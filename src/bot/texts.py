@@ -1156,8 +1156,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "cmd.undo": {"ru": "Снять последнюю запись", "en": "Undo the last record"},
     "cmd.finish": {"ru": "Завершить и собрать отчёт", "en": "Finish and build the report"},
     "cmd.mcp": {"ru": "Установка MCP", "en": "MCP setup"},
-    # --- установка MCP: команда для терминала (T209 → T253, решения D087,
-    #     D098, D099) ---
+    # --- установка MCP: команда для терминала (T209 → T253 → T261, решения
+    #     D087, D098, D099) ---
     #
     # Пункт устроен как в соседнем продукте: в чат приходит готовая строка,
     # которую человек вставляет в терминал. До T253 отличие было одно и по
@@ -1167,6 +1167,49 @@ TEXTS: dict[str, dict[str, str]] = {
     # целиком, а объяснение говорит про три вещи, которых человек не увидит
     # сам: показан один раз, повторный вызов убивает прежний, пересылать
     # нельзя.
+    #
+    # T261 добавил к этому вопрос «какой Claude»: строка была рабочая, но
+    # ставила сервер не туда, куда человек потом смотрел. Разбор — у
+    # `mcp.which_client` ниже.
+    # --- какой именно Claude подключаем (T261) ---
+    #
+    # Спрашивается, потому что узнать неоткуда: и приложение, и терминал живут
+    # на МАШИНЕ человека, а бот видит только переписку. Ровно здесь пункт и
+    # споткнулся — прислал рабочую команду `claude mcp add`, которая настраивает
+    # Claude Code, а владелец подключал Claude Desktop и потом не нашёл наш
+    # сервер в настройках приложения. Ни одна сторона при этом не ошиблась:
+    # команда сработала там, куда была написана.
+    #
+    # Обе команды разом не шлются, и дело не в длине сообщения: токен
+    # показывается один раз и стоит РОВНО в одном сообщении переписки
+    # (`tests/test_bot_mcp_setup.py`). Две команды — это либо вторая копия
+    # секрета в чате навсегда, либо одно сообщение с двумя строками, из
+    # которого человек выбирает нужную сам. Второе — то самое «догадайся»,
+    # против которого владелец возражал, и вдобавок опаснее: сообщение в
+    # телеграме копируется ЦЕЛИКОМ, то есть в терминал уехали бы обе.
+    #
+    # Токен выпускается ПОСЛЕ нажатия, а не на вызове пункта, и это не мелочь:
+    # выпуск гасит прежний, а открыть пункт посмотреть — не повод ломать уже
+    # работающую настройку.
+    "mcp.which_client": {
+        "ru": (
+            "Куда подключаем — в приложение Claude Desktop или в Claude Code в терминале?\n\n"
+            "Это разные места: приложение читает свой файл настроек и про команду для "
+            "терминала не знает ничего. Выберите, и придёт готовая команда."
+        ),
+        "en": (
+            "Which one are we connecting — the Claude Desktop app or Claude Code in the "
+            "terminal?\n\n"
+            "These are different places: the app reads its own settings file and knows "
+            "nothing about the terminal command. Pick one and the ready command will arrive."
+        ),
+    },
+    # Надписи называют клиента так, как он называется, и добавляют примету, по
+    # которой человек узнаёт себя: приложение или терминал. Без приметы кнопки
+    # различаются одним словом, и промахнуться на них так же легко, как было
+    # промахнуться без вопроса вообще.
+    "btn.mcp_desktop": {"ru": "Claude Desktop (приложение)", "en": "Claude Desktop (the app)"},
+    "btn.mcp_code": {"ru": "Claude Code (терминал)", "en": "Claude Code (terminal)"},
     "mcp.setup": {
         "ru": (
             "Подключение к проверкам из Claude. Следующим сообщением придёт готовая "
@@ -1204,14 +1247,128 @@ TEXTS: dict[str, dict[str, str]] = {
     # сервер именно так и говорит. Проверено подключением — `claude mcp list`
     # отвечает `Connected`. Мост остаётся в репозитории для случаев, где HTTP
     # недоступен, но человеку он не показывается.
+    #
+    # Эта строка настраивает КЛАУД КОД — консольный клиент, и только его.
+    # Claude Desktop про `claude mcp add` не знает: у него свой файл настроек
+    # (`mcp.command_desktop` ниже).
     "mcp.command": {
         "ru": (
-            'claude mcp add --transport http dodo-audit {url} '
+            "claude mcp add --transport http dodo-audit {url} "
             '--header "Authorization: Bearer {token}"'
         ),
         "en": (
-            'claude mcp add --transport http dodo-audit {url} '
+            "claude mcp add --transport http dodo-audit {url} "
             '--header "Authorization: Bearer {token}"'
+        ),
+    },
+    # Строка для Claude Desktop (T261). Приложение не умеет ходить в MCP по
+    # HTTP само — удалённый сервер оно подключает через `mcp-remote`, который
+    # запускается как обычный локальный сервер и проксирует в наш HTTP. Так же
+    # у владельца настроен соседний продукт, и так же это проверено запуском:
+    # `mcp-remote` с нашим адресом и токеном доносит запрос и приносит ответ.
+    #
+    # ПОЧЕМУ ЭТО НЕ `>` В ФАЙЛ. У человека в этом файле уже стоят свои серверы
+    # (у владельца — четыре). Перезапись снесла бы их молча, то есть сломала бы
+    # ему рабочие инструменты в обмен на подключение нашего. Поэтому команда
+    # читает файл, дописывает одну запись и кладёт обратно, а всё остальное —
+    # и чужие серверы, и прочие настройки вроде `globalShortcut` — переживает
+    # её нетронутым. Проверено на копии настоящего конфига: четыре прежних
+    # сервера и посторонний ключ целы.
+    #
+    # ПОЧЕМУ ПАДАЕТ, А НЕ ЧИНИТ. Если файл есть, но не разбирается как JSON,
+    # `JSON.parse` бросает, и команда не пишет НИЧЕГО. Соблазнительное
+    # `try/catch` с пустым объектом на этом месте означало бы ровно то, чего
+    # нельзя: тихо заменить непонятый конфиг человека на наш единственный
+    # сервер. Пусть лучше человек увидит отказ и спросит.
+    #
+    # ПОЧЕМУ ЗАПИСЬ ЧЕРЕЗ `.tmp` И `renameSync`. Обрыв посреди `writeFileSync`
+    # оставил бы обрезанный JSON — то есть сломал бы все серверы разом, включая
+    # те, что работали. Переименование в пределах каталога атомарно: файл либо
+    # прежний, либо новый целиком.
+    #
+    # ПОЧЕМУ `node`, А НЕ `python3`. Node здесь не лишняя зависимость: сам
+    # `mcp-remote` запускается через `npx`, то есть без Node подключение не
+    # заработает в любом случае. Python же на macOS может отсутствовать, и
+    # тогда команда упала бы там, где всё остальное было в порядке.
+    #
+    # ПОЧЕМУ `new Object()` ВМЕСТО `{}` — и это не вкусовщина. Строки каталога
+    # проходят через `str.format` (`t()` внизу файла), и литеральная фигурная
+    # скобка в тексте ломает подстановку: `{}` стало бы позиционным полем, а
+    # `{recursive:true}` — неизвестным ключом. Экранировать их удвоением можно,
+    # но тогда строка в исходнике перестаёт совпадать с тем, что человек
+    # вставит в терминал, и сверять её глазами станет нечем. `new Object()`
+    # даёт тот же объект и не содержит скобок вовсе, поэтому здесь их ровно
+    # две — `{url}` и `{token}`, обе наши.
+    "mcp.command_desktop": {
+        "ru": (
+            """node -e 'const os=require("os"),fs=require("fs");"""
+            """const d=os.homedir()+"/Library/Application Support/Claude";"""
+            """const f=d+"/claude_desktop_config.json";"""
+            """const c=fs.existsSync(f)?JSON.parse(fs.readFileSync(f,"utf8")):new Object();"""
+            """const s=new Object();s.command="npx";"""
+            """s.args=["-y","mcp-remote","{url}","--transport","http-only"];"""
+            """s.args.push("--header","Authorization:Bearer {token}");"""
+            """c.mcpServers=c.mcpServers||new Object();c.mcpServers["dodo-audit"]=s;"""
+            """const o=new Object();o.recursive=true;fs.mkdirSync(d,o);"""
+            """fs.writeFileSync(f+".tmp",JSON.stringify(c,null,2));fs.renameSync(f+".tmp",f);"""
+            """console.log("dodo-audit добавлен, перезапустите Claude Desktop")'"""
+        ),
+        "en": (
+            """node -e 'const os=require("os"),fs=require("fs");"""
+            """const d=os.homedir()+"/Library/Application Support/Claude";"""
+            """const f=d+"/claude_desktop_config.json";"""
+            """const c=fs.existsSync(f)?JSON.parse(fs.readFileSync(f,"utf8")):new Object();"""
+            """const s=new Object();s.command="npx";"""
+            """s.args=["-y","mcp-remote","{url}","--transport","http-only"];"""
+            """s.args.push("--header","Authorization:Bearer {token}");"""
+            """c.mcpServers=c.mcpServers||new Object();c.mcpServers["dodo-audit"]=s;"""
+            """const o=new Object();o.recursive=true;fs.mkdirSync(d,o);"""
+            """fs.writeFileSync(f+".tmp",JSON.stringify(c,null,2));fs.renameSync(f+".tmp",f);"""
+            """console.log("dodo-audit added, restart Claude Desktop")'"""
+        ),
+    },
+    # Сказано ДО команды, а не после: обе вещи здесь человек должен знать
+    # прежде, чем нажмёт ввод. Про macOS — потому что на Windows и Linux файл
+    # настроек лежит в другом месте, и выполненная там команда создала бы
+    # никому не нужный каталог, ничего не подключив; молчаливый промах ровно
+    # того сорта, из-за которого задача и заведена. Про сохранность чужих
+    # серверов — потому что человек, у которого их четыре, имеет право знать,
+    # что с ними станет, ДО того как выполнит присланное из чата.
+    "mcp.desktop_note": {
+        "ru": (
+            "Команда написана для macOS: она правит файл настроек приложения в "
+            "~/Library/Application Support/Claude. На Windows и Linux он лежит в другом "
+            "месте — там эта команда не подойдёт, напишите, и придёт строка под вашу "
+            "систему.\n\n"
+            "Уже настроенные у вас серверы она сохраняет: читает файл, дописывает наш и "
+            "кладёт обратно. Нужен установленный Node.js — без него не заработает и само "
+            "подключение."
+        ),
+        "en": (
+            "The command is written for macOS: it edits the app settings file in "
+            "~/Library/Application Support/Claude. On Windows and Linux that file lives "
+            "elsewhere — the command will not fit there, so write to us and you will get a "
+            "line for your system.\n\n"
+            "It keeps the servers you already have: it reads the file, adds ours and writes "
+            "it back. Node.js must be installed — without it the connection itself will not "
+            "work either."
+        ),
+    },
+    # Отдельным сообщением ПОСЛЕ команды, по той же причине, что и
+    # `mcp.replaced`: мимо последнего сообщения человек не пройдёт. И узнать
+    # это больше неоткуда — приложение читает файл настроек только при запуске,
+    # поэтому до перезапуска наш сервер в нём не появится, а выглядит это как
+    # «команда не сработала». Именно так владелец и решил.
+    "mcp.desktop_restart": {
+        "ru": (
+            "Теперь перезапустите Claude Desktop — полностью, не просто закройте окно. "
+            "Файл настроек приложение читает только при запуске, и до перезапуска нашего "
+            "сервера в нём не будет."
+        ),
+        "en": (
+            "Now restart Claude Desktop — fully, not just closing the window. The app reads "
+            "its settings file only at startup, so until you restart, our server will not be "
+            "there."
         ),
     },
     # Сказано отдельным сообщением ПОСЛЕ команды, а не внутри объяснения до
