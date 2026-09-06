@@ -54,6 +54,7 @@ from src.db.errors import DbError
 
 from ..config import BotSettings
 from ..keyboards import (
+    MCP_CLIENT_CODE,
     MCP_CLIENT_DESKTOP,
     MCP_CLIENT_PREFIX,
     mcp_client_keyboard,
@@ -219,7 +220,15 @@ def build_mcp_router(settings: BotSettings) -> Router:
             return
         await message.answer(t("mcp.which_client", lang), reply_markup=mcp_client_keyboard(lang))
 
-    @router.callback_query(F.data.startswith(MCP_CLIENT_PREFIX))
+    # Оба кода перечислены поимённо, а не `startswith(MCP_CLIENT_PREFIX)`:
+    # с префиксом любой третий клиент, заведённый позже, молча попадал бы в
+    # ветку терминала — и человек получал бы рабочую команду не для своего
+    # клиента, то есть ровно тот дефект, ради которого задача и заведена.
+    @router.callback_query(
+        F.data.in_(
+            {f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}", f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}"}
+        )
+    )
     async def on_client(callback: CallbackQuery) -> None:
         """Готовая строка настройки выбранного клиента — с личным токеном.
 
