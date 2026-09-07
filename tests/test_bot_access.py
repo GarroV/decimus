@@ -6,12 +6,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
 from aiogram.types import Chat, Message, TelegramObject, Update, User
 
 from src.bot.access import AccessMiddleware, is_allowed
+from src.bot.invites import StaticInvites, parse_invites
+from src.bot.roster import Roster
 
 
 def _user(user_id: int) -> User:
@@ -86,3 +89,108 @@ async def test_middleware_ignores_non_user_events() -> None:
     update = Update(update_id=1)
     result = await middleware(handler, update, {})
     assert result is None
+
+
+# --- привод по юзернейму (#230) ---------------------------------------------
+#
+# Числовой ID нового аудитора неоткуда взять заранее, поэтому стенд называет
+# юзернеймы, а ID бот узнаёт при первом контакте и дальше держится за него.
+
+
+def _named(user_id: int, username: str | None) -> User:
+    return User(id=user_id, is_bot=False, first_name="Т", username=username)
+
+
+def _message_from(user: User) -> Message:
+    return Message(
+        message_id=1,
+        date=0,  # type: ignore[arg-type]
+        chat=Chat(id=user.id, type="private"),
+        from_user=user,
+        text="/start",
+    )
+
+
+async def _passes(middleware: AccessMiddleware, user: User) -> bool:
+    async def handler(event: TelegramObject, data: dict[str, Any]) -> str:
+        return "handled"
+
+    return await middleware(handler, _message_from(user), {}) == "handled"
+
+
+def _middleware(
+    tmp_path: Path, invites: str, allowed: frozenset[int] = frozenset()
+) -> tuple[AccessMiddleware, Roster]:
+    roster = Roster.load(tmp_path)
+    return (
+        AccessMiddleware(
+            allowed_ids=allowed,
+            invites=StaticInvites(parse_invites(invites)),
+            roster=roster,
+        ),
+        roster,
+    )
+
+
+@pytest.mark.asyncio
+async def test_invited_user_is_recognised_on_first_contact(tmp_path: Path) -> None:
+    """Клик по «старту» — и человек внутри: ID взят из этого же апдейта."""
+    middleware, roster = _middleware(tmp_path, "apetrov:Anna Petrova")
+
+    assert await _passes(middleware, _named(555000111, "apetrov")) is True
+    assert roster.knows(555000111) is True
+    assert roster.names() == {555000111: "Anna Petrova"}
+
+
+@pytest.mark.asyncio
+async def test_recognised_user_passes_by_id_after_changing_username(tmp_path: Path) -> None:
+    """Дальше ключ — число: смена юзернейма доступа не отнимает."""
+    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
+    await _passes(middleware, _named(555000111, "apetrov"))
+
+    assert await _passes(middleware, _named(555000111, "anna_new")) is True
+
+
+@pytest.mark.asyncio
+async def test_released_username_does_not_let_a_stranger_in(tmp_path: Path) -> None:
+    """Главный тест задачи: приглашение срабатывает ОДИН раз.
+
+    Юзернейм владелец отпускает, и его занимает кто угодно. Если бы
+    приглашение работало повторно, посторонний с чужим бывшим юзернеймом
+    получил бы отчёты партнёров и историю проверок.
+    """
+    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
+    await _passes(middleware, _named(555000111, "apetrov"))
+
+    assert await _passes(middleware, _named(999999, "apetrov")) is False
+
+
+@pytest.mark.asyncio
+async def test_invitation_is_matched_case_insensitively(tmp_path: Path) -> None:
+    middleware, _ = _middleware(tmp_path, "@Ivanov:Ivan Ivanov")
+
+    assert await _passes(middleware, _named(222, "IVANOV")) is True
+
+
+@pytest.mark.asyncio
+async def test_user_without_username_is_not_let_in(tmp_path: Path) -> None:
+    """Юзернейма нет — сверять нечего, и это не повод пускать."""
+    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
+
+    assert await _passes(middleware, _named(333, None)) is False
+
+
+@pytest.mark.asyncio
+async def test_stranger_with_unknown_username_stays_silent(tmp_path: Path) -> None:
+    middleware, roster = _middleware(tmp_path, "apetrov:Anna Petrova")
+
+    assert await _passes(middleware, _named(444, "somebody")) is False
+    assert roster.knows(444) is False
+
+
+@pytest.mark.asyncio
+async def test_configured_id_still_passes_without_any_invites(tmp_path: Path) -> None:
+    """Прежняя дверь не тронута: ID из `ALLOWED_TELEGRAM_IDS` работает как раньше."""
+    middleware, _ = _middleware(tmp_path, "", allowed=frozenset({111222333}))
+
+    assert await _passes(middleware, _named(111222333, None)) is True

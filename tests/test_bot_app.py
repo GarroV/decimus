@@ -16,6 +16,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from types import SimpleNamespace
+
 from typing import Any
 
 import pytest
@@ -56,12 +59,18 @@ class PollingSpy:
 
 
 @pytest.fixture
-def polling(monkeypatch: pytest.MonkeyPatch) -> PollingSpy:
-    """Бот, поднятый без сети: настройки подставлены, опрос Telegram подменён."""
+def polling(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> PollingSpy:
+    """Бот, поднятый без сети: настройки подставлены, опрос Telegram подменён.
+
+    Проверка окружения отдаёт каталог состояния, а не `None`: подъём читает
+    оттуда связки доступа, узнанные по приглашениям (#230).
+    """
     spy = PollingSpy()
     monkeypatch.setattr(Dispatcher, "start_polling", spy)
     monkeypatch.setattr(app, "load_bot_settings", lambda: SETTINGS)
-    monkeypatch.setattr(app.domain, "check_environment", lambda: None)
+    monkeypatch.setattr(
+        app.domain, "check_environment", lambda: SimpleNamespace(state_dir=tmp_path)
+    )
 
     async def remember_commands(bot: Bot, commands: list[Any], **kwargs: Any) -> bool:
         spy.commands.append(commands)

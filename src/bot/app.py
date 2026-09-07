@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
@@ -30,9 +31,11 @@ from src import domain
 from .access import AccessMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
+from .invites import StaticInvites
 from .lang import chat_ui_lang
 from .material import MaterialStore
 from .pending import PendingStore
+from .roster import Roster
 from .routers import (
     build_correct_router,
     build_edit_router,
@@ -134,6 +137,7 @@ def build_dispatcher(
     *,
     album_window: float = ALBUM_WINDOW_SECONDS,
     on_material: MaterialHandler | None = None,
+    roster: Roster | None = None,
 ) -> Dispatcher:
     """Диспетчер со всеми роутерами и мидлварью доступа.
 
@@ -154,7 +158,14 @@ def build_dispatcher(
     # раствориться в aiogram (T126).
     dispatcher.errors.register(on_unexpected_error)
 
-    access = AccessMiddleware(settings.allowed_ids)
+    # Имя приглашённого названо приглашением, но ручная запись сильнее: правка
+    # `AUDITOR_NAMES` обязана перебивать то, что когда-то стояло в приглашении,
+    # иначе исправить имя в шапке отчёта можно было бы только правкой файла
+    # состояния (#230).
+    if roster is not None:
+        settings = replace(settings, auditor_names={**roster.names(), **settings.auditor_names})
+
+    access = AccessMiddleware(settings.allowed_ids, StaticInvites(settings.invites), roster)
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
 
@@ -355,10 +366,14 @@ async def start_polling() -> None:
     settings = load_bot_settings()
     # Методика проверяется до первого сообщения: пустой чек-лист читался бы как
     # честный ответ «нарушений нет», а узнать об этом на точке — поздно.
-    domain.check_environment()
+    domain_settings = domain.check_environment()
+    # Связки «юзернейм → ID» читаются один раз при подъёме и дальше
+    # дополняются самой мидлварью, сразу ложась на диск (#230). Каталог
+    # состояния здесь уже проверен — раньше него читать нечего.
+    roster = Roster.load(domain_settings.state_dir)
     bot = create_bot(settings)
     await announce_commands(bot, circle_at_startup(settings))
-    dispatcher = build_dispatcher(settings)
+    dispatcher = build_dispatcher(settings, roster=roster)
     log_startup(settings)
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)

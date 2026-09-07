@@ -13,6 +13,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 
 from .errors import BotConfigError, BotTextError
+from .invites import INVITES_VAR, Invite, parse_invites
 from .texts import DEFAULT_UI_LANG, UI_LANG_VAR, default_ui_lang
 
 # Подавление ниже: S105 видит «TOKEN» в имени и считает строку зашитым секретом.
@@ -79,6 +80,9 @@ class BotSettings:
     mcp_owner_id: int | None = None
     #: Чью историю открывают выпущенные этим ботом токены.
     mcp_tenant: str = DEFAULT_MCP_TENANT
+    #: Кого ждём по юзернейму, пока его числовой ID неизвестен (#230). Пустая
+    #: карта — законное состояние: стенд, куда никого не приглашают.
+    invites: Mapping[str, Invite] = field(default_factory=dict)
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -110,7 +114,9 @@ def _parse_allowed_ids(raw: str) -> frozenset[int]:
     return frozenset(ids)
 
 
-def _parse_auditor_names(raw: str, allowed_ids: frozenset[int]) -> dict[int, str]:
+def _parse_auditor_names(
+    raw: str, allowed_ids: frozenset[int], *, invited: bool = False
+) -> dict[int, str]:
     """Разобрать карту «ID:имя» через запятую.
 
     Кривая запись — отказ на старте, а не пропуск: пропущенная строка означала
@@ -118,6 +124,13 @@ def _parse_auditor_names(raw: str, allowed_ids: frozenset[int]) -> dict[int, str
     это можно только по готовому отчёту. По той же причине отвергается ID,
     которого нет в списке разрешённых: две разъезжающиеся копии списка — то,
     из-за чего имя перестаёт подставляться без единого сообщения об ошибке.
+
+    **Приглашения снимают эту сверку, пока они заданы (#230).** ID
+    приглашённого до его первого сообщения не знает никто — ни стенд, ни бот, —
+    поэтому список разрешённых перестаёт быть полным перечнем тех, чьё имя
+    уместно назвать. Проверять по неполному списку означало бы отказывать
+    старту из-за верной записи. Как только приглашений нет, прежняя гарантия
+    возвращается целиком.
     """
     names: dict[int, str] = {}
     for chunk in raw.split(","):
@@ -137,7 +150,7 @@ def _parse_auditor_names(raw: str, allowed_ids: frozenset[int]) -> dict[int, str
             )
         if not value:
             raise BotConfigError(f"{AUDITOR_NAMES_VAR}: у ID {key} пустое имя")
-        if int(key) not in allowed_ids:
+        if not invited and int(key) not in allowed_ids:
             raise BotConfigError(
                 f"{AUDITOR_NAMES_VAR}: ID {key} не входит в {ALLOWED_IDS_VAR}. "
                 f"Имя без доступа никогда не подставится"
@@ -209,7 +222,10 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         raise BotConfigError(
             f"Режим «{mode}» ({MODE_VAR}) не поддержан. Доступно: {', '.join(KNOWN_MODES)}"
         )
-    names = _parse_auditor_names(src.get(AUDITOR_NAMES_VAR) or "", allowed_ids)
+    invites = parse_invites(src.get(INVITES_VAR) or "")
+    names = _parse_auditor_names(
+        src.get(AUDITOR_NAMES_VAR) or "", allowed_ids, invited=bool(invites)
+    )
     return BotSettings(
         token=token,
         allowed_ids=allowed_ids,
@@ -217,5 +233,6 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         ui_lang=_parse_ui_lang(src),
         auditor_names=names,
         mcp_owner_id=_parse_mcp_owner_id(src.get(MCP_OWNER_ID_VAR) or "", allowed_ids),
+        invites=invites,
         mcp_tenant=_parse_mcp_tenant(src.get(MCP_TENANT_VAR) or ""),
     )
