@@ -14,6 +14,7 @@ from __future__ import annotations
 import pytest
 
 from src.mcp.config import (
+    MCP_HOST_VAR,
     MCP_TOKENS_VAR,
     MIN_TOKEN_LENGTH,
     Settings,
@@ -190,3 +191,53 @@ def test_годный_порт_берётся_как_назван(порт: str)
     после которой годный порт молча заменяется значением по умолчанию, прошла
     бы незамеченной."""
     assert _настройки(MCP_PORT=порт).port == int(порт.strip())
+
+
+# --- пустая карта при живых личных токенах (#214) -----------------------------
+#
+# `MCP_TOKENS` требовалась непустой, потому что до T253 она была единственной
+# дверью: пустая означала «сервер открыт». После T253 доступ выдаёт бот —
+# токен личный, живёт отпечатком в базе и сверяется второй дверью
+# (`_tenant_from_store`). Пустая карта теперь означает «сторонних токенов нет,
+# ходят только по личным», и это законная настройка площадки.
+#
+# Заметно это стало на T255: сервер стал сервисом с `restart: unless-stopped`,
+# и отказ на старте перестал видеть человек — контейнер перезапускался бы
+# бесконечно, а стенд снаружи выглядел бы поднятым.
+
+
+def test_пустая_карта_с_личными_токенами_поднимает_сервер() -> None:
+    """Площадка не обязана держать сторонний токен ради старта."""
+    settings = load_settings(
+        {
+            MCP_TOKENS_VAR: "",
+            "DATABASE_URL": "postgresql://user@host/db",
+            MCP_HOST_VAR: "127.0.0.1",
+        }
+    )
+
+    assert settings.tokens == {}
+    assert settings.tenants == ()
+
+
+def test_пустая_карта_без_базы_по_прежнему_отказ() -> None:
+    """Обе двери закрыты — сервер поднялся бы открытым, и это по-прежнему запрещено."""
+    with pytest.raises(McpConfigError) as отказ:
+        load_settings({MCP_TOKENS_VAR: "", MCP_HOST_VAR: "127.0.0.1"})
+
+    сказано = str(отказ.value)
+    assert MCP_TOKENS_VAR in сказано
+    assert "DATABASE_URL" in сказано, "не сказано про вторую дверь — человек не поймёт, чего хватит"
+
+
+def test_пустая_база_в_переменной_дверью_не_считается() -> None:
+    """`DATABASE_URL=` (пусто) — это отсутствие базы, а не её наличие."""
+    with pytest.raises(McpConfigError):
+        load_settings({MCP_TOKENS_VAR: "", "DATABASE_URL": "   ", MCP_HOST_VAR: "127.0.0.1"})
+
+
+def test_непустая_карта_без_базы_работает_как_прежде() -> None:
+    """Стенд без блока `db` — законный: карта из `.env` остаётся рабочей дверью."""
+    settings = load_settings({MCP_TOKENS_VAR: f"partner={'z' * 32}", MCP_HOST_VAR: "127.0.0.1"})
+
+    assert settings.tenants == ("partner",)
