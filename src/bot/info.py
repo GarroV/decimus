@@ -32,12 +32,16 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from datetime import date
 
 from src import domain
 from src.domain.errors import DomainError
+
+# Разбор даты живёт своим модулем (#220), но отдаётся наружу отсюда: зовущий код
+# и тесты знают его по этому имени, и переносить их за ним незачем.
+from .dates import DATE_FORMAT, parse_date
+
+__all__ = ["DATE_FORMAT", "FIELDS", "InfoField", "fields_to_ask", "parse_date", "question"]
 
 #: Свободный текст: пишется, наговаривается или приходит подписью к кадру.
 KIND_TEXT = "text"
@@ -99,51 +103,3 @@ def fields_to_ask(lang: str, *, chat_id: int) -> tuple[tuple[InfoField, str], ..
     return tuple(asked)
 
 
-#: Разделители даты, которые встречаются в живой записи: точка, дефис, косая.
-_DATE = re.compile(r"^\s*(\d{1,4})\s*[.\-/]\s*(\d{1,2})\s*[.\-/]\s*(\d{2,4})")
-#: Время рядом с датой: «18:30», «18 30», «в 18:30».
-_TIME = re.compile(r"(?<!\d)([01]?\d|2[0-3])\s*[:.\s]\s*([0-5]\d)(?!\d)")
-
-#: Как дата уезжает в отчёт партнёру. Совпадает с тем, как их печатает движок
-#: (`engine/report.py: fmt_date`), и письмо такую строку пропускает как есть —
-#: то есть срок плана действий читается человеком, а не машиной.
-DATE_FORMAT = "%d.%m.%Y"
-
-
-def parse_date(text: str, *, today: date | None = None) -> str | None:
-    """Разобрать дату в записываемый вид — или ничего, если это не дата.
-
-    Форматы приняты те, которыми люди пишут дату в чате: `14.09.2026`,
-    `14-09-2026`, `14/09/2026` и `2026-09-14`. Двузначный год достраивается до
-    текущего века: `14.09.26` — это 2026 год, а не 26-й.
-
-    Время, если оно названо, остаётся рядом с датой: `INF05` спрашивает дату **и
-    время** созвона, и терять половину ответа нельзя.
-
-    Ничего не возвращается там, где разобрать не удалось. Молча записать
-    неразобранное значило бы отправить партнёру в отчёт «завтра после обеда» в
-    поле, которое читает письмо как срок.
-    """
-    hit = _DATE.match(text)
-    if hit is None:
-        return None
-    first, second, third = (int(part) for part in hit.groups())
-    if len(hit.group(1)) == 4:
-        year, month, day = first, second, third
-    else:
-        day, month, year = first, second, third
-        if year < 100:
-            century = (today or date.today()).year // 100 * 100
-            year += century
-    try:
-        parsed = date(year, month, day)
-    except ValueError:
-        # Разобрали числа, но такой даты нет: 31.02 или 45-й месяц. Это не
-        # дата, и записывать её нельзя ровно так же, как неразобранный текст.
-        return None
-    stamp = parsed.strftime(DATE_FORMAT)
-    tail = text[hit.end() :]
-    clock = _TIME.search(tail)
-    if clock is None:
-        return stamp
-    return f"{stamp} {int(clock.group(1)):02d}:{clock.group(2)}"
