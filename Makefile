@@ -1,4 +1,4 @@
-.PHONY: check test test-honest regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
+.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -114,6 +114,23 @@ demo-down:
 # не меняет.
 migrate:
 	$(VENV)/python -m src.db.migrate
+
+# Сборка образов бота и MCP-сервера с версией внутри (#229).
+#
+# Существует потому, что версию нельзя вспоминать руками. `BUILD_SHA` приходит
+# в сборку из окружения (docker-compose.yml), а образ, собранный без неё,
+# поднимается УСПЕШНО и отвечает «сборка: неизвестна» — то есть единственный
+# признак, по которому раскатанное отличается от собранного мимо процедуры,
+# пропадает молча. Так и вышло на раскатке 07.09.2026: собрано по доке, где
+# переменная не упоминалась ни разу.
+#
+# Пара build + up, а не `up --build`: последний пересборку ПРОПУСКАЕТ —
+# проверено на площадке 06.09.2026, после него в образе не оказалось файлов,
+# появившихся в новом коде. Здесь только сборка; подъём — отдельным шагом,
+# потому что раскатка на живой продукт идёт по своей процедуре и по «да»
+# владельца (docs/08-deploy.md).
+image:
+	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp
 
 # Стенд базы одной командой (T090): поднять Postgres рядом с ботом, дождаться
 # ГОТОВНОСТИ БАЗЫ (`--wait` идёт по healthcheck, а не по факту запуска
