@@ -54,11 +54,31 @@ _PRAISE_PATTERNS = (
     re.compile(r"нет\s+нареканий", re.IGNORECASE),
 )
 
+#: Служебная оговорка вместо формулировки (#224). На живом прогоне 06.09.2026
+#: в запись уехало «Предлагаемый вариант, если <условие>: <находка>» — модель
+#: написала рассуждение о применимости своего же варианта, а фиксация приняла
+#: его за текст записи и отправила партнёру.
+#:
+#: Ловится НАЧАЛО строки, а не слово где угодно: «вариант», «если» и «уточните»
+#: встречаются и внутри честной находки («выложен вариант меню без цен»,
+#: «дверь не закрывается, если полка выдвинута»), и пометка на них была бы
+#: шумом. Шумная пометка перестаёт читаться, а вместе с ней перестают читаться
+#: и настоящие.
+_ASIDE_PATTERNS = (
+    re.compile(r"^\s*предлагаем(ый|ая)\s+(вариант|формулировк)", re.IGNORECASE),
+    re.compile(r"^\s*вариант\s+(формулировки|записи|текста)", re.IGNORECASE),
+    re.compile(r"^\s*(могу|можно)\s+записать", re.IGNORECASE),
+    re.compile(r"^\s*(уточните|подскажите|скажите)\b", re.IGNORECASE),
+    re.compile(r"^\s*если\s+[^,]{,60},?\s*(то\s*)?:", re.IGNORECASE),
+    re.compile(r"^\s*(я\s+бы|предлагаю)\s+(записа|сформулирова)", re.IGNORECASE),
+)
+
 #: Значения `Candidate.flags`. Строки, а не enum: пометки читает только
 #: человек (текст рядом с записью), машинного потребителя у них нет.
 SCALE_BEYOND_FRAME = "масштаб-за-кадром"
 DAMAGE_WITHOUT_BASIS = "характер-повреждения-не-обоснован"
 UNWARRANTED_PRAISE = "похвала-без-основания"
+SERVICE_ASIDE = "служебная-оговорка"
 
 
 def check_wording(wording: str, reason: str) -> tuple[str, ...]:
@@ -75,4 +95,6 @@ def check_wording(wording: str, reason: str) -> tuple[str, ...]:
         flags.append(DAMAGE_WITHOUT_BASIS)
     if any(p.search(wording) for p in _PRAISE_PATTERNS) and not reason.strip():
         flags.append(UNWARRANTED_PRAISE)
+    if any(p.search(wording) for p in _ASIDE_PATTERNS):
+        flags.append(SERVICE_ASIDE)
     return tuple(flags)
