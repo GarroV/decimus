@@ -1,12 +1,21 @@
-"""Настройка подключения к MCP и небольшая админка вокруг неё (T209, T253).
+"""Настройка подключения к MCP и небольшая админка вокруг неё (T209, T253, T261).
 
 Решения D087 (пункт меню и готовая строка), D098 (личный токен), D099 (пункт
 виден не всем).
 
-**Что человек получает.** Готовую строку настройки Claude Desktop со своим
+**Что человек получает.** Готовую строку настройки своего Claude со своим
 личным токеном внутри — вставил в терминал, и подключение есть. Токен здесь
 деталь строки, а не отдельный предмет разговора: человек не «получает токен», а
 получает работающую настройку.
+
+**Клиентов два, и они настраиваются по-разному (T261).** Claude Desktop —
+приложение со своим файлом настроек; Claude Code — консольный клиент, который
+про этот файл ничего не знает и держит своё. До T261 пункт слал строку для
+Claude Code всем подряд: она работала, но настраивала не тот клиент, и владелец
+не нашёл наш сервер в настройках приложения. Угадать здесь нечем — оба клиента
+живут на машине человека, а бот видит переписку, — поэтому бот спрашивает, а
+строку печатает уже адресно. Обе разом не шлются: токен обязан стоять ровно в
+одном сообщении (`tests/test_bot_mcp_setup.py`).
 
 **Чего не было до T253.** Токен заводился руками в `.env` записью
 «арендатор=токен» (`src/mcp/config.py`), принадлежал СТОРОНЕ и открывал всю её
@@ -37,13 +46,19 @@ import asyncio
 import logging
 import os
 
-from aiogram import Bot, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
-from aiogram.types import Message, User
+from aiogram.types import CallbackQuery, Message, User
 
 from src.db.errors import DbError
 
 from ..config import BotSettings
+from ..keyboards import (
+    MCP_CLIENT_CODE,
+    MCP_CLIENT_DESKTOP,
+    MCP_CLIENT_PREFIX,
+    mcp_client_keyboard,
+)
 from ..lang import chat_ui_lang
 from ..texts import t
 
@@ -121,11 +136,24 @@ async def _guard(message: Message, settings: BotSettings) -> User | None:
     означает «не смогли посмотреть», а не «вам нельзя». Пустить при этом
     внутрь нельзя тем более — поэтому ответ честно говорит про недоступность.
     """
+    return await _guard_user(message, message.from_user, settings)
+
+
+async def _guard_user(message: Message, user: User | None, settings: BotSettings) -> User | None:
+    """То же самое, но человек называется отдельно от сообщения-ответа (T261).
+
+    Нужно нажатию: у него отправитель — сам человек (`callback.from_user`), а
+    сообщение, в которое отвечать, — БОТА, и `from_user` у него бот. Проверять
+    круг по нему значило бы не проверять его вовсе.
+
+    Заслон на нажатии не лишний: кнопка остаётся в переписке навсегда, и её
+    вправе нажать тот, у кого доступ уже отозвали. Проверка меню его не
+    остановит — меню он не открывал.
+    """
     lang = chat_ui_lang(message.chat.id)
     if settings.mcp_owner_id is None:
         await message.answer(t("mcp.circle_unset", lang))
         return None
-    user = message.from_user
     if user is None:
         # Обновление без отправителя: отвечать некому и выпускать не на кого.
         return None
@@ -180,21 +208,53 @@ def build_mcp_router(settings: BotSettings) -> Router:
 
     @router.message(Command(MCP_COMMAND))
     async def on_mcp(message: Message) -> None:
-        """Готовая строка настройки с личным токеном — тремя сообщениями.
+        """Вопрос «какой Claude» — и ничего кроме него (T261).
+
+        Токен здесь НЕ выпускается намеренно. Выпуск гасит прежний, то есть
+        ломает уже сделанную настройку, а открыть пункт и посмотреть — не
+        повод её ломать. До T261 так и было: вызов пункта наказывал за
+        любопытство, и узнавал об этом человек из третьего сообщения.
+        """
+        lang = chat_ui_lang(message.chat.id)
+        if await _guard(message, settings) is None:
+            return
+        await message.answer(t("mcp.which_client", lang), reply_markup=mcp_client_keyboard(lang))
+
+    # Оба кода перечислены поимённо, а не `startswith(MCP_CLIENT_PREFIX)`:
+    # с префиксом любой третий клиент, заведённый позже, молча попадал бы в
+    # ветку терминала — и человек получал бы рабочую команду не для своего
+    # клиента, то есть ровно тот дефект, ради которого задача и заведена.
+    @router.callback_query(
+        F.data.in_(
+            {f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}", f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}"}
+        )
+    )
+    async def on_client(callback: CallbackQuery) -> None:
+        """Готовая строка настройки выбранного клиента — с личным токеном.
 
         Разными сообщениями не для красоты: в телеграме копируется сообщение
         ЦЕЛИКОМ одним движением, и команда, склеенная с объяснением, приезжала
         бы в терминал вместе с ним. Здесь это важнее прежнего — в строке стоит
         настоящий токен.
 
-        Порядок: объяснение, команда, и только потом — что прежний токен
-        отозван. Последнее идёт после, а не до: человек, вызвавший пункт второй
-        раз, первое сообщение читает по диагонали, а мимо последнего не пройдёт.
+        Порядок: объяснение, чем эта команда особенная (у приложения — что она
+        для macOS и что чужие серверы уцелеют), сама команда, что надо
+        перезапустить, и только потом — что прежний токен отозван. Всё, мимо
+        чего пройти нельзя, стоит ПОСЛЕ команды: первое сообщение человек,
+        пришедший сюда второй раз, читает по диагонали.
         """
+        await callback.answer()
+        message = callback.message
+        if not isinstance(message, Message):
+            # Нажатие без сообщения (кнопка старше 48 часов, инлайн-режим):
+            # отвечать некуда. Токен при этом не выпускается — иначе человек
+            # остался бы с погашенным прежним и без нового.
+            return
         lang = chat_ui_lang(message.chat.id)
-        user = await _guard(message, settings)
+        user = await _guard_user(message, callback.from_user, settings)
         if user is None:
             return
+        desktop = (callback.data or "").removeprefix(MCP_CLIENT_PREFIX) == MCP_CLIENT_DESKTOP
         from src.db.mcp_access import issue_token
 
         try:
@@ -206,7 +266,12 @@ def build_mcp_router(settings: BotSettings) -> Router:
             await message.answer(t("mcp.unavailable", lang))
             return
         await message.answer(t("mcp.setup", lang))
-        await message.answer(t("mcp.command", lang, url=setup_url(lang), token=выпущен.value))
+        if desktop:
+            await message.answer(t("mcp.desktop_note", lang))
+        строка = "mcp.command_desktop" if desktop else "mcp.command"
+        await message.answer(t(строка, lang, url=setup_url(lang), token=выпущен.value))
+        if desktop:
+            await message.answer(t("mcp.desktop_restart", lang))
         if выпущен.replaced_previous:
             await message.answer(t("mcp.replaced", lang))
 

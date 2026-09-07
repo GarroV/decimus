@@ -495,3 +495,36 @@ def info_heard_keyboard(lang: str) -> InlineKeyboardMarkup:
     builder.button(text=t("btn.info_skip", lang), callback_data=INFO_SKIP_CALLBACK)
     builder.adjust(2)
     return builder.as_markup()
+
+
+# --- установка MCP: какой клиент настраиваем (T261) --------------------------
+
+#: Код клиента в `callback_data`, а не его название: по общему принципу проекта
+#: сущности связываются кодами. Надписи на кнопках переводятся и правятся
+#: (`btn.mcp_desktop`, `btn.mcp_code`), коды — нет.
+MCP_CLIENT_PREFIX = "mcp:client:"
+MCP_CLIENT_DESKTOP = "desktop"
+MCP_CLIENT_CODE = "code"
+
+
+def mcp_client_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """Приложение или терминал: два клиента, и выбирает человек (T261).
+
+    Угадать нечем: и Claude Desktop, и Claude Code стоят на МАШИНЕ человека, а
+    бот видит только переписку. Прежняя редакция не спрашивала и слала команду
+    для терминала всем — владелец настраивал приложение и нашего сервера в нём
+    не увидел.
+
+    По кнопке на строку, а не две в ряд: надписи длинные, и в ряд телеграм
+    обрежет обе ровно по той примете («приложение», «терминал»), ради которой
+    они и написаны.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=t("btn.mcp_desktop", lang), callback_data=f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}"
+    )
+    builder.button(
+        text=t("btn.mcp_code", lang), callback_data=f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}"
+    )
+    builder.adjust(1)
+    return builder.as_markup()
