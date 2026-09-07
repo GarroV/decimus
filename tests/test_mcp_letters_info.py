@@ -91,7 +91,7 @@ def _строка() -> InspectionRow:
         id="11111111-1111-1111-1111-111111111111",
         tenant_code="укашка",
         unit_name="Белград-1",
-        chat_id=744230399,
+        chat_id=100500100,
         kind="planned",
         inspection_date=date(2026, 8, 19),
         report_lang="ru",

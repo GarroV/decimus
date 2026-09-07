@@ -57,7 +57,7 @@ description: >
 
 ```
 AUDIT init --unit "Тбилиси-3" --city "Тбилиси" --partner "Georgia Foods LLC" \
-  --contact "Георгий" --auditor "Павел Васько" --type "Плановая" --lang ru
+  --contact "Георгий" --auditor "Имя Фамилия" --type "Плановая" --lang ru
 ```
 
 Если в папке уже лежит `inspection.json`, не перезаписывай его молча: покажи через
