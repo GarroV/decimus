@@ -335,7 +335,11 @@ async def _open_manual(
         return
     _, report_lang = chat_langs(chat_id)
     try:
-        items = await asyncio.to_thread(manual_candidates, zone, lang=report_lang, chat_id=chat_id)
+        # Слова аудитора уходят в перечень поиском (#226): без них он был бы
+        # всем чек-листом, а с ними — единицами пунктов про сказанный объект.
+        items = await asyncio.to_thread(
+            manual_candidates, zone, note=proposal.note, lang=report_lang, chat_id=chat_id
+        )
     except RecognizeError as exc:
         # Сырой текст исключения — в журнал, а не в чат (тот же принцип, что
         # у отказа движка, T127): в нём бывают пути на диске и ссылки на
