@@ -497,34 +497,28 @@ def info_heard_keyboard(lang: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-# --- установка MCP: какой клиент настраиваем (T261) --------------------------
+# --- установка MCP: согласие на выпуск токена (T261 → #222) -------------------
 
-#: Код клиента в `callback_data`, а не его название: по общему принципу проекта
-#: сущности связываются кодами. Надписи на кнопках переводятся и правятся
-#: (`btn.mcp_desktop`, `btn.mcp_code`), коды — нет.
-MCP_CLIENT_PREFIX = "mcp:client:"
-MCP_CLIENT_DESKTOP = "desktop"
-MCP_CLIENT_CODE = "code"
+#: Код в `callback_data`, а не название: по общему принципу проекта сущности
+#: связываются кодами — надписи переводятся и правятся, коды нет.
+#:
+#: Код кнопки, по которой приходит команда настройки. Кнопка одна (#222,
+#: решение D103): развилку «какой Claude» владелец снял, поддерживается
+#: Claude Desktop. Сама кнопка осталась не для выбора, а как согласие — по
+#: нажатию выпускается токен, а выпуск гасит прежний и ломает уже работающую
+#: настройку. Надпись кнопки — в каталоге (`btn.mcp_send`), код — нет.
+MCP_SETUP_SEND = "mcp:setup:send"
 
 
-def mcp_client_keyboard(lang: str) -> InlineKeyboardMarkup:
-    """Приложение или терминал: два клиента, и выбирает человек (T261).
+def mcp_setup_keyboard(lang: str) -> InlineKeyboardMarkup:
+    """Одна кнопка: прислать команду настройки.
 
-    Угадать нечем: и Claude Desktop, и Claude Code стоят на МАШИНЕ человека, а
-    бот видит только переписку. Прежняя редакция не спрашивала и слала команду
-    для терминала всем — владелец настраивал приложение и нашего сервера в нём
-    не увидел.
-
-    По кнопке на строку, а не две в ряд: надписи длинные, и в ряд телеграм
-    обрежет обе ровно по той примете («приложение», «терминал»), ради которой
-    они и написаны.
+    Ряд из одной кнопки, а не текстовая просьба «напишите да»: нажатие видно
+    боту как событие, а «да» пришлось бы разбирать среди обычной речи аудитора
+    — в чате, где человек диктует находки, это ошибка, которую нельзя не
+    сделать.
     """
     builder = InlineKeyboardBuilder()
-    builder.button(
-        text=t("btn.mcp_desktop", lang), callback_data=f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}"
-    )
-    builder.button(
-        text=t("btn.mcp_code", lang), callback_data=f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}"
-    )
+    builder.button(text=t("btn.mcp_send", lang), callback_data=MCP_SETUP_SEND)
     builder.adjust(1)
     return builder.as_markup()

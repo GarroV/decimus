@@ -32,13 +32,8 @@ T261 добавил к этому вопрос «какой Claude» и втор
 
 from __future__ import annotations
 
-import json
 import logging
-import os
 import re
-import shutil
-import subprocess
-from pathlib import Path
 
 import pytest
 from bot_harness import (
@@ -62,9 +57,7 @@ from src.bot.app import (
 )
 from src.bot.config import UI_LANG_VAR, BotSettings
 from src.bot.keyboards import (
-    MCP_CLIENT_CODE,
-    MCP_CLIENT_DESKTOP,
-    MCP_CLIENT_PREFIX,
+    MCP_SETUP_SEND,
 )
 from src.bot.routers.mcp import (
     MCP_ADD_COMMAND,
@@ -116,11 +109,13 @@ SETTINGS_NO_CIRCLE = BotSettings(
     mcp_owner_id=None,
 )
 
-#: Токен из напечатанной строки. Ищется ровно там, где стоит в команде, а не
+#: Токен из напечатанной команды. Ищется ровно там, где стоит, а не
 #: «где-нибудь в тексте»: сверять надо то, что человек вставит в терминал.
-#: Формат заголовка, а не переменной окружения: Claude ходит в MCP по HTTP сам,
-#: и мост человеку больше не нужен (задача T257).
-_TOKEN_IN_COMMAND = re.compile(r'Bearer ([^"\s]+)')
+#:
+#: Именно `DODO_MCP_TOKEN`, а не `Bearer`: с #222 токен уезжает в `env` записи
+#: настроек, а слово `Bearer` в команде тоже есть — внутри моста, в шаблоне
+#: `printf`, где вместо токена стоит `%s`. Прежний образец ловил бы его.
+_TOKEN_IN_COMMAND = re.compile(r'DODO_MCP_TOKEN\\":\\"([^"\\]+)')
 
 
 def выданный_токен(текст: str) -> str:
@@ -135,25 +130,22 @@ async def позвать(dp: object, bot: object, команда: str, *, кто
     await feed(dp, bot, text_message(команда, user_id=кто, chat_id=кто))
 
 
-async def настроить(
-    dp: object, bot: object, *, кто: int = AUDITOR_ID, клиент: str = MCP_CLIENT_DESKTOP
-) -> None:
-    """Пройти пункт целиком: вызвать и выбрать клиента (T261).
+async def настроить(dp: object, bot: object, *, кто: int = AUDITOR_ID) -> None:
+    """Пройти пункт целиком: вызвать и нажать кнопку (T261 → #222).
 
-    Клиент по умолчанию — приложение: им пользуется владелец, и на нём задача
-    заведена. Всё, что клиента не касается (токен, круг, язык), проверяется на
-    нём же, чтобы не гонять оба там, где разницы нет.
+    Два шага, а не один: по кнопке выпускается токен, и вызов пункта сам по
+    себе прежнюю настройку не ломает.
     """
     await позвать(dp, bot, COMMAND, кто=кто)
-    await feed(dp, bot, callback_query(f"{MCP_CLIENT_PREFIX}{клиент}", user_id=кто, chat_id=кто))
+    await feed(dp, bot, callback_query(MCP_SETUP_SEND, user_id=кто, chat_id=кто))
 
 
 def строка_настройки(session: RecordingSession) -> str:
     """Сообщение с командой — то самое, которое человек копирует.
 
-    Ищется по токену, а не по номеру в переписке: сообщений у приложения и у
-    терминала разное число, и номер разъехался бы при первой же правке текстов.
-    Заодно это и проверка: строка настройки в переписке ровно одна.
+    Ищется по токену, а не по номеру в переписке: номер разъехался бы при
+    первой же правке текстов. Заодно это и проверка: команда настройки в
+    переписке ровно одна.
     """
     тексты = list(session.texts)
     найдено = [текст for текст in тексты if _TOKEN_IN_COMMAND.search(текст)]
@@ -161,19 +153,19 @@ def строка_настройки(session: RecordingSession) -> str:
     return найдено[0]
 
 
-#: Начало команды у каждого клиента. Терминальный клиент настраивается своей же
-#: командой, приложение — правкой файла настроек, и перепутать их нельзя: ровно
-#: на этом пункт и споткнулся (T261).
-НАЧАЛО_КОМАНДЫ = {MCP_CLIENT_DESKTOP: "node -e ", MCP_CLIENT_CODE: "claude mcp add"}
+#: Начало присланной команды. Она выполняется в отдельной оболочке — так у
+#: человека в сессии не остаётся ни наших переменных с токеном, ни `set -eu`
+#: (`src/bot/mcp_setup.py`). Сама команда проверяется запуском в
+#: `tests/test_bot_mcp_command.py`; здесь — что в переписку уехала именно она.
+НАЧАЛО_КОМАНДЫ = "bash <<'DODO_SETUP'"
 
 
 # --- то, ради чего задача заведена ------------------------------------------
 
 
 @requires_db
-@pytest.mark.parametrize("клиент", [MCP_CLIENT_DESKTOP, MCP_CLIENT_CODE])
 async def test_строка_настройки_приходит_с_личным_токеном_звавшего(
-    domain_env: object, db_env: str, monkeypatch: pytest.MonkeyPatch, клиент: str
+    domain_env: object, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Суть T253: токен в строке — ТОТ САМЫЙ, что выпущен на этого человека.
 
@@ -182,9 +174,6 @@ async def test_строка_настройки_приходит_с_личным_
     T253 не существовало вовсе, и она здесь единственное, что изменилось по
     существу.
 
-    Оба клиента разом (T261): токен и адрес в строку подставляются одинаково, а
-    подставиться они могли бы в одну и не подставиться в другую — ровно тем
-    молчаливым способом, которым пункт уже один раз промахнулся.
     """
     from src.db.mcp_access import resolve_token
 
@@ -192,10 +181,10 @@ async def test_строка_настройки_приходит_с_личным_
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await настроить(dp, bot, клиент=клиент)
+    await настроить(dp, bot)
 
     команда = строка_настройки(session)
-    assert команда.startswith(НАЧАЛО_КОМАНДЫ[клиент]), "пришла команда не для этого клиента"
+    assert команда.startswith(НАЧАЛО_КОМАНДЫ), "пришла не команда настройки"
     assert "ПУТЬ" not in команда and "PATH_TO" not in команда, (
         "в команде осталась заглушка: человек не обязан ничего подставлять"
     )
@@ -250,28 +239,31 @@ async def test_при_первой_выдаче_про_отзыв_не_гово�
     assert t("mcp.replaced", "ru") not in session.texts
 
 
-# --- какой именно Claude настраиваем (T261) ----------------------------------
+# --- пункт спрашивает не «какой Claude», а согласие (T261 → #222, D103) ------
 
 
 @requires_db
-async def test_пункт_сначала_спрашивает_какой_клиент(domain_env: object, db_env: str) -> None:
-    """То, ради чего задача заведена: клиента выбирает человек, а не догадка.
+async def test_пункт_сначала_говорит_что_будет_и_ждёт_кнопку(
+    domain_env: object, db_env: str
+) -> None:
+    """Развилки про клиента больше нет, а согласие осталось — и не зря.
 
-    Приложение и терминал настраиваются по-разному, и оба стоят на МАШИНЕ
-    человека — бот их не видит. Прежняя редакция не спрашивала и слала команду
-    для терминала: она работала, но настраивала не тот клиент, а искал владелец
-    потом в настройках приложения.
+    По кнопке выпускается токен, а выпуск гасит прежний, то есть ломает уже
+    работающую настройку человека. Поэтому вызов пункта сам по себе не делает
+    ничего: он говорит, что произойдёт, и ждёт. Прежде здесь стоял вопрос
+    «какой у вас Claude» — владелец эту развилку снял, поддерживается
+    Claude Desktop.
     """
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
     await позвать(dp, bot, COMMAND)
 
-    assert session.texts == [t("mcp.which_client", "ru")], "пункт ответил чем-то ещё, кроме вопроса"
-    assert session.keyboard_data() == [
-        f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}",
-        f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}",
-    ], "выбора клиента человеку не предложено"
+    assert session.texts == [t("mcp.offer", "ru")], "пункт ответил чем-то ещё, кроме предупреждения"
+    assert session.keyboard_data() == [MCP_SETUP_SEND], "кнопки настройки человеку не предложено"
+    assert not any(_TOKEN_IN_COMMAND.search(текст) for текст in session.texts), (
+        "токен выпущен на одном вызове пункта — прежняя настройка сломана за любопытство"
+    )
 
 
 @requires_db
@@ -300,32 +292,6 @@ async def test_один_вызов_пункта_прежнюю_настройк�
 
 
 @requires_db
-async def test_приложению_и_терминалу_приходят_разные_команды(
-    domain_env: object, db_env: str
-) -> None:
-    """Разница между клиентами и есть содержание задачи.
-
-    `claude mcp add` настраивает Claude Code и Claude Desktop не задевает
-    вовсе: приложение читает свой файл настроек и про эту команду ничего не
-    знает. Строка для приложения этот файл и правит.
-    """
-    bot, приложение = make_bot()
-    dp = build_dispatcher(SETTINGS)
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
-    для_приложения = строка_настройки(приложение)
-
-    bot, терминал = make_bot()
-    await настроить(dp, bot, клиент=MCP_CLIENT_CODE)
-    для_терминала = строка_настройки(терминал)
-
-    assert для_приложения.startswith("node -e "), "приложению пришла не его команда"
-    assert "claude_desktop_config.json" in для_приложения, "команда не правит настройки приложения"
-    assert "mcp-remote" in для_приложения, "приложение ходит в удалённый MCP через mcp-remote"
-    assert для_терминала.startswith("claude mcp add"), "терминалу пришла не его команда"
-    assert "claude_desktop_config.json" not in для_терминала
-
-
-@requires_db
 async def test_про_перезапуск_приложения_сказано_после_команды(
     domain_env: object, db_env: str
 ) -> None:
@@ -339,7 +305,7 @@ async def test_про_перезапуск_приложения_сказано_�
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
+    await настроить(dp, bot)
 
     assert session.texts[-1] == t("mcp.desktop_restart", "ru"), "про перезапуск не сказано"
     команда = строка_настройки(session)
@@ -360,187 +326,13 @@ async def test_про_macOS_сказано_до_того_как_человек_�
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
+    await настроить(dp, bot)
 
     предупреждение = session.texts[2]
     assert предупреждение == t("mcp.desktop_note", "ru")
     assert "macOS" in предупреждение, "не сказано, для какой системы написана команда"
     assert "Windows" in предупреждение, "не сказано, что на других системах она не подойдёт"
     assert session.texts.index(строка_настройки(session)) > 2, "предупреждение пришло после команды"
-
-
-@requires_db
-async def test_незнакомый_клиент_командой_терминала_не_подменяется(
-    domain_env: object, db_env: str
-) -> None:
-    """Третий клиент, заведённый позже, не должен молча получить чужую команду.
-
-    Ловушка ровно та, из-за которой задача и заведена: фильтр по префиксу
-    отправлял бы любой незнакомый код в ветку терминала, и человек получал бы
-    рабочую команду не для своего клиента — то есть тот же промах, только уже
-    заложенный в код на будущее. Поэтому оба кода перечислены поимённо.
-    """
-    bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS)
-
-    await позвать(dp, bot, COMMAND)
-    session.clear()
-    await feed(dp, bot, callback_query(f"{MCP_CLIENT_PREFIX}третий"))
-
-    assert not any(_TOKEN_IN_COMMAND.search(текст) for текст in session.texts), (
-        "незнакомому клиенту выдана команда другого"
-    )
-
-
-@requires_db
-async def test_терминалу_про_приложение_не_рассказывают(domain_env: object, db_env: str) -> None:
-    """Выбравшему терминал незачем читать про macOS и перезапуск приложения.
-
-    Лишние два сообщения здесь не безобидны: человек, которому сказали
-    перезапустить приложение, которого у него нет, перестаёт верить остальному
-    в этом же разговоре.
-    """
-    bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS)
-
-    await настроить(dp, bot, клиент=MCP_CLIENT_CODE)
-
-    assert t("mcp.desktop_note", "ru") not in session.texts
-    assert t("mcp.desktop_restart", "ru") not in session.texts
-
-
-# --- команда приложения проверяется ЗАПУСКОМ, а не чтением --------------------
-#
-# Она правит файл настроек живого человека, и «судя по коду, должна работать»
-# здесь стоит ему рабочих инструментов: у владельца в этом файле четыре чужих
-# сервера. Поэтому тесты ниже берут строку ровно в том виде, в каком её получает
-# человек, и выполняют её — на подставном доме, а не на настоящем.
-
-
-ЕСТЬ_NODE = pytest.mark.skipif(
-    shutil.which("node") is None,
-    reason="нет node — команду настройки приложения не на чем выполнить",
-)
-
-#: Правдоподобный файл настроек: чужие серверы и настройка, к серверам
-#: отношения не имеющая. Всё это обязано пережить нашу команду.
-ЧУЖИЕ_НАСТРОЙКИ = {
-    "globalShortcut": "Alt+Space",
-    "mcpServers": {
-        "filesystem": {"command": "npx", "args": ["-y", "server-filesystem", "/somewhere"]},
-        "sqlite": {"command": "uvx", "args": ["mcp-server-sqlite"]},
-        "memory": {"command": "npx", "args": ["-y", "server-memory"]},
-        "neighbour": {"command": "npx", "args": ["-y", "mcp-remote", "https://neighbour.invalid/"]},
-    },
-}
-
-
-def _настройки(дом: Path) -> Path:
-    return дом / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
-
-
-def _выполнить(команда: str, дом: Path) -> subprocess.CompletedProcess[str]:
-    """Выполнить присланную строку так, как её выполнит человек: целиком, в оболочке.
-
-    Дом подставной: настоящий файл настроек тестами не трогается ни при каком
-    исходе. `os.homedir()` в Node берёт `HOME`, поэтому подмена дома и есть
-    подмена пути к настройкам.
-    """
-    return subprocess.run(  # noqa: S602 — строка наша же, и проверяется именно она
-        команда,
-        shell=True,
-        check=False,
-        capture_output=True,
-        text=True,
-        env={**os.environ, "HOME": str(дом)},
-    )
-
-
-@requires_db
-@ЕСТЬ_NODE
-async def test_команда_приложения_не_сносит_уже_настроенные_серверы(
-    domain_env: object, db_env: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Главное требование задачи: у человека уже есть свои серверы, и они остаются.
-
-    Простое `>` в файл подключило бы наш сервер и снесло остальные — то есть
-    сломало бы человеку рабочие инструменты в обмен на наш. Поэтому команда
-    читает файл, дописывает одну запись и кладёт обратно, а тест смотрит на
-    ФАЙЛ ПОСЛЕ ЕЁ ВЫПОЛНЕНИЯ, а не на текст команды.
-    """
-    monkeypatch.setenv(MCP_URL_VAR, "https://audit.example.invalid/")
-    файл = _настройки(tmp_path)
-    файл.parent.mkdir(parents=True)
-    файл.write_text(json.dumps(ЧУЖИЕ_НАСТРОЙКИ), encoding="utf-8")
-    bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS)
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
-    команда = строка_настройки(session)
-
-    исход = _выполнить(команда, tmp_path)
-
-    assert исход.returncode == 0, f"команда не выполнилась: {исход.stderr}"
-    стало = json.loads(файл.read_text(encoding="utf-8"))
-    assert set(стало["mcpServers"]) == {*ЧУЖИЕ_НАСТРОЙКИ["mcpServers"], "dodo-audit"}, (
-        "чужие серверы не пережили нашу команду"
-    )
-    for имя, было in ЧУЖИЕ_НАСТРОЙКИ["mcpServers"].items():
-        assert стало["mcpServers"][имя] == было, f"сервер «{имя}» изменился"
-    assert стало["globalShortcut"] == "Alt+Space", "посторонняя настройка не пережила команду"
-    наш = стало["mcpServers"]["dodo-audit"]
-    assert наш["command"] == "npx"
-    assert "mcp-remote" in наш["args"] and "https://audit.example.invalid/" in наш["args"]
-    assert f"Authorization:Bearer {выданный_токен(команда)}" in наш["args"], (
-        "токен не доехал до файла настроек в том виде, в каком его ждёт mcp-remote"
-    )
-
-
-@requires_db
-@ЕСТЬ_NODE
-async def test_команда_приложения_заводит_файл_если_его_нет(
-    domain_env: object, db_env: str, tmp_path: Path
-) -> None:
-    """Человек мог не настраивать ни одного сервера до нас — тогда файла нет вовсе.
-
-    Отказ в этом месте выглядел бы как «команда не работает», а починка
-    сводилась бы к тому, чтобы завести пустой файл руками, — то самое, чего
-    человек делать не обязан.
-    """
-    bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS)
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
-
-    исход = _выполнить(строка_настройки(session), tmp_path)
-
-    assert исход.returncode == 0, f"команда не выполнилась: {исход.stderr}"
-    стало = json.loads(_настройки(tmp_path).read_text(encoding="utf-8"))
-    assert list(стало["mcpServers"]) == ["dodo-audit"]
-
-
-@requires_db
-@ЕСТЬ_NODE
-async def test_непонятый_файл_настроек_команда_не_трогает(
-    domain_env: object, db_env: str, tmp_path: Path
-) -> None:
-    """Файл есть, но не разбирается — значит, писать в него нельзя.
-
-    Соблазнительное «не разобрали, начнём с пустого» на этом месте означало бы
-    тихо заменить непонятый конфиг человека на наш единственный сервер, то есть
-    ровно ту потерю, которой вся эта осторожность и избегает. Пусть лучше
-    человек увидит отказ.
-    """
-    файл = _настройки(tmp_path)
-    файл.parent.mkdir(parents=True)
-    файл.write_text("{ это не json", encoding="utf-8")
-    bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS)
-    await настроить(dp, bot, клиент=MCP_CLIENT_DESKTOP)
-
-    исход = _выполнить(строка_настройки(session), tmp_path)
-
-    assert исход.returncode != 0, "команда смолчала о непонятом файле настроек"
-    assert файл.read_text(encoding="utf-8") == "{ это не json", "испорченный файл переписан"
-    assert not list(файл.parent.glob("*.tmp")), "после отказа остался обрывок записи"
 
 
 # --- утечка: главный сторож этого файла --------------------------------------
@@ -592,10 +384,7 @@ async def test_личный_токен_в_журнал_не_попадает(
 
 
 @requires_db
-@pytest.mark.parametrize("клиент", [MCP_CLIENT_DESKTOP, MCP_CLIENT_CODE])
-async def test_токен_печатается_ровно_в_одном_сообщении(
-    domain_env: object, db_env: str, клиент: str
-) -> None:
+async def test_токен_печатается_ровно_в_одном_сообщении(domain_env: object, db_env: str) -> None:
     """Сообщение в телеграме копируется целиком одним движением.
 
     Поэтому объяснение и команда идут врозь (иначе объяснение уехало бы в
@@ -603,18 +392,16 @@ async def test_токен_печатается_ровно_в_одном_сооб
     человек копирует. Второе вхождение означало бы вторую копию секрета в
     переписке, живущую там навсегда.
 
-    Это же требование и запрещает слать обе команды сразу (T261): вторая была
-    бы вторым сообщением с тем же токеном.
     """
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await настроить(dp, bot, клиент=клиент)
+    await настроить(dp, bot)
 
     личный = выданный_токен(строка_настройки(session))
     с_токеном = [текст for текст in session.texts if личный in текст]
     assert len(с_токеном) == 1, "токен напечатан больше одного раза"
-    assert с_токеном[0].startswith(НАЧАЛО_КОМАНДЫ[клиент]), "токен уехал не в ту строку"
+    assert с_токеном[0].startswith(НАЧАЛО_КОМАНДЫ), "токен уехал не в то сообщение"
 
 
 # --- круг: кому пункт доступен ------------------------------------------------
@@ -653,9 +440,7 @@ async def test_нажатие_чужого_настройку_тоже_не_вы
     await feed(
         dp,
         bot,
-        callback_query(
-            f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}", user_id=OUTSIDER_ID, chat_id=OUTSIDER_ID
-        ),
+        callback_query(MCP_SETUP_SEND, user_id=OUTSIDER_ID, chat_id=OUTSIDER_ID),
     )
 
     assert not any(_TOKEN_IN_COMMAND.search(текст) for текст in session.texts), (
@@ -1105,9 +890,9 @@ async def test_сорвавшийся_выпуск_не_печатает_нич�
     await настроить(dp, bot)
 
     assert session.last_text == t("mcp.unavailable", "ru")
-    assert not any(
-        текст.startswith(начало) for текст in session.texts for начало in НАЧАЛО_КОМАНДЫ.values()
-    ), "строка настройки ушла человеку без токена"
+    assert not any(текст.startswith(НАЧАЛО_КОМАНДЫ) for текст in session.texts), (
+        "строка настройки ушла человеку без токена"
+    )
     assert caplog.records, "о сорвавшемся выпуске в журнале нет ни строки"
 
 
@@ -1162,9 +947,11 @@ async def test_объяснение_и_команда_разными_сообщ�
 ) -> None:
     """Сообщение копируется целиком, поэтому объяснение к команде не приклеено.
 
-    С T261 проверяется сильнее: в строке настройки не должно быть НИЧЕГО, кроме
-    самой команды, — ни предупреждения про macOS, ни просьбы перезапустить
+    С T261 проверяется сильнее: в сообщении с командой не должно быть НИЧЕГО,
+    кроме неё самой, — ни предупреждения про macOS, ни просьбы перезапустить
     приложение. Всё это пришло отдельными сообщениями и в терминал не уедет.
+    Хвост здесь — закрывающая метка вставки (`DODO_SETUP`): за ней у команды
+    не должно оставаться ни строки.
     """
     monkeypatch.delenv(MCP_URL_VAR, raising=False)
     bot, session = make_bot()
@@ -1174,8 +961,10 @@ async def test_объяснение_и_команда_разными_сообщ�
 
     assert session.texts[1] == t("mcp.setup", "ru")
     команда = строка_настройки(session)
-    assert команда.startswith("node -e "), "команда пришла не голой — в терминал уедет лишний текст"
-    assert команда.endswith("'"), "к команде приклеен хвост"
+    assert команда.startswith(НАЧАЛО_КОМАНДЫ), (
+        "команда пришла не голой — в терминал уедет лишний текст"
+    )
+    assert команда.endswith("DODO_SETUP"), "к команде приклеен хвост"
     assert t("mcp.desktop_restart", "ru") not in команда
     assert t("mcp.desktop_note", "ru") not in команда
 
@@ -1219,10 +1008,11 @@ async def test_язык_интерфейса_параметр_и_здесь(
 ) -> None:
     """Английский стенд не имеет права отвечать на установку по-русски.
 
-    Проверяются все сообщения пункта, а не первое: с T261 их пять, и новые —
-    вопрос про клиента, надписи на кнопках, предупреждение про macOS, просьба
-    перезапустить — ровно то место, где русская строка на английском стенде
-    заводится незаметнее всего.
+    Проверяются все сообщения пункта, а не первое: их пять, и часть добавлена
+    позже — предупреждение перед кнопкой, надпись на ней, предупреждение про
+    macOS, просьба перезапустить, — ровно то место, где русская строка на
+    английском стенде заводится незаметнее всего. Сообщение об удаче печатает
+    сама команда, и оно тоже на языке стенда.
     """
     monkeypatch.setenv(UI_LANG_VAR, "en")
     monkeypatch.delenv(MCP_URL_VAR, raising=False)
@@ -1231,15 +1021,17 @@ async def test_язык_интерфейса_параметр_и_здесь(
 
     await настроить(dp, bot)
 
-    assert session.texts[0] == t("mcp.which_client", "en")
+    assert session.texts[0] == t("mcp.offer", "en")
     assert session.texts[1] == t("mcp.setup", "en")
     assert session.texts[2] == t("mcp.desktop_note", "en")
     assert t("mcp.url_unknown", "en") in строка_настройки(session)
     assert session.texts[-1] == t("mcp.desktop_restart", "en")
-    assert session.keyboard_texts() == [
-        t("btn.mcp_desktop", "en"),
-        t("btn.mcp_code", "en"),
-    ], "надписи на кнопках выбора клиента остались на языке стенда по умолчанию"
+    assert session.keyboard_texts() == [t("btn.mcp_send", "en")], (
+        "надпись на кнопке осталась на языке стенда по умолчанию"
+    )
+    assert t("mcp.desktop_done", "en") in строка_настройки(session), (
+        "команда напечатает по-русски то, что человек прочтёт в терминале"
+    )
 
 
 @requires_db
@@ -1277,8 +1069,8 @@ async def test_работает_и_до_начала_проверки_и_во_в
     session.clear()
     await настроить(dp, bot)
 
-    assert до.startswith("node -e ")
-    assert строка_настройки(session).startswith("node -e ")
+    assert до.startswith(НАЧАЛО_КОМАНДЫ)
+    assert строка_настройки(session).startswith(НАЧАЛО_КОМАНДЫ)
 
 
 async def test_постороннему_не_отвечает(domain_env: object) -> None:

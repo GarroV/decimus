@@ -8,14 +8,20 @@
 деталь строки, а не отдельный предмет разговора: человек не «получает токен», а
 получает работающую настройку.
 
-**Клиентов два, и они настраиваются по-разному (T261).** Claude Desktop —
-приложение со своим файлом настроек; Claude Code — консольный клиент, который
-про этот файл ничего не знает и держит своё. До T261 пункт слал строку для
-Claude Code всем подряд: она работала, но настраивала не тот клиент, и владелец
-не нашёл наш сервер в настройках приложения. Угадать здесь нечем — оба клиента
-живут на машине человека, а бот видит переписку, — поэтому бот спрашивает, а
-строку печатает уже адресно. Обе разом не шлются: токен обязан стоять ровно в
-одном сообщении (`tests/test_bot_mcp_setup.py`).
+**Клиент один — Claude Desktop (#222, решение D103).** До T261 пункт слал
+команду для Claude Code всем подряд: она работала, но настраивала не тот
+клиент, и владелец не нашёл наш сервер в настройках приложения. T261 добавил
+вопрос «какой Claude», а #222 его снял — владелец назвал развилку ненужной, и
+поддерживаемая настройка осталась одна. Кнопка при этом сохранилась как
+согласие: по нажатию выпускается токен, а выпуск гасит прежний, то есть ломает
+уже работающую настройку. Токен стоит ровно в одном сообщении переписки
+(`tests/test_bot_mcp_setup.py`).
+
+**Команда не рассказывается словами, а выполняется** — она правит файл
+настроек, где у человека уже стоят свои серверы. Собирается в
+`src/bot/mcp_setup.py`: кладёт мост `tools/mcp_bridge.sh` в `~/.dodo-audit/bin`
+и дописывает одну запись штатным `plutil`. Ни Node, ни Python на машине
+человека не нужны.
 
 **Чего не было до T253.** Токен заводился руками в `.env` записью
 «арендатор=токен» (`src/mcp/config.py`), принадлежал СТОРОНЕ и открывал всю её
@@ -53,13 +59,9 @@ from aiogram.types import CallbackQuery, Message, User
 from src.db.errors import DbError
 
 from ..config import BotSettings
-from ..keyboards import (
-    MCP_CLIENT_CODE,
-    MCP_CLIENT_DESKTOP,
-    MCP_CLIENT_PREFIX,
-    mcp_client_keyboard,
-)
+from ..keyboards import MCP_SETUP_SEND, mcp_setup_keyboard
 from ..lang import chat_ui_lang
+from ..mcp_setup import desktop_command
 from ..texts import t
 
 logger = logging.getLogger(__name__)
@@ -208,7 +210,7 @@ def build_mcp_router(settings: BotSettings) -> Router:
 
     @router.message(Command(MCP_COMMAND))
     async def on_mcp(message: Message) -> None:
-        """Вопрос «какой Claude» — и ничего кроме него (T261).
+        """Что произойдёт по кнопке — и ничего кроме этого (T261, #222).
 
         Токен здесь НЕ выпускается намеренно. Выпуск гасит прежний, то есть
         ломает уже сделанную настройку, а открыть пункт и посмотреть — не
@@ -218,30 +220,22 @@ def build_mcp_router(settings: BotSettings) -> Router:
         lang = chat_ui_lang(message.chat.id)
         if await _guard(message, settings) is None:
             return
-        await message.answer(t("mcp.which_client", lang), reply_markup=mcp_client_keyboard(lang))
+        await message.answer(t("mcp.offer", lang), reply_markup=mcp_setup_keyboard(lang))
 
-    # Оба кода перечислены поимённо, а не `startswith(MCP_CLIENT_PREFIX)`:
-    # с префиксом любой третий клиент, заведённый позже, молча попадал бы в
-    # ветку терминала — и человек получал бы рабочую команду не для своего
-    # клиента, то есть ровно тот дефект, ради которого задача и заведена.
-    @router.callback_query(
-        F.data.in_(
-            {f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_DESKTOP}", f"{MCP_CLIENT_PREFIX}{MCP_CLIENT_CODE}"}
-        )
-    )
-    async def on_client(callback: CallbackQuery) -> None:
-        """Готовая строка настройки выбранного клиента — с личным токеном.
+    @router.callback_query(F.data == MCP_SETUP_SEND)
+    async def on_send(callback: CallbackQuery) -> None:
+        """Готовая команда настройки Claude Desktop — с личным токеном внутри.
 
         Разными сообщениями не для красоты: в телеграме копируется сообщение
         ЦЕЛИКОМ одним движением, и команда, склеенная с объяснением, приезжала
-        бы в терминал вместе с ним. Здесь это важнее прежнего — в строке стоит
+        бы в терминал вместе с ним. Здесь это важнее прежнего — в команде стоит
         настоящий токен.
 
-        Порядок: объяснение, чем эта команда особенная (у приложения — что она
-        для macOS и что чужие серверы уцелеют), сама команда, что надо
-        перезапустить, и только потом — что прежний токен отозван. Всё, мимо
-        чего пройти нельзя, стоит ПОСЛЕ команды: первое сообщение человек,
-        пришедший сюда второй раз, читает по диагонали.
+        Порядок: объяснение, чем эта команда особенная (что она для macOS и что
+        чужие серверы уцелеют), сама команда, что надо перезапустить, и только
+        потом — что прежний токен отозван. Всё, мимо чего пройти нельзя, стоит
+        ПОСЛЕ команды: первое сообщение человек, пришедший сюда второй раз,
+        читает по диагонали.
         """
         await callback.answer()
         message = callback.message
@@ -254,7 +248,6 @@ def build_mcp_router(settings: BotSettings) -> Router:
         user = await _guard_user(message, callback.from_user, settings)
         if user is None:
             return
-        desktop = (callback.data or "").removeprefix(MCP_CLIENT_PREFIX) == MCP_CLIENT_DESKTOP
         from src.db.mcp_access import issue_token
 
         try:
@@ -266,12 +259,13 @@ def build_mcp_router(settings: BotSettings) -> Router:
             await message.answer(t("mcp.unavailable", lang))
             return
         await message.answer(t("mcp.setup", lang))
-        if desktop:
-            await message.answer(t("mcp.desktop_note", lang))
-        строка = "mcp.command_desktop" if desktop else "mcp.command"
-        await message.answer(t(строка, lang, url=setup_url(lang), token=выпущен.value))
-        if desktop:
-            await message.answer(t("mcp.desktop_restart", lang))
+        await message.answer(t("mcp.desktop_note", lang))
+        await message.answer(
+            desktop_command(
+                url=setup_url(lang), token=выпущен.value, done=t("mcp.desktop_done", lang)
+            )
+        )
+        await message.answer(t("mcp.desktop_restart", lang))
         if выпущен.replaced_previous:
             await message.answer(t("mcp.replaced", lang))
 
