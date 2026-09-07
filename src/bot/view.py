@@ -243,8 +243,32 @@ def stored_headline(lang: str) -> str:
     return t("record.stored", lang)
 
 
+def _zone_note(lang: str, *, zone_guessed: bool, zone_from_item: bool) -> str:
+    """Оговорка о том, откуда взялась зона, — или пусто, если её назвал человек.
+
+    Два случая и два текста, и смешивать их нельзя: «поставил прошлую» про зону
+    из пункта было бы неправдой, а неправда в оговорке хуже её отсутствия —
+    аудитор перестаёт ей верить и не проверяет ни один из случаев (#218).
+
+    Оба взаимно исключают друг друга по построению (`routers/record.py`), но
+    порядок здесь задан явно: догадка памяти важнее, потому что она и есть та,
+    которую надо перепроверить руками.
+    """
+    if zone_guessed:
+        return t("record.fixed_zone_guess", lang)
+    if zone_from_item:
+        return t("record.fixed_zone_from_item", lang)
+    return ""
+
+
 def confirmed_block(
-    finding: domain.Finding, lang: str, *, title: str, chat_id: int, zone_guessed: bool = False
+    finding: domain.Finding,
+    lang: str,
+    *,
+    title: str,
+    chat_id: int,
+    zone_guessed: bool = False,
+    zone_from_item: bool = False,
 ) -> str:
     """Запись, которую аудитор подтвердил кнопкой (T055, расширен T135).
 
@@ -276,7 +300,7 @@ def confirmed_block(
     которая появляется через раз, перестаёт что-либо значить.
     """
     line = confirm_line(finding, lang, chat_id=chat_id)
-    guess = t("record.fixed_zone_guess", lang) if zone_guessed else ""
+    guess = _zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item)
     note = shorten(finding.text, FAST_NOTE_LIMIT)
     stored = stored_headline(lang)
     if note.strip() == title.strip():
@@ -294,6 +318,7 @@ def fixed_block(
     cue: str,
     chat_id: int,
     zone_guessed: bool = False,
+    zone_from_item: bool = False,
 ) -> str:
     """Запись, легшая по словам сразу, без подтверждения (T121, D064).
 
@@ -322,7 +347,7 @@ def fixed_block(
         lang,
         stored=stored_headline(lang),
         line=confirm_line(finding, lang, chat_id=chat_id),
-        guess=t("record.fixed_zone_guess", lang) if zone_guessed else "",
+        guess=_zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item),
         title=title,
         note=shorten(finding.text, FAST_NOTE_LIMIT),
         cue=cue,
@@ -337,6 +362,7 @@ def corrected_block(
     chat_id: int,
     cue: str = "",
     zone_guessed: bool = False,
+    zone_from_item: bool = False,
 ) -> str:
     """Запись после правки ответом на сообщение бота (T204, D081).
 
@@ -358,7 +384,7 @@ def corrected_block(
         lang,
         n=finding.n,
         line=confirm_line(finding, lang, chat_id=chat_id),
-        guess=t("record.fixed_zone_guess", lang) if zone_guessed else "",
+        guess=_zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item),
         title=title,
         note=shorten(finding.text, FAST_NOTE_LIMIT),
         cue=t("record.corrected_cue", lang, cue=cue) if cue else "",

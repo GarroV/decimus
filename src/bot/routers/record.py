@@ -754,6 +754,28 @@ async def _save(
     и тем, чем запись стала в итоге, — перезапиши мы предложение правкой, промах
     перестал бы существовать ровно в том случае, ради которого сигнал и собирают.
     """
+    if zone_guessed:
+        # Зону никто не называл, и до задачи #218 на её место молча садилась
+        # зона ПРОШЛОЙ записи. Но у пункта зона бывает известна из самой
+        # методики: 59 пунктов из 136 живут ровно в одной зоне, и пункт про печь
+        # среди них. Тогда это не догадка, а ответ, и память здесь неуместна —
+        # именно так печь и уехала в холодный цех на живом прогоне.
+        #
+        # Стоит ДО запрета сдачи и до вызова движка намеренно: зона входит в
+        # пару «пункт + зона», по которой движок проверяет занятость, и
+        # подменять её после проверки значило бы проверить не то, что пишем.
+        своя = domain.only_zone(code, chat_id=chat_id)
+        if своя is not None and своя != zone:
+            zone = своя
+            # Оговорка о прошлой зоне здесь была бы неправдой: зона взята не из
+            # памяти, а из пункта. Сказать всё равно надо — аудитор зоны не
+            # называл, и подтверждать запись он не будет.
+            zone_guessed = False
+            zone_from_item = True
+        else:
+            zone_from_item = False
+    else:
+        zone_from_item = False
     if sealed.is_sealed(chat_id):
         # Последний рубеж запрета (T201, D080): сюда приходят и нажатия под
         # старыми предложениями, показанными ДО сдачи отчёта. Проверка стоит у
@@ -832,6 +854,7 @@ async def _save(
                 title=refusal.item_title(shown.code, lang, chat_id=chat_id),
                 cue="" if auto is None else auto.cue,
                 zone_guessed=zone_guessed,
+                zone_from_item=zone_from_item,
             ),
             reply_markup=(edit_keyboard if auto is None else fixed_keyboard)(finding.n, lang),
         )
@@ -847,6 +870,7 @@ async def _save(
                 chat_id=chat_id,
                 title=refusal.item_title(shown.code, lang, chat_id=chat_id),
                 zone_guessed=zone_guessed,
+                zone_from_item=zone_from_item,
             ),
             reply_markup=edit_keyboard(finding.n, lang),
         )
@@ -859,6 +883,7 @@ async def _save(
                 cue=auto.cue,
                 chat_id=chat_id,
                 zone_guessed=zone_guessed,
+                zone_from_item=zone_from_item,
             ),
             reply_markup=fixed_keyboard(finding.n, lang),
         )

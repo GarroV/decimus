@@ -12,7 +12,14 @@
 
 from __future__ import annotations
 
-from .checklist import allowed_levels, checklist_version, get_item, list_items, list_zones
+from .checklist import (
+    allowed_levels,
+    checklist_version,
+    get_item,
+    list_items,
+    list_zones,
+    only_zone,
+)
 from .config import check_environment
 from .findings import add_finding, attach_photo, drop_finding, edit_finding
 from .info import set_info
@@ -63,6 +70,7 @@ __all__ = [
     "kind_title",
     "list_items",
     "list_zones",
+    "only_zone",
     "score",
     "set_info",
     "settings_for",
