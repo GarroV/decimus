@@ -48,7 +48,7 @@ STAND_SERVICES = ("bot", "mcp")
 #: Имя проекта — своё, как требует правило параллельных копий: без него вызов
 #: разговаривал бы с контейнерами соседа. Здесь ничего не поднимается, только
 #: читается конфигурация, но привычку ломать нельзя.
-PROJECT = "dodo_audit_service-tests"
+PROJECT = "decimus-tests"
 
 requires_docker = pytest.mark.skipif(
     shutil.which("docker") is None,
