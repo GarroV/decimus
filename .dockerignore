@@ -28,6 +28,6 @@ reports/
 demo/state/
 
 # Документы стройки Forge и рабочие файлы диспетчера — не часть продукта.
-docs/forge/
+docs/furca/
 tasks.md
 progress.md
