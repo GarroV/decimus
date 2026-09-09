@@ -101,5 +101,3 @@ def fields_to_ask(lang: str, *, chat_id: int) -> tuple[tuple[InfoField, str], ..
         if text:
             asked.append((field, text))
     return tuple(asked)
-
-
