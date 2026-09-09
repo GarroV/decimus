@@ -23,10 +23,16 @@ done < "$TERMS_FILE"
 [ "${#TERMS[@]}" -gt 0 ] || exit 0
 
 ZERO=0000000000000000000000000000000000000000
+# Пустое дерево — стандартный объект git, его хэш одинаков в любом
+# репозитории. Нужен как «до» для первого пуша ветки: `git diff "$local_sha"`
+# без второй стороны сравнивал бы коммит с рабочим деревом, которое в момент
+# пуша обычно совпадает с самим коммитом, — diff выходил пустым, и первый пуш
+# новой ветки проходил вообще без проверки на секреты.
+EMPTY_TREE=4b825dc642cb6eb9a060e54bf8d69288fbee4904
 found=0
 while read -r _local_ref local_sha _remote_ref remote_sha; do
     [ "$local_sha" = "$ZERO" ] && continue
-    if [ "$remote_sha" = "$ZERO" ]; then range="$local_sha"; else range="$remote_sha..$local_sha"; fi
+    if [ "$remote_sha" = "$ZERO" ]; then range="$EMPTY_TREE..$local_sha"; else range="$remote_sha..$local_sha"; fi
     payload=$(git diff "$range" 2>/dev/null | grep '^+' || true)
     [ -n "$payload" ] || continue
     for term in "${TERMS[@]}"; do
