@@ -40,14 +40,22 @@ class Run:
 
 
 def git(*args: str, cwd: Path) -> None:
-    subprocess.run(  # noqa: S603, S607 — аргументы собираем сами, тестовая песочница
-        ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+    subprocess.run(  # noqa: S603 — аргументы собираем сами, тестовая песочница
+        ["git", *args],  # noqa: S607
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
     )
 
 
 def commit_sha(cwd: Path) -> str:
-    p = subprocess.run(  # noqa: S603, S607
-        ["git", "rev-parse", "HEAD"], cwd=cwd, check=True, capture_output=True, text=True
+    p = subprocess.run(
+        ["git", "rev-parse", "HEAD"],  # noqa: S607
+        cwd=cwd,
+        check=True,
+        capture_output=True,
+        text=True,
     )
     return p.stdout.strip()
 
@@ -83,7 +91,7 @@ def guard(repo: Path, terms_file: Callable[..., Path]) -> Callable[..., Run]:
         env = dict(os.environ)
         env["GIT_SECRET_TERMS"] = str(terms_file(*values)) if values else "/nonexistent"
         p = subprocess.run(  # noqa: S603
-            ["bash", str(GUARD)],
+            ["bash", str(GUARD)],  # noqa: S607
             cwd=repo,
             input=f"refs/heads/main {local_sha} refs/heads/main {remote_sha}\n",
             env=env,
