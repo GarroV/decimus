@@ -13,7 +13,7 @@ if [ -z "$HOST" ]; then
     echo "смоук: задай DEPLOY_HOST=<ssh-алиас площадки>" >&2
     exit 2
 fi
-REMOTE_DIR="${DEPLOY_DIR:-C:\\projects\\dodo_audit_service}"
+REMOTE_DIR="${DEPLOY_DIR:-C:\\projects\\decimus}"
 fail=0
 say() { printf '%-38s %s\n' "$1" "$2"; }
 

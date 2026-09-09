@@ -184,13 +184,13 @@ PDF собран: 17989 байт
 
 ```powershell
 # каталог проекта
-New-Item -ItemType Directory -Force C:\projects\dodo_audit_service
+New-Item -ItemType Directory -Force C:\projects\decimus
 
 # код
-git clone <url> C:\projects\dodo_audit_service
+git clone <url> C:\projects\decimus
 
 # методика — копированием с ноутбука, НЕ из git
-#   scp -r data <HOST>:C:/projects/dodo_audit_service/data
+#   scp -r data <HOST>:C:/projects/decimus/data
 
 # секреты
 Copy-Item .env.example .env    # и заполнить руками
@@ -451,7 +451,7 @@ docker compose up -d
 
 # полностью убрать проект (данные тома остаются)
 docker compose down
-Remove-Item -Recurse -Force C:\projects\dodo_audit_service
+Remove-Item -Recurse -Force C:\projects\decimus
 ```
 
 С подъёма 04.09.2026 откатываться есть куда: прошлый образ на сервере остаётся

@@ -15,7 +15,7 @@ if [ -z "$HOST" ]; then
     echo "раскатка: задай DEPLOY_HOST=<ssh-алиас площадки>" >&2
     exit 2
 fi
-REMOTE_DIR="${DEPLOY_DIR:-C:\\projects\\dodo_audit_service}"
+REMOTE_DIR="${DEPLOY_DIR:-C:\\projects\\decimus}"
 here=$(cd "$(dirname "$0")/.." && pwd)
 
 remote() {
