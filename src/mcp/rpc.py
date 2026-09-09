@@ -61,7 +61,7 @@ _TYPES: dict[str, type | tuple[type, ...]] = {
 def _version() -> str:
     """Версия продукта из метаданных пакета, а не переписанная сюда числом."""
     try:
-        return version("dodo-audit-service")
+        return version("decimus")
     except PackageNotFoundError:  # pragma: no cover — пакет не установлен
         return "0"
 

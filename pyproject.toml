@@ -1,5 +1,5 @@
 [project]
-name = "dodo-audit-service"
+name = "decimus"
 version = "0.1.0"
 description = "Сервис выездных проверок пиццерий: телеграм-бот фиксации нарушений, расчёт оценки и сборка отчёта"
 requires-python = ">=3.12"

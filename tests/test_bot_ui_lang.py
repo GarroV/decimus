@@ -37,7 +37,7 @@ from src.domain.kinds import kind_title
 
 ROOT = Path(__file__).resolve().parent.parent
 ENV_EXAMPLE = ROOT / ".env.example"
-COMPOSE_PROJECT = "dodo_audit_service-tests"
+COMPOSE_PROJECT = "decimus-tests"
 
 requires_docker = pytest.mark.skipif(
     shutil.which("docker") is None,
