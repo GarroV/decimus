@@ -80,6 +80,11 @@ T = {
 }
 GRADE_COLOR = {"A": "#1E7A45", "B": "#7A6A17", "C": "#B4610F", "D": "#A81E1E"}
 
+# Имя продукта (D106, сужено D107): DECIMUS — имя всей системы, не персона
+# бота, и в отчёт ставится как есть на обоих языках — не запись каталога T,
+# чтобы никогда не попасть в перевод.
+BRAND = "DECIMUS"
+
 
 def img_tag(path, max_px=1100):
     if not path or not os.path.exists(path):
@@ -216,6 +221,7 @@ def page_css(t):
 
 CSS = """
 body { font-family: "Audit Sans", "DejaVu Sans", "Helvetica Neue", Arial, sans-serif; color:#23202B; font-size:10.5pt; line-height:1.3; }
+.brand { font-size:9.5pt; font-weight:700; letter-spacing:2pt; text-transform:uppercase; color:#7A56B8; margin:0 0 1mm 0; }
 h1 { font-size:19pt; margin:0 0 2mm 0; color:#3F2A63; letter-spacing:-.2pt; }
 h2 { font-size:12.5pt; margin:6mm 0 2.5mm 0; color:#3F2A63; border-bottom:1.4pt solid #E6E1EF; padding-bottom:1.2mm; page-break-after:avoid; page-break-inside:avoid; }
 h2.sec-findings { page-break-before:always; margin-top:0; }
@@ -266,7 +272,8 @@ def build_html(res, lang, photos, src=None):
     zk = "zone_name_en" if lang == "en" else "zone_name_ru"
     nk = "name_en" if lang == "en" else "name_ru"
     g = res["grade"]
-    h = [f"<style>{font_css()}\n{page_css(t)}\n{CSS}</style>", f"<h1>{esc(t['title'])}</h1>",
+    h = [f"<style>{font_css()}\n{page_css(t)}\n{CSS}</style>",
+         f'<div class="brand">{esc(BRAND)}</div>', f"<h1>{esc(t['title'])}</h1>",
          '<table class="meta">']
     # Вид проверки стоит в шапке самого отчёта, а не только в письме (T180,
     # решение D084): партнёру важно видеть в документе, плановая это проверка
