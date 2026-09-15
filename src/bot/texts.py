@@ -1251,16 +1251,18 @@ TEXTS: dict[str, dict[str, str]] = {
     # (клиент читает список серверов при старте).
     "mcp.code_restart": {
         "ru": (
-            "Готово. Если Claude Code уже был запущен — перезапустите сессию: список "
-            "серверов он читает при старте.\n\n"
-            "Проверить: claude mcp list — в списке должен стоять dodo-audit с отметкой "
-            "Connected. Если его нет или он не подключается, напишите сюда."
+            "Скрипт сам находит, что стоит на машине: Claude Code он настраивает "
+            "сразу, Claude Desktop — через мост, и тогда приложение надо полностью "
+            "перезапустить (Cmd+Q и открыть заново).\n\n"
+            "Проверить в терминале: claude mcp list — в списке должен стоять dodo-audit "
+            "с отметкой Connected. Если его нет, напишите сюда."
         ),
         "en": (
-            "Done. If Claude Code was already running, restart the session: it reads the "
-            "server list at startup.\n\n"
-            "To check: claude mcp list — dodo-audit should be there, marked Connected. "
-            "If it is missing or fails to connect, tell us here."
+            "The script finds what is installed on the machine: Claude Code is set up "
+            "right away, Claude Desktop through a bridge — and then the app has to be "
+            "fully restarted (Cmd+Q and open again).\n\n"
+            "To check in a terminal: claude mcp list — dodo-audit should be there, marked "
+            "Connected. If it is missing, tell us here."
         ),
     },
     # Сама команда собирается не здесь, а в `src/bot/mcp_setup.py`, и это

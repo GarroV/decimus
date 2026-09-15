@@ -601,7 +601,9 @@ Python runtime state: core initialized
 | `src/mcp/cli.py` | `main()`: читает окружение, поднимает сервер, отказ настроек печатает строкой, а не трейсбеком |
 | `src/mcp/__main__.py` | запуск: `python -m src.mcp`, он же `make mcp`. Тонкая обёртка: подстановка `.env` и вызов `main` |
 | `src/mcp/errors.py` | `McpError`, `McpConfigError`, `AuthError`, `ToolError`, `ChecklistError` |
-| `tools/mcp_bridge.sh` | мост stdio↔HTTP для клиента — тот же приём, что у `swarm-mcp` |
+| `tools/mcp_bridge.sh` | мост stdio↔HTTP для клиента — тот же приём, что у `swarm-mcp`. Нужен только Claude Desktop: Claude Code ходит к серверу по HTTP сам |
+| `tools/mcp_install.sh` | установщик, который сервер отдаёт по публичному `GET /setup` (#244, D112). Кладёт мост, прописывает сервер в том клиенте, который найдёт на машине. Тело моста подставляется при раздаче — `src/mcp/install.py`, копии текста не заводится |
+| `src/mcp/install.py` | сборка установщика и его раздача: единственная просматриваемая поверхность сервера, всё остальное по-прежнему `405` |
 
 ## Технические заметки
 

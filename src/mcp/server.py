@@ -28,6 +28,7 @@ from typing import Any
 from .checklist import Store
 from .config import Settings, resolve_access
 from .errors import AuthError
+from .install import INSTALL_CONTENT_TYPE, INSTALL_PATH, InstallScriptError, install_script
 from .rpc import CODE_PARSE_ERROR, handle
 
 #: Больше мегабайта читающему серверу присылать нечего: вопросы к базе
@@ -190,9 +191,49 @@ class _Handler(BaseHTTPRequestHandler):
                 # уронить поток. Отказ при этом уже записан в лог выше.
                 pass
 
+    def _send_text(self, status: HTTPStatus, text: str, content_type: str) -> None:
+        """Ответ не-JSON: установщик. Отдельно от `_send`, чтобы тот остался про JSON."""
+        body = text.encode("utf-8")
+        self._answered = True
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def _serve_install(self) -> None:
+        """Отдать скрипт установки — публично, без токена.
+
+        Секретов в нём нет: адрес и токен человек подставляет сам, запуская
+        его. Требовать токен на скачивание значило бы требовать его до того,
+        как человек узнал, куда вписывать (#244, D112).
+
+        Отказ собрать скрипт — это 500, а не пустая страница: человек, чей
+        `curl` молча вернул ноль байт, получит `bash`, которому нечего делать,
+        и решит, что подключился.
+        """
+        try:
+            текст = install_script()
+        except InstallScriptError as отказ:
+            print(f"[mcp] установщик не собран: {отказ}", file=sys.stderr)
+            self._send(
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"error": "Скрипт установки на сервере не собран"},
+            )
+            return
+        self._send_text(HTTPStatus.OK, текст, INSTALL_CONTENT_TYPE)
+
     # Имена do_GET/do_POST задаёт BaseHTTPRequestHandler — он ищет их по имени.
     def do_GET(self) -> None:
-        """Просматриваемой поверхности у сервера нет: только JSON-RPC по POST."""
+        """Единственная просматриваемая поверхность — скрипт установки.
+
+        Остальное по-прежнему 405: сервер отвечает на JSON-RPC по POST, и
+        расширять эту дверь нечем — за ней история проверок партнёров.
+        """
+        путь = self.path.split("?", 1)[0].rstrip("/") or "/"
+        if путь == INSTALL_PATH:
+            self._guarded(self._serve_install)
+            return
         self._guarded(
             lambda: self._send(
                 HTTPStatus.METHOD_NOT_ALLOWED, {"error": "Сервер отвечает только на POST"}
