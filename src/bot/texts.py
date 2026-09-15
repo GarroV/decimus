@@ -1206,16 +1206,17 @@ TEXTS: dict[str, dict[str, str]] = {
     # написано, что произойдёт.
     "mcp.offer": {
         "ru": (
-            "Подключение к проверкам из Claude Desktop. По кнопке придёт готовая команда "
-            "с вашим личным токеном — вставить в терминал, и подключение есть.\n\n"
+            "Подключение к проверкам из Claude Code. По кнопке придёт одна строка с "
+            "вашим личным токеном — вставить в терминал, и подключение есть.\n\n"
             "Если вы уже подключались, нажатие выпустит новый токен, а прежняя настройка "
             "перестанет работать: её надо будет заменить присланной командой."
         ),
         "en": (
-            "Connecting Claude Desktop to the inspections. The button sends a ready command "
-            "with your personal token — paste it into a terminal and the connection is there."
-            "\n\nIf you have connected before, pressing it issues a new token and the "
-            "previous setup stops working: it will have to be replaced with the new command."
+            "Connecting Claude Code to the inspections. The button sends a single line "
+            "with your personal token — paste it into a terminal and the connection is "
+            "there.\n\n"
+            "If you have connected before, pressing it issues a new token and the previous "
+            "setup stops working: replace it with the command that arrives."
         ),
     },
     # На кнопке написано ДЕЙСТВИЕ, а не «да»: человек, вернувшийся к пункту
@@ -1225,7 +1226,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": (
             "Подключение к проверкам из Claude. Следующим сообщением придёт готовая "
             "команда с вашим личным токеном — скопируйте её целиком и выполните в "
-            "терминале той машины, где стоит Claude. Менять в ней нечего.\n\n"
+            "терминале той машины, где стоит Claude Code. Одна строка: она пропишет "
+            "сервер в настройки клиента, ставить для этого ничего не нужно.\n\n"
             "Токен показан один раз. Бот его не хранит и повторить не сможет: если "
             "команда потеряется, вызовите пункт заново — придёт новый токен, а прежний "
             "перестанет работать, и настройку придётся сделать заново.\n\n"
@@ -1233,14 +1235,32 @@ TEXTS: dict[str, dict[str, str]] = {
             "пересылайте: пересланный работает у того, кто его получил."
         ),
         "en": (
-            "Connecting Claude to the inspections. The next message is the ready command "
-            "with your personal token — copy it whole and run it in the terminal of the "
-            "machine where Claude is installed. Nothing in it needs changing.\n\n"
-            "The token is shown once. The bot does not store it and cannot repeat it: if "
-            "the command gets lost, call this item again — a new token will arrive and the "
-            "previous one will stop working, so the setup will have to be redone.\n\n"
-            "The token is personal and opens the entire inspection history. Forward it to "
-            "no one: a forwarded token works for whoever received it."
+            "Connecting Claude to the inspections. The next message is a ready command "
+            "with your personal token — copy it whole and run it in a terminal on the "
+            "machine where Claude Code is installed. One line: it writes the server into "
+            "the client's settings, and nothing has to be installed for that.\n\n"
+            "The token is shown once. The bot does not keep it and cannot repeat it: if "
+            "the command gets lost, open the menu item again — a new token arrives, the "
+            "previous one stops working, and the setup has to be redone.\n\n"
+            "The token is personal and opens the whole inspection history. Do not forward "
+            "it to anyone: a forwarded token works for whoever received it."
+        ),
+    },
+    # Сказано ПОСЛЕ команды, а не до: пока человек её не выполнил, говорить ему
+    # про перезапуск сессии незачем, а после — это первое, обо что он споткнётся
+    # (клиент читает список серверов при старте).
+    "mcp.code_restart": {
+        "ru": (
+            "Готово. Если Claude Code уже был запущен — перезапустите сессию: список "
+            "серверов он читает при старте.\n\n"
+            "Проверить: claude mcp list — в списке должен стоять dodo-audit с отметкой "
+            "Connected. Если его нет или он не подключается, напишите сюда."
+        ),
+        "en": (
+            "Done. If Claude Code was already running, restart the session: it reads the "
+            "server list at startup.\n\n"
+            "To check: claude mcp list — dodo-audit should be there, marked Connected. "
+            "If it is missing or fails to connect, tell us here."
         ),
     },
     # Сама команда собирается не здесь, а в `src/bot/mcp_setup.py`, и это

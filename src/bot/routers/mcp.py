@@ -61,7 +61,7 @@ from src.db.errors import DbError
 from ..config import BotSettings
 from ..keyboards import MCP_SETUP_SEND, mcp_setup_keyboard
 from ..lang import chat_ui_lang
-from ..mcp_setup import desktop_command
+from ..mcp_setup import code_command
 from ..texts import t
 
 logger = logging.getLogger(__name__)
@@ -259,13 +259,8 @@ def build_mcp_router(settings: BotSettings) -> Router:
             await message.answer(t("mcp.unavailable", lang))
             return
         await message.answer(t("mcp.setup", lang))
-        await message.answer(t("mcp.desktop_note", lang))
-        await message.answer(
-            desktop_command(
-                url=setup_url(lang), token=выпущен.value, done=t("mcp.desktop_done", lang)
-            )
-        )
-        await message.answer(t("mcp.desktop_restart", lang))
+        await message.answer(code_command(url=setup_url(lang), token=выпущен.value))
+        await message.answer(t("mcp.code_restart", lang))
         if выпущен.replaced_previous:
             await message.answer(t("mcp.replaced", lang))
 
