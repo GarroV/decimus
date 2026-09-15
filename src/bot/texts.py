@@ -1246,6 +1246,23 @@ TEXTS: dict[str, dict[str, str]] = {
             "it to anyone: a forwarded token works for whoever received it."
         ),
     },
+    # Сказано ПОСЛЕ команды, а не до: пока человек её не выполнил, говорить ему
+    # про перезапуск сессии незачем, а после — это первое, обо что он споткнётся
+    # (клиент читает список серверов при старте).
+    "mcp.code_restart": {
+        "ru": (
+            "Готово. Если Claude Code уже был запущен — перезапустите сессию: список "
+            "серверов он читает при старте.\n\n"
+            "Проверить: claude mcp list — в списке должен стоять dodo-audit с отметкой "
+            "Connected. Если его нет или он не подключается, напишите сюда."
+        ),
+        "en": (
+            "Done. If Claude Code was already running, restart the session: it reads the "
+            "server list at startup.\n\n"
+            "To check: claude mcp list — dodo-audit should be there, marked Connected. "
+            "If it is missing or fails to connect, tell us here."
+        ),
+    },
     # Сама команда собирается не здесь, а в `src/bot/mcp_setup.py`, и это
     # вынужденно: в ней есть и фигурные скобки JSON, и `${{...}}` оболочки, а
     # тексты каталога проходят через `str.format` (`t()` внизу файла), где
