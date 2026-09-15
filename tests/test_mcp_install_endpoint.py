@@ -9,12 +9,14 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 import threading
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 
 import pytest
 
@@ -133,3 +135,51 @@ def test_сборщик_и_дверь_отдают_одно_и_то_же(сер�
     _, тело, _ = _get(f"{сервер}{INSTALL_PATH}")
 
     assert тело == install_script()
+
+
+def test_установщик_реально_отрабатывает_на_подставном_доме(сервер: str, tmp_path: Path) -> None:
+    """Скрипт запускается по-настоящему, а не только разбирается.
+
+    **Зачем отдельно от `bash -n`.** Разбор проверяет синтаксис и пропускает
+    то, что ломается на исполнении. Живой промах 15.09.2026: имена переменных
+    были написаны кириллицей, а bash допускает в них только `[A-Za-z0-9_]` —
+    для него `TOKEN="..."` с русскими буквами не присваивание, а команда с
+    таким именем. `bash -n` дал зелёный свет, установщик упал у человека на
+    первой же строке `command not found`, и поймал это не тест, а владелец.
+
+    Прогон идёт в подставном доме (`HOME`) и без `claude` в `PATH`: трогать
+    настоящий файл настроек человека тест не имеет права, а ветку Claude Code
+    здесь и не проверяют — проверяется, что скрипт доходит до конца и кладёт
+    мост.
+    """
+    _, тело, _ = _get(f"{сервер}{INSTALL_PATH}")
+    дом = tmp_path / "home"
+    (дом / "Library" / "Application Support" / "Claude").mkdir(parents=True)
+    чужой = дом / "Library" / "Application Support" / "Claude" / "claude_desktop_config.json"
+    чужой.write_text('{"mcpServers":{"сосед":{"command":"/bin/echo","args":["привет"]}}}')
+
+    прогон = subprocess.run(
+        ["/bin/bash", "-s"],
+        input=тело,
+        text=True,
+        capture_output=True,
+        check=False,
+        env={
+            "HOME": str(дом),
+            "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            "DODO_MCP_URL": "http://127.0.0.1:8265/",
+            "DODO_MCP_TOKEN": "t" * 40,
+        },
+    )
+
+    assert прогон.returncode == 0, f"установщик упал: {прогон.stderr}"
+    мост = дом / ".dodo-audit" / "bin" / "mcp_bridge.sh"
+    assert мост.exists(), "мост на машину не лёг"
+    assert "curl" in мост.read_text(), "мост лёг пустым"
+    настройки = json.loads(чужой.read_text())
+    assert "сосед" in настройки["mcpServers"], "чужой сервер в настройках затёрт"
+    наш = настройки["mcpServers"]["dodo-audit"]
+    assert наш["command"] == "/bin/bash", "запись сделана не в форме command+args"
+    assert "url" not in наш and "type" not in наш, (
+        "в настройки Desktop попала форма http — приложение молча сотрёт весь блок"
+    )
