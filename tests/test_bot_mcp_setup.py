@@ -157,7 +157,7 @@ def строка_настройки(session: RecordingSession) -> str:
 #: человека в сессии не остаётся ни наших переменных с токеном, ни `set -eu`
 #: (`src/bot/mcp_setup.py`). Сама команда проверяется запуском в
 #: `tests/test_bot_mcp_command.py`; здесь — что в переписку уехала именно она.
-НАЧАЛО_КОМАНДЫ = "bash <<'DODO_SETUP'"
+НАЧАЛО_КОМАНДЫ = "claude mcp add"
 
 
 # --- то, ради чего задача заведена ------------------------------------------
@@ -307,7 +307,7 @@ async def test_про_перезапуск_приложения_сказано_�
 
     await настроить(dp, bot)
 
-    assert session.texts[-1] == t("mcp.desktop_restart", "ru"), "про перезапуск не сказано"
+    assert session.texts[-1] == t("mcp.code_restart", "ru"), "про перезапуск не сказано"
     команда = строка_настройки(session)
     assert session.texts.index(команда) < len(session.texts) - 1, "перезапуск назван до команды"
 
@@ -966,7 +966,7 @@ async def test_объяснение_и_команда_разными_сообщ�
         "команда пришла не голой — в терминал уедет лишний текст"
     )
     assert команда.endswith("DODO_SETUP"), "к команде приклеен хвост"
-    assert t("mcp.desktop_restart", "ru") not in команда
+    assert t("mcp.code_restart", "ru") not in команда
     assert t("mcp.desktop_note", "ru") not in команда
 
 
@@ -1026,7 +1026,7 @@ async def test_язык_интерфейса_параметр_и_здесь(
     assert session.texts[1] == t("mcp.setup", "en")
     assert session.texts[2] == t("mcp.desktop_note", "en")
     assert t("mcp.url_unknown", "en") in строка_настройки(session)
-    assert session.texts[-1] == t("mcp.desktop_restart", "en")
+    assert session.texts[-1] == t("mcp.code_restart", "en")
     assert session.keyboard_texts() == [t("btn.mcp_send", "en")], (
         "надпись на кнопке осталась на языке стенда по умолчанию"
     )
