@@ -42,10 +42,16 @@ TEST_APP_PASSWORD ?= $(shell grep -m1 '^DATABASE_APP_PASSWORD=' .env 2>/dev/null
 # теста снятия падают отказом связи, хотя роль в базе есть и права у неё те.
 TEST_RETRACTION_PASSWORD ?= $(shell grep -m1 '^DATABASE_RETRACTION_PASSWORD=' .env 2>/dev/null | cut -d= -f2-)
 
+# Доступы уходят в окружение дочернего процесса через target-specific export,
+# а НЕ подстановкой в командную строку рецепта. Разница не косметическая:
+# make печатает рецепт перед выполнением, и подставленные там пароли уехали бы
+# в вывод прогона целиком — в терминал, в лог CI, в транскрипт сессии, откуда
+# их уже не отозвать иначе как сменой пароля. Заодно они не попадают в
+# командную строку процесса, то есть не видны в `ps` любому на машине.
+test: export DATABASE_URL = $(TEST_DATABASE_URL)
+test: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
+test: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 test:
-	DATABASE_URL="$(TEST_DATABASE_URL)" \
-	DATABASE_APP_PASSWORD="$(TEST_APP_PASSWORD)" \
-	DATABASE_RETRACTION_PASSWORD="$(TEST_RETRACTION_PASSWORD)" \
 	$(VENV)/pytest
 
 # Прогон с ЧЕСТНОЙ проверкой порчей. Отдельная цель, а не режим `test`, и это
