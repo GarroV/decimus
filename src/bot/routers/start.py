@@ -16,6 +16,7 @@ import asyncio
 import logging
 
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -44,6 +45,7 @@ from ..keyboards import (
     sealed_keyboard,
 )
 from ..lang import chat_ui_lang
+from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
@@ -108,12 +110,22 @@ async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
     await message.answer(t("start.ask_unit", lang))
 
 
-def build_start_router(settings: BotSettings, pending: PendingStore | None = None) -> Router:
+def build_start_router(
+    settings: BotSettings,
+    pending: PendingStore | None = None,
+    store: MaterialStore | None = None,
+) -> Router:
     """Роутер мастера начала проверки.
 
     `settings` нужен ради карты имён (T063). `pending` — чтобы кнопки прошлой
     проверки не выстрелили в новую: предложение, показанное пять минут назад,
-    зафиксировало бы запись уже в другой пиццерии.
+    зафиксировало бы запись уже в другой пиццерии. `store` — ровно по той же
+    причине и о том же (T249, issue #202): очередь ожидания живёт в памяти
+    процесса, и кадр новой проверки забирал придержанные слова старой.
+
+    Оба необязательны: юнит-тесты мастера собирают роутер в одиночку, и
+    требовать от них хранилища, которых мастер не наполняет, значило бы
+    заставить их знать про разбор материала.
     """
     router = Router(name="start")
 
@@ -248,9 +260,13 @@ def build_start_router(settings: BotSettings, pending: PendingStore | None = Non
         sidecar.reset(chat_id)
         if pending is not None:
             pending.forget(chat_id)
+        if store is not None:
+            # Проверки в чате больше нет вовсе — ждать её кадрам и словам не
+            # для чего (T249).
+            store.forget(chat_id)
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
-    @router.message(StateFilter(StartFlow.waiting_unit), F.text)
+    @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))
     async def on_unit(message: Message, state: FSMContext) -> None:
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
@@ -271,9 +287,42 @@ def build_start_router(settings: BotSettings, pending: PendingStore | None = Non
         await state.set_state(StartFlow.waiting_kind)
         await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
-    @router.message(StateFilter(StartFlow.waiting_unit))
+    @router.message(StateFilter(StartFlow.waiting_unit), F.text, F.text.startswith("/"))
+    async def on_unit_command(message: Message) -> None:
+        """Команда вместо названия точки (T250, issue #203).
+
+        Роутер `start` стоит в диспетчере первым, и до этой задачи команда,
+        набранная или выбранная в меню на шаге названия, до своего обработчика
+        не доходила — она становилась названием пиццерии и уезжала в шапку
+        отчёта и в имя файла. Поводов попасть сюда прибавилось с пунктом
+        «Установка MCP» (T209): это разовая настройка, её нажимают в
+        произвольный момент, в том числе не дочитав вопрос мастера.
+
+        Команда выполняется, а мастер остаётся ждать название. Порядок роутеров
+        при этом не трогается — он в этом блоке несущий, — потому что сообщение
+        пропускается дальше отсюда (`SkipHandler`). Тем же приёмом и по той же
+        причине живёт вопрос о новой формулировке (`routers/edit.py`).
+
+        `/start` сюда не попадает: он зарегистрирован в этом же роутере выше и
+        обязан работать всегда — это единственный выход из тупика.
+
+        Строка в чат — не вежливость. Своего ответа у незнакомой команды нет
+        вовсе, а у знакомой он придёт следом и вытеснит вопрос мастера с
+        экрана: аудитор прочитает ответ команды и решит, что название принято.
+        """
+        await message.answer(t("start.unit_command", chat_ui_lang(message.chat.id)))
+        raise SkipHandler
+
+    @router.message(StateFilter(StartFlow.waiting_unit), ~F.text)
     async def on_unit_not_text(message: Message) -> None:
-        """Кадр или голос вместо названия: сказать, чего ждём, а не молчать."""
+        """Кадр или голос вместо названия: сказать, чего ждём, а не молчать.
+
+        Фильтр `~F.text` обязателен, и это не украшение подписи (T250):
+        `SkipHandler` продолжает поиск с ОСТАВШИХСЯ обработчиков того же
+        роутера, а не со следующего. Будь этот перехватчиком всего подряд, он
+        поймал бы пропущенную команду здесь же — и она никуда бы не уехала, а
+        аудитор получил бы «жду название» вместо ответа команды.
+        """
         await message.answer(t("start.unit_expected", chat_ui_lang(message.chat.id)))
 
     @router.callback_query(StateFilter(StartFlow.waiting_kind), F.data.startswith(KIND_PREFIX))
@@ -360,6 +409,13 @@ def build_start_router(settings: BotSettings, pending: PendingStore | None = Non
         sidecar.reset(message.chat.id)
         if pending is not None:
             pending.forget(message.chat.id)
+        if store is not None:
+            # Очередь ожидания — того же возраста (T249, issue #202). Чистится
+            # здесь, а не на входе в мастер: мастер аудитор бросает на полпути,
+            # и тогда прежняя проверка остаётся жить — вместе со сказанным в
+            # неё. Именно поэтому и сама проверка лежит на диске до этой
+            # строки (T052).
+            store.forget(message.chat.id)
 
         started_lang = ui_lang_or_default(inspection.ui_lang)
         # Обрезка не уезжает молча (T128): строка про неё — рядом с именем,
