@@ -54,7 +54,7 @@ def _проверка(
     """Завершённая проверка нужного арендатора через официальный контракт домена."""
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     for номер in range(находок):
-        add_finding(chat_id, code="CLN05", level="D1", zone=ЗОНЫ[номер], text=текст)
+        add_finding(chat_id, code="CLN03", level="D1", zone=ЗОНЫ[номер], text=текст)
     return push_inspection(chat_id)
 
 

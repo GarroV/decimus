@@ -277,7 +277,7 @@ async def test_поправленное_предложение_лежит_в_б�
         monkeypatch,
         suggestion(
             candidate("CLN02", "D1", "hot_kitchen", confidence=0.51),
-            candidate("CLN05", "D1", "hot_kitchen", confidence=0.31),
+            candidate("CLN03", "D1", "hot_kitchen", confidence=0.31),
         ),
     )
     bot, session = make_bot()
@@ -286,13 +286,19 @@ async def test_поправленное_предложение_лежит_в_б�
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:pick:1"))
     await feed(dp, bot, callback(f"{EDIT_PREFIX}1:zone"))
-    await feed(dp, bot, callback("ez:1:dining"))
+    # Зона правится на ДОПУСТИМУЮ этому пункту: с T271 движок отвергает пару,
+    # которой методика не даёт, и правка в чужую зону здесь отказала бы — а
+    # тест не про отказ, он про то, что обе тройки доезжают до базы. Запрет
+    # правки в чужую зону стережёт `tests/test_bot_zone_unusual.py`.
+    await feed(dp, bot, callback("ez:1:cold_kitchen"))
     await build_report(dp, bot)
 
     assert session.documents, "отчёт не отдан — слива могло и не быть"
     (строка,) = db.findings_by_unit(tenant="default", unit="Белград 2")
 
-    assert (строка.code, строка.zone) == ("CLN05", "dining"), "в базу легла не итоговая тройка"
+    assert (строка.code, строка.zone) == ("CLN03", "cold_kitchen"), (
+        "в базу легла не итоговая тройка"
+    )
     assert (строка.suggested_code, строка.suggested_level, строка.suggested_zone) == (
         "CLN02",
         "D1",
