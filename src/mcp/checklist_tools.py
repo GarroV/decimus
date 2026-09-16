@@ -479,7 +479,7 @@ def photo_cue_suggestions(
         proposals_api.CueRow(
             section=row.section,
             phrase=row.cells[0],
-            columns=tuple(cues_api.cell_codes(ячейка) for ячейка in row.cells[1:]),
+            cells=cues_api.editable_cells(row),
         )
         for row in разобранные
     )

@@ -35,7 +35,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from ..recognize.config import NO_CHAT
-from ..recognize.cues import CUES_FILE, THRESHOLDS_HEADINGS, load_cues
+from ..recognize.cues import CUES_FILE, THRESHOLDS_HEADINGS, ZONE_HEADINGS, load_cues
 from .checklist import Outcome, Store, _ensure, _version_dir, apply_edit
 from .errors import ChecklistError
 
@@ -50,13 +50,27 @@ _RULE_CHARS = set("-: ")
 #: задумывал человек.
 _PIPE = "|"
 
+#: Чем пишется «кода в этой колонке нет». Прочерк стоит в карте у объектов, о
+#: которых спрашивают не всё: у стеллажа есть вопрос про грязь и нет про
+#: поломку. Разборщик продукта такую ячейку просто пропускает.
+_DASH = "—"
+
+#: Ячейка, которая означает «кода нет», а не формулировку не на месте.
+_BLANK = frozenset({"", "-", "–", "—", "--"})
+
 
 @dataclass(frozen=True)
 class _Row:
-    """Строка файла карты, разобранная настолько, насколько нужно для правки."""
+    """Строка файла карты, разобранная настолько, насколько нужно для правки.
+
+    `header` — шапка ТОЙ таблицы, в которой лежит строка, а не первая шапка
+    раздела: под одним заголовком раздела боевой карты стоят семнадцать
+    таблиц, и колонки строка обязана узнавать у своей.
+    """
 
     index: int
     section: str
+    header: tuple[str, ...]
     cells: tuple[str, ...]
     codes: tuple[str, ...]
 
@@ -74,16 +88,21 @@ def _scan(text: str) -> tuple[list[_Row], dict[str, tuple[str, ...]]]:
 
     Правила отбора — те же, что у разборщика продукта: раздел порогов классов
     пропускается целиком (там коды стоят в первой ячейке и подсказками не
-    являются), заголовком таблицы считается первая строка без кодов.
+    являются), заголовком таблицы считается строка без кодов — и заголовок
+    этот запоминается КАЖДОЙ следующей строке, как его запоминает продукт.
+    Словарь разделов остаётся прежним (первая шапка раздела): по нему
+    заводится новая строка и отвечает чтение.
     """
     rows: list[_Row] = []
     headers: dict[str, tuple[str, ...]] = {}
     section = ""
+    header: tuple[str, ...] = ()
     in_thresholds = False
     for index, line in enumerate(text.splitlines()):
         if line.startswith("## "):
             section = line[3:].strip()
             in_thresholds = line.strip().startswith(THRESHOLDS_HEADINGS)
+            header = ()
             continue
         if in_thresholds or not line.lstrip().startswith(_PIPE):
             continue
@@ -92,10 +111,110 @@ def _scan(text: str) -> tuple[list[_Row], dict[str, tuple[str, ...]]]:
             continue
         codes = tuple(dict.fromkeys(_CODE.findall(" ".join(cells[1:]))))
         if not codes:
+            header = cells
             headers.setdefault(section, cells)
             continue
-        rows.append(_Row(index=index, section=section, cells=cells, codes=codes))
+        rows.append(_Row(index=index, section=section, header=header, cells=cells, codes=codes))
     return rows, headers
+
+
+def _zone_at(header: tuple[str, ...]) -> int | None:
+    """Где в таблице стоит колонка «Зона» — по ЗАГОЛОВКУ, а не по номеру (T262).
+
+    Считать колонки числом нельзя в принципе: колонка, добавленная управляющей
+    компанией, сдвигает все номера разом. Заголовок колонки зоны продукт знает
+    на всех языках правил (`zone_column` в `language_rules.json`), и знает его
+    тот же код, который читает карту в проверке.
+    """
+    for место, название in enumerate(header):
+        if место and название.strip().lower() in ZONE_HEADINGS:
+            return место
+    return None
+
+
+def _named(header: tuple[str, ...]) -> tuple[int, ...]:
+    """Колонки, которые называет вызывающий: все, кроме фразы и кроме зоны.
+
+    Зона не называется, потому что кодов она не несёт и ставит её управляющая
+    компания в самой карте: правка кодов обязана вернуть зону на место, а не
+    потребовать её заново — иначе она молча снимала бы зону объекта.
+    """
+    зона = _zone_at(header)
+    return tuple(место for место in range(1, len(header)) if место != зона)
+
+
+def _shape(row: _Row) -> tuple[str, ...]:
+    """Форма строки: её шапка, а если строка шире или уже шапки — она сама.
+
+    Второй случай означает разъехавшуюся карту. Тогда правка ведёт себя как до
+    T289 — названы все ячейки, — но молчаливой формулировки в кодовой колонке
+    не пропускает: у формы без шапки кодовыми считаются все колонки.
+    """
+    return row.header if len(row.header) == len(row.cells) else row.cells
+
+
+def _zone_value(row: _Row) -> str:
+    место = _zone_at(_shape(row))
+    return row.cells[место].strip() if место is not None and место < len(row.cells) else ""
+
+
+def editable_cells(row: _Row) -> tuple[str, ...]:
+    """Ячейки строки, которые называет правка: без фразы и без колонки зоны.
+
+    Публично, потому что этим же разбором сборка предложений (T165) собирает
+    вызов правки, а чтение карты отвечает агенту. Свой разбор в каждом из трёх
+    мест означал бы предложение, которое `edit_photo_cue` отклонит по ширине.
+    """
+    форма = _shape(row)
+    return tuple(row.cells[место] if место < len(row.cells) else "" for место in _named(форма))
+
+
+def _code_bearing(rows: list[_Row], header: tuple[str, ...]) -> frozenset[int]:
+    """Колонки, несущие коды у строк таблицы такой же формы.
+
+    Кодовые колонки от колонок управляющей компании («Откуда» — кем строка
+    заведена) отличаются наблюдаемым: у кодовой колонки коды в таблице ЕСТЬ.
+    Списком заголовков это не решается — заголовки своих колонок УК не
+    согласовывает ни с кем, и список пришлось бы вести здесь за неё.
+
+    Строк такой формы нет вовсе — кодовыми считаются все колонки: строгость
+    здесь дешевле молча принятой формулировки на месте кода.
+    """
+    свои = [row for row in rows if row.header == header]
+    if not свои:
+        return frozenset(_named(header))
+    return frozenset(
+        место
+        for место in _named(header)
+        for row in свои
+        if место < len(row.cells) and cell_codes(row.cells[место])
+    )
+
+
+def _compose(
+    header: tuple[str, ...],
+    cells: tuple[str, ...],
+    phrase: str,
+    *,
+    previous: _Row | None,
+) -> tuple[str, ...]:
+    """Строка целиком: фраза, названные ячейки по своим колонкам и зона.
+
+    Зона берётся у прежней строки (правка) либо остаётся пустой (новая
+    строка): пустая зона — законное значение и означает «спросить», а не
+    беду данных. Ячейка под неё обязана быть в любом случае — строка другой
+    ширины разъезжается по колонкам.
+    """
+    названные = dict(zip(_named(header), cells, strict=True))
+    получилось = [phrase]
+    for место in range(1, len(header)):
+        if место in названные:
+            получилось.append(названные[место])
+        elif previous is not None and место < len(previous.cells):
+            получилось.append(previous.cells[место])
+        else:
+            получилось.append("")
+    return tuple(получилось)
 
 
 def _known_codes(data_dir: Path) -> set[str]:
@@ -135,35 +254,73 @@ def _check_phrase(phrase: str) -> str:
     return value
 
 
-def _check_codes(codes: list[str], *, known: set[str], columns: int) -> tuple[str, ...]:
-    """Коды по колонкам — или отказ, называющий, что именно не так."""
+def _check_codes(
+    codes: list[str],
+    *,
+    known: set[str],
+    header: tuple[str, ...],
+    bearing: frozenset[int],
+) -> tuple[str, ...]:
+    """Ячейки строки по колонкам — или отказ, называющий, что именно не так.
+
+    Ячеек называется столько, сколько в таблице колонок кроме фразы и кроме
+    зоны, и узнаются они по ЗАГОЛОВКУ. Числом колонки считать нельзя: карта
+    управляющей компании держит рядом свои колонки, и каждая новая ломала бы
+    правку заново — ровно это и случилось с колонкой «Зона» (T289).
+    """
+    места = _named(header)
     if not codes:
         raise ChecklistError(
             "Не названо ни одного кода пункта. Подсказка без кодов — это заголовок таблицы, "
             "а не строка карты: разборщик продукта прочитает её именно так"
         )
-    if len(codes) != columns:
+    if len(codes) != len(места):
+        названия = ", ".join(f"«{header[место]}»" for место in места) or "нет"
+        зона = _zone_at(header)
+        про_зону = (
+            f" Колонка «{header[зона]}» правкой не задаётся и остаётся как записана."
+            if зона is not None
+            else ""
+        )
         raise ChecklistError(
-            f"В таблице этого раздела {columns} колонок с кодами, а названо {len(codes)}. "
-            f"Строка другой ширины разъезжается, и коды попадают не в те колонки — а колонки "
-            f"здесь значат разное: «грязь» и «поломка» это два разных вопроса про один объект"
+            f"Ячеек в строке этого раздела {len(места)} — {названия}, а названо {len(codes)}."
+            f"{про_зону} Строка другой ширины разъезжается, и коды попадают не в те колонки — "
+            f"а колонки здесь значат разное: «грязь» и «поломка» это два разных вопроса про "
+            f"один объект"
+        )
+    if not any(_CODE.findall(cell.upper()) for cell in codes):
+        raise ChecklistError(
+            "Ни в одной названной ячейке нет ни одного кода пункта. Строка без кодов — это "
+            "заголовок таблицы, а не строка карты: разборщик продукта прочитает её именно "
+            "так. Коды выглядят как CLN05"
         )
     ячейки: list[str] = []
-    for cell in codes:
+    for место, cell in zip(места, codes, strict=True):
         найденные = _CODE.findall(cell.upper())
-        if not найденные:
+        if найденные:
+            чужие = sorted(set(найденные) - known)
+            if чужие:
+                raise ChecklistError(
+                    f"Кодов {', '.join(чужие)} в методике этой версии нет. Подсказка вывела бы "
+                    f"модели пункт, которого в чек-листе не существует, а быстрый путь записал "
+                    f"бы его без подтверждения аудитора"
+                )
+            ячейки.append(", ".join(dict.fromkeys(найденные)))
+            continue
+        текст = (cell or "").strip()
+        if место not in bearing:
+            # Колонка управляющей компании: кодов она не несёт ни у одной
+            # строки таблицы, и слова в ней — то, что там и написано.
+            ячейки.append(текст)
+            continue
+        if текст not in _BLANK:
             raise ChecklistError(
-                f"В колонке «{cell}» нет ни одного кода пункта. Коды выглядят как CLN05: "
-                f"сущности связываются кодами, а не формулировками"
+                f"В колонке «{header[место]}» стоит «{текст}», а не код пункта. У других строк "
+                f"этой таблицы коды в ней есть, значит колонка кодовая: сущности связываются "
+                f"кодами, а не формулировками. Кода в этой колонке нет — так и напишите "
+                f"«{_DASH}»"
             )
-        чужие = sorted(set(найденные) - known)
-        if чужие:
-            raise ChecklistError(
-                f"Кодов {', '.join(чужие)} в методике этой версии нет. Подсказка вывела бы "
-                f"модели пункт, которого в чек-листе не существует, а быстрый путь записал бы "
-                f"его без подтверждения аудитора"
-            )
-        ячейки.append(", ".join(dict.fromkeys(найденные)))
+        ячейки.append(_DASH)
     return tuple(ячейки)
 
 
@@ -251,7 +408,15 @@ def read(store: Store, *, version: str | None = None) -> dict[str, object]:
     разделы: dict[str, list[dict[str, object]]] = {}
     for row in rows:
         разделы.setdefault(row.section, []).append(
-            {"phrase": row.cells[0], "codes": list(row.codes), "cells": list(row.cells[1:])}
+            {
+                "phrase": row.cells[0],
+                "codes": list(row.codes),
+                # Ячейки — ровно те, что называет правка: из ответа агент
+                # собирает её вызов, и лишняя ячейка вернулась бы отказом по
+                # ширине. Зона стоит своим полем и правкой не задаётся.
+                "cells": list(editable_cells(row)),
+                "zone": _zone_value(row),
+            }
         )
     return {
         "version": каталог.name,
@@ -259,12 +424,14 @@ def read(store: Store, *, version: str | None = None) -> dict[str, object]:
         "count": len(rows),
         "status": (
             f"{len(rows)} cue rows in {len(разделы)} sections; the map only adds and reorders "
-            f"candidates and never trims them, and the thresholds section is not part of it"
+            f"candidates and never trims them, and the thresholds section is not part of it. "
+            f"'cells' and 'columns' are exactly what an edit names; the zone column is set by "
+            f"the management company in the map itself and is kept as it is"
         ),
         "sections": [
             {
                 "section": name,
-                "columns": list(headers.get(name, ())[1:]),
+                "columns": [headers[name][место] for место in _named(headers.get(name, ()))],
                 "cues": строки,
             }
             for name, строки in разделы.items()
@@ -302,12 +469,20 @@ def add(
                 f"Строка «{фраза}» в карте уже есть. Две строки с одной фразой — это правка "
                 f"мимо цели: работать будет первая, а править человек станет вторую"
             )
-        заголовок = headers[section.strip()]
-        ячейки = _check_codes(codes, known=_known_codes(кандидат), columns=len(заголовок) - 1)
         свои = [row for row in rows if row.section == section.strip()]
+        # Шапка ТОЙ таблицы, в которую строка ложится, а не первая шапка
+        # раздела: под одним заголовком раздела боевой карты стоят семнадцать
+        # таблиц, и новая строка встаёт в последнюю.
+        заголовок = (свои[-1].header if свои else ()) or headers[section.strip()]
+        ячейки = _check_codes(
+            codes,
+            known=_known_codes(кандидат),
+            header=заголовок,
+            bearing=_code_bearing(rows, заголовок),
+        )
         куда = (свои[-1].index if свои else _scan(текст)[0][0].index) + 1
         строки = текст.splitlines()
-        строки.insert(куда, _line((фраза, *ячейки)))
+        строки.insert(куда, _line(_compose(заголовок, ячейки, фраза, previous=None)))
         _cues_file(кандидат).write_text("\n".join(строки) + "\n", encoding="utf-8")
         коды = tuple(dict.fromkeys(_CODE.findall(" ".join(ячейки))))
         _verify(кандидат, expected={фраза: коды})
@@ -343,13 +518,18 @@ def edit(
 
     def _mutate(кандидат: Path, _holder: Path) -> tuple[str | None, str]:
         текст = _text(кандидат)
-        rows, headers = _scan(текст)
+        rows, _ = _scan(текст)
         строка = _find(rows, phrase)
-        заголовок = headers.get(строка.section, строка.cells)
+        форма = _shape(строка)
         ячейки = (
-            _check_codes(codes, known=_known_codes(кандидат), columns=len(заголовок) - 1)
+            _check_codes(
+                codes,
+                known=_known_codes(кандидат),
+                header=форма,
+                bearing=_code_bearing(rows, форма),
+            )
             if codes is not None
-            else строка.cells[1:]
+            else editable_cells(строка)
         )
         итоговая = новая if новая is not None else строка.cells[0]
         if новая is not None and новая.casefold() != строка.cells[0].casefold():
@@ -357,7 +537,7 @@ def edit(
             if занято:
                 raise ChecklistError(f"Строка «{новая}» в карте уже есть")
         строки = текст.splitlines()
-        строки[строка.index] = _line((итоговая, *ячейки))
+        строки[строка.index] = _line(_compose(форма, ячейки, итоговая, previous=строка))
         _cues_file(кандидат).write_text("\n".join(строки) + "\n", encoding="utf-8")
         коды = tuple(dict.fromkeys(_CODE.findall(" ".join(ячейки))))
         ожидаемо: dict[str, tuple[str, ...] | None] = {итоговая: коды}

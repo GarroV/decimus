@@ -223,11 +223,17 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
     "type": "array",
     "items": {"type": "string"},
     "description": (
-        "Checklist codes the cue raises, one entry per code column of the "
-        "section's table (a two-column table takes exactly one entry). Put "
-        "several codes in one entry separated by commas, in the order they "
-        "should be offered. Codes only: entities are linked by code, never by "
-        "wording."
+        "One entry per cell the row names: every column of that section's "
+        "table except the phrase itself and the zone column (a table of "
+        "phrase plus candidates takes exactly one entry). photo_cues returns "
+        "them in order as 'columns' and 'cells' — build the call from there. "
+        "Put several codes in one entry separated by commas, in the order "
+        "they should be offered; write a dash for a code column this object "
+        "has no question in, and repeat a management company's own column "
+        "(where it records who entered the row) as it stands. In a code "
+        "column, entities are linked by code, never by wording. The zone "
+        "column is not named here at all and keeps what is recorded for the "
+        "row: the zone is the management company's to set in the map."
     ),
 }
 
@@ -844,10 +850,12 @@ TOOLS: tuple[ToolSpec, ...] = (
             "checked against the checklist of that same version: a cue "
             "pointing at an item that does not exist would offer the model a "
             "code the methodology does not carry. 'codes' is one entry per "
-            "code column of that section's table, so a two-column table takes "
-            "exactly one entry; a row of the wrong width is rejected, because "
-            "the columns mean different things (dirt and breakage are two "
-            "questions about one object)."
+            "cell the map names — every column of that section's table except "
+            "the phrase and the zone column; a row of the wrong width is "
+            "rejected, because the columns mean different things (dirt and "
+            "breakage are two questions about one object). A new row gets an "
+            "empty zone: an empty zone means 'ask', and filling it in the map "
+            "is the management company's call."
         ),
         input_schema={
             "type": "object",
@@ -880,7 +888,9 @@ TOOLS: tuple[ToolSpec, ...] = (
             "force. The row is named by its phrase in full and word for word: "
             "no nearest match is substituted, because editing the wrong row "
             "changes what gets recorded without the auditor confirming it. "
-            "Name at least one of 'codes' and 'new_phrase'."
+            "The zone column is not named and is kept exactly as recorded, so "
+            "correcting codes never drops the object's zone. Name at least "
+            "one of 'codes' and 'new_phrase'."
         ),
         input_schema={
             "type": "object",
