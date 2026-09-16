@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
+.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -130,6 +130,13 @@ loadcheck-live:
 # без денег — гонять после каждого пополнения карты слов data/photo-cues.md.
 fastpath:
 	STATE_DIR=$${STATE_DIR:-/tmp/fastpath-state} $(VENV)/python tools/fastpath_measure.py
+
+# Замер T272: покрытие словаря зон — сколько формулировок доходит до зоны
+# словами и картой кадров, и какие строки карты дописать следующими, чтобы
+# покрытие выросло. Отвечает на «много ли осталось» числом, а не ощущением.
+# Детерминированно, без сети и без денег.
+zonecov:
+	STATE_DIR=$${STATE_DIR:-/tmp/zonecov-state} $(VENV)/python tools/zone_coverage.py
 
 # Замер T166: сколько раз признак «<описание>, это <процесс>» срабатывает там,
 # где указания словарю не было. Признак ненадёжен по устройству, и единственное,

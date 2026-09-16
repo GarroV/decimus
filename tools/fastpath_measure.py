@@ -22,22 +22,32 @@
 сняты с подсказки, которой на точке не будет, и к живому боту отношения не
 имели.
 
+**Чем он был неверен во второй раз — до T272 (задача #218).** Память о прошлой
+записи как источник зоны снята целиком (T264): она уводила пункт про печь в
+холодный цех, потому что прошлая запись была оттуда. Решение D048 отменено,
+и `sidecar.remember_zone` в продукте больше нет вовсе. Замер, продолжавший
+моделировать память, мерил бы поведение, которого в боте не осталось.
+
 **Что меряется теперь.** Три способа добыть зону, а не один, и каждый честно
 подписан:
 
-* `hints_bot` — как зовёт бот: слова, иначе память проверки. Это и есть
-  боевое число.
-* `hints_spoken` — только слова, без памяти: пол замера, то есть срабатывания,
-  за которыми стоит названная человеком зона, а не догадка.
+* `hints_bot` — как зовёт бот сегодня (T263): слова комментария, иначе словарь
+  объектов карты кадров (колонка «Зона», T262). Это и есть боевое число.
+* `hints_spoken` — только слова, без словаря: пол замера, то есть срабатывания,
+  за которыми стоит названная человеком зона, а не вывод по объекту.
 * `hints_reference` — эталонная зона из записи. Верхняя граница, живому боту
   недостижимая; оставлена, чтобы видеть цену незнания зоны, а не выдавать её
   за результат.
 
-**Память смоделирована зоной предыдущей записи той же проверки.** Бот пишет в
-заметки зону только что созданной записи (`sidecar.remember_zone` в `_save`,
-`src/bot/routers/record.py`), а в `examples/*/inspection.json` записи лежат в
-порядке создания и несут ту зону, которая в итоге записана. Перед первой
-записью проверки памяти нет — значит, зоны нет вовсе.
+**Словарь зовётся продуктовый, а не своя копия правил.** `zone_from_words` и
+`dictionary_zone` — те самые функции из `src/bot/zones.py`, которыми зону
+выводит бот; разойдясь с ними, замер дал бы число, которого на точке не
+бывает. Ровно этим он и был неверен до T125.
+
+**Третьего источника — спроса кнопкой — здесь нет, и это не пропуск.** Кнопку
+нажимает человек, а замер меряет то, что происходит ДО него: быстрый путь
+отвечает без участия аудитора, и подставленный за него ответ превратил бы
+замер автоматики в замер человека.
 
 **Числа живут ровно до следующей правки карты слов** (D066: карту ведёт
 управляющая компания). Поэтому замер печатает дату и отпечаток карты сам:
@@ -96,7 +106,7 @@ sys.path.insert(0, str(ROOT))
 # снова мерил бы не то, что происходит на точке. Контракт слоёв (import-linter,
 # `pyproject.toml`) этим не задет — он описывает пакет `src`, а `tools/` это
 # инструменты ПОВЕРХ продукта, не его ярус.
-from src.bot.zones import zone_from_words  # noqa: E402
+from src.bot.zones import dictionary_zone, zone_from_words  # noqa: E402
 from src.domain import get_item  # noqa: E402
 from src.domain.errors import ConfigError, DomainError  # noqa: E402
 from src.recognize import language  # noqa: E402
@@ -106,7 +116,7 @@ from src.recognize.fastpath import fast_path  # noqa: E402
 
 #: Откуда взялась зона, с которой позвали быстрый путь.
 FROM_WORDS = "из слов"
-FROM_MEMORY = "из памяти"
+FROM_DICTIONARY = "из словаря"
 FROM_NOWHERE = "неоткуда"
 FROM_REFERENCE = "из эталона"
 
@@ -171,9 +181,9 @@ class Mode:
 def load_records(root: Path) -> tuple[Record, ...]:
     """Боевые записи из `examples/*/inspection.json`, в порядке их создания.
 
-    Порядок важен: память бота о прошлой зоне (D048) моделируется предыдущей
-    записью той же проверки, и перемешать записи значило бы смоделировать
-    другой обход точки.
+    Порядок сохраняется, потому что по нему читается таблица разбора: она
+    показывает обход точки. На подсказку зоны он с T264 не влияет — память о
+    прошлой записи снята как источник, и каждая запись стоит сама за себя.
 
     Файлы лежат вне git (решение D002), поэтому на чужой машине их может не
     быть — пустой кортеж тогда не ошибка чтения, а законный итог.
@@ -200,7 +210,7 @@ def hints_reference(records: Sequence[Record]) -> tuple[Hint, ...]:
 
 
 def hints_spoken(records: Sequence[Record]) -> tuple[Hint, ...]:
-    """Только слова комментария, без памяти: пол замера."""
+    """Только слова комментария, без словаря объектов: пол замера."""
     out: list[Hint] = []
     for record in records:
         spoken = zone_from_words(record.note, chat_id=NO_CHAT)
@@ -209,27 +219,28 @@ def hints_spoken(records: Sequence[Record]) -> tuple[Hint, ...]:
 
 
 def hints_bot(records: Sequence[Record]) -> tuple[Hint, ...]:
-    """Как зовёт бот: слова комментария, иначе память о прошлой записи проверки.
+    """Как зовёт бот (T263): слова комментария, иначе словарь объектов карты кадров.
 
-    Память сбрасывается на смене проверки: у каждой свой чат и свои заметки.
-    Она догадка, а не факт (D048), и подставленная ею чужая зона — не изъян
-    модели замера, а ровно то, что происходит на точке.
+    Порядок именно такой и другим не бывает: человек, назвавший место вслух,
+    сильнее любой таблицы. Прошлая запись проверки источником зоны больше не
+    является (T264) — она уводила пункт про печь в холодный цех, — и записи
+    здесь поэтому независимы друг от друга: порядок их следования на результат
+    не влияет вовсе.
+
+    Третьего источника, спроса кнопкой, у замера нет: его даёт человек, а
+    быстрый путь отвечает до него.
     """
     out: list[Hint] = []
-    memory: str | None = None
-    inspection: str | None = None
     for record in records:
-        if record.source != inspection:
-            inspection, memory = record.source, None
         spoken = zone_from_words(record.note, chat_id=NO_CHAT)
         if spoken:
             out.append(Hint(zone=spoken, source=FROM_WORDS))
-        elif memory:
-            out.append(Hint(zone=memory, source=FROM_MEMORY))
+            continue
+        known = dictionary_zone(record.note, chat_id=NO_CHAT)
+        if known:
+            out.append(Hint(zone=known[0], source=FROM_DICTIONARY))
         else:
             out.append(Hint(zone=None, source=FROM_NOWHERE))
-        # Бот запоминает зону СОЗДАННОЙ записи, а созданная запись — эталонная.
-        memory = record.zone
     return tuple(out)
 
 
@@ -247,8 +258,8 @@ def measure(records: Sequence[Record], hints: Sequence[Hint] | None = None) -> t
 def modes(records: Sequence[Record]) -> tuple[Mode, ...]:
     """Три способа добыть зону. Первый — боевой, остальные для сравнения с ним."""
     return (
-        Mode("Как зовёт бот: слова, иначе память проверки", measure(records, hints_bot(records))),
-        Mode("Только слова аудитора, без памяти", measure(records, hints_spoken(records))),
+        Mode("Как зовёт бот: слова, иначе словарь объектов", measure(records, hints_bot(records))),
+        Mode("Только слова аудитора, без словаря", measure(records, hints_spoken(records))),
         Mode(
             "Эталонная зона из записи — ВЕРХНЯЯ ГРАНИЦА, живому боту недостижима",
             measure(records, hints_reference(records)),
@@ -286,7 +297,7 @@ def _table(outcomes: Sequence[Outcome]) -> list[str]:
 def _zone_sources(outcomes: Sequence[Outcome]) -> str:
     counted = Counter(o.hint.source for o in outcomes)
     parts = ", ".join(
-        f"{name}: {counted.get(name, 0)}" for name in (FROM_WORDS, FROM_MEMORY, FROM_NOWHERE)
+        f"{name}: {counted.get(name, 0)}" for name in (FROM_WORDS, FROM_DICTIONARY, FROM_NOWHERE)
     )
     return f"Откуда бот брал зону — {parts} (всего записей: {len(outcomes)})."
 
@@ -322,8 +333,9 @@ def render(measured: Sequence[Mode]) -> str:
         "карты: карту ведёт управляющая компания (D066), после её правки замер "
         "снимается заново.",
         "",
-        "Зона берётся так же, как в src/bot/routers/record.py::_analyze — "
-        "zone_from_words(комментарий), иначе память о прошлой записи проверки.",
+        "Зона берётся так же, как в src/bot/zones.py::resolve_zone — "
+        "zone_from_words(комментарий), иначе dictionary_zone (колонка «Зона» карты кадров). "
+        "Память о прошлой записи источником зоны не является с T264.",
         "",
         *_table(live.outcomes),
         "",

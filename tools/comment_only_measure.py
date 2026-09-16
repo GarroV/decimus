@@ -21,8 +21,9 @@
 законный исход). Он не переиспользует `tools.fastpath_measure.load_records`:
 тому загрузчику неоткуда взять путь к кадру — он меряет только текст, а этому
 кадр нужен как раз для плеча A. Зона-подсказка при этом ПЕРЕИСПОЛЬЗУЕТСЯ
-(`tools.fastpath_measure.hints_bot`) — свою копию правила «слова, иначе память
-проверки» здесь заводить нельзя, она разошлась бы с ботом молча.
+(`tools.fastpath_measure.hints_bot`) — свою копию правила «слова, иначе
+словарь объектов карты кадров» (T263) здесь заводить нельзя, она разошлась бы
+с ботом молча.
 
 **Плечо A строит СТАРОЕ правило заново**, а не зовёт продукт: `needs_photo`
 после D081 приняло другую сигнатуру (без `cue_hits`), и просто вызвать функцию
@@ -102,7 +103,7 @@ from src.recognize.errors import RecognizeError  # noqa: E402
 from src.recognize.schema import picks_for  # noqa: E402
 from src.recognize.shortlist import shortlist  # noqa: E402
 from tools.fastpath_measure import (  # noqa: E402
-    FROM_MEMORY,
+    FROM_DICTIONARY,
     FROM_NOWHERE,
     FROM_WORDS,
     Hint,
@@ -145,9 +146,9 @@ class Corpus:
 def load_corpus(root: Path) -> Corpus:
     """Боевые записи `examples/*/inspection.json`, в порядке файла и папки.
 
-    Порядок сохраняется целиком: `hints_bot` моделирует память бота о зоне
-    предыдущей записи той же проверки (D048), и перемешанные записи значили
-    бы другой обход точки.
+    Порядок сохраняется целиком: он и есть обход точки, и по нему читается
+    таблица разбора. На подсказку зоны порядок с T264 не влияет вовсе — память
+    о прошлой записи снята как источник, и каждая запись стоит сама за себя.
     """
     records: list[Record] = []
     skipped: list[str] = []
@@ -445,7 +446,7 @@ def _hint_sources_line(outcomes: Sequence[CaseOutcome]) -> str:
     counted = Counter(o.hint_source for o in outcomes)
     return (
         f"Откуда бот брал зону-подсказку — {FROM_WORDS}: {counted.get(FROM_WORDS, 0)}, "
-        f"{FROM_MEMORY}: {counted.get(FROM_MEMORY, 0)}, "
+        f"{FROM_DICTIONARY}: {counted.get(FROM_DICTIONARY, 0)}, "
         f"{FROM_NOWHERE}: {counted.get(FROM_NOWHERE, 0)} (всего записей: {len(outcomes)})."
     )
 

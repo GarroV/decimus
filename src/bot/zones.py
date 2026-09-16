@@ -263,8 +263,14 @@ def allowed_zones(item_code: str | None, *, chat_id: int | None) -> tuple[str, .
     return tuple(code for code in зоны if пункт.applies_to(code))
 
 
-def _dictionary_zone(note: str, *, chat_id: int | None) -> tuple[str, str] | None:
+def dictionary_zone(note: str, *, chat_id: int | None) -> tuple[str, str] | None:
     """Зона объекта из карты кадров и сам объект. Не вывелась — `None`.
+
+    Публичная не для продукта, а для замера: `tools/fastpath_measure.py` и
+    `tools/zone_coverage.py` обязаны звать ТУ ЖЕ выборку, которой зовёт бот.
+    Своя копия правил в замере разошлась бы с продуктом при первой правке и
+    дала бы число, которого на точке не бывает, — ровно тем этот замер и был
+    неверен до T125.
 
     Зон несколько — не вывелась: объект стоит в разных цехах, и выбирать за
     человека разбор не вправе (случай стеллажа). Код, которого нет в
@@ -315,7 +321,7 @@ def resolve_zone(note: str, item_code: str | None, *, chat_id: int | None) -> Zo
     """
     options = allowed_zones(item_code, chat_id=chat_id)
     spoken = zone_from_words(note, chat_id=chat_id)
-    known = _dictionary_zone(note, chat_id=chat_id)
+    known = dictionary_zone(note, chat_id=chat_id)
     if spoken is not None:
         conflict = (
             ZoneConflict(spoken=spoken, dictionary=known[0], phrase=known[1])
