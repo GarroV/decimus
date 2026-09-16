@@ -390,3 +390,24 @@ def stub_manual(monkeypatch: Any, items: tuple[ManualCandidate, ...]) -> Calls:
 
     monkeypatch.setattr("src.bot.routers.record.manual_candidates", fake)
     return calls
+
+
+def stub_search(monkeypatch: Any, items: tuple[ManualCandidate, ...]) -> Calls:
+    """Подмена поиска пункта СЛОВОМ — первого входа в ручной выбор (T267).
+
+    Нужна там, где тест написан про ЛИСТАНИЕ перечня: с T267 `_open_manual`
+    сперва зовёт `search_items`, и если слово аудитора подняло хоть один пункт,
+    до `manual_candidates` управление не доходит вовсе — заглушка перечня
+    молчит, а тест проверяет находку по слову вместо страницы.
+
+    Пустой кортеж означает «слово не подняло ничего» и открывает ровно ту
+    ветку, ради которой листание и осталось запасным входом.
+    """
+    calls = Calls()
+
+    def fake(word: object, **kw: object) -> tuple[ManualCandidate, ...]:
+        calls.append((word,))
+        return items
+
+    monkeypatch.setattr("src.bot.routers.record.search_items", fake)
+    return calls
