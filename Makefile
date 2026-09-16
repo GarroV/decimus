@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
+.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down state-backup mcp mcp-outside cov-engine
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -175,8 +175,10 @@ migrate:
 # появившихся в новом коде. Здесь только сборка; подъём — отдельным шагом,
 # потому что раскатка на живой продукт идёт по своей процедуре и по «да»
 # владельца (docs/08-deploy.md).
+# state-backup собирается здесь же: compose именует образы по сервису, и без
+# него первый ночной прогон выгрузки полез бы собирать образ сам (#233).
 image:
-	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp
+	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp state-backup
 
 # Стенд базы одной командой (T090): поднять Postgres рядом с ботом, дождаться
 # ГОТОВНОСТИ БАЗЫ (`--wait` идёт по healthcheck, а не по факту запуска
@@ -206,6 +208,21 @@ storage-up:
 # `--profile storage down -v` унёс бы том состояния идущих проверок.
 storage-down:
 	docker compose --profile storage rm -sf storage
+
+# Выгрузка тома состояния в бэкап (#233). В томе лежат папки идущих проверок и
+# связки доступа `access/roster.json`; бэкап площадки умеет только дампы
+# Postgres, и до этой задачи состояние не выгружалось никуда.
+#
+# `run --rm`, а не `up`: сервис одноразовый — делает архив и выходит.
+# Симметричная на вид `--profile backup up -d` подняла бы заодно бота и
+# сервер, потому что сервис без `profiles:` активен при ЛЮБОМ значении
+# профиля (та же ловушка, что у demo-down и db-down).
+#
+# Каталог бэкапа — BACKUP_DIR в .env (на площадке C:\backups), по умолчанию
+# ./backups рядом с копией репозитория. Срок хранения своих архивов —
+# BACKUP_KEEP_DAYS, по умолчанию 14 суток, как у бэкапа Postgres площадки.
+state-backup:
+	docker compose run --rm state-backup
 
 # MCP-сервер поверх базы проверок (T095). Только чтение; доступ — личным
 # токеном из MCP_TOKENS (.env), слушает петлю и наружу не публикуется.
