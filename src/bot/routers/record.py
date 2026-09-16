@@ -472,6 +472,7 @@ async def _try_fast(
         auto=item,
         zone_spoken=base.zone_spoken,
         zone_from_cues=base.zone_from_cues,
+        zone_source=base.zone_source,
         # Быстрый путь — это и есть тот список терминов, который владелец просил
         # пополнять (D077). Промах здесь опаснее всего: подтверждения у него нет
         # (D064), и увидеть его можно только правкой записи следом. Уверенности
@@ -623,11 +624,30 @@ async def analyze(
     await _analyze_resolved(message, chat_id, base, pending, lang, report_lang, fast=fast)
 
 
+def _frame_without_record(chat_id: int, file_ids: Sequence[str], outcome: str) -> None:
+    """Кадру — причина, по которой записи по нему не появилось (T269, #219).
+
+    Отдельно от накопителя намеренно, и это не дробление ради дробления.
+    Причина у кадра известна СРАЗУ: «система ничего не нашла» — уже ответ, и
+    при завершении проверки аудитор обязан его прочитать, а не просто увидеть
+    кадр без объяснений. Судьба самой ФОРМУЛИРОВКИ в этот момент ещё не
+    решена: после «ничего не нашлось» показывается ручной перечень, и запись
+    по ней вполне может появиться. Запиши мы накопитель здесь — одна
+    формулировка легла бы в него дважды (сначала «не нашлось», следом «не
+    записывать»), а читается он счётом «встретилось N раз», то есть дубль
+    прямо искажает ответ управляющей компании.
+    """
+    sidecar.remember_outcome(chat_id, file_ids, outcome)
+
+
 def _lost(
     chat_id: int,
-    proposal: Proposal,
-    outcome: str,
     *,
+    file_ids: Sequence[str],
+    note: str,
+    zone: str,
+    zone_source: str,
+    outcome: str,
     suggested: domain.Suggestion | None = None,
 ) -> None:
     """Записи по этому материалу не появилось — сказать почему и не потерять (T269).
@@ -641,23 +661,28 @@ def _lost(
       накопитель не идёт: копится именно она, а кадр без слов покрывать
       словарём нечего — он уже назван своим исходом выше.
 
+    Зовётся там, где судьба формулировки решена окончательно: аудитор нажал
+    «не записывать» или движок отказал парой, которой методика не даёт. Там,
+    где впереди ещё есть путь к записи, ставится только исход кадра
+    (`_frame_without_record`).
+
     Молчание на этом месте и было дефектом: аудитор сказал о находке, система
     не нашла пункт, аудитор пошёл дальше — и не осталось ни записи, ни следа.
     """
-    sidecar.remember_outcome(chat_id, proposal.file_ids, outcome)
-    note = proposal.note.strip()
-    if not note:
+    _frame_without_record(chat_id, file_ids, outcome)
+    сказанное = note.strip()
+    if not сказанное:
         return
     inspection = read_inspection(chat_id)
     domain.record_uncovered(
         chat_id,
         domain.UncoveredEntry(
-            note=note,
+            note=сказанное,
             suggested_code="" if suggested is None else suggested.code,
             suggested_level="" if suggested is None else suggested.level,
             suggested_zone="" if suggested is None else suggested.zone,
-            zone=proposal.zone_hint,
-            zone_source=proposal.zone_source,
+            zone=zone,
+            zone_source=zone_source,
             outcome=(
                 domain.OUTCOME_REFUSED
                 if outcome == sidecar.OUTCOME_REFUSED
@@ -790,6 +815,14 @@ async def _analyze_resolved(
         if suggestion.question:
             await message.answer(t("record.question", lang, question=suggestion.question))
         await message.answer(t("record.nothing_found", lang))
+        # Причина кадра известна уже здесь (T269, #219): до этой задачи кадр,
+        # по которому система не нашла ничего, доживал до завершения проверки
+        # без единого слова о том, почему он остался без записи. Формулировка
+        # в накопитель отсюда НЕ уходит — ручной перечень открывается следом,
+        # и запись по ней ещё может появиться.
+        await asyncio.to_thread(
+            _frame_without_record, chat_id, base.file_ids, sidecar.OUTCOME_NOTHING_FOUND
+        )
         await _open_manual(message, chat_id, base, pending, lang)
         return
 
@@ -879,6 +912,7 @@ async def _save(
     auto: FastItem | None = None,
     zone_spoken: bool = False,
     zone_from_cues: bool = False,
+    zone_source: str = "",
     suggested: domain.Suggestion | None = None,
     correcting: int | None = None,
     origin: int | None = None,
@@ -921,6 +955,13 @@ async def _save(
     терялся бы целиком, как терялся до этой задачи. Пусто — предложения не было
     (ручной перечень); домен запишет это как «система не предлагала ничего», и
     в базе такая запись не выглядит попаданием модели.
+
+    `zone_source` — чем зона получена (`domain.ZONE_SOURCES`), и нужен он
+    ровно одному читателю: строке накопителя, которая заводится, когда движок
+    отказал (T269). Два признака рядом (`zone_spoken`, `zone_from_cues`)
+    отвечают на другой вопрос — какую оговорку показать аудитору, — и кнопку
+    от слов не различают вовсе. Пусто — зону дал не человек и не словарь
+    (ответ модели, зона самого пункта), и накопитель это так и запишет.
 
     `correcting` — номер записи, которую надо ПОПРАВИТЬ вместо того, чтобы
     заводить новую (T204, D081). Аудитор ответил на сообщение бота словами
@@ -1002,6 +1043,26 @@ async def _save(
         # Отказ, назвавший запись, — её показ: ответ словами на него правит её,
         # а не заводит новую из чужого ждущего кадра (T227).
         await tell_refusal(message, chat_id, told, lang)
+        if correcting is None and told.clash is None:
+            # Записи по этой формулировке не появилось, и пара не занята —
+            # значит движок отверг саму пару «пункт + зона» (T271). Это ровно
+            # тот сигнал, ради которого заведён накопитель (T269, #228).
+            #
+            # Занятая пара сюда не идёт намеренно: там запись о том же
+            # нарушении уже есть, формулировка покрыта картой, и строка
+            # накопителя утопила бы настоящие пробелы в частом случае — тот же
+            # пункт в той же зоне аудитор снимает дважды за обход. Правка (
+            # `correcting`) не идёт по той же причине: правимая запись жива.
+            await asyncio.to_thread(
+                _lost,
+                chat_id,
+                file_ids=file_ids,
+                note=words,
+                zone=zone,
+                zone_source=zone_source,
+                outcome=sidecar.OUTCOME_REFUSED,
+                suggested=suggested,
+            )
         return None
     for file_id in file_ids:
         try:
@@ -1215,6 +1276,11 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # модели словарём не является: это её ответ, и оговорка о карте
             # кадров соврала бы.
             zone_from_cues=(proposal.zone_from_cues and candidate.zone == proposal.zone_hint),
+            # Зона записи — ответ МОДЕЛИ, и источником из трёх он становится
+            # только тогда, когда совпал с выведенным до неё. Разошлись —
+            # накопитель честно скажет «не вывелась»: подписать ответ модели
+            # словами аудитора значило бы соврать там, где сигнал и собирают.
+            zone_source=(proposal.zone_source if candidate.zone == proposal.zone_hint else ""),
             suggested=_model_suggestion(proposal),
             # Нажатие под правкой означает «поправить на этот пункт», а не
             # «завести ещё один»: адресат назван ответом аудитора и с тех пор
@@ -1252,6 +1318,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # Зону назвал человек кнопкой: оговорка о том, откуда она взялась,
             # была бы неправдой, а зона пункта не имеет права её перебить.
             zone_spoken=True,
+            zone_source=domain.ZONE_SOURCE_BUTTONS,
             # В предложении остаётся ответ модели — `UNKNOWN`. Подставить сюда
             # выбранную зону значило бы спрятать её отказ и превратить промах
             # в попадание.
@@ -1357,6 +1424,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # словами — `zone_spoken` уже стоит.
             zone_spoken=proposal.zone_spoken,
             zone_from_cues=proposal.zone_from_cues,
+            zone_source=proposal.zone_source,
             # Предложения здесь нет и быть не может: ручной перечень
             # показывается ровно тогда, когда модель не ответила ничего —
             # недоступна или вернула пустой список. Записать предложением
@@ -1490,7 +1558,15 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # «Не записывать» — законный выбор аудитора, но не повод потерять
             # формулировку: в конце проверки у кадра будет названа причина, а
             # управляющая компания увидит, чего не хватило карте (T269, #219).
-            await asyncio.to_thread(_lost, chat_id, proposal, sidecar.OUTCOME_ABANDONED)
+            await asyncio.to_thread(
+                _lost,
+                chat_id,
+                file_ids=proposal.file_ids,
+                note=proposal.note,
+                zone=proposal.zone_hint,
+                zone_source=proposal.zone_source,
+                outcome=sidecar.OUTCOME_ABANDONED,
+            )
         await message.answer(t("record.skipped", lang))
 
     return router

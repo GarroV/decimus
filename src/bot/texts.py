@@ -901,6 +901,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Этот кадр остался без записи.",
         "en": "This photo has no record.",
     },
+    # Причина у кадра, а не только сам кадр (T269, задача #219). Показать кадр
+    # и промолчать о причине значило бы отдать аудитору на точке загадку:
+    # «система не нашла пункт» и «я нажал не записывать» чинятся по-разному, а
+    # выглядели одинаково. Неизвестный исход (заметки прежних проверок) берёт
+    # нейтральный текст выше — врать про причину хуже, чем её не назвать.
+    "finish.unclaimed_nothing": {
+        "ru": "Этот кадр остался без записи: подходящего пункта не нашлось.",
+        "en": "This photo has no record: no matching item was found.",
+    },
+    "finish.unclaimed_abandoned": {
+        "ru": "Этот кадр остался без записи: вы выбрали «не записывать».",
+        "en": "This photo has no record: you chose not to record it.",
+    },
+    "finish.unclaimed_refused": {
+        "ru": "Этот кадр остался без записи: пункт в этой зоне методика не держит.",
+        "en": "This photo has no record: the methodology does not allow that item in that zone.",
+    },
     "finish.unclaimed_rest": {
         "ru": "Ещё {rest} — показываю по одной пачке: разберите эти и вызовите /records, "
         "покажу следующие.",

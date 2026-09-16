@@ -61,6 +61,17 @@ UNCLAIMED_SHOWN_LIMIT = 10
 HELD_SHOWN_LIMIT = 10
 
 
+#: Причина, по которой кадр остался без записи, → текст под ним (T269, #219).
+#: Исход, которого здесь нет (пусто у кадра, по которому выбор не сделан, или
+#: значение из заметок прежних изданий), берёт нейтральный `unclaimed_frame`:
+#: назвать причину неверно хуже, чем не назвать её вовсе.
+UNCLAIMED_REASONS = {
+    sidecar.OUTCOME_NOTHING_FOUND: "finish.unclaimed_nothing",
+    sidecar.OUTCOME_ABANDONED: "finish.unclaimed_abandoned",
+    sidecar.OUTCOME_REFUSED: "finish.unclaimed_refused",
+}
+
+
 async def _show_unclaimed(
     message: Message, frames: tuple[sidecar.SeenFrame, ...], lang: str
 ) -> None:
@@ -80,6 +91,12 @@ async def _show_unclaimed(
     Отказ на одном кадре не отменяет остальных и не проходит молча: сколько
     кадров показать не удалось, сказано числом — иначе «показал всё» было бы
     неправдой ровно там, где T068 и заведена.
+
+    Под каждым кадром — ПРИЧИНА, по которой записи по нему не появилось (T269,
+    задача #219). До этой задачи текст был один на все случаи: «этот кадр
+    остался без записи». Аудитор видел кадр и не знал, что с ним делать —
+    система не нашла пункт, он сам нажал «не записывать» или движок отверг
+    пару, — а чинятся эти три случая по-разному.
     """
     await message.answer(t("finish.unclaimed", lang, count=len(frames)))
     failed = 0
@@ -87,7 +104,7 @@ async def _show_unclaimed(
         try:
             await message.answer_photo(
                 frame.file_id,
-                caption=t("finish.unclaimed_frame", lang),
+                caption=t(UNCLAIMED_REASONS.get(frame.outcome, "finish.unclaimed_frame"), lang),
                 reply_to_message_id=frame.message_id,
                 allow_sending_without_reply=True,
             )
