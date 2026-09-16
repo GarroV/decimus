@@ -46,11 +46,11 @@ from bot_harness import (
     photo_message,
     stub_classify,
     stub_manual,
+    stub_search,
     suggestion,
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import MANUAL_PAGE_SIZE
@@ -95,6 +95,23 @@ _HOT_KITCHEN_ITEMS: tuple[tuple[str, tuple[str, ...]], ...] = (
 def _hot_kitchen_manual_items() -> tuple[ManualCandidate, ...]:
     """Двадцать пунктов зоны "hot_kitchen" для `stub_manual` — три страницы."""
     return tuple(manual(code, levels, f"Пункт {code}") for code, levels in _HOT_KITCHEN_ITEMS)
+
+
+@pytest.fixture(autouse=True)
+def _без_находок_по_слову(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Поиск словом молчит: этот файл про ЛИСТАНИЕ, а оно — запасной вход (T267).
+
+    С T267 `_open_manual` сперва зовёт `search_items`, и подпись «печь, посмотри
+    что тут» поднимает по слову пару пунктов. Тогда перечнем становится находка,
+    заглушка `stub_manual` не зовётся вовсе, и каждый тест страниц проверяет не
+    то, что написано в его имени. Пустая находка открывает ровно ту ветку, ради
+    которой листание и осталось: слово не подняло ничего — показываем пункты
+    зоны страницами.
+
+    Сам поиск словом стережёт `tests/test_bot_record_router.py` и наборы блока
+    `recognize`; дублировать его здесь значило бы мерить дважды одно.
+    """
+    stub_search(monkeypatch, ())
 
 
 def started() -> None:
@@ -228,6 +245,9 @@ async def test_item_picked_from_the_second_page_records_the_correct_code(
     dp = build_dispatcher(SETTINGS)
 
     await feed(dp, bot, photo_message("frame-1", caption="протухший фарш на разделке"))
+    # Слова не называют ни места, ни объекта карты — зону называет кнопка, и
+    # только после неё есть перечень, который можно листать (T266, T267).
+    await feed(dp, bot, callback("rec:zm:hot_kitchen"))
     await feed(dp, bot, callback("rec:mp:1"))
     assert "rec:mi:9" in session.keyboard_data(), (
         "пункт с индексом 9 обязан быть на второй странице"
@@ -244,18 +264,28 @@ async def test_item_picked_from_the_second_page_records_the_correct_code(
     assert state.findings[0].text == "протухший фарш на разделке"
 
 
-async def test_unknown_zone_is_asked_before_the_list(
+async def test_слово_ничего_не_подняло_и_тогда_спрашивается_зона(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Зону взять неоткуда — сначала кнопки зон, перечень пунктов ещё не открыт."""
+    """Тупика нет ни в одной ветке (#219): не нашлось по слову — выбираем зоной.
+
+    Зона больше не спрашивается ПЕРЕД перечнем всегда (так было до T267): если
+    слово аудитора подняло пункты, зона не нужна вовсе, а нужную спросят после
+    выбора пункта и только из допустимых ему (T266). Кнопки зон остались ровно
+    для этого случая — слов нет или они не легли ни на одну строку карты, — и
+    бот обязан сказать об этом прямо, а не показать пустой перечень.
+    """
     started()
     stub_classify(monkeypatch, ModelUnavailable("нет сети"))
     stub_manual(monkeypatch, (manual("PRD06", ("D1",), "Пункт без сети"),))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
+    await feed(dp, bot, photo_message("frame-1", caption="тут грязно"))
 
+    assert t("record.nothing_by_words", "ru") in session.texts, (
+        "перечень подменён молча — аудитор не знает, что по его словам не нашлось"
+    )
     assert session.last_text == t("record.ask_zone", "ru")
     data = session.keyboard_data()
     assert any(d.startswith("rec:zm:") for d in data)
@@ -265,20 +295,24 @@ async def test_unknown_zone_is_asked_before_the_list(
     assert findings() == []
 
 
-async def test_zone_picked_by_button_opens_the_list_and_is_remembered(
+async def test_zone_picked_by_button_opens_the_list_for_that_zone(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """После кнопки зоны перечень открывается для неё, и она запоминается (D048)."""
+    """После кнопки зоны перечень собирается ДЛЯ НЕЁ, а не для какой-то другой.
+
+    Хвост «и запоминается» из имени снят вместе с самой памятью (T264, D118):
+    зона прошлой записи источником не является ни в одной ветке, и запоминать
+    названную кнопкой не для чего.
+    """
     started()
     stub_classify(monkeypatch, ModelUnavailable("нет сети"))
     manual_calls = stub_manual(monkeypatch, (manual("PRD06", ("D1",), "Пункт без сети"),))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
+    await feed(dp, bot, photo_message("frame-1", caption="тут грязно"))
     await feed(dp, bot, callback("rec:zm:hot_kitchen"))
 
-    assert sidecar.read(CHAT_ID).zone == "hot_kitchen"
     assert manual_calls[-1] == ("hot_kitchen",)
     assert session.last_text == t("record.manual_page", "ru", page=1, pages=1)
     assert "rec:mi:0" in session.keyboard_data()
