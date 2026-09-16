@@ -45,8 +45,11 @@ from src.bot.config import BotSettings
 from src.bot.texts import t
 from src.domain import get_state, only_zone, start_inspection
 
-pytestmark = pytest.mark.asyncio
-
+# Пометка стоит у каждого асинхронного теста, а не на модуле целиком (T290):
+# половина файла спрашивает методику синхронно, и общая `pytestmark` вешала
+# `asyncio` и на них — три предупреждения на КАЖДОМ прогоне. Предупреждение,
+# которое видно всегда, перестаёт читаться, и следующее настоящее уедет вместе с
+# ним. Тот же приём в `test_bot_kind_code.py`.
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
 
@@ -84,6 +87,7 @@ def test_незнакомый_пункт_зоны_не_даёт(domain_env: Path
 # --- поведение в разговоре -----------------------------------------------------
 
 
+@pytest.mark.asyncio
 async def test_печь_в_чужой_зоне_от_модели_спрашивается_а_не_пишется(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -123,6 +127,7 @@ async def test_печь_в_чужой_зоне_от_модели_спрашив�
     assert состояние.findings[0].zone == "hot_kitchen"
 
 
+@pytest.mark.asyncio
 async def test_пункт_многих_зон_зоной_берёт_ответ_модели(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -143,6 +148,7 @@ async def test_пункт_многих_зон_зоной_берёт_ответ_�
     assert состояние.findings[0].zone == "cold_kitchen"
 
 
+@pytest.mark.asyncio
 async def test_расхождение_слова_со_словарём_называется_до_фиксации(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
