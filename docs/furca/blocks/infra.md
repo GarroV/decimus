@@ -624,6 +624,42 @@ docker compose run --rm -T state-backup   Архив: decimus-state-20260916-080
   «поставил метку, значит бэкапится» — ровно то необоснованное утверждение, из-за
   которого заведена #233.
 
+
+#### Полный прогон перед сдачей (волна 5)
+
+```
+ruff format --check .             All checks passed
+ruff check .                      All checks passed
+mypy                              Success, 106 файлов (--strict)
+vulture                           чисто (код возврата 0)
+deptry .                          Success
+lint-imports                      2 контракта из 2
+make test                         2585 passed, 0 failed, 0 skipped,
+                                  покрытие 97 %, 8 мин 24 с
+make regress                      belgrade-1 → 97.5 %, A, 5×D1
+                                  belgrade-2 → 97 %,   A, 6×D1
+```
+
+**Ловушка прогона, стоившая часа: строку подключения для тестов подставляет
+`make test`, а не оболочка.** Первый заход экспортировал `DATABASE_URL` из
+`.env` напрямую — и 339 тестов блока `db` упали с `permission denied to create
+database`: у прикладной роли нет права заводить базы, а `conftest` создаёт свою
+`dodo_audit_test_<uuid>` на каждый прогон. `make test` берёт для этого
+АДМИНИСТРАТИВНУЮ строку (`TEST_DATABASE_URL` ← `DATABASE_ADMIN_URL`) и отдаёт
+её через target-specific export, чтобы пароль не уехал в вывод. Вывод для
+следующего: гейты гонять целями `make`, а не собственной сборкой команд.
+
+`data/` и `examples/` не изменялись: 45 файлов, ни одного в `git status`.
+
+#### Уборка
+
+Стенд поднимался только под своим именем `decimus-infrablk` и портом 8340 из
+своего диапазона. Снят целиком: `docker compose -p decimus-infrablk --profile
+funnel --profile backup down -v --remove-orphans`; контейнеров, томов и образов
+с этим именем не осталось ни одного, порты 8340-8349 свободны, проверено
+`lsof`. Общий стенд `decimus-infra` с базой трёх соседей не тронут — он как был
+`Up (healthy)`, так и остался. На площадке не выполнено ни одной команды.
+
 #### Чего в этой волне НЕ делал
 
 - **T259 не брал** — переезд с Cloudflare отложен решением D101 до конца пилота.
