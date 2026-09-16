@@ -40,6 +40,7 @@ from src.bot.texts import t
 from src.domain import add_finding, read_uncovered, start_inspection
 from src.domain.config import check_environment
 from src.domain.engine import chat_dir
+from src.recognize.manual import manual_candidates
 
 pytestmark = pytest.mark.asyncio
 
@@ -53,6 +54,11 @@ SETTINGS = BotSettings(
 #: Комментарий, на котором сверка с картой кадров молчит (колонка не названа
 #: однозначно), и материал уходит модели — то есть туда, где стоит подмена.
 СКАЗАНО = "печь, посмотри что тут"
+
+#: Сказанное, которого карта не знает вовсе: поиск пункта словом молчит, и
+#: ручной выбор начинается с вопроса о зоне — той самой ветки, где до движка
+#: доходит пара, которой методика не даёт.
+НЕЗНАКОМОЕ = "абракадабра шурум-бурум"
 
 
 def начата() -> None:
@@ -150,3 +156,64 @@ async def test_накопитель_уезжает_в_историю_при_сд
     assert [строка["note"] for строка in накопитель["history"]] == [СКАЗАНО], (
         "перенесённая строка обязана найтись в истории, а не пропасть"
     )
+
+
+async def выбран_вручную(dp: Any, bot: Any, zone: str, code: str, level: str) -> None:
+    """Пройти ручной выбор до конца: зона кнопкой, пункт из перечня, класс.
+
+    Номер пункта берётся из того же перечня, что собирает бот, — в кнопке едет
+    именно он. Класс досылается только когда их у пункта несколько: у пункта с
+    единственным классом нажатие на сам пункт уже фиксирует запись, и второе
+    нажатие было бы второй попыткой, а не продолжением первой.
+    """
+    await feed(dp, bot, callback_query(f"rec:zm:{zone}"))
+    перечень = manual_candidates(zone, chat_id=CHAT_ID)
+    место = next(номер for номер, пункт in enumerate(перечень) if пункт.code == code)
+    await feed(dp, bot, callback_query(f"rec:mi:{место}"))
+    if len(перечень[место].levels) > 1:
+        await feed(dp, bot, callback_query(f"rec:ml:{место}:{level}"))
+
+
+async def test_отказ_движка_заводит_строку_накопителя(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Методика не держит пункт в этой зоне (T271) — это и есть пробел, который копят.
+
+    Записи не появилось, а формулировка была: управляющая компания обязана
+    увидеть её в разборе, иначе аудитор упирается в один и тот же отказ на
+    каждом выезде, и об этом не знает никто.
+    """
+    начата()
+    stub_classify(monkeypatch, suggestion())
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, photo_message("frame-1", caption=НЕЗНАКОМОЕ))
+    await выбран_вручную(dp, bot, "dining", "CLN05", "D1")
+
+    (запись,) = read_uncovered(chat_id=CHAT_ID)
+    assert (запись.note, запись.outcome, запись.zone) == (НЕЗНАКОМОЕ, "refused", "dining")
+    session.clear()
+    await feed(dp, bot, text_message("/finish"))
+    assert подписи_кадров(session) == [t("finish.unclaimed_refused", "ru")]
+
+
+async def test_занятая_пара_строки_накопителя_не_заводит(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Повтор обхода — не пробел карты, и в разборе ему не место.
+
+    Тот же пункт в той же зоне аудитор снимает дважды за выезд. Запись о том
+    же нарушении уже есть, формулировка картой покрыта — строка о ней утопила
+    бы настоящие пробелы в самом частом случае.
+    """
+    начата()
+    stub_classify(monkeypatch, suggestion())
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    bot, _ = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, photo_message("frame-1", caption=НЕЗНАКОМОЕ))
+    await выбран_вручную(dp, bot, "hot_kitchen", "CLN05", "D1")
+
+    assert read_uncovered(chat_id=CHAT_ID) == ()
