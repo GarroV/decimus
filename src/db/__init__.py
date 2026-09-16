@@ -48,23 +48,36 @@ if TYPE_CHECKING:
     from .retract import Retraction as Retraction
     from .retract import retract_inspection as retract_inspection
     from .synonyms import ALREADY_KNOWN as ALREADY_KNOWN
+    from .synonyms import ALREADY_POINTED as ALREADY_POINTED
+    from .synonyms import ALREADY_RETRACTED as ALREADY_RETRACTED
     from .synonyms import CONFLICT as CONFLICT
     from .synonyms import LEARNED as LEARNED
     from .synonyms import MANUAL as MANUAL
     from .synonyms import REMEMBERED as REMEMBERED
+    from .synonyms import REPOINTED as REPOINTED
+    from .synonyms import RESTORED as RESTORED
+    from .synonyms import RETRACTED as RETRACTED
     from .synonyms import PhraseAlias as PhraseAlias
+    from .synonyms import PhraseEdit as PhraseEdit
     from .synonyms import PhraseMemory as PhraseMemory
     from .synonyms import list_phrases as list_phrases
     from .synonyms import lookup_phrase as lookup_phrase
     from .synonyms import normalize_phrase as normalize_phrase
     from .synonyms import remember_phrase as remember_phrase
+    from .synonyms import repoint_phrase as repoint_phrase
+    from .synonyms import retract_phrase as retract_phrase
 
 __all__ = [
     "ALREADY_KNOWN",
+    "ALREADY_POINTED",
+    "ALREADY_RETRACTED",
     "CONFLICT",
     "LEARNED",
     "MANUAL",
     "REMEMBERED",
+    "REPOINTED",
+    "RESTORED",
+    "RETRACTED",
     "AccessError",
     "ConfigError",
     "DbError",
@@ -73,6 +86,7 @@ __all__ = [
     "InspectionDetail",
     "InspectionRow",
     "PhraseAlias",
+    "PhraseEdit",
     "PhraseMemory",
     "PushError",
     "Retraction",
@@ -90,8 +104,10 @@ __all__ = [
     "normalize_phrase",
     "push_inspection",
     "remember_phrase",
+    "repoint_phrase",
     "resolve_unit",
     "retract_inspection",
+    "retract_phrase",
     "upload_photos",
     "upsert_unit",
 ]
@@ -123,6 +139,17 @@ _LAZY = {
     "CONFLICT": (".synonyms", "CONFLICT"),
     "LEARNED": (".synonyms", "LEARNED"),
     "MANUAL": (".synonyms", "MANUAL"),
+    # Правка карты (T292): снятие неверной строки и перенаправление её на
+    # другой пункт. Ходят под ролью администратора и своим подключением —
+    # роли приложения переписывать карту по-прежнему нечем.
+    "retract_phrase": (".synonyms", "retract_phrase"),
+    "repoint_phrase": (".synonyms", "repoint_phrase"),
+    "PhraseEdit": (".synonyms", "PhraseEdit"),
+    "RETRACTED": (".synonyms", "RETRACTED"),
+    "ALREADY_RETRACTED": (".synonyms", "ALREADY_RETRACTED"),
+    "REPOINTED": (".synonyms", "REPOINTED"),
+    "ALREADY_POINTED": (".synonyms", "ALREADY_POINTED"),
+    "RESTORED": (".synonyms", "RESTORED"),
 }
 
 
