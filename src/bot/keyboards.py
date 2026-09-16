@@ -173,6 +173,16 @@ MANUAL_LEVEL_PREFIX = "rec:ml:"
 #: Зона, названная кнопкой: для выбранного кандидата и для входа в перечень.
 ZONE_FOR_PICK_PREFIX = "rec:zp:"
 ZONE_FOR_MANUAL_PREFIX = "rec:zm:"
+#: Зона для пункта, выбранного в ручном перечне (T266). Отдельно от входа в
+#: перечень: там зона открывает список, здесь — заканчивает уже сделанный выбор,
+#: и кнопки у неё другие — только зоны, допустимые методикой для ЭТОГО пункта.
+ZONE_FOR_ITEM_PREFIX = "rec:zi:"
+
+#: Расхождение названной зоны со словарём объектов (T266). Аудитор сказал
+#: «холодный цех», а карта держит названный объект в горячем: молча не пишется
+#: ни то, ни другое. Две кнопки и есть весь выбор — зона объекта или другой пункт.
+CUES_ZONE_CALLBACK = "rec:cz"
+CUES_ITEM_CALLBACK = "rec:ci"
 
 #: Правки записи (T056): что менять у записи №n.
 EDIT_PREFIX = "edit:"
@@ -346,6 +356,25 @@ def levels_keyboard(prefix: str, levels: Sequence[str]) -> InlineKeyboardMarkup:
     for level in levels:
         builder.button(text=level, callback_data=f"{prefix}{level}")
     builder.adjust(len(levels) or 1)
+    return builder.as_markup()
+
+
+def zone_conflict_keyboard(lang: str, zone_title: str) -> InlineKeyboardMarkup:
+    """Выбор при расхождении названной зоны со словарём объектов (T266).
+
+    Две кнопки, и третьей нет намеренно. «Оставить мою зону» отсутствует
+    потому, что пара «этот пункт в этой зоне» методикой не разрешена, и движок
+    её не примет (T271): кнопка предлагала бы то, что кончится отказом. Выбор
+    настоящий и ровно такой, как его назвал владелец: либо речь об объекте, и
+    зона у него своя, либо речь о другом пункте — и его надо выбрать.
+    """
+    builder = InlineKeyboardBuilder()
+    builder.button(
+        text=t("btn.cues_zone", lang, zone=_short(zone_title, ZONE_TITLE_LIMIT)),
+        callback_data=CUES_ZONE_CALLBACK,
+    )
+    builder.button(text=t("btn.cues_item", lang), callback_data=CUES_ITEM_CALLBACK)
+    builder.adjust(1)
     return builder.as_markup()
 
 

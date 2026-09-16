@@ -57,6 +57,7 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import replace
+from datetime import datetime, timezone
 from math import ceil
 
 from aiogram import F, Router
@@ -67,7 +68,7 @@ from src.domain.errors import DomainError
 from src.recognize.classify import classify, needs_photo
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
-from src.recognize.manual import manual_candidates
+from src.recognize.manual import manual_candidates, search_items
 from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.transcribe import transcribe
 
@@ -75,6 +76,8 @@ from .. import refusal, sealed, sidecar, view
 from ..inspection import read_inspection
 from ..keyboards import (
     ANALYZE_PREFIX,
+    CUES_ITEM_CALLBACK,
+    CUES_ZONE_CALLBACK,
     MANUAL_CALLBACK,
     MANUAL_LEVEL_PREFIX,
     MANUAL_PAGE_PREFIX,
@@ -83,6 +86,7 @@ from ..keyboards import (
     MODEL_CALLBACK,
     PICK_PREFIX,
     SKIP_CALLBACK,
+    ZONE_FOR_ITEM_PREFIX,
     ZONE_FOR_MANUAL_PREFIX,
     ZONE_FOR_PICK_PREFIX,
     analyze_keyboard,
@@ -91,6 +95,7 @@ from ..keyboards import (
     fixed_keyboard,
     levels_keyboard,
     manual_keyboard,
+    zone_conflict_keyboard,
     zones_keyboard,
 )
 from ..lang import chat_langs
@@ -100,7 +105,7 @@ from ..photos import fetch_bytes
 from ..shown import remember as remember_shown
 from ..shown import remember_origin, tell_refusal
 from ..texts import t
-from ..zones import zone_from_words
+from ..zones import DICTIONARY, WORDS, ZoneConflict, allowed_zones, resolve_zone
 
 logger = logging.getLogger(__name__)
 
@@ -312,34 +317,77 @@ async def _ask_zone(
     pending: PendingStore,
     prefix: str,
     lang: str,
+    *,
+    item_code: str | None = None,
 ) -> None:
-    """Зону взять неоткуда — назвать её кнопкой (D047: обычно она из слов)."""
-    zones = [(zone.code, zone.title(lang)) for zone in domain.list_zones(chat_id=chat_id)]
-    await _hand(
-        message,
-        chat_id,
-        pending,
-        proposal,
-        t("record.ask_zone", lang),
-        zones_keyboard(prefix, zones),
+    """Зону взять неоткуда — назвать её кнопкой (D047: обычно она из слов).
+
+    `item_code` назван — кнопками идут **только зоны, допустимые методикой для
+    этого пункта** (T266). Спрашивать тем, чего движок не примет, нельзя: с
+    T271 пара «пункт + зона» вне методики отвергается, и кнопка кончалась бы
+    отказом на ровном месте — аудитор жмёт, а запись не проходит.
+
+    Пункт не назван — спрашиваем всеми зонами: сузить перечень нечем, а
+    показать неполный значило бы отнять верный ответ.
+    """
+    разрешённые = allowed_zones(item_code, chat_id=chat_id)
+    zones = [
+        (zone.code, zone.title(lang))
+        for zone in domain.list_zones(chat_id=chat_id)
+        if zone.code in разрешённые
+    ]
+    текст = (
+        t("record.ask_zone", lang)
+        if item_code is None
+        else t("record.ask_zone_for_item", lang, code=item_code)
     )
+    await _hand(message, chat_id, pending, proposal, текст, zones_keyboard(prefix, zones))
 
 
 async def _open_manual(
     message: Message, chat_id: int, proposal: Proposal, pending: PendingStore, lang: str
 ) -> None:
-    """Ручной выбор пункта: без сети и без ранжирования (T034 со стороны бота)."""
-    zone = proposal.zone_hint or sidecar.read(chat_id).zone
+    """Ручной выбор пункта: сперва ПОИСК СЛОВОМ, листание — запасной вход (T267).
+
+    Порядок задан замером (07.09.2026): ручной перечень — 123 пункта по 8 на
+    страницу, то есть 16 страниц листания в цехе с занятыми руками. Слово
+    аудитора поднимает единицы пунктов, и показывать надо их.
+
+    **Поиску зона не нужна** (T265, T267): слово называет объект, а не место, и
+    резать найденное зоной значило бы вернуть дефект #218 — пункт про печь был
+    недостижим из холодного цеха даже вручную. Зона спрашивается ПОСЛЕ выбора
+    пункта и спрашивается тем, что методика этому пункту даёт (T266).
+
+    Слово ничего не подняло (или слов нет вовсе) — спрашиваем зону и показываем
+    её пункты страницами. Тупика нет ни в одной ветке (#219).
+    """
+    _, report_lang = chat_langs(chat_id)
+    if proposal.note.strip():
+        try:
+            найденные = await asyncio.to_thread(
+                search_items, proposal.note, lang=report_lang, chat_id=chat_id
+            )
+        except RecognizeError as exc:
+            logger.warning("поиск пункта словом не сработал в чате %s: %s", chat_id, exc)
+            найденные = ()
+        if найденные:
+            await _show_manual_page(
+                message, chat_id, replace(proposal, manual=найденные), pending, 0, lang
+            )
+            return
+    # Памяти о прошлой записи здесь больше нет (T264): зона либо уже выведена
+    # словами или словарём, либо её спрашивают кнопкой.
+    zone = proposal.zone_hint
     if not zone:
+        if proposal.note.strip():
+            await message.answer(t("record.nothing_by_words", lang))
         await _ask_zone(message, chat_id, proposal, pending, ZONE_FOR_MANUAL_PREFIX, lang)
         return
-    _, report_lang = chat_langs(chat_id)
     try:
-        # Слова аудитора уходят в перечень поиском (#226): без них он был бы
-        # всем чек-листом, а с ними — единицами пунктов про сказанный объект.
-        items = await asyncio.to_thread(
-            manual_candidates, zone, note=proposal.note, lang=report_lang, chat_id=chat_id
-        )
+        # Слова сюда уже не идут: они либо подняли пункты выше, либо не подняли
+        # ничего, и повторять ту же выборку значило бы получить тот же пустой
+        # ответ и показать пустые кнопки на последнем рубеже выбора.
+        items = await asyncio.to_thread(manual_candidates, zone, lang=report_lang, chat_id=chat_id)
     except RecognizeError as exc:
         # Сырой текст исключения — в журнал, а не в чат (тот же принцип, что
         # у отказа движка, T127): в нём бывают пути на диске и ссылки на
@@ -422,7 +470,8 @@ async def _try_fast(
         # зависимости от того, каким путём легла запись.
         words=base.note,
         auto=item,
-        zone_guessed=not base.zone_spoken,
+        zone_spoken=base.zone_spoken,
+        zone_from_cues=base.zone_from_cues,
         # Быстрый путь — это и есть тот список терминов, который владелец просил
         # пополнять (D077). Промах здесь опаснее всего: подтверждения у него нет
         # (D064), и увидеть его можно только правкой записи следом. Уверенности
@@ -495,9 +544,10 @@ async def _correct_zone(message: Message, chat_id: int, base: Proposal, lang: st
         source=base.source,
         lang=lang,
         correcting=n,
-        # Зону аудитор назвал ЭТИМИ словами — оговорка про догадку была бы
-        # неправдой ровно там, где человек только что сказал обратное.
-        zone_guessed=False,
+        # Зону аудитор назвал ЭТИМИ словами — оговорка была бы неправдой ровно
+        # там, где человек только что сказал обратное.
+        zone_spoken=True,
+        zone_from_cues=False,
         origin=base.origin,
     )
     return saved is not None
@@ -542,26 +592,157 @@ async def analyze(
     отбивка называет номер кадра.
     """
     lang, report_lang = chat_langs(chat_id)
-    # Слова текущего комментария — первыми, память — только если о зоне в них
-    # ничего не сказано (T124). Обратный порядок и был дефектом: «в зале лужа»
-    # ложилось в горячий цех, потому что там была прошлая запись.
-    spoken = zone_from_words(note, chat_id=chat_id)
-    zone_hint = spoken or sidecar.read(chat_id).zone
+    # Зона выводится ОДНИМ местом (T263): слова аудитора, затем словарь
+    # объектов карты кадров, а не вывелось — спросим кнопками. Памяти о прошлой
+    # записи среди источников нет (T264, #218): обратный порядок и был
+    # дефектом — «в зале лужа» ложилось в горячий цех, потому что там была
+    # прошлая запись, а пункт про печь уезжал в холодный цех.
+    #
+    # Пункт здесь ещё не выбран, поэтому `item_code` пуст: зоны кнопок сузит
+    # тот, кто спрашивает, — он к тому времени пункт уже знает.
+    resolved = await asyncio.to_thread(resolve_zone, note, None, chat_id=chat_id)
     base = Proposal(
         file_ids=file_ids,
         source=source,
         note=note,
-        zone_hint=zone_hint,
-        zone_spoken=spoken is not None,
+        zone_hint=resolved.zone or "",
+        zone_source=_source_of(resolved.source),
+        cues_zone="" if resolved.conflict is None else resolved.conflict.dictionary,
         correcting=correcting,
         slot=pending.next_slot(),
         batch=batch,
         origin=origin,
     )
+    if resolved.conflict is not None:
+        # Названная зона разошлась со словарём объектов («холодный цех,
+        # пицца-печь»). Молча не пишется ни то, ни другое: обе стороны сразу
+        # правдой быть не могут, и выбирать между словом человека и данными
+        # управляющей компании бот не вправе (T266, требование владельца).
+        await _ask_zone_conflict(message, chat_id, base, pending, resolved.conflict, lang)
+        return
+    await _analyze_resolved(message, chat_id, base, pending, lang, report_lang, fast=fast)
+
+
+def _lost(
+    chat_id: int,
+    proposal: Proposal,
+    outcome: str,
+    *,
+    suggested: domain.Suggestion | None = None,
+) -> None:
+    """Записи по этому материалу не появилось — сказать почему и не потерять (T269).
+
+    Две разные вещи разом, и обе нужны:
+
+    * **кадру** проставляется исход, чтобы в конце проверки по каждому кадру без
+      записи была названа причина, а не только показан сам кадр (#219);
+    * **формулировке** заводится строка накопителя, чтобы управляющая компания
+      увидела, чего не хватило в карте кадров (#228). Пустая формулировка в
+      накопитель не идёт: копится именно она, а кадр без слов покрывать
+      словарём нечего — он уже назван своим исходом выше.
+
+    Молчание на этом месте и было дефектом: аудитор сказал о находке, система
+    не нашла пункт, аудитор пошёл дальше — и не осталось ни записи, ни следа.
+    """
+    sidecar.remember_outcome(chat_id, proposal.file_ids, outcome)
+    note = proposal.note.strip()
+    if not note:
+        return
+    inspection = read_inspection(chat_id)
+    domain.record_uncovered(
+        chat_id,
+        domain.UncoveredEntry(
+            note=note,
+            suggested_code="" if suggested is None else suggested.code,
+            suggested_level="" if suggested is None else suggested.level,
+            suggested_zone="" if suggested is None else suggested.zone,
+            zone=proposal.zone_hint,
+            zone_source=proposal.zone_source,
+            outcome=(
+                domain.OUTCOME_REFUSED
+                if outcome == sidecar.OUTCOME_REFUSED
+                else domain.OUTCOME_ABANDONED
+            ),
+            checklist_version="" if inspection is None else inspection.checklist_version,
+            at=datetime.now(timezone.utc).isoformat(),
+        ),
+    )
+
+
+def _source_of(resolved: str) -> str:
+    """Ответ `resolve_zone` — словарём накопителя (`domain.ZONE_SOURCES`).
+
+    Словари разные, потому что разное и называют: `resolve_zone` отвечает, чем
+    зона выведена ИЛИ что её надо спросить, а накопитель хранит, чем она в
+    итоге получена. «Спросить» исходом не бывает: к моменту записи её либо
+    назвали кнопкой, либо записи нет.
+    """
+    if resolved == WORDS:
+        return domain.ZONE_SOURCE_WORDS
+    if resolved == DICTIONARY:
+        return domain.ZONE_SOURCE_DICTIONARY
+    return ""
+
+
+async def _ask_zone_conflict(
+    message: Message,
+    chat_id: int,
+    base: Proposal,
+    pending: PendingStore,
+    conflict: ZoneConflict,
+    lang: str,
+) -> None:
+    """Назвать расхождение зоны до фиксации и дать выбор (T266).
+
+    Выбор ровно тот, который назвал владелец: зона объекта или другой пункт.
+    Третьей кнопки «оставить мою зону» нет намеренно — методика этому пункту
+    такой зоны не даёт, и движок пару не примет (T271): кнопка предлагала бы
+    то, что кончится отказом.
+    """
+    названия = {zone.code: zone.title(lang) for zone in domain.list_zones(chat_id=chat_id)}
+    dictionary = названия.get(conflict.dictionary, conflict.dictionary)
+    await _hand(
+        message,
+        chat_id,
+        pending,
+        base,
+        t(
+            "record.zone_conflict",
+            lang,
+            spoken=названия.get(conflict.spoken, conflict.spoken),
+            object=conflict.phrase,
+            dictionary=dictionary,
+        ),
+        zone_conflict_keyboard(lang, dictionary),
+    )
+
+
+async def _analyze_resolved(
+    message: Message,
+    chat_id: int,
+    base: Proposal,
+    pending: PendingStore,
+    lang: str,
+    report_lang: str,
+    *,
+    fast: bool,
+) -> None:
+    """Разбор материала, у которого зона уже выведена (или её решили спросить).
+
+    Отдельной функцией, потому что сюда возвращаются ДВА входа: обычный разбор
+    и кнопка «зона объекта» под расхождением (T266). Второй дорогой был бы
+    второй разбор, и он разошёлся бы с первым на первой же правке.
+    """
+    note = base.note
 
     if fast and note:
         found = await asyncio.to_thread(
-            fast_path, base.note, base.zone_hint or None, lang=lang, chat_id=chat_id
+            fast_path,
+            base.note,
+            base.zone_hint or None,
+            zone_fixed=base.zone_from_cues,
+            lang=lang,
+            chat_id=chat_id,
         )
         if found.item is not None:
             if await _try_fast(message, chat_id, base, pending, lang, found.item):
@@ -577,19 +758,19 @@ async def analyze(
 
     bot = message.bot
     photo = (
-        await fetch_bytes(bot, file_ids[0])
-        if needs_photo(note) and bot is not None and file_ids
+        await fetch_bytes(bot, base.file_ids[0])
+        if needs_photo(note) and bot is not None and base.file_ids
         else None
     )
 
-    if batch is None:
+    if base.batch is None:
         # У пачки (T206) «Разбираю…» на каждый кадр — это N одинаковых строк
         # между отбивками, то есть шум ровно там, где аудитор читает список.
         # Сколько кадров разбирается, сказано один раз, до цикла.
         await message.answer(t("record.thinking", lang))
     try:
         suggestion = await asyncio.to_thread(
-            classify, note, photo, zone_hint or None, lang=report_lang, chat_id=chat_id
+            classify, note, photo, base.zone_hint or None, lang=report_lang, chat_id=chat_id
         )
     except ModelUnavailable as exc:
         # Модель недоступна — проверка не встаёт: тот же перечень пунктов
@@ -696,7 +877,8 @@ async def _save(
     lang: str,
     words: str = "",
     auto: FastItem | None = None,
-    zone_guessed: bool = False,
+    zone_spoken: bool = False,
+    zone_from_cues: bool = False,
     suggested: domain.Suggestion | None = None,
     correcting: int | None = None,
     origin: int | None = None,
@@ -754,12 +936,13 @@ async def _save(
     и тем, чем запись стала в итоге, — перезапиши мы предложение правкой, промах
     перестал бы существовать ровно в том случае, ради которого сигнал и собирают.
     """
-    if zone_guessed:
-        # Зону никто не называл, и до задачи #218 на её место молча садилась
-        # зона ПРОШЛОЙ записи. Но у пункта зона бывает известна из самой
+    zone_from_item = False
+    if not zone_spoken:
+        # Зону аудитор не называл. У пункта она бывает известна из самой
         # методики: 59 пунктов из 136 живут ровно в одной зоне, и пункт про печь
-        # среди них. Тогда это не догадка, а ответ, и память здесь неуместна —
-        # именно так печь и уехала в холодный цех на живом прогоне.
+        # среди них. Тогда это ответ, а не догадка, — и он сильнее словаря
+        # объектов: словарь пишет управляющая компания от руки, а зоны пункта
+        # движок этой же методики и проверяет.
         #
         # Стоит ДО запрета сдачи и до вызова движка намеренно: зона входит в
         # пару «пункт + зона», по которой движок проверяет занятость, и
@@ -767,15 +950,11 @@ async def _save(
         своя = domain.only_zone(code, chat_id=chat_id)
         if своя is not None and своя != zone:
             zone = своя
-            # Оговорка о прошлой зоне здесь была бы неправдой: зона взята не из
-            # памяти, а из пункта. Сказать всё равно надо — аудитор зоны не
-            # называл, и подтверждать запись он не будет.
-            zone_guessed = False
+            # Два разных ответа на «откуда зона» — два разных текста: «из
+            # карты кадров» про зону из пункта было бы неправдой, а неправда в
+            # оговорке хуже её отсутствия (#218).
+            zone_from_cues = False
             zone_from_item = True
-        else:
-            zone_from_item = False
-    else:
-        zone_from_item = False
     if sealed.is_sealed(chat_id):
         # Последний рубеж запрета (T201, D080): сюда приходят и нажатия под
         # старыми предложениями, показанными ДО сдачи отчёта. Проверка стоит у
@@ -832,7 +1011,11 @@ async def _save(
             # это не станет: не прикрепившийся кадр остаётся в заметках без
             # записи и попадёт в список кадров без записи при завершении (T068).
             logger.exception("кадр %s не прикрепился к записи #%s", file_id, finding.n)
-    sidecar.remember_zone(chat_id, zone)
+    # Зона записи здесь НЕ запоминается (T264, #218). Раньше запоминалась и
+    # подставлялась следующему кадру первой догадкой (D048) — и это был весь
+    # механизм промаха, ради которого задача заведена: пункт про печь уезжал в
+    # холодный цех, потому что там была прошлая запись. Источников зоны теперь
+    # три, и прошлой записи среди них нет (`bot.zones.resolve_zone`).
     # `get_state` — чтение файла, 0.1 мс: в поток не выносится, обёртка стоила
     # бы дороже самой операции. Оценка здесь больше не считается вовсе (T162,
     # D072): процент по ходу обхода не показывается, а считать его ради
@@ -853,7 +1036,7 @@ async def _save(
                 chat_id=chat_id,
                 title=refusal.item_title(shown.code, lang, chat_id=chat_id),
                 cue="" if auto is None else auto.cue,
-                zone_guessed=zone_guessed,
+                zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
             reply_markup=(edit_keyboard if auto is None else fixed_keyboard)(finding.n, lang),
@@ -869,7 +1052,7 @@ async def _save(
                 lang,
                 chat_id=chat_id,
                 title=refusal.item_title(shown.code, lang, chat_id=chat_id),
-                zone_guessed=zone_guessed,
+                zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
             reply_markup=edit_keyboard(finding.n, lang),
@@ -882,7 +1065,7 @@ async def _save(
                 title=auto.title,
                 cue=auto.cue,
                 chat_id=chat_id,
-                zone_guessed=zone_guessed,
+                zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
             reply_markup=fixed_keyboard(finding.n, lang),
@@ -990,7 +1173,15 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             return
         index = int(raw)
         candidate = proposal.candidates[index]
-        if not candidate.zone or candidate.zone == UNKNOWN_ZONE:
+        неизвестна = not candidate.zone or candidate.zone == UNKNOWN_ZONE
+        # Зона модели вне списка методики — это тот же случай, что и её
+        # отсутствие: записать такую пару с T271 нельзя вовсе, движок её
+        # отвергает. Спросить до фиксации лучше, чем отказать после: аудитор на
+        # точке видит кнопки допустимых зон, а не сообщение о неудаче.
+        чужая = not неизвестна and candidate.zone not in allowed_zones(
+            candidate.code, chat_id=chat_id
+        )
+        if неизвестна or чужая:
             await _ask_zone(
                 message,
                 chat_id,
@@ -998,6 +1189,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
                 pending,
                 ZONE_FOR_PICK_PREFIX,
                 lang,
+                item_code=candidate.code,
             )
             return
         if await _save(
@@ -1018,11 +1210,11 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # вернула ту самую, которую ей подсказали из памяти (T156). Своя
             # зона модели памятью не является: это её ответ, а не прошлая
             # запись, и оговорка о нём соврала бы.
-            zone_guessed=(
-                not proposal.zone_spoken
-                and bool(proposal.zone_hint)
-                and candidate.zone == proposal.zone_hint
-            ),
+            zone_spoken=proposal.zone_spoken,
+            # Зона из словаря — только если модель вернула ЕЁ ЖЕ. Своя зона
+            # модели словарём не является: это её ответ, и оговорка о карте
+            # кадров соврала бы.
+            zone_from_cues=(proposal.zone_from_cues and candidate.zone == proposal.zone_hint),
             suggested=_model_suggestion(proposal),
             # Нажатие под правкой означает «поправить на этот пункт», а не
             # «завести ещё один»: адресат назван ответом аудитора и с тех пор
@@ -1057,9 +1249,12 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             source=proposal.source,
             lang=lang,
             words=proposal.note,
-            # Зону назвал человек кнопкой, а в предложении остаётся ответ
-            # модели — `UNKNOWN`. Подставить сюда выбранную зону значило бы
-            # спрятать её отказ и превратить промах в попадание.
+            # Зону назвал человек кнопкой: оговорка о том, откуда она взялась,
+            # была бы неправдой, а зона пункта не имеет права её перебить.
+            zone_spoken=True,
+            # В предложении остаётся ответ модели — `UNKNOWN`. Подставить сюда
+            # выбранную зону значило бы спрятать её отказ и превратить промах
+            # в попадание.
             suggested=_model_suggestion(proposal),
             correcting=proposal.correcting,
             origin=proposal.origin,
@@ -1078,13 +1273,13 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         if proposal is None:
             await stale(message, lang)
             return
-        sidecar.remember_zone(chat_id, zone)
-        # Зону назвал сам аудитор, пусть и кнопкой, а не словами: догадкой из
-        # памяти она после этого не является (T156).
+        # Зона НЕ запоминается для следующего кадра (T264, #218): память о
+        # прошлой записи снята как источник — именно ею пункт про печь и уехал
+        # в холодный цех, пока аудитор об этом не знал.
         await _open_manual(
             message,
             chat_id,
-            replace(proposal, zone_hint=zone, zone_spoken=True),
+            replace(proposal, zone_hint=zone, zone_source=domain.ZONE_SOURCE_BUTTONS),
             pending,
             lang,
         )
@@ -1128,6 +1323,22 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         уходит в отчёт с чужим текстом молча.
         """
         item = proposal.manual[index]
+        if not proposal.zone_hint:
+            # Пункт выбран, а зона не выведена: поиск словом зоны не требует
+            # (T267), и спросить её надо здесь — кнопками ТОЛЬКО из зон,
+            # допустимых методикой для этого пункта (T266). Раньше зона
+            # спрашивалась ДО перечня и всеми зонами разом, и нажатие на чужую
+            # кончалось отказом движка у аудитора на точке.
+            await _ask_zone(
+                message,
+                chat_id,
+                replace(proposal, picked=index, picked_level=level),
+                pending,
+                ZONE_FOR_ITEM_PREFIX,
+                lang,
+                item_code=item.code,
+            )
+            return
         if await _save(
             message,
             chat_id,
@@ -1141,10 +1352,11 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # Модель тут промолчала, и слова аудитора становятся ценнее, а не
             # наоборот: по ним видно, чего в списке слов не хватило.
             words=proposal.note,
-            # Перечень собран по зоне из памяти, и человек выбрал в нём пункт,
-            # а не зону: пометка нужна здесь ровно по тому же правилу (T156).
-            # Назвал зону сам — кнопкой или словами — `zone_spoken` уже стоит.
-            zone_guessed=not proposal.zone_spoken,
+            # Человек выбрал в перечне пункт, а не зону: откуда зона взялась,
+            # сказать всё равно надо (T156). Назвал её сам — кнопкой или
+            # словами — `zone_spoken` уже стоит.
+            zone_spoken=proposal.zone_spoken,
+            zone_from_cues=proposal.zone_from_cues,
             # Предложения здесь нет и быть не может: ручной перечень
             # показывается ровно тогда, когда модель не ответила ничего —
             # недоступна или вернула пустой список. Записать предложением
@@ -1156,6 +1368,76 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             origin=proposal.origin,
         ):
             pending.take_proposal(chat_id, at=message.message_id)
+
+    @router.callback_query(F.data.startswith(ZONE_FOR_ITEM_PREFIX))
+    async def on_zone_for_item(callback: CallbackQuery) -> None:
+        """Зона, названная кнопкой для уже выбранного пункта (T266)."""
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        zone = (callback.data or "").removeprefix(ZONE_FOR_ITEM_PREFIX)
+        proposal = pending.proposal(chat_id, at=message.message_id)
+        if proposal is None or proposal.picked is None or not proposal.picked_level:
+            await stale(message, lang)
+            return
+        await _save_manual(
+            message,
+            chat_id,
+            # Зону назвал человек кнопкой: `zone_spoken` стоит по той же
+            # причине, что и на пути кандидата модели.
+            replace(proposal, zone_hint=zone, zone_source=domain.ZONE_SOURCE_BUTTONS),
+            proposal.picked,
+            proposal.picked_level,
+            lang,
+        )
+
+    @router.callback_query(F.data == CUES_ZONE_CALLBACK)
+    async def on_cues_zone(callback: CallbackQuery) -> None:
+        """«Зона объекта» под расхождением: разбор продолжается с зоной словаря."""
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        proposal = pending.proposal(chat_id, at=message.message_id)
+        if proposal is None or not proposal.cues_zone:
+            await stale(message, lang)
+            return
+        _, report_lang = chat_langs(chat_id)
+        await _analyze_resolved(
+            message,
+            chat_id,
+            replace(
+                proposal,
+                zone_hint=proposal.cues_zone,
+                # Зону назвал не аудитор, а карта кадров: `zone_spoken` здесь
+                # был бы неправдой ровно там, где человек сказал другое.
+                zone_source=domain.ZONE_SOURCE_DICTIONARY,
+                cues_zone="",
+            ),
+            pending,
+            lang,
+            report_lang,
+            fast=True,
+        )
+
+    @router.callback_query(F.data == CUES_ITEM_CALLBACK)
+    async def on_cues_item(callback: CallbackQuery) -> None:
+        """«Другой пункт» под расхождением: поиск пункта словом (T267)."""
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        proposal = pending.proposal(chat_id, at=message.message_id)
+        if proposal is None:
+            await stale(message, lang)
+            return
+        # Зона остаётся НАЗВАННОЙ аудитором: он выбрал «другой пункт», то есть
+        # подтвердил своё место и отказался от объекта, а не наоборот.
+        await _open_manual(message, chat_id, replace(proposal, cues_zone=""), pending, lang)
 
     @router.callback_query(F.data.startswith(MANUAL_PICK_PREFIX))
     async def on_manual_pick(callback: CallbackQuery) -> None:
@@ -1203,7 +1485,12 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         if here is None:
             return
         message, chat_id, lang = here
-        pending.take_proposal(chat_id, at=message.message_id)
+        proposal = pending.take_proposal(chat_id, at=message.message_id)
+        if proposal is not None:
+            # «Не записывать» — законный выбор аудитора, но не повод потерять
+            # формулировку: в конце проверки у кадра будет названа причина, а
+            # управляющая компания увидит, чего не хватило карте (T269, #219).
+            await asyncio.to_thread(_lost, chat_id, proposal, sidecar.OUTCOME_ABANDONED)
         await message.answer(t("record.skipped", lang))
 
     return router

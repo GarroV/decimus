@@ -60,13 +60,21 @@ def needs_photo(note: str) -> bool:
     return not note.strip()
 
 
-def _candidate(record: dict[str, Any], zone_hint: str | None) -> Candidate | None:
+def _candidate(record: dict[str, Any]) -> Candidate | None:
+    """Один кандидат из ответа модели. Зона берётся её ответом, и только им.
+
+    `UNKNOWN` подсказкой НЕ подменяется (T264, #218). Раньше подменялся, и это
+    был весь механизм промаха: модель отвечала честно «места не знаю», а сюда
+    садилась зона ПРОШЛОЙ записи — так пункт про печь и уехал в холодный цех.
+    Гадала не модель.
+
+    `UNKNOWN` теперь доживает до `_suggestion`, где становится поводом спросить
+    человека (`needs_human`), — то есть ровно тем, чем и был ответ модели.
+    """
     code, level = split_pick(str(record.get("item", "")))
     if code == NONE_CODE or not level:
         return None
     zone = str(record.get("zone", UNKNOWN_ZONE))
-    if zone == UNKNOWN_ZONE and zone_hint:
-        zone = zone_hint
     wording = str(record.get("wording", "")).strip()
     reason = str(record.get("reason", "")).strip()
     return Candidate(
@@ -86,7 +94,6 @@ def _candidate(record: dict[str, Any], zone_hint: str | None) -> Candidate | Non
 def _suggestion(
     payload: dict[str, Any],
     usage: dict[str, int],
-    zone_hint: str | None,
     settings: RecognizeSettings,
     *,
     used_photo: bool,
@@ -97,7 +104,7 @@ def _suggestion(
         c
         for record in records
         if isinstance(record, dict)
-        for c in (_candidate(record, zone_hint),)
+        for c in (_candidate(record),)
         if c is not None
     )[: settings.max_candidates]
     question = str(payload.get("question", "")).strip()
@@ -154,4 +161,4 @@ def classify(
         settings=cfg,
         model=model,
     )
-    return _suggestion(answer.payload, answer.usage, zone_hint, cfg, used_photo=use_photo)
+    return _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo)
