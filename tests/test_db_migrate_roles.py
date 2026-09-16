@@ -15,15 +15,19 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import empty_database
+from db_harness import empty_database, empty_database_with_unique_roles
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.db.errors import ConfigError  # noqa: E402 — после importorskip намеренно
+from src.db import migrate  # noqa: E402 — после importorskip намеренно
+from src.db.errors import ConfigError  # noqa: E402
 from src.db.migrate import (  # noqa: E402
+    ADMIN_ROLE,
     APP_ROLE,
     DATABASE_ADMIN_URL_VAR,
     DATABASE_APP_PASSWORD_VAR,
+    DATABASE_RETRACTION_PASSWORD_VAR,
+    _set_role_password,
     admin_dsn,
     apply_migrations,
     discover_migrations,
@@ -102,3 +106,127 @@ def test_роль_приложения_политики_не_обходит() ->
             f"роль {APP_ROLE} обходит политики — запрет правки завершённых "
             "проверок на ней не сработает, а выглядеть будет включённым"
         )
+
+
+# --- Накат на роли с уникальным именем (задача #196) --------------------------
+#
+# Проверки выше сторожат СОСТОЯНИЕ ролей в кластере, и это правильная проверка
+# для стенда. Но роль заводится миграцией только если её ещё нет, поэтому на
+# любой машине, где прогон шёл хоть раз, правка `create role dodo_audit_app
+# login` на всесильную ими не ловится: `create role` попросту не выполняется.
+# Проверено порчей — семь тестов остались зелёными.
+#
+# Ниже накат идёт на КОПИЮ миграций, где роли переименованы в уникальные
+# (`empty_database_with_unique_roles`). Роли с таким именем в кластере нет,
+# значит `create role` выполняется по-настоящему, и тесту видно, какой роль
+# создана. Тем же ходом становится проверяемой установка пароля: на настоящей
+# роли `alter role … password` действует на весь кластер и однажды унесла
+# стенды соседних копий (#128).
+
+
+@requires_db
+def test_накат_заводит_роли_без_всесилия(tmp_path: Path) -> None:
+    """Миграция, заводящая роль всесильной, обязана валить этот тест.
+
+    Перечислены не только `rolsuper`/`rolbypassrls`: `createrole` — это тот же
+    обход политик через один шаг, роль с ним выдаёт себе членство в роли
+    администратора истории и начинает видеть снятые проверки, а `replication`
+    читает данные мимо прав вовсе.
+    """
+    with empty_database_with_unique_roles(tmp_path) as (dsn, directory, roles):
+        applied = apply_migrations(dsn, directory=directory)
+        assert applied, "накат не применил ни одной миграции — проверять нечего"
+
+        with psycopg.connect(dsn) as conn:
+            rows = conn.execute(
+                "select rolname, rolsuper, rolbypassrls, rolcreaterole, rolcreatedb,"
+                " rolreplication from pg_roles where rolname = any(%s)",
+                (list(roles.values()),),
+            ).fetchall()
+        привилегии = {row[0]: row[1:] for row in rows}
+
+        for настоящая, уникальная in roles.items():
+            assert уникальная in привилегии, (
+                f"накат не завёл роль {настоящая} — либо `create role` из миграции "
+                f"пропал, либо подстановка уникального имени не сработала"
+            )
+            assert not any(привилегии[уникальная]), (
+                f"роль {настоящая} заведена накатом всесильной "
+                f"(super/bypassrls/createrole/createdb/replication = "
+                f"{привилегии[уникальная]}) — построчные политики на ней не держат "
+                f"ничего, а выглядеть защита будет включённой"
+            )
+
+
+@requires_db
+def test_роль_приложения_не_состоит_в_роли_администратора(tmp_path: Path) -> None:
+    """Разграничение снятых проверок держится членством — его не должно быть.
+
+    Миграция `0010` пускает к снятым проверкам через
+    `pg_has_role(current_user, 'dodo_audit_admin', 'member')`. Выданное накатом
+    членство роли приложения в роли администратора сняло бы это разграничение
+    целиком, и ни один тест снятия этого бы не заметил: он ходит под своими
+    связями, а не проверяет, кто кому член.
+    """
+    with empty_database_with_unique_roles(tmp_path) as (dsn, directory, roles):
+        apply_migrations(dsn, directory=directory)
+        with psycopg.connect(dsn) as conn:
+            row = conn.execute(
+                "select pg_has_role(%s, %s, 'member')",
+                (roles[APP_ROLE], roles[ADMIN_ROLE]),
+            ).fetchone()
+        assert row is not None and row[0] is False, (
+            f"роль приложения {APP_ROLE} состоит в роли администратора истории "
+            f"{ADMIN_ROLE} — снятые проверки видны приложению, хотя вся защита "
+            f"миграции 0010 построена на обратном"
+        )
+
+
+@requires_db
+def test_пароль_ложится_роли_и_кавычка_в_нём_не_ломает_запрос(tmp_path: Path) -> None:
+    """Установка пароля проверяется на временной роли, а не на настоящей.
+
+    На настоящей её проверить нельзя: `alter role … password` меняет объект
+    кластера, а кластер общий — так прогон и унёс стенды соседних копий (#128).
+    Здесь роль своя и одноразовая, поэтому можно и поставить пароль, и убедиться,
+    что он лёг.
+
+    Кавычка в пароле — не придирка: пароль приходит из `.env`, то есть извне
+    кода, и склеенный руками `alter role` был бы ровно тем местом, где она
+    превращается в чужой SQL.
+    """
+    with empty_database_with_unique_roles(tmp_path) as (dsn, directory, roles):
+        apply_migrations(dsn, directory=directory)
+        роль = roles[APP_ROLE]
+        _set_role_password(dsn, 'па\'роль "с кавычками"', role=роль, var=DATABASE_APP_PASSWORD_VAR)
+        with psycopg.connect(dsn) as conn:
+            row = conn.execute(
+                "select rolpassword is not null from pg_authid where rolname = %s",
+                (роль,),
+            ).fetchone()
+        assert row is not None and row[0] is True, (
+            f"пароль роли {роль} не поставлен — на стенде с парольной "
+            f"аутентификацией она просто не войдёт"
+        )
+
+
+def test_пароль_уходит_той_роли_и_из_той_переменной(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Пара «роль, переменная» у каждой из двух функций своя и не перепутана.
+
+    Без базы намеренно: перепутанная пара поставила бы администратору истории
+    пароль приложения, не сказав ни слова, и узнать об этом на живом кластере
+    можно было бы только сломав его.
+    """
+    вызовы: list[tuple[str, str]] = []
+
+    def запись(dsn: str, password: str, *, role: str, var: str) -> None:
+        вызовы.append((role, var))
+
+    monkeypatch.setattr(migrate, "_set_role_password", запись)
+    migrate.set_app_password("postgresql://x/y", "пароль")
+    migrate.set_admin_password("postgresql://x/y", "пароль")
+
+    assert вызовы == [
+        (APP_ROLE, DATABASE_APP_PASSWORD_VAR),
+        (ADMIN_ROLE, DATABASE_RETRACTION_PASSWORD_VAR),
+    ]

@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
+.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -168,6 +168,15 @@ demo-down:
 migrate:
 	$(VENV)/python -m src.db.migrate
 
+# Можно ли снять совместимость с прежним рецептом отпечатка НА ЭТОЙ базе.
+# Условие снятия — «строк того рецепта не осталось ни в одной базе», а баз
+# три: своя, владельца и площадки. Цель нужна затем, чтобы на каждой из них
+# спрашивали одним и тем же способом: ответ, полученный разными запросами,
+# сравнивать нельзя. Ходит связью наката — роли приложения снятые проверки
+# не видны, и её «ноль» ничего не значил бы.
+recipe-check:
+	$(VENV)/python -m src.db.recipe_audit
+
 # Сборка образов бота и MCP-сервера с версией внутри (#229).
 #
 # Существует потому, что версию нельзя вспоминать руками. `BUILD_SHA` приходит
@@ -182,8 +191,10 @@ migrate:
 # появившихся в новом коде. Здесь только сборка; подъём — отдельным шагом,
 # потому что раскатка на живой продукт идёт по своей процедуре и по «да»
 # владельца (docs/08-deploy.md).
+# state-backup собирается здесь же: compose именует образы по сервису, и без
+# него первый ночной прогон выгрузки полез бы собирать образ сам (#233).
 image:
-	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp
+	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp state-backup
 
 # Стенд базы одной командой (T090): поднять Postgres рядом с ботом, дождаться
 # ГОТОВНОСТИ БАЗЫ (`--wait` идёт по healthcheck, а не по факту запуска
@@ -213,6 +224,25 @@ storage-up:
 # `--profile storage down -v` унёс бы том состояния идущих проверок.
 storage-down:
 	docker compose --profile storage rm -sf storage
+
+# Выгрузка тома состояния в бэкап (#233). В томе лежат папки идущих проверок и
+# связки доступа `access/roster.json`; бэкап площадки умеет только дампы
+# Postgres, и до этой задачи состояние не выгружалось никуда.
+#
+# `run --rm`, а не `up`: сервис одноразовый — делает архив и выходит.
+# Симметричная на вид `--profile backup up -d` подняла бы заодно бота и
+# сервер, потому что сервис без `profiles:` активен при ЛЮБОМ значении
+# профиля (та же ловушка, что у demo-down и db-down).
+#
+# Каталог бэкапа — BACKUP_DIR в .env (на площадке C:\backups), по умолчанию
+# ./backups рядом с копией репозитория. Срок хранения своих архивов —
+# BACKUP_KEEP_DAYS, по умолчанию 14 суток, как у бэкапа Postgres площадки.
+#
+# `-T` (без терминала): выгрузку гоняет задача по расписанию, у которой
+# терминала нет вовсе. Пусть команда в доке и здесь будет одна и та же — иначе
+# «у меня работает» и «ночью не пошло» разойдутся по этой мелочи.
+state-backup:
+	docker compose run --rm -T state-backup
 
 # MCP-сервер поверх базы проверок (T095). Только чтение; доступ — личным
 # токеном из MCP_TOKENS (.env), слушает петлю и наружу не публикуется.

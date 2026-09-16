@@ -382,3 +382,103 @@ def test_every_tunnel_variable_is_documented() -> None:
         "COMPOSE_PROFILES не описан: без него человек на площадке не узнает, чем "
         "включается туннель, и подключение снаружи молча не заработает"
     )
+
+
+# --- выгрузка состояния в бэкап (#233) ---------------------------------------
+
+
+@pytest.fixture(scope="module")
+def with_backup() -> dict[str, dict]:
+    """Конфигурация с включённым профилем выгрузки состояния."""
+    r = compose("--profile", "backup", "config", "--format", "json")
+    assert r.returncode == 0, r.stderr
+    services = json.loads(r.stdout)["services"]
+    assert isinstance(services, dict)
+    return services
+
+
+@requires_docker
+def test_backup_is_not_pulled_in_by_the_plain_stand() -> None:
+    """Обычный `up -d` выгрузку не поднимает: у неё свой профиль."""
+    r = compose("config", "--services")
+    assert r.returncode == 0, r.stderr
+    assert "state-backup" not in r.stdout.split(), r.stdout
+
+
+@requires_docker
+def test_backup_reads_the_state_without_writing_it(with_backup: dict[str, dict]) -> None:
+    """Снять копию — не значит менять то, что копируешь.
+
+    Состояние смонтировано только на чтение: том с папками идущих проверок
+    отдан задаче, которая ходит по расписанию и без человека рядом.
+    """
+    точки = with_backup["state-backup"]["volumes"]
+    состояние = [v for v in точки if v["target"] == "/app/state"]
+    assert состояние, f"состояние не смонтировано: {точки}"
+    assert состояние[0].get("read_only") is True, (
+        f"состояние смонтировано на запись: {состояние[0]}"
+    )
+    assert состояние[0]["source"].endswith("state"), состояние[0]
+
+
+@requires_docker
+def test_backup_does_not_loop(with_backup: dict[str, dict]) -> None:
+    """Сервис одноразовый, и политика перезапуска обязана это подтверждать.
+
+    С `unless-stopped` он делал бы архив, выходил и поднимался снова — то есть
+    писал бы в каталог бэкапа непрерывно, пока не кончится место. На общей
+    машине это отняло бы место у соседей, а не только у нас.
+    """
+    assert with_backup["state-backup"].get("restart") == "no", with_backup["state-backup"]
+
+
+@requires_docker
+def test_backup_runs_the_same_image_as_the_bot(with_backup: dict[str, dict]) -> None:
+    """Второй образ разошёлся бы с первым — ровно так же, как разъезжалось демо."""
+    assert with_backup["state-backup"]["build"] == with_backup["bot"]["build"]
+
+
+@requires_docker
+def test_backup_keeps_its_own_retention_and_target(with_backup: dict[str, dict]) -> None:
+    """Каталог бэкапа и срок хранения приходят настройкой, а не зашиты в код."""
+    окружение = with_backup["state-backup"]["environment"]
+    assert окружение["BACKUP_DIR"] == "/backup", окружение
+    assert окружение["STATE_DIR"] == "/app/state", окружение
+    assert окружение["BACKUP_KEEP_DAYS"], "срок хранения не задан вовсе"
+    цели = {v["target"] for v in with_backup["state-backup"]["volumes"]}
+    assert "/backup" in цели, f"каталог бэкапа не смонтирован: {цели}"
+
+
+def test_every_backup_variable_is_documented() -> None:
+    """Переменная выгрузки, не описанная в .env.example, не будет заведена.
+
+    На площадке каталог бэкапа общий с чужими проектами, а срок хранения решает,
+    когда наши архивы исчезнут, — обе строки человек обязан увидеть заранее.
+    """
+    в_стенде = set(re.findall(r"\$\{(BACKUP_[A-Z0-9_]+)", COMPOSE_FILE.read_text(encoding="utf-8")))
+    assert в_стенде, "в docker-compose.yml не осталось переменных выгрузки"
+    описано = set(re.findall(r"^([A-Z][A-Z0-9_]+)=", ENV_EXAMPLE.read_text(encoding="utf-8"), re.M))
+    assert в_стенде <= описано, (
+        f"переменные выгрузки не описаны в .env.example: {sorted(в_стенде - описано)}"
+    )
+
+
+def test_backup_archives_never_reach_the_public_repository() -> None:
+    """Архив состояния не имеет права попасть в индекс: репозиторий публичный.
+
+    Умолчание `BACKUP_DIR` указывает на каталог рядом с кодом, а внутри архива
+    лежат папки идущих проверок партнёров и связки доступа. Спрашивается САМ
+    git, а не текст `.gitignore`: правило, написанное не в том виде, выглядит
+    работающим ровно до первого `git add`.
+    """
+    r = subprocess.run(
+        ["git", "check-ignore", "-q", "backups/decimus-state-20260916-000000.tar.gz"],  # noqa: S607
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r.returncode == 0, (
+        "каталог бэкапа не игнорируется git: архив с историей проверок уедет "
+        "в публичный репозиторий первым же `git add`"
+    )
