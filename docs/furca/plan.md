@@ -1,6 +1,6 @@
 # Техплан: Dodo Audit Service
 
-Как строим первую версию — телеграм-бота для выездных проверок. Что строим — в `docs/forge/spec.md`, принципы — в `docs/forge/constitution.md`, обоснования выбора — в `docs/forge/research-report.md`.
+Как строим первую версию — телеграм-бота для выездных проверок. Что строим — в `docs/furca/spec.md`, принципы — в `docs/furca/constitution.md`, обоснования выбора — в `docs/furca/research-report.md`.
 
 ## Стек с обоснованием
 

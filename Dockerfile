@@ -1,6 +1,6 @@
 # Образ бота выездных проверок (задача T070, блок infra).
 #
-# python:3.12-slim — Debian, не Alpine (решение D009 / docs/forge/plan.md,
+# python:3.12-slim — Debian, не Alpine (решение D009 / docs/furca/plan.md,
 # раздел «Стек»): musl-сборки Alpine не дают нужных системных библиотек
 # Pango, на которых держится WeasyPrint.
 FROM python:3.12-slim
@@ -57,7 +57,7 @@ COPY tools ./tools
 # ruff/mypy/pytest в проде не нужны и увеличивают образ.
 RUN pip install --no-cache-dir --no-cache -e .
 
-# Методика — данные управляющей компании (docs/forge/plan.md, «Данные
+# Методика — данные управляющей компании (docs/furca/plan.md, «Данные
 # предметной области лежат вне репозитория»). В образ не запекается: том
 # `docker-compose.yml` монтирует её снаружи в /app/data, здесь для неё
 # нарочно нет ни COPY, ни каталога-заглушки — пустой каталог маскировал бы
