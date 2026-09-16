@@ -171,13 +171,14 @@ def drop_finding(chat_id: int, n: int) -> None:
     settings = settings_for(chat_id)
     run_audit(["drop", str(n)], chat_id=chat_id, settings=settings)
     path = state_file(chat_id, settings)
+    # Все три снимаются по одной причине, и причина не та, что стояла здесь до
+    # T221. Чужой записи оставленное достаться не может: движок номера не
+    # переиспользует, счётчик `seq` в состоянии только растёт. Но сведения о
+    # записи, которой в проверке больше нет, — мусор внутри самой проверки, а
+    # она едет дальше одним объектом.
     forget_source(path, n)
-    # Номер после удаления освобождается, и оставленное предложение досталось бы
-    # следующей записи — то есть в базу уехало бы предложение к чужой записи.
     forget_suggestion(path, n)
-    # По той же причине снимаются и слова аудитора (T183): в выборке они
-    # выглядели бы речью человека о нарушении, которого он не описывал.
-    forget_words(path, n)
+    forget_words(path, n)  # слова аудитора (T183)
     state = read_state(chat_id, settings)
     if state is not None and state.finding(n) is not None:
         raise EngineError(
