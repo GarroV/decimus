@@ -127,6 +127,7 @@
         "погнут"
       ]
     },
+    "zone_column": "Зона",
     "sections": {
       "thresholds": "## Пороги классов",
       "column_words": "## Слова, которыми аудитор называет колонку"
@@ -251,6 +252,7 @@
         "wobbly"
       ]
     },
+    "zone_column": "Zone",
     "sections": {
       "thresholds": "## Class thresholds",
       "column_words": "## Words the auditor uses for a column"

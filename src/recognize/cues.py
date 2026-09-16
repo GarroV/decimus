@@ -45,6 +45,11 @@ COLUMN_WORDS_HEADINGS = language.section_headings(language.COLUMN_WORDS)
 #: Разделы карты, которые подсказками не являются и в перечень строк не идут.
 _NOT_CUES = THRESHOLDS_HEADINGS + COLUMN_WORDS_HEADINGS
 
+#: Заголовки колонки «Зона» — на всех языках правил (T262). Колонка читается ПО
+#: ЗАГОЛОВКУ, а не по номеру: порядок колонок у управляющей компании свой в
+#: каждом разделе карты, и разбор по номеру сломался бы на первой же правке.
+ZONE_HEADINGS = language.zone_columns()
+
 _CODE = re.compile(r"\b[A-Z]{3}\d{2}\b")
 _WORD = re.compile(r"[а-яёa-z0-9]+")
 
@@ -111,6 +116,12 @@ class Cue:
     `codes` — все коды строки подряд, в порядке карты: это то, чем сужается
     перечень для модели, и там колонки не важны.
 
+    `zone` — зона объекта, если управляющая компания её зафиксировала (T262).
+    Пустая строка — законное значение и означает «спросить», а не ошибку
+    данных: на большинстве объектов зона не фиксирована (стеллажи бывают в
+    разных цехах), и отказ здесь сделал бы обязательным то, что обязательным не
+    является.
+
     `by_column` помнит, из какой колонки таблицы взят каждый код. Разница
     существенна для быстрого пути (T113): «Печь | CLN05 | TEH05» — это не выбор
     из двух кандидатов, а два разных вопроса про один объект, и карта сама это
@@ -121,6 +132,7 @@ class Cue:
     phrase: str
     codes: tuple[str, ...]
     by_column: tuple[tuple[str, tuple[str, ...]], ...] = ()
+    zone: str = ""
 
 
 def _stem(word: str) -> str:
@@ -259,12 +271,39 @@ def load_cues(path: Path | None = None, *, chat_id: int | None) -> tuple[Cue, ..
         if not codes:
             headers = tuple(cells)
             continue
-        cues.append(Cue(phrase=phrase, codes=codes, by_column=_columns(cells, headers)))
+        cues.append(
+            Cue(
+                phrase=phrase,
+                codes=codes,
+                by_column=_columns(cells, headers),
+                zone=_zone(cells, headers),
+            )
+        )
     return tuple(cues)
 
 
+def _zone(cells: list[str], headers: tuple[str, ...]) -> str:
+    """Зона объекта из колонки «Зона». Колонки нет или ячейка пуста — пусто.
+
+    Код зоны здесь НЕ сверяется со справочником намеренно: разбор карты не
+    знает, о каком издании методики речь (`load_cues` умеет читать и файл, и
+    издание проверки), а сверять зону изданием, которого у разбора нет, значило
+    бы сверять не с тем. Сверка живёт там, где издание известно, — у того, кто
+    зону спрашивает.
+    """
+    for index, header in enumerate(headers):
+        if header.strip().lower() in ZONE_HEADINGS and index < len(cells):
+            return cells[index].strip()
+    return ""
+
+
 def _columns(cells: list[str], headers: tuple[str, ...]) -> tuple[tuple[str, tuple[str, ...]], ...]:
-    """Коды строки по колонкам. Пустые колонки (прочерк) отбрасываются."""
+    """Коды строки по колонкам. Пустые колонки (прочерк) отбрасываются.
+
+    Колонка «Зона» кодов не несёт и потому отсеивается сама — отдельного
+    условия на неё здесь нет намеренно: признаком колонки кодов остаётся код в
+    ячейке, а не список заголовков, который пришлось бы вести в двух местах.
+    """
     columns: list[tuple[str, tuple[str, ...]]] = []
     for index, cell in enumerate(cells[1:], start=1):
         codes = tuple(dict.fromkeys(_CODE.findall(cell)))
@@ -275,8 +314,8 @@ def _columns(cells: list[str], headers: tuple[str, ...]) -> tuple[tuple[str, tup
     return tuple(columns)
 
 
-def match_cues(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
-    """Коды, которые карта поднимает по словам комментария.
+def matched_cues(note: str, cues: tuple[Cue, ...]) -> tuple[Cue, ...]:
+    """Строки карты, которые слова комментария поднимают, в порядке показа.
 
     Подсказка срабатывает, когда совпали два слова или одно различающее.
     Различающее — то, что ведёт не более чем к `DISTINCTIVE_CODES_AT_MOST`
@@ -284,6 +323,11 @@ def match_cues(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
     имеет (T142). Порядок — сначала по числу совпавших слов, потом по доле
     совпавшего в самой подсказке: строка из одного слова, совпавшая целиком,
     стоит выше длинной строки того же объекта, где из шести слов совпало одно.
+
+    Строки, а не коды: по тем же совпавшим строкам читается зона объекта (T262)
+    и собирается поиск пункта словом (T267). Два разных совпадения по одной
+    карте разошлись бы на первой же правке правила — поэтому совпадение здесь
+    одно, а `match_cues` и `match_zones` только читают из него разное.
     """
     words = stems(note)
     if not words:
@@ -294,7 +338,7 @@ def match_cues(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
         for stem in phrase:
             leads_to.setdefault(stem, set()).update(cue.codes)
 
-    scored: list[tuple[int, float, int, tuple[str, ...]]] = []
+    scored: list[tuple[int, float, int, Cue]] = []
     for order, (cue, phrase) in enumerate(zip(cues, phrase_stems, strict=True)):
         hit = phrase & words
         if not hit:
@@ -302,14 +346,32 @@ def match_cues(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
         distinctive = any(len(leads_to[stem]) <= DISTINCTIVE_CODES_AT_MOST for stem in hit)
         if len(hit) < 2 and not distinctive:
             continue
-        scored.append((-len(hit), -len(hit) / len(phrase), order, cue.codes))
+        scored.append((-len(hit), -len(hit) / len(phrase), order, cue))
+    return tuple(cue for _, _, _, cue in sorted(scored, key=lambda row: row[:3]))
 
+
+def match_cues(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
+    """Коды, которые карта поднимает по словам комментария."""
     codes: list[str] = []
-    for _, _, _, cue_codes in sorted(scored):
-        for code in cue_codes:
+    for cue in matched_cues(note, cues):
+        for code in cue.codes:
             if code not in codes:
                 codes.append(code)
     return tuple(codes)
+
+
+def match_zones(note: str, cues: tuple[Cue, ...]) -> tuple[str, ...]:
+    """Зоны объектов, которые карта поднимает по словам комментария (T262).
+
+    Пустая зона в строку ответа не идёт: она означает «спросить», и молчание
+    здесь — тот самый ответ. Зон несколько — отдаются все: решать за человека,
+    какая из них та, разбор не вправе, и этот случай кончается вопросом.
+    """
+    zones: list[str] = []
+    for cue in matched_cues(note, cues):
+        if cue.zone and cue.zone not in zones:
+            zones.append(cue.zone)
+    return tuple(zones)
 
 
 def class_thresholds(path: Path | None = None, *, chat_id: int | None) -> str:
