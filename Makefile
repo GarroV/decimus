@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate db-up db-down storage-up storage-down mcp mcp-outside cov-engine
+.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -160,6 +160,15 @@ demo-down:
 # не меняет.
 migrate:
 	$(VENV)/python -m src.db.migrate
+
+# Можно ли снять совместимость с прежним рецептом отпечатка НА ЭТОЙ базе.
+# Условие снятия — «строк того рецепта не осталось ни в одной базе», а баз
+# три: своя, владельца и площадки. Цель нужна затем, чтобы на каждой из них
+# спрашивали одним и тем же способом: ответ, полученный разными запросами,
+# сравнивать нельзя. Ходит связью наката — роли приложения снятые проверки
+# не видны, и её «ноль» ничего не значил бы.
+recipe-check:
+	$(VENV)/python -m src.db.recipe_audit
 
 # Сборка образов бота и MCP-сервера с версией внутри (#229).
 #
