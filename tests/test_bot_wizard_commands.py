@@ -21,9 +21,11 @@
 from __future__ import annotations
 
 import pytest
+from aiogram import Bot, Dispatcher
 from bot_harness import (
     AUDITOR_ID,
     CHAT_ID,
+    RecordingSession,
     callback_query,
     feed,
     make_bot,
@@ -51,7 +53,7 @@ SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_I
 MENU = [RECORDS_COMMAND, "undo", "finish", VERSION_COMMAND]
 
 
-async def ask_unit(settings: BotSettings = SETTINGS) -> tuple[object, object, object]:
+async def ask_unit(settings: BotSettings = SETTINGS) -> tuple[Dispatcher, Bot, RecordingSession]:
     """Довести мастер до вопроса «как называется пиццерия?»."""
     bot, session = make_bot()
     dp = build_dispatcher(settings)
@@ -67,9 +69,9 @@ async def test_пункт_меню_не_становится_названием(
     """Главный случай issue #203: бот принимал команду за название и шёл дальше."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{command}"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message(f"/{command}"))
 
-    assert t("start.ask_kind", "ru") not in session.texts, (  # type: ignore[attr-defined]
+    assert t("start.ask_kind", "ru") not in session.texts, (
         f"/{command} принят названием пиццерии — мастер ушёл к виду проверки"
     )
 
@@ -78,19 +80,19 @@ async def test_команда_в_мастере_выполняется(domain_en
     """Выбранный пункт меню обязан сработать, а не упереться в мастер."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))
 
-    assert t("version.answer", "ru", v=build_version()) in session.texts  # type: ignore[attr-defined]
+    assert t("version.answer", "ru", v=build_version()) in session.texts
 
 
 async def test_мастер_после_команды_ждёт_название_дальше(domain_env: object) -> None:
     """Команда не выбивает из мастера: следом присланное название принимается."""
     dp, bot, _session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))  # type: ignore[arg-type]
-    await feed(dp, bot, text_message("Белград 2"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback_query("start:kind:planned"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback_query("start:lang:ru"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))
+    await feed(dp, bot, text_message("Белград 2"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:ru"))
 
     state = get_state(CHAT_ID)
     assert state is not None and state.unit == "Белград 2", (
@@ -102,9 +104,9 @@ async def test_аудитор_понимает_почему_название_н�
     """Молчание здесь читалось бы как «бот проглотил название»."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message(f"/{VERSION_COMMAND}"))
 
-    assert t("start.unit_command", "ru") in session.texts  # type: ignore[attr-defined]
+    assert t("start.unit_command", "ru") in session.texts
 
 
 async def test_незнакомая_команда_названием_тоже_не_становится(domain_env: object) -> None:
@@ -115,40 +117,40 @@ async def test_незнакомая_команда_названием_тоже_�
     """
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message("/recordz"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message("/recordz"))
 
-    assert t("start.ask_kind", "ru") not in session.texts  # type: ignore[attr-defined]
-    assert t("start.unit_command", "ru") in session.texts  # type: ignore[attr-defined]
+    assert t("start.ask_kind", "ru") not in session.texts
+    assert t("start.unit_command", "ru") in session.texts
 
 
 async def test_название_с_командой_внутри_принимается(domain_env: object) -> None:
     """Слэш ловится только в начале: «Дом 5/1» — законное название точки."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message("Белград, Дом 5/1"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message("Белград, Дом 5/1"))
 
-    assert session.last_text == t("start.ask_kind", "ru")  # type: ignore[attr-defined]
+    assert session.last_text == t("start.ask_kind", "ru")
 
 
 async def test_кадр_вместо_названия_отвечает_как_раньше(domain_env: object) -> None:
     """Правка не должна была тронуть остальные ответы мастера."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, photo_message("frame"))  # type: ignore[arg-type]
+    await feed(dp, bot, photo_message("frame"))
 
-    assert session.last_text == t("start.unit_expected", "ru")  # type: ignore[attr-defined]
+    assert session.last_text == t("start.unit_expected", "ru")
 
 
 async def test_start_в_мастере_работает_как_прежде(domain_env: object) -> None:
     """`/start` — единственный выход из тупика, и мастер его не перехватывает."""
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message("/start"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message("/start"))
 
-    assert t("start.unit_command", "ru") not in session.texts, (  # type: ignore[attr-defined]
+    assert t("start.unit_command", "ru") not in session.texts, (
         "`/start` в мастере получил отговорку вместо приветствия"
     )
-    assert session.last_text == t("start.greeting", "ru")  # type: ignore[attr-defined]
+    assert session.last_text == t("start.greeting", "ru")
 
 
 async def test_установка_mcp_в_мастере_работает_и_мастер_ждёт_дальше(domain_env: object) -> None:
@@ -159,18 +161,18 @@ async def test_установка_mcp_в_мастере_работает_и_ма
     """
     dp, bot, session = await ask_unit()
 
-    await feed(dp, bot, text_message(f"/{MCP_COMMAND}"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message(f"/{MCP_COMMAND}"))
 
-    assert t("start.ask_kind", "ru") not in session.texts, (  # type: ignore[attr-defined]
+    assert t("start.ask_kind", "ru") not in session.texts, (
         "«Установка MCP» принята названием пиццерии"
     )
     # Круг доступа на этом стенде не назначен, и заслон пункта отвечает именно
     # так. Ответ взят его — то есть команда дошла до своего обработчика, а не
     # осталась в мастере; что печатает пункт с назначенным кругом, проверяет
     # `tests/test_bot_mcp_setup.py`, и повторять это здесь нечем.
-    assert t("mcp.circle_unset", "ru") in session.texts, "пункт меню до своего заслона не дошёл"  # type: ignore[attr-defined]
+    assert t("mcp.circle_unset", "ru") in session.texts, "пункт меню до своего заслона не дошёл"
 
-    await feed(dp, bot, text_message("Белград 2"))  # type: ignore[arg-type]
-    assert session.last_text == t("start.ask_kind", "ru"), (  # type: ignore[attr-defined]
+    await feed(dp, bot, text_message("Белград 2"))
+    assert session.last_text == t("start.ask_kind", "ru"), (
         "мастер после пункта меню название не принял"
     )

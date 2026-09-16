@@ -12,6 +12,7 @@ on_new
 on_resume_continue
 on_resume_new
 on_unit
+on_unit_command
 on_unit_not_text
 on_kind
 on_lang

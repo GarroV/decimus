@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import pytest
+from aiogram import Bot, Dispatcher
 from bot_harness import (
     AUDITOR_ID,
     CHAT_ID,
@@ -74,13 +75,13 @@ def started(unit: str = "Первая точка") -> None:
     sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
-async def start_new_inspection(dp: object, bot: object, unit: str) -> None:
+async def start_new_inspection(dp: Dispatcher, bot: Bot, unit: str) -> None:
     """Пройти мастер целиком — тем же путём, каким идёт аудитор."""
-    await feed(dp, bot, text_message("/start"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback_query(RESUME_NEW_CALLBACK))  # type: ignore[arg-type]
-    await feed(dp, bot, text_message(unit))  # type: ignore[arg-type]
-    await feed(dp, bot, callback_query("start:kind:planned"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback_query("start:lang:ru"))  # type: ignore[arg-type]
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(RESUME_NEW_CALLBACK))
+    await feed(dp, bot, text_message(unit))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:ru"))
 
 
 def findings_count() -> int:
