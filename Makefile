@@ -78,6 +78,9 @@ test:
 #
 # Поэтому: обычный прогон быстрый, а порчу гоняют этой целью или ставят
 # переменную руками на конкретный файл.
+test-honest: export DATABASE_URL = $(TEST_DATABASE_URL)
+test-honest: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
+test-honest: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 test-honest:
 	PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
 
