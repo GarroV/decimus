@@ -116,6 +116,35 @@ def test_связь_не_видящая_снятого_отказывает_а_�
 
 
 @requires_db
+def test_база_без_схемы_отказывает_а_не_отвечает_нулём() -> None:
+    """Пустая база — это «схемы нет», а не «строк нет», и ответы разные.
+
+    Ответ этой проверки читают как «снимать можно», поэтому «я не смог
+    посмотреть» обязано выглядеть иначе, чем «посмотрел, пусто». База без
+    наката раньше отдавала сырой стек драйвера — то есть отказ был, но
+    неотличимый от поломки инструмента.
+    """
+    from db_harness import empty_database
+
+    with empty_database() as dsn:
+        with pytest.raises(ConfigError) as exc:
+            audit_legacy_recipes(dsn)
+
+    текст = str(exc.value)
+    assert "схема не накатывалась" in текст
+    assert "пустая база ответом не является" in текст
+
+
+def test_недоступная_база_отказывает_внятно() -> None:
+    """Молчащая база — тоже отказ, а не ноль. Инструмент зовут руками на трёх
+    разных машинах, и стек драйвера там не ответ."""
+    with pytest.raises(ConfigError) as exc:
+        audit_legacy_recipes("postgresql://nobody@127.0.0.1:1/nothing?connect_timeout=2")
+
+    assert "не отвечает" in str(exc.value)
+
+
+@requires_db
 def test_администратор_истории_считать_может(
     domain_env: Path, db_env: str, retraction_env: str
 ) -> None:

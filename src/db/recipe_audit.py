@@ -166,7 +166,25 @@ def _info_part_applied_at(conn: psycopg.Connection[Any]) -> tuple[bool, datetime
 
 
 def audit_legacy_recipes(dsn: str) -> LegacyRecipeReport:
-    """Сосчитать, что лежит в базе, и сказать, можно ли снимать прежние рецепты."""
+    """Сосчитать, что лежит в базе, и сказать, можно ли снимать прежние рецепты.
+
+    Недоступная база и база без схемы — такой же отказ, как нехватка прав, и по
+    той же причине: ответ этой проверки читают как «снимать можно», а «я не
+    смог посмотреть» обязано выглядеть иначе, чем «посмотрел, пусто». Модуль
+    зовут руками на трёх разных машинах, поэтому стек драйвера здесь не ответ.
+    """
+    try:
+        return _audit(dsn)
+    except psycopg.OperationalError as err:
+        raise ConfigError(f"База не отвечает по этой связи: {err}") from err
+    except psycopg.errors.UndefinedTable as err:
+        raise ConfigError(
+            "В базе нет таблицы проверок: схема не накатывалась этим раннером. "
+            "Накатите миграции и повторите — пустая база ответом не является"
+        ) from err
+
+
+def _audit(dsn: str) -> LegacyRecipeReport:
     with psycopg.connect(dsn) as conn:
         database = _require_visibility(conn)
         row = conn.execute("select count(*) from inspections").fetchone()
