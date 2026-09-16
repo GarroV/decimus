@@ -44,7 +44,6 @@ from bot_harness import (
 from bot_harness import callback_query as callback
 
 from src import domain
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import EDIT_DROP, EDIT_PREFIX, PICK_PREFIX
@@ -78,7 +77,6 @@ def findings() -> list[Finding]:
 
 async def make_record(dp: object, bot: object, session: object, caption: str = OVEN) -> int:
     """Записать нарушение словами и вернуть номер сообщения бота о нём."""
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, photo_message(f"frame-{caption[:6]}", caption=caption))  # type: ignore[arg-type]
     return session.last_sent_id  # type: ignore[attr-defined,no-any-return]
 
@@ -295,7 +293,6 @@ async def test_ответ_не_на_запись_связывает_коммен
     stub_classify(monkeypatch, suggestion())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-bare"))
     asked = session.last_sent_id

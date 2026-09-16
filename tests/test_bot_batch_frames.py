@@ -48,7 +48,6 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import ANALYZE_PREFIX, PICK_PREFIX
@@ -131,7 +130,6 @@ def dispatcher() -> Any:
 
 async def analyze_album(dp: Any, bot: Any, session: Any, *file_ids: str) -> list[int]:
     """Прислать пачку и нажать «Разобрать?». Возвращает номера сообщений отбивки."""
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     first = await send_album(dp, bot, *file_ids)
     mark = len(session.sent_ids)
     await feed(dp, bot, callback(f"{ANALYZE_PREFIX}{first.message_id}"))
@@ -254,7 +252,6 @@ async def test_кадры_с_комментарием_остаются_одно�
     asked = stub_by_call(monkeypatch, BY_FRAME)
     bot, _ = make_bot()
     dp = dispatcher()
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await send_album(dp, bot, "b1", "b2", "b3", caption="печь грязная")
 

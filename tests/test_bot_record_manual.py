@@ -115,7 +115,6 @@ async def test_manual_button_opens_the_list_without_recording_model_candidates(
     manual_calls = stub_manual(monkeypatch, (manual("PRD06", ("D1",), "Пункт без сети"),))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:manual"))
@@ -135,7 +134,6 @@ async def test_long_list_is_paginated_with_next_button_on_first_page(
     stub_manual(monkeypatch, _hot_kitchen_manual_items())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 
@@ -156,7 +154,6 @@ async def test_next_page_shows_different_items_and_adds_back_button(
     stub_manual(monkeypatch, _hot_kitchen_manual_items())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     first_page = {d for d in session.keyboard_data() if d.startswith("rec:mi:")}
@@ -180,7 +177,6 @@ async def test_last_page_has_no_next_button(
     stub_manual(monkeypatch, _hot_kitchen_manual_items())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:mp:2"))
@@ -204,7 +200,6 @@ async def test_page_number_beyond_the_list_clamps_to_the_last_page(
     stub_manual(monkeypatch, _hot_kitchen_manual_items())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:mp:99"))
@@ -231,7 +226,6 @@ async def test_item_picked_from_the_second_page_records_the_correct_code(
     stub_manual(monkeypatch, _hot_kitchen_manual_items())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="протухший фарш на разделке"))
     await feed(dp, bot, callback("rec:mp:1"))
@@ -299,7 +293,6 @@ async def test_stale_manual_pick_after_restart_records_nothing(
     stub_classify(monkeypatch, ModelUnavailable("нет сети"))
     stub_manual(monkeypatch, (manual("PRD06", ("D1",), "Пункт без сети"),))
     bot, session = make_bot()
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     first = build_dispatcher(SETTINGS)
     await feed(first, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
@@ -324,7 +317,6 @@ async def test_manual_pick_out_of_range_is_stale_not_a_crash(
     )
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     session.clear()
@@ -347,7 +339,6 @@ async def test_config_error_from_classify_is_reported_not_treated_as_empty(
     stub_classify(monkeypatch, RecognizeConfigError("нет карты кадров"))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 
@@ -374,7 +365,6 @@ async def test_config_error_building_the_manual_list_is_reported_and_bot_survive
     monkeypatch.setattr("src.bot.routers.record.manual_candidates", failing_manual)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 

@@ -385,7 +385,6 @@ async def test_model_outage_falls_back_to_manual_pick(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     # Слова неоднозначны намеренно: однозначные забрал бы быстрый путь (T117),
     # и до недоступной модели дело бы не дошло — проверять было бы нечего.
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
@@ -417,7 +416,6 @@ async def test_manual_pick_asks_for_the_class_when_there_is_a_choice(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "fridge")
     await feed(dp, bot, photo_message("frame-1", caption="продукт размораживается на столе"))
     await feed(dp, bot, callback("rec:mi:0"))
 
@@ -480,7 +478,6 @@ async def test_empty_answer_opens_the_manual_list(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, photo_message("frame-1", caption="тут грязно"))
 
     assert any("Что именно на кадре загрязнено?" in text for text in session.texts)

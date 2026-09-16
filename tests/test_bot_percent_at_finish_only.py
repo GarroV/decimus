@@ -30,7 +30,6 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.domain import Finding, get_state, start_inspection
@@ -80,7 +79,6 @@ async def test_фиксация_словами_без_процента(
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 

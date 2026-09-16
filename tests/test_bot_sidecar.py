@@ -23,7 +23,6 @@ from src.bot.sidecar import (
     record_of,
     remember_frames,
     remember_record,
-    remember_zone,
     reset,
     unclaimed,
 )
@@ -38,19 +37,7 @@ def кадр(message_id: int, file_id: str) -> SeenFrame:
 def test_заметок_нет_read_отдаёт_пустые(domain_env: Path) -> None:
     notes = read(CHAT)
     assert notes.frames == ()
-    assert notes.zone == ""
     assert not notes_path(CHAT).is_file()
-
-
-def test_remember_zone_сохраняется_и_перезаписывается(domain_env: Path) -> None:
-    remember_zone(CHAT, "hot_kitchen")
-    assert read(CHAT).zone == "hot_kitchen"
-
-    remember_zone(CHAT, "bar")
-    assert read(CHAT).zone == "bar", "повторный вызов должен перезаписать зону, а не сложить"
-
-    remember_zone(CHAT, "")
-    assert read(CHAT).zone == "", "пустая строка обязана стереть память о зоне"
 
 
 def test_remember_frames_двумя_вызовами_сохраняет_порядок(domain_env: Path) -> None:
@@ -85,18 +72,17 @@ def test_unclaimed_с_пустым_used_отдаёт_все_кадры(domain_en
 
 def test_reset_стирает_всё(domain_env: Path) -> None:
     remember_frames(CHAT, [кадр(1, "AAA")])
-    remember_zone(CHAT, "hot_kitchen")
 
     reset(CHAT)
 
-    assert read(CHAT) == Notes(frames=(), zone="")
+    assert read(CHAT) == Notes(frames=())
     assert not notes_path(CHAT).is_file()
 
 
 def test_reset_на_чате_без_заметок_не_падает(domain_env: Path) -> None:
     reset(CHAT)  # не должно поднять исключение
 
-    assert read(CHAT) == Notes(frames=(), zone="")
+    assert read(CHAT) == Notes(frames=())
 
 
 def test_испорченный_json_даёт_botnoteserror_с_путём(domain_env: Path) -> None:
@@ -120,7 +106,6 @@ def test_список_вместо_объекта_даёт_botnoteserror(domain_
 
 def test_заметки_переживают_перезапуск(domain_env: Path) -> None:
     remember_frames(CHAT, [кадр(10, "AAA"), кадр(11, "BBB")])
-    remember_zone(CHAT, "hot_kitchen")
 
     path = notes_path(CHAT)
     assert path.is_file(), "заметки обязаны лежать файлом в папке проверки"
@@ -129,19 +114,14 @@ def test_заметки_переживают_перезапуск(domain_env: Pa
     # «Перезапуск» — второе, независимое чтение с диска.
     notes = read(CHAT)
     assert notes.frames == (кадр(10, "AAA"), кадр(11, "BBB"))
-    assert notes.zone == "hot_kitchen"
 
 
 def test_заметки_разных_чатов_не_смешиваются(domain_env: Path) -> None:
     other = CHAT + 1
-    remember_zone(CHAT, "hot_kitchen")
     remember_frames(CHAT, [кадр(10, "AAA")])
-    remember_zone(other, "bar")
     remember_frames(other, [кадр(20, "BBB")])
 
-    assert read(CHAT).zone == "hot_kitchen"
     assert read(CHAT).frames == (кадр(10, "AAA"),)
-    assert read(other).zone == "bar"
     assert read(other).frames == (кадр(20, "BBB"),)
 
 
@@ -155,7 +135,6 @@ def test_старые_заметки_с_источниками_читаются(
     проверка перестала завершаться: кадры не показать, отчёт не собрать. Ключ
     просто не нужен — источник теперь у самой записи.
     """
-    remember_zone(CHAT, "hot_kitchen")
     remember_frames(CHAT, [кадр(10, "AAA")])
     path = notes_path(CHAT)
     raw = json.loads(path.read_text(encoding="utf-8"))
@@ -164,7 +143,6 @@ def test_старые_заметки_с_источниками_читаются(
 
     notes = read(CHAT)
 
-    assert notes.zone == "hot_kitchen"
     assert notes.frames == (кадр(10, "AAA"),)
 
 
@@ -172,17 +150,16 @@ def test_старый_файл_без_ключа_кадров_читается(d
     """Заметки прежней версии кадров ещё не знали — читаться они обязаны.
 
     Отказ здесь означал бы, что после обновления бота проверка, начатая до него,
-    перестала завершаться: список кадров пуст, а не «файл испорчен».
+    перестала завершаться: список кадров пуст, а не «файл испорчен». Ключ «zone»
+    из тех же старых заметок (память о прошлой записи, D048) читается так же
+    мимоходом: он больше ничего не значит (T264, #218), но и не мешает.
     """
-    remember_zone(CHAT, "hot_kitchen")
     path = notes_path(CHAT)
-    raw = json.loads(path.read_text(encoding="utf-8"))
-    del raw["frames"]
-    path.write_text(json.dumps(raw, ensure_ascii=False), encoding="utf-8")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"schema": 2, "zone": "hot_kitchen"}), encoding="utf-8")
 
     notes = read(CHAT)
     assert notes.frames == ()
-    assert notes.zone == "hot_kitchen"
 
 
 @pytest.mark.parametrize(
@@ -200,7 +177,7 @@ def test_испорченный_список_кадров_это_отказ(doma
     Молча потерянный кадр — то, ради чего заведена задача T068; вернуть тут
     пустоту значило бы обойти её же защиту через испорченный файл.
     """
-    remember_zone(CHAT, "hot_kitchen")
+    remember_frames(CHAT, [кадр(1, "seed")])
     path = notes_path(CHAT)
     raw = json.loads(path.read_text(encoding="utf-8"))
     raw["frames"] = битые_кадры
@@ -218,7 +195,7 @@ def test_сорванная_запись_не_оставляет_мусора(
     Мусор `.bot-notes-*.tmp` копился бы в папке проверки каждым сбоем и уехал бы
     вместе с ней; хуже того, читатель принял бы его за состояние.
     """
-    remember_zone(CHAT, "hot_kitchen")
+    remember_frames(CHAT, [кадр(1, "AAA")])
     папка = notes_path(CHAT).parent
 
     def сорвать(*_a: object, **_k: object) -> None:
@@ -226,11 +203,11 @@ def test_сорванная_запись_не_оставляет_мусора(
 
     monkeypatch.setattr("src.bot.sidecar.json.dump", сорвать)
     with pytest.raises(OSError, match="нет места"):
-        remember_zone(CHAT, "dining")
+        remember_frames(CHAT, [кадр(2, "BBB")])
 
     assert list(папка.glob(".bot-notes-*.tmp")) == []
     # Прежние заметки целы: сорванная запись не тронула файл.
-    assert read(CHAT).zone == "hot_kitchen"
+    assert read(CHAT).frames == (кадр(1, "AAA"),)
 
 
 def test_повтор_тех_же_кадров_не_переписывает_файл(domain_env: Path) -> None:

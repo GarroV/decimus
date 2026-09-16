@@ -48,7 +48,6 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import EDIT_PREFIX, MODEL_CALLBACK, PICK_PREFIX
@@ -116,7 +115,6 @@ async def test_однозначные_слова_ложатся_записью_�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
@@ -135,7 +133,6 @@ async def test_запись_ложится_словами_аудитора_с_и
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, _session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=TWO_VIOLATIONS))
 
@@ -161,7 +158,6 @@ async def test_показ_записи_называет_пункт_словам�
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
@@ -171,9 +167,10 @@ async def test_показ_записи_называет_пункт_словам�
         "ru",
         # Отбивка о сохранении — одна на все пути добавления записи (T230, D090).
         stored=stored_headline("ru"),
-        # Зону аудитор в этих словах не называл — она из памяти (D048), и
-        # оговорка про это стоит в показе (T124).
-        guess=t("record.fixed_zone_guess", "ru"),
+        # Зону аудитор в этих словах не называл — она взята из карты кадров по
+        # названному объекту («Печь» → `hot_kitchen`, T262/T263), и оговорка об
+        # этом стоит в показе (T124).
+        guess=t("record.fixed_zone_from_cues", "ru"),
         line=t(
             "record.saved",
             "ru",
@@ -202,7 +199,6 @@ async def test_фраза_с_двумя_нарушениями_показыва�
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=TWO_VIOLATIONS))
 
@@ -226,7 +222,6 @@ async def test_под_записью_есть_и_правка_и_выход_к_�
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
@@ -249,7 +244,6 @@ async def test_отказ_движка_не_оставляет_тупика_а_�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN12", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
     assert len(findings()) == 1
@@ -277,7 +271,6 @@ async def test_кнопка_разобрать_моделью_отдаёт_мо�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN12", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=TWO_VIOLATIONS))
     assert asked == []
@@ -301,7 +294,6 @@ async def test_разбор_моделью_после_быстрого_пути_
     stub_classify(monkeypatch, suggestion(candidate("CLN12", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
     assert len(findings()) == 1
@@ -337,7 +329,6 @@ async def test_выход_к_модели_поверх_кандидатов_мо
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="тут непорядок"))
     assert f"{PICK_PREFIX}0" in session.keyboard_data(), "нужно живое предложение от модели"
@@ -351,13 +342,19 @@ async def test_выход_к_модели_поверх_кандидатов_мо
 async def test_без_названной_зоны_ничего_не_фиксируется_само(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Зону определяет аудитор (правило 6), а не догадка по словам."""
+    """Зону определяет аудитор (правило 6), а не догадка по словам.
+
+    Объект («Раковина и смеситель») карта кадров зоны не держит совсем
+    (`tests/methodology/photo-cues.md` — колонка «Зона» у него пуста, в
+    отличие от «Печи»), и словами зона тоже не названа — значит, взять её
+    неоткуда, и решает модель.
+    """
     started()
-    asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
+    asked = stub_classify(monkeypatch, suggestion(candidate("CLN02", "D1", "dishwashing")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
+    await feed(dp, bot, photo_message("frame-1", caption="раковина и смеситель грязные"))
 
     assert len(asked) == 1, "без зоны разбирать обязана модель"
     assert findings() == [], "запись появилась сама, хотя зона не названа"
@@ -379,7 +376,6 @@ async def test_кадр_без_слов_фиксируется_только_по
     checked = spy_fast_path(monkeypatch)
     bot, _session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", message_id=501))
     await feed(dp, bot, callback("rec:analyze:501"))
@@ -401,7 +397,6 @@ async def test_неоднозначные_слова_идут_модели_ка�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="печь"))
 
@@ -418,7 +413,6 @@ async def test_причина_отказа_человеку_не_показыв�
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption="тут непорядок"))
     await feed(dp, bot, photo_message("frame-2", caption="печь"))
@@ -436,7 +430,6 @@ async def test_фиксация_словами_работает_и_на_комм
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", message_id=601))
     await feed(dp, bot, text_message(CLEAR))

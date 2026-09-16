@@ -136,7 +136,6 @@ async def test_устаревшая_кнопка_продолжить_не_ст�
 async def test_кадр_с_комментарием_в_сданную_не_ложится_записью(domain_env: Path) -> None:
     """Кадр — главный вход, и он же оставался открытым: кнопка не единственный путь."""
     bot, session, dp = await сданная()
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-late", caption="печь грязная"))
 
@@ -203,7 +202,6 @@ async def test_нажатие_под_старым_предложением_по�
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     stub_classify(monkeypatch, suggestion(candidate("CLN06", "D1", "hot_kitchen")))
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, photo_message("frame-x", caption="что-то не так с мебелью"))
     assert session.keyboard_data(), "предложение не показано — нажимать нечего"
     await сдать(bot, session)
@@ -267,7 +265,6 @@ async def test_проверка_в_работе_запретом_не_задет
     записать()
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "dining")
 
     await feed(dp, bot, photo_message("frame-live", caption="урна в зале переполнена"))
 

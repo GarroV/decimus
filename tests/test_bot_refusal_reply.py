@@ -149,7 +149,6 @@ async def test_сторонний_кадр_после_ответа_на_отка
 
     # Пара CLN05 + hot_kitchen освободилась правкой — слова про печь ложатся
     # записью, и ждущий кадр достаётся ей.
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, text_message(ПЕЧЬ))
 
     assert [(f.n, f.code, f.zone) for f in записи()] == [
@@ -198,7 +197,6 @@ async def test_отказ_без_записи_в_карту_не_попадае�
 
     await feed(dp, bot, callback("el:1:D3"))
     отказ = номер_сообщения(session, "Не поправил")
-    sidecar.remember_zone(CHAT_ID, "dishwashing")
     await feed(dp, bot, text_message(ОТВЕТ, reply_to=bot_message(отказ)))
 
     assert sidecar.record_of(CHAT_ID, отказ) is None, "отказ без записи попал в карту сообщений"

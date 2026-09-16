@@ -24,7 +24,6 @@ from bot_harness import (
 )
 
 from src import domain
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
@@ -35,10 +34,14 @@ pytestmark = [pytest.mark.asyncio]
 
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
-#: Название зоны `dining` на русском (`tests/methodology/zones.csv`) — тем же
-#: значением, что и код зоны в постановке задачи. Тест сравнивает с данными
-#: методики, а не с каталогом `t()`: названия зон в нём не заведены.
-DINING_TITLE_RU = "Гостевой зал"
+#: Название зоны `cold_kitchen` на русском (`tests/methodology/zones.csv`) —
+#: тем же значением, что и код зоны в постановке задачи. Тест сравнивает с
+#: данными методики, а не с каталогом `t()`: названия зон в нём не заведены.
+#: `dining` для этой роли не годится: `PRD01` живёт в зонах
+#: `fridge,cold_kitchen,hot_kitchen` (`tests/methodology/checklist.csv`), а
+#: зала среди них нет — с T271 движок пару с ним отклонил бы, и правка зоны
+#: кнопкой ни разу не прошла бы.
+COLD_KITCHEN_TITLE_RU = "Холодный участок"
 #: Название зоны `fridge` — там записи `PRD01` заводятся в тестах.
 FRIDGE_TITLE_RU = "Среднетемпературный шкаф"
 
@@ -150,26 +153,16 @@ async def test_zone_change_updates_the_finding(domain_env: object) -> None:
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, callback_query("ez:1:dining"))
+    await feed(dp, bot, callback_query("ez:1:cold_kitchen"))
 
     inspection = domain.get_state(CHAT_ID)
     assert inspection is not None
     finding = inspection.finding(1)
-    assert finding is not None and finding.zone == "dining"
-    assert DINING_TITLE_RU in session.last_text
-    assert "dining" not in session.last_text, "код зоны не должен утекать в текст для аудитора"
-
-
-async def test_zone_change_is_remembered_as_the_last_named_zone(domain_env: object) -> None:
-    """Правка зоны кнопкой запоминается как последняя названная (решение D048)."""
-    domain.start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
-    domain.add_finding(CHAT_ID, "PRD01", "D1", "fridge", "текст")
-    bot, _ = make_bot()
-    dp = build_dispatcher(SETTINGS)
-
-    await feed(dp, bot, callback_query("ez:1:dining"))
-
-    assert sidecar.read(CHAT_ID).zone == "dining"
+    assert finding is not None and finding.zone == "cold_kitchen"
+    assert COLD_KITCHEN_TITLE_RU in session.last_text
+    assert "cold_kitchen" not in session.last_text, (
+        "код зоны не должен утекать в текст для аудитора"
+    )
 
 
 async def test_level_button_offers_only_levels_allowed_for_the_item(domain_env: object) -> None:
@@ -304,7 +297,7 @@ async def test_edit_buttons_return_after_a_successful_change(domain_env: object)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, callback_query("ez:1:dining"))
+    await feed(dp, bot, callback_query("ez:1:cold_kitchen"))
 
     data = session.keyboard_data()
     assert "edit:1:zone" in data
@@ -424,6 +417,6 @@ async def test_record_gone_between_the_edit_and_the_answer_is_reported(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, callback_query("ez:1:dining"))
+    await feed(dp, bot, callback_query("ez:1:cold_kitchen"))
 
     assert session.last_text == t("edit.gone", "ru", n=1)
