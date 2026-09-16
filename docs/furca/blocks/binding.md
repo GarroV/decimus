@@ -555,3 +555,51 @@ kept.
 причина у кадра в `records.py::_show_unclaimed`, `archive_uncovered` при
 завершении проверки, тесты); (5) принять работу исполнителя по переборке тестов,
 прогнать `make check` целиком один раз и `tools/regress_check.py` перед сдачей.
+
+### Точка продолжения после второго обрыва по лимиту (16.09.2026)
+
+Принята и закоммичена первая половина переборки тестов (`509dc11`, 27 файлов,
+исполнитель `optio`). Исполнитель остановился по исчерпанию окна, не оборвав
+себя посреди файла; его правки по смыслу верны — проверено прогоном и чтением
+диффа, `ruff check` и `ruff format` чисты.
+
+**Остаток переборки: 48 падений в 18 файлах.** Прогон затронутых наборов
+(`440 passed, 48 failed, 1 skipped`, 4 мин 23 с):
+
+| Файл | Падений |
+|---|---|
+| `tests/test_bot_record_router.py` | 10 |
+| `tests/test_bot_record_manual.py` | 9 |
+| `tests/test_bot_zone_from_words.py` | 5 |
+| `tests/test_recognize_language.py` | 4 |
+| `tests/test_bot_zone_from_item.py` | 3 |
+| `tests/test_recognize_manual_by_words.py`, `test_recognize_manual.py`, `test_domain_source.py`, `test_bot_percent_at_finish_only.py` | по 2 |
+| `test_recognize_cues_absent.py`, `test_recognize_classify.py`, `test_engine_atomic_state.py`, `test_domain_words.py`, `test_domain_suggestion.py`, `test_domain_state.py`, `test_bot_refusal_reply.py`, `test_bot_refusal.py`, `test_bot_candidate_buttons.py` | по 1 |
+
+Причины те же семь, что описаны в контракте переборки, плюс две, которые видно
+по именам тестов и которые надо чинить ПО СМЫСЛУ, а не подгонкой:
+
+* `test_recognize_classify.py::test_зона_UNKNOWN_подставляется_подсказкой` —
+  поведение снято задачей T264 намеренно. Тест обязан быть переписан в
+  обратное: `UNKNOWN` доживает до `needs_human`, а не подменяется.
+* `test_recognize_manual.py::test_перечень_зоны_это_база_и_она_полная` и
+  `test_recognize_manual_by_words.py::test_слова_без_попаданий_перечень_не_обрезают` —
+  база перечня с T265 это весь чек-лист, зона только упорядочивает. Проверять
+  надо достижимость пункта чужой зоны, а не зональную базу.
+* `tests/test_recognize_language.py` — четыре падения из-за двух новых
+  обязательных полей правил языка (`zone_column`, `place_prepositions`);
+  образец готовой оснастки лежит рядом, в `tests/test_recognize_language_rules.py`
+  (`ВАЛИДНЫЙ_ЯЗЫК`).
+
+**Порядок дальнейших шагов (задан координатором):** (1) доперебрать эти 18
+файлов; (2) слить `main` — в него влиты блоки `bot`, `db`, `infra`, `report`,
+и правка `engine/report.py` от `report` задевает мой регресс, проверить его
+после слияния; (3) доделать T269 по коду (`_lost` не сшит с отказом и с
+«ничего не нашлось», причина кадра в `records.py::_show_unclaimed`,
+`archive_uncovered` при завершении проверки, тесты); (4) T273 —
+`docs/furca/blocks/bot.md`, две строки DoD в `recognize.md`, `CHANGELOG.md`;
+(5) один полный `make check` и `tools/regress_check.py` (обязан дать дословно
+97.5% A 5×D1 и 97% A 6×D1).
+
+**Числа замеров не переделывать под ожидание** — координатор выносит развилку
+владельцу отдельным вопросом. Решение T265 не отменять.
