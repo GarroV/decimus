@@ -461,3 +461,24 @@ def test_every_backup_variable_is_documented() -> None:
     assert в_стенде <= описано, (
         f"переменные выгрузки не описаны в .env.example: {sorted(в_стенде - описано)}"
     )
+
+
+def test_backup_archives_never_reach_the_public_repository() -> None:
+    """Архив состояния не имеет права попасть в индекс: репозиторий публичный.
+
+    Умолчание `BACKUP_DIR` указывает на каталог рядом с кодом, а внутри архива
+    лежат папки идущих проверок партнёров и связки доступа. Спрашивается САМ
+    git, а не текст `.gitignore`: правило, написанное не в том виде, выглядит
+    работающим ровно до первого `git add`.
+    """
+    r = subprocess.run(
+        ["git", "check-ignore", "-q", "backups/decimus-state-20260916-000000.tar.gz"],  # noqa: S607
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert r.returncode == 0, (
+        "каталог бэкапа не игнорируется git: архив с историей проверок уедет "
+        "в публичный репозиторий первым же `git add`"
+    )

@@ -154,7 +154,11 @@ def test_звено_спрашивается_как_сервис_стенда_а
 def test_звено_перезапускается_это_провал(площадка: Path) -> None:
     r = прогон(
         площадка,
-        **{"docker compose ps": "bot|Up 2 hours (healthy)\nmcp|Up 2 hours (healthy)\nlink|Restarting (1)"},
+        **{
+            "docker compose ps": (
+                "bot|Up 2 hours (healthy)\nmcp|Up 2 hours (healthy)\nlink|Restarting (1)"
+            )
+        },
     )
     assert "СМОУК КРАСНЫЙ" in r.stdout
     assert "ПРОВАЛ" in строка(r.stdout, "звено до сервера")
