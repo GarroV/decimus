@@ -46,7 +46,6 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import MANUAL_PAGE_SIZE
@@ -59,12 +58,18 @@ SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_I
 
 #: Комментарий, по которому модель не отвечает ничего, — тогда открывается
 #: ручной перечень. Однозначным его делать нельзя: быстрый путь записал бы
-#: пункт сам, и до перечня разговор не дошёл бы.
-НЕЯСНО = "печь, посмотри что тут"
+#: пункт сам, и до перечня разговор не дошёл бы. Зона названа словами явно
+#: («в тепловом») — без неё перечень спросил бы её кнопкой вместо показа
+#: перечня (T267); слова при этом ни одной строки карты кадров не поднимают
+#: (T267, #226) — иначе поиск словом нашёл бы пункт раньше перечня зоны, и
+#: тест проверял бы не ту ветку.
+НЕЯСНО = "тут что-то не так, в тепловом"
 
-#: Перечень зоны: первым пунктом тот, который уже занят записью.
+#: Перечень зоны: первым пунктом тот, который уже занят записью. Пункт держит
+#: несколько зон (T271, #239) — иначе тест про «тот же пункт в другой зоне»
+#: не собрать: движок отклонит саму запись, а не только пометку в перечне.
 ПЕРЕЧЕНЬ = (
-    manual("CLN05", ("D1",), "Загрязнение оборудования"),
+    manual("CLN06", ("D1",), "Загрязнение оборудования"),
     manual("CLN02", ("D1",), "Оборудование в зоне мойки"),
 )
 
@@ -83,16 +88,15 @@ async def test_занятый_пункт_назван_в_тексте_стран
 ) -> None:
     """Главное требование: нажатие на такой пункт даст отказ, и сказать об этом надо до нажатия."""
     начата()
-    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    add_finding(CHAT_ID, "CLN06", "D1", "hot_kitchen", "Пятна на стеллаже")
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, ПЕРЕЧЕНЬ)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
     await открыть_перечень(dp, bot)
 
-    assert "CLN05" in session.last_text, f"занятый пункт не назван: {session.last_text!r}"
+    assert "CLN06" in session.last_text, f"занятый пункт не назван: {session.last_text!r}"
     assert "#1" in session.last_text, "номер занявшей записи не назван — править пойдут вслепую"
 
 
@@ -103,7 +107,6 @@ async def test_формулировка_на_кнопке_не_пострада�
     начата()
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, ПЕРЕЧЕНЬ)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -116,7 +119,7 @@ async def test_формулировка_на_кнопке_не_пострада�
     )
     без_пометки = session.keyboard_texts()
 
-    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    add_finding(CHAT_ID, "CLN06", "D1", "hot_kitchen", "Пятна на стеллаже")
     session.clear()
     await feed(dp, bot, callback("rec:manual"))
 
@@ -128,10 +131,9 @@ async def test_тот_же_пункт_в_другой_зоне_не_помеча
 ) -> None:
     """Помечается ПАРА: тот же пункт в другой зоне — законная и частая запись."""
     начата()
-    add_finding(CHAT_ID, "CLN05", "D1", "dining", "Загрязнение в зале")
+    add_finding(CHAT_ID, "CLN06", "D1", "cold_kitchen", "Пятна на стеллаже в холодном")
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, ПЕРЕЧЕНЬ)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -150,7 +152,6 @@ async def test_без_занятых_пунктов_пометки_нет_вов
     начата()
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, ПЕРЕЧЕНЬ)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -166,15 +167,20 @@ async def test_пометка_только_про_пункты_этой_стра
 ) -> None:
     """Строка про пункт, которого на экране нет, — шум и повод искать не то."""
     начата()
-    перечень = tuple(
-        manual(f"CLN{n:02d}", ("D1",), f"пункт {n}") for n in range(1, MANUAL_PAGE_SIZE + 3)
-    )
-    # Занят пункт, который стоит на ВТОРОЙ странице.
+    # Коды остальных кнопок вымышлены (номер сдвинут за пределы настоящего
+    # чек-листа), чтобы не столкнуться с занятым пунктом ниже.
+    перечень_список = [
+        manual(f"CLN{30 + n:02d}", ("D1",), f"пункт {n}") for n in range(1, MANUAL_PAGE_SIZE + 3)
+    ]
+    # Занят пункт, который стоит на ВТОРОЙ странице. Код у него настоящий и
+    # держит зону, в которую его сведут слова НЕЯСНО (T271, #239) — иначе
+    # занятость отклонит сам движок, а не то, что проверяет тест.
+    перечень_список[MANUAL_PAGE_SIZE] = manual("CLN06", ("D1",), f"пункт {MANUAL_PAGE_SIZE + 1}")
+    перечень = tuple(перечень_список)
     занятый = перечень[MANUAL_PAGE_SIZE].code
     add_finding(CHAT_ID, занятый, "D1", "hot_kitchen", "Запись со второй страницы")
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, перечень)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -202,10 +208,9 @@ async def test_занятый_пункт_остаётся_в_перечне_и_�
     правкой.
     """
     начата()
-    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    add_finding(CHAT_ID, "CLN06", "D1", "hot_kitchen", "Пятна на стеллаже")
     stub_classify(monkeypatch, suggestion())
     stub_manual(monkeypatch, ПЕРЕЧЕНЬ)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 

@@ -505,6 +505,26 @@ def photos_of(f):
     return [f["photo"]] if f.get("photo") else []
 
 
+def zone_refusal(qid, zone, allowed):
+    """Отказ на паре «пункт + зона», которой методика не даёт (T271, #239).
+
+    До задачи такая пара ПРИНИМАЛАСЬ и лишь помечалась `zone_unusual` —
+    предупреждением, которое читал только тот, кто смотрел вывод команды.
+    Живой прогон владельца показал, чем это кончается: пункт про печь лёг в
+    холодный цех, предупреждение проехало мимо, и вычет уехал в отчёт партнёру
+    в чужую зону. Гадания в предметной области нет: методика прямо называет, в
+    каких зонах пункт бывает, и запись вне этого списка — не «нетипичная», а
+    невозможная.
+
+    `score` этой проверки не делает и не менялся: разбивка по зонам считается
+    по тому, что записано. Регрессионный якорь на боевых выгрузках остался
+    дословным.
+    """
+    зоны = ", ".join(allowed)
+    return (f"Пункт {qid} в зоне {zone} методика не держит. "
+            f"Допустимые зоны: {зоны}")
+
+
 def cmd_add(a):
     cl = {r["id"]: r for r in load_checklist()}
     zones = load_zones()
@@ -519,6 +539,8 @@ def cmd_add(a):
     if a.zone not in zc:
         sys.exit(f"Нет зоны {a.zone}. Доступны: {', '.join(sorted(zc))}")
     allowed = zone_codes(r, zones)
+    if a.zone not in allowed:
+        sys.exit(zone_refusal(qid, a.zone, allowed))
     st = load_state()
     check_pair_free(st, qid, a.zone)
     # Счётчик сквозной: номера аудитор называет вслух, переиспользовать нельзя.
@@ -526,13 +548,10 @@ def cmd_add(a):
     st["seq"] = n
     f = {"n": n, "qid": qid, "level": lvl, "zone": a.zone, "photos": split_photos(a.photo),
          "comment": a.comment or "", "evidence": a.evidence or ""}
-    if a.zone not in allowed:
-        f["zone_unusual"] = True
     st["findings"].append(f)
     save_state(st)
-    warn = "  (зона нетипична для этого вопроса — перепроверьте)" if a.zone not in allowed else ""
     ph = f"  [фото: {len(f['photos'])}]" if f["photos"] else ""
-    print(f"#{n} {qid} {lvl} / {a.zone}: {r['question_ru'][:90]}{ph}{warn}")
+    print(f"#{n} {qid} {lvl} / {a.zone}: {r['question_ru'][:90]}{ph}")
 
 
 def find_by_n(st, n):
@@ -578,19 +597,21 @@ def cmd_edit(a):
         sys.exit(f"У вопроса {qid} нет уровня {lvl}. Доступны: {'/'.join(r['levels'])}")
     if zone not in zc:
         sys.exit(f"Нет зоны {zone}. Доступны: {', '.join(sorted(zc))}")
+    allowed = zone_codes(r, zones)
+    if zone not in allowed:
+        sys.exit(zone_refusal(qid, zone, allowed))
     check_pair_free(st, qid, zone, skip_n=f["n"])
     f["qid"], f["level"], f["zone"] = qid, lvl, zone
     if a.evidence is not None:
         f["evidence"] = a.evidence
     if a.comment is not None:
         f["comment"] = a.comment
-    if zone in zone_codes(r, zones):
-        f.pop("zone_unusual", None)
-    else:
-        f["zone_unusual"] = True
+    # Запись прошла проверку зоны, значит пометка «зона нетипична» к ней больше
+    # не относится. Пометка осталась только у записей, сделанных ДО запрета:
+    # читать её продукт обязан (выгрузки прошлых лет), выставлять — уже нет.
+    f.pop("zone_unusual", None)
     save_state(st)
-    warn = "  (зона нетипична для этого вопроса — перепроверьте)" if f.get("zone_unusual") else ""
-    print(f"#{f['n']} {qid} {lvl} / {zone}: {r['question_ru'][:90]}{warn}")
+    print(f"#{f['n']} {qid} {lvl} / {zone}: {r['question_ru'][:90]}")
 
 
 def cmd_photo(a):

@@ -40,7 +40,6 @@ from bot_harness import (
 from bot_harness import callback_query as callback
 from conftest import requires_data
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.domain import Finding, get_state, start_inspection
@@ -132,8 +131,6 @@ async def test_быстрый_путь_сохраняет_слова(domain_env:
     начата()
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
-
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=БЫСТРАЯ))
 

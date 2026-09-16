@@ -65,14 +65,16 @@ async_test = pytest.mark.asyncio
 
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
-#: Однозначная фраза на синтетической карте (см. `tests/methodology`): зону
-#: подставит память, как на точке.
+#: Однозначная фраза на синтетической карте (см. `tests/methodology`): и пункт,
+#: и зону даёт сама карта — объект «Печь» стоит в ней с заполненной зоной
+#: (T262, T263), поэтому запись появляется без единого вопроса, как на точке.
+#: Подставлять зону памятью о прошлой записи больше нечем и не нужно: с T264
+#: такого источника нет вовсе.
 OVEN = "печь грязная"
 
 
 def started(unit: str = "Первая точка") -> None:
     start_inspection(CHAT_ID, unit, "planned", "ru", ui_lang="ru")
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
 async def start_new_inspection(dp: Dispatcher, bot: Bot, unit: str) -> None:

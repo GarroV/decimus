@@ -64,7 +64,7 @@ def test_источник_со_слов_аудитора_отличим_от_д�
     начать()
 
     add_finding(CHAT, "CLN05", "D1", "hot_kitchen", "нагар", source=SOURCE_COMMENT)
-    add_finding(CHAT, "CLN05", "D1", "cold_kitchen", "нагар", source=SOURCE_PHOTO)
+    add_finding(CHAT, "CLN06", "D1", "cold_kitchen", "нагар", source=SOURCE_PHOTO)
 
     assert [запись(1).source, запись(2).source] == [SOURCE_COMMENT, SOURCE_PHOTO]  # type: ignore[union-attr]
 
@@ -125,9 +125,14 @@ def test_удаление_записи_забывает_источник(domain_
 
 
 def test_правка_записи_источник_не_теряет(domain_env: Path) -> None:
-    """Аудитор поправил зону — запись осталась той же, и догадкой она быть не перестала."""
+    """Аудитор поправил зону — запись осталась той же, и догадкой она быть не перестала.
+
+    Код взят CLN06, а не CLN05: методика держит CLN05 только в одной зоне
+    (`hot_kitchen`), и правка зоны у него ничего не сдвинула бы. CLN06 держит
+    несколько зон (T271), поэтому правка здесь настоящая, а не запрещённая пара.
+    """
     начать()
-    add_finding(CHAT, "CLN05", "D1", "hot_kitchen", "нагар", source=SOURCE_PHOTO)
+    add_finding(CHAT, "CLN06", "D1", "hot_kitchen", "нагар", source=SOURCE_PHOTO)
 
     edit_finding(CHAT, 1, zone="cold_kitchen")
 

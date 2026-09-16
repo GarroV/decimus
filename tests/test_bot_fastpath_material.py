@@ -40,7 +40,6 @@ from bot_harness import (
     voice_message,
 )
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import MODEL_CALLBACK
@@ -112,7 +111,6 @@ async def test_быстрый_путь_срабатывает_на_подпис�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
@@ -127,7 +125,6 @@ async def test_быстрый_путь_срабатывает_на_коммен�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", message_id=701))
     await feed(dp, bot, text_message(CLEAR))
@@ -143,7 +140,6 @@ async def test_быстрый_путь_срабатывает_на_ответе_
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     first = photo_message("frame-1")
     second = photo_message("frame-2")
@@ -163,7 +159,6 @@ async def test_быстрый_путь_срабатывает_на_голосо�
     monkeypatch.setattr("src.bot.routers.record.transcribe", lambda audio, **kw: CLEAR)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1"))
     await feed(dp, bot, voice_message("voice-1"))
@@ -179,7 +174,6 @@ async def test_быстрый_путь_срабатывает_на_альбом�
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS, album_window=0.01)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     group_id = "album-fast"
     await feed(dp, bot, photo_message("frame-1", media_group_id=group_id, caption=CLEAR))

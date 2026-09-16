@@ -48,7 +48,9 @@ pytestmark = requires_db
 АРЕНДАТОР_Б = "партнёр-б"
 
 #: Один пункт в одной зоне движок принимает один раз, поэтому несколько
-#: находок разводятся по зонам, а не повторяют одну и ту же запись.
+#: находок разводятся по зонам, а не повторяют одну и ту же запись. Код для них
+#: нужен МНОГОЗОННЫЙ: с T271 пара «пункт + зона» вне методики отвергается, и
+#: односложный код сделал бы саму оснастку неисполнимой.
 ЗОНЫ = ("hot_kitchen", "cold_kitchen", "dough", "dishwashing", "staff")
 
 
@@ -73,7 +75,7 @@ def _проверка(
         chat_id, unit=точка, kind="planned", report_lang=язык_отчёта, tenant=арендатор, date=дата
     )
     for номер in range(находок):
-        add_finding(chat_id, code="CLN05", level="D1", zone=ЗОНЫ[номер], text="нагар на печи")
+        add_finding(chat_id, code="CLN03", level="D1", zone=ЗОНЫ[номер], text="грязь на полу")
     for код, ответ in инфо:
         set_info(chat_id, код, ответ)
     return push_inspection(chat_id)
@@ -167,9 +169,9 @@ def test_находки_проверки_читаются_целиком(domain_
     assert len(находки) == 3
     assert [находка["n"] for находка in находки] == sorted(находка["n"] for находка in находки)
     assert {находка["zone"] for находка in находки} == set(ЗОНЫ[:3])
-    assert all(находка["code"] == "CLN05" for находка in находки)
+    assert all(находка["code"] == "CLN03" for находка in находки)
     assert all(находка["level"] == "D1" for находка in находки)
-    assert all(находка["text"] == "нагар на печи" for находка in находки)
+    assert all(находка["text"] == "грязь на полу" for находка in находки)
     assert all(находка["comment"] is None for находка in находки)
 
 

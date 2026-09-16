@@ -155,9 +155,16 @@ def test_код_NONE_не_становится_кандидатом(
     assert s.needs_human is True
 
 
-def test_зона_UNKNOWN_подставляется_подсказкой(
+def test_зона_UNKNOWN_подсказкой_не_подменяется(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """Подсказка зоны ответ модели не переписывает (T264, #218).
+
+    До задачи `UNKNOWN` здесь подменялся подсказкой, и это был весь механизм
+    промаха: модель отвечала честно «места не знаю», а на её место садилась
+    зона прошлой записи. Теперь ответ модели доживает до `needs_human` — зону
+    называет человек кнопкой, а не догадка системы.
+    """
     # Arrange: модель честно не увидела зону в словах аудитора
     recorder = _Recorder(
         {
@@ -175,11 +182,12 @@ def test_зона_UNKNOWN_подставляется_подсказкой(
     )
     _patch(monkeypatch, recorder)
 
-    # Act
+    # Act: подсказка есть, и она заведомо верная — подменять всё равно нечем
     s = classify("печь грязная", zone_hint="hot_kitchen", chat_id=NO_CHAT)
 
-    # Assert: подсказка компенсирует, а не сама модель угадывает
-    assert s.candidates[0].zone == "hot_kitchen"
+    # Assert
+    assert s.candidates[0].zone == UNKNOWN_ZONE, "подсказка подменила ответ модели"
+    assert s.needs_human is True, "зону обязан назвать человек, а не подсказка"
 
 
 def test_зона_UNKNOWN_без_подсказки_поднимает_needs_human(

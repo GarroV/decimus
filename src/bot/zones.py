@@ -30,12 +30,20 @@
 
 from __future__ import annotations
 
+import logging
 import re
+from collections.abc import Mapping
+from dataclasses import dataclass
+from typing import Final, Literal
 
 from src import domain
-from src.recognize.cues import stems
+from src.domain.errors import DomainError
+from src.recognize import language
+from src.recognize.cues import load_cues, matched_cues, stems, words_and_gaps
 
 from .texts import UI_LANGS
+
+logger = logging.getLogger(__name__)
 
 #: Как зоны называют вслух — то, чего в `data/zones.csv` нет.
 #:
@@ -62,6 +70,11 @@ SPOKEN: dict[str, tuple[str, ...]] = {
 #: Чем разрезается название зоны на самостоятельные имена: составное имя зоны —
 #: это два имени одного места, и произносят их по отдельности.
 _SPLIT = re.compile(r"[/,]|\sи\s|\sand\s")
+
+#: Предлоги места — данные языка, а не константа кода (T192): по ним форма без
+#: существительного («в холодном») отличается от признака предмета («холодная
+#: вода»). Третий язык добавляется словарём, а не правкой этого файла.
+_PLACE_PREPOSITIONS = language.place_prepositions()
 
 
 def _names(code: str, title: str) -> list[str]:
@@ -93,24 +106,229 @@ def phrases(*, chat_id: int | None) -> dict[str, tuple[frozenset[str], ...]]:
     return out
 
 
+def qualifiers(named: Mapping[str, tuple[frozenset[str], ...]]) -> dict[str, str]:
+    """Основа-определение → код зоны: «холодн» → холодный цех (T263).
+
+    Так место называют без существительного — «полы в холодном», «в горячем».
+    Имя зоны при этом произнесено НЕ целиком, и брать за него любое слово имени
+    нельзя: «Стеллаж хранения» — имя из двух слов, но «стеллаж» зоной не
+    является, стеллажи стоят в разных цехах (слова владельца).
+
+    Поэтому определением считается основа, у которой есть **семья**: имя, в
+    которое она входит, содержит ещё и головное слово, общее с именем ДРУГОЙ
+    зоны («цех» у горячего и холодного, «камера» у холодильной и морозильной).
+    Внутри такой семьи определение и есть всё различие, поэтому названное одно
+    оно называет зону однозначно. У имени-одиночки, ни с кем головного слова не
+    делящего, определения нет вовсе — и это не упущение, а отказ гадать.
+
+    Примеры имён здесь намеренно неполны: это строки методики управляющей
+    компании, а репозиторий публичный (`tests/test_methodology_leak.py`).
+
+    Сама основа обязана вести ровно к одной зоне: ведущая к двум ничего не
+    различает и в словарь не попадает.
+    """
+    где: dict[str, set[str]] = {}
+    for code, names in named.items():
+        for name in names:
+            for stem in name:
+                где.setdefault(stem, set()).add(code)
+    головные = {stem for stem, codes in где.items() if len(codes) > 1}
+    out: dict[str, str] = {}
+    for code, names in named.items():
+        for name in names:
+            if len(name) < 2 or not (name & головные):
+                continue
+            for stem in name - головные:
+                if len(где[stem]) == 1:
+                    out[stem] = code
+    return out
+
+
+def named_places(note: str) -> set[str]:
+    """Основы слов, стоящих сразу за предлогом места (T263).
+
+    Предлог здесь — то, чем форма без существительного отличается от признака
+    предмета: «полы **в** холодном» называет место, а «холодная вода» — воду.
+    Без этого различия определение зоны начало бы срабатывать на любом
+    прилагательном («горячая вода течёт» → горячий цех), то есть ровно тем
+    гаданием, которое задача убирает.
+
+    Разделитель между предлогом и словом обязан быть пустым или пробельным: за
+    знаком препинания стоит уже другая часть фразы — тем же правилом живёт
+    отрицание в `recognize.fastpath`.
+    """
+    words, gaps = words_and_gaps(note)
+    места: set[str] = set()
+    for index, word in enumerate(words[:-1]):
+        if word in _PLACE_PREPOSITIONS and not gaps[index].strip():
+            места |= stems(words[index + 1])
+    return места
+
+
 def zone_from_words(note: str, *, chat_id: int | None) -> str | None:
     """Код зоны, названной в этих словах. Не названа или названы две — `None`.
 
-    `None` — обычный ответ, а не отказ: он означает «зону подставит память»
-    (D048), и на боевых комментариях так заканчивается большинство записей.
+    `None` — обычный ответ, а не отказ, и означает он «зону здесь не назвали»:
+    дальше её ищет словарь объектов, а не нашёл и он — спрашивает сам аудитор
+    (`resolve_zone`). Памятью о прошлой записи `None` больше не заполняется ни в
+    одной ветке (T264, #218).
+
+    Имя, названное целиком, сильнее формы без существительного всегда: длина
+    совпавшего имени — мера того, насколько его произнесли, а определение
+    («в холодном») весит одно слово по устройству.
     """
     words = stems(note)
     if not words:
         return None
+    named = phrases(chat_id=chat_id)
     # Длина совпавшего имени — мера того, насколько это имя произнесли, а не
     # задели одним словом: имя из двух основ весомее имени из одной.
     best: dict[str, int] = {}
-    for code, names in phrases(chat_id=chat_id).items():
+    for code, names in named.items():
         for name in names:
             if name <= words:
                 best[code] = max(best.get(code, 0), len(name))
     if not best:
-        return None
+        # Имя целиком не названо — место могли назвать определением («в
+        # холодном»). Ветка стоит ПОСЛЕ полного имени, а не соревнуется с ним:
+        # определение весит одно слово, и спор с названным именем оно всегда
+        # проигрывало бы, а лишний способ проиграть — лишний способ разойтись.
+        словарь = qualifiers(named)
+        найдено = {словарь[stem] for stem in named_places(note) if stem in словарь}
+        return найдено.pop() if len(найдено) == 1 else None
     top = max(best.values())
     winners = [code for code, size in best.items() if size == top]
     return winners[0] if len(winners) == 1 else None
+
+
+#: Откуда взялась зона. Четвёртого источника нет и не заводится: прошлая
+#: запись зоной не становится никогда (T264, #218), а догадка по виду кадра
+#: запрещена правилом 6 `docs/03-recording-rules.md`.
+WORDS: Final = "words"
+DICTIONARY: Final = "dictionary"
+ASK: Final = "ask"
+
+ZoneSource = Literal["words", "dictionary", "ask"]
+
+
+@dataclass(frozen=True)
+class ZoneConflict:
+    """Названная зона разошлась с зоной объекта из карты кадров (T263).
+
+    Случай владельца: «холодный цех, пицца-печь». Печь живёт только в горячем
+    цехе, и обе стороны сразу правдой быть не могут — либо аудитор назвал не то
+    место, либо речь о другом объекте. Молча не пишется ни то, ни другое:
+    расхождение называется ему до фиксации, с выбором «зона объекта или другой
+    пункт».
+    """
+
+    #: Зона, названная аудитором словами.
+    spoken: str
+    #: Зона, которую карта кадров держит за названным объектом.
+    dictionary: str
+    #: Сам объект — то, чем расхождение объясняется человеку.
+    phrase: str
+
+
+@dataclass(frozen=True)
+class ZoneResolution:
+    """Одна точка вывода зоны вместо четырёх мест подстановки (T263)."""
+
+    #: Зона, если она вывелась. `None` — её предстоит спросить.
+    zone: str | None
+    #: Чем она выведена: слова аудитора, словарь объектов или ничем.
+    source: ZoneSource
+    #: Зоны, допустимые методикой для `item_code`, — и только они. Спрашивать
+    #: тем, чего движок не примет, нельзя (T266, T271).
+    options: tuple[str, ...]
+    #: Расхождение названной зоны со словарём, если оно есть.
+    conflict: ZoneConflict | None = None
+
+
+def allowed_zones(item_code: str | None, *, chat_id: int | None) -> tuple[str, ...]:
+    """Зоны, которые методика даёт этому пункту, в порядке методики.
+
+    Пункт не назван или методика такого не знает — все зоны: сузить перечень
+    нечем, а показать неполный значило бы отнять у аудитора верный ответ.
+    Пункт «во всех зонах» (`*` или пусто) читается так же, как читает движок
+    (`ChecklistItem.applies_to`), а не вторым правилом рядом.
+    """
+    зоны = [zone.code for zone in domain.list_zones(chat_id=chat_id)]
+    if item_code is None:
+        return tuple(зоны)
+    try:
+        пункт = domain.get_item(item_code, chat_id=chat_id)
+    except DomainError:
+        return tuple(зоны)
+    return tuple(code for code in зоны if пункт.applies_to(code))
+
+
+def dictionary_zone(note: str, *, chat_id: int | None) -> tuple[str, str] | None:
+    """Зона объекта из карты кадров и сам объект. Не вывелась — `None`.
+
+    Публичная не для продукта, а для замера: `tools/fastpath_measure.py` и
+    `tools/zone_coverage.py` обязаны звать ТУ ЖЕ выборку, которой зовёт бот.
+    Своя копия правил в замере разошлась бы с продуктом при первой правке и
+    дала бы число, которого на точке не бывает, — ровно тем этот замер и был
+    неверен до T125.
+
+    Зон несколько — не вывелась: объект стоит в разных цехах, и выбирать за
+    человека разбор не вправе (случай стеллажа). Код, которого нет в
+    справочнике зон этого издания, отбрасывается с записью в журнал: это
+    опечатка управляющей компании, и молча подставленная она увела бы запись в
+    несуществующее место, а отказ посреди разговора с аудитором сделал бы
+    необязательный файл обязательным (D068).
+    """
+    known = {zone.code for zone in domain.list_zones(chat_id=chat_id)}
+    hit: tuple[str, str] | None = None
+    for cue in matched_cues(note, load_cues(chat_id=chat_id)):
+        if not cue.zone:
+            continue
+        if cue.zone not in known:
+            logger.warning(
+                "карта кадров: у объекта «%s» зона «%s», которой нет в методике этого издания",
+                cue.phrase,
+                cue.zone,
+            )
+            continue
+        if hit is None:
+            hit = (cue.zone, cue.phrase)
+        elif hit[0] != cue.zone:
+            return None
+    return hit
+
+
+def resolve_zone(note: str, item_code: str | None, *, chat_id: int | None) -> ZoneResolution:
+    """Зона записи: слова аудитора, затем словарь объектов, затем спрос (T263).
+
+    Порядок источников — весь смысл задачи, и пятого источника нет:
+
+    1. **Названа словами** — берётся слово аудитора всегда, включая форму без
+       существительного («в холодном», «на кассе») и обиходные названия мест.
+    2. **Задана словарём объектов** — объект найден в карте кадров, и его
+       колонка «Зона» заполнена. Одна зона = жёстко, без вопроса: пицца-печь
+       это горячий цех и никакой другой (слова владельца).
+    3. **Не вывелось — спрашивается** кнопками, и кнопки только из зон,
+       допустимых методикой для пункта.
+
+    Прошлая запись источником не является ни в одной ветке (T264): именно ею
+    печь и уехала в холодный цех на живом прогоне владельца. Здесь её нет не по
+    забывчивости — её здесь не должно быть.
+
+    Расхождение названной зоны со словарём не разрешается молча: зона остаётся
+    названной аудитором (его слово сильнее данных), а расхождение возвращается
+    в `conflict`, чтобы спросить до фиксации.
+    """
+    options = allowed_zones(item_code, chat_id=chat_id)
+    spoken = zone_from_words(note, chat_id=chat_id)
+    known = dictionary_zone(note, chat_id=chat_id)
+    if spoken is not None:
+        conflict = (
+            ZoneConflict(spoken=spoken, dictionary=known[0], phrase=known[1])
+            if known is not None and known[0] != spoken
+            else None
+        )
+        return ZoneResolution(zone=spoken, source=WORDS, options=options, conflict=conflict)
+    if known is not None:
+        return ZoneResolution(zone=known[0], source=DICTIONARY, options=options)
+    return ZoneResolution(zone=None, source=ASK, options=options)

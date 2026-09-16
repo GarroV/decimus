@@ -142,11 +142,14 @@ def test_ручной_перечень_кнопками_без_карты_соб
     До T157 было именно так: `manual_candidates` идёт через `shortlist`, а тот
     читал карту — то есть на стенде без карты не работал и запасной путь.
     """
-    зональные = {i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"}
+    # База перечня — весь чек-лист: зона его упорядочивает, но не режет
+    # (T265, #218). Карты нет, поднимать наверх нечем — тем важнее, что
+    # перечень собрался целиком, а не выродился в пустые кнопки.
+    все = {i.code for i in list_items() if i.kind == "violation"}
 
     итог = manual_candidates("hot_kitchen", chat_id=NO_CHAT)
 
-    assert {c.code for c in итог} == зональные
+    assert {c.code for c in итог} == все
 
 
 def test_разбор_моделью_без_карты_доходит_до_модели(

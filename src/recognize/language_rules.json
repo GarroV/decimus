@@ -127,6 +127,15 @@
         "погнут"
       ]
     },
+    "zone_column": "Зона",
+    "place_prepositions": [
+      "в",
+      "во",
+      "на",
+      "у",
+      "около",
+      "возле"
+    ],
     "sections": {
       "thresholds": "## Пороги классов",
       "column_words": "## Слова, которыми аудитор называет колонку"
@@ -251,6 +260,13 @@
         "wobbly"
       ]
     },
+    "zone_column": "Zone",
+    "place_prepositions": [
+      "in",
+      "at",
+      "on",
+      "near"
+    ],
     "sections": {
       "thresholds": "## Class thresholds",
       "column_words": "## Words the auditor uses for a column"

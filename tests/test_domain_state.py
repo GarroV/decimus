@@ -147,12 +147,18 @@ def test_параллельная_дозагрузка_кадров_альбом
 
 
 def test_параллельная_фиксация_записей_не_бьёт_файл(domain_env: Path) -> None:
+    """Шесть потоков пишут в разные зоны разом — проверяется файл, а не методика.
+
+    Код взят FSB17: синтетическая методика держит его в любой зоне (`zones: *`),
+    а тесту важно разнообразие зон, а не то, какому именно пункту они
+    соответствуют (T271 отклоняет пары «пункт + зона», которых методика не даёт).
+    """
     начать()
     зоны = ["hot_kitchen", "cold_kitchen", "dining", "fridge", "dough", "staff"]
     with ThreadPoolExecutor(max_workers=len(зоны)) as pool:
         list(
             pool.map(
-                lambda z: add_finding(42, code="CLN06", level="D1", zone=z, text="загрязнение"),
+                lambda z: add_finding(42, code="FSB17", level="D1", zone=z, text="загрязнение"),
                 зоны,
             )
         )

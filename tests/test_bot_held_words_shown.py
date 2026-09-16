@@ -30,7 +30,6 @@ from bot_harness import (
     voice_message,
 )
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.routers.records import HELD_SHOWN_LIMIT
@@ -55,7 +54,6 @@ FURNITURE = "мебель участка грязная"
 
 def started() -> None:
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
 def findings() -> list[Finding]:

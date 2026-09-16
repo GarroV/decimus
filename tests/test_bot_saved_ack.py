@@ -67,7 +67,6 @@ AMBIGUOUS = "печь, посмотри что тут"
 
 def started(lang: str = "ru") -> None:
     start_inspection(CHAT_ID, "Белград 2", "planned", lang, ui_lang=lang)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
 def findings() -> list[Finding]:

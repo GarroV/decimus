@@ -64,12 +64,14 @@ SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_I
 
 #: Однозначная фраза на синтетической методике набора: строка карты произнесена
 #: целиком, колонка выбрана словом → ровно один код с единственным классом.
-#: Зону слова не называют — её подставит память, как на точке.
+#: Зону слова не называют — карта кадров держит её сама («Печь» → `hot_kitchen`,
+#: T262/T263).
 OVEN = "печь грязная"
 
 #: Вторая такая же фраза, ведущая в другой пункт: нужна там, где записей должно
-#: быть две и проверяется адресность.
-FURNITURE = "мебель участка в пятнах"
+#: быть две и проверяется адресность. Строка «Мебель участка» карты кадров (в
+#: отличие от «Печи») зоны не держит вовсе, поэтому она названа словами.
+FURNITURE = "мебель участка в пятнах, в тепловом участке"
 
 
 def started() -> None:
@@ -88,7 +90,6 @@ async def record_by_voice(dp: object, bot: object, said: str = OVEN, frame: str 
     обязательна всегда (D078), и одни слова записью не становятся. Досланный
     ответом кадр — второй у этой записи, а не первый.
     """
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, photo_message(frame))  # type: ignore[arg-type]
     voice = voice_message(f"voice-{frame}")
     await feed(dp, bot, voice)  # type: ignore[arg-type]
@@ -194,7 +195,6 @@ async def test_кадр_ответом_на_свою_подпись_попада
     stub_classify(monkeypatch, suggestion())
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     said = photo_message("c1", caption=OVEN)
     await feed(dp, bot, said)
     assert [f.photos for f in findings()] == [["c1"]]

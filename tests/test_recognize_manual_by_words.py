@@ -11,8 +11,9 @@
 его даже руками. Слова аудитора зоной не отсекаются — это и стережётся здесь.
 
 Что НЕ меняется: когда слов нет (модель недоступна, разбор шёл по кадру),
-перечень остаётся полным перечнем зоны — тем самым, что и был. Его стерегут
-тесты в `test_recognize_manual.py`, и ослаблять их эта задача не имеет права.
+перечень остаётся ПОЛНЫМ — всем чек-листом, а зона его только упорядочивает
+(T265). Состав и порядок базы стерегут тесты в `test_recognize_manual.py`,
+и ослаблять их эта задача не имеет права.
 """
 
 from __future__ import annotations
@@ -51,12 +52,12 @@ def test_пункт_чужой_зоны_из_слов_достижим(domain_en
 
 
 def test_без_слов_перечень_остаётся_полным(domain_env: Path) -> None:
-    """Слов нет — сузить нечем, и перечень зоны остаётся прежним."""
-    зональные = {i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"}
+    """Слов нет — сузить нечем, и перечень остаётся всем чек-листом (T265)."""
+    все = {i.code for i in list_items() if i.kind == "violation"}
 
     итог = manual_candidates("hot_kitchen", note="", chat_id=NO_CHAT)
 
-    assert {c.code for c in итог} == зональные
+    assert {c.code for c in итог} == все
 
 
 def test_слова_без_попаданий_перечень_не_обрезают(domain_env: Path) -> None:
@@ -64,12 +65,11 @@ def test_слова_без_попаданий_перечень_не_обреза
 
     Пустой перечень здесь был бы худшим исходом: последний рубеж выбора
     превратился бы в тупик ровно там, где предыдущие два уже промолчали.
+    Перечень при этом полный — зоной он не режется (T265).
     """
     итог = manual_candidates("hot_kitchen", note="абракадабра шурум-бурум", chat_id=NO_CHAT)
 
-    assert {c.code for c in итог} == {
-        i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"
-    }
+    assert {c.code for c in итог} == {i.code for i in list_items() if i.kind == "violation"}
 
 
 def test_каждый_пункт_короткого_перечня_несёт_классы_и_текст(domain_env: Path) -> None:

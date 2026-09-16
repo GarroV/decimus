@@ -47,16 +47,24 @@ SETTINGS = BotSettings(
 )
 
 
-async def show_candidates(dp: Any, bot: Any, monkeypatch: pytest.MonkeyPatch, *zones: str) -> None:
+async def show_candidates(
+    dp: Any, bot: Any, monkeypatch: pytest.MonkeyPatch, *zones: str, code: str = "CLN05"
+) -> None:
     """Довести разговор до показа предложений моделью.
 
     Кадр без подписи и кнопка «Разобрать»: слов нет, поэтому сверка со списком
     нарушений (T117) в дело не вступает и предложения точно приходят от модели.
+
+    Код по умолчанию — CLN05: тестам ниже, которые только читают подписи
+    кнопок и не нажимают их, безразлично, держит ли методика эту зону за
+    пунктом. Тесту, который доводит выбор до записи (T271 отклоняет пару, коей
+    методика не даёт), нужен код с несколькими допустимыми зонами — он передаёт
+    свой.
     """
     stub_classify(
         monkeypatch,
         suggestion(
-            *(candidate("CLN05", "D1", zone, f"формулировка {i}") for i, zone in enumerate(zones))
+            *(candidate(code, "D1", zone, f"формулировка {i}") for i, zone in enumerate(zones))
         ),
     )
     await feed(dp, bot, photo_message("frame-1", message_id=501))
@@ -110,19 +118,24 @@ async def test_нескольких_кандидатов_кнопка_назыв
 async def test_код_кнопки_не_изменился_и_запись_по_ней_появляется(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Надпись — для человека, `callback_data` — для связи: менялось только первое."""
+    """Надпись — для человека, `callback_data` — для связи: менялось только первое.
+
+    Код взят CLN06, а не CLN05 по умолчанию: методика держит CLN05 только за
+    `hot_kitchen`, а тест доводит выбор до настоящей записи в `dining` — без
+    второй допустимой зоны движок отказал бы (T271), и это уже другой тест.
+    """
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await show_candidates(dp, bot, monkeypatch, "hot_kitchen", "dining")
+    await show_candidates(dp, bot, monkeypatch, "hot_kitchen", "dining", code="CLN06")
     assert session.keyboard_data()[:2] == ["rec:pick:0", "rec:pick:1"]
 
     await feed(dp, bot, callback("rec:pick:1"))
 
     state = get_state(CHAT_ID)
     assert state is not None
-    assert [(f.code, f.zone) for f in state.findings] == [("CLN05", "dining")]
+    assert [(f.code, f.zone) for f in state.findings] == [("CLN06", "dining")]
 
 
 async def test_надписи_кнопок_переводятся(

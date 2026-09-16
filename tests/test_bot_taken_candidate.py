@@ -32,7 +32,6 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
@@ -57,7 +56,6 @@ async def test_после_отказа_модель_предлагает_зан�
 ) -> None:
     """Сам дефект, целиком: запись, второй такой же кадр, отказ, перечень модели."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)

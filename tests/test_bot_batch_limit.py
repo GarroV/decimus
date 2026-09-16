@@ -62,7 +62,6 @@ CLOSING_FRAME = "closing-frame"
 
 def started() -> None:
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
 def stub_calls(monkeypatch: pytest.MonkeyPatch) -> Calls:
@@ -210,7 +209,6 @@ async def test_на_английской_проверке_предел_объя�
 ) -> None:
     """Язык — параметр и здесь."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "en", ui_lang="en")
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     stub_calls(monkeypatch)
     bot, session = make_bot()
 

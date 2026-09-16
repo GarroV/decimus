@@ -32,6 +32,7 @@ from bot_harness import (
     photo_message,
     stub_classify,
     stub_manual,
+    stub_search,
     suggestion,
     text_message,
     voice_message,
@@ -44,6 +45,7 @@ from src.bot.config import BotSettings
 from src.bot.pending import Offer
 from src.bot.routers.record import _drop_question
 from src.bot.texts import t
+from src.bot.zones import allowed_zones
 from src.domain import SOURCE_COMMENT, SOURCE_PHOTO, Finding, get_state, score, start_inspection
 from src.domain.config import check_environment
 from src.domain.engine import state_file
@@ -113,13 +115,15 @@ async def test_кадр_с_комментарием_уходит_в_модель
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    # Зону слова не называют: назвали бы — сверка со списком записала бы сразу
-    # (T121), и до модели разбор бы не дошёл.
-    await feed(dp, bot, photo_message("frame-1", caption="печь в нагаре", message_id=501))
+    # По словам не виден КЛАСС — грязь это или поломка, — и материал уходит
+    # модели. Подпись вроде «печь в нагаре» до неё не доходит вовсе: сверка со
+    # списком нарушений пишет сразу (T121), а зону ей теперь даёт словарь карты
+    # кадров (T263), так что отказа «зона не названа» больше не случается.
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут", message_id=501))
 
     assert len(asked) == 1
     note, photo, _zone, _lang = asked[0]
-    assert note == "печь в нагаре"
+    assert note == "печь, посмотри что тут"
     assert photo is None, "кадр с комментарием всё ещё оплачивается как разбор с картинкой"
     assert [type(c).__name__ for c in session.calls].count("GetFile") == 0
 
@@ -134,12 +138,12 @@ async def test_comment_after_the_frame_cancels_the_question(
     dp = build_dispatcher(SETTINGS)
 
     await feed(dp, bot, photo_message("frame-1", message_id=501))
-    # Зону слова не называют намеренно: назвали бы — сверка со списком нарушений
-    # записала бы сразу (T121, T124), и до модели разбор бы не дошёл.
-    await feed(dp, bot, text_message("печь в нагаре"))
+    # Класс по словам не виден намеренно: был бы виден — сверка со списком
+    # нарушений записала бы сразу (T121, T124), и до модели разбор бы не дошёл.
+    await feed(dp, bot, text_message("печь, посмотри что тут"))
 
     assert [type(c).__name__ for c in session.calls].count("EditMessageReplyMarkup") == 1
-    assert asked[-1][0] == "печь в нагаре"
+    assert asked[-1][0] == "печь, посмотри что тут"
 
     session.clear()
     await feed(dp, bot, callback("rec:analyze:501"))
@@ -161,7 +165,7 @@ async def test_candidates_are_shown_but_nothing_is_recorded_yet(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная"))
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 
     assert "CLN05" in session.last_text and "PRD01" in session.last_text
     assert session.keyboard_data()[:2] == ["rec:pick:0", "rec:pick:1"]
@@ -189,7 +193,11 @@ async def test_confirmation_records_and_answers_compactly(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная"))
+    # Зона названа СЛОВАМИ намеренно: выведенная из карты кадров добавила бы в
+    # подтверждение оговорку об источнике (T263), и предел строк пришлось бы
+    # ослабить — а он и держит запрет на таблицу.
+    подпись = "печь, посмотри что тут, тепловой участок"
+    await feed(dp, bot, photo_message("frame-1", caption=подпись))
     session.clear()
     await feed(dp, bot, callback("rec:pick:0"))
 
@@ -287,24 +295,33 @@ async def test_the_source_set_at_recording_reaches_the_proofreading(
     )
 
 
-async def test_last_zone_is_remembered_and_offered_as_a_guess(
+async def test_прошлая_зона_следующему_разбору_не_подсказывается(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Решение D048: зона из слов запоминается и подставляется следующему разбору."""
+    """T264 отменяет D048: записанная зона следующему кадру ничего не подсказывает.
+
+    Тест развёрнут, а не удалён. Подстановка прошлой зоны и есть дефект #218:
+    аудитор сказал про печь, а запись легла в холодный цех — потому что там
+    лежала предыдущая. Снятое поведение обязано быть заперто тестом, иначе оно
+    вернётся первой же правкой, которой «не хватает подсказки».
+
+    Первый кадр называет зону словами и записывается в неё быстрым путём — так
+    дешевле и ближе к точке, где эта пара и встречается. Второй («и стена там
+    же») места не называет и ни одной строки карты кадров не задевает: зону
+    взять неоткуда, и модель обязана получить ПУСТУЮ подсказку, а не зал.
+    """
     started()
-    asked = stub_classify(
-        monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре"))
-    )
+    asked = stub_classify(monkeypatch, suggestion(candidate("CLN03", "D1", "dining", "Стена")))
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная"))
-    assert asked[0][2] is None, "первой зоны взять неоткуда — догадки быть не должно"
-    await feed(dp, bot, callback("rec:pick:0"))
+    await feed(dp, bot, photo_message("frame-1", caption="в зале урна переполнена"))
+    записано = findings()
+    assert len(записано) == 1, "быстрый путь не сработал — наследовать зону нечему"
 
     await feed(dp, bot, photo_message("frame-2", caption="и стена там же"))
-    assert asked[1][2] == "hot_kitchen"
-    assert sidecar.read(CHAT_ID).zone == "hot_kitchen"
+    assert asked, "второй кадр до модели не дошёл — проверять подсказку не на чем"
+    assert asked[-1][2] is None, "зона прошлой записи досталась следующему разбору"
 
 
 async def test_skip_records_nothing_and_promises_to_show_the_frame_later(
@@ -316,7 +333,7 @@ async def test_skip_records_nothing_and_promises_to_show_the_frame_later(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная"))
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     session.clear()
     await feed(dp, bot, callback("rec:skip"))
 
@@ -327,7 +344,13 @@ async def test_skip_records_nothing_and_promises_to_show_the_frame_later(
 async def test_candidate_without_a_zone_asks_for_it_by_button(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Зону выводить из вида кадра нельзя (правило 6) — её называют кнопкой."""
+    """Зону выводить из вида кадра нельзя (правило 6) — её называют кнопкой.
+
+    Пункт к этому моменту уже выбран, поэтому спрашивается он поимённо и только
+    ЗОНАМИ, ДОПУСТИМЫМИ ЕМУ (T266): с T271 движок отвергает пару, которой
+    методика не даёт, и кнопка чужой зоны кончалась бы отказом у аудитора на
+    точке — он жмёт, а запись не проходит.
+    """
     started()
     stub_classify(monkeypatch, suggestion(candidate("INF11", "D0", UNKNOWN_ZONE, "Фото продукта")))
     bot, session = make_bot()
@@ -336,7 +359,11 @@ async def test_candidate_without_a_zone_asks_for_it_by_button(
     await feed(dp, bot, photo_message("frame-1", caption="вот продукт"))
     await feed(dp, bot, callback("rec:pick:0"))
 
-    assert session.last_text == t("record.ask_zone", "ru")
+    assert session.last_text == t("record.ask_zone_for_item", "ru", code="INF11")
+    предложены = {d.removeprefix("rec:zp:") for d in session.keyboard_data()}
+    assert предложены == set(allowed_zones("INF11", chat_id=CHAT_ID)), (
+        "кнопками предложено не то, что методика даёт этому пункту"
+    )
     assert "rec:zp:dining" in session.keyboard_data()
     assert findings() == []
 
@@ -385,7 +412,6 @@ async def test_model_outage_falls_back_to_manual_pick(
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     # Слова неоднозначны намеренно: однозначные забрал бы быстрый путь (T117),
     # и до недоступной модели дело бы не дошло — проверять было бы нечего.
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
@@ -410,15 +436,23 @@ async def test_model_outage_falls_back_to_manual_pick(
 async def test_manual_pick_asks_for_the_class_when_there_is_a_choice(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Два разрешённых класса — выбирает человек, а не бот за него."""
+    """Два разрешённых класса — выбирает человек, а не бот за него.
+
+    Поиск словом подменён пустым намеренно: иначе перечнем станет его находка,
+    заглушка перечня не позовётся, и тест начнёт мерить не свой вопрос (T267).
+
+    Зона спрашивается ПОСЛЕ класса и только допустимыми пункту (T266): слов о
+    месте здесь нет, а выводить его из вида кадра нельзя.
+    """
     started()
     stub_classify(monkeypatch, ModelUnavailable("нет ключа"))
+    stub_search(monkeypatch, ())
     stub_manual(monkeypatch, (manual("PRD01", ("D1", "D2"), "Разморозка продуктов"),))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "fridge")
     await feed(dp, bot, photo_message("frame-1", caption="продукт размораживается на столе"))
+    await feed(dp, bot, callback("rec:zm:hot_kitchen"))
     await feed(dp, bot, callback("rec:mi:0"))
 
     assert session.keyboard_data() == ["rec:ml:0:D1", "rec:ml:0:D2"]
@@ -438,8 +472,10 @@ async def test_stale_button_after_restart_says_so_instead_of_recording(
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
 
+    # Класс по словам не виден: иначе запись сделал бы быстрый путь ещё до
+    # перезапуска, и «ничего не зафиксировано» перестало бы быть правдой.
     first = build_dispatcher(SETTINGS)
-    await feed(first, bot, photo_message("frame-1", caption="печь грязная"))
+    await feed(first, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
 
     second = build_dispatcher(SETTINGS)
     session.clear()
@@ -473,17 +509,27 @@ async def test_flagged_wording_is_marked_for_the_auditor(
 async def test_empty_answer_opens_the_manual_list(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Пустой ответ модели — валидный: бот переспрашивает человека, а не выдумывает."""
+    """Пустой ответ модели — валидный: бот переспрашивает человека, а не выдумывает.
+
+    «Тут грязно» не поднимает по слову ни одного пункта и не называет места,
+    поэтому ручной выбор открывается штатной веткой T267: бот говорит, что по
+    словам не нашлось, и предлагает зоны. Тупика нет — после кнопки зоны
+    перечень её пунктов на месте.
+    """
     started()
     stub_classify(monkeypatch, suggestion(question="Что именно на кадре загрязнено?"))
     stub_manual(monkeypatch, (manual("CLN05", ("D1",), "Пункт синтетического набора"),))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
     await feed(dp, bot, photo_message("frame-1", caption="тут грязно"))
 
     assert any("Что именно на кадре загрязнено?" in text for text in session.texts)
+    assert t("record.nothing_by_words", "ru") in session.texts
+    assert any(d.startswith("rec:zm:") for d in session.keyboard_data())
+    assert findings() == []
+
+    await feed(dp, bot, callback("rec:zm:hot_kitchen"))
     assert "rec:mi:0" in session.keyboard_data()
     assert findings() == []
 

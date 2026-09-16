@@ -50,9 +50,11 @@ from src.recognize.language import (
     fleeting,
     load_rules,
     negations,
+    place_prepositions,
     section_headings,
     stopwords,
     suffixes,
+    zone_columns,
 )
 from src.recognize.language import column_words as builtin_column_words
 
@@ -156,6 +158,8 @@ def test_третий_язык_добавляется_словарём_а_не_�
                     "negations": {"nix": "forward"},
                     "connectives": ["ovo"],
                     "column_words": {"prljavo": ["blato"]},
+                    "zone_column": "Zona",
+                    "place_prepositions": ["kod"],
                     "sections": {
                         "thresholds": "## Pragovi",
                         "column_words": "## Reci",
@@ -175,6 +179,8 @@ def test_третий_язык_добавляется_словарём_а_не_�
     assert fleeting(правила) == ("ak",)
     assert negations(правила)["nix"] == "forward"
     assert builtin_column_words(правила)["prljavo"] == ("blato",)
+    assert zone_columns(правила) == {"zona"}
+    assert place_prepositions(правила) == {"kod"}
     assert section_headings(THRESHOLDS, правила) == ("## Pragovi",)
     assert section_headings(COLUMN_WORDS, правила) == ("## Reci",)
 
@@ -211,7 +217,9 @@ def test_сломанные_правила_это_отказ_с_именем_я�
 #: не взят из `_FIELDS`: перебор по самому коду проверял бы код им же — поле,
 #: снятое из `_FIELDS`, просто перестало бы перебираться, и тест молча
 #: уменьшился бы на один случай вместо того, чтобы покраснеть (поймано порчей
-#: при T242).
+#: при T242). `zone_column` и `place_prepositions` — два новых обязательных
+#: поля T262/T263: без колонки зоны карта кадров читалась бы наполовину, без
+#: предлогов места слова аудитора не отличали бы место от признака предмета.
 ОБЯЗАТЕЛЬНЫЕ_ПОЛЯ = (
     "about",
     "stopwords",
@@ -220,6 +228,8 @@ def test_сломанные_правила_это_отказ_с_именем_я�
     "negations",
     "connectives",
     "column_words",
+    "zone_column",
+    "place_prepositions",
     "sections",
 )
 
@@ -246,6 +256,8 @@ def test_пропуск_любого_поля_правил_это_отказ(tmp
         "negations": {"nix": "forward"},
         "connectives": ["ovo"],
         "column_words": {"prljavo": ["blato"]},
+        "zone_column": "Zona",
+        "place_prepositions": ["kod"],
         "sections": {THRESHOLDS: "## Pragovi", COLUMN_WORDS: "## Reci"},
     }
     язык.pop(поле)
@@ -578,6 +590,8 @@ def test_одна_частица_в_разных_языках_не_может_с
         "fleeting": ["ak"],
         "connectives": ["ovo"],
         "column_words": {"prljavo": ["blato"]},
+        "zone_column": "Zona",
+        "place_prepositions": ["kod"],
         "sections": {THRESHOLDS: "## Pragovi", COLUMN_WORDS: "## Reci"},
     }
     файл = tmp_path / "language_rules.json"

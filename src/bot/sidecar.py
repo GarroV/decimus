@@ -4,8 +4,6 @@
 
 * все кадры, присланные за проверку (задача T068) — в конце проверки нужно
   показать те, что не попали ни в одну запись, иначе они бесследно исчезают;
-* последняя названная зона (решение D048) — подставляется догадкой к
-  следующему кадру;
 * сколько записей было в проверке, когда бот отдал по ней отчёт (задача
   T153) — по этому и видно, что проверка сдана;
 * каким сообщением бот показал каждую запись (задача T204) — аудитор правит
@@ -77,6 +75,14 @@ SCHEMA = 4
 #: снова назвать сданную проверку незавершённой.
 NEVER_HANDED_OVER = -1
 
+#: Почему кадр остался без записи (T269, #219). Пустая строка — четвёртое
+#: законное значение и означает «выбор по кадру не сделан»: до задачи это был
+#: единственный ответ на все случаи сразу, и кадр терялся молча.
+OUTCOME_NOTHING_FOUND = "nothing"
+OUTCOME_ABANDONED = "abandoned"
+OUTCOME_REFUSED = "refused"
+FRAME_OUTCOMES = (OUTCOME_NOTHING_FOUND, OUTCOME_ABANDONED, OUTCOME_REFUSED)
+
 
 @dataclass(frozen=True)
 class SeenFrame:
@@ -84,6 +90,13 @@ class SeenFrame:
 
     message_id: int
     file_id: str
+    #: Почему по кадру не появилось записи, если это уже известно (T269, #219).
+    #: Пусто — «выбор по кадру не сделан»: либо разбор не запускался, либо
+    #: кандидаты показаны и остались без нажатия. Остальные значения —
+    #: `OUTCOME_*` ниже: система ничего не нашла, аудитор отказался записывать,
+    #: движок отклонил пару. Хранится у кадра, потому что в конце проверки
+    #: спрашивают именно про кадр: «этот почему без записи?»
+    outcome: str = ""
 
 
 @dataclass(frozen=True)
@@ -110,12 +123,17 @@ class RecordMessage:
 
 @dataclass(frozen=True)
 class Notes:
-    """Заметки одной проверки: все присланные кадры и последняя названная зона."""
+    """Заметки одной проверки: все присланные кадры и карты сообщений.
+
+    Последней названной зоны здесь больше нет (T264, #218). Она лежала здесь с
+    решения D048 и подставлялась к следующему кадру «первой догадкой» — этим и
+    уехал пункт про печь в холодный цех: аудитор зоны не называл, а бот ставил
+    ту, что была у прошлой записи. Источник зоны теперь один и стоит в
+    `bot.zones.resolve_zone`; памяти среди его источников нет.
+    """
 
     #: Все присланные кадры в порядке прихода. Не только те, что стали записью.
     frames: tuple[SeenFrame, ...]
-    #: Последняя названная зона; пустая строка — её не было или её забыли.
-    zone: str
     #: Сообщения бота, которыми показаны записи (T204), в порядке отправки.
     records: tuple[RecordMessage, ...] = ()
     #: Сообщения аудитора, из которых выросли записи (T205), в порядке прихода.
@@ -143,7 +161,14 @@ def _frames_from_raw(raw: Any, path: Path) -> tuple[SeenFrame, ...]:
         return ()
     try:
         return tuple(
-            SeenFrame(message_id=int(item["message_id"]), file_id=str(item["file_id"]))
+            SeenFrame(
+                message_id=int(item["message_id"]),
+                file_id=str(item["file_id"]),
+                # Ключа нет у кадров, записанных до T269: проверки, начатые
+                # тогда, ещё в работе, и отказ на незнакомой форме означал бы,
+                # что после обновления бота их стало нечем завершить.
+                outcome=str(item.get("outcome") or ""),
+            )
             for item in raw
         )
     except (TypeError, KeyError, ValueError) as exc:
@@ -203,7 +228,6 @@ def _parse(raw: dict[str, Any], path: Path) -> Notes:
     # после обновления бота их стало нечем завершить.
     return Notes(
         frames=_frames_from_raw(raw.get("frames"), path),
-        zone=str(raw.get("zone") or ""),
         records=_messages_from_raw(raw.get("records"), path, "Карта сообщений о записях"),
         origins=_messages_from_raw(raw.get("origins"), path, "Карта сообщений аудитора"),
         handed_over_findings=_handed_over_from_raw(raw.get("handed_over_findings"), path),
@@ -214,7 +238,7 @@ def read(chat_id: int) -> Notes:
     """Заметки чата. Файла нет — пустые, а не отказ: до первой записи это норма."""
     path = notes_path(chat_id)
     if not path.is_file():
-        return Notes(frames=(), zone="")
+        return Notes(frames=())
     return _parse(_decode(path), path)
 
 
@@ -246,8 +270,10 @@ def _write(chat_id: int, notes: Notes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     raw: dict[str, Any] = {
         "schema": SCHEMA,
-        "zone": notes.zone,
-        "frames": [{"message_id": f.message_id, "file_id": f.file_id} for f in notes.frames],
+        "frames": [
+            {"message_id": f.message_id, "file_id": f.file_id, "outcome": f.outcome}
+            for f in notes.frames
+        ],
         "records": [{"message_id": r.message_id, "n": r.n} for r in notes.records],
         "origins": [{"message_id": r.message_id, "n": r.n} for r in notes.origins],
         "handed_over_findings": notes.handed_over_findings,
@@ -324,9 +350,38 @@ def remember_frames(chat_id: int, frames: Iterable[SeenFrame]) -> None:
     _change(chat_id, дополнить)
 
 
-def remember_zone(chat_id: int, zone: str) -> None:
-    """Запомнить последнюю названную зону. Пустая строка стирает память о ней."""
-    _change(chat_id, lambda notes: replace(notes, zone=zone))
+def remember_outcome(chat_id: int, file_ids: Iterable[str], outcome: str) -> None:
+    """Записать, почему по этим кадрам не появилось записи (T269, #219).
+
+    До задачи кадр без записи показывался в конце проверки числом и картинкой,
+    и на вопрос «а этот почему?» ответить было нечем ни аудитору, ни разбору
+    после выезда. Молчание здесь стоило находок: аудитор видел кадр, не помнил
+    обстоятельств и шёл дальше.
+
+    Исход **перезаписывается**, а не накапливается: у кадра он один и всегда
+    последний. Аудитор возвращается к тому же кадру («Разобрать моделью» после
+    отказа движка), и хранить историю попыток здесь незачем — её место в
+    накопителе формулировок (`domain.uncovered`), где у каждой попытки своя
+    строка.
+
+    Неизвестное значение — отказ, а не молчаливая запись: исход читает человек
+    в конце проверки, и опечатка в нём означала бы кадр без причины ровно там,
+    где причина и нужна.
+    """
+    if outcome not in FRAME_OUTCOMES:
+        raise BotNotesError(f"Исход кадра «{outcome}» не из {FRAME_OUTCOMES}")
+    нужные = set(file_ids)
+    if not нужные:
+        return
+
+    def отметить(notes: Notes) -> Notes | None:
+        frames = tuple(
+            replace(frame, outcome=outcome) if frame.file_id in нужные else frame
+            for frame in notes.frames
+        )
+        return None if frames == notes.frames else replace(notes, frames=frames)
+
+    _change(chat_id, отметить)
 
 
 def remember_record(chat_id: int, message_id: int, n: int) -> None:

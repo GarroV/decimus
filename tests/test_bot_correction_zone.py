@@ -44,20 +44,24 @@ from bot_harness import (
     text_message,
 )
 
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.bot.view import stored_headline
-from src.domain import Finding, get_state, start_inspection
+from src.bot.view import stored_headline, zone_title
+from src.domain import Finding, get_item, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
-#: Однозначная фраза синтетической карты: строка «Печь» плюс колонка «грязная»
-#: → CLN05. Зону слова не называют — её подставит память, как на точке.
-OVEN = "печь грязная"
+#: Однозначная фраза синтетической карты: строка «Стеллаж» плюс колонка
+#: «грязная» → CLN01, и зона названа тут же словами («в тепловом участке»).
+#: Печь (CLN05) для этой роли не годится: методика держит её только в одной
+#: зоне (`hot_kitchen`), и ни один из тестов файла не смог бы показать, что
+#: зона ПЕРЕЕХАЛА, — движок с T271 такую пару отклонял бы всегда. У стеллажа
+#: зон четыре, и в горячем участке начатая запись законно переезжает в
+#: холодный (`ZONE_ONLY` ниже).
+ITEM_WITH_ZONE = "стеллаж грязный в тепловом участке"
 
 #: Ответ той же формы, что в примере владельца: названо только МЕСТО. Объекта в
 #: словах нет вовсе — сверке не за что зацепиться, и до T231 это уходило модели.
@@ -67,16 +71,19 @@ ZONE_ONLY = "это был холодный участок"
 #: есть правит ровно то, в чём система промахнулась. Прежняя дорога T204.
 ZONE_AND_ITEM = "посудный участок, раковина и смеситель грязные"
 
-#: Ответ, где место названо, объект назван, а СВЕРКА не сошлась: строка карты
-#: «Печь» произнесена, но по словам не видно, грязь это или поломка. Отказ
-#: сверки тут не «объекта нет», и правкой одной зоны такой ответ быть не может —
-#: пункт обязан искаться заново.
-ZONE_AND_UNCLEAR_ITEM = "холодный участок, печь, посмотри что тут"
+#: Ответ, где ОБЪЕКТ назван, а СВЕРКА не сошлась: строка карты «Печь»
+#: произнесена, но по словам не видно, грязь это или поломка. Отказ сверки тут
+#: не «объекта нет», и правкой одной зоны такой ответ быть не может — пункт
+#: обязан искаться заново. Место словами намеренно не называется: печь у карты
+#: кадров держит зону `hot_kitchen` (T262/T263), и назови слова ЕЩЁ и зону —
+#: расхождение (T266) перехватило бы ответ раньше, чем до сверки дойдёт очередь,
+#: а этот тест проверяет именно её, а не соседний случай (`test_bot_correction_reply.py`
+#: и `record.zone_conflict`).
+ZONE_AND_UNCLEAR_ITEM = "печь, посмотри что тут"
 
 
 def started(lang: str = "ru") -> None:
     start_inspection(CHAT_ID, "Белград 2", "planned", lang, ui_lang=lang)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
 
 def findings() -> list[Finding]:
@@ -86,7 +93,7 @@ def findings() -> list[Finding]:
 
 async def запись(dp: object, bot: object, session: object) -> int:
     """Завести запись словами и вернуть номер сообщения бота о ней."""
-    await feed(dp, bot, photo_message("frame-oven", caption=OVEN))  # type: ignore[arg-type]
+    await feed(dp, bot, photo_message("frame-shelf", caption=ITEM_WITH_ZONE))  # type: ignore[arg-type]
     return session.last_sent_id  # type: ignore[attr-defined,no-any-return]
 
 
@@ -99,11 +106,11 @@ async def test_ответ_с_одной_зоной_переставляет_зо
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     сказано = await запись(dp, bot, session)
-    assert [(f.n, f.code, f.zone) for f in findings()] == [(1, "CLN05", "hot_kitchen")]
+    assert [(f.n, f.code, f.zone) for f in findings()] == [(1, "CLN01", "hot_kitchen")]
 
     await feed(dp, bot, text_message(ZONE_ONLY, reply_to=bot_message(сказано)))
 
-    assert [(f.n, f.code, f.zone) for f in findings()] == [(1, "CLN05", "cold_kitchen")], (
+    assert [(f.n, f.code, f.zone) for f in findings()] == [(1, "CLN01", "cold_kitchen")], (
         "ответ, назвавший зону, её не переставил"
     )
 
@@ -156,8 +163,11 @@ async def test_правка_зоны_подтверждается_новой_о�
     ), f"правка зоны не названа правкой: {показ!r}"
     assert stored_headline("ru") not in показ, "правка выдана за новую запись"
     assert "Холодный участок" in показ, "новая зона в отбивке не названа"
-    assert t("record.fixed_zone_guess", "ru") not in показ, (
-        "зона названа этими же словами — оговорка про догадку здесь неправда"
+    assert t("record.fixed_zone_from_cues", "ru") not in показ, (
+        "зона названа этими же словами — оговорка про карту кадров здесь неправда"
+    )
+    assert t("record.fixed_zone_from_item", "ru") not in показ, (
+        "зона названа этими же словами — оговорка про единственную зону пункта здесь неправда"
     )
 
 
@@ -198,13 +208,16 @@ async def test_ответ_с_объектом_ищет_пункт_заново(
     )
 
 
-async def test_зона_не_из_списка_пункта_называется_вслух(
+async def test_зона_не_из_списка_пункта_отклоняется_движком(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Правка — самый частый способ увести запись туда, где пункта нет (T147).
+    """Правка — самый частый способ увести запись туда, где пункта нет (T271, #239).
 
-    Движок такую запись пропускает и лишь помечает флагом, а в отчёт партнёру
-    пометка не попадает: единственное место, где её видно, — чат.
+    До задачи T271 движок такую пару принимал и лишь помечал флагом
+    `zone_unusual`, а в отчёт партнёру пометка не попадала — единственным
+    местом, где её было видно, оставался чат. Теперь движок пару «пункт + зона
+    вне методики» не принимает вовсе: запись остаётся в прежней зоне, а отказ
+    показан аудитору его же словами (T127), а не тихой пометкой.
     """
     started()
     stub_classify(monkeypatch, suggestion())
@@ -215,11 +228,16 @@ async def test_зона_не_из_списка_пункта_называется
 
     await feed(dp, bot, text_message("это был гостевой зал", reply_to=bot_message(сказано)))
 
-    assert findings()[0].zone == "dining"
-    assert findings()[0].zone_unusual, "тест проверяет не то: зона оказалась обычной для пункта"
-    assert t("record.zone_unusual", "ru").strip() in session.last_text, (
-        "нетипичная зона после правки ответом не названа"
+    assert findings()[0].zone == "hot_kitchen", "движок принял пару, которой методика не даёт"
+    assert findings()[0].zone_unusual is False, "флаг нетипичности зоны больше не выставляется"
+    отказ = t(
+        "edit.failed",
+        "ru",
+        n=1,
+        item=get_item("CLN01").question("ru"),
+        zone=zone_title("dining", "ru", chat_id=CHAT_ID),
     )
+    assert отказ in session.texts, "отказ движка не дошёл до аудитора"
 
 
 async def test_ответ_зоной_на_снятую_запись_не_заводит_новую(
@@ -261,7 +279,7 @@ async def test_отказ_сверки_не_по_отсутствию_объек
     await feed(dp, bot, text_message(ZONE_AND_UNCLEAR_ITEM, reply_to=bot_message(сказано)))
 
     assert len(зовы) == 1, "пункт не искался заново — ответ принят за правку одной зоны"
-    assert [(f.code, f.zone) for f in findings()] == [("CLN05", "hot_kitchen")], (
+    assert [(f.code, f.zone) for f in findings()] == [("CLN01", "hot_kitchen")], (
         "запись изменилась до того, как аудитор выбрал пункт"
     )
     assert any(data.startswith("rec:pick:") for data in session.keyboard_data()), (

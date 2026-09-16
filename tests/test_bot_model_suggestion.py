@@ -41,7 +41,6 @@ from bot_harness import callback_query as callback
 from conftest import requires_data, requires_db
 
 from src import db
-from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import EDIT_PREFIX
@@ -84,7 +83,10 @@ async def test_подтверждённая_запись_помнит_предл
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="нагар на подине печи"))
+    # Колонка не названа однозначно (грязь или поломка?) — сверка со списком
+    # нарушений отказывает (`NO_COLUMN`), и разбирает материал модель, как и
+    # требует случай теста (T271 здесь ни при чём: до движка дело не доходит).
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:pick:0"))
 
     (запись,) = записи()
@@ -115,7 +117,7 @@ async def test_выбранный_второй_кандидат_оставляе
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="нагар на подине печи"))
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:pick:1"))
 
     (запись,) = записи()
@@ -185,7 +187,6 @@ async def test_запись_по_словам_помнит_пункт_сверк
     вызовы = stub_classify(monkeypatch, suggestion())
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
@@ -209,17 +210,20 @@ async def test_правка_зоны_после_записи_по_словам_�
     stub_classify(monkeypatch, suggestion())
     bot, _ = make_bot()
     dp = build_dispatcher(SETTINGS)
-    sidecar.remember_zone(CHAT_ID, "hot_kitchen")
 
-    await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
+    # CLN05 (CLEAR) держит только горячий цех (T271, #239) — на нём правку зоны
+    # не собрать, движок отклонит любую другую. Пункт «Стеллаж/Пол участка»
+    # держит несколько зон, и слова прямо называют место — оба нужны, чтобы
+    # быстрый путь сработал сам, без модели, как того требует случай теста.
+    await feed(dp, bot, photo_message("frame-1", caption="стеллаж грязный в тепловом участке"))
     (до,) = записи()
     assert до.zone == "hot_kitchen", "случай не тот: зона и так не горячий цех"
 
     await feed(dp, bot, callback(f"{EDIT_PREFIX}1:zone"))
-    await feed(dp, bot, callback("ez:1:dining"))
+    await feed(dp, bot, callback("ez:1:cold_kitchen"))
 
     (после,) = записи()
-    assert после.zone == "dining", "правка зоны не применилась"
+    assert после.zone == "cold_kitchen", "правка зоны не применилась"
     assert после.suggested_zone == "hot_kitchen", "правка переписала предложение системы"
 
 
@@ -273,22 +277,28 @@ async def test_поправленное_предложение_лежит_в_б�
         monkeypatch,
         suggestion(
             candidate("CLN02", "D1", "hot_kitchen", confidence=0.51),
-            candidate("CLN05", "D1", "hot_kitchen", confidence=0.31),
+            candidate("CLN03", "D1", "hot_kitchen", confidence=0.31),
         ),
     )
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="нагар на подине печи"))
+    await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут"))
     await feed(dp, bot, callback("rec:pick:1"))
     await feed(dp, bot, callback(f"{EDIT_PREFIX}1:zone"))
-    await feed(dp, bot, callback("ez:1:dining"))
+    # Зона правится на ДОПУСТИМУЮ этому пункту: с T271 движок отвергает пару,
+    # которой методика не даёт, и правка в чужую зону здесь отказала бы — а
+    # тест не про отказ, он про то, что обе тройки доезжают до базы. Запрет
+    # правки в чужую зону стережёт `tests/test_bot_zone_unusual.py`.
+    await feed(dp, bot, callback("ez:1:cold_kitchen"))
     await build_report(dp, bot)
 
     assert session.documents, "отчёт не отдан — слива могло и не быть"
     (строка,) = db.findings_by_unit(tenant="default", unit="Белград 2")
 
-    assert (строка.code, строка.zone) == ("CLN05", "dining"), "в базу легла не итоговая тройка"
+    assert (строка.code, строка.zone) == ("CLN03", "cold_kitchen"), (
+        "в базу легла не итоговая тройка"
+    )
     assert (строка.suggested_code, строка.suggested_level, строка.suggested_zone) == (
         "CLN02",
         "D1",

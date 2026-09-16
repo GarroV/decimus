@@ -33,6 +33,7 @@ from . import checklist as store_api
 from . import photo_cues as cues_api
 from . import suggestions as proposals_api
 from . import tools as reads
+from . import uncovered as uncovered_api
 from .checklist import Outcome, Store
 from .errors import ChecklistError
 
@@ -496,6 +497,39 @@ def photo_cue_suggestions(
             truncated=найденное.truncated,
         ),
     }
+
+
+def uncovered_phrases(
+    *,
+    tenant: str,
+    store: Store,
+    limit: int | None = None,
+) -> dict[str, Any]:
+    """Слова, которые звучат на точке и до сих пор не дают записи, — по частоте.
+
+    Обратная сторона `photo_cue_suggestions`. Тот собран из УЖЕ СДЕЛАННЫХ
+    записей и потому молчит там, где сигнал нужнее всего: где записи не
+    случилось вовсе. Накопитель копит ровно эти случаи (T268), и здесь они
+    складываются в список кандидатов «слово → зона, встретилось N раз».
+
+    Карта кадров этим вызовом НЕ правится: пополнение остаётся ручным
+    (решение D077), потому что по этой карте быстрый путь записывает находку
+    без подтверждения аудитора. Готового вызова `add_photo_cue` в ответе тоже
+    нет — раздел карты и формулировка строки из сказанного не выводятся.
+
+    Ни арендатор, ни хранилище версий сюда не нужны, и это не упущение.
+    Накопитель — состояние проверки на машине бота, а не история проверок в
+    базе и не файл методики: разделения по арендаторам в нём нет вовсе.
+    Поэтому вызов объявлен инструментом МЕТОДИКИ (`KIND_CHECKLIST`): право на
+    него — отдельная настройка `MCP_CHECKLIST_TENANTS`, то есть сырые слова
+    аудиторов не открываются партнёрскому токену заодно с историей его
+    пиццерий.
+    """
+    del tenant  # право на методику проверено на входе, по коду арендатора
+    del store  # накопитель лежит в состоянии проверки, а не в хранилище версий
+    return uncovered_api.read_all(
+        limit=uncovered_api.DEFAULT_CANDIDATES if limit is None else limit
+    )
 
 
 def add_photo_cue(

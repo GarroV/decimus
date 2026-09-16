@@ -29,7 +29,7 @@ from aiogram.types import CallbackQuery, Message
 from src import domain
 from src.domain.errors import DomainError
 
-from .. import refusal, sealed, sidecar, view
+from .. import refusal, sealed, view
 from ..inspection import read_inspection
 from ..keyboards import (
     EDIT_DROP,
@@ -117,10 +117,9 @@ def build_edit_router() -> Router:
             # запись, значит ответом на него правят её.
             await tell_refusal(message, chat_id, told, lang)
             return
-        if "zone" in fields:
-            # Аудитор назвал зону руками — она и становится догадкой для
-            # следующего кадра (D048), а не та, что стояла до правки.
-            sidecar.remember_zone(chat_id, fields["zone"])
+        # Названная руками зона НЕ становится догадкой для следующего кадра
+        # (T264, #218): память о прошлой записи снята как источник зоны целиком.
+        # Правка говорит о ТОЙ записи и ни о чём больше.
         await show_changed(message, chat_id, n, lang)
 
     @router.message(Command("undo"))

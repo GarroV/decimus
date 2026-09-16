@@ -34,6 +34,8 @@ from src.recognize.language import COLUMN_WORDS, THRESHOLDS, fleeting, load_rule
     "negations": {"not": "forward"},
     "connectives": ["is"],
     "column_words": {"dirt": ["stain"]},
+    "zone_column": "Zone",
+    "place_prepositions": ["at"],
     "sections": {
         THRESHOLDS: "## Thresholds",
         COLUMN_WORDS: "## Column words",
@@ -230,6 +232,23 @@ def test_пустой_словарь_колонок_это_отказ(tmp_path: 
         load_rules(файл)
 
     assert "колонок" in str(отказ.value), str(отказ.value)
+
+
+def test_колонка_зоны_без_названия_это_отказ(tmp_path: Path) -> None:
+    """T262: без названия колонки карта разбиралась бы наполовину.
+
+    Коды читались бы, а зона объекта — никогда, причём молча: строка карты без
+    зоны законна и означает «спросить», поэтому ненайденная колонка выглядела
+    бы ровно как незаполненная. Отличить одно от другого потом нечем.
+    """
+    язык = copy.deepcopy(ВАЛИДНЫЙ_ЯЗЫК)
+    язык["zone_column"] = "   "
+    файл = _записать(tmp_path, язык)
+
+    with pytest.raises(RecognizeConfigError) as отказ:
+        load_rules(файл)
+
+    assert "колонк" in str(отказ.value), str(отказ.value)
 
 
 def test_объявлен_только_один_раздел_карты_это_отказ(tmp_path: Path) -> None:

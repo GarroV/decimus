@@ -7,9 +7,14 @@
 Главное, что здесь проверяется, — что замер меряет ТО, ЧТО ПРОИСХОДИТ НА
 ТОЧКЕ. До T125 (задача #100) он звал `fast_path` с зоной из эталонной записи,
 то есть из уже известного правильного ответа, и его 18% к живому боту
-отношения не имели. Бот берёт зону из слов комментария (`src/bot/zones.py`),
-а память о прошлой записи (D048) — только догадка на случай, когда о зоне не
-сказано ничего.
+отношения не имели.
+
+**С T272 (задача #218) боевой режим меряет другое.** Память о прошлой записи
+снята как источник зоны целиком (T264, решение D048 отменено): она уводила
+пункт про печь в холодный цех. Бот берёт зону из слов комментария, а если о
+зоне не сказано ничего — из словаря объектов карты кадров (колонка «Зона»,
+T262). Тесты про память здесь поэтому не «поправлены», а сняты вместе с
+поведением, и на их месте стоят тесты про словарь.
 
 Остальное: подсчёт (`measure`) на синтетике с заранее известным исходом; коды
 возврата CLI (1 — есть неверное срабатывание, 2 — боевых данных нет); шапка
@@ -39,27 +44,33 @@ from src.recognize.config import NO_CHAT
 from src.recognize.cues import CUES_FILE, load_cues
 from src.recognize.fastpath import NO_COLUMN, NO_ZONE, WRONG_ZONE
 from tools import fastpath_measure as fpm
-from tools.fastpath_measure import FROM_MEMORY, FROM_NOWHERE, FROM_WORDS, Mode, Record
+from tools.fastpath_measure import FROM_DICTIONARY, FROM_NOWHERE, FROM_WORDS, Mode, Record
 
 #: «Печь» — строка карты, произнесённая целиком, «нагар» выбирает колонку
-#: «Грязь». Зоны в этих словах нет: их у бота придётся брать из памяти.
+#: «Грязь». Зоны в этих словах нет — её даст словарь объектов: у «Печи» в
+#: синтетической карте колонка «Зона» заполнена.
 OVEN = "Печь: под лентой нагар"
-#: Те же слова, но зону аудитор назвал сам.
+#: Те же слова, но зону аудитор назвал сам — и ту же самую.
 OVEN_WITH_ZONE = "Тепловой участок: печь, под лентой нагар"
+#: Те же слова, но названа ДРУГАЯ зона, чем держит карта: слово сильнее словаря.
+OVEN_WRONG_ZONE = "В зале: печь, под лентой нагар"
+#: Объект, у которого колонка «Зона» в карте пуста: зону взять неоткуда вовсе.
+SINK = "Раковина и смеситель: налёт"
 #: Зона названа («в зале»), строка карты произнесена, колонка выбрана «крошками».
 FURNITURE = "Мебель участка в зале: крошки на столах"
 
 
 def test_замер_не_подставляет_эталонную_зону_которой_у_бота_нет(domain_env: Path) -> None:
-    """T125: «Печь: под лентой нагар» зоны не называет — у бота зоны нет, и пункта тоже.
+    """T125: у объекта без зоны в карте бот зоны не добудет — и пункта не покажет.
 
     Дефект #100: замер звал `fast_path` с зоной ИЗ ЭТАЛОННОЙ ЗАПИСИ, то есть из
-    уже известного правильного ответа. Живой бот берёт зону только из слов
-    аудитора (`src/bot/zones.py`) и памяти о прошлой записи; на первой записи
-    проверки памяти ещё нет — значит, зоны нет вовсе и быстрый путь обязан
-    отказать, а не показывать пункт.
+    уже известного правильного ответа. Живой бот берёт зону из слов аудитора
+    (`src/bot/zones.py`), а если их нет — из словаря объектов карты кадров. У
+    «Раковины и смесителя» колонка «Зона» пуста, и это не упущение карты, а
+    законное «объект стоит не в одном месте»: зоны нет вовсе, и быстрый путь
+    обязан отказать, а не показывать пункт.
     """
-    records = (Record(code="CLN05", zone="hot_kitchen", note=OVEN, source="synthetic"),)
+    records = (Record(code="CLN02", zone="dishwashing", note=SINK, source="synthetic"),)
 
     (outcome,) = fpm.measure(records)
 
@@ -69,13 +80,12 @@ def test_замер_не_подставляет_эталонную_зону_ко
     assert outcome.hint.source == FROM_NOWHERE
 
 
-def test_память_проверки_может_подставить_чужую_зону(domain_env: Path) -> None:
-    """Память — догадка (D048), и догадка бывает неверной; замер обязан это показывать.
+def test_словарь_объектов_даёт_зону_когда_её_не_назвали(domain_env: Path) -> None:
+    """T262/T263: зону печи держит карта кадров, а не память о прошлой записи.
 
-    Первая запись сделана в зале, вторая — про печь, но зону аудитор не назвал.
-    Бот подставит зал, и `CLN05` к залу не применим: законный отказ. Замер с
-    эталонной зоной этого не видел вовсе — он подставлял тепловой участок и
-    рапортовал срабатывание, которого на точке не будет.
+    До T264 на этом месте стояла зона ПРЕДЫДУЩЕЙ записи: сделал запись в зале,
+    сказал про печь — и печь уезжала в зал. Теперь зона берётся у объекта,
+    которого аудитор назвал, и она верна независимо от того, что было до.
     """
     records = (
         Record(code="CLN06", zone="dining", note=FURNITURE, source="synthetic"),
@@ -86,48 +96,65 @@ def test_память_проверки_может_подставить_чужу�
 
     assert first.fired == "CLN06"
     assert first.hint.source == FROM_WORDS
-    assert second.fired is None
-    assert second.reason == WRONG_ZONE
-    assert second.hint.zone == "dining"
-    assert second.hint.source == FROM_MEMORY
-
-
-def test_слова_комментария_сильнее_памяти(domain_env: Path) -> None:
-    """Порядок бота: `spoken or memory`, а не наоборот (T124)."""
-    records = (
-        Record(code="CLN06", zone="dining", note=FURNITURE, source="synthetic"),
-        Record(code="CLN05", zone="hot_kitchen", note=OVEN_WITH_ZONE, source="synthetic"),
-    )
-
-    _, second = fpm.measure(records)
-
     assert second.hint.zone == "hot_kitchen"
-    assert second.hint.source == FROM_WORDS
+    assert second.hint.source == FROM_DICTIONARY
     assert second.fired == "CLN05"
     assert second.correct is True
 
 
-def test_память_не_переходит_из_одной_проверки_в_другую(domain_env: Path) -> None:
-    """У каждой проверки свой чат и свои заметки: зона предыдущей сюда не течёт."""
+def test_слова_комментария_сильнее_словаря(domain_env: Path) -> None:
+    """Порядок бота: слова, потом словарь, и никогда наоборот (T124, T263).
+
+    Проверяется на расхождении, а не на совпадении: карта держит печь в
+    тепловом участке, аудитор сказал «в зале». Совпадение источников ничего бы
+    не доказало — при нём порядок неразличим. Что пункт после этого не
+    срабатывает, здесь ожидаемо: методика `CLN05` в зале не даёт, и отказ
+    быстрого пути — правильный ответ на противоречие, а не потеря.
+    """
     records = (
-        Record(code="CLN06", zone="dining", note=FURNITURE, source="belgrade-1"),
-        Record(code="CLN05", zone="hot_kitchen", note=OVEN, source="belgrade-2"),
+        Record(code="CLN05", zone="hot_kitchen", note=OVEN_WITH_ZONE, source="synthetic"),
+        Record(code="CLN05", zone="hot_kitchen", note=OVEN_WRONG_ZONE, source="synthetic"),
     )
 
-    _, second = fpm.measure(records)
+    сказана_та_же, сказана_другая = fpm.measure(records)
 
-    assert second.hint.source == FROM_NOWHERE
-    assert second.reason == NO_ZONE
+    assert сказана_та_же.hint.zone == "hot_kitchen"
+    assert сказана_та_же.hint.source == FROM_WORDS
+    assert сказана_та_же.fired == "CLN05"
+    assert сказана_другая.hint.zone == "dining"
+    assert сказана_другая.hint.source == FROM_WORDS
+    assert сказана_другая.reason == WRONG_ZONE
+
+
+def test_порядок_записей_на_подсказку_не_влияет(domain_env: Path) -> None:
+    """T264: записи независимы, и перестановка ничего не меняет.
+
+    Раньше это было неверно: зона текла из записи в запись, и та же запись,
+    поставленная первой, получала другую подсказку. Тест стережёт, чтобы
+    источник «предыдущая запись» не вернулся тихо, под другим именем.
+    """
+    прямо = (
+        Record(code="CLN06", zone="dining", note=FURNITURE, source="belgrade-1"),
+        Record(code="CLN02", zone="dishwashing", note=SINK, source="belgrade-2"),
+    )
+    наоборот = tuple(reversed(прямо))
+
+    подсказки_прямо = {r.note: h for r, h in zip(прямо, fpm.hints_bot(прямо), strict=True)}
+    подсказки_наоборот = {r.note: h for r, h in zip(наоборот, fpm.hints_bot(наоборот), strict=True)}
+
+    assert подсказки_прямо == подсказки_наоборот
+    assert подсказки_прямо[SINK].source == FROM_NOWHERE
 
 
 def test_эталонная_зона_считается_отдельно_как_верхняя_граница(domain_env: Path) -> None:
     """Прежнее число не выброшено, но подписано честно и стоит рядом с боевым.
 
-    Те же две записи: с эталонной зоной «печь» срабатывает, «панель печи»
-    отказывается по колонке — а как зовёт бот, не срабатывает ни одна.
+    Записи подобраны так, чтобы граница была видна: у «Раковины и смесителя»
+    колонка «Зона» в карте пуста, поэтому эталон зону знает, а бот — нет.
+    Вторая запись отказывается по колонке при любой зоне.
     """
     records = (
-        Record(code="CLN05", zone="hot_kitchen", note=OVEN, source="synthetic"),
+        Record(code="CLN02", zone="dishwashing", note=SINK, source="synthetic"),
         Record(
             code="INF09",
             zone="hot_kitchen",
@@ -138,7 +165,7 @@ def test_эталонная_зона_считается_отдельно_как_
 
     fired, rejected = fpm.measure(records, fpm.hints_reference(records))
 
-    assert fired.fired == "CLN05"
+    assert fired.fired == "CLN02"
     assert fired.correct is True
     assert fired.reason == ""
     assert rejected.fired is None
@@ -149,11 +176,17 @@ def test_эталонная_зона_считается_отдельно_как_
 
 
 def test_доля_и_счёт_неверных_считаются_по_способу(domain_env: Path) -> None:
-    """`Mode` отвечает за арифметику отчёта: срабатывания, доля, неверные."""
+    """`Mode` отвечает за арифметику отчёта: срабатывания, доля, неверные.
+
+    Третья запись — объект без зоны в карте: она не срабатывает вовсе, и доля
+    поэтому меньше единицы. Взять здесь запись, срабатывающую по словарю,
+    значило бы мерить арифметику на трёх сплошных срабатываниях, где деление
+    не видно.
+    """
     records = (
         Record(code="CLN06", zone="dining", note=FURNITURE, source="synthetic"),
         Record(code="TEH05", zone="hot_kitchen", note=OVEN_WITH_ZONE, source="synthetic"),
-        Record(code="CLN05", zone="hot_kitchen", note=OVEN, source="belgrade-2"),
+        Record(code="CLN02", zone="dishwashing", note=SINK, source="belgrade-2"),
     )
 
     mode = Mode("проба", fpm.measure(records))

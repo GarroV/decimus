@@ -243,21 +243,21 @@ def stored_headline(lang: str) -> str:
     return t("record.stored", lang)
 
 
-def _zone_note(lang: str, *, zone_guessed: bool, zone_from_item: bool) -> str:
+def _zone_note(lang: str, *, zone_from_cues: bool, zone_from_item: bool) -> str:
     """Оговорка о том, откуда взялась зона, — или пусто, если её назвал человек.
 
-    Два случая и два текста, и смешивать их нельзя: «поставил прошлую» про зону
+    Два случая и два текста, и смешивать их нельзя: «из карты кадров» про зону
     из пункта было бы неправдой, а неправда в оговорке хуже её отсутствия —
     аудитор перестаёт ей верить и не проверяет ни один из случаев (#218).
 
     Оба взаимно исключают друг друга по построению (`routers/record.py`), но
-    порядок здесь задан явно: догадка памяти важнее, потому что она и есть та,
-    которую надо перепроверить руками.
+    порядок здесь задан явно: зона пункта сильнее, потому что её проверяет тот
+    же движок, который запись и примет.
     """
-    if zone_guessed:
-        return t("record.fixed_zone_guess", lang)
     if zone_from_item:
         return t("record.fixed_zone_from_item", lang)
+    if zone_from_cues:
+        return t("record.fixed_zone_from_cues", lang)
     return ""
 
 
@@ -267,7 +267,7 @@ def confirmed_block(
     *,
     title: str,
     chat_id: int,
-    zone_guessed: bool = False,
+    zone_from_cues: bool = False,
     zone_from_item: bool = False,
 ) -> str:
     """Запись, которую аудитор подтвердил кнопкой (T055, расширен T135).
@@ -292,7 +292,7 @@ def confirmed_block(
     до задачи путь с подтверждением о сохранении не говорил вовсе, и аудитор
     решал по строке записи, уехало это в отчёт или ещё нет.
 
-    `zone_guessed` — та же оговорка и тем же текстом, что у `fixed_block` (T156).
+    `zone_from_cues` — та же оговорка и тем же текстом, что у `fixed_block` (T156).
     Правило про зону из памяти одно на все пути записи, а стояло оно только на
     быстром: подсказка уходила в модель, модель возвращала зону как свою, и
     подтверждение печаталось без оговорки. Опасность здесь меньше — зона видна
@@ -300,7 +300,7 @@ def confirmed_block(
     которая появляется через раз, перестаёт что-либо значить.
     """
     line = confirm_line(finding, lang, chat_id=chat_id)
-    guess = _zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item)
+    guess = _zone_note(lang, zone_from_cues=zone_from_cues, zone_from_item=zone_from_item)
     note = shorten(finding.text, FAST_NOTE_LIMIT)
     stored = stored_headline(lang)
     if note.strip() == title.strip():
@@ -317,7 +317,7 @@ def fixed_block(
     title: str,
     cue: str,
     chat_id: int,
-    zone_guessed: bool = False,
+    zone_from_cues: bool = False,
     zone_from_item: bool = False,
 ) -> str:
     """Запись, легшая по словам сразу, без подтверждения (T121, D064).
@@ -337,17 +337,18 @@ def fixed_block(
     D090): своя формулировка на этом пути и молчание на остальных читались как
     разные события.
 
-    `zone_guessed` — зона взята из памяти о прошлой записи (D048), а не из этих
-    слов (T124). Тогда «по вашим словам» про зону неправда, и оговорка стоит
-    прямо под строкой записи: сама зона в ней видна, но не видно, откуда она
-    взялась, — а вычет уезжает партнёру в ту зону, которую бот подставил сам.
+    `zone_from_cues` — зона взята из карты кадров по названному объекту, а не
+    из этих слов (T262, T263). Тогда «по вашим словам» про зону неправда, и
+    оговорка стоит прямо под строкой записи: сама зона в ней видна, но не
+    видно, откуда она взялась, — а вычет уезжает партнёру в ту зону, которую
+    подставил не он.
     """
     return t(
         "record.fixed",
         lang,
         stored=stored_headline(lang),
         line=confirm_line(finding, lang, chat_id=chat_id),
-        guess=_zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item),
+        guess=_zone_note(lang, zone_from_cues=zone_from_cues, zone_from_item=zone_from_item),
         title=title,
         note=shorten(finding.text, FAST_NOTE_LIMIT),
         cue=cue,
@@ -361,7 +362,7 @@ def corrected_block(
     title: str,
     chat_id: int,
     cue: str = "",
-    zone_guessed: bool = False,
+    zone_from_cues: bool = False,
     zone_from_item: bool = False,
 ) -> str:
     """Запись после правки ответом на сообщение бота (T204, D081).
@@ -384,7 +385,7 @@ def corrected_block(
         lang,
         n=finding.n,
         line=confirm_line(finding, lang, chat_id=chat_id),
-        guess=_zone_note(lang, zone_guessed=zone_guessed, zone_from_item=zone_from_item),
+        guess=_zone_note(lang, zone_from_cues=zone_from_cues, zone_from_item=zone_from_item),
         title=title,
         note=shorten(finding.text, FAST_NOTE_LIMIT),
         cue=t("record.corrected_cue", lang, cue=cue) if cue else "",

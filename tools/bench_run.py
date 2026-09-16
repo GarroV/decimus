@@ -2,10 +2,26 @@
 
 Прогоняет набор `bench_dataset.load_cases()` (31 кадр с известным ответом:
 код, класс, зона) через `classify()` ровно так, как это делает бот по кнопке
-«Разобрать» (T064) — без комментария, с зоной-подсказкой, которая
-соответствует памяти последней зоны (D048): `zone_hint = case.zone`. Один и
-тот же набор кадров прогоняется по трём моделям — флагман, средняя, дешёвая —
-чтобы сравнение было честным, а не «первое, что попробовали».
+«Разобрать» (T064) — без комментария и БЕЗ подсказки зоны. Один и тот же набор
+кадров прогоняется по трём моделям — флагман, средняя, дешёвая — чтобы
+сравнение было честным, а не «первое, что попробовали».
+
+**Подсказка зоны стала режимом, а по умолчанию её нет (T272, задача #218).**
+До T264 она бралась из памяти о прошлой записи (D048) и моделировалась
+эталонной зоной кадра — `zone_hint = case.zone`, то есть уже известным
+правильным ответом. Память как источник зоны снята целиком: она уводила пункт
+про печь в холодный цех. У кадра без комментария слов нет, а словарь объектов
+карты кадров выводится ИЗ СЛОВ — значит зоны на этом пути не будет вовсе, и
+`--zone-hint none` и есть то, что происходит на точке.
+
+`--zone-hint reference` оставлен НЕ для отчётности, а ради одного сравнения,
+без которого нельзя ответить на вопрос задачи. Сняв резку перечня по зоне
+(T265), мы изменили вход модели: раньше она выбирала из пунктов названной
+зоны, теперь из всего чек-листа. Чтобы узнать, стоило ли это точности, надо
+держать подсказку постоянной и менять только код — иначе два изменения
+складываются в одно число и не различаются. Числом отчётности этот режим не
+является: подсказка из эталонной записи — знание, которого у бота нет (тот же
+дефект #100, что чинила T125 в замере быстрого пути).
 
 Сеть здесь — не побочный эффект, а смысл модуля: без реального вызова числа
 были бы мнением. `run_model`/`run_case` делают вызовы, `summarize` — чистая
@@ -66,7 +82,15 @@ class CaseResult:
     error: str = ""
 
 
-def run_case(case: BenchCase, model: str) -> CaseResult:
+#: Режимы подсказки зоны. `none` — то, что происходит на точке; `reference` —
+#: эталонная зона кадра, знание, которого у бота нет: только для сравнения
+#: кода с кодом при постоянной подсказке.
+ZONE_HINT_NONE = "none"
+ZONE_HINT_REFERENCE = "reference"
+ZONE_HINT_MODES = (ZONE_HINT_NONE, ZONE_HINT_REFERENCE)
+
+
+def run_case(case: BenchCase, model: str, *, zone_hint: str = ZONE_HINT_NONE) -> CaseResult:
     """Один вызов `classify` — ровно то, что бот делает по кнопке «Разобрать».
 
     Отказ модели (`RecognizeError`) не прерывает замер — он такой же
@@ -75,7 +99,11 @@ def run_case(case: BenchCase, model: str) -> CaseResult:
     """
     try:
         suggestion = classify(
-            "", photo=case.photo.read_bytes(), zone_hint=case.zone, model=model, chat_id=NO_CHAT
+            "",
+            photo=case.photo.read_bytes(),
+            zone_hint=case.zone if zone_hint == ZONE_HINT_REFERENCE else None,
+            model=model,
+            chat_id=NO_CHAT,
         )
     except RecognizeError as exc:
         return CaseResult(
@@ -164,13 +192,18 @@ def _print_progress(done: int, total: int, started: float) -> None:
     print(f"[{done}/{total}] {elapsed:.0f}s", flush=True)
 
 
-def run_models(cases: list[BenchCase], models: tuple[str, ...]) -> list[CaseResult]:
+def run_models(
+    cases: list[BenchCase], models: tuple[str, ...], *, zone_hint: str = ZONE_HINT_NONE
+) -> list[CaseResult]:
     """Все кадры на всех моделях, с прогрессом — чтобы не молчать долгими минутами."""
     jobs = [(case, model) for model in models for case in cases]
     results: list[CaseResult] = []
     started = time.monotonic()
     with ThreadPoolExecutor(max_workers=CONCURRENCY) as pool:
-        futures = {pool.submit(run_case, case, model): (case, model) for case, model in jobs}
+        futures = {
+            pool.submit(run_case, case, model, zone_hint=zone_hint): (case, model)
+            for case, model in jobs
+        }
         for i, future in enumerate(as_completed(futures), start=1):
             results.append(future.result())
             if i % 5 == 0 or i == len(jobs):
@@ -198,16 +231,26 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--examples", type=Path, default=Path("examples"))
     parser.add_argument("--out", type=Path, default=Path("reports/bench.json"))
     parser.add_argument("--models", nargs="+", default=list(DEFAULT_MODELS))
+    parser.add_argument(
+        "--zone-hint",
+        choices=ZONE_HINT_MODES,
+        default=ZONE_HINT_NONE,
+        help=(
+            "none — как на точке: у кадра без комментария зоны неоткуда взять. "
+            "reference — эталонная зона кадра; знание, которого у бота нет, и "
+            "число отчётности из него не делается (только сравнение кода с кодом)"
+        ),
+    )
     args = parser.parse_args(argv)
 
     cases = load_cases(args.examples)
     print(
         f"{len(cases)} кадров × {len(args.models)} моделей = "
-        f"{len(cases) * len(args.models)} запросов",
+        f"{len(cases) * len(args.models)} запросов; подсказка зоны: {args.zone_hint}",
         flush=True,
     )
 
-    results = run_models(cases, tuple(args.models))
+    results = run_models(cases, tuple(args.models), zone_hint=args.zone_hint)
     summaries = summarize(results)
 
     args.out.parent.mkdir(parents=True, exist_ok=True)
