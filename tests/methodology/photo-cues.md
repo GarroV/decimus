@@ -22,6 +22,7 @@ Illustrative fixture for the test suite. It does NOT describe any real audit met
 | Печь | CLN05 | TEH05 | hot_kitchen |
 | Шкаф с дверцей | — | TEH06 | |
 | Раковина и смеситель | CLN02 | — | |
+| Стеллаж | CLN01 | TEH04 | |
 
 ## Подсказки по кадру
 

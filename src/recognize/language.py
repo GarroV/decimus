@@ -64,6 +64,7 @@ _FIELDS = (
     "connectives",
     "column_words",
     "zone_column",
+    "place_prepositions",
     "sections",
 )
 
@@ -104,6 +105,11 @@ class LanguageRules:
     connectives: tuple[str, ...]
     #: Заголовок колонки карты → слова, которыми аудитор эту колонку называет.
     column_words: Mapping[str, tuple[str, ...]]
+    #: Предлоги места: слова, после которых стоит НАЗВАНИЕ МЕСТА, а не признак
+    #: предмета (T263). Ими отличается «полы в холодном» — форма без
+    #: существительного, где зона названа определением, — от «холодная вода»,
+    #: где то же слово описывает предмет и никакого места не называет.
+    place_prepositions: tuple[str, ...]
     #: Заголовок колонки «Зона» в карте кадров, в нижнем регистре (T262).
     #: Колонка читается ПО ЗАГОЛОВКУ, а не по номеру: карту пишет управляющая
     #: компания, и порядок колонок у неё свой в каждом разделе.
@@ -185,6 +191,7 @@ def _one(raw: Mapping[str, object], code: str) -> LanguageRules:
     columns = raw["column_words"]
     if not isinstance(columns, dict) or not columns:
         raise _fail(f"у языка «{code}» пустой словарь колонок")
+    places = _words(raw["place_prepositions"], f"{code}/place_prepositions")
     zone_column = raw["zone_column"]
     if not isinstance(zone_column, str) or not zone_column.strip():
         raise _fail(
@@ -208,6 +215,7 @@ def _one(raw: Mapping[str, object], code: str) -> LanguageRules:
             _words([header], f"{code}/column_words")[0]: _words(words, f"{code}/{header}")
             for header, words in columns.items()
         },
+        place_prepositions=places,
         zone_column=zone_column.strip().lower(),
         sections={str(kind): str(heading) for kind, heading in sections.items()},
     )
@@ -308,6 +316,18 @@ def column_words(rules: Mapping[str, LanguageRules] = RULES) -> dict[str, tuple[
         for header, words in language.column_words.items():
             merged[header] = tuple(dict.fromkeys(merged.get(header, ()) + tuple(words)))
     return merged
+
+
+def place_prepositions(rules: Mapping[str, LanguageRules] = RULES) -> frozenset[str]:
+    """Предлоги места всех языков разом (T263).
+
+    Складываются по той же причине, что стоп-слова и частицы (T192): языков в
+    разборе одновременно три, и выбор правил по `lang` означал бы, что русское
+    «в холодном» перестаёт узнаваться, как только аудитор попросил английский
+    отчёт. Столкновений между языками здесь не бывает: предлог, совпавший с
+    чужим, всё равно значит «дальше место».
+    """
+    return frozenset(word for r in rules.values() for word in r.place_prepositions)
 
 
 def zone_columns(rules: Mapping[str, LanguageRules] = RULES) -> frozenset[str]:

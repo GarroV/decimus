@@ -35,6 +35,7 @@ from src.recognize.language import COLUMN_WORDS, THRESHOLDS, fleeting, load_rule
     "connectives": ["is"],
     "column_words": {"dirt": ["stain"]},
     "zone_column": "Zone",
+    "place_prepositions": ["at"],
     "sections": {
         THRESHOLDS: "## Thresholds",
         COLUMN_WORDS: "## Column words",
