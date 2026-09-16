@@ -1002,6 +1002,50 @@ TOOLS: tuple[ToolSpec, ...] = (
         history=True,
     ),
     ToolSpec(
+        name="uncovered_phrases",
+        description=(
+            "List the words auditors say on site that still produce no record, "
+            "most frequent first, with the zone each was said in and how often. "
+            "This is the other side of photo_cue_suggestions: that one is built "
+            "from records that were made, so it is silent exactly where the "
+            "signal matters most — where nothing was recorded at all. The bot "
+            "collects those cases while the inspection runs: nothing matched, "
+            "the proposal was wrong, the engine refused the item-and-zone pair, "
+            "the auditor gave up. "
+            "Forms of one word are folded together by the same stemmer the "
+            "product searches with, and the word is shown as that stemmer sees "
+            "it; what was actually said stands verbatim beside it. "
+            "Nothing is applied and no ready call is built: the word map is a "
+            "management-company document, and the fast path records a finding by "
+            "it without the auditor confirming the item (decision D077), so a "
+            "word added automatically would reach a partner's report with nobody "
+            "having seen it. Which section a row belongs in, and how the row "
+            "should be worded, are a human's decision — a spoken sentence is not "
+            "yet a cue term. "
+            "An empty answer says whether the accumulator is empty or whether it "
+            "held formulations that yielded no candidate: those are different "
+            "answers and must not be retold as one."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": (
+                        "Maximum number of candidate words to return. A cut-off "
+                        "answer says so in its 'truncated' field rather than "
+                        "passing for a complete one."
+                    ),
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.uncovered_phrases,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
         name="publish_checklist_version",
         description=(
             "Make a stored checklist version the one the audit engine "
