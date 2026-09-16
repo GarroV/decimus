@@ -550,6 +550,35 @@ TEXTS: dict[str, dict[str, str]] = {
             "drop a record you do not need with “Delete”."
         ),
     },
+    # Запись, которую поставила КАРТА СИНОНИМОВ (T285, решение D119). Отдельный
+    # текст, а не `record.fixed` с другой подстановкой: там последней строкой
+    # стоит «Строка карты», то есть строка карты кадров, произнесённая целиком,
+    # — а здесь пункт поднят тем, что этой же формулировкой уже кончался
+    # разбор. Подписать одно другим значило бы соврать аудитору ровно в том
+    # месте, которым он проверяет, почему система выбрала пункт.
+    #
+    # Самой накопленной формулировки в тексте нет намеренно: ключ карты
+    # отличается от сказанного только регистром, пробелами и знаками по краям,
+    # и строка «раньше сказано» показывала бы аудитору его же слова второй раз.
+    "record.learned": {
+        "ru": (
+            "{stored} Подтверждать не нужно — эту формулировку уже сводили с этим пунктом.\n\n"
+            "{line}{guess}\n"
+            "{title}\n\n"
+            "В отчёт: «{note}»\n\n"
+            "Пункт не тот или в словах есть ещё нарушение — «Разобрать моделью»; "
+            "лишнюю запись уберите кнопкой «Удалить»."
+        ),
+        "en": (
+            "{stored} No confirmation needed — this wording has been matched to this item "
+            "before.\n\n"
+            "{line}{guess}\n"
+            "{title}\n\n"
+            "Into the report: \u201c{note}\u201d\n\n"
+            "Wrong item, or your words name another violation — \u201cAnalyze with the "
+            "model\u201d; drop a record you do not need with \u201cDelete\u201d."
+        ),
+    },
     "record.candidate_line": {
         "ru": "{index}. {code} · {level} · {zone}\n   {wording}",
         "en": "{index}. {code} · {level} · {zone}\n   {wording}",

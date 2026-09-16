@@ -68,7 +68,7 @@ from src.domain.errors import DomainError
 from src.recognize.classify import classify, needs_photo
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
-from src.recognize.manual import manual_candidates, search_items
+from src.recognize.manual import ManualCandidate, manual_candidates, search_items
 from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.transcribe import transcribe
 
@@ -98,10 +98,11 @@ from ..keyboards import (
     zone_conflict_keyboard,
     zones_keyboard,
 )
-from ..lang import chat_langs
+from ..lang import chat_langs, chat_speech_lang
 from ..material import Comment, Material, MaterialStore, PhotoGroup
 from ..pending import Offer, PendingStore, Proposal
 from ..photos import fetch_bytes
+from ..phrases import Learned, learn, recall
 from ..shown import remember as remember_shown
 from ..shown import remember_origin, tell_refusal
 from ..texts import t
@@ -494,6 +495,127 @@ async def _try_fast(
     return True
 
 
+async def _try_learned(
+    message: Message,
+    chat_id: int,
+    base: Proposal,
+    pending: PendingStore,
+    lang: str,
+    report_lang: str,
+    learned: Learned,
+) -> bool:
+    """Записать пункт, который подняла карта синонимов (T285, решение D119).
+
+    Возвращает, кончилось ли дело записью или вопросом о зоне. Не кончилось —
+    материал разбирается дальше как раньше, и карта в этом больше не участвует.
+
+    Зовётся ПОСЛЕ сверки со списком нарушений и только когда та промолчала:
+    прямое совпадение карту не спрашивает (D119). Дальше решение владельца
+    держится на одном: сказанное однажды не переспрашивается второй раз.
+
+    Подтверждения у этой записи нет — ровно как у записи по словам (D064), и
+    по той же причине под ней стоит выход к модели: код пункта правкой не
+    меняется, а те же слова поднимут тот же синоним. Показывается она своим
+    блоком (`view.learned_block`): строки карты кадров здесь не было, и
+    подписать накопленное ею значило бы соврать.
+
+    Два случая кончаются отказом, и оба — не тупик, а обычный разбор дальше:
+    класс у пункта не один (синоним класса не хранит, а выбирать его за
+    аудитора нельзя) и названная человеком зона пункту не годится (методика
+    такой пары не даёт, T271, а подменять сказанное молча система не вправе).
+    """
+    code = learned.code
+    levels = domain.allowed_levels(code, chat_id=chat_id)
+    if len(levels) != 1:
+        logger.info(
+            "синоним поднял пункт %s в чате %s, но класс у пункта не один — разбор идёт дальше",
+            code,
+            chat_id,
+        )
+        return False
+    level = levels[0]
+    # Зона у накопленного пункта берётся оттуда же, откуда всегда (T263): слова
+    # аудитора, словарь объектов карты кадров, сама методика. Карта синонимов
+    # зоны не хранит и хранить не будет — она отвечает на «какой пункт», а не
+    # на «где».
+    zone = base.zone_hint or domain.only_zone(code, chat_id=chat_id) or ""
+    if not zone:
+        # Взять зону неоткуда: у пункта их несколько, а места аудитор не назвал.
+        # Спрашивается она кнопками ТОЛЬКО допустимых зон (T266). Это не то
+        # «переспрашивание одного и того же», от которого уходит D119: пункт
+        # карта уже знает, и человек называет одно место, а не выбирает из 123
+        # пунктов.
+        item = ManualCandidate(
+            code=code,
+            levels=(level,),
+            title=domain.get_item(code, chat_id=chat_id).question(report_lang),
+        )
+        await _ask_zone(
+            message,
+            chat_id,
+            replace(base, manual=(item,), picked=0, picked_level=level),
+            pending,
+            ZONE_FOR_ITEM_PREFIX,
+            lang,
+            item_code=code,
+        )
+        return True
+    if zone not in allowed_zones(code, chat_id=chat_id):
+        logger.info(
+            "синоним поднял пункт %s, а зона «%s» ему методикой не дана — разбор идёт дальше",
+            code,
+            zone,
+        )
+        return False
+    saved = await _save(
+        message,
+        chat_id,
+        code=code,
+        level=level,
+        # Пусто — зону подставит сам `_save` из единственной зоны пункта и
+        # скажет об этом оговоркой. Подставь её здесь — оговорка пропала бы, и
+        # аудитор не увидел бы, откуда взялось место в записи (#218).
+        zone=base.zone_hint,
+        text=base.note,
+        file_ids=base.file_ids,
+        source=base.source,
+        lang=lang,
+        words=base.note,
+        learned=learned.phrase,
+        zone_spoken=base.zone_spoken,
+        zone_from_cues=base.zone_from_cues,
+        zone_source=base.zone_source,
+        # Предложения здесь нет и быть не может: модель по этому материалу не
+        # звали вовсе. Записать предложением накопленный синоним значило бы
+        # утопить настоящие промахи модели в выборке управляющей компании —
+        # тот же довод, что у ручного перечня (D077).
+        suggested=None,
+        correcting=base.correcting,
+        origin=base.origin,
+    )
+    if saved is None:
+        return False
+    # Кнопка «Разобрать моделью» адресуется этой записи и требует предложения
+    # (`on_model`). Пункт в нём — тот же, что лёг: модель по материалу не
+    # звали, и разобрать его ею аудитор вправе ровно так же, как после сверки.
+    # Строка карты пуста намеренно: её тут не было, и выдуманная соврала бы.
+    pending.propose(
+        chat_id,
+        replace(
+            base,
+            fast=FastItem(
+                code=code,
+                level=level,
+                zone=zone,
+                title=domain.get_item(code, chat_id=chat_id).question(report_lang),
+                cue="",
+            ),
+        ),
+        at=getattr(saved, "message_id", None),
+    )
+    return True
+
+
 async def _correct_zone(message: Message, chat_id: int, base: Proposal, lang: str) -> bool:
     """Ответ назвал ТОЛЬКО зону — поправить зону записи, не трогая пункт (T231, D090).
 
@@ -780,6 +902,20 @@ async def _analyze_resolved(
             logger.info("быстрый путь не сработал в чате %s: %s", chat_id, found.reason)
             if found.reason == NO_CUE and await _correct_zone(message, chat_id, base, lang):
                 return
+            # Прямого совпадения с методикой не нашлось — спрашиваем карту
+            # синонимов (T285, решение D119). Порядок тут и есть всё решение:
+            # выученное работает ПОСЛЕ методики и ДО модели, то есть не
+            # подменяет собой сверку и не платит запросом к модели за то, что
+            # система уже знает. Ключ карты — язык РЕЧИ аудитора, а не
+            # интерфейса и не отчёта.
+            #
+            # Отказ базы сюда не долетает и долететь не может (`bot.phrases`):
+            # невыученное слово — не повод остановить обход точки.
+            запомненное = await asyncio.to_thread(_recall_words, chat_id, note=note)
+            if запомненное is not None and await _try_learned(
+                message, chat_id, base, pending, lang, report_lang, запомненное
+            ):
+                return
 
     bot = message.bot
     photo = (
@@ -897,6 +1033,29 @@ async def _analyze_frames(
         )
 
 
+def _recall_words(chat_id: int, *, note: str) -> Learned | None:
+    """Спросить карту синонимов о сказанном (T285, решение D119).
+
+    Отдельной функцией и в потоке — по той же причине, что и пополнение ниже:
+    язык речи читается из состояния проверки, карта из базы, и оба чтения
+    блокирующие.
+    """
+    return recall(note, lang=chat_speech_lang(chat_id), chat_id=chat_id)
+
+
+def _remember_words(chat_id: int, *, code: str, words: str) -> None:
+    """Сложить сказанное синонимом пункта (T285, решение D119).
+
+    Отдельной функцией, потому что зовётся из потока: язык речи читается из
+    состояния проверки, а карта — из базы, и оба чтения блокирующие.
+
+    Ни один отказ отсюда наружу не выходит (`bot.phrases`): запись аудитора к
+    этому времени уже сделана и показана, и «не сохранено» из-за невыученного
+    слова было бы неправдой о его работе.
+    """
+    learn(words, item_code=code, lang=chat_speech_lang(chat_id), chat_id=chat_id)
+
+
 async def _save(
     message: Message,
     chat_id: int,
@@ -910,6 +1069,7 @@ async def _save(
     lang: str,
     words: str = "",
     auto: FastItem | None = None,
+    learned: str = "",
     zone_spoken: bool = False,
     zone_from_cues: bool = False,
     zone_source: str = "",
@@ -947,6 +1107,13 @@ async def _save(
     сообщение и расшифровка голоса приходят сюда одной строкой (`Proposal.note`),
     и разделять их нечем — для разбора промаха важно то, на чём система приняла
     решение. Пусто — аудитор не сказал ничего (разбор голого кадра).
+
+    `learned` — формулировка, которой этот пункт уже называли, когда запись
+    поставила карта синонимов (T285, D119). Не пусто — значит, подтверждения не
+    было и строки карты кадров тоже не было: показ у такой записи свой
+    (`view.learned_block`), а кнопки те же, что у записи по словам, — выход к
+    модели под ней обязателен. Не пусто ещё и означает «в карту уже ложилось»:
+    второй строки сработавший синоним не заводит.
 
     `suggested` — что система предложила ДО нажатия (D077, T181). Передаётся
     здесь и только здесь: это единственный момент, когда предложение и запись
@@ -1100,9 +1267,41 @@ async def _save(
                 zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
-            reply_markup=(edit_keyboard if auto is None else fixed_keyboard)(finding.n, lang),
+            # Запись без подтверждения — и поправленная тем же путём — обязана
+            # держать выход к модели: код пункта правка в чате не меняет.
+            reply_markup=(edit_keyboard if auto is None and not learned else fixed_keyboard)(
+                finding.n, lang
+            ),
         )
-    elif auto is None:
+    elif auto is not None:
+        sent = await message.answer(
+            view.fixed_block(
+                shown,
+                lang,
+                title=auto.title,
+                cue=auto.cue,
+                chat_id=chat_id,
+                zone_from_cues=zone_from_cues,
+                zone_from_item=zone_from_item,
+            ),
+            reply_markup=fixed_keyboard(finding.n, lang),
+        )
+    elif learned:
+        # Пункт подняла карта синонимов (T285): строки карты кадров здесь не
+        # было, и показывать её нечем — блок свой, а кнопки те же, что у записи
+        # по словам.
+        sent = await message.answer(
+            view.learned_block(
+                shown,
+                lang,
+                title=refusal.item_title(shown.code, lang, chat_id=chat_id),
+                chat_id=chat_id,
+                zone_from_cues=zone_from_cues,
+                zone_from_item=zone_from_item,
+            ),
+            reply_markup=fixed_keyboard(finding.n, lang),
+        )
+    else:
         # Подтверждённая запись показывается не строкой, а блоком (T135): к
         # строке добавлены вопрос пункта словами и то, что уйдёт в отчёт
         # партнёру. Код в строке глазами не проверяется, а формулировка —
@@ -1118,19 +1317,6 @@ async def _save(
             ),
             reply_markup=edit_keyboard(finding.n, lang),
         )
-    else:
-        sent = await message.answer(
-            view.fixed_block(
-                shown,
-                lang,
-                title=auto.title,
-                cue=auto.cue,
-                chat_id=chat_id,
-                zone_from_cues=zone_from_cues,
-                zone_from_item=zone_from_item,
-            ),
-            reply_markup=fixed_keyboard(finding.n, lang),
-        )
     # Этим сообщением аудитор и правит запись — ответом на него (T204). Карта
     # ведётся здесь, а не в роутере правки: показ записи собирается в этом
     # месте, и любой другой был бы вторым списком мест, который однажды отстал
@@ -1140,6 +1326,23 @@ async def _save(
     # карты ведутся рядом по той же причине: запись показана здесь, и разнеси их
     # по разным местам — одна отстала бы от другой на один путь фиксации.
     remember_origin(chat_id, origin, finding.n)
+    if correcting is None and auto is None and not learned:
+        # Совпадение было НЕПРЯМЫМ: сверка со списком нарушений пункт не нашла,
+        # а человек его назвал — кнопкой кандидата или в ручном перечне. С D119
+        # сказанное складывается синонимом пункта и работает при следующем
+        # поиске; прямое совпадение (`auto`) и сработавший синоним (`learned`)
+        # второй строки не заводят.
+        #
+        # Правка (`correcting`) сюда не идёт намеренно: строку карты не
+        # переписывает никто (прав UPDATE у роли приложения нет, T284), и
+        # накопить по правке значило бы либо ничего не изменить, либо завести
+        # синоним рядом с уже неверным. Снятие неверной строки управляющей
+        # компанией заведено отдельной задачей (#255).
+        #
+        # Стоит ПОСЛЕ показа записи: поход в базу — это десятки миллисекунд, и
+        # платить ими за задержку ответа аудитору на точке незачем. Запись уже
+        # сделана и уже показана, а память — дело следующего разбора.
+        await asyncio.to_thread(_remember_words, chat_id, code=code, words=words)
     return sent
 
 
