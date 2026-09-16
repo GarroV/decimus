@@ -210,7 +210,9 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
 }
 
 
-def _выданные_права(dsn: str, роль: str) -> tuple[dict[str, set[str]], dict[str, dict[str, set[str]]]]:
+def _выданные_права(
+    dsn: str, роль: str
+) -> tuple[dict[str, set[str]], dict[str, dict[str, set[str]]]]:
     """Права роли в базе, разложенные на табличные и собственно колоночные.
 
     `information_schema.column_privileges` разворачивает право, выданное на
