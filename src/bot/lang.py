@@ -67,6 +67,24 @@ def chat_ui_lang(chat_id: int) -> str:
     return _lang(None if inspection is None else inspection.ui_lang)
 
 
+def chat_speech_lang(chat_id: int) -> str:
+    """Язык РЕЧИ аудитора этого чата (T285): третий язык, а не первые два.
+
+    Им ключуется карта синонимов формулировок (`inspections.speech_lang`, D119):
+    сказанное складывается в неё на том языке, на котором сказано, — не на
+    языке интерфейса, который аудитор читает, и не на языке отчёта, который
+    читает партнёр. Спутай их — и карта, накопленная на одном языке, молча
+    перестанет отвечать на другом.
+
+    Проверки нет — язык речи брать неоткуда, и умолчание здесь то же, что у
+    интерфейса: до начала проверки записывать всё равно нечего.
+    """
+    inspection = _state(chat_id)
+    if inspection is None:
+        return _lang(None)
+    return inspection.speech_lang
+
+
 def chat_langs(chat_id: int) -> tuple[str, str]:
     """Язык интерфейса и язык отчёта этого чата.
 

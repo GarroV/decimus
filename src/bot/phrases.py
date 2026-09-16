@@ -73,9 +73,7 @@ def _applicable(code: str, *, chat_id: int) -> bool:
     except DomainError:
         # Предупреждением, а не молчанием: код в карте есть, а в издании
         # проверки его нет — это и есть тот разбор, ради которого карта ведётся.
-        logger.warning(
-            "синоним ведёт к пункту «%s», которого в издании этой проверки нет", code
-        )
+        logger.warning("синоним ведёт к пункту «%s», которого в издании этой проверки нет", code)
         return False
     if item.kind != VIOLATION or code in MANUAL_ONLY:
         logger.info("пункт «%s» разбор не предлагает — синонимом он не работает", code)

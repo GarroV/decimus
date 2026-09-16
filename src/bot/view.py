@@ -355,6 +355,37 @@ def fixed_block(
     )
 
 
+def learned_block(
+    finding: domain.Finding,
+    lang: str,
+    *,
+    title: str,
+    chat_id: int,
+    zone_from_cues: bool = False,
+    zone_from_item: bool = False,
+) -> str:
+    """Запись, которую поставила карта синонимов формулировок (T285, D119).
+
+    Собран из тех же частей, что и запись по словам (`fixed_block`), и по той
+    же причине: подтверждения не было, а код глазами не читается — значит рядом
+    обязаны стоять вопрос пункта словами и то, что уйдёт в отчёт партнёру.
+
+    Отличие ровно одно и оно смысловое: строки карты кадров здесь нет. Пункт
+    подняла не произнесённая целиком строка карты, а накопленное прежде
+    сопоставление, и подписать второе первым значило бы соврать в том месте,
+    которым аудитор и проверяет выбор системы.
+    """
+    return t(
+        "record.learned",
+        lang,
+        stored=stored_headline(lang),
+        line=confirm_line(finding, lang, chat_id=chat_id),
+        guess=_zone_note(lang, zone_from_cues=zone_from_cues, zone_from_item=zone_from_item),
+        title=title,
+        note=shorten(finding.text, FAST_NOTE_LIMIT),
+    )
+
+
 def corrected_block(
     finding: domain.Finding,
     lang: str,
