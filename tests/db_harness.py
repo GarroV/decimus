@@ -16,8 +16,9 @@ from __future__ import annotations
 
 import os
 import uuid
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from conftest import BASE_DSN
@@ -101,3 +102,85 @@ def set_retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     dsn = admin_role_dsn(db_env)
     monkeypatch.setenv(RETRACTION_URL_VAR, dsn)
     return dsn
+
+
+#: Роли, которые заводит накат: приложение (`0004`) и администратор истории
+#: (`0010`). Список нужен переименованию ниже, и он же сторожит сам себя —
+#: роль, которой не нашлось ни в одном файле миграций, считается опечаткой и
+#: валит подготовку, а не тихо выключает проверку.
+MIGRATION_ROLES = ("dodo_audit_app", "dodo_audit_admin")
+
+
+@contextmanager
+def empty_database_with_unique_roles(
+    tmp_path: Path,
+) -> Iterator[tuple[str, Path, dict[str, str]]]:
+    """Пустая база и КОПИЯ каталога миграций, где роли переименованы в уникальные.
+
+    Зачем (задача #196). Роли в Postgres — объекты кластера, а не базы, и
+    миграции заводят их условно: `if not exists ... then create role`. На любой
+    машине, где прогон шёл хоть раз, роли уже есть, поэтому `create role` из
+    миграции больше НЕ ВЫПОЛНЯЕТСЯ — и правка этой строки на всесильную роль
+    тестом не ловится вовсе: проверено порчей, тесты остались зелёными. Ровно
+    так же не проверить и установку пароля: `alter role … password` действует
+    на весь кластер и однажды унесла стенды соседних копий (#128).
+
+    Уникальное имя снимает оба случая разом: роли с таким именем в кластере
+    нет, значит накат её создаёт по-настоящему, и тесту видны и сам `create
+    role`, и все выданные ей права. За собой роль убирается — после удаления
+    базы, иначе `drop role` упёрся бы в выданные в ней права.
+
+    Отдаёт: строку подключения, каталог с переименованными миграциями и карту
+    «настоящее имя роли → уникальное».
+    """
+    import uuid as _uuid
+
+    from src.db.migrate import MIGRATIONS_DIR
+
+    suffix = _uuid.uuid4().hex[:12]
+    names = {role: f"{role}_{suffix}" for role in MIGRATION_ROLES}
+    target = tmp_path / f"migrations_{suffix}"
+    target.mkdir()
+
+    hits = dict.fromkeys(MIGRATION_ROLES, 0)
+    for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        text = path.read_text(encoding="utf-8")
+        for role, unique in names.items():
+            hits[role] += text.count(role)
+            text = text.replace(role, unique)
+        (target / path.name).write_text(text, encoding="utf-8")
+
+    # Подстановка, не нашедшая ни одного вхождения, — это молчаливо выключенная
+    # проверка: миграции накатились бы на НАСТОЯЩИЕ роли, тест сверил бы
+    # состояние кластера и снова ничего не поймал. Роль переименовали в коде —
+    # переименовать и здесь, а не узнавать об этом через полгода.
+    missing = [role for role, count in hits.items() if count == 0]
+    if missing:
+        raise AssertionError(
+            f"в миграциях не найдено ни одного упоминания ролей {missing} — "
+            f"подстановка уникального имени не сработала бы, и накат пошёл бы "
+            f"на настоящие роли кластера; поправить MIGRATION_ROLES"
+        )
+
+    try:
+        with empty_database() as dsn:
+            yield dsn, target, names
+    finally:
+        _drop_roles(names.values())
+
+
+def _drop_roles(roles: Iterable[str]) -> None:
+    """Убрать за собой временные роли. Зовётся после удаления базы.
+
+    Порядок обязателен: пока база жива, у роли в ней есть выданные права и
+    построчные политики, и `drop role` отказывает «объекты зависят от роли».
+    После удаления базы зависимостей не остаётся.
+    """
+    import psycopg
+    from psycopg import sql
+    from psycopg.conninfo import make_conninfo
+
+    maintenance_dsn = make_conninfo(BASE_DSN, dbname="postgres")
+    with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
+        for role in roles:
+            conn.execute(sql.SQL("drop role if exists {}").format(sql.Identifier(role)))
