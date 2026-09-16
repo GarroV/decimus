@@ -911,9 +911,7 @@ async def _analyze_resolved(
             #
             # Отказ базы сюда не долетает и долететь не может (`bot.phrases`):
             # невыученное слово — не повод остановить обход точки.
-            запомненное = await asyncio.to_thread(
-                recall, note, lang=chat_speech_lang(chat_id), chat_id=chat_id
-            )
+            запомненное = await asyncio.to_thread(_recall_words, chat_id, note=note)
             if запомненное is not None and await _try_learned(
                 message, chat_id, base, pending, lang, report_lang, запомненное
             ):
@@ -1033,6 +1031,16 @@ async def _analyze_frames(
             pending=pending,
             batch=(no, total),
         )
+
+
+def _recall_words(chat_id: int, *, note: str) -> Learned | None:
+    """Спросить карту синонимов о сказанном (T285, решение D119).
+
+    Отдельной функцией и в потоке — по той же причине, что и пополнение ниже:
+    язык речи читается из состояния проверки, карта из базы, и оба чтения
+    блокирующие.
+    """
+    return recall(note, lang=chat_speech_lang(chat_id), chat_id=chat_id)
 
 
 def _remember_words(chat_id: int, *, code: str, words: str) -> None:
