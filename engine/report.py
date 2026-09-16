@@ -39,7 +39,7 @@ T = {
         "appendix": "Приложение. Информационные записи",
         "appendix_note": "Раздел носит справочный характер: перечисленные ниже записи "
                          "не являются нарушениями и не влияют на оценку.",
-        "recorded": "Зафиксировано", "item": "Пункт стандарта",
+        "recorded": "Зафиксировано",
         "method": "Методика расчёта", "zeroed": "обнулена критическим нарушением D3",
         "not_counted": "учтено в обнулении зоны", "page": "стр.",
         "method_text": ("Старт — 100%. Каждое нарушение D1 снижает результат на {d1} п.п., "
@@ -64,7 +64,7 @@ T = {
         "appendix": "Appendix. Informational records",
         "appendix_note": "This section is for reference only: the records below are not "
                          "violations and do not affect the score.",
-        "recorded": "Recorded", "item": "Standard item",
+        "recorded": "Recorded",
         "method": "Scoring method", "zeroed": "zeroed by a critical D3 violation",
         "not_counted": "covered by the zone reset", "page": "p.",
         "method_text": ("Starting score is 100%. Each D1 violation deducts {d1} pp, each D2 "
@@ -178,6 +178,18 @@ def clean_q(text):
     return t.strip()
 
 
+def item_title(f, qk):
+    """Название пункта стандарта на языке ПЕЧАТИ, без служебной пометки класса.
+
+    Формулировка пункта — данные методики, и они двуязычные: перевод здесь
+    законный, в отличие от слов аудитора, которые не переводятся никогда.
+    Заголовок нарушения в отчёте, строка приложения и ссылка на пункт в письме
+    обязаны называть пункт одинаково — иначе три копии одного правила
+    разъедутся на первой же правке (T234).
+    """
+    return clean_q(f.get(qk) or f.get("question_ru"))
+
+
 def recorded_text(f, qk):
     """Формулировка записи для печати партнёру — без служебной пометки класса (D115).
 
@@ -196,12 +208,17 @@ def recorded_text(f, qk):
     аудитора регулярным выражением. Списка классов для различения не нужно,
     сравнивается строка методики со строкой методики — как в T217.
 
-    Пустая формулировка, как и прежде, подменяется вопросом пункта: это не
-    подмена слов, а единственное, что о записи вообще известно.
+    **Слов нет — и текста нет** (T248). Пустая формулировка подменялась здесь
+    формулировкой ПУНКТА, да ещё на языке печати: вопросы методики написаны как
+    утверждение нормы, и у отклонения оказывался текст, читающийся как «всё в
+    порядке». В отчёте это не всплывало (строка `Зафиксировано:` печатается
+    только при непустой формулировке), а письмо на тех же данных выдавало пункт
+    за находку. Кто печатает пустую запись, решает теперь место печати: отчёт
+    строки не печатает вовсе, письмо называет пункт пунктом (`letter_text`).
     """
     text = str(f.get("evidence") or "").strip()
     if not text:
-        return clean_q(f.get(qk) or f.get("question_ru"))
+        return ""
     if any(text == str(f.get(k) or "").strip() for k in ("question_ru", "question_en")):
         return clean_q(text)
     return text
@@ -373,10 +390,13 @@ def build_html(res, lang, photos, src=None):
             nc = "" if f["counted"] or f["level"] == "D3" else f' · {t["not_counted"]}'
             h.append('<div class="f">')
             h.append(f'<div class="h"><span class="badge {f["level"]}">{f["level"]}</span> '
-                     f'{esc(clean_q(f.get(qk) or f.get("question_ru")))}</div>')
-            if f.get("evidence"):
-                h.append(f'<div class="c"><b>{esc(t["recorded"])}:</b> '
-                         f'{esc(recorded_text(f, qk))}</div>')
+                     f'{esc(item_title(f, qk))}</div>')
+            # Условие стоит на самом печатаемом тексте, а не на наличии поля:
+            # формулировка из одних пробелов проходила проверку «запись есть» и
+            # печаталась подставленным вопросом пункта (T248).
+            записано = recorded_text(f, qk)
+            if записано:
+                h.append(f'<div class="c"><b>{esc(t["recorded"])}:</b> {esc(записано)}</div>')
             if f.get("comment"):
                 h.append(f'<div class="c">{esc(t["comment"])}: {esc(f["comment"])}</div>')
             h.append(f'<div class="m">{esc(t["process"])}: {esc(f.get(pk) or "")}{esc(nc)}'
@@ -419,9 +439,10 @@ def build_html(res, lang, photos, src=None):
         for f in sorted(notes, key=lambda x: x["n"]):
             if True:
                 h.append('<div class="f">')
-                h.append(f'<div class="h">{esc(clean_q(f.get(qk) or f.get("question_ru")))}</div>')
-                if f.get("evidence"):
-                    h.append(f'<div class="c">{esc(recorded_text(f, qk))}</div>')
+                h.append(f'<div class="h">{esc(item_title(f, qk))}</div>')
+                записано = recorded_text(f, qk)
+                if записано:
+                    h.append(f'<div class="c">{esc(записано)}</div>')
                 if f.get("comment"):
                     h.append(f'<div class="c">{esc(t["comment"])}: {esc(f["comment"])}</div>')
                 h.extend(shots_html(f, t, src))
@@ -615,6 +636,33 @@ GRADE_NOTE = {
 }
 
 
+#: Как письмо ссылается на пункт стандарта, когда слов аудитора нет (T248).
+#: Кавычки у каждого языка свои, поэтому шаблон целиком, а не слово плюс
+#: сборка. Слово здесь одно на весь продукт: подпись `item` в словаре `T`
+#: («Пункт стандарта») не использовалась ни разу и снята — две копии одной
+#: формулировки разъехались бы при первой правке.
+#:
+#: Того, что формулировки нет, письмо партнёру не объявляет: в отчёте её
+#: отсутствие тоже видно только отсутствием строки, а отправителю об этом
+#: говорит слой MCP (`BLANK_TEXT_FIELD`) — до отправки и внутри компании.
+ITEM_REF = {"ru": "пункт стандарта «{q}»", "en": "standard item “{q}”"}
+
+
+def letter_text(f, qk, lang):
+    """Строка записи в письме: слова аудитора, а нет их — ссылка на пункт стандарта.
+
+    Письмо перечисляет находки одной строкой на зону, без класса и без
+    структуры отчёта, поэтому формулировка пункта, поставленная сюда без
+    оговорки, читается как утверждение о состоянии дел («Замороженные продукты
+    размораживаются в соответствии со стандартом») — то есть как «всё в
+    порядке» на месте нарушения. Названный пунктом, тот же текст читается тем,
+    чем он является: пунктом стандарта, по которому есть отклонение. Отчёт на
+    этих же данных печатает ровно столько же — пункт в заголовке нарушения и
+    ни строки записи.
+    """
+    return recorded_text(f, qk) or ITEM_REF[lang].format(q=item_title(f, qk))
+
+
 def summary_lines(res, lang, clean):
     """Сводка нарушений. При чистой проверке перечисляем зоны с D1, а не D2/D3."""
     c = res["counts"]
@@ -635,7 +683,7 @@ def summary_lines(res, lang, clean):
         if f["level"] in shown:
             by_zone.setdefault(f[zk], []).append(f)
     for z, lst in by_zone.items():
-        names = "; ".join(recorded_text(x, qk) for x in lst[:3])
+        names = "; ".join(letter_text(x, qk, lang) for x in lst[:3])
         lines.append(f"— {z}: {names}" + (" …" if len(lst) > 3 else ""))
     return "\n".join(lines)
 
@@ -700,7 +748,7 @@ def build_letter(res, lang):
     crit = ""
     d3 = [f for f in res["findings"] if f["level"] == "D3"]
     if d3:
-        names = "; ".join(recorded_text(f, qk) + f" — {f[zk]}" for f in d3)
+        names = "; ".join(letter_text(f, qk, lang) + f" — {f[zk]}" for f in d3)
         if lang == "en":
             crit = ("\nCritical (D3): " + names + ". Per our methodology a D3 violation zeroes "
                     "the whole zone where it was found.\n\n")
