@@ -172,7 +172,11 @@ def build_dispatcher(
     store = MaterialStore()
     pending = PendingStore()
 
-    dispatcher.include_router(build_start_router(settings, pending))
+    # Мастер получает оба хранилища в памяти (`pending`, `store`) не ради
+    # работы, а ради забывания: начатая проверка обязана начинаться с чистого
+    # листа — иначе кнопка прошлой проверки выстрелит в новую (T206), а кадр
+    # новой заберёт придержанные слова старой (T249).
+    dispatcher.include_router(build_start_router(settings, pending, store))
     dispatcher.include_router(build_edit_router())
     # Показ записанного и завершение получают ту же очередь ожидания, из которой
     # собираются записи (T241): при завершении называются не только кадры без
