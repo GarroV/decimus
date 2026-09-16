@@ -479,18 +479,22 @@ docker compose build bot mcp state-backup
 **Прогон руками** (на своей машине — `make state-backup`):
 
 ```powershell
-docker compose run --rm state-backup
+docker compose run --rm -T state-backup
 ```
+
+`-T` означает «без терминала». Задача по расписанию терминала не имеет, и
+команда у неё обязана быть той же самой, что прогоняют руками, — иначе «у меня
+работает» и «ночью не пошло» разойдутся именно на этой мелочи.
 
 **По расписанию — шаги для площадки, здесь НЕ ВЫПОЛНЯЛИСЬ.** Заводится задача
 рядом с «PG Docker Backup», временем позже неё, чтобы два тяжёлых обхода не
 шли разом:
 
 ```powershell
-$действие = New-ScheduledTaskAction -Execute "docker" `
-    -Argument "compose run --rm state-backup" -WorkingDirectory "C:\projects\decimus"
-$когда = New-ScheduledTaskTrigger -Daily -At 03:50
-Register-ScheduledTask -TaskName "Decimus State Backup" -Action $действие -Trigger $когда
+$action = New-ScheduledTaskAction -Execute "docker" `
+    -Argument "compose run --rm -T state-backup" -WorkingDirectory "C:\projects\decimus"
+$trigger = New-ScheduledTaskTrigger -Daily -At 03:50
+Register-ScheduledTask -TaskName "Decimus State Backup" -Action $action -Trigger $trigger
 ```
 
 Помнить про сон машины: у площадки выключены таймеры пробуждения, и задача,
