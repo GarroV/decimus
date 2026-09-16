@@ -9,13 +9,16 @@
 ```bash
 docker compose up -d                   # поднимает бота
 docker compose --profile demo up -d    # он же плюс демо-стенд (T102)
+docker compose --profile funnel up -d  # он же плюс звено до сервера (#216)
+docker compose run --rm -T state-backup  # выгрузить состояние в бэкап (#233)
 tools/demo_refresh.sh                  # подтянуть main и пересеять демо
 make regress                           # прогон движка на эталонных данных
 make demo                              # демо-набор на английском
 ```
 
 Переменные: `TELEGRAM_BOT_TOKEN`, `OPENAI_API_KEY`, `AUDIT_DATA_DIR`,
-`ALLOWED_TELEGRAM_IDS`, `STATE_DIR`, `BOT_MODE` (`polling` | `webhook`), `TZ`.
+`ALLOWED_TELEGRAM_IDS`, `STATE_DIR`, `BOT_MODE` (`polling` | `webhook`), `TZ`,
+`BACKUP_DIR`, `BACKUP_KEEP_DAYS` (выгрузка состояния, #233).
 
 Демо-стенд (T102, решение D059) берёт их из **того же** `.env` тем же
 механизмом. Своё у него только то, что обязано отличаться:
