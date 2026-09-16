@@ -178,6 +178,35 @@ def clean_q(text):
     return t.strip()
 
 
+def recorded_text(f, qk):
+    """Формулировка записи для печати партнёру — без служебной пометки класса (D115).
+
+    Ручной выбор пункта по кадру БЕЗ комментария кладёт в запись вопрос пункта
+    целиком (`src/bot/routers/record.py`: `text=proposal.note.strip() or
+    item.title`), а управляющая компания ставит классы в начало самой
+    формулировки: `(D1, D2) Заготовка размечена ярлыком образца А`. Пометка
+    внутренняя — она говорит, какими классами пункт вообще можно нарушить, — и
+    партнёру не адресована. С кнопки её сняли раньше (T217), и до этой правки
+    отчёт на тех же данных расходился с кнопкой.
+
+    **Снимается она только с вопроса методики, не со слов аудитора.** Условие —
+    формулировка записи совпадает со строкой методики (на любом из двух языков:
+    записывают на языке проверки, а печатать могут на другом). Не совпала —
+    значит её писал человек, и скобка в ней его: продукт не правит слова
+    аудитора регулярным выражением. Списка классов для различения не нужно,
+    сравнивается строка методики со строкой методики — как в T217.
+
+    Пустая формулировка, как и прежде, подменяется вопросом пункта: это не
+    подмена слов, а единственное, что о записи вообще известно.
+    """
+    text = str(f.get("evidence") or "").strip()
+    if not text:
+        return clean_q(f.get(qk) or f.get("question_ru"))
+    if any(text == str(f.get(k) or "").strip() for k in ("question_ru", "question_en")):
+        return clean_q(text)
+    return text
+
+
 def esc(s):
     return (str(s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
@@ -346,7 +375,8 @@ def build_html(res, lang, photos, src=None):
             h.append(f'<div class="h"><span class="badge {f["level"]}">{f["level"]}</span> '
                      f'{esc(clean_q(f.get(qk) or f.get("question_ru")))}</div>')
             if f.get("evidence"):
-                h.append(f'<div class="c"><b>{esc(t["recorded"])}:</b> {esc(f["evidence"])}</div>')
+                h.append(f'<div class="c"><b>{esc(t["recorded"])}:</b> '
+                         f'{esc(recorded_text(f, qk))}</div>')
             if f.get("comment"):
                 h.append(f'<div class="c">{esc(t["comment"])}: {esc(f["comment"])}</div>')
             h.append(f'<div class="m">{esc(t["process"])}: {esc(f.get(pk) or "")}{esc(nc)}'
@@ -391,7 +421,7 @@ def build_html(res, lang, photos, src=None):
                 h.append('<div class="f">')
                 h.append(f'<div class="h">{esc(clean_q(f.get(qk) or f.get("question_ru")))}</div>')
                 if f.get("evidence"):
-                    h.append(f'<div class="c">{esc(f["evidence"])}</div>')
+                    h.append(f'<div class="c">{esc(recorded_text(f, qk))}</div>')
                 if f.get("comment"):
                     h.append(f'<div class="c">{esc(t["comment"])}: {esc(f["comment"])}</div>')
                 h.extend(shots_html(f, t, src))
@@ -605,8 +635,7 @@ def summary_lines(res, lang, clean):
         if f["level"] in shown:
             by_zone.setdefault(f[zk], []).append(f)
     for z, lst in by_zone.items():
-        names = "; ".join(x.get("evidence") or clean_q(x.get(qk) or x["question_ru"])
-                          for x in lst[:3])
+        names = "; ".join(recorded_text(x, qk) for x in lst[:3])
         lines.append(f"— {z}: {names}" + (" …" if len(lst) > 3 else ""))
     return "\n".join(lines)
 
@@ -671,8 +700,7 @@ def build_letter(res, lang):
     crit = ""
     d3 = [f for f in res["findings"] if f["level"] == "D3"]
     if d3:
-        names = "; ".join((f.get("evidence") or clean_q(f.get(qk) or f["question_ru"]))
-                          + f" — {f[zk]}" for f in d3)
+        names = "; ".join(recorded_text(f, qk) + f" — {f[zk]}" for f in d3)
         if lang == "en":
             crit = ("\nCritical (D3): " + names + ". Per our methodology a D3 violation zeroes "
                     "the whole zone where it was found.\n\n")
