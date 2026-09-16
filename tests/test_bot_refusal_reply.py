@@ -163,12 +163,23 @@ async def test_сторонний_кадр_после_ответа_на_отка
 async def test_отказ_при_правке_кнопкой_тоже_правится_ответом(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Дверь другая — правило то же: отказ назвал запись, значит говорит о ней."""
+    """Дверь другая — правило то же: отказ назвал запись, значит говорит о ней.
+
+    Занятая пара и вторая запись собраны здесь напрямую, а не через
+    `сцена()`/`занять_пару()`: методика держит CLN05 только за `hot_kitchen`, и
+    второй записи того же пункта в другой зоне для него не бывает (T271
+    отклоняет пару, которой методика не даёт). CLN06 держит несколько зон,
+    поэтому вторая запись и правка в занятую зону возможны, а слова ответа
+    распознаются в CLN02/dishwashing независимо от того, каким пункт был у
+    записи #1 до правки.
+    """
     stub_classify(monkeypatch, suggestion())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
-    await сцена(dp, bot)
-    domain.add_finding(CHAT_ID, "CLN05", "D1", "dining", "нагар и здесь")
+    начата()
+    domain.add_finding(CHAT_ID, "CLN06", "D1", "hot_kitchen", "нагар на подине печи")
+    await feed(dp, bot, photo_message(СТОРОННИЙ_КАДР))
+    domain.add_finding(CHAT_ID, "CLN06", "D1", "dining", "нагар и здесь")
 
     await feed(dp, bot, callback("ez:2:hot_kitchen"))
     отказ = номер_сообщения(session, "Не поправил")
@@ -176,7 +187,7 @@ async def test_отказ_при_правке_кнопкой_тоже_прави
 
     assert [(f.n, f.code, f.zone) for f in записи()] == [
         (1, "CLN02", "dishwashing"),
-        (2, "CLN05", "dining"),
+        (2, "CLN06", "dining"),
     ], "ответ на отказ правки не поправил названную запись"
     assert СТОРОННИЙ_КАДР not in кадры()
 

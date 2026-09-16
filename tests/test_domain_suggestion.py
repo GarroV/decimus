@@ -131,17 +131,20 @@ def test_правка_зоны_не_трогает_предложение(domain
     """Главный случай задачи: аудитор поправил — расхождение стало видно.
 
     Предложение обязано остаться прежним: именно разница между ним и итоговой
-    записью и есть сигнал для пополнения списка терминов.
+    записью и есть сигнал для пополнения списка терминов. Код взят CLN06, а не
+    CLN05: методика держит CLN06 и в `hot_kitchen`, и в `dining` (T271
+    отклоняет пару, которой методика не даёт), а правка обязана увести запись
+    в другую валидную зону.
     """
     начата()
     add_finding(
         CHAT,
-        "CLN05",
+        "CLN06",
         "D1",
         "hot_kitchen",
         "нагар",
         source=SOURCE_COMMENT,
-        suggested=Suggestion(code="CLN05", level="D1", zone="hot_kitchen", confidence=0.8),
+        suggested=Suggestion(code="CLN06", level="D1", zone="hot_kitchen", confidence=0.8),
     )
     edit_finding(CHAT, 1, zone="dining")
 

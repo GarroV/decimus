@@ -159,10 +159,16 @@ async def test_отказ_не_заканчивается_тупиком(domain_
 
 
 async def test_правка_в_занятую_зону_отвечает_по_человечески(domain_env: Path) -> None:
-    """Смена зоны — самый частый способ упереться в занятую пару при правке."""
+    """Смена зоны — самый частый способ упереться в занятую пару при правке.
+
+    Пункт взят CLN06, а не CLN05 из `занять_пару()`: методика держит CLN05
+    только за `hot_kitchen`, а тесту нужна вторая запись того же пункта в
+    ДРУГОЙ допустимой зоне (T271 отклоняет пару, которой методика не даёт).
+    CLN06 держит и `hot_kitchen`, и `dining`.
+    """
     начата()
-    занять_пару()
-    domain.add_finding(CHAT_ID, "CLN05", "D1", "dining", "нагар и здесь")
+    domain.add_finding(CHAT_ID, "CLN06", "D1", "hot_kitchen", "нагар на подине печи")
+    domain.add_finding(CHAT_ID, "CLN06", "D1", "dining", "нагар и здесь")
     bot, session = make_bot()
 
     await feed(build_dispatcher(SETTINGS), bot, callback("ez:2:hot_kitchen"))
@@ -171,7 +177,7 @@ async def test_правка_в_занятую_зону_отвечает_по_ч�
         "edit.duplicate",
         "ru",
         n=1,
-        item=domain.get_item("CLN05").question("ru"),
+        item=domain.get_item("CLN06").question("ru"),
         zone=zone_title("hot_kitchen", "ru", chat_id=CHAT_ID),
     )
     assert "audit.py" not in session.last_text

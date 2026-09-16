@@ -56,13 +56,20 @@ def findings() -> list[Finding]:
 async def test_подтверждение_записи_по_кадру_без_процента(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Запись сделана — строка о ней есть, процента в ней нет."""
+    """Запись сделана — строка о ней есть, процента в ней нет.
+
+    Кадр без подписи и кнопка «Разобрать»: слов нет, поэтому до сохранения
+    доходит подтверждение кандидата моделью, а не сверка по карте кадров.
+    Подпись со словами карты (T262/T264 читают зону из карты кадров) уводила
+    бы запись сразу, минуя предложение, и тест проверял бы уже не то нажатие.
+    """
     started()
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная в нагаре"))
+    await feed(dp, bot, photo_message("frame-1", message_id=501))
+    await feed(dp, bot, callback("rec:analyze:501"))
     session.clear()
     await feed(dp, bot, callback("rec:pick:0"))
 
@@ -89,13 +96,21 @@ async def test_фиксация_словами_без_процента(
 async def test_правка_записи_без_процента(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """После правки процент пересчитывается движком, но аудитору не показывается."""
+    """После правки процент пересчитывается движком, но аудитору не показывается.
+
+    Кадр без подписи и кнопка «Разобрать» — по той же причине, что в тесте
+    выше: подпись со словами карты сохранила бы запись сразу, минуя
+    предложение. Код взят CLN06, а не CLN05: методика держит CLN06 и в
+    `hot_kitchen`, и в `dining` (T271 отклоняет пару, которой методика не
+    даёт), а правка обязана увести запись в другую валидную зону.
+    """
     started()
-    stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре")))
+    stub_classify(monkeypatch, suggestion(candidate("CLN06", "D1", "hot_kitchen", "Печь в нагаре")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption="печь грязная в нагаре"))
+    await feed(dp, bot, photo_message("frame-1", message_id=501))
+    await feed(dp, bot, callback("rec:analyze:501"))
     await feed(dp, bot, callback("rec:pick:0"))
     session.clear()
     await feed(dp, bot, callback("ez:1:dining"))
