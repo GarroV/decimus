@@ -16,6 +16,7 @@ import asyncio
 import logging
 
 from aiogram import F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
@@ -265,7 +266,7 @@ def build_start_router(
             store.forget(chat_id)
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
-    @router.message(StateFilter(StartFlow.waiting_unit), F.text)
+    @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))
     async def on_unit(message: Message, state: FSMContext) -> None:
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
@@ -286,9 +287,42 @@ def build_start_router(
         await state.set_state(StartFlow.waiting_kind)
         await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
-    @router.message(StateFilter(StartFlow.waiting_unit))
+    @router.message(StateFilter(StartFlow.waiting_unit), F.text, F.text.startswith("/"))
+    async def on_unit_command(message: Message) -> None:
+        """Команда вместо названия точки (T250, issue #203).
+
+        Роутер `start` стоит в диспетчере первым, и до этой задачи команда,
+        набранная или выбранная в меню на шаге названия, до своего обработчика
+        не доходила — она становилась названием пиццерии и уезжала в шапку
+        отчёта и в имя файла. Поводов попасть сюда прибавилось с пунктом
+        «Установка MCP» (T209): это разовая настройка, её нажимают в
+        произвольный момент, в том числе не дочитав вопрос мастера.
+
+        Команда выполняется, а мастер остаётся ждать название. Порядок роутеров
+        при этом не трогается — он в этом блоке несущий, — потому что сообщение
+        пропускается дальше отсюда (`SkipHandler`). Тем же приёмом и по той же
+        причине живёт вопрос о новой формулировке (`routers/edit.py`).
+
+        `/start` сюда не попадает: он зарегистрирован в этом же роутере выше и
+        обязан работать всегда — это единственный выход из тупика.
+
+        Строка в чат — не вежливость. Своего ответа у незнакомой команды нет
+        вовсе, а у знакомой он придёт следом и вытеснит вопрос мастера с
+        экрана: аудитор прочитает ответ команды и решит, что название принято.
+        """
+        await message.answer(t("start.unit_command", chat_ui_lang(message.chat.id)))
+        raise SkipHandler
+
+    @router.message(StateFilter(StartFlow.waiting_unit), ~F.text)
     async def on_unit_not_text(message: Message) -> None:
-        """Кадр или голос вместо названия: сказать, чего ждём, а не молчать."""
+        """Кадр или голос вместо названия: сказать, чего ждём, а не молчать.
+
+        Фильтр `~F.text` обязателен, и это не украшение подписи (T250):
+        `SkipHandler` продолжает поиск с ОСТАВШИХСЯ обработчиков того же
+        роутера, а не со следующего. Будь этот перехватчиком всего подряд, он
+        поймал бы пропущенную команду здесь же — и она никуда бы не уехала, а
+        аудитор получил бы «жду название» вместо ответа команды.
+        """
         await message.answer(t("start.unit_expected", chat_ui_lang(message.chat.id)))
 
     @router.callback_query(StateFilter(StartFlow.waiting_kind), F.data.startswith(KIND_PREFIX))
