@@ -22,6 +22,7 @@ from typing import Any
 
 import pytest
 from bot_harness import CHAT_ID
+from conftest import requires_db
 
 from src.bot.phrases import learn, recall
 from src.db import synonyms
@@ -277,3 +278,27 @@ def test_отказ_записи_проверку_не_роняет(
     with caplog.at_level(logging.WARNING):
         assert learn(СЛОВА, item_code=ПУНКТ, lang=ЯЗЫК, chat_id=CHAT_ID) == ""
     assert caplog.records, "отказ карты проглочен молча"
+
+
+# --- настоящая база ------------------------------------------------------------
+
+
+@requires_db
+def test_карта_помнит_сказанное_между_разборами(domain_env: Path, db_env: str) -> None:
+    """Единственный тест файла с НАСТОЯЩИМ Postgres — и он про само обещание D119.
+
+    Всё остальное здесь проверяется заглушками, и без этого теста сходилось бы
+    только то, как блок зовёт слой. А обещано другое: сказанное однажды
+    поднимается ВТОРЫМ разбором. Поэтому вопрос задаётся не той строкой, какой
+    ответ клался: другой регистр, лишние пробелы, точка в конце и язык, набранный
+    заглавными. Разойдись правило ключа у записи и у поиска хоть на знак — карта
+    перестала бы работать молча и только на части написаний.
+    """
+    начата()
+
+    assert learn(СЛОВА, item_code=ПУНКТ, lang=ЯЗЫК, chat_id=CHAT_ID) == REMEMBERED
+
+    поднято = recall(f"  {СЛОВА.upper()}.  ", lang=ЯЗЫК.upper(), chat_id=CHAT_ID)
+    assert поднято is not None and поднято.code == ПУНКТ
+    assert поднято.phrase == СЛОВА, "аудитору показали бы не то, что он сказал"
+    assert learn(СЛОВА, item_code=ПУНКТ, lang=ЯЗЫК, chat_id=CHAT_ID) == ALREADY_KNOWN
