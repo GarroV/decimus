@@ -16,6 +16,7 @@ from .errors import (
     PushError,
     RetractionError,
     StorageError,
+    SynonymError,
     VersionMismatchError,
 )
 from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
@@ -46,8 +47,24 @@ if TYPE_CHECKING:
     from .queries import list_inspections as list_inspections
     from .retract import Retraction as Retraction
     from .retract import retract_inspection as retract_inspection
+    from .synonyms import ALREADY_KNOWN as ALREADY_KNOWN
+    from .synonyms import CONFLICT as CONFLICT
+    from .synonyms import LEARNED as LEARNED
+    from .synonyms import MANUAL as MANUAL
+    from .synonyms import REMEMBERED as REMEMBERED
+    from .synonyms import PhraseAlias as PhraseAlias
+    from .synonyms import PhraseMemory as PhraseMemory
+    from .synonyms import list_phrases as list_phrases
+    from .synonyms import lookup_phrase as lookup_phrase
+    from .synonyms import normalize_phrase as normalize_phrase
+    from .synonyms import remember_phrase as remember_phrase
 
 __all__ = [
+    "ALREADY_KNOWN",
+    "CONFLICT",
+    "LEARNED",
+    "MANUAL",
+    "REMEMBERED",
     "AccessError",
     "ConfigError",
     "DbError",
@@ -55,17 +72,24 @@ __all__ = [
     "InfoRow",
     "InspectionDetail",
     "InspectionRow",
+    "PhraseAlias",
+    "PhraseMemory",
     "PushError",
     "Retraction",
     "RetractionError",
     "StorageError",
+    "SynonymError",
     "Unit",
     "VersionMismatchError",
     "findings_by_unit",
     "get_inspection",
     "list_inspections",
+    "list_phrases",
     "list_units",
+    "lookup_phrase",
+    "normalize_phrase",
     "push_inspection",
+    "remember_phrase",
     "resolve_unit",
     "retract_inspection",
     "upload_photos",
@@ -84,6 +108,21 @@ _LAZY = {
     "findings_by_unit": (".queries", "findings_by_unit"),
     "retract_inspection": (".retract", "retract_inspection"),
     "Retraction": (".retract", "Retraction"),
+    # Карта синонимов формулировок (T284, D119). Коды исхода и происхождения
+    # выведены сюда вместе с функциями намеренно: без них вызывающий сравнивал
+    # бы исход со строковым литералом, то есть с опечаткой, которую ничто
+    # не ловит.
+    "lookup_phrase": (".synonyms", "lookup_phrase"),
+    "remember_phrase": (".synonyms", "remember_phrase"),
+    "list_phrases": (".synonyms", "list_phrases"),
+    "normalize_phrase": (".synonyms", "normalize_phrase"),
+    "PhraseAlias": (".synonyms", "PhraseAlias"),
+    "PhraseMemory": (".synonyms", "PhraseMemory"),
+    "REMEMBERED": (".synonyms", "REMEMBERED"),
+    "ALREADY_KNOWN": (".synonyms", "ALREADY_KNOWN"),
+    "CONFLICT": (".synonyms", "CONFLICT"),
+    "LEARNED": (".synonyms", "LEARNED"),
+    "MANUAL": (".synonyms", "MANUAL"),
 }
 
 
