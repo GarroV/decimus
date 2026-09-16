@@ -3,9 +3,9 @@
 Контракт блока: «блок деградирует: при недоступной модели бот предлагает
 выбрать пункт кнопками вручную». `manual_candidates` — то, чем блок это
 исполняет: без сети, без ранжирования по словам комментария (комментарий тут
-взять неоткуда — модель как раз недоступна), с теми же зональными границами,
-что и у запроса к модели, и с пунктами `MGM22`/`MGM23`, которые модели не
-показывают никогда.
+взять неоткуда — модель как раз недоступна), с пунктами `MGM22`/`MGM23`,
+которые модели не показывают никогда, и с ПОЛНОЙ базой перечня: зона его
+упорядочивает, но не режет (T265, #218).
 """
 
 from __future__ import annotations
@@ -18,12 +18,24 @@ from src.recognize.manual import manual_candidates
 from src.recognize.shortlist import MANUAL_ONLY
 
 
-def test_перечень_зоны_это_база_и_она_полная(domain_env: Path) -> None:
+def test_база_перечня_это_весь_чек_лист_а_зона_его_упорядочивает(domain_env: Path) -> None:
+    """Зона задаёт порядок перечня и не задаёт его состав (T265, #218).
+
+    До задачи базой был перечень одной зоны, и пункт чужой зоны исчезал из
+    кнопок вовсе: последний рубеж выбора отказывал ровно в том случае, ради
+    которого он и существует. Поэтому проверяется и полнота базы, и порядок —
+    пункты названной зоны идут первыми.
+    """
+    все = {i.code for i in list_items() if i.kind == "violation"}
     зональные = {i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"}
 
-    итог = manual_candidates("hot_kitchen", chat_id=NO_CHAT)
+    итог = [c.code for c in manual_candidates("hot_kitchen", chat_id=NO_CHAT)]
 
-    assert {c.code for c in итог} == зональные
+    assert set(итог) == все, "перечень обрезан зоной"
+    свои = [место for место, code in enumerate(итог) if code in зональные]
+    чужие = [место for место, code in enumerate(итог) if code not in зональные]
+    assert свои and чужие, "предпосылка теста: в чек-листе есть пункты обеих половин"
+    assert max(свои) < min(чужие), "пункты названной зоны обязаны идти первыми"
 
 
 def test_ручные_пункты_аудитора_доступны(domain_env: Path) -> None:
@@ -58,12 +70,18 @@ def test_каждый_пункт_несёт_допустимые_классы_и
 
 def test_порядок_как_в_чек_листе_а_не_по_словам(domain_env: Path) -> None:
     # Без слов аудитора карте кадров нечего поднимать наверх — вызов
-    # `shortlist("", ...)` внутри не находит подсказок, порядок — базовый
-    зональные_коды = [i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"]
+    # `shortlist("", ...)` внутри не находит подсказок. Порядок задаёт одна
+    # только зона: свои пункты вперёд, и внутри каждой половины сохраняется
+    # порядок чек-листа (сортировка устойчива, T265).
+    нарушения = [i.code for i in list_items() if i.kind == "violation"]
+    зональные = {i.code for i in list_items(zone="hot_kitchen") if i.kind == "violation"}
+    ожидание = [c for c in нарушения if c in зональные] + [
+        c for c in нарушения if c not in зональные
+    ]
 
     итог = manual_candidates("hot_kitchen", chat_id=NO_CHAT)
 
-    assert [c.code for c in итог] == зональные_коды
+    assert [c.code for c in итог] == ожидание
 
 
 def test_язык_по_умолчанию_русский(domain_env: Path) -> None:
