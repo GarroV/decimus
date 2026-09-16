@@ -61,7 +61,7 @@ from src.recognize.language import column_words as builtin_column_words
 ROOT = Path(__file__).resolve().parent.parent
 DEMO_DATA = ROOT / "demo" / "data"
 
-#: Языки продукта: русский и английский с первой версии (`docs/forge/spec.md`,
+#: Языки продукта: русский и английский с первой версии (`docs/furca/spec.md`,
 #: скилл `product-i18n`). Третий добавляется словарём, и это проверяется ниже.
 ЯЗЫКИ_ПРОДУКТА = ("ru", "en")
 

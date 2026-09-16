@@ -8,7 +8,7 @@
 неизвестная зона).
 
 T064 — отдельный случай этого же `classify()`: комментарий пуст, кадр есть.
-Отдельной функции для него нет: контракт `docs/forge/plan.md` даёт один вход
+Отдельной функции для него нет: контракт `docs/furca/plan.md` даёт один вход
 `classify(note, photo, zone_hint)`, кнопку «Разобрать» дожимает бот (T067) —
 без нажатия он этот вызов просто не делает. Здесь проверяется то, что
 происходит ПОСЛЕ решения бота позвать модель: кадр обязан уйти в запрос, а
@@ -249,7 +249,7 @@ def test_вопрос_модели_поднимает_needs_human_даже_с_к
 def test_низкая_уверенность_поднимает_needs_human(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange: порог 0.6 по умолчанию (docs/forge/research/recognize-probe.md — 0.55 у промаха)
+    # Arrange: порог 0.6 по умолчанию (docs/furca/research/recognize-probe.md — 0.55 у промаха)
     recorder = _Recorder(
         {
             "records": [

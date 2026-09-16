@@ -1,7 +1,7 @@
 """Типы, которыми блок `db` разговаривает наружу.
 
 `InspectionRow` — сводка одной проверки для списка (контракт
-`list_inspections` в `docs/forge/blocks/db.md`). `FindingRow` — одна
+`list_inspections` в `docs/furca/blocks/db.md`). `FindingRow` — одна
 записанная находка, `InspectionDetail` — проверка целиком вместе с находками
 (контракт `get_inspection` и `findings_by_unit`, T114).
 

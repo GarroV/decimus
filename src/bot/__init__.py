@@ -1,1 +1,1 @@
-"""Блок bot. Контракт — docs/forge/blocks/bot.md."""
+"""Блок bot. Контракт — docs/furca/blocks/bot.md."""

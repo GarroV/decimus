@@ -20,7 +20,7 @@
 чтение говорит об этом само.
 
 Запросов к базе здесь нет: они живут в `src/db/queries.py`, и никто, кроме
-блока `db`, в Postgres не ходит (`docs/forge/blocks/db.md`).
+блока `db`, в Postgres не ходит (`docs/furca/blocks/db.md`).
 """
 
 from __future__ import annotations
@@ -306,7 +306,7 @@ def _finding(row: FindingRow) -> dict[str, object]:
 
     `text`/`comment` могут быть `None` — так и отдаётся наружу, `None` пустой
     строкой не подменяется: «перевода нет вовсе» и «аудитор ничего не
-    написал» обязаны различаться (`docs/forge/blocks/db.md`).
+    написал» обязаны различаться (`docs/furca/blocks/db.md`).
     """
     return {
         "id": row.id,

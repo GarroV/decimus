@@ -1,4 +1,4 @@
-"""Блок `db`. Контракт — `docs/forge/blocks/db.md`.
+"""Блок `db`. Контракт — `docs/furca/blocks/db.md`.
 
 Postgres принимает уже завершённую проверку (D027, D053); идущая проверка
 остаётся файлом (`domain`, решение D007). Никто, кроме этого блока, не ходит
@@ -23,7 +23,7 @@ from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
 
 # `apply_migrations` (src.db.migrate) и `check_environment` (src.db.config)
 # сюда намеренно не попадают: это операционные функции наката и диагностики
-# окружения, а не часть контракта блока (`docs/forge/blocks/db.md`). Импорт
+# окружения, а не часть контракта блока (`docs/furca/blocks/db.md`). Импорт
 # `python -m src.db.migrate` их и так найдёт напрямую; тащить их в пакетный
 # `__init__` означало бы каждому импорту `src.db` тянуть psycopg заранее.
 #

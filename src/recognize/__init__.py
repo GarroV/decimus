@@ -1,1 +1,1 @@
-"""Блок recognize. Контракт — docs/forge/blocks/recognize.md."""
+"""Блок recognize. Контракт — docs/furca/blocks/recognize.md."""
