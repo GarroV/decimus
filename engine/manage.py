@@ -66,6 +66,17 @@ _TRANSLIT = {
 }
 
 
+PROCESS_NAMES_EN = {
+    "PRODUCT": "Product Handling",
+    "TECH": "Technical Condition",
+    "FOOD": "Food Safety",
+    "CLEAN": "Cleanliness",
+    "MGMT": "Management",
+    "SAFETY": "Safety",
+    "INFO": "Information",
+}
+
+
 def process_code(name_ru):
     """Код процесса по русской формулировке.
 
@@ -467,6 +478,33 @@ def zone_problems(zrows):
     return problems
 
 
+def cmd_backfill_processes(a):
+    """Проставить process_code в чек-листе, где его ещё нет.
+
+    Данные лежат вне git и доставляются томом, поэтому новая колонка сама в
+    боевом чек-листе не появится — её доносит эта команда. Идемпотентна:
+    повторный прогон ничего не меняет. Заодно приводит process_en к
+    справочнику: русская формулировка в английской колонке раскалывает
+    процесс надвое при группировке (так было у INF09-INF11).
+    """
+    d = active_dir()
+    rows = read_rows(d)
+    codes = names = 0
+    for r in rows:
+        code = r.get("process_code") or process_code(r.get("process_ru", ""))
+        if r.get("process_code") != code:
+            r["process_code"] = code
+            codes += 1
+        en = PROCESS_NAMES_EN.get(code)
+        if en and (r.get("process_en") or "").strip() != en:
+            r["process_en"] = en
+            names += 1
+    write_rows(rows, d)
+    print(f"пунктов: {len(rows)}; проставлено кодов: {codes}; выправлено process_en: {names}")
+    if not codes and not names:
+        print("данные уже в порядке — менять было нечего")
+
+
 def cmd_validate(a):
     problems = []
     # Строки-комментарии — заявленная возможность чтения (`is_comment_row`), а
@@ -673,6 +711,7 @@ def main():
     zr.add_argument("--keep-shares", action="store_true", help="доли остальных зон не трогать")
     zr.add_argument("--equal-shares", action="store_true", help="уравнять доли ВСЕХ оставшихся зон на 100/N")
     zr.set_defaults(fn=cmd_zone_remove)
+    s.add_parser("backfill-processes").set_defaults(fn=cmd_backfill_processes)
     s.add_parser("validate").set_defaults(fn=cmd_validate)
     im = s.add_parser("import-xlsx"); im.add_argument("path"); im.add_argument("--keep-zones", action="store_true")
     im.add_argument("--drop-extra-columns", action="store_true"); im.set_defaults(fn=cmd_import)
