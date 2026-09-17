@@ -589,6 +589,38 @@ def edit_photo_cue(
     )
 
 
+def set_photo_cue_zone(
+    *,
+    tenant: str,
+    store: Store,
+    phrase: str,
+    zone: str,
+    version_name: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Поставить строке карты слов зону объекта — своим вызовом, а не правкой кодов.
+
+    Форму выбрало решение D125: заполнение зон предстоит массовое, и смешанное
+    с правкой кодов оно стирает границу между «поправил код» и «переназначил
+    зону» — в журнале хранилища эти два действия перестали бы различаться.
+    `edit_photo_cue` колонку зоны по-прежнему бережёт и показывает отдельным
+    полем ответа.
+
+    Зона сверяется со справочником зон ТОЙ ЖЕ версии: незнакомый код бот
+    отбрасывает записью в лог, то есть молча для аудитора.
+    """
+    return _accepted(
+        cues_api.set_zone(
+            store,
+            tenant=tenant,
+            phrase=phrase,
+            zone=zone,
+            version_name=version_name,
+            note=_note(note),
+        )
+    )
+
+
 def remove_photo_cue(
     *,
     tenant: str,
