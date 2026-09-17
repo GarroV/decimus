@@ -911,6 +911,41 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_CHECKLIST,
     ),
     ToolSpec(
+        name="set_photo_cue_zone",
+        description=(
+            "Set the object's zone on one cue row of the word map, storing a "
+            "new methodology version beside the one in force. Separate from "
+            "editing codes on purpose: filling zones is bulk work by the "
+            "management company, and mixing it into a code edit would blur "
+            "the line between correcting a code and reassigning a zone. The "
+            "zone must be a zone code of that same methodology version — the "
+            "bot matches it against the edition's zones code for code and "
+            "drops an unknown one into the log, silently as far as the "
+            "auditor is concerned. Pass the dash sign to clear the zone: an "
+            "empty zone is a legal value and means 'ask'. A table with no "
+            "zone column is refused rather than given one."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "phrase": _CUE_PHRASE_PROPERTY,
+                "zone": {
+                    "type": "string",
+                    "description": (
+                        "Zone code of this methodology version, as checklist_items "
+                        "reports it. The dash sign clears the zone back to 'ask'."
+                    ),
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": ["phrase", "zone"],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.set_photo_cue_zone,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
         name="remove_photo_cue",
         description=(
             "Remove one cue row from the word map, storing a new methodology "
