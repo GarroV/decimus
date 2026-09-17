@@ -56,6 +56,8 @@ from src.mcp.rpc import handle
     "get_inspection": {"id": "00000000-0000-0000-0000-000000000001"},
     "findings_by_unit": {"unit": "Белград-1"},
     "inspection_letter": {"id": "00000000-0000-0000-0000-000000000001"},
+    "checklist_source": {},
+    "checklist_source_item": {"code": "CLN01"},
     "checklist_versions": {},
     "checklist_items": {},
     "checklist_item": {"code": "CLN01"},
@@ -143,6 +145,8 @@ from src.mcp.rpc import handle
     "get_inspection": {"id": "не-uuid"},
     "findings_by_unit": {"unit": "Белград-1", "limit": -1},
     "inspection_letter": {"id": "00000000-0000-0000-0000-000000000001", "lang": "de"},
+    "checklist_source": {"version": ЗАГЛУШКА_ВЕРСИИ},
+    "checklist_source_item": {"code": "ZZZ99"},
     "checklist_versions": {},
     "checklist_items": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "checklist_item": {"code": "ZZZ99"},
@@ -297,7 +301,10 @@ def _вызвать(имя: str, аргументы: dict[str, Any], *, store: S
     # Право на снятие выдано намеренно: без него инструмент отвечал бы одним
     # отказом доступа, и его собственные тексты в эту батарею не попали бы
     # вовсе — а проверяются здесь именно они.
-    return handle(сообщение, tenant=АРЕНДАТОР, checklist=store, may_retract=True)
+    # Хранилище подставляется обоими способами — как право на правку и как
+    # исходник эталона (T315): иначе тексты инструментов чтения эталона в эту
+    # батарею не попали бы, а проверяются здесь именно они.
+    return handle(сообщение, tenant=АРЕНДАТОР, checklist=store, source=store, may_retract=True)
 
 
 def _собрать(корень: Path) -> Батарея:
