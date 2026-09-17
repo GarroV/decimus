@@ -172,3 +172,119 @@ def test_имя_нашего_сервера_у_пробы_не_разошлос�
     assert (представился or "").strip() == mcp_healthcheck.SERVER_HEADER, (
         "проба сверяет заголовок Server с устаревшей копией имени сервера"
     )
+
+
+# --- звено до сервера: проба обязана мерить его тоже (T279, #243) ------------
+#
+# Поломка, ради которой эти проверки заведены, случилась на площадке 17.09.2026
+# и выглядела так: снаружи 502, контейнер `mcp` — `Up (healthy)`. Проба
+# стучалась на порт сервера и получала честный 401, а оборвано было следующее
+# звено — socat из сервиса `link`. Контейнер `mcp` пересоздали, звено осталось
+# в сетевом пространстве, которого больше нет; в новом пространстве его порт не
+# слушал никто. Зелёная проверка при неработающем снаружи сервисе опаснее
+# падения: чинить никто не идёт.
+
+
+def прогон_звена(
+    порт_сервера: int, порт_звена: int, *, профили: str
+) -> subprocess.CompletedProcess[str]:
+    """Проба на стенде, где звено объявлено профилем (или не объявлено)."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import mcp_healthcheck
+
+    env = {
+        "PATH": "/usr/bin:/bin",
+        MCP_HOST_VAR: "127.0.0.1",
+        MCP_PORT_VAR: str(порт_сервера),
+        mcp_healthcheck.MCP_LINK_PORT_VAR: str(порт_звена),
+        mcp_healthcheck.COMPOSE_PROFILES_VAR: профили,
+    }
+    return subprocess.run(  # noqa: S603 — аргументы собираем сами, ввода извне нет
+        [sys.executable, str(ПРОБА)],
+        cwd=str(ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+        env=env,
+        timeout=60,
+    )
+
+
+def _мёртвый_порт() -> int:
+    """Свободный номер, на котором заведомо никто не слушает."""
+    httpd = ThreadingHTTPServer(("127.0.0.1", 0), _подделка(401, "неважно"))
+    порт = int(httpd.server_address[1])
+    httpd.server_close()
+    return порт
+
+
+@pytest.fixture
+def звено_в_никуда() -> Iterator[int]:
+    """Осиротевший socat: соединение принимает и тут же рвёт.
+
+    Ровно это и видел снаружи пользователь площадки: TCP-соединение
+    устанавливается (порт слушают), ответа нет никогда. Проба, считающая
+    здоровьем сам факт открытого порта, эту поломку пропускает.
+    """
+    import socket
+
+    гнездо = socket.socket()
+    гнездо.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    гнездо.bind(("127.0.0.1", 0))
+    гнездо.listen(8)
+    жив = True
+
+    def принимать() -> None:
+        while жив:
+            try:
+                соединение, _ = гнездо.accept()
+            except OSError:
+                return
+            соединение.close()
+
+    поток = threading.Thread(target=принимать, daemon=True)
+    поток.start()
+    try:
+        yield int(гнездо.getsockname()[1])
+    finally:
+        жив = False
+        гнездо.close()
+        поток.join(timeout=5)
+
+
+def test_звено_отвечающее_нашим_сервером_считается_здоровым(сервер: int) -> None:
+    """Звено доводит до сервера — оба отрезка пути целы."""
+    r = прогон_звена(сервер, сервер, профили="funnel")
+    assert r.returncode == 0, f"исправный путь объявлен больным: {r.stderr}"
+
+
+def test_звено_не_поднято_проба_краснеет_и_называет_звено(сервер: int) -> None:
+    """Сегодняшняя поломка: сервер жив, звена нет, снаружи 502."""
+    r = прогон_звена(сервер, _мёртвый_порт(), профили="funnel")
+    assert r.returncode == 1, "проба назвала здоровым стенд, недоступный снаружи"
+    assert "звено" in r.stderr, r.stderr
+
+
+def test_звено_ведущее_в_никуда_здоровьем_не_считается(сервер: int, звено_в_никуда: int) -> None:
+    """Осиротевшее звено слушает порт и не отдаёт ничего — открытый порт не здоровье."""
+    r = прогон_звена(сервер, звено_в_никуда, профили="funnel")
+    assert r.returncode == 1, "открытый порт без ответа принят за здоровье"
+    assert "звено" in r.stderr, r.stderr
+
+
+def test_без_профиля_funnel_звена_не_требуется(сервер: int) -> None:
+    """На стенде разработчика звена нет вовсе — требовать с него ответа нельзя."""
+    r = прогон_звена(сервер, _мёртвый_порт(), профили="")
+    assert r.returncode == 0, f"звено спрошено там, где оно не поднимается: {r.stderr}"
+
+
+def test_звено_спрашивается_по_тому_же_признаку_по_которому_поднимается() -> None:
+    """Признак один — профиль. Второй разошёлся бы с первым молча."""
+    sys.path.insert(0, str(ROOT / "tools"))
+    import mcp_healthcheck
+
+    assert mcp_healthcheck.link_url({}) is None
+    assert mcp_healthcheck.link_url({"COMPOSE_PROFILES": "tunnel"}) is None
+    assert mcp_healthcheck.link_url({"COMPOSE_PROFILES": "db, funnel "}) == (
+        f"http://{DEFAULT_HOST}:{mcp_healthcheck.DEFAULT_LINK_PORT}/"
+    )

@@ -482,3 +482,92 @@ def test_backup_archives_never_reach_the_public_repository() -> None:
         "каталог бэкапа не игнорируется git: архив с историей проверок уедет "
         "в публичный репозиторий первым же `git add`"
     )
+
+
+# --- звено до сервера и то, что меряет проба здоровья (T279, #243) -----------
+#
+# 17.09.2026 снаружи сервер отдавал 502, а контейнер `mcp` стоял `healthy`:
+# проба мерила отрезок «сервер жив», а оборван был следующий — звено socat.
+# Ниже сторожатся ровно те свойства описания стенда, без которых проба снова
+# перестанет видеть путь пользователя.
+
+
+@pytest.fixture(scope="module")
+def with_funnel() -> dict[str, dict]:
+    """Конфигурация с включённым профилем звена."""
+    r = compose("--profile", "funnel", "config", "--format", "json")
+    assert r.returncode == 0, r.stderr
+    services = json.loads(r.stdout)["services"]
+    assert isinstance(services, dict)
+    return services
+
+
+@requires_docker
+def test_link_is_not_pulled_in_by_the_plain_stand(resolved: dict[str, dict]) -> None:
+    """Звено нужно только там, где наружу ведёт общий вход площадки."""
+    assert "link" not in resolved, (
+        "звено поднимается обычным `up -d`: на стенде разработчика оно займёт порт "
+        "и будет вести в никуда"
+    )
+
+
+@requires_docker
+def test_health_probe_knows_whether_the_link_is_expected(resolved: dict[str, dict]) -> None:
+    """Профиль — единственный признак «звено обязано отвечать».
+
+    Проба живёт внутри контейнера и о профилях стенда сама не знает ничего.
+    Не передать их — она снова будет мерить только сервер, то есть окажется
+    зелёной при недоступном снаружи стенде.
+    """
+    assert "COMPOSE_PROFILES" in resolved["mcp"].get("environment", {}), (
+        "контейнер mcp не знает, какие профили включены: проба здоровья не сможет "
+        "спросить звено и вернётся к зелёному при 502 снаружи"
+    )
+
+
+@requires_docker
+def test_link_listens_on_the_port_the_probe_knocks(with_funnel: dict[str, dict]) -> None:
+    """Номер звена у пробы — копия числа из описания стенда; расхождение ловится здесь."""
+    import sys
+
+    sys.path.insert(0, str(ROOT / "tools"))
+    import mcp_healthcheck
+
+    команда = " ".join(with_funnel["link"]["command"])
+    найдено = re.search(r"TCP-LISTEN:(\d+)", команда)
+    assert найдено is not None, f"звено не слушает TCP-порт вовсе: {команда}"
+    assert int(найдено.group(1)) == mcp_healthcheck.DEFAULT_LINK_PORT, (
+        f"звено слушает {найдено.group(1)}, а проба стучится на "
+        f"{mcp_healthcheck.DEFAULT_LINK_PORT}: проба будет зелёной мимо звена"
+    )
+
+
+@requires_docker
+def test_link_lives_in_the_network_space_of_the_server(with_funnel: dict[str, dict]) -> None:
+    """Без этой строки `127.0.0.1` звена — его собственный, и до сервера он не ведёт."""
+    assert with_funnel["link"].get("network_mode") == "service:mcp", (
+        "звено вне сетевого пространства сервера: оно будет выглядеть рабочим и "
+        "ничего не отдавать — ровно поломка 17.09.2026"
+    )
+
+
+# --- база проверок попадает в бэкап площадки (T281, #246) --------------------
+
+
+@requires_docker
+def test_database_is_marked_for_the_platform_backup() -> None:
+    """Явная метка, а не совпадение имени образа.
+
+    Ночная задача площадки берёт контейнеры по метке `backup.pgdump=true` и,
+    запасным правилом, все, в чьём имени образа есть `postgres`. Сегодня база
+    проверок попадает в дампы вторым путём (сверено 17.09.2026 файлом дампа), и
+    этого мало: запасное правило держится на имени ЧУЖОГО образа. Смена образа
+    на pgvector или на свою сборку выкинет базу из бэкапа молча.
+    """
+    r = compose("--profile", "db", "config", "--format", "json")
+    assert r.returncode == 0, r.stderr
+    услуги = json.loads(r.stdout)["services"]
+    assert услуги["db"].get("labels", {}).get("backup.pgdump") == "true", (
+        "сервис db не помечен backup.pgdump=true: попадание базы проверок в дампы "
+        "площадки держится только на имени образа postgres"
+    )
