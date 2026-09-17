@@ -591,7 +591,7 @@ main() -> None                                   # точка входа `python
 
 `in_progress` — **волна 17.09.2026, копия `/Users/garva/Documents/workbench/worktrees/decimus-bot`, ветка `feat/bot-t287`.** Сданы T287 (бот не пишет за аудитора формулировку вопроса методики, решение D128) и T297 (довод про освобождающийся номер записи приведён к факту).
 
-**Где стою.** Обе задачи закоммичены по отдельности (`a8b7591`, `e7bf59c`), исполнителей не звал — обе на одного человека и одну-две правки. Тронуты `src/bot/routers/record.py` (`_save_manual`), `src/bot/view.py` (`confirmed_block`), `src/bot/texts.py` (комментарий у `record.confirmed_plain`), заведён `tests/test_bot_no_wording_from_item.py`. Блоки `domain`, `recognize`, `report`, `db`, `mcp` и `engine/` не тронуты вовсе; схема данных не трогалась — в этой волне её ведёт другой блок.
+**Где стою.** Обе задачи закоммичены по отдельности, исполнителей не звал — обе на одного человека и одну-две правки. Тронуты `src/bot/routers/record.py` (`_save_manual`), `src/bot/view.py` (`confirmed_block`), `src/bot/texts.py` (комментарий у `record.confirmed_plain`), заведён `tests/test_bot_no_wording_from_item.py`. Блоки `domain`, `recognize`, `report`, `db`, `mcp` и `engine/` не тронуты вовсе; схема данных не трогалась — в этой волне её ведёт другой блок.
 
 **Что проверено и чем.**
 - Красный до правки: 2 падения из 5 в новом наборе, ровно на подстановке вопроса методики; после правки 5 passed.
