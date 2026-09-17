@@ -788,10 +788,23 @@ def compute(st, cl_rows, zones, cfg):
     # прочие нарушения в ней ничего не стоят) или упереться в свою долю.
     by_process = {}
 
+    # Оценивается ли процесс — свойство МЕТОДИКИ, а не находок этой проверки.
+    # Без этого «нарушений нет» и «нечему быть нарушением» (информационная
+    # часть, одни D0) слились бы в одну строку, и чистый процесс читался бы
+    # как непроверенный.
+    VIOLATION_LEVELS = {"D1", "D2", "D3"}
+    scored_processes = set()
+    for r in cl_rows:
+        levels = r.get("levels") or []
+        if isinstance(levels, str):
+            levels = re.split(r"[;,]", levels)
+        if {str(x).strip().upper() for x in levels} & VIOLATION_LEVELS:
+            scored_processes.add((r.get("process_code") or r.get("process_ru") or "").strip())
+
     def _process(i):
         key = i["process_code"] or i["process_ru"] or "—"
         return by_process.setdefault(key, {"code": i["process_code"], "name_ru": i["process_ru"],
-                                           "name_en": i["process_en"],
+                                           "name_en": i["process_en"], "scored": key in scored_processes,
                                            "D1": 0, "D2": 0, "D3": 0, "loss": 0.0})
 
     for i in items:
@@ -812,6 +825,16 @@ def compute(st, cl_rows, zones, cfg):
             for i in here:
                 if i["cost"]:
                     _process(i)["loss"] += z["loss"] * i["cost"] / paid
+
+    # Процессы, по которым записей нет, всё равно стоят в таблице нулями:
+    # сводка из двух строк вместо семи читается как «остальное не смотрели», а
+    # смотрели всё. Порядок строк задаёт тот, кто показывает, не движок.
+    for r in cl_rows:
+        code = (r.get("process_code") or r.get("process_ru") or "").strip()
+        if code and code not in by_process:
+            by_process[code] = {"code": r.get("process_code", ""), "name_ru": r.get("process_ru", ""),
+                                "name_en": r.get("process_en", ""), "scored": code in scored_processes,
+                                "D1": 0, "D2": 0, "D3": 0, "loss": 0.0}
 
     for p in by_process.values():
         p["loss"] = round(p["loss"], 4)

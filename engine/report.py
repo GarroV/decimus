@@ -371,10 +371,10 @@ def build_html(res, lang, photos, src=None):
              f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th></tr>')
     procs = sorted(res["by_process"].items(), key=lambda kv: (-kv[1]["loss"], kv[1][nk]))
     for _code, pr in procs:
-        # Процесс без единого нарушения — только информационные записи (D0):
-        # вычетов он не даёт, и ноль процентов читался бы как «проверено, чисто».
-        scored = pr["D1"] or pr["D2"] or pr["D3"]
-        lost = f'{pr["loss"]:g}%' if scored else "—"
+        # Прочерк — только у процесса, которому нечему быть нарушением
+        # (информационная часть, одни D0). Процесс, который оценивается и чист,
+        # обязан показать 0%: прочерк на его месте читался бы как «не смотрели».
+        lost = f'{pr["loss"]:g}%' if pr.get("scored", True) else "—"
         h.append(f'<tr><td>{esc(pr[nk])}</td>'
                  f'<td class="n">{pr["D1"] or ""}</td><td class="n">{pr["D2"] or ""}</td>'
                  f'<td class="n">{pr["D3"] or ""}</td><td class="n">{lost}</td></tr>')
