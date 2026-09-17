@@ -32,6 +32,7 @@ T = {
         "partner": "Партнёр", "auditor": "Аудитор", "type": "Вид проверки", "date": "Дата проверки",
         "result": "Результат проверки", "grade": "Оценка", "score": "Итоговый балл",
         "summary": "Сводка", "crit": "Критичность", "count": "Количество", "cost": "Вычет",
+        "processes": "Итог по процессам", "process": "Процесс",
         "zones": "Разбивка по зонам", "zone": "Зона", "share": "Доля", "lost": "Потеряно",
         "left": "Осталось", "findings": "Зафиксированные нарушения", "no_findings":
         "Нарушений не зафиксировано.", "deadline": "Устранить до", "immediately": "немедленно",
@@ -57,6 +58,7 @@ T = {
         "partner": "Partner", "auditor": "Auditor", "type": "Inspection type", "date": "Inspection date",
         "result": "Result", "grade": "Grade", "score": "Final score",
         "summary": "Summary", "crit": "Severity", "count": "Count", "cost": "Deduction",
+        "processes": "Breakdown by process", "process": "Process",
         "zones": "Breakdown by zone", "zone": "Zone", "share": "Share", "lost": "Lost",
         "left": "Remaining", "findings": "Recorded violations", "no_findings":
         "No violations recorded.", "deadline": "Fix by", "immediately": "immediately",
@@ -359,6 +361,23 @@ def build_html(res, lang, photos, src=None):
             actual = sum(x["cost"] for x in res["findings"] if x["level"] == lv)
             cost = f"−{actual:g}%" if c[lv] else "—"
         h.append(f'<tr><td><span class="badge {lv}">{lv}</span></td><td class="n">{c[lv]}</td><td>{esc(cost)}</td></tr>')
+    h.append("</table>")
+
+    # Итог по процессам (D120/D121) идёт перед зонами: зона говорит, куда идти
+    # чинить, процесс — что именно разъехалось в работе. Потеря здесь в той же
+    # шкале, что и у зон, и сумма по столбцу равна общему вычету.
+    h.append(f"<h2>{esc(t['processes'])}</h2>")
+    h.append(f'<table class="d"><tr><th>{esc(t["process"])}</th>'
+             f'<th>D1</th><th>D2</th><th>D3</th><th>{esc(t["lost"])}</th></tr>')
+    procs = sorted(res["by_process"].items(), key=lambda kv: (-kv[1]["loss"], kv[1][nk]))
+    for _code, pr in procs:
+        # Процесс без единого нарушения — только информационные записи (D0):
+        # вычетов он не даёт, и ноль процентов читался бы как «проверено, чисто».
+        scored = pr["D1"] or pr["D2"] or pr["D3"]
+        lost = f'{pr["loss"]:g}%' if scored else "—"
+        h.append(f'<tr><td>{esc(pr[nk])}</td>'
+                 f'<td class="n">{pr["D1"] or ""}</td><td class="n">{pr["D2"] or ""}</td>'
+                 f'<td class="n">{pr["D3"] or ""}</td><td class="n">{lost}</td></tr>')
     h.append("</table>")
 
     h.append(f"<h2>{esc(t['zones'])}</h2>")
