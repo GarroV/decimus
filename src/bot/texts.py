@@ -1577,6 +1577,82 @@ TEXTS: dict[str, dict[str, str]] = {
     # тому же правилу, что и остальные подставляемые слова: молча подставить
     # петлю значило бы выдать догадку за настройку стенда.
     "mcp.url_unknown": {"ru": "АДРЕС_СЕРВЕРА", "en": "SERVER_ADDRESS"},
+    # Краткая справка (#257). Её текст — единственное место продукта, где
+    # порядок работы описан целиком; порядок пунктов повторяет порядок
+    # обхода, а не список команд, потому что аудитор читает её на точке.
+    "cmd.help": {"ru": "Как работать с ботом", "en": "How to work with the bot"},
+    "help.text": {
+        "ru": (
+            "Как работать с ботом\n"
+            "\n"
+            "1. /start — начать проверку. Три вопроса: название пиццерии, вид проверки, язык.\n"
+            "\n"
+            "2. Нарушение = кадр + комментарий. Без кадра записи не будет.\n"
+            "Комментарий: подписью к кадру, сообщением следом или голосовым.\n"
+            "Порядок любой — слова можно дать и до кадра.\n"
+            "Кадров несколько и комментарий не к последнему — ответить (reply) на нужный кадр.\n"
+            "Кадр без слов бот разбирает только по кнопке «Разобрать».\n"
+            "\n"
+            "3. Узнал пункт по вашим словам — запись появится сразу, подтверждать нечего.\n"
+            "Не узнал — разберёт моделью и покажет варианты: нажать «Записать».\n"
+            "Не подобрал ничего — «Выбрать пункт», список по зонам.\n"
+            "Зону и класс спрашивает, только если взять их неоткуда.\n"
+            "\n"
+            "4. Запись неверна — ответить (reply) на сообщение бота с этой записью и написать, "
+            "что там на самом деле. Бот подберёт пункт заново.\n"
+            "Точечная правка — кнопки под записью: «Зона», «Класс», «Формулировка», «Удалить».\n"
+            "/undo — снять последнюю запись.\n"
+            "\n"
+            "5. /records — что записано, кадры без записи, слова без кадра. Проверку не "
+            "завершает.\n"
+            "\n"
+            "6. /finish — итог, правка записей, вопросы для отчёта (можно пропускать), PDF и "
+            "письмо партнёру.\n"
+            "\n"
+            "Ограничения\n"
+            "— Одна проверка на чат. Незавершённая не теряется: бот предложит продолжить.\n"
+            "— Процент и буква — только в конце.\n"
+            "— Сданную проверку править нельзя.\n"
+            "— Сбой — /start. /version — версия сборки.\n"
+        ),
+        "en": (
+            "How to work with the bot\n"
+            "\n"
+            "1. /start — begin an inspection. Three questions: pizzeria name, inspection type, "
+            "language.\n"
+            "\n"
+            "2. A record = photo + comment. No photo, no record.\n"
+            "The comment: as a caption, as the next message, or as a voice note.\n"
+            "Any order — the words may come before the photo.\n"
+            "Several photos and the comment is not about the last one — reply to the right "
+            "photo.\n"
+            "A photo with no words is analyzed only when you tap “Analyze”.\n"
+            "\n"
+            "3. The item recognized from your words — the record appears at once, nothing to "
+            "confirm.\n"
+            "Not recognized — the bot asks the model and shows the options: tap “Record it”.\n"
+            "Nothing fits — “Pick an item”, the list by zone.\n"
+            "Zone and class are asked only when there is nowhere to take them from.\n"
+            "\n"
+            "4. A record is wrong — reply to the bot’s message with that record and write what "
+            "is actually there. The bot matches the item again.\n"
+            "Point fixes — the buttons under the record: “Zone”, “Class”, “Wording”, “Delete”.\n"
+            "/undo — remove the last record.\n"
+            "\n"
+            "5. /records — what is recorded, photos with no record, words waiting for a photo. "
+            "It does not finish the inspection.\n"
+            "\n"
+            "6. /finish — the summary, fixing records, the report questions (any may be "
+            "skipped), the PDF and the letter to the partner.\n"
+            "\n"
+            "Limits\n"
+            "— One inspection per chat. An unfinished one is not lost: the bot offers to "
+            "continue it.\n"
+            "— The percentage and the grade come at the end, not during the walk.\n"
+            "— A handed-over inspection cannot be edited.\n"
+            "— Something broke — /start. /version tells the build.\n"
+        ),
+    },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
     # Ответ о сборке — не украшение: по нему аудитор может сказать, что именно
     # он видел, а мы — понять, к какому образу относится его жалоба (T246).

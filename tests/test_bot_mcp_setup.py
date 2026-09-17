@@ -719,6 +719,7 @@ async def test_спрятанных_команд_у_бота_нет(domain_env: 
         "records",
         "undo",
         "finish",
+        "help",
         "version",
         MCP_COMMAND,
         MCP_ADD_COMMAND,

@@ -10,6 +10,7 @@ from .correct import build_correct_router
 from .edit import build_edit_router
 from .fallback import build_fallback_router
 from .finish import build_finish_router
+from .help import build_help_router
 from .info import build_info_router
 from .material import build_material_router
 from .mcp import build_mcp_router
@@ -23,6 +24,7 @@ __all__ = [
     "build_edit_router",
     "build_fallback_router",
     "build_finish_router",
+    "build_help_router",
     "build_info_router",
     "build_material_router",
     "build_mcp_router",

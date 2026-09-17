@@ -41,6 +41,7 @@ from .routers import (
     build_edit_router,
     build_fallback_router,
     build_finish_router,
+    build_help_router,
     build_info_router,
     build_material_router,
     build_mcp_router,
@@ -49,6 +50,7 @@ from .routers import (
     build_start_router,
     build_version_router,
 )
+from .routers.help import HELP_COMMAND
 from .routers.material import MaterialHandler
 from .routers.mcp import (
     MCP_ADD_COMMAND,
@@ -186,6 +188,7 @@ def build_dispatcher(
     # рядом с остальными командами: своих состояний диалога у них нет, обычного
     # текста они не ждут, и на порядок разбора материала не влияют.
     dispatcher.include_router(build_mcp_router(settings))
+    dispatcher.include_router(build_help_router())
     dispatcher.include_router(build_version_router())
     dispatcher.include_router(build_finish_router(store))
     # Информационная часть ждёт обычный текст, голос и кадр в своём состоянии
@@ -237,6 +240,9 @@ MENU_COMMANDS = (
     (RECORDS_COMMAND, "cmd.records"),
     ("undo", "cmd.undo"),
     ("finish", "cmd.finish"),
+    # Справка и версия — не шаги обхода, поэтому стоят за работой, а не
+    # посреди неё. Справка выше версии: её читает аудитор, и читает чаще.
+    (HELP_COMMAND, "cmd.help"),
     (VERSION_COMMAND, "cmd.version"),
 )
 
