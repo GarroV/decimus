@@ -63,6 +63,7 @@ test: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
 test: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 test:
 	$(VENV)/pytest
+	$(VENV)/python scripts/check_test_floor.py reports/junit.xml
 
 # Прогон с ЧЕСТНОЙ проверкой порчей. Отдельная цель, а не режим `test`, и это
 # измерено: `PYTHONDONTWRITEBYTECODE=1` заставляет каждый подпроцесс движка
@@ -81,8 +82,14 @@ test:
 test-honest: export DATABASE_URL = $(TEST_DATABASE_URL)
 test-honest: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
 test-honest: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
+# ARGS пуст — значит это полный прогон, а не точечная порча: тогда цель обязана
+# быть такой же правдой о состоянии проекта, как `make test`. Отсюда
+# AUDIT_REQUIRE_DATA и сторож планки ровно в этом случае: вторая цель, которая
+# зеленеет легче первой, — это вторая правда, и зелёной она будет ровно тогда,
+# когда проверяет меньше (D129, #267).
 test-honest:
-	PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
+	AUDIT_REQUIRE_DATA=$(if $(strip $(ARGS)),,1) PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
+	@if [ -z "$(strip $(ARGS))" ]; then $(VENV)/python scripts/check_test_floor.py reports/junit.xml; fi
 
 dead:
 	$(VENV)/vulture
