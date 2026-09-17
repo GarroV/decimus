@@ -36,32 +36,50 @@ from pathlib import Path
 
 from src.db.migrate import MIGRATIONS_DIR, discover_migrations
 
-#: Имя файла → отпечаток его содержимого (sha256, тот же, что пишет раннер в
-#: `schema_migrations`). Строка добавляется вместе с новым файлом миграции и
-#: после этого не меняется никогда.
+#: Имя файла → отпечаток, ТОТ ЖЕ, что раннер пишет в `schema_migrations`:
+#: `sql1:<sha256>` по нормализованному SQL — без комментариев и лишних пробелов
+#: (`src/db/checksum.py`). Строка добавляется вместе с новым файлом миграции и
+#: после этого не меняется никогда. Правка комментария к применённой миграции
+#: отпечаток не двигает намеренно: раскатка 17.09.2026 встала именно на ней.
 ОТПЕЧАТКИ: dict[str, str] = {
-    "0001_initial_schema.sql": "f1b6c6a003637000a2e75a5f7cc66c9a8324a0f41b22d3671a0e0e9f369917bc",
-    "0002_unit_directory.sql": "498766ab3a42ba8c1e44ad07e73e4dae8d881b481c7b77a8b76f5b685210879b",
+    "0001_initial_schema.sql": (
+        "sql1:c68eb1b448da2143443f5d5145cd75dcd27bd4f0df745599c1514965f39ee335"
+    ),
+    "0002_unit_directory.sql": (
+        "sql1:f7ea4e16c3566e2b8433c852445ebb068337ffc2a234b2ba9ee81de22cda5abb"
+    ),
     "0003_tenant_scoped_reads.sql": (
-        "0be02886cfff4566ee496334f8b66cd3b78049931b924de9df1c364037de6ca2"
+        "sql1:2ccb0b1530b27307ec958d7efa04ca62c23f9519c1c33191ea336d3f18a63e44"
     ),
     "0004_finalized_write_protection.sql": (
-        "66b90ffee0f3e97b5d929b0751e4fc940254edaf15de452703c531424dbb2435"
+        "sql1:cb710fc57551e2bd1dbd5c167877b01a225b44a71974319a096f4d18b64d5094"
     ),
-    "0005_reads_by_period.sql": "33b53d3ff6c49bc0f8223da06235f2d6b0540df80fad34b27a6917a76b20a87a",
-    "0006_kind_is_a_code.sql": "680a2e6585d9a681a8d7d4bc1d0a60ddc68e974ce6b3494f71c4d01752031de9",
-    "0007_model_suggestion.sql": "e0a40b638c9d821e7eb68b2aada6e8060c53a3d57ede66aeabfbd0bdc13880c8",
-    "0008_auditor_words.sql": "b7da026c7018eeae43d833ca21faf62c9c2bb488a9b7712f0efca048aa466634",
-    "0009_inspection_info.sql": "794fbb9b0b941d1268dc3b827b46da12750d08158c5f8faf6ed5245d0878e8d5",
+    "0005_reads_by_period.sql": (
+        "sql1:636e4f452286d09aa0c8d7633b94401a6800398d3914de20b16569d2ef3a8429"
+    ),
+    "0006_kind_is_a_code.sql": (
+        "sql1:c52b9c1311de0c22ce9355a44413b8f89f3b7586647f48a1a62bce00d219369c"
+    ),
+    "0007_model_suggestion.sql": (
+        "sql1:90a476e42d6f870f843ca216e98d22947f359b251b55304ccb95f7d146afe95f"
+    ),
+    "0008_auditor_words.sql": (
+        "sql1:91a5a2b2aedb812d0a06d01fc0aa0c6567d9e8de930b06c8fba9ff65ebbbf27c"
+    ),
+    "0009_inspection_info.sql": (
+        "sql1:0ef3c2c0c61cb5ab0c2146c0ff859e6ceee71b7d93c57bda7b13ef2f5e09bd8e"
+    ),
     "0010_retracted_inspections.sql": (
-        "e7f04ae41ab2aa19d7dc15503a588106dbadb9114165636b48d3cbff6e2de6ee"
+        "sql1:70eec0e7d8b15c9c1522be0a2da6ceee1b5871f43b6c781a88ce4b346da1a47a"
     ),
     "0011_mcp_personal_access.sql": (
-        "1dee78b9c7cada0bd102f4216240086e0ae70fc1ff13e918fcf3f5393c45dc65"
+        "sql1:068cd068da465ffb51aa2f084a4fe17568d8e9c92fbd589be7873fcd81be1da6"
     ),
-    "0012_phrase_aliases.sql": "50ec3ad8cdbef022909a069ce295a142bafbddf434068a8b2c578173a500e080",
+    "0012_phrase_aliases.sql": (
+        "sql1:f0f506ba202363aa15e1275ef09920cc9e73ba549e20365d3710e376992a4774"
+    ),
     "0013_phrase_alias_curation.sql": (
-        "bfb219ac73b711279bce59f837405d82a1145634fbddb454aad8bd2cbe0461f0"
+        "sql1:460369f931ba759ab6af9ea6e16f0d5237214ab3da0be462d419c723b1e2b8c9"
     ),
 }
 
