@@ -734,6 +734,7 @@ def compute(st, cl_rows, zones, cfg):
         days = min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
         due = (inspected + timedelta(days=days)).isoformat()
         items.append({**f, "photos": photos_of(f), "question_ru": r.get("question_ru", ""), "question_en": r.get("question_en", ""),
+                      "process_code": r.get("process_code", ""),
                       "process_ru": r.get("process_ru", ""), "process_en": r.get("process_en", ""),
                       "zone_name_ru": zmap.get(f["zone"], {}).get("name_ru", f["zone"]),
                       "zone_name_en": zmap.get(f["zone"], {}).get("name_en", f["zone"]),
@@ -779,10 +780,41 @@ def compute(st, cl_rows, zones, cfg):
     if grade is None:
         grade = cfg["grades"]["fallback"]
 
+    # Разбивка по процессам (D120/D121). Ключ — код: формулировки переводятся и
+    # правятся, коды нет. `loss` — вклад процесса в потерю итога, в той же
+    # шкале, что и вычеты по зонам, и сумма вкладов обязана сходиться с
+    # `deductions`. Поэтому потеря берётся не суммой `cost` напрямую, а долей
+    # от уже посчитанной потери зоны: зона могла быть обнулена по D3 (тогда
+    # прочие нарушения в ней ничего не стоят) или упереться в свою долю.
     by_process = {}
+
+    def _process(i):
+        key = i["process_code"] or i["process_ru"] or "—"
+        return by_process.setdefault(key, {"code": i["process_code"], "name_ru": i["process_ru"],
+                                           "name_en": i["process_en"],
+                                           "D1": 0, "D2": 0, "D3": 0, "loss": 0.0})
+
     for i in items:
-        p = by_process.setdefault(i["process_ru"] or "—", {"D1": 0, "D2": 0, "D3": 0})
+        p = _process(i)
         p[i["level"]] = p.get(i["level"], 0) + 1
+
+    for code, z in per_zone.items():
+        here = [i for i in items if i["zone"] == code]
+        if not here or not z["loss"]:
+            continue
+        if z["zeroed"]:
+            # Долю обнулённой зоны делят виновники: D3 стоил зоне всего.
+            blamed = [i for i in here if i["level"] == "D3"]
+            for i in blamed:
+                _process(i)["loss"] += z["loss"] / len(blamed)
+        else:
+            paid = sum(i["cost"] for i in here)
+            for i in here:
+                if i["cost"]:
+                    _process(i)["loss"] += z["loss"] * i["cost"] / paid
+
+    for p in by_process.values():
+        p["loss"] = round(p["loss"], 4)
 
     return {"meta": st["meta"], "pct": pct, "grade": grade["grade"],
             "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
