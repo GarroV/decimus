@@ -22,6 +22,7 @@ from __future__ import annotations
 import inspect
 
 from src.mcp import checklist_tools
+from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
 from src.mcp import tools as tools_module
 from src.mcp.catalogue import (
@@ -75,8 +76,22 @@ from src.mcp.catalogue import (
 #: инструмент, меняющий проверки, мимо всякого разбора.
 ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ = {"retract_inspection"}
 
+#: Карта синонимов формулировок (T294). Открывается правом методики — там
+#: правится внутренняя память продукта, а не документ партнёра, — но обработчики
+#: живут своим модулем `src.mcp.phrases`, поэтому группа отдельная: иначе
+#: проверка «обработчик взят из правильного модуля» требовала бы селить их в
+#: чужом модуле ради теста.
+ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ = {
+    "learned_phrases",
+    "retract_learned_phrase",
+    "repoint_learned_phrase",
+}
+
 ИМЕНА_ИНСТРУМЕНТОВ = (
-    ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК | ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ | ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ
+    ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
+    | ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ
+    | ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ
+    | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ
 )
 
 #: Кто ходит в базу проверок. Инструменты проверок — все, и с ними один
@@ -90,10 +105,10 @@ from src.mcp.catalogue import (
 )
 
 
-def test_каталог_содержит_ровно_двадцать_четыре_инструмента_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_двадцать_семь_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 24
+    assert len(TOOLS) == 27
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -159,7 +174,7 @@ def test_вид_инструмента_соответствует_его_гру�
     обычный токен, а инструмент проверок с `KIND_CHECKLIST` — наоборот, стал
     бы недоступен тем, кому доступны только проверки."""
     for spec in TOOLS:
-        if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ:
+        if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ:
             assert spec.kind == KIND_CHECKLIST, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.kind == KIND_RETRACTION, spec.name
@@ -190,7 +205,9 @@ def test_обработчик_взят_из_правильного_модуля(
     самом деле выполнится: агент увидел одно описание, а вызвался чужой
     обработчик."""
     for spec in TOOLS:
-        if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ:
+        if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ:
+            assert spec.handler.__module__ == phrases_module.__name__, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ:
             assert spec.handler.__module__ == checklist_tools.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.handler.__module__ == retraction_module.__name__, spec.name
@@ -215,7 +232,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 24
+    assert len(перечень) == 27
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 
