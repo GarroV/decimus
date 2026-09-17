@@ -40,7 +40,53 @@ from audit import (  # noqa: E402
 )
 
 PLUGIN_DATA = os.path.normpath(os.path.join(HERE, os.pardir, "data"))
-FIELDS = ["id", "kind", "process_ru", "process_en", "question_ru", "question_en", "levels", "zones", "days"]
+FIELDS = ["id", "kind", "process_code", "process_ru", "process_en", "question_ru", "question_en", "levels", "zones", "days"]
+
+# Процессы (направления методики). Код — то, чем пункт связан с процессом;
+# формулировки переводятся и правятся, код нет. Группировка отчёта и аналитики
+# идёт по коду: сгруппируй её по формулировке — и один непереведённый
+# `process_en` расколет процесс надвое (так и было с INF09-INF11).
+PROCESSES = {
+    "Работа с продуктом": "PRODUCT",
+    "Техническое состояние": "TECH",
+    "Пищевая безопасность": "FOOD",
+    "Чистота": "CLEAN",
+    "Менеджмент": "MGMT",
+    "Безопасность": "SAFETY",
+    "Информация": "INFO",
+}
+
+
+_TRANSLIT = {
+    "а": "A", "б": "B", "в": "V", "г": "G", "д": "D", "е": "E", "ё": "E",
+    "ж": "ZH", "з": "Z", "и": "I", "й": "Y", "к": "K", "л": "L", "м": "M",
+    "н": "N", "о": "O", "п": "P", "р": "R", "с": "S", "т": "T", "у": "U",
+    "ф": "F", "х": "H", "ц": "C", "ч": "CH", "ш": "SH", "щ": "SCH",
+    "ъ": "", "ы": "Y", "ь": "", "э": "E", "ю": "YU", "я": "YA", " ": "_",
+}
+
+
+def process_code(name_ru):
+    """Код процесса по русской формулировке.
+
+    Известные процессы берут код из справочника. Незнакомый — методику
+    подкладывают снаружи, и она вправе принести новый процесс — получает код,
+    выведенный из названия, и предупреждение в stderr. Молча вернуть пустой
+    код нельзя: пункт выпал бы из разбивки по процессам, а заметили бы это
+    только по несходящейся сумме вычетов. Раз записанный в CSV код дальше
+    стабилен: перевод и правка формулировки его не трогают.
+    """
+    name = (name_ru or "").strip()
+    code = PROCESSES.get(name)
+    if code:
+        return code
+    if not name:
+        sys.exit("У пункта нет процесса: разбивка по процессам его потеряет.")
+    code = "".join(_TRANSLIT.get(c, c if c.isalnum() else "_") for c in name.lower()).strip("_").upper()
+    print(f"Процесс {name!r} не в справочнике, код выведен из названия: {code}. "
+          f"Проверьте его и внесите в PROCESSES, если процесс постоянный.", file=sys.stderr)
+    return code
+
 ZONE_FIELDS = ["code", "name_ru", "name_en", "share_pct"]
 # D0 — не класс нарушения, а приём: информационная запись живёт среди findings
 # с нулевым вычетом (docs/02-domain.md). Уровня не знала только эта проверка, и
@@ -176,7 +222,8 @@ def cmd_add(a):
     zones = (a.zones or "*").strip()
     check_zone_codes(zones)
     levels = ";".join(x.strip().upper() for x in re.split(r"[;,]", a.levels or "D1") if x.strip())
-    row = {"id": qid, "kind": a.kind or "violation", "process_ru": a.process or "",
+    row = {"id": qid, "kind": a.kind or "violation",
+           "process_code": process_code(a.process or ""), "process_ru": a.process or "",
            "process_en": a.process_en or a.process or "", "question_ru": a.question_ru or "",
            "question_en": a.question_en or "", "levels": levels, "zones": zones,
            "days": a.days if a.days is not None else 10}
@@ -245,6 +292,8 @@ def cmd_edit(a):
                      ("zones", a.zones), ("kind", a.kind)):
             if v is not None:
                 r[f] = v
+        if a.process is not None:
+            r["process_code"] = process_code(a.process)
         if a.levels is not None:
             r["levels"] = ";".join(x.strip().upper() for x in re.split(r"[;,]", a.levels) if x.strip())
         if a.days is not None:
@@ -581,7 +630,8 @@ def cmd_import(a):
             levels = levels or ["D1"]
         prev = old.get(q.lower())
         zones = prev.get("zones") if prev else "*"
-        rows.append({"id": qid, "kind": kind, "process_ru": proc.rstrip("."), "process_en": e["proc_en"],
+        rows.append({"id": qid, "kind": kind, "process_code": process_code(proc.rstrip(".")),
+                     "process_ru": proc.rstrip("."), "process_en": e["proc_en"],
                      "question_ru": q, "question_en": e["q_en"], "levels": ";".join(levels),
                      "zones": zones if kind == "violation" else "",
                      "days": int(float(e["days"])) if str(e["days"] or "").replace(".", "").isdigit() else 10})

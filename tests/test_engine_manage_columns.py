@@ -36,6 +36,7 @@ MANAGE = ROOT / "engine" / "manage.py"
 FIELDS = [
     "id",
     "kind",
+    "process_code",
     "process_ru",
     "process_en",
     "question_ru",
