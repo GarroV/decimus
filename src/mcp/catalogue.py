@@ -3,8 +3,10 @@
 Декларация, а не логика: имя, текст для агента, JSON Schema аргументов и
 ссылка на обработчик. Читающие проверки инструменты (`kind=KIND_INSPECTIONS`)
 ссылаются на `src.mcp.tools`, инструменты методики (`kind=KIND_CHECKLIST`) —
-на `src.mcp.checklist_tools`. Сам разбор аргументов, чтение, правка и отказы
-остаются там — этот файл только описывает, что наружу видно.
+на `src.mcp.checklist_tools`, а карта синонимов формулировок, открытая тем
+же правом методики, — на `src.mcp.phrases` (T294). Сам разбор аргументов,
+чтение, правка и отказы остаются там — этот файл только описывает, что наружу
+видно.
 
 **У инструментов нет аргумента `tenant`.** Арендатора называет не собеседник,
 а личный токен запроса (`src/mcp/config.py`): схема, объявившая `tenant`,
@@ -27,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_tools, retraction, tools
+from . import checklist_tools, phrases, retraction, tools
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -1088,6 +1090,168 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=checklist_tools.uncovered_phrases,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="learned_phrases",
+        description=(
+            "Show the synonym map: the wordings auditors actually used on site "
+            "that the product has learned, and the checklist item each of them "
+            "leads to. The map fills itself — when a spoken finding does not "
+            "match a checklist item directly, the parsed wording is stored as a "
+            "synonym and is used from the next search on. That is why it has to "
+            "be readable: a wrongly attached wording keeps leading to the wrong "
+            "item on every inspection after it, quietly. "
+            "Retracted rows are hidden by default, exactly as the search does "
+            "not see them; ask with include_retracted to review them or to find "
+            "one that was retracted by mistake. "
+            "Nothing here is computed: rows come out as recorded, with where "
+            "each came from (learned by the machine or entered by a person) and "
+            "where it led before it was corrected. "
+            "An empty answer says which of the two it is: nothing matches this "
+            "filter, or nothing has been learned at all."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "lang": {
+                    "type": "string",
+                    "description": (
+                        "Language of the wording, as the auditor spoke it. The "
+                        "map is kept per language: the same sentence in another "
+                        "language is another row."
+                    ),
+                },
+                "item_code": _code_property(meaning="checklist item the wordings lead to"),
+                "include_retracted": {
+                    "type": "boolean",
+                    "description": (
+                        "Show rows retracted by the management company as well. "
+                        "Off by default: those rows no longer take part in any "
+                        "search, and shown among the working ones they would "
+                        "read as working."
+                    ),
+                },
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": (
+                        "Maximum number of rows to show. A cut-off answer says "
+                        "so and still names the full count, rather than passing "
+                        "for the whole map."
+                    ),
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=phrases.learned_phrases,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="retract_learned_phrase",
+        description=(
+            "Retract a learned wording from the synonym map, so that it stops "
+            "matching and stops proposing a record. Use this when the product "
+            "learned a wording wrong: it leads to an item the auditor did not "
+            "mean.\n\n"
+            "This does not delete the row and does not change any inspection "
+            "already recorded. The row stays and keeps its place in the map on "
+            "purpose: were it deleted, the machine would learn the very same "
+            "wording again, with the very same wrong item, on the next near "
+            "match. Bringing it back into work is a person's call and is done "
+            "with repoint_learned_phrase — nothing else does it.\n\n"
+            "A reason is mandatory and is recorded once: retracting an already "
+            "retracted wording does not replace the reason it was retracted "
+            "for, and comes back as a refusal rather than pretending to record "
+            "a new one. "
+            "A wording entered by a person and one learned by the machine are "
+            "retracted the same way: a wrong synonym is wrong whoever put it "
+            "there."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "phrase": {
+                    "type": "string",
+                    "description": (
+                        "The wording to retract, as it stands in the map. Read "
+                        "it off learned_phrases first: spacing, case and edge "
+                        "punctuation do not matter, but it must be that row."
+                    ),
+                },
+                "lang": {
+                    "type": "string",
+                    "description": (
+                        "Language of that row. The same wording in another "
+                        "language is another row and is not touched."
+                    ),
+                },
+                "reason": {
+                    "type": "string",
+                    "description": (
+                        "Why this wording must stop working, in the words of "
+                        "the person who decided it — recorded next to the row. "
+                        "Without a reason a retracted row cannot be told apart "
+                        "from a quietly erased one, so this is refused when "
+                        "empty."
+                    ),
+                },
+            },
+            "required": ["phrase", "lang", "reason"],
+            "additionalProperties": False,
+        },
+        handler=phrases.retract_learned_phrase,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="repoint_learned_phrase",
+        description=(
+            "Point a learned wording at a different checklist item — and bring "
+            "a retracted one back into work. One call, because the question is "
+            "one: which item this wording leads to and whether it works at all. "
+            "Which of the two happened is named in the answer.\n\n"
+            "The item is checked against the checklist in force before anything "
+            "is written: a mistyped code would be stored silently, and the row "
+            "would look corrected while it no longer matched anything.\n\n"
+            "Where the wording led before stays recorded, so a corrected row "
+            "can still be told apart from one that was right from the start — "
+            "without that, the misses of the model cannot be reviewed at all. "
+            "A reason is mandatory and is recorded next to the row. Repointing "
+            "a wording at the item it already leads to changes nothing and is "
+            "refused, rather than reported as done."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "phrase": {
+                    "type": "string",
+                    "description": (
+                        "The wording to repoint, as it stands in the map. Read "
+                        "it off learned_phrases first."
+                    ),
+                },
+                "lang": {
+                    "type": "string",
+                    "description": (
+                        "Language of that row. The same wording in another "
+                        "language is another row and is not touched."
+                    ),
+                },
+                "item_code": _code_property(meaning="checklist item this wording must lead to"),
+                "reason": {
+                    "type": "string",
+                    "description": (
+                        "Why the wording is being repointed or brought back, in "
+                        "the words of the person who decided it — recorded next "
+                        "to the row. Refused when empty."
+                    ),
+                },
+            },
+            "required": ["phrase", "lang", "item_code", "reason"],
+            "additionalProperties": False,
+        },
+        handler=phrases.repoint_learned_phrase,
         kind=KIND_CHECKLIST,
     ),
     ToolSpec(
