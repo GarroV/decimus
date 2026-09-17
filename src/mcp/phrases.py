@@ -192,10 +192,19 @@ def _пусто(*, tenant: str, lang: str | None, item_code: str | None) -> dict
             "no learned phrases for this tenant at all: nothing has been learned yet. This "
             "is an empty map, not a failed read"
         )
-    else:
+    elif отбор:
         статус = (
-            f"no learned phrase matches this filter ({отбор or 'none'}); the map holds "
-            f"{len(вся)} phrases, retracted ones included"
+            f"no learned phrase matches this filter ({отбор}); rows in the map, retracted "
+            f"ones included: {len(вся)}"
+        )
+    else:
+        # Отбора не было, а выдача пуста — значит работающих строк не осталось
+        # вовсе: все сняты. Сказать это прямо важнее, чем повторить «ничего не
+        # нашлось»: иначе снятая целиком карта читается как невыученная.
+        статус = (
+            f"no learned phrase is working right now: every row in the map is retracted "
+            f"(rows: {len(вся)}). Ask with include_retracted to see them and to bring back "
+            f"one that was retracted by mistake"
         )
     return {
         "phrases": [],

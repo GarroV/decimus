@@ -302,6 +302,27 @@ def test_пустая_карта_говорит_что_карта_пуста_а_
     assert "no" in выдача["status"].lower()
 
 
+def test_снятая_целиком_карта_не_читается_как_невыученная(
+    методика: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Отбора не было, а показывать нечего — значит работающих строк не осталось.
+
+    Тот же ответ, что у пустой карты, сказал бы управляющей компании «продукт
+    ничего не выучил», хотя выучил и она же это сняла.
+    """
+
+    def список(**kwargs: Any) -> list[synonyms_api.PhraseAlias]:
+        if kwargs.get("include_retracted"):
+            return [_строка(retracted_at=datetime(2026, 9, 12, 8, 0, 0))]
+        return []
+
+    monkeypatch.setattr(synonyms_api, "list_phrases", список)
+
+    выдача = _выдача(_вызов("learned_phrases", {}, методика=методика))
+
+    assert "every row in the map is retracted" in выдача["status"]
+
+
 def test_отбор_по_языку_не_выдаёт_опечатку_за_пустую_карту(
     методика: Store, monkeypatch: pytest.MonkeyPatch
 ) -> None:
