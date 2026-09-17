@@ -1590,8 +1590,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Rebuilding the report…",
     },
     "resend.caption": {
-        "ru": "Отчёт собран заново в текущем формате. Оценка та же: проверка считается по методике, при которой её начали.",
-        "en": "Report rebuilt in the current format. The score is unchanged: the inspection is scored by the methodology edition it was started on.",
+        "ru": (
+            "Отчёт собран заново в текущем формате. Оценка та же: "
+            "проверка считается по методике, при которой её начали."
+        ),
+        "en": (
+            "Report rebuilt in the current format. The score is unchanged: "
+            "the inspection is scored by the methodology edition it was started on."
+        ),
     },
     "resend.failed": {
         "ru": "Пересобрать отчёт не вышло. Подробности — в журнале стенда.",

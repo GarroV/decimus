@@ -48,7 +48,7 @@ async def test_проверка_остаётся_нетронутой(domain_env
     """Пересборка отчёта — чтение: записи после неё те же, что были."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
     add_finding(CHAT_ID, "PRD01", "D1", "fridge", "Ярлык без даты вскрытия")
-    bot, session = make_bot()
+    bot, _session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
     await feed(dp, bot, text_message(COMMAND))
@@ -73,7 +73,14 @@ async def test_команда_объявлена_в_меню() -> None:
 
 @pytest.mark.parametrize("lang", UI_LANGS)
 @pytest.mark.parametrize(
-    "ключ", ("cmd.resend", "resend.no_inspection", "resend.building", "resend.caption", "resend.failed")
+    "ключ",
+    (
+        "cmd.resend",
+        "resend.no_inspection",
+        "resend.building",
+        "resend.caption",
+        "resend.failed",
+    ),
 )
 def test_тексты_заведены_на_обоих_языках(ключ: str, lang: str) -> None:
     текст = TEXTS[ключ][lang]

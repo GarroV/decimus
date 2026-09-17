@@ -14,10 +14,9 @@
 
 from __future__ import annotations
 
+import csv
 import json
 from collections.abc import Callable
-
-import csv
 from pathlib import Path
 
 from conftest import ROOT, Run
@@ -61,7 +60,9 @@ def test_обнулённая_зона_ложится_на_процесс_вин
     assert round(sum(p["loss"] for p in s["by_process"].values()), 4) == round(s["deductions"], 4)
 
 
-def test_нарушение_чужого_процесса_в_обнулённой_зоне_ничего_не_стоит(started: Callable[..., Run]) -> None:
+def test_нарушение_чужого_процесса_в_обнулённой_зоне_ничего_не_стоит(
+    started: Callable[..., Run],
+) -> None:
     """Зона уже в нуле — вычитать с неё второй раз нечего, и приписать этот
     ноль второму процессу нельзя: иначе сумма вкладов перерастёт общую потерю."""
     started("add", "--qid", "PRD04", "--level", "D3", "--zone", "hot_kitchen")
@@ -92,8 +93,7 @@ def test_в_сводку_попадают_все_процессы_методик
     s = свод(started)
 
     процессы_методики = {
-        (r.get("process_code") or r["process_ru"]).strip()
-        for r in методика_пунктов()
+        (r.get("process_code") or r["process_ru"]).strip() for r in методика_пунктов()
     }
     assert set(s["by_process"]) == процессы_методики
 

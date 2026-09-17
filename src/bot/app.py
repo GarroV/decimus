@@ -42,17 +42,16 @@ from .routers import (
     build_fallback_router,
     build_finish_router,
     build_help_router,
-    build_resend_router,
     build_info_router,
     build_material_router,
     build_mcp_router,
     build_record_router,
     build_records_router,
+    build_resend_router,
     build_start_router,
     build_version_router,
 )
 from .routers.help import HELP_COMMAND
-from .routers.resend import RESEND_COMMAND
 from .routers.material import MaterialHandler
 from .routers.mcp import (
     MCP_ADD_COMMAND,
@@ -62,6 +61,7 @@ from .routers.mcp import (
 )
 from .routers.record import make_frame_handler, make_material_handler, make_waiting_handler
 from .routers.records import RECORDS_COMMAND
+from .routers.resend import RESEND_COMMAND
 from .routers.version import VERSION_COMMAND
 from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
