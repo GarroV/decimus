@@ -75,6 +75,19 @@ class _Row:
     codes: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class _Head:
+    """Шапка таблицы раздела: её колонки и СТРОКА ФАЙЛА, где она стоит (T291).
+
+    Номер строки нужен ровно одному случаю — разделу, у которого шапка есть, а
+    строк ещё нет: новой строке не за что зацепиться, и опереться она обязана
+    на свою шапку, а не на первую строку файла.
+    """
+
+    cells: tuple[str, ...]
+    index: int
+
+
 def _cells(line: str) -> tuple[str, ...]:
     return tuple(c.strip() for c in line.strip().strip(_PIPE).split(_PIPE))
 
@@ -83,7 +96,7 @@ def _is_rule(cells: tuple[str, ...]) -> bool:
     return all(set(c) <= _RULE_CHARS for c in cells)
 
 
-def _scan(text: str) -> tuple[list[_Row], dict[str, tuple[str, ...]]]:
+def _scan(text: str) -> tuple[list[_Row], dict[str, _Head]]:
     """Строки-подсказки файла и заголовок таблицы каждого раздела.
 
     Правила отбора — те же, что у разборщика продукта: раздел порогов классов
@@ -94,7 +107,7 @@ def _scan(text: str) -> tuple[list[_Row], dict[str, tuple[str, ...]]]:
     заводится новая строка и отвечает чтение.
     """
     rows: list[_Row] = []
-    headers: dict[str, tuple[str, ...]] = {}
+    headers: dict[str, _Head] = {}
     section = ""
     header: tuple[str, ...] = ()
     in_thresholds = False
@@ -112,10 +125,27 @@ def _scan(text: str) -> tuple[list[_Row], dict[str, tuple[str, ...]]]:
         codes = tuple(dict.fromkeys(_CODE.findall(" ".join(cells[1:]))))
         if not codes:
             header = cells
-            headers.setdefault(section, cells)
+            headers.setdefault(section, _Head(cells=cells, index=index))
             continue
         rows.append(_Row(index=index, section=section, header=header, cells=cells, codes=codes))
     return rows, headers
+
+
+def _after_head(строки: list[str], head: _Head) -> int:
+    """Первая строка ПУСТОЙ таблицы встаёт сразу за её шапкой (T291).
+
+    Разделитель шапки (`|---|---|`) пропускается: строка, вставленная между
+    шапкой и разделителем, перестаёт быть строкой таблицы — и продукт её не
+    увидит вовсе, а правка при этом вернула бы успех. Разделитель не
+    обязателен (карта — свободный Markdown), поэтому он именно пропускается,
+    если стоит, а не требуется.
+    """
+    куда = head.index + 1
+    if куда < len(строки):
+        следующая = строки[куда]
+        if следующая.lstrip().startswith(_PIPE) and _is_rule(_cells(следующая)):
+            куда += 1
+    return куда
 
 
 def _zone_at(header: tuple[str, ...]) -> int | None:
@@ -431,7 +461,10 @@ def read(store: Store, *, version: str | None = None) -> dict[str, object]:
         "sections": [
             {
                 "section": name,
-                "columns": [headers[name][место] for место in _named(headers.get(name, ()))],
+                "columns": [
+                    headers[name].cells[место]
+                    for место in _named(headers[name].cells if name in headers else ())
+                ],
                 "cues": строки,
             }
             for name, строки in разделы.items()
@@ -470,18 +503,26 @@ def add(
                 f"мимо цели: работать будет первая, а править человек станет вторую"
             )
         свои = [row for row in rows if row.section == section.strip()]
+        шапка = headers[section.strip()]
         # Шапка ТОЙ таблицы, в которую строка ложится, а не первая шапка
         # раздела: под одним заголовком раздела боевой карты стоят семнадцать
         # таблиц, и новая строка встаёт в последнюю.
-        заголовок = (свои[-1].header if свои else ()) or headers[section.strip()]
+        заголовок = (свои[-1].header if свои else ()) or шапка.cells
         ячейки = _check_codes(
             codes,
             known=_known_codes(кандидат),
             header=заголовок,
             bearing=_code_bearing(rows, заголовок),
         )
-        куда = (свои[-1].index if свои else _scan(текст)[0][0].index) + 1
         строки = текст.splitlines()
+        # Строк у раздела ещё нет — встаём за его собственной шапкой (T291).
+        # Прежний расчёт брал в этом случае ПЕРВУЮ строку всего файла, то есть
+        # клал строку в чужую таблицу: раздел в вызове назван верно, отказа
+        # нет, продукт видит строку под чужими колонками — а колонки значат
+        # разное. Колонки при этом берутся у той же шапки, за которой строка
+        # встаёт: разойдись эти два места, строка легла бы в одну таблицу с
+        # колонками другой.
+        куда = (свои[-1].index + 1) if свои else _after_head(строки, шапка)
         строки.insert(куда, _line(_compose(заголовок, ячейки, фраза, previous=None)))
         _cues_file(кандидат).write_text("\n".join(строки) + "\n", encoding="utf-8")
         коды = tuple(dict.fromkeys(_CODE.findall(" ".join(ячейки))))
