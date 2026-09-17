@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import re
 from collections.abc import Mapping
@@ -21,6 +20,8 @@ import psycopg
 from dotenv import load_dotenv
 from psycopg import sql
 
+from .checksum import checksum as _checksum
+from .checksum import is_legacy, legacy_checksum
 from .errors import ConfigError
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
@@ -79,8 +80,6 @@ class Migration:
     checksum: str
 
 
-def _checksum(sql: str) -> str:
-    return hashlib.sha256(sql.encode("utf-8")).hexdigest()
 
 
 def discover_migrations(directory: Path = MIGRATIONS_DIR) -> list[Migration]:
@@ -123,6 +122,78 @@ def discover_migrations(directory: Path = MIGRATIONS_DIR) -> list[Migration]:
     return migrations
 
 
+def _verify(conn: "psycopg.Connection", migration: Migration, stored: str) -> None:
+    """Сверить применённую миграцию с файлом — и, где можно, перевести печать.
+
+    Три исхода, и разница между ними и есть весь смысл задачи #258.
+
+    Печать нового формата совпала — идём дальше. Печать СТАРАЯ (снята с полного
+    текста прежним раннером) и файл с тех пор не тронут — переводим её молча:
+    тот, кто ничего не менял, о смене формата отпечатка знать не обязан.
+
+    Всё остальное — отказ. Он и раньше был отказом, но теперь называет выход:
+    если менялись только слова (комментарий, ссылка на решение), печать
+    перепечатывается поимённо — `python -m src.db.migrate --reseal ИМЯ`. Делает
+    это человек, а не раннер: отличить правку комментария от правки схемы по
+    старой печати нечем — прежнего текста у нас нет.
+    """
+    if stored == migration.checksum:
+        return
+    if is_legacy(stored) and stored == legacy_checksum(migration.sql):
+        _reseal(conn, migration)
+        return
+    raise ConfigError(
+        f"Миграция {migration.filename} применена, но её содержимое с тех пор "
+        f"изменилось — отпечаток в базе не совпадает с файлом. Старые миграции "
+        f"не правятся: новая правка идёт новым файлом. Если менялись только "
+        f"комментарии, а схема нет, — перепечатать: "
+        f"python -m src.db.migrate --reseal {migration.filename}"
+    )
+
+
+def _reseal(conn: "psycopg.Connection", migration: Migration) -> None:
+    """Записать отпечаток файла как действующий. Схему не трогает."""
+    with conn.cursor() as cur:
+        cur.execute(
+            "update schema_migrations set checksum = %s where filename = %s",
+            (migration.checksum, migration.filename),
+        )
+    conn.commit()
+
+
+def reseal_migration(dsn: str, filename: str, *, directory: Path = MIGRATIONS_DIR) -> str:
+    """Перепечатать ОДНУ применённую миграцию под текущий файл (#258).
+
+    Поимённо и вручную — по той же причине, по которой сторож вообще
+    существует: перепечать заявляет «схема та же, менялись слова», а проверить
+    это может только человек, глядя в `git log` файла. Раннер здесь лишь
+    сторожит очевидные промахи: файла нет в каталоге или он вовсе не применён —
+    отказ, потому что молчаливый успех на опечатке в имени выглядел бы как
+    починка, которой не было.
+
+    Возвращает новый отпечаток — его печатает CLI, чтобы в журнале раскатки
+    осталось, что именно было перепечатано.
+    """
+    known = {m.filename: m for m in discover_migrations(directory)}
+    migration = known.get(filename)
+    if migration is None:
+        raise ConfigError(
+            f"Перепечатывать нечего: файла {filename} нет в каталоге миграций {directory}"
+        )
+    with psycopg.connect(dsn) as conn:
+        with conn.cursor() as cur:
+            cur.execute(_TRACKING_TABLE_SQL)
+            cur.execute("select checksum from schema_migrations where filename = %s", (filename,))
+            row = cur.fetchone()
+        if row is None:
+            raise ConfigError(
+                f"Миграция {filename} на этой базе не применена — перепечатывать нечего. "
+                f"Её накатит обычный накат"
+            )
+        _reseal(conn, migration)
+    return migration.checksum
+
+
 def apply_migrations(dsn: str, *, directory: Path = MIGRATIONS_DIR) -> list[str]:
     """Накатить все миграции, которых ещё нет в базе. Вернуть имена применённых.
 
@@ -142,12 +213,7 @@ def apply_migrations(dsn: str, *, directory: Path = MIGRATIONS_DIR) -> list[str]
         for migration in migrations:
             existing = known.get(migration.filename)
             if existing is not None:
-                if existing != migration.checksum:
-                    raise ConfigError(
-                        f"Миграция {migration.filename} применена, но её содержимое с тех пор "
-                        f"изменилось — отпечаток в базе не совпадает с файлом. Старые миграции "
-                        f"не правятся: новая правка идёт новым файлом"
-                    )
+                _verify(conn, migration, existing)
                 continue
             with conn.cursor() as cur:
                 cur.execute(migration.sql)
@@ -259,12 +325,28 @@ def _warn_if_app_role_bypasses_rls(app_url: str) -> None:
         )
 
 
-def main() -> None:  # pragma: no cover — тонкая обёртка CLI, части проверены по отдельности
+def main(argv: list[str] | None = None) -> None:  # pragma: no cover — тонкая обёртка CLI
+    import sys
+
     from .config import check_environment
 
+    args = list(sys.argv[1:] if argv is None else argv)
     load_env_file()
     app_url = check_environment().dsn
     dsn = admin_dsn() or app_url
+
+    # Перепечать — отдельный заход, а не шаг наката: она заявляет, что схема
+    # та же, и делать это «заодно» нельзя (#258).
+    if args and args[0] == "--reseal":
+        if len(args) != 2:
+            raise ConfigError(
+                "Перепечать зовётся с одним именем файла: "
+                "python -m src.db.migrate --reseal 0007_model_suggestion.sql"
+            )
+        отпечаток = reseal_migration(dsn, args[1])
+        print(f"Отпечаток {args[1]} перепечатан под текущий файл: {отпечаток}")
+        return
+
     applied = apply_migrations(dsn)
     if applied:
         print("Применены миграции: " + ", ".join(applied))
