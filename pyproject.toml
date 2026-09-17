@@ -122,7 +122,7 @@ exclude = ["engine", "\\.venv"]
 # Опускать планку, чтобы прогон позеленел, — это снять сторожа, а не починить
 # прогон; удаление тестов-переборок опускает её законно, но тем же коммитом.
 [tool.decimus]
-test_floor = 2878
+test_floor = 2885
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
