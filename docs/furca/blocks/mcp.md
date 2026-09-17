@@ -776,7 +776,12 @@ regress` (97.5% A 5×D1, 97.0% A 6×D1) — зелёные. Тесты блок�
 потребителей: `test_mcp_checklist_access.py` (28), `test_mcp_catalogue.py`,
 `test_mcp_no_paths.py`, `test_mcp_rpc.py`, `test_mcp_no_history.py`,
 `test_mcp_entrance.py`, `test_mcp_checklist_tools.py`, `test_mcp_phrases.py`,
-`test_mcp_config.py`, `test_methodology_leak.py` — 209 прошло, пропущенных нет.
+`test_mcp_config.py`, `test_methodology_leak.py`, `test_mcp_server.py`,
+`test_bot_mcp_command.py`, `test_bot_mcp_setup.py`, `test_mcp_install_endpoint.py`
+— 259 прошло, 39 пропущено (нужен Postgres, стенд базы не поднимался: инструменты
+T315 в базу не ходят). Заслон «записи нет ни у одного инструмента»
+(`test_mcp_server.py`) новый вид и поймал — до правки он требовал от инструментов
+исходника обработчик из чужого модуля.
 Право T315 проверено порчей в обе стороны: правящему инструменту подставлено
 читательское хранилище — красные четыре теста, включая «партнёру чтение не даёт
 ни одной правки»; чтение снова заперто правом правки — красные пять; код
