@@ -720,6 +720,8 @@ async def test_спрятанных_команд_у_бота_нет(domain_env: 
         "undo",
         "finish",
         "help",
+        # Временная: обкатка формата отчёта (#261, D122) — уйдёт вместе с ней.
+        "resend",
         "version",
         MCP_COMMAND,
         MCP_ADD_COMMAND,

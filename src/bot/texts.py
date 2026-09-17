@@ -1580,6 +1580,23 @@ TEXTS: dict[str, dict[str, str]] = {
     # Краткая справка (#257). Её текст — единственное место продукта, где
     # порядок работы описан целиком; порядок пунктов повторяет порядок
     # обхода, а не список команд, потому что аудитор читает её на точке.
+    "cmd.resend": {"ru": "Прислать отчёт ещё раз", "en": "Send the report again"},
+    "resend.no_inspection": {
+        "ru": "Проверки в этом чате нет — присылать нечего.",
+        "en": "No inspection in this chat — nothing to send.",
+    },
+    "resend.building": {
+        "ru": "Пересобираю отчёт…",
+        "en": "Rebuilding the report…",
+    },
+    "resend.caption": {
+        "ru": "Отчёт собран заново в текущем формате. Оценка та же: проверка считается по методике, при которой её начали.",
+        "en": "Report rebuilt in the current format. The score is unchanged: the inspection is scored by the methodology edition it was started on.",
+    },
+    "resend.failed": {
+        "ru": "Пересобрать отчёт не вышло. Подробности — в журнале стенда.",
+        "en": "Rebuilding the report failed. Details are in the server log.",
+    },
     "cmd.help": {"ru": "Как работать с ботом", "en": "How to work with the bot"},
     "help.text": {
         "ru": (
