@@ -700,9 +700,7 @@ def test_зона_снимается_прочерком_и_ячейка_оста
     """Снять зону — законное действие: объект бывает в разных цехах, и пустая
     зона означает «спросить». Пишется при этом ПУСТАЯ ячейка, а не прочерк:
     прочерк разбор продукта вернул бы как зону с таким названием."""
-    итог = photo_cues.set_zone(
-        store, tenant=АРЕНДАТОР, phrase="Печь", zone="—", version_name="imf"
-    )
+    итог = photo_cues.set_zone(store, tenant=АРЕНДАТОР, phrase="Печь", zone="—", version_name="imf")
 
     assert итог.accepted is True, итог.refusal
     assert _строка(store, итог.version, "Печь").zone == ""

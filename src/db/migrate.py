@@ -80,8 +80,6 @@ class Migration:
     checksum: str
 
 
-
-
 def discover_migrations(directory: Path = MIGRATIONS_DIR) -> list[Migration]:
     """Миграции по имени файла — числовой префикс задаёт порядок наката.
 

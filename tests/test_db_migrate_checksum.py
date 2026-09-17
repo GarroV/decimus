@@ -142,7 +142,9 @@ def test_старая_печать_нетронутого_файла_обнов�
         # И печать действительно переведена, а не сверена «на лету»: следующий
         # накат не должен снова упираться в тот же старый формат.
         with psycopg.connect(dsn) as conn, conn.cursor() as cur:
-            cur.execute("select checksum from schema_migrations where filename = %s", ("0001_first.sql",))
+            cur.execute(
+                "select checksum from schema_migrations where filename = %s", ("0001_first.sql",)
+            )
             row = cur.fetchone()
         assert row is not None and row[0] == checksum(текст)
 
