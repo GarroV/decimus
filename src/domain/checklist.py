@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import edition, route, version
 from .config import DATA_FILES, Settings, check_environment
-from .errors import ValidationError
+from .errors import ConfigError, ValidationError
 from .models import ChecklistItem, Zone
 
 
@@ -42,15 +42,40 @@ def _rows(path: Path) -> list[dict[str, str | None]]:
         return list(csv.DictReader(f))
 
 
-def _item(row: dict[str, str | None]) -> ChecklistItem:
+def _days(row: dict[str, str | None], code: str, path: Path, line: int) -> int:
+    """Срок устранения пункта. Нечитаемое значение — отказ, а не ноль (T302).
+
+    Нулевой срок печатается партнёру как «устранить немедленно», поэтому движок
+    на нечисловой клетке завершается с объяснением (T106). Пока здесь стояла
+    молчаливая нормализация в ноль, блок и движок читали один файл и расходились
+    в выводе: справочник показывал пункт со сроком «немедленно», а движок
+    отказывался считать — и узнавал об этом аудитор на точке.
+
+    Пустая клетка ноль и остаётся: `manage.py add` без `--days` пишет в CSV
+    именно пустоту, и запрет сломал бы штатное заведение пункта. Граница
+    проходит там же, где у движка.
+    """
+    raw = _text(row, "days")
+    if not raw:
+        return 0
+    try:
+        return int(float(raw))
+    except ValueError:
+        raise ConfigError(
+            f"Срок устранения не число: у пункта «{code}» в колонке days стоит "
+            f"«{raw}». Файл: {path}, строка {line}. Поставьте целое число дней — "
+            f"иначе срок в предписании партнёру превращается в «немедленно», и "
+            f"рядовое нарушение выглядит критическим"
+        ) from None
+
+
+def _item(row: dict[str, str | None], path: Path, line: int) -> ChecklistItem:
     levels = [x.strip().upper() for x in re.split(r"[;,]", _text(row, "levels")) if x.strip()]
     zones = [z.strip() for z in _text(row, "zones").split(",") if z.strip()]
-    try:
-        days = int(float(_text(row, "days") or 0))
-    except ValueError:
-        days = 0
+    code = _text(row, "id")
+    days = _days(row, code, path, line)
     return ChecklistItem(
-        code=_text(row, "id"),
+        code=code,
         kind=_text(row, "kind") or "violation",
         process_ru=_text(row, "process_ru"),
         process_en=_text(row, "process_en"),
@@ -63,16 +88,29 @@ def _item(row: dict[str, str | None]) -> ChecklistItem:
 
 
 def _all_items(settings: Settings) -> list[ChecklistItem]:
+    path = settings.data_dir / "checklist.csv"
     items: list[ChecklistItem] = []
-    seen: set[str] = set()
-    for row in _rows(settings.data_dir / "checklist.csv"):
+    seen: dict[str, int] = {}
+    # Строка 1 — шапка, поэтому данные начинаются со второй: номер должен
+    # совпадать с тем, что покажет управляющей компании её редактор.
+    for line, row in enumerate(_rows(path), start=2):
         code = _text(row, "id")
-        # Дубль кода движок пропускает с предупреждением в stderr; здесь то же
-        # правило, иначе список пунктов и мнение движка разойдутся.
-        if not code or code.startswith("#") or code in seen:
+        if not code or code.startswith("#"):
             continue
-        seen.add(code)
-        items.append(_item(row))
+        # Дубль кода — отказ, как у движка (T106, T302). Пункты связываются
+        # кодами, а не формулировками: две строки с одним кодом означают, что в
+        # отчёт попадёт не тот вопрос. Раньше здесь брали первую строку и
+        # молчали — блок показывал аудитору пункт, по которому движок считать
+        # отказывается.
+        if code in seen:
+            raise ConfigError(
+                f"Дубль id в чек-листе: «{code}» встречается в строках "
+                f"{seen[code]} и {line}. Файл: {path}. Пункты связываются кодами, "
+                f"а не формулировками: две строки с одним кодом означают, что в "
+                f"отчёт попадёт не тот вопрос. Оставьте одну строку или смените код"
+            )
+        seen[code] = line
+        items.append(_item(row, path, line))
     # Порядок обхода (T061) — данные: пункты выстраиваются так, как аудитор идёт
     # по точке, а не как строки легли в CSV.
     return route.arrange(
