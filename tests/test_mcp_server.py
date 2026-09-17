@@ -26,7 +26,7 @@ from typing import Any
 import pytest
 from conftest import requires_db
 
-from src.mcp.catalogue import KIND_CHECKLIST, KIND_RETRACTION, TOOLS
+from src.mcp.catalogue import KIND_CHECKLIST, KIND_CHECKLIST_SOURCE, KIND_RETRACTION, TOOLS
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
 from src.mcp.rpc import (
     CODE_INVALID_PARAMS,
@@ -376,6 +376,14 @@ def test_содержимое_проверки_остаётся_нетронут
     запись в отчёт партнёру мимо человека, — а «модель предлагает, фиксирует
     человек» держится не обещанием.
 
+    Исключений три, и третье ничего не ослабляет: чтение исходника эталона
+    (T315, D132) не пишет вообще никуда — ни в проверку, ни в методику. Оно
+    названо отдельным видом потому, что открыто ВСЯКОМУ токену, и потому
+    проверяется здесь строже остальных: обработчик обязан лежать в модуле
+    `src.mcp.checklist_source`, где записи нет вовсе. Обработчик из
+    `checklist_tools`, подставленный сюда, отдал бы правку методики любому
+    предъявителю токена.
+
     Утверждение с T211 звучит точнее прежнего «проверки только на чтение», и
     не потому, что его ослабили. Снятие проверки (D086, D089) не пишет в
     документ ни знака: оно ставит пометку и записывает причину, а исправленная
@@ -405,6 +413,9 @@ def test_содержимое_проверки_остаётся_нетронут
     for spec in TOOLS:
         assert spec.name in объявленные
         if spec.kind in (KIND_CHECKLIST, KIND_RETRACTION):
+            continue
+        if spec.kind == KIND_CHECKLIST_SOURCE:
+            assert spec.handler.__module__ == "src.mcp.checklist_source", spec.name
             continue
         assert spec.handler.__module__ == "src.mcp.tools", spec.name
         for запрещённое in ("create", "update", "delete", "insert", "push", "set_", "edit"):
