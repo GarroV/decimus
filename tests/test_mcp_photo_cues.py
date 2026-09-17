@@ -654,3 +654,96 @@ def test_первая_строка_карты_без_единой_строки_�
 
     assert итог.accepted is True, итог.refusal
     assert _фразы(store, итог.version) == ["Пол в разводах"]
+
+
+# --- зона строки ставится отдельным инструментом (T293, D125) -------------------
+
+
+def test_зона_ставится_и_видна_разборщику_продукта(store: Store) -> None:
+    """Заполнять зоны предстоит массово, и делает это отдельный вызов (D125).
+
+    Проверяется наблюдаемое: зону видит ТОТ ЖЕ разбор, которым её читает бот
+    (`Cue.zone`), а не записанная строка файла.
+    """
+    итог = photo_cues.set_zone(
+        store, tenant=АРЕНДАТОР, phrase="Стеллаж", zone="dough", version_name="imf"
+    )
+
+    assert итог.accepted is True, итог.refusal
+    строка = _строка(store, итог.version, "Стеллаж")
+    assert строка.zone == "dough"
+    assert строка.codes == ("CLN01",), "правка зоны тронула коды строки"
+
+
+def test_зона_записывается_кодом_справочника_а_не_как_набрали(store: Store) -> None:
+    """Потребитель сверяет зону кода в код (`src/bot/zones.py`): чужое написание
+    он молча отбросит в лог, и на точке это выглядит как «карта не сработала»."""
+    итог = photo_cues.set_zone(
+        store, tenant=АРЕНДАТОР, phrase="Стеллаж", zone="DOUGH", version_name="imf"
+    )
+
+    assert _строка(store, итог.version, "Стеллаж").zone == "dough"
+
+
+def test_зоны_нет_в_справочнике_издания_отказ(store: Store) -> None:
+    """Код, которого в `zones.csv` этой версии нет, бот отбрасывает с записью в
+    лог — то есть молча для аудитора. Отказ здесь дешевле."""
+    with pytest.raises(ChecklistError, match="кухня") as отказ:
+        photo_cues.set_zone(
+            store, tenant=АРЕНДАТОР, phrase="Стеллаж", zone="кухня", version_name="imf"
+        )
+
+    assert "dough" in str(отказ.value), "отказ не называет, какие зоны есть"
+
+
+def test_зона_снимается_прочерком_и_ячейка_остаётся_пустой(store: Store) -> None:
+    """Снять зону — законное действие: объект бывает в разных цехах, и пустая
+    зона означает «спросить». Пишется при этом ПУСТАЯ ячейка, а не прочерк:
+    прочерк разбор продукта вернул бы как зону с таким названием."""
+    итог = photo_cues.set_zone(
+        store, tenant=АРЕНДАТОР, phrase="Печь", zone="—", version_name="imf"
+    )
+
+    assert итог.accepted is True, итог.refusal
+    assert _строка(store, итог.version, "Печь").zone == ""
+    текст = (_version_dir(store, итог.version) / CUES_FILE).read_text(encoding="utf-8")
+    assert "| Печь | CLN01 | CLN02 |  | вопрос |" in текст
+
+
+def test_пустая_зона_в_вызове_отказ_а_не_молчаливое_снятие(store: Store) -> None:
+    """Аргумент, оказавшийся пустым, снял бы зону молча. Снятие называется
+    прочерком — тем же знаком, которым карта пишет «здесь ничего нет»."""
+    with pytest.raises(ChecklistError, match="—"):
+        photo_cues.set_zone(store, tenant=АРЕНДАТОР, phrase="Печь", zone="  ", version_name="imf")
+
+
+def test_в_таблице_без_колонки_зоны_отказ_а_не_новая_колонка(store: Store) -> None:
+    """Колонку заводит управляющая компания в самой карте: дописанная отсюда,
+    она сменила бы ширину всех строк таблицы разом."""
+    with pytest.raises(ChecklistError, match="колонки зоны") as отказ:
+        photo_cues.set_zone(
+            store,
+            tenant=АРЕНДАТОР,
+            phrase="Стена в подтёках",
+            zone="dough",
+            version_name="imf",
+        )
+
+    assert "Что видно" in str(отказ.value), f"отказ не называет колонки таблицы: {отказ.value}"
+
+
+def test_правка_зоны_не_трогает_колонку_управляющей_компании(store: Store) -> None:
+    """«Откуда» — колонка УК, и переписывать её правкой зоны нечем."""
+    итог = photo_cues.set_zone(
+        store, tenant=АРЕНДАТОР, phrase="Печь", zone="dough", version_name="imf"
+    )
+
+    текст = (_version_dir(store, итог.version) / CUES_FILE).read_text(encoding="utf-8")
+    assert "| Печь | CLN01 | CLN02 | dough | вопрос |" in текст
+
+
+def test_зона_несуществующей_строки_отказ(store: Store) -> None:
+    with pytest.raises(ChecklistError, match="карте слов нет"):
+        photo_cues.set_zone(
+            store, tenant=АРЕНДАТОР, phrase="Тестомес", zone="dough", version_name="imf"
+        )

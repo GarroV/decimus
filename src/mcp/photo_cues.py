@@ -253,6 +253,19 @@ def _known_codes(data_dir: Path) -> set[str]:
         return {(row.get("id") or "").strip().upper() for row in csv.DictReader(f)} - {""}
 
 
+def _known_zones(data_dir: Path) -> tuple[str, ...]:
+    """Коды зон этой версии — по её же `zones.csv`, в написании справочника.
+
+    Написание важно: бот сверяет зону строки со справочником издания кодом в
+    код (`src/bot/zones.py`) и чужое написание отбрасывает записью в лог — то
+    есть молча для аудитора. Поэтому в карту уезжает код справочника, а не то,
+    как его набрали в вызове.
+    """
+    with (data_dir / "zones.csv").open(encoding="utf-8-sig", newline="") as f:
+        коды = [(row.get("code") or "").strip() for row in csv.DictReader(f)]
+    return tuple(dict.fromkeys(code for code in коды if code))
+
+
 def cell_codes(cell: str) -> tuple[str, ...]:
     """Коды пунктов ОДНОЙ ячейки таблицы, в порядке появления.
 
@@ -389,29 +402,45 @@ def _line(cells: tuple[str, ...]) -> str:
     return f"{_PIPE} " + f" {_PIPE} ".join(cells) + f" {_PIPE}"
 
 
-def _verify(data_dir: Path, *, expected: dict[str, tuple[str, ...] | None]) -> None:
+def _verify(
+    data_dir: Path,
+    *,
+    expected: dict[str, tuple[str, ...] | None],
+    zones: dict[str, str] | None = None,
+) -> None:
     """Сверить наблюдаемый результат разборщиком ПРОДУКТА, а не своим.
 
-    `expected`: фраза → её коды, или `None`, если строки быть не должно. Без
+    `expected`: фраза → её коды, или `None`, если строки быть не должно.
+    `zones`: фраза → зона, которую продукт обязан у неё увидеть (T293). Без
     этой сверки правка возвращала бы успех, не сделав работу: формат карты
     свободный, и строка, записанная чуть не так, тихо перестаёт быть строкой.
     """
     # `NO_CHAT`: карта читается по НАЗВАННОМУ каталогу версии из хранилища, а
     # не по изданию какой-то идущей проверки — здесь правят методику, а не
     # ведут выезд (T226).
-    видно = {cue.phrase: cue.codes for cue in load_cues(_cues_file(data_dir), chat_id=NO_CHAT)}
+    видно = {cue.phrase: cue for cue in load_cues(_cues_file(data_dir), chat_id=NO_CHAT)}
     for phrase, codes in expected.items():
+        строка = видно.get(phrase)
         if codes is None:
-            if phrase in видно:
+            if строка is not None:
                 raise ChecklistError(
                     f"Строка «{phrase}» осталась в карте после снятия: правка записана, но "
                     f"продукт видит прежнее"
                 )
             continue
-        if видно.get(phrase) != codes:
+        if строка is None or строка.codes != codes:
             raise ChecklistError(
                 f"После правки разборщик продукта видит у строки «{phrase}» коды "
-                f"{видно.get(phrase)}, а не {codes}. Правка записана не так, как задумано"
+                f"{None if строка is None else строка.codes}, а не {codes}. Правка записана "
+                f"не так, как задумано"
+            )
+    for phrase, zone in (zones or {}).items():
+        строка = видно.get(phrase)
+        if строка is None or строка.zone != zone:
+            raise ChecklistError(
+                f"После правки разборщик продукта видит у строки «{phrase}» зону "
+                f"«{'' if строка is None else строка.zone}», а не «{zone}». Правка записана "
+                f"не так, как задумано"
             )
 
 
@@ -621,6 +650,94 @@ def remove(
         store,
         tenant=tenant,
         tool="remove_photo_cue",
+        mutate=_mutate,
+        version_name=version_name,
+        note=note,
+    )
+
+
+def set_zone(
+    store: Store,
+    *,
+    tenant: str,
+    phrase: str,
+    zone: str,
+    version_name: str | None = None,
+    note: str | None = None,
+) -> Outcome:
+    """Поставить строке карты зону объекта — отдельным ходом от правки кодов (T293).
+
+    Форму выбрало решение D125: отдельный инструмент, а не ещё одно поле у
+    правки кодов. Причина названа там же — заполнение зон предстоит массовое, и
+    смешанное с правкой кодов оно стирает границу между «поправил код» и
+    «переназначил зону»: в журнале хранилища эти два действия перестали бы
+    различаться, а различать их придётся именно тогда, когда что-то уедет
+    партнёру не туда.
+
+    **Зона сверяется со справочником зон ЭТОЙ версии.** Разбор карты сверять её
+    не может — он не знает, о каком издании речь (`recognize.cues._zone`), — а
+    здесь версия названа. Незнакомый код бот отбрасывает записью в лог, то есть
+    молча для аудитора: на точке это выглядит как «карта не сработала», и найти
+    причину человеку неоткуда.
+
+    **Снятие называется прочерком.** Пустая зона — законное значение и означает
+    «спросить», поэтому снять её надо чем-то; но пустой аргумент снимал бы зону
+    молча всякий раз, когда вызов собран небрежно. Прочерк — тот же знак,
+    которым карта пишет «здесь ничего нет»; в ячейку при этом уезжает ПУСТО, а
+    не сам прочерк: прочерк разбор вернул бы как зону с таким названием.
+    """
+    значение = (zone or "").strip()
+    if not значение:
+        raise ChecklistError(
+            f"Не названа зона. Пустой аргумент снял бы зону объекта молча; чтобы снять её "
+            f"нарочно, назовите «{_DASH}» — карта пишет этим знаком «здесь ничего нет»"
+        )
+    снять = значение in _BLANK
+
+    def _mutate(кандидат: Path, _holder: Path) -> tuple[str | None, str]:
+        текст = _text(кандидат)
+        rows, _ = _scan(текст)
+        строка = _find(rows, phrase)
+        форма = _shape(строка)
+        место = _zone_at(форма)
+        if место is None:
+            raise ChecklistError(
+                f"У таблицы этой строки нет колонки зоны (её заголовок — "
+                f"{', '.join(f'«{имя}»' for имя in sorted(ZONE_HEADINGS))}): колонки таблицы — "
+                f"{', '.join(f'«{имя}»' for имя in форма) or 'нет'}. Колонку заводит "
+                f"управляющая компания в самой карте: дописанная отсюда, она сменила бы "
+                f"ширину всех строк таблицы разом"
+            )
+        известные = _known_zones(кандидат)
+        if снять:
+            новая = ""
+        else:
+            подходящие = [код for код in известные if код.casefold() == значение.casefold()]
+            if not подходящие:
+                raise ChecklistError(
+                    f"Зоны «{значение}» в методике этой версии нет. Бот сверяет зону строки "
+                    f"со справочником издания и незнакомую отбрасывает в лог — то есть молча "
+                    f"для аудитора. Зоны этой версии: {', '.join(известные) or 'нет'}"
+                )
+            новая = подходящие[0]
+        ячейки = list(строка.cells) + [""] * max(0, len(форма) - len(строка.cells))
+        ячейки[место] = новая
+        строки = текст.splitlines()
+        строки[строка.index] = _line(tuple(ячейки))
+        _cues_file(кандидат).write_text("\n".join(строки) + "\n", encoding="utf-8")
+        коды = tuple(dict.fromkeys(_CODE.findall(" ".join(editable_cells(строка)))))
+        _verify(
+            кандидат,
+            expected={строка.cells[0]: коды},
+            zones={строка.cells[0]: новая},
+        )
+        сказано = новая or _DASH
+        return None, f"zone of cue «{строка.cells[0]}» set to «{сказано}»"
+
+    return apply_edit(
+        store,
+        tenant=tenant,
+        tool="set_photo_cue_zone",
         mutate=_mutate,
         version_name=version_name,
         note=note,
