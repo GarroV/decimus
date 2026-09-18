@@ -1,0 +1,73 @@
+{#
+  Каркас админки: шапка, боковая навигация из реестра разделов, содержимое.
+
+  Навигация строится ИЗ ДАННЫХ (`src/web/sections.py`), а не перечислением в
+  разметке: признак «построен / не построен» живёт в одном месте, и лента
+  «в разработке» не может разойтись с фактом (D138).
+
+  Названия разделов берутся по ключу `section.<код>.title` — ключ остаётся
+  кодом, переводится только название (конституция, принцип 5).
+#}<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ t('app.name') }}{% endblock %} · {{ t('app.mark') }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
+</head>
+<body>
+  <div class="appbar">
+    <div class="appbar__brand">
+      <span class="appbar__brand-name">{{ t('app.name') }}</span>
+      <span class="appbar__brand-mark">Dodo</span>
+    </div>
+    <span class="tag tag--neutral tag--micro">{{ t('app.mark') }}</span>
+    <div class="appbar__spacer"></div>
+    <div class="tenant">
+      <div>
+        <div class="tenant__name">{{ tenant }}</div>
+        <div class="tenant__meta">{{ t('app.tenant_label') }}</div>
+      </div>
+    </div>
+    <div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
+      {% for code in langs %}
+        {% if code == lang %}
+          <span class="btn btn--sm" aria-current="true">{{ code|upper }}</span>
+        {% else %}
+          <a class="btn btn--sm btn--ghost" href="{{ current_path }}?lang={{ code }}">{{ code|upper }}</a>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="shell">
+    <nav class="sidenav shell__nav">
+      {% for item in sections %}
+        {% set title = t('section.' ~ item.key ~ '.title') %}
+        {% set href = item.path ~ '?lang=' ~ lang %}
+        <span class="sidenav__wrap">
+          {% if not item.built %}<span class="tape tape--nav" aria-hidden="true"></span>{% endif %}
+          {% if item.path == current_path %}
+            <span class="sidenav__current">{{ title }}</span>
+          {% else %}
+            <a class="sidenav__item{% if not item.built %} sidenav__item--wip{% endif %}" href="{{ href }}">
+              <span class="grow">{{ title }}</span>
+              {% if not item.built %}<span class="tag tag--warn tag--micro tag--dashed nowrap">{{ t('nav.wip') }}</span>{% endif %}
+            </a>
+          {% endif %}
+        </span>
+      {% endfor %}
+    </nav>
+
+    <main class="shell__main">
+      <div class="page">
+        <div class="page__body">
+          {% block body %}{% endblock %}
+        </div>
+      </div>
+    </main>
+  </div>
+</body>
+</html>

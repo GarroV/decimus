@@ -1,0 +1,79 @@
+{#
+  Реестр проведённых проверок.
+
+  Процент и буква печатаются такими, какими они лежат в базе. Ни одного
+  действия над ними в шаблоне нет и быть не может — на экран приходит уже
+  подготовленная строка (`src/web/view.py`).
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.registry.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('section.registry.title') }}</h1>
+      <span class="section__num">
+        {{ t('registry.count', count=registry.rows|length) }}{% if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
+      </span>
+    </div>
+    <p class="section__lead">{{ t('registry.lead') }}</p>
+  </div>
+
+  {% if not registry.retracted_visible %}
+    <div class="note note--warn mt-gap">
+      <div>
+        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
+        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  {% if registry.rows %}
+    <div class="table-wrap mt-gap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="is-text">{{ t('registry.col.grade') }}</th>
+            <th class="is-text">{{ t('registry.col.unit') }}</th>
+            <th>{{ t('registry.col.score') }}</th>
+            <th>{{ t('registry.col.date') }}</th>
+            <th class="is-text">{{ t('registry.col.kind') }}</th>
+            <th class="is-text">{{ t('registry.col.auditor') }}</th>
+            <th>{{ t('registry.col.findings') }}</th>
+            <th class="is-text">{{ t('registry.col.status') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in registry.rows %}
+            <tr{% if row.retracted %} class="row-mark row-mark--frozen"{% endif %}>
+              <td class="is-text">
+                <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+              </td>
+              <td class="is-text">
+                <a href="/inspections/{{ row.id }}?lang={{ lang }}">{{ row.unit_name }}</a>
+                {% if row.city %}<div class="meta">{{ row.city }}</div>{% endif %}
+              </td>
+              <td class="is-num">{{ row.pct }}</td>
+              <td class="is-num">{{ row.inspection_date }}</td>
+              <td class="is-text">{{ kind_title(row.kind, lang) }}</td>
+              <td class="is-text">{{ row.auditor or '—' }}</td>
+              <td class="is-num">{{ row.findings_count }}</td>
+              <td class="is-text">
+                {% if row.retracted %}
+                  <span class="tag tag--err tag--micro">{{ t('state.retracted') }}</span>
+                  <div class="meta">{{ row.retraction_reason }}</div>
+                {% else %}
+                  <span class="tag tag--neutral tag--micro">{{ t('state.sealed') }}</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty mt-gap">
+      <div class="empty__title">{{ t('registry.empty.title') }}</div>
+      <p class="empty__text">{{ t('registry.empty.text') }}</p>
+    </div>
+  {% endif %}
+{% endblock %}
