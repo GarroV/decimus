@@ -250,6 +250,225 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "История проверок не прочиталась: {reason}",
         "en": "The inspection history could not be read: {reason}",
     },
+    # --- методика: состав чек-листа и его версии (T320) --------------------
+    # Слово «версия» здесь несёт весь смысл раздела: правка НИКОГДА не меняет
+    # действующую методику, она кладёт рядом новую версию (D049, D050).
+    # Поэтому тексты всюду говорят «записана», а «действует» — только про
+    # опубликованную: иначе «сохранил» прочиталось бы как «теперь по ней и
+    # считают», и управляющая компания решила бы, что предписания партнёрам
+    # уже уехали по новым правилам.
+    "methodology.lead": {
+        "ru": (
+            "Состав проверки: пункты, их классы, зоны и сроки. Любая правка кладёт рядом "
+            "новую версию и проходит сверку движком; действующей она становится отдельным "
+            "шагом — публикацией. Уже проведённые проверки остаются на своей версии и "
+            "не пересчитываются."
+        ),
+        "en": (
+            "What an inspection asks: items, their levels, zones and deadlines. Every edit "
+            "stores a new version next to the current one and is validated by the audit "
+            "engine; it takes effect only as a separate step — publishing. Inspections "
+            "already scored stay on their own version and are not recalculated."
+        ),
+    },
+    "methodology.count": {"ru": "Пунктов: {count}", "en": "{count} items"},
+    "methodology.store.missing.title": {
+        "ru": "Хранилище версий методики не настроено",
+        "en": "The methodology version store is not configured",
+    },
+    "methodology.store.missing.text": {
+        "ru": (
+            "Не заданы переменные окружения: {vars}. Пока их нет, состав чек-листа "
+            "показывать не из чего — пустая таблица читалась бы как «чек-лист пуст». "
+            "Правка методики без хранилища версий невозможна по устройству: она обязана "
+            "давать новую версию, а не переписывать действующую."
+        ),
+        "en": (
+            "These environment variables are not set: {vars}. Until they are, there is "
+            "nothing to show — an empty table would read as «the checklist is empty». "
+            "Editing without a version store is impossible by design: an edit must produce "
+            "a new version rather than overwrite the live one."
+        ),
+    },
+    "methodology.version.viewing": {"ru": "Версия {version}", "en": "Version {version}"},
+    "methodology.version.published": {
+        "ru": "Действует: {version}",
+        "en": "In effect: {version}",
+    },
+    "methodology.version.latest": {
+        "ru": "Свежая записанная: {version}",
+        "en": "Newest stored: {version}",
+    },
+    "methodology.version.badge.published": {"ru": "действует", "en": "in effect"},
+    "methodology.version.badge.draft": {"ru": "не опубликована", "en": "not published"},
+    "methodology.draft.title": {
+        "ru": "Есть записанная версия, которой движок ещё не видит",
+        "en": "A stored version the engine does not read yet",
+    },
+    "methodology.draft.text": {
+        "ru": (
+            "Записана {latest}, а проверки считаются по {current}. Публикация переставляет "
+            "указатель и на уже посчитанные проверки не действует."
+        ),
+        "en": (
+            "{latest} is stored, while inspections are scored by {current}. Publishing moves "
+            "the pointer and does not touch inspections already scored."
+        ),
+    },
+    "methodology.publish.submit": {"ru": "Опубликовать", "en": "Publish"},
+    "methodology.published": {
+        "ru": "Опубликована версия {version}. Проверки считаются по ней начиная с этой минуты.",
+        "en": "Version {version} is published. Inspections are scored by it from now on.",
+    },
+    "methodology.saved": {
+        "ru": (
+            "Записана версия {version}. Движок её принял, но проверки считаются "
+            "по-прежнему по действующей: опубликуйте её отдельным шагом."
+        ),
+        "en": (
+            "Version {version} is stored and accepted by the engine, but inspections are "
+            "still scored by the published one: publish it as a separate step."
+        ),
+    },
+    "methodology.failed": {
+        "ru": "Правка не принята: {reason}",
+        "en": "The edit was refused: {reason}",
+    },
+    "methodology.old.title": {"ru": "Старая версия", "en": "An older version"},
+    "methodology.old.text": {
+        "ru": (
+            "Показана версия {version} — правка от неё не отсчитывается, поэтому формы "
+            "здесь нет. Править можно свежую записанную: {latest}."
+        ),
+        "en": (
+            "This is version {version}; edits are not based on it, so there is no form here. "
+            "The one that can be edited is the newest stored: {latest}."
+        ),
+    },
+    "methodology.versions.title": {"ru": "Версии", "en": "Versions"},
+    "methodology.versions.col.version": {"ru": "Версия", "en": "Version"},
+    "methodology.versions.col.name": {"ru": "Набор", "en": "Set"},
+    "methodology.versions.col.day": {"ru": "Издана", "en": "Issued"},
+    "methodology.versions.hint": {
+        "ru": "Версии не удаляются никогда: по ним посчитаны отчёты. Откат — публикация прежней.",
+        "en": (
+            "Versions are never deleted: reports were scored by them. A rollback is "
+            "publishing an earlier one."
+        ),
+    },
+    "methodology.items.title": {"ru": "Пункты", "en": "Items"},
+    "methodology.col.id": {"ru": "Код", "en": "Code"},
+    "methodology.col.kind": {"ru": "Вид строки", "en": "Row kind"},
+    "methodology.col.process_ru": {"ru": "Процесс", "en": "Process"},
+    "methodology.col.question_ru": {"ru": "Формулировка", "en": "Wording"},
+    "methodology.col.levels": {"ru": "Классы", "en": "Levels"},
+    "methodology.col.zones": {"ru": "Зоны", "en": "Zones"},
+    "methodology.col.days": {"ru": "Срок, дней", "en": "Days"},
+    "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
+    "methodology.zones.col.code": {"ru": "Код", "en": "Code"},
+    "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
+    "methodology.zones.col.share": {"ru": "Доля, %", "en": "Share, %"},
+    "methodology.zones.hint": {
+        "ru": (
+            "Зоны и их доли правятся пока не отсюда, а из разговора с агентом: доли "
+            "задаются набором сразу, потому что обязаны сойтись к 100%."
+        ),
+        "en": (
+            "Zones and their shares are not edited here yet, only from the agent "
+            "conversation: shares are set as a whole because they must add up to 100%."
+        ),
+    },
+    "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
+    "methodology.empty.text": {
+        "ru": "В этой версии методики нет ни одного пункта.",
+        "en": "This version of the methodology has no items.",
+    },
+    # --- правка пункта -----------------------------------------------------
+    "methodology.add.title": {"ru": "Завести пункт", "en": "Add an item"},
+    "methodology.add.hint": {
+        "ru": (
+            "Критерии стоит задать сразу: без них движок методику не примет — класс "
+            "нарушения по фотографии оказался бы угадан, а не выведен из правил."
+        ),
+        "en": (
+            "Give the criteria right away: without them the engine will not accept the "
+            "methodology — the level would be guessed from a photo rather than derived."
+        ),
+    },
+    "methodology.add.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
+    "methodology.edit.title": {"ru": "Поправить пункт", "en": "Edit the item"},
+    "methodology.edit.hint": {
+        "ru": "Меняются только заполненные поля. Пустое поле означает «не трогать».",
+        "en": "Only the fields you fill in are changed. An empty field means «leave as is».",
+    },
+    "methodology.edit.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
+    "methodology.disable.submit": {"ru": "Выключить пункт", "en": "Switch the item off"},
+    "methodology.disable.hint": {
+        "ru": (
+            "Выключенный пункт остаётся в методике и не предлагается на проверке — так "
+            "видно, что его убрали, и вернуть его можно одной кнопкой."
+        ),
+        "en": (
+            "A switched-off item stays in the methodology and is not offered during an "
+            "inspection — so it is visible that it was withdrawn, and one button brings it back."
+        ),
+    },
+    "methodology.restore.submit": {"ru": "Вернуть пункт", "en": "Switch the item back on"},
+    "methodology.field.code": {"ru": "Код пункта", "en": "Item code"},
+    "methodology.field.code.hint": {
+        "ru": "Не задан — движок присвоит сам. Кодом пункт связан с проверками и картой слов.",
+        "en": "Left empty, the engine assigns one. The code is what ties the item to everything.",
+    },
+    "methodology.field.process": {"ru": "Процесс, ru", "en": "Process, ru"},
+    "methodology.field.process_en": {"ru": "Процесс, en", "en": "Process, en"},
+    "methodology.field.question_ru": {"ru": "Формулировка, ru", "en": "Wording, ru"},
+    "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
+    "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
+    "methodology.field.levels.hint": {
+        "ru": "Через точку с запятой, например D1;D2 — какими классами пункт вообще бывает.",
+        "en": "Semicolon-separated, e.g. D1;D2 — the levels this item can be recorded at.",
+    },
+    "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
+    "methodology.field.zones.hint": {
+        "ru": "Коды зон через точку с запятой; * — пункт встречается в любой зоне.",
+        "en": "Zone codes, semicolon-separated; * means the item appears in any zone.",
+    },
+    "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
+    "methodology.field.days.hint": {
+        "ru": (
+            "Печатается партнёру предписанием. Ноль — «устранить немедленно», и это не то "
+            "же самое, что пустое поле."
+        ),
+        "en": (
+            "Printed to the partner as an order. Zero means «fix immediately», which is not "
+            "the same as leaving the field empty."
+        ),
+    },
+    "methodology.field.criteria": {"ru": "Критерии D1 / D2 / D3", "en": "Criteria D1 / D2 / D3"},
+    "methodology.field.kind": {"ru": "Вид строки", "en": "Row kind"},
+    "methodology.field.kind.hint": {
+        "ru": "Выключить пункт — отдельная кнопка, а не вид строки: так это видно в журнале.",
+        "en": "Switching an item off is a button, not a row kind: that way the journal shows it.",
+    },
+    "methodology.field.note": {"ru": "Зачем правим", "en": "Why this edit"},
+    "methodology.field.note.hint": {
+        "ru": (
+            "Одной фразой — попадёт в журнал правок вместе с вашим логином. Не длиннее "
+            "{max} знаков."
+        ),
+        "en": (
+            "One phrase — it goes into the edit journal together with your login. No longer "
+            "than {max} characters."
+        ),
+    },
+    "methodology.item.title": {"ru": "Пункт {code}", "en": "Item {code}"},
+    "methodology.item.back": {"ru": "К составу", "en": "Back to the composition"},
+    "methodology.item.criteria.title": {"ru": "Критерии", "en": "Criteria"},
+    "methodology.item.criteria.empty": {
+        "ru": "Критериев у пункта нет — класс нарушения выводить не из чего.",
+        "en": "The item has no criteria — there is nothing to derive the level from.",
+    },
+    "methodology.item.fields.title": {"ru": "Как пункт записан", "en": "How the item is stored"},
     "error.not_found.title": {"ru": "Страницы нет", "en": "No such page"},
     "error.not_found.text": {
         "ru": "Такого адреса в админке нет. Разделы — в навигации слева.",

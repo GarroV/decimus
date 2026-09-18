@@ -140,3 +140,45 @@
   .whoami { padding-right: 0; }
   .logout { margin-left: 0; }
 }
+
+/* ── Правка методики (T320) ──────────────────────────────────────
+   Формы состава чек-листа спрятаны под раскрывашку браузера, а не под свой
+   скрипт: у админки нет ни сборщика, ни единой строки JavaScript, и заводить
+   их ради «показать форму» дороже, чем один <details>.
+
+   Раскладка формы — колонкой, как у входа: полей много, и две колонки на
+   узком окне превратились бы в чересполосицу подписей и пояснений. */
+
+.edit {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-block);
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface);
+}
+
+.edit__summary {
+  cursor: pointer;
+  font-weight: var(--w-semibold);
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  max-width: 640px;
+}
+
+.form-grid .input { width: 100%; }
+.form-grid .field-label { margin-top: var(--space-5); }
+.form-grid .btn { margin-top: var(--space-7); align-self: flex-start; }
+
+/* Критерии приходят разметкой методики — показываем как написаны, не
+   переверстывая: класс нарушения выводится из них дословно. */
+.criteria {
+  margin: var(--space-5) 0 0;
+  white-space: pre-wrap;
+  font-size: var(--fs-dense);
+  line-height: var(--lh-meta);
+  color: var(--ink-2);
+}
