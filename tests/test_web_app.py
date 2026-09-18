@@ -265,8 +265,12 @@ def test_снятие_зовёт_дверь_блока_db_с_причиной_и
     monkeypatch.setattr(data, "retract_card", снять)
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(строка))
 
-    # Act
-    ответ = стенд.post(f"/inspections/{строка.id}/retract", data={"reason": "дубль обхода"})
+    # Act — запрос со своей же страницы: браузер ставит `Origin` сам.
+    ответ = стенд.post(
+        f"/inspections/{строка.id}/retract",
+        data={"reason": "дубль обхода"},
+        headers={"Origin": "http://localhost"},
+    )
 
     # Assert — ровно один вызов, тенант стенда, причина как введена.
     assert ответ.status_code == 200
@@ -285,7 +289,9 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
 
     # Act
-    ответ = стенд.post("/inspections/x/retract", data={"reason": ""})
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": ""}, headers={"Origin": "http://localhost"}
+    )
 
     # Assert
     assert ответ.status_code == 200
@@ -305,16 +311,48 @@ def test_снятие_с_чужой_страницы_отклонено_и_не_
 
     monkeypatch.setattr(data, "retract_card", снять)
 
+    # Act / Assert — три способа прийти не со своей страницы, и все три отказ.
+    # Пустой заголовок стоит первым намеренно: проверка, которая на пустом
+    # входе разрешает, обходится тем, что заголовок просто не присылают.
+    случаи: list[dict[str, str]] = [
+        {},
+        {"Origin": "http://зло.example"},
+        {"Referer": "http://зло.example/страница"},
+        # Понижение схемы: хост тот же, происхождение другое.
+        {"Origin": "https://localhost"},
+    ]
+    for заголовки in случаи:
+        ответ = стенд.post(
+            "/inspections/x/retract", data={"reason": "чужой запрос"}, headers=заголовки
+        )
+        assert ответ.status_code == 403, заголовки
+    assert вызвано is False
+
+
+def test_снятие_со_своей_страницы_проходит_и_по_одному_referer(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — `Origin` ставит не всякий браузер и не во всяком случае;
+    # заслон обязан пропускать настоящую форму, иначе он ломает продукт.
+    monkeypatch.setattr(
+        data,
+        "retract_card",
+        lambda inspection_id, *, tenant, reason: Retraction(
+            inspection_id=inspection_id, reason=reason, retracted_at="2026-09-18", photos_purged=0
+        ),
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
     # Act
     ответ = стенд.post(
         "/inspections/x/retract",
-        data={"reason": "чужой запрос"},
-        headers={"Origin": "http://зло.example"},
+        data={"reason": "своя страница"},
+        headers={"Referer": "http://localhost/inspections/x"},
     )
 
     # Assert
-    assert ответ.status_code == 403
-    assert вызвано is False
+    assert ответ.status_code == 200
+    assert "Кадров убрано: 0" in ответ.get_data(as_text=True)
 
 
 # --- язык, отказы, ненайденное ---------------------------------------------

@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest image regress web demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -259,6 +259,21 @@ state-backup:
 # Строку подключения к базе и карту токенов читает сам из .env.
 mcp:
 	$(VENV)/python -m src.mcp
+
+# Веб-админка на хосте (T318, T319). Существует потому, что из compose её не
+# посмотреть: сервис `web` слушает петлю СВОЕГО контейнера и наружу не
+# публикуется, пока у админки нет аутентификации (docker-compose.yml, сервис
+# `web`). Эта цель — единственный способ открыть её глазами.
+#
+# Переменные окружения берутся из файла окружения через python-dotenv, как у
+# бота: WEB_TENANT обязателен (чья это история — не додумывается), WEB_PORT и
+# WEB_UI_LANG необязательны. Соединение к базе — DATABASE_URL, снятые проверки
+# и снятие — DATABASE_RETRACTION_URL; без второго админка честно скажет, что
+# снятых ей не видно, а не покажет укороченный список молча.
+#
+#   WEB_TENANT=<код тенанта> make web
+web:
+	$(VENV)/python -m src.web
 
 # Смоук доступа к MCP СНАРУЖИ (T256). Отвечает на «доступен ли сервер с чужой
 # машины», а не на «поднят ли контейнер»: разница между этими вопросами стоила
