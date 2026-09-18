@@ -436,6 +436,18 @@ def _register_errors(app: Flask) -> None:
     def _db_down(exc: DbError) -> tuple[str, int]:
         return render_template("error_db.html", reason=str(exc)), 503
 
+    @app.errorhandler(MethodologyRefused)
+    def _methodology_broken(exc: MethodologyRefused) -> tuple[str, int]:
+        """Отказ хранилища методики, дошедший до края, — страницей, а не пятисоткой.
+
+        Отклонённую правку показывает сама страница раздела: там отказ —
+        часть работы. Сюда доходит другое: хранилище не читается вовсе
+        (каталог снесли, указатель сломан, движка нет). Это ровно тот же род
+        события, что недоступная база, и ответ на него такой же — сказать
+        причину словами.
+        """
+        return render_template("methodology/broken.html", reason=str(exc)), 503
+
     @app.errorhandler(404)
     def _not_found(_: object) -> tuple[str, int]:
         return render_template("error_not_found.html"), 404
