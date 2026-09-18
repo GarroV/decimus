@@ -15,7 +15,14 @@
   <div class="section">
     <div class="section__head">
       <h1 class="section__title">{{ t('methodology.item.title', code=item.get('id', '')) }}</h1>
-      <span class="section__num">{{ t('methodology.version.viewing', version=version) }}</span>
+      <span class="section__num">
+        {{ t('methodology.version.viewing', version=version) }}
+        {% if version == current %}
+          <span class="tag tag--ok tag--micro">{{ t('methodology.version.badge.published') }}</span>
+        {% else %}
+          <span class="tag tag--warn tag--micro tag--dashed">{{ t('methodology.version.badge.draft') }}</span>
+        {% endif %}
+      </span>
     </div>
     <p class="section__lead">
       <a href="/admin?lang={{ lang }}">{{ t('methodology.item.back') }}</a>
@@ -49,7 +56,7 @@
     <div class="card__body">
       <div class="card__fact-label">{{ t('methodology.item.fields.title') }}</div>
       <div class="table-wrap mt-gap">
-        <table class="table">
+        <table class="table table--fields">
           <tbody>
             {% for name, value in item.items() if name != 'criteria' %}
               <tr>
