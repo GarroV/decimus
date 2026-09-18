@@ -16,6 +16,9 @@
 
 from __future__ import annotations
 
+import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -70,6 +73,17 @@ class Счётчики:
 
     def __init__(self) -> None:
         self.rows: dict[tuple[str, str, str], web_throttle.Counter] = {}
+        #: Замок вместо `pg_advisory_xact_lock`: в базе попытки по одному ключу
+        #: не идут одновременно, и оснастка обязана вести себя так же — иначе
+        #: набор зеленел бы на ограничителе, который параллельные попытки
+        #: пропускает мимо порога (T328).
+        self._замок = threading.Lock()
+
+    @contextmanager
+    def сделка(self, *, tenant: str, keys: Any) -> Iterator[web_throttle.AttemptStore]:
+        """Хранилище на время одной попытки, под замком. Правило — продуктовое."""
+        with self._замок:
+            yield _Строки(self, tenant)
 
     def load(self, *, tenant: str, scope: str, fingerprint: str) -> web_throttle.Counter | None:
         return self.rows.get((tenant, scope, fingerprint))
@@ -97,11 +111,30 @@ class Счётчики:
         }
 
 
+class _Строки:
+    """Строки одного арендатора: то же, чем `web_throttle` работает в базе."""
+
+    def __init__(self, счётчики: Счётчики, tenant: str) -> None:
+        self._счётчики = счётчики
+        self._tenant = tenant
+
+    def load(self, *, scope: str, fingerprint: str) -> web_throttle.Counter | None:
+        return self._счётчики.load(tenant=self._tenant, scope=scope, fingerprint=fingerprint)
+
+    def bump(self, *, scope: str, fingerprint: str) -> web_throttle.Counter:
+        return self._счётчики.bump(tenant=self._tenant, scope=scope, fingerprint=fingerprint)
+
+
 def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Счётчики:
-    """Хранилище счётчика попыток — в память, на границе модуля `web_throttle`."""
+    """Хранилище счётчика попыток — в память, на границе модуля `web_throttle`.
+
+    Подменяются ровно две двери: сделка на время попытки и забвение при удаче.
+    Само правило (`verdict_of`, пороги, порядок «решить и записать») остаётся
+    продуктовым — подменить его значило бы проверять оснастку.
+    """
     счётчики = Счётчики()
+    monkeypatch.setattr(web_throttle, "attempt_transaction", счётчики.сделка)
     monkeypatch.setattr(web_throttle, "load_counter", счётчики.load)
-    monkeypatch.setattr(web_throttle, "bump_counter", счётчики.bump)
     monkeypatch.setattr(web_throttle, "forget_counter", счётчики.forget)
     return счётчики
 

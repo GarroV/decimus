@@ -17,11 +17,14 @@
 **В куке едет не то, что лежит в базе.** В браузере — подписанный токен, в
 базе — его отпечаток SHA-256. Украденная база не даёт войти ни под кем.
 
-**Пароль подбирать дорого (T325).** Неудачи считаются по адресу и по логину
-(`src/db/web_throttle.py`), и запертая попытка не доходит до сверки пароля
-вовсе. Порядок вызовов здесь важен и держится тремя строками: спросить ДО
-`authenticate`, записать неудачу ПОСЛЕ неё, забыть счётчик при удаче. Забыть
-последнее — значит запирать людей, которые давно вошли.
+**Пароль подбирать дорого (T325, T328).** Попытки считаются по адресу и по
+логину (`src/db/web_throttle.py`), и запертая попытка не доходит до сверки
+пароля вовсе. Порядок вызовов здесь важен и держится двумя строками: заявка
+(`admit_attempt`) ДО `authenticate` — она же и записывает попытку, — и забыть
+счётчик при удаче. Забыть последнее — значит запирать людей, которые давно
+вошли. Заявка и запись слиты в одну операцию не для красоты: врозь они
+пропускали мимо порога столько лишних параллельных попыток, сколько у сервера
+потоков.
 """
 
 from __future__ import annotations
@@ -41,7 +44,7 @@ from src.db.web_access import (
     open_session,
     resolve_session,
 )
-from src.db.web_throttle import Verdict, check_attempt, note_failure, note_success
+from src.db.web_throttle import Verdict, admit_attempt, note_success
 
 from .config import Settings
 from .origin import over_https, refuse_foreign_origin
@@ -157,16 +160,18 @@ def install(app: Flask, conf: Settings) -> None:
         refuse_foreign_origin()
         имя = request.form.get("login") or ""
         адрес = client_address(trusted_proxies=conf.trusted_proxies)
-        # Спрашивается ДО сверки пароля: смысл ограничителя в том, что запертый
-        # не доходит до дорогой части вовсе — ни до scrypt, ни до базы учёток.
-        приговор = check_attempt(tenant=conf.tenant, address=адрес, login=имя)
-        if приговор.locked:
-            return заперто(приговор)
+        # ОДНИМ движением: пустить ли к сверке пароля и записать саму попытку.
+        # Раздельные «спросить» и «записать» пропускали мимо порога столько
+        # лишних параллельных попыток, сколько у сервера потоков (T328). Сверка
+        # пароля идёт ПОСЛЕ: смысл ограничителя в том, что запертый не доходит
+        # до дорогой части вовсе — ни до scrypt, ни до базы учёток.
+        попытка = admit_attempt(tenant=conf.tenant, address=адрес, login=имя)
+        if not попытка.admitted:
+            return заперто(попытка.verdict)
         account = authenticate(имя, request.form.get("password") or "", tenant=conf.tenant)
         if account is None:
-            приговор = note_failure(tenant=conf.tenant, address=адрес, login=имя)
-            if приговор.locked:
-                return заперто(приговор)
+            if попытка.verdict.locked:
+                return заперто(попытка.verdict)
             # Один и тот же отказ на «нет такого логина» и «пароль не тот»:
             # иначе форма сама рассказывает перебором, кто здесь заведён.
             # Введённое обратно на страницу не возвращается — среди него
