@@ -49,6 +49,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_sections(app)
     _register_registry(app, conf)
     _register_errors(app)
+    _register_frame_ban(app)
     return app
 
 
@@ -206,6 +207,27 @@ def _refuse_foreign_origin() -> None:
     пришёл = urlsplit(источник)
     if (пришёл.scheme, пришёл.netloc) != (свой.scheme, свой.netloc):
         abort(403)
+
+
+def _register_frame_ban(app: Flask) -> None:
+    """Запретить встраивание страниц админки в чужой документ.
+
+    Заслон происхождения (`_refuse_foreign_origin`) закрывает запрос С чужой
+    страницы, но не закрывает случай, когда чужая страница показывает НАШУ в
+    рамке: документ тогда честно наш, происхождение совпадает, и заслон
+    пропустит отправку формы — сняв проверку руками человека, который думал,
+    что нажимает что-то другое. Обязательное поле причины делает подмену
+    многоходовой, но не невозможной.
+
+    Два заголовка, а не один: `frame-ancestors` — действующее правило, а
+    `X-Frame-Options` остаётся ради просмотрщиков, которые его не знают.
+    """
+
+    @app.after_request
+    def _no_frames(response: Response) -> Response:
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        return response
 
 
 def _register_errors(app: Flask) -> None:
