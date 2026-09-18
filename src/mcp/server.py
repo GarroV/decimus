@@ -290,6 +290,7 @@ class _Handler(BaseHTTPRequestHandler):
             message,
             tenant=доступ.tenant,
             checklist=_checklist_for(self._settings, доступ.tenant),
+            source=_checklist_source_for(self._settings, доступ.tenant),
             may_retract=доступ.may_retract,
         )
         if answer is None:
@@ -309,6 +310,26 @@ def _checklist_for(settings: Settings, tenant: str) -> Store | None:
     if хранилище is None or методика is None:
         return None
     if not settings.may_manage_checklist(tenant):
+        return None
+    return Store(root=хранилище, live=методика)
+
+
+def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
+    """Хранилище для ЧТЕНИЯ исходника эталона — или `None`, если методики нет.
+
+    Отдельная подстановка, а не та же самая с флагом (T315, D132): вниз уходят
+    два разных значения, и правящий инструмент получает только то, что пришло
+    с правом на правку. Одно значение на оба вида означало бы, что правка
+    открывается читательским правом при одной опечатке в разборе вида.
+
+    `None` здесь — не «не открыто», а «читать неоткуда»: право на чтение имеет
+    всякий заведённый арендатор, и отказывает этот путь только на сервере, где
+    методика не настроена вовсе.
+    """
+    хранилище, методика = settings.checklist_store, settings.data_dir
+    if хранилище is None or методика is None:
+        return None
+    if not settings.may_read_checklist(tenant):
         return None
     return Store(root=хранилище, live=методика)
 

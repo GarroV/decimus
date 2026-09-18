@@ -23,7 +23,14 @@ import json
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from .catalogue import KIND_CHECKLIST, KIND_RETRACTION, ToolSpec, as_list, find
+from .catalogue import (
+    KIND_CHECKLIST,
+    KIND_CHECKLIST_SOURCE,
+    KIND_RETRACTION,
+    ToolSpec,
+    as_list,
+    find,
+)
 from .checklist import Store
 from .errors import McpError, ToolError
 
@@ -141,6 +148,18 @@ CHECKLIST_CLOSED = (
 )
 
 
+#: Отказ на чтение исходника эталона. Случай тут ровно один — методика на
+#: сервере не настроена вовсе: право на чтение не выдаётся списком, его имеет
+#: всякий токен (T315, D132). Поэтому текст не про доступ, а про настройку, и
+#: путать его с отказом правки нельзя: «вам не открыто» на чтении эталона
+#: отправило бы партнёра просить права, которых просить не нужно.
+CHECKLIST_SOURCE_CLOSED = (
+    "Исходник чек-листа на этом сервере не настроен: переменные MCP_CHECKLIST_STORE и "
+    "AUDIT_DATA_DIR. Чтение эталона правом не ограничено — по нему идут проверки, и видеть "
+    "его вправе каждая сторона; отдельной настройкой открывается только правка"
+)
+
+
 #: Отказ на снятие проверки без открытого права. Один текст на оба случая —
 #: «на сервере снятие не настроено» и «этому токену оно не открыто» — по той же
 #: причине, что у методики: разница между ними спрашивающему ничем не поможет,
@@ -158,12 +177,21 @@ RETRACTION_CLOSED = (
 
 
 def _call_tool(
-    params: dict[str, Any], *, tenant: str, checklist: Store | None, may_retract: bool
+    params: dict[str, Any],
+    *,
+    tenant: str,
+    checklist: Store | None,
+    source: Store | None,
+    may_retract: bool,
 ) -> dict[str, Any] | str:
     """Вызов инструмента. Строка в ответе — отказ протокола, словарь — результат.
 
-    `checklist` — хранилище версий методики, и оно же признак права на неё:
-    транспорт передаёт его, только если методика открыта ЭТОМУ арендатору.
+    `checklist` — хранилище версий методики, и оно же признак права на её
+    ПРАВКУ: транспорт передаёт его, только если правка открыта ЭТОМУ
+    арендатору. `source` — то же хранилище, но подставленное для ЧТЕНИЯ
+    эталона, которое правом не ограничено (T315, D132). Их два, а не одно с
+    флагом, именно для того, чтобы правящий инструмент не мог получить
+    хранилище по ошибке в одной строке: ниже каждому виду подставляется своё.
     Заслон стоит здесь, у входа, рядом с границей арендаторов, а не в
     обработчиках: обработчик, забывший спросить о правах, был бы дырой,
     которую видно только чтением всех обработчиков подряд.
@@ -179,12 +207,21 @@ def _call_tool(
         return f"Аргументы инструмента {name} ожидаются объектом"
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
+    if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
+        return _tool_text(CHECKLIST_SOURCE_CLOSED, failed=True)
     if spec.kind == KIND_RETRACTION and not may_retract:
         return _tool_text(RETRACTION_CLOSED, failed=True)
     refusal = _check_arguments(spec, arguments)
     if refusal is not None:
         return refusal
-    прочее: dict[str, Any] = {"store": checklist} if spec.kind == KIND_CHECKLIST else {}
+    # Хранилище подставляется ПО ВИДУ, каждому своё: правящему инструменту —
+    # только то, что пришло с правом на правку. Общая переменная «какое-нибудь
+    # хранилище» открыла бы правку читательским правом одной опечаткой.
+    прочее: dict[str, Any] = {}
+    if spec.kind == KIND_CHECKLIST:
+        прочее = {"store": checklist}
+    elif spec.kind == KIND_CHECKLIST_SOURCE:
+        прочее = {"store": source}
     try:
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
@@ -216,6 +253,10 @@ def _call_tool(
                 "правку методики",
                 "Это отказ записи, а не отклонение правки движком",
             ),
+            KIND_CHECKLIST_SOURCE: (
+                "чтение эталона",
+                "Это отказ чтения, а не пустая методика",
+            ),
             KIND_RETRACTION: (
                 "снятие проверки",
                 "Это отказ базы или хранилища, а не отказ в снятии; сняли или нет — "
@@ -230,7 +271,12 @@ def _call_tool(
 
 
 def handle(
-    message: object, *, tenant: str, checklist: Store | None = None, may_retract: bool = False
+    message: object,
+    *,
+    tenant: str,
+    checklist: Store | None = None,
+    source: Store | None = None,
+    may_retract: bool = False,
 ) -> dict[str, Any] | None:
     """Разобранное сообщение JSON-RPC → ответ. `None` — уведомление, ответа нет.
 
@@ -276,7 +322,13 @@ def handle(
     if method == "tools/list":
         return _result(request_id, {"tools": as_list()})
     if method == "tools/call":
-        outcome = _call_tool(params, tenant=tenant, checklist=checklist, may_retract=may_retract)
+        outcome = _call_tool(
+            params,
+            tenant=tenant,
+            checklist=checklist,
+            source=source,
+            may_retract=may_retract,
+        )
         if isinstance(outcome, str):
             return _error(request_id, CODE_INVALID_PARAMS, outcome)
         return _result(request_id, outcome)

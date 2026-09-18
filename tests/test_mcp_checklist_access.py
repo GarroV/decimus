@@ -372,3 +372,131 @@ def test_через_сервер_чужой_токен_методику_не_м�
 
     assert настройки.checklist_store is not None
     assert not настройки.checklist_store.exists()
+
+
+# --- исходник эталона: чтение без правки (T315, D132) --------------------------
+#
+# Право на методику до T315 было одно на чтение и на правку: хранилище
+# подставлялось только названным в `MCP_CHECKLIST_TENANTS`, а через него шли и
+# читающие инструменты. Партнёру при этом полагается ровно чтение — «базово он
+# должен будет видеть исходник» (D132), — и ошибка здесь дорога в обе стороны:
+# закрытое чтение прячет от партнёра эталон, по которому его проверяют, а
+# открытая правка даёт ему менять эталон управляющей компании.
+
+
+def _вызов_партнёра(имя: str, аргументы: dict[str, Any], *, настройки: Settings) -> Any:
+    """Вызов ОТ ИМЕНИ ПАРТНЁРА через те же подстановки, что делает транспорт."""
+    from src.mcp.server import _checklist_for, _checklist_source_for
+
+    return handle(
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": имя, "arguments": аргументы},
+        },
+        tenant=ПАРТНЁР,
+        checklist=_checklist_for(настройки, ПАРТНЁР),
+        source=_checklist_source_for(настройки, ПАРТНЁР),
+    )
+
+
+def test_исходник_эталона_подставляется_и_тому_кому_правка_не_открыта(
+    настройки: Settings,
+) -> None:
+    """Чтение эталона и правка эталона — два разных права на одной настройке
+    хранилища: партнёру подставляется исходник и не подставляется правка."""
+    from src.mcp.server import _checklist_for, _checklist_source_for
+
+    assert _checklist_source_for(настройки, ПАРТНЁР) is not None
+    assert _checklist_for(настройки, ПАРТНЁР) is None
+    assert _checklist_source_for(настройки, УК) is not None
+
+
+def test_без_хранилища_исходник_не_подставляется_никому(настройки: Settings) -> None:
+    """Права на чтение хватает не всегда: выключенная целиком методика
+    означает, что читать неоткуда, а не «читать можно пусто»."""
+    from dataclasses import replace
+
+    from src.mcp.server import _checklist_source_for
+
+    assert _checklist_source_for(replace(настройки, checklist_store=None), ПАРТНЁР) is None
+    assert _checklist_source_for(replace(настройки, data_dir=None), ПАРТНЁР) is None
+
+
+def test_партнёр_читает_эталон_по_которому_его_проверяют(настройки: Settings) -> None:
+    """То, ради чего задача и делалась: партнёрским токеном видно пункты,
+    зоны, классы нарушений и сроки."""
+    ответ = _вызов_партнёра("checklist_source", {}, настройки=настройки)
+
+    assert "isError" not in ответ["result"]
+    выдача = json.loads(ответ["result"]["content"][0]["text"])
+    assert выдача["tenant"] == ПАРТНЁР
+    assert выдача["count"] > 0
+    assert выдача["zones"]
+    пункт = выдача["items"][0]
+    assert {"code", "levels", "days", "zones"} <= set(пункт)
+
+
+def test_партнёр_видит_критерии_одного_пункта(настройки: Settings) -> None:
+    """Класс нарушения — это не буква в колонке, а условия, при которых пункт
+    D1, а при каких D2 (`docs/02-domain.md`). Без них партнёр видит вычет, но
+    не видит, из чего он вышел."""
+    перечень = json.loads(
+        _вызов_партнёра("checklist_source", {}, настройки=настройки)["result"]["content"][0]["text"]
+    )
+    код = перечень["items"][0]["code"]
+
+    ответ = _вызов_партнёра("checklist_source_item", {"code": код}, настройки=настройки)
+
+    выдача = json.loads(ответ["result"]["content"][0]["text"])
+    assert выдача["item"]["code"] == код
+    assert "criteria" in выдача["item"]
+
+
+def test_партнёру_чтение_эталона_не_даёт_ни_одной_правки(настройки: Settings) -> None:
+    """Главная проверка задачи. Чтение открыто всем, правка — только названным:
+    ни один инструмент правки не должен стать доступен заодно с исходником."""
+    for spec in TOOLS:
+        if spec.kind != KIND_CHECKLIST:
+            continue
+        ответ = _вызов_партнёра(spec.name, {}, настройки=настройки)
+        assert ответ["result"]["isError"] is True, spec.name
+        assert ответ["result"]["content"][0]["text"] == CHECKLIST_CLOSED, spec.name
+
+
+def test_исходник_не_отдаёт_колонок_управляющей_компании(настройки: Settings) -> None:
+    """В файле методики рядом с эталоном лежат собственные колонки УК (T109,
+    T289) — произвольные и заведомо не предназначенные партнёру. Исходник
+    отдаёт названные поля эталона, а не строку файла как она лежит."""
+    методика = настройки.data_dir
+    assert методика is not None
+    исходный = (методика / "checklist.csv").read_text(encoding="utf-8").splitlines()
+    (методика / "checklist.csv").write_text(
+        "\n".join(
+            [исходный[0] + ",Внутренняя пометка"]
+            + [строка + ",секрет УК" for строка in исходный[1:] if строка.strip()]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    выдача = json.loads(
+        _вызов_партнёра("checklist_source", {}, настройки=настройки)["result"]["content"][0]["text"]
+    )
+
+    assert выдача["count"] > 0
+    for пункт in выдача["items"]:
+        assert "Внутренняя пометка" not in пункт
+        assert "секрет УК" not in json.dumps(пункт, ensure_ascii=False)
+
+
+def test_через_сервер_исходник_открыт_партнёрскому_токену(сервер: str) -> None:
+    """Через настоящий сокет: тот самый токен, которому правка отказывает,
+    получает эталон."""
+    правка = _спросить(сервер, ТОКЕН_ПАРТНЁРА, "checklist_versions", {})
+    чтение = _спросить(сервер, ТОКЕН_ПАРТНЁРА, "checklist_source", {})
+
+    assert правка["result"]["isError"] is True
+    assert "isError" not in чтение["result"]
+    assert json.loads(чтение["result"]["content"][0]["text"])["count"] > 0

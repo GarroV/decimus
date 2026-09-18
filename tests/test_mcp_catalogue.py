@@ -21,12 +21,14 @@ from __future__ import annotations
 
 import inspect
 
+from src.mcp import checklist_source as checklist_source_module
 from src.mcp import checklist_tools
 from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
 from src.mcp import tools as tools_module
 from src.mcp.catalogue import (
     KIND_CHECKLIST,
+    KIND_CHECKLIST_SOURCE,
     KIND_INSPECTIONS,
     KIND_RETRACTION,
     TOOLS,
@@ -69,6 +71,16 @@ from src.mcp.catalogue import (
     "uncovered_phrases",
 }
 
+#: Чтение исходника эталона (T315, D132). Своя группа, потому что своё право:
+#: эти два инструмента открыты ВСЯКОМУ токену, тогда как соседняя группа
+#: методики открывается отдельной настройкой. Имя, тихо переехавшее отсюда в
+#: группу методики, спрятало бы от партнёра эталон, по которому его проверяют;
+#: переехавшее сюда из методики — открыло бы партнёру правку эталона.
+ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА = {
+    "checklist_source",
+    "checklist_source_item",
+}
+
 #: Снятие проверки из истории (T211, D086/D089). Своя группа из одного имени,
 #: и это не педантизм: снятие — единственное, что меняет уже выданный документ,
 #: право на него личное (по токену, а не по арендатору), и стоит оно своего
@@ -90,6 +102,7 @@ from src.mcp.catalogue import (
 ИМЕНА_ИНСТРУМЕНТОВ = (
     ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
     | ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ
+    | ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА
     | ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ
     | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ
 )
@@ -105,10 +118,10 @@ from src.mcp.catalogue import (
 )
 
 
-def test_каталог_содержит_ровно_двадцать_семь_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_двадцать_девять_инструментов_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 27
+    assert len(TOOLS) == 29
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -176,6 +189,8 @@ def test_вид_инструмента_соответствует_его_гру�
     for spec in TOOLS:
         if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ:
             assert spec.kind == KIND_CHECKLIST, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА:
+            assert spec.kind == KIND_CHECKLIST_SOURCE, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.kind == KIND_RETRACTION, spec.name
         else:
@@ -207,6 +222,12 @@ def test_обработчик_взят_из_правильного_модуля(
     for spec in TOOLS:
         if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ:
             assert spec.handler.__module__ == phrases_module.__name__, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА:
+            # Модуль исходника — это и есть гарантия, что чтением эталона
+            # ничего не правится: записи в нём нет вовсе. Обработчик,
+            # взятый из `checklist_tools`, вернул бы правку под читательским
+            # правом, и снаружи это выглядело бы как работающее чтение.
+            assert spec.handler.__module__ == checklist_source_module.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ:
             assert spec.handler.__module__ == checklist_tools.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
@@ -232,7 +253,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 27
+    assert len(перечень) == 29
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

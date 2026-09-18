@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_tools, phrases, retraction, tools
+from . import checklist_source, checklist_tools, phrases, retraction, tools
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -51,6 +51,15 @@ KIND_CHECKLIST = "checklist"
 #: методики: обработчик, забывший спросить о правах, был бы дырой, которую
 #: видно только чтением всех обработчиков подряд.
 KIND_RETRACTION = "retraction"
+
+#: Чтение исходника эталона (T315, D132). Четвёртый вид, а не «инструмент
+#: методики, который только читает»: вид решает, КАКОЕ хранилище подставит
+#: транспорт, а подставленное хранилище здесь и есть право. Инструменты этого
+#: вида открыты всякому токену — чек-лист пишет управляющая компания, но
+#: проверяемый обязан видеть, по какому эталону его проверяют, — и правки в них
+#: нет вовсе: обработчики живут отдельным модулем `src.mcp.checklist_source`, и
+#: это проверяется снаружи (`tests/test_mcp_catalogue.py`).
+KIND_CHECKLIST_SOURCE = "checklist_source"
 
 
 @dataclass(frozen=True)
@@ -425,6 +434,60 @@ TOOLS: tuple[ToolSpec, ...] = (
         history=True,
     ),
     # --- методика: чтение --------------------------------------------------
+    ToolSpec(
+        name="checklist_source",
+        description=(
+            "Read the checklist the caller is audited against: its items "
+            "(what is checked), the violation classes each item can produce "
+            "(D1/D2/D3), the days allowed to fix each one, and the zones with "
+            "their share of the score. This is the managing company's "
+            "reference document, readable by every tenant and editable by "
+            "none through this tool — the editing tools are separate and "
+            "separately granted. Defaults to the version the audit engine "
+            "scores by today; name an older version to read the one an older "
+            "report was scored against. Criteria text is omitted here: read "
+            "one item's criteria with checklist_source_item."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "version": _CHECKLIST_VERSION_PROPERTY,
+                "process": {
+                    "type": "string",
+                    "description": (
+                        "Case-insensitive substring filter on the process "
+                        "name (matches either the Russian or the English "
+                        "text). Omit to include every process."
+                    ),
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_source.checklist_source,
+        kind=KIND_CHECKLIST_SOURCE,
+    ),
+    ToolSpec(
+        name="checklist_source_item",
+        description=(
+            "Read one item of the checklist the caller is audited against, "
+            "together with the D1/D2/D3 criteria that decide which class a "
+            "violation of it falls into. Those conditions are the only source "
+            "of that class — it is never derived from the wording. Items are "
+            "addressed by code; the codes come from checklist_source."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "code": _code_property(meaning="The checklist item to read."),
+                "version": _CHECKLIST_VERSION_PROPERTY,
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+        handler=checklist_source.checklist_source_item,
+        kind=KIND_CHECKLIST_SOURCE,
+    ),
     ToolSpec(
         name="checklist_versions",
         description=(
