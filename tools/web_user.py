@@ -86,13 +86,24 @@ def _password() -> str:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="web_user", description="Учётки веб-админки (T323)")
-    parser.add_argument("--tenant", help=f"код арендатора; по умолчанию {WEB_TENANT_VAR}")
     команды = parser.add_subparsers(dest="command", required=True)
 
-    завести = команды.add_parser("add", help="завести учётку")
+    def с_арендатором(имя: str, help: str) -> argparse.ArgumentParser:
+        """Подкоманда с `--tenant` у самой себя, а не у корня.
+
+        Это не вкусовщина: у корня ключ принимался бы ТОЛЬКО перед именем
+        подкоманды (`--tenant demo add director`), а пишут его после — и
+        argparse отвечает на это «unrecognized arguments», из которого не
+        видно, что именно не так. Поймано первым же запуском.
+        """
+        под = команды.add_parser(имя, help=help)
+        под.add_argument("--tenant", help=f"код арендатора; по умолчанию {WEB_TENANT_VAR}")
+        return под
+
+    завести = с_арендатором("add", "завести учётку")
     завести.add_argument("login")
-    команды.add_parser("list", help="перечислить учётки арендатора")
-    отключить = команды.add_parser("disable", help="отключить учётку")
+    с_арендатором("list", "перечислить учётки арендатора")
+    отключить = с_арендатором("disable", "отключить учётку")
     отключить.add_argument("login")
 
     args = parser.parse_args(argv)

@@ -80,7 +80,7 @@ def test_loopback_host_is_accepted(raw: str, expected: str) -> None:
 
 @pytest.mark.parametrize("raw", ["0.0.0.0", "192.168.1.10", "не-адрес"])  # noqa: S104
 def test_non_loopback_host_is_config_error(raw: str) -> None:
-    """У админки нет аутентификации: слушать что-то кроме петли наружу — отказ."""
+    """Наружу выходим туннелем (D100): слушать что-то кроме петли — отказ."""
     env = {"WEB_TENANT": "belgrade", "WEB_HOST": raw}
     with pytest.raises(WebConfigError):
         load_settings(env)
