@@ -23,6 +23,7 @@ from src.db.web_throttle import (
     LOCK_STEPS,
     SCOPES,
     Counter,
+    canonical_address,
     key_fingerprint,
     lock_for,
     verdict_of,
@@ -141,3 +142,40 @@ def test_один_и_тот_же_логин_считается_одним_клю
 
 def test_разные_ключи_не_складываются_в_один() -> None:
     assert key_fingerprint("director") != key_fingerprint("manager")
+
+
+# --- адрес до отпечатка приводится к канону (T328) ---------------------------
+
+
+@pytest.mark.parametrize(
+    ("одна_запись", "другая_запись"),
+    [
+        ("2001:db8::1", "2001:db8:0:0:0:0:0:1"),
+        ("2001:DB8::1", "2001:db8::1"),
+        ("::ffff:203.0.113.7", "203.0.113.7"),
+        (" 203.0.113.7 ", "203.0.113.7"),
+    ],
+)
+def test_один_адрес_записанный_по_разному_даёт_один_ключ(
+    одна_запись: str, другая_запись: str
+) -> None:
+    """Иначе счётчик по адресу обходится сменой записи того же адреса.
+
+    Сжатые и развёрнутые нули IPv6, IPv4 внутри IPv6, регистр — всё это один и
+    тот же отправитель, и второй счётчик у него означает второй запас попыток.
+    """
+    assert key_fingerprint(canonical_address(одна_запись)) == key_fingerprint(
+        canonical_address(другая_запись)
+    )
+
+
+def test_разные_адреса_в_один_ключ_не_сливаются() -> None:
+    """Обратная половина: канон не обязан склеивать соседей по подсети."""
+    assert canonical_address("203.0.113.7") != canonical_address("203.0.113.8")
+    assert canonical_address("2001:db8::1") != canonical_address("2001:db8::2")
+
+
+def test_неразобранный_адрес_остаётся_ключом() -> None:
+    """`unknown` (сокет без адреса) обязан считаться, а не пропадать из учёта."""
+    assert canonical_address("unknown") == "unknown"
+    assert len(key_fingerprint(canonical_address("unknown"))) == 64
