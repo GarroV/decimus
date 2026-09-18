@@ -15,7 +15,16 @@
     </div>
     <p class="login__lead">{{ t('auth.lead') }}</p>
 
-    {% if failed %}
+    {#
+      Запрет и «не подошло» — разные сообщения намеренно. Человеку, который
+      упёрся в счётчик, нужно знать, что ждать, а не пробовать ещё раз: иначе
+      он продлевает себе запрет каждой новой попыткой.
+    #}
+    {% if locked_minutes %}
+      <div class="note note--error mt-gap" role="alert">
+        <div><div class="note__title">{{ t('auth.locked', minutes=locked_minutes) }}</div></div>
+      </div>
+    {% elif failed %}
       <div class="note note--error mt-gap" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>
       </div>
