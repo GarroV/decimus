@@ -20,6 +20,8 @@
 
 from __future__ import annotations
 
+import hashlib
+
 from flask import Flask, g, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
@@ -35,7 +37,7 @@ from src.db.web_access import (
 )
 
 from .config import Settings
-from .origin import refuse_foreign_origin
+from .origin import over_https, refuse_foreign_origin
 
 LOGIN_PATH = "/login"
 LOGOUT_PATH = "/logout"
@@ -68,7 +70,9 @@ def current_account() -> Account | None:
 
 def install(app: Flask, conf: Settings) -> None:
     """Повесить заслон и зарегистрировать вход с выходом."""
-    signer = URLSafeTimedSerializer(conf.secret_key, salt=COOKIE_SALT)
+    signer = URLSafeTimedSerializer(
+        conf.secret_key, salt=COOKIE_SALT, signer_kwargs={"digest_method": hashlib.sha256}
+    )
     max_age = int(SESSION_TTL.total_seconds())
 
     def token_of_request() -> str | None:
@@ -97,7 +101,7 @@ def install(app: Flask, conf: Settings) -> None:
             expires=session.expires_at,
             httponly=True,
             samesite="Lax",
-            secure=_over_https(),
+            secure=over_https(),
             path="/",
         )
         return response
@@ -157,18 +161,3 @@ def install(app: Flask, conf: Settings) -> None:
         ответ = redirect(url_for("login"))
         ответ.delete_cookie(COOKIE_NAME, path="/")
         return ответ
-
-
-def _over_https() -> bool:
-    """Идёт ли этот запрос по HTTPS — включая случай «TLS снял туннель».
-
-    `Secure` ставится ровно тогда, когда соединение защищено, и не ставится на
-    петле по HTTP: поставленный там, он запретил бы браузеру возвращать куку, и
-    вход перестал бы работать вовсе на стенде разработки.
-
-    Заголовок `X-Forwarded-Proto` учитывается потому, что наружу админка
-    выходит туннелем (D100): TLS заканчивается на туннеле, а до сервера на
-    петле доезжает обычный HTTP. Подставить этот заголовок может только тот,
-    кто уже дотянулся до петли, — то есть сам туннель.
-    """
-    return request.is_secure or request.headers.get("X-Forwarded-Proto", "").lower() == "https"
