@@ -90,6 +90,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0015_web_login_attempts.sql": (
         "sql1:390bd29a8a3d7bc297f40ef728096cd6a7e44ce81544dc40fe6ebc5254016f18"
     ),
+    "0016_web_unlock.sql": (
+        "sql1:69d57ebd5297ee7816fa8e600493c0788ab75d2fb59b89a38c8287f3d23af0b3"
+    ),
 }
 
 
