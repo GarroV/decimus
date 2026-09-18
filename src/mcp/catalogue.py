@@ -959,6 +959,80 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler=checklist_tools.rename_zone,
         kind=KIND_CHECKLIST,
     ),
+    # --- порядок обхода точки (T317) -----------------------------------------
+    ToolSpec(
+        name="route",
+        description=(
+            "Read the walking route of one methodology version: the order in "
+            "which the auditor physically walks the pizzeria — street first, "
+            "then the dining room, and so on — and, if the managing company "
+            "set one, the order of checklist items inside it. Zones are "
+            "returned in the order the auditor will actually get them: the "
+            "ones the route names first, in its order, then everything the "
+            "route does not name, in checklist order. The route changes no "
+            "score and no wording whatsoever; it changes the order of the "
+            "walk. Omit 'version' for the version in force."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {"version": _CHECKLIST_VERSION_PROPERTY},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.route,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="set_route",
+        description=(
+            "Set the walking route: the order in which the auditor goes "
+            "through the pizzeria. Give 'zones' as the list of zone codes in "
+            "walking order, and/or 'items' as the list of checklist item "
+            "codes. The list named is the order in full — a route is a "
+            "sequence, and one zone on its own says nothing; the list not "
+            "named is left untouched. Codes are checked against this "
+            "version's zones and checklist here: the audit engine never reads "
+            "the route file, so a code that does not exist would be stored "
+            "happily and then stop the walk on site. Comment lines the "
+            "managing company keeps in the route file are preserved. As with "
+            "every checklist-editing tool, the change is stored as a NEW "
+            "checklist version and is not published automatically "
+            "(publish_checklist_version does that)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "zones": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Zone codes in walking order, e.g. "
+                        '["facade", "dining", "hot_kitchen"]. Name every zone '
+                        "that is to be ordered — read the current route first "
+                        "(the route tool returns it). An empty list drops the "
+                        "zone order; omit the argument to leave it as it is."
+                    ),
+                },
+                "items": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Checklist item codes in walking order, e.g. "
+                        '["CLN05", "CLN01"]. Items the list does not name '
+                        "follow the ones it does, in checklist order. An "
+                        "empty list drops the item order; omit the argument "
+                        "to leave it as it is."
+                    ),
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.set_route,
+        kind=KIND_CHECKLIST,
+    ),
     # --- методика: публикация ------------------------------------------------
     # --- карта слов: чтение и правка (T144) --------------------------------
     ToolSpec(
