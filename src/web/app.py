@@ -13,6 +13,7 @@ Node не требуется вовсе — стиль приезжает гот
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 from flask import Flask, redirect, render_template, request, url_for
@@ -24,7 +25,9 @@ from src.domain.kinds import kind_title
 
 from . import auth, view
 from . import inspections as data
+from . import methodology as method
 from .config import Settings, load_settings
+from .errors import MethodologyRefused
 from .origin import refuse_foreign_origin
 from .sections import SECTIONS, check_registry, section
 from .texts import UI_LANGS, lang_or_default, t
@@ -36,7 +39,7 @@ REGISTRY_LIMIT = 100
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("registry",)
+SCREENS = ("registry", "admin")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -52,6 +55,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _register_sections(app)
     _register_registry(app, conf)
+    _register_methodology(app, conf)
     _register_errors(app)
     _register_frame_ban(app)
     return app
@@ -170,6 +174,211 @@ def _render_card(
         kind=_kind_title(detail.inspection.kind, lang),
         may_retract=data.retraction_available(),
         retraction_var=data.RETRACTION_URL_VAR,
+        notice=notice,
+        failure=failure,
+    )
+
+
+def _register_methodology(app: Flask, conf: Settings) -> None:
+    """Раздел «Методика»: состав чек-листа, правка, публикация отдельным шагом.
+
+    Ни одна правка не трогает действующую методику. Каждая кладёт РЯДОМ новую
+    версию, движок её проверяет, и только принятую можно опубликовать (D049,
+    D050). Сами эти правила живут в хранилище версий — `src/web/methodology.py`
+    зовёт его, а не повторяет.
+
+    Правка отвечает не перенаправлением, а той же страницей с итогом: человеку
+    нужно увидеть номер записанной версии и то, что она ещё НЕ опубликована, —
+    иначе «сохранил» прочиталось бы как «теперь по ней и считают».
+    """
+    путь = section("admin").path
+
+    @app.get(путь)
+    def methodology() -> str:
+        return _render_methodology(conf, notice=None, failure=None)
+
+    @app.get(f"{путь}/items/<code>")
+    def methodology_item(code: str) -> str:
+        return _render_item(conf, code=code, notice=None, failure=None)
+
+    @app.post(f"{путь}/items")
+    def methodology_add() -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.add_item(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                process=(form.get("process") or "").strip(),
+                question_ru=(form.get("question_ru") or "").strip(),
+                levels=(form.get("levels") or "").strip(),
+                code=form.get("code"),
+                process_en=form.get("process_en"),
+                question_en=form.get("question_en"),
+                zones=form.get("zones"),
+                days=form.get("days"),
+                criteria=form.get("criteria"),
+                kind=form.get("kind"),
+                note=form.get("note"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/items/<code>")
+    def methodology_edit(code: str) -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.edit_item(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=code,
+                process=form.get("process"),
+                process_en=form.get("process_en"),
+                question_ru=form.get("question_ru"),
+                question_en=form.get("question_en"),
+                levels=form.get("levels"),
+                zones=form.get("zones"),
+                days=form.get("days"),
+                criteria=form.get("criteria"),
+                note=form.get("note"),
+            ),
+        )
+        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/items/<code>/disable")
+    def methodology_disable(code: str) -> str:
+        refuse_foreign_origin()
+        итог = _apply(
+            conf,
+            lambda store, автор: method.disable_item(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=code,
+                note=request.form.get("note"),
+            ),
+        )
+        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/items/<code>/restore")
+    def methodology_restore(code: str) -> str:
+        refuse_foreign_origin()
+        итог = _apply(
+            conf,
+            lambda store, автор: method.restore_item(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=code,
+                note=request.form.get("note"),
+            ),
+        )
+        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/publish")
+    def methodology_publish() -> str:
+        refuse_foreign_origin()
+        version = (request.form.get("version") or "").strip()
+        state = method.load_store()
+        if state.store is None:
+            return _render_methodology(conf, notice=None, failure=None)
+        try:
+            опубликована = method.publish_version(state.store, tenant=conf.tenant, version=version)
+        except MethodologyRefused as отказ:
+            return _render_methodology(conf, notice=None, failure=str(отказ))
+        return _render_methodology(
+            conf,
+            notice=t("methodology.published", _lang(conf), version=опубликована),
+            failure=None,
+        )
+
+
+@dataclass(frozen=True)
+class _Итог:
+    """Чем кончилась правка на экране: сообщение или отказ, но не оба."""
+
+    notice: str | None = None
+    failure: str | None = None
+
+
+def _author(conf: Settings) -> str:
+    """Кто правит — для журнала хранилища.
+
+    Заслон без учётки на эти маршруты не пускает вовсе, так что ветка с
+    тенантом — не подстраховка «на всякий случай», а честный ответ на случай,
+    когда правку однажды позовёт не человек: подписать её именем арендатора
+    правдивее, чем пустым местом.
+    """
+    account = auth.current_account()
+    return account.login if account else conf.tenant
+
+
+def _apply(conf: Settings, действие: Any) -> _Итог:
+    """Сделать правку дверью методики и сказать словами, чем она кончилась."""
+    state = method.load_store()
+    if state.store is None:
+        return _Итог()
+    try:
+        правка = действие(state.store, _author(conf))
+    except MethodologyRefused as отказ:
+        return _Итог(failure=str(отказ))
+    return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
+
+
+def _render_methodology(conf: Settings, *, notice: str | None, failure: str | None) -> str:
+    """Состав выбранной версии, список версий и формы правки.
+
+    Хранилище не настроено — страница называет незаданные переменные поимённо и
+    состава не показывает вовсе: пустая таблица читалась бы как «чек-лист пуст».
+    """
+    state = method.load_store()
+    if state.store is None:
+        return render_template("methodology/unset.html", missing=state.missing)
+    попросили = (request.args.get("version") or "").strip() or None
+    try:
+        состав = method.load_composition(state.store, tenant=conf.tenant, version=попросили)
+    except MethodologyRefused as отказ:
+        состав = method.load_composition(state.store, tenant=conf.tenant)
+        failure = failure or str(отказ)
+    return render_template(
+        "methodology/index.html",
+        composition=состав,
+        columns=method.ITEM_COLUMNS,
+        kinds=method.ITEM_KINDS,
+        max_note=method.MAX_NOTE,
+        notice=notice,
+        failure=failure,
+    )
+
+
+def _render_item(conf: Settings, *, code: str, notice: str | None, failure: str | None) -> str:
+    """Пункт целиком: все колонки, критерии и правка.
+
+    Правка показывается только у самой свежей записанной версии. У старой её
+    быть не может: дверь стакает правку на свежую, и форма под старым составом
+    обещала бы поправить то, что на экране, а поправила бы другое.
+    """
+    state = method.load_store()
+    if state.store is None:
+        return render_template("methodology/unset.html", missing=state.missing)
+    попросили = (request.args.get("version") or "").strip() or None
+    try:
+        карточка = method.load_item(state.store, tenant=conf.tenant, code=code, version=попросили)
+    except MethodologyRefused as отказ:
+        return _render_methodology(conf, notice=None, failure=str(отказ))
+    версия = str(карточка["version"])
+    return render_template(
+        "methodology/item.html",
+        item=карточка["item"],
+        version=версия,
+        latest=method.latest_version(state.store),
+        current=method.published_version(state.store),
+        max_note=method.MAX_NOTE,
         notice=notice,
         failure=failure,
     )

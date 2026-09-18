@@ -41,8 +41,9 @@ class Section:
     built: bool
 
 
-#: Девять разделов прототипа в порядке прототипа. Построен один — «Проверки»
-#: (T319): объём спринта — базовая часть веб-версии (D133), а не вся она.
+#: Девять разделов прототипа в порядке прототипа. Построены два — «Проверки»
+#: (T319) и «Методика» (T320): объём спринта — базовая часть веб-версии
+#: (D133), а не вся она.
 SECTIONS: tuple[Section, ...] = (
     Section(key="overview", path="/overview", built=False),
     Section(key="registry", path="/inspections", built=True),
@@ -50,7 +51,7 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="orders", path="/orders", built=False),
     Section(key="country", path="/country", built=False),
     Section(key="calendar", path="/calendar", built=False),
-    Section(key="admin", path="/admin", built=False),
+    Section(key="admin", path="/admin", built=True),
     Section(key="tenants", path="/tenants", built=False),
     Section(key="mini", path="/mini", built=False),
 )

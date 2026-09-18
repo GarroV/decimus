@@ -34,7 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp import checklist_tools as door
-from src.mcp.checklist import Store
+from src.mcp.checklist import Store, current_version, tip_version
 from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
 from src.mcp.errors import McpError
 
@@ -138,10 +138,19 @@ def _refusal(exc: McpError) -> MethodologyRefused:
 
 
 def load_composition(store: Store, *, tenant: str, version: str | None = None) -> Composition:
-    """Состав версии: пункты, зоны и список версий. Ни одной своей цифры."""
+    """Состав версии: пункты, зоны и список версий. Ни одной своей цифры.
+
+    **Без явной версии показывается самая свежая записанная, а не действующая.**
+    Экран правки обязан показывать то, от чего отсчитывается следующая правка:
+    дверь стакает правки на последнюю записанную версию, и человек, правящий
+    опубликованную, получал бы не тот состав, который увидит после сохранения.
+    Чем действующая отличается от последней — говорит шапка страницы.
+    """
     try:
         versions = door.checklist_versions(tenant=tenant, store=store)
-        listing = door.checklist_items(tenant=tenant, store=store, version=version)
+        listing = door.checklist_items(
+            tenant=tenant, store=store, version=version or str(versions["latest"])
+        )
     except McpError as отказ:
         raise _refusal(отказ) from None
     return Composition(
@@ -154,6 +163,22 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
     )
 
 
+def latest_version(store: Store) -> str:
+    """Самая свежая ЗАПИСАННАЯ версия — та, от которой отсчитывается правка."""
+    try:
+        return tip_version(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def published_version(store: Store) -> str:
+    """Версия, по которой движок считает проверки сегодня."""
+    try:
+        return current_version(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def load_item(
     store: Store, *, tenant: str, code: str, version: str | None = None
 ) -> dict[str, Any]:
@@ -162,9 +187,14 @@ def load_item(
     Пустой выдачи и 404 здесь нет намеренно: дверь различает «такого пункта
     нет» и «код написан не по правилам», и человеку с экрана нужна именно эта
     разница, а не одинаковая пустая страница.
+
+    Версия по умолчанию — свежая записанная, а не действующая, по той же
+    причине, что и у состава: правка стакается на свежую.
     """
     try:
-        return door.checklist_item(tenant=tenant, store=store, code=code, version=version)
+        return door.checklist_item(
+            tenant=tenant, store=store, code=code, version=version or tip_version(store)
+        )
     except McpError as отказ:
         raise _refusal(отказ) from None
 

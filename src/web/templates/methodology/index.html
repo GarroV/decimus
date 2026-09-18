@@ -1,0 +1,245 @@
+{#
+  Состав чек-листа одной версии и работа с версиями.
+
+  Ни одного числа собственного производства: пункты, зоны и доли печатаются
+  такими, какими они лежат в файлах методики. Доли зон здесь НЕ складываются —
+  сумма это уже утверждение о методике, и проверяет её движок, а не экран.
+
+  Две версии на экране всегда разведены словами: «действует» — та, по которой
+  движок считает проверки, «свежая записанная» — та, от которой отсчитывается
+  следующая правка. Смешать их означало бы показать правку действующей, какой
+  не бывает по устройству (D049, D050).
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.admin.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('section.admin.title') }}</h1>
+      <span class="section__num">{{ t('methodology.count', count=composition.items|length) }}</span>
+    </div>
+    <p class="section__lead">{{ t('methodology.lead') }}</p>
+  </div>
+
+  {% if notice %}
+    <div class="note note--ok mt-gap" role="status">
+      <div><div class="note__title">{{ notice }}</div></div>
+    </div>
+  {% endif %}
+  {% if failure %}
+    <div class="note note--error mt-gap" role="alert">
+      <div><div class="note__title">{{ t('methodology.failed', reason=failure) }}</div></div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-gap">
+    <div class="card__head row row--between">
+      <div class="grow">
+        <div class="card__title">{{ t('methodology.version.viewing', version=composition.version) }}</div>
+        <div class="card__meta">
+          {{ t('methodology.version.published', version=composition.current) }}
+          · {{ t('methodology.version.latest', version=composition.latest) }}
+        </div>
+      </div>
+      {% if composition.version == composition.current %}
+        <span class="tag tag--ok tag--micro">{{ t('methodology.version.badge.published') }}</span>
+      {% else %}
+        <span class="tag tag--warn tag--micro tag--dashed">{{ t('methodology.version.badge.draft') }}</span>
+      {% endif %}
+    </div>
+
+    {#
+      Публикация — ОТДЕЛЬНЫЙ шаг и отдельная кнопка. Соединить её с правкой
+      значило бы отменить единственную страховку методики: правка успевает
+      полежать проверенной, прежде чем по ней начнут считать партнёров.
+    #}
+    {% if composition.unpublished %}
+      <div class="card__body">
+        <div class="note note--warn">
+          <div>
+            <div class="note__title">{{ t('methodology.draft.title') }}</div>
+            <div class="note__text">
+              {{ t('methodology.draft.text', latest=composition.latest, current=composition.current) }}
+            </div>
+          </div>
+        </div>
+        <form class="row row--tight mt-gap" method="post" action="/admin/publish?lang={{ lang }}">
+          <input type="hidden" name="version" value="{{ composition.latest }}">
+          <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
+        </form>
+      </div>
+    {% endif %}
+  </div>
+
+  {% if not composition.is_latest %}
+    <div class="note note--info mt-gap">
+      <div>
+        <div class="note__title">{{ t('methodology.old.title') }}</div>
+        <div class="note__text">
+          {{ t('methodology.old.text', version=composition.version, latest=composition.latest) }}
+        </div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="section mt-gap">
+    <div class="section__head">
+      <h2 class="section__title">{{ t('methodology.items.title') }}</h2>
+    </div>
+  </div>
+
+  {% if composition.items %}
+    <div class="table-wrap mt-gap">
+      <table class="table">
+        <thead>
+          <tr>
+            {% for column in columns %}
+              <th class="is-text">{{ t('methodology.col.' ~ column) }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in composition.items %}
+            {% set off = item.get('kind', '') == 'off' %}
+            <tr{% if off %} class="row-mark row-mark--frozen"{% endif %}>
+              {% for column in columns %}
+                <td class="is-text">
+                  {% if column == 'id' %}
+                    <a href="/admin/items/{{ item.get('id', '') }}?lang={{ lang }}&version={{ composition.version }}">{{ item.get('id', '—') }}</a>
+                  {% elif column == 'kind' %}
+                    <span class="tag {% if off %}tag--err{% else %}tag--neutral{% endif %} tag--micro">{{ item.get('kind') or 'violation' }}</span>
+                  {% else %}
+                    {{ item.get(column) or '—' }}
+                  {% endif %}
+                </td>
+              {% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="empty mt-gap">
+      <div class="empty__title">{{ t('methodology.empty.title') }}</div>
+      <p class="empty__text">{{ t('methodology.empty.text') }}</p>
+    </div>
+  {% endif %}
+
+  {#
+    Завести пункт можно только у свежей записанной версии: правка стакается
+    на неё, и форма под старым составом обещала бы не то, что сделает.
+  #}
+  {% if composition.is_latest %}
+    <details class="edit mt-gap">
+      <summary class="edit__summary">{{ t('methodology.add.title') }}</summary>
+      <p class="field-note">{{ t('methodology.add.hint') }}</p>
+      <form class="form-grid" method="post" action="/admin/items?lang={{ lang }}">
+        <label class="field-label" for="add-code">{{ t('methodology.field.code') }}</label>
+        <input class="input" id="add-code" name="code" type="text" autocapitalize="characters" spellcheck="false">
+        <p class="field-note">{{ t('methodology.field.code.hint') }}</p>
+
+        <label class="field-label" for="add-process">{{ t('methodology.field.process') }}</label>
+        <input class="input" id="add-process" name="process" type="text" required>
+
+        <label class="field-label" for="add-process-en">{{ t('methodology.field.process_en') }}</label>
+        <input class="input" id="add-process-en" name="process_en" type="text">
+
+        <label class="field-label" for="add-question">{{ t('methodology.field.question_ru') }}</label>
+        <input class="input" id="add-question" name="question_ru" type="text" required>
+
+        <label class="field-label" for="add-question-en">{{ t('methodology.field.question_en') }}</label>
+        <input class="input" id="add-question-en" name="question_en" type="text">
+
+        <label class="field-label" for="add-levels">{{ t('methodology.field.levels') }}</label>
+        <input class="input" id="add-levels" name="levels" type="text" required>
+        <p class="field-note">{{ t('methodology.field.levels.hint') }}</p>
+
+        <label class="field-label" for="add-zones">{{ t('methodology.field.zones') }}</label>
+        <input class="input" id="add-zones" name="zones" type="text">
+        <p class="field-note">{{ t('methodology.field.zones.hint') }}</p>
+
+        <label class="field-label" for="add-days">{{ t('methodology.field.days') }}</label>
+        <input class="input input--num" id="add-days" name="days" type="number" min="0" step="1">
+        <p class="field-note">{{ t('methodology.field.days.hint') }}</p>
+
+        <label class="field-label" for="add-kind">{{ t('methodology.field.kind') }}</label>
+        <select class="input" id="add-kind" name="kind">
+          {% for kind in kinds %}
+            <option value="{{ kind }}">{{ kind }}</option>
+          {% endfor %}
+        </select>
+        <p class="field-note">{{ t('methodology.field.kind.hint') }}</p>
+
+        <label class="field-label" for="add-criteria">{{ t('methodology.field.criteria') }}</label>
+        <textarea class="input" id="add-criteria" name="criteria" rows="4"></textarea>
+
+        <label class="field-label" for="add-note">{{ t('methodology.field.note') }}</label>
+        <input class="input" id="add-note" name="note" type="text" maxlength="{{ max_note }}">
+        <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>
+
+        <button class="btn btn--primary" type="submit">{{ t('methodology.add.submit') }}</button>
+      </form>
+    </details>
+  {% endif %}
+
+  <div class="section mt-gap">
+    <div class="section__head">
+      <h2 class="section__title">{{ t('methodology.zones.title') }}</h2>
+    </div>
+    <p class="section__lead">{{ t('methodology.zones.hint') }}</p>
+  </div>
+
+  <div class="table-wrap mt-gap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="is-text">{{ t('methodology.zones.col.code') }}</th>
+          <th class="is-text">{{ t('methodology.zones.col.name') }}</th>
+          <th>{{ t('methodology.zones.col.share') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for zone in composition.zones %}
+          <tr>
+            <td class="is-text">{{ zone.get('code', '—') }}</td>
+            <td class="is-text">{{ zone.get('name_ru') or zone.get('name_en') or '—' }}</td>
+            <td class="is-num">{{ zone.get('share_pct') or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section mt-gap">
+    <div class="section__head">
+      <h2 class="section__title">{{ t('methodology.versions.title') }}</h2>
+    </div>
+    <p class="section__lead">{{ t('methodology.versions.hint') }}</p>
+  </div>
+
+  <div class="table-wrap mt-gap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th class="is-text">{{ t('methodology.versions.col.version') }}</th>
+          <th class="is-text">{{ t('methodology.versions.col.name') }}</th>
+          <th class="is-text">{{ t('methodology.versions.col.day') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for version in composition.versions %}
+          <tr>
+            <td class="is-text">
+              <a href="/admin?lang={{ lang }}&version={{ version.version }}">{{ version.version }}</a>
+              {% if version.current %}
+                <span class="tag tag--ok tag--micro">{{ t('methodology.version.badge.published') }}</span>
+              {% endif %}
+            </td>
+            <td class="is-text">{{ version.name or '—' }}</td>
+            <td class="is-text">{{ version.published_on or '—' }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% endblock %}
