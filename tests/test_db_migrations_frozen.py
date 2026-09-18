@@ -81,6 +81,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0013_phrase_alias_curation.sql": (
         "sql1:460369f931ba759ab6af9ea6e16f0d5237214ab3da0be462d419c723b1e2b8c9"
     ),
+    # Заведена вместе с файлом (T323) и нигде ещё не применена — это тот
+    # единственный момент, когда содержимое миграции можно было менять.
+    "0014_web_accounts.sql": (
+        "sql1:d48500b536d6fd0bdcc018f5873382a39850ac52042972f2e3c3a8c54c3d84e5"
+    ),
 }
 
 

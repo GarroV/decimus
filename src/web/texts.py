@@ -51,6 +51,34 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     "section.tenants.title": {"ru": "Проект", "en": "Project"},
     "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
+    # --- вход, выход, отказ (T323) -----------------------------------------
+    # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
+    # тот» превращают форму в справочник заведённых людей: перебором по ней
+    # узнают, кто здесь есть, ещё не зная ни одного пароля.
+    "auth.title": {"ru": "Вход", "en": "Sign in"},
+    "auth.lead": {
+        "ru": "Админка управляющей компании. Учётку заводит команда проекта.",
+        "en": "Management company admin panel. Accounts are created by the project team.",
+    },
+    "auth.login": {"ru": "Логин", "en": "Login"},
+    "auth.password": {"ru": "Пароль", "en": "Password"},
+    "auth.submit": {"ru": "Войти", "en": "Sign in"},
+    "auth.failed": {
+        "ru": "Логин или пароль не подошли.",
+        "en": "That login and password did not match.",
+    },
+    "auth.aside": {
+        "ru": (
+            "Забыли пароль или нужна учётка — обратитесь к команде проекта: "
+            "самостоятельной регистрации здесь нет."
+        ),
+        "en": (
+            "Forgot your password or need an account — ask the project team: "
+            "there is no self-service sign-up here."
+        ),
+    },
+    "auth.logout": {"ru": "Выйти", "en": "Sign out"},
+    "auth.signed_in": {"ru": "Вошли", "en": "Signed in"},
     # --- экран непостроенного раздела (D138) -------------------------------
     "wip.title": {"ru": "Раздел ещё в разработке", "en": "This section is not built yet"},
     "wip.text": {

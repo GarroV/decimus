@@ -14,18 +14,18 @@ Node не требуется вовсе — стиль приезжает гот
 from __future__ import annotations
 
 from typing import Any
-from urllib.parse import urlsplit
 
-from flask import Flask, abort, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from src.db.errors import DbError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
+from . import auth, view
 from . import inspections as data
-from . import view
 from .config import Settings, load_settings
+from .origin import refuse_foreign_origin
 from .sections import SECTIONS, check_registry, section
 from .texts import UI_LANGS, lang_or_default, t
 
@@ -46,6 +46,10 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     app = Flask(__name__)
     _register_context(app, conf)
+    # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
+    # порядке регистрации, и опознание обязано случиться раньше всего, что
+    # ходит в базу за данными арендатора.
+    auth.install(app, conf)
     _register_sections(app)
     _register_registry(app, conf)
     _register_errors(app)
@@ -70,6 +74,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
     @app.context_processor
     def _context() -> dict[str, Any]:
         lang = _lang(conf)
+        account = auth.current_account()
         return {
             "lang": lang,
             "langs": UI_LANGS,
@@ -77,6 +82,10 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "sections": SECTIONS,
             "tenant": conf.tenant,
             "current_path": request.path,
+            # Кто вошёл — берётся из того же ответа, что пропустил запрос
+            # через заслон, а не спрашивается у базы второй раз.
+            "account": account,
+            "logout_path": auth.LOGOUT_PATH,
         }
 
 
@@ -130,7 +139,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> str | tuple[str, int]:
-        _refuse_foreign_origin()
+        refuse_foreign_origin()
         reason = (request.form.get("reason") or "").strip()
         notice: str | None = None
         failure: str | None = None
@@ -178,41 +187,10 @@ def _kind_title(code: str, lang: str) -> str:
         return code
 
 
-def _refuse_foreign_origin() -> None:
-    """Пропустить POST только со своей же страницы. Во всех прочих случаях — отказ.
-
-    Аутентификации у админки нет, а снятие проверки необратимо убирает кадры из
-    хранилища — то есть чужая страница, открытая в том же браузере, могла бы
-    это запустить одним скрытым запросом. Заслон нужен именно поэтому, и он
-    сегодня единственный.
-
-    **Правило: разрешает совпадение, а не отсутствие данных.** Происхождение
-    берётся из `Origin`, а если его нет — из `Referer`; нет ни одного —
-    отказ. Прежняя редакция пропускала запрос без `Origin`, рассуждая так:
-    заголовок ставит браузер, значит его отсутствие безопасно. Рассуждение
-    неверное дважды. Во-первых, заголовок ставит не всякий браузер и не во
-    всяком случае (политика источника ссылки, старые версии, встроенные
-    просмотрщики). Во-вторых, проверка, которая на пустом входе разрешает, —
-    это не проверка, а пропуск: обойти её достаточно тем, чтобы заголовок не
-    пришёл, и злоупотребить этим легче, чем подделать значение.
-
-    **Сверяется схема вместе с хостом, а не один `netloc`.** Иначе
-    `http://хост` и `https://хост` считались бы одним происхождением, и
-    заслон снимался бы понижением схемы.
-    """
-    свой = urlsplit(request.host_url)
-    источник = request.headers.get("Origin") or request.headers.get("Referer")
-    if not источник:
-        abort(403)
-    пришёл = urlsplit(источник)
-    if (пришёл.scheme, пришёл.netloc) != (свой.scheme, свой.netloc):
-        abort(403)
-
-
 def _register_frame_ban(app: Flask) -> None:
     """Запретить встраивание страниц админки в чужой документ.
 
-    Заслон происхождения (`_refuse_foreign_origin`) закрывает запрос С чужой
+    Заслон происхождения (`origin.refuse_foreign_origin`) закрывает запрос С чужой
     страницы, но не закрывает случай, когда чужая страница показывает НАШУ в
     рамке: документ тогда честно наш, происхождение совпадает, и заслон
     пропустит отправку формы — сняв проверку руками человека, который думал,

@@ -89,3 +89,54 @@
 
 /* Переключатель языка в шапке: язык — параметр продукта, и он виден. */
 .langpick { display: inline-flex; gap: var(--space-1); }
+
+/* ── Вход (T323) ─────────────────────────────────────────────────
+   Своих цветов и размеров здесь нет: карточка, поля и кнопка —
+   те же, что на остальных экранах, а этот блок задаёт только
+   раскладку. Форма узкая и стоит по центру потому, что на этом
+   экране больше нет ничего, с чем её можно спутать. */
+
+.login {
+  max-width: 380px;
+  margin: var(--space-10) auto;
+  padding: var(--space-9);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-block);
+  box-shadow: var(--sh-card);
+}
+.login__lead { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-2); }
+.login__form { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-7); }
+.login__form .input { width: 100%; }
+.login__form .field-label { margin-top: var(--space-5); }
+.login__form .btn { margin-top: var(--space-7); justify-content: center; }
+.login__aside {
+  font-size: 10px; line-height: 14px; color: var(--ink-3);
+  border-top: 1px dashed var(--line-control);
+  padding-top: var(--space-4); margin-top: var(--space-7);
+}
+
+/* Кто вошёл и выход — в шапке, рядом с арендатором и по его образцу. */
+.whoami { display: flex; align-items: center; gap: var(--space-5); padding-right: var(--space-6); }
+.whoami__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); text-align: right; }
+.whoami__meta { font-size: var(--fs-meta); color: var(--ink-3); text-align: right; }
+.logout { display: inline-flex; margin-left: var(--space-3); }
+
+/* ── Шапка на телефоне ────────────────────────────────────────────
+   Ядро на узком экране растягивает КАЖДУЮ кнопку на всю ширину
+   (`dodo-ds.css`, `.btn { width: 100% }`) — это верно для кнопок
+   внутри страницы и неверно для шапки: там их несколько в ряд, и
+   растянутые они наезжают друг на друга. Поймано сверкой снимков на
+   390 px: «EN» и «Выйти» рисовались одна поверх другой и не читались.
+
+   Правится в слое продукта, а не правкой ядра: ядро — копия из
+   `forma`, и расхождение с каноном стоит дороже одного правила здесь.
+   Высота нажатия (`min-height: var(--tap-min)`) остаётся ядровой — её
+   этот блок не трогает. */
+
+@media (max-width: 767px) {
+  .appbar .btn { width: auto; font-size: var(--fs-dense); }
+  .langpick, .logout { flex: 0 0 auto; }
+  .whoami { padding-right: 0; }
+  .logout { margin-left: 0; }
+}

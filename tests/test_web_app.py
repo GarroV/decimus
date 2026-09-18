@@ -25,13 +25,12 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
+from web_harness import войти, подменить_двери, собрать
 
 from src.db.errors import DbError, RetractionError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.retract import Retraction
 from src.web import inspections as data
-from src.web.app import create_app
-from src.web.config import Settings
 from src.web.sections import SECTIONS
 
 ТЕНАНТ = "default"
@@ -100,13 +99,19 @@ def карточка(row: InspectionRow, **поля: Any) -> InspectionDetail:
 
 @pytest.fixture
 def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    """Приложение с подменёнными дверями блока `db` и заданным тенантом."""
+    """Приложение с подменёнными дверями блока `db` и УЖЕ ВОШЕДШИМ человеком.
+
+    Вход настоящий — отправкой формы (`tests/web_harness.py`). После T323 без
+    него не открывается ни один экран, и подставлять сюда обход заслона
+    значило бы проверять экраны в положении, которого у живого приложения не
+    бывает.
+    """
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
-    app = create_app(Settings(host="127.0.0.1", port=8266, tenant=ТЕНАНТ, ui_lang="ru"))
-    app.config.update(TESTING=True)
-    with app.test_client() as client:
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        assert войти(client).status_code == 302
         yield client
 
 
@@ -226,8 +231,9 @@ def test_без_администратора_истории_снятие_не_п
     # Act
     страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
 
-    # Assert
-    assert "<form" not in страница
+    # Assert — ищется именно форма снятия: выход в шапке есть на каждой
+    # странице, и «форм на странице нет вовсе» с ним больше не проверка.
+    assert "/retract" not in страница
     assert "Снятые проверки не видны" in страница
 
 
@@ -243,7 +249,7 @@ def test_снятая_проверка_видна_снятой_и_с_причи�
 
     # Assert — снятой проверке действий не предлагают.
     assert "проверка проведена не по той методике" in страница
-    assert "<form" not in страница
+    assert "/retract" not in страница
 
 
 # --- снятие идёт существующей дверью ---------------------------------------
@@ -301,7 +307,8 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
 def test_снятие_с_чужой_страницы_отклонено_и_не_доходит_до_базы(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange — аутентификации у админки нет, а снятие необратимо убирает кадры.
+    # Arrange — снятие необратимо убирает кадры, а сессионная кука уехала бы
+    # с чужой страницы сама: браузер прикладывает её независимо от затейщика.
     вызвано = False
 
     def снять(*_a: Any, **_k: Any) -> Retraction:

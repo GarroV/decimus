@@ -1,4 +1,4 @@
-.PHONY: check test test-honest cov image regress web web-up web-demo demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-stand-user demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -313,7 +313,7 @@ WEB_STAND_TENANT ?= demo
 #   make web-up                      # демо-стенд: есть что смотреть сразу
 #   WEB_TENANT=<код> make web-up     # своя история вместо демонстрационной
 web-up: export WEB_TENANT = $(WEB_STAND_TENANT)
-web-up: db-up web-demo
+web-up: db-up web-demo web-stand-user
 	@echo ""
 	@echo "Демо-история лежит под тенантом demo и ничего другого не касается."
 	@echo "Остановить стенд — Ctrl-C; база остаётся поднятой (снести — make db-down)."
@@ -326,6 +326,30 @@ web-up: db-up web-demo
 # новые. В неместную базу писать отказывается (tools/seed_web_demo.py).
 web-demo:
 	$(VENV)/python tools/seed_web_demo.py
+
+# Учётки веб-админки (T323). Регистрации снаружи у админки нет — человек
+# появляется в круге тем, что команда проекта выполнила эту цель. Идёт под
+# ролью ВЛАДЕЛЬЦА СХЕМЫ (DATABASE_ADMIN_URL): роль приложения права заводить
+# и править учётки не имеет вовсе, и это держит база, а не код.
+#
+# Пароль в аргументах не передаётся — он виден в `ps` и остаётся в истории
+# оболочки. Команда спрашивает его вводом без эха; для скрипта есть
+# WEB_USER_PASSWORD.
+#
+#   make web-user ARGS="add director --tenant demo"
+#   make web-user ARGS="list --tenant demo"
+#   make web-user ARGS="disable director --tenant demo"
+web-user:
+	$(VENV)/python tools/web_user.py $(ARGS)
+
+# Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
+# командой: после T323 стенд без учётки встречает формой входа, войти в
+# которую нечем. Заводится один раз, пароль делается случайным и печатается на
+# экран — постоянный пароль стенда лежал бы в репозитории, то есть был бы
+# известен всем. Повторный запуск учётку не трогает.
+web-stand-user: export WEB_TENANT = $(WEB_STAND_TENANT)
+web-stand-user:
+	$(VENV)/python tools/web_user.py ensure
 
 # Смоук доступа к MCP СНАРУЖИ (T256). Отвечает на «доступен ли сервер с чужой
 # машины», а не на «поднят ли контейнер»: разница между этими вопросами стоила
