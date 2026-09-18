@@ -1,0 +1,188 @@
+{#
+  Карточка проведённой проверки.
+
+  Каждое число на этом экране записано в базе движком при завершении проверки.
+  Ни сложения, ни процентов, ни округления здесь нет — ни в шаблоне, ни в том,
+  что в него приехало (`src/web/view.py`).
+
+  Формулировки находок показываются на языке РЕЧИ той проверки, где они
+  записаны, а подписи вокруг — на языке интерфейса. Это разные языки, и
+  смешивать их нельзя (`CLAUDE.md`).
+#}{% extends "base.html" %}
+{% block title %}{{ head.unit_name }}{% endblock %}
+
+{% block body %}
+  <div class="row row--tight">
+    <a class="btn btn--sm btn--ghost" href="/inspections?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+  </div>
+
+  {% if notice %}
+    <div class="note note--ok mt-gap">
+      <div><div class="note__title">{{ notice }}</div></div>
+    </div>
+  {% endif %}
+  {% if failure %}
+    <div class="note note--error mt-gap">
+      <div><div class="note__title">{{ t('retract.failed', reason=failure) }}</div></div>
+    </div>
+  {% endif %}
+
+  {% if head.retracted %}
+    <div class="note note--error mt-gap">
+      <div>
+        <div class="note__title">{{ t('retract.banner.title') }}</div>
+        <div class="note__text">{{ t('retract.banner.text', reason=head.retraction_reason or '—') }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-gap">
+    <div class="card__head head-line">
+      <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade }}</span>
+      <div class="head-line__score">
+        <span class="num num--hero">{{ head.pct }}</span>
+        <span class="muted">{{ t('card.score.unit') }}</span>
+      </div>
+      <div class="head-line__grow">
+        <div class="card__title">{{ head.unit_name }}</div>
+        <div class="card__meta">{{ t('card.meta', date=head.inspection_date, kind=kind, version=head.checklist_version) }}</div>
+        <div class="meta">{{ t('card.score.note', deductions=detail.deductions, findings=head.findings_count) }}</div>
+      </div>
+      <span class="tag {% if head.retracted %}tag--err{% else %}tag--neutral{% endif %} tag--micro">
+        {{ t('state.retracted') if head.retracted else t('state.sealed') }}
+      </span>
+    </div>
+
+    <div class="card__facts">
+      <div class="card__fact">
+        <div class="card__fact-label">{{ t('card.fact.auditor') }}</div>
+        <div>{{ head.auditor or '—' }}</div>
+      </div>
+      <div class="card__fact">
+        <div class="card__fact-label">{{ t('card.fact.city') }}</div>
+        <div>{{ head.city or '—' }}</div>
+      </div>
+      <div class="card__fact">
+        <div class="card__fact-label">{{ t('card.fact.partner') }}</div>
+        <div>{{ head.partner or '—' }}</div>
+      </div>
+      <div class="card__fact">
+        <div class="card__fact-label">{{ t('card.fact.report_lang') }}</div>
+        <div>{{ head.report_lang }}</div>
+      </div>
+    </div>
+
+    <div class="card__body">
+      <div class="card__fact-label">{{ t('card.counts.title') }}</div>
+      <div class="row row--tight mt-gap">
+        {% for line in counts %}
+          <span class="tag {{ line.tone }}">{{ line.level }}<span class="tag__note">{{ line.count }}</span></span>
+        {% else %}
+          <span class="muted">—</span>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  <div class="section mt-gap">
+    <div class="section__head"><h2 class="section__title">{{ t('card.zones.title') }}</h2></div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="is-text">{{ t('card.zones.col.zone') }}</th>
+            <th>{{ t('card.zones.col.share') }}</th>
+            <th>{{ t('card.zones.col.loss') }}</th>
+            <th>{{ t('card.zones.col.left') }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for zone in zones %}
+            <tr>
+              <td class="is-text">
+                {{ zone.name }}
+                <span class="meta">{{ zone.code }}</span>
+                {% if zone.zeroed %}<span class="tag tag--err tag--micro">{{ t('card.zones.zeroed') }}</span>{% endif %}
+              </td>
+              <td class="is-num">{{ zone.share }}</td>
+              <td class="is-num">{{ zone.loss }}</td>
+              <td class="is-num">{{ zone.left }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section__head"><h2 class="section__title">{{ t('card.findings.title') }}</h2></div>
+    {% if detail.findings %}
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>{{ t('card.findings.col.n') }}</th>
+              <th class="is-text">{{ t('card.findings.col.code') }}</th>
+              <th class="is-text">{{ t('card.findings.col.level') }}</th>
+              <th class="is-text">{{ t('card.findings.col.zone') }}</th>
+              <th class="is-text">{{ t('card.findings.col.text') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for finding in detail.findings %}
+              <tr>
+                <td class="is-num">{{ finding.n }}</td>
+                <td class="is-text">{{ finding.code }}</td>
+                <td class="is-text"><span class="tag {{ level_tone(finding.level) }} tag--micro">{{ finding.level }}</span></td>
+                <td class="is-text">
+                  {{ finding.zone }}
+                  {% if finding.zone_unusual %}<span class="tag tag--warn tag--micro tag--dashed">{{ t('card.findings.zone_unusual') }}</span>{% endif %}
+                </td>
+                <td class="is-text">
+                  <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
+                  <div class="meta">{{ t('card.findings.speech_lang', lang=finding.lang) }}</div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="empty"><p class="empty__text">{{ t('card.findings.empty') }}</p></div>
+    {% endif %}
+  </div>
+
+  {% if detail.info %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('card.info.title') }}</h2></div>
+      <div class="card"><div class="card__body stack">
+        {% for row in detail.info %}
+          <div><span class="meta">{{ row.code }}</span><div>{{ row.text }}</div></div>
+        {% endfor %}
+      </div></div>
+    </div>
+  {% endif %}
+
+  {% if may_retract and not head.retracted %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('retract.title') }}</h2></div>
+      <div class="card"><div class="card__body">
+        <p class="field-note">{{ t('retract.hint') }}</p>
+        <form method="post" action="/inspections/{{ head.id }}/retract?lang={{ lang }}" class="row mt-gap">
+          <label class="grow">
+            <span class="field-label">{{ t('retract.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">
+          </label>
+          <button class="btn btn--danger" type="submit">{{ t('retract.submit') }}</button>
+        </form>
+      </div></div>
+    </div>
+  {% elif not may_retract %}
+    <div class="note note--warn">
+      <div>
+        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
+        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
