@@ -541,8 +541,18 @@ def cmd_validate(a):
                         problems.append(f"{qid}: неизвестная зона «{x.strip()}»")
             if not r.get("question_ru"):
                 problems.append(f"{qid}: пустая формулировка")
+            срок = (r.get("days") or "").strip()
+            if not срок and levels_of(r) & VIOLATION_LEVELS:
+                # Пустая клетка не нейтральна: движок читает её нулём, а ноль в
+                # отчёте партнёру означает «устранить немедленно». Забытый срок
+                # выглядит как выставленный самый жёсткий. Умолчание не
+                # подставляем — цену ответа назначает владелец методики.
+                problems.append(
+                    f"{qid}: нарушение без срока устранения (колонка days пуста) — "
+                    f"в отчёте партнёру это прочтётся как «устранить немедленно»"
+                )
             try:
-                int(float(r.get("days") or 0))
+                int(float(срок or 0))
             except ValueError:
                 problems.append(f"{qid}: срок не число")
     crit = open(data_path("criteria.md"), encoding="utf-8").read()
