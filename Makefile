@@ -1,4 +1,4 @@
-.PHONY: check test test-honest image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -65,10 +65,30 @@ test:
 	$(VENV)/pytest
 	$(VENV)/python scripts/check_test_floor.py reports/junit.xml
 
+# Покрытие отдельной целью, а не режимом по умолчанию (#284). Причина —
+# замер 18.09.2026 на 2959 тестах: 323 с без покрытия против больше 13 минут
+# с ним. Пока `--cov=src` стоял в `addopts`, эти восемь минут платил КАЖДЫЙ
+# вызов pytest, включая точечные прогоны по ходу работы, ради дешевизны
+# которых и принималось D129.
+#
+# Считается по ядру из конституции, а не по `src` целиком: ориентир 80%
+# объявлен для слоя молчаливого сбоя, а поверхность юнит-тестами не
+# покрывается по стандарту. Процент по `src` целиком требовал бы переборку,
+# которую D129 велит удалять.
+#
+# Движок живёт в подпроцессе и этой целью не меряется — для него `cov-engine`.
+cov: export DATABASE_URL = $(TEST_DATABASE_URL)
+cov: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
+cov: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
+cov: export AUDIT_REQUIRE_DATA = 1
+cov:
+	$(VENV)/pytest --cov=src/domain --cov=src/report --cov-report=term-missing
+
 # Прогон с ЧЕСТНОЙ проверкой порчей. Отдельная цель, а не режим `test`, и это
 # измерено: `PYTHONDONTWRITEBYTECODE=1` заставляет каждый подпроцесс движка
 # компилироваться заново, и вместе с покрытием набор перестаёт проходить —
 # 115 секунд без покрытия против больше десяти минут с ним (замерено 03.09,
+# на 18.09 набор вырос и те же 115 с стали 323 с — см. #284,
 # регрессию внёс диспетчер и поймал на приёмке).
 #
 # Зачем переменная вообще: Python инвалидирует кэш байткода по паре «время
