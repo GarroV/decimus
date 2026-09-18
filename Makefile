@@ -1,4 +1,4 @@
-.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-stand-user demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -341,6 +341,18 @@ web-demo:
 #   make web-user ARGS="disable director --tenant demo"
 web-user:
 	$(VENV)/python tools/web_user.py $(ARGS)
+
+# ЗАПРЕТ НА ВХОД: посмотреть и снять (T328, решение D158). Ограничитель перебора
+# запирает вход после серии неудач, и до T328 запрет проходил только по времени
+# — значит, посторонний, знающий логин, держал человека запертым сколь угодно
+# долго одной попыткой в час. Работает под ролью АДМИНИСТРАТОРА ИСТОРИИ
+# (DATABASE_RETRACTION_URL), той же, что снимает проверку.
+#
+#   make web-unlock ARGS="list --tenant demo"
+#   make web-unlock ARGS="unlock director --tenant demo"
+#   make web-unlock ARGS="unlock-address 203.0.113.7 --tenant demo"
+web-unlock:
+	$(VENV)/python tools/web_unlock.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
 # командой: после T323 стенд без учётки встречает формой входа, войти в
