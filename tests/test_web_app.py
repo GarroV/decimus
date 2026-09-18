@@ -400,3 +400,45 @@ def test_недоступная_база_показана_страницей_а_
     # Assert
     assert ответ.status_code == 503
     assert "связь с базой не установлена" in ответ.get_data(as_text=True)
+
+
+def test_страницы_не_встраиваются_в_чужой_документ(стенд: FlaskClient) -> None:
+    # Arrange — заслон происхождения закрывает запрос С чужой страницы, но не
+    # случай, когда чужая страница показывает НАШУ в рамке: происхождение
+    # тогда честно совпадает, и форму снятия можно нажать чужими руками.
+    # Проверяем и построенный раздел, и заглушку, и страницу отказа: рамка не
+    # выбирает, какую страницу встраивать.
+    for адрес in ("/inspections", "/calendar", "/нет-такой-страницы"):
+        # Act
+        ответ = стенд.get(адрес)
+
+        # Assert
+        assert ответ.headers.get("X-Frame-Options") == "DENY", адрес
+        assert "frame-ancestors 'none'" in ответ.headers.get("Content-Security-Policy", ""), адрес
+
+
+def test_отказ_снятия_показан_на_карточке_а_не_потерян(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — отказ снятия обязан дойти до человека словами. Что в самом
+    # отказе не окажется адреса базы, проверяет не этот тест, а
+    # `test_db_retraction_error_text.py`: здесь источник подменён, и порча
+    # настоящего текста отсюда не видна — проверено порчей.
+    def снять(*_a: Any, **_k: Any) -> Retraction:
+        raise RetractionError("Снятие проверки x не удалось (OperationalError). Повторить можно")
+
+    monkeypatch.setattr(data, "retract_card", снять)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract",
+        data={"reason": "проверка отказа"},
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert — причина отказа на экране есть, адреса базы в ней нет.
+    страница = ответ.get_data(as_text=True)
+    assert "OperationalError" in страница
+    for след in ("host=", "port=", "dbname=", "user=", "postgresql://"):
+        assert след not in страница, след
