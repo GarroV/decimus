@@ -222,6 +222,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 criteria=form.get("criteria"),
                 kind=form.get("kind"),
                 note=form.get("note"),
+                version_name=form.get("version_name"),
             ),
         )
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
@@ -246,6 +247,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 days=form.get("days"),
                 criteria=form.get("criteria"),
                 note=form.get("note"),
+                version_name=form.get("version_name"),
             ),
         )
         return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
@@ -261,6 +263,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 author=автор,
                 code=code,
                 note=request.form.get("note"),
+                version_name=request.form.get("version_name"),
             ),
         )
         return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
@@ -276,6 +279,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 author=автор,
                 code=code,
                 note=request.form.get("note"),
+                version_name=request.form.get("version_name"),
             ),
         )
         return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
@@ -348,6 +352,7 @@ def _render_methodology(conf: Settings, *, notice: str | None, failure: str | No
     return render_template(
         "methodology/index.html",
         composition=состав,
+        needs_name=method.needs_set_name(состав),
         columns=method.ITEM_COLUMNS,
         kinds=method.ITEM_KINDS,
         max_note=method.MAX_NOTE,
@@ -372,12 +377,13 @@ def _render_item(conf: Settings, *, code: str, notice: str | None, failure: str 
     except MethodologyRefused as отказ:
         return _render_methodology(conf, notice=None, failure=str(отказ))
     версия = str(карточка["version"])
+    состав = method.load_composition(state.store, tenant=conf.tenant)
     return render_template(
         "methodology/item.html",
         item=карточка["item"],
         version=версия,
-        latest=method.latest_version(state.store),
-        current=method.published_version(state.store),
+        latest=состав.latest,
+        needs_name=method.needs_set_name(состав),
         max_note=method.MAX_NOTE,
         notice=notice,
         failure=failure,

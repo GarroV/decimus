@@ -173,6 +173,12 @@
         <label class="field-label" for="add-criteria">{{ t('methodology.field.criteria') }}</label>
         <textarea class="input" id="add-criteria" name="criteria" rows="4"></textarea>
 
+        {% if needs_name %}
+          <label class="field-label" for="add-version-name">{{ t('methodology.field.version_name') }}</label>
+          <input class="input" id="add-version-name" name="version_name" type="text" required>
+          <p class="field-note">{{ t('methodology.field.version_name.hint') }}</p>
+        {% endif %}
+
         <label class="field-label" for="add-note">{{ t('methodology.field.note') }}</label>
         <input class="input" id="add-note" name="note" type="text" maxlength="{{ max_note }}">
         <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>

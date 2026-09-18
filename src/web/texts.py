@@ -450,6 +450,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Выключить пункт — отдельная кнопка, а не вид строки: так это видно в журнале.",
         "en": "Switching an item off is a button, not a row kind: that way the journal shows it.",
     },
+    "methodology.field.version_name": {"ru": "Имя набора", "en": "Set name"},
+    "methodology.field.version_name.hint": {
+        "ru": (
+            "У этой методики имени ещё нет, а идентификатор версии складывается из имени, "
+            "даты издания и отпечатка данных. Спрашивается один раз: дальше имя "
+            "подхватывается само. Без даты в самом имени, например «imf»."
+        ),
+        "en": (
+            "This methodology has no name yet, and a version identifier is made of the name, "
+            "the issue date and a fingerprint of the data. Asked once: afterwards the name is "
+            "carried over. No date inside the name itself, e.g. «imf»."
+        ),
+    },
     "methodology.field.note": {"ru": "Зачем правим", "en": "Why this edit"},
     "methodology.field.note.hint": {
         "ru": (
