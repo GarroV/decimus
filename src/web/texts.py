@@ -474,6 +474,21 @@ TEXTS: dict[str, dict[str, str]] = {
             "than {max} characters."
         ),
     },
+    "methodology.broken.title": {
+        "ru": "Хранилище версий методики не читается",
+        "en": "The methodology version store cannot be read",
+    },
+    "methodology.broken.text": {
+        "ru": (
+            "Состав чек-листа не показать: {reason}. Это не отклонённая правка, а беда "
+            "самого хранилища — история проверок в соседнем разделе при этом цела."
+        ),
+        "en": (
+            "The checklist composition cannot be shown: {reason}. This is not a refused edit "
+            "but a fault of the store itself — the inspection history in the neighbouring "
+            "section is unaffected."
+        ),
+    },
     "methodology.item.title": {"ru": "Пункт {code}", "en": "Item {code}"},
     "methodology.item.back": {"ru": "К составу", "en": "Back to the composition"},
     "methodology.item.criteria.title": {"ru": "Критерии", "en": "Criteria"},
