@@ -16,13 +16,19 @@
 
 **В куке едет не то, что лежит в базе.** В браузере — подписанный токен, в
 базе — его отпечаток SHA-256. Украденная база не даёт войти ни под кем.
+
+**Пароль подбирать дорого (T325).** Неудачи считаются по адресу и по логину
+(`src/db/web_throttle.py`), и запертая попытка не доходит до сверки пароля
+вовсе. Порядок вызовов здесь важен и держится тремя строками: спросить ДО
+`authenticate`, записать неудачу ПОСЛЕ неё, забыть счётчик при удаче. Забыть
+последнее — значит запирать людей, которые давно вошли.
 """
 
 from __future__ import annotations
 
 import hashlib
 
-from flask import Flask, g, redirect, render_template, request, url_for
+from flask import Flask, g, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
@@ -35,9 +41,11 @@ from src.db.web_access import (
     open_session,
     resolve_session,
 )
+from src.db.web_throttle import Verdict, check_attempt, note_failure, note_success
 
 from .config import Settings
 from .origin import over_https, refuse_foreign_origin
+from .remote import client_address
 
 LOGIN_PATH = "/login"
 LOGOUT_PATH = "/logout"
@@ -124,23 +132,48 @@ def install(app: Flask, conf: Settings) -> None:
         setattr(g, CURRENT, account)
         return None
 
+    def заперто(приговор: Verdict) -> Response:
+        """Ответ запертому: та же форма, но со сроком и без сверки пароля.
+
+        Код 429, а не 401: «не подошло» и «больше не принимаем» — разные
+        ответы, и второй обязан быть виден и человеку на экране, и тому, кто
+        потом будет разбирать журнал площадки. `Retry-After` ставится тем же
+        числом, что напечатано человеку: два источника одного срока разъехались
+        бы при первой же правке шага.
+        """
+        ответ = make_response(
+            render_template(
+                "login.html", failed=False, locked_minutes=приговор.retry_after_minutes
+            ),
+            429,
+        )
+        ответ.headers["Retry-After"] = str(приговор.retry_after_seconds)
+        return ответ
+
     @app.route(LOGIN_PATH, methods=("GET", "POST"), endpoint="login")
     def login() -> str | Response | tuple[str, int]:
         if request.method != "POST":
-            return render_template("login.html", failed=False)
+            return render_template("login.html", failed=False, locked_minutes=None)
         refuse_foreign_origin()
-        account = authenticate(
-            request.form.get("login") or "",
-            request.form.get("password") or "",
-            tenant=conf.tenant,
-        )
+        имя = request.form.get("login") or ""
+        адрес = client_address(trusted_proxies=conf.trusted_proxies)
+        # Спрашивается ДО сверки пароля: смысл ограничителя в том, что запертый
+        # не доходит до дорогой части вовсе — ни до scrypt, ни до базы учёток.
+        приговор = check_attempt(tenant=conf.tenant, address=адрес, login=имя)
+        if приговор.locked:
+            return заперто(приговор)
+        account = authenticate(имя, request.form.get("password") or "", tenant=conf.tenant)
         if account is None:
+            приговор = note_failure(tenant=conf.tenant, address=адрес, login=имя)
+            if приговор.locked:
+                return заперто(приговор)
             # Один и тот же отказ на «нет такого логина» и «пароль не тот»:
             # иначе форма сама рассказывает перебором, кто здесь заведён.
             # Введённое обратно на страницу не возвращается — среди него
             # пароль, и он уехал бы в разметку, а оттуда в кэш и в снимок
             # экрана.
-            return render_template("login.html", failed=True), 401
+            return render_template("login.html", failed=True, locked_minutes=None), 401
+        note_success(tenant=conf.tenant, address=адрес, login=имя)
         session = open_session(account)
         return remember(redirect(url_for("registry")), session)
 

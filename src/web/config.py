@@ -30,6 +30,19 @@ WEB_HOST_VAR = "WEB_HOST"
 WEB_PORT_VAR = "WEB_PORT"
 WEB_TENANT_VAR = "WEB_TENANT"
 WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ переменной, а не значение
+WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
+
+#: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
+#: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
+#: доверие к нему по умолчанию раздало бы перебирающему бесконечный запас
+#: «адресов» одной строкой в запросе (`src/web/remote.py`).
+DEFAULT_TRUSTED_PROXIES = 0
+
+#: Выше этого числа звеньев настройка не принимается. Это не предел
+#: устройства, а ловушка на опечатку: `WEB_TRUSTED_PROXIES=10` при одном
+#: туннеле велит брать адрес из начала цепочки — то есть оттуда, куда пишет
+#: сам перебирающий.
+MAX_TRUSTED_PROXIES = 8
 
 #: Короче этого ключ подписи не принимается. Подобранный ключ означает
 #: поддельную куку, то есть вход под кем угодно без пароля, — и «пусть будет
@@ -66,6 +79,10 @@ class Settings:
     #: этого работает, но сессии не переживут перезапуск, и сказать об этом
     #: вслух обязан тот, кто запускает (`src/web/__main__.py`).
     secret_key_is_ephemeral: bool = False
+    #: Сколько своих звеньев (туннель, обратный проси) стоит перед сервером.
+    #: От этого зависит, чей адрес считает ограничитель перебора: ноль —
+    #: адрес соединения, больше — соответствующее звено `X-Forwarded-For`.
+    trusted_proxies: int = DEFAULT_TRUSTED_PROXIES
 
 
 def _parse_host(raw: str) -> str:
@@ -135,6 +152,33 @@ def _parse_secret_key(raw: str) -> tuple[str, bool]:
     return key, False
 
 
+def _parse_trusted_proxies(raw: str) -> int:
+    """Сколько звеньев впереди считать своими. Пусто — ни одного.
+
+    **Умолчание «не верить» выбрано сознательно, и цена у него есть.** За
+    туннелем без этой настройки все запросы приходят с одного адреса, и
+    счётчик по адресу становится общим на всех: перебор запрёт форму входа не
+    только себе. Обратная ошибка дороже — доверие к `X-Forwarded-For` без
+    своего звена впереди снимает счётчик по адресу совсем, а выглядит при этом
+    работающим.
+    """
+    value = raw.strip()
+    if not value:
+        return DEFAULT_TRUSTED_PROXIES
+    try:
+        число = int(value)
+    except ValueError:
+        raise WebConfigError(f"Значение {WEB_TRUSTED_PROXIES_VAR}={value} не число") from None
+    if not 0 <= число <= MAX_TRUSTED_PROXIES:
+        raise WebConfigError(
+            f"{WEB_TRUSTED_PROXIES_VAR}={число} вне допустимого: от 0 до "
+            f"{MAX_TRUSTED_PROXIES}. Это число СВОИХ звеньев перед сервером "
+            f"(туннель — одно), а не запас на будущее: чем оно больше, тем ближе "
+            f"к началу цепочки берётся адрес, а начало пишет тот, кто пришёл"
+        )
+    return число
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение админки. Отказ — `WebConfigError`."""
     src = os.environ if env is None else env
@@ -146,4 +190,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         ui_lang=default_ui_lang(src),
         secret_key=secret_key,
         secret_key_is_ephemeral=ephemeral,
+        trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
     )
