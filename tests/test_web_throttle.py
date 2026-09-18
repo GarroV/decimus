@@ -19,10 +19,10 @@ import pytest
 
 from src.db.web_throttle import (
     FAILURES_BEFORE_LOCK,
-    SCOPE_ADDRESS,
-    SCOPE_LOGIN,
     FORGET_AFTER,
     LOCK_STEPS,
+    SCOPE_ADDRESS,
+    SCOPE_LOGIN,
     SCOPES,
     Counter,
     canonical_address,
