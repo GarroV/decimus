@@ -15,7 +15,21 @@
     </div>
     <p class="login__lead">{{ t('auth.lead') }}</p>
 
-    {% if failed %}
+    {#
+      Запрет и «не подошло» — разные сообщения намеренно: человеку, который
+      упёрся в счётчик, нужно знать, сколько ждать, а не «проверьте пароль».
+
+      Поля при этом НЕ гасятся, и это не недосмотр. Запрет стоит на паре
+      «адрес + логин», а форму видит и тот, кого он не касается: сосед по
+      выходу в сеть, другой логин, вернувшийся через час человек. Погашенная
+      форма закрыла бы вход им, а запертому не добавила бы ни секунды — его
+      попытка всё равно не доходит до сверки пароля.
+    #}
+    {% if locked_minutes %}
+      <div class="note note--error mt-gap" role="alert">
+        <div><div class="note__title">{{ t('auth.locked', minutes=locked_minutes) }}</div></div>
+      </div>
+    {% elif failed %}
       <div class="note note--error mt-gap" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>
       </div>

@@ -86,6 +86,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0014_web_accounts.sql": (
         "sql1:d48500b536d6fd0bdcc018f5873382a39850ac52042972f2e3c3a8c54c3d84e5"
     ),
+    # Заведена вместе с файлом (T325) и нигде ещё не применена.
+    "0015_web_login_attempts.sql": (
+        "sql1:390bd29a8a3d7bc297f40ef728096cd6a7e44ce81544dc40fe6ebc5254016f18"
+    ),
 }
 
 
