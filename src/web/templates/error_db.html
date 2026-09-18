@@ -1,0 +1,12 @@
+{# База недоступна — обычный исход, а не поломка кода: админка читает стенд,
+   который бывает выключен. Причина показывается словами, без трассировки. #}
+{% extends "base.html" %}
+{% block title %}{{ t('error.db.title') }}{% endblock %}
+{% block body %}
+  <div class="note note--error">
+    <div>
+      <div class="note__title">{{ t('error.db.title') }}</div>
+      <div class="note__text">{{ t('error.db.text', reason=reason) }}</div>
+    </div>
+  </div>
+{% endblock %}

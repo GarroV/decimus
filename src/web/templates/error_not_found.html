@@ -1,0 +1,10 @@
+{# Адреса нет. Разделы продукта при этом остаются в навигации — карта не
+   пропадает вместе с опечаткой в адресе. #}
+{% extends "base.html" %}
+{% block title %}{{ t('error.not_found.title') }}{% endblock %}
+{% block body %}
+  <div class="empty">
+    <div class="empty__title">{{ t('error.not_found.title') }}</div>
+    <p class="empty__text">{{ t('error.not_found.text') }}</p>
+  </div>
+{% endblock %}
