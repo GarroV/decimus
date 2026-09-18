@@ -182,3 +182,29 @@
   line-height: var(--lh-meta);
   color: var(--ink-2);
 }
+
+/* ── Таблица состава чек-листа ───────────────────────────────────
+   Ядро раскладывает таблицу `table-layout: fixed` и делит ширину поровну.
+   Семи колонкам методики это не подходит вдвойне: формулировке нужна
+   половина ширины, а коду хватает узкой полосы, — и, главное, список зон
+   («fridge,cold_kitchen,hot_kitchen») переносить НЕГДЕ: в нём нет ни одного
+   пробела. Ячейка при этом не обрезается, и текст наезжал на соседнюю
+   колонку — найдено сверкой снимков с эталоном на T320, в обоих языках.
+
+   Поэтому две правки: доли колонок по смыслу и разрешение переносить
+   слитную строку в любом месте. Многоточие вместо переноса здесь было бы
+   хуже: код зоны, обрезанный до «cold_kit…», перестаёт быть кодом. */
+
+.table--methodology { word-break: normal; overflow-wrap: anywhere; }
+.table--methodology th:nth-child(1), .table--methodology td:nth-child(1) { width: 9%; }
+.table--methodology th:nth-child(2), .table--methodology td:nth-child(2) { width: 10%; }
+.table--methodology th:nth-child(3), .table--methodology td:nth-child(3) { width: 12%; }
+.table--methodology th:nth-child(4), .table--methodology td:nth-child(4) { width: 33%; }
+.table--methodology th:nth-child(5), .table--methodology td:nth-child(5) { width: 9%; }
+.table--methodology th:nth-child(6), .table--methodology td:nth-child(6) { width: 18%; }
+.table--methodology th:nth-child(7), .table--methodology td:nth-child(7) { width: 9%; }
+
+/* Карточка пункта: таблица «как пункт записан» — две колонки, имя колонки и
+   значение, и длинные значения там такие же слитные. */
+.table--fields { overflow-wrap: anywhere; }
+.table--fields th:nth-child(1), .table--fields td:nth-child(1) { width: 22%; }

@@ -383,6 +383,7 @@ def _render_item(conf: Settings, *, code: str, notice: str | None, failure: str 
         item=карточка["item"],
         version=версия,
         latest=состав.latest,
+        current=состав.current,
         needs_name=method.needs_set_name(состав),
         max_note=method.MAX_NOTE,
         notice=notice,
