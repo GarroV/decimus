@@ -7,18 +7,33 @@
 
 Отказ окружения печатается строкой, а не трассировкой: не задан тенант или
 адрес не петля — человеку нужно имя переменной, а не стек.
+
+`load_dotenv()` подставляет переменные из файла окружения до чтения настроек —
+тем же приёмом и по той же причине, что в `src/bot/__main__.py` (issue #75) и
+`src/mcp/__main__.py`. Без него `make web` поднимался без `DATABASE_URL`, и
+реестр отвечал «База недоступна» при живой базе: человек шёл по доке и не мог
+отличить незаведённую базу от непрочитанного окружения (issue #290).
 """
 
 from __future__ import annotations
 
 import logging
 import sys
+from pathlib import Path
 
-from waitress import serve
+from dotenv import load_dotenv
 
-from .app import create_app
-from .config import load_settings
-from .errors import WebError
+# Путь строится от файла, а не от текущего каталога, — как у бота и MCP.
+# Отсутствие файла отказом не является: в контейнере переменные приходят из
+# `docker compose`, и уже стоящие в окружении значения `load_dotenv` не трогает
+# (`override=False` по умолчанию).
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+
+from waitress import serve  # noqa: E402 -- окружение читается до импорта конфигурации
+
+from .app import create_app  # noqa: E402
+from .config import load_settings  # noqa: E402
+from .errors import WebError  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +48,13 @@ def main() -> int:
     except WebError as exc:
         print(f"Веб-админка не поднялась: {exc}", file=sys.stderr)
         return 2
+    # Адрес печатается строкой, а не только уходит в лог: человек запускает эту
+    # команду, чтобы ОТКРЫТЬ админку, и первым делом ему нужен адрес, по
+    # которому можно щёлкнуть. Собирается он из тех же настроек, с которыми
+    # сервер сейчас встанет, — второй записи того же факта (в Makefile, в доке)
+    # здесь быть не должно: она разъедется с портом при первой же правке.
+    print(f"Веб-админка: http://{settings.host}:{settings.port}/inspections")
+    print(f"Тенант: {settings.tenant} · язык интерфейса: {settings.ui_lang}", flush=True)
     logger.info(
         "веб-админка слушает http://%s:%s, тенант %s, язык интерфейса %s",
         settings.host,
