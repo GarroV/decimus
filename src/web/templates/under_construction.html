@@ -1,0 +1,28 @@
+{#
+  Экран непостроенного раздела (D138). Здесь намеренно нет ни данных, ни
+  декоративной разметки: пустая таблица или нарисованная сводка выглядели бы
+  рабочими, и человек решил бы, что сломался он.
+#}{% extends "base.html" %}
+{% set title = t('section.' ~ section.key ~ '.title') %}
+{% block title %}{{ title }}{% endblock %}
+
+{% block body %}
+  <div class="tape tape--screen"><span class="tape__word">{{ t('nav.wip') }}</span></div>
+
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ title }}</h1>
+    </div>
+  </div>
+
+  <div class="empty">
+    <div class="empty__title">{{ t('wip.title') }}</div>
+    <p class="empty__text">{{ t('wip.text', section=title) }}</p>
+    {% if section.key in ('calendar', 'plans') %}
+      <p class="empty__text">{{ t('wip.calendar_note') }}</p>
+    {% endif %}
+    <div class="empty__aside">
+      {{ t('wip.aside', built=t('section.registry.title')) }}
+    </div>
+  </div>
+{% endblock %}

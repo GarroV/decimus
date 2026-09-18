@@ -1,0 +1,91 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DECIMUS · веб-админка — слой экранов поверх ядра и доменного слоя.
+   Подключается ПОСЛЕ dodo-ds.css и decimus-domain.css.
+
+   Правило слоя: ни одного своего цвета, шрифта или радиуса. Всё значением
+   ядра через var(--…). Если здесь появился хекс — он появился не там:
+   значит, токена не хватает, и заводить его надо в GarroV/forma.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Раскладка: навигация слева, содержимое справа ───────────────
+   Разделов девять, и у непостроенных рядом стоит лента — в строку шапки
+   это не помещается, поэтому боковая навигация ядра (.sidenav). */
+
+.shell { display: flex; align-items: stretch; min-height: calc(100vh - 52px); }
+.shell__nav { flex: 0 0 auto; }
+.shell__main { flex: 1 1 auto; min-width: 0; }
+.shell__main .page { width: 100%; }
+
+/* ── Лента «в разработке» ────────────────────────────────────────
+   Строительная лента, а не метка: непостроенное обязано выглядеть
+   непостроенным (D138). Полоска берёт предупреждающий тон ядра и
+   ставится и в навигации, и поперёк экрана раздела. */
+
+.tape {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--warn-mark) 0 10px,
+    var(--warn-soft) 10px 20px
+  );
+  border-top: 1px solid var(--warn-line);
+  border-bottom: 1px solid var(--warn-line);
+}
+
+.tape--nav { display: block; height: 4px; border-radius: 2px; margin: 2px 0 6px; }
+
+.tape--screen {
+  display: flex; align-items: center; justify-content: center;
+  height: 26px; margin-bottom: var(--space-7);
+  border-radius: var(--r-control);
+}
+
+.tape__word {
+  padding: 0 var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--warn-line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro); line-height: 16px;
+  letter-spacing: var(--tracking-micro); text-transform: uppercase;
+  font-weight: var(--w-bold); color: var(--warn-ink);
+}
+
+.sidenav__item--wip { opacity: .82; }
+.sidenav__wrap { display: block; }
+
+/* ── Метка буквы оценки ──────────────────────────────────────────
+   Буква — одно из двух мест, где продукт берёт сильный цвет
+   (decimus-domain.css). Форма — квадрат, а не пилюля: она не
+   выбирается нажатием и не должна читаться как фильтр. */
+
+.grade {
+  display: inline-grid; place-items: center;
+  width: 34px; height: 34px; flex: 0 0 auto;
+  border-radius: var(--r-control); border: 1px solid transparent;
+  font-family: var(--font-num); font-size: var(--fs-num); font-weight: var(--w-bold);
+}
+.grade--lg { width: 54px; height: 54px; border-radius: var(--r-block); font-size: var(--fs-num-hero); }
+
+/* ── Шапка карточки проверки ─────────────────────────────────────
+   Буква, процент и предмет проверки в одну строку; на узком экране
+   переносятся, а не сжимаются до нечитаемого. */
+
+.head-line { display: flex; align-items: center; gap: var(--space-7); flex-wrap: wrap; }
+.head-line__score { display: flex; align-items: baseline; gap: var(--space-3); }
+.head-line__grow { flex: 1 1 260px; min-width: 0; }
+
+/* ── Мелочи раскладки, чтобы не сыпать style= в шаблоны ──────────
+   Инлайновый стиль в разметке — это тот же свой цвет, только
+   спрятанный: его не видно при сверке с дизайн-системой. */
+
+.row { display: flex; align-items: center; gap: var(--space-5); flex-wrap: wrap; }
+.row--tight { gap: var(--space-3); }
+.row--between { justify-content: space-between; }
+.stack { display: flex; flex-direction: column; gap: var(--space-7); }
+.grow { flex: 1 1 auto; min-width: 0; }
+.muted { color: var(--ink-2); }
+.meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.nowrap { white-space: nowrap; }
+.mt-gap { margin-top: var(--space-7); }
+
+/* Переключатель языка в шапке: язык — параметр продукта, и он виден. */
+.langpick { display: inline-flex; gap: var(--space-1); }
