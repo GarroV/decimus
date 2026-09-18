@@ -32,7 +32,7 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 from waitress import serve  # noqa: E402 -- окружение читается до импорта конфигурации
 
 from .app import create_app  # noqa: E402
-from .config import load_settings  # noqa: E402
+from .config import WEB_SECRET_KEY_VAR, load_settings  # noqa: E402
 from .errors import WebError  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -54,7 +54,16 @@ def main() -> int:
     # сервер сейчас встанет, — второй записи того же факта (в Makefile, в доке)
     # здесь быть не должно: она разъедется с портом при первой же правке.
     print(f"Веб-админка: http://{settings.host}:{settings.port}/inspections")
-    print(f"Тенант: {settings.tenant} · язык интерфейса: {settings.ui_lang}", flush=True)
+    print(f"Тенант: {settings.tenant} · язык интерфейса: {settings.ui_lang}")
+    # Временный ключ подписи — законное состояние стенда, но молчать о нём
+    # нельзя: человек, которого выбросило на форму входа после перезапуска,
+    # иначе ищет поломку там, где её нет.
+    if settings.secret_key_is_ephemeral:
+        print(
+            f"{WEB_SECRET_KEY_VAR} не задан — ключ подписи сделан на этот запуск. "
+            f"Стенд работает, но перезапуск закроет все открытые сессии."
+        )
+    print(flush=True)
     logger.info(
         "веб-админка слушает http://%s:%s, тенант %s, язык интерфейса %s",
         settings.host,

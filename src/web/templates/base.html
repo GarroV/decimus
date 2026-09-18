@@ -25,12 +25,23 @@
     </div>
     <span class="tag tag--neutral tag--micro">{{ t('app.mark') }}</span>
     <div class="appbar__spacer"></div>
-    <div class="tenant">
-      <div>
-        <div class="tenant__name">{{ tenant }}</div>
-        <div class="tenant__meta">{{ t('app.tenant_label') }}</div>
+    {#
+      Тенант, кто вошёл и выход показываются только вошедшему. Форме входа
+      знать про арендатора незачем, а неопознанному человеку и подавно: код
+      арендатора — это уже сведение о стенде.
+    #}
+    {% if account %}
+      <div class="tenant">
+        <div>
+          <div class="tenant__name">{{ tenant }}</div>
+          <div class="tenant__meta">{{ t('app.tenant_label') }}</div>
+        </div>
       </div>
-    </div>
+      <div class="whoami">
+        <div class="whoami__name">{{ account.login }}</div>
+        <div class="whoami__meta">{{ t('auth.signed_in') }}</div>
+      </div>
+    {% endif %}
     <div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
       {% for code in langs %}
         {% if code == lang %}
@@ -40,9 +51,19 @@
         {% endif %}
       {% endfor %}
     </div>
+    {#
+      Выход — форма, а не ссылка: по ссылке его запустила бы картинка на чужой
+      странице, выбив человека из админки без единого его движения.
+    #}
+    {% if account %}
+      <form class="logout" method="post" action="{{ logout_path }}">
+        <button class="btn btn--sm btn--ghost" type="submit">{{ t('auth.logout') }}</button>
+      </form>
+    {% endif %}
   </div>
 
   <div class="shell">
+    {% if account %}
     <nav class="sidenav shell__nav">
       {% for item in sections %}
         {% set title = t('section.' ~ item.key ~ '.title') %}
@@ -60,6 +81,7 @@
         </span>
       {% endfor %}
     </nav>
+    {% endif %}
 
     <main class="shell__main">
       <div class="page">
