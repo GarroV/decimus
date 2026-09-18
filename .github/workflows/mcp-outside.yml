@@ -57,12 +57,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          открытая=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
-          if [ -n "$открытая" ]; then
-            gh issue comment "$открытая" --body "Путь всё ещё оборван: $RUN_URL"
+          issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
+          if [ -n "$issue_no" ]; then
+            gh issue comment "$issue_no" --body "Путь всё ещё оборван: $RUN_URL"
             exit 0
           fi
-          cat > /tmp/тело.md <<ТЕКСТ
+          cat > /tmp/body.md <<BODY
           Сторож не достучался до продукта снаружи. Прогон: $RUN_URL
 
           Дверь снаружи не отвечает ожидаемым отказом. Контейнеры на площадке при
@@ -72,15 +72,15 @@ jobs:
           всего это осиротевший \`link\` после одиночного рестарта \`mcp\`.
 
           Задача закроется сама, когда сторож снова станет зелёным.
-          ТЕКСТ
-          gh issue create --title "$ISSUE_TITLE" --body-file /tmp/тело.md
+          BODY
+          gh issue create --title "$ISSUE_TITLE" --body-file /tmp/body.md
 
       - name: Закрыть задачу, когда путь вернулся
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          открытая=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
-          if [ -n "$открытая" ]; then
-            gh issue close "$открытая" --comment "Путь снаружи восстановлен, сторож зелёный."
+          issue_no=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
+          if [ -n "$issue_no" ]; then
+            gh issue close "$issue_no" --comment "Путь снаружи восстановлен, сторож зелёный."
           fi
