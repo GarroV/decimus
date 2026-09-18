@@ -36,7 +36,16 @@
   {% endif %}
   {% if failure %}
     <div class="note note--error mt-gap" role="alert">
-      <div><div class="note__title">{{ t('methodology.failed', reason=failure) }}</div></div>
+      <div>
+        <div class="note__title">{{ t('methodology.failed', reason=failure) }}</div>
+        {#
+          Хранилище методики одно на две поверхности, и отказ у него один и тот
+          же — названный именами инструментов агента. Переписывать его здесь
+          нельзя: пересказ потерял бы то, ЧТО именно не принято. Поэтому рядом
+          стоит перевод двух имён на язык этой страницы.
+        #}
+        <div class="note__text">{{ t('methodology.failed.glossary') }}</div>
+      </div>
     </div>
   {% endif %}
 
