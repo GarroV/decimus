@@ -332,3 +332,115 @@ def test_публикация_которую_движок_не_увидит_эт
         инструменты.publish_checklist_version(tenant=АРЕНДАТОР, store=store, version=новая)
 
     assert "AUDIT_DATA_DIR" in str(отказ.value)
+
+
+# --- настройка существующей зоны (T313) ---------------------------------------
+
+
+def test_доли_зон_задаются_набором_и_версия_принята(store: Store) -> None:
+    """То, ради чего просят гибкую настройку: «холодильник тяжелее теста».
+
+    Набором, а не по одной доле за вызов: доли складываются в 100%, и версию с
+    несошедшейся суммой хранилище не примет — то есть правка по одной доле до
+    расчёта не дошла бы вовсе.
+    """
+    ответ = инструменты.set_zone_shares(
+        tenant=АРЕНДАТОР, store=store, shares={"fridge": 70, "dough": 30}, version_name="imf"
+    )
+
+    зоны = инструменты.checklist_items(tenant=АРЕНДАТОР, store=store, version=ответ["version"])[
+        "zones"
+    ]
+    доли = {з["code"]: float(з["share_pct"]) for з in зоны}
+    assert доли == {"fridge": 70.0, "dough": 30.0}
+    assert ответ["published"] is False
+
+
+def test_несошедшиеся_доли_это_отказ_а_не_версия(store: Store) -> None:
+    """Сумма долей ≠ 100 — методика, которую движок считать откажется. Агент
+    обязан получить отказ словами движка, а не «готово, но»."""
+    было = current_version(store)
+
+    with pytest.raises(ChecklistError) as отказ:
+        инструменты.set_zone_shares(
+            tenant=АРЕНДАТОР, store=store, shares={"fridge": 70}, version_name="imf"
+        )
+
+    assert "100" in str(отказ.value)
+    assert current_version(store) == было
+
+
+def test_доля_несуществующей_зоне_это_отказ(store: Store) -> None:
+    with pytest.raises(ChecklistError) as отказ:
+        инструменты.set_zone_shares(
+            tenant=АРЕНДАТОР,
+            store=store,
+            shares={"fridge": 50, "terrace": 50},
+            version_name="imf",
+        )
+
+    assert "terrace" in str(отказ.value)
+
+
+def test_негодный_код_зоны_в_долях_до_движка_не_доходит(store: Store) -> None:
+    """Код с запятой или равенством внутри разобрался бы движком как вторая
+    пара «код=доля» — до него такой код не доходит вовсе.
+
+    Отказ обязан быть отказом ПРО КОД, а не просто отказом: сумма долей после
+    такого разбора тоже не сходится, и проверка на один лишь факт отказа
+    оставалась бы зелёной с выброшенной проверкой кода — это здесь проверено
+    порчей, а не предположено."""
+    with pytest.raises(ChecklistError) as отказ:
+        инструменты.set_zone_shares(
+            tenant=АРЕНДАТОР, store=store, shares={"fridge=1,dough": 100}, version_name="imf"
+        )
+
+    assert "не похоже на код" in str(отказ.value)
+
+
+def test_нечисловая_доля_это_отказ(store: Store) -> None:
+    with pytest.raises(ChecklistError):
+        инструменты.set_zone_shares(
+            tenant=АРЕНДАТОР, store=store, shares={"fridge": "половина"}, version_name="imf"
+        )
+
+
+def test_пустой_набор_долей_это_отказ(store: Store) -> None:
+    """Вызов без единой доли — потерянная правка, а не «оставить как есть»."""
+    with pytest.raises(ChecklistError):
+        инструменты.set_zone_shares(tenant=АРЕНДАТОР, store=store, shares={}, version_name="imf")
+
+
+def test_переименование_меняет_имя_и_не_трогает_код_и_долю(store: Store) -> None:
+    """Формулировки правятся и переводятся, коды нет: код зоны стоит в колонке
+    `zones` у пунктов и в записанных проверках."""
+    ответ = инструменты.rename_zone(
+        tenant=АРЕНДАТОР,
+        store=store,
+        code="fridge",
+        name_ru="Среднетемпературный шкаф",
+        name_en="Mid-temperature cabinet",
+        version_name="imf",
+    )
+
+    выдача = инструменты.checklist_items(tenant=АРЕНДАТОР, store=store, version=ответ["version"])
+    зоны = {з["code"]: з for з in выдача["zones"]}
+    assert set(зоны) == {"fridge", "dough"}, "код зоны изменён переименованием"
+    assert зоны["fridge"]["name_ru"] == "Среднетемпературный шкаф"
+    assert зоны["fridge"]["name_en"] == "Mid-temperature cabinet"
+    assert float(зоны["fridge"]["share_pct"]) == 50.0, "переименование тронуло долю"
+    assert any("fridge" in п["zones"] for п in выдача["items"]), "ссылки пунктов на зону потеряны"
+
+
+def test_переименование_без_единого_имени_это_отказ(store: Store) -> None:
+    with pytest.raises(ChecklistError):
+        инструменты.rename_zone(tenant=АРЕНДАТОР, store=store, code="fridge", version_name="imf")
+
+
+def test_переименование_неизвестной_зоны_это_отказ(store: Store) -> None:
+    with pytest.raises(ChecklistError) as отказ:
+        инструменты.rename_zone(
+            tenant=АРЕНДАТОР, store=store, code="terrace", name_ru="Терраса", version_name="imf"
+        )
+
+    assert "terrace" in str(отказ.value)

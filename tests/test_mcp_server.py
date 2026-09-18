@@ -298,6 +298,9 @@ def test_перечень_инструментов_отдаётся_целико
         "restore_checklist_item",
         "add_zone",
         "remove_zone",
+        # доля существующей зоны и её имя (T313) — своими инструментами
+        "set_zone_shares",
+        "rename_zone",
         "publish_checklist_version",
         # карта слов — правка версиями (T144)
         "photo_cues",
