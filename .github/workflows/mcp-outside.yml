@@ -20,7 +20,7 @@ on:
     - cron: "*/15 * * * *"
   workflow_dispatch:
     inputs:
-      порча:
+      porcha:
         description: "Проверить самого сторожа: подменить адрес заведомо мёртвым и убедиться, что сигнал дошёл"
         type: boolean
         default: false
@@ -32,7 +32,7 @@ permissions:
 
 env:
   # Заголовок — он же ключ поиска: задача у сторожа одна, вторую он не плодит.
-  ЗАДАЧА: "MCP снаружи недоступен"
+  ISSUE_TITLE: "MCP снаружи недоступен"
 
 jobs:
   check:
@@ -48,22 +48,22 @@ jobs:
           # При проверке на порче он подменяется заведомо мёртвым: так видно,
           # что сторож умеет краснеть И что сигнал доходит, а не только что шаг
           # отработал.
-          MCP_PUBLIC_URL: ${{ inputs.порча && 'https://127.0.0.1:9' || secrets.MCP_PUBLIC_URL }}
+          MCP_PUBLIC_URL: ${{ inputs.porcha && 'https://127.0.0.1:9' || secrets.MCP_PUBLIC_URL }}
         run: python3 tools/mcp_watch.py
 
       - name: Открыть задачу, если путь оборван
         if: failure()
         env:
           GH_TOKEN: ${{ github.token }}
-          ПРОГОН: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          открытая=$(gh issue list --state open --search "\"$ЗАДАЧА\" in:title" --json number -q '.[0].number')
+          открытая=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
           if [ -n "$открытая" ]; then
-            gh issue comment "$открытая" --body "Путь всё ещё оборван: $ПРОГОН"
+            gh issue comment "$открытая" --body "Путь всё ещё оборван: $RUN_URL"
             exit 0
           fi
           cat > /tmp/тело.md <<ТЕКСТ
-          Сторож не достучался до продукта снаружи. Прогон: $ПРОГОН
+          Сторож не достучался до продукта снаружи. Прогон: $RUN_URL
 
           Дверь снаружи не отвечает ожидаемым отказом. Контейнеры на площадке при
           этом могут быть здоровы: сторож проверяет путь целиком, а не процесс.
@@ -73,14 +73,14 @@ jobs:
 
           Задача закроется сама, когда сторож снова станет зелёным.
           ТЕКСТ
-          gh issue create --title "$ЗАДАЧА" --body-file /tmp/тело.md
+          gh issue create --title "$ISSUE_TITLE" --body-file /tmp/тело.md
 
       - name: Закрыть задачу, когда путь вернулся
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          открытая=$(gh issue list --state open --search "\"$ЗАДАЧА\" in:title" --json number -q '.[0].number')
+          открытая=$(gh issue list --state open --search "\"$ISSUE_TITLE\" in:title" --json number -q '.[0].number')
           if [ -n "$открытая" ]; then
             gh issue close "$открытая" --comment "Путь снаружи восстановлен, сторож зелёный."
           fi
