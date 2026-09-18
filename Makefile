@@ -1,4 +1,4 @@
-.PHONY: check test test-honest cov image regress web web-up web-demo demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress web web-up web-demo web-user demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -326,6 +326,21 @@ web-up: db-up web-demo
 # новые. В неместную базу писать отказывается (tools/seed_web_demo.py).
 web-demo:
 	$(VENV)/python tools/seed_web_demo.py
+
+# Учётки веб-админки (T323). Регистрации снаружи у админки нет — человек
+# появляется в круге тем, что команда проекта выполнила эту цель. Идёт под
+# ролью ВЛАДЕЛЬЦА СХЕМЫ (DATABASE_ADMIN_URL): роль приложения права заводить
+# и править учётки не имеет вовсе, и это держит база, а не код.
+#
+# Пароль в аргументах не передаётся — он виден в `ps` и остаётся в истории
+# оболочки. Команда спрашивает его вводом без эха; для скрипта есть
+# WEB_USER_PASSWORD.
+#
+#   make web-user ARGS="add director --tenant demo"
+#   make web-user ARGS="list --tenant demo"
+#   make web-user ARGS="disable director --tenant demo"
+web-user:
+	$(VENV)/python tools/web_user.py $(ARGS)
 
 # Смоук доступа к MCP СНАРУЖИ (T256). Отвечает на «доступен ли сервер с чужой
 # машины», а не на «поднят ли контейнер»: разница между этими вопросами стоила

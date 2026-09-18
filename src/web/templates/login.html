@@ -1,0 +1,42 @@
+{#
+  Форма входа. Единственная страница админки, которая открывается без
+  опознания, — и поэтому на ней нет ничего, кроме формы: ни навигации, ни
+  кода арендатора, ни числа проверок. Всё это уже сведения о стенде.
+
+  Отказ один на все причины: «нет такого логина» и «пароль не тот» выглядят
+  одинаково, иначе форма сама рассказывает перебором, кто здесь заведён.
+#}{% extends "base.html" %}
+{% block title %}{{ t('auth.title') }}{% endblock %}
+
+{% block body %}
+  <div class="login">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('auth.title') }}</h1>
+    </div>
+    <p class="login__lead">{{ t('auth.lead') }}</p>
+
+    {% if failed %}
+      <div class="note note--error mt-gap" role="alert">
+        <div><div class="note__title">{{ t('auth.failed') }}</div></div>
+      </div>
+    {% endif %}
+
+    {#
+      Введённое обратно не подставляется: среди него пароль, и вернувшийся в
+      разметку, он уезжает в кэш браузера и в снимок экрана.
+    #}
+    <form class="login__form" method="post" action="{{ url_for('login') }}?lang={{ lang }}">
+      <label class="field-label" for="login">{{ t('auth.login') }}</label>
+      <input class="input" id="login" name="login" type="text"
+             autocomplete="username" autocapitalize="none" spellcheck="false" autofocus required>
+
+      <label class="field-label" for="password">{{ t('auth.password') }}</label>
+      <input class="input" id="password" name="password" type="password"
+             autocomplete="current-password" required>
+
+      <button class="btn btn--primary" type="submit">{{ t('auth.submit') }}</button>
+    </form>
+
+    <p class="login__aside">{{ t('auth.aside') }}</p>
+  </div>
+{% endblock %}
