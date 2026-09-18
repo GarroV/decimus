@@ -1,4 +1,4 @@
-.PHONY: check test test-honest cov image regress web demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress web web-up web-demo demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -294,6 +294,38 @@ mcp:
 #   WEB_TENANT=<код тенанта> make web
 web:
 	$(VENV)/python -m src.web
+
+# Тенант веб-стенда. Демо — потому, что `make web-up` поднимает стенд ДЛЯ
+# ПОКАЗА и разработки поверхности; свой тенант передаётся в командной строке
+# (`WEB_TENANT=<код> make web-up`) и перекрывает это значение, как любая
+# переменная окружения перекрывает `?=`. Значение из файла окружения сюда НЕ
+# доезжает: make его не читает, а выставленную здесь переменную `load_dotenv`
+# не перетирает. Это не обход правила «тенант не додумывается» — цель для
+# показа знает свой тенант, а `make web` по-прежнему требует его явно.
+WEB_STAND_TENANT ?= demo
+
+# Веб-стенд ОДНОЙ КОМАНДОЙ (#291): база → схема → демо-история → админка,
+# адрес печатается на старте. Образец — `npm run up` в meridius: в контейнере
+# живёт только база, а продукт запускается на хосте. Так же и здесь, и по той
+# же причине: строка подключения в файле окружения указывает на порт ХОСТА,
+# внутри контейнера по ней базы нет.
+#
+#   make web-up                      # демо-стенд: есть что смотреть сразу
+#   WEB_TENANT=<код> make web-up     # своя история вместо демонстрационной
+web-up: export WEB_TENANT = $(WEB_STAND_TENANT)
+web-up: db-up web-demo
+	@echo ""
+	@echo "Демо-история лежит под тенантом demo и ничего другого не касается."
+	@echo "Остановить стенд — Ctrl-C; база остаётся поднятой (снести — make db-down)."
+	@echo ""
+	$(VENV)/python -m src.web
+
+# Демо-история В БАЗЕ — то, что показывает админка. Отдельно от `make demo`:
+# тот сид кладёт проверку в состояние бота, а веб состояния бота не видит
+# вовсе. Идемпотентно: повторный запуск возвращает те же строки, а не плодит
+# новые. В неместную базу писать отказывается (tools/seed_web_demo.py).
+web-demo:
+	$(VENV)/python tools/seed_web_demo.py
 
 # Смоук доступа к MCP СНАРУЖИ (T256). Отвечает на «доступен ли сервер с чужой
 # машины», а не на «поднят ли контейнер»: разница между этими вопросами стоила
