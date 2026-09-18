@@ -50,7 +50,7 @@
               </td>
               <td class="is-text">
                 <a href="/inspections/{{ row.id }}?lang={{ lang }}">{{ row.unit_name }}</a>
-                {% if row.city %}<div class="meta">{{ row.city }}</div>{% endif %}
+                <div class="meta">{% if row.city %}{{ row.city }} · {% endif %}{{ t('registry.checklist', version=row.checklist_version) }}</div>
               </td>
               <td class="is-num">{{ row.pct }}</td>
               <td class="is-num">{{ row.inspection_date }}</td>

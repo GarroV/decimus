@@ -91,6 +91,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "registry.checklist": {"ru": "чек-лист {version}", "en": "checklist {version}"},
     "registry.col.score": {"ru": "Итог, %", "en": "Total, %"},
     "registry.col.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.col.kind": {"ru": "Вид", "en": "Kind"},
@@ -117,7 +118,11 @@ TEXTS: dict[str, dict[str, str]] = {
             "retraction is unavailable too."
         ),
     },
-    "state.sealed": {"ru": "Завершена", "en": "Completed"},
+    # «Заморожена» — не украшение к «завершена», а отдельное состояние, которое
+    # обязано быть видно: завершённая проверка не пересчитывается правкой
+    # чек-листа задним числом (`dodo/decimus/domain.css`, раздел «Заморожено»),
+    # и в эталоне состояние написано именно так.
+    "state.sealed": {"ru": "Завершена · заморожена", "en": "Completed · frozen"},
     "state.retracted": {"ru": "Снята", "en": "Retracted"},
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К реестру", "en": "Back to the registry"},
