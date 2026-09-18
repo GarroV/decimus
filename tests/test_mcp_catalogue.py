@@ -55,6 +55,11 @@ from src.mcp.catalogue import (
     "restore_checklist_item",
     "add_zone",
     "remove_zone",
+    # Доля существующей зоны и её имя — отдельные инструменты, а не поля
+    # правки состава (T313, тот же довод, что у D125): доля это цена ответа,
+    # и смешать её правку с правкой состава значило бы потерять границу.
+    "set_zone_shares",
+    "rename_zone",
     "publish_checklist_version",
     "photo_cues",
     "add_photo_cue",
@@ -118,10 +123,10 @@ from src.mcp.catalogue import (
 )
 
 
-def test_каталог_содержит_ровно_двадцать_девять_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_тридцать_один_инструмент_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 29
+    assert len(TOOLS) == 31
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -253,7 +258,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 29
+    assert len(перечень) == 31
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

@@ -883,6 +883,82 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler=checklist_tools.remove_zone,
         kind=KIND_CHECKLIST,
     ),
+    ToolSpec(
+        name="set_zone_shares",
+        description=(
+            "Set the share (weight in the score) of zones that already "
+            "exist. Zones named here get the share given; every other zone "
+            "is left untouched. Shares are given as a SET in one call, not "
+            "one at a time: they must add up to 100%, and a checklist whose "
+            "zone shares do not add up is one the engine refuses — a single "
+            "share changed on its own is therefore rejected and no version "
+            "is stored. This is how the managing company says where a "
+            "failure costs more (a hot kitchen weighing more than a "
+            "facade). It neither adds nor removes zones (add_zone and "
+            "remove_zone do that) and does not rename them (rename_zone "
+            "does). As with every checklist-editing tool, the change is "
+            "stored as a NEW checklist version and is not published "
+            "automatically (publish_checklist_version does that)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "shares": {
+                    "type": "object",
+                    "description": (
+                        "Zone code to its share as a percentage, e.g. "
+                        '{"hot_kitchen": 20, "facade": 5}. Name every zone '
+                        "whose share changes; the shares of all zones "
+                        "together must come to 100%, so read the current "
+                        "ones first (checklist_items returns them) and send "
+                        "a set that adds up."
+                    ),
+                    "additionalProperties": {"type": "number"},
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": ["shares"],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.set_zone_shares,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="rename_zone",
+        description=(
+            "Rename a zone: change the Russian and/or English name the "
+            "auditor sees on site and the partner reads in the report. The "
+            "zone CODE never changes — checklist items, recorded "
+            "inspections and the photo-cue map all refer to a zone by its "
+            "code, and a rename that touched the code would break those "
+            "references silently. Give one name to leave the other as it "
+            "is. Zone shares are not touched (set_zone_shares does that). "
+            "As with every checklist-editing tool, the change is stored as "
+            "a NEW checklist version and is not published automatically "
+            "(publish_checklist_version does that)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "code": _code_property(meaning="Code of the zone to rename. It stays as it is."),
+                "name_ru": {
+                    "type": "string",
+                    "description": "New zone name in Russian. Omit to keep the current one.",
+                },
+                "name_en": {
+                    "type": "string",
+                    "description": "New zone name in English. Omit to keep the current one.",
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.rename_zone,
+        kind=KIND_CHECKLIST,
+    ),
     # --- методика: публикация ------------------------------------------------
     # --- карта слов: чтение и правка (T144) --------------------------------
     ToolSpec(
