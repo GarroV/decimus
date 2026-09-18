@@ -31,6 +31,7 @@ from typing import Any
 
 from . import checklist as store_api
 from . import photo_cues as cues_api
+from . import route as route_api
 from . import suggestions as proposals_api
 from . import tools as reads
 from . import uncovered as uncovered_api
@@ -506,6 +507,47 @@ def rename_zone(
         options={"name-ru": name_ru, "name-en": name_en},
         version_name=version_name,
         note=note,
+    )
+
+
+# --- порядок обхода точки (T317) ----------------------------------------------
+
+
+def route(*, tenant: str, store: Store, version: str | None = None) -> dict[str, Any]:
+    """Порядок, в котором аудитор идёт по пиццерии, — как его получит он сам.
+
+    Зоны, которых маршрут не называет, идут следом за названными: показать
+    вместо этого содержимое файла значило бы пересказать человеку порядок,
+    которого на точке не будет.
+    """
+    del tenant  # право на методику проверено на входе, по коду арендатора
+    return route_api.read(store, version=version)
+
+
+def set_route(
+    *,
+    tenant: str,
+    store: Store,
+    zones: list[str] | None = None,
+    items: list[str] | None = None,
+    version_name: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Задать порядок обхода точки в новой версии методики.
+
+    Коды сверяются со справочниками той же версии здесь, а не движком: движок
+    `route.csv` не читает вовсе, и версия с опечаткой в коде была бы принята, —
+    а встал бы на ней обход уже на точке, в руках у аудитора.
+    """
+    return _accepted(
+        route_api.set_route(
+            store,
+            tenant=tenant,
+            zones=zones,
+            items=items,
+            version_name=version_name,
+            note=_note(note),
+        )
     )
 
 
