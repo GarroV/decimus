@@ -334,6 +334,18 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Правка не принята: {reason}",
         "en": "The edit was refused: {reason}",
     },
+    "methodology.failed.glossary": {
+        "ru": (
+            "Отказ пришёл словами хранилища методики — общего с разговором с агентом. "
+            "На этой странице «publish_checklist_version» — это кнопка «Опубликовать», "
+            "а «version_name» — поле «Имя набора»."
+        ),
+        "en": (
+            "The refusal comes in the words of the methodology store, shared with the agent "
+            "conversation. On this page «publish_checklist_version» is the «Publish» button, "
+            "and «version_name» is the «Set name» field."
+        ),
+    },
     "methodology.old.title": {"ru": "Старая версия", "en": "An older version"},
     "methodology.old.text": {
         "ru": (
