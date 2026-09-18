@@ -1,0 +1,1430 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E4E4E7;font-family:Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:#5B57F2;text-decoration:none}a:hover{text-decoration:underline}
+button{font-family:inherit}
+input,textarea,select{font-family:inherit;font-variant-numeric:tabular-nums}
+@keyframes fadeup{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+</style>
+</helmet>
+
+<div style="min-height:100vh;box-sizing:border-box;background:var(--bg,#E4E4E7);color:var(--ink,#121214);--r:14px;{{ themeVars }}">
+
+<div style="position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 16px;background:var(--srf,#fff);border-bottom:1px solid var(--line,#E4E4E7)">
+  <div style="font-family:'Space Grotesk',Manrope;font-weight:700;font-size:15px;letter-spacing:-.03em;color:var(--ink,#121214)">Audit<span style="color:var(--accent,#5B57F2)">.</span></div>
+  <button onClick="{{ cycleTenant }}" style="display:flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:transparent;font-weight:600;font-size:13px;color:var(--ink,#121214);cursor:pointer;min-height:36px">{{ tenantName }} <span style="color:var(--muted,#8E8E96);font-size:9px">▾</span></button>
+  <div style="display:flex;gap:2px;flex-wrap:wrap">
+    <sc-for list="{{ nav }}" as="n" hint-placeholder-count="6">
+      <button onClick="{{ n.go }}" style="display:inline-flex;align-items:center;gap:7px;padding:8px 11px;border:0;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;min-height:36px;background:{{ n.bg }};color:{{ n.fg }}">{{ n.label }}<sc-if value="{{ n.badge }}" hint-placeholder-val="{{ true }}"><span style="font-family:'Space Grotesk',Manrope;color:{{ n.badgeFg }}">{{ n.badge }}</span></sc-if></button>
+    </sc-for>
+  </div>
+  <div style="flex:1;min-width:8px"></div>
+  <button onClick="{{ cycleLang }}" title="Язык формулировок и отчёта" style="padding:7px 10px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:transparent;font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:36px">{{ langLabel }}</button>
+  <button onClick="{{ toggleTheme }}" style="padding:7px 10px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:transparent;font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:36px">{{ themeLabel }}</button>
+  <div style="width:30px;height:30px;border-radius:999px;background:var(--accsoft,#EEEDFE);display:flex;align-items:center;justify-content:center;font:600 11px/1 'Space Grotesk',Manrope;color:var(--accent,#5B57F2)">ИК</div>
+</div>
+
+<div style="max-width:1320px;margin:0 auto;padding:18px 16px 96px;display:flex;flex-direction:column;gap:16px;animation:fadeup .3s ease both">
+
+<sc-if value="{{ isOverview }}" hint-placeholder-val="{{ true }}">
+  <div style="display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px">
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Обзор сети · {{ tenantName }}</div>
+      <div style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:6px">Куда смотреть сегодня</div>
+    </div>
+    <button onClick="{{ cyclePeriod }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:var(--srf,#fff);font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:40px">Период: {{ periodLabel }}</button>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ ui.twoCol }};gap:14px">
+    <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Средняя оценка сети</div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-top:10px">
+        <div style="font-family:'Space Grotesk',Manrope;font-size:48px;font-weight:600;letter-spacing:-.04em;line-height:1">{{ net.avg }}</div>
+        <div style="padding:4px 9px;border-radius:999px;font:600 13px/1 'Space Grotesk',Manrope;background:{{ net.deltaBg }};color:{{ net.deltaFg }}">{{ net.delta }}</div>
+      </div>
+      <div style="font:500 12px/1.5 Manrope;color:var(--muted,#8E8E96);margin-top:8px">{{ net.meta }}</div>
+      <div style="display:flex;height:32px;border-radius:10px;overflow:hidden;gap:2px;margin-top:16px">
+        <sc-for list="{{ net.letters }}" as="l" hint-placeholder-count="4">
+          <button onClick="{{ l.go }}" title="Открыть реестр по букве" style="border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;font:600 13px/1 'Space Grotesk',Manrope;flex:{{ l.flex }};background:{{ l.bg }};color:{{ l.fg }}">{{ l.k }} <span style="opacity:.7">{{ l.n }}</span></button>
+        </sc-for>
+      </div>
+      <div style="font:500 11px/1.5 Manrope;color:var(--muted,#8E8E96);margin-top:8px">Клик по букве — реестр с этим фильтром</div>
+    </div>
+    <div style="display:grid;grid-template-columns:{{ ui.threeCol }};gap:14px;align-content:start">
+      <sc-for list="{{ net.kpis }}" as="k" hint-placeholder-count="3">
+        <button onClick="{{ k.go }}" style="text-align:left;cursor:pointer;padding:16px;border-radius:18px;border:1px solid {{ k.border }};background:{{ k.bg }}">
+          <div style="font-weight:500;font-size:13px;color:{{ k.labelFg }}">{{ k.label }}</div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin-top:9px">
+            <span style="font-family:'Space Grotesk',Manrope;font-size:28px;font-weight:600;line-height:1;color:{{ k.valueFg }}">{{ k.value }}</span>
+            <span style="font-weight:500;font-size:12px;line-height:1.3;color:{{ k.noteFg }}">{{ k.note }}</span>
+          </div>
+        </button>
+      </sc-for>
+    </div>
+  </div>
+
+  <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)">
+      <div style="font-weight:600;font-size:15px">Требует внимания сегодня</div>
+      <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">{{ attentionCount }}</div>
+    </div>
+    <sc-for list="{{ attention }}" as="a" hint-placeholder-count="4">
+      <div style="display:flex;gap:12px;align-items:flex-start;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+        <span style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:{{ a.dot }}"></span>
+        <div style="flex:1;min-width:180px">
+          <div style="font-weight:600;font-size:14px">{{ a.point }}</div>
+          <div style="font-weight:500;font-size:13px;line-height:1.45;color:var(--ink2,#52525B);margin-top:2px">{{ a.what }}</div>
+          <div style="font:600 12px/1 'Space Grotesk',Manrope;margin-top:6px;color:{{ a.whenFg }}">{{ a.when }}</div>
+        </div>
+        <button onClick="{{ a.go }}" style="padding:10px 13px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;font-weight:600;font-size:12px;color:var(--ink,#121214);cursor:pointer;min-height:40px">{{ a.cta }}</button>
+      </div>
+    </sc-for>
+    <sc-if value="{{ noAttention }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:28px 16px;text-align:center;font-weight:500;font-size:13px;color:var(--muted,#8E8E96)">Поводов нет: критических нарушений и просроченных предписаний в периоде не осталось.</div>
+    </sc-if>
+  </div>
+
+  <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+    <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)">
+      <div style="font-weight:600;font-size:15px">Точки сети</div>
+      <div style="font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ pointsCount }}</div>
+    </div>
+    <sc-if value="{{ ui.wide }}" hint-placeholder-val="{{ true }}">
+      <div style="display:grid;grid-template-columns:{{ ui.pointCols }};gap:14px;padding:10px 16px;background:var(--srf2,#FAFAFA);border-bottom:1px solid var(--line2,#F4F4F5);font:600 10px/1.2 Manrope;letter-spacing:.11em;text-transform:uppercase;color:var(--muted,#8E8E96)">
+        <span>Точка</span><span>Город</span><span style="text-align:right">Буква</span><span style="text-align:right">Оценка</span><span style="text-align:right">Δ</span><span>Худшая зона</span><span style="text-align:right">Проверена</span>
+      </div>
+    </sc-if>
+    <sc-for list="{{ points }}" as="p" hint-placeholder-count="8">
+      <div onClick="{{ p.go }}" style="display:grid;grid-template-columns:{{ ui.pointCols }};gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5);cursor:pointer">
+        <span style="font-weight:600;font-size:14px">{{ p.name }}</span>
+        <span style="font-weight:500;font-size:13px;color:var(--ink2,#52525B)">{{ p.city }}</span>
+        <span style="justify-self:{{ ui.gradeJustify }};display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9px;font:600 13px/1 'Space Grotesk',Manrope;background:{{ p.gbg }};color:{{ p.gfg }}">{{ p.letter }}</span>
+        <span style="justify-self:{{ ui.numJustify }};font:600 15px/1 'Space Grotesk',Manrope">{{ p.score }}</span>
+        <span style="justify-self:{{ ui.numJustify }};font:500 13px/1 'Space Grotesk',Manrope;color:{{ p.dFg }}">{{ p.delta }}</span>
+        <span style="font-weight:500;font-size:12px;color:var(--ink2,#52525B)">{{ p.worst }}</span>
+        <span style="justify-self:{{ ui.numJustify }};font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ p.date }}</span>
+      </div>
+    </sc-for>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isPoint }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button onClick="{{ goOverview }}" style="padding:8px 11px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:var(--srf,#fff);font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:36px">‹ Обзор сети</button>
+    <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">Точка</div>
+  </div>
+  <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div style="flex:1;min-width:220px">
+      <div style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;letter-spacing:-.03em">{{ point.name }}</div>
+      <div style="font-weight:500;font-size:13px;color:var(--ink2,#52525B);margin-top:5px">{{ point.meta }}</div>
+    </div>
+    <div>
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Последняя</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:11px;font:600 17px/1 'Space Grotesk',Manrope;background:{{ point.gbg }};color:{{ point.gfg }}">{{ point.letter }}</span>
+        <span style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;line-height:1">{{ point.score }}</span>
+      </div>
+    </div>
+    <div>
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Открытых предписаний</div>
+      <div style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;line-height:1;margin-top:10px;color:{{ point.ordersFg }}">{{ point.orders }}</div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button onClick="{{ point.openAudit }}" style="padding:12px 14px;border:0;border-radius:14px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:13px;cursor:pointer;min-height:44px">Открыть проверку</button>
+      <button onClick="{{ toastSoon }}" style="padding:12px 14px;border:1px solid var(--line,#E4E4E7);border-radius:14px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:13px;cursor:pointer;min-height:44px">Назначить проверку</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:{{ ui.twoCol }};gap:14px">
+    <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+      <div style="display:flex;align-items:center;gap:10px"><div style="font-weight:600;font-size:15px">Динамика по проверкам</div><div style="flex:1"></div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">клик — открыть</div></div>
+      <div style="display:flex;align-items:flex-end;gap:10px;height:160px;margin-top:18px;border-bottom:1px solid var(--line2,#F4F4F5)">
+        <sc-for list="{{ point.history }}" as="h" hint-placeholder-count="6">
+          <button onClick="{{ h.go }}" style="flex:1;height:100%;border:0;background:transparent;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:7px;cursor:pointer">
+            <span style="font:600 12px/1 'Space Grotesk',Manrope;color:var(--ink,#121214)">{{ h.score }}</span>
+            <span style="width:100%;border-radius:8px 8px 0 0;background:{{ h.bg }};height:{{ h.h }}"></span>
+          </button>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <sc-for list="{{ point.history }}" as="h" hint-placeholder-count="6">
+          <div style="flex:1;text-align:center"><div style="font-weight:500;font-size:11px;color:var(--muted,#8E8E96)">{{ h.date }}</div><div style="font:600 11px/1.5 'Space Grotesk',Manrope;color:{{ h.fg }}">{{ h.letter }}</div></div>
+        </sc-for>
+      </div>
+      <div style="margin-top:16px;padding:13px;border-radius:14px;background:var(--srf2,#FAFAFA);font-weight:500;font-size:13px;line-height:1.5;color:var(--ink2,#52525B)">{{ point.versionNote }}</div>
+    </div>
+    <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+      <div style="font-weight:600;font-size:15px">Повторяющиеся нарушения</div>
+      <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">Столбики — 6 последних проверок, слева старая</div>
+      <sc-for list="{{ point.repeats }}" as="r" hint-placeholder-count="5">
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 0;border-top:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);width:56px">{{ r.code }}</span>
+          <span style="flex:1;min-width:150px;font-weight:500;font-size:13px;line-height:1.35">{{ r.text }}</span>
+          <span style="font-weight:500;font-size:12px;color:var(--ink2,#52525B)">{{ r.zone }}</span>
+          <span style="display:flex;gap:3px"><sc-for list="{{ r.marks }}" as="m" hint-placeholder-count="6"><span style="width:8px;height:15px;border-radius:3px;background:{{ m.bg }}"></span></sc-for></span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isAudit }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button onClick="{{ goBackFromAudit }}" style="padding:8px 11px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:var(--srf,#fff);font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:36px">‹ Назад</button>
+    <div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--srf2,#FAFAFA);border:1px solid var(--line,#E4E4E7)">
+      <button onClick="{{ setInternal }}" style="padding:8px 12px;border:0;border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;min-height:36px;background:{{ audit.internalBg }};color:{{ audit.internalFg }}">Внутреннее</button>
+      <button onClick="{{ setPartner }}" style="padding:8px 12px;border:0;border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;min-height:36px;background:{{ audit.partnerBg }};color:{{ audit.partnerFg }}">Как видит партнёр</button>
+    </div>
+    <div style="flex:1"></div>
+    <button onClick="{{ exportPdf }}" style="padding:10px 13px;border:0;border-radius:12px;background:var(--ink,#121214);color:var(--srf,#fff);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Выгрузить PDF</button>
+    <sc-if value="{{ audit.canRevoke }}" hint-placeholder-val="{{ true }}">
+      <button onClick="{{ openRevoke }}" style="padding:10px 13px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;color:var(--ink2,#52525B);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Отозвать…</button>
+    </sc-if>
+  </div>
+
+  <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+    <span style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;font:600 30px/1 'Space Grotesk',Manrope;background:{{ audit.gbg }};color:{{ audit.gfg }}">{{ audit.letter }}</span>
+    <div style="min-width:180px">
+      <div style="font-family:'Space Grotesk',Manrope;font-size:38px;font-weight:600;letter-spacing:-.04em;line-height:1;transition:.2s">{{ audit.score }} <span style="font-size:18px;color:var(--muted,#8E8E96)">%</span></div>
+      <div style="font-weight:500;font-size:12px;line-height:1.45;color:var(--ink2,#52525B);margin-top:6px">{{ audit.why }}</div>
+    </div>
+    <div style="flex:1;min-width:220px">
+      <div style="font-weight:600;font-size:17px">{{ audit.title }}</div>
+      <div style="font-weight:500;font-size:12px;line-height:1.5;color:var(--ink2,#52525B);margin-top:4px">{{ audit.meta }}</div>
+      <div style="display:inline-flex;align-items:center;gap:7px;margin-top:8px;padding:5px 10px;border-radius:999px;background:var(--srf2,#FAFAFA);border:1px solid var(--line,#E4E4E7);font-weight:600;font-size:11px;color:{{ audit.stateFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ audit.stateFg }}"></span>{{ audit.stateLabel }}</div>
+    </div>
+    <sc-if value="{{ audit.pending }}" hint-placeholder-val="{{ true }}">
+      <div style="padding:13px;border-radius:14px;background:var(--accsoft,#EEEDFE);max-width:280px">
+        <div style="font-weight:600;font-size:13px;color:var(--accent,#5B57F2)">{{ audit.pendingLabel }}</div>
+        <div style="font-weight:500;font-size:12px;line-height:1.45;color:var(--accent,#5B57F2);opacity:.85;margin-top:4px">Неподтверждённое не влияет на оценку. Потенциально ещё {{ audit.pendingLoss }}.</div>
+        <button onClick="{{ confirmAll }}" style="margin-top:10px;padding:9px 12px;border:0;border-radius:11px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Подтвердить все</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{ audit.isPartner }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+      <div style="padding:16px;border-bottom:1px solid var(--line2,#F4F4F5)">
+        <div style="font-weight:600;font-size:16px">Что исправить</div>
+        <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">{{ audit.partnerNote }}</div>
+      </div>
+      <sc-for list="{{ audit.partnerItems }}" as="p" hint-placeholder-count="4">
+        <div style="display:flex;gap:14px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <button onClick="{{ p.zoom }}" style="width:96px;height:66px;border-radius:12px;border:1px solid var(--line,#E4E4E7);background:repeating-linear-gradient(135deg,var(--srf2,#F4F4F5) 0 8px,var(--line2,#EDEDEF) 8px 16px);cursor:zoom-in;flex:none"></button>
+          <div style="flex:1;min-width:180px">
+            <div style="font-weight:600;font-size:14px;line-height:1.35">{{ p.text }}</div>
+            <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">{{ p.zone }} · срок до {{ p.due }}</div>
+          </div>
+          <button onClick="{{ p.upload }}" style="padding:12px 14px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;font-weight:600;font-size:12px;color:var(--ink,#121214);cursor:pointer;min-height:44px">{{ p.cta }}</button>
+        </div>
+      </sc-for>
+      <div style="padding:16px;font-weight:500;font-size:13px;line-height:1.55;color:var(--ink2,#52525B);background:var(--srf2,#FAFAFA)">Партнёр не видит: кодов пунктов, классов D1/D2/D3, весов зон, арифметики вычетов, непроверенных пунктов и статуса «предложение модели».</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ audit.isInternal }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:{{ ui.auditCols }};gap:14px;align-items:start">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+          <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Потери по зонам</div>
+          <sc-for list="{{ audit.zones }}" as="z" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:1fr 46px 56px;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line2,#F4F4F5)">
+              <div>
+                <div style="display:flex;align-items:center;gap:7px"><span style="font-weight:500;font-size:13px">{{ z.name }}</span><span style="font-weight:500;font-size:11px;color:{{ z.badgeFg }}">{{ z.badge }}</span></div>
+                <div style="height:6px;border-radius:3px;background:var(--line2,#F4F4F5);margin-top:6px;overflow:hidden"><span style="display:block;height:6px;border-radius:3px;background:{{ z.bar }};width:{{ z.pct }};transition:width .25s"></span></div>
+              </div>
+              <span style="text-align:right;font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ z.share }}</span>
+              <span style="text-align:right;font:600 13px/1 'Space Grotesk',Manrope;color:{{ z.lossFg }}">{{ z.loss }}</span>
+            </div>
+          </sc-for>
+          <div style="display:flex;justify-content:space-between;padding-top:11px;margin-top:6px;border-top:1px solid var(--line,#E4E4E7)"><span style="font:600 11px/1 Manrope;letter-spacing:.1em;text-transform:uppercase;color:var(--muted,#8E8E96)">Итого потеряно</span><span style="font:600 14px/1 'Space Grotesk',Manrope;color:var(--bad,#A63A25)">{{ audit.totalLoss }}</span></div>
+        </div>
+
+        <sc-if value="{{ audit.burned }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:16px;border-radius:18px;background:var(--badbg,#FBE7E2)">
+            <div style="font-weight:600;font-size:13px;color:var(--bad,#A63A25)">{{ audit.burnedTitle }}</div>
+            <div style="font-weight:500;font-size:12px;line-height:1.55;color:var(--bad,#A63A25);opacity:.9;margin-top:6px">{{ audit.burnedNote }}</div>
+          </div>
+        </sc-if>
+
+        <div style="padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Письмо партнёру</div>
+            <div style="flex:1"></div>
+            <span style="padding:4px 9px;border-radius:999px;background:var(--srf2,#FAFAFA);font-weight:600;font-size:11px;color:var(--ink2,#52525B)">{{ audit.letterTemplate }}</span>
+          </div>
+          <div style="font-weight:500;font-size:13px;line-height:1.6;color:var(--ink2,#52525B);margin-top:12px">{{ audit.letterText }}</div>
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            <button onClick="{{ sendLetter }}" style="padding:11px 13px;border:0;border-radius:12px;background:{{ audit.letterBtnBg }};color:{{ audit.letterBtnFg }};font-weight:600;font-size:12px;cursor:pointer;min-height:40px">{{ audit.letterBtn }}</button>
+            <button onClick="{{ toastSoon }}" style="padding:11px 13px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;color:var(--ink2,#52525B);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Править текст</button>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+          <div style="display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+            <div style="font-weight:600;font-size:15px">Записи</div>
+            <div style="font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ audit.findingsCount }}</div>
+            <div style="flex:1"></div>
+            <sc-for list="{{ audit.classFilters }}" as="c" hint-placeholder-count="4">
+              <button onClick="{{ c.go }}" style="padding:7px 10px;border:1px solid var(--line,#E4E4E7);border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;min-height:36px;background:{{ c.bg }};color:{{ c.fg }}">{{ c.label }}</button>
+            </sc-for>
+          </div>
+          <sc-for list="{{ audit.findings }}" as="f" hint-placeholder-count="5">
+            <div style="display:flex;gap:14px;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap;background:{{ f.rowBg }}">
+              <button onClick="{{ f.zoom }}" style="width:124px;height:92px;flex:none;border-radius:14px;border:1px solid var(--line,#E4E4E7);background:repeating-linear-gradient(135deg,var(--srf2,#F4F4F5) 0 8px,var(--line2,#EDEDEF) 8px 16px);cursor:zoom-in;display:flex;align-items:flex-end;padding:8px;box-sizing:border-box;color:var(--muted,#8E8E96);font:500 10px/1.2 'Space Grotesk',Manrope">{{ f.photoLabel }}</button>
+              <div style="flex:1;min-width:220px;display:flex;flex-direction:column;gap:7px">
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  <button onClick="{{ f.cycleClass }}" title="Сменить класс" style="padding:4px 9px;border:0;border-radius:8px;font:600 11px/1 'Space Grotesk',Manrope;cursor:pointer;background:{{ f.clsBg }};color:{{ f.clsFg }}">{{ f.cls }} ↻</button>
+                  <span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ f.code }}</span>
+                  <span style="font-weight:500;font-size:12px;color:var(--ink2,#52525B)">{{ f.zone }}</span>
+                  <span style="display:inline-flex;align-items:center;gap:5px;font-weight:600;font-size:11px;color:{{ f.stateFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ f.stateFg }}"></span>{{ f.stateLabel }}</span>
+                </div>
+                <sc-if value="{{ f.editing }}" hint-placeholder-val="{{ false }}">
+                  <textarea onChange="{{ f.onText }}" value="{{ f.text }}" rows="2" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1px solid var(--accent,#5B57F2);border-radius:12px;background:var(--srf2,#FAFAFA);color:var(--ink,#121214);font-weight:600;font-size:14px;line-height:1.4;resize:vertical"></textarea>
+                </sc-if>
+                <sc-if value="{{ f.notEditing }}" hint-placeholder-val="{{ true }}">
+                  <div style="font-weight:600;font-size:14px;line-height:1.4">{{ f.text }}</div>
+                </sc-if>
+                <div style="font-weight:500;font-size:12px;line-height:1.5;color:var(--muted,#8E8E96)">{{ f.note }}</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:2px">
+                  <sc-if value="{{ f.needsConfirm }}" hint-placeholder-val="{{ false }}">
+                    <button onClick="{{ f.confirm }}" style="padding:9px 12px;border:0;border-radius:11px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Подтвердить</button>
+                  </sc-if>
+                  <button onClick="{{ f.toggleEdit }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:11px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">{{ f.editLabel }}</button>
+                  <button onClick="{{ f.prescribe }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:11px;background:{{ f.presBg }};color:{{ f.presFg }};font-weight:600;font-size:12px;cursor:pointer;min-height:40px">{{ f.presLabel }}</button>
+                  <button onClick="{{ f.remove }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:11px;background:transparent;color:var(--bad,#A63A25);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Удалить</button>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:96px">
+                <span style="font:600 14px/1 'Space Grotesk',Manrope;color:{{ f.lossFg }}">{{ f.loss }}</span>
+                <span style="font-weight:500;font-size:11px;color:var(--muted,#8E8E96);text-align:right">{{ f.author }}</span>
+              </div>
+            </div>
+          </sc-for>
+          <sc-if value="{{ audit.noFindings }}" hint-placeholder-val="{{ false }}">
+            <div style="padding:30px 16px;text-align:center;font-weight:500;font-size:13px;color:var(--muted,#8E8E96)">По фильтру записей нет. Сбросьте класс или зону.</div>
+          </sc-if>
+        </div>
+
+        <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+          <div style="padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><span style="font-weight:600;font-size:15px">Информационные записи</span> <span style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">в отчёте есть, на оценку не влияют</span></div>
+          <div style="display:grid;grid-template-columns:{{ ui.infoCols }};gap:1px;background:var(--line2,#F4F4F5)">
+            <sc-for list="{{ audit.infos }}" as="i" hint-placeholder-count="6">
+              <div style="padding:13px 16px;background:var(--srf,#fff)">
+                <div style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ i.code }}</div>
+                <div style="font-weight:500;font-size:13px;line-height:1.35;color:var(--ink2,#52525B);margin-top:5px">{{ i.text }}</div>
+                <div style="font-family:'Space Grotesk',Manrope;font-size:17px;font-weight:600;margin-top:4px">{{ i.value }}</div>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</sc-if>
+
+<sc-if value="{{ isRegistry }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Реестр</div><div style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:6px">Проверки</div></div>
+  </div>
+  <div style="padding:14px 16px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input onChange="{{ setQuery }}" value="{{ filters.q }}" placeholder="Точка или аудитор" style="flex:1;min-width:180px;padding:10px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:var(--srf2,#FAFAFA);color:var(--ink,#121214);font-size:13px;min-height:40px"></input>
+    <sc-for list="{{ filters.letters }}" as="l" hint-placeholder-count="4">
+      <button onClick="{{ l.go }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;font:600 13px/1 'Space Grotesk',Manrope;cursor:pointer;min-height:40px;background:{{ l.bg }};color:{{ l.fg }}">{{ l.k }}</button>
+    </sc-for>
+    <button onClick="{{ toggleD3 }}" style="padding:10px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;min-height:40px;background:{{ filters.d3Bg }};color:{{ filters.d3Fg }}">Есть D3</button>
+    <button onClick="{{ cycleKind }}" style="padding:10px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;min-height:40px;background:transparent;color:var(--ink2,#52525B)">Вид: {{ filters.kind }}</button>
+    <button onClick="{{ resetFilters }}" style="padding:10px 12px;border:0;border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;min-height:40px;background:var(--srf2,#FAFAFA);color:var(--ink2,#52525B)">Сбросить</button>
+  </div>
+  <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+    <div style="padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5);font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">{{ registryCount }}</div>
+    <sc-for list="{{ registry }}" as="r" hint-placeholder-count="6">
+      <div onClick="{{ r.go }}" style="display:flex;gap:14px;align-items:center;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5);cursor:pointer;flex-wrap:wrap;opacity:{{ r.op }}">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:11px;font:600 15px/1 'Space Grotesk',Manrope;flex:none;background:{{ r.gbg }};color:{{ r.gfg }}">{{ r.letter }}</span>
+        <div style="flex:1;min-width:170px">
+          <div style="display:flex;align-items:baseline;gap:9px;flex-wrap:wrap"><span style="font-weight:600;font-size:14px">{{ r.point }}</span><span style="font:600 15px/1 'Space Grotesk',Manrope">{{ r.score }}</span></div>
+          <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:3px">{{ r.meta }}</div>
+        </div>
+        <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:11px;color:{{ r.stFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.stFg }}"></span>{{ r.status }}</span>
+        <span style="font-weight:600;font-size:18px;color:var(--muted,#8E8E96)">›</span>
+      </div>
+    </sc-for>
+    <sc-if value="{{ registryEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:34px 16px;text-align:center">
+        <div style="font-weight:600;font-size:15px">Под фильтр не попало ни одной проверки</div>
+        <div style="font-weight:500;font-size:13px;color:var(--muted,#8E8E96);margin-top:6px">Сбросьте буквы или снимите «Есть D3».</div>
+        <button onClick="{{ resetFilters }}" style="margin-top:12px;padding:11px 14px;border:0;border-radius:12px;background:var(--ink,#121214);color:var(--srf,#fff);font-weight:600;font-size:12px;cursor:pointer;min-height:44px">Сбросить фильтры</button>
+      </div>
+    </sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isOrders }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+    <div style="flex:1;min-width:200px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Предписания и сроки</div><div style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:6px">{{ ordersTitle }}</div></div>
+    <button onClick="{{ toggleOrdersDone }}" style="padding:10px 13px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:var(--srf,#fff);font-weight:600;font-size:12px;color:var(--ink2,#52525B);cursor:pointer;min-height:40px">{{ ordersToggleLabel }}</button>
+  </div>
+  <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+    <sc-for list="{{ orders }}" as="o" hint-placeholder-count="6">
+      <div style="display:flex;gap:14px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap;opacity:{{ o.op }}">
+        <span style="width:8px;height:34px;border-radius:4px;flex:none;background:{{ o.dot }}"></span>
+        <div style="flex:1;min-width:200px">
+          <div style="font-weight:600;font-size:14px;line-height:1.35">{{ o.text }}</div>
+          <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:3px">{{ o.meta }}</div>
+        </div>
+        <span style="font:600 12px/1.3 'Space Grotesk',Manrope;color:{{ o.dueFg }};min-width:120px">{{ o.due }}</span>
+        <span style="font-weight:500;font-size:12px;color:var(--ink2,#52525B);min-width:140px">{{ o.proof }}</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <sc-if value="{{ o.canAccept }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ o.accept }}" style="padding:10px 12px;border:0;border-radius:12px;background:var(--ok,#0E7A51);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Принять</button>
+          </sc-if>
+          <sc-if value="{{ o.canRemind }}" hint-placeholder-val="{{ true }}">
+            <button onClick="{{ o.remind }}" style="padding:10px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Напомнить</button>
+          </sc-if>
+          <sc-if value="{{ o.done }}" hint-placeholder-val="{{ false }}">
+            <span style="padding:10px 12px;border-radius:12px;background:var(--okbg,#E4F4EC);color:var(--ok,#0E7A51);font-weight:600;font-size:12px">Исправление принято</span>
+          </sc-if>
+        </div>
+      </div>
+    </sc-for>
+    <sc-if value="{{ ordersEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="padding:34px 16px;text-align:center;font-weight:500;font-size:13px;color:var(--muted,#8E8E96)">Открытых предписаний нет — всё принято.</div>
+    </sc-if>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isEvents }}" hint-placeholder-val="{{ false }}">
+  <div><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Лента событий</div><div style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:6px">Что произошло</div></div>
+  <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+    <sc-for list="{{ events }}" as="e" hint-placeholder-count="7">
+      <div onClick="{{ e.go }}" style="display:flex;gap:12px;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);align-items:flex-start;cursor:pointer;opacity:{{ e.op }}">
+        <span style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:{{ e.dot }}"></span>
+        <div style="flex:1"><div style="font-weight:600;font-size:14px;line-height:1.35">{{ e.text }}</div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:3px">{{ e.meta }}</div></div>
+        <span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);flex:none;margin-top:3px">{{ e.time }}</span>
+      </div>
+    </sc-for>
+    <div style="padding:14px 16px;font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">Напоминания «точку давно не проверяли» приглушены и стоят внизу.</div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ isAdmin }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:180px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Админка методики</div><div style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;letter-spacing:-.03em;margin-top:6px">Чек-лист и правила</div></div>
+    <sc-if value="{{ admin.hasDraft }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--accsoft,#EEEDFE);flex-wrap:wrap">
+        <span style="font-weight:600;font-size:12px;color:var(--accent,#5B57F2)">{{ admin.draftLabel }}</span>
+        <button onClick="{{ publishVersion }}" style="padding:9px 12px;border:0;border-radius:11px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Опубликовать {{ admin.nextVersion }}</button>
+      </div>
+    </sc-if>
+  </div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap">
+    <sc-for list="{{ admin.tabs }}" as="t" hint-placeholder-count="6">
+      <button onClick="{{ t.go }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;min-height:40px;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button>
+    </sc-for>
+  </div>
+
+  <sc-if value="{{ admin.isEditor }}" hint-placeholder-val="{{ true }}">
+    <div style="display:grid;grid-template-columns:{{ ui.editorCols }};gap:14px;align-items:start">
+      <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--line2,#F4F4F5);font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Зоны</div>
+        <sc-for list="{{ admin.zoneNav }}" as="z" hint-placeholder-count="10">
+          <button onClick="{{ z.go }}" style="width:100%;text-align:left;display:flex;align-items:center;justify-content:space-between;gap:8px;padding:11px 14px;border:0;border-bottom:1px solid var(--line2,#F4F4F5);font-weight:500;font-size:13px;cursor:pointer;min-height:42px;background:{{ z.bg }};color:{{ z.fg }}"><span>{{ z.name }}</span><span style="font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ z.n }}</span></button>
+        </sc-for>
+      </div>
+      <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+        <div style="padding:12px 14px;border-bottom:1px solid var(--line2,#F4F4F5);font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Пункты · {{ admin.zoneName }}</div>
+        <sc-for list="{{ admin.items }}" as="i" hint-placeholder-count="8">
+          <button onClick="{{ i.go }}" style="width:100%;text-align:left;display:flex;gap:10px;align-items:center;padding:11px 14px;border:0;border-bottom:1px solid var(--line2,#F4F4F5);cursor:pointer;min-height:44px;background:{{ i.bg }};opacity:{{ i.op }}">
+            <span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);flex:none">{{ i.code }}</span>
+            <span style="flex:1;font-weight:500;font-size:13px;line-height:1.35;color:var(--ink,#121214)">{{ i.text }}</span>
+            <span style="padding:3px 7px;border-radius:6px;font:600 11px/1 'Space Grotesk',Manrope;flex:none;background:{{ i.clsBg }};color:{{ i.clsFg }}">{{ i.cls }}</span>
+          </button>
+        </sc-for>
+        <sc-if value="{{ admin.noItems }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:26px 16px;text-align:center">
+            <div style="font-weight:600;font-size:14px">В зоне нет пунктов</div>
+            <div style="font-weight:500;font-size:12px;line-height:1.5;color:var(--muted,#8E8E96);margin-top:6px">Добавьте первый пункт — он попадёт в черновик версии и станет доступен аудиторам после публикации.</div>
+            <button onClick="{{ toastSoon }}" style="margin-top:12px;padding:11px 14px;border:0;border-radius:12px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:44px">Добавить пункт</button>
+          </div>
+        </sc-if>
+      </div>
+      <sc-if value="{{ admin.hasItems }}" hint-placeholder-val="{{ true }}">
+      <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);padding:16px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="padding:5px 9px;border-radius:8px;background:var(--srf2,#FAFAFA);font:600 12px/1 'Space Grotesk',Manrope;color:var(--ink2,#52525B)">{{ admin.item.code }}</span>
+          <span style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96)">код не редактируется</span>
+          <div style="flex:1"></div>
+          <button onClick="{{ toggleRetire }}" style="padding:8px 11px;border:1px solid var(--line,#E4E4E7);border-radius:11px;background:transparent;font-weight:600;font-size:12px;color:{{ admin.item.retireFg }};cursor:pointer;min-height:38px">{{ admin.item.retireLabel }}</button>
+        </div>
+        <div>
+          <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Формулировка · RU</div>
+          <textarea onChange="{{ setItemRu }}" value="{{ admin.item.ru }}" rows="2" style="width:100%;box-sizing:border-box;margin-top:8px;padding:11px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:var(--srf2,#FAFAFA);color:var(--ink,#121214);font-weight:500;font-size:14px;line-height:1.45;resize:vertical"></textarea>
+        </div>
+        <div>
+          <div style="display:flex;align-items:center;gap:8px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Wording · EN</div><span style="font-weight:600;font-size:11px;color:{{ admin.item.lenFg }}">{{ admin.item.lenNote }}</span></div>
+          <textarea onChange="{{ setItemEn }}" value="{{ admin.item.en }}" rows="2" style="width:100%;box-sizing:border-box;margin-top:8px;padding:11px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:var(--srf2,#FAFAFA);color:var(--ink,#121214);font-weight:500;font-size:14px;line-height:1.45;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="flex:1;min-width:170px">
+            <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Класс по умолчанию</div>
+            <div style="display:flex;gap:4px;margin-top:8px;padding:3px;border-radius:12px;background:var(--srf2,#FAFAFA)">
+              <sc-for list="{{ admin.item.classes }}" as="c" hint-placeholder-count="3">
+                <button onClick="{{ c.go }}" style="flex:1;padding:10px 0;border:0;border-radius:9px;font:600 12px/1 'Space Grotesk',Manrope;cursor:pointer;min-height:40px;background:{{ c.bg }};color:{{ c.fg }}">{{ c.k }}</button>
+              </sc-for>
+            </div>
+          </div>
+          <div style="flex:1;min-width:170px">
+            <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">Обязательное фото</div>
+            <button onClick="{{ togglePhoto }}" style="display:flex;align-items:center;gap:10px;margin-top:10px;padding:8px 10px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;cursor:pointer;min-height:44px">
+              <span style="width:42px;height:26px;border-radius:999px;display:inline-flex;align-items:center;padding:0 3px;box-sizing:border-box;justify-content:{{ admin.item.photoJustify }};background:{{ admin.item.photoBg }}"><span style="width:20px;height:20px;border-radius:50%;background:#fff"></span></span>
+              <span style="font-weight:500;font-size:13px;color:var(--ink,#121214)">{{ admin.item.photoLabel }}</span>
+            </button>
+          </div>
+        </div>
+        <div style="padding:13px;border-radius:14px;background:var(--warnbg,#FBF1DC);font-weight:500;font-size:12px;line-height:1.55;color:var(--warn,#8A5D06)">Правки идут в черновик {{ admin.nextVersion }}. Завершённые проверки заморожены и не пересчитываются.</div>
+      </div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ admin.isZones }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+      <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+        <div style="font-weight:600;font-size:15px">Зоны и доли</div>
+        <div style="flex:1"></div>
+        <span style="padding:6px 11px;border-radius:999px;font:600 12px/1 'Space Grotesk',Manrope;background:{{ admin.sumBg }};color:{{ admin.sumFg }}">Сумма {{ admin.sum }} %</span>
+        <button onClick="{{ saveZones }}" style="padding:10px 12px;border:0;border-radius:12px;font-weight:600;font-size:12px;cursor:pointer;min-height:40px;background:{{ admin.saveBg }};color:{{ admin.saveFg }}">Сохранить доли</button>
+      </div>
+      <sc-for list="{{ admin.zoneRows }}" as="z" hint-placeholder-count="10">
+        <div style="display:flex;gap:12px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <span style="font:500 12px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);width:20px">{{ z.i }}</span>
+          <span style="flex:1;min-width:150px;font-weight:600;font-size:14px">{{ z.ru }}</span>
+          <span style="flex:1;min-width:150px;font-weight:500;font-size:13px;color:var(--ink2,#52525B)">{{ z.en }}</span>
+          <div style="display:flex;align-items:center;gap:8px">
+            <button onClick="{{ z.dec }}" style="width:36px;height:36px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:15px;cursor:pointer">−</button>
+            <span style="width:52px;text-align:center;font:600 15px/1 'Space Grotesk',Manrope">{{ z.share }} %</span>
+            <button onClick="{{ z.inc }}" style="width:36px;height:36px;border:1px solid var(--line,#E4E4E7);border-radius:10px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:15px;cursor:pointer">+</button>
+          </div>
+          <span style="font:500 13px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);width:40px;text-align:right">{{ z.n }}</span>
+        </div>
+      </sc-for>
+      <div style="padding:14px 16px;font-weight:500;font-size:12px;line-height:1.5;color:var(--muted,#8E8E96)">Порядок строк = порядок обхода точки в мини-аппе. Сохранение заблокировано, пока сумма ≠ 100 %.</div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ admin.isVersions }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+      <sc-for list="{{ admin.versions }}" as="v" hint-placeholder-count="4">
+        <div style="display:flex;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:9px;flex-wrap:wrap"><span style="font:600 14px/1 'Space Grotesk',Manrope">{{ v.name }}</span><span style="padding:3px 9px;border-radius:999px;font-weight:600;font-size:11px;background:{{ v.stBg }};color:{{ v.stFg }}">{{ v.state }}</span></div>
+            <div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">{{ v.meta }}</div>
+          </div>
+          <span style="font-weight:500;font-size:12px;color:var(--ink2,#52525B);min-width:130px">{{ v.changes }}</span>
+          <span style="font:500 12px/1 'Space Grotesk',Manrope;color:var(--ink2,#52525B);min-width:90px">{{ v.used }}</span>
+          <button onClick="{{ v.go }}" style="padding:9px 12px;border:1px solid var(--line,#E4E4E7);border-radius:11px;background:transparent;font-weight:600;font-size:12px;color:var(--accent,#5B57F2);cursor:pointer;min-height:38px">Смотреть диф</button>
+        </div>
+      </sc-for>
+      <div style="padding:13px 16px;background:var(--srf2,#FAFAFA);border-bottom:1px solid var(--line2,#F4F4F5);font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:var(--muted,#8E8E96)">{{ admin.diffTitle }}</div>
+      <sc-for list="{{ admin.diff }}" as="d" hint-placeholder-count="4">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5)">
+          <span style="font:600 15px/1.2 'Space Grotesk',Manrope;color:{{ d.fg }};width:16px">{{ d.sign }}</span>
+          <span style="font:500 11px/1.3 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);width:60px">{{ d.code }}</span>
+          <div style="flex:1;min-width:180px"><div style="font-weight:500;font-size:13px;line-height:1.4">{{ d.text }}</div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:2px">{{ d.note }}</div></div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ admin.isRules }}" hint-placeholder-val="{{ false }}">
+    <div style="display:grid;grid-template-columns:{{ ui.twoCol }};gap:14px;align-items:start">
+      <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+        <div style="display:flex;align-items:center;gap:10px;padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><div style="font-weight:600;font-size:15px">Правила расчёта</div><span style="padding:4px 10px;border-radius:999px;background:var(--srf2,#FAFAFA);font-weight:600;font-size:11px;color:var(--ink2,#52525B)">Заморожено</span></div>
+        <sc-for list="{{ admin.rules }}" as="r" hint-placeholder-count="7">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:baseline;padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><span style="font-weight:500;font-size:13px;line-height:1.4;color:var(--ink2,#52525B)">{{ r.label }}</span><span style="font:600 14px/1 'Space Grotesk',Manrope;white-space:nowrap">{{ r.value }}</span></div>
+        </sc-for>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <div style="padding:13px;border-radius:14px;background:var(--badbg,#FBE7E2);font-weight:500;font-size:12px;line-height:1.55;color:var(--bad,#A63A25)">Правка ставок расходится с уже отправленными партнёрам отчётами. Изменение — только через запрос на разморозку.</div>
+          <button onClick="{{ requestUnfreeze }}" style="padding:12px;border:1px solid var(--line,#E4E4E7);border-radius:14px;background:transparent;font-weight:600;font-size:13px;color:var(--ink2,#52525B);cursor:pointer;min-height:44px">Запросить разморозку</button>
+        </div>
+      </div>
+      <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+        <div style="padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><div style="font-weight:600;font-size:15px">Как считается текущая проверка</div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">{{ admin.calcSubject }}</div></div>
+        <sc-for list="{{ admin.calcSteps }}" as="s" hint-placeholder-count="5">
+          <div style="display:flex;justify-content:space-between;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><span style="font-weight:500;font-size:13px;line-height:1.45;color:var(--ink2,#52525B)">{{ s.label }}</span><span style="font:600 13px/1.3 'Space Grotesk',Manrope;color:{{ s.fg }};white-space:nowrap">{{ s.value }}</span></div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ admin.isUncovered }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+      <div style="padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><div style="font-weight:600;font-size:15px">Модель не привязала к пункту</div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">{{ admin.uncoveredMeta }}</div></div>
+      <sc-for list="{{ admin.uncovered }}" as="u" hint-placeholder-count="5">
+        <div style="display:flex;gap:12px;align-items:center;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <div style="flex:1;min-width:200px"><div style="font-weight:500;font-size:13px;line-height:1.45">«{{ u.text }}»</div><div style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96);margin-top:5px">{{ u.meta }}</div></div>
+          <button onClick="{{ u.synonym }}" style="padding:10px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;font-weight:600;font-size:12px;color:var(--ink,#121214);cursor:pointer;min-height:40px">В синонимы</button>
+          <button onClick="{{ u.newItem }}" style="padding:10px 12px;border:0;border-radius:12px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Новый пункт</button>
+        </div>
+      </sc-for>
+      <sc-if value="{{ admin.uncoveredEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="padding:34px 16px;text-align:center;font-weight:500;font-size:13px;color:var(--muted,#8E8E96)">Разобрано всё. Новые формулировки появятся после следующих проверок.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{ admin.isShots }}" hint-placeholder-val="{{ false }}">
+    <div style="border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden">
+      <div style="padding:13px 16px;border-bottom:1px solid var(--line2,#F4F4F5)"><div style="font-weight:600;font-size:15px">Карта кадров</div><div style="font-weight:500;font-size:12px;color:var(--muted,#8E8E96);margin-top:4px">Подсказка уходит аудитору в мини-апп</div></div>
+      <sc-for list="{{ admin.shots }}" as="s" hint-placeholder-count="4">
+        <div style="display:flex;gap:14px;align-items:flex-start;padding:14px 16px;border-bottom:1px solid var(--line2,#F4F4F5);flex-wrap:wrap">
+          <button onClick="{{ s.zoom }}" style="width:96px;height:68px;flex:none;border-radius:12px;border:1px solid var(--line,#E4E4E7);background:repeating-linear-gradient(135deg,var(--srf2,#F4F4F5) 0 8px,var(--line2,#EDEDEF) 8px 16px);cursor:zoom-in;display:flex;align-items:flex-end;padding:6px;box-sizing:border-box;color:var(--muted,#8E8E96);font:500 9px/1.2 'Space Grotesk',Manrope">{{ s.slot }}</button>
+          <div style="flex:1;min-width:200px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ s.code }}</span><span style="padding:3px 8px;border-radius:7px;background:var(--accsoft,#EEEDFE);font-weight:600;font-size:10px;color:var(--accent,#5B57F2)">{{ s.req }}</span></div>
+            <div style="font-weight:600;font-size:14px;margin-top:5px">{{ s.title }}</div>
+            <div style="font-weight:500;font-size:12px;line-height:1.45;color:var(--ink2,#52525B);margin-top:3px">{{ s.hint }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+  </sc-if>
+</sc-if>
+
+<sc-if value="{{ isMini }}" hint-placeholder-val="{{ false }}">
+  <div style="display:flex;gap:18px;flex-wrap:wrap;align-items:flex-start">
+    <div style="width:390px;max-width:100%;border-radius:24px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);overflow:hidden;box-shadow:0 16px 40px -18px rgba(0,0,0,.28)">
+      <div style="display:flex;justify-content:space-between;padding:10px 20px 2px;font:600 12px/1 'Space Grotesk',Manrope"><span>9:41</span><span style="letter-spacing:.1em;color:var(--muted,#8E8E96)">▮▮▮</span></div>
+      <div style="padding:10px 16px 14px;border-bottom:1px solid var(--line2,#F4F4F5)">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-weight:600;font-size:15px">{{ mini.point }}</span><span style="padding:4px 9px;border-radius:999px;background:var(--accsoft,#EEEDFE);font-weight:600;font-size:11px;color:var(--accent,#5B57F2)">{{ mini.state }}</span></div>
+        <div style="display:flex;align-items:center;gap:10px;margin-top:12px">
+          <div style="flex:1;height:8px;border-radius:4px;background:var(--line2,#F4F4F5);overflow:hidden"><span style="display:block;height:8px;background:var(--accent,#5B57F2);width:{{ mini.progress }};transition:width .25s"></span></div>
+          <span style="font:600 12px/1 'Space Grotesk',Manrope;color:var(--ink2,#52525B)">{{ mini.progressLabel }}</span>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+          <sc-for list="{{ mini.zones }}" as="z" hint-placeholder-count="5">
+            <button onClick="{{ z.go }}" style="padding:9px 11px;border:0;border-radius:999px;font-weight:600;font-size:12px;cursor:pointer;min-height:38px;background:{{ z.bg }};color:{{ z.fg }}">{{ z.label }}</button>
+          </sc-for>
+        </div>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+        <sc-if value="{{ mini.hasRemaining }}" hint-placeholder-val="{{ true }}">
+          <div style="padding:13px;border-radius:14px;background:var(--warnbg,#FBF1DC);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+            <div style="flex:1;min-width:150px"><div style="font-weight:600;font-size:13px;line-height:1.35;color:var(--warn,#8A5D06)">{{ mini.remainingTitle }}</div><div style="font-weight:500;font-size:12px;color:var(--warn,#8A5D06);opacity:.85;margin-top:3px">{{ mini.remainingNote }}</div></div>
+            <button onClick="{{ mini.walk }}" style="padding:10px 12px;border:0;border-radius:11px;background:var(--warn,#8A5D06);color:#fff;font-weight:600;font-size:12px;cursor:pointer;min-height:40px">Обход</button>
+          </div>
+        </sc-if>
+        <sc-for list="{{ mini.records }}" as="r" hint-placeholder-count="3">
+          <div style="padding:13px;border:1px solid var(--line,#E4E4E7);border-radius:14px;display:flex;gap:12px;align-items:flex-start">
+            <button onClick="{{ r.zoom }}" style="width:56px;height:56px;flex:none;border-radius:12px;border:1px solid var(--line,#E4E4E7);background:repeating-linear-gradient(135deg,var(--srf2,#F4F4F5) 0 8px,var(--line2,#EDEDEF) 8px 16px);cursor:zoom-in"></button>
+            <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><button onClick="{{ r.cycleClass }}" style="padding:3px 8px;border:0;border-radius:7px;font:600 11px/1 'Space Grotesk',Manrope;cursor:pointer;background:{{ r.clsBg }};color:{{ r.clsFg }}">{{ r.cls }} ↻</button><span style="font:500 11px/1 'Space Grotesk',Manrope;color:var(--muted,#8E8E96)">{{ r.code }}</span><span style="font-weight:500;font-size:11px;color:var(--muted,#8E8E96)">{{ r.zone }}</span></div>
+              <div style="font-weight:600;font-size:14px;line-height:1.3">{{ r.text }}</div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:11px;color:{{ r.stateFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.stateFg }}"></span>{{ r.stateLabel }}</span>
+                <sc-if value="{{ r.needsConfirm }}" hint-placeholder-val="{{ false }}">
+                  <button onClick="{{ r.confirm }}" style="padding:8px 11px;border:0;border-radius:10px;background:var(--accent,#5B57F2);color:#fff;font-weight:600;font-size:11px;cursor:pointer;min-height:36px">Подтвердить</button>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <button onClick="{{ mini.addRecord }}" style="padding:13px;border:1px dashed var(--line,#E4E4E7);border-radius:14px;background:transparent;font-weight:600;font-size:13px;color:var(--ink2,#52525B);cursor:pointer;min-height:50px">+ Добавить запись (фото + голос)</button>
+        <div style="display:flex;gap:8px">
+          <button onClick="{{ confirmAll }}" style="flex:1;min-height:50px;border:0;border-radius:14px;background:var(--ink,#121214);color:var(--srf,#fff);font-weight:600;font-size:14px;cursor:pointer">Подтвердить все</button>
+          <button onClick="{{ mini.finish }}" style="min-height:50px;padding:0 16px;border:1px solid var(--line,#E4E4E7);border-radius:14px;background:transparent;color:var(--ink,#121214);font-weight:600;font-size:14px;cursor:pointer">{{ mini.finishLabel }}</button>
+        </div>
+        <div style="font-weight:500;font-size:12px;line-height:1.5;color:var(--muted,#8E8E96);text-align:center">{{ mini.footer }}</div>
+      </div>
+    </div>
+    <div style="flex:1;min-width:260px;padding:18px;border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7)">
+      <div style="font-weight:600;font-size:15px">Что здесь можно пощупать</div>
+      <sc-for list="{{ mini.help }}" as="h" hint-placeholder-count="5">
+        <div style="display:flex;gap:10px;padding:11px 0;border-bottom:1px solid var(--line2,#F4F4F5)"><span style="font:600 12px/1.4 'Space Grotesk',Manrope;color:var(--accent,#5B57F2)">{{ h.i }}</span><span style="font-weight:500;font-size:13px;line-height:1.5;color:var(--ink2,#52525B)">{{ h.text }}</span></div>
+      </sc-for>
+      <div style="margin-top:12px;font-weight:500;font-size:12px;line-height:1.55;color:var(--muted,#8E8E96)">Оценка проверки пересчитывается сразу: подтверждение D3 сжигает долю зоны и роняет букву до D — видно и в обзоре сети, и в реестре.</div>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+
+<sc-if value="{{ lightbox.open }}" hint-placeholder-val="{{ false }}">
+  <div onClick="{{ closeLightbox }}" style="position:fixed;inset:0;z-index:70;background:rgba(8,8,10,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px;animation:pop .18s ease both;cursor:zoom-out">
+    <div style="width:min(860px,92vw);height:min(560px,64vh);border-radius:18px;border:1px solid #33333A;background:repeating-linear-gradient(135deg,#1C1C20 0 14px,#212126 14px 28px);display:flex;align-items:center;justify-content:center;color:#71717A;font:500 13px/1 'Space Grotesk',Manrope">{{ lightbox.slot }}</div>
+    <div style="max-width:min(860px,92vw);color:#F4F4F5">
+      <div style="font-weight:600;font-size:15px">{{ lightbox.title }}</div>
+      <div style="font-weight:500;font-size:13px;line-height:1.5;color:#A1A1AA;margin-top:5px">{{ lightbox.caption }}</div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ revoke.open }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;inset:0;z-index:75;background:rgba(8,8,10,.6);display:flex;align-items:center;justify-content:center;padding:24px;animation:pop .18s ease both">
+    <div style="width:min(480px,94vw);border-radius:18px;background:var(--srf,#fff);border:1px solid var(--line,#E4E4E7);padding:20px;display:flex;flex-direction:column;gap:12px">
+      <div style="font-weight:600;font-size:17px">Отозвать проверку</div>
+      <div style="font-weight:500;font-size:13px;line-height:1.55;color:var(--ink2,#52525B)">Отзыв не удаляет отчёт: он остаётся в реестре с причиной и не попадает в аналитику сети. Причина обязательна.</div>
+      <textarea onChange="{{ setRevokeReason }}" value="{{ revoke.reason }}" rows="3" placeholder="Например: дубль записи, аудитор ошибся точкой" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:var(--srf2,#FAFAFA);color:var(--ink,#121214);font-size:13px;line-height:1.45;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap">
+        <button onClick="{{ closeRevoke }}" style="padding:12px 14px;border:1px solid var(--line,#E4E4E7);border-radius:12px;background:transparent;font-weight:600;font-size:13px;color:var(--ink2,#52525B);cursor:pointer;min-height:44px">Отмена</button>
+        <button onClick="{{ confirmRevoke }}" style="padding:12px 14px;border:0;border-radius:12px;font-weight:600;font-size:13px;cursor:pointer;min-height:44px;background:{{ revoke.btnBg }};color:{{ revoke.btnFg }}">Отозвать</button>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{ toast.open }}" hint-placeholder-val="{{ false }}">
+  <div style="position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:80;display:flex;align-items:center;gap:10px;padding:13px 16px;border-radius:14px;background:var(--ink,#121214);color:var(--srf,#fff);box-shadow:0 14px 36px -14px rgba(0,0,0,.5);animation:fadeup .2s ease both;max-width:92vw">
+    <span style="width:8px;height:8px;border-radius:50%;background:{{ toast.dot }};flex:none"></span>
+    <span style="font-weight:600;font-size:13px;line-height:1.4">{{ toast.text }}</span>
+  </div>
+</sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:900},&quot;startScreen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;overview&quot;,&quot;registry&quot;,&quot;orders&quot;,&quot;admin&quot;,&quot;mini&quot;],&quot;default&quot;:&quot;overview&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Прототип&quot;},&quot;darkByDefault&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Прототип&quot;}}">
+const LIGHT = {
+  bg: '#E4E4E7', srf: '#ffffff', srf2: '#FAFAFA', ink: '#121214', ink2: '#52525B',
+  muted: '#8E8E96', line: '#E4E4E7', line2: '#F4F4F5', accent: '#5B57F2', accsoft: '#EEEDFE',
+  ok: '#0E7A51', okbg: '#E4F4EC', warn: '#8A5D06', warnbg: '#FBF1DC', bad: '#A63A25', badbg: '#FBE7E2',
+};
+const DARK = {
+  bg: '#08080A', srf: '#121214', srf2: '#18181B', ink: '#F4F4F5', ink2: '#A1A1AA',
+  muted: '#71717A', line: '#26262A', line2: '#1C1C20', accent: '#8E8AFF', accsoft: '#1E1B3A',
+  ok: '#4ED08F', okbg: '#10281F', warn: '#E8C77A', warnbg: '#2E2510', bad: '#FF8A73', badbg: '#2A1512',
+};
+const BURN = '#E0533D';
+const ZONES = [
+  { id: 'facade', ru: 'Фасад', en: 'Facade', share: 10 },
+  { id: 'around', ru: 'Прилегающая территория', en: 'Surroundings', share: 5 },
+  { id: 'hall', ru: 'Зал', en: 'Dining room', share: 10 },
+  { id: 'wc', ru: 'Санузлы', en: 'Restrooms', share: 10 },
+  { id: 'kitchen', ru: 'Кухня', en: 'Kitchen', share: 18 },
+  { id: 'freezer', ru: 'Морозильная камера', en: 'Freezer', share: 12 },
+  { id: 'storage', ru: 'Склад', en: 'Storage', share: 12 },
+  { id: 'dispatch', ru: 'Раздача и упаковка', en: 'Dispatch & packaging', share: 9 },
+  { id: 'staff', ru: 'Персонал и гигиена', en: 'Staff & hygiene', share: 8 },
+  { id: 'docs', ru: 'Документы', en: 'Documents', share: 6 },
+];
+const ITEMS = [
+  { code: 'K-041', zone: 'kitchen', cls: 'D3', ru: 'Открытая продукция хранится без маркировки со сроком годности', en: 'Opened products are stored without a label showing the use-by date', photo: true },
+  { code: 'K-052', zone: 'kitchen', cls: 'D2', ru: 'Разделочные доски с порезами и сколами', en: 'Cutting boards have cuts and chips', photo: true },
+  { code: 'K-058', zone: 'kitchen', cls: 'D1', ru: 'Рабочая поверхность не протёрта после операции', en: 'Work surface is not wiped after the operation', photo: false },
+  { code: 'M-005', zone: 'freezer', cls: 'D2', ru: 'Термометр камеры не отображает температуру', en: 'The freezer thermometer does not display the temperature', photo: true },
+  { code: 'M-011', zone: 'freezer', cls: 'D1', ru: 'Продукция стоит на полу камеры', en: 'Products are placed on the freezer floor', photo: true },
+  { code: 'S-018', zone: 'storage', cls: 'D2', ru: 'Нарушено товарное соседство: химия рядом с сыпучими', en: 'Chemicals are stored next to dry goods', photo: true },
+  { code: 'S-024', zone: 'storage', cls: 'D1', ru: 'Стеллаж не подписан по зонам хранения', en: 'Shelving is not labelled by storage area', photo: false },
+  { code: 'F-007', zone: 'facade', cls: 'D1', ru: 'Входная группа загрязнена, следы на стекле', en: 'The entrance area is dirty, marks on the glass', photo: true },
+  { code: 'F-015', zone: 'facade', cls: 'D1', ru: 'Вывеска не подсвечена в тёмное время', en: 'The sign is not lit after dark', photo: true },
+  { code: 'Z-022', zone: 'hall', cls: 'D1', ru: 'Стол не убран более 10 минут после гостя', en: 'A table was not cleared for more than 10 minutes', photo: true },
+  { code: 'Z-030', zone: 'hall', cls: 'D1', ru: 'График уборки зала не заполнен', en: 'The dining room cleaning log is not filled in', photo: false },
+  { code: 'W-003', zone: 'wc', cls: 'D2', ru: 'Нет мыла или бумажных полотенец', en: 'No soap or paper towels available', photo: true },
+  { code: 'D-002', zone: 'docs', cls: 'D2', ru: 'Журнал дезинфекции не заполнен за неделю', en: 'The disinfection log is not filled in for the week', photo: false },
+  { code: 'P-009', zone: 'staff', cls: 'D2', ru: 'Сотрудник на раздаче без перчаток', en: 'Staff at dispatch without gloves', photo: true },
+  { code: 'R-006', zone: 'dispatch', cls: 'D1', ru: 'Упаковка хранится вне защищённой зоны', en: 'Packaging is stored outside the protected area', photo: false },
+  { code: 'R-012', zone: 'dispatch', cls: 'D2', ru: 'Готовый заказ стоит вне зоны выдачи дольше 5 минут', en: 'A finished order sits outside the pickup area for over 5 minutes', photo: true },
+  { code: 'A-004', zone: 'around', cls: 'D1', ru: 'Мусор и окурки на прилегающей территории', en: 'Litter and cigarette butts on the surrounding area', photo: true },
+  { code: 'A-009', zone: 'around', cls: 'D2', ru: 'Площадка для мусорных контейнеров переполнена', en: 'The waste container area is overflowing', photo: true },
+  { code: 'W-008', zone: 'wc', cls: 'D1', ru: 'График уборки санузла не заполнен', en: 'The restroom cleaning log is not filled in', photo: false },
+  { code: 'D-007', zone: 'docs', cls: 'D1', ru: 'Медосмотры сотрудников просрочены', en: 'Staff medical checks are overdue', photo: false },
+  { code: 'P-014', zone: 'staff', cls: 'D1', ru: 'Форма сотрудника загрязнена', en: 'Staff uniform is dirty', photo: true },
+];
+const POINTS = [
+  { id: 'p1', tenant: 0, name: 'Тверская 18', city: 'Москва', code: 'MSK-014', partner: 'Осипов А.' },
+  { id: 'p2', tenant: 0, name: 'Мира 14', city: 'Казань', code: 'KZN-004', partner: 'Гайнутдинов Р.' },
+  { id: 'p3', tenant: 0, name: 'Ленина 3', city: 'Самара', code: 'SAM-002', partner: 'Дьяченко И.' },
+  { id: 'p4', tenant: 0, name: 'Победы 7', city: 'Москва', code: 'MSK-031', partner: 'Осипов А.' },
+  { id: 'p5', tenant: 0, name: 'Гагарина 21', city: 'Уфа', code: 'UFA-007', partner: 'Хамидуллин Т.' },
+  { id: 'p6', tenant: 0, name: 'Невский 102', city: 'Санкт-Петербург', code: 'SPB-019', partner: 'Белов К.' },
+  { id: 'p7', tenant: 0, name: 'Садовая 5', city: 'Казань', code: 'KZN-011', partner: 'Гайнутдинов Р.' },
+  { id: 'p8', tenant: 1, name: 'Красная 60', city: 'Краснодар', code: 'KRD-001', partner: 'Тарасов В.' },
+  { id: 'p9', tenant: 1, name: 'Мичурина 9', city: 'Сочи', code: 'SOC-003', partner: 'Тарасов В.' },
+];
+const F = (code, cls, confirmed, source, note, photos) => ({ code, cls, confirmed, source, note: note || '', photos: photos || 1, prescribed: false, text: null });
+const AUDITS = [
+  {
+    id: 'a1', point: 'p1', date: '14.09.26', kind: 'Плановая', auditor: 'Ковалёв Д.', status: 'frozen', letterSent: false, version: 'v5 (04.09.26)',
+    findings: [
+      F('K-041', 'D3', true, 'auditor', 'Критерий D3: продукция в работе, маркировка отсутствует полностью. Голосовой комментарий: «две гастроёмкости на верхней полке».', 3),
+      F('M-005', 'D2', false, 'model', 'Модель предложила класс по фото. Пока не подтверждено — в оценку и в отчёт не идёт.', 1),
+      F('S-018', 'D2', true, 'auditor', 'Повторяется четвёртую проверку подряд — попадёт в письмо отдельным пунктом.', 2),
+      F('F-007', 'D1', true, 'auditor', '', 1),
+      F('Z-022', 'D1', true, 'auditor', 'Аудитор переписал формулировку модели: было «грязный стол в зале».', 4),
+      F('D-002', 'D1', false, 'model', 'Распознано из речи аудитора, пункт предложен моделью.', 1),
+    ],
+  },
+  {
+    id: 'a2', point: 'p2', date: '11.09.26', kind: 'Плановая', auditor: 'Сафина Л.', status: 'frozen', letterSent: false, version: 'v5 (04.09.26)',
+    findings: [F('M-005', 'D3', true, 'auditor', 'Камера не держала температуру более 4 часов.', 2), F('S-024', 'D1', true, 'auditor', '', 1), F('W-003', 'D2', true, 'auditor', '', 1), F('P-009', 'D2', false, 'model', 'Ждёт подтверждения аудитором.', 1)],
+  },
+  {
+    id: 'a3', point: 'p3', date: '09.09.26', kind: 'Плановая', auditor: 'Орлов П.', status: 'frozen', letterSent: true, version: 'v5 (04.09.26)',
+    findings: [F('S-018', 'D2', true, 'auditor', '', 2), F('K-058', 'D1', true, 'auditor', '', 1), F('F-015', 'D1', true, 'auditor', '', 1), F('R-006', 'D1', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a4', point: 'p4', date: '09.09.26', kind: 'Повторная', auditor: 'Ковалёв Д.', status: 'frozen', letterSent: true, version: 'v5 (04.09.26)',
+    findings: [F('Z-022', 'D2', true, 'auditor', '', 2), F('Z-030', 'D1', true, 'auditor', '', 1), F('W-003', 'D2', true, 'auditor', '', 1), F('K-052', 'D2', true, 'auditor', '', 2), F('P-009', 'D2', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a5', point: 'p5', date: '16.09.26', kind: 'Внеплановая', auditor: 'Сафина Л.', status: 'active', letterSent: false, version: 'v5 (04.09.26)', checked: 85,
+    findings: [F('F-007', 'D1', true, 'auditor', '', 1), F('K-041', 'D3', false, 'model', 'Модель распознала отсутствие маркировки на фото. Подтверждение сожжёт долю кухни — 18 %.', 2), F('S-018', 'D2', false, 'model', 'Предложение модели по фото склада.', 1)],
+  },
+  {
+    id: 'a6', point: 'p6', date: '03.09.26', kind: 'Плановая', auditor: 'Белов К.', status: 'frozen', letterSent: true, version: 'v4 (12.06.26)',
+    findings: [F('K-058', 'D1', true, 'auditor', '', 1), F('F-007', 'D1', true, 'auditor', '', 1), F('S-024', 'D1', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a7', point: 'p7', date: '28.08.26', kind: 'Плановая', auditor: 'Сафина Л.', status: 'frozen', letterSent: true, version: 'v4 (12.06.26)',
+    findings: [F('Z-022', 'D1', true, 'auditor', '', 1), F('F-015', 'D1', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a8', point: 'p1', date: '12.05.26', kind: 'Плановая', auditor: 'Ковалёв Д.', status: 'frozen', letterSent: true, version: 'v4 (12.06.26)',
+    findings: [F('K-041', 'D2', true, 'auditor', '', 2), F('S-018', 'D2', true, 'auditor', '', 1), F('F-007', 'D1', true, 'auditor', '', 1), F('Z-022', 'D1', true, 'auditor', '', 1), F('K-058', 'D1', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a9', point: 'p8', date: '10.09.26', kind: 'Плановая', auditor: 'Тимофеев А.', status: 'frozen', letterSent: true, version: 'v5 (04.09.26)',
+    findings: [F('W-003', 'D2', true, 'auditor', '', 1), F('F-007', 'D1', true, 'auditor', '', 1)],
+  },
+  {
+    id: 'a10', point: 'p9', date: '06.09.26', kind: 'Повторная', auditor: 'Тимофеев А.', status: 'frozen', letterSent: false, version: 'v5 (04.09.26)',
+    findings: [F('K-041', 'D3', true, 'auditor', '', 2), F('D-002', 'D2', true, 'auditor', '', 1)],
+  },
+];
+const HISTORY = {
+  p1: [{ date: 'мар 25', score: 92 }, { date: 'июн 25', score: 88.5 }, { date: 'окт 25', score: 85 }, { date: 'янв 26', score: 83.5 }],
+  p2: [{ date: 'дек 25', score: 86 }, { date: 'мар 26', score: 82 }, { date: 'июн 26', score: 78.5 }],
+  p3: [{ date: 'янв 26', score: 80 }, { date: 'апр 26', score: 81 }, { date: 'июл 26', score: 82 }],
+  p4: [{ date: 'фев 26', score: 88 }, { date: 'май 26', score: 84 }],
+  p5: [{ date: 'мар 26', score: 90 }, { date: 'июн 26', score: 88.5 }],
+  p6: [{ date: 'апр 26', score: 90 }],
+  p7: [{ date: 'май 26', score: 95.5 }],
+  p8: [{ date: 'июн 26', score: 91 }],
+  p9: [{ date: 'июл 26', score: 87 }],
+};
+const ORDERS0 = [
+  { id: 'o1', audit: 'a1', code: 'K-041', point: 'p1', due: 'Просрочено 4 дня', overdue: 2, proof: 'Фото не загружено', proofReady: false, state: 'open' },
+  { id: 'o2', audit: 'a2', code: 'M-005', point: 'p2', due: 'Просрочено 2 дня', overdue: 2, proof: 'Фото не загружено', proofReady: false, state: 'open' },
+  { id: 'o3', audit: 'a3', code: 'S-018', point: 'p3', due: 'Срок сегодня', overdue: 1, proof: '1 фото · на проверке', proofReady: true, state: 'open' },
+  { id: 'o4', audit: 'a4', code: 'K-052', point: 'p4', due: 'Через 2 дня', overdue: 0, proof: '2 фото · на проверке', proofReady: true, state: 'open' },
+  { id: 'o5', audit: 'a1', code: 'F-007', point: 'p1', due: 'Через 5 дней', overdue: 0, proof: 'Ожидаем партнёра', proofReady: false, state: 'open' },
+  { id: 'o6', audit: 'a6', code: 'Z-030', point: 'p6', due: 'Через 9 дней', overdue: 0, proof: 'Ожидаем партнёра', proofReady: false, state: 'open' },
+];
+const UNCOVERED0 = [
+  { id: 'u1', text: 'на раздаче нет перчаток у кассира', count: 7, zone: 'предположительно Персонал' },
+  { id: 'u2', text: 'в подсобке хранится личная одежда сотрудников', count: 5, zone: 'предположительно Склад' },
+  { id: 'u3', text: 'наклейка с QR для отзывов оторвана', count: 4, zone: 'предположительно Зал' },
+  { id: 'u4', text: 'вытяжка над печью шумит сильнее обычного', count: 3, zone: 'предположительно Кухня' },
+  { id: 'u5', text: 'нет журнала дезинфекции за август', count: 3, zone: 'предположительно Документы' },
+];
+const INFOS = [
+  { code: 'I-101', text: 'Температура печи, конвейер 1', value: '248 °C' },
+  { code: 'I-102', text: 'Время выпечки', value: '6:20' },
+  { code: 'I-110', text: 'Температура морозильной камеры', value: '−17 °C' },
+  { code: 'I-115', text: 'Показания счётчика воды', value: '1 482 м³' },
+  { code: 'I-120', text: 'Настройка тестомеса', value: '4 мин / 2 ск.' },
+  { code: 'I-131', text: 'Смен в день проверки', value: '2' },
+];
+const SHOTS = [
+  { code: 'K-041', slot: 'общий план полки', req: '2 кадра · обяз.', title: 'Маркировка открытой продукции', hint: 'Кадр 1 — полка целиком, кадр 2 — крупно этикетка или её отсутствие' },
+  { code: 'M-005', slot: 'крупно дисплей', req: '1 кадр · обяз.', title: 'Показания термометра камеры', hint: 'Дисплей должен читаться, без блика от вспышки' },
+  { code: 'S-018', slot: 'полка склада', req: '1 кадр', title: 'Товарное соседство', hint: 'Химия и продукты видны в одном кадре' },
+  { code: 'Z-022', slot: 'стол в зале', req: '1 кадр', title: 'Неубранный стол', hint: 'Видно стол и часы/таймер аудитора' },
+];
+const RATE = { D1: 0.5, D2: 2 };
+const NEXT_CLS = { D1: 'D2', D2: 'D3', D3: 'D1' };
+const fmt = n => (Math.round(n * 10) / 10).toFixed(1).replace('.', ',');
+const item = code => ITEMS.find(i => i.code === code) || ITEMS[0];
+
+class Component extends DCLogic {
+  state = {
+    screen: this.props.startScreen || 'overview', tenant: 0, theme: this.props.darkByDefault ? 'dark' : 'light', lang: 'ru', periodIdx: 0,
+    pointId: 'p1', auditId: 'a1', partnerView: false, classFilter: 'all',
+    adminTab: 'editor', adminZone: 'kitchen', adminItem: 'K-041',
+    items: {}, zoneShares: {}, draft: [], versionN: 5,
+    filters: { q: '', letters: [], d3: false, kindIdx: 0 },
+    audits: JSON.parse(JSON.stringify(AUDITS)),
+    orders: JSON.parse(JSON.stringify(ORDERS0)),
+    uncovered: UNCOVERED0.slice(),
+    ordersShowDone: false, editing: null, wide: true,
+    toast: null, lightbox: null, revoke: { open: false, reason: '' },
+  };
+
+  componentDidMount() {
+    this._ro = new ResizeObserver(es => {
+      const w = es[0].contentRect.width;
+      if ((w >= 900) !== this.state.wide) this.setState({ wide: w >= 900 });
+    });
+    const el = document.querySelector('[data-dc-root]') || document.body;
+    this._ro.observe(el);
+  }
+  componentWillUnmount() { if (this._ro) this._ro.disconnect(); if (this._t) clearTimeout(this._t); }
+
+  toast(text, dot) {
+    const t = this.tk();
+    this.setState({ toast: { text, dot: dot || t.accent } });
+    if (this._t) clearTimeout(this._t);
+    this._t = setTimeout(() => this.setState({ toast: null }), 2600);
+  }
+  tk() { return this.state.theme === 'dark' ? DARK : LIGHT; }
+  share(id) { const s = this.state.zoneShares[id]; return s === undefined ? ZONES.find(z => z.id === id).share : s; }
+  itemOf(code) { return Object.assign({}, item(code), this.state.items[code] || {}); }
+
+  calc(audit) {
+    const byZone = {};
+    ZONES.forEach(z => { byZone[z.id] = { loss: 0, burned: false, findings: 0, pending: 0 }; });
+    let pendingLoss = 0;
+    audit.findings.forEach(f => {
+      const it = this.itemOf(f.code);
+      const z = byZone[it.zone];
+      if (!z) return;
+      if (!f.confirmed) { z.pending += 1; pendingLoss += f.cls === 'D3' ? this.share(it.zone) : RATE[f.cls]; return; }
+      z.findings += 1;
+      if (f.cls === 'D3') z.burned = true;
+      else z.loss += RATE[f.cls];
+    });
+    let total = 0; let anyD3 = false;
+    ZONES.forEach(z => {
+      const b = byZone[z.id]; const sh = this.share(z.id);
+      if (b.burned) { b.loss = sh; anyD3 = true; }
+      else if (b.loss > sh) b.loss = sh;
+      total += b.loss;
+    });
+    const score = Math.max(0, 100 - total);
+    const letter = anyD3 ? 'D' : score >= 95 ? 'A' : score >= 85 ? 'B' : score >= 70 ? 'C' : 'D';
+    return { score, letter, byZone, total, anyD3, pendingLoss, pending: audit.findings.filter(f => !f.confirmed).length };
+  }
+
+  gradeColors(letter) {
+    const t = this.tk();
+    if (letter === 'A') return { gbg: t.okbg, gfg: t.ok };
+    if (letter === 'B') return { gbg: t.warnbg, gfg: t.warn };
+    if (letter === 'C') return { gbg: t.badbg, gfg: t.bad };
+    if (letter === 'D') return { gbg: BURN, gfg: '#ffffff' };
+    return { gbg: t.srf2, gfg: t.muted };
+  }
+  clsColors(cls) {
+    const t = this.tk();
+    if (cls === 'D3') return { clsBg: BURN, clsFg: '#ffffff' };
+    if (cls === 'D2') return { clsBg: t.warnbg, clsFg: t.warn };
+    return { clsBg: t.srf2, clsFg: t.ink2 };
+  }
+  auditsOf(pointId) { return this.state.audits.filter(a => a.point === pointId).sort((x, y) => this.ts(y.date) - this.ts(x.date)); }
+  ts(d) { const p = d.split('.'); return new Date(2000 + (+p[2]), (+p[1]) - 1, +p[0]).getTime(); }
+  tenantPoints() { return POINTS.filter(p => p.tenant === this.state.tenant); }
+  latestOf(pointId) { const a = this.auditsOf(pointId).filter(x => x.status !== 'revoked'); return a[0]; }
+  openOrders() { return this.state.orders.filter(o => o.state === 'open' && POINTS.find(p => p.id === o.point).tenant === this.state.tenant); }
+
+  setFinding(auditId, idx, patch) {
+    this.setState(s => ({
+      audits: s.audits.map(a => a.id !== auditId ? a : Object.assign({}, a, {
+        findings: a.findings.map((f, i) => i !== idx ? f : Object.assign({}, f, patch)),
+      })),
+    }));
+  }
+
+  renderVals() {
+    const t = this.tk(); const s = this.state; const wide = s.wide;
+    const themeVars = Object.keys(t).map(k => '--' + k + ':' + t[k]).join(';');
+    const go = screen => () => this.setState({ screen, partnerView: false });
+    const points = this.tenantPoints();
+    const periods = ['30 дней', '90 дней', '12 месяцев'];
+
+    const pointRows = points.map(p => {
+      const last = this.latestOf(p.id);
+      const c = last ? this.calc(last) : null;
+      const hist = HISTORY[p.id] || [];
+      const prev = hist.length ? hist[hist.length - 1].score : null;
+      const delta = c && prev !== null ? c.score - prev : 0;
+      let worst = '—';
+      if (c) {
+        const arr = ZONES.map(z => ({ z, l: c.byZone[z.id].loss, b: c.byZone[z.id].burned })).sort((a, b) => b.l - a.l)[0];
+        worst = arr.l > 0 ? arr.z.ru + (arr.b ? ' · сожжена D3' : ' · −' + fmt(arr.l)) : 'нарушений нет';
+      }
+      return Object.assign({
+        id: p.id, name: p.name, city: p.city,
+        letter: c ? c.letter : '—', score: c ? fmt(c.score) : '—',
+        delta: c ? (delta > 0 ? '+' : delta < 0 ? '−' : '') + fmt(Math.abs(delta)) : '—',
+        dFg: delta > 0 ? t.ok : delta < 0 ? t.bad : t.muted,
+        worst, date: last ? last.date : '—', raw: c,
+        go: () => this.setState({ screen: 'point', pointId: p.id }),
+      }, this.gradeColors(c ? c.letter : '—'));
+    });
+
+    const scored = pointRows.filter(p => p.raw);
+    const avg = scored.length ? scored.reduce((a, p) => a + p.raw.score, 0) / scored.length : 0;
+    const counts = { A: 0, B: 0, C: 0, D: 0 };
+    scored.forEach(p => { counts[p.raw.letter] += 1; });
+    const d3Points = scored.filter(p => p.raw.anyD3);
+    const overdue = this.openOrders().filter(o => o.overdue === 2);
+    const waiting = this.openOrders().filter(o => o.proofReady);
+    const pendingModel = s.audits.filter(a => POINTS.find(p => p.id === a.point).tenant === s.tenant).reduce((n, a) => n + a.findings.filter(f => !f.confirmed).length, 0);
+
+    const letterBars = ['A', 'B', 'C', 'D'].map(k => {
+      const col = this.gradeColors(k);
+      return { k, n: counts[k], flex: Math.max(counts[k], 0.4), bg: col.gbg, fg: col.gfg, go: () => this.setState({ screen: 'registry', filters: Object.assign({}, s.filters, { letters: [k] }) }) };
+    });
+
+    const attention = [];
+    d3Points.forEach(p => {
+      const last = this.latestOf(p.id);
+      attention.push({ dot: BURN, point: p.name, what: 'Критическое D3 — доля зоны списана полностью', when: 'проверка ' + last.date, whenFg: t.bad, cta: 'Открыть', go: () => this.setState({ screen: 'audit', auditId: last.id, pointId: p.id, partnerView: false }) });
+    });
+    s.audits.filter(a => a.status === 'frozen' && !a.letterSent && POINTS.find(p => p.id === a.point).tenant === s.tenant).forEach(a => {
+      const p = POINTS.find(x => x.id === a.point);
+      attention.push({ dot: BURN, point: p.name, what: 'Письмо партнёру не отправлено', when: 'отчёт от ' + a.date, whenFg: t.bad, cta: 'Письмо', go: () => this.setState({ screen: 'audit', auditId: a.id, pointId: p.id, partnerView: false }) });
+    });
+    if (overdue.length) attention.push({ dot: t.warn, point: POINTS.find(p => p.id === overdue[0].point).name, what: overdue.length + ' предписание(й) просрочено, подтверждений нет', when: 'срок истёк', whenFg: t.warn, cta: 'Напомнить', go: go('orders') });
+    if (pendingModel) attention.push({ dot: t.accent, point: 'Записи от модели', what: pendingModel + ' запис(ей) ждут подтверждения аудитором', when: 'не влияют на оценку', whenFg: t.accent, cta: 'Проверить', go: () => this.setState({ screen: 'mini' }) });
+
+    const audit = s.audits.find(a => a.id === s.auditId) || s.audits[0];
+    const aPoint = POINTS.find(p => p.id === audit.point);
+    const c = this.calc(audit);
+    const zoneRowsAudit = ZONES.map(z => {
+      const b = c.byZone[z.id]; const sh = this.share(z.id);
+      return {
+        name: z.ru, badge: b.burned ? 'сожжена D3' : '', badgeFg: t.bad, share: sh + ' %',
+        loss: b.loss > 0 ? '−' + fmt(b.loss) : '0,0',
+        lossFg: b.burned ? t.bad : b.loss > 0 ? t.warn : t.muted,
+        bar: b.burned ? BURN : b.loss > 0 ? '#E8A317' : t.line,
+        pct: Math.round((b.loss / sh) * 100) + '%',
+      };
+    });
+    const burnedZone = ZONES.find(z => c.byZone[z.id].burned);
+    const visible = audit.findings.map((f, i) => ({ f, i })).filter(x => s.classFilter === 'all' || x.f.cls === s.classFilter);
+    const findings = visible.map(({ f, i }) => {
+      const it = this.itemOf(f.code);
+      const zone = ZONES.find(z => z.id === it.zone);
+      const text = f.text !== null && f.text !== undefined ? f.text : (s.lang === 'en' ? it.en : it.ru);
+      const isPending = !f.confirmed;
+      const stateLabel = isPending ? (f.source === 'model' ? 'Предложение модели' : 'Ждёт подтверждения') : (f.text ? 'Подтверждено · формулировка правлена' : 'Подтверждено аудитором');
+      return Object.assign({
+        code: f.code, zone: zone.ru, cls: f.cls, text, note: f.note,
+        photoLabel: f.photos + (f.photos === 1 ? ' кадр' : ' кадра'),
+        stateLabel, stateFg: isPending ? t.accent : t.ok,
+        needsConfirm: isPending, rowBg: isPending ? t.accsoft : 'transparent',
+        loss: isPending ? '—' : (f.cls === 'D3' ? '−' + fmt(this.share(it.zone)) : '−' + fmt(RATE[f.cls])),
+        lossFg: f.cls === 'D3' ? t.bad : t.ink2,
+        author: isPending ? 'модель · ждёт' : audit.auditor,
+        editing: s.editing === audit.id + '#' + i, notEditing: s.editing !== audit.id + '#' + i,
+        editLabel: s.editing === audit.id + '#' + i ? 'Готово' : 'Править текст',
+        presLabel: f.prescribed ? 'В предписаниях ✓' : 'В предписание',
+        presBg: f.prescribed ? t.okbg : 'transparent', presFg: f.prescribed ? t.ok : t.ink,
+        confirm: () => { this.setFinding(audit.id, i, { confirmed: true }); this.toast('Запись подтверждена — оценка пересчитана', t.ok); },
+        cycleClass: () => { this.setFinding(audit.id, i, { cls: NEXT_CLS[f.cls] }); this.toast('Класс изменён на ' + NEXT_CLS[f.cls]); },
+        toggleEdit: () => this.setState({ editing: s.editing === audit.id + '#' + i ? null : audit.id + '#' + i }),
+        onText: e => this.setFinding(audit.id, i, { text: e.target.value }),
+        remove: () => { this.setState(st => ({ audits: st.audits.map(a => a.id !== audit.id ? a : Object.assign({}, a, { findings: a.findings.filter((_, j) => j !== i) })) })); this.toast('Запись удалена', t.bad); },
+        prescribe: () => {
+          if (f.prescribed) { this.toast('Уже в предписаниях'); return; }
+          this.setFinding(audit.id, i, { prescribed: true });
+          this.setState(st => ({ orders: st.orders.concat([{ id: 'o' + Date.now(), audit: audit.id, code: f.code, point: audit.point, due: 'Через 7 дней', overdue: 0, proof: 'Ожидаем партнёра', proofReady: false, state: 'open' }]) }));
+          this.toast('Добавлено в предписания со сроком 7 дней', t.ok);
+        },
+        zoom: () => this.setState({ lightbox: { slot: f.photos + ' кадра · ' + zone.ru, title: text, caption: f.code + ' · класс ' + f.cls + ' · ' + (isPending ? 'не подтверждено' : 'подтверждено ' + audit.auditor) } }),
+      }, this.clsColors(f.cls));
+    });
+
+    const partnerItems = audit.findings.filter(f => f.confirmed).map(f => {
+      const it = this.itemOf(f.code);
+      const order = s.orders.find(o => o.code === f.code && o.point === audit.point);
+      return {
+        text: f.text || (s.lang === 'en' ? it.en : it.ru),
+        zone: ZONES.find(z => z.id === it.zone).ru,
+        due: order ? order.due.replace('Через ', 'через ') : 'по договорённости',
+        cta: order && order.proofReady ? 'Фото загружено' : 'Загрузить фото',
+        upload: () => this.toast('Партнёр загрузил фото — предписание ушло на проверку УК', t.ok),
+        zoom: () => this.setState({ lightbox: { slot: 'фото нарушения', title: f.text || it.ru, caption: 'Партнёрский вид: без кода пункта и класса' } }),
+      };
+    });
+
+    const registryList = s.audits
+      .filter(a => POINTS.find(p => p.id === a.point).tenant === s.tenant)
+      .map(a => {
+        const p = POINTS.find(x => x.id === a.point);
+        const cc = this.calc(a);
+        const letter = a.status === 'active' ? '—' : cc.letter;
+        return { a, p, cc, letter };
+      })
+      .filter(r => {
+        const f = s.filters;
+        const kinds = ['все', 'Плановая', 'Повторная', 'Внеплановая'];
+        if (f.kindIdx > 0 && r.a.kind !== kinds[f.kindIdx]) return false;
+        if (f.letters.length && f.letters.indexOf(r.letter) === -1) return false;
+        if (f.d3 && !r.cc.anyD3) return false;
+        if (f.q) { const q = f.q.toLowerCase(); if ((r.p.name + ' ' + r.a.auditor).toLowerCase().indexOf(q) === -1) return false; }
+        return true;
+      })
+      .sort((x, y) => this.ts(y.a.date) - this.ts(x.a.date))
+      .map(r => {
+        const st = r.a.status === 'active' ? { status: 'Идёт · ' + (r.a.checked || 0) + ' / 137', stFg: t.accent } : r.a.status === 'revoked' ? { status: 'Отозвана · ' + (r.a.reason || 'без причины'), stFg: t.muted } : !r.a.letterSent ? { status: 'Письмо не отправлено', stFg: t.bad } : { status: 'Завершена · заморожена', stFg: t.ink2 };
+        return Object.assign({
+          letter: r.letter, score: r.a.status === 'active' ? '—' : fmt(r.cc.score),
+          point: r.p.name, meta: r.a.date + ' · ' + r.a.kind + ' · ' + r.a.auditor + ' · ' + r.a.findings.length + ' записей · ' + r.a.version,
+          op: r.a.status === 'revoked' ? '.5' : '1',
+          go: () => this.setState({ screen: r.a.status === 'active' ? 'mini' : 'audit', auditId: r.a.id, pointId: r.p.id, partnerView: false }),
+        }, st, this.gradeColors(r.letter));
+      });
+
+    const ordersRows = s.orders
+      .filter(o => POINTS.find(p => p.id === o.point).tenant === s.tenant)
+      .filter(o => s.ordersShowDone ? true : o.state === 'open')
+      .map(o => {
+        const it = this.itemOf(o.code);
+        const p = POINTS.find(x => x.id === o.point);
+        const done = o.state === 'done';
+        return {
+          text: s.lang === 'en' ? it.en : it.ru,
+          meta: p.name + ' · ' + o.code + ' · ' + ZONES.find(z => z.id === it.zone).ru,
+          due: done ? 'Закрыто' : o.due, dueFg: done ? t.ok : o.overdue === 2 ? t.bad : o.overdue === 1 ? t.warn : t.ink2,
+          proof: done ? 'Подтверждение принято' : o.proof,
+          dot: done ? t.ok : o.overdue === 2 ? BURN : o.overdue === 1 ? '#E8A317' : t.line,
+          op: done ? '.6' : '1', done,
+          canAccept: !done && o.proofReady, canRemind: !done && !o.proofReady,
+          accept: () => { this.setState(st => ({ orders: st.orders.map(x => x.id === o.id ? Object.assign({}, x, { state: 'done' }) : x) })); this.toast('Исправление принято, предписание закрыто', t.ok); },
+          remind: () => this.toast('Напоминание отправлено партнёру ' + p.partner, t.warn),
+        };
+      });
+
+    const events = [];
+    d3Points.forEach(p => { const l = this.latestOf(p.id); events.push({ dot: BURN, text: 'Проверка с D3: ' + p.name, meta: 'критическое нарушение · буква D', time: l.date, op: '1', go: () => this.setState({ screen: 'audit', auditId: l.id, pointId: p.id }) }); });
+    overdue.forEach(o => { const p = POINTS.find(x => x.id === o.point); events.push({ dot: BURN, text: 'Срок предписания истёк: ' + p.name, meta: o.code + ' · подтверждение не загружено', time: o.due, op: '1', go: go('orders') }); });
+    waiting.forEach(o => { const p = POINTS.find(x => x.id === o.point); events.push({ dot: '#E8A317', text: 'Загружено подтверждение: ' + p.name, meta: o.code + ' · нужно решение УК', time: 'сегодня', op: '1', go: go('orders') }); });
+    events.push({ dot: t.accent, text: 'Опубликована версия чек-листа v' + s.versionN, meta: 'Сафина Л. · активна для новых проверок', time: '04.09', op: '1', go: () => this.setState({ screen: 'admin', adminTab: 'versions' }) });
+    points.slice(-2).forEach(p => { events.push({ dot: t.line, text: 'Точку давно не проверяли: ' + p.name, meta: 'низкий приоритет', time: '01.09', op: '.55', go: () => this.setState({ screen: 'point', pointId: p.id }) }); });
+
+    const pointObj = POINTS.find(p => p.id === s.pointId) || points[0];
+    const pAudits = this.auditsOf(pointObj.id);
+    const pLast = pAudits.filter(a => a.status !== 'revoked')[0];
+    const pCalc = pLast ? this.calc(pLast) : null;
+    const histAll = (HISTORY[pointObj.id] || []).concat(pAudits.filter(a => a.status === 'frozen').map(a => ({ date: a.date, score: this.calc(a).score, id: a.id }))).slice(-6);
+    const pointHistory = histAll.map(h => {
+      const letter = h.score >= 95 ? 'A' : h.score >= 85 ? 'B' : h.score >= 70 ? 'C' : 'D';
+      const col = this.gradeColors(letter);
+      return { date: h.date, score: fmt(h.score), letter, fg: col.gfg === '#ffffff' ? t.bad : col.gfg, bg: letter === 'D' ? BURN : t.line, h: Math.round(20 + (h.score / 100) * 78) + '%', go: () => h.id ? this.setState({ screen: 'audit', auditId: h.id }) : this.toast('Архивная проверка: отчёт в PDF, детализация недоступна', t.warn) };
+    });
+    const repeatCodes = {};
+    pAudits.slice(0, 6).reverse().forEach((a, idx) => { a.findings.forEach(f => { repeatCodes[f.code] = repeatCodes[f.code] || []; repeatCodes[f.code].push({ idx, cls: f.cls }); }); });
+    const repeats = Object.keys(repeatCodes).map(code => {
+      const hits = repeatCodes[code]; const it = this.itemOf(code);
+      const marks = [0, 1, 2, 3, 4, 5].map(i => {
+        const hit = hits.find(h => h.idx === i);
+        return { bg: !hit ? t.line2 : hit.cls === 'D3' ? BURN : hit.cls === 'D2' ? '#E8A317' : t.line };
+      });
+      return { code, text: s.lang === 'en' ? it.en : it.ru, zone: ZONES.find(z => z.id === it.zone).ru, marks, n: hits.length };
+    }).sort((a, b) => b.n - a.n).slice(0, 6);
+
+    const adminZone = ZONES.find(z => z.id === s.adminZone);
+    const adminItems = ITEMS.filter(i => i.zone === s.adminZone).map(i => {
+      const merged = this.itemOf(i.code);
+      return Object.assign({
+        code: i.code, text: s.lang === 'en' ? merged.en : merged.ru, cls: merged.cls,
+        bg: s.adminItem === i.code ? t.accsoft : 'transparent', op: merged.retired ? '.45' : '1',
+        go: () => this.setState({ adminItem: i.code }),
+      }, this.clsColors(merged.cls));
+    });
+    const ai = this.itemOf(s.adminItem);
+    const lenRatio = ai.ru.length ? Math.round(((ai.en.length - ai.ru.length) / ai.ru.length) * 100) : 0;
+    const noteDraft = (code, what) => this.setState(st => ({ draft: st.draft.concat([code + ': ' + what]) }));
+    const sum = ZONES.reduce((n, z) => n + this.share(z.id), 0);
+
+    const versions = [
+      { name: 'v' + (s.versionN + 1) + ' · черновик', state: s.draft.length ? 'Черновик' : 'Пусто', stBg: t.accsoft, stFg: t.accent, meta: s.draft.length ? s.draft.slice(-2).join(' · ') : 'правок нет', changes: s.draft.length + ' правок', used: '—' },
+      { name: 'v' + s.versionN + ' · 04.09.26', state: 'Активная', stBg: t.okbg, stFg: t.ok, meta: 'Сафина Л. · опубликована 04.09.26', changes: '+4, −1, 6 правок', used: '11 проверок' },
+      { name: 'v4 · 12.06.26', state: 'Заморожена', stBg: t.srf2, stFg: t.ink2, meta: 'Орлов П. · опубликована 12.06.26', changes: '+1, 9 правок', used: '14 проверок' },
+      { name: 'v3 · 12.01.26', state: 'Заморожена', stBg: t.srf2, stFg: t.ink2, meta: 'Орлов П. · первая версия', changes: '+137', used: '9 проверок' },
+    ].map(v => Object.assign({}, v, { go: () => this.toast('Диф ' + v.name + ' · показан ниже', t.accent) }));
+
+    const diff = s.draft.length
+      ? s.draft.slice(-6).map(d => ({ sign: '~', fg: t.warn, code: d.split(':')[0], text: d.split(': ')[1] || '', note: 'черновик v' + (s.versionN + 1) }))
+      : [
+        { sign: '+', fg: t.ok, code: 'K-052', text: 'Разделочные доски с порезами и сколами', note: 'Кухня · D2 · фото обязательно' },
+        { sign: '+', fg: t.ok, code: 'Z-030', text: 'График уборки зала не заполнен', note: 'Зал · D1' },
+        { sign: '~', fg: t.warn, code: 'K-041', text: 'Формулировка уточнена на двух языках', note: 'класс не менялся (D3)' },
+        { sign: '−', fg: t.bad, code: 'F-012', text: 'Наклейка с режимом работы на двери', note: 'снят: дублирует F-007 · в старых проверках сохраняется' },
+      ];
+
+    const active = s.audits.find(a => a.status === 'active') || audit;
+    const activePoint = POINTS.find(p => p.id === active.point);
+    const aCalc = this.calc(active);
+    const checkedN = active.checked || 137;
+    const zoneVisited = { facade: true, hall: true };
+    const miniZones = ZONES.slice(0, 6).map(z => {
+      const done = zoneVisited[z.id];
+      const rem = done ? 0 : z.id === 'kitchen' ? 12 : 0;
+      return {
+        label: z.ru + (done ? ' ✓' : rem ? ' · ' + rem + ' осталось' : ''),
+        bg: done ? t.okbg : rem ? t.warnbg : t.srf2, fg: done ? t.ok : rem ? t.warn : t.ink2,
+        go: () => this.toast('Открыт обход зоны «' + z.ru + '»', t.accent),
+      };
+    });
+    const miniRecords = active.findings.map((f, i) => {
+      const it = this.itemOf(f.code);
+      const zone = ZONES.find(z => z.id === it.zone);
+      return Object.assign({
+        code: f.code, zone: zone.ru, cls: f.cls, text: f.text || (s.lang === 'en' ? it.en : it.ru),
+        stateLabel: f.confirmed ? 'Подтверждено' : 'Предложение модели',
+        stateFg: f.confirmed ? t.ok : t.accent, needsConfirm: !f.confirmed,
+        confirm: () => { this.setFinding(active.id, i, { confirmed: true }); this.toast(f.cls === 'D3' ? 'D3 подтверждён: доля зоны «' + zone.ru + '» списана полностью' : 'Запись подтверждена — оценка пересчитана', f.cls === 'D3' ? BURN : t.ok); },
+        cycleClass: () => this.setFinding(active.id, i, { cls: NEXT_CLS[f.cls] }),
+        zoom: () => this.setState({ lightbox: { slot: 'кадр аудитора', title: f.text || it.ru, caption: f.code + ' · ' + zone.ru } }),
+      }, this.clsColors(f.cls));
+    });
+
+    return {
+      themeVars,
+      tenantName: s.tenant === 0 ? 'УК «Додо Центр»' : 'УК «Додо Юг»',
+      themeLabel: s.theme === 'dark' ? 'Светлая' : 'Тёмная',
+      langLabel: s.lang === 'ru' ? 'Чек-лист: RU' : 'Чек-лист: EN',
+      periodLabel: periods[s.periodIdx],
+      cycleTenant: () => this.setState(st => ({ tenant: st.tenant === 0 ? 1 : 0, screen: 'overview', pointId: POINTS.filter(p => p.tenant === (st.tenant === 0 ? 1 : 0))[0].id })),
+      toggleTheme: () => this.setState(st => ({ theme: st.theme === 'dark' ? 'light' : 'dark' })),
+      cycleLang: () => this.setState(st => ({ lang: st.lang === 'ru' ? 'en' : 'ru' })),
+      cyclePeriod: () => this.setState(st => ({ periodIdx: (st.periodIdx + 1) % 3 })),
+      toastSoon: () => this.toast('Не в прототипе: показывает только форму экрана', t.warn),
+
+      nav: [
+        { label: 'Обзор', key: 'overview' }, { label: 'Точка', key: 'point' }, { label: 'Проверки', key: 'registry' },
+        { label: 'Предписания', key: 'orders', badge: this.openOrders().length ? String(this.openOrders().length) : '' },
+        { label: 'События', key: 'events' }, { label: 'Методика', key: 'admin' }, { label: 'Мини-апп', key: 'mini' },
+      ].map(n => ({
+        label: n.label, badge: n.badge || '', badgeFg: t.bad,
+        bg: s.screen === n.key ? t.accsoft : 'transparent', fg: s.screen === n.key ? t.accent : t.ink2,
+        go: n.key === 'point' ? () => this.setState({ screen: 'point' }) : go(n.key),
+      })),
+
+      isOverview: s.screen === 'overview', isPoint: s.screen === 'point', isAudit: s.screen === 'audit',
+      isRegistry: s.screen === 'registry', isOrders: s.screen === 'orders', isEvents: s.screen === 'events',
+      isAdmin: s.screen === 'admin', isMini: s.screen === 'mini',
+      goOverview: go('overview'),
+
+      ui: {
+        wide,
+        twoCol: wide ? '1.1fr 1fr' : '1fr',
+        threeCol: wide ? 'repeat(3,1fr)' : '1fr',
+        auditCols: wide ? '400px 1fr' : '1fr',
+        editorCols: wide ? '190px 300px 1fr' : '1fr',
+        infoCols: wide ? 'repeat(3,1fr)' : '1fr',
+        pointCols: wide ? '2fr 1fr 60px 84px 74px 1.3fr 104px' : '1fr auto',
+        gradeJustify: wide ? 'end' : 'start',
+        numJustify: wide ? 'end' : 'start',
+      },
+
+      net: {
+        avg: fmt(avg),
+        delta: '+1,2', deltaBg: t.okbg, deltaFg: t.ok,
+        meta: scored.length + ' точек с оценкой · ' + s.audits.filter(a => POINTS.find(p => p.id === a.point).tenant === s.tenant).length + ' проверок · период ' + periods[s.periodIdx],
+        letters: letterBars,
+        kpis: [
+          { label: 'Критические D3', value: String(d3Points.length), note: d3Points.length ? d3Points.map(p => p.name).join(', ') : 'нет', bg: d3Points.length ? t.badbg : t.srf, border: d3Points.length ? t.badbg : t.line, labelFg: d3Points.length ? t.bad : t.ink2, valueFg: d3Points.length ? t.bad : t.ink, noteFg: d3Points.length ? t.bad : t.muted, go: () => this.setState({ screen: 'registry', filters: Object.assign({}, s.filters, { d3: true }) }) },
+          { label: 'Предписания просрочены', value: String(overdue.length), note: 'из ' + this.openOrders().length + ' открытых', bg: t.srf, border: t.line, labelFg: t.ink2, valueFg: t.ink, noteFg: t.muted, go: go('orders') },
+          { label: 'Ждут решения УК', value: String(waiting.length), note: 'подтверждения загружены', bg: t.srf, border: t.line, labelFg: t.ink2, valueFg: t.ink, noteFg: t.muted, go: go('orders') },
+        ],
+      },
+      attention, attentionCount: attention.length + ' поводов', noAttention: attention.length === 0,
+      points: pointRows, pointsCount: String(points.length),
+
+      point: {
+        name: pointObj.name,
+        meta: pointObj.city + ' · партнёр ' + pointObj.partner + ' · код ' + pointObj.code + ' · ' + pAudits.length + ' проверок в системе',
+        letter: pCalc ? pCalc.letter : '—', score: pCalc ? fmt(pCalc.score) : '—',
+        gbg: this.gradeColors(pCalc ? pCalc.letter : '—').gbg, gfg: this.gradeColors(pCalc ? pCalc.letter : '—').gfg,
+        orders: String(s.orders.filter(o => o.point === pointObj.id && o.state === 'open').length),
+        ordersFg: s.orders.filter(o => o.point === pointObj.id && o.state === 'open' && o.overdue === 2).length ? t.bad : t.ink,
+        openAudit: () => pLast ? this.setState({ screen: pLast.status === 'active' ? 'mini' : 'audit', auditId: pLast.id }) : this.toast('Проверок по точке ещё нет', t.warn),
+        history: pointHistory, repeats,
+        versionNote: pLast ? 'Последняя проверка сделана по версии ' + pLast.version + '. Более старые — по v4 и v3: сравнение идёт по общим пунктам, добавленные и снятые исключены из динамики.' : 'Проверок нет.',
+      },
+
+      audit: {
+        title: audit.kind + ' · ' + aPoint.name,
+        meta: 'Аудитор ' + audit.auditor + ' · чек-лист ' + audit.version + ' · язык отчёта ' + (s.lang === 'ru' ? 'RU' : 'EN') + ' · записей ' + audit.findings.length,
+        letter: audit.status === 'active' ? '—' : c.letter, score: fmt(c.score),
+        gbg: this.gradeColors(audit.status === 'active' ? '—' : c.letter).gbg, gfg: this.gradeColors(audit.status === 'active' ? '—' : c.letter).gfg,
+        why: c.anyD3 ? 'Буква D из-за критического нарушения, а не из-за суммы вычетов' : 'Буква по сумме вычетов, критических нарушений нет',
+        stateLabel: audit.status === 'active' ? 'Идёт' : audit.status === 'revoked' ? 'Отозвана · ' + audit.reason : 'Завершена · заморожена ' + audit.date,
+        stateFg: audit.status === 'active' ? t.accent : audit.status === 'revoked' ? t.muted : t.ink2,
+        canRevoke: audit.status === 'frozen',
+        pending: c.pending > 0, pendingLabel: c.pending + ' запис(ей) ждут подтверждения', pendingLoss: '−' + fmt(c.pendingLoss),
+        zones: zoneRowsAudit, totalLoss: '−' + fmt(c.total),
+        burned: !!burnedZone,
+        burnedTitle: burnedZone ? 'Зона «' + burnedZone.ru + '» сожжена критическим D3' : '',
+        burnedNote: burnedZone ? 'Доля зоны ' + this.share(burnedZone.id) + ' % списана полностью. Остальные нарушения этой зоны попадают в отчёт, но процент повторно не снижают.' : '',
+        findings, findingsCount: findings.length + ' из ' + audit.findings.length,
+        noFindings: findings.length === 0,
+        classFilters: ['all', 'D1', 'D2', 'D3'].map(k => ({
+          label: k === 'all' ? 'Все' : k,
+          bg: s.classFilter === k ? t.accsoft : 'transparent', fg: s.classFilter === k ? t.accent : t.ink2,
+          go: () => this.setState({ classFilter: k }),
+        })),
+        infos: INFOS,
+        isInternal: !s.partnerView, isPartner: s.partnerView,
+        internalBg: s.partnerView ? 'transparent' : t.accent, internalFg: s.partnerView ? t.ink2 : '#fff',
+        partnerBg: s.partnerView ? t.accent : 'transparent', partnerFg: s.partnerView ? '#fff' : t.ink2,
+        partnerItems, partnerNote: 'Отчёт для ' + aPoint.partner + ' · только подтверждённые находки, ' + partnerItems.length + ' пунктов',
+        letterTemplate: audit.findings.filter(f => f.confirmed).length ? 'Шаблон «с планом действий»' : 'Шаблон «проверка пройдена»',
+        letterText: audit.findings.filter(f => f.confirmed).length
+          ? 'Добрый день, ' + aPoint.partner + '. ' + audit.date + ' на «' + aPoint.name + '» прошла ' + audit.kind.toLowerCase() + ' проверка. Итог — ' + fmt(c.score) + ' % (' + c.letter + '). Ключевое: ' + (burnedZone ? 'критическое нарушение в зоне «' + burnedZone.ru + '»' : 'накопленные нарушения по зонам') + '. План действий и сроки — в приложении.'
+          : 'Добрый день, ' + aPoint.partner + '. ' + audit.date + ' на «' + aPoint.name + '» прошла проверка. Нарушений не выявлено, итог — ' + fmt(c.score) + ' % (' + c.letter + '). Спасибо за работу.',
+        letterBtn: audit.letterSent ? 'Письмо отправлено ✓' : 'Подтвердить и отправить',
+        letterBtnBg: audit.letterSent ? t.okbg : t.accent, letterBtnFg: audit.letterSent ? t.ok : '#fff',
+      },
+      setInternal: () => this.setState({ partnerView: false }),
+      setPartner: () => this.setState({ partnerView: true }),
+      goBackFromAudit: () => this.setState({ screen: 'point', pointId: audit.point }),
+      exportPdf: () => this.toast(c.pending ? 'PDF собран без ' + c.pending + ' неподтверждённых записей' : 'PDF собран: ' + aPoint.name + ', ' + audit.date, t.ok),
+      sendLetter: () => { if (audit.letterSent) { this.toast('Уже отправлено'); return; } this.setState(st => ({ audits: st.audits.map(a => a.id === audit.id ? Object.assign({}, a, { letterSent: true }) : a) })); this.toast('Письмо отправлено партнёру ' + aPoint.partner, t.ok); },
+      confirmAll: () => {
+        const target = s.screen === 'mini' ? active.id : audit.id;
+        this.setState(st => ({ audits: st.audits.map(a => a.id !== target ? a : Object.assign({}, a, { findings: a.findings.map(f => Object.assign({}, f, { confirmed: true })) })) }));
+        this.toast('Все записи подтверждены — оценка пересчитана', t.ok);
+      },
+      openRevoke: () => this.setState({ revoke: { open: true, reason: '' } }),
+      closeRevoke: () => this.setState({ revoke: { open: false, reason: '' } }),
+      setRevokeReason: e => this.setState({ revoke: { open: true, reason: e.target.value } }),
+      confirmRevoke: () => {
+        if (!s.revoke.reason.trim()) { this.toast('Причина обязательна: без неё отзыв не сохранится', t.bad); return; }
+        const reason = s.revoke.reason.trim();
+        this.setState(st => ({ audits: st.audits.map(a => a.id === audit.id ? Object.assign({}, a, { status: 'revoked', reason }) : a), revoke: { open: false, reason: '' }, screen: 'registry' }));
+        this.toast('Проверка отозвана: ' + reason, t.muted);
+      },
+      revoke: Object.assign({}, s.revoke, { btnBg: s.revoke.reason.trim() ? BURN : t.line, btnFg: s.revoke.reason.trim() ? '#fff' : t.muted }),
+
+      registry: registryList, registryCount: registryList.length + ' проверок по фильтру', registryEmpty: registryList.length === 0,
+      filters: {
+        q: s.filters.q,
+        letters: ['A', 'B', 'C', 'D'].map(k => ({
+          k, bg: s.filters.letters.indexOf(k) > -1 ? t.accsoft : 'transparent', fg: s.filters.letters.indexOf(k) > -1 ? t.accent : t.ink2,
+          go: () => this.setState(st => ({ filters: Object.assign({}, st.filters, { letters: st.filters.letters.indexOf(k) > -1 ? st.filters.letters.filter(x => x !== k) : st.filters.letters.concat([k]) }) })),
+        })),
+        d3Bg: s.filters.d3 ? t.accsoft : 'transparent', d3Fg: s.filters.d3 ? t.accent : t.ink2,
+        kind: ['все', 'Плановая', 'Повторная', 'Внеплановая'][s.filters.kindIdx],
+      },
+      setQuery: e => this.setState(st => ({ filters: Object.assign({}, st.filters, { q: e.target.value }) })),
+      toggleD3: () => this.setState(st => ({ filters: Object.assign({}, st.filters, { d3: !st.filters.d3 }) })),
+      cycleKind: () => this.setState(st => ({ filters: Object.assign({}, st.filters, { kindIdx: (st.filters.kindIdx + 1) % 4 }) })),
+      resetFilters: () => this.setState({ filters: { q: '', letters: [], d3: false, kindIdx: 0 } }),
+
+      orders: ordersRows, ordersEmpty: ordersRows.length === 0,
+      ordersTitle: this.openOrders().length + ' не исправлено · ' + overdue.length + ' просрочено',
+      ordersToggleLabel: s.ordersShowDone ? 'Скрыть закрытые' : 'Показать закрытые',
+      toggleOrdersDone: () => this.setState(st => ({ ordersShowDone: !st.ordersShowDone })),
+
+      events,
+
+      admin: {
+        tabs: [
+          { k: 'editor', label: 'Редактор' }, { k: 'zones', label: 'Зоны' }, { k: 'versions', label: 'Версии' },
+          { k: 'rules', label: 'Правила расчёта' }, { k: 'shots', label: 'Карта кадров' }, { k: 'uncovered', label: 'Непокрытые' },
+        ].map(x => ({ label: x.label, bg: s.adminTab === x.k ? t.accsoft : 'transparent', fg: s.adminTab === x.k ? t.accent : t.ink2, go: () => this.setState({ adminTab: x.k }) })),
+        isEditor: s.adminTab === 'editor', isZones: s.adminTab === 'zones', isVersions: s.adminTab === 'versions',
+        isRules: s.adminTab === 'rules', isShots: s.adminTab === 'shots', isUncovered: s.adminTab === 'uncovered',
+        hasDraft: s.draft.length > 0, draftLabel: 'Черновик: ' + s.draft.length + ' правок', nextVersion: 'v' + (s.versionN + 1),
+        zoneName: adminZone.ru,
+        zoneNav: ZONES.map(z => ({
+          name: z.ru, n: ITEMS.filter(i => i.zone === z.id).length,
+          bg: s.adminZone === z.id ? t.accsoft : 'transparent', fg: s.adminZone === z.id ? t.accent : t.ink2,
+          go: () => { const first = ITEMS.filter(i => i.zone === z.id)[0]; this.setState({ adminZone: z.id, adminItem: first ? first.code : null }); },
+        })),
+        items: adminItems, hasItems: adminItems.length > 0, noItems: adminItems.length === 0,
+        item: {
+          code: ai.code, ru: ai.ru, en: ai.en,
+          lenNote: 'EN ' + (lenRatio >= 0 ? '+' : '') + lenRatio + ' % длины',
+          lenFg: lenRatio > 45 ? t.bad : lenRatio > 25 ? t.warn : t.ok,
+          classes: ['D1', 'D2', 'D3'].map(k => {
+            const col = this.clsColors(k);
+            return { k, bg: ai.cls === k ? col.clsBg : 'transparent', fg: ai.cls === k ? col.clsFg : t.ink2, go: () => { this.setState(st => ({ items: Object.assign({}, st.items, { [ai.code]: Object.assign({}, st.items[ai.code], { cls: k }) }) })); noteDraft(ai.code, 'класс → ' + k); } };
+          }),
+          photoLabel: ai.photo ? 'Да · кадры по карте' : 'Нет',
+          photoBg: ai.photo ? t.accent : t.line, photoJustify: ai.photo ? 'flex-end' : 'flex-start',
+          retireLabel: ai.retired ? 'Вернуть пункт' : 'Снять пункт', retireFg: ai.retired ? t.ok : t.bad,
+        },
+        sum, sumBg: sum === 100 ? t.okbg : t.badbg, sumFg: sum === 100 ? t.ok : t.bad,
+        saveBg: sum === 100 ? t.accent : t.line, saveFg: sum === 100 ? '#fff' : t.muted,
+        zoneRows: ZONES.map((z, i) => ({
+          i: String(i + 1), ru: z.ru, en: z.en, share: this.share(z.id), n: ITEMS.filter(x => x.zone === z.id).length,
+          inc: () => this.setState(st => ({ zoneShares: Object.assign({}, st.zoneShares, { [z.id]: this.share(z.id) + 1 }) })),
+          dec: () => this.setState(st => ({ zoneShares: Object.assign({}, st.zoneShares, { [z.id]: Math.max(0, this.share(z.id) - 1) }) })),
+        })),
+        versions, diff, diffTitle: s.draft.length ? 'Черновик v' + (s.versionN + 1) + ': что изменится' : 'Что изменилось: v4 → v5',
+        rules: [
+          { label: 'Старт оценки', value: '100 %' }, { label: 'Вычет за D1', value: '−0,5 %' }, { label: 'Вычет за D2', value: '−2 %' },
+          { label: 'Поведение D3', value: 'Сжигает долю зоны' }, { label: 'Повторное снижение в сожжённой зоне', value: 'Нет' },
+          { label: 'Пороги букв', value: 'A ≥ 95 · B ≥ 85 · C ≥ 70' }, { label: 'Буква D', value: '< 70 или любой D3' },
+        ],
+        calcSubject: aPoint.name + ' · ' + audit.date,
+        calcSteps: ZONES.filter(z => c.byZone[z.id].loss > 0).map(z => ({
+          label: z.ru + ' · доля ' + this.share(z.id) + ' %' + (c.byZone[z.id].burned ? ' · D3' : ' · ' + c.byZone[z.id].findings + ' нарушений'),
+          value: '−' + fmt(c.byZone[z.id].loss), fg: c.byZone[z.id].burned ? t.bad : t.warn,
+        })).concat([{ label: 'Итог', value: fmt(c.score) + ' % · ' + c.letter, fg: t.ink }]),
+        shots: SHOTS.map(x => Object.assign({}, x, { zoom: () => this.setState({ lightbox: { slot: x.slot, title: x.title, caption: x.code + ' · ' + x.req + ' · ' + x.hint } }) })),
+        uncovered: s.uncovered.map(u => ({
+          text: u.text, meta: u.count + ' раз · ' + u.zone,
+          synonym: () => { this.setState(st => ({ uncovered: st.uncovered.filter(x => x.id !== u.id) })); noteDraft('синонимы', '«' + u.text + '»'); this.toast('Добавлено в синонимы существующего пункта', t.ok); },
+          newItem: () => { this.setState(st => ({ uncovered: st.uncovered.filter(x => x.id !== u.id) })); noteDraft('новый пункт', '«' + u.text + '»'); this.toast('Новый пункт создан в черновике v' + (s.versionN + 1), t.accent); },
+        })),
+        uncoveredEmpty: s.uncovered.length === 0,
+        uncoveredMeta: s.uncovered.length + ' фраз · источник будущих пунктов и синонимов',
+      },
+      setItemRu: e => { const v = e.target.value; this.setState(st => ({ items: Object.assign({}, st.items, { [ai.code]: Object.assign({}, st.items[ai.code], { ru: v }) }) })); },
+      setItemEn: e => { const v = e.target.value; this.setState(st => ({ items: Object.assign({}, st.items, { [ai.code]: Object.assign({}, st.items[ai.code], { en: v }) }) })); },
+      togglePhoto: () => { this.setState(st => ({ items: Object.assign({}, st.items, { [ai.code]: Object.assign({}, st.items[ai.code], { photo: !ai.photo }) }) })); noteDraft(ai.code, 'обязательное фото → ' + (!ai.photo ? 'да' : 'нет')); },
+      toggleRetire: () => { this.setState(st => ({ items: Object.assign({}, st.items, { [ai.code]: Object.assign({}, st.items[ai.code], { retired: !ai.retired }) }) })); noteDraft(ai.code, !ai.retired ? 'пункт снят' : 'пункт возвращён'); },
+      saveZones: () => { if (sum !== 100) { this.toast('Сумма долей ' + sum + ' % — сохранить нельзя, нужно ровно 100 %', t.bad); return; } noteDraft('зоны', 'доли пересохранены'); this.toast('Доли сохранены в черновик', t.ok); },
+      publishVersion: () => { this.setState(st => ({ versionN: st.versionN + 1, draft: [] })); this.toast('Версия v' + (s.versionN + 1) + ' опубликована. Идущие проверки остаются на прежней версии', t.ok); },
+      requestUnfreeze: () => this.toast('Запрос на разморозку методики отправлен владельцу арендатора', t.warn),
+
+      mini: {
+        point: activePoint.name, state: active.status === 'active' ? 'Идёт · 1 ч 12 мин' : 'Завершена',
+        progress: Math.round((checkedN / 137) * 100) + '%', progressLabel: checkedN + ' / 137',
+        zones: miniZones, records: miniRecords,
+        hasRemaining: active.status === 'active',
+        remainingTitle: 'В зоне «Кухня» не смотрели 12 пунктов', remainingNote: '4 из них требуют фото по карте кадров',
+        walk: () => this.toast('Обход: показываю непроверенные пункты кухни по порядку', t.warn),
+        addRecord: () => {
+          const codes = ITEMS.map(i => i.code).filter(cd => !active.findings.some(f => f.code === cd));
+          const cd = codes[Math.floor(Math.random() * codes.length)] || 'K-058';
+          const it = item(cd);
+          this.setState(st => ({ audits: st.audits.map(a => a.id !== active.id ? a : Object.assign({}, a, { findings: a.findings.concat([F(cd, it.cls, false, 'model', 'Модель предложила пункт и класс по фото и голосу. Подтвердите или смените класс.', 2)]), checked: Math.min(137, (a.checked || 0) + 1) })) }));
+          this.toast('Модель предложила запись ' + cd + ' — ждёт подтверждения', t.accent);
+        },
+        finishLabel: active.status === 'active' ? 'Завершить' : 'Завершена',
+        finish: () => {
+          if (active.status !== 'active') { this.toast('Проверка уже завершена и заморожена'); return; }
+          if (aCalc.pending) { this.toast(aCalc.pending + ' запис(ей) не подтверждены — они не попадут в отчёт', t.warn); }
+          this.setState(st => ({ audits: st.audits.map(a => a.id !== active.id ? a : Object.assign({}, a, { status: 'frozen', checked: 137 })), screen: 'audit', auditId: active.id, pointId: active.point }));
+          this.toast('Проверка завершена и заморожена: ' + fmt(aCalc.score) + ' % · ' + aCalc.letter, aCalc.anyD3 ? BURN : t.ok);
+        },
+        footer: 'Завершение заморозит отчёт: правка чек-листа его уже не пересчитает.',
+        help: [
+          { i: '01', text: 'Подтвердите предложение модели K-041 (D3) — доля кухни 18 % списывается целиком, буква падает до D.' },
+          { i: '02', text: 'Нажмите на класс записи (↻) — D1 → D2 → D3, оценка пересчитывается на месте.' },
+          { i: '03', text: '«Добавить запись» — модель предлагает пункт и класс, человек фиксирует.' },
+          { i: '04', text: '«Завершить» переводит проверку в заморозку и открывает её во внутреннем виде.' },
+          { i: '05', text: 'Фото открывается крупно — тап по превью в любой записи.' },
+        ],
+      },
+
+      lightbox: { open: !!s.lightbox, slot: s.lightbox ? s.lightbox.slot : '', title: s.lightbox ? s.lightbox.title : '', caption: s.lightbox ? s.lightbox.caption : '' },
+      closeLightbox: () => this.setState({ lightbox: null }),
+      toast: { open: !!s.toast, text: s.toast ? s.toast.text : '', dot: s.toast ? s.toast.dot : t.accent },
+    };
+  }
+}
+
+</script>
+</body>
+</html>

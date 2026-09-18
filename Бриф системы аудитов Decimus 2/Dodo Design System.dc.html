@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="dodo-ds.css">
+<style>
+  .dsx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 8px; }
+  .dsx-tk { display: flex; align-items: center; gap: 10px; padding: 8px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-block); }
+  .dsx-sw { width: 34px; height: 34px; flex: 0 0 auto; border-radius: var(--r-mark); border: 1px solid var(--line-strong); }
+  .dsx-tn { font: var(--w-medium) var(--fs-dense) / 1.3 var(--font-ui); }
+  .dsx-tv { font-family: var(--font-num); font-size: var(--fs-num-sm); color: var(--ink-2); text-transform: uppercase; }
+  .dsx-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px; background: var(--surface); border: 1px solid var(--line-strong); border-radius: var(--r-block); }
+  .dsx-col { flex-direction: column; align-items: stretch; }
+  .dsx-pre { margin: 0; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block); font: var(--w-regular) var(--fs-num) / 18px var(--font-num); color: var(--ink-2); overflow-x: auto; }
+  .dsx-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start; }
+  .dsx-cell { padding: 8px 10px; font-size: var(--fs-meta); vertical-align: top; }
+  .dsx-lbl { font-size: var(--fs-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-semibold); }
+</style>
+</helmet>
+<div style="min-height:100%;background:var(--canvas);color:var(--ink);font:var(--w-regular) var(--fs-body)/var(--lh-body) var(--font-ui);padding-bottom:56px">
+
+  <div class="appbar" style="position:sticky;top:0;z-index:20">
+    <div class="appbar__brand">
+      <span class="appbar__brand-name">{{ markName }}</span>
+      <span class="appbar__brand-mark">Dodo</span>
+    </div>
+    <div class="seg">
+      <button class="seg__item" onClick="{{ pickMaximus }}" style="{{ segMaximus }}">MAXIMUS</button>
+      <button class="seg__item" onClick="{{ pickDecimus }}" style="{{ segDecimus }}">DECIMUS</button>
+      <button class="seg__item" onClick="{{ pickMeridius }}" style="{{ segMeridius }}">MERIDIUS</button>
+    </div>
+    <div class="appbar__spacer"></div>
+    <div class="tenant">
+      <div>
+        <div class="tenant__name">Единая дизайн-система</div>
+        <div class="tenant__meta">сборка 17.09.2026</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn btn--sm" onClick="{{ toggleTheme }}">{{ themeLabel }}</button>
+      <a class="btn btn--sm btn--download" href="dodo-ds.css" download="dodo-ds.css">Скачать <span class="btn__ext">.css</span></a>
+    </div>
+  </div>
+
+  <div class="page">
+  <div class="page__body">
+
+    <div style="margin-bottom:32px;padding-bottom:20px;border-bottom:1px solid var(--line-strong)">
+      <div class="dsx-lbl" style="margin-bottom:6px">MAXIMUS · DECIMUS · MERIDIUS</div>
+      <h1 style="margin:0;font:var(--w-semibold) var(--fs-display)/var(--lh-display) var(--font-ui)">Одна система на три продукта</h1>
+      <p style="max-width:76ch;margin:8px 0 0;font-size:var(--fs-lead);line-height:var(--lh-lead);color:var(--ink-2);text-wrap:pretty">Родословная у источников одна: язык вырос в P&amp;L, оттуда пришёл в чек-листы отдельным визуальным китом. Сборка не примиряет два вкуса, а снимает расхождения, накопленные при копировании, и достраивает то, что каждый продукт изобретал сам.</p>
+    </div>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">01</span><h2 class="section__title">Три продукта и что у них общего</h2></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(252px,1fr));gap:10px">
+        <div class="card">
+          <div class="card__head" style="padding:12px 14px;gap:8px">
+            <div><div class="card__title" style="font-size:var(--fs-lead)">MAXIMUS</div><div class="card__meta">ведение P&amp;L</div></div>
+            <span class="tag tag--accent" style="margin-left:auto">источник языка</span>
+          </div>
+          <div class="card__body" style="font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Плотный реестр, ведомость, табель, деньги в каждой ячейке. Отсюда пришли шкала, плотность строки и правило о числах.</div>
+        </div>
+        <div class="card">
+          <div class="card__head" style="padding:12px 14px;gap:8px">
+            <div><div class="card__title" style="font-size:var(--fs-lead)">DECIMUS</div><div class="card__meta">аудиты сети</div></div>
+            <span class="tag tag--warn" style="margin-left:auto">перевод</span>
+          </div>
+          <div class="card__body" style="font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Проверки, предписания, планы действий, аналитика по странам. Единственный продукт, которому сборка означает перевод: жил на #5B57F2, Manrope и радиусах 12px.</div>
+        </div>
+        <div class="card">
+          <div class="card__head" style="padding:12px 14px;gap:8px">
+            <div><div class="card__title" style="font-size:var(--fs-lead)">MERIDIUS</div><div class="card__meta">чек-листы</div></div>
+            <span class="tag tag--teal" style="margin-left:auto">чистка языка</span>
+          </div>
+          <div class="card__body" style="font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Тот же язык без доменного слоя P&amp;L, с правкой доступности и снятой минимальной шириной под телефон управляющего.</div>
+        </div>
+      </div>
+      <div class="note note--info" style="margin-top:12px">
+        <span class="note__icon">i</span>
+        <div class="note__text"><div class="note__title">Пользователь у трёх продуктов общий</div>Управляющий и УК за день заходят во все три. Поэтому акцент один, плотность одна, а различает продукты словесный знак в шапке — переключите его слева сверху.</div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">02</span><h2 class="section__title">Шесть снятых расхождений</h2></div>
+      <p class="section__lead">Каждое решение — с причиной, чтобы через полгода никто не откатил его «как было».</p>
+      <div class="table-wrap" style="max-height:none">
+        <table class="table" style="table-layout:auto">
+          <thead><tr>
+            <th class="is-text" style="width:140px">Расхождение</th>
+            <th class="is-text">Было</th>
+            <th class="is-text" style="width:36%">Решено</th>
+          </tr></thead>
+          <tbody>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Контраст метаданных</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)"><code>--ink-3</code> #98A1AC в P&amp;L не добирает порог на белом; в чек-листах затемнён до #626B77</td>
+              <td class="is-text dsx-cell">Взято значение чек-листов. Доступность не обсуждается</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Ширина страницы</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)"><code>min-width: 1280px</code> под таблицу на весь экран; в чек-листах снято под телефон</td>
+              <td class="is-text dsx-cell">Ядро ширину не назначает — это решение экрана. Продукт ставит сам</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Доменный слой</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)"><code>--reg-*</code>, <code>--st-*</code>, <code>--origin-*</code>, поверхности удержаний и итога — в ядре</td>
+              <td class="is-text dsx-cell">Вынесено в слой продукта: половина не использовалась, вторая — под чужими смыслами</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Тона категорий</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)"><code>--reg-supp</code> и <code>--reg-internal</code> красили вид сущности, а назывались учётом</td>
+              <td class="is-text dsx-cell">Значения сохранены как <code>--cat-violet</code> и <code>--cat-teal</code>; роли переведены на них без правки разметки</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Метка</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)">Одна форма изобретена трижды: <code>.role</code>, <code>.inbox__kind</code>, статусные плашки аудитов</td>
+              <td class="is-text dsx-cell">Введён <code>.tag</code> с тонами; <code>.role</code> оставлен частным случаем</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Радиусы и воздух</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)">В кит попали радиусы 2–6px и сетка из вертикальных линий, а живой продукт чек-листов давно скруглён сильнее и дышит свободнее</td>
+              <td class="is-text dsx-cell">Радиусы 4 / 8 / 12 / 16 и пилюля, строка 34px, контрол 36px, линии тише, у блока мягкая тень вместо жёсткой рамки</td>
+            </tr>
+            <tr>
+              <td class="is-text dsx-cell" style="font-size:var(--fs-dense);font-weight:var(--w-medium)">Акцент</td>
+              <td class="is-text dsx-cell" style="color:var(--ink-2)">Синий #1F4E9C в двух продуктах, фиолетовый #5B57F2 в третьем, бренд — #5B3DEC</td>
+              <td class="is-text dsx-cell">Акцент один на три продукта: «синее — нажимается» переучивать трижды нельзя</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">03</span><h2 class="section__title">Четыре слоя</h2></div>
+      <p class="section__lead">Границы слоёв отвечают на вопрос «что здесь можно менять и кто это решает».</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:10px">
+        <div class="card" style="border-color:var(--brand-border)">
+          <div class="card__body">
+            <div style="display:flex;align-items:baseline;gap:8px"><span class="section__num">0</span><b style="font-size:var(--fs-lead)">Бренд</b></div>
+            <p style="margin:6px 0 10px;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Решение компании. Справочный слой: знак и всё, что видно наружу. Интерфейс на нём не строится.</p>
+            <div style="display:flex;gap:4px">
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--brand-purple)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--brand-orange)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--brand-blue)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;background:var(--brand-beige)"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__body">
+            <div style="display:flex;align-items:baseline;gap:8px"><span class="section__num">1</span><b style="font-size:var(--fs-lead)">Токены ядра</b></div>
+            <p style="margin:6px 0 10px;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Решение системы. Поверхности, чернила, линии, смыслы, шкала, плотность — светлая и тёмная тема.</p>
+            <div style="display:flex;gap:4px">
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--accent)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--warn-mark)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--ok)"></span>
+              <span class="dsx-sw" style="width:26px;height:26px;border-color:transparent;background:var(--err)"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card__body">
+            <div style="display:flex;align-items:baseline;gap:8px"><span class="section__num">2</span><b style="font-size:var(--fs-lead)">Компоненты</b></div>
+            <p style="margin:6px 0 10px;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Ни одного хекса — только <code>var(--…)</code>. Поэтому тёмная тема не требует правки компонентов.</p>
+            <div class="actions"><button class="btn btn--primary btn--sm">Провести</button><button class="btn btn--sm">Отмена</button></div>
+          </div>
+        </div>
+        <div class="card" style="border-style:dashed">
+          <div class="card__body">
+            <div style="display:flex;align-items:baseline;gap:8px"><span class="section__num">3</span><b style="font-size:var(--fs-lead)">Слой продукта</b></div>
+            <p style="margin:6px 0 10px;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Решение продукта. Доменные токены и классы своих сущностей — файлом рядом, а не правкой ядра.</p>
+            <div style="display:flex;gap:6px;flex-wrap:wrap"><span class="tag tag--violet">регистр</span><span class="tag tag--teal">тип</span><span class="tag tag--warn tag--dashed">срок</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">04</span><h2 class="section__title">Токены</h2></div>
+      <p class="section__lead">Значения показывает браузер — подпись не может разойтись с кодом. Переключите тему в шапке: имена те же, значения другие.</p>
+
+      <div class="field-label">Поверхности</div>
+      <div class="dsx-grid" style="margin-bottom:16px">
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--canvas)"></span><div><div class="dsx-tn">--canvas</div><div class="dsx-tv">{{ v.canvas }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--surface)"></span><div><div class="dsx-tn">--surface</div><div class="dsx-tv">{{ v.surface }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--surface-2)"></span><div><div class="dsx-tn">--surface-2</div><div class="dsx-tv">{{ v.surface2 }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--surface-3)"></span><div><div class="dsx-tn">--surface-3</div><div class="dsx-tv">{{ v.surface3 }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--surface-head)"></span><div><div class="dsx-tn">--surface-head</div><div class="dsx-tv">{{ v.surfaceHead }}</div></div></div>
+      </div>
+
+      <div class="field-label">Чернила</div>
+      <div class="dsx-grid" style="margin-bottom:16px">
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--ink)"></span><div><div class="dsx-tn">--ink</div><div class="dsx-tv">{{ v.ink }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--ink-2)"></span><div><div class="dsx-tn">--ink-2</div><div class="dsx-tv">{{ v.ink2 }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--ink-3)"></span><div><div class="dsx-tn">--ink-3</div><div class="dsx-tv">{{ v.ink3 }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--ink-empty)"></span><div><div class="dsx-tn">--ink-empty</div><div class="dsx-tv">{{ v.inkEmpty }}</div></div></div>
+      </div>
+
+      <div class="field-label">Линии</div>
+      <div class="dsx-grid" style="margin-bottom:16px">
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--line)"></span><div><div class="dsx-tn">--line</div><div class="dsx-tv">{{ v.line }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--line-strong)"></span><div><div class="dsx-tn">--line-strong</div><div class="dsx-tv">{{ v.lineStrong }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--line-control)"></span><div><div class="dsx-tn">--line-control</div><div class="dsx-tv">{{ v.lineControl }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--line-control-2)"></span><div><div class="dsx-tn">--line-control-2</div><div class="dsx-tv">{{ v.lineControl2 }}</div></div></div>
+      </div>
+
+      <div class="field-label">Смыслы</div>
+      <div class="dsx-grid" style="margin-bottom:16px">
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--accent)"></span><div><div class="dsx-tn">--accent</div><div class="dsx-tv">{{ v.accent }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--accent-soft)"></span><div><div class="dsx-tn">--accent-soft</div><div class="dsx-tv">{{ v.accentSoft }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--warn)"></span><div><div class="dsx-tn">--warn</div><div class="dsx-tv">{{ v.warn }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--warn-mark)"></span><div><div class="dsx-tn">--warn-mark</div><div class="dsx-tv">{{ v.warnMark }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--ok)"></span><div><div class="dsx-tn">--ok</div><div class="dsx-tv">{{ v.ok }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--err)"></span><div><div class="dsx-tn">--err</div><div class="dsx-tv">{{ v.err }}</div></div></div>
+      </div>
+
+      <div class="field-label">Категориальные тона — общие имена вместо доменных</div>
+      <div class="dsx-grid">
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--cat-violet)"></span><div><div class="dsx-tn">--cat-violet</div><div class="dsx-tv">{{ v.catViolet }}</div></div></div>
+        <div class="dsx-tk"><span class="dsx-sw" style="background:var(--cat-teal)"></span><div><div class="dsx-tn">--cat-teal</div><div class="dsx-tv">{{ v.catTeal }}</div></div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">05</span><h2 class="section__title">Типографика и числа</h2></div>
+      <p class="section__lead">Интерфейс — Golos Text, числа — IBM Plex Mono. База 13/18, а не браузерные 16: в реестре и чек-листе на экран должно влезать больше строк, чем в статье.</p>
+      <div class="dsx-two">
+        <div class="dsx-demo dsx-col" style="gap:0">
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-display</code><span style="font:var(--w-semibold) var(--fs-display)/var(--lh-display) var(--font-ui)">Закрытие месяца</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-title</code><span style="font:var(--w-semibold) var(--fs-title)/var(--lh-title) var(--font-ui)">Предписание № 412</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-lead</code><span style="font-size:var(--fs-lead);line-height:var(--lh-lead)">Крупное поле и ввод</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-body</code><span style="font-size:var(--fs-body);line-height:var(--lh-body)">База интерфейса</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-dense</code><span style="font-size:var(--fs-dense);line-height:var(--lh-dense)">Таблицы и тулбары</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0;border-bottom:1px solid var(--line)"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-meta</code><span style="font-size:var(--fs-meta);line-height:var(--lh-meta)">Подпись под полем</span></div>
+          <div style="display:flex;align-items:baseline;gap:12px;padding:6px 0"><code style="width:104px;flex:0 0 auto;font-size:var(--fs-micro);color:var(--ink-3)">--fs-micro</code><span class="dsx-lbl">Надстрочная метка</span></div>
+        </div>
+        <div class="dsx-demo dsx-col">
+          <div style="font-size:var(--fs-meta);color:var(--ink-2);text-wrap:pretty"><b style="color:var(--ink)">Инвариант.</b> Число — правым краем, моноширинным, табличными цифрами: колонки сравнивают глазом, а не калькулятором. Ноль — цифра, отсутствие значения — прочерк.</div>
+          <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:baseline;margin-top:4px">
+            <span class="num num--hero">1 284 900</span><span class="dsx-lbl">num--hero</span>
+            <span class="num num--total">438 210</span><span class="dsx-lbl">num--total</span>
+            <span class="num num--muted">−52 000</span><span class="dsx-lbl">num--muted</span>
+            <span class="num num--zero">0</span><span class="dsx-lbl">num--zero</span>
+            <span class="num num--empty">—</span><span class="dsx-lbl">num--empty</span>
+            <span class="num num--up">+12,4%</span><span class="dsx-lbl">num--up</span>
+            <span class="num num--down">−3,1%</span><span class="dsx-lbl">num--down</span>
+            <span class="num num--flagged">96 300</span><span class="dsx-lbl">num--flagged</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">06</span><h2 class="section__title">Кнопки, срез, фильтр, поля</h2></div>
+      <p class="section__lead">Выгрузка отличается видом, а не только подписью: пунктир, стрелка, расширение файла. Выбранное значение среза — <code>span[aria-current]</code>, не кнопка.</p>
+      <div class="dsx-demo" style="margin-bottom:10px">
+        <button class="btn btn--primary">Отправить предписание</button>
+        <button class="btn">Сохранить черновик</button>
+        <button class="btn btn--ghost">Отмена</button>
+        <button class="btn btn--danger">Снять с публикации</button>
+        <button class="btn btn--download">Выгрузить ↓ <span class="btn__ext">.xlsx</span></button>
+        <button class="btn" disabled="disabled">Недоступно</button>
+      </div>
+      <div class="dsx-demo" style="margin-bottom:10px">
+        <div class="seg">
+          <span class="seg__current" aria-current="true">Все точки<span class="seg__count">482</span></span>
+          <button class="seg__item"><span class="seg__dot" style="background:var(--warn-mark)"></span>С нарушениями<span class="seg__count">57</span></button>
+          <button class="seg__item"><span class="seg__dot" style="background:var(--ok)"></span>Чисто<span class="seg__count">425</span></button>
+        </div>
+        <button class="filter-btn filter-btn--active">Страна: Казахстан ▾</button>
+        <button class="filter-btn">Период ▾</button>
+      </div>
+      <div class="dsx-two">
+        <div class="popover">
+          <div class="popover__search"><span style="color:var(--ink-3)">⌕</span><input placeholder="Найти точку"></div>
+          <div class="popover__group">Алматы</div>
+          <div class="popover__row popover__row--on"><span class="checkbox checkbox--on">✓</span>Абая, 150<span class="popover__count">12</span></div>
+          <div class="popover__row"><span class="checkbox"></span>Розыбакиева, 247<span class="popover__count">8</span></div>
+          <div class="popover__row popover__row--empty"><span class="checkbox"></span>Сейфуллина, 502<span class="popover__count">0</span></div>
+          <div class="popover__foot">Выбрано 1 из 34 · Esc — закрыть</div>
+        </div>
+        <div class="dsx-demo dsx-col">
+          <div><label class="field-label">Ответственный</label><input class="input" value="Ирина Соколова"></div>
+          <div><label class="field-label">Срок устранения</label><input class="input input--flagged" value="12.10.2026"><div class="field-note field-note--warn">Позже планового обхода — значение принято</div></div>
+          <div><label class="field-label">Сумма удержания</label><div class="input-money"><input value="52 000"><span class="input-money__currency">₸</span></div></div>
+          <div><label class="field-label">Комментарий</label><textarea class="textarea">Холодильная витрина без термометра.</textarea></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">07</span><h2 class="section__title">Таблица данных</h2></div>
+      <p class="section__lead">Прокручивается контейнер, а не страница. Имя слева и итог справа закреплены. Подкраска строки говорит о происхождении, не о величине числа; действие в строке набрано мельче сумм.</p>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th class="is-text" style="width:210px">Точка</th>
+              <th style="width:86px">Проверок</th>
+              <th style="width:86px">Открыто</th>
+              <th style="width:96px">Просрочено</th>
+              <th style="width:104px">Удержания</th>
+              <th style="width:120px">Балл</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="table__name"><div class="table__name-main"><span class="row-mark"></span><span>Абая, 150</span></div><div class="table__name-sub"><span>Алматы · Казахстан</span></div></td>
+              <td class="is-num">12</td><td class="is-num">3</td><td class="is-num num--zero">0</td><td class="is-num">52 000</td>
+              <td class="table__total-col">94</td>
+            </tr>
+            <tr>
+              <td class="table__name"><div class="table__name-main"><span class="row-mark row-mark--frozen"></span><span>Розыбакиева, 247</span></div><div class="table__name-sub"><span>Алматы · перенос из сентября</span></div></td>
+              <td class="is-num">8</td><td class="is-num">5</td><td class="is-num num--down">2</td><td class="is-num">18 400</td>
+              <td class="table__total-col">71</td>
+            </tr>
+            <tr>
+              <td class="table__name"><div class="table__name-main"><span class="row-mark"></span><span>Сейфуллина, 502</span></div><div class="table__name-sub"><span>Алматы · новая точка</span></div></td>
+              <td class="is-num">2</td><td class="is-num">1</td><td class="is-num num--zero">0</td><td class="is-num num--empty">—</td>
+              <td class="table__total-col">88</td>
+            </tr>
+          </tbody>
+          <tfoot>
+            <tr>
+              <th class="table__name is-text">Итого по городу</th>
+              <td class="is-num">22</td><td class="is-num">9</td><td class="is-num">2</td><td class="is-num">70 400</td>
+              <td class="table__total-col">84</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">08</span><h2 class="section__title">Метка и категориальные тона</h2></div>
+      <p class="section__lead">Одна форма на роли, виды сущностей и статусы. Тон означает смысл, а не важность: фиолетовый и бирюзовый — это «другой вид», а не «хуже» или «лучше».</p>
+      <div class="dsx-demo" style="margin-bottom:10px">
+        <span class="tag tag--accent">Управляющая компания</span>
+        <span class="tag tag--violet">Дополнительный регистр</span>
+        <span class="tag tag--teal">Внутренний учёт</span>
+        <span class="tag tag--ok">Устранено</span>
+        <span class="tag tag--warn tag--dashed">Партнёр · до 30.09<span class="tag__note">14 дн.</span></span>
+        <span class="tag tag--err">Просрочено</span>
+        <span class="tag tag--neutral">Черновик</span>
+      </div>
+      <div class="dsx-demo">
+        <span class="tag tag--accent tag--micro">Платёж</span>
+        <span class="tag tag--warn tag--micro tag--dashed">Вложение</span>
+        <span class="tag tag--violet tag--micro">Чек-лист</span>
+        <span class="tag tag--teal tag--micro">Обход</span>
+        <span style="font-size:var(--fs-meta);color:var(--ink-3)">— надстрочный размер: метка внутри строки таблицы или очереди</span>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">09</span><h2 class="section__title">Показатели и путь</h2></div>
+      <p class="section__lead">Добавлено при сборке: дашборд и иерархия есть у всех трёх продуктов, и каждый рисовал их по-своему.</p>
+      <div class="crumbs" style="margin-bottom:10px">
+        <a href="#">Евразия</a><span class="crumbs__sep">/</span>
+        <a href="#">Казахстан</a><span class="crumbs__sep">/</span>
+        <a href="#">Алматы</a><span class="crumbs__sep">/</span>
+        <span class="crumbs__current">Абая, 150</span>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat__label">Проверок за месяц</div><div class="stat__value">482</div><div class="stat__delta stat__delta--up">+38 к августу</div></div>
+        <div class="stat"><div class="stat__label">Средний балл</div><div class="stat__value">84<span class="stat__unit">из 100</span></div><div class="stat__delta stat__delta--down">−2,4 к августу</div></div>
+        <div class="stat stat--flagged"><div class="stat__label">Просроченных предписаний</div><div class="stat__value">17</div><div class="stat__delta">срок вышел, партнёр не ответил</div></div>
+        <div class="stat"><div class="stat__label">Удержания</div><div class="stat__value">1,28<span class="stat__unit">млн ₸</span></div><div class="stat__delta">по 34 точкам</div></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">10</span><h2 class="section__title">Сообщения, очередь, прогресс, отказ</h2></div>
+      <div class="dsx-two" style="margin-bottom:10px">
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="note note--ok"><span class="note__icon">✓</span><div class="note__text"><div class="note__title">Предписание закрыто</div>Партнёр приложил фотоотчёт, аудитор подтвердил.</div></div>
+          <div class="note note--warn"><span class="note__icon">!</span><div class="note__text"><div class="note__title">Срок истекает через 2 дня</div>Ответственный не назначен — задача никому не принадлежит.</div></div>
+          <div class="note note--error"><span class="note__icon">×</span><div class="note__text"><div class="note__title">Проверка не сохранена</div>Не заполнены 3 обязательных пункта чек-листа.</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="progress">
+            <div class="progress__head"><span class="progress__stage">Пересчёт баллов по стране</span><span class="progress__counter">318 / 482</span></div>
+            <div class="progress__body">
+              <div class="progress__track"><div class="progress__bar" style="width:66%"></div></div>
+              <div class="progress__foot"><span>Казахстан, 34 города</span><span>≈ 40 сек.</span></div>
+            </div>
+          </div>
+          <div class="empty empty--actionable">
+            <div class="empty__title">Проверок за период нет</div>
+            <div class="empty__text">Ни одного обхода с 1 сентября. Если точка открылась позже — это ожидаемо.</div>
+            <button class="btn btn--sm btn--primary">Назначить обход</button>
+            <div class="empty__aside">Кнопка показана только тому, кто вправе назначать обходы.</div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="inbox__bar"><b style="font-size:var(--fs-dense)">Очередь на разбор</b><span style="font-size:var(--fs-meta);color:var(--ink-3)">две разные сущности в одном списке — вид говорит метка, а не цвет строки</span></div>
+        <div class="inbox__row inbox__row--selected"><span class="inbox__kind inbox__kind--payment">Проверка</span><span class="inbox__title">Абая, 150</span><span class="inbox__state">на подтверждении</span><span class="inbox__guess">3 пункта с нарушением · аудитор Соколова</span><span class="num inbox__sum">94</span></div>
+        <div class="inbox__row inbox__row--attachment"><span class="inbox__kind inbox__kind--attachment">Вложение</span><span class="inbox__title">IMG_4821.heic</span><span class="inbox__state">не распознано</span><span class="inbox__guess">похоже на фотоотчёт по предписанию № 412</span><span class="num inbox__sum num--empty">—</span></div>
+        <div class="inbox__row"><span class="inbox__kind inbox__kind--payment">Проверка</span><span class="inbox__title">Розыбакиева, 247</span><span class="inbox__state">просрочена</span><span class="inbox__guess">срок вышел 12.09 · партнёр не ответил</span><span class="num inbox__sum">71</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">11</span><h2 class="section__title">Знак: продукт различает имя, а не цвет</h2></div>
+      <p class="section__lead">Имя продукта — прописными, полужирным, чернилами. Имя компании или тенанта — рядом и тише. Одна форма на три продукта, порядок канонический.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">
+        <div class="appbar" style="border:1px solid var(--line-strong);border-radius:var(--r-block);height:auto;padding:12px 14px;gap:12px">
+          <div class="appbar__brand"><span class="appbar__brand-name">MAXIMUS</span><span class="appbar__brand-mark">Dodo</span></div>
+          <div class="appbar__spacer"></div><span class="tag tag--neutral tag--micro">P&amp;L</span>
+        </div>
+        <div class="appbar" style="border:1px solid var(--line-strong);border-radius:var(--r-block);height:auto;padding:12px 14px;gap:12px">
+          <div class="appbar__brand"><span class="appbar__brand-name">DECIMUS</span><span class="appbar__brand-mark">Dodo</span></div>
+          <div class="appbar__spacer"></div><span class="tag tag--neutral tag--micro">Аудиты</span>
+        </div>
+        <div class="appbar" style="border:1px solid var(--line-strong);border-radius:var(--r-block);height:auto;padding:12px 14px;gap:12px">
+          <div class="appbar__brand"><span class="appbar__brand-name">MERIDIUS</span><span class="appbar__brand-mark">Dodo</span></div>
+          <div class="appbar__spacer"></div><span class="tag tag--neutral tag--micro">Чек-листы</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">12</span><h2 class="section__title">Каркас экрана</h2></div>
+      <p class="section__lead">Боковая навигация взята из чек-листов: раздел — надстрочной прописной, пункт без рамок и без иконок ради иконок, текущий — мягкая заливка и полоса слева. Шапка над прокруткой полупрозрачная и размывает подложку.</p>
+      <div style="display:flex;border:1px solid var(--line);border-radius:var(--r-block);box-shadow:var(--sh-card);overflow:hidden;background:var(--canvas)">
+        <nav class="sidenav" style="border-radius:0">
+          <div class="sidenav__group">Работа</div>
+          <span class="sidenav__current" aria-current="true">Проверки<span class="sidenav__count">482</span></span>
+          <a class="sidenav__item" href="#">Предписания<span class="sidenav__count">57</span></a>
+          <a class="sidenav__item" href="#">Планы действий<span class="sidenav__count">18</span></a>
+          <div class="sidenav__group">Справочники</div>
+          <a class="sidenav__item" href="#">Чек-листы</a>
+          <a class="sidenav__item" href="#">Страны и точки</a>
+          <a class="sidenav__item" href="#">Пространство</a>
+        </nav>
+        <div style="flex:1;min-width:0">
+          <div class="appbar" style="border-bottom:1px solid var(--line);height:auto;padding:12px var(--gutter)">
+            <div class="crumbs"><a href="#">Евразия</a><span class="crumbs__sep">/</span><a href="#">Казахстан</a><span class="crumbs__sep">/</span><span class="crumbs__current">Алматы</span></div>
+            <div class="appbar__spacer"></div>
+            <button class="btn btn--sm btn--primary">Назначить обход</button>
+          </div>
+          <div style="padding:20px var(--gutter)">
+            <h3 style="margin:0 0 4px;font:var(--w-semibold) var(--fs-display)/var(--lh-display) var(--font-ui)">Проверки</h3>
+            <p style="margin:0 0 16px;font-size:var(--fs-meta);color:var(--ink-2)">34 точки, 12 аудиторов, период — сентябрь</p>
+            <div class="stats">
+              <div class="stat"><div class="stat__label">Проверок</div><div class="stat__value">482</div><div class="stat__delta stat__delta--up">+38</div></div>
+              <div class="stat"><div class="stat__label">Средний балл</div><div class="stat__value">84</div><div class="stat__delta stat__delta--down">−2,4</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section__head"><span class="section__num">13</span><h2 class="section__title">Как подключить и где заводить своё</h2></div>
+      <div class="dsx-two">
+        <div>
+          <div class="field-label">Подключение</div>
+          <pre class="dsx-pre">&lt;link rel="stylesheet" href="dodo-ds.css"&gt;
+&lt;link rel="stylesheet" href="fonts.css"&gt;   Golos Text, IBM Plex Mono
+
+&lt;html data-theme="dark"&gt;                   тёмная тема — атрибутом</pre>
+          <p style="margin:10px 0 0;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Ни один компонент о теме не знает: все читают <code>var(--…)</code>. Для Tailwind 4 нужен мост <code>@theme inline</code> — имена токенов не совпадают с его конвенцией.</p>
+        </div>
+        <div>
+          <div class="field-label">Слой продукта</div>
+          <pre class="dsx-pre">/* static/decimus/domain.css */
+:root {
+  --audit-open:    var(--warn);
+  --audit-fixed:   var(--ok);
+  --audit-overdue: var(--err);
+  --audit-kind-walk: var(--cat-teal);
+}</pre>
+          <p style="margin:10px 0 0;font-size:var(--fs-meta);line-height:var(--lh-meta);color:var(--ink-2)">Можно: назначать доменные токены значениями ядра, добавлять классы своих сущностей, ставить ширину страницы. Нельзя: переопределять токены ядра под свой вкус и писать хексы в компонентах. Разошлись значения — правится ядро, сразу для трёх.</p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1320,&quot;height&quot;:900},&quot;theme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Каталог&quot;},&quot;product&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;MAXIMUS&quot;,&quot;DECIMUS&quot;,&quot;MERIDIUS&quot;],&quot;default&quot;:&quot;DECIMUS&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Каталог&quot;}}">
+const TOKENS = {
+  canvas: '--canvas', surface: '--surface', surface2: '--surface-2', surface3: '--surface-3',
+  surfaceHead: '--surface-head', ink: '--ink', ink2: '--ink-2', ink3: '--ink-3',
+  inkEmpty: '--ink-empty', line: '--line', lineStrong: '--line-strong',
+  lineControl: '--line-control', lineControl2: '--line-control-2',
+  accent: '--accent', accentSoft: '--accent-soft', warn: '--warn', warnMark: '--warn-mark',
+  ok: '--ok', err: '--err', catViolet: '--cat-violet', catTeal: '--cat-teal'
+};
+
+class Component extends DCLogic {
+  state = { theme: 'light', product: 'DECIMUS', v: {} };
+
+  componentDidMount() {
+    this.setState({
+      theme: this.props.theme ?? 'light',
+      product: this.props.product ?? 'DECIMUS'
+    }, this.apply);
+  }
+
+  componentDidUpdate(prev) {
+    if (prev.theme !== this.props.theme && this.props.theme) this.setState({ theme: this.props.theme }, this.apply);
+    if (prev.product !== this.props.product && this.props.product) this.setState({ product: this.props.product });
+  }
+
+  apply = () => {
+    document.documentElement.setAttribute('data-theme', this.state.theme);
+    this.read(0);
+  };
+
+  read = (tries) => {
+    const cs = getComputedStyle(document.documentElement);
+    if (!cs.getPropertyValue('--canvas').trim() && tries < 20) {
+      setTimeout(() => this.read(tries + 1), 100);
+      return;
+    }
+    const v = {};
+    Object.keys(TOKENS).forEach(k => { v[k] = cs.getPropertyValue(TOKENS[k]).trim(); });
+    this.setState({ v });
+  };
+
+  toggleTheme = () => {
+    this.setState(s => ({ theme: s.theme === 'dark' ? 'light' : 'dark' }), this.apply);
+  };
+
+  pick = (p) => () => this.setState({ product: p });
+
+  seg = (p) => this.state.product === p
+    ? { background: 'var(--surface)', color: 'var(--ink)', fontWeight: 'var(--w-semibold)', boxShadow: 'var(--sh-xs)' }
+    : null;
+
+  renderVals() {
+    const p = this.state.product;
+    return {
+      v: this.state.v,
+      markName: p,
+      themeLabel: this.state.theme === 'dark' ? 'Светлая тема' : 'Тёмная тема',
+      toggleTheme: this.toggleTheme,
+      pickMaximus: this.pick('MAXIMUS'),
+      pickDecimus: this.pick('DECIMUS'),
+      pickMeridius: this.pick('MERIDIUS'),
+      segMaximus: this.seg('MAXIMUS'),
+      segDecimus: this.seg('DECIMUS'),
+      segMeridius: this.seg('MERIDIUS')
+    };
+  }
+}
+</script>
+</body>
+</html>

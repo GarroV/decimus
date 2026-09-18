@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E4E4E7;font-family:Manrope,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+a{color:#5B57F2;text-decoration:none}a:hover{color:#4844d6;text-decoration:underline}
+</style>
+</helmet>
+
+<section style="display:flex;flex-direction:column;gap:64px;padding:56px;box-sizing:border-box">
+
+<div style="display:flex;flex-direction:column;gap:12px;max-width:1000px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.16em;text-transform:uppercase;color:#8E8E96">DODO AUDIT SERVICE · ВИЗУАЛ ВЕБ-ЧАСТИ</div>
+<div style="font-family:'Space Grotesk',Manrope;font-size:34px;font-weight:600;letter-spacing:-.03em;color:#121214">Сеть → точка → проверка → запись</div>
+<div style="font-size:15px;line-height:1.6;color:#52525B;text-wrap:pretty">Рабочий инструмент: плотные таблицы, табличные цифры, цвет только на букве оценки и классе нарушения. Каждый ключевой экран — в двух ширинах, с данными. Отдельно: <a href="#partner-vs">партнёрское представление рядом с внутренним</a>, <a href="#edge">пограничные состояния</a>, <a href="#additions">список добавленного сверх задания</a>.</div>
+<div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px;align-items:center;font:600 12px/1 'Space Grotesk',Manrope;color:#52525B">
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#E4F4EC;color:#0E7A51">A</span>≥ 95</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#FBF1DC;color:#8A5D06">B</span>85–94</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#FBE7E2;color:#A63A25">C</span>70–84</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:7px;background:#E0533D;color:#fff">D</span>&lt; 70 или любой D3</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="padding:3px 7px;border-radius:6px;background:#F4F4F5;color:#52525B">D1</span>−0,5 %</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="padding:3px 7px;border-radius:6px;background:#FBF1DC;color:#8A5D06">D2</span>−2 %</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="padding:3px 7px;border-radius:6px;background:#E0533D;color:#fff">D3</span>сжигает долю зоны</span>
+<span style="display:inline-flex;align-items:center;gap:7px;padding:6px 10px;border-radius:10px;background:#fff;border:1px solid #E4E4E7"><span style="width:8px;height:8px;border-radius:50%;background:#5B57F2"></span>предложение модели, не подтверждено</span>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Управляющая компания</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">01 · Обзор сети — «куда смотреть сегодня» · 1280</div>
+<div style="width:1280px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+
+  <div style="display:flex;align-items:center;gap:16px;padding:12px 18px;border-bottom:1px solid #EFEFF1">
+    <div style="font-family:'Space Grotesk',Manrope;font-weight:700;font-size:15px;letter-spacing:-.03em;color:#121214">Audit<span style="color:#5B57F2">.</span></div>
+    <button style="display:flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #E4E4E7;border-radius:10px;background:#fff;font:600 13px/1 Manrope;color:#121214;cursor:pointer" style-hover="background:#F4F4F5">УК «Додо Центр» <span style="color:#8E8E96;font-size:9px">▾</span></button>
+    <div style="display:flex;gap:2px;margin-left:6px">
+      <span style="padding:7px 11px;border-radius:10px;background:#EEEDFE;color:#5B57F2;font:600 13px/1 Manrope">Обзор</span>
+      <span style="padding:7px 11px;border-radius:10px;color:#52525B;font:500 13px/1 Manrope;cursor:pointer" style-hover="background:#F4F4F5">Точки</span>
+      <span style="padding:7px 11px;border-radius:10px;color:#52525B;font:500 13px/1 Manrope;cursor:pointer" style-hover="background:#F4F4F5">Проверки</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:7px 11px;border-radius:10px;color:#52525B;font:500 13px/1 Manrope;cursor:pointer" style-hover="background:#F4F4F5">Предписания <span style="font-family:'Space Grotesk',Manrope;font-weight:600;color:#A63A25">7</span></span>
+      <span style="padding:7px 11px;border-radius:10px;color:#52525B;font:500 13px/1 Manrope;cursor:pointer" style-hover="background:#F4F4F5">Методика</span>
+    </div>
+    <div style="flex:1"></div>
+    <span style="padding:6px 10px;border:1px solid #E4E4E7;border-radius:10px;font:500 12px/1 Manrope;color:#52525B">Сентябрь 2026 ▾</span>
+    <span style="padding:6px 10px;border-radius:10px;font:600 12px/1 Manrope;color:#52525B;background:#F4F4F5">RU</span>
+    <span style="width:28px;height:28px;border-radius:999px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font:600 11px/1 'Space Grotesk',Manrope;color:#5B57F2">ИК</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:320px 1fr;border-bottom:1px solid #EFEFF1">
+    <div style="padding:20px;border-right:1px solid #EFEFF1">
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Средняя оценка сети</div>
+      <div style="display:flex;align-items:baseline;gap:12px;margin-top:10px">
+        <div style="font-family:'Space Grotesk',Manrope;font-size:52px;font-weight:600;letter-spacing:-.04em;line-height:1;color:#121214">88,4</div>
+        <div style="display:inline-flex;align-items:center;gap:5px;padding:4px 8px;border-radius:999px;background:#E4F4EC;font:600 13px/1 'Space Grotesk',Manrope;color:#0E7A51">+1,2</div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:44px;margin-top:18px">
+        <sc-for list="{{ spark }}" as="v" hint-placeholder-count="12"><div style="width:16px;border-radius:4px 4px 0 0;background:#E4E4E7;height:{{ v.h }}" style-hover="background:#C9C9CE"></div></sc-for>
+      </div>
+      <div style="font:500 11px/1.4 Manrope;color:#8E8E96;margin-top:8px">12 месяцев · 34 проверки за период · 30 точек</div>
+    </div>
+    <div style="padding:20px;display:flex;flex-direction:column;gap:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between">
+        <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Буквы по точкам · последняя проверка каждой</div>
+        <span style="font:500 12px/1 Manrope;color:#5B57F2;cursor:pointer">Разложить по зонам</span>
+      </div>
+      <div style="display:flex;height:34px;border-radius:10px;overflow:hidden;gap:2px">
+        <sc-for list="{{ letters }}" as="l" hint-placeholder-count="4">
+          <div style="display:flex;align-items:center;justify-content:center;gap:7px;font:600 13px/1 'Space Grotesk',Manrope;cursor:pointer;flex:{{ l.n }};background:{{ l.bg }};color:{{ l.fg }}">{{ l.k }} <span style="opacity:.7">{{ l.n }}</span></div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1;padding:14px;border-radius:14px;background:#FBE7E2">
+          <div style="font:500 13px/1 Manrope;color:#A63A25">Критические D3</div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin-top:8px"><span style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;line-height:1;color:#A63A25">2</span><span style="font:500 12px/1.3 Manrope;color:#A63A25;opacity:.85">точки · Тверская 18, Мира 14</span></div>
+        </div>
+        <div style="flex:1;padding:14px;border-radius:14px;border:1px solid #E4E4E7">
+          <div style="font:500 13px/1 Manrope;color:#52525B">Предписания просрочены</div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin-top:8px"><span style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;line-height:1;color:#121214">7</span><span style="font:500 12px/1.3 Manrope;color:#8E8E96">из 23 открытых</span></div>
+        </div>
+        <div style="flex:1;padding:14px;border-radius:14px;border:1px solid #E4E4E7">
+          <div style="font:500 13px/1 Manrope;color:#52525B">Ждут подтверждения</div>
+          <div style="display:flex;align-items:baseline;gap:9px;margin-top:8px"><span style="font-family:'Space Grotesk',Manrope;font-size:26px;font-weight:600;line-height:1;color:#121214">4</span><span style="font:500 12px/1.3 Manrope;color:#8E8E96">фото не загружено</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #EFEFF1">
+    <div style="font:600 14px/1 Manrope;color:#121214">Требует внимания сегодня</div>
+    <div style="font:500 12px/1 Manrope;color:#8E8E96">5 поводов · по риску</div>
+    <div style="flex:1"></div>
+    <span style="font:500 12px/1 Manrope;color:#5B57F2;cursor:pointer">Скрыть разобранное</span>
+  </div>
+  <sc-for list="{{ attention }}" as="a" hint-placeholder-count="5">
+    <div style="display:grid;grid-template-columns:20px 1.3fr 2.6fr 150px 128px;gap:16px;align-items:center;padding:13px 18px;border-bottom:1px solid #F4F4F5;font-size:13px" style-hover="background:#FAFAFA">
+      <span style="width:8px;height:8px;border-radius:50%;justify-self:center;background:{{ a.dot }}"></span>
+      <span style="font:600 13px/1.3 Manrope;color:#121214">{{ a.point }}</span>
+      <span style="font:500 13px/1.4 Manrope;color:#52525B">{{ a.what }}</span>
+      <span style="font:500 12px/1 'Space Grotesk',Manrope;color:{{ a.whenColor }}">{{ a.when }}</span>
+      <span style="justify-self:end;padding:7px 12px;border:1px solid #E4E4E7;border-radius:10px;font:600 12px/1 Manrope;color:#121214;cursor:pointer;background:#fff" style-hover="background:#F4F4F5">{{ a.cta }}</span>
+    </div>
+  </sc-for>
+
+  <div style="display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid #EFEFF1">
+    <div style="font:600 14px/1 Manrope;color:#121214">Точки сети</div>
+    <div style="font:500 12px/1 'Space Grotesk',Manrope;color:#8E8E96">30</div>
+    <div style="flex:1"></div>
+    <span style="padding:6px 10px;border:1px solid #E4E4E7;border-radius:10px;font:500 12px/1 Manrope;color:#52525B;cursor:pointer">Буква: все ▾</span>
+    <span style="padding:6px 10px;border:1px solid #E4E4E7;border-radius:10px;font:500 12px/1 Manrope;color:#52525B;cursor:pointer">Город ▾</span>
+    <span style="padding:6px 10px;border:1px solid #E4E4E7;border-radius:10px;font:500 12px/1 Manrope;color:#52525B;cursor:pointer">Экспорт CSV</span>
+  </div>
+  <div style="display:grid;grid-template-columns:2fr 1fr 60px 84px 74px 1.3fr 104px;gap:16px;padding:10px 18px;border-bottom:1px solid #EFEFF1;font:600 10px/1.2 Manrope;letter-spacing:.11em;text-transform:uppercase;color:#8E8E96;background:#FAFAFA">
+    <span>Точка</span><span>Город</span><span style="text-align:right">Буква</span><span style="text-align:right">Оценка</span><span style="text-align:right">Δ</span><span>Худшая зона</span><span style="text-align:right">Проверена</span>
+  </div>
+  <sc-for list="{{ points }}" as="p" hint-placeholder-count="8">
+    <div style="display:grid;grid-template-columns:2fr 1fr 60px 84px 74px 1.3fr 104px;gap:16px;align-items:center;padding:11px 18px;border-bottom:1px solid #F4F4F5;cursor:pointer" style-hover="background:#FAFAFA">
+      <span style="font:600 13px/1.3 Manrope;color:#121214">{{ p.name }}</span>
+      <span style="font:500 13px/1 Manrope;color:#52525B">{{ p.city }}</span>
+      <span style="justify-self:end;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;font:600 13px/1 'Space Grotesk',Manrope;background:{{ p.gbg }};color:{{ p.gfg }}">{{ p.grade }}</span>
+      <span style="justify-self:end;font:500 14px/1 'Space Grotesk',Manrope;color:#121214">{{ p.score }}</span>
+      <span style="justify-self:end;font:500 13px/1 'Space Grotesk',Manrope;color:{{ p.dcol }}">{{ p.delta }}</span>
+      <span style="font:500 12px/1.3 Manrope;color:#52525B">{{ p.worst }}</span>
+      <span style="justify-self:end;font:500 12px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ p.date }}</span>
+    </div>
+  </sc-for>
+  <div style="padding:12px 18px;font:500 12px/1 Manrope;color:#8E8E96">Показано 8 из 30 · <span style="color:#5B57F2;cursor:pointer">показать все</span></div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">01-m · 390</div>
+<div style="width:390px;background:#fff;border:1px solid #E4E4E7;border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 16px 40px -18px rgba(18,18,20,.25)">
+  <div style="display:flex;justify-content:space-between;padding:10px 20px 2px;font:600 12px/1 'Space Grotesk',Manrope;color:#121214"><span>9:41</span><span style="letter-spacing:.1em;color:#8E8E96">▮▮▮</span></div>
+  <div style="display:flex;align-items:center;gap:10px;padding:10px 16px 12px;border-bottom:1px solid #EFEFF1">
+    <div style="font-family:'Space Grotesk',Manrope;font-weight:700;font-size:15px;letter-spacing:-.03em;color:#121214">Audit<span style="color:#5B57F2">.</span></div>
+    <span style="padding:5px 9px;border:1px solid #E4E4E7;border-radius:999px;font:600 12px/1 Manrope;color:#121214">Додо Центр ▾</span>
+    <div style="flex:1"></div>
+    <span style="width:28px;height:28px;border-radius:999px;background:#EEEDFE;display:flex;align-items:center;justify-content:center;font:600 11px/1 'Space Grotesk',Manrope;color:#5B57F2">ИК</span>
+  </div>
+  <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+    <div style="display:flex;align-items:flex-end;justify-content:space-between">
+      <div>
+        <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Средняя по сети</div>
+        <div style="display:flex;align-items:baseline;gap:10px;margin-top:8px"><span style="font-family:'Space Grotesk',Manrope;font-size:44px;font-weight:600;letter-spacing:-.04em;line-height:1;color:#121214">88,4</span><span style="padding:4px 8px;border-radius:999px;background:#E4F4EC;font:600 12px/1 'Space Grotesk',Manrope;color:#0E7A51">+1,2</span></div>
+      </div>
+      <div style="display:flex;align-items:flex-end;gap:3px;height:38px">
+        <sc-for list="{{ spark }}" as="v" hint-placeholder-count="12"><div style="width:9px;border-radius:3px 3px 0 0;background:#E4E4E7;height:{{ v.h }}"></div></sc-for>
+      </div>
+    </div>
+    <div style="display:flex;height:30px;border-radius:10px;overflow:hidden;gap:2px">
+      <sc-for list="{{ letters }}" as="l" hint-placeholder-count="4">
+        <div style="display:flex;align-items:center;justify-content:center;gap:5px;font:600 12px/1 'Space Grotesk',Manrope;flex:{{ l.n }};background:{{ l.bg }};color:{{ l.fg }}">{{ l.k }} <span style="opacity:.7">{{ l.n }}</span></div>
+      </sc-for>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96;padding:6px 0">Требует внимания · 5</div>
+      <sc-for list="{{ attention }}" as="a" hint-placeholder-count="5">
+        <div style="display:flex;gap:12px;align-items:flex-start;padding:13px 0;border-top:1px solid #F4F4F5;min-height:44px">
+          <span style="width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none;background:{{ a.dot }}"></span>
+          <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+            <div style="font:600 14px/1.25 Manrope;color:#121214">{{ a.point }}</div>
+            <div style="font:500 13px/1.35 Manrope;color:#52525B">{{ a.what }}</div>
+            <div style="font:500 12px/1 'Space Grotesk',Manrope;color:{{ a.whenColor }}">{{ a.when }}</div>
+          </div>
+          <span style="padding:9px 12px;border:1px solid #E4E4E7;border-radius:10px;font:600 12px/1 Manrope;color:#121214;flex:none">{{ a.cta }}</span>
+        </div>
+      </sc-for>
+    </div>
+  </div>
+  <div style="display:flex;padding:8px 16px 18px;border-top:1px solid #EFEFF1;background:rgba(255,255,255,.9);backdrop-filter:blur(16px)">
+    <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;border-radius:12px;min-height:44px;background:{{ t.bg }};color:{{ t.fg }};font:600 11px/1 Manrope">{{ t.icon }}<span>{{ t.label }}</span></div>
+    </sc-for>
+  </div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">02 · Карточка точки — что повторяется · 1280</div>
+<div style="width:1280px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:flex-start;gap:20px;padding:18px">
+    <div style="flex:1">
+      <div style="font:500 12px/1 Manrope;color:#8E8E96"><a href="#">Обзор сети</a> / Точка</div>
+      <div style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;letter-spacing:-.03em;color:#121214;margin-top:7px">Тверская 18</div>
+      <div style="font:500 13px/1.4 Manrope;color:#52525B;margin-top:5px">Москва · партнёр Осипов А. · код <span style="font-family:'Space Grotesk',Manrope">MSK-014</span> · 6 проверок за 18 мес.</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:28px">
+      <div><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Последняя</div><div style="display:flex;align-items:center;gap:10px;margin-top:8px"><span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:#E0533D;color:#fff;font:600 16px/1 'Space Grotesk',Manrope">D</span><span style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;line-height:1;color:#121214">71,5</span></div></div>
+      <div><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Открытых предписаний</div><div style="font-family:'Space Grotesk',Manrope;font-size:24px;font-weight:600;line-height:1;color:#A63A25;margin-top:10px">3 <span style="font:500 12px/1 Manrope;color:#8E8E96">· 1 просрочено</span></div></div>
+      <div style="display:flex;gap:8px"><span style="padding:11px 14px;border-radius:14px;background:#5B57F2;color:#fff;font:600 13px/1 Manrope;cursor:pointer">Назначить проверку</span><span style="padding:11px 14px;border-radius:14px;border:1px solid #E4E4E7;font:600 13px/1 Manrope;color:#121214;cursor:pointer">Письмо партнёру</span></div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.15fr 1fr;border-top:1px solid #EFEFF1">
+    <div style="padding:18px;border-right:1px solid #EFEFF1">
+      <div style="display:flex;align-items:center;justify-content:space-between"><div style="font:600 14px/1 Manrope;color:#121214">Динамика по проверкам</div><span style="font:500 12px/1 Manrope;color:#8E8E96">оценка и буква</span></div>
+      <div style="display:flex;align-items:flex-end;gap:14px;height:150px;margin-top:20px;padding-bottom:4px;border-bottom:1px solid #EFEFF1">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="6">
+          <div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:8px;cursor:pointer">
+            <span style="font:600 12px/1 'Space Grotesk',Manrope;color:#121214">{{ h.score }}</span>
+            <div style="width:100%;border-radius:8px 8px 0 0;background:{{ h.bg }};height:{{ h.h }}"></div>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:8px">
+        <sc-for list="{{ history }}" as="h" hint-placeholder-count="6"><div style="flex:1;text-align:center;font:500 11px/1.3 Manrope;color:#8E8E96">{{ h.date }}<div style="font:600 11px/1.4 'Space Grotesk',Manrope;color:{{ h.fg }}">{{ h.grade }}</div></div></sc-for>
+      </div>
+      <div style="margin-top:18px;padding:13px;border-radius:14px;background:#F4F4F5;font:500 13px/1.5 Manrope;color:#52525B">Февральская проверка сделана по версии чек-листа <span style="font-family:'Space Grotesk',Manrope;color:#121214">v3 (12.01.26)</span> — сравнение с текущей v5 частичное: 4 пункта добавлены, 1 снят.</div>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:14px">
+      <div><div style="font:600 14px/1 Manrope;color:#121214">Повторяющиеся нарушения</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:4px">Встречаются ≥ 3 проверок подряд — ценнее разовых</div></div>
+      <div style="display:flex;flex-direction:column">
+        <sc-for list="{{ repeats }}" as="r" hint-placeholder-count="5">
+          <div style="display:grid;grid-template-columns:64px 1fr 96px 60px;gap:12px;align-items:center;padding:11px 0;border-top:1px solid #F4F4F5">
+            <span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ r.code }}</span>
+            <span style="font:500 13px/1.35 Manrope;color:#121214">{{ r.text }}</span>
+            <span style="font:500 12px/1 Manrope;color:#52525B">{{ r.zone }}</span>
+            <span style="justify-self:end;display:flex;gap:3px"><sc-for list="{{ r.marks }}" as="m" hint-placeholder-count="6"><span style="width:8px;height:14px;border-radius:3px;background:{{ m.bg }}"></span></sc-for></span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font:500 12px/1.5 Manrope;color:#8E8E96">Столбики — последние 6 проверок, слева старая. Заполненный = нарушение найдено.</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">02-m · таблица стала карточками · 390</div>
+<div style="width:390px;background:#fff;border:1px solid #E4E4E7;border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 16px 40px -18px rgba(18,18,20,.25)">
+  <div style="display:flex;justify-content:space-between;padding:10px 20px 2px;font:600 12px/1 'Space Grotesk',Manrope;color:#121214"><span>9:41</span><span style="letter-spacing:.1em;color:#8E8E96">▮▮▮</span></div>
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 16px 12px"><span style="font:600 14px/1 Manrope;color:#5B57F2">‹ Сеть</span><div style="flex:1"></div><span style="font:500 13px/1 Manrope;color:#5B57F2">Ещё</span></div>
+  <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:14px">
+    <div>
+      <div style="font-family:'Space Grotesk',Manrope;font-size:22px;font-weight:600;letter-spacing:-.03em;color:#121214">Тверская 18</div>
+      <div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:3px">Москва · MSK-014 · Осипов А.</div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div style="flex:1;padding:13px;border-radius:14px;background:#FBE7E2"><div style="font:500 12px/1 Manrope;color:#A63A25">Последняя</div><div style="display:flex;align-items:center;gap:8px;margin-top:7px"><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:#E0533D;color:#fff;font:600 13px/1 'Space Grotesk',Manrope">D</span><span style="font-family:'Space Grotesk',Manrope;font-size:22px;font-weight:600;line-height:1;color:#A63A25">71,5</span></div></div>
+      <div style="flex:1;padding:13px;border-radius:14px;border:1px solid #E4E4E7"><div style="font:500 12px/1 Manrope;color:#52525B">Предписания</div><div style="font-family:'Space Grotesk',Manrope;font-size:22px;font-weight:600;line-height:1;color:#121214;margin-top:9px">3</div></div>
+    </div>
+    <div style="display:flex;align-items:flex-end;gap:8px;height:74px;padding:14px;border:1px solid #E4E4E7;border-radius:14px">
+      <sc-for list="{{ history }}" as="h" hint-placeholder-count="6"><div style="flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:6px"><span style="font:600 11px/1 'Space Grotesk',Manrope;color:#52525B">{{ h.score }}</span><div style="width:100%;border-radius:5px 5px 0 0;background:{{ h.bg }};height:{{ h.hm }}"></div></div></sc-for>
+    </div>
+    <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Повторяется из раза в раз</div>
+    <sc-for list="{{ repeats }}" as="r" hint-placeholder-count="4">
+      <div style="padding:13px;border:1px solid #E4E4E7;border-radius:14px;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ r.code }} · {{ r.zone }}</span><span style="display:flex;gap:3px"><sc-for list="{{ r.marks }}" as="m" hint-placeholder-count="6"><span style="width:7px;height:13px;border-radius:3px;background:{{ m.bg }}"></span></sc-for></span></div>
+        <div style="font:600 14px/1.3 Manrope;color:#121214">{{ r.text }}</div>
+        <div style="font:500 12px/1 Manrope;color:#8E8E96">{{ r.note }} <span style="color:#5B57F2">Подробнее</span></div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Проверка · внутреннее и партнёрское</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">03 · Проверка целиком · тёмная тема · 1280</div>
+<div style="width:1280px;background:#0B0B0D;border:1px solid #26262A;border-radius:18px;overflow:hidden;box-shadow:0 20px 50px -24px rgba(0,0,0,.6)">
+  <div style="display:flex;align-items:center;gap:14px;padding:14px 18px;border-bottom:1px solid #26262A">
+    <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+      <div style="font:500 12px/1 Manrope;color:#8E8E96">Проверки / Тверская 18 / 14 сентября 2026</div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <span style="font-family:'Space Grotesk',Manrope;font-size:20px;font-weight:600;letter-spacing:-.03em;color:#F4F4F5">Плановая проверка · Тверская 18</span>
+        <span style="display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;background:#1C1C20;border:1px solid #33333A;font:600 11px/1 Manrope;color:#A1A1AA"><span style="width:7px;height:7px;border-radius:50%;background:#8E8AFF"></span>Завершена · заморожена 14.09 18:20</span>
+      </div>
+      <div style="font:500 12px/1 Manrope;color:#8E8E96">Аудитор Ковалёв Д. · чек-лист <span style="font-family:'Space Grotesk',Manrope;color:#D4D4D8">v5 (04.09.26)</span> · язык отчёта RU · 137 пунктов, проверено 137</div>
+    </div>
+    <div style="display:flex;gap:2px;padding:3px;border-radius:12px;background:#1C1C20">
+      <span style="padding:8px 13px;border-radius:10px;background:#8E8AFF;color:#0B0B0D;font:600 13px/1 Manrope">Внутреннее</span>
+      <span style="padding:8px 13px;border-radius:10px;color:#A1A1AA;font:600 13px/1 Manrope;cursor:pointer">Как видит партнёр</span>
+    </div>
+    <span style="padding:11px 14px;border-radius:14px;background:#F4F4F5;color:#121214;font:600 13px/1 Manrope;cursor:pointer">Выгрузить PDF</span>
+    <span style="padding:11px 14px;border-radius:14px;border:1px solid #33333A;color:#D4D4D8;font:600 13px/1 Manrope;cursor:pointer">Отозвать…</span>
+  </div>
+
+  <div style="display:grid;grid-template-columns:400px 1fr">
+    <div style="padding:18px;border-right:1px solid #26262A;display:flex;flex-direction:column;gap:18px">
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:64px;height:64px;border-radius:18px;background:#E0533D;color:#fff;font:600 32px/1 'Space Grotesk',Manrope">D</span>
+        <div>
+          <div style="font-family:'Space Grotesk',Manrope;font-size:40px;font-weight:600;letter-spacing:-.04em;line-height:1;color:#F4F4F5">71,5<span style="font-size:20px;color:#8E8E96"> %</span></div>
+          <div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:6px">Буква D — из-за критического нарушения на кухне, а не из-за суммы вычетов</div>
+        </div>
+      </div>
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Потери по зонам</div><span style="font:500 11px/1 Manrope;color:#8E8AFF;cursor:pointer">Сортировать по потере</span></div>
+        <div style="display:flex;flex-direction:column;margin-top:10px">
+          <sc-for list="{{ zones }}" as="z" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:1fr 46px 58px;gap:10px;align-items:center;padding:8px 0;border-top:1px solid #1C1C20;cursor:pointer">
+              <div style="display:flex;flex-direction:column;gap:5px">
+                <div style="display:flex;align-items:center;gap:7px"><span style="font:500 13px/1 Manrope;color:#F4F4F5">{{ z.name }}</span><span style="font:500 11px/1 Manrope;color:#71717A">{{ z.badge }}</span></div>
+                <div style="height:6px;border-radius:3px;background:#1C1C20;overflow:hidden"><div style="height:6px;border-radius:3px;background:{{ z.bar }};width:{{ z.pct }}"></div></div>
+              </div>
+              <span style="text-align:right;font:500 12px/1 'Space Grotesk',Manrope;color:#71717A">{{ z.share }}</span>
+              <span style="text-align:right;font:600 13px/1 'Space Grotesk',Manrope;color:{{ z.lossColor }}">{{ z.loss }}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:10px 0;border-top:1px solid #33333A;font:600 13px/1 'Space Grotesk',Manrope;color:#F4F4F5"><span style="font-family:Manrope;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#8E8E96">Итого потеряно</span><span style="color:#FF8A73">−28,5</span></div>
+      </div>
+      <div style="padding:14px;border-radius:14px;background:#2A1512;border:1px solid #4A241E">
+        <div style="font:600 13px/1 Manrope;color:#FF8A73">Зона «Кухня» сожжена критическим D3</div>
+        <div style="font:500 12px/1.5 Manrope;color:#D4A79C;margin-top:6px">K-041 — открытая продукция без маркировки. Доля зоны 18 % списана полностью; остальные 6 нарушений кухни попадают в отчёт, но процент повторно не снижают.</div>
+      </div>
+      <div>
+        <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Письмо партнёру</div>
+        <div style="margin-top:10px;padding:14px;border-radius:14px;background:#161618;border:1px solid #26262A">
+          <div style="display:flex;align-items:center;gap:8px"><span style="padding:4px 8px;border-radius:999px;background:#1C1C20;font:600 11px/1 Manrope;color:#A1A1AA">Шаблон «с планом действий»</span><span style="display:inline-flex;align-items:center;gap:5px;font:600 11px/1 Manrope;color:#8E8AFF"><span style="width:7px;height:7px;border-radius:50%;background:#8E8AFF"></span>Черновик модели</span></div>
+          <div style="font:500 13px/1.55 Manrope;color:#D4D4D8;margin-top:10px">Добрый день, Александр. 14 сентября на Тверской 18 прошла плановая проверка. Итог — 71,5 % (D). Ключевое: маркировка открытой продукции на кухне…</div>
+          <div style="display:flex;gap:8px;margin-top:12px"><span style="padding:9px 12px;border-radius:12px;background:#8E8AFF;color:#0B0B0D;font:600 12px/1 Manrope;cursor:pointer">Подтвердить и отправить</span><span style="padding:9px 12px;border-radius:12px;border:1px solid #33333A;color:#D4D4D8;font:600 12px/1 Manrope;cursor:pointer">Править текст</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column">
+      <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #26262A">
+        <div style="font:600 14px/1 Manrope;color:#F4F4F5">Записи</div>
+        <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#8E8E96">19 · влияют на оценку</span>
+        <div style="flex:1"></div>
+        <span style="padding:6px 10px;border-radius:10px;background:#1C1C20;font:600 12px/1 Manrope;color:#D4D4D8;cursor:pointer">Зона: все ▾</span>
+        <span style="padding:6px 10px;border-radius:10px;background:#1C1C20;font:600 12px/1 Manrope;color:#D4D4D8;cursor:pointer">Класс: все ▾</span>
+        <span style="padding:6px 10px;border-radius:10px;background:#1C1C20;font:600 12px/1 Manrope;color:#D4D4D8;cursor:pointer">Только неподтверждённые <span style="font-family:'Space Grotesk',Manrope;color:#8E8AFF">2</span></span>
+      </div>
+      <sc-for list="{{ findings }}" as="f" hint-placeholder-count="5">
+        <div style="display:grid;grid-template-columns:132px 1fr 190px;gap:16px;padding:14px 18px;border-bottom:1px solid #1C1C20" style-hover="background:#121214">
+          <div style="position:relative;height:96px;border-radius:14px;background:repeating-linear-gradient(135deg,#1C1C20 0 8px,#212126 8px 16px);border:1px solid #33333A;display:flex;align-items:flex-end;padding:8px;box-sizing:border-box;cursor:zoom-in">
+            <span style="font:500 10px/1.3 'Space Grotesk',Manrope;color:#71717A">{{ f.photo }}</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:7px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="padding:3px 8px;border-radius:7px;font:600 11px/1 'Space Grotesk',Manrope;background:{{ f.clsBg }};color:{{ f.clsFg }}">{{ f.cls }}</span>
+              <span style="font:500 11px/1 'Space Grotesk',Manrope;color:#71717A">{{ f.code }}</span>
+              <span style="font:500 12px/1 Manrope;color:#A1A1AA">{{ f.zone }}</span>
+              <span style="display:inline-flex;align-items:center;gap:5px;font:600 11px/1 Manrope;color:{{ f.stateFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ f.stateFg }}"></span>{{ f.state }}</span>
+            </div>
+            <div style="font:600 14px/1.4 Manrope;color:#F4F4F5">{{ f.text }}</div>
+            <div style="font:500 12px/1.5 Manrope;color:#8E8E96">{{ f.note }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+            <span style="font:600 13px/1 'Space Grotesk',Manrope;color:{{ f.lossFg }}">{{ f.loss }}</span>
+            <span style="padding:7px 11px;border-radius:10px;border:1px solid #33333A;font:600 12px/1 Manrope;color:#D4D4D8;cursor:pointer">{{ f.action }}</span>
+            <span style="font:500 11px/1 Manrope;color:#71717A">{{ f.author }}</span>
+          </div>
+        </div>
+      </sc-for>
+      <div style="display:flex;align-items:center;gap:10px;padding:13px 18px;border-bottom:1px solid #26262A;background:#121214">
+        <div style="font:600 14px/1 Manrope;color:#F4F4F5">Информационные записи</div>
+        <span style="font:500 12px/1 Manrope;color:#8E8E96">6 · в отчёте есть, на оценку не влияют</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:#1C1C20">
+        <sc-for list="{{ infos }}" as="i" hint-placeholder-count="6">
+          <div style="padding:13px 18px;background:#0B0B0D;display:flex;flex-direction:column;gap:5px">
+            <span style="font:500 11px/1 'Space Grotesk',Manrope;color:#71717A">{{ i.code }}</span>
+            <span style="font:500 13px/1.35 Manrope;color:#D4D4D8">{{ i.text }}</span>
+            <span style="font-family:'Space Grotesk',Manrope;font-size:16px;font-weight:600;color:#F4F4F5">{{ i.value }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="partner-vs" style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">03-p · Партнёрское представление того же отчёта · 780</div>
+<div style="width:780px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="padding:18px;border-bottom:1px solid #EFEFF1;display:flex;align-items:center;gap:14px">
+    <div style="flex:1"><div style="font-family:'Space Grotesk',Manrope;font-size:20px;font-weight:600;letter-spacing:-.03em;color:#121214">Отчёт о проверке · 14 сентября 2026</div><div style="font:500 13px/1.4 Manrope;color:#52525B;margin-top:4px">Тверская 18 · плановая проверка</div></div>
+    <span style="padding:11px 14px;border-radius:14px;background:#5B57F2;color:#fff;font:600 13px/1 Manrope;cursor:pointer">Скачать PDF</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:18px;padding:18px;border-bottom:1px solid #EFEFF1">
+    <span style="display:inline-flex;align-items:center;justify-content:center;width:56px;height:56px;border-radius:16px;background:#E0533D;color:#fff;font:600 28px/1 'Space Grotesk',Manrope">D</span>
+    <div><div style="font-family:'Space Grotesk',Manrope;font-size:32px;font-weight:600;letter-spacing:-.04em;line-height:1;color:#121214">71,5 %</div><div style="font:500 13px/1.4 Manrope;color:#52525B;margin-top:5px">Есть критическое нарушение — его нужно устранить в первую очередь</div></div>
+  </div>
+  <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+    <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Что исправить</div>
+    <sc-for list="{{ partnerItems }}" as="p" hint-placeholder-count="4">
+      <div style="display:grid;grid-template-columns:96px 1fr 132px;gap:14px;align-items:center;padding:13px 0;border-top:1px solid #F4F4F5">
+        <div style="height:64px;border-radius:12px;background:repeating-linear-gradient(135deg,#F4F4F5 0 8px,#EDEDEF 8px 16px);border:1px solid #E4E4E7;cursor:zoom-in"></div>
+        <div><div style="font:600 14px/1.35 Manrope;color:#121214">{{ p.text }}</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:4px">{{ p.zone }} · срок до {{ p.due }}</div></div>
+        <span style="justify-self:end;padding:10px 12px;border-radius:12px;border:1px solid #E4E4E7;font:600 12px/1 Manrope;color:#121214;cursor:pointer;min-height:44px;display:inline-flex;align-items:center">Загрузить фото</span>
+      </div>
+    </sc-for>
+    <div style="margin-top:6px;padding:14px;border-radius:14px;background:#F4F4F5;font:500 13px/1.55 Manrope;color:#52525B">Партнёр не видит: кодов и префиксов классов, весов зон, арифметики вычетов, непроверенных пунктов, служебных комментариев аудитора и статуса «предложение модели».</div>
+  </div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">14 · Второй экран аудитора · мини-апп · 390</div>
+<div style="width:390px;background:#fff;border:1px solid #E4E4E7;border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 16px 40px -18px rgba(18,18,20,.25)">
+  <div style="display:flex;justify-content:space-between;padding:10px 20px 2px;font:600 12px/1 'Space Grotesk',Manrope;color:#121214"><span>9:41</span><span style="letter-spacing:.1em;color:#8E8E96">▮▮▮</span></div>
+  <div style="padding:10px 16px 14px;border-bottom:1px solid #EFEFF1">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font:600 15px/1 Manrope;color:#121214">Тверская 18</span><span style="padding:4px 8px;border-radius:999px;background:#EEEDFE;font:600 11px/1 Manrope;color:#5B57F2">Идёт · 1 ч 12 мин</span></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:12px">
+      <div style="flex:1;height:8px;border-radius:4px;background:#F4F4F5;overflow:hidden"><div style="width:62%;height:8px;background:#5B57F2"></div></div>
+      <span style="font:600 12px/1 'Space Grotesk',Manrope;color:#52525B">85 / 137</span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px">
+      <sc-for list="{{ miniZones }}" as="z" hint-placeholder-count="4"><span style="padding:8px 11px;border-radius:999px;font:600 12px/1 Manrope;white-space:nowrap;background:{{ z.bg }};color:{{ z.fg }};min-height:36px;display:inline-flex;align-items:center">{{ z.label }}</span></sc-for>
+    </div>
+  </div>
+  <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+    <div style="padding:13px;border-radius:14px;background:#FBF1DC;display:flex;gap:10px;align-items:flex-start">
+      <span style="font-family:'Space Grotesk',Manrope;font-weight:600;color:#8A5D06;font-size:13px">12</span>
+      <div style="flex:1"><div style="font:600 13px/1.35 Manrope;color:#8A5D06">В зоне «Кухня» не смотрели 12 пунктов</div><div style="font:500 12px/1.4 Manrope;color:#8A5D06;opacity:.85;margin-top:3px">4 из них требуют фото</div></div>
+      <span style="padding:9px 11px;border-radius:10px;background:#8A5D06;color:#fff;font:600 12px/1 Manrope;min-height:36px;display:inline-flex;align-items:center">Обход</span>
+    </div>
+    <sc-for list="{{ miniRecords }}" as="r" hint-placeholder-count="3">
+      <div style="padding:13px;border:1px solid #E4E4E7;border-radius:14px;display:flex;gap:12px;align-items:flex-start">
+        <div style="width:56px;height:56px;border-radius:12px;background:repeating-linear-gradient(135deg,#F4F4F5 0 8px,#EDEDEF 8px 16px);border:1px solid #E4E4E7;flex:none"></div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:7px"><span style="padding:3px 7px;border-radius:6px;font:600 11px/1 'Space Grotesk',Manrope;background:{{ r.clsBg }};color:{{ r.clsFg }}">{{ r.cls }}</span><span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ r.code }}</span><span style="font:500 11px/1 Manrope;color:#8E8E96">{{ r.zone }}</span></div>
+          <div style="font:600 14px/1.3 Manrope;color:#121214">{{ r.text }}</div>
+          <div style="display:inline-flex;align-items:center;gap:6px;font:600 11px/1 Manrope;color:{{ r.stateFg }}"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.stateFg }}"></span>{{ r.state }}</div>
+        </div>
+      </div>
+    </sc-for>
+    <div style="display:flex;gap:8px">
+      <span style="flex:1;min-height:50px;display:inline-flex;align-items:center;justify-content:center;border-radius:14px;background:#121214;color:#fff;font:600 14px/1 Manrope">Подтвердить все</span>
+      <span style="min-height:50px;display:inline-flex;align-items:center;justify-content:center;padding:0 16px;border-radius:14px;border:1px solid #E4E4E7;font:600 14px/1 Manrope;color:#121214">Завершить</span>
+    </div>
+    <div style="font:500 12px/1.5 Manrope;color:#8E8E96;text-align:center">Завершение заморозит отчёт: пересчёт после правки чек-листа уже не коснётся этой проверки</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Реестр · предписания · события</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">04 · Реестр проверок · 1280</div>
+<div style="width:1280px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:8px;padding:14px 18px;border-bottom:1px solid #EFEFF1;flex-wrap:wrap">
+    <div style="font:600 15px/1 Manrope;color:#121214;margin-right:6px">Проверки</div>
+    <span style="padding:7px 11px;border-radius:10px;border:1px solid #E4E4E7;font:500 12px/1 Manrope;color:#52525B">Точка ▾</span>
+    <span style="padding:7px 11px;border-radius:10px;border:1px solid #E4E4E7;font:500 12px/1 Manrope;color:#52525B">Период: 01.06 – 16.09 ▾</span>
+    <span style="padding:7px 11px;border-radius:10px;border:1px solid #E4E4E7;font:500 12px/1 Manrope;color:#52525B">Вид ▾</span>
+    <span style="padding:7px 11px;border-radius:10px;border:1px solid #E4E4E7;font:500 12px/1 Manrope;color:#52525B">Аудитор ▾</span>
+    <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:10px;background:#EEEDFE;font:600 12px/1 Manrope;color:#5B57F2">Буква: C, D ✕</span>
+    <span style="display:inline-flex;align-items:center;gap:7px;padding:7px 11px;border-radius:10px;background:#EEEDFE;font:600 12px/1 Manrope;color:#5B57F2">Есть D3 ✕</span>
+    <div style="flex:1"></div>
+    <span style="font:500 12px/1 Manrope;color:#5B57F2;cursor:pointer">Сохранить как вид</span>
+  </div>
+  <div style="display:grid;grid-template-columns:96px 1.6fr 1fr 60px 78px 1fr 90px 130px;gap:14px;padding:10px 18px;border-bottom:1px solid #EFEFF1;background:#FAFAFA;font:600 10px/1.2 Manrope;letter-spacing:.11em;text-transform:uppercase;color:#8E8E96">
+    <span>Дата</span><span>Точка</span><span>Вид</span><span style="text-align:right">Буква</span><span style="text-align:right">Оценка</span><span>Аудитор</span><span style="text-align:right">Записей</span><span>Статус</span>
+  </div>
+  <sc-for list="{{ registry }}" as="r" hint-placeholder-count="7">
+    <div style="display:grid;grid-template-columns:96px 1.6fr 1fr 60px 78px 1fr 90px 130px;gap:14px;align-items:center;padding:11px 18px;border-bottom:1px solid #F4F4F5;cursor:pointer;opacity:{{ r.op }}" style-hover="background:#FAFAFA">
+      <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#52525B">{{ r.date }}</span>
+      <span style="font:600 13px/1.3 Manrope;color:#121214">{{ r.point }}</span>
+      <span style="font:500 13px/1 Manrope;color:#52525B">{{ r.kind }}</span>
+      <span style="justify-self:end;display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;font:600 13px/1 'Space Grotesk',Manrope;background:{{ r.gbg }};color:{{ r.gfg }}">{{ r.grade }}</span>
+      <span style="justify-self:end;font:500 14px/1 'Space Grotesk',Manrope;color:#121214">{{ r.score }}</span>
+      <span style="font:500 13px/1 Manrope;color:#52525B">{{ r.auditor }}</span>
+      <span style="justify-self:end;font:500 13px/1 'Space Grotesk',Manrope;color:#52525B">{{ r.records }}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;font:600 11px/1.3 Manrope;color:{{ r.stFg }}"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ r.stFg }}"></span>{{ r.status }}</span>
+    </div>
+  </sc-for>
+  <div style="padding:12px 18px;font:500 12px/1 Manrope;color:#8E8E96">7 проверок по фильтру · из 34 за период</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">04-m · та же таблица · 390</div>
+<div style="width:390px;background:#fff;border:1px solid #E4E4E7;border-radius:24px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 16px 40px -18px rgba(18,18,20,.25)">
+  <div style="padding:14px 16px;border-bottom:1px solid #EFEFF1;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px"><span style="font:600 16px/1 Manrope;color:#121214">Проверки</span><div style="flex:1"></div><span style="padding:8px 11px;border-radius:10px;background:#EEEDFE;font:600 12px/1 Manrope;color:#5B57F2;min-height:36px;display:inline-flex;align-items:center">Фильтры · 2</span></div>
+    <div style="font:500 12px/1.4 Manrope;color:#8E8E96">C, D · есть D3 · 7 из 34</div>
+  </div>
+  <div style="padding:12px 16px;display:flex;flex-direction:column;gap:10px">
+    <sc-for list="{{ registry }}" as="r" hint-placeholder-count="4">
+      <div style="padding:13px;border:1px solid #E4E4E7;border-radius:14px;display:flex;gap:12px;align-items:center;opacity:{{ r.op }}">
+        <span style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:12px;font:600 16px/1 'Space Grotesk',Manrope;flex:none;background:{{ r.gbg }};color:{{ r.gfg }}">{{ r.grade }}</span>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:baseline;gap:8px"><span style="font:600 14px/1.25 Manrope;color:#121214">{{ r.point }}</span><span style="font-family:'Space Grotesk',Manrope;font-size:15px;font-weight:600;color:#121214">{{ r.score }}</span></div>
+          <div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:3px">{{ r.date }} · {{ r.kind }} · {{ r.auditor }}</div>
+          <div style="display:inline-flex;align-items:center;gap:6px;font:600 11px/1 Manrope;color:{{ r.stFg }};margin-top:5px"><span style="width:7px;height:7px;border-radius:50%;background:{{ r.stFg }}"></span>{{ r.status }}</div>
+        </div>
+        <span style="font:600 20px/1 Manrope;color:#C9C9CE;flex:none">›</span>
+      </div>
+    </sc-for>
+    <div style="font:500 12px/1.5 Manrope;color:#8E8E96">Второстепенные колонки — за раскрытием строки; буква и оценка видны сразу. Горизонтальной прокрутки нет.</div>
+  </div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">05 · Предписания и сроки · 760</div>
+<div style="width:760px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EFEFF1">
+    <div style="font:600 15px/1 Manrope;color:#121214">Не исправлено</div>
+    <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#8E8E96">23 предписания · 7 просрочено</span>
+    <div style="flex:1"></div>
+    <span style="padding:7px 11px;border-radius:10px;background:#EEEDFE;font:600 12px/1 Manrope;color:#5B57F2">Группировка: по давности ▾</span>
+  </div>
+  <sc-for list="{{ orders }}" as="o" hint-placeholder-count="6">
+    <div style="display:grid;grid-template-columns:8px 1fr 118px 104px 120px;gap:14px;align-items:center;padding:13px 18px;border-bottom:1px solid #F4F4F5" style-hover="background:#FAFAFA">
+      <span style="width:8px;height:32px;border-radius:4px;background:{{ o.dot }}"></span>
+      <div><div style="font:600 13px/1.35 Manrope;color:#121214">{{ o.text }}</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:3px">{{ o.point }} · {{ o.code }} · {{ o.zone }}</div></div>
+      <span style="font:600 12px/1.3 'Space Grotesk',Manrope;color:{{ o.dueFg }}">{{ o.due }}</span>
+      <span style="font:500 12px/1.3 Manrope;color:#52525B">{{ o.proof }}</span>
+      <span style="justify-self:end;padding:9px 12px;border-radius:12px;border:1px solid #E4E4E7;font:600 12px/1 Manrope;color:#121214;cursor:pointer;background:#fff" style-hover="background:#F4F4F5">{{ o.cta }}</span>
+    </div>
+  </sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">06 · Лента событий · 480</div>
+<div style="width:480px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EFEFF1"><div style="font:600 15px/1 Manrope;color:#121214">События</div><div style="flex:1"></div><span style="font:500 12px/1 Manrope;color:#5B57F2;cursor:pointer">Настроить, что показывать</span></div>
+  <sc-for list="{{ events }}" as="e" hint-placeholder-count="7">
+    <div style="display:flex;gap:12px;padding:13px 18px;border-bottom:1px solid #F4F4F5;align-items:flex-start;opacity:{{ e.op }}" style-hover="background:#FAFAFA">
+      <span style="width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:{{ e.dot }}"></span>
+      <div style="flex:1"><div style="font:600 13px/1.35 Manrope;color:#121214">{{ e.text }}</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:3px">{{ e.meta }}</div></div>
+      <span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96;flex:none;margin-top:2px">{{ e.time }}</span>
+    </div>
+  </sc-for>
+  <div style="padding:12px 18px;font:500 12px/1.5 Manrope;color:#8E8E96">Низкий приоритет («точку давно не проверяли») свёрнут внизу и приглушён.</div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Админка методики</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">07 · Версии чек-листа + диф · 620</div>
+<div style="width:620px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EFEFF1"><div style="font:600 15px/1 Manrope;color:#121214">Версии чек-листа</div><div style="flex:1"></div><span style="padding:9px 12px;border-radius:12px;background:#5B57F2;color:#fff;font:600 12px/1 Manrope;cursor:pointer">Опубликовать v6</span></div>
+  <sc-for list="{{ versions }}" as="v" hint-placeholder-count="4">
+    <div style="display:grid;grid-template-columns:1fr 130px 92px 118px;gap:12px;align-items:center;padding:13px 18px;border-bottom:1px solid #F4F4F5">
+      <div><div style="display:flex;align-items:center;gap:8px"><span style="font:600 13px/1 'Space Grotesk',Manrope;color:#121214">{{ v.name }}</span><span style="padding:3px 8px;border-radius:999px;font:600 11px/1 Manrope;background:{{ v.stBg }};color:{{ v.stFg }}">{{ v.state }}</span></div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:4px">{{ v.meta }}</div></div>
+      <span style="font:500 12px/1.3 Manrope;color:#52525B">{{ v.changes }}</span>
+      <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#52525B">{{ v.used }}</span>
+      <span style="justify-self:end;font:600 12px/1 Manrope;color:#5B57F2;cursor:pointer">{{ v.cta }}</span>
+    </div>
+  </sc-for>
+  <div style="padding:16px 18px;background:#FAFAFA;border-bottom:1px solid #EFEFF1"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Что изменилось: v4 → v5</div></div>
+  <sc-for list="{{ diff }}" as="d" hint-placeholder-count="4">
+    <div style="display:grid;grid-template-columns:22px 66px 1fr;gap:12px;align-items:flex-start;padding:11px 18px;border-bottom:1px solid #F4F4F5">
+      <span style="font:600 14px/1.2 'Space Grotesk',Manrope;color:{{ d.fg }}">{{ d.sign }}</span>
+      <span style="font:500 11px/1.3 'Space Grotesk',Manrope;color:#8E8E96">{{ d.code }}</span>
+      <div><div style="font:500 13px/1.4 Manrope;color:#121214">{{ d.text }}</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:2px">{{ d.note }}</div></div>
+    </div>
+  </sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">08 · Редактор чек-листа · 620</div>
+<div style="width:620px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EFEFF1">
+    <div style="font:600 15px/1 Manrope;color:#121214">Чек-лист</div>
+    <span style="padding:4px 9px;border-radius:999px;background:#EEEDFE;font:600 11px/1 Manrope;color:#5B57F2">черновик v6</span>
+    <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#8E8E96">137 пунктов · 10 зон</span>
+    <div style="flex:1"></div>
+    <span style="padding:6px 10px;border-radius:10px;border:1px solid #E4E4E7;font:600 12px/1 Manrope;color:#121214">RU / EN</span>
+  </div>
+  <div style="display:grid;grid-template-columns:170px 1fr">
+    <div style="border-right:1px solid #EFEFF1;padding:10px 0">
+      <sc-for list="{{ zoneNav }}" as="z" hint-placeholder-count="8">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 16px;font:500 13px/1 Manrope;cursor:pointer;background:{{ z.bg }};color:{{ z.fg }}"><span>{{ z.name }}</span><span style="font-family:'Space Grotesk',Manrope;font-size:12px;color:#8E8E96">{{ z.n }}</span></div>
+      </sc-for>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="padding:5px 9px;border-radius:8px;background:#F4F4F5;font:600 12px/1 'Space Grotesk',Manrope;color:#52525B">K-041</span>
+        <span style="font:500 12px/1 Manrope;color:#8E8E96">код не редактируется</span>
+        <div style="flex:1"></div>
+        <span style="font:600 12px/1 Manrope;color:#A63A25;cursor:pointer">Снять пункт</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Формулировка · RU</div>
+        <div style="padding:12px 13px;border:1px solid #E4E4E7;border-radius:14px;background:#FAFAFA;font:500 14px/1.45 Manrope;color:#121214">Открытая продукция хранится без маркировки со сроком годности</div>
+        <div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96;margin-top:4px">Wording · EN <span style="color:#5B57F2">+31 % длиннее</span></div>
+        <div style="padding:12px 13px;border:1px solid #E4E4E7;border-radius:14px;background:#FAFAFA;font:500 14px/1.45 Manrope;color:#121214">Opened products are stored without a label showing the use-by date</div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:150px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Класс по умолчанию</div><div style="display:flex;gap:4px;margin-top:8px;padding:3px;border-radius:12px;background:#F4F4F5"><span style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font:600 12px/1 'Space Grotesk',Manrope;color:#52525B">D1</span><span style="flex:1;text-align:center;padding:8px 0;border-radius:9px;font:600 12px/1 'Space Grotesk',Manrope;color:#52525B">D2</span><span style="flex:1;text-align:center;padding:8px 0;border-radius:9px;background:#E0533D;color:#fff;font:600 12px/1 'Space Grotesk',Manrope">D3</span></div></div>
+        <div style="flex:1;min-width:150px"><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Обязательное фото</div><div style="display:flex;align-items:center;gap:10px;margin-top:12px"><span style="width:40px;height:24px;border-radius:999px;background:#5B57F2;display:inline-flex;align-items:center;justify-content:flex-end;padding:0 3px;box-sizing:border-box"><span style="width:18px;height:18px;border-radius:50%;background:#fff"></span></span><span style="font:500 13px/1 Manrope;color:#121214">Да · 2 кадра</span></div></div>
+      </div>
+      <div><div style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Критерии класса</div>
+        <sc-for list="{{ criteria }}" as="c" hint-placeholder-count="3">
+          <div style="display:grid;grid-template-columns:44px 1fr;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid #F4F4F5"><span style="padding:3px 7px;border-radius:6px;font:600 11px/1 'Space Grotesk',Manrope;background:{{ c.bg }};color:{{ c.fg }}">{{ c.cls }}</span><span style="font:500 13px/1.45 Manrope;color:#52525B">{{ c.text }}</span></div>
+        </sc-for>
+      </div>
+      <div style="padding:12px 13px;border-radius:14px;background:#FBF1DC;font:500 12px/1.5 Manrope;color:#8A5D06">Правка попадёт в черновик v6. Уже проведённые проверки не пересчитываются — они заморожены на своих версиях.</div>
+    </div>
+  </div>
+</div>
+</div>
+</div>
+
+<div style="display:flex;gap:28px;align-items:flex-start;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">09 · Зоны и доли · 480</div>
+<div style="width:480px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid #EFEFF1"><div style="font:600 15px/1 Manrope;color:#121214">Зоны</div><div style="flex:1"></div><span style="display:inline-flex;align-items:center;gap:7px;padding:5px 10px;border-radius:999px;background:#E4F4EC;font:600 12px/1 'Space Grotesk',Manrope;color:#0E7A51">Сумма 100 %</span></div>
+  <div style="display:grid;grid-template-columns:24px 1fr 1fr 74px 64px;gap:10px;padding:9px 18px;border-bottom:1px solid #EFEFF1;background:#FAFAFA;font:600 10px/1.2 Manrope;letter-spacing:.11em;text-transform:uppercase;color:#8E8E96"><span>#</span><span>RU</span><span>EN</span><span style="text-align:right">Доля</span><span style="text-align:right">Пунктов</span></div>
+  <sc-for list="{{ zoneRows }}" as="z" hint-placeholder-count="10">
+    <div style="display:grid;grid-template-columns:24px 1fr 1fr 74px 64px;gap:10px;align-items:center;padding:10px 18px;border-bottom:1px solid #F4F4F5" style-hover="background:#FAFAFA">
+      <span style="font:500 12px/1 'Space Grotesk',Manrope;color:#C9C9CE;cursor:grab">{{ z.i }}</span>
+      <span style="font:600 13px/1.3 Manrope;color:#121214">{{ z.ru }}</span>
+      <span style="font:500 13px/1.3 Manrope;color:#52525B">{{ z.en }}</span>
+      <span style="justify-self:end;font:600 13px/1 'Space Grotesk',Manrope;color:#121214">{{ z.share }}</span>
+      <span style="justify-self:end;font:500 13px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ z.n }}</span>
+    </div>
+  </sc-for>
+  <div style="padding:12px 18px;font:500 12px/1.5 Manrope;color:#8E8E96">Порядок строк = порядок обхода точки. Перетаскивание меняет и порядок в мини-аппе.</div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">11 · Правила расчёта · заморожено · 380</div>
+<div style="width:380px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="padding:14px 18px;border-bottom:1px solid #EFEFF1;display:flex;align-items:center;gap:10px"><div style="font:600 15px/1 Manrope;color:#121214">Правила расчёта</div><span style="display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;background:#F4F4F5;font:600 11px/1 Manrope;color:#52525B">🔒 Заморожено</span></div>
+  <div style="padding:16px 18px;display:flex;flex-direction:column;gap:12px">
+    <sc-for list="{{ rules }}" as="r" hint-placeholder-count="5">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding-bottom:10px;border-bottom:1px solid #F4F4F5"><span style="font:500 13px/1.4 Manrope;color:#52525B">{{ r.label }}</span><span style="font:600 14px/1 'Space Grotesk',Manrope;color:#121214;white-space:nowrap">{{ r.value }}</span></div>
+    </sc-for>
+    <div style="padding:13px;border-radius:14px;background:#FBE7E2;font:500 12px/1.5 Manrope;color:#A63A25">Методика заморожена решением команды. Правка ставок задним числом не пересчитывает завершённые проверки, но расходится с уже отправленными партнёрам отчётами. Изменение — через запрос на разморозку.</div>
+    <span style="min-height:44px;display:inline-flex;align-items:center;justify-content:center;border-radius:14px;border:1px solid #E4E4E7;font:600 13px/1 Manrope;color:#52525B">Запросить разморозку</span>
+  </div>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">12 · Непокрытые формулировки · 380</div>
+<div style="width:380px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="padding:14px 18px;border-bottom:1px solid #EFEFF1"><div style="font:600 15px/1 Manrope;color:#121214">Модель не привязала к пункту</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:4px">34 фразы за 3 месяца · источник будущих пунктов и синонимов</div></div>
+  <sc-for list="{{ uncovered }}" as="u" hint-placeholder-count="5">
+    <div style="padding:13px 18px;border-bottom:1px solid #F4F4F5;display:flex;flex-direction:column;gap:7px">
+      <div style="font:500 13px/1.45 Manrope;color:#121214">«{{ u.text }}»</div>
+      <div style="display:flex;align-items:center;gap:8px"><span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ u.count }} · {{ u.zone }}</span><div style="flex:1"></div><span style="font:600 12px/1 Manrope;color:#5B57F2;cursor:pointer">В синонимы</span><span style="font:600 12px/1 Manrope;color:#5B57F2;cursor:pointer">Новый пункт</span></div>
+    </div>
+  </sc-for>
+</div>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:10px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.12em;text-transform:uppercase;color:#8E8E96">10 · Карта кадров · 420</div>
+<div style="width:420px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="padding:14px 18px;border-bottom:1px solid #EFEFF1"><div style="font:600 15px/1 Manrope;color:#121214">Карта кадров · Кухня</div><div style="font:500 12px/1.4 Manrope;color:#8E8E96;margin-top:4px">Что снимаем на каком пункте · подсказка уходит в мини-апп</div></div>
+  <div style="padding:16px 18px;display:flex;flex-direction:column;gap:14px">
+    <sc-for list="{{ shots }}" as="s" hint-placeholder-count="3">
+      <div style="display:flex;gap:12px;align-items:flex-start">
+        <div style="width:84px;height:62px;border-radius:12px;background:repeating-linear-gradient(135deg,#F4F4F5 0 8px,#EDEDEF 8px 16px);border:1px solid #E4E4E7;flex:none;display:flex;align-items:flex-end;padding:6px;box-sizing:border-box"><span style="font:500 9px/1.2 'Space Grotesk',Manrope;color:#8E8E96">{{ s.slot }}</span></div>
+        <div style="flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font:500 11px/1 'Space Grotesk',Manrope;color:#8E8E96">{{ s.code }}</span><span style="padding:3px 7px;border-radius:6px;background:#EEEDFE;font:600 10px/1 Manrope;color:#5B57F2">{{ s.req }}</span></div><div style="font:600 13px/1.35 Manrope;color:#121214;margin-top:5px">{{ s.title }}</div><div style="font:500 12px/1.45 Manrope;color:#52525B;margin-top:3px">{{ s.hint }}</div></div>
+      </div>
+    </sc-for>
+  </div>
+</div>
+</div>
+</div>
+
+<div id="edge" style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Пограничные состояния</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="display:grid;grid-template-columns:repeat(3,360px);gap:24px">
+<sc-for list="{{ edges }}" as="e" hint-placeholder-count="6">
+  <div style="background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04)">
+    <div style="padding:11px 16px;border-bottom:1px solid #EFEFF1;display:flex;align-items:center;gap:8px"><span style="font:600 10px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">{{ e.kind }}</span><div style="flex:1"></div><span style="font:500 11px/1 Manrope;color:#C9C9CE">{{ e.screen }}</span></div>
+    <div style="padding:20px 16px;min-height:158px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;justify-content:center;background:{{ e.bg }}">
+      <div style="font:600 15px/1.35 Manrope;color:{{ e.fg }}">{{ e.title }}</div>
+      <div style="font:500 13px/1.5 Manrope;color:#52525B;text-wrap:pretty">{{ e.body }}</div>
+      <div style="display:flex;gap:8px;margin-top:4px"><span style="padding:10px 13px;border-radius:12px;background:#121214;color:#fff;font:600 12px/1 Manrope">{{ e.cta }}</span><span style="padding:10px 13px;border-radius:12px;border:1px solid #E4E4E7;font:600 12px/1 Manrope;color:#52525B">{{ e.cta2 }}</span></div>
+    </div>
+  </div>
+</sc-for>
+</div>
+
+<div id="additions" style="display:flex;align-items:center;gap:14px"><div style="font:700 12px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#121214">Добавлено сверх задания — принять или отклонить</div><div style="flex:1;height:1px;background:#CFCFD4"></div></div>
+
+<div style="width:1040px;background:#fff;border:1px solid #E4E4E7;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(18,18,20,.04),0 6px 20px -10px rgba(18,18,20,.12)">
+  <div style="padding:16px 18px;border-bottom:1px solid #EFEFF1;font:500 13px/1.5 Manrope;color:#52525B">Каждая строка — одно добавление и причина. Ничего из этого нет в брифе; всё видно на экранах выше.</div>
+  <div style="display:grid;grid-template-columns:34px 1.1fr 2fr 130px;gap:14px;padding:10px 18px;border-bottom:1px solid #EFEFF1;background:#FAFAFA;font:600 10px/1.2 Manrope;letter-spacing:.11em;text-transform:uppercase;color:#8E8E96"><span>#</span><span>Что добавил</span><span>Почему — без него нельзя</span><span>Где смотреть</span></div>
+  <sc-for list="{{ additions }}" as="a" hint-placeholder-count="10">
+    <div style="display:grid;grid-template-columns:34px 1.1fr 2fr 130px;gap:14px;align-items:flex-start;padding:13px 18px;border-bottom:1px solid #F4F4F5" style-hover="background:#FAFAFA">
+      <span style="font:500 12px/1.4 'Space Grotesk',Manrope;color:#C9C9CE">{{ a.i }}</span>
+      <span style="font:600 13px/1.4 Manrope;color:#121214">{{ a.what }}</span>
+      <span style="font:500 13px/1.5 Manrope;color:#52525B">{{ a.why }}</span>
+      <span style="font:500 12px/1.4 'Space Grotesk',Manrope;color:#5B57F2">{{ a.where }}</span>
+    </div>
+  </sc-for>
+</div>
+
+<div style="display:flex;flex-direction:column;gap:8px;max-width:1040px;padding-bottom:24px">
+<div style="font:600 11px/1 Manrope;letter-spacing:.14em;text-transform:uppercase;color:#8E8E96">Осознанно не нарисовано</div>
+<div style="font:500 13px/1.6 Manrope;color:#52525B">Планшетная ширина (промежуточная — те же правила перестройки), кабинет партнёра целиком (разметил представление отчёта — <a href="#partner-vs">03-p</a>), администрирование арендаторов и прав, экспорт аналитики в BI. Скажите, что из этого нужно — добавлю следующим проходом.</div>
+</div>
+
+</section>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{}">
+const G = {
+  A: { bg: '#E4F4EC', fg: '#0E7A51' },
+  B: { bg: '#FBF1DC', fg: '#8A5D06' },
+  C: { bg: '#FBE7E2', fg: '#A63A25' },
+  D: { bg: '#E0533D', fg: '#ffffff' },
+};
+const CLS = {
+  D1: { bg: '#F4F4F5', fg: '#52525B' },
+  D2: { bg: '#FBF1DC', fg: '#8A5D06' },
+  D3: { bg: '#E0533D', fg: '#ffffff' },
+};
+const CLS_DARK = {
+  D1: { bg: '#1C1C20', fg: '#A1A1AA' },
+  D2: { bg: '#3A2E12', fg: '#E8C77A' },
+  D3: { bg: '#E0533D', fg: '#ffffff' },
+};
+
+class Component extends DCLogic {
+  renderVals() {
+    const grade = g => ({ gbg: G[g].bg, gfg: G[g].fg });
+    return {
+      spark: [72, 64, 80, 58, 66, 74, 62, 70, 84, 76, 90, 100].map(p => ({ h: p + '%' })),
+
+      letters: [
+        { k: 'A', n: 7, bg: '#E4F4EC', fg: '#0E7A51' },
+        { k: 'B', n: 13, bg: '#FBF1DC', fg: '#8A5D06' },
+        { k: 'C', n: 8, bg: '#FBE7E2', fg: '#A63A25' },
+        { k: 'D', n: 2, bg: '#E0533D', fg: '#ffffff' },
+      ],
+
+      tabs: [
+        { icon: '◱', label: 'Обзор', bg: '#EEEDFE', fg: '#5B57F2' },
+        { icon: '⌂', label: 'Точки', bg: 'transparent', fg: '#8E8E96' },
+        { icon: '≡', label: 'Проверки', bg: 'transparent', fg: '#8E8E96' },
+        { icon: '⏱', label: 'Сроки', bg: 'transparent', fg: '#8E8E96' },
+      ],
+
+      attention: [
+        { dot: '#E0533D', point: 'Тверская 18', what: 'D3 на кухне — маркировка открытой продукции', when: 'проверка 14.09', whenColor: '#A63A25', cta: 'Открыть' },
+        { dot: '#E0533D', point: 'Мира 14', what: 'D3 в морозильной камере, письмо партнёру не отправлено', when: 'висит 2 дня', whenColor: '#A63A25', cta: 'Письмо' },
+        { dot: '#E8A317', point: 'Ленина 3', what: '2 предписания просрочены, подтверждений нет', when: 'срок был 12.09', whenColor: '#8A5D06', cta: 'Напомнить' },
+        { dot: '#E8A317', point: 'Победы 7', what: 'Оценка упала на 11 пунктов за одну проверку', when: '09.09 · C → D', whenColor: '#8A5D06', cta: 'Сравнить' },
+        { dot: '#5B57F2', point: 'Гагарина 21', what: '3 записи модели ждут подтверждения аудитором', when: 'проверка идёт', whenColor: '#5B57F2', cta: 'Проверить' },
+      ],
+
+      points: [
+        { name: 'Тверская 18', city: 'Москва', grade: 'D', ...grade('D'), score: '71,5', delta: '−11,0', dcol: '#A63A25', worst: 'Кухня · сожжена D3', date: '14.09.26' },
+        { name: 'Мира 14', city: 'Казань', grade: 'D', ...grade('D'), score: '74,0', delta: '−4,5', dcol: '#A63A25', worst: 'Морозильная камера', date: '11.09.26' },
+        { name: 'Ленина 3', city: 'Самара', grade: 'C', ...grade('C'), score: '82,5', delta: '+1,5', dcol: '#0E7A51', worst: 'Склад · −6,0', date: '09.09.26' },
+        { name: 'Победы 7', city: 'Москва', grade: 'C', ...grade('C'), score: '79,0', delta: '−3,0', dcol: '#A63A25', worst: 'Зал · −7,5', date: '09.09.26' },
+        { name: 'Гагарина 21', city: 'Уфа', grade: 'B', ...grade('B'), score: '88,5', delta: '+2,0', dcol: '#0E7A51', worst: 'Фасад · −4,0', date: '05.09.26' },
+        { name: 'Невский 102', city: 'Санкт-Петербург', grade: 'B', ...grade('B'), score: '91,0', delta: '+0,5', dcol: '#0E7A51', worst: 'Кухня · −3,5', date: '03.09.26' },
+        { name: 'Садовая 5', city: 'Казань', grade: 'A', ...grade('A'), score: '96,5', delta: '+1,0', dcol: '#0E7A51', worst: 'Зал · −2,0', date: '28.08.26' },
+        { name: 'Ломоносова 9', city: 'Уфа', grade: 'A', ...grade('A'), score: '95,0', delta: '0,0', dcol: '#8E8E96', worst: 'Склад · −2,5', date: '26.08.26' },
+      ],
+
+      history: [
+        { date: 'мар 25', score: '92,0', grade: 'B', fg: '#8A5D06', bg: '#E4E4E7', h: '78%', hm: '62%' },
+        { date: 'июн 25', score: '88,5', grade: 'B', fg: '#8A5D06', bg: '#E4E4E7', h: '70%', hm: '56%' },
+        { date: 'окт 25', score: '85,0', grade: 'B', fg: '#8A5D06', bg: '#E4E4E7', h: '64%', hm: '50%' },
+        { date: 'янв 26', score: '83,5', grade: 'C', fg: '#A63A25', bg: '#E4E4E7', h: '60%', hm: '46%' },
+        { date: 'май 26', score: '82,5', grade: 'C', fg: '#A63A25', bg: '#E4E4E7', h: '58%', hm: '44%' },
+        { date: 'сен 26', score: '71,5', grade: 'D', fg: '#A63A25', bg: '#E0533D', h: '40%', hm: '30%' },
+      ],
+
+      repeats: [
+        { code: 'K-041', text: 'Открытая продукция без маркировки', zone: 'Кухня', note: '5 проверок из 6', marks: [1, 1, 1, 0, 1, 1].map(v => ({ bg: v ? '#E0533D' : '#EFEFF1' })) },
+        { code: 'F-007', text: 'Загрязнённая входная группа', zone: 'Фасад', note: '4 проверки подряд', marks: [0, 1, 1, 1, 1, 1].map(v => ({ bg: v ? '#E8A317' : '#EFEFF1' })) },
+        { code: 'S-018', text: 'Нарушено товарное соседство на складе', zone: 'Склад', note: '4 из 6', marks: [1, 0, 1, 1, 0, 1].map(v => ({ bg: v ? '#E8A317' : '#EFEFF1' })) },
+        { code: 'Z-022', text: 'Стол в зале не убран более 10 минут', zone: 'Зал', note: '3 подряд', marks: [0, 0, 0, 1, 1, 1].map(v => ({ bg: v ? '#E8A317' : '#EFEFF1' })) },
+        { code: 'M-005', text: 'Термометр морозильной камеры не работает', zone: 'Морозильная', note: '3 из 6', marks: [0, 1, 0, 1, 0, 1].map(v => ({ bg: v ? '#E0533D' : '#EFEFF1' })) },
+      ],
+
+      zones: [
+        { name: 'Кухня', badge: 'сожжена D3', share: '18 %', loss: '−18,0', lossColor: '#FF8A73', bar: '#E0533D', pct: '100%' },
+        { name: 'Морозильная камера', badge: '', share: '12 %', loss: '−4,0', lossColor: '#E8C77A', bar: '#E8A317', pct: '33%' },
+        { name: 'Склад', badge: '', share: '12 %', loss: '−3,0', lossColor: '#E8C77A', bar: '#E8A317', pct: '25%' },
+        { name: 'Зал', badge: '', share: '10 %', loss: '−2,0', lossColor: '#A1A1AA', bar: '#52525B', pct: '20%' },
+        { name: 'Фасад', badge: '', share: '10 %', loss: '−1,5', lossColor: '#A1A1AA', bar: '#52525B', pct: '15%' },
+        { name: 'Санузлы', badge: '', share: '10 %', loss: '0,0', lossColor: '#52525B', bar: '#26262A', pct: '0%' },
+        { name: 'Раздача и упаковка', badge: '', share: '9 %', loss: '0,0', lossColor: '#52525B', bar: '#26262A', pct: '0%' },
+        { name: 'Персонал и гигиена', badge: '', share: '8 %', loss: '0,0', lossColor: '#52525B', bar: '#26262A', pct: '0%' },
+        { name: 'Документы', badge: '', share: '6 %', loss: '0,0', lossColor: '#52525B', bar: '#26262A', pct: '0%' },
+        { name: 'Прилегающая территория', badge: '', share: '5 %', loss: '0,0', lossColor: '#52525B', bar: '#26262A', pct: '0%' },
+      ],
+
+      findings: [
+        { photo: '3 кадра', cls: 'D3', clsBg: CLS_DARK.D3.bg, clsFg: CLS_DARK.D3.fg, code: 'K-041', zone: 'Кухня', state: 'Подтверждено аудитором', stateFg: '#4ED08F', text: 'Открытая продукция хранится без маркировки со сроком годности', note: 'Критерий D3: продукция в работе, маркировка отсутствует полностью. Комментарий голосом: «две гастроёмкости на верхней полке».', loss: '−18,0', lossFg: '#FF8A73', action: 'В предписание', author: 'Ковалёв Д. · 12:41' },
+        { photo: '1 кадр', cls: 'D2', clsBg: CLS_DARK.D2.bg, clsFg: CLS_DARK.D2.fg, code: 'M-005', zone: 'Морозильная камера', state: 'Предложение модели', stateFg: '#8E8AFF', text: 'Термометр камеры не отображает температуру', note: 'Модель предложила класс D2 по фото. Формулировка не подтверждена человеком — в отчёт и в оценку не уйдёт до подтверждения.', loss: '−2,0', lossFg: '#E8C77A', action: 'Подтвердить', author: 'модель · ждёт' },
+        { photo: '2 кадра', cls: 'D2', clsBg: CLS_DARK.D2.bg, clsFg: CLS_DARK.D2.fg, code: 'S-018', zone: 'Склад', state: 'Подтверждено аудитором', stateFg: '#4ED08F', text: 'Нарушено товарное соседство: химия рядом с сыпучими', loss: '−2,0', lossFg: '#E8C77A', note: 'Повторяется четвёртую проверку подряд — попадёт в письмо отдельным пунктом.', action: 'В предписание', author: 'Ковалёв Д. · 12:58' },
+        { photo: '1 кадр', cls: 'D1', clsBg: CLS_DARK.D1.bg, clsFg: CLS_DARK.D1.fg, code: 'F-007', zone: 'Фасад', state: 'Подтверждено аудитором', stateFg: '#4ED08F', text: 'Входная группа загрязнена, следы на стекле', note: '', loss: '−0,5', lossFg: '#A1A1AA', action: 'В предписание', author: 'Ковалёв Д. · 11:20' },
+        { photo: '4 кадра', cls: 'D1', clsBg: CLS_DARK.D1.bg, clsFg: CLS_DARK.D1.fg, code: 'Z-022', zone: 'Зал', state: 'Правка формулировки', stateFg: '#8E8AFF', text: 'Стол не убран более 10 минут после гостя', note: 'Аудитор переписал текст модели: было «грязный стол в зале».', loss: '−0,5', lossFg: '#A1A1AA', action: 'История правок', author: 'Ковалёв Д. · 12:10' },
+      ],
+
+      infos: [
+        { code: 'I-101', text: 'Температура печи, конвейер 1', value: '248 °C' },
+        { code: 'I-102', text: 'Время выпечки', value: '6:20' },
+        { code: 'I-110', text: 'Температура морозильной камеры', value: '−17 °C' },
+        { code: 'I-115', text: 'Показания счётчика воды', value: '1 482 м³' },
+        { code: 'I-120', text: 'Настройка тестомеса', value: '4 мин / 2 ск.' },
+        { code: 'I-131', text: 'Количество смен в день проверки', value: '2' },
+      ],
+
+      partnerItems: [
+        { text: 'Маркировать открытую продукцию на кухне со сроком годности', zone: 'Кухня', due: '17.09' },
+        { text: 'Восстановить работу термометра морозильной камеры', zone: 'Морозильная камера', due: '21.09' },
+        { text: 'Разнести химию и сыпучие продукты на складе', zone: 'Склад', due: '21.09' },
+        { text: 'Вымыть входную группу и стекло', zone: 'Фасад', due: '17.09' },
+      ],
+
+      miniZones: [
+        { label: 'Фасад ✓', bg: '#E4F4EC', fg: '#0E7A51' },
+        { label: 'Зал ✓', bg: '#E4F4EC', fg: '#0E7A51' },
+        { label: 'Кухня · 12 осталось', bg: '#FBF1DC', fg: '#8A5D06' },
+        { label: 'Склад', bg: '#F4F4F5', fg: '#52525B' },
+        { label: 'Морозильная', bg: '#F4F4F5', fg: '#52525B' },
+      ],
+
+      miniRecords: [
+        { cls: 'D3', clsBg: CLS.D3.bg, clsFg: CLS.D3.fg, code: 'K-041', zone: 'Кухня', text: 'Открытая продукция без маркировки', state: 'Подтверждено', stateFg: '#0E7A51' },
+        { cls: 'D2', clsBg: CLS.D2.bg, clsFg: CLS.D2.fg, code: 'M-005', zone: 'Морозильная', text: 'Термометр не показывает температуру', state: 'Предложение модели · подтвердить', stateFg: '#5B57F2' },
+        { cls: 'D1', clsBg: CLS.D1.bg, clsFg: CLS.D1.fg, code: 'F-007', zone: 'Фасад', text: 'Загрязнена входная группа', state: 'Подтверждено', stateFg: '#0E7A51' },
+      ],
+
+      registry: [
+        { date: '14.09.26', point: 'Тверская 18', kind: 'Плановая', grade: 'D', ...grade('D'), score: '71,5', auditor: 'Ковалёв Д.', records: '19', status: 'Завершена · заморожена', stFg: '#52525B', op: '1' },
+        { date: '11.09.26', point: 'Мира 14', kind: 'Плановая', grade: 'D', ...grade('D'), score: '74,0', auditor: 'Сафина Л.', records: '22', status: 'Письмо не отправлено', stFg: '#A63A25', op: '1' },
+        { date: '09.09.26', point: 'Победы 7', kind: 'Повторная', grade: 'C', ...grade('C'), score: '79,0', auditor: 'Ковалёв Д.', records: '17', status: 'Завершена · заморожена', stFg: '#52525B', op: '1' },
+        { date: '09.09.26', point: 'Ленина 3', kind: 'Плановая', grade: 'C', ...grade('C'), score: '82,5', auditor: 'Орлов П.', records: '14', status: 'Завершена · заморожена', stFg: '#52525B', op: '1' },
+        { date: '16.09.26', point: 'Гагарина 21', kind: 'Внеплановая', grade: '—', gbg: '#F4F4F5', gfg: '#8E8E96', score: '—', auditor: 'Сафина Л.', records: '8', status: 'Идёт · 1 ч 12 мин', stFg: '#5B57F2', op: '1' },
+        { date: '02.09.26', point: 'Кирова 44', kind: 'Плановая', grade: 'C', ...grade('C'), score: '80,0', auditor: 'Орлов П.', records: '15', status: 'Отозвана · дубль', stFg: '#8E8E96', op: '.55' },
+        { date: '28.08.26', point: 'Мира 14', kind: 'Повторная', grade: 'C', ...grade('C'), score: '78,5', auditor: 'Сафина Л.', records: '20', status: 'Завершена · заморожена', stFg: '#52525B', op: '1' },
+      ],
+
+      orders: [
+        { dot: '#E0533D', text: 'Маркировать открытую продукцию со сроком годности', point: 'Тверская 18', code: 'K-041', zone: 'Кухня', due: 'Просрочено 4 дня', dueFg: '#A63A25', proof: 'Фото не загружено', cta: 'Напомнить' },
+        { dot: '#E0533D', text: 'Восстановить термометр морозильной камеры', point: 'Мира 14', code: 'M-005', zone: 'Морозильная', due: 'Просрочено 2 дня', dueFg: '#A63A25', proof: 'Фото не загружено', cta: 'Напомнить' },
+        { dot: '#E8A317', text: 'Разнести химию и сыпучие продукты', point: 'Ленина 3', code: 'S-018', zone: 'Склад', due: 'Срок сегодня', dueFg: '#8A5D06', proof: '1 фото · на проверке', cta: 'Принять' },
+        { dot: '#E8A317', text: 'Заменить разделочные доски с порезами', point: 'Победы 7', code: 'K-052', zone: 'Кухня', due: 'Через 2 дня', dueFg: '#8A5D06', proof: '2 фото · на проверке', cta: 'Принять' },
+        { dot: '#C9C9CE', text: 'Вымыть входную группу и стекло', point: 'Тверская 18', code: 'F-007', zone: 'Фасад', due: 'Через 5 дней', dueFg: '#52525B', proof: 'Ожидаем', cta: 'Открыть' },
+        { dot: '#C9C9CE', text: 'Обновить график уборки зала', point: 'Невский 102', code: 'Z-030', zone: 'Зал', due: 'Через 9 дней', dueFg: '#52525B', proof: 'Ожидаем', cta: 'Открыть' },
+      ],
+
+      events: [
+        { dot: '#E0533D', text: 'Проверка с D3: Тверская 18', meta: 'Кухня · K-041 · письмо партнёру ждёт подтверждения', time: '14:20', op: '1' },
+        { dot: '#E0533D', text: 'Срок предписания истёк: Мира 14', meta: 'M-005 · подтверждение не загружено', time: '09:00', op: '1' },
+        { dot: '#E8A317', text: 'Срок истекает сегодня: Ленина 3', meta: 'S-018 · загружено 1 фото, нужно решение', time: '08:30', op: '1' },
+        { dot: '#5B57F2', text: 'Опубликована версия чек-листа v5', meta: 'Сафина Л. · 4 пункта добавлено, 1 снят', time: '04.09', op: '1' },
+        { dot: '#C9C9CE', text: 'Отозвана проверка: Кирова 44', meta: 'Орлов П. · причина: дубль записи', time: '02.09', op: '1' },
+        { dot: '#E4E4E7', text: 'Точку давно не проверяли: Садовая 5', meta: '19 дней с последней проверки', time: '01.09', op: '.6' },
+        { dot: '#E4E4E7', text: 'Точку давно не проверяли: Ломоносова 9', meta: '21 день с последней проверки', time: '30.08', op: '.6' },
+      ],
+
+      versions: [
+        { name: 'v6 · черновик', state: 'Черновик', stBg: '#EEEDFE', stFg: '#5B57F2', meta: 'Сафина Л. · правки от 15.09.26', changes: '+2 пункта, 3 правки', used: '—', cta: 'Продолжить' },
+        { name: 'v5 · 04.09.26', state: 'Активная', stBg: '#E4F4EC', stFg: '#0E7A51', meta: 'Сафина Л. · опубликована 04.09.26', changes: '+4, −1, 6 правок', used: '11 проверок', cta: 'Смотреть диф' },
+        { name: 'v4 · 12.06.26', state: 'Заморожена', stBg: '#F4F4F5', stFg: '#52525B', meta: 'Орлов П. · опубликована 12.06.26', changes: '+1, 9 правок', used: '14 проверок', cta: 'Смотреть диф' },
+        { name: 'v3 · 12.01.26', state: 'Заморожена', stBg: '#F4F4F5', stFg: '#52525B', meta: 'Орлов П. · опубликована 12.01.26', changes: 'первая версия +137', used: '9 проверок', cta: 'Смотреть диф' },
+      ],
+
+      diff: [
+        { sign: '+', fg: '#0E7A51', code: 'K-052', text: 'Разделочные доски с порезами и сколами', note: 'Кухня · класс D2 · фото обязательно' },
+        { sign: '+', fg: '#0E7A51', code: 'Z-030', text: 'График уборки зала не заполнен', note: 'Зал · класс D1' },
+        { sign: '~', fg: '#8A5D06', code: 'K-041', text: 'Формулировка уточнена на двух языках', note: 'Было: «продукция без маркировки» · класс не менялся (D3)' },
+        { sign: '−', fg: '#A63A25', code: 'F-012', text: 'Наклейка с режимом работы на двери', note: 'Снят: дублирует F-007 · в старых проверках сохраняется' },
+      ],
+
+      zoneNav: [
+        { name: 'Фасад', n: 11, bg: 'transparent', fg: '#52525B' },
+        { name: 'Прилегающая', n: 7, bg: 'transparent', fg: '#52525B' },
+        { name: 'Зал', n: 16, bg: 'transparent', fg: '#52525B' },
+        { name: 'Санузлы', n: 9, bg: 'transparent', fg: '#52525B' },
+        { name: 'Кухня', n: 34, bg: '#EEEDFE', fg: '#5B57F2' },
+        { name: 'Морозильная', n: 12, bg: 'transparent', fg: '#52525B' },
+        { name: 'Склад', n: 18, bg: 'transparent', fg: '#52525B' },
+        { name: 'Раздача', n: 13, bg: 'transparent', fg: '#52525B' },
+        { name: 'Персонал', n: 11, bg: 'transparent', fg: '#52525B' },
+        { name: 'Документы', n: 6, bg: 'transparent', fg: '#52525B' },
+      ],
+
+      criteria: [
+        { cls: 'D1', bg: CLS.D1.bg, fg: CLS.D1.fg, text: 'Маркировка есть, но заполнена не полностью (нет времени открытия)' },
+        { cls: 'D2', bg: CLS.D2.bg, fg: CLS.D2.fg, text: 'Маркировка отсутствует на закрытой таре в холодильнике' },
+        { cls: 'D3', bg: CLS.D3.bg, fg: CLS.D3.fg, text: 'Продукция в работе полностью без маркировки — сжигает долю зоны' },
+      ],
+
+      zoneRows: [
+        { i: '1', ru: 'Фасад', en: 'Facade', share: '10 %', n: 11 },
+        { i: '2', ru: 'Прилегающая территория', en: 'Surroundings', share: '5 %', n: 7 },
+        { i: '3', ru: 'Зал', en: 'Dining room', share: '10 %', n: 16 },
+        { i: '4', ru: 'Санузлы', en: 'Restrooms', share: '10 %', n: 9 },
+        { i: '5', ru: 'Кухня', en: 'Kitchen', share: '18 %', n: 34 },
+        { i: '6', ru: 'Морозильная камера', en: 'Freezer', share: '12 %', n: 12 },
+        { i: '7', ru: 'Склад', en: 'Storage', share: '12 %', n: 18 },
+        { i: '8', ru: 'Раздача и упаковка', en: 'Dispatch & packaging', share: '9 %', n: 13 },
+        { i: '9', ru: 'Персонал и гигиена', en: 'Staff & hygiene', share: '8 %', n: 11 },
+        { i: '10', ru: 'Документы', en: 'Documents', share: '6 %', n: 6 },
+      ],
+
+      rules: [
+        { label: 'Старт оценки', value: '100 %' },
+        { label: 'Вычет за нарушение D1', value: '−0,5 %' },
+        { label: 'Вычет за нарушение D2', value: '−2 %' },
+        { label: 'Поведение D3', value: 'Сжигает долю зоны' },
+        { label: 'Повторное снижение в сожжённой зоне', value: 'Нет' },
+        { label: 'Пороги букв', value: 'A ≥ 95 · B ≥ 85 · C ≥ 70' },
+        { label: 'Буква D', value: '< 70 или любой D3' },
+      ],
+
+      uncovered: [
+        { text: 'на раздаче нет перчаток у кассира', count: '7 раз', zone: 'предположительно Персонал' },
+        { text: 'в подсобке хранится личная одежда сотрудников', count: '5 раз', zone: 'предположительно Склад' },
+        { text: 'наклейка с QR для отзывов оторвана', count: '4 раза', zone: 'предположительно Зал' },
+        { text: 'вытяжка над печью шумит сильнее обычного', count: '3 раза', zone: 'предположительно Кухня' },
+        { text: 'нет журнала дезинфекции за август', count: '3 раза', zone: 'предположительно Документы' },
+      ],
+
+      shots: [
+        { slot: 'общий план кухни', code: 'K-041', req: '2 кадра · обяз.', title: 'Маркировка открытой продукции', hint: 'Кадр 1 — полка целиком, кадр 2 — крупно этикетка или её отсутствие' },
+        { slot: 'крупно термометр', code: 'M-005', req: '1 кадр · обяз.', title: 'Показания термометра камеры', hint: 'Дисплей должен читаться, без блика от вспышки' },
+        { slot: 'полка склада', code: 'S-018', req: '1 кадр', title: 'Товарное соседство', hint: 'Видно и химию, и продукты в одном кадре' },
+      ],
+
+      edges: [
+        { kind: 'Пусто', screen: 'Обзор сети', bg: '#ffffff', fg: '#121214', title: 'За сентябрь проверок ещё нет', body: 'Средняя по сети считается по завершённым проверкам периода. Расширьте период или назначьте первую проверку.', cta: 'Назначить проверку', cta2: 'Период: 90 дней' },
+        { kind: 'Слишком много', screen: 'Записи проверки', bg: '#ffffff', fg: '#121214', title: '148 записей — лента свёрнута по зонам', body: 'Показываем по 5 записей на зону, остальные раскрываются. Сортировка — по потере процентов, а не по времени.', cta: 'Развернуть кухню', cta2: 'Только D2 и D3' },
+        { kind: 'Ошибка', screen: 'Выгрузка PDF', bg: '#FBE7E2', fg: '#A63A25', title: 'PDF не собрался: 3 фото недоступны', body: 'Отчёт без доказательств отправлять нельзя. Можно собрать PDF без этих записей — они останутся во внутреннем виде.', cta: 'Повторить', cta2: 'Собрать без 3 фото' },
+        { kind: 'Долгая загрузка', screen: 'Карточка точки', bg: '#ffffff', fg: '#121214', title: 'Считаем 6 проверок за 18 месяцев', body: 'Шапка и последняя оценка уже готовы, динамика и повторы дозагружаются. Ничего не прыгает: места зарезервированы.', cta: 'Открыть последнюю', cta2: 'Отменить' },
+        { kind: 'Прав не хватает', screen: 'Правила расчёта', bg: '#ffffff', fg: '#121214', title: 'Только чтение: вы аудитор, не методолог', body: 'Ставки и пороги видны, правка — у роли «методология». Запрос уходит владельцу арендатора с указанием, что хотите изменить.', cta: 'Запросить доступ', cta2: 'Кто может' },
+        { kind: 'Данные устарели', screen: 'Сравнение проверок', bg: '#FBF1DC', fg: '#8A5D06', title: 'Проверки сделаны по разным версиям', body: 'Февральская — v3, сентябрьская — v5. Сравнение по 133 общим пунктам; 4 добавленных и 1 снятый исключены из динамики.', cta: 'Смотреть диф v3→v5', cta2: 'Сравнить как есть' },
+      ],
+
+      additions: [
+        { i: '1', what: '«Требует внимания сегодня» вместо плиток', why: 'Бриф просит ответить «куда смотреть сегодня». Четыре цифры на этот вопрос не отвечают: нужен ранжированный список поводов с действием в строке.', where: 'Экран 01' },
+        { i: '2', what: 'Полоса распределения букв как фильтр', why: 'Без клика по букве из обзора нельзя попасть в список нужных точек — иначе приходится идти в реестр и собирать фильтр руками.', where: 'Экран 01, 04' },
+        { i: '3', what: 'Столбики «повторяется в 6 проверках» у каждого пункта', why: 'Бриф говорит, что повторы ценнее разовых, но не даёт им формы. Без шкалы повтор не отличить от вчерашнего нарушения.', where: 'Экран 02' },
+        { i: '4', what: 'Явный переключатель «Внутреннее / Как видит партнёр»', why: 'Требование «переключение должно быть явным» — реализовано как сегмент в шапке, а не как ссылка «предпросмотр» в меню.', where: 'Экран 03, 03-p' },
+        { i: '5', what: 'Плашка «зона сожжена D3» с объяснением арифметики', why: 'Иначе видно только −18,0 у кухни, и непонятно, почему остальные её нарушения не снижают процент. Логика D3 должна читаться на экране.', where: 'Экран 03' },
+        { i: '6', what: 'Статус записи: предложение модели / подтверждено / правка формулировки + автор и время', why: 'Бриф требует отличать предложение от факта; без автора и времени нельзя разобрать спор «кто это записал».', where: 'Экран 03, 14' },
+        { i: '7', what: 'Кнопка «В предписание» прямо на записи', why: 'Предписания есть как экран, но не сказано, откуда они появляются. Без действия в ленте записей предписание приходится создавать вручную.', where: 'Экран 03 → 05' },
+        { i: '8', what: 'Колонка «подтверждение» и решение «Принять / Напомнить» в предписаниях', why: 'Партнёр грузит фото исправления — кто-то должен его принять или отклонить. Без этого цикл исправления не закрывается.', where: 'Экран 05, 13' },
+        { i: '9', what: 'Версия чек-листа в шапке проверки и предупреждение при сравнении разных версий', why: 'Заморозка требует, чтобы было видно, по какой версии сделана проверка; иначе динамика по точке сравнивает несравнимое.', where: 'Экран 02, 03' },
+        { i: '10', what: 'Диф версий с пометкой «пункт снят, в старых проверках сохраняется»', why: 'Бриф просит показать, что изменилось. Без указания судьбы снятого пункта непонятно, что будет со старыми отчётами.', where: 'Экран 07' },
+        { i: '11', what: 'Индикатор «EN на треть длиннее» в редакторе формулировок', why: 'Требование про длину английских строк проверяется в момент правки, а не после публикации.', where: 'Экран 08' },
+        { i: '12', what: 'Обход «что в этой зоне ещё не смотрели» как жёлтая плашка с числом', why: 'Мини-апп должен вести аудитора по точке; счётчик непроверенного — единственный способ не потерять 12 пунктов кухни на ходу.', where: 'Экран 14' },
+        { i: '13', what: 'Запрос на разморозку методики вместо серых полей', why: 'Методика заморожена, но тупик — плохой экран. Запрос даёт выход, не открывая ручки.', where: 'Экран 11' },
+        { i: '14', what: '«Сохранить как вид» для набора фильтров реестра', why: 'Управляющий смотрит один и тот же срез каждый день (C, D + есть D3); пересборка фильтров вручную — потерянное время.', where: 'Экран 04' },
+        { i: '15', what: 'Явный список того, чего партнёр не видит', why: 'Требование «не показывать внутреннюю кухню» иначе остаётся на честном слове; список делает его проверяемым при приёмке.', where: 'Экран 03-p' },
+      ],
+    };
+  }
+}
+
+</script>
+</body>
+</html>
