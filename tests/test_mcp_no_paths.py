@@ -83,6 +83,10 @@ from src.mcp.rpc import handle
         "version_name": "imf",
     },
     "remove_zone": {"code": "dough", "equal_shares": True, "version_name": "imf"},
+    # Доли — набором и сходящиеся: иначе движок откажет, и успешного ответа
+    # у этого инструмента батарея не увидит (T313).
+    "set_zone_shares": {"shares": {"fridge": 70, "dough": 30}, "version_name": "imf"},
+    "rename_zone": {"code": "fridge", "name_ru": "Шкаф", "version_name": "imf"},
     "publish_checklist_version": {"version": None},
     "photo_cues": {},
     "add_photo_cue": {
@@ -161,6 +165,8 @@ from src.mcp.rpc import handle
     "restore_checklist_item": {"code": "CLN 02"},
     "add_zone": {"code": "тесто", "name_ru": "Тесто"},
     "remove_zone": {"code": "dough", "note": "я" * (MAX_NOTE + 1)},
+    "set_zone_shares": {"shares": {"fridge": 70}},
+    "rename_zone": {"code": "терраса", "name_ru": "Терраса"},
     "photo_cues": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "add_photo_cue": {"section": "Чистата", "phrase": "Пятно", "codes": ["CLN01"]},
     "edit_photo_cue": {"phrase": "Стена в потёках", "codes": ["ZZZ99"]},
