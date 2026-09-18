@@ -13,7 +13,14 @@
   manage.py zone-add --code terrace --name-ru "Терраса" [--name-en "Terrace"] \
                 (--share 5 | --equal-shares)
   manage.py zone-remove terrace (--keep-shares | --equal-shares)
-  manage.py validate                       проверить целостность файлов
+  manage.py zone-share --shares hot_kitchen=20,facade=5,dining=5
+        задать доли названных зон; остальные не трогаются. Доли задаются набором,
+        а не по одной: одна доля в отрыве от остальных разваливает сумму 100%, а
+        такую методику движок считать откажется.
+  manage.py zone-rename hot_kitchen [--name-ru "..."] [--name-en "..."]
+        переименовать зону. Код зоны не трогается никогда: им зона связана с
+        пунктами чек-листа и с записанными проверками.
+  manage.py validate                     проверить целостность файлов
   manage.py import-xlsx файл.xlsx [--keep-zones] [--drop-extra-columns]
         пересобрать чек-лист из выгрузки шаблона IMF (Template_CL). --keep-zones
         сохраняет уже расставленные зоны для вопросов с совпадающей формулировкой.
@@ -425,6 +432,108 @@ def cmd_zone_remove(a):
     сказать_про_доли(p)
 
 
+def разобрать_доли(text):
+    """«код=доля» через запятую → словарь {код: доля}. Непонятое — отказ, не пропуск.
+
+    Набором, а не по одной доле за вызов, потому что доли складываются в 100%:
+    правка одной доли в отрыве от остальных сумму разваливает, и методику с
+    несошедшейся суммой движок считать откажется (T103). Дать управляющей
+    компании назвать новый расклад целиком — единственная форма, в которой
+    правка доли доходит до расчёта.
+    """
+    заданные = {}
+    куски = [x.strip() for x in (text or "").split(",") if x.strip()]
+    if not куски:
+        sys.exit(
+            "Не названо ни одной доли. Ожидается --shares «код=доля» через запятую, "
+            "например --shares hot_kitchen=20,facade=5,dining=5"
+        )
+    for кусок in куски:
+        if кусок.count("=") != 1:
+            sys.exit(f"Доля «{кусок}» не разобрана: ожидается «код=доля», например hot_kitchen=20")
+        код, сырое = (x.strip() for x in кусок.split("="))
+        if not код:
+            sys.exit(f"Доля «{кусок}» не разобрана: не назван код зоны")
+        if код in заданные:
+            sys.exit(
+                f"Зона {код} названа дважды. Какая из двух долей верна — решение управляющей "
+                f"компании, и движок не вправе выбрать за неё"
+            )
+        try:
+            доля = float(сырое)
+        except ValueError:
+            sys.exit(f"Доля «{сырое}» у зоны {код} не число")
+        if доля < 0:
+            sys.exit(f"Доля зоны не может быть отрицательной: {код}={доля:g}")
+        заданные[код] = доля
+    return заданные
+
+
+def зоны_из_файла():
+    """Зоны как они лежат, вместе с чужими колонками, и множество их кодов."""
+    rows = list(csv.DictReader(open(data_path("zones.csv"), encoding="utf-8-sig")))
+    return rows, {(r.get("code") or "").strip() for r in rows}
+
+
+def cmd_zone_share(a):
+    # Доля зоны — вес «где нам важнее», то есть цена ответа, а не оформление.
+    # Поэтому правятся ТОЛЬКО названные зоны: раздать остальное за управляющую
+    # компанию движок не вправе (T112), а промолчать о том, сошлась ли сумма
+    # после правки, значит отдать человеку методику, которую движок не считает.
+    заданные = разобрать_доли(a.shares)
+    rows, zc = зоны_из_файла()
+    неизвестные = sorted(k for k in заданные if k not in zc)
+    if неизвестные:
+        sys.exit(
+            f"Неизвестные зоны: {', '.join(неизвестные)}. Доступны: {', '.join(sorted(zc))}"
+        )
+    d = target_dir(create=True)
+    p = os.path.join(d, "zones.csv")
+    for r in rows:
+        код = (r.get("code") or "").strip()
+        if код in заданные:
+            print(f"зона {код}: доля {r.get('share_pct')} → {заданные[код]:g}%")
+            r["share_pct"] = заданные[код]
+    нетронуто = len(rows) - len(заданные)
+    print(f"долей задано {len(заданные)}, остальные {нетронуто} зон не тронуты")
+    write_csv_rows(p, rows, ZONE_FIELDS)
+    сказать_про_доли(p)
+
+
+def cmd_zone_rename(a):
+    # Переименование меняет имя, но никогда код: кодом зона связана с колонкой
+    # `zones` у пунктов чек-листа, с записанными проверками и с картой слов.
+    # Формулировки переводятся и правятся, коды нет (docs/02-domain.md).
+    названные = {
+        поле: значение
+        for поле, значение in (("name_ru", a.name_ru), ("name_en", a.name_en))
+        if значение is not None
+    }
+    if not названные:
+        sys.exit(
+            "Не названо ни одного имени: --name-ru и/или --name-en. Код зоны переименование "
+            "не трогает — им зона связана с пунктами чек-листа и записанными проверками"
+        )
+    пустые = sorted(поле for поле, значение in названные.items() if not значение.strip())
+    if пустые:
+        sys.exit(
+            f"Пустое имя зоны: {', '.join(пустые)}. Название зоны видит аудитор на обходе и "
+            f"партнёр в отчёте; убрать его переименованием нельзя"
+        )
+    rows, zc = зоны_из_файла()
+    if a.code not in zc:
+        sys.exit(f"Неизвестная зона: {a.code}. Доступны: {', '.join(sorted(zc))}")
+    d = target_dir(create=True)
+    p = os.path.join(d, "zones.csv")
+    for r in rows:
+        if (r.get("code") or "").strip() == a.code:
+            for поле, значение in названные.items():
+                r[поле] = значение.strip()
+    write_csv_rows(p, rows, ZONE_FIELDS)
+    стало = ", ".join(f"{поле}={значение.strip()}" for поле, значение in названные.items())
+    print(f"зона {a.code} переименована: {стало}; код и доля зоны не тронуты")
+
+
 def levels_of(row):
     """Классы пункта из колонки `levels` — множеством, в верхнем регистре."""
     return {x.strip().upper() for x in re.split(r"[;,]", row.get("levels", "")) if x.strip()}
@@ -721,6 +830,12 @@ def main():
     zr.add_argument("--keep-shares", action="store_true", help="доли остальных зон не трогать")
     zr.add_argument("--equal-shares", action="store_true", help="уравнять доли ВСЕХ оставшихся зон на 100/N")
     zr.set_defaults(fn=cmd_zone_remove)
+    zs = s.add_parser("zone-share")
+    zs.add_argument("--shares", required=True, help="доли зон набором: код=доля через запятую")
+    zs.set_defaults(fn=cmd_zone_share)
+    zn = s.add_parser("zone-rename"); zn.add_argument("code")
+    zn.add_argument("--name-ru"); zn.add_argument("--name-en")
+    zn.set_defaults(fn=cmd_zone_rename)
     s.add_parser("backfill-processes").set_defaults(fn=cmd_backfill_processes)
     s.add_parser("validate").set_defaults(fn=cmd_validate)
     im = s.add_parser("import-xlsx"); im.add_argument("path"); im.add_argument("--keep-zones", action="store_true")
