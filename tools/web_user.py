@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import getpass
 import os
+import secrets
 import sys
 from pathlib import Path
 
@@ -84,6 +85,36 @@ def _password() -> str:
     return первый
 
 
+#: Логин учётки стенда. Один и тот же, чтобы человек не гадал, чем входить;
+#: пароль при этом каждый раз новый — постоянный лежал бы в репозитории.
+STAND_LOGIN = "director"
+
+
+def _ensure(tenant: str) -> int:
+    """Учётка стенда: завести, если её нет, и напечатать пароль ОДИН раз.
+
+    Нужно затем, что `make web-up` обязан оставаться одной командой: после
+    T323 стенд без учётки открывается формой входа, войти в которую нечем, и
+    это выглядит как поломка, а не как «учётку заводят руками».
+
+    Пароль делается случайным и печатается на экран, а НЕ кладётся в
+    репозиторий: постоянный пароль стенда — это пароль, известный всем, кто
+    когда-либо видел исходники. Повторный запуск учётку не трогает и пароля не
+    показывает — показать его второй раз нечем, в базе его нет.
+    """
+    if list_accounts(tenant=tenant):
+        print(f"Учётки арендатора {tenant} уже заведены — вход прежний")
+        return 0
+    пароль = secrets.token_urlsafe(12)
+    create_account(STAND_LOGIN, tenant=tenant, password=пароль)
+    print("")
+    print(f"  Учётка стенда: {STAND_LOGIN} / {пароль}")
+    print("  Пароль показан ОДИН раз — в базе его нет, только необратимая свёртка.")
+    print(f'  Забыли — заведите новую: make web-user ARGS="add <логин> --tenant {tenant}"')
+    print("")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="web_user", description="Учётки веб-админки (T323)")
     команды = parser.add_subparsers(dest="command", required=True)
@@ -102,6 +133,7 @@ def main(argv: list[str] | None = None) -> int:
 
     завести = с_арендатором("add", "завести учётку")
     завести.add_argument("login")
+    с_арендатором("ensure", "завести учётку стенда, если её ещё нет")
     с_арендатором("list", "перечислить учётки арендатора")
     отключить = с_арендатором("disable", "отключить учётку")
     отключить.add_argument("login")
@@ -114,6 +146,8 @@ def main(argv: list[str] | None = None) -> int:
             account = create_account(args.login, tenant=tenant, password=_password())
             print(f"Учётка заведена: {account.login} · арендатор {account.tenant}")
             return 0
+        if args.command == "ensure":
+            return _ensure(tenant)
         if args.command == "list":
             строки = list_accounts(tenant=tenant)
             if not строки:
