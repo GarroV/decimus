@@ -163,6 +163,25 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
     )
 
 
+def needs_set_name(composition: Composition) -> bool:
+    """Нужно ли спросить у человека имя набора перед правкой.
+
+    Идентификатор версии составной: имя набора, дата издания и отпечаток данных
+    (D050). У методики, которую никто не издавал, имени нет — она живёт под
+    одним отпечатком, — и хранилище отказывает первой же правке: дата без имени
+    не идентификатор. Имя спрашивается ровно один раз, дальше оно подхватывается
+    из предыдущей версии.
+
+    Найдено живым смоуком: без этого поля конструктор отказывал на первой же
+    правке боевой методики, а человеку с экрана предлагалось назвать аргумент
+    инструмента MCP, которого у него нет.
+    """
+    for версия in composition.versions:
+        if версия.get("version") == composition.latest:
+            return not версия.get("name")
+    return False
+
+
 def latest_version(store: Store) -> str:
     """Самая свежая ЗАПИСАННАЯ версия — та, от которой отсчитывается правка."""
     try:
@@ -267,6 +286,7 @@ def add_item(
     criteria: str | None = None,
     kind: str | None = None,
     note: str | None = None,
+    version_name: str | None = None,
 ) -> Edit:
     """Завести пункт — новой версией методики, а не правкой действующей."""
     try:
@@ -285,6 +305,7 @@ def add_item(
                 criteria=_maybe(criteria),
                 kind=_maybe(kind),
                 note=_signed(author, note),
+                version_name=_maybe(version_name),
             )
         )
     except McpError as отказ:
@@ -306,6 +327,7 @@ def edit_item(
     days: str | None = None,
     criteria: str | None = None,
     note: str | None = None,
+    version_name: str | None = None,
 ) -> Edit:
     """Поправить пункт — новой версией. Меняются только заполненные поля."""
     try:
@@ -323,6 +345,7 @@ def edit_item(
                 days=_days(days),
                 criteria=_maybe(criteria),
                 note=_signed(author, note),
+                version_name=_maybe(version_name),
             )
         )
     except McpError as отказ:
@@ -330,7 +353,13 @@ def edit_item(
 
 
 def disable_item(
-    store: Store, *, tenant: str, author: str, code: str, note: str | None = None
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    note: str | None = None,
+    version_name: str | None = None,
 ) -> Edit:
     """Выключить пункт. Строка остаётся в методике — так видно, что его убрали.
 
@@ -341,7 +370,11 @@ def disable_item(
     try:
         return _edit(
             door.remove_checklist_item(
-                tenant=tenant, store=store, code=code, note=_signed(author, note)
+                tenant=tenant,
+                store=store,
+                code=code,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
             )
         )
     except McpError as отказ:
@@ -349,13 +382,23 @@ def disable_item(
 
 
 def restore_item(
-    store: Store, *, tenant: str, author: str, code: str, note: str | None = None
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    note: str | None = None,
+    version_name: str | None = None,
 ) -> Edit:
     """Включить выключенный пункт обратно — тоже новой версией."""
     try:
         return _edit(
             door.restore_checklist_item(
-                tenant=tenant, store=store, code=code, note=_signed(author, note)
+                tenant=tenant,
+                store=store,
+                code=code,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
             )
         )
     except McpError as отказ:

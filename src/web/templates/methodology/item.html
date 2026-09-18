@@ -111,6 +111,12 @@
         <label class="field-label" for="edit-criteria">{{ t('methodology.field.criteria') }}</label>
         <textarea class="input" id="edit-criteria" name="criteria" rows="4"></textarea>
 
+        {% if needs_name %}
+          <label class="field-label" for="edit-version-name">{{ t('methodology.field.version_name') }}</label>
+          <input class="input" id="edit-version-name" name="version_name" type="text" required>
+          <p class="field-note">{{ t('methodology.field.version_name.hint') }}</p>
+        {% endif %}
+
         <label class="field-label" for="edit-note">{{ t('methodology.field.note') }}</label>
         <input class="input" id="edit-note" name="note" type="text" maxlength="{{ max_note }}">
         <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>
@@ -127,12 +133,14 @@
       <div class="card__body">
         {% if item.get('kind') == 'off' %}
           <form class="row row--tight" method="post" action="/admin/items/{{ item.get('id', '') }}/restore?lang={{ lang }}">
+            {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
             <input class="input grow" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.field.note') }}">
             <button class="btn btn--primary" type="submit">{{ t('methodology.restore.submit') }}</button>
           </form>
         {% else %}
           <p class="field-note">{{ t('methodology.disable.hint') }}</p>
           <form class="row row--tight mt-gap" method="post" action="/admin/items/{{ item.get('id', '') }}/disable?lang={{ lang }}">
+            {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
             <input class="input grow" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.field.note') }}">
             <button class="btn btn--danger" type="submit">{{ t('methodology.disable.submit') }}</button>
           </form>
