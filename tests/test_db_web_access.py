@@ -23,7 +23,7 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.db.errors import AccessError  # noqa: E402
+from src.db.errors import AccessError, EmailTakenError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     ROLE_ADMIN,
     ROLE_AUDITOR,
@@ -437,5 +437,5 @@ def test_две_учётки_с_одной_почтой_у_арендатора_
     create_account("auditor", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
 
-    with pytest.raises(psycopg.errors.UniqueViolation):
+    with pytest.raises(EmailTakenError):
         set_email("auditor", tenant=ТЕНАНТ, email=ПОЧТА)

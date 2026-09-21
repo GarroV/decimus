@@ -40,7 +40,7 @@ from typing import Any
 import psycopg
 
 from .config import check_environment, load_retraction_settings
-from .errors import AccessError, ConfigError
+from .errors import AccessError, ConfigError, EmailTakenError
 from .migrate import admin_dsn
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
@@ -481,7 +481,15 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
     """
     значение = None if email is None else normalize_email(email)
     with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
-        cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+        try:
+            cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+        except psycopg.errors.UniqueViolation as занято:
+            # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
+            # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
+            # там, где была опечатка в логине.
+            raise EmailTakenError(
+                f"почта {значение} уже привязана к другой учётке арендатора {tenant}"
+            ) from занято
         return cur.rowcount > 0
 
 
