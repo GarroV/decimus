@@ -268,7 +268,7 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # перечне по-прежнему нет, и INSERT с UPDATE названы колонками по той же
     # причине — табличный грант раздал бы заодно `password_hash` и `id`.
     "web_users": {
-        "SELECT": {"login", "tenant_code", "disabled_at", "role", "created_at"},
+        "SELECT": {"id", "login", "tenant_code", "disabled_at", "role", "created_at"},
         "INSERT": {"tenant_code", "login", "password_hash", "role"},
         "UPDATE": {"disabled_at", "role"},
     },
