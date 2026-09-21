@@ -152,6 +152,7 @@ async def archive(
     lang: str,
     *,
     allow_missing: bool,
+    report: Path | None = None,
 ) -> None:
     """Отправить завершённую проверку в историю: сама проверка, затем кадры (T123).
 
@@ -212,6 +213,33 @@ async def archive(
     except db.DbError:
         logger.exception("выгрузка кадров проверки чата %s не удалась", chat_id)
         await message.answer(t("finish.photos_not_archived", lang))
+
+    if report is None:
+        return
+
+    # Готовый отчёт уезжает в хранилище (T336, #317). Тот самый файл, что
+    # получил аудитор, а не пересобранный: пересборка дала бы второй документ,
+    # и «что именно у партнёра на руках» снова остался бы без ответа.
+    #
+    # Отказ здесь молчит для аудитора намеренно. Отчёт у него уже есть, история
+    # записана, и сообщение «не сохранился отчёт» на точке значило бы для него
+    # ровно ничего: починить он это не может, а проверка сдана. Цена названа в
+    # журнале, и она настоящая — в админке этой проверки документа не будет.
+    try:
+        data = await asyncio.to_thread(report.read_bytes)
+        stored = await asyncio.to_thread(db.upload_report, inspection_id, data=data)
+    except db.ConfigError as exc:
+        logger.info("отчёт проверки чата %s не выгружается: %s", chat_id, exc)
+    except (db.DbError, OSError):
+        logger.exception("выгрузка отчёта проверки чата %s не удалась", chat_id)
+    else:
+        logger.info(
+            "отчёт проверки %s в хранилище: %s (%d байт%s)",
+            inspection_id,
+            stored.storage_path,
+            stored.size_bytes,
+            ", уже лежал" if stored.already else "",
+        )
 
 
 async def warn_untranslated(message: Message, inspection: domain.Inspection, lang: str) -> None:
@@ -354,7 +382,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
 
         # После отчёта, а не вместо: не собравшееся письмо проверку в истории
         # не отменяет — она завершена ровно тем, что документ уже у аудитора.
-        await archive(message, chat_id, found, lang, allow_missing=allow_missing)
+        await archive(message, chat_id, found, lang, allow_missing=allow_missing, report=pdf)
 
 
 def build_finish_router(store: MaterialStore) -> Router:
