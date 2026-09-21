@@ -1,4 +1,4 @@
-.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -353,6 +353,23 @@ web-user:
 #   make web-unlock ARGS="unlock-address 203.0.113.7 --tenant demo"
 web-unlock:
 	$(VENV)/python tools/web_unlock.py $(ARGS)
+
+# СПРАВОЧНИК ТОЧЕК СЕТИ: загрузка с сайтов стран и заведение руками (T335).
+# География точки (страна кодом ISO, город) появилась миграцией 0017 — до неё
+# база не могла ответить на вопрос «сколько у нас точек в Грузии» вовсе.
+#
+# Загрузка берёт ВИТРИНУ, а не учёт: сайт страны показывает пиццерии, открытые
+# гостю для заказа, и сеть числит больше (131 против 209 у DP IMF на август
+# 2026). Учётным источником станет Partner API, когда будет ключ (#312).
+# Поэтому загрузка ничего не удаляет: точка, пропавшая с витрины на день, не
+# закрыта.
+#
+#   make units ARGS="sites --dry-run"
+#   make units ARGS="sites --country GE --country RS"
+#   make units ARGS="add 'Тбилиси-4' --country GE --city Tbilisi"
+#   make units ARGS="list --country GE"
+units:
+	$(VENV)/python tools/units.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
 # командой: после T323 стенд без учётки встречает формой входа, войти в
