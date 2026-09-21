@@ -141,6 +141,75 @@
   .logout { margin-left: 0; }
 }
 
+/* ── Правка методики (T320) ──────────────────────────────────────
+   Формы состава чек-листа спрятаны под раскрывашку браузера, а не под свой
+   скрипт: у админки нет ни сборщика, ни единой строки JavaScript, и заводить
+   их ради «показать форму» дороже, чем один <details>.
+
+   Раскладка формы — колонкой, как у входа: полей много, и две колонки на
+   узком окне превратились бы в чересполосицу подписей и пояснений. */
+
+.edit {
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-block);
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface);
+}
+
+.edit__summary {
+  cursor: pointer;
+  font-weight: var(--w-semibold);
+}
+
+.form-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  max-width: 640px;
+}
+
+.form-grid .input { width: 100%; }
+.form-grid .field-label { margin-top: var(--space-5); }
+.form-grid .btn { margin-top: var(--space-7); align-self: flex-start; }
+
+/* Критерии приходят разметкой методики — показываем как написаны, не
+   переверстывая: класс нарушения выводится из них дословно. */
+.criteria {
+  margin: var(--space-5) 0 0;
+  white-space: pre-wrap;
+  font-size: var(--fs-dense);
+  line-height: var(--lh-meta);
+  color: var(--ink-2);
+}
+
+/* ── Таблица состава чек-листа ───────────────────────────────────
+   Ядро раскладывает таблицу `table-layout: fixed` и делит ширину поровну.
+   Семи колонкам методики это не подходит вдвойне: формулировке нужна
+   половина ширины, а коду хватает узкой полосы, — и, главное, список зон
+   («fridge,cold_kitchen,hot_kitchen») переносить НЕГДЕ: в нём нет ни одного
+   пробела. Ячейка при этом не обрезается, и текст наезжал на соседнюю
+   колонку — найдено сверкой снимков с эталоном на T320, в обоих языках.
+
+   Поэтому две правки: доли колонок по смыслу и разрешение переносить
+   слитную строку в любом месте. Многоточие вместо переноса здесь было бы
+   хуже: код зоны, обрезанный до «cold_kit…», перестаёт быть кодом. */
+
+.table--methodology { word-break: normal; overflow-wrap: anywhere; }
+.table--methodology th:nth-child(1), .table--methodology td:nth-child(1) { width: 9%; }
+.table--methodology th:nth-child(2), .table--methodology td:nth-child(2) { width: 10%; }
+.table--methodology th:nth-child(3), .table--methodology td:nth-child(3) { width: 12%; }
+.table--methodology th:nth-child(4), .table--methodology td:nth-child(4) { width: 33%; }
+.table--methodology th:nth-child(5), .table--methodology td:nth-child(5) { width: 9%; }
+.table--methodology th:nth-child(6), .table--methodology td:nth-child(6) { width: 18%; }
+.table--methodology th:nth-child(7), .table--methodology td:nth-child(7) { width: 9%; }
+
+/* Карточка пункта: таблица «как пункт записан» — две колонки, имя колонки и
+   значение, и длинные значения там такие же слитные. */
+.table--fields { overflow-wrap: anywhere; }
+.table--fields th:nth-child(1), .table--fields td:nth-child(1) { width: 22%; }
+
+
 /* ── Письмо партнёру: многострочное поле и перечень оговорок ──────
    Ядро знает `.input` ростом в одну строку (`--control-h`) — письмо в
    такое поле не помещается физически. Правило продуктовое: ядро — копия

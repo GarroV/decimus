@@ -27,8 +27,8 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
     ]
 
 
-def test_built_keys_is_only_registry() -> None:
-    assert built_keys() == frozenset({"registry"})
+def test_built_keys_are_the_registry_and_the_methodology() -> None:
+    assert built_keys() == frozenset({"registry", "admin"})
 
 
 def test_keys_and_paths_are_unique_and_paths_are_absolute() -> None:
@@ -48,20 +48,20 @@ def test_section_refuses_an_unknown_key() -> None:
         section("нет-такого")
 
 
-def test_check_registry_accepts_exactly_the_built_section() -> None:
-    check_registry(("registry",))
+def test_check_registry_accepts_exactly_the_built_sections() -> None:
+    check_registry(("registry", "admin"))
 
 
 def test_check_registry_refuses_a_built_section_left_without_a_screen() -> None:
     with pytest.raises(SectionRegistryError, match="registry"):
-        check_registry(())
+        check_registry(("admin",))
 
 
 def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
     with pytest.raises(SectionRegistryError, match="plans"):
-        check_registry(("registry", "plans"))
+        check_registry(("registry", "admin", "plans"))
 
 
 def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
     with pytest.raises(SectionRegistryError, match="выдумка"):
-        check_registry(("выдумка",))
+        check_registry(("registry", "admin", "выдумка"))
