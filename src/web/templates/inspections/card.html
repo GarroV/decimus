@@ -12,8 +12,14 @@
 {% block title %}{{ head.unit_name }}{% endblock %}
 
 {% block body %}
-  <div class="row row--tight">
-    <a class="btn btn--sm btn--ghost" href="/inspections?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+  <div class="row row--tight row--between">
+    <a class="btn btn--sm btn--ghost" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+    {#
+      Письмо — отдельный экран, а не блок здесь. Оно собирается движком в
+      подпроцессе, и карточка, ждущая этой сборки, открывалась бы секундами
+      там, где сейчас открывается сразу.
+    #}
+    <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
   </div>
 
   {% if notice %}
@@ -168,7 +174,7 @@
       <div class="section__head"><h2 class="section__title">{{ t('retract.title') }}</h2></div>
       <div class="card"><div class="card__body">
         <p class="field-note">{{ t('retract.hint') }}</p>
-        <form method="post" action="/inspections/{{ head.id }}/retract?lang={{ lang }}" class="row mt-gap">
+        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/retract') }}?lang={{ lang }}" class="row mt-gap">
           <label class="grow">
             <span class="field-label">{{ t('retract.reason_label') }}</span>
             <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">

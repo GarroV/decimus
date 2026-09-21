@@ -15,8 +15,18 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from src.report.letters import (
+    BLANK_TEXT_FIELD,
+    COVER_FIELDS,
+    FINDING_TEXT_FIELD,
+    FROM_LIVE,
+    FROM_SHELF,
+    FROM_SNAPSHOT,
+    PLAN_DUE_FIELD,
+)
+
 from .errors import WebTextError
-from .texts import UI_LANGS
+from .texts import UI_LANGS, t
 
 #: Буква оценки → тон метки `forma`. Буквы приходят из движка (`data/scoring.json`),
 #: и неизвестная буква получает нейтральный тон, а не пропадает с экрана:
@@ -118,3 +128,47 @@ def _as_text(value: object) -> str:
     if value is None:
         return "—"
     return str(value)
+
+
+#: Что сборщик письма не восстановил → ключ подписи в словаре интерфейса.
+#:
+#: Ключи словаря берутся ИЗ САМИХ констант сборщика, а не переписаны строками:
+#: перечень невосстановленного — его язык, и переписанная копия разошлась бы с
+#: ним при первом же переименовании, оставив экран молчать ровно о том, о чём
+#: он обязан говорить.
+_LETTER_CAVEATS = {
+    **{поле: f"letter.caveat.cover.{поле}" for поле in COVER_FIELDS},
+    PLAN_DUE_FIELD: "letter.caveat.plan_due",
+    FINDING_TEXT_FIELD: "letter.caveat.speech_lang",
+    BLANK_TEXT_FIELD: "letter.caveat.blank",
+}
+
+#: Откуда взята методика письма → ключ подписи. Сборщик отвечает на это
+#: по-английски (строка написана для инструмента модели), а на экране рядом с
+#: русскими подписями это был бы чужой язык посреди страницы.
+_LETTER_SOURCES = {
+    FROM_SNAPSHOT: "letter.source.snapshot",
+    FROM_LIVE: "letter.source.live",
+    FROM_SHELF: "letter.source.shelf",
+}
+
+
+def letter_caveats(codes: tuple[str, ...], lang: str) -> tuple[str, ...]:
+    """Перечень невосстановленного — словами языка интерфейса.
+
+    Незнакомый код показывается как есть, а не пропадает. Пропажа здесь стоит
+    дороже некрасивой строки: каждый такой код — причина, по которой письмо
+    нельзя отправлять, и молчание о ней вернуло бы экран к виду «всё хорошо».
+    """
+    return tuple(_letter_word(код, lang) for код in codes)
+
+
+def _letter_word(code: str, lang: str) -> str:
+    ключ = _LETTER_CAVEATS.get(code)
+    return code if ключ is None else t(ключ, lang)
+
+
+def letter_source(source: str, lang: str) -> str:
+    """Откуда взята методика письма — словами. Незнакомое — как есть."""
+    ключ = _LETTER_SOURCES.get(source)
+    return source if ключ is None else t(ключ, lang)

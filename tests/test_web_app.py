@@ -449,3 +449,25 @@ def test_отказ_снятия_показан_на_карточке_а_не_п
     assert "OperationalError" in страница
     for след in ("host=", "port=", "dbname=", "user=", "postgresql://"):
         assert след not in страница, след
+
+
+def test_ссылки_страницы_собираются_с_путём_общего_входа(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Под чужим корнем кнопки ведут к админке, а не в корень площадки.
+
+    Снаружи админка живёт под путём общего входа (`WEB_URL_PREFIX`, T324), и
+    путь этот приходит в `SCRIPT_NAME`. Ссылка, собранная без него, открывает
+    корень площадки — то есть соседний продукт: страница при этом выглядит
+    рабочей, и промах виден только по нажатию.
+
+    Проверено на живой поломке: до этой правки шаблоны писали `/inspections`
+    строкой, и снаружи первая же кнопка реестра уводила с админки.
+    """
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((шапка(),), True))
+
+    ответ = стенд.get("/inspections", base_url="http://localhost/audit/")
+
+    разметка = ответ.get_data(as_text=True)
+    assert 'href="/audit/inspections' in разметка
+    assert 'href="/inspections' not in разметка
