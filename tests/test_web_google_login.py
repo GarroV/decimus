@@ -33,13 +33,14 @@ class Обмен:
     def __init__(self, почта: str = ПОЧТА_СВОЯ, срывается: bool = False) -> None:
         self.почта = почта
         self.срывается = срывается
+        self.подтверждена = True
         self.звали = 0
 
     def __call__(self, settings: GoogleSettings, *, code: str) -> GoogleIdentity:
         self.звали += 1
         if self.срывается:
             raise GoogleAuthError("двойник: Google отказал")
-        return GoogleIdentity(email=self.почта, email_verified=True)
+        return GoogleIdentity(email=self.почта, email_verified=self.подтверждена)
 
 
 @pytest.fixture
@@ -172,3 +173,21 @@ def test_метка_одноразовая(клиент: FlaskClient, обмен
     второй = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
 
     assert второй.status_code == 401
+
+
+def test_неподтверждённая_почта_не_пускает_даже_со_знакомым_адресом(
+    клиент: FlaskClient, обмен: Обмен
+) -> None:
+    """Заслон продублирован в маршруте: первый стоит в разборе токена.
+
+    Дубль не лишний — `GoogleIdentity` несёт признак с собой, и маршрут,
+    который его не смотрит, пропустил бы неподтверждённую почту, приди она
+    любым другим путём.
+    """
+    обмен.подтверждена = False
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 401
+    assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
