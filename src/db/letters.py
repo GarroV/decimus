@@ -30,7 +30,7 @@ returning id, created_at
 _SELECT_LATEST_SQL = """
 select id, body, lang, saved_by, created_at
 from partner_letters
-where inspection_id = %s
+where inspection_id = %s and (%s::text is null or lang = %s)
 order by created_at desc, id desc
 limit 1
 """
@@ -91,17 +91,23 @@ def save_letter(inspection_id: str, *, body: str, lang: str, saved_by: str) -> S
     return SavedLetter(id=str(row[0]), body=body, lang=lang, saved_by=saved_by, created_at=row[1])
 
 
-def latest_letter(inspection_id: str) -> SavedLetter | None:
+def latest_letter(inspection_id: str, *, lang: str | None = None) -> SavedLetter | None:
     """Последнее зафиксированное письмо проверки — или `None`, если его нет.
 
     `None` означает ровно «никто ничего не фиксировал», а не «письма не
     существует»: заготовку по-прежнему соберёт движок. Различать эти два случая
     обязан тот, кто показывает письмо человеку, — иначе экран выдаст заготовку
     за отправленное.
+
+    `lang` спрашивает письмо НА КОНКРЕТНОМ языке, и это не удобство. Письмо
+    партнёру другой страны пишется на его языке, и зафиксированное русское для
+    сербского партнёра — не «то же письмо, но переведут потом», а чужой текст.
+    Без этого отбора переключатель языка на экране показывал бы сохранённое
+    русское под видом сербского.
     """
     settings = check_environment()
     with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_LATEST_SQL, (inspection_id,))
+        cur.execute(_SELECT_LATEST_SQL, (inspection_id, lang, lang))
         row = cur.fetchone()
 
     if row is None:

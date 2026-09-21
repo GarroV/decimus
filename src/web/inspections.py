@@ -189,7 +189,9 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
 RETRACTION_URL_VAR = DATABASE_RETRACTION_URL_VAR
 
 
-def saved_letter(inspection_id: str) -> letters_store.SavedLetter | None:
+def saved_letter(
+    inspection_id: str, *, lang: str | None = None
+) -> letters_store.SavedLetter | None:
     """Зафиксированное письмо этой проверки — или `None`, если его не фиксировали.
 
     Разница с `load_letter` не в источнике, а в смысле. `load_letter` собирает
@@ -201,7 +203,7 @@ def saved_letter(inspection_id: str) -> letters_store.SavedLetter | None:
     текст, и выдать за него сегодняшнюю заготовку значит ответить на вопрос
     «что мы отправили» правдоподобной неправдой.
     """
-    return letters_store.latest_letter(inspection_id)
+    return letters_store.latest_letter(inspection_id, lang=lang)
 
 
 def remember_letter(

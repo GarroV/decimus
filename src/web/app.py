@@ -180,7 +180,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # стенда) страница честно говорит, что сохранённое сейчас неизвестно, и
         # показывает заготовку.
         try:
-            записанное = data.saved_letter(inspection_id)
+            записанное = data.saved_letter(
+                inspection_id, lang=письмо_на or detail.inspection.report_lang
+            )
             сохранённое_известно = True
         except DbError:
             записанное = None
