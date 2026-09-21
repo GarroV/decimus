@@ -122,7 +122,7 @@ _CHANGE_PASSWORD_SQL = """
        set password_hash = %s
      where tenant_code = %s and login = %s and disabled_at is null
  returning id
-"""
+"""  # noqa: S105 — это текст ЗАПРОСА, а не пароль
 
 _CLOSE_USER_SESSIONS_SQL = """
     update web_sessions

@@ -11,10 +11,10 @@ from collections.abc import Iterator
 
 import pytest
 from flask.testing import FlaskClient
+from web_harness import Сессия, Учётка, подменить_двери, собрать
 
 from src.web import auth
 from src.web.google_auth import GoogleAuthError, GoogleIdentity, GoogleSettings
-from web_harness import ТОКЕН, Сессия, Учётка, подменить_двери, собрать
 
 ТЕНАНТ = "rs"
 ПОЧТА_СВОЯ = "director@dodobrands.io"

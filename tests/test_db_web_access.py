@@ -25,22 +25,22 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import AccessError, EmailTakenError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
-    change_password,
     ROLE_ADMIN,
     ROLE_AUDITOR,
     SESSION_TTL,
     authenticate,
+    change_password,
     close_session,
     create_account,
     disable_account,
+    find_by_email,
     list_accounts,
     new_session_token,
+    normalize_email,
     open_session,
     password_hash,
     resolve_session,
     session_fingerprint,
-    find_by_email,
-    normalize_email,
     set_email,
     set_role,
 )
