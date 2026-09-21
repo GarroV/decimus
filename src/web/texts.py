@@ -244,6 +244,123 @@ TEXTS: dict[str, dict[str, str]] = {
             "is issued for it. A new inspection of the unit is required."
         ),
     },
+    # --- письмо партнёру (T321) --------------------------------------------
+    #
+    # «Собралось» и «можно отправлять» разведены намеренно и в текстах тоже:
+    # письмо с пустой шапкой или подставленным сроком выглядит законченным,
+    # и человеку надо сказать это словами, а не оставить сверять глазами.
+    "letter.title": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    "letter.open": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    "letter.lead": {
+        "ru": (
+            "Письмо собирается заново по этой проверке и по методике той версии, "
+            "которой она помечена. В системе оно не хранится: отправляет его человек "
+            "из почты."
+        ),
+        "en": (
+            "The letter is rebuilt from this inspection on the methodology version it "
+            "was scored by. It is not stored in the system: a human sends it from mail."
+        ),
+    },
+    "letter.back": {"ru": "К карточке проверки", "en": "Back to the inspection"},
+    "letter.meta.lang": {"ru": "Язык письма", "en": "Letter language"},
+    "letter.lang.pick": {"ru": "Собрать письмо на языке", "en": "Build the letter in"},
+    "letter.lang.note": {
+        "ru": (
+            "По умолчанию — язык отчёта этой проверки. Формулировки находок движок "
+            "не переводит ни на каком языке письма: это слова аудитора."
+        ),
+        "en": (
+            "Defaults to this inspection's report language. The engine translates no "
+            "finding wordings in any letter language: they are the auditor's own words."
+        ),
+    },
+    "letter.meta.source": {"ru": "Методика", "en": "Methodology"},
+    "letter.meta.score": {"ru": "Оценка сошлась с записанной", "en": "Score matches the record"},
+    "letter.source.snapshot": {
+        "ru": "снимок той версии, по которой считалась проверка",
+        "en": "snapshot of the version this inspection was scored by",
+    },
+    "letter.source.live": {
+        "ru": "боевая методика — это ровно та версия",
+        "en": "live methodology, which is that exact version",
+    },
+    "letter.source.shelf": {
+        "ru": "снимок, отложенный ботом на старте проверки",
+        "en": "snapshot the bot kept when this inspection was started",
+    },
+    "letter.ready.title": {"ru": "Письмо готово к отправке", "en": "Ready to send"},
+    "letter.ready.text": {
+        "ru": "Оценка, посчитанная движком заново, совпала с записанной в базе.",
+        "en": "The score the engine recomputed matches the one recorded.",
+    },
+    "letter.caveats.title": {
+        "ru": "Отправлять как есть нельзя",
+        "en": "Not ready to send as it stands",
+    },
+    "letter.caveats.lead": {
+        "ru": (
+            "Письмо собрано, и оценка в нём верна, но восстановилось не всё. "
+            "По виду письма это не заметно — поэтому названо здесь:"
+        ),
+        "en": (
+            "The letter is built and its score is correct, but not everything was "
+            "restored. The letter itself does not show it — hence the list:"
+        ),
+    },
+    "letter.caveat.cover.auditor": {
+        "ru": "не восстановлено имя аудитора",
+        "en": "auditor name not restored",
+    },
+    "letter.caveat.cover.city": {"ru": "не восстановлен город", "en": "city not restored"},
+    "letter.caveat.cover.partner": {"ru": "не восстановлен партнёр", "en": "partner not restored"},
+    "letter.caveat.cover.contact": {"ru": "не восстановлен контакт", "en": "contact not restored"},
+    "letter.caveat.plan_due": {
+        "ru": (
+            "срок плана действий в письме подставлен расчётом, а не взят из ответа "
+            "аудитора — партнёр может получить не тот срок, что у него на руках"
+        ),
+        "en": (
+            "the action plan deadline is computed, not taken from the auditor's answer "
+            "— the partner may get a deadline different from the one they hold"
+        ),
+    },
+    "letter.caveat.speech_lang": {
+        "ru": (
+            "часть формулировок напечатана на языке речи аудитора: их не переводит "
+            "никто, это его слова"
+        ),
+        "en": (
+            "some wordings are printed in the auditor's speech language: nobody "
+            "translates them, they are the auditor's own words"
+        ),
+    },
+    "letter.caveat.blank": {
+        "ru": (
+            "у части находок формулировки нет ни на одном языке — движок называет "
+            "пункт пунктом, и дописать слова может только аудитор"
+        ),
+        "en": (
+            "some findings have no wording in any language — the engine names the item "
+            "instead, and only the auditor can supply the words"
+        ),
+    },
+    "letter.failed.title": {
+        "ru": "Письмо собрать не удалось",
+        "en": "The letter could not be built",
+    },
+    "letter.edit.label": {"ru": "Текст письма", "en": "Letter text"},
+    "letter.edit.hint": {
+        "ru": (
+            "Правки здесь никуда не сохраняются — письмо каждый раз собирается заново. "
+            "Поправьте и выгрузите файл либо скопируйте текст в почту."
+        ),
+        "en": (
+            "Edits here are not stored — the letter is rebuilt every time. Adjust it and "
+            "download the file, or copy the text into mail."
+        ),
+    },
+    "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
     # --- отказы ------------------------------------------------------------
     "error.db.title": {"ru": "База недоступна", "en": "The database is unavailable"},
     "error.db.text": {

@@ -49,7 +49,7 @@
                 <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
               </td>
               <td class="is-text">
-                <a href="/inspections/{{ row.id }}?lang={{ lang }}">{{ row.unit_name }}</a>
+                <a href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">{{ row.unit_name }}</a>
                 <div class="meta">{% if row.city %}{{ row.city }} · {% endif %}{{ t('registry.checklist', version=row.checklist_version) }}</div>
               </td>
               <td class="is-num">{{ row.pct }}</td>

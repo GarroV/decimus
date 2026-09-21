@@ -180,6 +180,8 @@ home
 registry
 card
 do_retract
+letter
+export_letter
 _db_down
 _not_found
 
