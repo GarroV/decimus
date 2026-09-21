@@ -4,7 +4,7 @@
 {% block title %}{{ t('card.not_found.title') }}{% endblock %}
 {% block body %}
   <div class="row row--tight">
-    <a class="btn btn--sm btn--ghost" href="/inspections?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+    <a class="btn btn--sm btn--ghost" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
   </div>
   <div class="empty mt-gap">
     <div class="empty__title">{{ t('card.not_found.title') }}</div>
