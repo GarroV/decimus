@@ -12,8 +12,14 @@
 {% block title %}{{ head.unit_name }}{% endblock %}
 
 {% block body %}
-  <div class="row row--tight">
+  <div class="row row--tight row--between">
     <a class="btn btn--sm btn--ghost" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+    {#
+      Письмо — отдельный экран, а не блок здесь. Оно собирается движком в
+      подпроцессе, и карточка, ждущая этой сборки, открывалась бы секундами
+      там, где сейчас открывается сразу.
+    #}
+    <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
   </div>
 
   {% if notice %}

@@ -1,0 +1,103 @@
+{#
+  Письмо партнёру по записанной проверке.
+
+  Текста письма продукт не сочиняет: он собран движком по методике той версии,
+  которой помечена проверка, и приехал сюда строкой. Ни склейки, ни подстановки
+  в шаблоне нет — иначе письмо на экране разошлось бы с письмом, которое по той
+  же проверке отдаёт инструмент модели.
+
+  «Собралось» и «можно отправлять» разведены намеренно: письмо с пустой шапкой
+  или подставленным сроком выглядит законченным, и сказать об этом обязан
+  экран, а не глаз читающего.
+#}{% extends "base.html" %}
+{% block title %}{{ t('letter.title') }}{% endblock %}
+
+{% block body %}
+  <div class="row row--tight">
+    <a class="btn btn--sm btn--ghost" href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}">‹ {{ t('letter.back') }}</a>
+  </div>
+
+  <div class="section mt-gap">
+    <div class="section__head">
+      <h2 class="section__title">{{ t('letter.title') }}</h2>
+      <span class="meta">{{ head.unit_name }} · {{ head.inspection_date }}</span>
+    </div>
+    <p class="field-note">{{ t('letter.lead') }}</p>
+    {#
+      Язык ПИСЬМА, а не интерфейса: партнёру пишут на его языке. Перечень
+      приезжает из методики — свой список предложил бы язык, которого в ней
+      нет.
+    #}
+    <div class="row row--tight mt-gap">
+      <span class="field-label">{{ t('letter.lang.pick') }}</span>
+      {% for код in letter_langs %}
+        <a class="btn btn--sm {% if код == letter_lang %}btn--primary{% else %}btn--ghost{% endif %}"
+           href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&letter_lang={{ код }}">{{ код }}</a>
+      {% endfor %}
+    </div>
+    <p class="field-note">{{ t('letter.lang.note') }}</p>
+  </div>
+
+  {% if letter.failure %}
+    <div class="note note--error mt-gap">
+      <div>
+        <div class="note__title">{{ t('letter.failed.title') }}</div>
+        <div class="note__text">{{ letter.failure }}</div>
+      </div>
+    </div>
+  {% else %}
+    {% if letter.ready %}
+      <div class="note note--ok mt-gap">
+        <div>
+          <div class="note__title">{{ t('letter.ready.title') }}</div>
+          <div class="note__text">{{ t('letter.ready.text') }}</div>
+        </div>
+      </div>
+    {% else %}
+      <div class="note note--warn mt-gap">
+        <div>
+          <div class="note__title">{{ t('letter.caveats.title') }}</div>
+          <div class="note__text">{{ t('letter.caveats.lead') }}</div>
+          <ul class="note__list">
+            {% for caveat in caveats %}<li>{{ caveat }}</li>{% endfor %}
+          </ul>
+        </div>
+      </div>
+    {% endif %}
+
+    <div class="card mt-gap">
+      <div class="card__facts">
+        <div class="card__fact">
+          <div class="card__fact-label">{{ t('letter.meta.lang') }}</div>
+          <div>{{ letter.lang }}</div>
+        </div>
+        <div class="card__fact">
+          <div class="card__fact-label">{{ t('letter.meta.source') }}</div>
+          <div>{{ source }}</div>
+        </div>
+        <div class="card__fact">
+          <div class="card__fact-label">{{ t('letter.meta.score') }}</div>
+          <div>{{ head.pct }}{{ t('card.score.unit') }} · {{ head.grade }}</div>
+        </div>
+      </div>
+
+      <div class="card__body">
+        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}" class="stack">
+          <label>
+            <span class="field-label">{{ t('letter.edit.label') }}</span>
+            {#
+              Письмо уезжает партнёру как есть, поэтому и правится как есть:
+              поле показывает ровно тот текст, который собрал движок, без
+              разметки вокруг и без переносов от себя.
+            #}
+            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ letter.lang }}">{{ letter.text }}</textarea>
+          </label>
+          <p class="field-note">{{ t('letter.edit.hint') }}</p>
+          <div class="row">
+            <button class="btn btn--primary" type="submit">{{ t('letter.export.submit') }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
