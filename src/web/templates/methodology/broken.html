@@ -1,0 +1,14 @@
+{# Хранилище версий методики не читается вовсе — каталог снесли, указатель
+   сломан, движок не отвечает. Это не отклонённая правка: ту показывает сама
+   страница раздела, там отказ часть работы. Здесь причина печатается словами
+   двери, без трассировки. #}
+{% extends "base.html" %}
+{% block title %}{{ t('methodology.broken.title') }}{% endblock %}
+{% block body %}
+  <div class="note note--error">
+    <div>
+      <div class="note__title">{{ t('methodology.broken.title') }}</div>
+      <div class="note__text">{{ t('methodology.broken.text', reason=reason) }}</div>
+    </div>
+  </div>
+{% endblock %}

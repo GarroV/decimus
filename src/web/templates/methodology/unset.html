@@ -1,0 +1,25 @@
+{#
+  Раздел «Методика», когда хранилища версий нет.
+
+  Пустой состав здесь не показывается вовсе. Пустая таблица прочиталась бы как
+  «чек-лист пуст», то есть как факт о методике, а на деле это ненастроенное
+  окружение стенда — и лечится оно не в админке, а в файле окружения.
+  Переменные названы поимённо: искать их в коде человеку не должно быть нужно.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.admin.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('section.admin.title') }}</h1>
+    </div>
+    <p class="section__lead">{{ t('methodology.lead') }}</p>
+  </div>
+
+  <div class="note note--warn mt-gap">
+    <div>
+      <div class="note__title">{{ t('methodology.store.missing.title') }}</div>
+      <div class="note__text">{{ t('methodology.store.missing.text', vars=missing|join(', ')) }}</div>
+    </div>
+  </div>
+{% endblock %}

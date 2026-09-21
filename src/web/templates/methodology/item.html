@@ -1,0 +1,167 @@
+{#
+  Один пункт: как он записан, его критерии и правка.
+
+  Колонки печатаются ВСЕ, какие есть в строке методики, а не выбранные экраном.
+  Управляющая компания заводит в файле свои колонки (T109), и спрятать их
+  значило бы показать человеку методику короче, чем она есть.
+
+  Правка показывается только у свежей записанной версии: дверь стакает правку
+  на неё, и форма под старым составом обещала бы поправить то, что на экране,
+  а поправила бы другое.
+#}{% extends "base.html" %}
+{% block title %}{{ t('methodology.item.title', code=item.get('id', '')) }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('methodology.item.title', code=item.get('id', '')) }}</h1>
+      <span class="section__num">
+        {{ t('methodology.version.viewing', version=version) }}
+        {% if version == current %}
+          <span class="tag tag--ok tag--micro">{{ t('methodology.version.badge.published') }}</span>
+        {% else %}
+          <span class="tag tag--warn tag--micro tag--dashed">{{ t('methodology.version.badge.draft') }}</span>
+        {% endif %}
+      </span>
+    </div>
+    <p class="section__lead">
+      <a href="/admin?lang={{ lang }}">{{ t('methodology.item.back') }}</a>
+    </p>
+  </div>
+
+  {% if notice %}
+    <div class="note note--ok mt-gap" role="status">
+      <div><div class="note__title">{{ notice }}</div></div>
+    </div>
+  {% endif %}
+  {% if failure %}
+    <div class="note note--error mt-gap" role="alert">
+      <div>
+        <div class="note__title">{{ t('methodology.failed', reason=failure) }}</div>
+        {#
+          Хранилище методики одно на две поверхности, и отказ у него один и тот
+          же — названный именами инструментов агента. Переписывать его здесь
+          нельзя: пересказ потерял бы то, ЧТО именно не принято. Поэтому рядом
+          стоит перевод двух имён на язык этой страницы.
+        #}
+        <div class="note__text">{{ t('methodology.failed.glossary') }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-gap">
+    <div class="card__head head-line">
+      <div class="head-line__grow">
+        <div class="card__title">{{ item.get('question_ru') or item.get('question_en') or '—' }}</div>
+        <div class="card__meta">{{ item.get('process_ru') or item.get('process_en') or '—' }}</div>
+      </div>
+      {% if item.get('kind') == 'off' %}
+        <span class="tag tag--err tag--micro">{{ item.get('kind') }}</span>
+      {% else %}
+        <span class="tag tag--neutral tag--micro">{{ item.get('kind') or 'violation' }}</span>
+      {% endif %}
+    </div>
+
+    <div class="card__body">
+      <div class="card__fact-label">{{ t('methodology.item.fields.title') }}</div>
+      <div class="table-wrap mt-gap">
+        <table class="table table--fields">
+          <tbody>
+            {% for name, value in item.items() if name != 'criteria' %}
+              <tr>
+                <td class="is-text">{{ name }}</td>
+                <td class="is-text">{{ value or '—' }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card__body">
+      <div class="card__fact-label">{{ t('methodology.item.criteria.title') }}</div>
+      {% if item.get('criteria') %}
+        <pre class="criteria">{{ item.get('criteria') }}</pre>
+      {% else %}
+        <p class="field-note field-note--warn">{{ t('methodology.item.criteria.empty') }}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if version != latest %}
+    <div class="note note--info mt-gap">
+      <div>
+        <div class="note__title">{{ t('methodology.old.title') }}</div>
+        <div class="note__text">{{ t('methodology.old.text', version=version, latest=latest) }}</div>
+      </div>
+    </div>
+  {% else %}
+    <details class="edit mt-gap" {% if failure %}open{% endif %}>
+      <summary class="edit__summary">{{ t('methodology.edit.title') }}</summary>
+      <p class="field-note">{{ t('methodology.edit.hint') }}</p>
+      <form class="form-grid" method="post" action="/admin/items/{{ item.get('id', '') }}?lang={{ lang }}">
+        <label class="field-label" for="edit-process">{{ t('methodology.field.process') }}</label>
+        <input class="input" id="edit-process" name="process" type="text" placeholder="{{ item.get('process_ru') or '' }}">
+
+        <label class="field-label" for="edit-process-en">{{ t('methodology.field.process_en') }}</label>
+        <input class="input" id="edit-process-en" name="process_en" type="text" placeholder="{{ item.get('process_en') or '' }}">
+
+        <label class="field-label" for="edit-question">{{ t('methodology.field.question_ru') }}</label>
+        <input class="input" id="edit-question" name="question_ru" type="text" placeholder="{{ item.get('question_ru') or '' }}">
+
+        <label class="field-label" for="edit-question-en">{{ t('methodology.field.question_en') }}</label>
+        <input class="input" id="edit-question-en" name="question_en" type="text" placeholder="{{ item.get('question_en') or '' }}">
+
+        <label class="field-label" for="edit-levels">{{ t('methodology.field.levels') }}</label>
+        <input class="input" id="edit-levels" name="levels" type="text" placeholder="{{ item.get('levels') or '' }}">
+        <p class="field-note">{{ t('methodology.field.levels.hint') }}</p>
+
+        <label class="field-label" for="edit-zones">{{ t('methodology.field.zones') }}</label>
+        <input class="input" id="edit-zones" name="zones" type="text" placeholder="{{ item.get('zones') or '' }}">
+        <p class="field-note">{{ t('methodology.field.zones.hint') }}</p>
+
+        <label class="field-label" for="edit-days">{{ t('methodology.field.days') }}</label>
+        <input class="input input--num" id="edit-days" name="days" type="number" min="0" step="1" placeholder="{{ item.get('days') or '' }}">
+        <p class="field-note">{{ t('methodology.field.days.hint') }}</p>
+
+        <label class="field-label" for="edit-criteria">{{ t('methodology.field.criteria') }}</label>
+        <textarea class="input" id="edit-criteria" name="criteria" rows="4"></textarea>
+
+        {% if needs_name %}
+          <label class="field-label" for="edit-version-name">{{ t('methodology.field.version_name') }}</label>
+          <input class="input" id="edit-version-name" name="version_name" type="text" required>
+          <p class="field-note">{{ t('methodology.field.version_name.hint') }}</p>
+        {% endif %}
+
+        <label class="field-label" for="edit-note">{{ t('methodology.field.note') }}</label>
+        <input class="input" id="edit-note" name="note" type="text" maxlength="{{ max_note }}">
+        <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>
+
+        <button class="btn btn--primary" type="submit">{{ t('methodology.edit.submit') }}</button>
+      </form>
+    </details>
+
+    {#
+      Выключение и возврат — отдельные формы с одним полем причины: в журнале
+      они обязаны быть видны своим именем, а не как правка колонки `kind`.
+    #}
+    <div class="card mt-gap">
+      <div class="card__body">
+        {% if item.get('kind') == 'off' %}
+          <form class="row row--tight" method="post" action="/admin/items/{{ item.get('id', '') }}/restore?lang={{ lang }}">
+            {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+            <input class="input grow" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.field.note') }}">
+            <button class="btn btn--primary" type="submit">{{ t('methodology.restore.submit') }}</button>
+          </form>
+        {% else %}
+          <p class="field-note">{{ t('methodology.disable.hint') }}</p>
+          <form class="row row--tight mt-gap" method="post" action="/admin/items/{{ item.get('id', '') }}/disable?lang={{ lang }}">
+            {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+            <input class="input grow" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.field.note') }}">
+            <button class="btn btn--danger" type="submit">{{ t('methodology.disable.submit') }}</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
