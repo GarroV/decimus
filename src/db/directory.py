@@ -35,22 +35,29 @@ DEFAULT_TENANT = "default"
 
 @dataclass(frozen=True)
 class Unit:
-    """Точка справочника: идентификатор, каноничное название, синонимы."""
+    """Точка справочника: идентификатор, каноничное название, синонимы, география."""
 
     id: str
     name: str
     code: str | None
     aliases: tuple[str, ...]
+    #: Код страны ISO 3166-1 alpha-2 в верхнем регистре. `None` — географии у
+    #: точки нет: она заведена по факту первой проверки, и откуда она, никто
+    #: не спрашивал. Это НЕ «страна неизвестна навсегда» — проставить её может
+    #: загрузка справочника или человек.
+    country: str | None = None
+    #: Город как он называется в источнике. Без справочника и без нормализации.
+    city: str | None = None
 
 
 _SELECT_UNITS_SQL = """
 select u.id, u.name, u.code, coalesce(array_agg(a.alias order by a.alias)
-       filter (where a.alias is not null), '{}')
+       filter (where a.alias is not null), '{}'), u.country, u.city
 from units u
 left join unit_aliases a on a.unit_id = u.id
-where u.tenant_code = %s
-group by u.id, u.name, u.code
-order by u.name
+where u.tenant_code = %s and (%s::text is null or u.country = %s)
+group by u.id, u.name, u.code, u.country, u.city
+order by u.country nulls last, u.city nulls last, u.name
 """
 
 # Порядок ветвей задан ЯВНО колонкой приоритета, а не тем, что каноничное
@@ -75,19 +82,28 @@ limit 1
 
 _INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
 
+# География проставляется через `coalesce(excluded…, units…)` и в обеих
+# ветвях: повторная загрузка НЕ обязана знать всё, что знает база. Загрузчик
+# справочника отдаёт страну и город, а человек, заводящий точку руками одним
+# названием, — нет; прямое присваивание стёрло бы его же географию обратно в
+# NULL и сделало бы это молча.
 _UPSERT_UNIT_BY_CODE_SQL = """
-insert into units (tenant_code, name, name_normalized, code)
-values (%(tenant)s, %(name)s, %(key)s, %(code)s)
+insert into units (tenant_code, name, name_normalized, code, country, city)
+values (%(tenant)s, %(name)s, %(key)s, %(code)s, %(country)s, %(city)s)
 on conflict (tenant_code, code) do update set name = excluded.name,
-    name_normalized = excluded.name_normalized
+    name_normalized = excluded.name_normalized,
+    country = coalesce(excluded.country, units.country),
+    city = coalesce(excluded.city, units.city)
 returning id
 """
 
 _UPSERT_UNIT_BY_NAME_SQL = """
-insert into units (tenant_code, name, name_normalized, code)
-values (%(tenant)s, %(name)s, %(key)s, %(code)s)
+insert into units (tenant_code, name, name_normalized, code, country, city)
+values (%(tenant)s, %(name)s, %(key)s, %(code)s, %(country)s, %(city)s)
 on conflict (tenant_code, name_normalized) do update set name = excluded.name,
-    code = coalesce(excluded.code, units.code)
+    code = coalesce(excluded.code, units.code),
+    country = coalesce(excluded.country, units.country),
+    city = coalesce(excluded.city, units.city)
 returning id
 """
 
@@ -101,7 +117,14 @@ returning unit_id
 
 
 def _row_to_unit(row: tuple[Any, ...], aliases: tuple[str, ...] = ()) -> Unit:
-    return Unit(id=str(row[0]), name=str(row[1]), code=row[2], aliases=aliases)
+    return Unit(
+        id=str(row[0]),
+        name=str(row[1]),
+        code=row[2],
+        aliases=aliases,
+        country=row[4] if len(row) > 4 else None,
+        city=row[5] if len(row) > 5 else None,
+    )
 
 
 def resolve_unit_id(
@@ -147,12 +170,19 @@ def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
     return _row_to_unit(row, aliases)
 
 
-def list_units(*, tenant: str = DEFAULT_TENANT) -> list[Unit]:
-    """Весь справочник арендатора с синонимами. То, из чего бот однажды покажет список."""
+def list_units(*, tenant: str = DEFAULT_TENANT, country: str | None = None) -> list[Unit]:
+    """Справочник арендатора с синонимами, целиком или одной страной.
+
+    `country` — код ISO 3166-1 alpha-2; регистр приводится здесь, потому что
+    код приходит из адреса страницы и от человека, а в базе он лежит в одном
+    виде. Точки без страны в страновой срез не попадают — и это верно: «страна
+    не проставлена» не значит «страна эта».
+    """
     settings = check_environment()
+    код = (country or "").strip().upper() or None
     try:
         with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_SELECT_UNITS_SQL, (tenant,))
+            cur.execute(_SELECT_UNITS_SQL, (tenant, код, код))
             rows = cur.fetchall()
     except psycopg.Error as exc:
         raise PushError(f"Справочник точек недоступен ({type(exc).__name__}): {exc}") from exc
@@ -164,6 +194,8 @@ def upsert_unit(
     *,
     code: str | None = None,
     aliases: tuple[str, ...] = (),
+    country: str | None = None,
+    city: str | None = None,
     tenant: str = DEFAULT_TENANT,
 ) -> str:
     """Завести или обновить точку справочника вместе с её синонимами.
@@ -186,6 +218,13 @@ def upsert_unit(
         raise PushError("У точки пустое название — в справочник её завести нечем")
 
     normalized_code = (code or "").strip() or None
+    # Код страны приводится к одному виду на границе, а не проверяется на
+    # принадлежность списку: список стран меняется, и своя копия запретила бы
+    # новую страну ровно в день прихода сети в неё. Форму держит база
+    # (`units_country_is_code`), и отказ там — это положенное вместо кода
+    # название, то есть настоящая ошибка вызывающего.
+    страна = (country or "").strip().upper() or None
+    город = (city or "").strip() or None
     try:
         with psycopg.connect(settings.dsn) as conn:
             with conn.cursor() as cur:
@@ -193,7 +232,14 @@ def upsert_unit(
                 sql = _UPSERT_UNIT_BY_CODE_SQL if normalized_code else _UPSERT_UNIT_BY_NAME_SQL
                 cur.execute(
                     sql,
-                    {"tenant": tenant, "name": name.strip(), "key": key, "code": normalized_code},
+                    {
+                        "tenant": tenant,
+                        "name": name.strip(),
+                        "key": key,
+                        "code": normalized_code,
+                        "country": страна,
+                        "city": город,
+                    },
                 )
                 row = cur.fetchone()
                 if row is None:
