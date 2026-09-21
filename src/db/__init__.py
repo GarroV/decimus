@@ -45,6 +45,8 @@ if TYPE_CHECKING:
     from .queries import findings_by_unit as findings_by_unit
     from .queries import get_inspection as get_inspection
     from .queries import list_inspections as list_inspections
+    from .reports import StoredReport as StoredReport
+    from .reports import upload_report as upload_report
     from .retract import Retraction as Retraction
     from .retract import retract_inspection as retract_inspection
     from .synonyms import ALREADY_KNOWN as ALREADY_KNOWN
@@ -92,6 +94,7 @@ __all__ = [
     "Retraction",
     "RetractionError",
     "StorageError",
+    "StoredReport",
     "SynonymError",
     "Unit",
     "VersionMismatchError",
@@ -109,6 +112,7 @@ __all__ = [
     "retract_inspection",
     "retract_phrase",
     "upload_photos",
+    "upload_report",
     "upsert_unit",
 ]
 
@@ -118,6 +122,8 @@ _LAZY = {
     "resolve_unit": (".directory", "resolve_unit"),
     "upsert_unit": (".directory", "upsert_unit"),
     "upload_photos": (".photos", "upload_photos"),
+    "upload_report": (".reports", "upload_report"),
+    "StoredReport": (".reports", "StoredReport"),
     "push_inspection": (".push", "push_inspection"),
     "list_inspections": (".queries", "list_inspections"),
     "get_inspection": (".queries", "get_inspection"),
