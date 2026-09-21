@@ -101,6 +101,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0018_inspection_reports.sql": (
         "sql1:10226e34e16587df03088ed9f5a7bb95acfb80797edfb99a0ea0aa21c4c1106d"
     ),
+    "0019_partner_letters.sql": (
+        "sql1:25cc063152855596a3331fd7225d15c1ccee57410cb79ecff6f11070959b046b"
+    ),
 }
 
 

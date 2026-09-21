@@ -250,6 +250,43 @@ TEXTS: dict[str, dict[str, str]] = {
     # письмо с пустой шапкой или подставленным сроком выглядит законченным,
     # и человеку надо сказать это словами, а не оставить сверять глазами.
     "letter.title": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    # --- фиксация письма (T333, #310) ---------------------------------------
+    #
+    # «Сохранить», а не «Отправить»: отправки из системы нет и не заводится
+    # (Q010, D035), письмо уходит из почты руками. Кнопка отвечает на «вот
+    # текст, который мы считаем отправленным», и обещать большее ей нельзя.
+    "letter.save.submit": {"ru": "Сохранить письмо", "en": "Save the letter"},
+    "letter.save.ok": {
+        "ru": "Письмо сохранено — теперь видно, какой текст ушёл партнёру",
+        "en": "Letter saved — the text sent to the partner is now on record",
+    },
+    "letter.save.failed": {
+        "ru": (
+            "Письмо не сохранено. Пустой текст не записывается, "
+            "а если текст есть — не ответила база"
+        ),
+        "en": (
+            "Letter not saved. Empty text is never stored; "
+            "if the text is there, the database did not answer"
+        ),
+    },
+    "letter.saved.note": {
+        "ru": "Сохранено: {who}, {when}. Показан сохранённый текст, а не пересобранный",
+        "en": "Saved by {who} on {when}. Showing the saved text, not a rebuilt one",
+    },
+    "letter.saved.unknown": {
+        "ru": "Сохранённое письмо сейчас недоступно: база не ответила. Показана заготовка",
+        "en": (
+            "The saved letter is unavailable right now: the database did not "
+            "answer. Showing a draft"
+        ),
+    },
+    "letter.saved.none": {
+        "ru": (
+            "Письмо ещё не сохраняли: показана заготовка, и правка пропадёт, если её не сохранить"
+        ),
+        "en": "Not saved yet: this is a draft, and edits are lost unless you save them",
+    },
     "letter.open": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     "letter.lead": {
         "ru": (

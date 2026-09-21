@@ -169,9 +169,28 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # движок на такой молча собрал бы письмо по-русски.
         письмо_на = request.args.get("letter_lang") or None
         собранное = data.load_letter(detail, lang=письмо_на)
+        # Зафиксированное письмо СИЛЬНЕЕ заготовки: у партнёра на руках лежит
+        # один текст, и показать вместо него сегодняшнюю пересборку значит
+        # ответить на «что мы отправили» правдоподобной неправдой. Заготовка
+        # при этом собирается всё равно — по ней видно оговорки (пустая шапка,
+        # чужой язык), и они не перестают быть правдой оттого, что письмо
+        # зафиксировали.
+        # Отказ базы здесь НЕ роняет экран и не выдаётся за «письма нет»: это
+        # разные вещи, и вторая — молчаливая ложь. Без базы (законная настройка
+        # стенда) страница честно говорит, что сохранённое сейчас неизвестно, и
+        # показывает заготовку.
+        try:
+            записанное = data.saved_letter(inspection_id)
+            сохранённое_известно = True
+        except DbError:
+            записанное = None
+            сохранённое_известно = False
         return render_template(
             "inspections/letter.html",
             letter=собранное,
+            saved=записанное,
+            saved_known=сохранённое_известно,
+            save_outcome=request.args.get("saved"),
             head=detail.inspection,
             letter_langs=data.LETTER_LANGS,
             letter_lang=письмо_на or detail.inspection.report_lang,
@@ -191,6 +210,48 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return render_template("inspections/not_found.html"), 404
         текст = request.form.get("text") or ""
         return _letter_file(текст, inspection_id)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/letter/save")
+    def save_letter(inspection_id: str) -> FlaskResponse | tuple[str, int] | str:
+        """Зафиксировать письмо в том виде, в каком его подтвердил человек (T333).
+
+        Отправки из системы по-прежнему нет (Q010, D035): письмо уходит из
+        почты руками. Фиксация отвечает не на «отправлено», а на «вот текст,
+        который мы считаем отправленным», — и без неё этот вопрос остаётся
+        без ответа навсегда.
+        """
+        refuse_foreign_origin()
+        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        if detail is None:
+            return render_template("inspections/not_found.html"), 404
+
+        текст = request.form.get("text") or ""
+        письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
+        вошедший = auth.current_account()
+        try:
+            data.remember_letter(
+                inspection_id,
+                body=текст,
+                lang=письмо_на,
+                saved_by="—" if вошедший is None else вошедший.login,
+            )
+        except DbError:
+            # Исход виден человеку словами на той же странице, а не пятисотой:
+            # пустое письмо и потерянная база чинятся по-разному, и молчащая
+            # кнопка «Сохранить» — ровно то, на что владелец и пожаловался.
+            return redirect(
+                url_for(
+                    "letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="failed"
+                ),
+                code=303,
+            )
+        # Перенаправление, а не отрисовка на месте: иначе обновление страницы
+        # повторяло бы отправку формы, и в истории появлялось бы второе письмо,
+        # которого никто не фиксировал.
+        return redirect(
+            url_for("letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="ok"),
+            code=303,
+        )
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> str | tuple[str, int]:

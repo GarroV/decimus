@@ -40,6 +40,9 @@ if TYPE_CHECKING:
     from .directory import list_units as list_units
     from .directory import resolve_unit as resolve_unit
     from .directory import upsert_unit as upsert_unit
+    from .letters import SavedLetter as SavedLetter
+    from .letters import latest_letter as latest_letter
+    from .letters import save_letter as save_letter
     from .photos import upload_photos as upload_photos
     from .push import push_inspection as push_inspection
     from .queries import findings_by_unit as findings_by_unit
@@ -93,6 +96,7 @@ __all__ = [
     "PushError",
     "Retraction",
     "RetractionError",
+    "SavedLetter",
     "StorageError",
     "StoredReport",
     "SynonymError",
@@ -100,6 +104,7 @@ __all__ = [
     "VersionMismatchError",
     "findings_by_unit",
     "get_inspection",
+    "latest_letter",
     "list_inspections",
     "list_phrases",
     "list_units",
@@ -111,6 +116,7 @@ __all__ = [
     "resolve_unit",
     "retract_inspection",
     "retract_phrase",
+    "save_letter",
     "upload_photos",
     "upload_report",
     "upsert_unit",
@@ -121,6 +127,9 @@ _LAZY = {
     "list_units": (".directory", "list_units"),
     "resolve_unit": (".directory", "resolve_unit"),
     "upsert_unit": (".directory", "upsert_unit"),
+    "save_letter": (".letters", "save_letter"),
+    "latest_letter": (".letters", "latest_letter"),
+    "SavedLetter": (".letters", "SavedLetter"),
     "upload_photos": (".photos", "upload_photos"),
     "upload_report": (".reports", "upload_report"),
     "StoredReport": (".reports", "StoredReport"),

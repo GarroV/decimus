@@ -21,6 +21,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from src.db import letters as letters_store
 from src.db import queries, retract
 from src.db.config import DATABASE_RETRACTION_URL_VAR, load_retraction_settings
 from src.db.errors import DbError
@@ -186,3 +187,29 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
 #: Пересказывать её строкой в шаблоне нельзя: переименуют в `db`, а здесь
 #: останется старое имя, и человек пойдёт заводить несуществующую переменную.
 RETRACTION_URL_VAR = DATABASE_RETRACTION_URL_VAR
+
+
+def saved_letter(inspection_id: str) -> letters_store.SavedLetter | None:
+    """Зафиксированное письмо этой проверки — или `None`, если его не фиксировали.
+
+    Разница с `load_letter` не в источнике, а в смысле. `load_letter` собирает
+    ЗАГОТОВКУ: она пересобирается каждый раз и от пересборки меняется — правка
+    методики, новый шаблон, другая версия движка. Здесь — то, что человек
+    прочитал, поправил и подтвердил как отправляемое, и оно не меняется ничем.
+
+    Показывать их одинаково нельзя: у партнёра на руках лежит один-единственный
+    текст, и выдать за него сегодняшнюю заготовку значит ответить на вопрос
+    «что мы отправили» правдоподобной неправдой.
+    """
+    return letters_store.latest_letter(inspection_id)
+
+
+def remember_letter(
+    inspection_id: str, *, body: str, lang: str, saved_by: str
+) -> letters_store.SavedLetter:
+    """Зафиксировать письмо так, как его подтвердил человек.
+
+    Своей проверки текста здесь нет ни строки — она в `src/db/letters.py`, там
+    же, где запись. Вторая копия правил разошлась бы с первой молча.
+    """
+    return letters_store.save_letter(inspection_id, body=body, lang=lang, saved_by=saved_by)
