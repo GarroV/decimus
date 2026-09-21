@@ -117,6 +117,18 @@ _SET_ROLE_SQL = """
      where tenant_code = %s and login = %s and disabled_at is null
 """
 
+_SET_EMAIL_SQL = """
+    update web_users
+       set email = %s
+     where tenant_code = %s and login = %s and disabled_at is null
+"""
+
+_SELECT_USER_BY_EMAIL_SQL = """
+    select id, login, tenant_code, role
+      from web_users
+     where tenant_code = %s and email = %s and disabled_at is null
+"""
+
 _OPEN_SESSION_SQL = """
     insert into web_sessions (user_id, fingerprint, expires_at)
     values (%s, %s, now() + %s)
@@ -439,6 +451,64 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
         cur.execute(_SET_ROLE_SQL, (роль, tenant, login.strip().lower()))
         return cur.rowcount > 0
+
+
+def normalize_email(email: str) -> str:
+    """Почта к единственному виду хранения: без краёв, в нижнем регистре.
+
+    `Ivan@Dodobrands.io` и `ivan@dodobrands.io ` — один человек, и Google
+    вернёт ту форму, в какой почту завели у него, а не ту, в какой её завели
+    у нас. Без приведения один и тот же человек заводится дважды, а входит
+    как кто-то один — и какой именно, решит порядок строк.
+
+    Приводит вызывающий код, а база держит это ограничением (`0021`): так
+    забывчивость становится отказом записи, а не тихой второй учёткой.
+    """
+    приведённая = email.strip().lower()
+    if not приведённая:
+        raise ValueError("пустая почта: входить по ней некому")
+    return приведённая
+
+
+def set_email(login: str, *, tenant: str, email: str | None) -> bool:
+    """Привязать почту к живой учётке (или снять её, `None`). `False` — учётки нет.
+
+    Снятие — не удаление учётки: человек остаётся и входит паролем. Это и есть
+    способ закрыть кому-то вход через Google, не трогая всё остальное.
+
+    Роль владельца схемы, как заведение и роли: право менять круг допущенных
+    не выдаётся приложению, иначе кнопка на экране и дыра в нём — одно и то же.
+    """
+    значение = None if email is None else normalize_email(email)
+    with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
+        cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+        return cur.rowcount > 0
+
+
+def find_by_email(email: str, *, tenant: str) -> Account | None:
+    """Почта от Google → учётка. Незнакомая, отключённая, чужой арендатор — `None`.
+
+    **Это и есть круг допущенных.** Google подтверждает, что человек владеет
+    почтой, и ничего больше: кому можно в админку, решает эта строка в базе.
+    Поэтому незнакомая почта обязана получить `None`, а не завести учётку —
+    иначе круг допущенных задавал бы Google, а не владелец.
+
+    Отключённые не проходят по тому же условию, что и при входе паролем:
+    отзыв доступа обязан закрывать ВСЕ двери сразу, иначе он не отзыв.
+
+    Арендатор приходит из окружения стенда, а не из почты: домен почты не
+    говорит, чью историю человеку видно.
+    """
+    try:
+        приведённая = normalize_email(email)
+    except ValueError:
+        return None
+    with _connected("опознать по почте") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_BY_EMAIL_SQL, (tenant, приведённая))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
 
 
 def authenticate(login: str, password: str, *, tenant: str) -> Account | None:
