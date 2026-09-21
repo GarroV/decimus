@@ -1,4 +1,4 @@
-# Завести в .env площадки настройки своего хранилища файлов (D166, #318).
+﻿# Завести в .env площадки настройки своего хранилища файлов (D166, #318).
 #
 # Скрипт, а не строка в доке, по двум причинам. Во-первых, секрет обязан
 # родиться на самой машине: пароль, проехавший через чей-то экран или историю
@@ -36,7 +36,7 @@ if (-not (Test-Path -LiteralPath $EnvPath)) {
 # который читает файлы глазами шаблона.
 $secretKeyName = "S3_" + "SECRET_ACCESS_KEY"
 
-$нужные = [ordered]@{
+$needed = [ordered]@{
     "S3_BUCKET"         = $Bucket
     "S3_ACCESS_KEY_ID"  = $AccessKey
     $secretKeyName      = $null   # родится здесь, ниже
@@ -44,38 +44,38 @@ $нужные = [ordered]@{
     "S3_REGION"         = $Region
 }
 
-$текст = Get-Content -LiteralPath $EnvPath
-$добавить = @()
-$оставлено = @()
+$current = Get-Content -LiteralPath $EnvPath
+$toAdd = @()
+$kept = @()
 
-foreach ($имя in $нужные.Keys) {
-    $уже = $текст | Where-Object { $_ -match ("^" + [regex]::Escape($имя) + "=") }
-    if ($уже) {
-        $оставлено += $имя
+foreach ($name in $needed.Keys) {
+    $present = $current | Where-Object { $_ -match ("^" + [regex]::Escape($name) + "=") }
+    if ($present) {
+        $kept += $name
         continue
     }
-    $значение = $нужные[$имя]
-    if ($null -eq $значение) {
+    $value = $needed[$name]
+    if ($null -eq $value) {
         # 40 знаков из букв и цифр. Без служебных символов намеренно: значение
         # уезжает в переменную окружения контейнера, и кавычка в пароле ломает
         # запуск тем громче, чем позже её заметят.
-        $алфавит = (48..57) + (65..90) + (97..122)
-        $значение = -join ($алфавит | Get-Random -Count 40 | ForEach-Object { [char]$_ })
+        $alphabet = (48..57) + (65..90) + (97..122)
+        $value = -join ($alphabet | Get-Random -Count 40 | ForEach-Object { [char]$_ })
     }
-    $добавить += ($имя + "=" + $значение)
+    $toAdd += ($name + "=" + $value)
 }
 
-if ($добавить.Count -eq 0) {
-    Write-Output "Всё уже настроено, ничего не менял. Ключей на месте: $($оставлено.Count)"
+if ($toAdd.Count -eq 0) {
+    Write-Output "Всё уже настроено, ничего не менял. Ключей на месте: $($kept.Count)"
     exit 0
 }
 
-$шапка = @("", "# --- своё хранилище файлов на площадке (D166, #318) ---")
-Add-Content -LiteralPath $EnvPath -Value ($шапка + $добавить)
+$header = @("", "# --- своё хранилище файлов на площадке (D166, #318) ---")
+Add-Content -LiteralPath $EnvPath -Value ($header + $toAdd)
 
 # Печатаются ИМЕНА, никогда значения.
-$именаДобавленных = $добавить | ForEach-Object { ($_ -split "=", 2)[0] }
-Write-Output ("Добавлено: " + ($именаДобавленных -join ", "))
-if ($оставлено.Count -gt 0) {
-    Write-Output ("Оставлено как было: " + ($оставлено -join ", "))
+$addedNames = $toAdd | ForEach-Object { ($_ -split "=", 2)[0] }
+Write-Output ("Добавлено: " + ($addedNames -join ", "))
+if ($kept.Count -gt 0) {
+    Write-Output ("Оставлено как было: " + ($kept -join ", "))
 }
