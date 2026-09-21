@@ -59,19 +59,29 @@ from pathlib import Path
 from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
 from ..domain.engine import ENGINE_ATTEMPTS, pause_before_retry
 from ..domain.version import (
-    SEGMENT_BYTES,
     VERSION_FILE,
     compose,
     fingerprint,
-    is_one_segment,
     published,
 )
 from ..recognize.cues import CUES_FILE as RECOGNIZE_CUES_FILE
+from ..report.engine_call import (
+    AUDIT_SCRIPT,
+    ENGINE_TIMEOUT_SEC,
+    REPO_ROOT,
+    RUNTIME_BEFORE_SCRIPT,
+    RUNTIME_FATAL,
+    VERSIONS_DIR,
+    EngineCallError,
+)
+from ..report.engine_call import check_version as _check_version_common
+from ..report.engine_call import clean as _clean_common
+from ..report.engine_call import to_log as _to_log_common
 from .errors import ChecklistError, EngineNoVerdictError
 
 #: Подкаталог со снимками версий. Отдельный уровень, чтобы указатель и журнал
 #: не лежали среди версий и не притворялись одной из них.
-VERSIONS_DIR = "versions"
+
 
 #: Указатель на действующую версию — символическая ссылка. Ссылка, а не копия:
 #: публикация обязана быть одним неделимым действием, иначе движок однажды
@@ -90,10 +100,6 @@ CUES_FILE = RECOGNIZE_CUES_FILE
 #: на место переименованием, а не копированием через границу файловой системы.
 TMP_DIR = ".tmp"
 
-#: Чем заменяется путь кандидата в тексте отказа движка. Движок называет файл,
-#: в котором проблема, — а это временная копия под правку: показать её агенту
-#: значит показать путь, которого у человека нет и не будет.
-CANDIDATE_LABEL = "<каталог новой версии>"
 
 #: Хвост отказа, объясняющий, куда делся путь.
 #:
@@ -127,18 +133,6 @@ CODE_PATTERN = re.compile(r"^[A-Za-z0-9_]{1,32}$")
 #: ней сделала бы идентификатор нечитаемым.
 DATE_TAIL = re.compile(r"\d{4}-\d{2}-\d{2}$")
 
-#: Сколько ждём движок. Правка методики — это разбор пары CSV, секунды; всё,
-#: что дольше, — зависший подпроцесс, держащий поток сервера.
-ENGINE_TIMEOUT_SEC = 60
-
-#: Что печатает сам интерпретатор питона, умерший фатально. В выводе движка
-#: такого не бывает: свои отказы он объясняет словами и выходит нормально.
-RUNTIME_FATAL = "Fatal Python error"
-
-#: ...и что при этом инициализация не закончилась. Интерпретатор сообщает своё
-#: состояние сам, и `core initialized` означает, что до первой строки скрипта
-#: дело НЕ дошло: кандидат не тронут, повторить запуск безопасно.
-RUNTIME_BEFORE_SCRIPT = "Python runtime state: core initialized"
 
 # Сколько раз пробуем запустить движок и сколько ждём между попытками —
 # `ENGINE_ATTEMPTS` и `pause_before_retry` из `src/domain/engine.py`. Своей
@@ -155,23 +149,18 @@ RUNTIME_BEFORE_SCRIPT = "Python runtime state: core initialized"
 # `audit.py` не начинали работать, кандидат остался как был. Умерший ПОЗЖЕ
 # интерпретатор не повторяется — он мог успеть переписать половину.
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-MANAGE_SCRIPT = _REPO_ROOT / "engine" / "manage.py"
-AUDIT_SCRIPT = _REPO_ROOT / "engine" / "audit.py"
+MANAGE_SCRIPT = REPO_ROOT / "engine" / "manage.py"
+
+#: Общее с другими зовущими движок живёт ярусом ниже (`src/report/engine_call.py`):
+#: `src.mcp` и `src.web` — пиры, и копия этих правил у каждого разошлась бы.
 
 
 # --- лог процесса -------------------------------------------------------------
 
 
 def _to_log(повод: str, **пути: Path) -> None:
-    """Напечатать пути в лог процесса — рядом с отказом, но не внутри него.
-
-    Печатается в `stderr`, тем же префиксом `[mcp]`, что и лог транспорта:
-    журнал хранилища ведёт события методики, а это событие окружения, и
-    случается оно ровно тогда, когда хранилища ещё может не быть.
-    """
-    подробности = ", ".join(f"{имя}={путь}" for имя, путь in пути.items())
-    print(f"[mcp] {повод}: {подробности}", file=sys.stderr)
+    """Напечатать пути в лог процесса — общим способом, под меткой этого блока."""
+    _to_log_common(повод, метка="mcp", **пути)
 
 
 @dataclass(frozen=True)
@@ -236,31 +225,16 @@ def _check_name(name: str) -> str:
 
 
 def _check_version(version: str) -> str:
-    """Имя версии как кусок пути внутри хранилища — или отказ.
+    """Имя версии как кусок пути внутри хранилища — или отказ этого блока.
 
-    Правило одно на весь продукт (`domain.version.is_one_segment`) — то же,
-    которым полка снимков домена решает, годится ли издание в имя каталога. До
-    T243 их было два: здесь стоял белый список латиницы, у домена — список
-    запрещённого, и издание с нелатинским именем набора полка принимала, а
-    инструменты MCP не читали вовсе. Два правила на одно имя расходятся молча;
-    сведены они там, где живёт формула самого идентификатора.
-
-    Отказ называет НАСТОЯЩУЮ причину. Прежний говорил «не похоже на версию
-    методики» и показывал латинский пример — то есть отправлял человека
-    переименовывать законное издание его же управляющей компании вместо того,
-    чтобы починить испорченный идентификатор.
+    Само правило общее (`src/report/engine_call.py`): им пользуются и MCP, и
+    админка, а два правила на одно имя расходятся молча. Здесь только перевод
+    отказа в словарь блока — точка входа ловит `ChecklistError` одним `except`.
     """
-    value = (version or "").strip()
-    if not is_one_segment(value):
-        raise ChecklistError(
-            f"«{version}» не может быть именем каталога издания: в идентификаторе версии не "
-            f"бывает разделителей пути, и «.», «..» и пустая строка именем каталога тоже не "
-            f"бывают (длина — до {SEGMENT_BYTES} байт). Идентификатор выглядит как "
-            f"«imf-2026-09-03-3f5a91b2c7d0» — имя набора, дата издания и отпечаток данных; "
-            f"имя набора задаёт управляющая компания, и латиницей оно быть не обязано. "
-            f"Перечень версий отдаёт checklist_versions"
-        )
-    return value
+    try:
+        return _check_version_common(version)
+    except EngineCallError as отказ:
+        raise ChecklistError(str(отказ)) from None
 
 
 def check_code(code: str) -> str:
@@ -408,21 +382,8 @@ def _argv(command: str, positional: str | None, options: Mapping[str, object]) -
 
 
 def _clean(text: str, *paths: Path) -> str:
-    """Убрать из текста движка пути с диска.
-
-    Названные каталоги — это временная копия под правку и нейтральный каталог
-    рядом с ней: путей, которых у человека нет и не будет, в ответе быть не
-    должно. Корень продукта вычищается отдельно и до конца: движок падает без
-    общего перехвата, а трейсбек печатает путь к своим файлам — то есть
-    каталог, куда развёрнут продукт, вместе с именем пользователя. Отрезается
-    ровно корень, поэтому «engine/manage.py» остаётся: по нему чинить можно, а
-    устройство машины по нему не читается (T120).
-    """
-    out = text
-    for path in paths:
-        out = out.replace(str(path), CANDIDATE_LABEL)
-    out = out.replace(f"{_REPO_ROOT}{os.sep}", "")
-    return out.strip()
+    """Убрать из текста движка пути с диска — общим способом (T120)."""
+    return _clean_common(text, *paths)
 
 
 def _engine_accepts(candidate: Path, day: date) -> str | None:
