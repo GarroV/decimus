@@ -630,12 +630,12 @@ services:
       # не уезжают в аргументы команды, где их видно в списке процессов.
       MC_HOST_own: http://${S3_ACCESS_KEY_ID:-x}:${S3_SECRET_ACCESS_KEY:-x}@storage-live:9000
 
-    entrypoint: ["/bin/sh", "-c"]
+    entrypoint: ["/bin/sh"]
     # `--ignore-existing`: повторный запуск не ошибка и не пересоздание — корзина
     # с файлами проверок должна пережить любое количество накатов.
-    command: >-
-      mc mb --ignore-existing own/${S3_BUCKET:-inspection-frames}
-      && mc ls own
+    command:
+      - "-c"
+      - "mc mb --ignore-existing own/${S3_BUCKET:-inspection-frames} && mc ls own"
 
 
   # --- выгрузка состояния в бэкап (профиль `backup`, задача #233) ------------
