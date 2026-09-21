@@ -50,6 +50,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     "section.tenants.title": {"ru": "Проект", "en": "Project"},
+    "section.users.title": {"ru": "Люди", "en": "People"},
     "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
     # --- вход, выход, отказ (T323) -----------------------------------------
     # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
@@ -399,6 +400,87 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
+    # --- люди проекта (T338, #322) -----------------------------------------
+    "users.lead": {
+        "ru": (
+            "Кто заведён в админке этого арендатора. Отключённые остаются в "
+            "списке: вопрос «у кого был доступ» задают после инцидента."
+        ),
+        "en": (
+            "Who has an account in this tenant's admin. Disabled people stay "
+            "on the list: «who had access» is a question asked after an incident."
+        ),
+    },
+    "users.count": {"ru": "{count} чел.", "en": "{count} people"},
+    "users.unknown": {
+        "ru": "Список сейчас недоступен — это не значит, что людей нет.",
+        "en": "The list is unavailable right now — that does not mean there is nobody.",
+    },
+    "users.add.title": {"ru": "Завести человека", "en": "Add a person"},
+    "users.add.login": {"ru": "Логин", "en": "Login"},
+    "users.add.role": {"ru": "Что можно", "en": "Access"},
+    "users.add.submit": {"ru": "Завести", "en": "Add"},
+    "users.add.hint": {
+        "ru": (
+            "Пароль придумает система и покажет один раз — записать его "
+            "нужно сразу. В базе от него остаётся только свёртка."
+        ),
+        "en": (
+            "The system makes the password and shows it once — write it down "
+            "right away. Only a hash of it is kept."
+        ),
+    },
+    "users.add.failed": {
+        "ru": "Завести не вышло. Логин уже занят или не годится по форме.",
+        "en": "Could not add. The login is taken or malformed.",
+    },
+    "users.added.title": {"ru": "Учётка «{login}» заведена", "en": "Account «{login}» created"},
+    "users.added.text": {
+        "ru": "Пароль показан один раз — передайте его человеку и закройте страницу.",
+        "en": "The password is shown once — pass it on and close this page.",
+    },
+    "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
+    "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
+    "users.col.login": {"ru": "Логин", "en": "Login"},
+    "users.col.role": {"ru": "Что можно", "en": "Access"},
+    "users.col.state": {"ru": "Состояние", "en": "State"},
+    "users.col.created": {"ru": "Заведён", "en": "Added"},
+    "users.state.active": {"ru": "работает", "en": "active"},
+    "users.state.disabled": {"ru": "отключён {date}", "en": "disabled {date}"},
+    "users.disable.submit": {"ru": "Отключить", "en": "Disable"},
+    "users.disable.ok": {
+        "ru": "Учётка отключена. Открытые по ней сессии перестали действовать.",
+        "en": "The account is disabled. Sessions opened with it stopped working.",
+    },
+    "users.disable.missing": {
+        "ru": "Такой живой учётки нет — возможно, её уже отключили.",
+        "en": "No such active account — it may already be disabled.",
+    },
+    "users.disable.self": {
+        "ru": (
+            "Себя отключить нельзя: это выход без возврата, а на стенде с "
+            "одним администратором — ещё и закрытый навсегда экран людей."
+        ),
+        "en": (
+            "You cannot disable yourself: that is a one-way exit, and on a "
+            "stand with a single admin it closes this screen for good."
+        ),
+    },
+    "users.disable.failed": {
+        "ru": "Отключить не вышло — база не ответила.",
+        "en": "Could not disable — the database did not answer.",
+    },
+    "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
+    "users.forbidden.note": {
+        "ru": (
+            "Людей заводит администратор. Если он нужен вам — попросите того, "
+            "кто уже им является: роль назначается изнутри админки."
+        ),
+        "en": (
+            "Only an administrator manages people. If you need that, ask "
+            "someone who already is one — the role is granted from inside."
+        ),
+    },
     "letter.draft.shown": {
         "ru": (
             "В поле — заготовка, собранная сейчас. Зафиксированное письмо "

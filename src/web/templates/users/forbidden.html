@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}{{ t('users.forbidden.title') }}{% endblock %}
+{% block body %}
+  <div class="card">
+    <h1 class="card__title">{{ t('users.forbidden.title') }}</h1>
+    {# Прямо и без загадок: человек вошёл, он здесь свой, и «страница не
+       найдена» вместо «вам сюда нельзя» отправила бы его чинить несломанное. #}
+    <p class="muted">{{ t('users.forbidden.note') }}</p>
+  </div>
+{% endblock %}

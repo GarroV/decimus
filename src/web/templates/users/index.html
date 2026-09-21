@@ -1,0 +1,121 @@
+{#
+  Люди проекта: кто заведён, что ему можно, кто отключён.
+
+  Отключённые показываются вместе с живыми. Вопрос «у кого был доступ»
+  задают после инцидента, и пустое место на него не отвечает.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.users.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('section.users.title') }}</h1>
+      <span class="section__num">{{ t('users.count', count=people|length) }}</span>
+    </div>
+    <p class="section__lead">{{ t('users.lead') }}</p>
+  </div>
+
+  {% if added %}
+    {#
+      Пароль показан ЗДЕСЬ и больше нигде: в базе от него остаётся только
+      свёртка, а в адрес он не попадает намеренно — адреса остаются в истории
+      браузера и в журнале обратного прокси.
+    #}
+    <div class="note note--ok mt-gap">
+      <div>
+        <div class="note__title">{{ t('users.added.title', login=added.login) }}</div>
+        <div class="note__text">{{ t('users.added.text') }}</div>
+        <p class="pass"><code>{{ added.password }}</code></p>
+      </div>
+    </div>
+  {% elif outcome == 'add_failed' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.add.failed') }}</div>
+    </div>
+  {% elif outcome == 'disabled' %}
+    <div class="note note--ok mt-gap">
+      <div class="note__text">{{ t('users.disable.ok') }}</div>
+    </div>
+  {% elif outcome == 'disable_missing' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.disable.missing') }}</div>
+    </div>
+  {% elif outcome == 'disable_self' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.disable.self') }}</div>
+    </div>
+  {% elif outcome == 'disable_failed' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.disable.failed') }}</div>
+    </div>
+  {% endif %}
+
+  {% if not people_known %}
+    {# «База недоступна» и «людей нет» — разные вещи, и вторая была бы
+       молчаливой ложью на экране, где считают людей с доступом. #}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.unknown') }}</div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-gap">
+    <h2 class="card__title">{{ t('users.add.title') }}</h2>
+    <form method="post" action="{{ url(users_path ~ '/add') }}?lang={{ lang }}" class="row">
+      <label class="grow">
+        <span class="field-label">{{ t('users.add.login') }}</span>
+        <input class="input" name="login" required autocomplete="off"
+               pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false">
+      </label>
+      <label>
+        <span class="field-label">{{ t('users.add.role') }}</span>
+        <select class="input" name="role">
+          {% for код in roles %}
+            <option value="{{ код }}">{{ t('users.role.' ~ код) }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn btn--primary" type="submit">{{ t('users.add.submit') }}</button>
+    </form>
+    <p class="field-note">{{ t('users.add.hint') }}</p>
+  </div>
+
+  {% if people %}
+    <div class="table-wrap mt-gap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th class="is-text">{{ t('users.col.login') }}</th>
+            <th class="is-text">{{ t('users.col.role') }}</th>
+            <th class="is-text">{{ t('users.col.state') }}</th>
+            <th>{{ t('users.col.created') }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for человек in people %}
+            <tr{% if человек.disabled_at %} class="is-muted"{% endif %}>
+              <td class="is-text">{{ человек.login }}</td>
+              <td class="is-text">{{ t('users.role.' ~ человек.role) }}</td>
+              <td class="is-text">
+                {% if человек.disabled_at %}
+                  {{ t('users.state.disabled', date=человек.disabled_at.strftime('%Y-%m-%d')) }}
+                {% else %}
+                  {{ t('users.state.active') }}
+                {% endif %}
+              </td>
+              <td>{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
+              <td>
+                {% if not человек.disabled_at and человек.login != account.login %}
+                  <form method="post" action="{{ url(users_path ~ '/disable') }}?lang={{ lang }}">
+                    <input type="hidden" name="login" value="{{ человек.login }}">
+                    <button class="btn btn--sm" type="submit">{{ t('users.disable.submit') }}</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+{% endblock %}
