@@ -140,3 +140,35 @@
   .whoami { padding-right: 0; }
   .logout { margin-left: 0; }
 }
+
+/* ── Письмо партнёру: многострочное поле и перечень оговорок ──────
+   Ядро знает `.input` ростом в одну строку (`--control-h`) — письмо в
+   такое поле не помещается физически. Правило продуктовое: ядро — копия
+   из `forma`, и заводить в нём вариант ради одного экрана дороже, чем
+   держать две строки здесь.
+
+   Шрифт моноширинный и намеренно: письмо уезжает партнёру простым
+   текстом, и перенос строки, лишний пробел или съехавший отступ должны
+   быть видны здесь ровно такими, какими их увидит получатель. */
+
+.input--area {
+  height: auto;
+  min-height: calc(var(--control-h) * 6);
+  padding: var(--space-4);
+  font: var(--w-regular) var(--fs-dense) / var(--lh-dense) var(--font-num);
+  resize: vertical;
+  white-space: pre-wrap;
+}
+
+/* Перечень внутри note: причины, по которым письмо нельзя отправлять.
+   Тон берётся у самой note — свой цвет здесь запрещён правилом слоя. */
+
+.note__list {
+  margin: var(--space-3) 0 0;
+  padding-left: var(--space-7);
+  font-size: var(--fs-meta);
+  line-height: var(--lh-meta);
+  color: inherit;
+}
+.note__list li + li { margin-top: var(--space-2); }
+.note--warn .note__list { color: var(--warn-ink); }
