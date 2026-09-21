@@ -237,7 +237,10 @@ def _letter_file(text: str, inspection_id: str) -> FlaskResponse:
     вложением, простым текстом и с запретом угадывать тип: без этого браузер
     вправе показать присланное как страницу с адреса самой админки.
     """
-    ответ = FlaskResponse(text, mimetype="text/plain; charset=utf-8")
+    # `mimetype`, а не готовый `Content-Type`: кодировку Flask дописывает сам, и
+    # написанная здесь вручную уехала бы в заголовок дважды
+    # (`text/plain; charset=utf-8; charset=utf-8` — поймано смоуком снаружи).
+    ответ = FlaskResponse(text, mimetype="text/plain")
     ответ.headers["Content-Disposition"] = f'attachment; filename="{_letter_name(inspection_id)}"'
     ответ.headers["X-Content-Type-Options"] = "nosniff"
     return ответ

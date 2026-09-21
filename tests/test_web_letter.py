@@ -187,6 +187,10 @@ def test_выгружается_правленое_а_не_собранное(с
     assert ответ.get_data(as_text=True) == правленое
     assert "attachment" in ответ.headers["Content-Disposition"]
     assert ответ.headers["X-Content-Type-Options"] == "nosniff"
+    # Кодировка названа ровно один раз. Дважды — не косметика: заголовок с
+    # повтором часть получателей разбирает как имя кодировки «utf-8; charset=utf-8»
+    # и откатывается на латиницу, то есть письмо приезжает нечитаемым.
+    assert ответ.headers["Content-Type"] == "text/plain; charset=utf-8"
 
 
 def test_выгрузка_чужой_проверки_отказывает(
