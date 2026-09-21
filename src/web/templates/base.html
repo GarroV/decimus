@@ -47,7 +47,7 @@
         {% if code == lang %}
           <span class="btn btn--sm" aria-current="true">{{ code|upper }}</span>
         {% else %}
-          <a class="btn btn--sm btn--ghost" href="{{ current_path }}?lang={{ code }}">{{ code|upper }}</a>
+          <a class="btn btn--sm btn--ghost" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
         {% endif %}
       {% endfor %}
     </div>
@@ -56,7 +56,7 @@
       странице, выбив человека из админки без единого его движения.
     #}
     {% if account %}
-      <form class="logout" method="post" action="{{ logout_path }}">
+      <form class="logout" method="post" action="{{ url(logout_path) }}">
         <button class="btn btn--sm btn--ghost" type="submit">{{ t('auth.logout') }}</button>
       </form>
     {% endif %}
@@ -67,7 +67,7 @@
     <nav class="sidenav shell__nav">
       {% for item in sections %}
         {% set title = t('section.' ~ item.key ~ '.title') %}
-        {% set href = item.path ~ '?lang=' ~ lang %}
+        {% set href = url(item.path) ~ '?lang=' ~ lang %}
         <span class="sidenav__wrap">
           {% if not item.built %}<span class="tape tape--nav" aria-hidden="true"></span>{% endif %}
           {% if item.path == current_path %}

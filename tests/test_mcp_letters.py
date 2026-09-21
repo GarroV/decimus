@@ -31,8 +31,8 @@ import pytest
 from mcp_checklist_harness import build_edition, build_methodology, harness_edition
 
 from src.db.models import FindingRow, InfoRow, InspectionDetail, InspectionRow
-from src.mcp import letters
-from src.mcp.errors import ToolError
+from src.report import letters
+from src.report.letters import LetterError as ToolError
 
 #: Издание, которым нетронутый набор оснастки ЯВЛЯЕТСЯ: `pinned` сверяет
 #: отпечаток, поэтому имя каталога версии обязано быть настоящим (T236).

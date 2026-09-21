@@ -32,7 +32,7 @@ from src.domain.config import DATA_FILES
 from src.domain.version import VERSION_FILE, compose
 from src.mcp import info_part
 from src.mcp.errors import ToolError
-from src.mcp.letters import Papers, version_of
+from src.report.letters import Papers, version_of
 
 
 def _пункт(code: str, ru: str, en: str) -> str:
