@@ -39,8 +39,8 @@ from typing import Any
 
 import psycopg
 
-from .config import check_environment
-from .errors import AccessError
+from .config import check_environment, load_retraction_settings
+from .errors import AccessError, ConfigError
 from .migrate import admin_dsn
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
@@ -86,19 +86,19 @@ LOGIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 _INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
 
 _INSERT_USER_SQL = """
-    insert into web_users (tenant_code, login, password_hash)
-    values (%s, %s, %s)
+    insert into web_users (tenant_code, login, password_hash, role)
+    values (%s, %s, %s, %s)
     returning id
 """
 
 _SELECT_USER_SQL = """
-    select id, login, tenant_code, password_hash
+    select id, login, tenant_code, password_hash, role
       from web_users
      where tenant_code = %s and login = %s and disabled_at is null
 """
 
 _LIST_USERS_SQL = """
-    select login, created_at, disabled_at
+    select login, created_at, disabled_at, role
       from web_users
      where tenant_code = %s
      order by login
@@ -107,6 +107,12 @@ _LIST_USERS_SQL = """
 _DISABLE_USER_SQL = """
     update web_users
        set disabled_at = now()
+     where tenant_code = %s and login = %s and disabled_at is null
+"""
+
+_SET_ROLE_SQL = """
+    update web_users
+       set role = %s
      where tenant_code = %s and login = %s and disabled_at is null
 """
 
@@ -120,7 +126,7 @@ _OPEN_SESSION_SQL = """
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code
+    select u.id, u.login, u.tenant_code, u.role
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -137,6 +143,14 @@ _CLOSE_SESSION_SQL = """
 """
 
 
+#: Роли внутри админки. Перечислены здесь И ограничением схемы (`0020`):
+#: код без схемы пропустил бы опечатку в базу, схема без кода молчала бы о
+#: ней до первой записи.
+ROLE_AUDITOR = "auditor"
+ROLE_ADMIN = "admin"
+ROLES = (ROLE_AUDITOR, ROLE_ADMIN)
+
+
 @dataclass(frozen=True)
 class Account:
     """Учётка так, как её видят страницы: кто вошёл и чью историю показывать."""
@@ -144,6 +158,11 @@ class Account:
     id: str
     login: str
     tenant: str
+    #: Что человеку можно В АДМИНКЕ (`auditor` | `admin`), а не чью историю
+    #: ему видно: за историю отвечает арендатор, и роль его не расширяет.
+    #: Приезжает вместе с опознанием, одним запросом с ним: спрошенная
+    #: отдельно, она успела бы устареть между двумя запросами.
+    role: str = ROLE_AUDITOR
 
 
 @dataclass(frozen=True)
@@ -156,6 +175,7 @@ class AccountRow:
     """
 
     login: str
+    role: str
     created_at: datetime
     #: Когда учётка отключена; `None` — работает. Признаком-свойством это не
     #: оборачивается: единственный читатель — команда обслуживания, и ей нужна
@@ -281,6 +301,45 @@ def _owned(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
+@contextmanager
+def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
+    """Подключение, которым МОЖНО тронуть строку учётки.
+
+    Таких ролей две, и обе законны: администратор истории
+    (`DATABASE_RETRACTION_URL`, права выданы миграцией `0020`) и владелец схемы
+    (`DATABASE_ADMIN_URL`, он владеет таблицей). Берётся ПЕРВАЯ — узкая, — и
+    это не удобство, а разница в цене ошибки: веб-процесс, которому дали
+    владельца схемы, умеет не только завести учётку, но и снести таблицу
+    вместе с историей проверок.
+
+    Откатом на вторую это не является: обе роли имеют право по схеме, выбор
+    объявлен здесь и повторяется всегда одинаково. Молчаливым откат был бы,
+    если бы вторая роль права НЕ имела и отказывала уже на записи — тогда
+    настоящая причина («не задано подключение») пряталась бы за чужой.
+    """
+    try:
+        dsn = load_retraction_settings().dsn
+    except ConfigError:
+        dsn = admin_dsn() or ""
+    if not dsn:
+        raise AccessError(
+            f"Не удалось {зачем}: не задано ни DATABASE_RETRACTION_URL, ни "
+            f"DATABASE_ADMIN_URL. Учётки трогает роль повышенных полномочий; "
+            f"роль приложения этого права не имеет намеренно (D155)"
+        )
+    try:
+        with psycopg.connect(dsn) as conn:
+            yield conn
+    except psycopg.Error as exc:
+        raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
+
+
+def _checked_role(role: str) -> str:
+    if role not in ROLES:
+        raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
+    return role
+
+
 def _checked_login(login: str) -> str:
     имя = login.strip().lower()
     if not LOGIN_PATTERN.match(имя):
@@ -291,7 +350,7 @@ def _checked_login(login: str) -> str:
     return имя
 
 
-def create_account(login: str, *, tenant: str, password: str) -> Account:
+def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
     """Завести учётку. Роль владельца схемы, повтор логина — отказ.
 
     Пароль сюда приходит от человека, который учётку заводит, и в репозитории
@@ -299,16 +358,20 @@ def create_account(login: str, *, tenant: str, password: str) -> Account:
     незачем, а напечатанное уезжает в историю команд.
     """
     имя = _checked_login(login)
+    # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
+    # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
+    # бы админов молча.
+    роль = _checked_role(role)
     if len(password) < MIN_PASSWORD_LENGTH:
         raise AccessError(
             f"Пароль короче {MIN_PASSWORD_LENGTH} знаков. Короткий подбирается по "
             f"украденной базе за вечер, и никакой хеш этого не меняет"
         )
     хеш = password_hash(password)
-    with _owned("завести учётку") as conn, conn.cursor() as cur:
+    with _managing("завести учётку") as conn, conn.cursor() as cur:
         cur.execute(_INSERT_TENANT_SQL, (tenant,))
         try:
-            cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш))
+            cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
         except psycopg.errors.UniqueViolation as exc:
             raise AccessError(
                 f"Учётка «{имя}» у арендатора «{tenant}» уже есть. Сменить пароль "
@@ -316,15 +379,18 @@ def create_account(login: str, *, tenant: str, password: str) -> Account:
             ) from exc
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
-    return Account(id=str(row[0]), login=имя, tenant=tenant)
+    return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль)
 
 
 def list_accounts(*, tenant: str) -> tuple[AccountRow, ...]:
     """Кто заведён у этого арендатора. Роль владельца схемы."""
-    with _owned("перечислить учётки") as conn, conn.cursor() as cur:
+    with _managing("перечислить учётки") as conn, conn.cursor() as cur:
         cur.execute(_LIST_USERS_SQL, (tenant,))
         строки = cur.fetchall()
-    return tuple(AccountRow(login=str(r[0]), created_at=r[1], disabled_at=r[2]) for r in строки)
+    return tuple(
+        AccountRow(login=str(r[0]), created_at=r[1], disabled_at=r[2], role=str(r[3]))
+        for r in строки
+    )
 
 
 def disable_account(login: str, *, tenant: str) -> bool:
@@ -333,8 +399,22 @@ def disable_account(login: str, *, tenant: str) -> bool:
     Действует немедленно и на уже открытые сессии: опознание сверяет учётку
     вместе с сессией на каждом запросе, а не запоминает её при входе.
     """
-    with _owned("отключить учётку") as conn, conn.cursor() as cur:
+    with _managing("отключить учётку") as conn, conn.cursor() as cur:
         cur.execute(_DISABLE_USER_SQL, (tenant, login.strip().lower()))
+        return cur.rowcount > 0
+
+
+def set_role(login: str, *, tenant: str, role: str) -> bool:
+    """Назначить роль живой учётке. `False` — такой живой учётки нет.
+
+    Отдельной операцией, а не полем формы заведения: первый админ стенда
+    назначается именно ей. Накат `0020` не даёт прав НИКОМУ — кто заведён в
+    бою, миграция не знает, и раздача «всем» или «по имени» выдала бы права
+    людям, которых на это никто не смотрел.
+    """
+    роль = _checked_role(role)
+    with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
+        cur.execute(_SET_ROLE_SQL, (роль, tenant, login.strip().lower()))
         return cur.rowcount > 0
 
 
@@ -361,7 +441,7 @@ def authenticate(login: str, password: str, *, tenant: str) -> Account | None:
         return None
     if not password_matches(password, str(row[3])):
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]))
+    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
 
 
 def open_session(account: Account) -> OpenedSession:
@@ -391,7 +471,7 @@ def resolve_session(token: str, *, tenant: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]))
+    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
 
 
 def close_session(token: str) -> bool:

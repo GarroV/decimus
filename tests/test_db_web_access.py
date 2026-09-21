@@ -25,6 +25,8 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import AccessError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
+    ROLE_ADMIN,
+    ROLE_AUDITOR,
     SESSION_TTL,
     authenticate,
     close_session,
@@ -36,6 +38,7 @@ from src.db.web_access import (  # noqa: E402
     password_hash,
     resolve_session,
     session_fingerprint,
+    set_role,
 )
 
 pytestmark = requires_db
@@ -296,3 +299,56 @@ def test_список_показывает_отключённую_отключё
     строки = list_accounts(tenant=ТЕНАНТ)
     assert [строка.login for строка in строки] == ["director"]
     assert строки[0].disabled_at is not None
+
+
+def test_заведённая_учётка_по_умолчанию_не_админ(обе_роли: str) -> None:
+    """Умолчание — самая узкая роль.
+
+    Заводящий человек думает про «завести Петра», а не про объём его прав.
+    Умолчание, дающее больше, раздавало бы админов молча — и заметили бы это
+    ровно тогда, когда кто-то отключил чужую учётку.
+    """
+    заведённая = create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert заведённая.role == ROLE_AUDITOR
+    опознанная = authenticate("petr", ПАРОЛЬ, tenant=ТЕНАНТ)
+    assert опознанная is not None
+    # Роль приезжает ВМЕСТЕ с опознанием: спрошенная отдельным запросом, она
+    # успела бы устареть между двумя запросами.
+    assert опознанная.role == ROLE_AUDITOR
+
+
+def test_роль_назначается_и_видна_вошедшему(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert set_role("director", tenant=ТЕНАНТ, role=ROLE_ADMIN) is True
+
+    опознанная = authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ)
+    assert опознанная is not None and опознанная.role == ROLE_ADMIN
+    # И в сессии тоже: страницы спрашивают роль у сессии, а не у формы входа.
+    сессия = open_session(опознанная)
+    из_сессии = resolve_session(сессия.token, tenant=ТЕНАНТ)
+    assert из_сессии is not None and из_сессии.role == ROLE_ADMIN
+
+
+def test_роль_чужого_тенанта_не_назначается(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    # Арендатор — граница доступа, и роль её не расширяет ни в какую сторону.
+    assert set_role("director", tenant="xx", role=ROLE_ADMIN) is False
+    опознанная = authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ)
+    assert опознанная is not None and опознанная.role == ROLE_AUDITOR
+
+
+def test_незаведённая_роль_отвергается_а_не_ложится_в_базу(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    # Опечатка в роли — отказ вслух. Записанная как есть, она сделала бы
+    # учётку никем: проверка прав сравнивает со списком и молча не пустит.
+    for кривая in ("Admin", "админ", "superuser", ""):
+        with pytest.raises(AccessError):
+            set_role("director", tenant=ТЕНАНТ, role=кривая)
+        with pytest.raises(AccessError):
+            create_account(
+                f"u{abs(hash(кривая)) % 997}", tenant=ТЕНАНТ, password=ПАРОЛЬ, role=кривая
+            )
