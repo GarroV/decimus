@@ -398,6 +398,17 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
+    "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
+    "letter.draft.shown": {
+        "ru": (
+            "В поле — заготовка, собранная сейчас. Зафиксированное письмо "
+            "осталось на месте: оно заменится только после сохранения."
+        ),
+        "en": (
+            "The field shows a draft assembled just now. The saved letter is "
+            "still there: it changes only once you save."
+        ),
+    },
     # --- отказы ------------------------------------------------------------
     "error.db.title": {"ru": "База недоступна", "en": "The database is unavailable"},
     "error.db.text": {

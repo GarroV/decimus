@@ -25,6 +25,8 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -291,3 +293,35 @@ def test_переключатель_предлагает_только_языки
     for код in TEXT_LANGS:
         assert f"letter_lang={код}" in страница
     assert "letter_lang=fr" not in страница
+
+
+def test_возврат_к_заготовке_показывает_её_не_трогая_записанного(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — письмо уже зафиксировано человеком, и оно НЕ совпадает с тем,
+    # что собирает движок сегодня.
+    записанное = SimpleNamespace(
+        id="1",
+        body="Правленое человеком письмо",
+        lang="en",
+        saved_by="director",
+        created_at=datetime(2026, 9, 21, 12, 0, tzinfo=UTC),
+    )
+    monkeypatch.setattr(data, "saved_letter", lambda *_a, **_k: записанное)
+
+    # Act
+    обычная = стенд.get(f"/inspections/{ПРОВЕРКА}/letter").get_data(as_text=True)
+    заготовка = стенд.get(f"/inspections/{ПРОВЕРКА}/letter?draft=1").get_data(as_text=True)
+
+    # Assert — по умолчанию правится зафиксированное: подменять его сегодняшней
+    # пересборкой значит отвечать на «что мы отправили» правдоподобной неправдой.
+    assert "Правленое человеком письмо" in обычная
+    assert "Вернуть заготовку" in обычная
+
+    # А по прямой просьбе в поле — свежая заготовка движка.
+    assert "Your inspection scored 92%." in заготовка
+
+    # При этом запись НЕ исчезла и не подменена: письмо партнёру могло уже
+    # уйти, и вынуть его из истории нельзя ничем. На экране по-прежнему видно,
+    # что зафиксированное существует.
+    assert "director" in заготовка

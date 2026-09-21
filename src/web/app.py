@@ -187,10 +187,17 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         except DbError:
             записанное = None
             сохранённое_известно = False
+        # «Вернуть заготовку» — отказ от СВОИХ правок, а не от записи: письмо
+        # партнёру уже могло уйти, и вынуть его из истории нельзя ничем.
+        # Поэтому режим показывает свежесобранный движком текст в поле, но
+        # зафиксированное письмо остаётся на месте и остаётся видно, кем и
+        # когда оно записано. Новая правка ложится новой записью.
+        показать_заготовку = request.args.get("draft") == "1"
         return render_template(
             "inspections/letter.html",
             letter=собранное,
             saved=записанное,
+            show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
             save_outcome=request.args.get("saved"),
             head=detail.inspection,
