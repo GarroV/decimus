@@ -84,6 +84,8 @@ make web-user ARGS="add director --tenant demo"   # пароль спросят 
 make web-user ARGS="list --tenant demo"
 make web-user ARGS="role director admin --tenant demo"   # первый админ стенда
 make web-user ARGS="password director --tenant demo"   # сменить пароль (T340)
+make web-user ARGS="email director director@dodobrands.io --tenant demo"   # почта для входа через Google
+make web-user ARGS="email director --tenant demo"   # снять почту: вход через Google закрыт, пароль остался
 make web-user ARGS="disable director --tenant demo"
 ```
 
@@ -117,8 +119,9 @@ make web-user ARGS="disable director --tenant demo"
 **Круг допущенных задаёт владелец, а не Google.** Google подтверждает ровно
 одно — человек владеет этой почтой. Кого пускать, решает колонка `email` у
 `web_users` (миграция `0021`): незнакомая почта получает отказ, а не заводит
-учётку. Почта привязывается к УЖЕ заведённой учётке — из командной строки или
-с экрана «Люди».
+учётку. Почта привязывается к УЖЕ заведённой учётке командой `email` (см. выше).
+Снятие почты закрывает человеку вход через Google, не трогая пароль и саму
+учётку — это и есть способ отозвать одну дверь из двух.
 
 Тип приложения в Google — **Internal** (D168): входят только аккаунты
 организации `dodopizza.com`. Партнёрам вход откроется после переключения на
