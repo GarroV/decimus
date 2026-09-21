@@ -24,13 +24,13 @@ from src.db.errors import DbError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import auth, view
+from . import accounts, auth, view
 from . import inspections as data
 from . import methodology as method
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
 from .origin import refuse_foreign_origin
-from .sections import SECTIONS, check_registry, section
+from .sections import SECTIONS, check_registry, section, visible_sections
 from .texts import UI_LANGS, lang_or_default, t
 
 #: Сколько проверок читается в реестр за раз. Предел у чтения обязателен
@@ -46,7 +46,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("registry", "admin")
+SCREENS = ("registry", "admin", "users")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -91,7 +91,10 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "lang": lang,
             "langs": UI_LANGS,
             "t": lambda key, **params: t(key, lang, **params),
-            "sections": SECTIONS,
+            # Разделы ОТФИЛЬТРОВАНЫ по роли, а не спрятаны разметкой:
+            # ссылка, ведущая в отказ, выглядит как поломка продукта, а
+            # проверка внутри шаблона расходится с заслоном на экране молча.
+            "sections": visible_sections(account),
             "tenant": conf.tenant,
             "current_path": request.path,
             # Внутренние ссылки собираются ЭТИМ, а не склейкой строк в шаблоне.
@@ -261,6 +264,89 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             url_for("letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="ok"),
             code=303,
         )
+
+    # --- учётки админки (T338, #322) ---------------------------------------
+    # Заведение переехало из командной строки на экран, и заслон стоит ЗДЕСЬ, а
+    # не в навигации: адрес известен, набрать его руками может кто угодно.
+    users_path = section("users").path
+
+    def _только_админ() -> FlaskResponse | None:
+        вошедший = auth.current_account()
+        if вошедший is not None and вошедший.role == accounts.ROLE_ADMIN:
+            return None
+        # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
+        # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+
+    def _страница_учёток(
+        *, added: accounts.Added | None = None, outcome: str | None = None, code: int = 200
+    ) -> tuple[str, int]:
+        try:
+            люди = accounts.everyone(tenant=conf.tenant)
+            перечень_известен = True
+        except DbError:
+            # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и вторая
+            # была бы молчаливой ложью на экране, где считают людей с доступом.
+            люди = ()
+            перечень_известен = False
+        return (
+            render_template(
+                "users/index.html",
+                people=люди,
+                people_known=перечень_известен,
+                added=added,
+                outcome=outcome,
+                roles=accounts.ROLES,
+                users_path=users_path,
+            ),
+            code,
+        )
+
+    @app.get(users_path)
+    def users() -> FlaskResponse | tuple[str, int]:
+        отказ = _только_админ()
+        if отказ is not None:
+            return отказ
+        return _страница_учёток()
+
+    @app.post(f"{users_path}/add")
+    def add_user() -> FlaskResponse | tuple[str, int]:
+        """Завести человека. Пароль показывается ОДИН раз — на этой же странице.
+
+        Страница, а не перенаправление: пароль в адресе остался бы в истории
+        браузера и в журнале обратного прокси, то есть перестал бы быть
+        паролем ровно в момент показа.
+        """
+        отказ = _только_админ()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        логин = (request.form.get("login") or "").strip()
+        роль = request.form.get("role") or accounts.ROLE_AUDITOR
+        try:
+            заведённый = accounts.add(логин, tenant=conf.tenant, role=роль)
+        except DbError:
+            return _страница_учёток(outcome="add_failed", code=400)
+        return _страница_учёток(added=заведённый, outcome="added")
+
+    @app.post(f"{users_path}/disable")
+    def disable_user() -> FlaskResponse | tuple[str, int]:
+        отказ = _только_админ()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        логин = (request.form.get("login") or "").strip()
+        вошедший = auth.current_account()
+        if вошедший is not None and логин == вошедший.login:
+            # Отключить себя — это выйти и не вернуться, а на стенде с одним
+            # администратором ещё и закрыть экран учёток навсегда: снять
+            # пометку изнутри продукта нечем.
+            return _страница_учёток(outcome="disable_self", code=400)
+        try:
+            отключено = accounts.disable(логин, tenant=conf.tenant)
+        except DbError:
+            return _страница_учёток(outcome="disable_failed", code=400)
+        return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> str | tuple[str, int]:

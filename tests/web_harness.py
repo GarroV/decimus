@@ -44,10 +44,15 @@ from src.web.config import Settings
 class Учётка:
     """То немногое, что страницам нужно знать о вошедшем."""
 
-    def __init__(self, login: str = ЛОГИН, tenant: str = "default") -> None:
+    def __init__(
+        self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor"
+    ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
         self.tenant = tenant
+        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
+        # прятал бы отказ раздела людей во всех тестах разом.
+        self.role = role
 
 
 class Сессия:
@@ -139,14 +144,16 @@ def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Сч
     return счётчики
 
 
-def подменить_двери(monkeypatch: pytest.MonkeyPatch, *, tenant: str) -> dict[str, list[Any]]:
+def подменить_двери(
+    monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str = "auditor"
+) -> dict[str, list[Any]]:
     """Двери опознания, подменённые на границе модуля. Пишут, кого звали."""
     зовы: dict[str, list[Any]] = {"authenticate": [], "open": [], "resolve": [], "close": []}
 
     def _authenticate(login: str, password: str, *, tenant: str) -> Учётка | None:
         зовы["authenticate"].append((login, password, tenant))
         if login == ЛОГИН and password == ПАРОЛЬ:
-            return Учётка(tenant=tenant)
+            return Учётка(tenant=tenant, role=role)
         return None
 
     def _open(account: Учётка) -> Сессия:
@@ -155,7 +162,7 @@ def подменить_двери(monkeypatch: pytest.MonkeyPatch, *, tenant: st
 
     def _resolve(token: str, *, tenant: str) -> Учётка | None:
         зовы["resolve"].append((token, tenant))
-        return Учётка(tenant=tenant) if token == ТОКЕН else None
+        return Учётка(tenant=tenant, role=role) if token == ТОКЕН else None
 
     def _close(token: str) -> bool:
         зовы["close"].append(token)

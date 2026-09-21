@@ -39,6 +39,10 @@ class Section:
     key: str
     path: str
     built: bool
+    #: Виден и открывается ТОЛЬКО администратору. Заслон стоит на самом
+    #: экране, а признак здесь — чтобы навигация не звала человека туда, куда
+    #: его не пустят: ссылка, ведущая в отказ, выглядит как поломка продукта.
+    admin_only: bool = False
 
 
 #: Девять разделов прототипа в порядке прототипа. Построены два — «Проверки»
@@ -53,6 +57,9 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="calendar", path="/calendar", built=False),
     Section(key="admin", path="/admin", built=True),
     Section(key="tenants", path="/tenants", built=False),
+    # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток
+    # жило в командной строке, и владелец попросил перенести его на экран.
+    Section(key="users", path="/users", built=True, admin_only=True),
     Section(key="mini", path="/mini", built=False),
 )
 
@@ -104,3 +111,14 @@ def check_registry(with_screens: Iterable[str]) -> None:
             f"{', '.join(sorted(extra))}. Снимите ленту «в разработке» в "
             f"src/web/sections.py (D138)"
         )
+
+
+def visible_sections(account: object | None) -> tuple[Section, ...]:
+    """Разделы, которые этому человеку показывать.
+
+    Скрытие — не защита, и заменой заслону на экране это не является: адрес
+    известен, и набрать его руками может кто угодно. Смысл ровно в том, чтобы
+    не звать человека туда, куда его не пустят.
+    """
+    админ = getattr(account, "role", None) == "admin"
+    return tuple(item for item in SECTIONS if админ or not item.admin_only)
