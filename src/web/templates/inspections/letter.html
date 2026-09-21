@@ -82,6 +82,19 @@
       </div>
 
       <div class="card__body">
+        {% if save_outcome == 'ok' %}
+          <p class="note note--ok">{{ t('letter.save.ok') }}</p>
+        {% elif save_outcome == 'failed' %}
+          <p class="note note--warn">{{ t('letter.save.failed') }}</p>
+        {% endif %}
+        {% if not saved_known %}
+          <p class="field-note">{{ t('letter.saved.unknown') }}</p>
+        {% elif saved %}
+          {# Кем и когда — вопрос, который задают через год, а не сегодня. #}
+          <p class="field-note">{{ t('letter.saved.note', who=saved.saved_by, when=saved.created_at.strftime('%d.%m.%Y %H:%M')) }}</p>
+        {% else %}
+          <p class="field-note">{{ t('letter.saved.none') }}</p>
+        {% endif %}
         <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}" class="stack">
           <label>
             <span class="field-label">{{ t('letter.edit.label') }}</span>
@@ -90,11 +103,27 @@
               поле показывает ровно тот текст, который собрал движок, без
               разметки вокруг и без переносов от себя.
             #}
-            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ letter.lang }}">{{ letter.text }}</textarea>
+            {#
+              Показывается ЗАФИКСИРОВАННОЕ письмо, если оно есть, и заготовка
+              движка — если его нет. Заготовка пересобирается каждый раз и от
+              пересборки меняется; у партнёра же на руках один текст, и
+              подменять его сегодняшней пересборкой значит отвечать на «что мы
+              отправили» правдоподобной неправдой.
+            #}
+            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if saved else letter.lang }}">{{ saved.body if saved else letter.text }}</textarea>
           </label>
           <p class="field-note">{{ t('letter.edit.hint') }}</p>
+          <input type="hidden" name="letter_lang" value="{{ letter_lang }}">
           <div class="row">
-            <button class="btn btn--primary" type="submit">{{ t('letter.export.submit') }}</button>
+            {#
+              Сохранение и выгрузка — РАЗНЫЕ действия, и каждое названо своей
+              кнопкой. Одна кнопка со скрытым переключателем отличала бы их
+              только полем, которого не видно, а промах человек замечал бы уже
+              после того, как письмо ушло не туда.
+            #}
+            <button class="btn btn--primary" type="submit"
+                    formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
+            <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
           </div>
         </form>
       </div>
