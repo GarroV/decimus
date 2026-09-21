@@ -25,6 +25,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import AccessError, EmailTakenError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
+    change_password,
     ROLE_ADMIN,
     ROLE_AUDITOR,
     SESSION_TTL,
@@ -439,3 +440,58 @@ def test_две_учётки_с_одной_почтой_у_арендатора_
 
     with pytest.raises(EmailTakenError):
         set_email("auditor", tenant=ТЕНАНТ, email=ПОЧТА)
+
+
+# --- Смена пароля учётки (T340, #323) ---
+
+
+def test_новый_пароль_опознаёт_а_старый_перестаёт(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    НОВЫЙ = ПАРОЛЬ + "-другой"
+
+    assert change_password("director", tenant=ТЕНАНТ, password=НОВЫЙ) is True
+
+    assert authenticate("director", НОВЫЙ, tenant=ТЕНАНТ) is not None
+    assert authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ) is None
+
+
+def test_смена_пароля_выгоняет_открытые_сессии(обе_роли: str) -> None:
+    """Пароль меняют, когда его узнали: вошедший по старому обязан вылететь."""
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    открытая = open_session(учётка)
+    assert resolve_session(открытая.token, tenant=ТЕНАНТ) is not None
+
+    change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой")
+
+    assert resolve_session(открытая.token, tenant=ТЕНАНТ) is None
+
+
+def test_пароль_не_меняется_несуществующей_учётке(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert change_password("никто", tenant=ТЕНАНТ, password="какой-угодно-пароль") is False
+
+
+def test_пароль_не_меняется_отключённой_учётке(обе_роли: str) -> None:
+    """Отключённую не воскрешают сменой пароля: её включают отдельно и осознанно."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    disable_account("director", tenant=ТЕНАНТ)
+
+    assert change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой") is False
+
+
+def test_смена_пароля_не_трогает_чужого_арендатора(обе_роли: str) -> None:
+    create_account("director", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+
+    assert change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой") is False
+    assert authenticate("director", ПАРОЛЬ, tenant=ЧУЖОЙ) is not None
+
+
+def test_смена_пароля_не_принимает_короткий(обе_роли: str) -> None:
+    """Правило длины стояло только на заведении — это был обход в один шаг."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    with pytest.raises(AccessError):
+        change_password("director", tenant=ТЕНАНТ, password="коротыш")
+
+    assert authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ) is not None
