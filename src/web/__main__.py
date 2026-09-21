@@ -54,7 +54,7 @@ def main() -> int:
     # которому можно щёлкнуть. Собирается он из тех же настроек, с которыми
     # сервер сейчас встанет, — второй записи того же факта (в Makefile, в доке)
     # здесь быть не должно: она разъедется с портом при первой же правке.
-    print(f"Веб-админка: http://{settings.host}:{settings.port}/inspections")
+    print(f"Веб-админка: http://{settings.host}:{settings.port}{settings.url_prefix}/inspections")
     print(f"Тенант: {settings.tenant} · язык интерфейса: {settings.ui_lang}")
     # Временный ключ подписи — законное состояние стенда, но молчать о нём
     # нельзя: человек, которого выбросило на форму входа после перезапуска,
@@ -101,13 +101,22 @@ def _proxy_options(settings: Settings) -> dict[str, Any]:
     перечислен явно: всё, что не названо, `waitress` вырежет — а именно этого
     мы и хотим от постороннего, который решит представиться сам.
     """
-    if settings.trusted_proxies <= 0:
-        return {}
-    return {
-        "trusted_proxy": settings.host,
-        "trusted_proxy_count": settings.trusted_proxies,
-        "trusted_proxy_headers": {"x-forwarded-for", "x-forwarded-proto", "x-forwarded-host"},
-    }
+    опции: dict[str, Any] = {}
+    # Префикс уходит в `SCRIPT_NAME`, и от этого зависят ВСЕ ссылки страницы:
+    # `url_for` собирает их вместе с ним. Без этого админка под общим входом
+    # площадки открывалась бы по своему пути, а первая же кнопка уводила бы
+    # человека в корень — то есть в чужой продукт, который там стоит.
+    if settings.url_prefix:
+        опции["url_prefix"] = settings.url_prefix
+    if settings.trusted_proxies > 0:
+        опции["trusted_proxy"] = settings.host
+        опции["trusted_proxy_count"] = settings.trusted_proxies
+        опции["trusted_proxy_headers"] = {
+            "x-forwarded-for",
+            "x-forwarded-proto",
+            "x-forwarded-host",
+        }
+    return опции
 
 
 if __name__ == "__main__":

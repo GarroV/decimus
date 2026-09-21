@@ -31,6 +31,7 @@ WEB_PORT_VAR = "WEB_PORT"
 WEB_TENANT_VAR = "WEB_TENANT"
 WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ переменной, а не значение
 WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
+WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -83,6 +84,29 @@ class Settings:
     #: От этого зависит, чей адрес считает ограничитель перебора: ноль —
     #: адрес соединения, больше — соответствующее звено `X-Forwarded-For`.
     trusted_proxies: int = DEFAULT_TRUSTED_PROXIES
+    #: Путь, на котором админка живёт снаружи, когда общий вход площадки отдан
+    #: не ей. Пусто — своё имя целиком, и это умолчание. Непустой префикс
+    #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
+    #: иначе первая же кнопка увела бы человека в корень чужого продукта.
+    url_prefix: str = ""
+
+
+def _parse_url_prefix(raw: str) -> str:
+    """Путь, под которым админка видна снаружи. Пусто — под своим именем.
+
+    Нужен там, где общий вход площадки уже занят соседним продуктом, а своего
+    имени у админки нет: тогда снаружи её выделяют путём
+    (`https://площадка/audit`), а не портом в адресе.
+
+    Приводится к одному виду, а не принимается как написали: ведущая косая
+    обязательна, хвостовая убирается. Иначе `audit` и `/audit/` дали бы разные
+    `SCRIPT_NAME` при одном и том же намерении, а разошлись бы они молча —
+    страница открылась бы, а ссылки на ней вели бы мимо.
+    """
+    путь = raw.strip().strip("/")
+    if not путь:
+        return ""
+    return f"/{путь}"
 
 
 def _parse_host(raw: str) -> str:
@@ -191,4 +215,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         secret_key=secret_key,
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
+        url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
     )
