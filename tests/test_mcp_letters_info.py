@@ -28,7 +28,7 @@ from mcp_checklist_harness import build_methodology
 from src.db.models import FindingRow, InfoRow, InspectionDetail, InspectionRow
 from src.domain.config import DATA_FILES
 from src.domain.version import VERSION_FILE, compose
-from src.mcp import letters
+from src.report import letters
 
 #: Пункт методики про срок плана действий. Движок ищет поле НЕ по коду, а по
 #: формулировке вопроса (`engine/report.py: plan_due_date` — «план\\w* действий»),
