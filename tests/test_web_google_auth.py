@@ -77,7 +77,11 @@ def test_неподтверждённая_почта_не_пускает() -> No
 
 
 def test_токен_без_почты_отвергается() -> None:
-    без_почты = json.loads('{"iss":"accounts.google.com","aud":"%s","exp":%d}' % (НАШ_КЛИЕНТ, time.time() + 600))
+    без_почты = {
+        "iss": "accounts.google.com",
+        "aud": НАШ_КЛИЕНТ,
+        "exp": time.time() + 600,
+    }
     середина = base64.urlsafe_b64encode(json.dumps(без_почты).encode()).decode().rstrip("=")
     with pytest.raises(GoogleAuthError):
         identity_from_id_token(f"з.{середина}.п", client_id=НАШ_КЛИЕНТ)

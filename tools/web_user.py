@@ -41,8 +41,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.db.errors import DbError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
-    change_password,
     ROLES,
+    change_password,
     create_account,
     disable_account,
     list_accounts,

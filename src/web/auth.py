@@ -37,12 +37,12 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
 from src.db.web_access import (
-    find_by_email,
     SESSION_TTL,
     Account,
     OpenedSession,
     authenticate,
     close_session,
+    find_by_email,
     open_session,
     resolve_session,
 )

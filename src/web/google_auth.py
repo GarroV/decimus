@@ -120,7 +120,7 @@ def authorization_url(settings: GoogleSettings, *, state: str) -> str:
 
 def exchange_code(settings: GoogleSettings, *, code: str) -> GoogleIdentity:
     """Код возврата → почта вошедшего. Любая осечка — `GoogleAuthError`."""
-    запрос = urllib.request.Request(  # noqa: S310 — адрес константный, не из ввода
+    запрос = urllib.request.Request(
         TOKEN_ENDPOINT,
         data=urllib.parse.urlencode(
             {
