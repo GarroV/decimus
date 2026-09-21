@@ -176,6 +176,9 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "photos": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "translations": {"SELECT", "INSERT", "UPDATE", "DELETE"},
     "inspection_info": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    # Отчёт кладётся один раз и не переписывается (`0018`): UPDATE и DELETE
+    # не выданы вовсе, подмена документа задним числом невозможна правами.
+    "reports": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`).
     "mcp_admins": {"SELECT", "INSERT"},
     "mcp_tokens": {"SELECT", "INSERT"},
@@ -231,6 +234,7 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "photos": {"SELECT"},
     "translations": {"SELECT"},
     "inspection_info": {"SELECT"},
+    "reports": {"SELECT"},
     # Карту синонимов администратор читает целиком, вместе со снятыми строками
     # (`0013`, T292): в продуктовой выдаче снятых нет, а показать человеку
     # нужно именно их. Ни INSERT, ни DELETE не выдано — заводит синонимы

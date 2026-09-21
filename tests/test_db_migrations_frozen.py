@@ -93,6 +93,14 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0016_web_unlock.sql": (
         "sql1:69d57ebd5297ee7816fa8e600493c0788ab75d2fb59b89a38c8287f3d23af0b3"
     ),
+    # География точки (T335) и отчёты проверок (T336). Обе заведены вместе с
+    # файлом и на площадке ещё не применены.
+    "0017_unit_geography.sql": (
+        "sql1:78fcdc69e042819201090307488b7564c8dc7d3f986b2b9c992a315e79f14197"
+    ),
+    "0018_inspection_reports.sql": (
+        "sql1:10226e34e16587df03088ed9f5a7bb95acfb80797edfb99a0ea0aa21c4c1106d"
+    ),
 }
 
 
