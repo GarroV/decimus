@@ -110,7 +110,8 @@
               подменять его сегодняшней пересборкой значит отвечать на «что мы
               отправили» правдоподобной неправдой.
             #}
-            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if saved else letter.lang }}">{{ saved.body if saved else letter.text }}</textarea>
+            {% set правится = saved and not show_draft %}
+            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if правится else letter.lang }}">{{ saved.body if правится else letter.text }}</textarea>
           </label>
           <p class="field-note">{{ t('letter.edit.hint') }}</p>
           <input type="hidden" name="letter_lang" value="{{ letter_lang }}">
@@ -124,7 +125,19 @@
             <button class="btn btn--primary" type="submit"
                     formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
             <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
+            {#
+              Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
+              записывает и не отменяет, а только показывает свежесобранный
+              движком текст. Показывается лишь тогда, когда есть от чего
+              возвращаться, иначе предлагала бы вернуться к тому, что уже в поле.
+            #}
+            {% if saved and not show_draft %}
+              <a class="btn" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
+            {% endif %}
           </div>
+          {% if saved and show_draft %}
+            <p class="field-note">{{ t('letter.draft.shown') }}</p>
+          {% endif %}
         </form>
       </div>
     </div>
