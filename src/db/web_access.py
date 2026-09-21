@@ -84,6 +84,7 @@ MIN_PASSWORD_LENGTH = 12
 LOGIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 
 _INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
+_SELECT_TENANT_SQL = "select 1 from tenants where code = %s"
 
 _INSERT_USER_SQL = """
     insert into web_users (tenant_code, login, password_hash, role)
@@ -350,6 +351,28 @@ def _checked_login(login: str) -> str:
     return имя
 
 
+def _ensure_tenant(tenant: str) -> None:
+    """Убедиться, что арендатор заведён; завести — только если его нет.
+
+    Разделено намеренно. Заводить ЧЕЛОВЕКА — обычная работа админки, и она
+    идёт под узкой ролью. Заводить АРЕНДАТОРА — работа уровня схемы, и права
+    на неё есть только у владельца схемы: новый арендатор это новый заказчик,
+    а не новый сотрудник.
+
+    Проверка идёт под ролью приложения, потому что читать список арендаторов
+    ей можно. Без этой проверки заведение человека в СУЩЕСТВУЮЩЕМ арендаторе
+    требовало бы прав владельца схемы — то есть веб-процесс пришлось бы пускать
+    в базу с правом снести её целиком ради обычной кнопки «добавить».
+    """
+    with _connected("проверить арендатора") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_TENANT_SQL, (tenant,))
+        if cur.fetchone() is not None:
+            return
+    with _owned(f"завести арендатора «{tenant}»") as conn, conn.cursor() as cur:
+        cur.execute(_INSERT_TENANT_SQL, (tenant,))
+        conn.commit()
+
+
 def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
     """Завести учётку. Роль владельца схемы, повтор логина — отказ.
 
@@ -368,8 +391,8 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
             f"украденной базе за вечер, и никакой хеш этого не меняет"
         )
     хеш = password_hash(password)
+    _ensure_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
-        cur.execute(_INSERT_TENANT_SQL, (tenant,))
         try:
             cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
         except psycopg.errors.UniqueViolation as exc:

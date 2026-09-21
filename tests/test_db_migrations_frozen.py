@@ -105,7 +105,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:25cc063152855596a3331fd7225d15c1ccee57410cb79ecff6f11070959b046b"
     ),
     "0020_web_user_roles.sql": (
-        "sql1:5c75e60b5e1d54d02ae20378286e915aa4074a0107e9ee1cd94d228236327921"
+        "sql1:4ba7296245f623f67df1b10d3b788d5ecebe912f846afe2217122e053271d825"
     ),
 }
 

@@ -41,9 +41,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.db.errors import DbError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
+    ROLES,
     create_account,
     disable_account,
     list_accounts,
+    set_role,
 )
 from src.web.config import WEB_TENANT_VAR  # noqa: E402
 
@@ -137,6 +139,12 @@ def main(argv: list[str] | None = None) -> int:
     с_арендатором("list", "перечислить учётки арендатора")
     отключить = с_арендатором("disable", "отключить учётку")
     отключить.add_argument("login")
+    # Роль назначается отдельной командой, а не ключом у `add`. Накат `0020`
+    # не даёт прав никому, и первым админом стенда кого-то делает именно
+    # она — на живом стенде это единственный способ открыть экран учёток.
+    роль = с_арендатором("role", "назначить роль учётке")
+    роль.add_argument("login")
+    роль.add_argument("role", choices=ROLES, help="что человеку можно в админке")
 
     args = parser.parse_args(argv)
     tenant = _tenant(args.tenant)
@@ -148,6 +156,13 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "ensure":
             return _ensure(tenant)
+        if args.command == "role":
+            назначено = set_role(args.login, tenant=tenant, role=args.role)
+            if not назначено:
+                print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
+                return 1
+            print(f"Роль назначена: {args.login} · {args.role}")
+            return 0
         if args.command == "list":
             строки = list_accounts(tenant=tenant)
             if not строки:
@@ -157,7 +172,10 @@ def main(argv: list[str] | None = None) -> int:
                 метка = (
                     f"отключена {строка.disabled_at:%Y-%m-%d}" if строка.disabled_at else "работает"
                 )
-                print(f"{строка.login:<24} {метка:<10} заведена {строка.created_at:%Y-%m-%d}")
+                print(
+                    f"{строка.login:<24} {строка.role:<8} {метка:<10} "
+                    f"заведена {строка.created_at:%Y-%m-%d}"
+                )
             return 0
         отключено = disable_account(args.login, tenant=tenant)
         if not отключено:
