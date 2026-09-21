@@ -16,6 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from flask import Flask, redirect, render_template, request, url_for
+from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db.errors import DbError, RetractionError
@@ -34,6 +35,12 @@ from .texts import UI_LANGS, lang_or_default, t
 #: одной строки, а не поиском по коду.
 REGISTRY_LIMIT = 100
 
+#: Предел размера тела запроса. Формы админки маленькие — самая крупная это
+#: правленое письмо партнёру, — и неограниченное тело на странице, открытой
+#: наружу, означало бы, что вошедший съедает память стенда одной отправкой.
+#: Отказ на превышении даёт Flask сам, 413-м.
+MAX_BODY_BYTES = 256 * 1024
+
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
 SCREENS = ("registry",)
@@ -45,6 +52,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     check_registry(SCREENS)
 
     app = Flask(__name__)
+    app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
     _register_context(app, conf)
     # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
     # порядке регистрации, и опознание обязано случиться раньше всего, что
@@ -144,6 +152,42 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     def card(inspection_id: str) -> str | tuple[str, int]:
         return _render_card(inspection_id, conf=conf, notice=None, failure=None)
 
+    @app.get(f"{section('registry').path}/<inspection_id>/letter")
+    def letter(inspection_id: str) -> str | tuple[str, int]:
+        lang = _lang(conf)
+        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        if detail is None:
+            return render_template("inspections/not_found.html"), 404
+        # Язык ПИСЬМА — третий язык продукта, и он свой: партнёру пишут на его
+        # языке, а не на языке того, кто открыл админку. По умолчанию это язык
+        # отчёта проверки; переключатель нужен там, где письмо уходит партнёру
+        # другой страны. Незнакомый язык проверяет сборщик и отказывает вслух —
+        # движок на такой молча собрал бы письмо по-русски.
+        письмо_на = request.args.get("letter_lang") or None
+        собранное = data.load_letter(detail, lang=письмо_на)
+        return render_template(
+            "inspections/letter.html",
+            letter=собранное,
+            head=detail.inspection,
+            letter_langs=data.LETTER_LANGS,
+            letter_lang=письмо_на or detail.inspection.report_lang,
+            caveats=view.letter_caveats(собранное.caveats, lang),
+            source=None if собранное.source is None else view.letter_source(собранное.source, lang),
+        )
+
+    @app.post(f"{section('registry').path}/<inspection_id>/letter")
+    def export_letter(inspection_id: str) -> FlaskResponse | tuple[str, int]:
+        refuse_foreign_origin()
+        # Проверка существует и принадлежит этому арендатору — спрашивается
+        # ДО того, как что-то отдаётся. Иначе страница выгрузки превратилась
+        # бы в готовый способ получить от админки файл с любым присланным
+        # текстом по её собственному адресу.
+        head = data.load_card(inspection_id, tenant=conf.tenant)
+        if head is None:
+            return render_template("inspections/not_found.html"), 404
+        текст = request.form.get("text") or ""
+        return _letter_file(текст, inspection_id)
+
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> str | tuple[str, int]:
         refuse_foreign_origin()
@@ -180,6 +224,33 @@ def _render_card(
         notice=notice,
         failure=failure,
     )
+
+
+def _letter_file(text: str, inspection_id: str) -> FlaskResponse:
+    """Правленое письмо — файлом, который человек приложит к почте.
+
+    Отправки из системы нет и в этой задаче не заводится: письмо формируется в
+    почте и отправляется человеком руками (Q010, D035). Выгрузка — ровно мост
+    между экраном и почтой, а не тихое начало собственной рассылки.
+
+    Текст приезжает от человека и уезжает ему же обратно, поэтому отдаётся
+    вложением, простым текстом и с запретом угадывать тип: без этого браузер
+    вправе показать присланное как страницу с адреса самой админки.
+    """
+    ответ = FlaskResponse(text, mimetype="text/plain; charset=utf-8")
+    ответ.headers["Content-Disposition"] = f'attachment; filename="{_letter_name(inspection_id)}"'
+    ответ.headers["X-Content-Type-Options"] = "nosniff"
+    return ответ
+
+
+def _letter_name(inspection_id: str) -> str:
+    """Имя файла письма: только то, что не ломает заголовок ответа.
+
+    Идентификатор приходит из адреса, то есть снаружи. Кавычка или перевод
+    строки в нём — это уже не имя файла, а дописанный заголовок.
+    """
+    чистое = "".join(знак for знак in inspection_id if знак.isalnum() or знак in "-_")[:64]
+    return f"letter-{чистое or 'inspection'}.txt"
 
 
 def _kind_title(code: str, lang: str) -> str:
