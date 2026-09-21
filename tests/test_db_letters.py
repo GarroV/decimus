@@ -117,3 +117,34 @@ def test_письмо_несуществующей_проверки_не_лож�
             lang="ru",
             saved_by="director",
         )
+
+
+def test_письмо_спрашивается_на_своём_языке_а_не_какое_нашлось(
+    domain_env: Path, db_env: str
+) -> None:
+    inspection_id = _проверка(920_006)
+
+    save_letter(inspection_id, body=ПИСЬМО, lang="ru", saved_by="director")
+
+    # Партнёру другой страны пишут на его языке, и зафиксированное русское для
+    # него не «то же письмо, но переведут потом», а чужой текст. Без отбора по
+    # языку экран показал бы сохранённое русское под видом сербского — и
+    # заметить это было бы нечем: текст выглядит как письмо и лежит на месте
+    # письма.
+    assert latest_letter(inspection_id, lang="sr") is None
+    на_русском = latest_letter(inspection_id, lang="ru")
+    assert на_русском is not None
+    assert на_русском.body == ПИСЬМО
+
+    save_letter(inspection_id, body=ПРАВЛЕНОЕ, lang="sr", saved_by="director")
+
+    # Каждый язык живёт своей записью: правка сербского не трогает русское.
+    сербское = latest_letter(inspection_id, lang="sr")
+    русское = latest_letter(inspection_id, lang="ru")
+    assert сербское is not None and сербское.body == ПРАВЛЕНОЕ
+    assert русское is not None and русское.body == ПИСЬМО
+
+    # Без языка спрашивается «последнее любое» — этим пользуется история, а не
+    # экран письма.
+    любое = latest_letter(inspection_id)
+    assert любое is not None and любое.lang == "sr"
