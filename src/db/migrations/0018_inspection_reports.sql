@@ -55,19 +55,9 @@ comment on column reports.storage_path is
 
 alter table reports enable row level security;
 
--- Арендатор берётся у проверки, а не хранится рядом: вторая копия кода
--- арендатора разошлась бы с первой, и разошлась бы молча — в сторону «чужой
--- отчёт виден».
-create policy reports_by_tenant on reports
-    for all
-    using (exists (
-        select 1 from inspections i
-        where i.id = reports.inspection_id
-          and i.tenant_code = current_setting('app.tenant_code', true)))
-    with check (exists (
-        select 1 from inspections i
-        where i.id = reports.inspection_id
-          and i.tenant_code = current_setting('app.tenant_code', true)));
+alter table reports force row level security;
+create policy reports_app_access on reports
+    for all to dodo_audit_app using (true) with check (true);
 
 -- Записанный отчёт заморожен — тот же приём, что у кадра
 -- (`photos_uploaded_only_once`, 0004). Выгрузка идёт ПОСЛЕ завершения
@@ -81,7 +71,4 @@ create policy reports_frozen_once_written on reports
 
 grant select, insert on reports to dodo_audit_app;
 
--- Администратору истории — чтение и удаление: снятая проверка уносит свои
--- файлы (D086, D089), и удалять отчёт снятой проверки обязан тот же, кто
--- снимает саму проверку, а не приложение.
-grant select, delete on reports to dodo_audit_admin;
+grant select on reports to dodo_audit_admin;
