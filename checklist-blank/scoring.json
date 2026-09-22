@@ -1,0 +1,22 @@
+{
+  "_comment": "Бланк ставок и порогов: с него начинается новый чек-лист. Значения здесь — отправная точка, а не методика управляющей компании: их задаёт автор чек-листа под свой вид аудита. Правка этого файла меняет то, с чего начинаются НОВЫЕ чек-листы, и не трогает ни одного существующего.",
+  "start_pct": 100.0,
+  "penalty": {"D1": 0.5, "D2": 2.0},
+  "d3": {"mode": "zero_zone_share", "skip_other_violations_in_d3_zone": true},
+  "cap_zone_loss_at_share": true,
+  "floor_pct": 0.0,
+  "grades": {
+    "rules": [
+      {"grade": "D", "if": {"min_d3": 1}, "label_ru": "Критическое несоответствие", "label_en": "Critical non-compliance"},
+      {"grade": "A", "if": {"pct_at_least": 95.0, "max_d2": 0}, "label_ru": "Соответствует стандарту", "label_en": "Meets the standard"},
+      {"grade": "B", "if": {"pct_at_least": 85.0}, "label_ru": "Незначительные отклонения", "label_en": "Minor deviations"}
+    ],
+    "fallback": {"grade": "C", "label_ru": "Ниже стандарта", "label_en": "Below the standard"}
+  },
+  "deadlines": {
+    "max_days": {"D1": 14, "D2": 10, "D3": 0},
+    "d3_note_ru": "немедленно",
+    "d3_note_en": "immediately"
+  },
+  "plan_due_days": 10
+}
