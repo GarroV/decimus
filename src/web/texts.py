@@ -289,15 +289,21 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Not saved yet: this is a draft, and edits are lost unless you save them",
     },
     "letter.open": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    # Что экран ДЕЛАЕТ, а не чего он не делает. До T333 письмо действительно не
+    # хранилось, и текст об этом остался после фиксации писем — экран обещал
+    # «не хранится» кнопкой «Сохранить письмо» в том же кадре. Владелец прочёл
+    # ровно это: «сохранить письмо — это что, у нас нет редактора?»
     "letter.lead": {
         "ru": (
             "Письмо собирается заново по этой проверке и по методике той версии, "
-            "которой она помечена. В системе оно не хранится: отправляет его человек "
-            "из почты."
+            "которой она помечена. Отправляет его человек из почты — отправки из "
+            "системы нет; здесь письмо правят и сохраняют тот текст, который ушёл "
+            "партнёру."
         ),
         "en": (
             "The letter is rebuilt from this inspection on the methodology version it "
-            "was scored by. It is not stored in the system: a human sends it from mail."
+            "was scored by. A human sends it from mail — the system never sends; here "
+            "you edit it and save the text that went to the partner."
         ),
     },
     "letter.back": {"ru": "К карточке проверки", "en": "Back to the inspection"},
@@ -390,12 +396,14 @@ TEXTS: dict[str, dict[str, str]] = {
     "letter.edit.label": {"ru": "Текст письма", "en": "Letter text"},
     "letter.edit.hint": {
         "ru": (
-            "Правки здесь никуда не сохраняются — письмо каждый раз собирается заново. "
-            "Поправьте и выгрузите файл либо скопируйте текст в почту."
+            "Правка живёт, только если нажать «Сохранить письмо»: уход со страницы без "
+            "сохранения её теряет. Сохранённый текст и есть ответ на вопрос, что именно "
+            "мы отправили партнёру."
         ),
         "en": (
-            "Edits here are not stored — the letter is rebuilt every time. Adjust it and "
-            "download the file, or copy the text into mail."
+            "An edit survives only if you press \u201cSave the letter\u201d: leaving the "
+            "page without saving loses it. The saved text is the answer to what exactly "
+            "we sent the partner."
         ),
     },
     "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
