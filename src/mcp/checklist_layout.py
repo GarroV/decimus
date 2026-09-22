@@ -45,7 +45,7 @@ import json
 import os
 import re
 import secrets
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from ..report.engine_call import VERSIONS_DIR
@@ -287,6 +287,26 @@ def point_prod_at(store: Store) -> None:
     """
     guard_prod_link(store.root)
     swap_link(prod_link(store.root), os.path.join(store.space, store.code, CURRENT_LINK))
+
+
+def for_code(store: Store, code: str | None) -> Store:
+    """Хранилище, наведённое на названный чек-лист — или на применённый к проду.
+
+    Умолчание здесь не «тот, что был единственным», а именно **применённый к
+    проду**: иначе вызов без кода после смены прода продолжал бы править
+    чек-лист, по которому больше не считают, и правка уходила бы в никуда
+    молча.
+
+    Код проверяется до подстановки: он становится куском пути внутри
+    хранилища, а приходит снаружи — из вызова агента.
+    """
+    if code is not None:
+        return replace(store, code=check_slug(code, что="Код чек-листа"))
+    в_проде = applied(store.root)
+    if в_проде is None:
+        return store
+    space, чей = в_проде
+    return replace(store, space=space, code=чей)
 
 
 # --- перечень чек-листов ------------------------------------------------------

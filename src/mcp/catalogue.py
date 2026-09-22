@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_source, checklist_tools, phrases, retraction, tools
+from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -164,6 +164,21 @@ _CHECKLIST_VERSION_PROPERTY: dict[str, object] = {
         "currently scores inspections by (checklist_versions calls that one "
         "'current'; it may differ from 'latest', the most recently stored "
         "one)."
+    ),
+}
+
+#: Какой чек-лист. Хранилище несёт их много (T341, D183), и каждый инструмент
+#: методики обязан уметь сказать, о каком речь. Не назван — тот, что применён к
+#: проду: старые вызовы агента продолжают работать слово в слово, а новые
+#: называют чек-лист явно.
+_CHECKLIST_CODE_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "description": (
+        "Code of the checklist to work with, as returned by checklists "
+        "('checklist' field). Omit to work with the checklist currently "
+        "applied to production — the one inspections are scored against. The "
+        "code never changes: it is what ties a checklist to the inspections "
+        "already scored by it."
     ),
 }
 
@@ -1557,7 +1572,148 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_RETRACTION,
         history=True,
     ),
+    ToolSpec(
+        name="checklists",
+        description=(
+            "List every checklist the store holds: code, names, state (draft "
+            "/ active / retired) and which one is applied to production. "
+            "State and production are different things: 'active' means a "
+            "checklist is fit for use and several may be, while 'applied to "
+            "production' is a pointer and there is exactly one. Checklists "
+            "are never deleted — a retired one stays listed, because "
+            "inspections were scored by it."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.checklists,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="checklist_meta",
+        description=(
+            "Read one checklist's card: code, both names, state, whether it "
+            "is applied to production and which edition it publishes. Name "
+            "the checklist with 'checklist'; omit it to read the one applied "
+            "to production."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.checklist_meta,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="create_checklist",
+        description=(
+            "Create a new checklist from the blank: an empty item list, one "
+            "zone at 100 per cent and blank scoring rates. Not a copy of an "
+            "existing checklist — a copy drifts from its original on the "
+            "first edit while still looking like it. The new checklist is "
+            "born a draft and scores nothing until items are added; a "
+            "checklist without items cannot be applied to production, because "
+            "it would hand a partner 100 per cent without asking a single "
+            "question. The code is given in 'checklist' and never changes."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "name_ru": {
+                    "type": "string",
+                    "description": "Name shown to Russian-speaking people.",
+                },
+                "name_en": {
+                    "type": "string",
+                    "description": "Name shown to English-speaking people.",
+                },
+            },
+            "required": ["checklist", "name_ru", "name_en"],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.create_checklist,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="rename_checklist",
+        description=(
+            "Change a checklist's names. Names are wording and are translated "
+            "and edited freely; the code is the link to inspections already "
+            "scored and to stored editions, and it changes by nothing."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "name_ru": {"type": "string", "description": "New Russian name."},
+                "name_en": {"type": "string", "description": "New English name."},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.rename_checklist,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="set_checklist_state",
+        description=(
+            "Set a checklist's state: draft, active or retired. Retiring is "
+            "how a checklist is taken out of use — there is no deletion, "
+            "because deleting would take the history of everything scored by "
+            "it. A checklist applied to production cannot be retired: apply "
+            "another one first."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": ["draft", "active", "retired"],
+                    "description": "The state to set.",
+                },
+            },
+            "required": ["state"],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.set_checklist_state,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="apply_checklist",
+        description=(
+            "Apply a checklist to production: inspections are scored against "
+            "it from now on. One movement — the store pointer is moved — and "
+            "the rollback is applying the previous one. Inspections already "
+            "scored stay on their own checklist and edition and are never "
+            "recalculated. Refused for a retired checklist, for one with no "
+            "published edition, and for one with no items that can hold a "
+            "violation."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.apply_checklist,
+        kind=KIND_CHECKLIST,
+    ),
 )
+
+#: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним
+#: местом, а не двадцатью четырьмя объявлениями. Перечислять его в каждой схеме
+#: значило бы, что следующий инструмент забудет его молча, и агент получит
+#: отказ разбора аргументов вместо работы (#271: инструмент уже надо вносить в
+#: три места).
+for _спец in TOOLS:
+    if _спец.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE):
+        _свойства = _спец.input_schema.setdefault("properties", {})
+        if isinstance(_свойства, dict):
+            _свойства.setdefault("checklist", _CHECKLIST_CODE_PROPERTY)
 
 #: Индекс по имени — `find()` вызывается на каждый запрос `tools/call`,
 #: а линейный проход по всем записям каталога пересчитывать незачем.
