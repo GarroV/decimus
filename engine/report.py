@@ -534,7 +534,7 @@ def html_to_pdf(html, out):
 LETTER_PLAN = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
 
-Здравствуйте{partner_greet}!
+Здравствуйте!
 
 {date} мы провели проверку пиццерии {unit}{city}. Вид проверки — {type}.
 
@@ -546,14 +546,10 @@ LETTER_PLAN = {
 
 Просим до {plan_due} прислать план действий по устранению: ответственный и дата по каждому пункту. Нарушения D2 ждём закрытыми в срок, указанный в отчёте, D3 — немедленно, с подтверждением фотографией.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта и помочь с приоритизацией.
-
-С уважением,
-{auditor}
-Dodo Brands""",
+Спасибо за работу. Готовы обсудить любой пункт отчёта и помочь с приоритизацией.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
-Hello{partner_greet},
+Hello,
 
 On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
@@ -565,16 +561,12 @@ What we recorded:
 
 Please send us your action plan by {plan_due}, with an owner and a date for each item. D2 violations are expected to be closed within the deadline stated in the report; D3 violations immediately, confirmed with a photo.
 
-Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.
-
-Best regards,
-{auditor}
-Dodo Brands""",
+Thank you for your work. We are happy to walk through any item in the report and help with prioritisation.""",
 }
 LETTER_CLEAN = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
 
-Здравствуйте{partner_greet}!
+Здравствуйте!
 
 {date} мы провели проверку пиццерии {unit}{city}. Вид проверки — {type}.
 
@@ -584,14 +576,10 @@ LETTER_CLEAN = {
 {summary_lines}
 Подробный отчёт с фотофиксацией, разбивкой по зонам и сроками устранения по каждому пункту — во вложении. Плана действий не ждём: перечисленные отклонения устраняются в рабочем порядке в сроки, указанные в отчёте.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта.
-
-С уважением,
-{auditor}
-Dodo Brands""",
+Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
-Hello{partner_greet},
+Hello,
 
 On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
@@ -601,11 +589,7 @@ What we noted:
 {summary_lines}
 The full report — photo evidence, the breakdown by zone and a deadline for every item — is attached. No action plan is expected: the deviations listed above are closed in the normal course of work within the deadlines stated in the report.
 
-Thank you for your work. We are happy to walk through any item in the report.
-
-Best regards,
-{auditor}
-Dodo Brands""",
+Thank you for your work. We are happy to walk through any item in the report.""",
 }
 # Проверка без единой записи. Отдельный шаблон, а не «чистое письмо с нулём»:
 # у чистого письма есть блок «Что отметили» и обещание, что перечисленные
@@ -614,7 +598,7 @@ Dodo Brands""",
 LETTER_EMPTY = {
     "ru": """Тема: Результаты проверки — {unit}, {date}: оценка {grade} ({pct}%)
 
-Здравствуйте{partner_greet}!
+Здравствуйте!
 
 {date} мы провели проверку пиццерии {unit}{city}. Вид проверки — {type}.
 
@@ -622,14 +606,10 @@ LETTER_EMPTY = {
 
 Отчёт с разбивкой по зонам — во вложении. Плана действий не ждём.
 
-Спасибо за работу. Готовы обсудить любой пункт отчёта.
-
-С уважением,
-{auditor}
-Dodo Brands""",
+Спасибо за работу. Готовы обсудить любой пункт отчёта.""",
     "en": """Subject: Inspection results — {unit}, {date}: grade {grade} ({pct}%)
 
-Hello{partner_greet},
+Hello,
 
 On {date} we inspected the {unit} store{city}. Inspection type: {type}.
 
@@ -637,11 +617,7 @@ The final grade is {grade} ({pct}%).{grade_note} No violations were recorded.
 
 The report, with the breakdown by zone, is attached. No action plan is expected.
 
-Thank you for your work. We are happy to walk through any item in the report.
-
-Best regards,
-{auditor}
-Dodo Brands""",
+Thank you for your work. We are happy to walk through any item in the report.""",
 }
 GRADE_NOTE = {
     "ru": {"A": " Пиццерия соответствует стандарту.",
@@ -774,7 +750,6 @@ def build_letter(res, lang):
         else:
             crit = ("\nКритично (D3): " + names + ". По методике нарушение D3 обнуляет всю зону, "
                     "в которой оно зафиксировано.\n\n")
-    contact = m.get("contact") or ""
     if clean and not res["findings"]:
         template = LETTER_EMPTY[lang]
     else:
@@ -786,9 +761,7 @@ def build_letter(res, lang):
         grade=res["grade"], pct=f"{res['pct']:g}",
         grade_note=GRADE_NOTE[lang].get(res["grade"], ""),
         summary_lines=summary_lines(res, lang, clean), critical_block=crit,
-        plan_due=fmt_date(plan_due_date(res)),
-        partner_greet=(f", {contact}" if contact else ""),
-        auditor=m.get("auditor") or "___")
+        plan_due=fmt_date(plan_due_date(res)))
 
 
 def letter_problems(text, res):
