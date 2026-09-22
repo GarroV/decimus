@@ -23,21 +23,25 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.db.errors import AccessError  # noqa: E402
+from src.db.errors import AccessError, EmailTakenError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     ROLE_ADMIN,
     ROLE_AUDITOR,
     SESSION_TTL,
     authenticate,
+    change_password,
     close_session,
     create_account,
     disable_account,
+    find_by_email,
     list_accounts,
     new_session_token,
+    normalize_email,
     open_session,
     password_hash,
     resolve_session,
     session_fingerprint,
+    set_email,
     set_role,
 )
 
@@ -352,3 +356,142 @@ def test_незаведённая_роль_отвергается_а_не_лож
             create_account(
                 f"u{abs(hash(кривая)) % 997}", tenant=ТЕНАНТ, password=ПАРОЛЬ, role=кривая
             )
+
+
+# --- Вход через учётку Google: опознание по почте (T332) ---
+
+ПОЧТА = "director@dodobrands.io"
+
+
+def test_почта_опознаёт_живую_учётку(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    assert set_email("director", tenant=ТЕНАНТ, email=ПОЧТА) is True
+
+    учётка = find_by_email(ПОЧТА, tenant=ТЕНАНТ)
+
+    assert учётка is not None
+    assert учётка.login == "director"
+    assert учётка.tenant == ТЕНАНТ
+
+
+def test_регистр_и_пробелы_в_почте_не_плодят_второго_человека(обе_роли: str) -> None:
+    """Google вернёт почту в своей форме, а не в той, в какой её завели у нас."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email="  Director@DodoBrands.IO ")
+
+    учётка = find_by_email("DIRECTOR@dodobrands.io", tenant=ТЕНАНТ)
+
+    assert учётка is not None
+    assert учётка.login == "director"
+
+
+def test_незнакомая_почта_получает_отказ_а_не_учётку(обе_роли: str) -> None:
+    """Круг допущенных задаёт владелец, а не Google: автозавода по входу нет."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    assert find_by_email("kto-ugodno@gmail.com", tenant=ТЕНАНТ) is None
+    assert len(list_accounts(tenant=ТЕНАНТ)) == 1
+
+
+def test_отключённая_учётка_не_входит_и_через_google(обе_роли: str) -> None:
+    """Отзыв доступа закрывает все двери сразу, иначе это не отзыв."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    disable_account("director", tenant=ТЕНАНТ)
+
+    assert find_by_email(ПОЧТА, tenant=ТЕНАНТ) is None
+
+
+def test_почта_чужого_арендатора_не_опознаётся(обе_роли: str) -> None:
+    """Домен почты не говорит, чью историю человеку видно: арендатор из стенда."""
+    create_account("director", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("director", tenant=ЧУЖОЙ, email=ПОЧТА)
+
+    assert find_by_email(ПОЧТА, tenant=ТЕНАНТ) is None
+
+
+def test_снятая_почта_закрывает_вход_через_google_но_не_учётку(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    assert set_email("director", tenant=ТЕНАНТ, email=None) is True
+
+    assert find_by_email(ПОЧТА, tenant=ТЕНАНТ) is None
+    assert authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ) is not None
+
+
+def test_пустая_почта_не_опознаёт_никого(обе_роли: str) -> None:
+    """Пустая строка — не «любой», а никто: иначе вход открывается молчанием."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    assert find_by_email("", tenant=ТЕНАНТ) is None
+    assert find_by_email("   ", tenant=ТЕНАНТ) is None
+    with pytest.raises(ValueError):
+        normalize_email("   ")
+
+
+def test_две_учётки_с_одной_почтой_у_арендатора_не_заводятся(обе_роли: str) -> None:
+    """Иначе опознание стало бы выбором из двух строк, а выбирать не из чего."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    create_account("auditor", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    with pytest.raises(EmailTakenError):
+        set_email("auditor", tenant=ТЕНАНТ, email=ПОЧТА)
+
+
+# --- Смена пароля учётки (T340, #323) ---
+
+
+def test_новый_пароль_опознаёт_а_старый_перестаёт(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    НОВЫЙ = ПАРОЛЬ + "-другой"
+
+    assert change_password("director", tenant=ТЕНАНТ, password=НОВЫЙ) is True
+
+    assert authenticate("director", НОВЫЙ, tenant=ТЕНАНТ) is not None
+    assert authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ) is None
+
+
+def test_смена_пароля_выгоняет_открытые_сессии(обе_роли: str) -> None:
+    """Пароль меняют, когда его узнали: вошедший по старому обязан вылететь."""
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    открытая = open_session(учётка)
+    assert resolve_session(открытая.token, tenant=ТЕНАНТ) is not None
+
+    change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой")
+
+    assert resolve_session(открытая.token, tenant=ТЕНАНТ) is None
+
+
+def test_пароль_не_меняется_несуществующей_учётке(обе_роли: str) -> None:
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert change_password("никто", tenant=ТЕНАНТ, password="какой-угодно-пароль") is False
+
+
+def test_пароль_не_меняется_отключённой_учётке(обе_роли: str) -> None:
+    """Отключённую не воскрешают сменой пароля: её включают отдельно и осознанно."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    disable_account("director", tenant=ТЕНАНТ)
+
+    assert change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой") is False
+
+
+def test_смена_пароля_не_трогает_чужого_арендатора(обе_роли: str) -> None:
+    create_account("director", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+
+    assert change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой") is False
+    assert authenticate("director", ПАРОЛЬ, tenant=ЧУЖОЙ) is not None
+
+
+def test_смена_пароля_не_принимает_короткий(обе_роли: str) -> None:
+    """Правило длины стояло только на заведении — это был обход в один шаг."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    with pytest.raises(AccessError):
+        change_password("director", tenant=ТЕНАНТ, password="коротыш")
+
+    assert authenticate("director", ПАРОЛЬ, tenant=ТЕНАНТ) is not None

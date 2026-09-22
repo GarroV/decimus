@@ -107,6 +107,12 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0020_web_user_roles.sql": (
         "sql1:4ba7296245f623f67df1b10d3b788d5ecebe912f846afe2217122e053271d825"
     ),
+    "0021_web_user_email.sql": (
+        "sql1:5a80704e8d076c55205f62b3b93aee67b7b77ac7bfdc46996917b82cbb5c882b"
+    ),
+    "0022_web_password_change.sql": (
+        "sql1:985220a127c41ea2fd388fc3737670e2acdfbfb82d99e01d8619edb2b635a718"
+    ),
 }
 
 

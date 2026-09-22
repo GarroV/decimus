@@ -64,6 +64,15 @@ TEXTS: dict[str, dict[str, str]] = {
     "auth.login": {"ru": "Логин", "en": "Login"},
     "auth.password": {"ru": "Пароль", "en": "Password"},
     "auth.submit": {"ru": "Войти", "en": "Sign in"},
+    # Вход через учётку Google (T332). Кнопка РЯДОМ с паролем, а не вместо:
+    # у партнёра почта может оказаться не гугловой, и отнимать единственную
+    # дверь ради красоты схемы нельзя.
+    "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
+    "auth.google.hint": {
+        "ru": "Рабочей почтой, на которую вас завели. Незнакомая почта доступа не даёт.",
+        "en": "Use the work email your account was created with. Unknown emails get no access.",
+    },
+    "auth.or": {"ru": "или", "en": "or"},
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",

@@ -30,6 +30,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 
 from flask import Flask, g, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
@@ -41,17 +42,36 @@ from src.db.web_access import (
     OpenedSession,
     authenticate,
     close_session,
+    find_by_email,
     open_session,
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 
 from .config import Settings
+from .google_auth import (
+    GoogleAuthError,
+    authorization_url,
+    exchange_code,
+    load_google_settings,
+    new_state,
+)
 from .origin import over_https, refuse_foreign_origin
 from .remote import client_address
 
 LOGIN_PATH = "/login"
 LOGOUT_PATH = "/logout"
+
+#: Вход через учётку Google (T332). Путь возврата обязан совпадать побуквенно
+#: с тем, что вписано в консоли Google, иначе вход падает `redirect_uri_mismatch`.
+GOOGLE_START_PATH = "/login/google"
+GOOGLE_CALLBACK_PATH = "/auth/google/callback"
+
+#: Кука с меткой захода живёт минуты: столько идёт согласие у Google. Дольше —
+#: и украденная метка остаётся годной вместе с ней.
+GOOGLE_STATE_COOKIE = "dodo_audit_google_state"
+GOOGLE_STATE_SALT = "google-state"
+GOOGLE_STATE_TTL_SECONDS = 600
 
 #: Имя куки. Своё, а не `session`: рядом на той же машине живут другие стенды,
 #: и одноимённая кука соседа затирала бы нашу на общем хосте.
@@ -68,7 +88,7 @@ COOKIE_SALT = "web-session"
 #: файлы не рассказывают ничего. Как только в статику попадёт хоть что-то про
 #: данные, её место здесь придётся пересмотреть — поэтому список короткий и
 #: лежит на виду.
-OPEN_ENDPOINTS = frozenset({"login", "static"})
+OPEN_ENDPOINTS = frozenset({"login", "static", "google_start", "google_callback"})
 
 #: Ключ в `g`, под которым живёт вошедший на время запроса.
 CURRENT = "account"
@@ -181,6 +201,132 @@ def install(app: Flask, conf: Settings) -> None:
         note_success(tenant=conf.tenant, address=адрес, login=имя)
         session = open_session(account)
         return remember(redirect(url_for("registry")), session)
+
+    google = load_google_settings()
+    state_signer = URLSafeTimedSerializer(
+        conf.secret_key, salt=GOOGLE_STATE_SALT, signer_kwargs={"digest_method": hashlib.sha256}
+    )
+
+    @app.context_processor
+    def _вход_через_google_доступен() -> dict[str, bool]:
+        """Одно место на все страницы: есть ли у стенда реквизиты Google.
+
+        Через процессор контекста, а не аргументом render_template: форму
+        входа рисуют три разных пути (GET, отказ пароля, отказ возврата), и
+        забытый аргумент в одном из них убрал бы кнопку молча.
+        """
+        return {"google_enabled": google is not None}
+
+    @app.get(GOOGLE_START_PATH, endpoint="google_start")
+    def google_start() -> Response:
+        """Увести к Google за согласием. Реквизитов нет — возвращаем на форму.
+
+        Не 404 и не ошибка: стенд без реквизитов работает паролем, и человек,
+        ткнувший в кнопку по старой памяти, должен увидеть форму входа, а не
+        поломку.
+        """
+        if google is None:
+            return redirect(url_for("login"))
+        метка = new_state()
+        ответ = redirect(authorization_url(google, state=метка))
+        # Метка кладётся В КУКУ, а не в память процесса: стенд может работать
+        # несколькими воркерами, и возврат придёт не обязательно в тот, что
+        # уводил.
+        ответ.set_cookie(
+            GOOGLE_STATE_COOKIE,
+            state_signer.dumps(метка),
+            max_age=GOOGLE_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    @app.get(GOOGLE_CALLBACK_PATH, endpoint="google_callback")
+    def google_callback() -> str | Response | tuple[str, int]:
+        """Возврат от Google: сверить метку, обменять код, найти своего.
+
+        Порядок проверок не случаен. Метка сверяется ДО обращения к Google:
+        иначе чужая страница приводила бы нас к обмену своего кода, то есть
+        тратила бы наш запрос и открывала бы сессию чужим аккаунтом в браузере
+        человека.
+        """
+        if google is None:
+            return redirect(url_for("login"))
+
+        отказано = отказ_входа()
+        подписанная = request.cookies.get(GOOGLE_STATE_COOKIE)
+        пришедшая = request.args.get("state") or ""
+        if not подписанная or not пришедшая:
+            return отказано
+        try:
+            ожидаемая = state_signer.loads(подписанная, max_age=GOOGLE_STATE_TTL_SECONDS)
+        except BadSignature:
+            return отказано
+        # Сравнение постоянного времени: обычное `==` на строках отвечает тем
+        # быстрее, чем раньше расходятся байты, и по этому времени метку
+        # подбирают.
+        # Сравнение В БАЙТАХ, а не в строках: `compare_digest` на строках с
+        # не-ASCII падает TypeError, и подделанная метка с кириллицей давала бы
+        # 500 вместо отказа. Поймано тестом, а не в бою.
+        if not hmac.compare_digest(str(ожидаемая).encode(), пришедшая.encode()):
+            return отказано
+
+        # `error=access_denied` приходит, когда человек сам отказался в окне
+        # согласия. Это не поломка: возвращаем на форму без красного.
+        if request.args.get("error"):
+            return очистить_метку(redirect(url_for("login")))
+
+        код = request.args.get("code") or ""
+        if not код:
+            return отказано
+
+        try:
+            кто = exchange_code(google, code=код)
+        except GoogleAuthError:
+            return отказано
+
+        # Второй заслон на подтверждённость почты. Первый стоит в разборе
+        # токена (`google_auth.identity_from_id_token`), и обычно этого хватает
+        # — но `GoogleIdentity` несёт признак с собой, а маршрут его
+        # игнорировал. Появится завтра второй путь получения личности (другой
+        # провайдер, кеш, тест-двойник) — и неподтверждённая почта пройдёт
+        # сюда молча. Проверка стоит строки, пропуск стоит чужого входа.
+        if not кто.email_verified:
+            return отказано
+
+        # ВОТ ЗДЕСЬ круг допущенных: Google подтвердил владение почтой и не
+        # более того. Незнакомая почта получает отказ, а не заводит учётку —
+        # иначе круг допущенных задавал бы Google, а не владелец.
+        account = find_by_email(кто.email, tenant=conf.tenant)
+        if account is None:
+            return отказано
+
+        note_success(
+            tenant=conf.tenant,
+            address=client_address(trusted_proxies=conf.trusted_proxies),
+            login=account.login,
+        )
+        session = open_session(account)
+        return очистить_метку(remember(redirect(url_for("registry")), session))
+
+    def отказ_входа() -> tuple[str, int]:
+        """Один и тот же отказ на все осечки возврата.
+
+        Разные ответы на «метка не та», «код не тот» и «почты нет в списке»
+        рассказали бы подбирающему, на каком шаге он остановился, и заодно —
+        кто здесь заведён.
+        """
+        страница = render_template("login.html", failed=True, locked_minutes=None)
+        ответ = make_response(страница, 401)
+        ответ.delete_cookie(GOOGLE_STATE_COOKIE, path="/")
+        return ответ  # type: ignore[return-value]
+
+    def очистить_метку(response: Response) -> Response:
+        """Метка одноразовая: заход состоялся — её больше быть не должно."""
+        response.delete_cookie(GOOGLE_STATE_COOKIE, path="/")
+        return response
 
     @app.post(LOGOUT_PATH, endpoint="logout")
     def logout() -> Response:
