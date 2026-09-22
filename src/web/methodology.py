@@ -34,7 +34,9 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp import checklist_tools as door
+from src.mcp import checklists as lists_door
 from src.mcp.checklist import Store, current_version, tip_version
+from src.mcp.checklist_layout import ACTIVE, DRAFT, RETIRED, for_code
 from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
 from src.mcp.errors import McpError
 
@@ -416,3 +418,102 @@ def publish_version(store: Store, *, tenant: str, version: str) -> str:
     except McpError as отказ:
         raise _refusal(отказ) from None
     return str(итог["published"])
+
+
+# --- чек-листы как сущности (T347) --------------------------------------------
+#
+# Здесь же, а не своим модулем: дверь веба в хранилище методики ровно одна, и
+# это проверяется сборкой (`tests/test_web_bounds.py`). Вторая дверь означала бы
+# два разных представления об одном хранилище — ровно то, чего вся конструкция
+# избегает.
+
+#: Состояния чек-листа, в порядке жизни: черновик → в работе → снят.
+CHECKLIST_STATES = (DRAFT, ACTIVE, RETIRED)
+
+
+@dataclass(frozen=True)
+class Difference:
+    """«Сейчас в проде вот этот, будет вот этот» — то, что человек видит до кнопки."""
+
+    current: lists_door.Summary | None
+    candidate: lists_door.Summary | None
+
+
+def store_for(store: Store, code: str | None) -> Store:
+    """Хранилище, наведённое на чек-лист с экрана — или на применённый к проду.
+
+    Тот же ход, что у точки входа MCP (`rpc`), и та же функция: экран, знающий
+    про чек-листы своё, однажды показал бы не то, что правит агент.
+    """
+    try:
+        return for_code(store, code)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def checklists_overview(store: Store) -> list[lists_door.Overview]:
+    """Все чек-листы хранилища. Пусто — пустой список, а не отказ.
+
+    Нетронутое хранилище дверь заводит сама (`checklists.overview`): иначе
+    первый заход на экран показал бы «чек-листов нет» на площадке, где
+    методика есть и по ней считают, — пустой перечень читался бы как факт о
+    продукте.
+    """
+    try:
+        return lists_door.overview(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def checklist_difference(store: Store) -> Difference:
+    """Что стоит в проде сейчас и что встанет, если применить этот чек-лист."""
+    try:
+        сейчас, кандидат = lists_door.difference(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+    return Difference(current=сейчас, candidate=кандидат)
+
+
+def create_checklist(
+    store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
+) -> Any:
+    """Завести чек-лист с нуля. Рождается черновиком и к проду не идёт."""
+    целевое = store_for(store, code)
+    try:
+        return lists_door.create(
+            целевое, tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def rename_checklist(
+    store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
+) -> Any:
+    """Поменять названия. Код не меняется ничем и никогда."""
+    try:
+        return lists_door.rename(
+            store_for(store, code), tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_checklist_state(store: Store, *, tenant: str, author: str, code: str, state: str) -> Any:
+    """Черновик / в работе / снят."""
+    try:
+        return lists_door.set_state(store_for(store, code), tenant=tenant, state=state, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def apply_checklist(store: Store, *, tenant: str, author: str, code: str) -> dict[str, object]:
+    """Применить чек-лист к проду: по нему пойдут проверки.
+
+    Заслоны — в двери: пустой, снятый и без опубликованного издания к проду не
+    идут. Экран их не повторяет, он их показывает.
+    """
+    try:
+        return lists_door.apply_to_production(store_for(store, code), tenant=tenant, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None

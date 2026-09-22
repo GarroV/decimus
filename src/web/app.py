@@ -64,6 +64,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_sections(app)
     _register_registry(app, conf)
     _register_methodology(app, conf)
+    _mount_checklists(app, conf)
     _register_errors(app)
     _register_frame_ban(app)
     return app
@@ -507,6 +508,135 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             notice=t("methodology.published", _lang(conf), version=опубликована),
             failure=None,
         )
+
+
+def _mount_checklists(app: Flask, conf: Settings) -> None:
+    """Экраны чек-листов: перечень, заведение с нуля, состояние, применение к проду.
+
+    Отдельным адресом внутри «Методики», а не новым разделом: это та же
+    методика, только ярусом выше — какие чек-листы есть и по какому идут
+    проверки.
+
+    Применение к проду не спрятано за правом, и это решение (D182): ролей в
+    продукте нет, круг людей узкий, а от ошибки право не спасает — у
+    ошибающегося оно как раз есть. Вместо права три вещи: заслоны двери,
+    след в журнале с логином вошедшего и ПОКАЗ РАЗНИЦЫ перед применением.
+    Третье и есть настоящая защита, поэтому кнопка живёт на отдельной
+    странице, а не рядом со списком.
+    """
+    путь = f"{section('admin').path}/checklists"
+
+    @app.get(путь)
+    def checklists() -> str:
+        return _render_checklists(conf, notice=None, failure=None)
+
+    @app.post(путь)
+    def checklists_create() -> str:
+        refuse_foreign_origin()
+        form = request.form
+        state = method.load_store()
+        if state.store is None:
+            return _render_checklists(conf, notice=None, failure=None)
+        try:
+            заведён = method.create_checklist(
+                state.store,
+                tenant=conf.tenant,
+                author=_author(conf),
+                code=(form.get("code") or "").strip(),
+                name_ru=(form.get("name_ru") or "").strip(),
+                name_en=(form.get("name_en") or "").strip(),
+            )
+        except MethodologyRefused as отказ:
+            return _render_checklists(conf, notice=None, failure=str(отказ))
+        return _render_checklists(
+            conf,
+            notice=t("checklists.created", _lang(conf), checklist=заведён.code),
+            failure=None,
+        )
+
+    @app.post(f"{путь}/<code>/state")
+    def checklists_state(code: str) -> str:
+        refuse_foreign_origin()
+        state = method.load_store()
+        if state.store is None:
+            return _render_checklists(conf, notice=None, failure=None)
+        try:
+            стало = method.set_checklist_state(
+                state.store,
+                tenant=conf.tenant,
+                author=_author(conf),
+                code=code,
+                state=(request.form.get("state") or "").strip(),
+            )
+        except MethodologyRefused as отказ:
+            return _render_checklists(conf, notice=None, failure=str(отказ))
+        return _render_checklists(
+            conf,
+            notice=t("checklists.state.set", _lang(conf), checklist=стало.code, state=стало.state),
+            failure=None,
+        )
+
+    @app.get(f"{путь}/<code>/apply")
+    def checklists_apply_preview(code: str) -> str:
+        """Разница до применения. Отдельной страницей, а не всплывающим вопросом:
+        читать «столько пунктов, такие зоны, такие ставки» надо глазами."""
+        state = method.load_store()
+        if state.store is None:
+            return render_template("methodology/unset.html", missing=state.missing)
+        целевое = method.store_for(state.store, code)
+        return render_template(
+            "methodology/apply.html",
+            code=code,
+            difference=method.checklist_difference(целевое),
+            failure=None,
+        )
+
+    @app.post(f"{путь}/<code>/apply")
+    def checklists_apply(code: str) -> str:
+        refuse_foreign_origin()
+        state = method.load_store()
+        if state.store is None:
+            return _render_checklists(conf, notice=None, failure=None)
+        try:
+            итог = method.apply_checklist(
+                state.store, tenant=conf.tenant, author=_author(conf), code=code
+            )
+        except MethodologyRefused as отказ:
+            return _render_checklists(conf, notice=None, failure=str(отказ))
+        return _render_checklists(
+            conf,
+            notice=t("checklists.applied", _lang(conf), checklist=str(итог["applied"])),
+            failure=None,
+        )
+
+
+def _render_checklists(conf: Settings, *, notice: str | None, failure: str | None) -> str:
+    """Перечень чек-листов и заведение нового.
+
+    Хранилище не настроено — страница называет незаданные переменные поимённо,
+    как и соседний экран состава: пустой перечень читался бы как «чек-листов
+    нет», а это разные вещи.
+    """
+    state = method.load_store()
+    if state.store is None:
+        return render_template("methodology/unset.html", missing=state.missing)
+    try:
+        перечень = method.checklists_overview(state.store)
+    except MethodologyRefused as отказ:
+        return render_template(
+            "methodology/checklists.html",
+            checklists=[],
+            states=method.CHECKLIST_STATES,
+            notice=None,
+            failure=failure or str(отказ),
+        )
+    return render_template(
+        "methodology/checklists.html",
+        checklists=перечень,
+        states=method.CHECKLIST_STATES,
+        notice=notice,
+        failure=failure,
+    )
 
 
 @dataclass(frozen=True)
