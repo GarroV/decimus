@@ -40,7 +40,7 @@ from typing import Any
 import psycopg
 
 from .config import check_environment, load_retraction_settings
-from .errors import AccessError, ConfigError
+from .errors import AccessError, ConfigError, EmailTakenError
 from .migrate import admin_dsn
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
@@ -115,6 +115,31 @@ _SET_ROLE_SQL = """
     update web_users
        set role = %s
      where tenant_code = %s and login = %s and disabled_at is null
+"""
+
+_CHANGE_PASSWORD_SQL = """
+    update web_users
+       set password_hash = %s
+     where tenant_code = %s and login = %s and disabled_at is null
+ returning id
+"""  # noqa: S105 — это текст ЗАПРОСА, а не пароль
+
+_CLOSE_USER_SESSIONS_SQL = """
+    update web_sessions
+       set closed_at = now()
+     where user_id = %s and closed_at is null
+"""
+
+_SET_EMAIL_SQL = """
+    update web_users
+       set email = %s
+     where tenant_code = %s and login = %s and disabled_at is null
+"""
+
+_SELECT_USER_BY_EMAIL_SQL = """
+    select id, login, tenant_code, role
+      from web_users
+     where tenant_code = %s and email = %s and disabled_at is null
 """
 
 _OPEN_SESSION_SQL = """
@@ -341,6 +366,21 @@ def _checked_role(role: str) -> str:
     return role
 
 
+def _checked_password(password: str) -> str:
+    """Пароль или отказ. Одно место на заведение и на смену.
+
+    Стояла только в заведении, и это был обход в один шаг: завести с длинным
+    паролем, сменить на короткий. Правило, которое действует на одной двери из
+    двух, — не правило.
+    """
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise AccessError(
+            f"Пароль короче {MIN_PASSWORD_LENGTH} знаков. Короткий подбирается по "
+            f"украденной базе за вечер, и никакой хеш этого не меняет"
+        )
+    return password
+
+
 def _checked_login(login: str) -> str:
     имя = login.strip().lower()
     if not LOGIN_PATTERN.match(имя):
@@ -385,12 +425,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
     # бы админов молча.
     роль = _checked_role(role)
-    if len(password) < MIN_PASSWORD_LENGTH:
-        raise AccessError(
-            f"Пароль короче {MIN_PASSWORD_LENGTH} знаков. Короткий подбирается по "
-            f"украденной базе за вечер, и никакой хеш этого не меняет"
-        )
-    хеш = password_hash(password)
+    хеш = password_hash(_checked_password(password))
     _ensure_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
         try:
@@ -439,6 +474,95 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
         cur.execute(_SET_ROLE_SQL, (роль, tenant, login.strip().lower()))
         return cur.rowcount > 0
+
+
+def change_password(login: str, *, tenant: str, password: str) -> bool:
+    """Сменить пароль живой учётке. `False` — такой живой учётки нет.
+
+    **Открытые сессии закрываются тем же движением.** Пароль меняют в ответ на
+    «его кто-то узнал»: если вошедший по старому паролю продолжает работать,
+    смена не выгнала того, ради кого её делали. Закрытие идёт в той же
+    транзакции — иначе между записью хеша и закрытием остаётся окно, в котором
+    старая сессия ещё жива, а новый пароль уже роздан.
+
+    Роль владельца схемы: пароли меняет команда с машины, у роли приложения на
+    `web_users` по-прежнему только чтение. Смена с экрана — отдельная задача
+    (#324), и право там выдаётся не этим движением.
+    """
+    хеш = password_hash(_checked_password(password))
+    with _managing("сменить пароль учётки") as conn, conn.cursor() as cur:
+        cur.execute(_CHANGE_PASSWORD_SQL, (хеш, tenant, login.strip().lower()))
+        строка = cur.fetchone()
+        if строка is None:
+            return False
+        cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+        return True
+
+
+def normalize_email(email: str) -> str:
+    """Почта к единственному виду хранения: без краёв, в нижнем регистре.
+
+    `Ivan@Dodobrands.io` и `ivan@dodobrands.io ` — один человек, и Google
+    вернёт ту форму, в какой почту завели у него, а не ту, в какой её завели
+    у нас. Без приведения один и тот же человек заводится дважды, а входит
+    как кто-то один — и какой именно, решит порядок строк.
+
+    Приводит вызывающий код, а база держит это ограничением (`0021`): так
+    забывчивость становится отказом записи, а не тихой второй учёткой.
+    """
+    приведённая = email.strip().lower()
+    if not приведённая:
+        raise ValueError("пустая почта: входить по ней некому")
+    return приведённая
+
+
+def set_email(login: str, *, tenant: str, email: str | None) -> bool:
+    """Привязать почту к живой учётке (или снять её, `None`). `False` — учётки нет.
+
+    Снятие — не удаление учётки: человек остаётся и входит паролем. Это и есть
+    способ закрыть кому-то вход через Google, не трогая всё остальное.
+
+    Роль владельца схемы, как заведение и роли: право менять круг допущенных
+    не выдаётся приложению, иначе кнопка на экране и дыра в нём — одно и то же.
+    """
+    значение = None if email is None else normalize_email(email)
+    with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
+        try:
+            cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+        except psycopg.errors.UniqueViolation as занято:
+            # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
+            # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
+            # там, где была опечатка в логине.
+            raise EmailTakenError(
+                f"почта {значение} уже привязана к другой учётке арендатора {tenant}"
+            ) from занято
+        return cur.rowcount > 0
+
+
+def find_by_email(email: str, *, tenant: str) -> Account | None:
+    """Почта от Google → учётка. Незнакомая, отключённая, чужой арендатор — `None`.
+
+    **Это и есть круг допущенных.** Google подтверждает, что человек владеет
+    почтой, и ничего больше: кому можно в админку, решает эта строка в базе.
+    Поэтому незнакомая почта обязана получить `None`, а не завести учётку —
+    иначе круг допущенных задавал бы Google, а не владелец.
+
+    Отключённые не проходят по тому же условию, что и при входе паролем:
+    отзыв доступа обязан закрывать ВСЕ двери сразу, иначе он не отзыв.
+
+    Арендатор приходит из окружения стенда, а не из почты: домен почты не
+    говорит, чью историю человеку видно.
+    """
+    try:
+        приведённая = normalize_email(email)
+    except ValueError:
+        return None
+    with _connected("опознать по почте") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_BY_EMAIL_SQL, (tenant, приведённая))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
 
 
 def authenticate(login: str, password: str, *, tenant: str) -> Account | None:

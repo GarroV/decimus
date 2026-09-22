@@ -42,6 +42,8 @@ from src.db.errors import DbError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
     ROLES,
+    change_password,
+    set_email,
     create_account,
     disable_account,
     list_accounts,
@@ -83,7 +85,7 @@ def _password() -> str:
     первый = getpass.getpass(f"Пароль (не короче {MIN_PASSWORD_LENGTH} знаков): ")
     второй = getpass.getpass("Ещё раз: ")
     if первый != второй:
-        raise SystemExit("Пароли не совпали — учётка не заведена")
+        raise SystemExit("Пароли не совпали — ничего не изменено")
     return первый
 
 
@@ -137,6 +139,16 @@ def main(argv: list[str] | None = None) -> int:
     завести.add_argument("login")
     с_арендатором("ensure", "завести учётку стенда, если её ещё нет")
     с_арендатором("list", "перечислить учётки арендатора")
+    сменить = с_арендатором("password", "сменить пароль учётке")
+    сменить.add_argument("login")
+    # Привязка почты — отдельной командой, а не ключом у `add`: почты
+    # приезжают позже логинов (список даёт владелец), и заводить учётку
+    # заново ради почты было бы дороже, чем назвать её одной строкой.
+    почта = с_арендатором("email", "привязать почту для входа через Google")
+    почта.add_argument("login")
+    почта.add_argument(
+        "email", nargs="?", help="почта; без неё — СНЯТЬ привязку, вход останется по паролю"
+    )
     отключить = с_арендатором("disable", "отключить учётку")
     отключить.add_argument("login")
     # Роль назначается отдельной командой, а не ключом у `add`. Накат `0020`
@@ -156,6 +168,32 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "ensure":
             return _ensure(tenant)
+        if args.command == "email":
+            привязано = set_email(args.login, tenant=tenant, email=args.email)
+            if not привязано:
+                print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
+                return 1
+            if args.email:
+                print(
+                    f"Почта привязана: {args.login} · {args.email.strip().lower()}. "
+                    f"Этой почтой человек войдёт через Google"
+                )
+            else:
+                print(
+                    f"Почта снята: {args.login}. Вход через Google для него закрыт, "
+                    f"пароль работает как работал"
+                )
+            return 0
+        if args.command == "password":
+            сменено = change_password(args.login, tenant=tenant, password=_password())
+            if not сменено:
+                print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
+                return 1
+            print(
+                f"Пароль сменён: {args.login}. Сессии, открытые по прежнему паролю, "
+                f"закрыты — вошедший по нему вылетел"
+            )
+            return 0
         if args.command == "role":
             назначено = set_role(args.login, tenant=tenant, role=args.role)
             if not назначено:

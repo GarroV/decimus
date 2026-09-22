@@ -51,6 +51,21 @@
       <button class="btn btn--primary" type="submit">{{ t('auth.submit') }}</button>
     </form>
 
+    {#
+      Вход через Google — РЯДОМ с паролем, а не вместо него. Пароль остаётся
+      запасной дверью: гугловая почта есть не у всех, кого сюда пустят, и
+      отнимать у них единственный вход нельзя.
+
+      Кнопки нет вовсе, если реквизиты приложения не заданы: стенд без них
+      работает паролем, как работал, а мёртвая кнопка «Войти через Google»
+      выглядела бы поломкой продукта.
+    #}
+    {% if google_enabled %}
+      <p class="login__or">{{ t('auth.or') }}</p>
+      <a class="btn" href="{{ url_for('google_start') }}?lang={{ lang }}">{{ t('auth.google') }}</a>
+      <p class="login__aside">{{ t('auth.google.hint') }}</p>
+    {% endif %}
+
     <p class="login__aside">{{ t('auth.aside') }}</p>
   </div>
 {% endblock %}
