@@ -152,3 +152,21 @@ def test_экран_отвечает_на_английском(клиент: Fla
 
     assert "Checklists" in страница
     assert "in production" in страница
+
+
+def test_состав_открывается_у_выбранного_чеклиста(клиент: FlaskClient) -> None:
+    """Ссылка из перечня обязана показывать состав ТОГО чек-листа, на который
+    указывает. Иначе человек правил бы прод, думая, что правит черновик."""
+    войти(клиент)
+    клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd", "name_ru": "Аудит РНД", "name_en": "RnD audit"},
+        headers={"Origin": СВОЙ},
+    )
+
+    прод = клиент.get("/admin").get_data(as_text=True)
+    свой = клиент.get("/admin?checklist=rnd").get_data(as_text=True)
+
+    # Методика прода — оснастка с двумя пунктами; заведённый с нуля пуст.
+    assert "CLN01" in прод
+    assert "CLN01" not in свой

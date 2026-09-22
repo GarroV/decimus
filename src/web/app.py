@@ -647,6 +647,16 @@ class _Итог:
     failure: str | None = None
 
 
+def _который(запрос: Any) -> str | None:
+    """Какой чек-лист смотрит или правит человек — из адреса страницы.
+
+    Не назван — `None`, и дверь возьмёт применённый к проду. Своего умолчания
+    здесь нет намеренно: два умолчания на один вопрос однажды разойдутся, и
+    экран будет править не то, что показывает.
+    """
+    return (запрос.args.get("checklist") or "").strip() or None
+
+
 def _author(conf: Settings) -> str:
     """Кто правит — для журнала хранилища.
 
@@ -665,7 +675,7 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
     if state.store is None:
         return _Итог()
     try:
-        правка = действие(state.store, _author(conf))
+        правка = действие(method.store_for(state.store, _который(request)), _author(conf))
     except MethodologyRefused as отказ:
         return _Итог(failure=str(отказ))
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
@@ -681,10 +691,16 @@ def _render_methodology(conf: Settings, *, notice: str | None, failure: str | No
     if state.store is None:
         return render_template("methodology/unset.html", missing=state.missing)
     попросили = (request.args.get("version") or "").strip() or None
+    # Какой чек-лист смотрим. Не назван — тот, что применён к проду: экран
+    # открывался так до множественности и обязан открываться так и дальше.
     try:
-        состав = method.load_composition(state.store, tenant=conf.tenant, version=попросили)
+        склад = method.store_for(state.store, _который(request))
     except MethodologyRefused as отказ:
-        состав = method.load_composition(state.store, tenant=conf.tenant)
+        склад, failure = state.store, failure or str(отказ)
+    try:
+        состав = method.load_composition(склад, tenant=conf.tenant, version=попросили)
+    except MethodologyRefused as отказ:
+        состав = method.load_composition(склад, tenant=conf.tenant)
         failure = failure or str(отказ)
     return render_template(
         "methodology/index.html",
@@ -710,11 +726,12 @@ def _render_item(conf: Settings, *, code: str, notice: str | None, failure: str 
         return render_template("methodology/unset.html", missing=state.missing)
     попросили = (request.args.get("version") or "").strip() or None
     try:
-        карточка = method.load_item(state.store, tenant=conf.tenant, code=code, version=попросили)
+        склад = method.store_for(state.store, _который(request))
+        карточка = method.load_item(склад, tenant=conf.tenant, code=code, version=попросили)
     except MethodologyRefused as отказ:
         return _render_methodology(conf, notice=None, failure=str(отказ))
     версия = str(карточка["version"])
-    состав = method.load_composition(state.store, tenant=conf.tenant)
+    состав = method.load_composition(склад, tenant=conf.tenant)
     return render_template(
         "methodology/item.html",
         item=карточка["item"],
