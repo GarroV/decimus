@@ -538,6 +538,120 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.count": {"ru": "Пунктов: {count}", "en": "{count} items"},
+    # --- чек-листы как сущности (T347) ---------------------------------------
+    #
+    # Продукт несёт не один эталон, а много: девелоперский аудит, аудит РНД,
+    # любой другой. Тексты разводят две вещи, которые смешать легче всего:
+    # СОСТОЯНИЕ чек-листа («годен к употреблению») и ПРИМЕНЕНИЕ к проду («по
+    # нему идут проверки»). Первых может быть несколько, второй ровно один.
+    "checklists.title": {"ru": "Чек-листы", "en": "Checklists"},
+    "checklists.lead": {
+        "ru": (
+            "Виды проверок, заведённые в системе. По одному из них идут проверки — он "
+            "помечен «в проде»; остальные живут рядом и не мешают ему. Новый заводится с "
+            "нуля: пустой список вопросов, одна зона, бланк ставок — и дальше наполняется "
+            "как обычная методика."
+        ),
+        "en": (
+            "The kinds of audit this system holds. Inspections are scored against one of "
+            "them — the one marked 'in production'; the others live alongside and do not "
+            "affect it. A new one starts from scratch: no questions, one zone, blank "
+            "rates — and is then filled in like any methodology."
+        ),
+    },
+    "checklists.count": {"ru": "Чек-листов: {count}", "en": "{count} checklists"},
+    "checklists.empty": {
+        "ru": "Ни одного чек-листа ещё не заведено.",
+        "en": "No checklist has been created yet.",
+    },
+    "checklists.col.code": {"ru": "Код", "en": "Code"},
+    "checklists.col.name": {"ru": "Название", "en": "Name"},
+    "checklists.col.state": {"ru": "Состояние", "en": "State"},
+    "checklists.col.version": {"ru": "Издание", "en": "Edition"},
+    "checklists.col.actions": {"ru": "Действия", "en": "Actions"},
+    "checklists.state.draft": {"ru": "черновик", "en": "draft"},
+    "checklists.state.active": {"ru": "в работе", "en": "active"},
+    "checklists.state.retired": {"ru": "снят", "en": "retired"},
+    "checklists.state.submit": {"ru": "Сохранить", "en": "Save"},
+    "checklists.state.set": {
+        "ru": "Чек-лист {checklist}: состояние теперь «{state}»",
+        "en": "Checklist {checklist} is now {state}",
+    },
+    "checklists.in_production": {"ru": "в проде", "en": "in production"},
+    "checklists.new.title": {"ru": "Завести чек-лист", "en": "Create a checklist"},
+    "checklists.new.text": {
+        "ru": (
+            "Новый чек-лист рождается пустым черновиком, а не копией существующего: копия "
+            "разошлась бы с оригиналом с первой правки, оставаясь на него похожей. Пока в "
+            "нём нет ни одного вопроса, к проду он не применяется."
+        ),
+        "en": (
+            "A new checklist is born an empty draft, not a copy of an existing one: a copy "
+            "drifts from its original on the first edit while still looking like it. While "
+            "it holds no questions it cannot be applied to production."
+        ),
+    },
+    "checklists.new.code": {"ru": "Код", "en": "Code"},
+    "checklists.new.code.hint": {
+        "ru": (
+            "Строчные латинские буквы, цифры, дефис и подчёркивание. Код не меняется "
+            "никогда: им чек-лист связан с уже проведёнными проверками."
+        ),
+        "en": (
+            "Lowercase Latin letters, digits, hyphen and underscore. The code never "
+            "changes: it ties the checklist to inspections already scored by it."
+        ),
+    },
+    "checklists.new.name_ru": {"ru": "Название по-русски", "en": "Russian name"},
+    "checklists.new.name_en": {"ru": "Название по-английски", "en": "English name"},
+    "checklists.new.submit": {"ru": "Завести", "en": "Create"},
+    "checklists.created": {
+        "ru": "Чек-лист {checklist} заведён черновиком. Вопросов в нём пока нет.",
+        "en": "Checklist {checklist} created as a draft. It holds no questions yet.",
+    },
+    "checklists.apply.open": {"ru": "Применить к проду…", "en": "Apply to production…"},
+    "checklists.apply.title": {"ru": "Применение к проду", "en": "Applying to production"},
+    "checklists.apply.lead": {
+        "ru": (
+            "После применения проверки считаются по этому чек-листу. Уже проведённые "
+            "остаются на своём и не пересчитываются: отчёт, отправленный партнёру, задним "
+            "числом не меняется."
+        ),
+        "en": (
+            "Once applied, inspections are scored against this checklist. Those already "
+            "scored stay on their own and are not recalculated: a report already sent to a "
+            "partner does not change retroactively."
+        ),
+    },
+    "checklists.apply.now": {"ru": "Сейчас в проде", "en": "In production now"},
+    "checklists.apply.will": {"ru": "Будет в проде", "en": "Will be in production"},
+    "checklists.apply.version": {"ru": "Издание", "en": "Edition"},
+    "checklists.apply.items": {"ru": "Вопросов с нарушениями", "en": "Items that hold violations"},
+    "checklists.apply.zones": {"ru": "Зоны и доли", "en": "Zones and shares"},
+    "checklists.apply.rates": {"ru": "Ставки вычета", "en": "Deduction rates"},
+    "checklists.apply.start": {"ru": "Старт: {pct}%", "en": "Start: {pct}%"},
+    "checklists.apply.nothing": {
+        "ru": "Показывать нечего: опубликованного издания нет.",
+        "en": "Nothing to show: there is no published edition.",
+    },
+    "checklists.apply.warning": {
+        "ru": (
+            "Сверьте цифры выше. Ролей у учёток нет: применить может всякий вошедший, и "
+            "поймать ошибку можно только здесь — правом её не остановить. След применения "
+            "с вашим логином остаётся в журнале чек-листа."
+        ),
+        "en": (
+            "Check the figures above. Accounts have no roles: anyone signed in can apply, "
+            "and this screen is the only place an error can be caught — no permission "
+            "stops it. The change is recorded in the checklist journal under your login."
+        ),
+    },
+    "checklists.apply.submit": {"ru": "Применить к проду", "en": "Apply to production"},
+    "checklists.apply.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "checklists.applied": {
+        "ru": "Чек-лист {checklist} применён к проду: проверки считаются по нему.",
+        "en": "Checklist {checklist} is applied to production: inspections are scored by it.",
+    },
     "methodology.store.missing.title": {
         "ru": "Хранилище версий методики не настроено",
         "en": "The methodology version store is not configured",

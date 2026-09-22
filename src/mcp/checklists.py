@@ -24,6 +24,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import os
 from dataclasses import dataclass, replace
 from datetime import date
@@ -32,10 +33,19 @@ from pathlib import Path
 from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
 from ..domain.version import VERSION_FILE, compose
 from ..report.engine_call import REPO_ROOT, VERSIONS_DIR
-from .checklist import _engine_accepts, _holder, _journal, _point_at, _version_dir
+from .checklist import (
+    _engine_accepts,
+    _holder,
+    _journal,
+    _point_at,
+    _version_dir,
+    current_version,
+)
 from .checklist_layout import (
     ACTIVE,
     CURRENT_LINK,
+    DEFAULT_CODE,
+    DEFAULT_SPACE,
     DRAFT,
     RETIRED,
     Meta,
@@ -75,6 +85,17 @@ class Overview:
     version: str | None
 
 
+def _signed(note: str, by: str | None) -> str:
+    """Дописать к записи журнала того, кто это сделал.
+
+    Кто именно — знает только дверь, через которую пришли: у агента это код
+    арендатора, у экрана — логин вошедшего (`web:<логин>`). Ролей в продукте
+    нет (D182), поэтому разбор «кто применил не тот чек-лист» держится ровно
+    на этой строке.
+    """
+    return note if not by else f"{note}; {by}"
+
+
 def _meta_or_default(store: Store) -> Meta:
     """Карточка чек-листа или та, которой он был бы заведён.
 
@@ -96,8 +117,24 @@ def _published_edition(store: Store) -> str | None:
     return Path(os.readlink(указатель)).name
 
 
+def _alive(store: Store) -> None:
+    """Завести хранилище, если его ещё не заводили. Непустое не трогается вовсе.
+
+    Нулевым изданием в пустом хранилище ложится та методика, по которой продукт
+    считает сегодня, — тем же ходом, что у изданий (`_ensure`). Без этого
+    первое же действие на живой площадке отвечало бы «чек-листа bizdev нет»,
+    стоя на его методике ногами.
+
+    Заводится ТОЛЬКО пустое: в непустом второй чек-лист рождается с нуля из
+    бланка, а не молчаливой копией соседа.
+    """
+    if not known(store.root):
+        current_version(replace(store, space=DEFAULT_SPACE, code=DEFAULT_CODE))
+
+
 def overview(store: Store) -> list[Overview]:
-    """Все чек-листы хранилища. Пустое хранилище — пустой список, а не отказ."""
+    """Все чек-листы хранилища. Нетронутое хранилище заводится здесь же."""
+    _alive(store)
     в_проде = applied(store.root)
     ответ: list[Overview] = []
     for space, code in known(store.root):
@@ -136,12 +173,103 @@ def _violations(каталог: Path) -> int:
         )
 
 
+@dataclass(frozen=True)
+class Summary:
+    """Чек-лист коротко — чтобы человек увидел, ЧТО он меняет, до того как поменял.
+
+    Ролей в продукте нет (D182), и ошибку применения ловит экран, а не право:
+    круг людей узкий, риск здесь не злой умысел, а промах, а от промаха право
+    не спасает — у ошибающегося оно как раз есть. Поэтому сводка обязана
+    называть цифры, по которым промах виден: сколько вопросов, какие зоны и с
+    какими долями, по каким ставкам считается вычет.
+    """
+
+    checklist: str
+    name_ru: str
+    name_en: str
+    version: str | None
+    items: int
+    zones: tuple[tuple[str, float], ...]
+    penalty: tuple[tuple[str, float], ...]
+    start_pct: float
+
+
+def _zones(каталог: Path) -> tuple[tuple[str, float], ...]:
+    """Зоны издания с долями, в файловом порядке."""
+    путь = каталог / "zones.csv"
+    if not путь.is_file():
+        return ()
+    with путь.open(encoding="utf-8-sig", newline="") as f:
+        строки = list(csv.DictReader(f))
+    собранные: list[tuple[str, float]] = []
+    for строка in строки:
+        код = (строка.get("code") or "").strip()
+        доля = (строка.get("share_pct") or "").strip()
+        if код:
+            собранные.append((код, float(доля) if доля else 0.0))
+    return tuple(собранные)
+
+
+def _rates(каталог: Path) -> tuple[float, tuple[tuple[str, float], ...]]:
+    """Начальный процент и ставки вычета из `scoring.json`.
+
+    Читается ФАЙЛ, а не пересчитывается оценка: второй экземпляр арифметики
+    здесь запрещён под любым видом — проценты, буква и разбивка приходят
+    только из `audit.py score`.
+    """
+    путь = каталог / "scoring.json"
+    if not путь.is_file():
+        return (0.0, ())
+    тело = json.loads(путь.read_text(encoding="utf-8"))
+    ставки = тело.get("penalty") or {}
+    собранные = tuple((str(класс), float(значение)) for класс, значение in sorted(ставки.items()))
+    return (float(тело.get("start_pct") or 0.0), собранные)
+
+
+def summary(store: Store) -> Summary | None:
+    """Сводка чек-листа по его опубликованному изданию. Нет издания — `None`."""
+    _alive(store)
+    карточка = read_meta(store)
+    издание = _published_edition(store)
+    if карточка is None or издание is None:
+        return None
+    каталог = _version_dir(store, издание)
+    начало, ставки = _rates(каталог)
+    return Summary(
+        checklist=store.code,
+        name_ru=карточка.name_ru,
+        name_en=карточка.name_en,
+        version=издание,
+        items=_violations(каталог),
+        zones=_zones(каталог),
+        penalty=ставки,
+        start_pct=начало,
+    )
+
+
+def difference(store: Store) -> tuple[Summary | None, Summary | None]:
+    """«Сейчас в проде вот этот, будет вот этот» — пара сводок для показа.
+
+    Первая может быть `None` (к проду не применён никто), вторая — если у
+    чек-листа нет опубликованного издания. Обе пустые разом означают, что
+    показывать нечего, и экран обязан сказать это словами, а не пустой
+    таблицей.
+    """
+    в_проде = applied(store.root)
+    сейчас = None
+    if в_проде is not None:
+        space, code = в_проде
+        сейчас = summary(replace(store, space=space, code=code))
+    return (сейчас, summary(store))
+
+
 def create(
     store: Store,
     *,
     tenant: str,
     name_ru: str,
     name_en: str,
+    by: str | None = None,
     today: date | None = None,
 ) -> Overview:
     """Завести чек-лист с нуля из бланка. Рождается черновиком и к проду не идёт.
@@ -206,7 +334,7 @@ def create(
             "base_version": None,
             "version": издание,
             "refusal": None,
-            "note": f"заведён с нуля из бланка, состояние {DRAFT}",
+            "note": _signed(f"заведён с нуля из бланка, состояние {DRAFT}", by),
         },
     )
     return Overview(
@@ -220,13 +348,21 @@ def create(
     )
 
 
-def rename(store: Store, *, tenant: str, name_ru: str | None, name_en: str | None) -> Overview:
+def rename(
+    store: Store,
+    *,
+    tenant: str,
+    name_ru: str | None,
+    name_en: str | None,
+    by: str | None = None,
+) -> Overview:
     """Поменять названия чек-листа. Код не меняется ничем и никогда.
 
     Названия — формулировка: их переводят и правят. Код — связь: им чек-лист
     сцеплен с проверками в базе и со снимками изданий на полке, и смена кода
     оборвала бы обе связи молча.
     """
+    _alive(store)
     карточка = read_meta(store)
     if карточка is None:
         raise ChecklistError(
@@ -249,18 +385,19 @@ def rename(store: Store, *, tenant: str, name_ru: str | None, name_en: str | Non
             "base_version": None,
             "version": None,
             "refusal": None,
-            "note": f"названия: {новая.name_ru} / {новая.name_en}",
+            "note": _signed(f"названия: {новая.name_ru} / {новая.name_en}", by),
         },
     )
     return _overview_of(store, новая)
 
 
-def set_state(store: Store, *, tenant: str, state: str) -> Overview:
+def set_state(store: Store, *, tenant: str, state: str, by: str | None = None) -> Overview:
     """Черновик / в работе / снят.
 
     Снять применённый к проду нельзя: по нему идут проверки, и «снят» означало
     бы, что продукт считает по снятой методике. Сначала применяется другой.
     """
+    _alive(store)
     хотим = check_state(state)
     карточка = read_meta(store)
     if карточка is None:
@@ -287,19 +424,20 @@ def set_state(store: Store, *, tenant: str, state: str) -> Overview:
             "base_version": None,
             "version": None,
             "refusal": None,
-            "note": f"состояние: {карточка.state} → {хотим}",
+            "note": _signed(f"состояние: {карточка.state} → {хотим}", by),
         },
     )
     return _overview_of(store, новая)
 
 
-def apply_to_production(store: Store, *, tenant: str) -> dict[str, object]:
+def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> dict[str, object]:
     """Применить чек-лист к проду: по нему пойдут проверки.
 
     Одно движение — перестановка верхнего указателя. Повторной сверки методики
     движком здесь нет: она уже прошла, когда издание создавалось. А вот заслоны
     есть, и они не про формат, а про смысл (#339).
     """
+    _alive(store)
     карточка = read_meta(store)
     if карточка is None:
         raise ChecklistError(
@@ -345,7 +483,7 @@ def apply_to_production(store: Store, *, tenant: str) -> dict[str, object]:
             "base_version": None,
             "version": издание,
             "refusal": None,
-            "note": f"применён к проду вместо {прежний[1] if прежний else 'ничего'}",
+            "note": _signed(f"применён к проду вместо {прежний[1] if прежний else 'ничего'}", by),
         },
     )
     return {
@@ -376,9 +514,12 @@ def _overview_of(store: Store, карточка: Meta) -> Overview:
 __all__ = [
     "BLANK_DIR",
     "Overview",
+    "Summary",
     "apply_to_production",
     "create",
+    "difference",
     "overview",
     "rename",
     "set_state",
+    "summary",
 ]
