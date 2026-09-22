@@ -224,7 +224,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _letter_file(текст, inspection_id)
 
     @app.post(f"{section('registry').path}/<inspection_id>/letter/save")
-    def save_letter(inspection_id: str) -> FlaskResponse | tuple[str, int] | str:
+    def save_letter(inspection_id: str) -> Response | FlaskResponse | tuple[str, int] | str:
         """Зафиксировать письмо в том виде, в каком его подтвердил человек (T333).
 
         Отправки из системы по-прежнему нет (Q010, D035): письмо уходит из
