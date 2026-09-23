@@ -40,7 +40,7 @@ from .google_mail import (
     draft_subject,
     exchange_code_for_token,
 )
-from .origin import refuse_foreign_origin
+from .origin import over_https, refuse_foreign_origin
 from .sections import section
 
 MAIL_CALLBACK_PATH = "/auth/google/mail"
@@ -147,7 +147,11 @@ def install(app: Flask, conf: Settings) -> None:
             max_age=MAIL_STATE_TTL_SECONDS,
             httponly=True,
             samesite="Lax",
-            secure=request.is_secure,
+            # `over_https()`, а НЕ `request.is_secure`: наружу админка выходит
+            # туннелем (D100), TLS заканчивается на нём, и до сервера доезжает
+            # обычный HTTP. По `is_secure` кука похода ушла бы без `Secure`
+            # ровно там, где это и важно.
+            secure=over_https(),
             path="/",
         )
         return ответ
