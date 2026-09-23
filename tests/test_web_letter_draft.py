@@ -223,3 +223,24 @@ def client_страница(client: FlaskClient) -> str:
     ответ = client.get(f"/inspections/{ПРОВЕРКА}/letter")
     assert ответ.status_code == 200
     return ответ.get_data(as_text=True)
+
+
+def test_кука_похода_помечена_secure_за_туннелем(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Наружу админка выходит туннелем: TLS кончается на нём (D100).
+
+    `request.is_secure` внутри при этом False, и кука похода ушла бы без
+    `Secure` именно там, где это важно, — снаружи, а не на петле.
+    """
+    включить_почту(monkeypatch)
+    client, _ = клиент
+    ответ = client.post(
+        f"/inspections/{ПРОВЕРКА}/letter/draft",
+        data={"text": "Текст", "letter_lang": "ru"},
+        # Origin со схемой https — как его и присылает браузер снаружи: заслон
+        # происхождения сверяет схему с той, что видна за туннелем.
+        headers={"Origin": СВОЙ.replace("http://", "https://"), "X-Forwarded-Proto": "https"},
+    )
+    кука = next(к for к in ответ.headers.getlist("Set-Cookie") if "dodo_audit_mail_state" in к)
+    assert "Secure" in кука
