@@ -309,7 +309,7 @@
    правилом ниже, а не медиазапросом на каждую карточку. */
 .ov-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
   gap: var(--space-4);
   align-items: start;
   margin-top: var(--space-5);
@@ -360,3 +360,109 @@ a.ov-row:hover { background: var(--surface-3); }
 .ov-dot { width: .5rem; height: .5rem; border-radius: 50%; flex: none; margin-top: var(--space-2); }
 .ov-dot--err { background: var(--err); }
 .ov-dot--warn { background: var(--warn); }
+
+/* ═══ КАРКАС ПО ПРОТОТИПУ ════════════════════════════════════════════════
+   Навигация идёт СТРОКОЙ В ШАПКЕ, а не боковым столбцом (D188, D190). Это не
+   перестановка ради вкуса: боковой столбец с семью золотыми лентами
+   «в разработке» читался как прежний интерфейс даже после смены палитры и
+   типографики, и он же нарушал правило брифа о цвете — сильный цвет
+   оставлен букве оценки и классу нарушения, больше нигде.
+
+   Непостроенный раздел из карты не исчезает: он приглушён яркостью, а не
+   помечен плашкой. Спрятать его нельзя решением D138, кричать о нём семь раз
+   на экране — нельзя брифом. */
+
+.topbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 40;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+.topbar__inner {
+  max-width: 85rem;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.topbar .whoami { white-space: nowrap; }
+.topbar .logout { flex: none; }
+.topbar__brand { display: inline-flex; align-items: baseline; gap: var(--space-2); }
+.topbar__name { font-weight: var(--w-bold); letter-spacing: -.01em; }
+.topbar__mark { font-size: var(--fs-meta); color: var(--ink-3); }
+.topbar__tenant {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.topbar__spacer { flex: 1; min-width: .5rem; }
+
+.navrow { display: flex; gap: 2px; flex-wrap: wrap; }
+.navrow__item {
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--r-control);
+  font-weight: var(--w-semibold);
+  font-size: var(--fs-dense);
+  color: var(--ink-2);
+  text-decoration: none;
+  min-height: var(--tap-min);
+  white-space: nowrap;
+}
+.navrow__item:hover { background: var(--surface-3); color: var(--ink); }
+.navrow__item.is-current { background: var(--accent-soft); color: var(--accent); }
+/* Непостроенный раздел: тише остальных, но открывается и виден. */
+.navrow__item.is-wip { color: var(--ink-empty); }
+.navrow__item.is-wip:hover { color: var(--ink-3); }
+
+.page {
+  max-width: 85rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) calc(var(--space-9) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Нижняя панель телефона. На десктопе её нет вовсе — не спрятана, а не
+   отрисована: скрытая панель всё равно занимала бы фокус с клавиатуры. */
+.tabbar { display: none; }
+
+@media (max-width: 52rem) {
+  .navrow { display: none; }
+  .whoami { display: none; }
+  .tabbar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: space-around;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+  .tabbar__item {
+    flex: 1;
+    text-align: center;
+    padding: var(--space-2);
+    border-radius: var(--r-control);
+    font-size: var(--fs-micro);
+    font-weight: var(--w-semibold);
+    color: var(--ink-3);
+    text-decoration: none;
+    min-height: var(--tap-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
+}

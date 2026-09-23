@@ -40,6 +40,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "app.tenant_label": {"ru": "Тенант", "en": "Tenant"},
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
+    "nav.sections": {"ru": "Разделы", "en": "Sections"},
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
     # ── Обзор сети (T354) ───────────────────────────────────────────────
