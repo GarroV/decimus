@@ -575,3 +575,52 @@ a.ov-table__row:hover { background: var(--surface-3); }
   }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
 }
+
+/* ═══ СТРОКА РЕЕСТРА ═════════════════════════════════════════════════════
+   Не таблица, а список (D190). Порядок веса в строке задан размером, а не
+   местом: буква крупным знаком, точка и оценка рядом, всё остальное — мелкой
+   мета-строкой. На узком экране мета переносится, а строка остаётся
+   читаемой — восемь колонок таблицы так не умели. */
+
+.ins-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  color: inherit;
+  text-decoration: none;
+  flex-wrap: wrap;
+}
+.ins-row:last-child { border-bottom: 0; }
+.ins-row:hover { background: var(--surface-3); }
+.ins-row__grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-control);
+  font-family: var(--font-num);
+  font-size: var(--fs-lead);
+  font-weight: var(--w-semibold);
+  flex: none;
+}
+.ins-row__main { flex: 1; min-width: 11rem; }
+.ins-row__title { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.ins-row__unit { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ins-row__score {
+  font-family: var(--font-num);
+  font-size: var(--fs-lead);
+  font-weight: var(--w-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.ins-row__meta { display: block; font-size: var(--fs-meta); color: var(--ink-3); margin-top: var(--space-1); }
+.ins-row__state { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.ins-row__state .ov-dot { margin-top: 0; }
+.ins-row__state-text { font-size: var(--fs-micro); font-weight: var(--w-semibold); color: var(--ink-2); }
+.ins-row__go { font-size: var(--fs-lead); color: var(--ink-3); flex: none; }
+/* Снятая проверка приглушена целиком: её числа в отчёт не идут, и строка
+   не должна читаться наравне с запечатанными. */
+.ins-row.is-frozen { opacity: .62; }
+.ov-dot--ok { background: var(--ok); }

@@ -289,6 +289,16 @@ TEXTS: dict[str, dict[str, str]] = {
             "engine computed them when the inspection was closed — nothing is recomputed here."
         ),
     },
+    "registry.kicker": {"ru": "Реестр", "en": "Registry"},
+    "registry.all_kinds": {"ru": "Все виды", "en": "All kinds"},
+    "registry.filtered_out.title": {
+        "ru": "Под этот отбор не подошла ни одна проверка",
+        "en": "No inspection matches this filter",
+    },
+    "registry.filtered_out.text": {
+        "ru": "В реестре проверки есть — их отсёк отбор выше. Снимите часть условий.",
+        "en": "The registry does have inspections — the filter above cut them out. Clear some conditions.",
+    },
     "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
     "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
