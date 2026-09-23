@@ -2,6 +2,12 @@
   Обзор сети — экран, отвечающий на вопрос «куда смотреть сегодня» (бриф на
   визуал, экран 01; облик — прототип владельца, D188/D190).
 
+  ПОРЯДОК БЛОКОВ — ИЗ ПРОТОТИПА, а не из удобства вёрстки: шапка выборки,
+  панель отбора, плитки, разбивка рядом с потерями, системные нарушения рядом
+  с проблемными точками, поводы на сегодня, таблица точек. Порядок здесь —
+  это и есть ответ на вопрос экрана: сначала масштаб, потом где болит, потом
+  что делать сегодня, и только в конце полный список.
+
   Ни одного вычисления в шаблоне. Проценты, буквы и потери по зонам приходят
   готовыми из `src/web/overview.py`, который, в свою очередь, ничего не
   пересчитывает: движок посчитал — база записала — экран показал.
@@ -15,9 +21,66 @@
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('overview.kicker', tenant=tenant) }}</div>
-      <h1 class="ov-head__title">{{ t('section.overview.title') }}</h1>
-      <div class="ov-head__sub">{{ t('overview.lead') }}</div>
+      <h1 class="ov-head__title">
+        {{ selection.city or selection.country or t('overview.scope.all') }}
+      </h1>
+      <div class="ov-head__sub">
+        {{ t('overview.scope.sub',
+              units=data.units_total,
+              inspections=data.inspections|length,
+              period=t('overview.period.' ~ selection.period)) }}
+      </div>
     </div>
+    {# Кнопка ведёт в раздел планирования. Раздел ещё не построен и скажет об
+       этом честной страницей: кнопка, которая никуда не ведёт, врёт сильнее,
+       чем кнопка, ведущая в «ещё в разработке». #}
+    <a class="btn btn--primary ov-head__cta" href="{{ url(plans_path) }}?lang={{ lang }}">
+      {{ t('overview.assign') }}
+    </a>
+  </div>
+
+  {# ── Выборка ───────────────────────────────────────────────────────────
+     Отбор идёт ССЫЛКАМИ, а не формой с состоянием: срез живёт в адресе, и
+     ссылку на него отправляют коллеге. Каждый чип — это готовый адрес. #}
+  <div class="ov-filters">
+    <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
+
+    {% if data.countries %}
+      <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.country') }}">
+        <a class="ov-chip{% if not selection.country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('overview.filter.country') }}: {{ t('overview.filter.any') }}</a>
+        {% for code, units in data.countries %}
+          <a class="ov-chip{% if selection.country == code %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ code }} <span class="ov-chip__num">{{ units }}</span></a>
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    {% if data.cities %}
+      <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.city') }}">
+        <a class="ov-chip{% if not selection.city %} is-on{% endif %}" href="{{ select_url(city='') }}">{{ t('overview.filter.city') }}: {{ t('overview.filter.any') }}</a>
+        {% for name, units in data.cities %}
+          <a class="ov-chip{% if selection.city == name %} is-on{% endif %}" href="{{ select_url(city=name) }}">{{ name }} <span class="ov-chip__num">{{ units }}</span></a>
+        {% endfor %}
+      </span>
+    {% endif %}
+
+    <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.grade') }}">
+      <a class="ov-chip{% if not selection.grade %} is-on{% endif %}" href="{{ select_url(grade='') }}">{{ t('overview.filter.grade') }}: {{ t('overview.filter.any') }}</a>
+      {% for letter, count in data.grades %}
+        <a class="ov-chip{% if selection.grade == letter %} is-on{% endif %}" href="{{ select_url(grade=letter) }}">{{ letter }} <span class="ov-chip__num">{{ count }}</span></a>
+      {% endfor %}
+    </span>
+
+    <span class="ov-filters__gap"></span>
+
+    <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.period') }}">
+      {% for code in periods %}
+        <a class="ov-chip{% if selection.period == code %} is-on{% endif %}" href="{{ select_url(period=code) }}">{{ t('overview.period.' ~ code) }}</a>
+      {% endfor %}
+    </span>
+
+    {% if selection.narrowed %}
+      <a class="ov-chip ov-chip--reset" href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
+    {% endif %}
   </div>
 
   {# Плитки кликабельны все до одной: цифра без перехода на вопрос экрана не
@@ -42,24 +105,45 @@
   {% endif %}
 
   <div class="ov-grid">
-    {# ── Куда смотреть сегодня ─────────────────────────────────────────── #}
+    {# ── Разбивка по городам ───────────────────────────────────────────── #}
     <section class="ov-card">
       <div class="ov-card__head">
-        <div class="ov-card__title">{{ t('overview.attention.title') }}</div>
-        <div class="ov-card__hint">{{ t('overview.attention.hint') }}</div>
+        <div class="ov-card__title">{{ t('overview.breakdown.title') }}</div>
+        <div class="ov-card__hint">{{ t('overview.breakdown.hint') }}</div>
       </div>
-      {% if data.attention %}
-        {% for item in data.attention %}
-          <a class="ov-row" href="{{ url(registry_path ~ '/' ~ item.inspection_id) }}">
-            <span class="ov-dot ov-dot--{{ item.tone }}"></span>
-            <span class="ov-row__name">
-              {{ item.unit }}
-              <span class="ov-row__meta">{{ t('overview.why.' ~ item.why, detail=item.detail) }} · {{ item.when }}</span>
-            </span>
-          </a>
-        {% endfor %}
+      {% if data.breakdown %}
+        <div class="ov-table ov-table--breakdown">
+          <div class="ov-table__head">
+            <span>{{ t('overview.breakdown.city') }}</span>
+            <span class="ov-num">{{ t('overview.breakdown.units') }}</span>
+            <span class="ov-num">{{ t('overview.breakdown.average') }}</span>
+            <span>{{ t('overview.breakdown.grades') }}</span>
+            <span class="ov-num">{{ t('overview.breakdown.critical') }}</span>
+          </div>
+          {% for row in data.breakdown %}
+            <a class="ov-table__row" href="{{ select_url(city=row.city) }}">
+              <span class="ov-cell__name">{{ row.city or t('overview.breakdown.nocity') }}</span>
+              <span class="ov-num">{{ row.units }}</span>
+              <span class="ov-num ov-num--strong"
+                    {% if not row.comparable %}title="{{ t('overview.breakdown.incomparable') }}"{% endif %}>
+                {{ '—' if row.average is none or not row.comparable else '%.1f'|format(row.average) }}
+              </span>
+              {# Полоса букв — шкала, а не диаграмма: A слева, D справа, всегда
+                 в одном порядке, иначе одна и та же полоса меняет смысл. #}
+              <span class="ov-gradebar">
+                {% for letter, count in row.grades %}
+                  {% if count %}
+                    <span class="ov-gradebar__part {{ grade_tone(letter) }}"
+                          style="flex:{{ count }}" title="{{ letter }}: {{ count }}"></span>
+                  {% endif %}
+                {% endfor %}
+              </span>
+              <span class="ov-num{% if row.critical %} ov-num--err{% endif %}">{{ row.critical }}</span>
+            </a>
+          {% endfor %}
+        </div>
       {% else %}
-        <div class="ov-card__empty">{{ t('overview.attention.empty') }}</div>
+        <div class="ov-card__empty">{{ t('overview.breakdown.empty') }}</div>
       {% endif %}
     </section>
 
@@ -87,7 +171,9 @@
         <div class="ov-card__empty">{{ t('overview.zones.empty') }}</div>
       {% endif %}
     </section>
+  </div>
 
+  <div class="ov-grid">
     {# ── Системные нарушения ───────────────────────────────────────────── #}
     <section class="ov-card">
       <div class="ov-card__head">
@@ -132,4 +218,65 @@
       {% endif %}
     </section>
   </div>
+
+  {# ── Требует решения сегодня ─────────────────────────────────────────── #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('overview.attention.title') }}</div>
+      <div class="ov-card__hint">{{ t('overview.attention.hint') }}</div>
+    </div>
+    {% if data.attention %}
+      {% for item in data.attention %}
+        <a class="ov-row" href="{{ url(registry_path ~ '/' ~ item.inspection_id) }}">
+          <span class="ov-dot ov-dot--{{ item.tone }}"></span>
+          <span class="ov-row__name">
+            {{ item.unit }}
+            <span class="ov-row__meta">{{ t('overview.why.' ~ item.why, detail=item.detail) }} · {{ item.when }}</span>
+          </span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('overview.attention.empty') }}</div>
+    {% endif %}
+  </section>
+
+  {# ── Точки выборки ───────────────────────────────────────────────────── #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('overview.points.title') }}</div>
+      <div class="ov-card__hint">{{ t('overview.points.hint') }}</div>
+      <div class="ov-card__count">{{ data.points|length }}</div>
+    </div>
+    {% if data.points %}
+      <div class="ov-table ov-table--points">
+        <div class="ov-table__head">
+          <span>{{ t('overview.points.unit') }}</span>
+          <span>{{ t('overview.points.city') }}</span>
+          <span class="ov-num">{{ t('overview.points.grade') }}</span>
+          <span class="ov-num">{{ t('overview.points.score') }}</span>
+          <span class="ov-num">{{ t('overview.points.delta') }}</span>
+          <span>{{ t('overview.points.zone') }}</span>
+          <span class="ov-num">{{ t('overview.points.date') }}</span>
+        </div>
+        {% for point in data.points %}
+          <a class="ov-table__row" href="{{ url(registry_path ~ '/' ~ point.inspection_id) }}">
+            <span class="ov-cell__name">{{ point.unit }}</span>
+            <span class="ov-cell__muted">{{ point.city or '—' }}</span>
+            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
+            <span class="ov-num ov-num--strong">{{ '%.1f'|format(point.pct) }}</span>
+            {# Движение показывается только против СРАВНИМОЙ проверки: иначе
+               это разница ставок методики, а не работы точки. #}
+            <span class="ov-num{% if point.delta is not none and point.delta < 0 %} ov-num--err{% endif %}"
+                  {% if point.delta is none %}title="{{ t('overview.points.nodelta') }}"{% endif %}>
+              {{ '—' if point.delta is none else ('%+.1f'|format(point.delta)) }}
+            </span>
+            <span class="ov-cell__muted">{{ (point.worst_zone_ru if lang == 'ru' else point.worst_zone_en) or '—' }}</span>
+            <span class="ov-num ov-cell__muted">{{ point.when }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('overview.points.empty') }}</div>
+    {% endif %}
+  </section>
 {% endblock %}

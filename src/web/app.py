@@ -151,8 +151,42 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
     @app.get(section("overview").path)
     def overview() -> str:
-        snapshot = overview_data.load(tenant=conf.tenant, limit=REGISTRY_LIMIT)
+        # Выборка приходит адресом, а не состоянием сессии: ссылку на срез
+        # («Белград, буква D, за 30 дней») человек отправляет коллеге, и тот
+        # обязан увидеть ровно тот же экран. Значения — коды; непонятное
+        # значение сужает выборку в пустоту, но страницу не роняет.
+        selection = overview_data.Selection(
+            country=request.args.get("country", "").strip().upper()[:2],
+            city=request.args.get("city", "").strip()[:80],
+            grade=request.args.get("grade", "").strip().upper()[:1],
+            period=request.args.get("period", "all").strip()[:8],
+        )
+        snapshot = overview_data.load(
+            tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection
+        )
         registry_path = section("registry").path
+
+        def отбор(**изменения: str) -> str:
+            """Адрес того же экрана с изменённым срезом.
+
+            Собирается здесь, а не склейкой в шаблоне: пустое значение обязано
+            ИСЧЕЗАТЬ из адреса, иначе «сбросить город» оставляет в ссылке
+            `city=` и срез выглядит суженным, хотя он полный.
+            """
+            параметры = {
+                "country": selection.country,
+                "city": selection.city,
+                "grade": selection.grade,
+                "period": selection.period,
+                "lang": _lang(conf),
+                **изменения,
+            }
+            живые = {
+                ключ: значение
+                for ключ, значение in параметры.items()
+                if значение and not (ключ == "period" and значение == "all")
+            }
+            return url_for("overview", **живые)
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         среднее = (
             t("overview.tile.note.average_none", _lang(conf))
@@ -199,6 +233,10 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
             lang=_lang(conf),
+            selection=selection,
+            select_url=отбор,
+            periods=tuple(overview_data.PERIODS),
+            plans_path=section("plans").path,
         )
 
 

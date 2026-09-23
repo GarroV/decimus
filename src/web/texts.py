@@ -41,6 +41,62 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
+    # Названия окон периода — подписи; сами окна живут кодами в
+    # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
+    "overview.assign": {"ru": "Назначить проверку", "en": "Schedule an audit"},
+    "overview.scope.all": {"ru": "Вся сеть", "en": "The whole network"},
+    "overview.scope.sub": {
+        "ru": "{units} точек · {inspections} проверок · {period}",
+        "en": "{units} units · {inspections} inspections · {period}",
+    },
+    "overview.filter.title": {"ru": "Выборка", "en": "Selection"},
+    "overview.filter.country": {"ru": "Страна", "en": "Country"},
+    "overview.filter.city": {"ru": "Город", "en": "City"},
+    "overview.filter.grade": {"ru": "Буква", "en": "Grade"},
+    "overview.filter.period": {"ru": "Период", "en": "Period"},
+    "overview.filter.reset": {"ru": "Сбросить", "en": "Reset"},
+    "overview.filter.any": {"ru": "любая", "en": "any"},
+    "overview.period.all": {"ru": "всё время", "en": "all time"},
+    "overview.period.d30": {"ru": "30 дней", "en": "30 days"},
+    "overview.period.d90": {"ru": "90 дней", "en": "90 days"},
+    "overview.period.y1": {"ru": "год", "en": "a year"},
+    "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
+    "overview.breakdown.hint": {"ru": "клик — сузить выборку", "en": "click to narrow the selection"},
+    "overview.breakdown.city": {"ru": "Город", "en": "City"},
+    "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
+    "overview.breakdown.average": {"ru": "Средняя", "en": "Average"},
+    "overview.breakdown.grades": {"ru": "Буквы", "en": "Grades"},
+    "overview.breakdown.critical": {"ru": "D3", "en": "D3"},
+    "overview.breakdown.nocity": {"ru": "Без города", "en": "No city"},
+    "overview.breakdown.empty": {
+        "ru": "За выбранный период проверок нет — разбивать нечего.",
+        "en": "No inspections in the selected period — nothing to break down.",
+    },
+    "overview.breakdown.incomparable": {
+        "ru": "разные издания методики",
+        "en": "different methodology editions",
+    },
+    "overview.points.title": {"ru": "Точки выборки", "en": "Units in the selection"},
+    "overview.points.hint": {
+        "ru": "последняя проверка каждой точки",
+        "en": "the latest inspection of each unit",
+    },
+    "overview.points.unit": {"ru": "Точка", "en": "Unit"},
+    "overview.points.city": {"ru": "Город", "en": "City"},
+    "overview.points.grade": {"ru": "Буква", "en": "Grade"},
+    "overview.points.score": {"ru": "Оценка", "en": "Score"},
+    "overview.points.delta": {"ru": "Δ", "en": "Δ"},
+    "overview.points.zone": {"ru": "Слабая зона", "en": "Weakest zone"},
+    "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
+    "overview.points.empty": {
+        "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
+        "en": "No inspected unit in this selection. Clear part of the filter.",
+    },
+    "overview.points.nodelta": {
+        "ru": "первая сравнимая проверка",
+        "en": "first comparable inspection",
+    },
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
     # ── Обзор сети (T354) ───────────────────────────────────────────────

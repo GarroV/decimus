@@ -361,6 +361,115 @@ a.ov-row:hover { background: var(--surface-3); }
 .ov-dot--err { background: var(--err); }
 .ov-dot--warn { background: var(--warn); }
 
+/* ── Панель выборки ─────────────────────────────────────────────────────
+   Отбор — ссылки, а не форма: срез живёт в адресе и отправляется коллеге
+   ссылкой. Поэтому чип и выглядит ссылкой-таблеткой, а выбранный помечен
+   заливкой, а не отдельным цветом текста: цвет на этом экране занят буквой
+   оценки и классом нарушения. */
+.ov-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.ov-filters__label {
+  font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: var(--space-1);
+}
+.ov-filters__gap { flex: 1; min-width: var(--space-3); }
+.ov-chips { display: inline-flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.ov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  color: var(--ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ov-chip:hover { border-color: var(--accent-line); }
+.ov-chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--ink-inverse); }
+.ov-chip__num { font-family: var(--font-num); font-variant-numeric: tabular-nums; opacity: .7; }
+.ov-chip--reset { background: var(--surface-3); border-color: transparent; }
+
+.ov-head__cta { flex: none; white-space: nowrap; }
+.ov-card--wide { margin-top: var(--space-5); }
+.ov-card__count {
+  margin-left: auto;
+  font-family: var(--font-num);
+  font-size: var(--fs-meta);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.ov-card__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ── Таблицы разбивки и точек ───────────────────────────────────────────
+   Колонки заданы сеткой, а не таблицей: строка целиком — ссылка, и `<a>`
+   внутри `<tr>` разметкой не выражается. Узкий экран прокручивает таблицу
+   вбок в своей обёртке, а не ломает остальную страницу. */
+.ov-table { display: block; overflow-x: auto; }
+.ov-table__head,
+.ov-table__row {
+  display: grid;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+}
+.ov-table--breakdown .ov-table__head,
+.ov-table--breakdown .ov-table__row {
+  grid-template-columns: minmax(7rem, 1fr) 4rem 5rem minmax(5rem, 8rem) 3rem;
+  min-width: 30rem;
+}
+.ov-table--points .ov-table__head,
+.ov-table--points .ov-table__row {
+  grid-template-columns: minmax(9rem, 1.4fr) minmax(6rem, 1fr) 4rem 5rem 4rem minmax(8rem, 1fr) 7rem;
+  min-width: 48rem;
+}
+.ov-table__head {
+  background: var(--surface-3);
+  font: var(--w-semibold) var(--fs-micro) / var(--lh-meta) var(--font-ui);
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ov-table__row { color: inherit; text-decoration: none; }
+.ov-table__row:last-child { border-bottom: 0; }
+a.ov-table__row:hover { background: var(--surface-3); }
+.ov-cell__name { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ov-cell__muted { font-size: var(--fs-meta); color: var(--ink-2); }
+.ov-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  justify-self: end;
+  font-size: var(--fs-meta);
+}
+.ov-num--strong { font-size: var(--fs-dense); font-weight: var(--w-semibold); }
+.ov-num--err { color: var(--err); }
+
+/* Полоса букв — ШКАЛА: A слева, D справа, порядок не зависит от выборки.
+   Сегменты красятся теми же классами, что буква в таблице, поэтому цвет
+   буквы и цвет её доли не могут разойтись. */
+.ov-gradebar { display: flex; gap: 2px; height: 1rem; border-radius: var(--r-pill); overflow: hidden; }
+.ov-gradebar__part { display: block; }
+.ov-gradebar__part.tag--ok { background: var(--ok); }
+.ov-gradebar__part.tag--neutral { background: var(--ink-3); }
+.ov-gradebar__part.tag--warn { background: var(--warn); }
+.ov-gradebar__part.tag--err { background: var(--err); }
+
 /* ═══ КАРКАС ПО ПРОТОТИПУ ════════════════════════════════════════════════
    Навигация идёт СТРОКОЙ В ШАПКЕ, а не боковым столбцом (D188, D190). Это не
    перестановка ради вкуса: боковой столбец с семью золотыми лентами

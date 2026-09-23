@@ -17,7 +17,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from src.db import queries
 from src.db.models import InspectionRow
@@ -82,6 +82,68 @@ class Attention:
 
 
 @dataclass(frozen=True)
+class Selection:
+    """Чем сужена выборка. Везде КОДЫ, нигде формулировки (конституция, 5).
+
+    Пустая строка означает «не сужено», а не «сужено пустым»: отсутствие
+    фильтра и фильтр по пустому значению — разные выборки, и склеивать их
+    нельзя. Период хранится кодом окна (`all`, `d30`, `d90`, `y1`), а не парой
+    дат: подпись окна переводится, а его смысл — нет.
+    """
+
+    country: str = ""
+    city: str = ""
+    grade: str = ""
+    period: str = "all"
+
+    @property
+    def narrowed(self) -> bool:
+        """Сужена ли выборка хоть чем-нибудь — для кнопки «Сбросить»."""
+        return bool(self.country or self.city or self.grade) or self.period != "all"
+
+
+@dataclass(frozen=True)
+class CityRow:
+    """Строка разбивки: город, его точки и что с ними за период.
+
+    Средняя считается по записанным процентам ровно так же, как по сети, и
+    подчиняется тому же признаку сравнимости: ряд из разных изданий методики
+    не усредняется вовсе (T349).
+    """
+
+    city: str
+    country: str
+    units: int
+    inspections: int
+    average: float | None
+    comparable: bool
+    grades: tuple[tuple[str, int], ...]
+    critical: int
+
+
+@dataclass(frozen=True)
+class PointRow:
+    """Точка выборки: её последняя проверка и куда она движется.
+
+    `delta` — разница с предыдущей проверкой ТОЙ ЖЕ точки, и только если обе
+    посчитаны одним изданием методики: иначе это разница ставок, а не работы
+    точки, и стрелка вниз соврала бы человеку прямо на главном экране.
+    """
+
+    unit: str
+    city: str
+    country: str
+    inspection_id: str
+    when: date
+    grade: str
+    pct: float
+    delta: float | None
+    worst_zone_ru: str
+    worst_zone_en: str
+    critical: int
+
+
+@dataclass(frozen=True)
 class Overview:
     """Всё, что показывает экран, одним снимком."""
 
@@ -95,6 +157,11 @@ class Overview:
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problem_units: tuple[InspectionRow, ...]
+    selection: Selection = Selection()
+    countries: tuple[tuple[str, int], ...] = ()
+    cities: tuple[tuple[str, int], ...] = ()
+    breakdown: tuple[CityRow, ...] = ()
+    points: tuple[PointRow, ...] = ()
 
 
 def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
@@ -184,18 +251,142 @@ def _attention(
     return tuple(поводы[:TOP])
 
 
+#: Окна периода кодом: подпись окна переводится, число дней — нет.
+#: `all` намеренно первый и означает «не сужать»: обзор сети без выбранного
+#: периода обязан показывать всё, а не молча последний месяц.
+PERIODS: dict[str, int | None] = {"all": None, "d30": 30, "d90": 90, "y1": 365}
+
+
+def window(period: str, *, today: date) -> tuple[date | None, date | None]:
+    """Границы окна по его коду. Неизвестный код — то же, что «всё время».
+
+    Отказом это делать нельзя: код периода приходит из адресной строки, и
+    опечатка в ней не повод показать человеку страницу ошибки вместо сети.
+    """
+    дней = PERIODS.get(period)
+    if дней is None:
+        return None, None
+    return today - timedelta(days=дней), today
+
+
+def _fits(row: InspectionRow, *, selection: Selection, geo: dict[str, tuple[str, str]]) -> bool:
+    """Попадает ли проверка в выборку. Сравнение по кодам, не по подписям."""
+    country, city = geo.get(row.unit_name, ("", ""))
+    if selection.country and country != selection.country:
+        return False
+    if selection.city and city != selection.city:
+        return False
+    if selection.grade and row.grade != selection.grade:
+        return False
+    return True
+
+
+def _breakdown(
+    rows: tuple[InspectionRow, ...],
+    *,
+    geo: dict[str, tuple[str, str]],
+    counts: dict[str, dict[str, int]],
+) -> tuple[CityRow, ...]:
+    """Разбивка выборки по городам, крупные города сверху.
+
+    Точка без города попадает в отдельную строку с пустым названием, а не
+    выбрасывается: «в разбивке 40 точек, а в сети 150» — это вопрос к
+    справочнику, и экран обязан его задать, а не спрятать.
+    """
+    по_городам: dict[tuple[str, str], list[InspectionRow]] = {}
+    for row in rows:
+        country, city = geo.get(row.unit_name, ("", ""))
+        по_городам.setdefault((country, city), []).append(row)
+    строки = [
+        CityRow(
+            city=city,
+            country=country,
+            units=len({row.unit_name for row in ряд}),
+            inspections=len(ряд),
+            average=_average(tuple(ряд)),
+            comparable=_comparable(tuple(ряд)),
+            grades=_grades(tuple(ряд)),
+            critical=sum(counts.get(row.id, {}).get(CRITICAL, 0) for row in ряд),
+        )
+        for (country, city), ряд in по_городам.items()
+    ]
+    строки.sort(key=lambda с: (-с.units, -с.inspections, с.city))
+    return tuple(строки)
+
+
+def _points(
+    rows: tuple[InspectionRow, ...],
+    *,
+    geo: dict[str, tuple[str, str]],
+    counts: dict[str, dict[str, int]],
+    worst: dict[str, tuple[str, str, str, float]],
+) -> tuple[PointRow, ...]:
+    """Точки выборки: у каждой — её последняя проверка и движение оценки.
+
+    Ряд приходит отсортированным по дате убыванием, поэтому первая встреченная
+    проверка точки и есть последняя, а вторая — та, с которой считается
+    движение. Пересортировывать здесь нечего: порядок задан запросом.
+    """
+    последние: dict[str, InspectionRow] = {}
+    предыдущие: dict[str, InspectionRow] = {}
+    for row in rows:
+        if row.unit_name not in последние:
+            последние[row.unit_name] = row
+        elif row.unit_name not in предыдущие:
+            предыдущие[row.unit_name] = row
+    точки: list[PointRow] = []
+    for имя, row in последние.items():
+        country, city = geo.get(имя, ("", ""))
+        было = предыдущие.get(имя)
+        сравнимо = было is not None and (было.checklist_code, было.checklist_version) == (
+            row.checklist_code,
+            row.checklist_version,
+        )
+        зона = worst.get(row.id, ("", "", "", 0.0))
+        точки.append(
+            PointRow(
+                unit=имя,
+                city=city,
+                country=country,
+                inspection_id=row.id,
+                when=row.inspection_date,
+                grade=row.grade,
+                pct=row.pct,
+                delta=round(row.pct - было.pct, 1) if сравнимо and было else None,
+                worst_zone_ru=зона[1],
+                worst_zone_en=зона[2],
+                critical=counts.get(row.id, {}).get(CRITICAL, 0),
+            )
+        )
+    точки.sort(key=lambda т: (т.pct, т.unit))
+    return tuple(точки)
+
+
 def load(
     *,
     tenant: str,
     limit: int,
-    date_from: date | None = None,
-    date_to: date | None = None,
+    selection: Selection = Selection(),
+    today: date | None = None,
 ) -> Overview:
     """Снимок сети за период. Один проход по базе на каждый блок, не по строке."""
-    rows = tuple(queries.list_inspections(tenant=tenant, limit=limit))
-    counts = {row.id: {} for row in rows}
+    date_from, date_to = window(selection.period, today=today or date.today())
+    geo = queries.unit_geography(tenant=tenant)
+    counts = queries.class_counts(tenant=tenant, date_from=date_from, date_to=date_to)
+    worst = queries.worst_zones(tenant=tenant, date_from=date_from, date_to=date_to)
+    весь_ряд = tuple(
+        queries.list_inspections(tenant=tenant, limit=limit, date_from=date_from, date_to=date_to)
+    )
+    rows = tuple(row for row in весь_ряд if _fits(row, selection=selection, geo=geo))
     losses = queries.zone_losses(tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP)
     всего = sum(строка[3] for строка in losses) or 1.0
+    страны: dict[str, int] = {}
+    города: dict[str, int] = {}
+    for country, city in geo.values():
+        if country:
+            страны[country] = страны.get(country, 0) + 1
+        if city:
+            города[city] = города.get(city, 0) + 1
     return Overview(
         units_total=queries.units_total(tenant=tenant),
         inspections=rows,
@@ -223,4 +414,9 @@ def load(
         ),
         attention=_attention(rows, counts=counts),
         problem_units=tuple(sorted(rows, key=lambda r: r.pct)[:TOP]),
+        selection=selection,
+        countries=tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0]))),
+        cities=tuple(sorted(города.items(), key=lambda п: (-п[1], п[0]))),
+        breakdown=_breakdown(rows, geo=geo, counts=counts),
+        points=_points(rows, geo=geo, counts=counts, worst=worst),
     )
