@@ -24,7 +24,7 @@ from src.db.errors import DbError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import accounts, auth, view
+from . import accounts, auth, letter_draft, view
 from . import inspections as data
 from . import methodology as method
 from .config import Settings, load_settings
@@ -63,6 +63,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _register_sections(app)
     _register_registry(app, conf)
+    letter_draft.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     _register_errors(app)
@@ -204,6 +205,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
             save_outcome=request.args.get("saved"),
+            gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
             letter_langs=data.LETTER_LANGS,
             letter_lang=письмо_на or detail.inspection.report_lang,

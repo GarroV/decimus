@@ -418,6 +418,29 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
+    # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
+    # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
+    # делает, — иначе человек закроет экран, считая письмо ушедшим.
+    "letter.gmail.submit": {"ru": "В черновики Google", "en": "Save to Google drafts"},
+    "letter.gmail.ok": {
+        "ru": "Черновик лежит в вашей почте — отправьте его оттуда.",
+        "en": "The draft is in your mailbox — send it from there.",
+    },
+    "letter.gmail.failed": {
+        "ru": "Черновик не создан. Письмо сохранено — попробуйте ещё раз.",
+        "en": "The draft was not created. The letter is saved — please try again.",
+    },
+    "letter.gmail.denied": {
+        "ru": "Доступ к почте не выдан — черновика нет. Письмо сохранено.",
+        "en": "Mail access was not granted — no draft was created. The letter is saved.",
+    },
+    "letter.gmail.unavailable": {
+        "ru": "Почта на этом стенде не настроена — черновик создать некуда. Письмо сохранено.",
+        "en": (
+            "Mail is not configured on this stand — there is nowhere to put a draft. "
+            "The letter is saved."
+        ),
+    },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     # --- люди проекта (T338, #322) -----------------------------------------
     "users.lead": {
