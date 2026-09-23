@@ -1,0 +1,135 @@
+{#
+  Обзор сети — экран, отвечающий на вопрос «куда смотреть сегодня» (бриф на
+  визуал, экран 01; облик — прототип владельца, D188/D190).
+
+  Ни одного вычисления в шаблоне. Проценты, буквы и потери по зонам приходят
+  готовыми из `src/web/overview.py`, который, в свою очередь, ничего не
+  пересчитывает: движок посчитал — база записала — экран показал.
+
+  Блок, под который в базе нет данных, показывает пустое состояние словами, а
+  не исчезает: исчезнувший блок читается как «здесь всё в порядке».
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.overview.title') }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('overview.kicker', tenant=tenant) }}</div>
+      <h1 class="ov-head__title">{{ t('section.overview.title') }}</h1>
+      <div class="ov-head__sub">{{ t('overview.lead') }}</div>
+    </div>
+  </div>
+
+  {# Плитки кликабельны все до одной: цифра без перехода на вопрос экрана не
+     отвечает, а бриф прямо запрещает полосу мёртвых плиток. #}
+  <div class="ov-tiles">
+    {% for tile in tiles %}
+      <a class="ov-tile{% if tile.tone != 'plain' %} ov-tile--{{ tile.tone }}{% endif %}" href="{{ url(tile.href) }}">
+        <span class="ov-tile__label">{{ t('overview.tile.' ~ tile.key) }}</span>
+        <span class="ov-tile__value">{{ tile.value }}</span>
+        <span class="ov-tile__note">{{ tile.note }}</span>
+      </a>
+    {% endfor %}
+  </div>
+
+  {% if not data.comparable %}
+    <div class="note note--warn mt-gap">
+      <div>
+        <div class="note__title">{{ t('overview.incomparable.title') }}</div>
+        <div class="note__text">{{ t('overview.incomparable.text') }}</div>
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="ov-grid">
+    {# ── Куда смотреть сегодня ─────────────────────────────────────────── #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('overview.attention.title') }}</div>
+        <div class="ov-card__hint">{{ t('overview.attention.hint') }}</div>
+      </div>
+      {% if data.attention %}
+        {% for item in data.attention %}
+          <a class="ov-row" href="{{ url(registry_path ~ '/' ~ item.inspection_id) }}">
+            <span class="ov-dot ov-dot--{{ item.tone }}"></span>
+            <span class="ov-row__name">
+              {{ item.unit }}
+              <span class="ov-row__meta">{{ t('overview.why.' ~ item.why, detail=item.detail) }} · {{ item.when }}</span>
+            </span>
+          </a>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('overview.attention.empty') }}</div>
+      {% endif %}
+    </section>
+
+    {# ── Где сеть теряет проценты ──────────────────────────────────────── #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('overview.zones.title') }}</div>
+        <div class="ov-card__hint">{{ t('overview.zones.hint') }}</div>
+      </div>
+      {% if data.zone_losses %}
+        {% for zone in data.zone_losses %}
+          <div class="ov-row">
+            <span class="ov-row__name">
+              {{ zone.name_ru if lang == "ru" else zone.name_en }}
+              <span class="ov-row__meta">{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}</span>
+            </span>
+            <span class="ov-bar">
+              <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
+              <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
+            </span>
+            <span class="ov-row__num">−{{ '%.1f'|format(zone.loss) }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('overview.zones.empty') }}</div>
+      {% endif %}
+    </section>
+
+    {# ── Системные нарушения ───────────────────────────────────────────── #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('overview.systemic.title') }}</div>
+        <div class="ov-card__hint">{{ t('overview.systemic.hint') }}</div>
+      </div>
+      {% if data.systemic %}
+        {% for item in data.systemic %}
+          <div class="ov-row">
+            <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
+            <span class="ov-row__name">
+              {{ item.code }}
+              <span class="ov-row__meta">{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
+            </span>
+            <span class="ov-row__num">{{ item.units }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('overview.systemic.empty') }}</div>
+      {% endif %}
+    </section>
+
+    {# ── Проблемные точки ──────────────────────────────────────────────── #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('overview.units.title') }}</div>
+        <div class="ov-card__hint">{{ t('overview.units.hint') }}</div>
+      </div>
+      {% if data.problem_units %}
+        {% for row in data.problem_units %}
+          <a class="ov-row" href="{{ url(registry_path ~ '/' ~ row.id) }}">
+            <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+            <span class="ov-row__name">
+              {{ row.unit_name }}
+              <span class="ov-row__meta">{{ row.inspection_date }} · {{ t('overview.units.findings', count=row.findings_count) }}</span>
+            </span>
+            <span class="ov-row__num">{{ '%.1f'|format(row.pct) }}</span>
+          </a>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('overview.units.empty') }}</div>
+      {% endif %}
+    </section>
+  </div>
+{% endblock %}

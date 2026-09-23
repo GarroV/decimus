@@ -31,9 +31,26 @@ from src.db.errors import DbError, RetractionError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.retract import Retraction
 from src.web import inspections as data
+from src.web import overview as overview_data
 from src.web.sections import SECTIONS
 
 ТЕНАНТ = "default"
+
+
+#: Сеть без единой записи: экран «Обзор» ходит в базу, а этот стенд
+#: проверяет не данные, а то, что каждый раздел открывается.
+ПУСТАЯ_СЕТЬ = overview_data.Overview(
+    units_total=0,
+    inspections=(),
+    grades=(),
+    average=None,
+    comparable=True,
+    comparability_note="",
+    zone_losses=(),
+    systemic=(),
+    attention=(),
+    problem_units=(),
+)
 
 
 def шапка(**поля: Any) -> InspectionRow:
@@ -108,6 +125,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     """
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -134,7 +152,7 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 7
+    assert len(непостроенные) == 6
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key

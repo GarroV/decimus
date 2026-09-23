@@ -529,3 +529,136 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> l
         )
         rows = cur.fetchall()
     return [_row_to_finding(row) for row in rows]
+
+
+# ─── Сводка по сети: агрегаты, а не чтение карточек по одной ────────────────
+#
+# Экран «Обзор» (T354) показывает сеть целиком: где она теряет проценты, какие
+# пункты нарушаются на многих точках, какие точки проблемные. Собирать это из
+# карточек нельзя: на 390 точках это 390 запросов на один экран, а данные уже
+# лежат в форме, пригодной для группировки.
+#
+# ОЦЕНКА ЗДЕСЬ НЕ СЧИТАЕТСЯ. Запросы складывают то, что движок УЖЕ записал:
+# `by_zone` разложен им при завершении проверки, `pct` и `grade` взяты оттуда
+# же. Ни процента, ни буквы, ни вычета эти запросы не выводят.
+
+_ZONE_LOSSES_SQL = """
+select
+    zone.key as code,
+    max(zone.value ->> 'name_ru') as name_ru,
+    max(zone.value ->> 'name_en') as name_en,
+    sum((zone.value ->> 'deduction')::numeric) as loss,
+    count(distinct i.id) as inspections,
+    count(distinct i.unit_id) as units
+from inspections i
+     cross join lateral jsonb_each(i.by_zone) as zone
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and jsonb_typeof(zone.value) = 'object'
+  and (zone.value ->> 'deduction') is not null
+group by zone.key
+order by loss desc, zone.key
+limit %(limit)s
+"""
+
+_SYSTEMIC_SQL = """
+select
+    f.code,
+    f.level,
+    count(*) as records,
+    count(distinct i.unit_id) as units
+from findings f
+     join inspections i on i.id = f.inspection_id
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+group by f.code, f.level
+order by units desc, records desc, f.code
+limit %(limit)s
+"""
+
+_UNITS_TOTAL_SQL = """
+select count(*) from units where tenant_code = %(tenant)s
+"""
+
+
+def zone_losses(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = DEFAULT_LIMIT,
+) -> list[tuple[str, str, str, float, int, int]]:
+    """Потери по зонам: `(код, имя ru, имя en, вычет, проверок, точек)`.
+
+    Имя зоны берётся из того же снимка `by_zone`, а не из нынешней методики:
+    проверка заморожена вместе с формулировками своей версии, и подпись из
+    сегодняшнего справочника подменила бы название, под которым зону смотрели.
+
+    Вычет берётся из `by_zone`, куда его положил движок, и только сложением.
+    Зона, у которой в снимке нет числа вычета, в ответ не попадает: нулём её
+    подменять нельзя — «зона без потерь» и «зона, про которую эта проверка
+    ничего не записала» на экране читаются одинаково, а значат разное.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("потери по зонам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _ZONE_LOSSES_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": _require_limit(limit),
+            },
+        )
+        return [
+            (str(code), str(ru or code), str(en or code), float(loss), int(insp), int(units))
+            for code, ru, en, loss, insp, units in cur.fetchall()
+        ]
+
+
+def systemic_findings(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    limit: int = DEFAULT_LIMIT,
+) -> list[tuple[str, str, int, int]]:
+    """Нарушения по пунктам: `(код пункта, класс, записей, точек)`.
+
+    Порядок — по числу ТОЧЕК, а не записей: один пункт, нарушенный на двадцати
+    точках, — это методика или обучение, а двадцать записей по одному пункту на
+    одной точке — это одна точка. Сортировка по записям смешала бы эти случаи.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("нарушения по пунктам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _SYSTEMIC_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": _require_limit(limit),
+            },
+        )
+        return [
+            (str(code), str(level), int(records), int(units))
+            for code, level, records, units in cur.fetchall()
+        ]
+
+
+def units_total(*, tenant: str) -> int:
+    """Сколько точек у арендатора в справочнике — всего, а не «с проверками».
+
+    Считается отдельно от проверок намеренно: «проверено 12 из 150» и
+    «проверено 12» — разные утверждения, и первое возможно только если знать
+    знаменатель.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("число точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNITS_TOTAL_SQL, {"tenant": tenant_code})
+        row = cur.fetchone()
+        return int(row[0]) if row else 0

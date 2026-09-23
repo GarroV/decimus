@@ -42,6 +42,94 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
+    # ── Обзор сети (T354) ───────────────────────────────────────────────
+    # Причина повода — КОД, а фраза собирается здесь: причина одна на оба
+    # языка, а текст у каждого свой. Склейка фразы в шаблоне или в слое данных
+    # означала бы печатать мимо словаря.
+    "overview.kicker": {
+        "ru": "Аналитика сети · {tenant}",
+        "en": "Network analytics · {tenant}",
+    },
+    "overview.lead": {
+        "ru": "Куда смотреть сегодня: что сеть теряет, где это повторяется и какие точки просели.",
+        "en": "Where to look today: what the network loses, where it repeats, "
+        "and which units slipped.",
+    },
+    "overview.tile.units": {"ru": "Точек в справочнике", "en": "Units on file"},
+    "overview.tile.inspections": {"ru": "Проверок", "en": "Inspections"},
+    "overview.tile.average": {"ru": "Средняя оценка", "en": "Average score"},
+    "overview.tile.critical": {"ru": "С критическими", "en": "With critical"},
+    "overview.tile.note.units": {"ru": "проверено {checked}", "en": "{checked} inspected"},
+    "overview.tile.note.inspections": {"ru": "в реестре", "en": "in the registry"},
+    "overview.tile.note.average": {
+        "ru": "по записанным процентам",
+        "en": "over recorded percentages",
+    },
+    "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
+    "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
+    "overview.incomparable.title": {
+        "ru": "Средняя по этой выборке не считается",
+        "en": "No average for this selection",
+    },
+    "overview.incomparable.text": {
+        "ru": "Проверки посчитаны по разным ставкам или разным чек-листам: одно число по ним "
+        "было бы средним по несравнимому. Разбивка ниже остаётся верной — она не усредняет.",
+        "en": "These inspections were scored under different rates or checklists: a single number "
+        "would average the incomparable. The breakdown below still holds — it averages nothing.",
+    },
+    "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
+    "overview.attention.hint": {
+        "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
+        "en": "Burned zones and dropped scores, most urgent first",
+    },
+    "overview.attention.empty": {
+        "ru": "Поводов нет: критических нарушений и оценок ниже порога в выборке не записано.",
+        "en": "Nothing pending: no critical findings and no below-threshold scores recorded here.",
+    },
+    "overview.why.critical": {
+        "ru": "критических нарушений: {detail}",
+        "en": "critical findings: {detail}",
+    },
+    "overview.why.low_grade": {"ru": "оценка {detail} %", "en": "score {detail}%"},
+    "overview.zones.title": {
+        "ru": "Где сеть теряет проценты",
+        "en": "Where the network loses points",
+    },
+    "overview.zones.hint": {
+        "ru": "Сумма потерь по зонам — что лечить системно",
+        "en": "Losses summed by zone — what to fix systemically",
+    },
+    "overview.zones.spread": {
+        "ru": "точек: {units} · проверок: {inspections}",
+        "en": "units: {units} · inspections: {inspections}",
+    },
+    "overview.zones.empty": {
+        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
+        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
+    },
+    "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
+    "overview.systemic.hint": {
+        "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
+        "en": "One item across many units — a candidate for training or a methodology fix",
+    },
+    "overview.systemic.spread": {
+        "ru": "точек: {units} · записей: {records}",
+        "en": "units: {units} · records: {records}",
+    },
+    "overview.systemic.empty": {
+        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
+        "en": "No repeats: no item was breached at more than one unit.",
+    },
+    "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
+    "overview.units.hint": {
+        "ru": "Снизу вверх по записанной оценке",
+        "en": "Lowest recorded score first",
+    },
+    "overview.units.findings": {"ru": "записей: {count}", "en": "records: {count}"},
+    "overview.units.empty": {
+        "ru": "Проверок в выборке нет — показывать нечего.",
+        "en": "No inspections in this selection — nothing to show.",
+    },
     "section.overview.title": {"ru": "Обзор", "en": "Overview"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Планы", "en": "Action plans"},
