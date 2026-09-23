@@ -56,7 +56,12 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.filter.grade": {"ru": "Буква", "en": "Grade"},
     "overview.filter.period": {"ru": "Период", "en": "Period"},
     "overview.filter.reset": {"ru": "Сбросить", "en": "Reset"},
-    "overview.filter.any": {"ru": "любая", "en": "any"},
+    # Подписи «все …» вместо «любая»: у русских названий отборов разный род
+    # («страна» женский, «город» мужской), и одно слово на всех читается
+    # как опечатка ровно в половине случаев.
+    "overview.filter.all_countries": {"ru": "Все страны", "en": "All countries"},
+    "overview.filter.all_cities": {"ru": "Все города", "en": "All cities"},
+    "overview.filter.all_grades": {"ru": "Все буквы", "en": "All grades"},
     "overview.period.all": {"ru": "всё время", "en": "all time"},
     "overview.period.d30": {"ru": "30 дней", "en": "30 days"},
     "overview.period.d90": {"ru": "90 дней", "en": "90 days"},

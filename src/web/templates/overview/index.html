@@ -47,7 +47,7 @@
 
     {% if data.countries %}
       <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.country') }}">
-        <a class="ov-chip{% if not selection.country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('overview.filter.country') }}: {{ t('overview.filter.any') }}</a>
+        <a class="ov-chip{% if not selection.country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('overview.filter.all_countries') }}</a>
         {% for code, units in data.countries %}
           <a class="ov-chip{% if selection.country == code %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ code }} <span class="ov-chip__num">{{ units }}</span></a>
         {% endfor %}
@@ -56,7 +56,7 @@
 
     {% if data.cities %}
       <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.city') }}">
-        <a class="ov-chip{% if not selection.city %} is-on{% endif %}" href="{{ select_url(city='') }}">{{ t('overview.filter.city') }}: {{ t('overview.filter.any') }}</a>
+        <a class="ov-chip{% if not selection.city %} is-on{% endif %}" href="{{ select_url(city='') }}">{{ t('overview.filter.all_cities') }}</a>
         {% for name, units in data.cities %}
           <a class="ov-chip{% if selection.city == name %} is-on{% endif %}" href="{{ select_url(city=name) }}">{{ name }} <span class="ov-chip__num">{{ units }}</span></a>
         {% endfor %}
@@ -64,7 +64,7 @@
     {% endif %}
 
     <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.grade') }}">
-      <a class="ov-chip{% if not selection.grade %} is-on{% endif %}" href="{{ select_url(grade='') }}">{{ t('overview.filter.grade') }}: {{ t('overview.filter.any') }}</a>
+      <a class="ov-chip{% if not selection.grade %} is-on{% endif %}" href="{{ select_url(grade='') }}">{{ t('overview.filter.all_grades') }}</a>
       {% for letter, count in data.grades %}
         <a class="ov-chip{% if selection.grade == letter %} is-on{% endif %}" href="{{ select_url(grade=letter) }}">{{ letter }} <span class="ov-chip__num">{{ count }}</span></a>
       {% endfor %}

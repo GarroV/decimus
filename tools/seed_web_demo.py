@@ -86,6 +86,9 @@ class DemoInspection:
     chat_id: int
     unit: str
     city: str
+    #: Код страны точки ISO 3166-1 alpha-2, как в `units.country` (0017).
+    #: Кодом, а не названием: название переводится, код нет.
+    country: str
     auditor: str
     date: str
     kind: str
@@ -101,6 +104,7 @@ DEMO_INSPECTIONS = (
     DemoInspection(
         chat_id=999_000_000_101,
         unit="Demo Pizzeria #1",
+        country="RS",
         city="Demo City",
         auditor="Demo Auditor",
         date="2026-08-12",
@@ -115,6 +119,7 @@ DEMO_INSPECTIONS = (
     DemoInspection(
         chat_id=999_000_000_102,
         unit="Demo Pizzeria #2",
+        country="RS",
         city="Demo City",
         auditor="Demo Auditor",
         date="2026-08-19",
@@ -127,6 +132,7 @@ DEMO_INSPECTIONS = (
     DemoInspection(
         chat_id=999_000_000_103,
         unit="Demo Pizzeria #3",
+        country="GE",
         city="Demo Town",
         auditor="Demo Auditor",
         date="2026-09-02",
@@ -174,6 +180,25 @@ def _reset(app_dsn: str) -> int:
         return cur.rowcount
 
 
+def _set_geography(dsn: str) -> None:
+    """Проставить демо-точкам страну и город.
+
+    Отдельным шагом после слива, а не внутри него: проверка не знает
+    географии точки — её ведёт справочник, и слив трогать эти колонки не
+    вправе. Без этого шага экран сети нечем сузить: панель отбора показывает
+    страну и город, а у демо-точек они пусты, и панель выглядит сломанной,
+    хотя работает верно.
+    """
+    _require_local_dsn(dsn)
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        for spec in DEMO_INSPECTIONS:
+            cur.execute(
+                "update units set country = %s, city = %s "
+                "where tenant_code = %s and name = %s",
+                (spec.country, spec.city, DEMO_TENANT, spec.unit),
+            )
+
+
 def _build(spec: DemoInspection) -> None:
     """Собрать одну демо-проверку в состоянии тем же кодом, что и бот."""
     settings = domain.check_environment()
@@ -218,6 +243,7 @@ def seed() -> list[str]:
         score = domain.score(spec.chat_id)
         ids.append(inspection_id)
         print(f"{spec.unit} — {spec.date}: {score.pct:g}% grade {score.grade}, id={inspection_id}")
+    _set_geography(app_dsn)
     print(f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}")
     return ids
 
