@@ -49,7 +49,7 @@ class Section:
 #: (T319) и «Методика» (T320): объём спринта — базовая часть веб-версии
 #: (D133), а не вся она.
 SECTIONS: tuple[Section, ...] = (
-    Section(key="overview", path="/overview", built=False),
+    Section(key="overview", path="/overview", built=True),
     Section(key="registry", path="/inspections", built=True),
     Section(key="plans", path="/plans", built=False),
     Section(key="orders", path="/orders", built=False),

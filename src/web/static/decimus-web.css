@@ -241,3 +241,122 @@
 }
 .note__list li + li { margin-top: var(--space-2); }
 .note--warn .note__list { color: var(--warn-ink); }
+
+/* ═══ ОБЗОР СЕТИ ═════════════════════════════════════════════════════════
+   Облик перенесён с прототипа владельца (D188, D190): карточка со скруглением
+   экрана, шапка с подзаголовком, плотные строки-списки. Своих цветов и
+   размеров здесь нет — всё через токены ядра, иначе экран отвяжется от
+   дизайн-системы при первой же правке палитры.
+
+   Плитки сверху КЛИКАБЕЛЬНЫ и сужают выборку. Это не украшение: бриф
+   запрещает «шаблонный дашборд-вид с четырьмя одинаковыми плитками», и
+   отличие ровно здесь — цифра, из которой нельзя провалиться в список, на
+   вопрос «куда смотреть сегодня» не отвечает. */
+
+.ov-head { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; }
+.ov-head__main { flex: 1; min-width: 14rem; }
+.ov-head__kicker {
+  font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ov-head__title {
+  font-family: var(--font-num);
+  font-size: var(--fs-title);
+  font-weight: var(--w-semibold);
+  letter-spacing: -.03em;
+  margin-top: var(--space-2);
+}
+.ov-head__sub { font-size: var(--fs-body); color: var(--ink-2); margin-top: var(--space-2); }
+
+/* Полоса плиток. Ширина колонки задаётся сеткой, а не числом плиток:
+   блок, под который нет данных, не показывается вовсе, и полоса не должна
+   от этого разъезжаться. */
+.ov-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+.ov-tile {
+  display: block;
+  text-align: left;
+  padding: var(--space-4);
+  border-radius: var(--r-control);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+}
+.ov-tile:hover { border-color: var(--accent-line); }
+.ov-tile__label { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-2); }
+.ov-tile__value {
+  display: block;
+  font-family: var(--font-num);
+  font-size: var(--fs-display);
+  font-weight: var(--w-semibold);
+  line-height: 1;
+  letter-spacing: -.03em;
+  margin-top: var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+.ov-tile__note { font-size: var(--fs-micro); line-height: var(--lh-meta); color: var(--ink-3); margin-top: var(--space-2); }
+.ov-tile--err .ov-tile__value { color: var(--err); }
+.ov-tile--warn .ov-tile__value { color: var(--warn-ink); }
+
+/* Двухколоночная сетка карточек; на телефоне складывается в одну колонку
+   правилом ниже, а не медиазапросом на каждую карточку. */
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-5);
+}
+
+.ov-card {
+  border-radius: var(--r-screen);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.ov-card__head { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line-2); }
+.ov-card__title { font-weight: var(--w-semibold); font-size: var(--fs-lead); }
+.ov-card__hint { font-size: var(--fs-meta); color: var(--ink-3); margin-top: var(--space-1); }
+.ov-card__empty { padding: var(--space-5); font-size: var(--fs-meta); color: var(--ink-3); }
+
+.ov-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+  color: inherit;
+  text-decoration: none;
+}
+.ov-row:last-child { border-bottom: 0; }
+a.ov-row:hover { background: var(--surface-3); }
+.ov-row__name { flex: 1; min-width: 9rem; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ov-row__meta { font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-1); }
+.ov-row__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-dense);
+  font-weight: var(--w-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 3.5rem;
+}
+
+/* Полоса долей: ширина сегмента — это и есть число, поэтому подпись рядом
+   не дублируется, а дополняет (сколько именно). */
+.ov-bar { display: flex; height: .5rem; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-3); min-width: 6rem; flex: 1; }
+.ov-bar__part { display: block; }
+
+/* Точка-маркер повода. Единственный сильный цвет на экране, и он несёт смысл:
+   бриф разрешает цвет на букве оценки и классе нарушения, а повод — это и
+   есть класс нарушения, вынесенный на обзор. */
+.ov-dot { width: .5rem; height: .5rem; border-radius: 50%; flex: none; margin-top: var(--space-2); }
+.ov-dot--err { background: var(--err); }
+.ov-dot--warn { background: var(--warn); }

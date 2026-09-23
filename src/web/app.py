@@ -27,6 +27,7 @@ from src.domain.kinds import kind_title
 from . import accounts, auth, letter_draft, view
 from . import inspections as data
 from . import methodology as method
+from . import overview as overview_data
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
 from .origin import refuse_foreign_origin
@@ -46,7 +47,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("registry", "admin", "users")
+SCREENS = ("overview", "registry", "admin", "users")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -62,6 +63,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
     _register_sections(app)
+    _register_overview(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     _register_methodology(app, conf)
@@ -137,6 +139,67 @@ def _wip_view(key: str) -> Any:
 
     render.__name__ = f"wip_{key}"
     return render
+
+
+def _register_overview(app: Flask, conf: Settings) -> None:
+    """Раздел «Обзор»: сеть целиком одним экраном.
+
+    Плитки собираются здесь, а не в шаблоне: у каждой есть адрес перехода, и
+    адрес — это решение приложения, а не оформление. Цифра, из которой нельзя
+    провалиться в список, на вопрос экрана не отвечает (бриф на визуал).
+    """
+
+    @app.get(section("overview").path)
+    def overview() -> str:
+        snapshot = overview_data.load(tenant=conf.tenant, limit=REGISTRY_LIMIT)
+        registry_path = section("registry").path
+        критических = sum(1 for item in snapshot.attention if item.why == "critical")
+        среднее = (
+            t("overview.tile.note.average_none", _lang(conf))
+            if snapshot.average is None or not snapshot.comparable
+            else t("overview.tile.note.average", _lang(conf))
+        )
+        tiles = (
+            overview_data.Tile(
+                key="units",
+                value=str(snapshot.units_total),
+                note=t(
+                    "overview.tile.note.units",
+                    _lang(conf),
+                    checked=len({row.unit_name for row in snapshot.inspections}),
+                ),
+                href=registry_path,
+            ),
+            overview_data.Tile(
+                key="inspections",
+                value=str(len(snapshot.inspections)),
+                note=t("overview.tile.note.inspections", _lang(conf)),
+                href=registry_path,
+            ),
+            overview_data.Tile(
+                key="average",
+                value="—" if snapshot.average is None or not snapshot.comparable
+                else f"{snapshot.average:.1f}",
+                note=среднее,
+                href=registry_path,
+            ),
+            overview_data.Tile(
+                key="critical",
+                value=str(критических),
+                note=t("overview.tile.note.critical", _lang(conf)),
+                href=registry_path,
+                tone="err" if критических else "plain",
+            ),
+        )
+        return render_template(
+            "overview/index.html",
+            data=snapshot,
+            tiles=tiles,
+            registry_path=registry_path,
+            grade_tone=view.grade_tone,
+            level_tone=view.level_tone,
+            lang=_lang(conf),
+        )
 
 
 def _register_registry(app: Flask, conf: Settings) -> None:
