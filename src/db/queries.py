@@ -66,7 +66,10 @@ select
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
-    i.retracted_at, i.retraction_reason
+    i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
@@ -86,7 +89,10 @@ select
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
-    i.retracted_at, i.retraction_reason
+    i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
@@ -105,6 +111,9 @@ select
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code,
     i.deductions, i.counts, i.by_zone
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -208,6 +217,11 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         # проверку ИМЕННО как снятую, а не как обычную.
         retracted=row[16] is not None,
         retraction_reason=str(row[17] or ""),
+        # Код чек-листа приезжает последним и потому не двигает ничего выше
+        # (T345). `or "bizdev"` — для строк, залитых до миграции программно:
+        # пустой код у записанной проверки означал бы «не знаем, по чему
+        # проверяли», а такого состояния у неё не бывает.
+        checklist_code=str(row[18] or "bizdev"),
     )
 
 
