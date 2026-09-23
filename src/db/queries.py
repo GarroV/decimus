@@ -33,7 +33,7 @@ from typing import Any
 import psycopg
 
 from .config import check_environment, load_retraction_settings
-from .errors import DbError
+from .errors import DbError, StorageError
 from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
 from .units import normalize_unit_name
 
@@ -180,6 +180,33 @@ from inspection_info
 where inspection_id = %(id)s
 order by position
 """
+
+
+def _detail_parts(
+    колонки: dict[str, int], row: Any
+) -> tuple[float, dict[str, Any], dict[str, Any]]:
+    """Разбивка оценки из строки карточки — по именам колонок, а не по их номерам.
+
+    Позиционный разбор здесь уже ломался молча: колонка, приписанная в конец
+    списка (`checklist_code`, T345), сдвинула разбивку на единицу, и карточка
+    проверки перестала читаться вовсе — разбором, а не понятным отказом. Номер
+    колонки знает только тот, кто держит в голове весь `select`; имя знает
+    драйвер.
+
+    Отсутствие колонки — отказ, а не ноль: разбивка уезжает в документ
+    партнёру, и нулевые вычеты в нём выглядят как безупречная проверка.
+    """
+    недостающие = [имя for имя in ("deductions", "counts", "by_zone") if имя not in колонки]
+    if недостающие:
+        raise StorageError(
+            f"В ответе базы нет колонок разбивки оценки: {', '.join(недостающие)}. "
+            f"Карточка проверки без них — это документ партнёру с пустыми вычетами"
+        )
+    return (
+        float(row[колонки["deductions"]]),
+        dict(row[колонки["counts"]]),
+        dict(row[колонки["by_zone"]]),
+    )
 
 
 def _row_to_inspection(row: Any) -> InspectionRow:
@@ -445,6 +472,7 @@ def get_inspection(
     ):
         cur.execute(_GET_INSPECTION_SQL, {"tenant": tenant_code, "id": ident})
         row = cur.fetchone()
+        колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
         if row is None:
             return None
         # Находки читаются тем же соединением и в той же транзакции: между
@@ -457,11 +485,17 @@ def get_inspection(
         # документом, а не шапкой одной проверки и сроком другой.
         cur.execute(_INFO_OF_INSPECTION_SQL, {"id": ident})
         info = cur.fetchall()
+    # Разбивка берётся ПО ИМЕНИ колонки, а не по её номеру. Номер здесь уже
+    # ломался молча: приписка `checklist_code` в конец списка колонок (T345)
+    # сдвинула разбивку на единицу, и чтение карточки стало падать разбором
+    # «could not convert string to float: 'bizdev'». Имена отдаёт сам драйвер
+    # (`cur.description`), поэтому следующая приписка ничего не сдвинет.
+    deductions, counts, by_zone = _detail_parts(колонки, row)
     return InspectionDetail(
         inspection=_row_to_inspection(row),
-        deductions=float(row[18]),
-        counts=dict(row[19]),
-        by_zone=dict(row[20]),
+        deductions=deductions,
+        counts=counts,
+        by_zone=by_zone,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
     )
