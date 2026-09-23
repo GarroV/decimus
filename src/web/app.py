@@ -250,12 +250,37 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.get(section("registry").path)
     def registry() -> str:
         registry_data = data.load_registry(tenant=conf.tenant, limit=REGISTRY_LIMIT)
+        # Отбор реестра живёт в адресе ровно по той же причине, что и на
+        # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
+        # сравниваются как коды; непонятное значение сужает выборку в пустоту,
+        # но страницу не роняет.
+        буква = request.args.get("grade", "").strip().upper()[:1]
+        вид = request.args.get("kind", "").strip()[:20]
+        строки = tuple(
+            row
+            for row in registry_data.rows
+            if (not буква or row.grade == буква) and (not вид or row.kind == вид)
+        )
+
+        def отбор(**изменения: str) -> str:
+            параметры = {"grade": буква, "kind": вид, "lang": _lang(conf), **изменения}
+            живые = {ключ: значение for ключ, значение in параметры.items() if значение}
+            return url_for("registry", **живые)
+
         return render_template(
             "inspections/list.html",
             registry=registry_data,
+            rows=строки,
             retraction_var=data.RETRACTION_URL_VAR,
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
+            # Буквы — шкалой, а не по частоте: полоса отбора не должна менять
+            # порядок от выборки к выборке (то же правило, что на обзоре).
+            grades=("A", "B", "C", "D"),
+            kinds=tuple(dict.fromkeys(row.kind for row in registry_data.rows)),
+            grade=буква,
+            kind=вид,
+            select_url=отбор,
         )
 
     @app.get(f"{section('registry').path}/<inspection_id>")
