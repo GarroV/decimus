@@ -82,6 +82,15 @@
       </div>
 
       <div class="card__body">
+        {% if gmail_outcome == 'ok' %}
+          <p class="note note--ok">{{ t('letter.gmail.ok') }}</p>
+        {% elif gmail_outcome == 'denied' %}
+          <p class="note note--warn">{{ t('letter.gmail.denied') }}</p>
+        {% elif gmail_outcome == 'unavailable' %}
+          <p class="note note--warn">{{ t('letter.gmail.unavailable') }}</p>
+        {% elif gmail_outcome == 'failed' %}
+          <p class="note note--warn">{{ t('letter.gmail.failed') }}</p>
+        {% endif %}
         {% if save_outcome == 'ok' %}
           <p class="note note--ok">{{ t('letter.save.ok') }}</p>
         {% elif save_outcome == 'failed' %}
@@ -125,6 +134,13 @@
             <button class="btn btn--primary" type="submit"
                     formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
             <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
+            {#
+              Черновик в почте вошедшего: та же форма, свой адрес. Письмо
+              фиксируется до ухода за согласием, поэтому кнопка не теряет
+              правку, даже если человек откажется в окне Google.
+            #}
+            <button class="btn" type="submit"
+                    formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
             {#
               Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
               записывает и не отменяет, а только показывает свежесобранный
