@@ -547,7 +547,7 @@ select
     zone.key as code,
     max(zone.value ->> 'name_ru') as name_ru,
     max(zone.value ->> 'name_en') as name_en,
-    sum((zone.value ->> 'deduction')::numeric) as loss,
+    sum((zone.value ->> 'loss')::numeric) as loss,
     count(distinct i.id) as inspections,
     count(distinct i.unit_id) as units
 from inspections i
@@ -556,7 +556,7 @@ where i.tenant_code = %(tenant)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and jsonb_typeof(zone.value) = 'object'
-  and (zone.value ->> 'deduction') is not null
+  and (zone.value ->> 'loss') is not null
 group by zone.key
 order by loss desc, zone.key
 limit %(limit)s
@@ -662,3 +662,111 @@ def units_total(*, tenant: str) -> int:
         cur.execute(_UNITS_TOTAL_SQL, {"tenant": tenant_code})
         row = cur.fetchone()
         return int(row[0]) if row else 0
+
+
+_CLASS_COUNTS_SQL = """
+select
+    f.inspection_id,
+    f.level,
+    count(*) as records
+from findings f
+     join inspections i on i.id = f.inspection_id
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+group by f.inspection_id, f.level
+"""
+
+
+def class_counts(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, dict[str, int]]:
+    """Сколько находок каждого класса в каждой проверке периода.
+
+    Одним запросом на весь период, а не по запросу на проверку: экран сети
+    показывает десятки проверок сразу, и чтение по строке превратило бы один
+    экран в десятки походов в базу.
+
+    Ответ — словарь `{id проверки: {класс: число}}`. Проверка без находок в нём
+    отсутствует, и это честнее нулей: «находок не заводили» и «находок нет»
+    различаются, а ноль их бы склеил. Потребитель читает через `.get`.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("счётчики классов") as conn, conn.cursor() as cur:
+        cur.execute(_CLASS_COUNTS_SQL, {"tenant": tenant_code, "date_from": date_from, "date_to": date_to})
+        счёт: dict[str, dict[str, int]] = {}
+        for inspection_id, level, records in cur.fetchall():
+            счёт.setdefault(str(inspection_id), {})[str(level)] = int(records)
+        return счёт
+
+
+_UNIT_GEOGRAPHY_SQL = """
+select u.name, u.country, u.city
+from units u
+where u.tenant_code = %(tenant)s
+"""
+
+
+def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+    """География точек справочника: `{название: (код страны, город)}`.
+
+    География берётся у ТОЧКИ, а не у проверки. Город в проверке — то, что
+    ввёл аудитор в поле шапки, и он пишется свободной строкой; город точки
+    ведётся справочником и переживает опечатку в одной проверке. Срез сети по
+    городу, собранный из шапок, разъехался бы на «Belgrade» и «Белград».
+
+    Страна кодом, город строкой — как в базе (0017) и по той же причине:
+    формулировки переводятся, коды нет.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("география точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNIT_GEOGRAPHY_SQL, {"tenant": tenant_code})
+        return {str(name): (str(country or ""), str(city or "")) for name, country, city in cur.fetchall()}
+
+
+_WORST_ZONES_SQL = """
+select distinct on (i.id)
+    i.id,
+    zone.key as code,
+    zone.value ->> 'name_ru' as name_ru,
+    zone.value ->> 'name_en' as name_en,
+    (zone.value ->> 'loss')::numeric as loss
+from inspections i
+     cross join lateral jsonb_each(i.by_zone) as zone
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and jsonb_typeof(zone.value) = 'object'
+  and (zone.value ->> 'loss') is not null
+order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
+"""
+
+
+def worst_zones(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> dict[str, tuple[str, str, str, float]]:
+    """Самая дорогая зона каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
+
+    Имя зоны — из снимка самой проверки, а не из нынешней методики: проверка
+    заморожена вместе со своими формулировками, и подпись из сегодняшнего
+    справочника подменила бы название, под которым зону смотрели.
+
+    Зона выбирается по НАИБОЛЬШЕМУ вычету, а не по числу находок: экран
+    отвечает на вопрос «где потеряно больше всего процентов», и три мелких
+    замечания в одной зоне не перевешивают одного дорогого в другой.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
+        cur.execute(_WORST_ZONES_SQL, {"tenant": tenant_code, "date_from": date_from, "date_to": date_to})
+        return {
+            str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
+            for inspection_id, code, ru, en, loss in cur.fetchall()
+        }
