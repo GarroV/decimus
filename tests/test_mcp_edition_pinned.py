@@ -25,7 +25,7 @@ import pytest
 from mcp_checklist_harness import build_edition, build_methodology
 
 from src.domain.config import DATA_FILES, Settings
-from src.domain.edition import shelf, snapshot
+from src.domain.edition import SHELF_DIR, shelf, snapshot
 from src.domain.version import edition_of
 from src.mcp import letters
 from src.mcp.checklist import VERSIONS_DIR
@@ -180,6 +180,47 @@ def test_полка_бота_даёт_издание_которого_в_хра�
 
     assert найдено is not None
     assert найдено == (полка, letters.FROM_SHELF)
+
+
+def test_снимок_с_полки_своего_чек_листа_находится_из_корня_полки(tmp_path: Path) -> None:
+    """Полка стала двухуровневой (T346), и письмо обязано это знать.
+
+    `letters.sources()` отдаёт КОРЕНЬ полки — `STATE_DIR/methodology`, — а
+    снимки с T346 лежат уровнем ниже, у своего чек-листа. Ищи письмо по одному
+    плоскому пути, и снимок идущей проверки перестал бы находиться: письмо
+    партнёру собралось бы по боевой методике (другое издание — значит отказ)
+    или не собралось вовсе. Партнёр читает отправленное как факт.
+    """
+    издание = _издание(tmp_path / "выезд", ПУНКТ_СНИМКА, day="2026-09-04")
+    состояние = tmp_path / "state"
+    настройки = Settings(
+        data_dir=tmp_path / "выезд",
+        state_dir=состояние,
+        audit_script=tmp_path / "audit.py",
+    )
+    полка = shelf(настройки) / издание
+    shutil.copytree(tmp_path / "выезд", полка)
+
+    бумаги = letters.Papers(live=None, store=None, shelf=состояние / SHELF_DIR)
+
+    assert letters.pinned(издание, бумаги) == (полка, letters.FROM_SHELF)
+
+
+def test_чужой_снимок_под_тем_же_именем_в_дело_не_идёт(tmp_path: Path) -> None:
+    """Перебор полок не отменяет сверку: годен тот, чьё содержимое и есть издание.
+
+    Иначе двухуровневая полка стала бы новым местом, где методику можно
+    подменить незаметно, — ровно тем, от чего заведена T236.
+    """
+    издание = _издание(tmp_path / "выезд", ПУНКТ_СНИМКА, day="2026-09-04")
+    состояние = tmp_path / "state"
+    чужая = состояние / SHELF_DIR / "partner_x" / издание
+    shutil.copytree(tmp_path / "выезд", чужая)
+    _дописать(чужая, ПУНКТ_ПОДМЕНЫ)
+
+    бумаги = letters.Papers(live=None, store=None, shelf=состояние / SHELF_DIR)
+
+    assert letters.pinned(издание, бумаги) is None
 
 
 def test_полка_читается_из_окружения_а_не_подставляется_вызовом(

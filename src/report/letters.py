@@ -46,7 +46,7 @@ from typing import Any
 
 from ..db.models import InspectionDetail
 from ..domain.config import DATA_FILES
-from ..domain.edition import SHELF_DIR
+from ..domain.edition import SHELF_DIR, shelf_dirs
 from ..domain.kinds import kind_title
 from ..domain.models import TEXT_LANGS
 from ..domain.version import compose, edition_of
@@ -468,7 +468,11 @@ def pinned(version: str, papers: Papers) -> tuple[Path, str] | None:
     места = [] if papers.store is None else edition_dirs(papers.store, хотим)
     хранилище = next((м for м in места if м.is_dir() and edition_of(м, DATA_FILES) == хотим), None)
     названные = [м for м in места if м.is_dir()]
-    полка = None if papers.shelf is None else papers.shelf / хотим
+    # Полка тоже стала многоместной: снимки лежат у своего чек-листа (T346),
+    # а снятые раньше — в корне полки. Кода чек-листа здесь нет и взяться
+    # ему неоткуда: проверка помечена изданием, а не кодом.
+    полки = [] if papers.shelf is None else shelf_dirs(papers.shelf, хотим)
+    полка = next((п for п in полки if edition_of(п, DATA_FILES) == хотим), None)
 
     # Оба каталога, НАЗВАННЫЕ изданием, разбираются до ответа, а не до первого
     # совпадения. Самозванец, оставшийся за спиной удачного ответа, — это
@@ -476,12 +480,12 @@ def pinned(version: str, papers: Papers) -> tuple[Path, str] | None:
     # выручила соседняя полка. Стоит это одного лишнего чтения методики и
     # только когда оба каталога на месте: отсутствующий отвечает сразу.
     в_хранилище = None if хранилище is None else хотим
-    на_полке = None if полка is None else edition_of(полка, DATA_FILES)
+    на_полке = None if полка is None else хотим
 
     самозванцы: list[tuple[Path | None, str | None]] = [
         (каталог, edition_of(каталог, DATA_FILES)) for каталог in названные
     ]
-    самозванцы.append((полка, на_полке))
+    самозванцы += [(каталог, edition_of(каталог, DATA_FILES)) for каталог in полки]
     for каталог, оказалось in самозванцы:
         if каталог is not None and оказалось != хотим and каталог.is_dir():
             # Отказ агенту от этого не меняется — «этого издания на машине
