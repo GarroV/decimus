@@ -28,6 +28,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
 
 from src import domain
 
+from . import frame_copies
 from .access import AccessMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
@@ -389,9 +390,13 @@ async def start_polling() -> None:
     await announce_commands(bot, circle_at_startup(settings))
     dispatcher = build_dispatcher(settings, roster=roster)
     log_startup(settings)
+    # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца
+    # опроса: задачу без ссылки сборщик мусора снимает на середине.
+    sweeper = asyncio.create_task(frame_copies.sweep_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
+        sweeper.cancel()
         await bot.session.close()
 
 
