@@ -600,9 +600,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "{index}. {code} · {level} · {zone}  ⚠ проверьте формулировку\n   {wording}",
         "en": "{index}. {code} · {level} · {zone}  ⚠ check the wording\n   {wording}",
     },
+    # Приставка — знак, а не слово (#365): модель сама начинает вопрос с
+    # «Уточните…», и словесная приставка давала «Уточните: Уточните …».
     "record.question": {
-        "ru": "Уточните: {question}",
-        "en": "Please clarify: {question}",
+        "ru": "❓ {question}",
+        "en": "❓ {question}",
     },
     "record.nothing_found": {
         "ru": "По этому материалу пункт не подобрался. Выберите сами или уточните словами.",
