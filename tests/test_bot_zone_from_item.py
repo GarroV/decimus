@@ -117,9 +117,8 @@ async def test_печь_в_чужой_зоне_от_модели_спрашив�
         "невозможная пара «пункт + зона» записана молча"
     )
     assert session.last_text == t("record.ask_zone_for_item", "ru", code="CLN05")
-    assert session.keyboard_data() == ["rec:zp:hot_kitchen"], (
-        "кнопками предложено то, чего методика пункту не даёт"
-    )
+    # Все зоны, зона пункта — первой (D177): место находки выбирает человек.
+    assert session.keyboard_data()[0] == "rec:zp:hot_kitchen", "зона пункта не стоит первой"
 
     await feed(dp, bot, callback_query("rec:zp:hot_kitchen"))
     состояние = get_state(CHAT_ID)

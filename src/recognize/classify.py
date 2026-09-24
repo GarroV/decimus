@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -61,6 +62,16 @@ def needs_photo(note: str) -> bool:
     return not note.strip()
 
 
+#: Сколько кадров делают материал пачкой (D180). Один кадр с комментарием
+#: по-прежнему разбирается по словам (D081).
+ALBUM_MIN_FRAMES = 2
+
+
+def album_mode(note: str, frames: int) -> bool:
+    """Пачка кадров с комментарием: модель смотрит и слова, и кадры (D180)."""
+    return bool(note.strip()) and frames >= ALBUM_MIN_FRAMES
+
+
 def _candidate(record: dict[str, Any]) -> Candidate | None:
     """Один кандидат из ответа модели. Зона берётся её ответом, и только им.
 
@@ -92,6 +103,18 @@ def _candidate(record: dict[str, Any]) -> Candidate | None:
     )
 
 
+def _candidates(raw: Any, settings: RecognizeSettings) -> tuple[Candidate, ...]:
+    """Кандидаты из списка записей ответа; мусор и NONE отбрасываются."""
+    records = raw if isinstance(raw, list) else []
+    return tuple(
+        c
+        for record in records
+        if isinstance(record, dict)
+        for c in (_candidate(record),)
+        if c is not None
+    )[: settings.max_candidates]
+
+
 def _suggestion(
     payload: dict[str, Any],
     usage: dict[str, int],
@@ -99,15 +122,7 @@ def _suggestion(
     *,
     used_photo: bool,
 ) -> Suggestion:
-    raw = payload.get("records")
-    records = raw if isinstance(raw, list) else []
-    candidates = tuple(
-        c
-        for record in records
-        if isinstance(record, dict)
-        for c in (_candidate(record),)
-        if c is not None
-    )[: settings.max_candidates]
+    candidates = _candidates(payload.get("records"), settings)
     question = str(payload.get("question", "")).strip()
     top = candidates[0] if candidates else None
     needs_human = (
@@ -134,6 +149,7 @@ def classify(
     settings: RecognizeSettings | None = None,
     model: str | None = None,
     chat_id: int | None,
+    photos: Sequence[bytes] = (),
 ) -> Suggestion:
     """Предложить записи по комментарию аудитора. Решение остаётся за ним.
 
@@ -147,22 +163,32 @@ def classify(
     в `AUDIT_DATA_DIR` сейчас. Пустой чат (`config.NO_CHAT`) — законное
     «проверки нет»: так зовут замеры по выгрузкам `examples/`.
     """
+    album = album_mode(note, len(photos))
     cfg = settings or load_recognize_settings()
     picked = shortlist(note, zone_hint, chat_id=chat_id)
     picks = picks_for(picked.codes, chat_id=chat_id)
     zones = list_zones(chat_id=chat_id)
-    use_photo = photo is not None and needs_photo(note)
+    use_photo = album or (photo is not None and needs_photo(note))
     answer = ask_model(
         instructions=instructions(class_thresholds(chat_id=chat_id)),
         question=question_text(
-            note, picks, zones, zone_hint, lang, with_photo=use_photo, chat_id=chat_id
+            note,
+            picks,
+            zones,
+            zone_hint,
+            lang,
+            with_photo=use_photo,
+            chat_id=chat_id,
+            album_frames=len(photos) if album else 0,
         ),
-        schema=response_schema(picks, [z.code for z in zones]),
-        photo=photo if use_photo else None,
+        schema=response_schema(picks, [z.code for z in zones], album=album),
+        photo=photo if use_photo and not album else None,
+        photos=photos if album else (),
         settings=cfg,
         model=model,
     )
     return replace(
         _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo),
         shortlist=picked.codes,
+        also_seen=_candidates(answer.payload.get("also_seen"), cfg) if album else (),
     )

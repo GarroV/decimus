@@ -76,8 +76,13 @@ def add_finding(
     source: str = "",
     words: str = "",
     suggested: Suggestion | None = None,
+    zone_by_person: bool = False,
 ) -> Finding:
     """Зафиксировать запись.
+
+    `zone_by_person` — зону назвал человек (словами или кнопкой). Тогда зона вне
+    списка пункта принимается с пометкой `zone_unusual` (D177): зона — там, где
+    продукт. Зона, выведенная машиной, по-прежнему ограничена списком (T271).
 
     Отказ движка — пара «пункт + зона» уже занята, класс не разрешён для пункта,
     зоны нет в справочнике — уходит наружу `EngineError` с его же текстом:
@@ -130,6 +135,7 @@ def add_finding(
             option("zone", zone),
             option("evidence", text),
             option("comment", comment),
+            *(["--zone-by-person"] if zone_by_person else []),
         ],
         chat_id=chat_id,
         settings=settings,
@@ -142,7 +148,7 @@ def add_finding(
     return _finding_after(chat_id, settings, n, "add")
 
 
-def edit_finding(chat_id: int, n: int, **fields: str) -> Finding:
+def edit_finding(chat_id: int, n: int, *, zone_by_person: bool = False, **fields: str) -> Finding:
     """Поправить запись: `code`, `level`, `zone`, `text`, `comment`.
 
     Меняются только переданные поля. Пустой вызов и незнакомое имя поля — отказ:
@@ -162,6 +168,9 @@ def edit_finding(chat_id: int, n: int, **fields: str) -> Finding:
         )
     args = ["edit", option("n", str(n))]
     args += [option(FIELD_OPTIONS[name], value) for name, value in sorted(fields.items())]
+    if zone_by_person:
+        # Зону назвал человек — вне списка пункта она принимается с пометкой (D177).
+        args.append("--zone-by-person")
     run_audit(args, chat_id=chat_id, settings=settings)
     return _finding_after(chat_id, settings, n, "edit")
 

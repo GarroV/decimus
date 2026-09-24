@@ -606,6 +606,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "❓ {question}",
         "en": "❓ {question}",
     },
+    # Увиденное на кадрах пачки сверх слов аудитора (D180). Заголовок говорит
+    # прямо, что это догадка по кадрам: аудитор этого не произносил.
+    "record.also_seen": {
+        "ru": "На кадрах видно ещё — вы об этом не говорили. Записать что-то из этого?\n\n{lines}",
+        "en": "The frames also show this — you did not mention it. Record any of it?\n\n{lines}",
+    },
     "record.nothing_found": {
         "ru": "По этому материалу пункт не подобрался. Выберите сами или уточните словами.",
         "en": "No item matched this material. Pick one yourself or clarify in words.",

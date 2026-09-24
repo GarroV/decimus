@@ -66,66 +66,92 @@ def split_pick(pick: str) -> tuple[str, str]:
     return code, level
 
 
-def response_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]:
+def _record_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]:
+    """Одна запись ответа. Общая для сказанного (`records`) и увиденного (`also_seen`)."""
+    return {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["item", "zone", "wording", "reason", "confidence"],
+        "properties": {
+            "item": {
+                "type": "string",
+                "description": (
+                    "Пункт и класс одним значением из перечня. NONE — если "
+                    "ни один пункт перечня не подходит."
+                ),
+                "enum": list(picks),
+            },
+            "zone": {
+                "type": "string",
+                "description": (
+                    "Зона из слов аудитора или из подсказки. Выводить зону "
+                    f"из вида кадра запрещено: не сказано — {UNKNOWN_ZONE}."
+                ),
+                "enum": [*zones, UNKNOWN_ZONE],
+            },
+            "wording": {
+                "type": "string",
+                "description": "Формулировка записи по правилам фиксации.",
+            },
+            "reason": {
+                "type": "string",
+                "description": "Что в комментарии или кадре указывает на этот пункт.",
+            },
+            "confidence": {
+                "type": "number",
+                "description": "Уверенность от 0 до 1.",
+            },
+        },
+    }
+
+
+def response_schema(
+    picks: Sequence[str], zones: Sequence[str], *, album: bool = False
+) -> dict[str, Any]:
     """Строгая схема ответа: список записей плюс уточняющий вопрос.
 
     `question` — то, что модель спрашивает у аудитора, когда по кадру и
     комментарию непонятно (правило 7). Поле обязательное: в строгом режиме
     необязательных полей не бывает, пустая строка означает «вопросов нет».
+
+    `album` — пачка кадров с комментарием (D180). Тогда в ответе есть ещё
+    `also_seen`: нарушения, видимые на кадрах, о которых аудитор не сказал.
+    Отдельным полем, а не хвостом `records`: сказанное человеком и увиденное
+    моделью показываются аудитору по-разному, и смешать их значило бы выдать
+    догадку по картинке за его слова.
     """
+    record = _record_schema(picks, zones)
+    properties: dict[str, Any] = {
+        "records": {
+            "type": "array",
+            "description": (
+                "Предложения записей по словам аудитора. Один комментарий может "
+                "содержать несколько нарушений — тогда записей несколько. Ни одна "
+                "не подходит — пустой список либо единственная запись с item=NONE."
+            ),
+            "items": record,
+        },
+        "question": {
+            "type": "string",
+            "description": (
+                "Что спросить у аудитора, если непонятно. Пустая строка — вопросов нет."
+            ),
+        },
+    }
+    if album:
+        properties["also_seen"] = {
+            "type": "array",
+            "description": (
+                "Варианты по кадрам сверх слов аудитора: другой пункт или класс для "
+                "сказанного, если кадры показывают больше, чем слова, и нарушения, о "
+                "которых аудитор не сказал. Не повторять записи из records. Ничего "
+                "сверх — пустой список."
+            ),
+            "items": record,
+        }
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["records", "question"],
-        "properties": {
-            "records": {
-                "type": "array",
-                "description": (
-                    "Предложения записей. Один комментарий может содержать несколько "
-                    "нарушений — тогда записей несколько. Ни одна не подходит — пустой "
-                    "список либо единственная запись с item=NONE."
-                ),
-                "items": {
-                    "type": "object",
-                    "additionalProperties": False,
-                    "required": ["item", "zone", "wording", "reason", "confidence"],
-                    "properties": {
-                        "item": {
-                            "type": "string",
-                            "description": (
-                                "Пункт и класс одним значением из перечня. NONE — если "
-                                "ни один пункт перечня не подходит."
-                            ),
-                            "enum": list(picks),
-                        },
-                        "zone": {
-                            "type": "string",
-                            "description": (
-                                "Зона из слов аудитора или из подсказки. Выводить зону "
-                                f"из вида кадра запрещено: не сказано — {UNKNOWN_ZONE}."
-                            ),
-                            "enum": [*zones, UNKNOWN_ZONE],
-                        },
-                        "wording": {
-                            "type": "string",
-                            "description": "Формулировка записи по правилам фиксации.",
-                        },
-                        "reason": {
-                            "type": "string",
-                            "description": "Что в комментарии или кадре указывает на этот пункт.",
-                        },
-                        "confidence": {
-                            "type": "number",
-                            "description": "Уверенность от 0 до 1.",
-                        },
-                    },
-                },
-            },
-            "question": {
-                "type": "string",
-                "description": (
-                    "Что спросить у аудитора, если непонятно. Пустая строка — вопросов нет."
-                ),
-            },
-        },
+        "required": list(properties),
+        "properties": properties,
     }
