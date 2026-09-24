@@ -302,8 +302,26 @@
   font-variant-numeric: tabular-nums;
 }
 .ov-tile__note { font-size: var(--fs-micro); line-height: var(--lh-meta); color: var(--ink-3); margin-top: var(--space-2); }
+/* Плитки различаются на вид, и различие несёт смысл: цветом помечено
+   только то, что требует действия, — бриф разрешает сильный цвет там, где он
+   значит, а не украшает. Спокойная плитка остаётся спокойной. */
+.ov-tile--err { border-color: var(--err-line); background: var(--err-soft); }
 .ov-tile--err .ov-tile__value { color: var(--err); }
+.ov-tile--warn { border-color: var(--warn-line); background: var(--warn-soft); }
 .ov-tile--warn .ov-tile__value { color: var(--warn-ink); }
+.ov-tile--ok { border-color: var(--ok-line); }
+.ov-tile--ok .ov-tile__value { color: var(--ok); }
+/* Движение рядом с числом, а не вместо него: «88,0» отвечает «сколько»,
+   «−2,4» — «куда», и одно без другого на этом экране бесполезно. */
+.ov-tile__delta {
+  font-family: var(--font-num);
+  font-size: var(--fs-meta);
+  font-weight: var(--w-semibold);
+  letter-spacing: 0;
+  margin-left: var(--space-2);
+  color: var(--ink-3);
+}
+.ov-tile--err .ov-tile__delta { color: var(--err); }
 
 /* Двухколоночная сетка карточек; на телефоне складывается в одну колонку
    правилом ниже, а не медиазапросом на каждую карточку. */
@@ -430,8 +448,8 @@ a.ov-row:hover { background: var(--surface-3); }
 }
 .ov-table--breakdown .ov-table__head,
 .ov-table--breakdown .ov-table__row {
-  grid-template-columns: minmax(7rem, 1fr) 4rem 5rem minmax(5rem, 8rem) 3rem;
-  min-width: 30rem;
+  grid-template-columns: minmax(7rem, 1fr) 4rem 5rem 4rem minmax(5rem, 8rem) 3rem;
+  min-width: 34rem;
 }
 .ov-table--points .ov-table__head,
 .ov-table--points .ov-table__row {
@@ -664,3 +682,30 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .find-row__main { flex: 1; min-width: 12rem; }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
 .find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
+
+/* ── Повод, требующий решения ───────────────────────────────────────────
+   Строка-действие: слева индикатор срочности, посередине повод, справа
+   кнопка, ведущая туда, где повод закрывают. */
+.att-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+.att-row:last-child { border-bottom: 0; }
+.att-row__main { flex: 1; min-width: 12rem; color: inherit; text-decoration: none; }
+.att-row__main:hover .att-row__unit { text-decoration: underline; }
+.att-row__unit { display: block; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.att-row__what { display: block; font-size: var(--fs-meta); color: var(--ink-2); margin-top: var(--space-1); }
+.att-row__when {
+  display: block;
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  margin-top: var(--space-2);
+  color: var(--ink-3);
+}
+.att-row__when--err { color: var(--err); }
+.att-row__when--warn { color: var(--warn-ink); }
