@@ -6,6 +6,7 @@
     "D1": 0.5,
     "D2": 2.0
   },
+  "repeat_multiplier": 2.0,
   "d3": {
     "mode": "zero_zone_share",
     "skip_other_violations_in_d3_zone": true
