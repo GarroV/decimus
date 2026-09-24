@@ -72,7 +72,7 @@ from src.recognize.manual import ManualCandidate, manual_candidates, search_item
 from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.transcribe import transcribe
 
-from .. import refusal, sealed, sidecar, view
+from .. import refusal, repeats, sealed, sidecar, view
 from ..inspection import read_inspection
 from ..keyboards import (
     ANALYZE_PREFIX,
@@ -1343,6 +1343,20 @@ async def _save(
         # платить ими за задержку ответа аудитору на точке незачем. Запись уже
         # сделана и уже показана, а память — дело следующего разбора.
         await asyncio.to_thread(_remember_words, chat_id, code=code, words=words)
+    if correcting is None and await asyncio.to_thread(
+        repeats.seen_before, saved, code=shown.code, level=shown.level
+    ):
+        # Подсказка о повторе (#359, D191). Стоит ПОСЛЕ показа записи и по той
+        # же причине, что и память синонимов: поход в базу — это десятки
+        # миллисекунд, и задерживать ими ответ аудитору на точке незачем.
+        #
+        # Отдельным сообщением, а не строкой в блоке записи: блок говорит, что
+        # записано, а подсказка — что известно про прошлый раз. Вмешать её в
+        # блок значило бы выдать наблюдение системы за часть записи, которой
+        # аудитор ещё не принимал (принцип 3 конституции). Правка (`correcting`)
+        # подсказки не получает: запись уже показывалась, и повторять
+        # наблюдение на каждое исправление формулировки — шум.
+        await message.answer(t("record.repeat_seen", lang))
     return sent
 
 
