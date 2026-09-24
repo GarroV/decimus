@@ -471,29 +471,31 @@ TEXTS: dict[str, dict[str, str]] = {
             "deliberately so."
         ),
     },
-    # --- перенос проверки по дате и пиццерии (D195) --------------------------
-    "move.title": {"ru": "Перенести проверку", "en": "Move inspection"},
+    # --- исправление даты и пиццерии (D195; в коде — move) --------------------------
+    "move.title": {"ru": "Исправить дату или пиццерию", "en": "Correct the date or pizzeria"},
     "move.hint": {
         "ru": (
-            "Меняются только дата и пиццерия. Записи, оценка и буква остаются такими, "
-            "какими их посчитал движок. Каждый перенос остаётся в истории вместе с причиной."
+            "Если при заведении проверки ошиблись датой или пиццерией — исправьте здесь. "
+            "Записи, оценка и буква не меняются. Каждое исправление остаётся в истории "
+            "вместе с причиной."
         ),
         "en": (
-            "Only the date and the pizzeria change. Findings, score and grade stay as the "
-            "engine computed them. Every move is kept in the history with its reason."
+            "If the inspection was filed with the wrong date or pizzeria, correct it here. "
+            "Findings, score and grade do not change. Every correction is kept in the "
+            "history with its reason."
         ),
     },
     "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
     "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
-    "move.reason_label": {"ru": "Причина переноса", "en": "Reason for the move"},
-    "move.submit": {"ru": "Перенести", "en": "Move"},
-    "move.done": {"ru": "Проверка перенесена.", "en": "The inspection has been moved."},
+    "move.reason_label": {"ru": "Что было не так", "en": "What was wrong"},
+    "move.submit": {"ru": "Исправить", "en": "Correct"},
+    "move.done": {"ru": "Исправлено.", "en": "Corrected."},
     "move.same": {
-        "ru": "Дата и пиццерия уже такие — переносить нечего.",
-        "en": "The date and pizzeria are already set — nothing to move.",
+        "ru": "Дата и пиццерия уже такие — исправлять нечего.",
+        "en": "The date and pizzeria are already set — nothing to correct.",
     },
-    "move.failed": {"ru": "Перенести не удалось: {reason}", "en": "Move failed: {reason}"},
-    "move.history.title": {"ru": "История переносов", "en": "Move history"},
+    "move.failed": {"ru": "Исправить не удалось: {reason}", "en": "Correction failed: {reason}"},
+    "move.history.title": {"ru": "История исправлений", "en": "Correction history"},
     "move.history.line": {
         "ru": "{unit_from}, {date_from} → {unit_to}, {date_to}",
         "en": "{unit_from}, {date_from} → {unit_to}, {date_to}",
@@ -503,8 +505,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "{at} · {who} · {reason}",
     },
     "move.history.unknown": {
-        "ru": "История переносов сейчас недоступна — переносить до её возвращения нельзя.",
-        "en": "The move history is unavailable right now — moving is disabled until it is back.",
+        "ru": "История исправлений сейчас недоступна — исправлять до её возвращения нельзя.",
+        "en": "The correction history is unavailable — corrections are disabled until it is back.",
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
     "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
