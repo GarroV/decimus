@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from functools import partial
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -36,6 +37,7 @@ from ..keyboards import (
     EDIT_LEVEL,
     EDIT_LEVEL_PREFIX,
     EDIT_PREFIX,
+    EDIT_REPEAT,
     EDIT_TEXT,
     EDIT_ZONE,
     EDIT_ZONE_PREFIX,
@@ -92,7 +94,15 @@ def build_edit_router() -> Router:
         chat_id = message.chat.id
         return message, chat_id, chat_ui_lang(chat_id)
 
-    async def apply(message: Message, chat_id: int, n: int, lang: str, **fields: str) -> None:
+    async def apply(
+        message: Message,
+        chat_id: int,
+        n: int,
+        lang: str,
+        *,
+        repeat: bool | None = None,
+        **fields: str,
+    ) -> None:
         if sealed.is_sealed(chat_id):
             # Правка записанного — тоже правка отчёта, а он уже у получателя
             # (T201, D080). Кнопки под записями остаются в переписке навсегда,
@@ -100,7 +110,9 @@ def build_edit_router() -> Router:
             await sealed.refuse(message, lang)
             return
         try:
-            await asyncio.to_thread(domain.edit_finding, chat_id, n, **fields)
+            await asyncio.to_thread(
+                partial(domain.edit_finding, chat_id, n, repeat=repeat, **fields)
+            )
         except DomainError as exc:
             # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
             # сюда чаще всего сменой зоны: пункт тот же, место уже занято.
@@ -169,6 +181,16 @@ def build_edit_router() -> Router:
             return
         if what == EDIT_DROP:
             await drop(message, chat_id, n, lang)
+            return
+        if what == EDIT_REPEAT:
+            # Переключатель, а не «поставить»: аудитор видит одну кнопку и не
+            # обязан помнить, в каком состоянии запись. Состояние он узнаёт из
+            # ответа — молчаливая смена цены заставила бы нажать второй раз.
+            стало_повтором = not finding.repeat
+            await apply(message, chat_id, n, lang, repeat=стало_повтором)
+            await message.answer(
+                t("edit.repeat_on" if стало_повтором else "edit.repeat_off", lang, n=n)
+            )
             return
         if what == EDIT_ZONE:
             zones = [(zone.code, zone.title(lang)) for zone in domain.list_zones(chat_id=chat_id)]
