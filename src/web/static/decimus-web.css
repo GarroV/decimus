@@ -876,10 +876,18 @@ a.ov-table__row:hover { background: var(--surface-3); }
   border: 1px solid var(--line-2);
   background: transparent;
 }
-.pt-marks__dot--on {
+/* Обводка — нарушение в той проверке записано. Это наблюдение. */
+.pt-marks__dot--seen {
+  border-color: var(--err-line);
+}
+/* Заливка — аудитор отметил повтор, и вычет за запись удвоен. Это решение о
+   цене, а не совпадение кода: показывать его так же, как наблюдение, значит
+   выдавать одно за другое. */
+.pt-marks__dot--doubled {
   background: var(--err);
   border-color: var(--err-line);
 }
+.pt-doubled { color: var(--err); }
 
 @media (max-width: 52rem) {
   /* На телефоне строка блока перестраивается в карточку: имя сверху, цифры
