@@ -162,7 +162,7 @@ def list_moves(inspection_id: str, *, tenant: str) -> tuple[MoveRecord, ...]:
         строки = cur.fetchall()
     return tuple(
         MoveRecord(
-            moved_at=moved_at.isoformat(timespec="minutes"),
+            moved_at=moved_at.strftime("%Y-%m-%d %H:%M"),
             moved_by=str(moved_by),
             reason=str(reason),
             old_date=old_date.isoformat(),

@@ -26,10 +26,11 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
-from web_harness import войти, подменить_двери, собрать
+from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.db.errors import DbError, RetractionError
+from src.db.errors import DbError, MoveError, RetractionError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
+from src.db.move import MoveRecord
 from src.db.retract import Retraction
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -640,3 +641,138 @@ def test_аудитор_не_отклоняет_проверку(стенд: Fla
     # Assert — отказ, и формы ему не показывают.
     assert ответ.status_code == 403
     assert "/retract" not in карточка_аудитора
+
+
+# --- перенос по дате и пиццерии (D195) ---------------------------------------
+
+
+def _перенос(
+    monkeypatch: pytest.MonkeyPatch, *, история: tuple[Any, ...] = ()
+) -> list[dict[str, Any]]:
+    вызовы: list[dict[str, Any]] = []
+
+    def перенести(inspection_id: str, **kw: Any) -> bool:
+        вызовы.append({"id": inspection_id, **kw})
+        return True
+
+    monkeypatch.setattr(data, "move_card", перенести)
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: история)
+    monkeypatch.setattr(data, "load_units", lambda **_: (("u-1", "Тбилиси-1"), ("u-2", "Батуми-1")))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+    return вызовы
+
+
+@админ
+def test_администратор_переносит_и_автор_берётся_из_сессии(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    вызовы = _перенос(monkeypatch)
+
+    # Act — автор в форме не передаётся: его подставляет вход, а не человек.
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": "не та точка", "actor": "подлог"},
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert ответ.status_code == 200
+    assert вызовы == [
+        {
+            "id": "x",
+            "tenant": ТЕНАНТ,
+            "new_date": "2026-09-01",
+            "new_unit_id": "u-2",
+            "reason": "не та точка",
+            "actor": ЛОГИН,
+        }
+    ]
+    assert "Проверка перенесена." in ответ.get_data(as_text=True)
+
+
+def test_аудитор_не_переносит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    вызовы = _перенос(monkeypatch)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": "не та точка"},
+        headers={"Origin": "http://localhost"},
+    )
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert ответ.status_code == 403
+    assert вызовы == []
+    assert "/move" not in страница
+
+
+@админ
+def test_форма_переноса_и_история_на_карточке(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    след = MoveRecord(
+        moved_at="2026-09-24T15:00+00:00",
+        moved_by="admin",
+        reason="опечатка в названии",
+        old_date="2026-09-21",
+        new_date="2026-09-21",
+        old_unit="Тбилиси -1",
+        new_unit="Тбилиси-1",
+    )
+    _перенос(monkeypatch, история=(след,))
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "/move?lang=" in страница
+    assert "Тбилиси -1, 2026-09-21 → Тбилиси-1, 2026-09-21" in страница
+    assert "опечатка в названии" in страница
+
+
+@админ
+def test_без_истории_формы_переноса_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — схема без 0025: история не читается, и перенос без следа
+    # показывать нельзя.
+    _перенос(monkeypatch)
+
+    def нет_истории(*_a: Any, **_k: Any) -> Any:
+        raise DbError("relation inspection_moves does not exist")
+
+    monkeypatch.setattr(data, "load_moves", нет_истории)
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "/move" not in страница
+    assert "История переносов сейчас недоступна" in страница
+
+
+@админ
+def test_отказ_переноса_показан_текстом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _перенос(monkeypatch)
+
+    def отказать(*_a: Any, **_k: Any) -> bool:
+        raise MoveError("Не назван повод переноса")
+
+    monkeypatch.setattr(data, "move_card", отказать)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": ""},
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert "Перенести не удалось: Не назван повод переноса" in ответ.get_data(as_text=True)

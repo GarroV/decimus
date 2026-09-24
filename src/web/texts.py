@@ -471,6 +471,41 @@ TEXTS: dict[str, dict[str, str]] = {
             "deliberately so."
         ),
     },
+    # --- перенос проверки по дате и пиццерии (D195) --------------------------
+    "move.title": {"ru": "Перенести проверку", "en": "Move inspection"},
+    "move.hint": {
+        "ru": (
+            "Меняются только дата и пиццерия. Записи, оценка и буква остаются такими, "
+            "какими их посчитал движок. Каждый перенос остаётся в истории вместе с причиной."
+        ),
+        "en": (
+            "Only the date and the pizzeria change. Findings, score and grade stay as the "
+            "engine computed them. Every move is kept in the history with its reason."
+        ),
+    },
+    "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
+    "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "move.reason_label": {"ru": "Причина переноса", "en": "Reason for the move"},
+    "move.submit": {"ru": "Перенести", "en": "Move"},
+    "move.done": {"ru": "Проверка перенесена.", "en": "The inspection has been moved."},
+    "move.same": {
+        "ru": "Дата и пиццерия уже такие — переносить нечего.",
+        "en": "The date and pizzeria are already set — nothing to move.",
+    },
+    "move.failed": {"ru": "Перенести не удалось: {reason}", "en": "Move failed: {reason}"},
+    "move.history.title": {"ru": "История переносов", "en": "Move history"},
+    "move.history.line": {
+        "ru": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+        "en": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+    },
+    "move.history.meta": {
+        "ru": "{at} · {who} · {reason}",
+        "en": "{at} · {who} · {reason}",
+    },
+    "move.history.unknown": {
+        "ru": "История переносов сейчас недоступна — переносить до её возвращения нельзя.",
+        "en": "The move history is unavailable right now — moving is disabled until it is back.",
+    },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
     "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.hint": {
