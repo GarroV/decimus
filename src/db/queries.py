@@ -562,19 +562,45 @@ order by loss desc, zone.key
 limit %(limit)s
 """
 
+# Формулировка берётся из САМОЙ СВЕЖЕЙ записи этого пункта, а не из методики:
+# экран сводит проверки разных изданий, и одной формулировки пункта у них нет,
+# а перевод пункта живёт в хранилище методики, куда веб за этим не ходит. Текст
+# при этом — на языке РЕЧИ той проверки, где он записан (конституция, принцип
+# языков), поэтому язык возвращается рядом с ним и печатается у текста.
 _SYSTEMIC_SQL = """
+with записи as (
+    select
+        f.code,
+        f.level,
+        i.unit_id,
+        i.inspection_date,
+        i.speech_lang,
+        (select t.text from translations t
+          where t.entity_type = 'finding' and t.entity_id = f.id
+            and t.field = 'text' and t.lang = i.speech_lang) as text
+    from findings f
+         join inspections i on i.id = f.inspection_id
+    where i.tenant_code = %(tenant)s
+      and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+      and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+),
+свежие as (
+    select distinct on (code, level) code, level, text, speech_lang
+    from записи
+    where text is not null and text <> ''
+    order by code, level, inspection_date desc
+)
 select
-    f.code,
-    f.level,
+    записи.code,
+    записи.level,
     count(*) as records,
-    count(distinct i.unit_id) as units
-from findings f
-     join inspections i on i.id = f.inspection_id
-where i.tenant_code = %(tenant)s
-  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
-  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
-group by f.code, f.level
-order by units desc, records desc, f.code
+    count(distinct записи.unit_id) as units,
+    coalesce(max(свежие.text), '') as text,
+    coalesce(max(свежие.speech_lang), '') as lang
+from записи
+     left join свежие on свежие.code = записи.code and свежие.level = записи.level
+group by записи.code, записи.level
+order by units desc, records desc, записи.code
 limit %(limit)s
 """
 
@@ -625,8 +651,8 @@ def systemic_findings(
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = DEFAULT_LIMIT,
-) -> list[tuple[str, str, int, int]]:
-    """Нарушения по пунктам: `(код пункта, класс, записей, точек)`.
+) -> list[tuple[str, str, int, int, str, str]]:
+    """Нарушения по пунктам: `(код, класс, записей, точек, формулировка, язык)`.
 
     Порядок — по числу ТОЧЕК, а не записей: один пункт, нарушенный на двадцати
     точках, — это методика или обучение, а двадцать записей по одному пункту на
@@ -645,8 +671,8 @@ def systemic_findings(
             },
         )
         return [
-            (str(code), str(level), int(records), int(units))
-            for code, level, records, units in cur.fetchall()
+            (str(code), str(level), int(records), int(units), str(text or ""), str(lang or ""))
+            for code, level, records, units, text, lang in cur.fetchall()
         ]
 
 

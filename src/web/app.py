@@ -141,6 +141,35 @@ def _wip_view(key: str) -> Any:
     return render
 
 
+def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
+    """Формулировки пунктов методики по коду — для экранов, где есть только код.
+
+    Берётся ДЕЙСТВУЮЩАЯ методика, а не замороженная у проверки: экран сети
+    сводит проверки разных изданий, и одной формулировки на код у них нет.
+    Поэтому это подпись к коду, а не текст той проверки, — код остаётся
+    связью, формулировка только помогает его прочесть.
+
+    Методика может быть не настроена (законная настройка стенда) или
+    отказать: тогда словарь пуст, и экран покажет один код. Отказ здесь не
+    повод не показать сеть — аналитика не про методику.
+    """
+    state = method.load_store()
+    if state.store is None:
+        return {}
+    try:
+        состав = method.load_composition(state.store, tenant=conf.tenant)
+    except MethodologyRefused:
+        return {}
+    ключ = "question_ru" if lang == "ru" else "question_en"
+    подписи: dict[str, str] = {}
+    for item in состав.items:
+        код = str(item.get("id", "")).strip()
+        текст = str(item.get(ключ) or item.get("question_ru") or "").strip()
+        if код and текст:
+            подписи[код] = текст
+    return подписи
+
+
 def _register_overview(app: Flask, conf: Settings) -> None:
     """Раздел «Обзор»: сеть целиком одним экраном.
 
@@ -237,6 +266,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             select_url=отбор,
             periods=tuple(overview_data.PERIODS),
             plans_path=section("plans").path,
+            item_titles=_item_titles(conf, _lang(conf)),
         )
 
 

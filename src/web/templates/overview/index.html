@@ -185,8 +185,22 @@
           <div class="ov-row">
             <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
             <span class="ov-row__name">
-              {{ item.code }}
-              <span class="ov-row__meta">{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
+              {# Что именно нарушается, словами. Сперва подпись пункта из
+                 действующей методики, иначе — формулировка самой свежей
+                 записи (она на языке РЕЧИ проверки, поэтому помечена), иначе
+                 голый код: пустоты здесь быть не может, блок ради этих слов и
+                 существует. #}
+              {% if item_titles.get(item.code) %}
+                {{ item_titles.get(item.code) }}
+              {% elif item.text %}
+                <span lang="{{ item.lang }}">{{ item.text }}</span>
+              {% else %}
+                {{ item.code }}
+              {% endif %}
+              <span class="ov-row__meta">
+                {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
+                {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
+              </span>
             </span>
             <span class="ov-row__num">{{ item.units }}</span>
           </div>
