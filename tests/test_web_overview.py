@@ -191,9 +191,7 @@ def test_пустые_блоки_говорят_словами_а_не_исче�
     assert "Повторов нет" in страница
 
 
-def test_каждая_плитка_ведёт_куда_то(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_каждая_плитка_ведёт_куда_то(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     """Цифра, из которой нельзя провалиться, на вопрос экрана не отвечает.
 
     Бриф запрещает «шаблонный дашборд-вид с четырьмя одинаковыми плитками», и
@@ -471,3 +469,98 @@ def test_умолчания_не_висят_в_адресе_среза(
     # Assert
     assert "sort=score" not in страница
     assert "period=all" not in страница
+
+
+class ЗаписнаяБаза:
+    """Заглушка слоя базы, запоминающая, с чем её позвали.
+
+    Проверять сужение по факту ответа нельзя: заглушка вернёт что угодно.
+    Проверяется именно то, что отбор человека доехал до запроса, — потому что
+    сбой был ровно здесь: запрос звали без города, а ответ показывали рядом с
+    сузившейся таблицей.
+    """
+
+    def __init__(self) -> None:
+        self.звонки: dict[str, dict[str, object]] = {}
+
+    def _записать(self, имя: str, kwargs: dict[str, object]) -> None:
+        self.звонки[имя] = kwargs
+
+    def unit_geography(self, **kw: object) -> dict[str, tuple[str, str]]:
+        return {"Белград-1": ("RS", "Белград")}
+
+    def units_total(self, **kw: object) -> int:
+        return 1
+
+    def list_inspections(self, **kw: object) -> tuple[InspectionRow, ...]:
+        return ()
+
+    def class_counts(self, **kw: object) -> dict[str, dict[str, int]]:
+        self._записать("class_counts", kw)
+        return {}
+
+    def worst_zones(self, **kw: object) -> dict[str, tuple[str, str, str, float]]:
+        self._записать("worst_zones", kw)
+        return {}
+
+    def zone_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
+        self._записать("zone_losses", kw)
+        return []
+
+    def systemic_findings(self, **kw: object) -> list[tuple[str, str, int, int, str, str]]:
+        self._записать("systemic_findings", kw)
+        return []
+
+
+def test_отбор_сужает_и_те_блоки_что_считаются_запросом(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Город и буква доезжают до потерь по зонам и системных нарушений.
+
+    Без этого экран показывает два множества сразу: таблица точек — выбранный
+    город, а «Где сеть теряет проценты» — всю сеть, и цифры рядом выглядят
+    одним разговором.
+    """
+    # Arrange
+    база = ЗаписнаяБаза()
+    monkeypatch.setattr(ov, "queries", база)
+
+    # Act
+    ov.load(
+        tenant=ТЕНАНТ,
+        limit=50,
+        selection=ov.Selection(city="Белград", country="RS", grade="D"),
+        today=date(2026, 9, 24),
+    )
+
+    # Assert — все четыре агрегата спрошены с тем же отбором, а не по сети.
+    assert set(база.звонки) == {
+        "class_counts",
+        "worst_zones",
+        "zone_losses",
+        "systemic_findings",
+    }
+    for имя, kwargs in база.звонки.items():
+        assert kwargs.get("city") == "Белград", имя
+        assert kwargs.get("country") == "RS", имя
+        assert kwargs.get("grade") == "D", имя
+
+
+def test_пустой_отбор_не_сужает_агрегаты(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Экран без отбора обязан показывать сеть целиком.
+
+    Пустая строка, доехавшая до запроса как значение, отсекла бы всё: город
+    «» не совпадает ни с одной точкой. Поэтому «не сужать» передаётся пустым
+    значением, которое слой базы превращает в NULL.
+    """
+    # Arrange
+    база = ЗаписнаяБаза()
+    monkeypatch.setattr(ov, "queries", база)
+
+    # Act
+    ov.load(tenant=ТЕНАНТ, limit=50, today=date(2026, 9, 24))
+
+    # Assert
+    for имя, kwargs in база.звонки.items():
+        assert kwargs.get("city") == "", имя
+        assert kwargs.get("grade") == "", имя

@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import dataclasses
+import inspect
 import re
 
 from src.db import queries
@@ -39,9 +40,7 @@ def test_снимок_зоны_читается_по_настоящим_имен
     поля = {поле.name for поле in dataclasses.fields(ZoneScore)}
 
     # Act
-    прочитанные = {
-        (имя, ключ) for имя, sql in ЗАПРОСЫ.items() for ключ in ДОСТАЁТ.findall(sql)
-    }
+    прочитанные = {(имя, ключ) for имя, sql in ЗАПРОСЫ.items() for ключ in ДОСТАЁТ.findall(sql)}
 
     # Assert
     чужие = {(имя, ключ) for имя, ключ in прочитанные if ключ not in поля}
@@ -63,3 +62,34 @@ def test_проверка_вообще_смотрит_на_запросы() -> N
     assert any(ДОСТАЁТ.findall(sql) for sql in ЗАПРОСЫ.values()), (
         "запросы найдены, но ни один не достаёт поля из снимка — проверка ослепла"
     )
+
+
+def test_пустой_отбор_становится_NULL_а_не_пустой_строкой() -> None:
+    """«Не сужать» и «сузить до города с пустым именем» — разные вещи.
+
+    Пустая строка, доехав до запроса значением, сравнивалась бы с городом и не
+    совпала бы ни с одной строкой: экран показал бы пустоту и не сказал, что
+    это не отсутствие данных, а собственный дефект.
+    """
+    # Act
+    пусто = queries._narrowing("", "", "")
+    заданное = queries._narrowing("Белград", "RS", "D")
+
+    # Assert
+    assert пусто == {"city": None, "country": None, "grade": None}
+    assert заданное == {"city": "Белград", "country": "RS", "grade": "D"}
+
+
+def test_агрегаты_периода_умеют_сужаться_по_точке_и_букве() -> None:
+    """Все четыре агрегата экрана сети принимают один и тот же отбор.
+
+    Если хотя бы один его не принимает, экран снова покажет два множества
+    рядом — а заметить это можно только глазами на живых данных.
+    """
+    # Arrange
+    агрегаты = ("zone_losses", "systemic_findings", "class_counts", "worst_zones")
+
+    # Act / Assert
+    for имя in агрегаты:
+        параметры = inspect.signature(getattr(queries, имя)).parameters
+        assert {"city", "country", "grade"} <= set(параметры), имя
