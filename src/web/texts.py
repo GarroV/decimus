@@ -67,7 +67,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.d90": {"ru": "90 дней", "en": "90 days"},
     "overview.period.y1": {"ru": "год", "en": "a year"},
     "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
-    "overview.breakdown.hint": {"ru": "клик — сузить выборку", "en": "click to narrow the selection"},
+    "overview.breakdown.hint": {
+        "ru": "клик — сузить выборку",
+        "en": "click to narrow the selection",
+    },
     "overview.breakdown.city": {"ru": "Город", "en": "City"},
     "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
     "overview.breakdown.average": {"ru": "Средняя", "en": "Average"},
@@ -322,7 +325,10 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "registry.filtered_out.text": {
         "ru": "В реестре проверки есть — их отсёк отбор выше. Снимите часть условий.",
-        "en": "The registry does have inspections — the filter above cut them out. Clear some conditions.",
+        "en": (
+            "The registry does have inspections — the filter above cut them out. "
+            "Clear some conditions."
+        ),
     },
     "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
     "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
