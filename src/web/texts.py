@@ -82,6 +82,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "разные издания методики",
         "en": "different methodology editions",
     },
+    "overview.sort": {"ru": "Сортировка", "en": "Sort"},
+    "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
+    "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
+    "overview.sort.date": {"ru": "по дате проверки", "en": "by inspection date"},
+    "overview.sort.unit": {"ru": "по названию", "en": "by name"},
     "overview.points.title": {"ru": "Точки выборки", "en": "Units in the selection"},
     "overview.points.hint": {
         "ru": "последняя проверка каждой точки",

@@ -437,7 +437,12 @@ a.ov-row:hover { background: var(--surface-3); }
    Колонки заданы сеткой, а не таблицей: строка целиком — ссылка, и `<a>`
    внутри `<tr>` разметкой не выражается. Узкий экран прокручивает таблицу
    вбок в своей обёртке, а не ломает остальную страницу. */
-.ov-table { display: block; overflow-x: auto; }
+/* Прокрутка вбок принадлежит ТАБЛИЦЕ, а не карточке: у карточки
+   `overflow: hidden` ради скруглённых углов, и без собственной прокрутки
+   последняя колонка на узком экране обрезается молча — видно только то, что
+   влезло, и человек не знает, что там было ещё. */
+.ov-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ov-card:has(.ov-table) { overflow: visible; }
 .ov-table__head,
 .ov-table__row {
   display: grid;
