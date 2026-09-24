@@ -688,7 +688,7 @@ def test_администратор_переносит_и_автор_берёт�
             "actor": ЛОГИН,
         }
     ]
-    assert "Проверка перенесена." in ответ.get_data(as_text=True)
+    assert "Исправлено." in ответ.get_data(as_text=True)
 
 
 def test_аудитор_не_переносит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -752,7 +752,7 @@ def test_без_истории_формы_переноса_нет(
 
     # Assert
     assert "/move" not in страница
-    assert "История переносов сейчас недоступна" in страница
+    assert "История исправлений сейчас недоступна" in страница
 
 
 @админ
@@ -763,7 +763,7 @@ def test_отказ_переноса_показан_текстом(
     _перенос(monkeypatch)
 
     def отказать(*_a: Any, **_k: Any) -> bool:
-        raise MoveError("Не назван повод переноса")
+        raise MoveError("Не назван повод исправления")
 
     monkeypatch.setattr(data, "move_card", отказать)
 
@@ -775,4 +775,4 @@ def test_отказ_переноса_показан_текстом(
     )
 
     # Assert
-    assert "Перенести не удалось: Не назван повод переноса" in ответ.get_data(as_text=True)
+    assert "Исправить не удалось: Не назван повод исправления" in ответ.get_data(as_text=True)
