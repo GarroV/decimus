@@ -56,12 +56,19 @@ class ZoneLoss:
 
 @dataclass(frozen=True)
 class Systemic:
-    """Пункт, нарушенный на нескольких точках."""
+    """Пункт, нарушенный на нескольких точках.
+
+    `text` — формулировка самой свежей записи этого пункта, а `lang` — язык
+    РЕЧИ той проверки, где она записана. Язык носится рядом с текстом, потому
+    что на экране интерфейса он другой, и показывать чужой язык молча нельзя.
+    """
 
     code: str
     level: str
     records: int
     units: int
+    text: str = ""
+    lang: str = ""
 
 
 @dataclass(frozen=True)
@@ -407,8 +414,8 @@ def load(
             for code, ru, en, loss, insp, units in losses
         ),
         systemic=tuple(
-            Systemic(code=code, level=level, records=records, units=units)
-            for code, level, records, units in queries.systemic_findings(
+            Systemic(code=code, level=level, records=records, units=units, text=text, lang=lang)
+            for code, level, records, units, text, lang in queries.systemic_findings(
                 tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP
             )
         ),
