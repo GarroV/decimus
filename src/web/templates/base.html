@@ -94,12 +94,18 @@
     Нижняя панель — для телефона: бриф требует, чтобы основные действия
     доставались большим пальцем одной руки, а строка навигации в шапке на
     узком экране до него не дотягивается. На десктопе панель скрыта.
+
+    Разделы здесь ВСЕ, а не только построенные, и панель прокручивается вбок.
+    Показывать с телефона три раздела из девяти значило бы, что остальные с
+    телефона недостижимы вовсе, — а «не построен» и «до него нельзя дойти» это
+    разные вещи: первое видно по приглушению, второе выглядит как пропажа.
   #}
   {% if account %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
-      {% for item in sections if item.built %}
-        <a class="tabbar__item{% if item.path == current_path %} is-current{% endif %}"
-           href="{{ url(item.path) }}?lang={{ lang }}">{{ t('section.' ~ item.key ~ '.title') }}</a>
+      {% for item in sections %}
+        <a class="tabbar__item{% if item.path == current_path %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
+           href="{{ url(item.path) }}?lang={{ lang }}"
+           {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ t('section.' ~ item.key ~ '.title') }}</a>
       {% endfor %}
     </nav>
   {% endif %}

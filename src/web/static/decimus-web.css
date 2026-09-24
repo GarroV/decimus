@@ -577,7 +577,17 @@ a.ov-table__row:hover { background: var(--surface-3); }
     background: var(--surface-2);
     border-top: 1px solid var(--line);
   }
-  .tabbar__item {
+  /* Панель прокручивается вбок: разделов девять, и сжимать их в нечитаемые
+   огрызки хуже, чем дать провести пальцем. Полоса прокрутки скрыта — она
+   съедает высоту панели, а жест работает и без неё. */
+.tabbar { overflow-x: auto; scrollbar-width: none; }
+.tabbar::-webkit-scrollbar { display: none; }
+/* Непостроенный раздел приглушён так же, как в шапке: одна и та же пометка
+   на обоих поверхностях, иначе с телефона он выглядит рабочим. */
+.tabbar__item.is-wip { opacity: .45; }
+.tabbar__item {
+  flex: none;
+  white-space: nowrap;
     flex: 1;
     text-align: center;
     padding: var(--space-2);
@@ -709,3 +719,46 @@ a.ov-table__row:hover { background: var(--surface-3); }
 }
 .att-row__when--err { color: var(--err); }
 .att-row__when--warn { color: var(--warn-ink); }
+
+/* ── Выпадающий чип отбора ──────────────────────────────────────────────
+   Построен на `<details>`, без единой строки JS: панель обязана открываться
+   и там, где скрипт не загрузился. Стрелка поворачивается через `[open]` —
+   состояние держит сам браузер, а не класс, который кто-то забудет снять. */
+.pick { position: relative; display: inline-block; }
+.pick > summary { list-style: none; cursor: pointer; user-select: none; }
+.pick > summary::-webkit-details-marker { display: none; }
+.pick__caret { font-size: .7em; opacity: .7; }
+.pick[open] .pick__caret { transform: rotate(180deg); display: inline-block; }
+.pick__menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 60;
+  min-width: 13rem;
+  max-height: 18rem;
+  overflow: auto;
+  padding: var(--space-2);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop, 0 18px 44px rgba(8, 8, 10, .18));
+}
+.pick__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--r-inner, 10px);
+  font-size: var(--fs-meta);
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+  text-decoration: none;
+  min-height: 2.5rem;
+}
+.pick__item:hover { background: var(--surface-3); }
+.pick__item.is-on { background: var(--accent-soft); color: var(--accent); }
+.pick__label { flex: 1; }
+.pick__count { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+/* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
+   сдвигает панель ровно под рукой. */
+.ov-chip--reset.is-idle { opacity: .45; }
