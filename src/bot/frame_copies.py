@@ -37,7 +37,7 @@ from .photos import fetch_bytes
 logger = logging.getLogger(__name__)
 
 FRAMES_DIR_VAR = "FRAMES_DIR"
-#: Срок хранения копии, решение владельца D179: «кадры - 7 дней».
+#: Срок хранения копии — решение владельца D179.
 KEEP_DAYS = 7
 KEEP_SEC = KEEP_DAYS * 24 * 60 * 60
 #: Как часто убирать просроченное. Час — копия переживает срок не больше чем на час.
