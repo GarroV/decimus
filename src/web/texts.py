@@ -400,7 +400,7 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
-    "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
+    "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.checklist": {"ru": "чек-лист {version}", "en": "checklist {version}"},
@@ -422,7 +422,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # пользователя (D172). Свойство объясняется
     # там, где человек правит методику, а не рядом с оценкой.
     "state.sealed": {"ru": "Завершена", "en": "Completed"},
-    "state.retracted": {"ru": "Снята", "en": "Retracted"},
+    "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К реестру", "en": "Back to the registry"},
     "card.meta": {
@@ -463,35 +463,35 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.not_found.text": {
         "ru": (
             "Такой проверки у тенанта нет. Тот же ответ приходит на проверку другого тенанта "
-            "и на снятую, когда снятые не видны, — и это намеренно."
+            "и на отклонённую, когда отклонённые не видны, — и это намеренно."
         ),
         "en": (
             "There is no such inspection for this tenant. The same answer comes for another "
-            "tenant's inspection and for a retracted one when retracted are invisible — "
+            "tenant's inspection and for a rejected one when rejected are invisible — "
             "deliberately so."
         ),
     },
-    # --- снятие проверки ---------------------------------------------------
-    "retract.title": {"ru": "Снять проверку из истории", "en": "Retract from history"},
+    # --- отклонение проверки (код остаётся retract, D194) ---------------------------------------------------
+    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.hint": {
         "ru": (
-            "Снятие — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
+            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
             "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
         ),
         "en": (
-            "Retraction marks, it does not delete: the row stays in history with its reason, "
+            "Rejection marks, it does not delete: the row stays in history with its reason, "
             "is invisible to the ordinary role, and the photos are purged from storage. "
             "A reason is required."
         ),
     },
-    "retract.reason_label": {"ru": "Причина снятия", "en": "Reason for retraction"},
-    "retract.submit": {"ru": "Снять проверку", "en": "Retract inspection"},
+    "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
+    "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.done": {
-        "ru": "Проверка снята. Кадров убрано: {photos}.",
-        "en": "The inspection is retracted. Photos purged: {photos}.",
+        "ru": "Проверка отклонена. Кадров убрано: {photos}.",
+        "en": "The inspection is rejected. Photos purged: {photos}.",
     },
-    "retract.failed": {"ru": "Снять не удалось: {reason}", "en": "Retraction failed: {reason}"},
-    "retract.banner.title": {"ru": "Проверка снята", "en": "This inspection is retracted"},
+    "retract.failed": {"ru": "Отклонить не удалось: {reason}", "en": "Rejection failed: {reason}"},
+    "retract.banner.title": {"ru": "Проверка отклонена", "en": "This inspection is rejected"},
     "retract.banner.text": {
         "ru": (
             "Причина: {reason}. Оценка не участвует в аналитике, письмо и PDF по ней не "
