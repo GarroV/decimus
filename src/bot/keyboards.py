@@ -190,6 +190,8 @@ EDIT_ZONE = "zone"
 EDIT_LEVEL = "level"
 EDIT_TEXT = "text"
 EDIT_DROP = "drop"
+#: Переключить пометку повтора: вычет за запись удваивается (D191, #359).
+EDIT_REPEAT = "repeat"
 #: Новое значение поля записи.
 EDIT_ZONE_PREFIX = "ez:"
 EDIT_LEVEL_PREFIX = "el:"
@@ -410,6 +412,12 @@ EDIT_BUTTONS: tuple[tuple[str, str], ...] = (
     ("btn.zone", EDIT_ZONE),
     ("btn.level", EDIT_LEVEL),
     ("btn.text", EDIT_TEXT),
+    # Повтор стоит рядом с правками класса и зоны намеренно: это такое же
+    # решение о цене записи, как класс, и принимается оно на точке, сразу
+    # после фиксации (D191). Кнопка переключает пометку в обе стороны —
+    # ошибка в ней меняет цену вдвое, и снимать её обязано быть так же
+    # просто, как ставить.
+    ("btn.repeat", EDIT_REPEAT),
     ("btn.drop", EDIT_DROP),
 )
 

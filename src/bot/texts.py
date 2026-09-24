@@ -806,6 +806,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Поправлено. #{n} {code} · {level} замер · {zone}",
         "en": "Updated. #{n} {code} · {level} measurement · {zone}",
     },
+    # Состояние называется словами, а не молча меняет цену: аудитор видит одну
+    # кнопку-переключатель и по ответу узнаёт, в каком состоянии запись (#359).
+    "edit.repeat_on": {
+        "ru": "#{n}: отмечено как повтор — вычет за запись удвоен",
+        "en": "#{n}: marked as a repeat — the deduction is doubled",
+    },
+    "edit.repeat_off": {
+        "ru": "#{n}: пометка повтора снята — вычет обычный",
+        "en": "#{n}: repeat mark removed — the deduction is back to normal",
+    },
     "edit.dropped": {
         "ru": "Запись #{n} удалена.",
         "en": "Record #{n} deleted.",
@@ -1692,6 +1702,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.zone": {"ru": "Зона", "en": "Zone"},
     "btn.level": {"ru": "Класс", "en": "Class"},
     "btn.text": {"ru": "Формулировка", "en": "Wording"},
+    "btn.repeat": {"ru": "Повтор ×2", "en": "Repeat ×2"},
     "btn.drop": {"ru": "Удалить", "en": "Delete"},
     # Кнопки информационной части (T158).
     "btn.yes": {"ru": "Да", "en": "Yes"},
