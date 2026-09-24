@@ -21,7 +21,7 @@
         зафиксировать нарушение (можно повторять одно и то же qid в разных зонах).
         --photo можно указать несколько раз или через запятую — все ракурсы одного
         нарушения идут в одну запись
-  audit.py edit --n N [--qid PRD01] [--level D2] [--zone fridge] [--evidence "..."] [--comment "..."]
+  audit.py edit --n N [--qid PRD01] [--level D2] [--zone fridge] [--evidence "..."] [--comment "..."] [--repeat|--no-repeat]
         поправить уже зафиксированное нарушение #N. Синонимы из контракта блока:
         --code = --qid, --text = --evidence. Меняются только переданные поля
   audit.py photo N --add путь1,путь2 [--clear]
@@ -607,10 +607,11 @@ def cmd_edit(a):
     if f is None:
         sys.exit(f"Нарушения #{a.n} нет. Есть: {known_numbers(st)}")
     changed = [k for k, v in (("qid", a.qid), ("level", a.level), ("zone", a.zone),
-                              ("evidence", a.evidence), ("comment", a.comment)) if v is not None]
+                              ("evidence", a.evidence), ("comment", a.comment),
+                              ("repeat", getattr(a, "repeat", None))) if v is not None]
     if not changed:
         sys.exit("Нечего менять: укажите хотя бы одно из "
-                 "--qid/--level/--zone/--evidence/--comment")
+                 "--qid/--level/--zone/--evidence/--comment/--repeat")
     cl = {r["id"]: r for r in load_checklist()}
     zones = load_zones()
     zc = {z["code"] for z in zones}
@@ -633,6 +634,12 @@ def cmd_edit(a):
         f["evidence"] = a.evidence
     if a.comment is not None:
         f["comment"] = a.comment
+    # Пометка повтора — отдельное решение о цене записи (D191), поэтому правка
+    # формулировки её не трогает: аудитор поправил слова, а не передумал про
+    # повтор. Снять пометку так же обязательно, как поставить: ошибка в ней
+    # стоит партнёру денег, и исправлять её переписыванием записи нельзя.
+    if getattr(a, "repeat", None) is not None:
+        f["repeat"] = bool(a.repeat)
     # Запись прошла проверку зоны, значит пометка «зона нетипична» к ней больше
     # не относится. Пометка осталась только у записей, сделанных ДО запрета:
     # читать её продукт обязан (выгрузки прошлых лет), выставлять — уже нет.
@@ -931,6 +938,8 @@ def main():
     ed.add_argument("--level"); ed.add_argument("--zone")
     ed.add_argument("--evidence", "--text", dest="evidence")
     ed.add_argument("--comment")
+    ed.add_argument("--repeat", action=argparse.BooleanOptionalAction, default=None,
+                    help="отметить (--repeat) или снять (--no-repeat) повтор: вычет удваивается")
     ed.set_defaults(fn=cmd_edit)
     ph = s.add_parser("photo"); ph.add_argument("n", type=int)
     ph.add_argument("--add", action="append"); ph.add_argument("--clear", action="store_true")

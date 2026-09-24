@@ -146,11 +146,18 @@ def add_finding(
     return _finding_after(chat_id, settings, n, "add")
 
 
-def edit_finding(chat_id: int, n: int, **fields: str) -> Finding:
-    """Поправить запись: `code`, `level`, `zone`, `text`, `comment`.
+def edit_finding(
+    chat_id: int, n: int, *, repeat: bool | None = None, **fields: str
+) -> Finding:
+    """Поправить запись: `code`, `level`, `zone`, `text`, `comment`, `repeat`.
 
     Меняются только переданные поля. Пустой вызов и незнакомое имя поля — отказ:
     молча ничего не сделать здесь хуже всего, аудитор уйдёт с ошибкой в отчёте.
+
+    `repeat` стоит отдельным параметром, а не среди `fields`, по двум причинам.
+    Он не строка, а решение о цене записи (D191): остальные поля описывают
+    нарушение, это — сколько за него вычесть. И у него три состояния, а не два:
+    `None` значит «не трогать», и без этого снять пометку было бы нечем.
     """
     settings = settings_for(chat_id)
     unknown = sorted(set(fields) - set(FIELD_OPTIONS))
@@ -159,13 +166,15 @@ def edit_finding(chat_id: int, n: int, **fields: str) -> Finding:
             f"Неизвестные поля записи: {', '.join(unknown)}. "
             f"Менять можно: {', '.join(sorted(FIELD_OPTIONS))}"
         )
-    if not fields:
+    if not fields and repeat is None:
         raise ValidationError(
             f"Нечего менять в записи #{n}: укажите хотя бы одно из "
-            f"{', '.join(sorted(FIELD_OPTIONS))}"
+            f"{', '.join(sorted(FIELD_OPTIONS))} или пометку повтора"
         )
     args = ["edit", option("n", str(n))]
     args += [option(FIELD_OPTIONS[name], value) for name, value in sorted(fields.items())]
+    if repeat is not None:
+        args.append("--repeat" if repeat else "--no-repeat")
     run_audit(args, chat_id=chat_id, settings=settings)
     return _finding_after(chat_id, settings, n, "edit")
 
