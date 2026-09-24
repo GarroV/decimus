@@ -117,7 +117,7 @@ def карточка(row: InspectionRow, **поля: Any) -> InspectionDetail:
 
 
 @pytest.fixture
-def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> Iterator[FlaskClient]:
     """Приложение с подменёнными дверями блока `db` и УЖЕ ВОШЕДШИМ человеком.
 
     Вход настоящий — отправкой формы (`tests/web_harness.py`). После T323 без
@@ -129,10 +129,15 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    роль = getattr(request, "param", "auditor")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
+
+
+#: Тот же стенд, но вошёл администратор: отклонение и перенос — только его.
+админ = pytest.mark.parametrize("стенд", ["admin"], indirect=True)
 
 
 # --- каркас: девять разделов и честная лента (D138) ------------------------
@@ -298,6 +303,7 @@ def test_снятая_проверка_видна_снятой_и_с_причи�
 # --- снятие идёт существующей дверью ---------------------------------------
 
 
+@админ
 def test_снятие_зовёт_дверь_блока_db_с_причиной_из_формы(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -327,6 +333,7 @@ def test_снятие_зовёт_дверь_блока_db_с_причиной_и
     assert "Кадров убрано: 2" in ответ.get_data(as_text=True)
 
 
+@админ
 def test_отказ_снятия_показан_текстом_а_не_трассировкой(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -347,6 +354,7 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
     assert "Причина снятия не названа" in ответ.get_data(as_text=True)
 
 
+@админ
 def test_снятие_с_чужой_страницы_отклонено_и_не_доходит_до_базы(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -379,6 +387,7 @@ def test_снятие_с_чужой_страницы_отклонено_и_не_
     assert вызвано is False
 
 
+@админ
 def test_снятие_со_своей_страницы_проходит_и_по_одному_referer(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -467,6 +476,7 @@ def test_страницы_не_встраиваются_в_чужой_докум
         assert "frame-ancestors 'none'" in ответ.headers.get("Content-Security-Policy", ""), адрес
 
 
+@админ
 def test_отказ_снятия_показан_на_карточке_а_не_потерян(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -610,3 +620,23 @@ def test_лежащая_база_по_прежнему_отказ(monkeypatch: p
     # Act / Assert
     with pytest.raises(DbError):
         data.load_registry(tenant=ТЕНАНТ, limit=10)
+
+
+def test_аудитор_не_отклоняет_проверку(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange — до 24.09.2026 маршрут проверял только вход, и отклонить
+    # проверку с выносом кадров мог любой вошедший.
+    def отклонить(*_a: Any, **_k: Any) -> Retraction:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(data, "retract_card", отклонить)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
+    )
+    карточка_аудитора = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert — отказ, и формы ему не показывают.
+    assert ответ.status_code == 403
+    assert "/retract" not in карточка_аудитора

@@ -243,9 +243,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             period=request.args.get("period", "all").strip()[:8],
             sort=request.args.get("sort", "score").strip()[:8],
         )
-        snapshot = overview_data.load(
-            tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection
-        )
+        snapshot = overview_data.load(tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection)
         registry_path = section("registry").path
 
         def отбор(**изменения: str) -> str:
@@ -274,6 +272,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 if значение and умолчания.get(ключ) != значение
             }
             return url_for("overview", **живые)
+
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         среднее = (
             t("overview.tile.note.average_none", _lang(conf))
@@ -309,15 +308,15 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="average",
-                value="—" if snapshot.average is None or not snapshot.comparable
+                value="—"
+                if snapshot.average is None or not snapshot.comparable
                 else f"{snapshot.average:.1f}",
                 note=среднее,
                 href=registry_path,
                 # Движение показывается только там, где его есть с чем
                 # сравнить И где сравнение законно: ряд одного издания
                 # методики против такого же ряда прошлого периода (T349).
-                delta="" if snapshot.average_delta is None
-                else f"{snapshot.average_delta:+.1f}",
+                delta="" if snapshot.average_delta is None else f"{snapshot.average_delta:+.1f}",
                 tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
             ),
             overview_data.Tile(
@@ -364,9 +363,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 label=t("overview.filter.period", язык),
                 empty_title=t("overview.period.all", язык),
                 current="" if selection.period == "all" else selection.period,
-                values=tuple(
-                    (код, None) for код in overview_data.PERIODS if код != "all"
-                ),
+                values=tuple((код, None) for код in overview_data.PERIODS if код != "all"),
                 href=lambda значение: отбор(period=значение or "all"),
                 title=lambda код: t("overview.period." + код, язык),
             )
@@ -629,14 +626,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     # не в навигации: адрес известен, набрать его руками может кто угодно.
     users_path = section("users").path
 
-    def _только_админ() -> FlaskResponse | None:
-        вошедший = auth.current_account()
-        if вошедший is not None and вошедший.role == accounts.ROLE_ADMIN:
-            return None
-        # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
-        # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
-        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
-
     def _страница_учёток(
         *, added: accounts.Added | None = None, outcome: str | None = None, code: int = 200
     ) -> tuple[str, int]:
@@ -663,7 +652,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.get(users_path)
     def users() -> FlaskResponse | tuple[str, int]:
-        отказ = _только_админ()
+        отказ = _admin_only()
         if отказ is not None:
             return отказ
         return _страница_учёток()
@@ -676,7 +665,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         браузера и в журнале обратного прокси, то есть перестал бы быть
         паролем ровно в момент показа.
         """
-        отказ = _только_админ()
+        отказ = _admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -690,7 +679,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{users_path}/disable")
     def disable_user() -> FlaskResponse | tuple[str, int]:
-        отказ = _только_админ()
+        отказ = _admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -708,7 +697,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
-    def do_retract(inspection_id: str) -> str | tuple[str, int]:
+    def do_retract(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
         refuse_foreign_origin()
         reason = (request.form.get("reason") or "").strip()
         notice: str | None = None
@@ -720,6 +712,21 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         else:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+
+def _admin_only() -> FlaskResponse | None:
+    """Отказ 403 всем, кроме администратора; `None` — можно.
+
+    Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
+    руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
+    её с выносом кадров мог любой аудитор.
+    """
+    вошедший = auth.current_account()
+    if вошедший is not None and вошедший.role == accounts.ROLE_ADMIN:
+        return None
+    # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
+    # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
+    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
 def _render_card(
@@ -738,7 +745,7 @@ def _render_card(
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
-        may_retract=data.retraction_available(),
+        may_retract=data.retraction_available() and _admin_only() is None,
         notice=notice,
         failure=failure,
     )
