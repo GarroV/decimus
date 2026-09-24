@@ -542,6 +542,22 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> l
 # `by_zone` разложен им при завершении проверки, `pct` и `grade` взяты оттуда
 # же. Ни процента, ни буквы, ни вычета эти запросы не выводят.
 
+
+def _narrowing(city: str, country: str, grade: str) -> dict[str, str | None]:
+    """Отбор для агрегатов: пустое значение становится NULL, то есть «все».
+
+    Разница принципиальная. Пустая строка, доехав до запроса как значение,
+    сравнивалась бы с городом и не совпала бы ни с одной строкой — экран
+    показал бы пустоту и не сказал, почему. NULL в условии
+    `%(city)s::text is null or u.city = %(city)s` отключает сужение целиком.
+    """
+    return {
+        "city": city or None,
+        "country": country or None,
+        "grade": grade or None,
+    }
+
+
 _ZONE_LOSSES_SQL = """
 select
     zone.key as code,
@@ -551,10 +567,14 @@ select
     count(distinct i.id) as inspections,
     count(distinct i.unit_id) as units
 from inspections i
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and jsonb_typeof(zone.value) = 'object'
   and (zone.value ->> 'loss') is not null
 group by zone.key
@@ -580,9 +600,13 @@ with записи as (
             and t.field = 'text' and t.lang = i.speech_lang) as text
     from findings f
          join inspections i on i.id = f.inspection_id
+         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
     where i.tenant_code = %(tenant)s
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
 ),
 свежие as (
     select distinct on (code, level) code, level, text, speech_lang
@@ -614,6 +638,9 @@ def zone_losses(
     tenant: str,
     date_from: date | None = None,
     date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
     limit: int = DEFAULT_LIMIT,
 ) -> list[tuple[str, str, str, float, int, int]]:
     """Потери по зонам: `(код, имя ru, имя en, вычет, проверок, точек)`.
@@ -637,6 +664,11 @@ def zone_losses(
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": _require_limit(limit),
+                # Пустая строка означает «не сужать» и приходит в запрос как
+                # NULL: условие `%(city)s::text is null or ...` тогда истинно
+                # для всех строк. Пустую строку сравнивать с городом нельзя —
+                # она отсекла бы всё, молча и целиком.
+                **_narrowing(city, country, grade),
             },
         )
         return [
@@ -650,6 +682,9 @@ def systemic_findings(
     tenant: str,
     date_from: date | None = None,
     date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
     limit: int = DEFAULT_LIMIT,
 ) -> list[tuple[str, str, int, int, str, str]]:
     """Нарушения по пунктам: `(код, класс, записей, точек, формулировка, язык)`.
@@ -668,6 +703,11 @@ def systemic_findings(
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": _require_limit(limit),
+                # Пустая строка означает «не сужать» и приходит в запрос как
+                # NULL: условие `%(city)s::text is null or ...` тогда истинно
+                # для всех строк. Пустую строку сравнивать с городом нельзя —
+                # она отсекла бы всё, молча и целиком.
+                **_narrowing(city, country, grade),
             },
         )
         return [
@@ -697,9 +737,13 @@ select
     count(*) as records
 from findings f
      join inspections i on i.id = f.inspection_id
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
 group by f.inspection_id, f.level
 """
 
@@ -709,6 +753,9 @@ def class_counts(
     tenant: str,
     date_from: date | None = None,
     date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
 ) -> dict[str, dict[str, int]]:
     """Сколько находок каждого класса в каждой проверке периода.
 
@@ -723,7 +770,15 @@ def class_counts(
     tenant_code = _require_tenant(tenant)
     _require_window(date_from, date_to)
     with _reading("счётчики классов") as conn, conn.cursor() as cur:
-        cur.execute(_CLASS_COUNTS_SQL, {"tenant": tenant_code, "date_from": date_from, "date_to": date_to})
+        cur.execute(
+            _CLASS_COUNTS_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
         счёт: dict[str, dict[str, int]] = {}
         for inspection_id, level, records in cur.fetchall():
             счёт.setdefault(str(inspection_id), {})[str(level)] = int(records)
@@ -751,7 +806,10 @@ def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
     tenant_code = _require_tenant(tenant)
     with _reading("география точек") as conn, conn.cursor() as cur:
         cur.execute(_UNIT_GEOGRAPHY_SQL, {"tenant": tenant_code})
-        return {str(name): (str(country or ""), str(city or "")) for name, country, city in cur.fetchall()}
+        return {
+            str(name): (str(country or ""), str(city or ""))
+            for name, country, city in cur.fetchall()
+        }
 
 
 _WORST_ZONES_SQL = """
@@ -762,10 +820,14 @@ select distinct on (i.id)
     zone.value ->> 'name_en' as name_en,
     (zone.value ->> 'loss')::numeric as loss
 from inspections i
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and jsonb_typeof(zone.value) = 'object'
   and (zone.value ->> 'loss') is not null
 order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
@@ -777,6 +839,9 @@ def worst_zones(
     tenant: str,
     date_from: date | None = None,
     date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
 ) -> dict[str, tuple[str, str, str, float]]:
     """Самая дорогая зона каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
 
@@ -791,7 +856,15 @@ def worst_zones(
     tenant_code = _require_tenant(tenant)
     _require_window(date_from, date_to)
     with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
-        cur.execute(_WORST_ZONES_SQL, {"tenant": tenant_code, "date_from": date_from, "date_to": date_to})
+        cur.execute(
+            _WORST_ZONES_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
         return {
             str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
             for inspection_id, code, ru, en, loss in cur.fetchall()

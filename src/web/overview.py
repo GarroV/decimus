@@ -431,6 +431,11 @@ def _points(
     return tuple(точки)
 
 
+#: Экран без единого выбранного чипа. Значение одно на модуль: отбор
+#: неизменяемый, и создавать его заново на каждый вызов незачем.
+БЕЗ_ОТБОРА = Selection()
+
+
 #: Порядки таблицы точек: код → как сортировать. Порядок объявлен здесь, а
 #: не в шаблоне, потому что подпись переводится, а правило сортировки нет.
 #: `score` первый и он же умолчание: экран отвечает на вопрос «куда смотреть»,
@@ -490,14 +495,25 @@ def load(
     *,
     tenant: str,
     limit: int,
-    selection: Selection = Selection(),
+    selection: Selection = БЕЗ_ОТБОРА,
     today: date | None = None,
 ) -> Overview:
     """Снимок сети за период. Один проход по базе на каждый блок, не по строке."""
     date_from, date_to = window(selection.period, today=today or date.today())
+    # Отбор человека едет В БАЗУ, а не применяется поверх ответа. Иначе блоки,
+    # которые считаются запросом (потери по зонам, системные нарушения),
+    # показывают сеть целиком, пока соседние блоки на том же экране показывают
+    # выбранный город, — и ни один из них не сообщает, что говорит о другом
+    # множестве. Найдено сверкой экрана: «Белград + буква D» давал пустую
+    # таблицу точек и полный список потерь всей сети.
+    узко = {
+        "city": selection.city,
+        "country": selection.country,
+        "grade": selection.grade,
+    }
     geo = queries.unit_geography(tenant=tenant)
-    counts = queries.class_counts(tenant=tenant, date_from=date_from, date_to=date_to)
-    worst = queries.worst_zones(tenant=tenant, date_from=date_from, date_to=date_to)
+    counts = queries.class_counts(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
+    worst = queries.worst_zones(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
     весь_ряд = tuple(
         queries.list_inspections(tenant=tenant, limit=limit, date_from=date_from, date_to=date_to)
     )
@@ -518,7 +534,9 @@ def load(
         else ()
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
-    losses = queries.zone_losses(tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP)
+    losses = queries.zone_losses(
+        tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
+    )
     всего = sum(строка[3] for строка in losses) or 1.0
     страны: dict[str, int] = {}
     города: dict[str, int] = {}
@@ -550,7 +568,7 @@ def load(
         systemic=tuple(
             Systemic(code=code, level=level, records=records, units=units, text=text, lang=lang)
             for code, level, records, units, text, lang in queries.systemic_findings(
-                tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP
+                tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
             )
         ),
         attention=_attention(rows, counts=counts),
