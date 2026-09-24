@@ -30,6 +30,7 @@ from bot_harness import (
     CHAT_ID,
     Calls,
     RecordingSession,
+    callback_query,
     candidate,
     feed,
     make_bot,
@@ -166,10 +167,15 @@ async def test_быстрый_путь_срабатывает_на_голосо�
     assert_recorded_from_words(asked, session, ["frame-1"])
 
 
-async def test_быстрый_путь_срабатывает_на_альбоме(
+async def test_альбом_с_ясной_подписью_идёт_в_модель_а_не_быстрым_путём(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Способ 5: альбом из двух кадров с подписью на первом — оба кадра идут в запись."""
+    """Способ 5: альбом с подписью разбирается моделью вместе с кадрами (D180).
+
+    До D180 ясная подпись на альбоме записывалась быстрым путём по словам, и
+    кадры не смотрел никто. Теперь пачка всегда уходит в модель: запись — после
+    нажатия, как у любого предложения, и оба кадра остаются при ней.
+    """
     started()
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
@@ -180,4 +186,7 @@ async def test_быстрый_путь_срабатывает_на_альбом�
     await feed(dp, bot, photo_message("frame-2", media_group_id=group_id))
     await wait_for_album_close(session)
 
-    assert_recorded_from_words(asked, session, ["frame-1", "frame-2"])
+    assert len(asked) == 1, "альбом с подписью не дошёл до модели"
+    assert get_state(CHAT_ID).findings == [], "альбом записался по словам без разбора кадров"  # type: ignore[union-attr]
+    await feed(dp, bot, callback_query("rec:pick:0", message_id=session.sent_ids[-1]))
+    assert [f.photos for f in get_state(CHAT_ID).findings] == [["frame-1", "frame-2"]]  # type: ignore[union-attr]

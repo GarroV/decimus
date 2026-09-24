@@ -65,11 +65,11 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from src import domain
 from src.domain.errors import DomainError
-from src.recognize.classify import classify, needs_photo
+from src.recognize.classify import album_mode, classify, needs_photo
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
 from src.recognize.manual import ManualCandidate, manual_candidates, search_items
-from src.recognize.models import UNKNOWN_ZONE
+from src.recognize.models import UNKNOWN_ZONE, Candidate
 from src.recognize.transcribe import transcribe
 
 from .. import frame_copies, journal, refusal, sealed, sidecar, view
@@ -210,7 +210,13 @@ async def _hand(
 
 
 async def _show_candidates(
-    message: Message, chat_id: int, proposal: Proposal, pending: PendingStore, lang: str
+    message: Message,
+    chat_id: int,
+    proposal: Proposal,
+    pending: PendingStore,
+    lang: str,
+    *,
+    also_seen: bool = False,
 ) -> None:
     """Показать предложения модели, пометив уже занятые пары «пункт + зона» (T137).
 
@@ -230,7 +236,11 @@ async def _show_candidates(
     # У кадра из пачки (T206) вопрос тот же, но с номером кадра: сообщений в
     # отбивке столько же, сколько кадров, и без номера аудитор не соотнесёт
     # список с тем, что снимал.
-    if proposal.correcting is not None:
+    if also_seen:
+        # Увиденное на кадрах сверх слов (D180) — своим заголовком: аудитор
+        # этого не говорил, и выдать догадку по картинке за его слова нельзя.
+        text = t("record.also_seen", lang, lines=lines)
+    elif proposal.correcting is not None:
         text = t("record.candidates_correcting", lang, n=proposal.correcting, lines=lines)
     elif proposal.batch is not None:
         no, total = proposal.batch
@@ -900,8 +910,12 @@ async def _analyze_resolved(
     второй разбор, и он разошёлся бы с первым на первой же правке.
     """
     note = base.note
+    # Пачка с комментарием разбирается моделью всегда (D180): быстрый путь
+    # записал бы по словам, и кадры никто бы не посмотрел — ровно тот случай,
+    # ради которого правило заведено.
+    album = base.correcting is None and album_mode(note, len(base.file_ids))
 
-    if fast and note:
+    if fast and note and not album:
         found = await asyncio.to_thread(
             fast_path,
             base.note,
@@ -946,9 +960,15 @@ async def _analyze_resolved(
     bot = message.bot
     photo = (
         await fetch_bytes(bot, base.file_ids[0])
-        if needs_photo(note) and bot is not None and base.file_ids
+        if not album and needs_photo(note) and bot is not None and base.file_ids
         else None
     )
+    # Пачка с комментарием (D180): модель смотрит все кадры вместе со словами.
+    # Не скачавшийся кадр не останавливает разбор — уходят те, что есть.
+    photos: tuple[bytes, ...] = ()
+    if album and bot is not None:
+        fetched = await asyncio.gather(*(fetch_bytes(bot, f) for f in base.file_ids))
+        photos = tuple(raw for raw in fetched if raw is not None)
 
     if base.batch is None:
         # У пачки (T206) «Разбираю…» на каждый кадр — это N одинаковых строк
@@ -957,7 +977,13 @@ async def _analyze_resolved(
         await message.answer(t("record.thinking", lang))
     try:
         suggestion = await asyncio.to_thread(
-            classify, note, photo, base.zone_hint or None, lang=report_lang, chat_id=chat_id
+            classify,
+            note,
+            photo,
+            base.zone_hint or None,
+            lang=report_lang,
+            chat_id=chat_id,
+            photos=photos,
         )
     except ModelUnavailable as exc:
         journal.note(chat_id, "model_failed", slot=base.slot, kind="unavailable", error=str(exc))
@@ -985,7 +1011,9 @@ async def _analyze_resolved(
         shortlist=list(suggestion.shortlist),
         used_photo=suggestion.used_photo,
         photo_copy=frame_copies.copy_name(base.file_ids[0]) if photo is not None else None,
+        album_frames=len(photos),
         candidates=journal.candidates(suggestion.candidates),
+        also_seen=journal.candidates(suggestion.also_seen),
         question=suggestion.question,
         needs_human=suggestion.needs_human,
         degraded=suggestion.degraded,
@@ -1004,10 +1032,39 @@ async def _analyze_resolved(
             _frame_without_record, chat_id, base.file_ids, sidecar.OUTCOME_NOTHING_FOUND
         )
         await _open_manual(message, chat_id, base, pending, lang)
+        await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
         return
 
     proposal = replace(base, candidates=suggestion.candidates, question=suggestion.question)
     await _show_candidates(message, chat_id, proposal, pending, lang)
+    await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
+
+
+async def _offer_also_seen(
+    message: Message,
+    chat_id: int,
+    base: Proposal,
+    also_seen: Sequence[Candidate],
+    pending: PendingStore,
+    lang: str,
+) -> None:
+    """Предложить увиденное на кадрах пачки сверх слов аудитора (D180).
+
+    Только предложение: запись появится, если аудитор нажмёт кнопку, — как и
+    у любого кандидата. Своё предложение и свой слот, потому что это другой
+    выбор, чем по словам: нажатие под одним сообщением не должно гасить другое.
+    Источник — кадр, а не слова: этого аудитор не говорил.
+    """
+    if not also_seen:
+        return
+    extra = replace(
+        base,
+        source=domain.SOURCE_PHOTO,
+        candidates=tuple(also_seen),
+        question="",
+        slot=pending.next_slot(),
+    )
+    await _show_candidates(message, chat_id, extra, pending, lang, also_seen=True)
 
 
 async def _analyze_frames(
