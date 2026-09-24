@@ -116,6 +116,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0023_inspection_checklist_code.sql": (
         "sql1:f4dd0e5a2cc14660e40cd35b99b78448ed0dc0ce6db92e1e25ae139ce3e39f03"
     ),
+    "0024_finding_repeat.sql": (
+        "sql1:fd334753344578aabe9d4a114f8dfce5081d389f8c9c1bf98a603f91b58e498c"
+    ),
 }
 
 

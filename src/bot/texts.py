@@ -816,6 +816,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "#{n}: пометка повтора снята — вычет обычный",
         "en": "#{n}: repeat mark removed — the deduction is back to normal",
     },
+    # Подсказка приносит ФАКТ и не делает вывода: тот же код мог относиться к
+    # другому объекту, а исправленное и снова сломавшееся — не то же самое, что
+    # не исправленное вовсе. Цену назначает аудитор кнопкой (#359, D191).
+    "record.repeat_seen": {
+        "ru": (
+            "Такой же пункт был в прошлой проверке этой точки. "
+            "Если нарушение то же и не устранено — кнопка «Повтор ×2» удвоит вычет."
+        ),
+        "en": (
+            "The same item was recorded in this unit's previous inspection. "
+            "If it is the same unresolved issue, the “Repeat ×2” button doubles the deduction."
+        ),
+    },
     "edit.dropped": {
         "ru": "Запись #{n} удалена.",
         "en": "Record #{n} deleted.",
