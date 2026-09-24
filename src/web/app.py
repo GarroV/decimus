@@ -26,7 +26,7 @@ from src.db.errors import DbError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import accounts, auth, letter_draft, view
+from . import accounts, assets, auth, letter_draft, view
 from . import inspections as data
 from . import methodology as method
 from . import overview as overview_data
@@ -60,6 +60,7 @@ def create_app(settings: Settings | None = None) -> Flask:
 
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
+    assets.install(app)
     _register_context(app, conf)
     # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
     # порядке регистрации, и опознание обязано случиться раньше всего, что

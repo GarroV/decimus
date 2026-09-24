@@ -33,6 +33,7 @@ from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.retract import Retraction
 from src.web import inspections as data
 from src.web import overview as overview_data
+from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.sections import SECTIONS
 
 ТЕНАНТ = "default"
@@ -511,3 +512,42 @@ def test_ссылки_страницы_собираются_с_путём_общ
     разметка = ответ.get_data(as_text=True)
     assert 'href="/audit/inspections' in разметка
     assert 'href="/inspections' not in разметка
+
+
+# --- статика: отпечаток в адресе и долгий кеш (src/web/assets.py) ---------
+# Замер 24.09.2026: без кеша каждый переход между разделами переспрашивал три
+# таблицы стилей и шрифты, по 0,3 с на запрос через Funnel, и страница стояла
+# белой до ответа — владелец видел это как моргание экрана.
+
+
+def test_стили_адресуются_с_отпечатком_и_кешируются_на_год(стенд: FlaskClient) -> None:
+    # Arrange
+    страница = стенд.get("/inspections").get_data(as_text=True)
+    адреса = re.findall(r'href="([^"]*decimus-web\.css[^"]*)"', страница)
+    assert адреса, "страница обязана подключать decimus-web.css"
+
+    # Act
+    ответ = стенд.get(адреса[0])
+
+    # Assert
+    assert re.search(r"\?v=[0-9a-f]{12}$", адреса[0]), адреса[0]
+    assert ответ.status_code == 200
+    assert f"max-age={IMMUTABLE_MAX_AGE}" in ответ.headers["Cache-Control"]
+
+
+def test_адрес_без_отпечатка_перепроверяется(стенд: FlaskClient) -> None:
+    # Act — старый адрес без `?v=` на год кешировать нельзя: он не меняется
+    # вместе с файлом, и человек застрял бы на прошлых стилях.
+    ответ = стенд.get("/static/decimus-web.css")
+
+    # Assert
+    assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
+
+
+def test_шрифт_кешируется_на_неделю_без_отпечатка(стенд: FlaskClient) -> None:
+    # Act
+    ответ = стенд.get("/static/fonts/manrope-cyrillic.woff2")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert f"max-age={FONT_MAX_AGE}" in ответ.headers["Cache-Control"]
