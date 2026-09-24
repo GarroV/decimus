@@ -361,6 +361,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "last {n} audits, oldest on the left. A repeat costs twice as much",
     },
     "unit.repeats.times": {"ru": "раз: {n}", "en": "times: {n}"},
+    # Два разных утверждения, и путать их нельзя: «встречалось» — наблюдение по
+    # истории кодов, «засчитано вдвое» — решение аудитора, записанное в
+    # проверке и повлиявшее на цену (#359).
+    "unit.repeats.doubled": {"ru": "из них вдвое: {n}", "en": "charged double: {n}"},
+    "unit.finding.doubled": {"ru": "вычет удвоен", "en": "deduction doubled"},
     "unit.repeats.empty": {
         "ru": "Ни одно нарушение не повторялось",
         "en": "No violation repeated",

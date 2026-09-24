@@ -55,6 +55,13 @@ class WeakZone:
     zeroed: bool
 
 
+#: Клетка полосы повторов. Три состояния, а не два, и разница существенная:
+#: `seen` — нарушение в той проверке записано (НАБЛЮДЕНИЕ, «такое уже было»),
+#: `doubled` — аудитор отметил его повтором и вычет удвоен (ФАКТ РАСЧЁТА).
+#: Показывать их одинаково значит выдавать наблюдение за решение о цене.
+НЕТ, ВИДЕЛИ, ВДВОЕ = "none", "seen", "doubled"
+
+
 @dataclass(frozen=True)
 class Repeat:
     """Нарушение, встретившееся в окне больше одного раза."""
@@ -62,10 +69,12 @@ class Repeat:
     code: str
     text: str
     zone: str
-    #: По отметке на каждую проверку окна, слева старая. `True` — в той
-    #: проверке нарушение записано.
-    marks: tuple[bool, ...]
+    #: По отметке на каждую проверку окна, слева старая: `none`/`seen`/`doubled`.
+    marks: tuple[str, ...]
+    #: Сколько раз встречалось — наблюдение по записям окна.
     times: int
+    #: Сколько раз засчитано вдвое — решений аудитора, а не совпадений кода.
+    doubled: int = 0
 
 
 @dataclass(frozen=True)
@@ -166,14 +175,16 @@ def _repeats(
     формулировке: формулировки переводятся и правятся, коды нет.
     """
     место = {ид: n for n, ид in enumerate(окно)}
-    отметки: dict[str, list[bool]] = {}
+    отметки: dict[str, list[str]] = {}
     образец: dict[str, FindingRow] = {}
     for f in findings:
         n = место.get(f.inspection_id)
         if n is None:
             continue
-        ряд = отметки.setdefault(f.code, [False] * len(окно))
-        ряд[n] = True
+        ряд = отметки.setdefault(f.code, [НЕТ] * len(окно))
+        # Засчитанный повтор перекрывает наблюдение, но не наоборот: вторая
+        # запись того же кода в одной проверке не должна гасить пометку.
+        ряд[n] = ВДВОЕ if (f.repeat or ряд[n] == ВДВОЕ) else ВИДЕЛИ
         образец.setdefault(f.code, f)
     повторы = [
         Repeat(
@@ -181,12 +192,13 @@ def _repeats(
             text=(образец[код].text or "").strip(),
             zone=образец[код].zone,
             marks=tuple(ряд),
-            times=sum(ряд),
+            times=sum(1 for m in ряд if m != НЕТ),
+            doubled=sum(1 for m in ряд if m == ВДВОЕ),
         )
         for код, ряд in отметки.items()
-        if sum(ряд) > 1
+        if sum(1 for m in ряд if m != НЕТ) > 1
     ]
-    повторы.sort(key=lambda r: (-r.times, r.code))
+    повторы.sort(key=lambda r: (-r.doubled, -r.times, r.code))
     return tuple(повторы)[:limit]
 
 

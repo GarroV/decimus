@@ -125,7 +125,10 @@
           <span class="find-row__level grade grade--{{ level_tone(f.level) }}">{{ f.level }}</span>
           <span class="find-row__main">
             <span class="find-row__text">{{ item_titles.get(f.code, f.text or f.code) }}</span>
-            <span class="find-row__meta">{{ f.code }} · {{ f.zone }}</span>
+            <span class="find-row__meta">
+              {{ f.code }} · {{ f.zone }}
+              {% if f.repeat %} · <span class="pt-doubled">{{ t('unit.finding.doubled') }}</span>{% endif %}
+            </span>
           </span>
         </div>
       {% endfor %}
@@ -145,12 +148,18 @@
           <div class="ov-row">
             <span class="ov-row__name">{{ item_titles.get(r.code, r.text or r.code) }}</span>
             <span class="ov-row__meta">{{ r.code }} · {{ r.zone }}</span>
+            {# Три состояния клетки, а не два: пусто — нарушения в той проверке
+               не записано; обводка — записано (наблюдение); заливка — аудитор
+               отметил повтор и вычет удвоен (факт расчёта). #}
             <span class="pt-marks">
               {% for mark in r.marks %}
-                <span class="pt-marks__dot{% if mark %} pt-marks__dot--on{% endif %}"></span>
+                <span class="pt-marks__dot pt-marks__dot--{{ mark }}"></span>
               {% endfor %}
             </span>
-            <span class="ov-row__num">{{ t('unit.repeats.times', n=r.times) }}</span>
+            <span class="ov-row__num">
+              {{ t('unit.repeats.times', n=r.times) }}
+              {% if r.doubled %}<span class="ov-cell__muted">{{ t('unit.repeats.doubled', n=r.doubled) }}</span>{% endif %}
+            </span>
           </div>
         {% endfor %}
       {% else %}
