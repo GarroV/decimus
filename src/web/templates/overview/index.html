@@ -15,6 +15,7 @@
   Блок, под который в базе нет данных, показывает пустое состояние словами, а
   не исчезает: исчезнувший блок читается как «здесь всё в порядке».
 #}{% extends "base.html" %}
+{% from "_pick.html" import pick %}
 {% block title %}{{ t('section.overview.title') }}{% endblock %}
 
 {% block body %}
@@ -41,46 +42,20 @@
 
   {# ── Выборка ───────────────────────────────────────────────────────────
      Отбор идёт ССЫЛКАМИ, а не формой с состоянием: срез живёт в адресе, и
-     ссылку на него отправляют коллеге. Каждый чип — это готовый адрес. #}
+     ссылку на него отправляют коллеге. Каждый вариант — готовый адрес.
+
+     Чип раскрывается списком, а не раскладывается пилюлями по всей панели:
+     разложенный отбор на четыре размерности занимал три строки и на телефоне
+     съедал экран до самых данных. #}
   <div class="ov-filters">
     <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
-
-    {% if data.countries %}
-      <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.country') }}">
-        <a class="ov-chip{% if not selection.country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('overview.filter.all_countries') }}</a>
-        {% for code, units in data.countries %}
-          <a class="ov-chip{% if selection.country == code %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ code }} <span class="ov-chip__num">{{ units }}</span></a>
-        {% endfor %}
-      </span>
-    {% endif %}
-
-    {% if data.cities %}
-      <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.city') }}">
-        <a class="ov-chip{% if not selection.city %} is-on{% endif %}" href="{{ select_url(city='') }}">{{ t('overview.filter.all_cities') }}</a>
-        {% for name, units in data.cities %}
-          <a class="ov-chip{% if selection.city == name %} is-on{% endif %}" href="{{ select_url(city=name) }}">{{ name }} <span class="ov-chip__num">{{ units }}</span></a>
-        {% endfor %}
-      </span>
-    {% endif %}
-
-    <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.grade') }}">
-      <a class="ov-chip{% if not selection.grade %} is-on{% endif %}" href="{{ select_url(grade='') }}">{{ t('overview.filter.all_grades') }}</a>
-      {% for letter, count in data.grades %}
-        <a class="ov-chip{% if selection.grade == letter %} is-on{% endif %}" href="{{ select_url(grade=letter) }}">{{ letter }} <span class="ov-chip__num">{{ count }}</span></a>
-      {% endfor %}
-    </span>
-
+    {% for chip in picks %}{{ pick(chip) }}{% endfor %}
     <span class="ov-filters__gap"></span>
-
-    <span class="ov-chips" role="group" aria-label="{{ t('overview.filter.period') }}">
-      {% for code in periods %}
-        <a class="ov-chip{% if selection.period == code %} is-on{% endif %}" href="{{ select_url(period=code) }}">{{ t('overview.period.' ~ code) }}</a>
-      {% endfor %}
-    </span>
-
-    {% if selection.narrowed %}
-      <a class="ov-chip ov-chip--reset" href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
-    {% endif %}
+    {# «Сбросить» стоит всегда, а не появляется вместе с отбором: кнопка,
+       возникающая из ниоткуда, сдвигает панель под рукой. Когда сбрасывать
+       нечего, она приглушена и ведёт на тот же экран. #}
+    <a class="ov-chip ov-chip--reset{% if not selection.narrowed %} is-idle{% endif %}"
+       href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
   </div>
 
   {# Плитки кликабельны все до одной: цифра без перехода на вопрос экрана не

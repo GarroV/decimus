@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import date
 from typing import Any
@@ -164,8 +165,15 @@ def test_построенный_раздел_ленты_не_несёт(стен
     страница = стенд.get("/inspections").get_data(as_text=True)
 
     # Assert — ни ленты на экране, ни приглушения у своего пункта навигации.
+    # Смотрим ВНУТРЬ навигации, а не во всю страницу: адреса разделов есть и
+    # в отборе выборки, и проверка по всей странице ловила их вместо пунктов
+    # меню — то есть проверяла не то, что написано в её имени.
     assert "tape tape--screen" not in страница
-    assert 'href="/inspections?lang=ru" ' not in страница.replace("is-wip", "")
+    навигация = re.search(r'<nav class="navrow".*?</nav>', страница, re.S)
+    assert навигация, "на странице построенного раздела обязана быть навигация"
+    свой = re.search(r'<span class="navrow__item is-current"[^>]*>', навигация.group(0))
+    assert свой, "свой раздел в навигации обязан быть помечен как текущий"
+    assert "is-wip" not in свой.group(0), "построенный раздел не приглушается"
 
 
 def test_навигация_показывает_карту_продукта_целиком(стенд: FlaskClient) -> None:

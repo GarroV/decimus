@@ -14,6 +14,7 @@ Node не требуется вовсе — стиль приезжает гот
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 from flask import Flask, redirect, render_template, request, url_for
@@ -139,6 +140,53 @@ def _wip_view(key: str) -> Any:
 
     render.__name__ = f"wip_{key}"
     return render
+
+
+@dataclass(frozen=True)
+class PickOption:
+    """Один вариант отбора: подпись, счёт, готовый адрес и выбран ли он."""
+
+    title: str
+    href: str
+    selected: bool
+    count: int | None = None
+
+
+@dataclass(frozen=True)
+class Pick:
+    """Раскрывающийся чип отбора: название размерности и её варианты.
+
+    `current_title` — подпись ТЕКУЩЕГО выбора, а не название размерности:
+    панель обязана отвечать «что сейчас выбрано» одним взглядом.
+    """
+
+    label: str
+    current: str
+    current_title: str
+    options: tuple[PickOption, ...]
+
+
+def _pick(
+    *,
+    label: str,
+    empty_title: str,
+    current: str,
+    values: tuple[tuple[str, int | None], ...],
+    href: Callable[[str], str],
+    title: Callable[[str], str] = str,
+) -> Pick:
+    """Собрать чип отбора. Вариант «не сужать» всегда первый.
+
+    Снять отбор должно быть так же легко, как поставить: если «все» спрятано
+    в конце списка или его нет вовсе, человек снимает фильтр правкой адреса.
+    """
+    опции = [PickOption(title=empty_title, href=href(""), selected=not current)]
+    опции += [
+        PickOption(title=title(value), href=href(value), selected=current == value, count=count)
+        for value, count in values
+    ]
+    выбранное = next((о.title for о in опции[1:] if о.selected), empty_title)
+    return Pick(label=label, current=current, current_title=выбранное, options=tuple(опции))
 
 
 def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
@@ -270,10 +318,54 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 tone="err" if критических else "ok",
             ),
         )
+        язык = _lang(conf)
+        чипы = []
+        if snapshot.countries:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.country", язык),
+                    empty_title=t("overview.filter.all_countries", язык),
+                    current=selection.country,
+                    values=snapshot.countries,
+                    href=lambda значение: отбор(country=значение),
+                )
+            )
+        if snapshot.cities:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.city", язык),
+                    empty_title=t("overview.filter.all_cities", язык),
+                    current=selection.city,
+                    values=snapshot.cities,
+                    href=lambda значение: отбор(city=значение),
+                )
+            )
+        чипы.append(
+            _pick(
+                label=t("overview.filter.grade", язык),
+                empty_title=t("overview.filter.all_grades", язык),
+                current=selection.grade,
+                values=snapshot.grades,
+                href=lambda значение: отбор(grade=значение),
+            )
+        )
+        чипы.append(
+            _pick(
+                label=t("overview.filter.period", язык),
+                empty_title=t("overview.period.all", язык),
+                current="" if selection.period == "all" else selection.period,
+                values=tuple(
+                    (код, None) for код in overview_data.PERIODS if код != "all"
+                ),
+                href=lambda значение: отбор(period=значение or "all"),
+                title=lambda код: t("overview.period." + код, язык),
+            )
+        )
         return render_template(
             "overview/index.html",
             data=snapshot,
             tiles=tiles,
+            picks=tuple(чипы),
             registry_path=registry_path,
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
@@ -313,10 +405,41 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             живые = {ключ: значение for ключ, значение in параметры.items() if значение}
             return url_for("registry", **живые)
 
+        язык = _lang(conf)
+        # Буквы — шкалой со счётом по выборке: сколько проверок за каждой.
+        буквы = tuple(
+            (значение, sum(1 for row in registry_data.rows if row.grade == значение))
+            for значение in ("A", "B", "C", "D")
+        )
+        виды = tuple(
+            (код, sum(1 for row in registry_data.rows if row.kind == код))
+            for код in dict.fromkeys(row.kind for row in registry_data.rows)
+        )
+        чипы = [
+            _pick(
+                label=t("overview.filter.grade", язык),
+                empty_title=t("overview.filter.all_grades", язык),
+                current=буква,
+                values=буквы,
+                href=lambda значение: отбор(grade=значение),
+            )
+        ]
+        if виды:
+            чипы.append(
+                _pick(
+                    label=t("registry.col.kind", язык),
+                    empty_title=t("registry.all_kinds", язык),
+                    current=вид,
+                    values=виды,
+                    href=lambda значение: отбор(kind=значение),
+                    title=lambda код: _kind_title(код, язык),
+                )
+            )
         return render_template(
             "inspections/list.html",
             registry=registry_data,
             rows=строки,
+            picks=tuple(чипы),
             retraction_var=data.RETRACTION_URL_VAR,
             grade_tone=view.grade_tone,
             kind_title=_kind_title,

@@ -1,0 +1,33 @@
+{#
+  Выпадающий чип отбора — общий для всех экранов, где сужают выборку.
+
+  БЕЗ ЕДИНОЙ СТРОКИ JS: `<details>` открывается и закрывается сам, работает с
+  клавиатуры и в браузере с отключённым скриптом. Админка живёт за Tailscale
+  на чужой площадке, и каждый скрипт здесь — это то, что однажды не загрузится
+  молча, оставив человека с панелью, которая не открывается.
+
+  Подпись чипа показывает ТЕКУЩИЙ выбор, а не название размерности: панель
+  обязана отвечать «что сейчас выбрано» одним взглядом, иначе человек открывает
+  каждый чип по очереди, чтобы вспомнить, что он сузил.
+
+  Адреса опций собраны ЗАРАНЕЕ, в обработчике: шаблон не считает и не
+  склеивает ссылки — это решение приложения, а не оформление.
+#}
+{% macro pick(chip) %}
+  <details class="pick">
+    <summary class="ov-chip{% if chip.current %} is-on{% endif %}">
+      <span>{{ chip.label }}: {{ chip.current_title }}</span>
+      <span class="pick__caret" aria-hidden="true">▾</span>
+    </summary>
+    <div class="pick__menu" role="menu">
+      {% for option in chip.options %}
+        <a class="pick__item{% if option.selected %} is-on{% endif %}"
+           href="{{ option.href }}" role="menuitem">
+          <span class="pick__label">{{ option.title }}</span>
+          {% if option.count is not none %}<span class="pick__count">{{ option.count }}</span>{% endif %}
+          {% if option.selected %}<span class="pick__mark" aria-hidden="true">✓</span>{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  </details>
+{% endmacro %}
