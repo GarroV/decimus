@@ -24,15 +24,6 @@
    раскатываем `tools/spread.py`, а это переопределение снимаем. */
 :root { --canvas: var(--surface); }
 
-/* ── Раскладка: навигация слева, содержимое справа ───────────────
-   Разделов девять, и у непостроенных рядом стоит лента — в строку шапки
-   это не помещается, поэтому боковая навигация ядра (.sidenav). */
-
-.shell { display: flex; align-items: stretch; min-height: calc(100vh - 52px); }
-.shell__nav { flex: 0 0 auto; }
-.shell__main { flex: 1 1 auto; min-width: 0; }
-.shell__main .page { width: 100%; }
-
 /* ── Лента «в разработке» ────────────────────────────────────────
    Строительная лента, а не метка: непостроенное обязано выглядеть
    непостроенным (D138). Полоска берёт предупреждающий тон ядра и
@@ -66,8 +57,6 @@
   font-weight: var(--w-bold); color: var(--warn-ink);
 }
 
-.sidenav__item--wip { opacity: .82; }
-.sidenav__wrap { display: block; }
 
 /* ── Метка буквы оценки ──────────────────────────────────────────
    Буква — одно из двух мест, где продукт берёт сильный цвет
@@ -510,12 +499,11 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .ov-gradebar__part.tag--warn { background: var(--warn); }
 .ov-gradebar__part.tag--err { background: var(--err); }
 
-/* ═══ КАРКАС ПО ПРОТОТИПУ ════════════════════════════════════════════════
-   Навигация идёт СТРОКОЙ В ШАПКЕ, а не боковым столбцом (D188, D190). Это не
-   перестановка ради вкуса: боковой столбец с семью золотыми лентами
-   «в разработке» читался как прежний интерфейс даже после смены палитры и
-   типографики, и он же нарушал правило брифа о цвете — сильный цвет
-   оставлен букве оценки и классу нарушения, больше нигде.
+/* ═══ КАРКАС ═════════════════════════════════════════════════════════════
+   Шапка сверху, навигация СТОЛБЦОМ СЛЕВА (D192), содержимое справа. В
+   прототипе навигация шла строкой в шапке (D188, D190); владелец вернул
+   столбец — он адекватнее. Золотые ленты «в разработке» не вернулись: бриф
+   оставляет сильный цвет букве оценки и классу нарушения, больше нигде.
 
    Непостроенный раздел из карты не исчезает: он приглушён яркостью, а не
    помечен плашкой. Спрятать его нельзя решением D138, кричать о нём семь раз
@@ -528,9 +516,9 @@ a.ov-table__row:hover { background: var(--surface-3); }
   background: var(--surface-2);
   border-bottom: 1px solid var(--line);
 }
+/* Шапка во всю ширину, а не в колонку содержимого: бренд стоит над столбцом
+   навигации, иначе при широком окне он уезжает вправо от своего меню. */
 .topbar__inner {
-  max-width: 85rem;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -552,24 +540,20 @@ a.ov-table__row:hover { background: var(--surface-3); }
 }
 .topbar__spacer { flex: 1; min-width: .5rem; }
 
-.navrow { display: flex; gap: 2px; flex-wrap: wrap; }
-.navrow__item {
-  display: inline-flex;
-  align-items: center;
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--r-control);
-  font-weight: var(--w-semibold);
-  font-size: var(--fs-dense);
-  color: var(--ink-2);
-  text-decoration: none;
-  min-height: var(--tap-min);
-  white-space: nowrap;
+/* Высота шапки нужна столбцу навигации: он прилипает сразу под ней. */
+:root { --topbar-h: 2.75rem; }
+
+.shell { display: flex; align-items: flex-start; }
+.shell__nav {
+  flex: 0 0 auto;
+  position: sticky;
+  top: var(--topbar-h);
+  min-height: calc(100vh - var(--topbar-h));
 }
-.navrow__item:hover { background: var(--surface-3); color: var(--ink); }
-.navrow__item.is-current { background: var(--accent-soft); color: var(--accent); }
+.shell__main { flex: 1 1 auto; min-width: 0; }
 /* Непостроенный раздел: тише остальных, но открывается и виден. */
-.navrow__item.is-wip { color: var(--ink-empty); }
-.navrow__item.is-wip:hover { color: var(--ink-3); }
+.sidenav__item.is-wip { color: var(--ink-empty); }
+.sidenav__item.is-wip:hover { color: var(--ink-3); }
 
 .page {
   max-width: 85rem;
@@ -585,7 +569,7 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .tabbar { display: none; }
 
 @media (max-width: 52rem) {
-  .navrow { display: none; }
+  .shell__nav { display: none; }
   .whoami { display: none; }
   .tabbar {
     position: fixed;
@@ -604,7 +588,7 @@ a.ov-table__row:hover { background: var(--surface-3); }
    съедает высоту панели, а жест работает и без неё. */
 .tabbar { overflow-x: auto; scrollbar-width: none; }
 .tabbar::-webkit-scrollbar { display: none; }
-/* Непостроенный раздел приглушён так же, как в шапке: одна и та же пометка
+/* Непостроенный раздел приглушён так же, как в столбце слева: одна и та же пометка
    на обоих поверхностях, иначе с телефона он выглядит рабочим. */
 .tabbar__item.is-wip { opacity: .45; }
 .tabbar__item {

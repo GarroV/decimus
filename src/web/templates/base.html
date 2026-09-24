@@ -1,14 +1,13 @@
 {#
-  Каркас админки: шапка с навигацией в строку, содержимое, нижняя панель для
-  телефона.
+  Каркас админки: шапка, навигация столбцом слева, содержимое, нижняя
+  панель для телефона.
 
-  ОБЛИК — ПРОТОТИП ВЛАДЕЛЬЦА (D188, D190). До 24.09.2026 здесь был боковой
-  столбец с золотыми лентами «в разработке» у каждого непостроенного раздела.
-  Расхождение с каноном было не в мелочи: в прототипе навигация идёт строкой в
-  шапке, и именно боковой столбец читался как «всё тот же старый интерфейс»,
-  хотя палитра и типографика уже сменились. Ленты сняты и по второй причине —
-  бриф разрешает сильный цвет только на букве оценки и классе нарушения,
-  «иначе тревожным становится всё сразу», а лент было семь на один экран.
+  НАВИГАЦИЯ СЛЕВА — решение владельца D192 поверх прототипа (D190). В
+  прототипе она идёт строкой в шапке, так её и построили 24.09.2026, и в тот
+  же день владелец вернул столбец: боковая навигация адекватнее. Золотые ленты
+  «в разработке» при этом НЕ возвращаются — бриф разрешает сильный цвет только
+  на букве оценки и классе нарушения, «иначе тревожным становится всё сразу»,
+  а лент было семь на один экран. Непостроенный раздел приглушён.
 
   Навигация по-прежнему строится ИЗ ДАННЫХ (`src/web/sections.py`), а не
   перечислением в разметке: признак «построен / не построен» живёт в одном
@@ -43,19 +42,6 @@
       #}
       {% if account %}
         <div class="topbar__tenant" title="{{ t('app.tenant_label') }}">{{ tenant }}</div>
-
-        <nav class="navrow" aria-label="{{ t('nav.sections') }}">
-          {% for item in sections %}
-            {% set title = t('section.' ~ item.key ~ '.title') %}
-            {% if item.path == current_path %}
-              <span class="navrow__item is-current" aria-current="page">{{ title }}</span>
-            {% else %}
-              <a class="navrow__item{% if not item.built %} is-wip{% endif %}"
-                 href="{{ url(item.path) }}?lang={{ lang }}"
-                 {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ title }}</a>
-            {% endif %}
-          {% endfor %}
-        </nav>
       {% endif %}
 
       <div class="topbar__spacer"></div>
@@ -86,9 +72,26 @@
     </div>
   </header>
 
-  <main class="page">
-    {% block body %}{% endblock %}
-  </main>
+  <div class="shell">
+    {% if account %}
+      <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
+        {% for item in sections %}
+          {% set title = t('section.' ~ item.key ~ '.title') %}
+          {% if item.path == current_path %}
+            <span class="sidenav__current" aria-current="page">{{ title }}</span>
+          {% else %}
+            <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
+               href="{{ url(item.path) }}?lang={{ lang }}"
+               {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ title }}</a>
+          {% endif %}
+        {% endfor %}
+      </nav>
+    {% endif %}
+
+    <main class="page shell__main">
+      {% block body %}{% endblock %}
+    </main>
+  </div>
 
   {#
     Нижняя панель — для телефона: бриф требует, чтобы основные действия
