@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any
 
 from src.domain import list_zones
@@ -161,4 +162,7 @@ def classify(
         settings=cfg,
         model=model,
     )
-    return _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo)
+    return replace(
+        _suggestion(answer.payload, answer.usage, cfg, used_photo=use_photo),
+        shortlist=picked.codes,
+    )

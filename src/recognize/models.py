@@ -50,6 +50,9 @@ class Suggestion:
     degraded: bool = False
     #: Расход на запрос, для замера стоимости. Пусто, когда модель не звали.
     usage: dict[str, int] = field(default_factory=dict)
+    #: Коды, которые ушли модели перечнем кандидатов, в порядке показа (#367).
+    #: Нужны разбору промаха: не было нужного кода в перечне — модель тут ни при чём.
+    shortlist: tuple[str, ...] = ()
 
     def top(self) -> Candidate | None:
         return self.candidates[0] if self.candidates else None
