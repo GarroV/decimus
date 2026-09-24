@@ -21,6 +21,7 @@ from flask import Flask, redirect, render_template, request, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
+from src.db import directory
 from src.db.errors import DbError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
@@ -29,6 +30,7 @@ from . import accounts, auth, letter_draft, view
 from . import inspections as data
 from . import methodology as method
 from . import overview as overview_data
+from . import unit_card as unit_data
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
 from .origin import refuse_foreign_origin
@@ -65,6 +67,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _register_sections(app)
     _register_overview(app, conf)
+    _register_units(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     _register_methodology(app, conf)
@@ -390,6 +393,49 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             periods=tuple(overview_data.PERIODS),
             plans_path=section("plans").path,
             item_titles=_item_titles(conf, _lang(conf)),
+            # Идентификаторы точек нужны таблице, чтобы строка вела в карточку
+            # точки, а не в последний отчёт: по прототипу владельца клик по
+            # точке открывает точку. Связь идёт идентификатором справочника —
+            # название в ссылке сломалось бы на первой же правке названия.
+            unit_ids=snapshot.unit_ids,
+        )
+
+
+def _register_units(app: Flask, conf: Settings) -> None:
+    """Карточка одной точки: где она сейчас, куда движется, что не чинится.
+
+    Точка адресуется ИДЕНТИФИКАТОРОМ справочника, а не названием в адресной
+    строке. Название — формулировка: его правят, переводят и пишут с опечаткой,
+    и ссылка на карточку, собранная из него, ломается молча (CLAUDE.md,
+    «сущности связывать кодами»). Внутри выборка проверок всё ещё идёт по
+    каноничному названию — это устройство самой выборки вместе с её картой
+    синонимов, а не способ адресации снаружи.
+    """
+
+    @app.get("/units/<unit_id>")
+    def unit(unit_id: str) -> str | tuple[str, int]:
+        lang = _lang(conf)
+        # Справочник спрашивается целиком: точек у сети сотни, отдельный
+        # запрос по идентификатору — это новая функция слоя базы ради одной
+        # строки, и заводить её стоит тогда, когда список станет дорогим.
+        точка = next(
+            (u for u in directory.list_units(tenant=conf.tenant) if u.id == unit_id),
+            None,
+        )
+        if точка is None:
+            return render_template("inspections/not_found.html"), 404
+        снимок = unit_data.load(tenant=conf.tenant, unit=точка.name, lang=lang)
+        return render_template(
+            "units/card.html",
+            data=снимок,
+            lang=lang,
+            window=unit_data.ОКНО,
+            grade_tone=view.grade_tone,
+            level_tone=view.level_tone,
+            overview_path=section("overview").path,
+            registry_path=section("registry").path,
+            plans_path=section("plans").path,
+            item_titles=_item_titles(conf, lang),
         )
 
 

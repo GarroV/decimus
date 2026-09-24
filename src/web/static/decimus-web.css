@@ -767,3 +767,107 @@ a.ov-table__row:hover { background: var(--surface-3); }
 /* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
    сдвигает панель ровно под рукой. */
 .ov-chip--reset.is-idle { opacity: .45; }
+
+/* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
+   Столбики движения оценки, отметки повторов и шапка с действиями. Высоту
+   столбика считает `src/web/unit_card.py` и отдаёт готовым процентом: CSS
+   здесь только рисует, ничего не выводя из оценки сам. */
+.pt-back {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  text-decoration: none;
+}
+.pt-back:hover { color: var(--accent); }
+
+.pt-head__tiles { margin-top: var(--space-3); }
+.pt-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Полоса движения: столбики одной высоты поля, выровненные по низу. Поле
+   фиксированной высоты нужно затем, чтобы процент столбика был от чего
+   считать: у контейнера без высоты `height: 62%` не значит ничего. */
+.pt-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 9rem;
+  margin: var(--space-3) 0 var(--space-2);
+  overflow-x: auto;
+}
+.pt-bars__col {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 2.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+.pt-bars__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+}
+.pt-bars__bar {
+  width: 100%;
+  border-radius: var(--r-inner) var(--r-inner) 0 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-bottom: 0;
+  transition: background 120ms ease;
+}
+.pt-bars__col:hover .pt-bars__bar { background: var(--accent); }
+/* Столбик другого издания методики штрихуется: его высота стоит рядом с
+   соседями, но сравнивать её с ними нельзя — сменились ставки, а не работа
+   точки (T349). Цветом это не показать: цвет читается как оценка. */
+.pt-bars__bar--other {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2),
+    var(--surface-2) 3px,
+    var(--line) 3px,
+    var(--line) 6px
+  );
+  border-color: var(--line-2);
+}
+.pt-bars__date {
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Отметки повторов: по точке на проверку окна, слева старая. Заполненная —
+   нарушение записано в той проверке. */
+.pt-marks {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.pt-marks__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: transparent;
+}
+.pt-marks__dot--on {
+  background: var(--err);
+  border-color: var(--err-line);
+}
+
+@media (max-width: 52rem) {
+  /* На телефоне строка блока перестраивается в карточку: имя сверху, цифры
+     под ним. Бриф требует работу с телефона на каждом экране, а строка из
+     четырёх колонок на 390 точках уезжает вбок. */
+  .pt-head__actions .btn { flex: 1 1 auto; text-align: center; }
+  .pt-bars { height: 7rem; }
+}

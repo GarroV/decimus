@@ -307,6 +307,68 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The calendar and inspection planning are out of the current scope (decision D139).",
     },
     # --- реестр проверок ---------------------------------------------------
+    # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
+    "unit.back": {"ru": "‹ Аналитика сети", "en": "‹ Network analytics"},
+    "unit.title": {"ru": "Карточка точки", "en": "Unit card"},
+    "unit.meta": {"ru": "{city} · партнёр {partner}", "en": "{city} · partner {partner}"},
+    "unit.meta.no_partner": {
+        "ru": "{city} · партнёр не назначен",
+        "en": "{city} · no partner assigned",
+    },
+    "unit.audits": {"ru": "проверок: {n}", "en": "audits: {n}"},
+    "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
+    "unit.tile.orders": {"ru": "Открытых предписаний", "en": "Open orders"},
+    "unit.tile.orders.wip": {
+        "ru": "предписаний в системе пока нет — раздел в разработке",
+        "en": "orders do not exist in the system yet — section in progress",
+    },
+    "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
+    "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
+    "unit.movement.hint": {
+        "ru": "клик по столбику — открыть отчёт",
+        "en": "click a bar to open the report",
+    },
+    # Обрезанная ось преувеличивает разницу, поэтому граница названа вслух:
+    # столбики 89 и 99 на шкале от нуля выглядят одинаковыми, а на шкале от
+    # 85 — вдвое разными, и читатель обязан знать, какую картинку он видит.
+    "unit.movement.scale": {"ru": "шкала от {floor}%", "en": "scale starts at {floor}%"},
+    "unit.movement.mixed": {
+        "ru": "Проверки разных изданий методики — высоту столбиков сравнивать нельзя",
+        "en": "Audits from different methodology editions — bar heights are not comparable",
+    },
+    "unit.movement.empty": {
+        "ru": "Проверок по этой точке ещё не было",
+        "en": "This unit has not been audited yet",
+    },
+    "unit.weak": {"ru": "Слабые блоки последней проверки", "en": "Weak zones of the last audit"},
+    "unit.weak.open": {"ru": "Открыть отчёт целиком", "en": "Open the full report"},
+    "unit.weak.empty": {
+        "ru": "В последней проверке потерь по зонам не записано",
+        "en": "The last audit recorded no zone losses",
+    },
+    "unit.weak.zeroed": {"ru": "зона обнулена", "en": "zone zeroed"},
+    "unit.weak.share": {"ru": "доля {share}%", "en": "share {share}%"},
+    "unit.findings": {"ru": "Записи последней проверки", "en": "Records of the last audit"},
+    "unit.findings.empty": {"ru": "Записей нет", "en": "No records"},
+    "unit.repeats": {"ru": "Повторяющиеся нарушения", "en": "Repeating violations"},
+    # Формулировка прототипа «повтор стоит вдвое дороже» сюда НЕ перенесена:
+    # в `data/scoring.json` удвоения за повтор нет, и подпись утверждала бы
+    # цену, которой движок не считает (#358).
+    "unit.repeats.note": {
+        "ru": "{n} последних проверок, слева старая",
+        "en": "last {n} audits, oldest on the left",
+    },
+    "unit.repeats.times": {"ru": "раз: {n}", "en": "times: {n}"},
+    "unit.repeats.empty": {
+        "ru": "Ни одно нарушение не повторялось",
+        "en": "No violation repeated",
+    },
+    "unit.plan": {"ru": "План проверок точки", "en": "Audit plan for the unit"},
+    "unit.plan.wip": {
+        "ru": "Планов проверок в системе пока нет — раздел в разработке",
+        "en": "Audit plans do not exist in the system yet — section in progress",
+    },
+    "unit.not_found": {"ru": "Такой точки нет", "en": "No such unit"},
     "registry.lead": {
         "ru": (
             "Проведённые проверки. Процент, буква и разбивка показаны такими, какими их "

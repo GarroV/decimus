@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 from src.db import queries
@@ -191,6 +191,11 @@ class Overview:
     cities: tuple[tuple[str, int], ...] = ()
     breakdown: tuple[CityRow, ...] = ()
     points: tuple[PointRow, ...] = ()
+    #: `{название точки: идентификатор}` — чтобы строка таблицы вела в карточку
+    #: точки. Экран берёт ВСЁ одним снимком: отдельный поход в базу из
+    #: обработчика прошёл бы мимо подменяемого слоя и сломал бы проверки
+    #: экрана, которые до базы не доходят.
+    unit_ids: dict[str, str] = field(default_factory=dict)
 
 
 def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
@@ -512,6 +517,7 @@ def load(
         "grade": selection.grade,
     }
     geo = queries.unit_geography(tenant=tenant)
+    ид_точек = queries.unit_ids(tenant=tenant)
     counts = queries.class_counts(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
     worst = queries.worst_zones(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
     весь_ряд = tuple(
@@ -548,6 +554,7 @@ def load(
     всего_точек = queries.units_total(tenant=tenant)
     return Overview(
         units_total=всего_точек,
+        unit_ids=ид_точек,
         inspections=rows,
         grades=_grades(rows),
         average=_average(rows),
