@@ -222,6 +222,9 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             if snapshot.average is None or not snapshot.comparable
             else t("overview.tile.note.average", _lang(conf))
         )
+        # Плиток пять, и они РАЗНЫЕ на вид: бриф прямо запрещает полосу
+        # одинаковых плиток, и различие здесь несёт смысл, а не украшает —
+        # цветом помечено только то, что требует действия.
         tiles = (
             overview_data.Tile(
                 key="units",
@@ -232,6 +235,13 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                     checked=len({row.unit_name for row in snapshot.inspections}),
                 ),
                 href=registry_path,
+            ),
+            overview_data.Tile(
+                key="unchecked",
+                value=str(snapshot.unchecked),
+                note=t("overview.tile.note.unchecked", _lang(conf)),
+                href=registry_path,
+                tone="warn" if snapshot.unchecked else "plain",
             ),
             overview_data.Tile(
                 key="inspections",
@@ -245,13 +255,19 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 else f"{snapshot.average:.1f}",
                 note=среднее,
                 href=registry_path,
+                # Движение показывается только там, где его есть с чем
+                # сравнить И где сравнение законно: ряд одного издания
+                # методики против такого же ряда прошлого периода (T349).
+                delta="" if snapshot.average_delta is None
+                else f"{snapshot.average_delta:+.1f}",
+                tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
             ),
             overview_data.Tile(
                 key="critical",
                 value=str(критических),
                 note=t("overview.tile.note.critical", _lang(conf)),
                 href=registry_path,
-                tone="err" if критических else "plain",
+                tone="err" if критических else "ok",
             ),
         )
         return render_template(

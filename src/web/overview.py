@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 
 from src.db import queries
@@ -32,13 +32,19 @@ CRITICAL = "D3"
 
 @dataclass(frozen=True)
 class Tile:
-    """Плитка сводки. `href` обязателен: цифра без перехода — мёртвая цифра."""
+    """Плитка сводки. `href` обязателен: цифра без перехода — мёртвая цифра.
+
+    `delta` — движение числа против прошлого периода, уже готовой строкой со
+    знаком. Пусто — движения не показываем: ни нуля, ни стрелки в никуда.
+    Бриф требует у средней именно движение, а не голое число.
+    """
 
     key: str
     value: str
     note: str
     href: str
     tone: str = "plain"
+    delta: str = ""
 
 
 @dataclass(frozen=True)
@@ -126,6 +132,10 @@ class CityRow:
     comparable: bool
     grades: tuple[tuple[str, int], ...]
     critical: int
+    #: Движение средней против такого же периода перед этим. `None` — не с
+    #: чем сравнивать или сравнивать нельзя, и тогда на экране прочерк, а не
+    #: ноль: ноль читался бы как «ничего не изменилось».
+    delta: float | None = None
 
 
 @dataclass(frozen=True)
@@ -148,6 +158,9 @@ class PointRow:
     worst_zone_ru: str
     worst_zone_en: str
     critical: int
+    #: Почему точка попала в проблемные — КОДОМ причины, не готовой фразой:
+    #: причина одна, а языков у продукта два. Пусто — точка не проблемная.
+    why: str = ""
 
 
 @dataclass(frozen=True)
@@ -164,6 +177,13 @@ class Overview:
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problem_units: tuple[InspectionRow, ...]
+    problems: tuple[PointRow, ...] = ()
+    #: Движение средней против такого же периода перед этим. `None` — не с чем
+    #: или нельзя сравнивать.
+    average_delta: float | None = None
+    #: Сколько точек выборки за период не проверяли ни разу. Знаменатель
+    #: берётся из справочника: «проверено 12» без «из 150» — это не ответ.
+    unchecked: int = 0
     selection: Selection = Selection()
     countries: tuple[tuple[str, int], ...] = ()
     cities: tuple[tuple[str, int], ...] = ()
@@ -276,6 +296,35 @@ def window(period: str, *, today: date) -> tuple[date | None, date | None]:
     return today - timedelta(days=дней), today
 
 
+def window_before(period: str, *, today: date) -> tuple[date | None, date | None]:
+    """Окно такой же длины, стоящее сразу перед текущим.
+
+    Нужно ровно для одного: сказать, куда сеть движется. Сравнивать месяц с
+    «всем временем» бессмысленно, поэтому у периода «всё время» предыдущего
+    окна нет вовсе — и движение тогда не показывается, а не выдумывается.
+    """
+    дней = PERIODS.get(period)
+    if дней is None:
+        return None, None
+    конец = today - timedelta(days=дней + 1)
+    return конец - timedelta(days=дней), конец
+
+
+def _movement(сейчас: tuple[InspectionRow, ...], раньше: tuple[InspectionRow, ...]) -> float | None:
+    """Насколько средняя сдвинулась. `None` — сравнивать нечего или нельзя.
+
+    Нельзя — это когда хоть один из двух рядов посчитан разными изданиями
+    методики или когда ряды посчитаны РАЗНЫМИ изданиями между собой: тогда
+    разница показывает смену ставок, а не работу сети (T349).
+    """
+    если_сейчас, если_раньше = _average(сейчас), _average(раньше)
+    if если_сейчас is None or если_раньше is None:
+        return None
+    if not _comparable(сейчас) or not _comparable(раньше) or not _comparable(сейчас + раньше):
+        return None
+    return round(если_сейчас - если_раньше, 1)
+
+
 def _fits(row: InspectionRow, *, selection: Selection, geo: dict[str, tuple[str, str]]) -> bool:
     """Попадает ли проверка в выборку. Сравнение по кодам, не по подписям."""
     country, city = geo.get(row.unit_name, ("", ""))
@@ -288,11 +337,23 @@ def _fits(row: InspectionRow, *, selection: Selection, geo: dict[str, tuple[str,
     return True
 
 
+def _by_city(
+    rows: tuple[InspectionRow, ...], *, geo: dict[str, tuple[str, str]]
+) -> dict[tuple[str, str], list[InspectionRow]]:
+    """Разложить ряд по городам. Отдельно — потому что то же нужно прошлому окну."""
+    разложено: dict[tuple[str, str], list[InspectionRow]] = {}
+    for row in rows:
+        country, city = geo.get(row.unit_name, ("", ""))
+        разложено.setdefault((country, city), []).append(row)
+    return разложено
+
+
 def _breakdown(
     rows: tuple[InspectionRow, ...],
     *,
     geo: dict[str, tuple[str, str]],
     counts: dict[str, dict[str, int]],
+    before: tuple[InspectionRow, ...] = (),
 ) -> tuple[CityRow, ...]:
     """Разбивка выборки по городам, крупные города сверху.
 
@@ -300,10 +361,8 @@ def _breakdown(
     выбрасывается: «в разбивке 40 точек, а в сети 150» — это вопрос к
     справочнику, и экран обязан его задать, а не спрятать.
     """
-    по_городам: dict[tuple[str, str], list[InspectionRow]] = {}
-    for row in rows:
-        country, city = geo.get(row.unit_name, ("", ""))
-        по_городам.setdefault((country, city), []).append(row)
+    по_городам = _by_city(rows, geo=geo)
+    было_по_городам = _by_city(before, geo=geo)
     строки = [
         CityRow(
             city=city,
@@ -314,6 +373,7 @@ def _breakdown(
             comparable=_comparable(tuple(ряд)),
             grades=_grades(tuple(ряд)),
             critical=sum(counts.get(row.id, {}).get(CRITICAL, 0) for row in ряд),
+            delta=_movement(tuple(ряд), tuple(было_по_городам.get((country, city), ()))),
         )
         for (country, city), ряд in по_городам.items()
     ]
@@ -369,6 +429,39 @@ def _points(
     return tuple(точки)
 
 
+#: Ниже этой буквы точка попадает в проблемные сама по себе. Буквы — коды
+#: шкалы методики, порог здесь только для отбора на экран и оценку не трогает.
+СЛАБЫЕ_БУКВЫ = ("C", "D")
+
+
+def _problems(points: tuple[PointRow, ...]) -> tuple[PointRow, ...]:
+    """Точки, к которым есть вопрос, и КАКОЙ именно — по убыванию срочности.
+
+    Отбор по причине, а не по низу сортировки. «Шесть худших по проценту» —
+    это всегда шесть строк, даже когда в сети всё хорошо, и человек привыкает
+    читать список как шум. Список по причинам бывает пустым, и это тоже ответ:
+    поводов нет.
+
+    Причины в порядке веса: сожжённая зона (класс D3), падение против прошлой
+    сравнимой проверки, слабая буква. Первая сработавшая и записывается —
+    точке незачем объяснять три раза.
+    """
+    отобранные: list[PointRow] = []
+    for точка in points:
+        if точка.critical:
+            причина = "critical"
+        elif точка.delta is not None and точка.delta < 0:
+            причина = "dropped"
+        elif точка.grade in СЛАБЫЕ_БУКВЫ:
+            причина = "low_grade"
+        else:
+            continue
+        отобранные.append(replace(точка, why=причина))
+    порядок = {"critical": 0, "dropped": 1, "low_grade": 2}
+    отобранные.sort(key=lambda т: (порядок[т.why], т.delta or 0, т.pct))
+    return tuple(отобранные[:TOP])
+
+
 def load(
     *,
     tenant: str,
@@ -385,6 +478,22 @@ def load(
         queries.list_inspections(tenant=tenant, limit=limit, date_from=date_from, date_to=date_to)
     )
     rows = tuple(row for row in весь_ряд if _fits(row, selection=selection, geo=geo))
+    # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
+    # у «всего времени» предыдущего окна не существует, и лишний поход в базу
+    # на каждом открытии экрана был бы платой ни за что.
+    было_от, было_до = window_before(selection.period, today=today or date.today())
+    было = (
+        tuple(
+            row
+            for row in queries.list_inspections(
+                tenant=tenant, limit=limit, date_from=было_от, date_to=было_до
+            )
+            if _fits(row, selection=selection, geo=geo)
+        )
+        if было_от is not None
+        else ()
+    )
+    точки = _points(rows, geo=geo, counts=counts, worst=worst)
     losses = queries.zone_losses(tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP)
     всего = sum(строка[3] for строка in losses) or 1.0
     страны: dict[str, int] = {}
@@ -394,8 +503,9 @@ def load(
             страны[country] = страны.get(country, 0) + 1
         if city:
             города[city] = города.get(city, 0) + 1
+    всего_точек = queries.units_total(tenant=tenant)
     return Overview(
-        units_total=queries.units_total(tenant=tenant),
+        units_total=всего_точек,
         inspections=rows,
         grades=_grades(rows),
         average=_average(rows),
@@ -421,9 +531,15 @@ def load(
         ),
         attention=_attention(rows, counts=counts),
         problem_units=tuple(sorted(rows, key=lambda r: r.pct)[:TOP]),
+        problems=_problems(точки),
+        average_delta=_movement(rows, было),
+        # Точки справочника, по которым за период нет ни одной проверки.
+        # Считается от того же справочника, что и знаменатель плитки: иначе
+        # «не проверено» и «всего» пришли бы из разных мест и разошлись.
+        unchecked=max(всего_точек - len({row.unit_name for row in rows}), 0),
         selection=selection,
         countries=tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0]))),
         cities=tuple(sorted(города.items(), key=lambda п: (-п[1], п[0]))),
-        breakdown=_breakdown(rows, geo=geo, counts=counts),
-        points=_points(rows, geo=geo, counts=counts, worst=worst),
+        breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
+        points=точки,
     )

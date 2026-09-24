@@ -117,6 +117,24 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Where to look today: what the network loses, where it repeats, "
         "and which units slipped.",
     },
+    "overview.tile.unchecked": {"ru": "Не проверено", "en": "Not inspected"},
+    "overview.tile.note.unchecked": {
+        "ru": "точек без проверки за период",
+        "en": "units with no inspection in the period",
+    },
+    "overview.problem.critical": {
+        "ru": "сожжена зона: критических {count}",
+        "en": "a zone burned: {count} critical",
+    },
+    "overview.problem.dropped": {
+        "ru": "просела против прошлой проверки на {delta}",
+        "en": "dropped {delta} against the previous inspection",
+    },
+    "overview.problem.low_grade": {"ru": "оценка ниже порога", "en": "score below threshold"},
+    "overview.units.hint2": {
+        "ru": "Сожжённые зоны, падение оценки, слабая буква",
+        "en": "Burned zones, dropped scores, weak grades",
+    },
     "overview.tile.units": {"ru": "Точек в справочнике", "en": "Units on file"},
     "overview.tile.inspections": {"ru": "Проверок", "en": "Inspections"},
     "overview.tile.average": {"ru": "Средняя оценка", "en": "Average score"},
@@ -139,6 +157,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "These inspections were scored under different rates or checklists: a single number "
         "would average the incomparable. The breakdown below still holds — it averages nothing.",
     },
+    "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    "overview.attention.count": {"ru": "поводов: {count}", "en": "{count} pending"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
     "overview.attention.hint": {
         "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
