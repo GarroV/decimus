@@ -76,6 +76,7 @@ def add_finding(
     source: str = "",
     words: str = "",
     suggested: Suggestion | None = None,
+    repeat: bool = False,
 ) -> Finding:
     """Зафиксировать запись.
 
@@ -130,6 +131,9 @@ def add_finding(
             option("zone", zone),
             option("evidence", text),
             option("comment", comment),
+            # Повтор — решение аудитора о цене записи, а не наблюдение системы
+            # (D191). Флаг передаётся движку, потому что удваивает он.
+            *(["--repeat"] if repeat else []),
         ],
         chat_id=chat_id,
         settings=settings,

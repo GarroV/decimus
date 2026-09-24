@@ -139,7 +139,8 @@ select
         and t.field = 'text' and t.lang = i.speech_lang),
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang)
+        and t.field = 'comment' and t.lang = i.speech_lang),
+    f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -159,7 +160,8 @@ select
         and t.field = 'text' and t.lang = i.speech_lang),
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang)
+        and t.field = 'comment' and t.lang = i.speech_lang),
+    f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -291,6 +293,10 @@ def _row_to_finding(row: Any) -> FindingRow:
         suggested_confidence=None if row[15] is None else float(row[15]),
         text=row[16],
         comment=row[17],
+        # Пометка повтора (#359). Умолчание колонки — `false`, то есть «не
+        # отмечено»: у записанной проверки состояния «неизвестно, был ли
+        # повтор» не бывает.
+        repeat=bool(row[18]),
     )
 
 
