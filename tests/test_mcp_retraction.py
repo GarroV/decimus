@@ -176,7 +176,7 @@ def test_чужая_точка_в_подтверждении_ничего_не_�
     ident = _проверка(505)
     подтверждение = _подтверждение(ident)
 
-    with pytest.raises(ToolError, match="не снята"):
+    with pytest.raises(ToolError, match="не отклонена"):
         retraction.retract_inspection(
             tenant=АРЕНДАТОР,
             id=ident,
