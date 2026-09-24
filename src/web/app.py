@@ -22,7 +22,7 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import directory
-from src.db.errors import DbError, RetractionError
+from src.db.errors import DbError, MoveError, RetractionError
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
@@ -708,9 +708,34 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             done = data.retract_card(inspection_id, tenant=conf.tenant, reason=reason)
         except RetractionError as exc:
-            failure = str(exc)
+            failure = t("retract.failed", _lang(conf), reason=str(exc))
         else:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/move")
+    def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Перенести проверку по дате и пиццерии (D195). Только администратор."""
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            перенесено = data.move_card(
+                inspection_id,
+                tenant=conf.tenant,
+                new_date=request.form.get("date") or "",
+                new_unit_id=request.form.get("unit") or "",
+                reason=request.form.get("reason") or "",
+                actor=вошедший.login if вошедший else "",
+            )
+        except MoveError as exc:
+            failure = t("move.failed", _lang(conf), reason=str(exc))
+        else:
+            notice = t("move.done" if перенесено else "move.same", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
 
@@ -736,8 +761,27 @@ def _render_card(
     if detail is None:
         return render_template("inspections/not_found.html"), 404
     lang = _lang(conf)
+    админ = _admin_only() is None
+    try:
+        переносы = data.load_moves(inspection_id, tenant=conf.tenant)
+        история_известна = True
+    except DbError:
+        # История недоступна (например, схема ещё без `0025`) — карточка живёт,
+        # а переносить без истории нельзя: форма не показывается.
+        переносы = ()
+        история_известна = False
+    можно_переносить = (
+        админ
+        and история_известна
+        and data.retraction_available()
+        and not detail.inspection.retracted
+    )
     return render_template(
         "inspections/card.html",
+        moves=переносы,
+        moves_known=история_известна,
+        may_move=можно_переносить,
+        units=data.load_units(tenant=conf.tenant) if можно_переносить else (),
         detail=detail,
         head=detail.inspection,
         zones=view.zone_lines(detail.by_zone, lang),
@@ -745,7 +789,7 @@ def _render_card(
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
-        may_retract=data.retraction_available() and _admin_only() is None,
+        may_retract=data.retraction_available() and админ,
         notice=notice,
         failure=failure,
     )

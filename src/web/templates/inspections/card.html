@@ -29,7 +29,7 @@
   {% endif %}
   {% if failure %}
     <div class="note note--error mt-gap">
-      <div><div class="note__title">{{ t('retract.failed', reason=failure) }}</div></div>
+      <div><div class="note__title">{{ failure }}</div></div>
     </div>
   {% endif %}
 
@@ -156,6 +156,56 @@
         {% for row in detail.info %}
           <div><span class="meta">{{ row.code }}</span><div>{{ row.text }}</div></div>
         {% endfor %}
+      </div></div>
+    </div>
+  {% endif %}
+
+  {#
+    Перенос (D195): меняет «когда и где», а не документ. История показывается
+    всем, кто видит карточку; форма — только администратору и только при
+    живой истории: перенос без следа база не примет, и форма, которая заведомо
+    упадёт, хуже отсутствующей.
+  #}
+  {% if moves %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('move.history.title') }}</h2></div>
+      <div class="card"><div class="card__body stack">
+        {% for m in moves %}
+          <div>
+            <div>{{ t('move.history.line', unit_from=m.old_unit, date_from=m.old_date, unit_to=m.new_unit, date_to=m.new_date) }}</div>
+            <div class="meta">{{ t('move.history.meta', at=m.moved_at, who=m.moved_by, reason=m.reason) }}</div>
+          </div>
+        {% endfor %}
+      </div></div>
+    </div>
+  {% elif not moves_known and may_retract %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('move.history.unknown') }}</div></div></div>
+  {% endif %}
+
+  {% if may_move %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('move.title') }}</h2></div>
+      <div class="card"><div class="card__body">
+        <p class="field-note">{{ t('move.hint') }}</p>
+        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/move') }}?lang={{ lang }}" class="row mt-gap">
+          <label>
+            <span class="field-label">{{ t('move.date_label') }}</span>
+            <input class="input" type="date" name="date" required value="{{ head.inspection_date }}">
+          </label>
+          <label>
+            <span class="field-label">{{ t('move.unit_label') }}</span>
+            <select class="input" name="unit" required>
+              {% for unit_id, unit_name in units %}
+                <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="grow">
+            <span class="field-label">{{ t('move.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">
+          </label>
+          <button class="btn" type="submit">{{ t('move.submit') }}</button>
+        </form>
       </div></div>
     </div>
   {% endif %}

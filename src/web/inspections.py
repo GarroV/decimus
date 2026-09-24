@@ -21,11 +21,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from datetime import date
 
 from src.db import letters as letters_store
-from src.db import queries, retract
+from src.db import move, queries, retract
 from src.db.config import load_retraction_settings
-from src.db.errors import DbError
+from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow
 from src.domain.models import TEXT_LANGS
 from src.report.letters import LetterError
@@ -208,6 +209,43 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
     разошлось бы с оригиналом при первой же правке.
     """
     return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
+
+
+def move_card(
+    inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
+) -> bool:
+    """Перенести проверку по дате и пиццерии (D195). Отказ — `MoveError`.
+
+    Здесь только разбор даты из формы. Обязательность причины, запрет на
+    отклонённую и чужую пиццерию — правила переноса, они живут в
+    `src/db/move.py` и в самой базе.
+    """
+    try:
+        дата = date.fromisoformat((new_date or "").strip())
+    except ValueError:
+        raise MoveError("Дата не указана или указана не в формате ГГГГ-ММ-ДД") from None
+    return move.move_inspection(
+        inspection_id,
+        tenant=tenant,
+        new_date=дата,
+        new_unit_id=new_unit_id,
+        reason=reason,
+        actor=actor,
+    )
+
+
+def load_moves(inspection_id: str, *, tenant: str) -> tuple[move.MoveRecord, ...]:
+    """История переносов карточки, свежие первыми."""
+    return move.list_moves(inspection_id, tenant=tenant)
+
+
+def load_units(*, tenant: str) -> tuple[tuple[str, str], ...]:
+    """Пиццерии справочника для выбора при переносе: `(id, название)` по алфавиту."""
+    return tuple(
+        sorted(
+            ((ид, имя) for имя, ид in queries.unit_ids(tenant=tenant).items()), key=lambda x: x[1]
+        )
+    )
 
 
 def saved_letter(
