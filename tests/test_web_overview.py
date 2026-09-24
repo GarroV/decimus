@@ -489,6 +489,9 @@ class ЗаписнаяБаза:
     def unit_geography(self, **kw: object) -> dict[str, tuple[str, str]]:
         return {"Белград-1": ("RS", "Белград")}
 
+    def unit_ids(self, **kw: object) -> dict[str, str]:
+        return {"Белград-1": "11111111-2222-3333-4444-555555555555"}
+
     def units_total(self, **kw: object) -> int:
         return 1
 

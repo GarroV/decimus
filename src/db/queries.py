@@ -792,6 +792,26 @@ where u.tenant_code = %(tenant)s
 """
 
 
+_UNIT_IDS_SQL = """
+select u.name, u.id
+from units u
+where u.tenant_code = %(tenant)s
+"""
+
+
+def unit_ids(*, tenant: str) -> dict[str, str]:
+    """Идентификаторы точек справочника: `{название: id}`.
+
+    Нужны экранам, чтобы ссылаться на точку идентификатором, а не названием:
+    название правят и переводят, и ссылка, собранная из него, ломается молча
+    (CLAUDE.md, «сущности связывать кодами, никогда формулировками»).
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("идентификаторы точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNIT_IDS_SQL, {"tenant": tenant_code})
+        return {str(name): str(ид) for name, ид in cur.fetchall()}
+
+
 def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
     """География точек справочника: `{название: (код страны, город)}`.
 

@@ -282,8 +282,14 @@
           <span>{{ t('overview.points.zone') }}</span>
           <span class="ov-num">{{ t('overview.points.date') }}</span>
         </div>
+        {# Клик по строке открывает КАРТОЧКУ ТОЧКИ (прототип владельца): вопрос
+           «что с этой пиццерией» шире, чем «как прошёл последний обход».
+           Точки нет в справочнике — строка по-прежнему ведёт в отчёт, это
+           лучше мёртвой строки. #}
         {% for point in data.points %}
-          <a class="ov-table__row" href="{{ url(registry_path ~ '/' ~ point.inspection_id) }}">
+          {% set unit_id = unit_ids.get(point.unit) %}
+          <a class="ov-table__row"
+             href="{{ url('/units/' ~ unit_id) if unit_id else url(registry_path ~ '/' ~ point.inspection_id) }}">
             <span class="ov-cell__name">{{ point.unit }}</span>
             <span class="ov-cell__muted">{{ point.city or '—' }}</span>
             <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
