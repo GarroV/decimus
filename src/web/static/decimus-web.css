@@ -540,6 +540,19 @@ a.ov-table__row:hover { background: var(--surface-3); }
 }
 .topbar__spacer { flex: 1; min-width: .5rem; }
 
+/* Переход между разделами без белой вспышки. Каждый раздел — отдельная
+   страница с сервера, и без этого браузер на миг показывал пустой холст между
+   старой и новой. Шапка и столбец навигации названы отдельно: они одинаковы
+   на всех страницах и остаются на месте, плавно сменяется только содержимое.
+   Браузер, который правила не знает, просто переходит как раньше. */
+@view-transition { navigation: auto; }
+.topbar { view-transition-name: topbar; }
+.shell__nav { view-transition-name: sidenav; }
+::view-transition-group(root) { animation-duration: .12s; }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}
+
 /* Высота шапки нужна столбцу навигации: он прилипает сразу под ней. */
 :root { --topbar-h: 2.75rem; }
 
