@@ -415,21 +415,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "В историю этого тенанта ещё не слита ни одна завершённая проверка.",
         "en": "No completed inspection has been pushed into this tenant's history yet.",
     },
-    "registry.retracted_hidden.title": {
-        "ru": "Снятые проверки не видны",
-        "en": "Retracted inspections are not visible",
-    },
-    "registry.retracted_hidden.text": {
-        "ru": (
-            "Подключение администратора истории ({var}) не задано. Это не значит, что снятых "
-            "проверок нет, — это значит, что отсюда их не видно, и снять проверку тоже нельзя."
-        ),
-        "en": (
-            "The history administrator connection ({var}) is not configured. That does not mean "
-            "there are no retracted inspections — it means they are invisible here, and "
-            "retraction is unavailable too."
-        ),
-    },
     # «Завершена» и только. Слово «заморожена» стояло здесь за свойство, которое
     # в силе и никуда не уходит: записанная проверка не пересчитывается правкой
     # чек-листа задним числом. Но на карточке оно читается непонятным

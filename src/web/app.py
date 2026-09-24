@@ -502,7 +502,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             registry=registry_data,
             rows=строки,
             picks=tuple(чипы),
-            retraction_var=data.RETRACTION_URL_VAR,
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Буквы — шкалой, а не по частоте: полоса отбора не должна менять
@@ -740,7 +739,6 @@ def _render_card(
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
         may_retract=data.retraction_available(),
-        retraction_var=data.RETRACTION_URL_VAR,
         notice=notice,
         failure=failure,
     )
