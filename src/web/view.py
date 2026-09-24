@@ -71,6 +71,30 @@ class ZoneLine:
     loss: str
     left: str
     zeroed: bool
+    #: Насколько доля зоны сожжена, в процентах ШИРИНЫ ПОЛОСЫ. Это
+    #: ОФОРМЛЕНИЕ, а не число оценки: на экран по-прежнему печатаются
+    #: записанные `loss` и `share`, а это значение задаёт только длину
+    #: заливки. Считается здесь, а не в шаблоне, потому что шаблон не
+    #: считает ничего вовсе — иначе туда однажды переедет и арифметика
+    #: оценки.
+    fill: float = 0.0
+
+
+def _fill(loss: Any, share: Any) -> float:
+    """Какую часть доли зоны сожгли — в процентах ширины полосы.
+
+    Ноль на любом непонятном входе, а не отказ: полоса — оформление, и
+    сломанная ширина не повод не показать человеку записанные числа. Доля
+    зоны нулевой быть не может по построению методики, но пришедший ноль
+    здесь означает «нечем делить», а не «ничего не потеряно».
+    """
+    try:
+        потеря, доля = float(loss), float(share)
+    except (TypeError, ValueError):
+        return 0.0
+    if доля <= 0:
+        return 0.0
+    return round(min(потеря / доля, 1.0) * 100, 1)
 
 
 def zone_lines(by_zone: dict[str, Any], lang: str) -> tuple[ZoneLine, ...]:
@@ -91,6 +115,7 @@ def zone_lines(by_zone: dict[str, Any], lang: str) -> tuple[ZoneLine, ...]:
                 loss=_as_text(zone.get("loss")),
                 left=_as_text(zone.get("left")),
                 zeroed=bool(zone.get("zeroed", False)),
+                fill=_fill(zone.get("loss"), zone.get("share")),
             )
         )
     return tuple(lines)
