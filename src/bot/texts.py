@@ -65,6 +65,31 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Название пиццерии? Введите текстом.",
         "en": "Which pizzeria? Type the name.",
     },
+    # --- пиццерия из справочника (D196) ---
+    "start.unit_suggest": {
+        "ru": (
+            "Пиццерии «{typed}» нет в справочнике. Может быть, одна из этих? "
+            "Или введите название точнее."
+        ),
+        "en": (
+            "“{typed}” is not in the pizzeria directory. Is it one of these? "
+            "Or type the name more precisely."
+        ),
+    },
+    "start.unit_unknown": {
+        "ru": (
+            "Пиццерии «{typed}» нет в справочнике, и похожих тоже нет. Проверьте название. "
+            "Если пиццерия новая — её сначала заводит администратор."
+        ),
+        "en": (
+            "“{typed}” is not in the pizzeria directory, and nothing similar is. Check the name. "
+            "A new pizzeria has to be added by an administrator first."
+        ),
+    },
+    "start.unit_pick_gone": {
+        "ru": "Эти варианты уже неактуальны. Введите название пиццерии ещё раз.",
+        "en": "These options are out of date. Type the pizzeria name again.",
+    },
     "start.unit_empty": {
         "ru": "Название пиццерии пустое. Введите текстом, как оно должно стоять в отчёте.",
         "en": "The name is empty. Type it as it should appear in the report.",
