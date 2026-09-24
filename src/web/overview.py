@@ -108,6 +108,8 @@ class Selection:
     city: str = ""
     grade: str = ""
     period: str = "all"
+    #: Чем сортировать таблицу точек — код порядка, не подпись.
+    sort: str = "score"
 
     @property
     def narrowed(self) -> bool:
@@ -429,6 +431,28 @@ def _points(
     return tuple(точки)
 
 
+#: Порядки таблицы точек: код → как сортировать. Порядок объявлен здесь, а
+#: не в шаблоне, потому что подпись переводится, а правило сортировки нет.
+#: `score` первый и он же умолчание: экран отвечает на вопрос «куда смотреть»,
+#: и худшее должно стоять сверху, пока человек не попросил иначе.
+ПОРЯДКИ: dict[str, object] = {
+    "score": lambda т: (т.pct, т.unit),
+    "delta": lambda т: (т.delta if т.delta is not None else 0.0, т.unit),
+    "date": lambda т: (-т.when.toordinal(), т.unit),
+    "unit": lambda т: (т.unit.lower(), т.unit),
+}
+
+
+def sorted_points(points: tuple[PointRow, ...], sort: str) -> tuple[PointRow, ...]:
+    """Отсортировать точки выбранным порядком. Непонятный код — умолчание.
+
+    Отказ здесь был бы не к месту: код порядка приходит из адресной строки,
+    а опечатка в ней не повод показать страницу ошибки вместо сети.
+    """
+    ключ = ПОРЯДКИ.get(sort) or ПОРЯДКИ["score"]
+    return tuple(sorted(points, key=ключ))  # type: ignore[arg-type,call-overload]
+
+
 #: Ниже этой буквы точка попадает в проблемные сама по себе. Буквы — коды
 #: шкалы методики, порог здесь только для отбора на экран и оценку не трогает.
 СЛАБЫЕ_БУКВЫ = ("C", "D")
@@ -541,5 +565,5 @@ def load(
         countries=tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0]))),
         cities=tuple(sorted(города.items(), key=lambda п: (-п[1], п[0]))),
         breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
-        points=точки,
+        points=sorted_points(точки, selection.sort),
     )

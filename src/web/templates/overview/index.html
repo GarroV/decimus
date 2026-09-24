@@ -269,6 +269,7 @@
       <div class="ov-card__title">{{ t('overview.points.title') }}</div>
       <div class="ov-card__hint">{{ t('overview.points.hint') }}</div>
       <div class="ov-card__count">{{ data.points|length }}</div>
+      {{ pick(sort_pick) }}
     </div>
     {% if data.points %}
       <div class="ov-table ov-table--points">

@@ -237,6 +237,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             city=request.args.get("city", "").strip()[:80],
             grade=request.args.get("grade", "").strip().upper()[:1],
             period=request.args.get("period", "all").strip()[:8],
+            sort=request.args.get("sort", "score").strip()[:8],
         )
         snapshot = overview_data.load(
             tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection
@@ -255,13 +256,18 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 "city": selection.city,
                 "grade": selection.grade,
                 "period": selection.period,
+                "sort": selection.sort,
                 "lang": _lang(conf),
                 **изменения,
             }
+            # Умолчания из адреса ВЫПАДАЮТ: иначе «сбросить город» оставляет
+            # в ссылке `city=`, а `sort=score` висит в каждом адресе и срез
+            # выглядит настроенным, хотя он обычный.
+            умолчания = {"period": "all", "sort": "score"}
             живые = {
                 ключ: значение
                 for ключ, значение in параметры.items()
-                if значение and not (ключ == "period" and значение == "all")
+                if значение and умолчания.get(ключ) != значение
             }
             return url_for("overview", **живые)
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
@@ -361,11 +367,20 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 title=lambda код: t("overview.period." + код, язык),
             )
         )
+        порядок = _pick(
+            label=t("overview.sort", язык),
+            empty_title=t("overview.sort.score", язык),
+            current="" if selection.sort == "score" else selection.sort,
+            values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),
+            href=lambda значение: отбор(sort=значение or "score"),
+            title=lambda код: t("overview.sort." + код, язык),
+        )
         return render_template(
             "overview/index.html",
             data=snapshot,
             tiles=tiles,
             picks=tuple(чипы),
+            sort_pick=порядок,
             registry_path=registry_path,
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
