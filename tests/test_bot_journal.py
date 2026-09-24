@@ -112,7 +112,7 @@ def test_journal_failure_does_not_stop_the_inspection(
 
 
 def test_sweep_removes_only_copies_older_than_seven_days(tmp_path: Path) -> None:
-    """Копия старше недели убирается, свежая остаётся (D179: «кадры - 7 дней»)."""
+    """Копия старше недели убирается, свежая остаётся (срок владельца, D179)."""
     folder = tmp_path / f"chat_{CHAT_ID}"
     folder.mkdir()
     old = folder / frame_copies.copy_name("old")
