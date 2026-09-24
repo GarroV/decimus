@@ -56,6 +56,7 @@ from src.domain.engine import chat_dir
 from src.domain.errors import DomainError
 from src.domain.state import state_lock
 
+from . import journal
 from .errors import BotNotesError
 
 NOTES_FILE_NAME = "bot.json"
@@ -326,6 +327,9 @@ def reset(chat_id: int) -> None:
     """
     with _lock(chat_id):
         notes_path(chat_id).unlink(missing_ok=True)
+    # Журнал разбора — тоже спутник проверки (#367): прошлый закрывается и
+    # остаётся лежать с отметкой времени, новый начинается с чистого листа.
+    journal.close(chat_id)
 
 
 def remember_frames(chat_id: int, frames: Iterable[SeenFrame]) -> None:

@@ -29,7 +29,7 @@ from aiogram.types import CallbackQuery, Message
 from src import domain
 from src.domain.errors import DomainError
 
-from .. import refusal, sealed, view
+from .. import journal, refusal, sealed, view
 from ..inspection import read_inspection
 from ..keyboards import (
     EDIT_DROP,
@@ -99,12 +99,13 @@ def build_edit_router() -> Router:
             # поэтому запрет стоит здесь, а не только на входе в проверку.
             await sealed.refuse(message, lang)
             return
+        before = _finding(chat_id, n)
         try:
             await asyncio.to_thread(domain.edit_finding, chat_id, n, **fields)
         except DomainError as exc:
             # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
             # сюда чаще всего сменой зоны: пункт тот же, место уже занято.
-            before = _finding(chat_id, n)
+            journal.note(chat_id, "edit_refused", n=n, fields=fields, reason=str(exc))
             told = refusal.not_changed(
                 chat_id,
                 n,
@@ -120,6 +121,13 @@ def build_edit_router() -> Router:
         # Названная руками зона НЕ становится догадкой для следующего кадра
         # (T264, #218): память о прошлой записи снята как источник зоны целиком.
         # Правка говорит о ТОЙ записи и ни о чём больше.
+        journal.note(
+            chat_id,
+            "edited",
+            n=n,
+            fields=fields,
+            before=None if before is None else journal.finding(before),
+        )
         await show_changed(message, chat_id, n, lang)
 
     @router.message(Command("undo"))
@@ -140,6 +148,10 @@ def build_edit_router() -> Router:
         if sealed.is_sealed(chat_id):
             await sealed.refuse(message, lang)
             return
+        # Снимок ДО удаления (#367): удалённая запись уносит с собой и слова, и
+        # предложение системы, а «удалил и завёл другим пунктом» — самый ясный
+        # след промаха распознавания.
+        before = _finding(chat_id, n)
         try:
             await asyncio.to_thread(domain.drop_finding, chat_id, n)
         except DomainError:
@@ -150,6 +162,9 @@ def build_edit_router() -> Router:
             return
         # Источник записи чистить не надо: он лежит в самой записи (T108), и
         # `domain.drop_finding` уносит его вместе с ней.
+        journal.note(
+            chat_id, "dropped", n=n, before=None if before is None else journal.finding(before)
+        )
         await message.answer(t("edit.dropped", lang, n=n))
 
     @router.callback_query(F.data.startswith(EDIT_PREFIX))
