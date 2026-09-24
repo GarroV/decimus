@@ -37,18 +37,21 @@ from ..keyboards import (
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    UNIT_PICK_PREFIX,
     kind_keyboard,
     kind_title,
     lang_keyboard,
     new_inspection_keyboard,
     resume_keyboard,
     sealed_keyboard,
+    unit_pick_keyboard,
 )
 from ..lang import chat_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
+from ..unit_pick import match_unit
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +106,13 @@ async def _offer_resume(message: Message, inspection: domain.Inspection, lang: s
         ),
         reply_markup=sealed_keyboard(lang) if сдана else resume_keyboard(lang),
     )
+
+
+async def _unit_chosen(message: Message, state: FSMContext, lang: str, unit: str) -> None:
+    """Пиццерия определена — дальше вид проверки."""
+    await state.update_data(unit=unit, unit_suggestions=None)
+    await state.set_state(StartFlow.waiting_kind)
+    await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
 
 async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
@@ -283,9 +293,36 @@ def build_start_router(
             # а по байтам уже почти весь бюджет имени файла разом (T128).
             await message.answer(t("start.unit_too_long_bytes", lang))
             return
-        await state.update_data(unit=unit)
-        await state.set_state(StartFlow.waiting_kind)
-        await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
+        # Пиццерия — из справочника, а не из написанного (D196).
+        сверка = await asyncio.to_thread(match_unit, unit)
+        if сверка.checked and сверка.name is None:
+            await state.update_data(unit_suggestions=list(сверка.suggestions))
+            if сверка.suggestions:
+                await message.answer(
+                    t("start.unit_suggest", lang, typed=unit),
+                    reply_markup=unit_pick_keyboard(сверка.suggestions),
+                )
+            else:
+                await message.answer(t("start.unit_unknown", lang, typed=unit))
+            return
+        await _unit_chosen(message, state, lang, сверка.name or unit)
+
+    @router.callback_query(StateFilter(StartFlow.waiting_unit), F.data.startswith(UNIT_PICK_PREFIX))
+    async def on_unit_pick(callback: CallbackQuery, state: FSMContext) -> None:
+        """Аудитор выбрал пиццерию из подсказок справочника (D196)."""
+        await callback.answer()
+        message = callback.message
+        if not isinstance(message, Message):
+            return
+        lang = chat_ui_lang(message.chat.id)
+        варианты = (await state.get_data()).get("unit_suggestions") or []
+        номер = (callback.data or "").removeprefix(UNIT_PICK_PREFIX)
+        if not номер.isdigit() or int(номер) >= len(варианты):
+            # Кнопка из старого сообщения: вариантов, к которым она относилась,
+            # уже нет — угадывать по номеру нельзя.
+            await message.answer(t("start.unit_pick_gone", lang))
+            return
+        await _unit_chosen(message, state, lang, str(варианты[int(номер)]))
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, F.text.startswith("/"))
     async def on_unit_command(message: Message) -> None:
