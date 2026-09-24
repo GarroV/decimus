@@ -553,3 +553,60 @@ def test_шрифт_кешируется_на_неделю_без_отпечат
     # Assert
     assert ответ.status_code == 200
     assert f"max-age={FONT_MAX_AGE}" in ответ.headers["Cache-Control"]
+
+
+# --- сбой подключения администратора истории не роняет экран (#307) --------
+
+
+def _сломанный_админ(ответ: Any) -> Any:
+    """Чтение, которое падает под администратором и отвечает обычной ролью."""
+
+    def прочитать(*_a: Any, include_retracted: bool = False, **_k: Any) -> Any:
+        if include_retracted:
+            raise DbError("password authentication failed for user dodo_audit_admin")
+        return ответ
+
+    return прочитать
+
+
+def test_реестр_без_снятых_если_администратор_не_подключился(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange — 21.09.2026 неверный адрес этого подключения давал 503 на всём
+    # реестре при живой базе.
+    строка = шапка()
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "list_inspections", _сломанный_админ([строка]))
+
+    # Act
+    реестр = data.load_registry(tenant=ТЕНАНТ, limit=10)
+
+    # Assert
+    assert реестр.rows == (строка,)
+    assert реестр.retracted_visible is False
+
+
+def test_карточка_открывается_если_администратор_не_подключился(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    деталь = карточка(шапка())
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "get_inspection", _сломанный_админ(деталь))
+
+    # Act / Assert
+    assert data.load_card(деталь.inspection.id, tenant=ТЕНАНТ) is деталь
+
+
+def test_лежащая_база_по_прежнему_отказ(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange — откат на обычную роль не должен превращать «база лежит» в
+    # пустой реестр: обычное чтение падает следом и отказ доходит до экрана.
+    def лежит(*_a: Any, **_k: Any) -> Any:
+        raise DbError("connection refused")
+
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "list_inspections", лежит)
+
+    # Act / Assert
+    with pytest.raises(DbError):
+        data.load_registry(tenant=ТЕНАНТ, limit=10)
