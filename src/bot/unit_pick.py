@@ -32,7 +32,7 @@ SUGGESTIONS_LIMIT = 5
 #: Порог похожести `difflib`: ниже — вариант скорее путает, чем помогает.
 SIMILARITY_CUTOFF = 0.5
 
-_DASHES = re.compile(r"[‐-―−]")
+_DASHES = re.compile(r"[-‐-―−]")
 _SPACES = re.compile(r"\s+")
 
 #: Кириллица → латиница для ключа сравнения. Справочник сети загружен
@@ -81,10 +81,10 @@ def _key(name: str) -> str:
     """Ключ для сравнения: регистр, виды тире и пробелы не различаются.
 
     Строже, чем `normalize_unit_name`: там пробелы только схлопываются, и
-    «Тбилиси -1» с «Тбилиси-1» — разные ключи. Здесь пробелы убираются вовсе, а
+    «Тбилиси -1» с «Тбилиси-1» — разные ключи. Здесь пробелы и тире убираются вовсе, а
     кириллица читается латиницей: ключ служит поиску, а не хранению.
     """
-    return _SPACES.sub("", _DASHES.sub("-", name)).casefold().translate(_TRANSLIT)
+    return _SPACES.sub("", _DASHES.sub("", name)).casefold().translate(_TRANSLIT)
 
 
 @dataclass(frozen=True)
