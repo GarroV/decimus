@@ -13,8 +13,8 @@ Node не требуется вовсе — стиль приезжает гот
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 from flask import Flask, redirect, render_template, request, url_for
