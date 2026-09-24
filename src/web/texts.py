@@ -471,7 +471,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "deliberately so."
         ),
     },
-    # --- отклонение проверки (код остаётся retract, D194) ---------------------------------------------------
+    # --- отклонение проверки (код остаётся retract, D194) ------------------
     "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.hint": {
         "ru": (
