@@ -559,7 +559,11 @@ def cmd_add(a):
     if a.zone not in zc:
         sys.exit(f"Нет зоны {a.zone}. Доступны: {', '.join(sorted(zc))}")
     allowed = zone_codes(r, zones)
-    if a.zone not in allowed:
+    # Зону, которую назвал человек, движок принимает (D177: зона — там, где
+    # продукт). Отказ остаётся для зоны, выведенной машиной (T271): там он и
+    # ловил пункт про печь, уехавший в холодный цех.
+    unusual = a.zone not in allowed
+    if unusual and not a.zone_by_person:
         sys.exit(zone_refusal(qid, a.zone, allowed))
     st = load_state()
     check_pair_free(st, qid, a.zone)
@@ -570,6 +574,8 @@ def cmd_add(a):
     st["seq"] = n
     f = {"n": n, "qid": qid, "level": lvl, "zone": a.zone, "photos": split_photos(a.photo),
          "comment": a.comment or "", "evidence": a.evidence or ""}
+    if unusual:
+        f["zone_unusual"] = True
     st["findings"].append(f)
     save_state(st)
     ph = f"  [фото: {len(f['photos'])}]" if f["photos"] else ""
@@ -620,7 +626,11 @@ def cmd_edit(a):
     if zone not in zc:
         sys.exit(f"Нет зоны {zone}. Доступны: {', '.join(sorted(zc))}")
     allowed = zone_codes(r, zones)
-    if zone not in allowed:
+    unusual = zone not in allowed
+    # Зону оставили прежней, а она уже стояла нетипичной по слову человека —
+    # правка класса или текста не обязана её заново подтверждать (D177).
+    kept = a.zone is None and qid == f["qid"] and bool(f.get("zone_unusual"))
+    if unusual and not (a.zone_by_person or kept):
         sys.exit(zone_refusal(qid, zone, allowed))
     check_pair_free(st, qid, zone, skip_n=f["n"])
     f["qid"], f["level"], f["zone"] = qid, lvl, zone
@@ -628,10 +638,12 @@ def cmd_edit(a):
         f["evidence"] = a.evidence
     if a.comment is not None:
         f["comment"] = a.comment
-    # Запись прошла проверку зоны, значит пометка «зона нетипична» к ней больше
-    # не относится. Пометка осталась только у записей, сделанных ДО запрета:
-    # читать её продукт обязан (выгрузки прошлых лет), выставлять — уже нет.
-    f.pop("zone_unusual", None)
+    # Пометка «зона нетипична» — у зоны вне списка пункта, названной человеком
+    # (D177). Зона в списке пункта — пометки нет.
+    if unusual:
+        f["zone_unusual"] = True
+    else:
+        f.pop("zone_unusual", None)
     save_state(st)
     print(f"#{f['n']} {qid} {lvl} / {zone}: {r['question_ru'][:90]}")
 
@@ -907,6 +919,8 @@ def main():
     ad = s.add_parser("add")
     ad.add_argument("--qid", required=True); ad.add_argument("--level", required=True)
     ad.add_argument("--zone", required=True)
+    ad.add_argument("--zone-by-person", action="store_true",
+                    help="зону назвал человек: вне списка пункта принимается с пометкой (D177)")
     ad.add_argument("--photo", action="append",
                     help="путь к фото; можно указать несколько раз или через запятую")
     ad.add_argument("--comment"); ad.add_argument("--evidence")
@@ -915,6 +929,8 @@ def main():
     ed.add_argument("--n", type=int, required=True)
     ed.add_argument("--qid", "--code", dest="qid")
     ed.add_argument("--level"); ed.add_argument("--zone")
+    ed.add_argument("--zone-by-person", action="store_true",
+                    help="зону назвал человек: вне списка пункта принимается с пометкой (D177)")
     ed.add_argument("--evidence", "--text", dest="evidence")
     ed.add_argument("--comment")
     ed.set_defaults(fn=cmd_edit)

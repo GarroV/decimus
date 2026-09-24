@@ -47,8 +47,8 @@ from bot_harness import (
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.bot.view import stored_headline, zone_title
-from src.domain import Finding, get_item, get_state, start_inspection
+from src.bot.view import stored_headline
+from src.domain import Finding, get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
@@ -208,16 +208,14 @@ async def test_ответ_с_объектом_ищет_пункт_заново(
     )
 
 
-async def test_зона_не_из_списка_пункта_отклоняется_движком(
+async def test_зона_словами_вне_списка_пункта_принимается_с_пометкой(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Правка — самый частый способ увести запись туда, где пункта нет (T271, #239).
+    """Зону назвал человек словами — она и есть место находки (D177).
 
-    До задачи T271 движок такую пару принимал и лишь помечал флагом
-    `zone_unusual`, а в отчёт партнёру пометка не попадала — единственным
-    местом, где её было видно, оставался чат. Теперь движок пару «пункт + зона
-    вне методики» не принимает вовсе: запись остаётся в прежней зоне, а отказ
-    показан аудитору его же словами (T127), а не тихой пометкой.
+    С T271 по D177 такая правка кончалась отказом движка. Теперь зона
+    принимается, а запись помечается «зона нетипична»: вне списка пункта, но
+    названа аудитором, а не выведена машиной.
     """
     started()
     stub_classify(monkeypatch, suggestion())
@@ -228,16 +226,8 @@ async def test_зона_не_из_списка_пункта_отклоняетс
 
     await feed(dp, bot, text_message("это был гостевой зал", reply_to=bot_message(сказано)))
 
-    assert findings()[0].zone == "hot_kitchen", "движок принял пару, которой методика не даёт"
-    assert findings()[0].zone_unusual is False, "флаг нетипичности зоны больше не выставляется"
-    отказ = t(
-        "edit.failed",
-        "ru",
-        n=1,
-        item=get_item("CLN01").question("ru"),
-        zone=zone_title("dining", "ru", chat_id=CHAT_ID),
-    )
-    assert отказ in session.texts, "отказ движка не дошёл до аудитора"
+    assert findings()[0].zone == "dining", "зона, названная аудитором, не записалась"
+    assert findings()[0].zone_unusual is True, "зона вне списка пункта осталась без пометки"
 
 
 async def test_ответ_зоной_на_снятую_запись_не_заводит_новую(
