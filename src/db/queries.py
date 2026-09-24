@@ -805,6 +805,44 @@ where u.tenant_code = %(tenant)s
 """
 
 
+_PREVIOUS_CODES_SQL = """
+select f.code
+from findings f
+where f.inspection_id = (
+    select i.id
+    from inspections i
+    join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and u.name = %(unit)s
+      and i.retracted_at is null
+    order by i.inspection_date desc, i.pushed_at desc
+    limit 1
+)
+"""
+
+
+def previous_codes(*, tenant: str, unit: str) -> set[str]:
+    """Коды нарушений ПРЕДЫДУЩЕЙ проверки точки — основа подсказки о повторе.
+
+    Отдаётся ровно факт: какие пункты были записаны в последней проверке этой
+    точки. Вывод «значит это повтор» здесь не делается и сделан быть не может —
+    тот же код мог относиться к другому объекту, а исправленное и снова
+    сломавшееся отличается от неисправленного. Решение о цене принимает
+    аудитор (D191, конституция: «модель предлагает, фиксирует человек»).
+
+    Предыдущая — одна, последняя по дате обхода: правило говорит про
+    предыдущую проверку, а не «когда-нибудь за год». Снятые проверки в счёт не
+    идут: снятая проверка не является показанием о точке.
+
+    Пустое множество — прошлых проверок нет либо точка чужая. Это одно и то же
+    для подсказки: подсказывать нечем.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("коды предыдущей проверки") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_CODES_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        return {str(код) for (код,) in cur.fetchall()}
+
+
 def unit_ids(*, tenant: str) -> dict[str, str]:
     """Идентификаторы точек справочника: `{название: id}`.
 
