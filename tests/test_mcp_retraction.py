@@ -163,7 +163,7 @@ def test_чужая_дата_в_подтверждении_ничего_не_с�
             confirm_date="2001-01-01",
         )
 
-    assert "не снята" in str(отказ.value)
+    assert "не отклонена" in str(отказ.value)
     assert ТОЧКА in str(отказ.value), "отказ обязан сказать, чем эта проверка является"
     assert reads.get_inspection(tenant=АРЕНДАТОР, id=ident)["inspection"]["id"] == ident, (
         "проверка снята, хотя подтверждение не сошлось"
@@ -427,5 +427,5 @@ def test_повтор_с_пустой_причиной_говорит_про_с�
     with pytest.raises(ToolError) as отказ:
         _снять(ident, причина="")
 
-    assert "снята раньше" in str(отказ.value)
+    assert "отклонена раньше" in str(отказ.value)
     assert ПРИЧИНА in str(отказ.value), "записанная причина обязана быть названа"
