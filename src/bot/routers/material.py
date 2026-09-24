@@ -36,7 +36,7 @@ from collections.abc import Awaitable, Callable
 from aiogram import F, Router
 from aiogram.types import Message
 
-from .. import sealed, sidecar
+from .. import frame_copies, sealed, sidecar
 from ..albums import ALBUM_WINDOW_SECONDS, AlbumBuffer, Frame
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
@@ -124,6 +124,11 @@ def build_material_router(
                     group.message_ids, group.photo_file_ids, strict=False
                 )
             ],
+        )
+        frame_copies.received(
+            message.bot,
+            group.chat_id,
+            zip(group.message_ids, group.photo_file_ids, strict=False),
         )
         material = store.queue(group.chat_id).add_group(group)
         if material is not None:

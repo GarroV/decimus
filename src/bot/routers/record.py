@@ -72,7 +72,7 @@ from src.recognize.manual import ManualCandidate, manual_candidates, search_item
 from src.recognize.models import UNKNOWN_ZONE
 from src.recognize.transcribe import transcribe
 
-from .. import refusal, sealed, sidecar, view
+from .. import frame_copies, journal, refusal, sealed, sidecar, view
 from ..inspection import read_inspection
 from ..keyboards import (
     ANALYZE_PREFIX,
@@ -736,6 +736,25 @@ async def analyze(
         batch=batch,
         origin=origin,
     )
+    # Вход разбора целиком (#367): на этих словах и этой зоне система дальше
+    # принимает решение, и разбирающему случай нужно ровно это. Голос сюда
+    # приходит расшифровкой — аудио не хранится (D179).
+    journal.note(
+        chat_id,
+        "material",
+        slot=base.slot,
+        source=source,
+        note=note,
+        file_ids=list(file_ids),
+        copies=[frame_copies.copy_name(f) for f in file_ids],
+        zone_hint=base.zone_hint,
+        zone_source=base.zone_source,
+        zone_conflict=base.cues_zone,
+        correcting=correcting,
+        origin=origin,
+        batch=list(batch) if batch else None,
+        fast=fast,
+    )
     if resolved.conflict is not None:
         # Названная зона разошлась со словарём объектов («холодный цех,
         # пицца-печь»). Молча не пишется ни то, ни другое: обе стороны сразу
@@ -891,6 +910,13 @@ async def _analyze_resolved(
             lang=lang,
             chat_id=chat_id,
         )
+        journal.note(
+            chat_id,
+            "fast_path",
+            slot=base.slot,
+            code=None if found.item is None else found.item.code,
+            reason=found.reason,
+        )
         if found.item is not None:
             if await _try_fast(message, chat_id, base, pending, lang, found.item):
                 return
@@ -934,6 +960,7 @@ async def _analyze_resolved(
             classify, note, photo, base.zone_hint or None, lang=report_lang, chat_id=chat_id
         )
     except ModelUnavailable as exc:
+        journal.note(chat_id, "model_failed", slot=base.slot, kind="unavailable", error=str(exc))
         # Модель недоступна — проверка не встаёт: тот же перечень пунктов
         # показывается кнопками, выбирает человек (контракт `recognize`).
         # Сырой текст исключения — в журнал, а не в чат: в нём бывают пути на
@@ -943,10 +970,27 @@ async def _analyze_resolved(
         await _open_manual(message, chat_id, base, pending, lang)
         return
     except RecognizeError as exc:
+        journal.note(chat_id, "model_failed", slot=base.slot, kind="error", error=str(exc))
         logger.warning("разбор недоступен в чате %s: %s", chat_id, exc)
         await message.answer(t("record.unavailable", lang))
         return
 
+    # Что ушло в модель и что вернулось (#367). Без этой строки промах модели
+    # разбирается по скриншотам: предложения живут в памяти процесса, а
+    # запись, которую аудитор удалил, уносит с собой и их.
+    journal.note(
+        chat_id,
+        "model",
+        slot=base.slot,
+        shortlist=list(suggestion.shortlist),
+        used_photo=suggestion.used_photo,
+        photo_copy=frame_copies.copy_name(base.file_ids[0]) if photo is not None else None,
+        candidates=journal.candidates(suggestion.candidates),
+        question=suggestion.question,
+        needs_human=suggestion.needs_human,
+        degraded=suggestion.degraded,
+        usage=suggestion.usage,
+    )
     if not suggestion.candidates:
         if suggestion.question:
             await message.answer(t("record.question", lang, question=suggestion.question))
@@ -1054,6 +1098,15 @@ def _remember_words(chat_id: int, *, code: str, words: str) -> None:
     слова было бы неправдой о его работе.
     """
     learn(words, item_code=code, lang=chat_speech_lang(chat_id), chat_id=chat_id)
+
+
+def _via(*, auto: FastItem | None, learned: str, suggested: domain.Suggestion | None) -> str:
+    """Чем запись поставлена — для журнала разбора (#367)."""
+    if auto is not None:
+        return "fast_path"
+    if learned:
+        return "learned"
+    return "suggestion" if suggested is not None else "manual"
 
 
 async def _save(
@@ -1210,6 +1263,15 @@ async def _save(
         # Отказ, назвавший запись, — её показ: ответ словами на него правит её,
         # а не заводит новую из чужого ждущего кадра (T227).
         await tell_refusal(message, chat_id, told, lang)
+        journal.note(
+            chat_id,
+            "refused",
+            code=code,
+            level=level,
+            zone=zone,
+            correcting=correcting,
+            reason=str(exc),
+        )
         if correcting is None and told.clash is None:
             # Записи по этой формулировке не появилось, и пара не занята —
             # значит движок отверг саму пару «пункт + зона» (T271). Это ровно
@@ -1252,6 +1314,16 @@ async def _save(
     saved = read_inspection(chat_id)
     current = None if saved is None else saved.finding(finding.n)
     shown = current or finding
+    journal.note(
+        chat_id,
+        "corrected" if correcting is not None else "recorded",
+        via=_via(auto=auto, learned=learned, suggested=suggested),
+        finding=journal.finding(shown),
+        words=words,
+        zone_source=zone_source,
+        zone_from_item=zone_from_item,
+        origin=origin,
+    )
     if correcting is not None:
         # Правка ответом (T204): показ собран из тех же частей, но заголовком
         # говорит, что записи не прибавилось. Кнопки — те же, что были под
@@ -1775,6 +1847,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             return
         message, chat_id, lang = here
         proposal = pending.take_proposal(chat_id, at=message.message_id)
+        journal.note(chat_id, "skipped", slot=None if proposal is None else proposal.slot)
         if proposal is not None:
             # «Не записывать» — законный выбор аудитора, но не повод потерять
             # формулировку: в конце проверки у кадра будет названа причина, а
@@ -1840,6 +1913,7 @@ def make_frame_handler() -> FrameHandler:
         sidecar.remember_frames(
             chat_id, [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)]
         )
+        frame_copies.received(message.bot, chat_id, [(message.message_id, file_id)])
         try:
             await asyncio.to_thread(domain.attach_photo, chat_id, n, file_id)
         except DomainError:

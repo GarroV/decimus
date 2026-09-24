@@ -50,7 +50,7 @@ from src.domain.errors import DomainError
 from src.recognize.errors import RecognizeError
 from src.recognize.transcribe import transcribe
 
-from .. import sidecar, view
+from .. import frame_copies, sidecar, view
 from ..info import KIND_DATE, KIND_TEXT, KIND_YES_NO, fields_to_ask, parse_date
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -351,6 +351,7 @@ def build_info_router() -> Router:
             sidecar.remember_frames(
                 chat_id, [sidecar.SeenFrame(message_id=message.message_id, file_id=file_id)]
             )
+            frame_copies.received(message.bot, chat_id, [(message.message_id, file_id)])
             shots = await _photos(state)
             if file_id not in shots:
                 await state.update_data({PHOTOS_KEY: [*shots, file_id]})
