@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import base64
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -59,11 +60,11 @@ def _new_client(settings: RecognizeSettings) -> OpenAI:
     return OpenAI(api_key=settings.api_key, timeout=settings.timeout)
 
 
-def _content(question: str, photo: bytes | None) -> ResponseInputMessageContentListParam:
+def _content(question: str, photos: Sequence[bytes]) -> ResponseInputMessageContentListParam:
     content: ResponseInputMessageContentListParam = [
         ResponseInputTextParam(type="input_text", text=question)
     ]
-    if photo is not None:
+    for photo in photos:
         encoded = base64.b64encode(photo).decode("ascii")
         content.append(
             ResponseInputImageParam(
@@ -83,8 +84,12 @@ def ask_model(
     photo: bytes | None,
     settings: RecognizeSettings,
     model: str | None = None,
+    photos: Sequence[bytes] = (),
 ) -> ModelAnswer:
     """Спросить модель со строгой схемой ответа. Кадр уходит тем же запросом.
+
+    `photos` — кадры пачки с комментарием (D180): уходят все, тем же запросом и
+    в порядке съёмки. `photo` — одиночный кадр, как было; вместе их не передают.
 
     `model` перекрывает имя из настроек — это нужно замеру точности (T035),
     который гоняет один и тот же запрос по нескольким моделям. В работе бота
@@ -100,7 +105,7 @@ def ask_model(
     text_config: ResponseTextConfigParam = {"format": text_format}
     message: EasyInputMessageParam = {
         "role": "user",
-        "content": _content(question, photo),
+        "content": _content(question, (photo,) if photo is not None else tuple(photos)),
     }
     try:
         response = client.responses.create(

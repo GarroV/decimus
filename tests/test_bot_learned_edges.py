@@ -237,9 +237,11 @@ async def test_многозонный_синоним_спрашивает_зон
     await feed(dp, bot, photo_message("frame-1", caption=НЕПРЯМЫЕ_СЛОВА, message_id=601))
 
     assert session.last_text == t("record.ask_zone_for_item", "ru", code=МНОГОЗОННЫЙ)
-    assert session.keyboard_data() == [
+    своих = [
         f"{ZONE_FOR_ITEM_PREFIX}{zone}" for zone in allowed_zones(МНОГОЗОННЫЙ, chat_id=CHAT_ID)
-    ], "кнопками предложены не только допустимые методикой зоны"
+    ]
+    # Все зоны, зоны пункта — первыми (D177): место находки выбирает человек.
+    assert session.keyboard_data()[: len(своих)] == своих, "зоны пункта не стоят первыми"
     assert звонки == [], "модель позвана раньше, чем аудитор назвал зону"
 
     await feed(dp, bot, callback_query(f"{ZONE_FOR_ITEM_PREFIX}hot_kitchen"))

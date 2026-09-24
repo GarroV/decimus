@@ -34,7 +34,7 @@ from src.bot import view
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.domain import Finding, add_finding, get_item, get_state, start_inspection
+from src.domain import Finding, add_finding, get_state, start_inspection
 
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
@@ -56,43 +56,40 @@ def начать_с_записью() -> None:
 
 
 @pytest.mark.asyncio
-async def test_правка_зоны_в_чужую_отклоняется_движком(domain_env: Path) -> None:
-    """Главный случай задачи: движок отказывает паре, которой методика не даёт.
+async def test_зона_выбранная_кнопкой_принимается_с_пометкой(domain_env: Path) -> None:
+    """D177: зона — там, где продукт. Выбранную человеком зону движок принимает.
 
-    До T271 этот же диалог заканчивался словом «Поправлено» и молчаливым
-    флагом. Теперь запись остаётся в прежней зоне, а отказ назван вслух.
+    До D177 (с T271) тот же диалог кончался отказом «сбой на моей стороне», и
+    сгущёнку, найденную в горячем цехе, туда записать было нельзя. Теперь запись
+    переезжает, а пометка «зона нетипична» показывает, что зона вне списка пункта.
     """
     начать_с_записью()
-    bot, session = make_bot()
-
-    await feed(build_dispatcher(SETTINGS), bot, callback(f"ez:1:{ЧУЖАЯ_ЗОНА}"))
-
-    отказ = t(
-        "edit.failed",
-        "ru",
-        n=1,
-        item=get_item(ПУНКТ).question("ru"),
-        zone=view.zone_title(ЧУЖАЯ_ЗОНА, "ru", chat_id=CHAT_ID),
-    )
-    assert session.last_text == отказ, "отказ движка не дошёл до аудитора его словами"
-
-
-@pytest.mark.asyncio
-async def test_запись_остаётся_в_прежней_зоне_и_без_пометки(domain_env: Path) -> None:
-    """Отказ движка не портит запись и не помечает её задним числом."""
-    начать_с_записью()
-    bot, session = make_bot()
+    bot, _ = make_bot()
 
     await feed(build_dispatcher(SETTINGS), bot, callback(f"ez:1:{ЧУЖАЯ_ЗОНА}"))
 
     состояние = get_state(CHAT_ID)
     assert состояние is not None
     finding = состояние.finding(1)
-    assert finding is not None and finding.zone == СВОЯ_ЗОНА, (
-        "движок принял пару, которой методика не даёт"
-    )
-    assert finding.zone_unusual is False, "флаг нетипичности зоны больше не выставляется"
-    assert ПОМЕТКА not in session.last_text
+    assert finding is not None and finding.zone == ЧУЖАЯ_ЗОНА, "выбранная зона не записалась"
+    assert finding.zone_unusual is True, "зона вне списка пункта осталась без пометки"
+
+
+@pytest.mark.asyncio
+async def test_возврат_в_зону_пункта_снимает_пометку(domain_env: Path) -> None:
+    """Пометка — свойство зоны вне списка, а не записи навсегда."""
+    начать_с_записью()
+    bot, _ = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, callback(f"ez:1:{ЧУЖАЯ_ЗОНА}"))
+    await feed(dp, bot, callback(f"ez:1:{СВОЯ_ЗОНА}"))
+
+    состояние = get_state(CHAT_ID)
+    assert состояние is not None
+    finding = состояние.finding(1)
+    assert finding is not None and finding.zone == СВОЯ_ЗОНА
+    assert finding.zone_unusual is False
 
 
 @pytest.mark.asyncio

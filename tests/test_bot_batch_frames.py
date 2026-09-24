@@ -239,24 +239,60 @@ async def test_неадресованное_нажатие_в_пачке_отв�
     assert session.last_text == t("record.stale", "ru")
 
 
-async def test_кадры_с_комментарием_остаются_одной_записью(
+async def test_кадры_с_комментарием_разбираются_вместе_и_остаются_одной_записью(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Второй случай разводки: сказанное человеком слово — одно нарушение.
+    """Пачка с подписью уходит в модель со всеми кадрами (D180), запись — одна.
 
-    Спека требует этого прямо (`docs/06-mvp-bot.md`, шаг 3): несколько кадров
-    одного объекта — одно нарушение с несколькими фото. Задача T206 этот случай
-    не отменяет, а отделяет от пачки без слов.
+    Сказанное человеком слово — по-прежнему одно нарушение с несколькими фото
+    (`docs/06-mvp-bot.md`, шаг 3). Изменилось другое: до D180 кадры с подписью в
+    модель не шли вовсе (D081), и подпись «овощи и сыр» разбиралась без семи
+    кадров со щупами в мясе. Теперь модель видит все кадры — один вызов на
+    пачку, а не по вызову на кадр.
     """
     started()
-    asked = stub_by_call(monkeypatch, BY_FRAME)
-    bot, _ = make_bot()
+    calls: list[tuple[str, int]] = []
+
+    def fake(note: str, photo: object = None, zone_hint: object = None, **kw: Any) -> Suggestion:
+        calls.append((note, len(kw.get("photos") or ())))
+        return BY_FRAME[0]
+
+    monkeypatch.setattr("src.bot.routers.record.classify", fake)
+    bot, session = make_bot()
     dp = dispatcher()
 
     await send_album(dp, bot, "b1", "b2", "b3", caption="печь грязная")
+    await feed(dp, bot, callback(f"{PICK_PREFIX}0", message_id=session.sent_ids[-1]))
 
-    assert asked == [], "прокомментированные кадры уехали в модель (D081)"
+    assert calls == [("печь грязная", 3)], "пачка с подписью ушла в модель не всеми кадрами"
     assert [(f.code, f.photos) for f in findings()] == [("CLN05", ["b1", "b2", "b3"])]
+
+
+async def test_увиденное_на_кадрах_только_предлагается(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Увиденное сверх слов показывается отдельным сообщением и само не пишется (D180)."""
+    started()
+    ответ = Suggestion(
+        candidates=(candidate("CLN05", "D1", "hot_kitchen", "по словам"),),
+        needs_human=False,
+        also_seen=(candidate("CLN06", "D1", "hot_kitchen", "видно на кадре"),),
+    )
+
+    def fake(note: str, photo: object = None, zone_hint: object = None, **kw: Any) -> Suggestion:
+        return ответ
+
+    monkeypatch.setattr("src.bot.routers.record.classify", fake)
+    bot, session = make_bot()
+    dp = dispatcher()
+
+    await send_album(dp, bot, "c1", "c2", caption="печь грязная")
+
+    assert findings() == [], "увиденное на кадрах записалось без нажатия"
+    header = t("record.also_seen", "ru", lines="").strip()
+    assert any(header in text for text in session.texts), "увиденное на кадрах не предложено"
+    await feed(dp, bot, callback(f"{PICK_PREFIX}0", message_id=session.sent_ids[-1]))
+    assert [f.code for f in findings()] == ["CLN06"], "кнопка под увиденным не записала его"
 
 
 async def test_второе_нажатие_под_тем_же_кадром_ничего_не_дописывает(
