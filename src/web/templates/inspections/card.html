@@ -174,12 +174,5 @@
         </form>
       </div></div>
     </div>
-  {% elif not may_retract %}
-    <div class="note note--warn">
-      <div>
-        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
-        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
-      </div>
-    </div>
   {% endif %}
 {% endblock %}

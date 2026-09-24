@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 from src.db import letters as letters_store
 from src.db import queries, retract
-from src.db.config import DATABASE_RETRACTION_URL_VAR, load_retraction_settings
+from src.db.config import load_retraction_settings
 from src.db.errors import DbError
 from src.db.models import InspectionDetail, InspectionRow
 from src.domain.models import TEXT_LANGS
@@ -181,12 +181,6 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
     разошлось бы с оригиналом при первой же правке.
     """
     return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
-
-
-#: Имя переменной подключения администратора истории — для текста на странице.
-#: Пересказывать её строкой в шаблоне нельзя: переименуют в `db`, а здесь
-#: останется старое имя, и человек пойдёт заводить несуществующую переменную.
-RETRACTION_URL_VAR = DATABASE_RETRACTION_URL_VAR
 
 
 def saved_letter(

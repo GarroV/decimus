@@ -38,14 +38,11 @@
     </span>
   </div>
 
-  {% if not registry.retracted_visible %}
-    <div class="note note--warn mt-gap">
-      <div>
-        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
-        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
-      </div>
-    </div>
-  {% endif %}
+  {#
+    Плашки «снятые проверки не видны» здесь больше нет (D193): роль
+    администратора истории на площадке не заведена (#305), значит снять
+    проверку не мог никто и снятых нет. Предупреждение о невозможном — шум.
+  #}
 
   {% if rows %}
     <section class="ov-card ov-card--wide">
