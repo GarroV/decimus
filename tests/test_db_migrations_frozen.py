@@ -119,6 +119,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0024_finding_repeat.sql": (
         "sql1:fd334753344578aabe9d4a114f8dfce5081d389f8c9c1bf98a603f91b58e498c"
     ),
+    "0025_inspection_moves.sql": (
+        "sql1:64b75c8660b7aaab2ceb60c2675cfc32dad983e350ead2330b9e414002de82a4"
+    ),
 }
 
 
