@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from functools import partial
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -92,7 +93,15 @@ def build_edit_router() -> Router:
         chat_id = message.chat.id
         return message, chat_id, chat_ui_lang(chat_id)
 
-    async def apply(message: Message, chat_id: int, n: int, lang: str, **fields: str) -> None:
+    async def apply(
+        message: Message,
+        chat_id: int,
+        n: int,
+        lang: str,
+        *,
+        zone_by_person: bool = False,
+        **fields: str,
+    ) -> None:
         if sealed.is_sealed(chat_id):
             # Правка записанного — тоже правка отчёта, а он уже у получателя
             # (T201, D080). Кнопки под записями остаются в переписке навсегда,
@@ -101,7 +110,12 @@ def build_edit_router() -> Router:
             return
         before = _finding(chat_id, n)
         try:
-            await asyncio.to_thread(domain.edit_finding, chat_id, n, **fields)
+            await asyncio.to_thread(
+                partial(domain.edit_finding, zone_by_person=zone_by_person),
+                chat_id,
+                n,
+                **fields,
+            )
         except DomainError as exc:
             # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
             # сюда чаще всего сменой зоны: пункт тот же, место уже занято.
@@ -216,7 +230,8 @@ def build_edit_router() -> Router:
         raw, _, zone = (callback.data or "").removeprefix(EDIT_ZONE_PREFIX).partition(":")
         if not raw.isdigit() or not zone:
             return
-        await apply(message, chat_id, int(raw), lang, zone=zone)
+        # Зону выбрал человек кнопкой — движок примет её и вне списка пункта (D177).
+        await apply(message, chat_id, int(raw), lang, zone=zone, zone_by_person=True)
 
     @router.callback_query(F.data.startswith(EDIT_LEVEL_PREFIX))
     async def on_level(callback: CallbackQuery) -> None:

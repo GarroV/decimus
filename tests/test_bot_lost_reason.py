@@ -40,6 +40,7 @@ from src.bot.texts import t
 from src.domain import add_finding, read_uncovered, start_inspection
 from src.domain.config import check_environment
 from src.domain.engine import chat_dir
+from src.domain.errors import EngineError
 from src.recognize.manual import manual_candidates
 
 pytestmark = pytest.mark.asyncio
@@ -177,14 +178,20 @@ async def выбран_вручную(dp: Any, bot: Any, zone: str, code: str, l
 async def test_отказ_движка_заводит_строку_накопителя(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Методика не держит пункт в этой зоне (T271) — это и есть пробел, который копят.
+    """Движок отказал — это и есть пробел, который копят.
 
     Записи не появилось, а формулировка была: управляющая компания обязана
     увидеть её в разборе, иначе аудитор упирается в один и тот же отказ на
-    каждом выезде, и об этом не знает никто.
+    каждом выезде, и об этом не знает никто. Отказ вызывается подменой движка:
+    зону, выбранную человеком, движок с D177 принимает и вне списка пункта.
     """
     начата()
     stub_classify(monkeypatch, suggestion())
+
+    def отказ(*args: Any, **kwargs: Any) -> None:
+        raise EngineError("движок отказал", code=1, command="add")
+
+    monkeypatch.setattr("src.bot.routers.record.domain.add_finding", отказ)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 

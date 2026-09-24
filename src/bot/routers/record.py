@@ -333,20 +333,15 @@ async def _ask_zone(
 ) -> None:
     """Зону взять неоткуда — назвать её кнопкой (D047: обычно она из слов).
 
-    `item_code` назван — кнопками идут **только зоны, допустимые методикой для
-    этого пункта** (T266). Спрашивать тем, чего движок не примет, нельзя: с
-    T271 пара «пункт + зона» вне методики отвергается, и кнопка кончалась бы
-    отказом на ровном месте — аудитор жмёт, а запись не проходит.
-
-    Пункт не назван — спрашиваем всеми зонами: сузить перечень нечем, а
-    показать неполный значило бы отнять верный ответ.
+    Кнопками идут **все зоны**, а зоны, которые методика даёт пункту, — первыми
+    (D177: зона — там, где продукт). До D177 здесь стояли только зоны пункта, и
+    сгущёнку, найденную в горячем цехе, записать в горячий цех было нельзя.
+    Зону, выбранную кнопкой, движок принимает и вне списка пункта — с пометкой
+    «зона нетипична».
     """
     разрешённые = allowed_zones(item_code, chat_id=chat_id)
-    zones = [
-        (zone.code, zone.title(lang))
-        for zone in domain.list_zones(chat_id=chat_id)
-        if zone.code in разрешённые
-    ]
+    все = [(zone.code, zone.title(lang)) for zone in domain.list_zones(chat_id=chat_id)]
+    zones = [z for z in все if z[0] in разрешённые] + [z for z in все if z[0] not in разрешённые]
     текст = (
         t("record.ask_zone", lang)
         if item_code is None
@@ -570,7 +565,7 @@ async def _try_learned(
             item_code=code,
         )
         return True
-    if zone not in allowed_zones(code, chat_id=chat_id):
+    if zone not in allowed_zones(code, chat_id=chat_id) and not base.zone_spoken:
         logger.info(
             "синоним поднял пункт %s, а зона «%s» ему методикой не дана — разбор идёт дальше",
             code,
@@ -1293,6 +1288,7 @@ async def _save(
                 level=level,
                 zone=zone,
                 text=text,
+                zone_by_person=zone_spoken,
             )
         else:
             finding = await asyncio.to_thread(
@@ -1305,6 +1301,7 @@ async def _save(
                 source=source,
                 words=words,
                 suggested=suggested,
+                zone_by_person=zone_spoken,
             )
     except DomainError as exc:
         # Отказ движка разбирается, а не пересказывается (T127): пункт и зона
@@ -1571,8 +1568,13 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         # отсутствие: записать такую пару с T271 нельзя вовсе, движок её
         # отвергает. Спросить до фиксации лучше, чем отказать после: аудитор на
         # точке видит кнопки допустимых зон, а не сообщение о неудаче.
-        чужая = not неизвестна and candidate.zone not in allowed_zones(
-            candidate.code, chat_id=chat_id
+        # Зону вне списка назвал сам аудитор — это не чужая зона, а место
+        # находки (D177): спрашивать её второй раз незачем.
+        сказанная = proposal.zone_spoken and candidate.zone == proposal.zone_hint
+        чужая = (
+            not неизвестна
+            and not сказанная
+            and candidate.zone not in allowed_zones(candidate.code, chat_id=chat_id)
         )
         if неизвестна or чужая:
             await _ask_zone(
