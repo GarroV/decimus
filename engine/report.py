@@ -43,10 +43,12 @@ T = {
         "recorded": "Зафиксировано",
         "method": "Методика расчёта", "zeroed": "обнулена критическим нарушением D3",
         "not_counted": "учтено в обнулении зоны", "page": "стр.",
+        "repeat": "повтор — вычет удвоен",
         "method_text": ("Старт — 100%. Каждое нарушение D1 снижает результат на {d1} п.п., "
                         "каждое D2 — на {d2} п.п. Нарушение D3 полностью сжигает долю той зоны, "
                         "в которой оно зафиксировано. Вопросы, по которым нарушений не зафиксировано, "
-                        "считаются выполненными. Буква: A — от 95% без D2 и D3; B — от 90% без D3 "
+                        "считаются выполненными. Нарушение, повторяющее запись предыдущей проверки, "
+                        "стоит вдвое дороже. Буква: A — от 95% без D2 и D3; B — от 90% без D3 "
                         "и не более одного D2; C — два и более D2 либо результат ниже 90%; "
                         "D — хотя бы одно нарушение D3."),
         "photo_app": "Фотоприложение",
@@ -69,9 +71,11 @@ T = {
         "recorded": "Recorded",
         "method": "Scoring method", "zeroed": "zeroed by a critical D3 violation",
         "not_counted": "covered by the zone reset", "page": "p.",
+        "repeat": "repeat — deduction doubled",
         "method_text": ("Starting score is 100%. Each D1 violation deducts {d1} pp, each D2 "
                         "deducts {d2} pp. A D3 violation burns the entire share of the zone where "
-                        "it was recorded. Questions with no violation recorded are treated as met. "
+                        "it was recorded. A violation repeating a record of the previous audit costs "
+                        "twice as much. Questions with no violation recorded are treated as met. "
                         "Grade: A — 95% or above with no D2 and no D3; B — 90% or above with no D3 "
                         "and at most one D2; C — two or more D2, or a result below 90%; "
                         "D — at least one D3 violation."),
@@ -407,6 +411,12 @@ def build_html(res, lang, photos, src=None):
         h.append(f'<div class="zh">{esc(zname)}{esc(suffix)}</div>')
         for f in sorted(lst, key=lambda x: (order.get(x["level"], 9), x["n"])):
             nc = "" if f["counted"] or f["level"] == "D3" else f' · {t["not_counted"]}'
+            # Повтор назван у самой записи, а не только в разделе методики:
+            # партнёр сверяет цену по строке, и вычет, выросший вдвое без
+            # объяснения рядом, читается как ошибка расчёта (#359). У записи,
+            # не попавшей в цену, пометка молчит — удваивать там нечего.
+            if f.get("repeat") and f["counted"] and f["level"] != "D3":
+                nc += f' · {t["repeat"]}'
             h.append('<div class="f">')
             h.append(f'<div class="h"><span class="badge {f["level"]}">{f["level"]}</span> '
                      f'{esc(item_title(f, qk))}</div>')
