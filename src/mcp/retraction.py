@@ -280,7 +280,7 @@ def retract_inspection(
         "inspection_date": строка.inspection_date.isoformat(),
         "pct": строка.pct,
         "grade": строка.grade,
-        "retracted_at": отклонена,
+        "retracted_at": снята,
         "reason": причина,
         "photos_purged": убрано,
         "status": (
