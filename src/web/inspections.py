@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 
 from src.db import letters as letters_store
@@ -30,6 +31,8 @@ from src.domain.models import TEXT_LANGS
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,9 +67,30 @@ def retraction_available() -> bool:
 
 def load_registry(*, tenant: str, limit: int) -> Registry:
     """Проверки тенанта, свежие по дате обхода — первыми."""
-    visible = retraction_available()
-    rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=visible)
-    return Registry(rows=tuple(rows), retracted_visible=visible)
+    if retraction_available():
+        try:
+            rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=True)
+            return Registry(rows=tuple(rows), retracted_visible=True)
+        except DbError as exc:
+            _log_admin_read_failed("реестр", exc)
+    rows = queries.list_inspections(tenant=tenant, limit=limit)
+    return Registry(rows=tuple(rows), retracted_visible=False)
+
+
+def _log_admin_read_failed(where: str, exc: DbError) -> None:
+    """Сбой подключения администратора истории — в лог, а экран живёт дальше.
+
+    Настройка необязательная, и ронять из-за неё главный экран нельзя (#307):
+    21.09.2026 неверный адрес этого подключения давал 503 «База недоступна» на
+    всём реестре при живой базе, а в логе не было ни строки. Экран читается
+    обычной ролью — без снятых, — а причина уходит сюда, чтобы её было где
+    найти. Если лежит сама база, обычное чтение упадёт следом и честно даст 503.
+    """
+    logger.warning(
+        "%s: чтение под администратором истории не удалось, показано без снятых: %s",
+        where,
+        exc,
+    )
 
 
 def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
@@ -76,9 +100,12 @@ def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
     когда снятые не видны: «такой проверки нет» и «вам её не видно» снаружи
     неразличимы намеренно (`queries.get_inspection`).
     """
-    return queries.get_inspection(
-        inspection_id, tenant=tenant, include_retracted=retraction_available()
-    )
+    if retraction_available():
+        try:
+            return queries.get_inspection(inspection_id, tenant=tenant, include_retracted=True)
+        except DbError as exc:
+            _log_admin_read_failed("карточка проверки", exc)
+    return queries.get_inspection(inspection_id, tenant=tenant)
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
