@@ -624,3 +624,43 @@ a.ov-table__row:hover { background: var(--surface-3); }
    не должна читаться наравне с запечатанными. */
 .ins-row.is-frozen { opacity: .62; }
 .ov-dot--ok { background: var(--ok); }
+
+/* ═══ КАРТОЧКА ПРОВЕРКИ ══════════════════════════════════════════════════
+   Зоны — полосами, записи — списком (D190). Числа рядом с полосой остаются
+   записанными: полоса показывает, ГДЕ выжжено, число — СКОЛЬКО. */
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+.zone-row:last-child { border-bottom: 0; }
+.zone-row__name { flex: 1; min-width: 9rem; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.zone-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-1); }
+.zone-row__left { color: var(--ink-3); min-width: 3rem; }
+/* Обнулённая зона — её доля сгорела целиком, и строка обязана отличаться от
+   просто дорогой: это разные вещи для разговора с партнёром. */
+.zone-row.is-zeroed .zone-row__name { color: var(--err); }
+
+.find-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+}
+.find-row:last-child { border-bottom: 0; }
+.find-row__level { flex: none; }
+.find-row__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  min-width: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.find-row__main { flex: 1; min-width: 12rem; }
+.find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
+.find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }

@@ -359,6 +359,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.zones.col.share": {"ru": "Доля", "en": "Share"},
     "card.zones.col.loss": {"ru": "Потеряно", "en": "Lost"},
     "card.zones.col.left": {"ru": "Осталось", "en": "Left"},
+    "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},
     "card.findings.col.n": {"ru": "№", "en": "No."},
