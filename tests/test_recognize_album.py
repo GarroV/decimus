@@ -61,14 +61,37 @@ def test_пачка_с_комментарием_уходит_модели_все
     assert итог.used_photo is True
 
 
-def test_один_кадр_с_комментарием_по_прежнему_по_словам(
+def test_один_кадр_с_комментарием_тоже_уходит_модели(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Граница D180: одиночный кадр с подписью разбирается без картинки (D081)."""
+    """D181: одиночный кадр с подписью модель видит, а время отправки уходит в запрос."""
     recorder = _Recorder({"records": [_record("CLN05:D1", "по словам")], "question": ""})
     monkeypatch.setattr("src.recognize.classify.ask_model", recorder)
 
-    итог = classify("печь грязная", b"x", "hot_kitchen", chat_id=NO_CHAT, photos=(b"1",))
+    classify(
+        "печь грязная",
+        None,
+        "hot_kitchen",
+        chat_id=NO_CHAT,
+        photos=(b"1",),
+        sent_at="2026-09-25 10:32",
+    )
+
+    call = recorder.calls[0]
+    assert tuple(call["photos"]) == (b"1",), "одиночный кадр с подписью не ушёл модели"
+    assert "2026-09-25 10:32 UTC" in call["question"], "время отправки не попало в запрос"
+    assert "не опровергай" in call["question"], (
+        "модели не сказано, что слова аудитора не проверяются"
+    )
+
+
+def test_без_кадров_комментарий_разбирается_по_словам(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorder = _Recorder({"records": [_record("CLN05:D1", "по словам")], "question": ""})
+    monkeypatch.setattr("src.recognize.classify.ask_model", recorder)
+
+    итог = classify("печь грязная", None, "hot_kitchen", chat_id=NO_CHAT)
 
     call = recorder.calls[0]
     assert call["photo"] is None and tuple(call["photos"]) == ()
