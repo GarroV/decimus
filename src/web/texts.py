@@ -1057,6 +1057,30 @@ TEXTS: dict[str, dict[str, str]] = {
             "only when published."
         ),
     },
+    "methodology.rates.title": {"ru": "Ставки вычетов", "en": "Deduction rates"},
+    "methodology.rates.hint": {
+        "ru": (
+            "Ставка — цена нарушения. Пустое поле означает «не трогать»: ноль здесь "
+            "настоящая ставка, и спутать их нельзя. Пороги букв и режим D3 живут в том "
+            "же файле, но отсюда не правятся — они заданы списком правил с порядком "
+            "проверки, и поле на порог соврало бы про их устройство."
+        ),
+        "en": (
+            "A rate is the price of a violation. An empty field means «leave as is»: "
+            "zero here is a real rate, and the two must not be confused. Grade "
+            "thresholds and the D3 mode live in the same file but are not edited here — "
+            "they are a list of ordered rules, and a field per threshold would "
+            "misrepresent them."
+        ),
+    },
+    "methodology.rates.start": {"ru": "Начальный процент", "en": "Starting percentage"},
+    "methodology.rates.d1": {"ru": "Ставка D1", "en": "D1 rate"},
+    "methodology.rates.d2": {"ru": "Ставка D2", "en": "D2 rate"},
+    "methodology.rates.repeat": {
+        "ru": "Повтор дороже во столько раз",
+        "en": "Repeat costs this many times more",
+    },
+    "methodology.rates.submit": {"ru": "Записать ставки", "en": "Save rates"},
     "methodology.zones.col.actions": {"ru": "Что можно", "en": "Actions"},
     "methodology.zones.shares.title": {"ru": "Доли зон", "en": "Zone shares"},
     "methodology.zones.shares.submit": {"ru": "Записать доли", "en": "Save shares"},

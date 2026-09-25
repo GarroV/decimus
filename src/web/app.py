@@ -930,6 +930,26 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         )
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
+    @app.post(f"{путь}/scoring")
+    def methodology_scoring() -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.set_scoring(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                start_pct=form.get("start_pct"),
+                d1=form.get("d1"),
+                d2=form.get("d2"),
+                repeat_multiplier=form.get("repeat_multiplier"),
+                note=form.get("note"),
+                version_name=form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
     @app.post(f"{путь}/publish")
     def methodology_publish() -> str:
         refuse_foreign_origin()

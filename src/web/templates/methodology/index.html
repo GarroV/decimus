@@ -298,6 +298,39 @@
   {% endif %}
 
   {% if composition.is_latest %}
+    <div class="section mt-gap">
+      <div class="section__head">
+        <h2 class="section__title">{{ t('methodology.rates.title') }}</h2>
+      </div>
+      <p class="section__lead">{{ t('methodology.rates.hint') }}</p>
+      <form class="form-grid mt-gap" method="post" action="/admin/scoring?lang={{ lang }}">
+        {# Поля заполнены нынешними ставками, чтобы человек правил видя, что есть,
+           а не вслепую. Очищенное поле означает «не трогать» — так устроена дверь. #}
+        <label class="field-label" for="rate-start">{{ t('methodology.rates.start') }}</label>
+        <input class="input input--num" id="rate-start" name="start_pct" type="text"
+               inputmode="decimal" value="{{ composition.rates.get('start_pct') or '' }}">
+
+        <label class="field-label" for="rate-d1">{{ t('methodology.rates.d1') }}</label>
+        <input class="input input--num" id="rate-d1" name="d1" type="text" inputmode="decimal"
+               value="{{ composition.rates.get('penalty', {}).get('D1') or '' }}">
+
+        <label class="field-label" for="rate-d2">{{ t('methodology.rates.d2') }}</label>
+        <input class="input input--num" id="rate-d2" name="d2" type="text" inputmode="decimal"
+               value="{{ composition.rates.get('penalty', {}).get('D2') or '' }}">
+
+        <label class="field-label" for="rate-repeat">{{ t('methodology.rates.repeat') }}</label>
+        <input class="input input--num" id="rate-repeat" name="repeat_multiplier" type="text"
+               inputmode="decimal" value="{{ composition.rates.get('repeat_multiplier') or '' }}">
+
+        <label class="field-label" for="rate-note">{{ t('methodology.zones.note') }}</label>
+        <input class="input" id="rate-note" name="note" type="text">
+
+        <button class="btn btn--primary" type="submit">{{ t('methodology.rates.submit') }}</button>
+      </form>
+    </div>
+  {% endif %}
+
+  {% if composition.is_latest %}
   <div class="section mt-gap">
     <div class="section__head">
       <h2 class="section__title">{{ t('methodology.zones.add.title') }}</h2>

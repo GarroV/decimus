@@ -71,3 +71,20 @@ def test_правка_долей_не_публикует(хранилище: Sto
     assert method.published_version(хранилище) == действующая_до
     assert method.latest_version(хранилище) == правка.version
     assert правка.version != действующая_до
+
+def test_ставка_не_число_это_отказ_а_не_тихий_ноль(хранилище: Store) -> None:
+    """Ставка — цена нарушения: ноль вместо непонятного ввода обесценил бы класс."""
+    with pytest.raises(MethodologyRefused) as отказ:
+        method.set_scoring(хранилище, tenant=ТЕНАНТ, author=АВТОР, d1="подороже")
+
+    assert "не число" in str(отказ.value)
+
+
+def test_пустая_правка_ставок_не_заводит_версию(хранилище: Store) -> None:
+    """Версия, ничем не отличающаяся от предыдущей, — мусор в истории методики."""
+    было = method.latest_version(хранилище)
+
+    with pytest.raises(MethodologyRefused):
+        method.set_scoring(хранилище, tenant=ТЕНАНТ, author=АВТОР)
+
+    assert method.latest_version(хранилище) == было
