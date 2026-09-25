@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 import sys
 from pathlib import Path
-from typing import Any
 
 from dotenv import load_dotenv
 
@@ -33,8 +32,9 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 from waitress import serve  # noqa: E402 -- окружение читается до импорта конфигурации
 
 from .app import create_app  # noqa: E402
-from .config import WEB_SECRET_KEY_VAR, Settings, load_settings  # noqa: E402
+from .config import WEB_SECRET_KEY_VAR, load_settings  # noqa: E402
 from .errors import WebError  # noqa: E402
+from .proxy import _proxy_options  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -80,43 +80,6 @@ def main() -> int:
         **_proxy_options(settings),
     )
     return 0
-
-
-def _proxy_options(settings: Settings) -> dict[str, Any]:
-    """Что сказать `waitress` про звенья перед нами.
-
-    Без этого настройка `WEB_TRUSTED_PROXIES` не работала ВОВСЕ, хотя и
-    читалась: `waitress` по умолчанию (`clear_untrusted_proxy_headers`) режет
-    заголовки `X-Forwarded-*` на входе, потому что доверенного звена ему никто
-    не назвал. До приложения они не доезжали, и следствий было два, оба тихих.
-    Заслон происхождения считал запрос пришедшим по HTTP (`origin.over_https`),
-    сравнивал со схемой `https` в `Origin` и отвечал 403 на КАЖДУЮ отправку
-    формы — за туннелем нельзя было ни войти, ни выйти, ни снять проверку.
-    Счётчик неудачных входов (`remote.client_address`) видел один адрес на всех
-    пришедших снаружи, то есть запирал вход всем сразу.
-
-    Доверие называется адресом звена, а не «включено»: `trusted_proxy` — это
-    петля, потому что сервер принимает только её (`config._parse_host`), и
-    добраться до него может лишь тот, кто уже на машине. Набор заголовков
-    перечислен явно: всё, что не названо, `waitress` вырежет — а именно этого
-    мы и хотим от постороннего, который решит представиться сам.
-    """
-    опции: dict[str, Any] = {}
-    # Префикс уходит в `SCRIPT_NAME`, и от этого зависят ВСЕ ссылки страницы:
-    # `url_for` собирает их вместе с ним. Без этого админка под общим входом
-    # площадки открывалась бы по своему пути, а первая же кнопка уводила бы
-    # человека в корень — то есть в чужой продукт, который там стоит.
-    if settings.url_prefix:
-        опции["url_prefix"] = settings.url_prefix
-    if settings.trusted_proxies > 0:
-        опции["trusted_proxy"] = settings.host
-        опции["trusted_proxy_count"] = settings.trusted_proxies
-        опции["trusted_proxy_headers"] = {
-            "x-forwarded-for",
-            "x-forwarded-proto",
-            "x-forwarded-host",
-        }
-    return опции
 
 
 if __name__ == "__main__":
