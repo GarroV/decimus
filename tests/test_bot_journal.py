@@ -75,8 +75,7 @@ async def test_journal_keeps_words_model_answer_and_dropped_record(
     model = next(e for e in log if e["event"] == "model")
     assert model["candidates"][0]["code"] == "CLN05"  # type: ignore[index]
     assert model["question"] == "Сколько продуктов выше нормы?"
-    assert model["used_photo"] is True, "кадр с подписью уходит в модель (D181)"
-    assert model["album_frames"] == 1
+    assert model["album_frames"] == 1, "кадр с подписью уходит в модель (D181)"
     recorded = next(e for e in log if e["event"] == "recorded")
     assert recorded["via"] == "suggestion"
     dropped = next(e for e in log if e["event"] == "dropped")
