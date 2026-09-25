@@ -1049,3 +1049,6 @@ a.ov-table__row:hover { background: var(--surface-3); }
   .mx-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
   .mx-row__levels, .mx-row__days { display: none; }
 }
+/* Шапка раздела над полосой версии — без нижнего отступа дизайн-системы:
+   между ними ничего нет, и 48px читались пустым местом, где что-то пропало. */
+.page--wide > .section { margin-bottom: 0; }
