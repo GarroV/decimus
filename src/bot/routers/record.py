@@ -65,7 +65,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from src import domain
 from src.domain.errors import DomainError
-from src.recognize.classify import album_mode, classify, needs_photo
+from src.recognize.classify import album_mode, classify, framed, needs_photo
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
 from src.recognize.manual import ManualCandidate, manual_candidates, search_items
@@ -953,15 +953,16 @@ async def _analyze_resolved(
                 return
 
     bot = message.bot
+    # Кадры с комментарием — хоть один — модель смотрит вместе со словами
+    # (D180, D181). Не скачавшийся кадр не останавливает разбор — уходят те, что есть.
+    with_frames = base.correcting is None and framed(note, len(base.file_ids))
     photo = (
         await fetch_bytes(bot, base.file_ids[0])
-        if not album and needs_photo(note) and bot is not None and base.file_ids
+        if not with_frames and needs_photo(note) and bot is not None and base.file_ids
         else None
     )
-    # Пачка с комментарием (D180): модель смотрит все кадры вместе со словами.
-    # Не скачавшийся кадр не останавливает разбор — уходят те, что есть.
     photos: tuple[bytes, ...] = ()
-    if album and bot is not None:
+    if with_frames and bot is not None:
         fetched = await asyncio.gather(*(fetch_bytes(bot, f) for f in base.file_ids))
         photos = tuple(raw for raw in fetched if raw is not None)
 
@@ -979,6 +980,7 @@ async def _analyze_resolved(
             lang=report_lang,
             chat_id=chat_id,
             photos=photos,
+            sent_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
         )
     except ModelUnavailable as exc:
         journal.note(chat_id, "model_failed", slot=base.slot, kind="unavailable", error=str(exc))
