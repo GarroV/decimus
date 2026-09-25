@@ -270,3 +270,54 @@ def test_оба_языка_интерфейса(клиент: FlaskClient) -> No
 
     assert "Versions" in английская
     assert "Версии" in русская
+
+
+# --- зоны: правятся с экрана, и только на последней версии (T348) ----------------
+
+
+def test_экран_даёт_править_зоны(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    страница = клиент.get("/admin").get_data(as_text=True)
+
+    assert 'action="/admin/zones?' in страница, "формы заведения зоны на экране нет"
+    assert 'action="/admin/zones/shares?' in страница, "формы долей на экране нет"
+    assert "/rename?" in страница and "/remove?" in страница
+
+
+def test_на_старой_версии_зоны_не_правятся(клиент: FlaskClient) -> None:
+    """Старая версия читается, но не правится — то же правило, что у пунктов.
+
+    Правка старой версии либо промах, либо откат; неотличимыми их делать нельзя.
+    """
+    войти(клиент)
+    состояние = method.load_store()
+    assert состояние.store is not None
+    исходная = method.published_version(состояние.store)
+    method.add_zone(
+        состояние.store, tenant=ТЕНАНТ, author=АВТОР, code="terrace", name_ru="Терраса",
+        equal_shares=True,
+    )
+
+    страница = клиент.get(f"/admin?version={исходная}").get_data(as_text=True)
+
+    assert 'action="/admin/zones?' not in страница
+    assert 'action="/admin/zones/shares?' not in страница
+
+
+def test_несошедшиеся_доли_возвращают_отказ_на_экран(клиент: FlaskClient) -> None:
+    """Отказ движка обязан доехать до человека словами, а не тихим успехом."""
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/zones/shares",
+        data={"share_fridge": "10", "share_hall": "10"},
+        headers={"Origin": "http://localhost"},
+    )
+
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    # Сторожим БЛОК отказа, а не слово «100»: сотня есть на этой странице всегда
+    # (доли действующих зон), и проверка на неё была зелёной даже с выброшенным
+    # отказом — проверено внесением порчи 25.09.
+    assert 'class="note note--error' in страница, "отказ не доехал до экрана"
