@@ -312,6 +312,8 @@ def test_перечень_инструментов_отдаётся_целико
         # порядок обхода точки (T317) — чтение и правка тем же правом
         "route",
         "set_route",
+        "scoring",
+        "set_scoring",
         "publish_checklist_version",
         # карта слов — правка версиями (T144)
         "photo_cues",
