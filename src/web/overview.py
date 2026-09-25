@@ -496,6 +496,23 @@ def _problems(points: tuple[PointRow, ...]) -> tuple[PointRow, ...]:
     return tuple(отобранные[:TOP])
 
 
+def _units_in(geo: dict[str, tuple[str, str]], *, selection: Selection) -> int | None:
+    """Точек справочника в выбранном месте; `None` — место не выбрано, считать всю сеть.
+
+    Буква здесь не участвует: она свойство проверки, а не точки. Без этого
+    «Обзор» с Грузией показывал «точек 151, не проверено 147» при четырёх
+    грузинских точках, проверенных все (#380).
+    """
+    if not selection.country and not selection.city:
+        return None
+    return sum(
+        1
+        for country, city in geo.values()
+        if (not selection.country or country == selection.country)
+        and (not selection.city or city == selection.city)
+    )
+
+
 def _geo_choices(
     geo: dict[str, tuple[str, str]], *, selection: Selection
 ) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]]:
@@ -567,7 +584,8 @@ def load(
     )
     всего = sum(строка[3] for строка in losses) or 1.0
     страны, города = _geo_choices(geo, selection=selection)
-    всего_точек = queries.units_total(tenant=tenant)
+    в_месте = _units_in(geo, selection=selection)
+    всего_точек = queries.units_total(tenant=tenant) if в_месте is None else в_месте
     return Overview(
         units_total=всего_точек,
         unit_ids=ид_точек,
