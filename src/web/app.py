@@ -266,7 +266,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             # в ссылке `city=`, а `sort=score` висит в каждом адресе и срез
             # выглядит настроенным, хотя он обычный.
             умолчания = {"period": "all", "sort": "score"}
-            живые = {
+            живые: dict[str, Any] = {
                 ключ: значение
                 for ключ, значение in параметры.items()
                 if значение and умолчания.get(ключ) != значение
@@ -461,7 +461,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         def отбор(**изменения: str) -> str:
             параметры = {"grade": буква, "kind": вид, "lang": _lang(conf), **изменения}
-            живые = {ключ: значение for ключ, значение in параметры.items() if значение}
+            живые: dict[str, Any] = {
+                ключ: значение for ключ, значение in параметры.items() if значение
+            }
             return url_for("registry", **живые)
 
         язык = _lang(conf)

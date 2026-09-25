@@ -460,7 +460,7 @@ def sorted_points(points: tuple[PointRow, ...], sort: str) -> tuple[PointRow, ..
     а опечатка в ней не повод показать страницу ошибки вместо сети.
     """
     ключ = ПОРЯДКИ.get(sort) or ПОРЯДКИ["score"]
-    return tuple(sorted(points, key=ключ))  # type: ignore[arg-type,call-overload]
+    return tuple(sorted(points, key=ключ))  # type: ignore[call-overload]
 
 
 #: Ниже этой буквы точка попадает в проблемные сама по себе. Буквы — коды
