@@ -1398,6 +1398,25 @@ def _render_methodology(
             ]
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
+    # Разница действующей и свежей записанной — по запросу: чтение каждого
+    # пункта целиком дорого, а полоса версии и так говорит, что она есть.
+    разница: tuple[mview.Change, ...] | None = None
+    if request.args.get("diff") == "1" and состав.unpublished:
+        try:
+            разница = mview.diff_items(
+                method.full_items(склад, tenant=conf.tenant, version=состав.current),
+                method.full_items(склад, tenant=conf.tenant, version=состав.latest),
+            ) + mview.diff_zones(
+                method.zones_of_version(склад, tenant=conf.tenant, version=состав.current),
+                method.zones_of_version(склад, tenant=conf.tenant, version=состав.latest),
+            )
+        except MethodologyRefused as отказ:
+            failure = failure or str(отказ)
+    сводка = (
+        data.load_item_usage(tenant=conf.tenant, code=выбран, checklist=код or "")
+        if карточка is not None and выбран
+        else None
+    )
     раньше, позже = mview.neighbours(видимые, выбран or "")
     return render_template(
         "methodology/index.html",
@@ -1420,6 +1439,8 @@ def _render_methodology(
         is_off=mview.is_off,
         selected=выбран,
         card=карточка,
+        usage=сводка,
+        changes=разница,
         adding=новый,
         prev_href=адрес(item=раньше) if раньше else None,
         next_href=адрес(item=позже) if позже else None,

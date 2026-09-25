@@ -164,6 +164,36 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
     )
 
 
+def full_items(store: Store, *, tenant: str, version: str) -> tuple[dict[str, str], ...]:
+    """Пункты версии ВМЕСТЕ с критериями — для разницы перед публикацией.
+
+    Состав (`load_composition`) критериев не несёт: они лежат отдельным файлом.
+    Разница без них назвала бы правку критериев «изменений нет» — поэтому
+    здесь каждый пункт читается целиком. Дорого на каждом открытии экрана,
+    поэтому зовётся только по запросу разницы.
+    """
+    try:
+        listing = door.checklist_items(tenant=tenant, store=store, version=version)
+        return tuple(
+            dict(
+                door.checklist_item(
+                    tenant=tenant, store=store, code=str(item.get("id", "")), version=version
+                )["item"]
+            )
+            for item in listing["items"]
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def zones_of_version(store: Store, *, tenant: str, version: str) -> tuple[Mapping[str, str], ...]:
+    """Зоны и доли версии — как лежат в файле."""
+    try:
+        return tuple(door.checklist_items(tenant=tenant, store=store, version=version)["zones"])
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def needs_set_name(composition: Composition) -> bool:
     """Нужно ли спросить у человека имя набора перед правкой.
 

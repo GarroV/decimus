@@ -27,7 +27,7 @@ from src.db import letters as letters_store
 from src.db import move, queries, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
-from src.db.models import InspectionDetail, InspectionRow
+from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.domain.models import TEXT_LANGS
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
@@ -222,6 +222,19 @@ def load_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
     except DbError as exc:
         logger.warning("география точек недоступна, отбор по месту не показан: %s", exc)
         return {}
+
+
+def load_item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage | None:
+    """Как часто пункт нарушают — для панели «Методики» (D197). `None` — база молчит.
+
+    Сводка — подсказка к правке, а не часть методики: без неё пункт правится
+    так же, поэтому отказ базы не роняет экран, а называется на нём строкой.
+    """
+    try:
+        return queries.item_usage(tenant=tenant, code=code, checklist=checklist)
+    except DbError as exc:
+        logger.warning("сводка пункта %s недоступна: %s", code, exc)
+        return None
 
 
 def move_card(

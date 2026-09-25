@@ -64,3 +64,43 @@ def test_соседи_в_порядке_видимого_списка() -> None:
 
 def test_незнакомая_группировка_это_умолчание() -> None:
     assert mv.parse_filter({"group": "evil"}).group == "process"
+
+
+def test_разница_называет_новый_выключенный_изменённый_и_убранный() -> None:
+    # Arrange
+    было = (
+        {"id": "A1", "question_ru": "Пол", "days": "5"},
+        {"id": "A2", "question_ru": "Стены"},
+        {"id": "A3", "question_ru": "Печь"},
+    )
+    стало = (
+        {"id": "A1", "question_ru": "Пол сухой", "days": "5"},
+        {"id": "A2", "question_ru": "Стены", "kind": "off"},
+        {"id": "B1", "question_ru": "Касса"},
+    )
+
+    # Act
+    разница = {(c.code, c.kind): c.fields for c in mv.diff_items(было, стало)}
+
+    # Assert
+    assert разница == {
+        ("A1", "changed"): (("question_ru", "Пол", "Пол сухой"),),
+        ("A2", "disabled"): (),
+        ("B1", "added"): (),
+        ("A3", "removed"): (),
+    }
+
+
+def test_одинаковые_версии_разницы_не_дают() -> None:
+    assert mv.diff_items(ПУНКТЫ, ПУНКТЫ) == ()
+    assert (
+        mv.diff_zones([{"code": "hall", "share_pct": "10"}], [{"code": "hall", "share_pct": "10"}])
+        == ()
+    )
+
+
+def test_разница_зон_видит_долю() -> None:
+    [c] = mv.diff_zones(
+        [{"code": "hall", "share_pct": "10"}], [{"code": "hall", "share_pct": "12"}]
+    )
+    assert (c.code, c.kind, c.fields) == ("hall", "zone", (("share_pct", "10", "12"),))

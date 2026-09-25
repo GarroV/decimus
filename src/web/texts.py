@@ -1100,6 +1100,45 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
     "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
     "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.diff.open": {"ru": "Что изменится", "en": "What will change"},
+    "methodology.diff.title": {
+        "ru": "Что изменится при публикации",
+        "en": "What publishing changes",
+    },
+    "methodology.diff.lead": {
+        "ru": "Действует {current}, записана {latest}. Ниже — всё, чем они различаются.",
+        "en": "{current} is in force, {latest} is recorded. Below is everything that differs.",
+    },
+    "methodology.diff.none": {
+        "ru": (
+            "Пункты и зоны не различаются: версии отличаются только служебно — "
+            "именем набора или датой издания."
+        ),
+        "en": (
+            "Items and zones are the same: the versions differ only "
+            "in the set name or edition date."
+        ),
+    },
+    "methodology.diff.kind.added": {"ru": "новый", "en": "new"},
+    "methodology.diff.kind.removed": {"ru": "убран", "en": "removed"},
+    "methodology.diff.kind.disabled": {"ru": "выключен", "en": "disabled"},
+    "methodology.diff.kind.restored": {"ru": "возвращён", "en": "restored"},
+    "methodology.diff.kind.changed": {"ru": "изменён", "en": "changed"},
+    "methodology.diff.kind.zone": {"ru": "зона", "en": "zone"},
+    "methodology.usage.title": {"ru": "Как часто нарушают", "en": "How often it is breached"},
+    "methodology.usage.summary": {
+        "ru": "Записей: {records} · точек: {units} · проверок: {inspections}",
+        "en": "Records: {records} · units: {units} · inspections: {inspections}",
+    },
+    "methodology.usage.last": {"ru": "последний раз {day}", "en": "last on {day}"},
+    "methodology.usage.never": {
+        "ru": "В сданных проверках этого чек-листа ни разу не нарушен.",
+        "en": "Never breached in the finalised inspections of this checklist.",
+    },
+    "methodology.usage.unknown": {
+        "ru": "Сводка недоступна: база проверок не отвечает. Правке пункта это не мешает.",
+        "en": "No summary: the inspections database does not answer. Editing is not affected.",
+    },
     "methodology.prop.save": {"ru": "Записать версию", "en": "Record a version"},
     "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
     "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
@@ -1202,10 +1241,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
     "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
     "methodology.field.levels.hint": {
-        "ru": "Какими классами пункт вообще бывает. D0 — информационная запись: "
-        "на оценку не влияет.",
-        "en": "The levels this item can be recorded at. D0 is an information record: "
-        "it does not affect the score.",
+        "ru": (
+            "Какими классами пункт вообще бывает. D0 — информационная запись: на оценку не влияет."
+        ),
+        "en": (
+            "The levels this item can be recorded at. "
+            "D0 is an information record: it does not affect the score."
+        ),
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
