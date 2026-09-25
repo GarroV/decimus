@@ -91,6 +91,10 @@ from src.mcp.rpc import handle
     # у правки не увидеть (T317).
     "route": {},
     "set_route": {"zones": ["dough", "fridge"], "version_name": "imf"},
+    # Ставки: годная правка — одна названная цифра; пустой вызов дверь отвергает
+    # сама, и успешного ответа у неё батарея не увидела бы (T348).
+    "scoring": {},
+    "set_scoring": {"d1": 0.75, "version_name": "imf"},
     "publish_checklist_version": {"version": None},
     "photo_cues": {},
     "add_photo_cue": {
@@ -187,6 +191,10 @@ from src.mcp.rpc import handle
     "rename_zone": {"code": "терраса", "name_ru": "Терраса"},
     "route": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "set_route": {"zones": ["terrace"]},
+    "scoring": {"version": ЗАГЛУШКА_ВЕРСИИ},
+    # Ни одной названной ставки — отказ двери, а не версия, ничем не
+    # отличающаяся от предыдущей.
+    "set_scoring": {},
     "photo_cues": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "add_photo_cue": {"section": "Чистата", "phrase": "Пятно", "codes": ["CLN01"]},
     "edit_photo_cue": {"phrase": "Стена в потёках", "codes": ["ZZZ99"]},
