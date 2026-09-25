@@ -56,11 +56,6 @@ ITEM_KINDS = door.ITEM_KINDS
 #: него одно.
 MAX_NOTE = door.MAX_NOTE
 
-#: Колонки, которые экран показывает отдельными столбцами. Всё остальное, что
-#: управляющая компания завела в файле сама (T109), видно в карточке пункта
-#: строка за строкой: прятать чужие колонки экран не вправе.
-ITEM_COLUMNS = ("id", "kind", "process_ru", "question_ru", "levels", "zones", "days")
-
 
 @dataclass(frozen=True)
 class StoreState:

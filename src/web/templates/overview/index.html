@@ -23,7 +23,7 @@
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('overview.kicker', tenant=tenant) }}</div>
       <h1 class="ov-head__title">
-        {{ selection.city or selection.country or t('overview.scope.all') }}
+        {{ city_title(selection.city) or country_title(selection.country) or t('overview.scope.all') }}
       </h1>
       <div class="ov-head__sub">
         {{ t('overview.scope.sub',
@@ -100,8 +100,8 @@
             <span class="ov-num">{{ t('overview.breakdown.critical') }}</span>
           </div>
           {% for row in data.breakdown %}
-            <a class="ov-table__row" href="{{ select_url(city=row.city) }}">
-              <span class="ov-cell__name">{{ row.city or t('overview.breakdown.nocity') }}</span>
+            <a class="ov-table__row" href="{{ registry_url(city=row.city) }}">
+              <span class="ov-cell__name">{{ city_title(row.city) or t('overview.breakdown.nocity') }}</span>
               <span class="ov-num">{{ row.units }}</span>
               <span class="ov-num ov-num--strong"
                     {% if not row.comparable %}title="{{ t('overview.breakdown.incomparable') }}"{% endif %}>
@@ -291,7 +291,7 @@
           <a class="ov-table__row"
              href="{{ url('/units/' ~ unit_id) if unit_id else url(registry_path ~ '/' ~ point.inspection_id) }}">
             <span class="ov-cell__name">{{ point.unit }}</span>
-            <span class="ov-cell__muted">{{ point.city or '—' }}</span>
+            <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
             <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
             <span class="ov-num ov-num--strong">{{ '%.1f'|format(point.pct) }}</span>
             {# Движение показывается только против СРАВНИМОЙ проверки: иначе

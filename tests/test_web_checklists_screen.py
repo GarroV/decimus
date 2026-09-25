@@ -170,3 +170,45 @@ def test_состав_открывается_у_выбранного_чекли�
     # Методика прода — оснастка с двумя пунктами; заведённый с нуля пуст.
     assert "CLN01" in прод
     assert "CLN01" not in свой
+
+
+def _действие(страница: str, путь: str) -> str:
+    """Адрес формы на странице — таким, каким его отправит браузер."""
+    import html
+    import re
+
+    найдено = re.search(rf'action="({re.escape(путь)}[^"]*)"', страница)
+    assert найдено, f"формы {путь} на странице нет"
+    return html.unescape(найдено.group(1))
+
+
+def test_пункт_заводится_в_показанный_чеклист_а_не_в_прод(клиент: FlaskClient) -> None:
+    """#382: до 25.09.2026 формы теряли `?checklist=`, и правка открытого
+    чернового чек-листа молча уходила в чек-лист прода."""
+    # Arrange
+    войти(клиент)
+    клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd", "name_ru": "Аудит РНД", "name_en": "RnD audit"},
+        headers={"Origin": СВОЙ},
+    )
+    форма = клиент.get("/admin?checklist=rnd&new=1").get_data(as_text=True)
+
+    # Act — отправить форму заведения туда, куда её отправит браузер.
+    ответ = клиент.post(
+        _действие(форма, "/admin/items?"),
+        data={
+            "code": "RND01",
+            "process": "Кухня",
+            "question_ru": "Пол сухой",
+            "levels": ["D1"],
+            "criteria": "Нет луж и следов воды на полу.",
+            "version_name": "rnd",
+        },
+        headers={"Origin": СВОЙ},
+    )
+
+    # Assert
+    assert ответ.status_code == 200
+    assert "RND01" in клиент.get("/admin?checklist=rnd").get_data(as_text=True)
+    assert "RND01" not in клиент.get("/admin").get_data(as_text=True), "пункт ушёл в прод"
