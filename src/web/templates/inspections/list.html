@@ -58,7 +58,7 @@
             <span class="ins-row__meta">
               {{ row.inspection_date }} ·
               {{ kind_title(row.kind, lang) }} ·
-              {% if row.city %}{{ row.city }} · {% endif %}
+              {% if row.city %}{{ city_title(row.city) }} · {% endif %}
               {{ row.auditor or '—' }} ·
               {{ t('registry.col.findings') }}: {{ row.findings_count }} ·
               {{ t('registry.checklist', version=row.checklist_version) }}

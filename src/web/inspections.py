@@ -211,6 +211,19 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
     return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
 
 
+def load_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+    """География точек `{название: (страна, город)}` — для отбора реестра.
+
+    Отказ базы здесь — не повод не показать реестр: без географии отбор по
+    стране и городу просто не предлагается, а список проверок остаётся.
+    """
+    try:
+        return queries.unit_geography(tenant=tenant)
+    except DbError as exc:
+        logger.warning("география точек недоступна, отбор по месту не показан: %s", exc)
+        return {}
+
+
 def move_card(
     inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
 ) -> bool:
