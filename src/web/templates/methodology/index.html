@@ -143,54 +143,83 @@
       <summary class="edit__summary">{{ t('methodology.add.title') }}</summary>
       <p class="field-note">{{ t('methodology.add.hint') }}</p>
       <form class="form-grid" method="post" action="/admin/items?lang={{ lang }}">
-        <label class="field-label" for="add-code">{{ t('methodology.field.code') }}</label>
-        <input class="input" id="add-code" name="code" type="text" autocapitalize="characters" spellcheck="false">
-        <p class="field-note">{{ t('methodology.field.code.hint') }}</p>
+        {# Пара ru/en стоит рядом, а не одна под другой: бриф просит править
+           формулировки сразу на двух языках, и разница видна только рядом.
+           Ширина поля следует из того, что в него пишут — код и срок короткие,
+           формулировка и критерии идут во всю ширину формы. #}
+        <div class="field field--narrow">
+          <label class="field-label" for="add-code">{{ t('methodology.field.code') }}</label>
+          <input class="input" id="add-code" name="code" type="text" autocapitalize="characters" spellcheck="false">
+          <p class="field-note">{{ t('methodology.field.code.hint') }}</p>
+        </div>
 
-        <label class="field-label" for="add-process">{{ t('methodology.field.process') }}</label>
-        <input class="input" id="add-process" name="process" type="text" required>
+        <div class="field field--narrow">
+          <label class="field-label" for="add-days">{{ t('methodology.field.days') }}</label>
+          <input class="input input--num" id="add-days" name="days" type="number" min="0" step="1">
+          <p class="field-note">{{ t('methodology.field.days.hint') }}</p>
+        </div>
 
-        <label class="field-label" for="add-process-en">{{ t('methodology.field.process_en') }}</label>
-        <input class="input" id="add-process-en" name="process_en" type="text">
+        <div class="field">
+          <label class="field-label" for="add-process">{{ t('methodology.field.process') }}</label>
+          <input class="input" id="add-process" name="process" type="text" required>
+        </div>
 
-        <label class="field-label" for="add-question">{{ t('methodology.field.question_ru') }}</label>
-        <input class="input" id="add-question" name="question_ru" type="text" required>
+        <div class="field">
+          <label class="field-label" for="add-process-en">{{ t('methodology.field.process_en') }}</label>
+          <input class="input" id="add-process-en" name="process_en" type="text">
+        </div>
 
-        <label class="field-label" for="add-question-en">{{ t('methodology.field.question_en') }}</label>
-        <input class="input" id="add-question-en" name="question_en" type="text">
+        <div class="field">
+          <label class="field-label" for="add-question">{{ t('methodology.field.question_ru') }}</label>
+          <input class="input" id="add-question" name="question_ru" type="text" required>
+        </div>
 
-        <label class="field-label" for="add-levels">{{ t('methodology.field.levels') }}</label>
-        <input class="input" id="add-levels" name="levels" type="text" required>
-        <p class="field-note">{{ t('methodology.field.levels.hint') }}</p>
+        <div class="field">
+          <label class="field-label" for="add-question-en">{{ t('methodology.field.question_en') }}</label>
+          <input class="input" id="add-question-en" name="question_en" type="text">
+        </div>
 
-        <label class="field-label" for="add-zones">{{ t('methodology.field.zones') }}</label>
-        <input class="input" id="add-zones" name="zones" type="text">
-        <p class="field-note">{{ t('methodology.field.zones.hint') }}</p>
+        <div class="field">
+          <label class="field-label" for="add-levels">{{ t('methodology.field.levels') }}</label>
+          <input class="input" id="add-levels" name="levels" type="text" required>
+          <p class="field-note">{{ t('methodology.field.levels.hint') }}</p>
+        </div>
 
-        <label class="field-label" for="add-days">{{ t('methodology.field.days') }}</label>
-        <input class="input input--num" id="add-days" name="days" type="number" min="0" step="1">
-        <p class="field-note">{{ t('methodology.field.days.hint') }}</p>
+        <div class="field">
+          <label class="field-label" for="add-zones">{{ t('methodology.field.zones') }}</label>
+          <input class="input" id="add-zones" name="zones" type="text"
+                 list="zone-codes" autocapitalize="none" spellcheck="false">
+          <p class="field-note">{{ t('methodology.field.zones.hint') }}</p>
+        </div>
 
-        <label class="field-label" for="add-kind">{{ t('methodology.field.kind') }}</label>
-        <select class="input" id="add-kind" name="kind">
-          {% for kind in kinds %}
-            <option value="{{ kind }}">{{ kind }}</option>
-          {% endfor %}
-        </select>
-        <p class="field-note">{{ t('methodology.field.kind.hint') }}</p>
-
-        <label class="field-label" for="add-criteria">{{ t('methodology.field.criteria') }}</label>
-        <textarea class="input" id="add-criteria" name="criteria" rows="4"></textarea>
+        <div class="field">
+          <label class="field-label" for="add-kind">{{ t('methodology.field.kind') }}</label>
+          <select class="input" id="add-kind" name="kind">
+            {% for kind in kinds %}
+              <option value="{{ kind }}">{{ kind }}</option>
+            {% endfor %}
+          </select>
+          <p class="field-note">{{ t('methodology.field.kind.hint') }}</p>
+        </div>
 
         {% if needs_name %}
-          <label class="field-label" for="add-version-name">{{ t('methodology.field.version_name') }}</label>
-          <input class="input" id="add-version-name" name="version_name" type="text" required>
-          <p class="field-note">{{ t('methodology.field.version_name.hint') }}</p>
+          <div class="field">
+            <label class="field-label" for="add-version-name">{{ t('methodology.field.version_name') }}</label>
+            <input class="input" id="add-version-name" name="version_name" type="text" required>
+            <p class="field-note">{{ t('methodology.field.version_name.hint') }}</p>
+          </div>
         {% endif %}
 
-        <label class="field-label" for="add-note">{{ t('methodology.field.note') }}</label>
-        <input class="input" id="add-note" name="note" type="text" maxlength="{{ max_note }}">
-        <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>
+        <div class="field field--wide">
+          <label class="field-label" for="add-criteria">{{ t('methodology.field.criteria') }}</label>
+          <textarea class="input" id="add-criteria" name="criteria" rows="4"></textarea>
+        </div>
+
+        <div class="field field--wide">
+          <label class="field-label" for="add-note">{{ t('methodology.field.note') }}</label>
+          <input class="input" id="add-note" name="note" type="text" maxlength="{{ max_note }}">
+          <p class="field-note">{{ t('methodology.field.note.hint', max=max_note) }}</p>
+        </div>
 
         <button class="btn btn--primary" type="submit">{{ t('methodology.add.submit') }}</button>
       </form>
@@ -203,6 +232,10 @@
     </div>
     <p class="section__lead">{{ t('methodology.zones.hint') }}</p>
   </div>
+
+  <datalist id="zone-codes">
+    {% for zone in composition.zones %}<option value="{{ zone.get('code') }}"></option>{% endfor %}
+  </datalist>
 
   <div class="table-wrap mt-gap">
     <table class="table">
@@ -228,21 +261,25 @@
                  разметкой не разрешён, и вложить их в форму долей ниже тоже нельзя. #}
               <details>
                 <summary>{{ t('methodology.zones.rename.submit') }}</summary>
-                <form class="form-grid mt-gap" method="post"
+                <form class="form-grid form-grid--single mt-gap" method="post"
                       action="/admin/zones/{{ zone.get('code') }}/rename?lang={{ lang }}">
-                  <label class="field-label" for="rename-ru-{{ zone.get('code') }}">
-                    {{ t('methodology.zones.add.name_ru') }}</label>
-                  <input class="input" id="rename-ru-{{ zone.get('code') }}" name="name_ru"
-                         type="text" value="{{ zone.get('name_ru') or '' }}">
-
-                  <label class="field-label" for="rename-en-{{ zone.get('code') }}">
-                    {{ t('methodology.zones.add.name_en') }}</label>
-                  <input class="input" id="rename-en-{{ zone.get('code') }}" name="name_en"
-                         type="text" value="{{ zone.get('name_en') or '' }}">
-
-                  <label class="field-label" for="rename-note-{{ zone.get('code') }}">
-                    {{ t('methodology.zones.note') }}</label>
-                  <input class="input" id="rename-note-{{ zone.get('code') }}" name="note" type="text">
+                  <div class="field">
+                    <label class="field-label" for="rename-ru-{{ zone.get('code') }}">
+                      {{ t('methodology.zones.add.name_ru') }}</label>
+                    <input class="input" id="rename-ru-{{ zone.get('code') }}" name="name_ru"
+                           type="text" value="{{ zone.get('name_ru') or '' }}">
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="rename-en-{{ zone.get('code') }}">
+                      {{ t('methodology.zones.add.name_en') }}</label>
+                    <input class="input" id="rename-en-{{ zone.get('code') }}" name="name_en"
+                           type="text" value="{{ zone.get('name_en') or '' }}">
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="rename-note-{{ zone.get('code') }}">
+                      {{ t('methodology.zones.note') }}</label>
+                    <input class="input" id="rename-note-{{ zone.get('code') }}" name="note" type="text">
+                  </div>
 
                   <button class="btn btn--primary" type="submit">
                     {{ t('methodology.zones.rename.submit') }}</button>
@@ -250,16 +287,19 @@
               </details>
               <details>
                 <summary>{{ t('methodology.zones.remove.submit') }}</summary>
-                <form class="form-grid mt-gap" method="post"
+                <form class="form-grid form-grid--single mt-gap" method="post"
                       action="/admin/zones/{{ zone.get('code') }}/remove?lang={{ lang }}">
-                  <label class="field-label" for="remove-equal-{{ zone.get('code') }}">
-                    <input id="remove-equal-{{ zone.get('code') }}" name="equal_shares"
-                           type="checkbox" value="1">
-                    {{ t('methodology.zones.remove.equal') }}</label>
-
-                  <label class="field-label" for="remove-note-{{ zone.get('code') }}">
-                    {{ t('methodology.zones.note') }}</label>
-                  <input class="input" id="remove-note-{{ zone.get('code') }}" name="note" type="text">
+                  <div class="field">
+                    <label class="choice" for="remove-equal-{{ zone.get('code') }}">
+                      <input id="remove-equal-{{ zone.get('code') }}" name="equal_shares"
+                             type="checkbox" value="1">
+                      {{ t('methodology.zones.remove.equal') }}</label>
+                  </div>
+                  <div class="field">
+                    <label class="field-label" for="remove-note-{{ zone.get('code') }}">
+                      {{ t('methodology.zones.note') }}</label>
+                    <input class="input" id="remove-note-{{ zone.get('code') }}" name="note" type="text">
+                  </div>
 
                   <button class="btn" type="submit">{{ t('methodology.zones.remove.submit') }}</button>
                 </form>
@@ -277,19 +317,23 @@
       <div class="section__head">
         <h2 class="section__title">{{ t('methodology.zones.shares.title') }}</h2>
       </div>
-      <form class="form-grid mt-gap" method="post" action="/admin/zones/shares?lang={{ lang }}">
+      <form class="form-grid form-grid--dense mt-gap" method="post" action="/admin/zones/shares?lang={{ lang }}">
         {# Поля по всем зонам разом: доли обязаны сойтись к 100%, и правка по
            одной доле до расчёта не дошла бы вовсе — версию не примет движок. #}
         {% for zone in composition.zones %}
-          <label class="field-label" for="share-{{ zone.get('code') }}">
-            {{ zone.get('name_ru') or zone.get('name_en') or zone.get('code') }}</label>
-          <input class="input input--num" id="share-{{ zone.get('code') }}"
-                 name="share_{{ zone.get('code') }}" type="text" inputmode="decimal"
-                 value="{{ zone.get('share_pct') or '' }}">
+          <div class="field">
+            <label class="field-label" for="share-{{ zone.get('code') }}">
+              {{ zone.get('name_ru') or zone.get('name_en') or zone.get('code') }}</label>
+            <input class="input input--num" id="share-{{ zone.get('code') }}"
+                   name="share_{{ zone.get('code') }}" type="text" inputmode="decimal"
+                   value="{{ zone.get('share_pct') or '' }}">
+          </div>
         {% endfor %}
 
-        <label class="field-label" for="shares-note">{{ t('methodology.zones.note') }}</label>
-        <input class="input" id="shares-note" name="note" type="text">
+        <div class="field field--wide">
+          <label class="field-label" for="shares-note">{{ t('methodology.zones.note') }}</label>
+          <input class="input" id="shares-note" name="note" type="text">
+        </div>
 
         <button class="btn btn--primary" type="submit">
           {{ t('methodology.zones.shares.submit') }}</button>
@@ -303,27 +347,37 @@
         <h2 class="section__title">{{ t('methodology.rates.title') }}</h2>
       </div>
       <p class="section__lead">{{ t('methodology.rates.hint') }}</p>
-      <form class="form-grid mt-gap" method="post" action="/admin/scoring?lang={{ lang }}">
+      <form class="form-grid form-grid--dense mt-gap" method="post" action="/admin/scoring?lang={{ lang }}">
         {# Поля заполнены нынешними ставками, чтобы человек правил видя, что есть,
            а не вслепую. Очищенное поле означает «не трогать» — так устроена дверь. #}
-        <label class="field-label" for="rate-start">{{ t('methodology.rates.start') }}</label>
-        <input class="input input--num" id="rate-start" name="start_pct" type="text"
-               inputmode="decimal" value="{{ composition.rates.get('start_pct') or '' }}">
+        <div class="field">
+          <label class="field-label" for="rate-start">{{ t('methodology.rates.start') }}</label>
+          <input class="input input--num" id="rate-start" name="start_pct" type="text"
+                 inputmode="decimal" value="{{ composition.rates.get('start_pct') or '' }}">
+        </div>
 
-        <label class="field-label" for="rate-d1">{{ t('methodology.rates.d1') }}</label>
-        <input class="input input--num" id="rate-d1" name="d1" type="text" inputmode="decimal"
-               value="{{ composition.rates.get('penalty', {}).get('D1') or '' }}">
+        <div class="field">
+          <label class="field-label" for="rate-d1">{{ t('methodology.rates.d1') }}</label>
+          <input class="input input--num" id="rate-d1" name="d1" type="text" inputmode="decimal"
+                 value="{{ composition.rates.get('penalty', {}).get('D1') or '' }}">
+        </div>
 
-        <label class="field-label" for="rate-d2">{{ t('methodology.rates.d2') }}</label>
-        <input class="input input--num" id="rate-d2" name="d2" type="text" inputmode="decimal"
-               value="{{ composition.rates.get('penalty', {}).get('D2') or '' }}">
+        <div class="field">
+          <label class="field-label" for="rate-d2">{{ t('methodology.rates.d2') }}</label>
+          <input class="input input--num" id="rate-d2" name="d2" type="text" inputmode="decimal"
+                 value="{{ composition.rates.get('penalty', {}).get('D2') or '' }}">
+        </div>
 
-        <label class="field-label" for="rate-repeat">{{ t('methodology.rates.repeat') }}</label>
-        <input class="input input--num" id="rate-repeat" name="repeat_multiplier" type="text"
-               inputmode="decimal" value="{{ composition.rates.get('repeat_multiplier') or '' }}">
+        <div class="field">
+          <label class="field-label" for="rate-repeat">{{ t('methodology.rates.repeat') }}</label>
+          <input class="input input--num" id="rate-repeat" name="repeat_multiplier" type="text"
+                 inputmode="decimal" value="{{ composition.rates.get('repeat_multiplier') or '' }}">
+        </div>
 
-        <label class="field-label" for="rate-note">{{ t('methodology.zones.note') }}</label>
-        <input class="input" id="rate-note" name="note" type="text">
+        <div class="field field--wide">
+          <label class="field-label" for="rate-note">{{ t('methodology.zones.note') }}</label>
+          <input class="input" id="rate-note" name="note" type="text">
+        </div>
 
         <button class="btn btn--primary" type="submit">{{ t('methodology.rates.submit') }}</button>
       </form>
@@ -336,24 +390,36 @@
       <h2 class="section__title">{{ t('methodology.zones.add.title') }}</h2>
     </div>
     <form class="form-grid mt-gap" method="post" action="/admin/zones?lang={{ lang }}">
-      <label class="field-label" for="zone-code">{{ t('methodology.zones.add.code') }}</label>
-      <input class="input" id="zone-code" name="code" type="text" spellcheck="false" required>
+      <div class="field field--narrow">
+        <label class="field-label" for="zone-code">{{ t('methodology.zones.add.code') }}</label>
+        <input class="input" id="zone-code" name="code" type="text" spellcheck="false" required>
+      </div>
 
-      <label class="field-label" for="zone-name-ru">{{ t('methodology.zones.add.name_ru') }}</label>
-      <input class="input" id="zone-name-ru" name="name_ru" type="text" required>
+      <div class="field field--narrow">
+        <label class="field-label" for="zone-share">{{ t('methodology.zones.add.share') }}</label>
+        <input class="input input--num" id="zone-share" name="share" type="text" inputmode="decimal">
+      </div>
 
-      <label class="field-label" for="zone-name-en">{{ t('methodology.zones.add.name_en') }}</label>
-      <input class="input" id="zone-name-en" name="name_en" type="text">
+      <div class="field">
+        <label class="field-label" for="zone-name-ru">{{ t('methodology.zones.add.name_ru') }}</label>
+        <input class="input" id="zone-name-ru" name="name_ru" type="text" required>
+      </div>
 
-      <label class="field-label" for="zone-share">{{ t('methodology.zones.add.share') }}</label>
-      <input class="input input--num" id="zone-share" name="share" type="text" inputmode="decimal">
+      <div class="field">
+        <label class="field-label" for="zone-name-en">{{ t('methodology.zones.add.name_en') }}</label>
+        <input class="input" id="zone-name-en" name="name_en" type="text">
+      </div>
 
-      <label class="field-label" for="zone-equal">
-        <input id="zone-equal" name="equal_shares" type="checkbox" value="1">
-        {{ t('methodology.zones.add.equal') }}</label>
+      <div class="field field--wide">
+        <label class="choice" for="zone-equal">
+          <input id="zone-equal" name="equal_shares" type="checkbox" value="1">
+          {{ t('methodology.zones.add.equal') }}</label>
+      </div>
 
-      <label class="field-label" for="zone-note">{{ t('methodology.zones.note') }}</label>
-      <input class="input" id="zone-note" name="note" type="text">
+      <div class="field field--wide">
+        <label class="field-label" for="zone-note">{{ t('methodology.zones.note') }}</label>
+        <input class="input" id="zone-note" name="note" type="text">
+      </div>
 
       <button class="btn btn--primary" type="submit">{{ t('methodology.zones.add.submit') }}</button>
     </form>

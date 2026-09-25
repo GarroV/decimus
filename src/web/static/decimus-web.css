@@ -167,17 +167,81 @@
   font-weight: var(--w-semibold);
 }
 
+/* Форма правки методики. Раньше это был столбец одинаковых полей во всю
+   ширину: код пункта и формулировка на двух языках получали одинаковую
+   строку, и восемь полей подряд читались простынёй. Теперь сетка, а ширина
+   поля следует из того, что в него пишут (бриф: «форма должна следовать из
+   того, что на самом деле решают на экране»), и пара ru/en стоит рядом —
+   бриф просит править формулировки сразу на двух языках, а не одну под
+   другой. */
 .form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
   margin-top: var(--space-6);
-  max-width: 640px;
+  max-width: 760px;
+  align-items: start;
 }
 
+.field { min-width: 0; }
+/* Формулировка, критерии и примечание — во всю ширину формы: их читают
+   строкой, а не сравнивают глазами с соседом. */
+.field--wide { grid-column: 1 / -1; }
+/* Код, срок, доля: короткое значение в длинном поле выглядит ошибкой ввода. */
+.field--narrow .input { max-width: 14ch; }
+
 .form-grid .input { width: 100%; }
-.form-grid .field-label { margin-top: var(--space-5); }
-.form-grid .btn { margin-top: var(--space-7); align-self: flex-start; }
+.form-grid .field-note { margin-top: var(--space-2); }
+.form-grid .btn { grid-column: 1 / -1; margin-top: var(--space-4); justify-self: start; }
+
+/* Форма в ячейке таблицы (переименование и снятие зоны) — колонка: две
+   колонки в узкой ячейке дали бы поля в два символа шириной. */
+.form-grid--single { grid-template-columns: minmax(0, 1fr); max-width: none; }
+
+/* Форма из коротких числовых полей — доли зон, ставки вычетов. Их правят
+   пачкой и сравнивают между собой, поэтому в ряд встаёт столько, сколько
+   влезает, а не ровно два. */
+.form-grid--dense { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+
+/* Значение, которое показывают, но не правят (код пункта). Поле ввода с
+   `disabled` на его месте обещало бы правку, которой нет. */
+.field-static {
+  font-family: var(--font-num);
+  padding: var(--space-3) 0;
+}
+
+/* Набор из нескольких значений — флажками, а не строкой с точкой с запятой:
+   синтаксис в поле ввода человек набирает по памяти и ошибается молча. */
+.choice-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--t-state), background var(--t-state);
+}
+
+.choice:hover { border-color: var(--accent); }
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.choice:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .field--wide { grid-column: auto; }
+}
 
 /* Критерии приходят разметкой методики — показываем как написаны, не
    переверстывая: класс нарушения выводится из них дословно. */
