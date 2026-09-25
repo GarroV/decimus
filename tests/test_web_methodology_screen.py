@@ -323,3 +323,44 @@ def test_правка_плашками_классов_пишет_их_через
     assert ответ.status_code == 200
     пункт = method.load_item(состояние.store, tenant=ТЕНАНТ, code="CLN01")["item"]
     assert пункт["levels"] == "D1;D2"
+
+
+def test_панель_показывает_как_часто_пункт_нарушают(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    from datetime import date
+
+    from src.db.models import ItemUsage
+    from src.web import inspections as data
+
+    сводка = ItemUsage(
+        code="CLN01",
+        records=3,
+        units=2,
+        inspections=2,
+        last_date=date(2026, 9, 23),
+        by_level=(("D1", 3),),
+        top_units=(("Tbilisi-1", "u-1", 2), ("Batumi-1", "u-2", 1)),
+    )
+    monkeypatch.setattr(data, "load_item_usage", lambda **_: сводка)
+    войти(клиент)
+
+    # Act
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+
+    # Assert
+    assert "Записей: 3 · точек: 2 · проверок: 2" in страница
+    assert 'href="/units/u-1' in страница
+
+
+def test_без_базы_панель_говорит_что_сводки_нет(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.web import inspections as data
+
+    monkeypatch.setattr(data, "load_item_usage", lambda **_: None)
+    войти(клиент)
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+    assert "Сводка недоступна" in страница
+    assert 'action="/admin/items/CLN01?' in страница, "без сводки пропала и правка"
