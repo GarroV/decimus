@@ -348,6 +348,31 @@
               <dd>{{ value or '—' }}</dd>
             </div>
           {% endfor %}
+          {#
+            Сводка — по сданным неотклонённым проверкам этого чек-листа: по ней
+            видно, работает пункт или мёртвый. Счёт записей, а не оценка.
+          #}
+          <div class="mx-prop mx-prop--block">
+            <dt>{{ t('methodology.usage.title') }}</dt>
+            <dd>
+              {% if usage is none %}
+                <p class="field-note">{{ t('methodology.usage.unknown') }}</p>
+              {% elif usage.records == 0 %}
+                <p class="field-note">{{ t('methodology.usage.never') }}</p>
+              {% else %}
+                <div class="mx-usage">
+                  <span>{{ t('methodology.usage.summary', records=usage.records, units=usage.units, inspections=usage.inspections) }}</span>
+                  {% for level, n in usage.by_level %}<span class="tag tag--neutral tag--micro">{{ level }} × {{ n }}</span>{% endfor %}
+                  {% if usage.last_date %}<span class="mx-muted">{{ t('methodology.usage.last', day=usage.last_date.isoformat()) }}</span>{% endif %}
+                </div>
+                <ol class="mx-usage__top">
+                  {% for name, unit_id, n in usage.top_units %}
+                    <li><a href="{{ url_for('unit', unit_id=unit_id, lang=lang) }}">{{ name }}</a> <span class="mx-muted">× {{ n }}</span></li>
+                  {% endfor %}
+                </ol>
+              {% endif %}
+            </dd>
+          </div>
         </dl>
 
         {% if composition.is_latest %}

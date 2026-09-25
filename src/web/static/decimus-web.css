@@ -1052,3 +1052,5 @@ a.ov-table__row:hover { background: var(--surface-3); }
 /* Шапка раздела над полосой версии — без нижнего отступа дизайн-системы:
    между ними ничего нет, и 48px читались пустым местом, где что-то пропало. */
 .page--wide > .section { margin-bottom: 0; }
+.mx-usage { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; }
+.mx-usage__top { margin: var(--space-4) 0 0; padding-left: var(--space-8); font-size: var(--fs-dense); display: grid; gap: var(--space-2); width: 100%; }

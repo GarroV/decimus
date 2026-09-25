@@ -1100,6 +1100,20 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
     "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
     "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.usage.title": {"ru": "Как часто нарушают", "en": "How often it is breached"},
+    "methodology.usage.summary": {
+        "ru": "Записей: {records} · точек: {units} · проверок: {inspections}",
+        "en": "Records: {records} · units: {units} · inspections: {inspections}",
+    },
+    "methodology.usage.last": {"ru": "последний раз {day}", "en": "last on {day}"},
+    "methodology.usage.never": {
+        "ru": "В сданных проверках этого чек-листа ни разу не нарушен.",
+        "en": "Never breached in the finalised inspections of this checklist.",
+    },
+    "methodology.usage.unknown": {
+        "ru": "Сводка недоступна: база проверок не отвечает. Правке пункта это не мешает.",
+        "en": "No summary: the inspections database does not answer. Editing is not affected.",
+    },
     "methodology.prop.save": {"ru": "Записать версию", "en": "Record a version"},
     "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
     "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
@@ -1155,8 +1169,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
     "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
     "methodology.field.levels.hint": {
-        "ru": "Какими классами пункт вообще бывает. D0 — информационная запись: на оценку не влияет.",
-        "en": "The levels this item can be recorded at. D0 is an information record: it does not affect the score.",
+        "ru": (
+            "Какими классами пункт вообще бывает. D0 — информационная запись: на оценку не влияет."
+        ),
+        "en": (
+            "The levels this item can be recorded at. "
+            "D0 is an information record: it does not affect the score."
+        ),
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},

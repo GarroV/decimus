@@ -1296,6 +1296,11 @@ def _render_methodology(
             ]
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
+    сводка = (
+        data.load_item_usage(tenant=conf.tenant, code=выбран, checklist=код or "")
+        if карточка is not None and выбран
+        else None
+    )
     раньше, позже = mview.neighbours(видимые, выбран or "")
     return render_template(
         "methodology/index.html",
@@ -1318,6 +1323,7 @@ def _render_methodology(
         is_off=mview.is_off,
         selected=выбран,
         card=карточка,
+        usage=сводка,
         adding=новый,
         prev_href=адрес(item=раньше) if раньше else None,
         next_href=адрес(item=позже) if позже else None,
