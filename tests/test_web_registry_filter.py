@@ -100,3 +100,67 @@ def test_снятая_проверка_в_списке_помечена_а_не_
     # Assert
     assert "Белград-9" in страница
     assert "is-frozen" in страница
+
+
+# --- страна и город (клик по городу на «Обзоре» ведёт сюда) ------------------
+
+ГЕО = {
+    "Tbilisi-1": ("GE", "tbilisi"),
+    "Batumi-1": ("GE", "batumi"),
+    "Antalya-1": ("TR", "antalya"),
+}
+РЯД_МЕСТ = (
+    шапка(unit_name="Tbilisi-1", pct=90.0, grade="B"),
+    шапка(unit_name="Batumi-1", pct=85.5, grade="C"),
+    шапка(unit_name="Antalya-1", pct=97.0, grade="A"),
+)
+
+
+def _места(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry(РЯД_МЕСТ, True))
+    monkeypatch.setattr(data, "load_geography", lambda **_: ГЕО)
+
+
+def test_отбор_по_городу_оставляет_проверки_города(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _места(monkeypatch)
+
+    # Act
+    страница = стенд.get("/inspections?city=tbilisi").get_data(as_text=True)
+
+    # Assert
+    assert "Tbilisi-1" in страница
+    assert "Batumi-1" not in страница
+    assert "Antalya-1" not in страница
+
+
+def test_города_в_списке_только_выбранной_страны(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _места(monkeypatch)
+
+    # Act
+    страница = стенд.get("/inspections?country=TR").get_data(as_text=True)
+
+    # Assert — при Турции грузинских городов в списке нет, и сами они словом.
+    assert "Анталья" in страница
+    assert "Тбилиси" not in страница
+    assert "Батуми" not in страница
+    assert "Турция" in страница
+
+
+def test_города_показаны_словом_а_не_кодом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _места(monkeypatch)
+
+    # Act
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    # Assert — «tbilisi» 24.09.2026 стояло на экране кодом источника.
+    assert "Тбилиси" in страница
+    assert ">tbilisi<" not in страница

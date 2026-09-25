@@ -26,9 +26,9 @@
       <h1 class="ov-head__title">{{ data.name }}</h1>
       <div class="ov-head__sub">
         {% if data.partner %}
-          {{ t('unit.meta', city=data.city or data.country, partner=data.partner) }}
+          {{ t('unit.meta', city=city_title(data.city) or country_title(data.country), partner=data.partner) }}
         {% else %}
-          {{ t('unit.meta.no_partner', city=data.city or data.country) }}
+          {{ t('unit.meta.no_partner', city=city_title(data.city) or country_title(data.country)) }}
         {% endif %}
         · {{ t('unit.audits', n=data.audits_count) }}
       </div>

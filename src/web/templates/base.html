@@ -26,6 +26,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
+  <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
 </head>
 <body>
   <header class="topbar">
@@ -88,7 +89,7 @@
       </nav>
     {% endif %}
 
-    <main class="page shell__main">
+    <main class="page{% block page_class %}{% endblock %} shell__main">
       {% block body %}{% endblock %}
     </main>
   </div>

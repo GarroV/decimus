@@ -496,6 +496,45 @@ def _problems(points: tuple[PointRow, ...]) -> tuple[PointRow, ...]:
     return tuple(отобранные[:TOP])
 
 
+def _units_in(geo: dict[str, tuple[str, str]], *, selection: Selection) -> int | None:
+    """Точек справочника в выбранном месте; `None` — место не выбрано, считать всю сеть.
+
+    Буква здесь не участвует: она свойство проверки, а не точки. Без этого
+    «Обзор» с Грузией показывал «точек 151, не проверено 147» при четырёх
+    грузинских точках, проверенных все (#380).
+    """
+    if not selection.country and not selection.city:
+        return None
+    return sum(
+        1
+        for country, city in geo.values()
+        if (not selection.country or country == selection.country)
+        and (not selection.city or city == selection.city)
+    )
+
+
+def _geo_choices(
+    geo: dict[str, tuple[str, str]], *, selection: Selection
+) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]]:
+    """Варианты чипов «страна» и «город» с числом точек, самые крупные первыми.
+
+    Города — только выбранной страны: список, где рядом с Анталией стоит
+    Тбилиси при выбранной Турции, предлагает заведомо пустую выборку.
+    """
+    страны: dict[str, int] = {}
+    города: dict[str, int] = {}
+    for country, city in geo.values():
+        if country:
+            страны[country] = страны.get(country, 0) + 1
+        if city and (not selection.country or country == selection.country):
+            города[city] = города.get(city, 0) + 1
+
+    def по_весу(счёт: dict[str, int]) -> tuple[tuple[str, int], ...]:
+        return tuple(sorted(счёт.items(), key=lambda п: (-п[1], п[0])))
+
+    return по_весу(страны), по_весу(города)
+
+
 def load(
     *,
     tenant: str,
@@ -544,14 +583,9 @@ def load(
         tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
     )
     всего = sum(строка[3] for строка in losses) or 1.0
-    страны: dict[str, int] = {}
-    города: dict[str, int] = {}
-    for country, city in geo.values():
-        if country:
-            страны[country] = страны.get(country, 0) + 1
-        if city:
-            города[city] = города.get(city, 0) + 1
-    всего_точек = queries.units_total(tenant=tenant)
+    страны, города = _geo_choices(geo, selection=selection)
+    в_месте = _units_in(geo, selection=selection)
+    всего_точек = queries.units_total(tenant=tenant) if в_месте is None else в_месте
     return Overview(
         units_total=всего_точек,
         unit_ids=ид_точек,
@@ -587,8 +621,8 @@ def load(
         # «не проверено» и «всего» пришли бы из разных мест и разошлись.
         unchecked=max(всего_точек - len({row.unit_name for row in rows}), 0),
         selection=selection,
-        countries=tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0]))),
-        cities=tuple(sorted(города.items(), key=lambda п: (-п[1], п[0]))),
+        countries=страны,
+        cities=города,
         breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
     )

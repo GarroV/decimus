@@ -68,8 +68,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.y1": {"ru": "год", "en": "a year"},
     "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
     "overview.breakdown.hint": {
-        "ru": "клик — сузить выборку",
-        "en": "click to narrow the selection",
+        "ru": "клик — проверки города",
+        "en": "click — the city's inspections",
     },
     "overview.breakdown.city": {"ru": "Город", "en": "City"},
     "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
@@ -400,7 +400,7 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
-    "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
+    "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.checklist": {"ru": "чек-лист {version}", "en": "checklist {version}"},
@@ -415,21 +415,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "В историю этого тенанта ещё не слита ни одна завершённая проверка.",
         "en": "No completed inspection has been pushed into this tenant's history yet.",
     },
-    "registry.retracted_hidden.title": {
-        "ru": "Снятые проверки не видны",
-        "en": "Retracted inspections are not visible",
-    },
-    "registry.retracted_hidden.text": {
-        "ru": (
-            "Подключение администратора истории ({var}) не задано. Это не значит, что снятых "
-            "проверок нет, — это значит, что отсюда их не видно, и снять проверку тоже нельзя."
-        ),
-        "en": (
-            "The history administrator connection ({var}) is not configured. That does not mean "
-            "there are no retracted inspections — it means they are invisible here, and "
-            "retraction is unavailable too."
-        ),
-    },
     # «Завершена» и только. Слово «заморожена» стояло здесь за свойство, которое
     # в силе и никуда не уходит: записанная проверка не пересчитывается правкой
     # чек-листа задним числом. Но на карточке оно читается непонятным
@@ -437,7 +422,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # пользователя (D172). Свойство объясняется
     # там, где человек правит методику, а не рядом с оценкой.
     "state.sealed": {"ru": "Завершена", "en": "Completed"},
-    "state.retracted": {"ru": "Снята", "en": "Retracted"},
+    "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К реестру", "en": "Back to the registry"},
     "card.meta": {
@@ -478,35 +463,72 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.not_found.text": {
         "ru": (
             "Такой проверки у тенанта нет. Тот же ответ приходит на проверку другого тенанта "
-            "и на снятую, когда снятые не видны, — и это намеренно."
+            "и на отклонённую, когда отклонённые не видны, — и это намеренно."
         ),
         "en": (
             "There is no such inspection for this tenant. The same answer comes for another "
-            "tenant's inspection and for a retracted one when retracted are invisible — "
+            "tenant's inspection and for a rejected one when rejected are invisible — "
             "deliberately so."
         ),
     },
-    # --- снятие проверки ---------------------------------------------------
-    "retract.title": {"ru": "Снять проверку из истории", "en": "Retract from history"},
+    # --- исправление даты и пиццерии (D195; в коде — move) --------------------------
+    "move.title": {"ru": "Исправить дату или пиццерию", "en": "Correct the date or pizzeria"},
+    "move.hint": {
+        "ru": (
+            "Если при заведении проверки ошиблись датой или пиццерией — исправьте здесь. "
+            "Записи, оценка и буква не меняются. Каждое исправление остаётся в истории "
+            "вместе с причиной."
+        ),
+        "en": (
+            "If the inspection was filed with the wrong date or pizzeria, correct it here. "
+            "Findings, score and grade do not change. Every correction is kept in the "
+            "history with its reason."
+        ),
+    },
+    "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
+    "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "move.reason_label": {"ru": "Что было не так", "en": "What was wrong"},
+    "move.submit": {"ru": "Исправить", "en": "Correct"},
+    "move.done": {"ru": "Исправлено.", "en": "Corrected."},
+    "move.same": {
+        "ru": "Дата и пиццерия уже такие — исправлять нечего.",
+        "en": "The date and pizzeria are already set — nothing to correct.",
+    },
+    "move.failed": {"ru": "Исправить не удалось: {reason}", "en": "Correction failed: {reason}"},
+    "move.history.title": {"ru": "История исправлений", "en": "Correction history"},
+    "move.history.line": {
+        "ru": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+        "en": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+    },
+    "move.history.meta": {
+        "ru": "{at} · {who} · {reason}",
+        "en": "{at} · {who} · {reason}",
+    },
+    "move.history.unknown": {
+        "ru": "История исправлений сейчас недоступна — исправлять до её возвращения нельзя.",
+        "en": "The correction history is unavailable — corrections are disabled until it is back.",
+    },
+    # --- отклонение проверки (код остаётся retract, D194) ------------------
+    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.hint": {
         "ru": (
-            "Снятие — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
+            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
             "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
         ),
         "en": (
-            "Retraction marks, it does not delete: the row stays in history with its reason, "
+            "Rejection marks, it does not delete: the row stays in history with its reason, "
             "is invisible to the ordinary role, and the photos are purged from storage. "
             "A reason is required."
         ),
     },
-    "retract.reason_label": {"ru": "Причина снятия", "en": "Reason for retraction"},
-    "retract.submit": {"ru": "Снять проверку", "en": "Retract inspection"},
+    "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
+    "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.done": {
-        "ru": "Проверка снята. Кадров убрано: {photos}.",
-        "en": "The inspection is retracted. Photos purged: {photos}.",
+        "ru": "Проверка отклонена. Кадров убрано: {photos}.",
+        "en": "The inspection is rejected. Photos purged: {photos}.",
     },
-    "retract.failed": {"ru": "Снять не удалось: {reason}", "en": "Retraction failed: {reason}"},
-    "retract.banner.title": {"ru": "Проверка снята", "en": "This inspection is retracted"},
+    "retract.failed": {"ru": "Отклонить не удалось: {reason}", "en": "Rejection failed: {reason}"},
+    "retract.banner.title": {"ru": "Проверка отклонена", "en": "This inspection is rejected"},
     "retract.banner.text": {
         "ru": (
             "Причина: {reason}. Оценка не участвует в аналитике, письмо и PDF по ней не "
@@ -965,10 +987,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.version.badge.published": {"ru": "действует", "en": "in effect"},
     "methodology.version.badge.draft": {"ru": "не опубликована", "en": "not published"},
-    "methodology.draft.title": {
-        "ru": "Есть записанная версия, которой движок ещё не видит",
-        "en": "A stored version the engine does not read yet",
-    },
     "methodology.draft.text": {
         "ru": (
             "Записана {latest}, а проверки считаются по {current}. Публикация переставляет "
@@ -1023,7 +1041,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.versions.title": {"ru": "Версии", "en": "Versions"},
     "methodology.versions.col.version": {"ru": "Версия", "en": "Version"},
-    "methodology.versions.col.name": {"ru": "Набор", "en": "Set"},
     "methodology.versions.col.day": {"ru": "Издана", "en": "Issued"},
     "methodology.versions.hint": {
         "ru": "Версии не удаляются никогда: по ним посчитаны отчёты. Откат — публикация прежней.",
@@ -1033,15 +1050,58 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.items.title": {"ru": "Пункты", "en": "Items"},
-    "methodology.col.id": {"ru": "Код", "en": "Code"},
-    "methodology.col.kind": {"ru": "Вид строки", "en": "Row kind"},
-    "methodology.col.process_ru": {"ru": "Процесс", "en": "Process"},
-    "methodology.col.question_ru": {"ru": "Формулировка", "en": "Wording"},
-    "methodology.col.levels": {"ru": "Классы", "en": "Levels"},
-    "methodology.col.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.col.days": {"ru": "Срок, дней", "en": "Days"},
+    # Экран чек-листа в три колонки (D197).
+    "methodology.lists.title": {"ru": "Чек-листы", "en": "Checklists"},
+    "methodology.lists.prod": {"ru": "в проде", "en": "in production"},
+    "methodology.lists.manage": {
+        "ru": "Завести чек-лист, сменить состояние, применить к проду",
+        "en": "Create a checklist, change its state, apply to production",
+    },
+    "methodology.search.placeholder": {
+        "ru": "Код или слово из формулировки",
+        "en": "Code or a word from the wording",
+    },
+    "methodology.pick.level": {"ru": "Класс", "en": "Level"},
+    "methodology.pick.level.all": {"ru": "все", "en": "all"},
+    "methodology.pick.zone": {"ru": "Зона", "en": "Zone"},
+    "methodology.pick.zone.all": {"ru": "все", "en": "all"},
+    "methodology.pick.group": {"ru": "Группы", "en": "Groups"},
+    "methodology.group.process": {"ru": "по процессу", "en": "by process"},
+    "methodology.group.zone": {"ru": "по зоне", "en": "by zone"},
+    "methodology.group.level": {"ru": "по классу", "en": "by level"},
+    "methodology.off.toggle": {"ru": "Выключенные", "en": "Disabled"},
+    "methodology.off.badge": {"ru": "выключен", "en": "disabled"},
+    "methodology.shown": {"ru": "Показано {shown} из {total}", "en": "{shown} of {total}"},
+    "methodology.add.open": {"ru": "+ Пункт", "en": "+ Item"},
+    "methodology.none.title": {
+        "ru": "Под отбор не попал ни один пункт",
+        "en": "No item matches the filter",
+    },
+    "methodology.none.reset": {"ru": "Снять отбор", "en": "Clear the filter"},
+    "methodology.zone.all": {"ru": "Все зоны", "en": "All zones"},
+    "methodology.days.short": {"ru": "{days} дн.", "en": "{days} d"},
+    "methodology.days.long": {"ru": "{days} дн. на устранение", "en": "{days} days to fix"},
+    "methodology.days.now": {"ru": "немедленно", "en": "immediately"},
+    "methodology.panel.title": {"ru": "Пункт", "en": "Item"},
+    "methodology.panel.close": {"ru": "Закрыть", "en": "Close"},
+    "methodology.panel.prev": {"ru": "Предыдущий пункт", "en": "Previous item"},
+    "methodology.panel.next": {"ru": "Следующий пункт", "en": "Next item"},
+    "methodology.panel.keys": {
+        "ru": "↑ ↓ — соседний пункт · Esc — закрыть · / — поиск",
+        "en": "↑ ↓ — neighbour item · Esc — close · / — search",
+    },
+    "methodology.panel.empty": {
+        "ru": "Выберите пункт в списке — здесь откроется всё, что нужно для правки.",
+        "en": "Pick an item in the list — everything needed to edit it opens here.",
+    },
+    "methodology.prop.levels": {"ru": "Классы", "en": "Levels"},
+    "methodology.prop.zones": {"ru": "Зоны", "en": "Zones"},
+    "methodology.prop.days": {"ru": "Срок", "en": "Deadline"},
+    "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
+    "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
+    "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.prop.save": {"ru": "Записать версию", "en": "Record a version"},
     "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
-    "methodology.zones.col.code": {"ru": "Код", "en": "Code"},
     "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
     "methodology.zones.col.share": {"ru": "Доля, %", "en": "Share, %"},
     "methodology.zones.hint": {
@@ -1119,12 +1179,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.add.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
-    "methodology.edit.title": {"ru": "Поправить пункт", "en": "Edit the item"},
-    "methodology.edit.hint": {
-        "ru": "Меняются только заполненные поля. Пустое поле означает «не трогать».",
-        "en": "Only the fields you fill in are changed. An empty field means «leave as is».",
-    },
-    "methodology.edit.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
     "methodology.disable.submit": {"ru": "Выключить пункт", "en": "Switch the item off"},
     "methodology.disable.hint": {
         "ru": (
@@ -1148,14 +1202,12 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
     "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
     "methodology.field.levels.hint": {
-        "ru": "Через точку с запятой, например D1;D2 — какими классами пункт вообще бывает.",
-        "en": "Semicolon-separated, e.g. D1;D2 — the levels this item can be recorded at.",
+        "ru": "Какими классами пункт вообще бывает. D0 — информационная запись: "
+        "на оценку не влияет.",
+        "en": "The levels this item can be recorded at. D0 is an information record: "
+        "it does not affect the score.",
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.field.zones.hint": {
-        "ru": "Коды зон через точку с запятой; * — пункт встречается в любой зоне.",
-        "en": "Zone codes, semicolon-separated; * means the item appears in any zone.",
-    },
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
     "methodology.field.days.hint": {
         "ru": (
@@ -1212,14 +1264,11 @@ TEXTS: dict[str, dict[str, str]] = {
             "section is unaffected."
         ),
     },
-    "methodology.item.title": {"ru": "Пункт {code}", "en": "Item {code}"},
-    "methodology.item.back": {"ru": "К составу", "en": "Back to the composition"},
     "methodology.item.criteria.title": {"ru": "Критерии", "en": "Criteria"},
     "methodology.item.criteria.empty": {
         "ru": "Критериев у пункта нет — класс нарушения выводить не из чего.",
         "en": "The item has no criteria — there is nothing to derive the level from.",
     },
-    "methodology.item.fields.title": {"ru": "Как пункт записан", "en": "How the item is stored"},
     "error.not_found.title": {"ru": "Страницы нет", "en": "No such page"},
     "error.not_found.text": {
         "ru": "Такого адреса в админке нет. Разделы — в навигации слева.",

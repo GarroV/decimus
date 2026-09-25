@@ -26,10 +26,11 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
-from web_harness import войти, подменить_двери, собрать
+from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.db.errors import DbError, RetractionError
+from src.db.errors import DbError, MoveError, RetractionError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
+from src.db.move import MoveRecord
 from src.db.retract import Retraction
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -117,7 +118,7 @@ def карточка(row: InspectionRow, **поля: Any) -> InspectionDetail:
 
 
 @pytest.fixture
-def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) -> Iterator[FlaskClient]:
     """Приложение с подменёнными дверями блока `db` и УЖЕ ВОШЕДШИМ человеком.
 
     Вход настоящий — отправкой формы (`tests/web_harness.py`). После T323 без
@@ -129,10 +130,15 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    роль = getattr(request, "param", "auditor")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
+
+
+#: Тот же стенд, но вошёл администратор: отклонение и перенос — только его.
+админ = pytest.mark.parametrize("стенд", ["admin"], indirect=True)
 
 
 # --- каркас: девять разделов и честная лента (D138) ------------------------
@@ -246,7 +252,7 @@ def test_карточка_печатает_разбивку_записанной
 # --- «снятых нет» против «вам их не видно» --------------------------------
 
 
-def test_без_администратора_истории_страница_говорит_об_этом_вслух(
+def test_без_администратора_истории_плашки_о_снятых_нет(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
@@ -256,9 +262,11 @@ def test_без_администратора_истории_страница_г�
     # Act
     страница = стенд.get("/inspections").get_data(as_text=True)
 
-    # Assert — молчаливо укороченный список выглядел бы полным.
-    assert "Снятые проверки не видны" in страница
-    assert "DATABASE_RETRACTION_URL" in страница
+    # Assert — без роли администратора истории снять проверку не может никто,
+    # снятых нет, и предупреждать о них — шум (D193). Имя переменной окружения
+    # человеку на экране тем более не нужно.
+    assert "Снятые проверки не видны" not in страница
+    assert "DATABASE_RETRACTION_URL" not in страница
 
 
 def test_без_администратора_истории_снятие_не_предлагается(
@@ -275,7 +283,7 @@ def test_без_администратора_истории_снятие_не_п
     # Assert — ищется именно форма снятия: выход в шапке есть на каждой
     # странице, и «форм на странице нет вовсе» с ним больше не проверка.
     assert "/retract" not in страница
-    assert "Снятые проверки не видны" in страница
+    assert "Снятые проверки не видны" not in страница
 
 
 def test_снятая_проверка_видна_снятой_и_с_причиной(
@@ -296,6 +304,7 @@ def test_снятая_проверка_видна_снятой_и_с_причи�
 # --- снятие идёт существующей дверью ---------------------------------------
 
 
+@админ
 def test_снятие_зовёт_дверь_блока_db_с_причиной_из_формы(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -325,6 +334,7 @@ def test_снятие_зовёт_дверь_блока_db_с_причиной_и
     assert "Кадров убрано: 2" in ответ.get_data(as_text=True)
 
 
+@админ
 def test_отказ_снятия_показан_текстом_а_не_трассировкой(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -345,6 +355,7 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
     assert "Причина снятия не названа" in ответ.get_data(as_text=True)
 
 
+@админ
 def test_снятие_с_чужой_страницы_отклонено_и_не_доходит_до_базы(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -377,6 +388,7 @@ def test_снятие_с_чужой_страницы_отклонено_и_не_
     assert вызвано is False
 
 
+@админ
 def test_снятие_со_своей_страницы_проходит_и_по_одному_referer(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -465,6 +477,7 @@ def test_страницы_не_встраиваются_в_чужой_докум
         assert "frame-ancestors 'none'" in ответ.headers.get("Content-Security-Policy", ""), адрес
 
 
+@админ
 def test_отказ_снятия_показан_на_карточке_а_не_потерян(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -551,3 +564,215 @@ def test_шрифт_кешируется_на_неделю_без_отпечат
     # Assert
     assert ответ.status_code == 200
     assert f"max-age={FONT_MAX_AGE}" in ответ.headers["Cache-Control"]
+
+
+# --- сбой подключения администратора истории не роняет экран (#307) --------
+
+
+def _сломанный_админ(ответ: Any) -> Any:
+    """Чтение, которое падает под администратором и отвечает обычной ролью."""
+
+    def прочитать(*_a: Any, include_retracted: bool = False, **_k: Any) -> Any:
+        if include_retracted:
+            raise DbError("password authentication failed for user dodo_audit_admin")
+        return ответ
+
+    return прочитать
+
+
+def test_реестр_без_снятых_если_администратор_не_подключился(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange — 21.09.2026 неверный адрес этого подключения давал 503 на всём
+    # реестре при живой базе.
+    строка = шапка()
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "list_inspections", _сломанный_админ([строка]))
+
+    # Act
+    реестр = data.load_registry(tenant=ТЕНАНТ, limit=10)
+
+    # Assert
+    assert реестр.rows == (строка,)
+    assert реестр.retracted_visible is False
+
+
+def test_карточка_открывается_если_администратор_не_подключился(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange
+    деталь = карточка(шапка())
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "get_inspection", _сломанный_админ(деталь))
+
+    # Act / Assert
+    assert data.load_card(деталь.inspection.id, tenant=ТЕНАНТ) is деталь
+
+
+def test_лежащая_база_по_прежнему_отказ(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange — откат на обычную роль не должен превращать «база лежит» в
+    # пустой реестр: обычное чтение падает следом и отказ доходит до экрана.
+    def лежит(*_a: Any, **_k: Any) -> Any:
+        raise DbError("connection refused")
+
+    monkeypatch.setattr(data, "retraction_available", lambda: True)
+    monkeypatch.setattr(data.queries, "list_inspections", лежит)
+
+    # Act / Assert
+    with pytest.raises(DbError):
+        data.load_registry(tenant=ТЕНАНТ, limit=10)
+
+
+def test_аудитор_не_отклоняет_проверку(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange — до 24.09.2026 маршрут проверял только вход, и отклонить
+    # проверку с выносом кадров мог любой вошедший.
+    def отклонить(*_a: Any, **_k: Any) -> Retraction:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(data, "retract_card", отклонить)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
+    )
+    карточка_аудитора = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert — отказ, и формы ему не показывают.
+    assert ответ.status_code == 403
+    assert "/retract" not in карточка_аудитора
+
+
+# --- перенос по дате и пиццерии (D195) ---------------------------------------
+
+
+def _перенос(
+    monkeypatch: pytest.MonkeyPatch, *, история: tuple[Any, ...] = ()
+) -> list[dict[str, Any]]:
+    вызовы: list[dict[str, Any]] = []
+
+    def перенести(inspection_id: str, **kw: Any) -> bool:
+        вызовы.append({"id": inspection_id, **kw})
+        return True
+
+    monkeypatch.setattr(data, "move_card", перенести)
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: история)
+    monkeypatch.setattr(data, "load_units", lambda **_: (("u-1", "Тбилиси-1"), ("u-2", "Батуми-1")))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+    return вызовы
+
+
+@админ
+def test_администратор_переносит_и_автор_берётся_из_сессии(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    вызовы = _перенос(monkeypatch)
+
+    # Act — автор в форме не передаётся: его подставляет вход, а не человек.
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": "не та точка", "actor": "подлог"},
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert ответ.status_code == 200
+    assert вызовы == [
+        {
+            "id": "x",
+            "tenant": ТЕНАНТ,
+            "new_date": "2026-09-01",
+            "new_unit_id": "u-2",
+            "reason": "не та точка",
+            "actor": ЛОГИН,
+        }
+    ]
+    assert "Исправлено." in ответ.get_data(as_text=True)
+
+
+def test_аудитор_не_переносит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    вызовы = _перенос(monkeypatch)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": "не та точка"},
+        headers={"Origin": "http://localhost"},
+    )
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert ответ.status_code == 403
+    assert вызовы == []
+    assert "/move" not in страница
+
+
+@админ
+def test_форма_переноса_и_история_на_карточке(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    след = MoveRecord(
+        moved_at="2026-09-24T15:00+00:00",
+        moved_by="admin",
+        reason="опечатка в названии",
+        old_date="2026-09-21",
+        new_date="2026-09-21",
+        old_unit="Тбилиси -1",
+        new_unit="Тбилиси-1",
+    )
+    _перенос(monkeypatch, история=(след,))
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "/move?lang=" in страница
+    assert "Тбилиси -1, 2026-09-21 → Тбилиси-1, 2026-09-21" in страница
+    assert "опечатка в названии" in страница
+
+
+@админ
+def test_без_истории_формы_переноса_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — схема без 0025: история не читается, и перенос без следа
+    # показывать нельзя.
+    _перенос(monkeypatch)
+
+    def нет_истории(*_a: Any, **_k: Any) -> Any:
+        raise DbError("relation inspection_moves does not exist")
+
+    monkeypatch.setattr(data, "load_moves", нет_истории)
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "/move" not in страница
+    assert "История исправлений сейчас недоступна" in страница
+
+
+@админ
+def test_отказ_переноса_показан_текстом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _перенос(monkeypatch)
+
+    def отказать(*_a: Any, **_k: Any) -> bool:
+        raise MoveError("Не назван повод исправления")
+
+    monkeypatch.setattr(data, "move_card", отказать)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/move",
+        data={"date": "2026-09-01", "unit": "u-2", "reason": ""},
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert "Исправить не удалось: Не назван повод исправления" in ответ.get_data(as_text=True)

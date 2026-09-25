@@ -567,3 +567,63 @@ def test_пустой_отбор_не_сужает_агрегаты(monkeypatch:
     for имя, kwargs in база.звонки.items():
         assert kwargs.get("city") == "", имя
         assert kwargs.get("grade") == "", имя
+
+
+def test_при_выбранной_стране_города_только_её() -> None:
+    # Arrange — 24.09.2026 при выбранной Турции в списке стояли Тбилиси и Батуми.
+    гео = {
+        "Tbilisi-1": ("GE", "tbilisi"),
+        "Tbilisi-2": ("GE", "tbilisi"),
+        "Antalya-1": ("TR", "antalya"),
+    }
+
+    # Act
+    страны, города = ov._geo_choices(гео, selection=ov.Selection(country="TR"))
+
+    # Assert — страны все (иначе на другую не переключиться), города — турецкие.
+    assert страны == (("GE", 2), ("TR", 1))
+    assert города == (("antalya", 1),)
+
+
+def test_строка_разбивки_ведёт_в_реестр_проверок_города(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    данные = снимок(
+        breakdown=(
+            ov.CityRow(
+                city="tbilisi",
+                country="GE",
+                units=3,
+                inspections=2,
+                average=90.0,
+                comparable=True,
+                grades=(),
+                critical=0,
+                delta=None,
+            ),
+        )
+    )
+
+    # Act
+    страница = показать(стенд, monkeypatch, данные)
+
+    # Assert — ссылка несёт код города, а на экране город словом.
+    assert 'href="/inspections?city=tbilisi' in страница
+    assert "Тбилиси" in страница
+    assert ">tbilisi<" not in страница
+
+
+def test_точки_справочника_считаются_в_выбранном_месте() -> None:
+    # Arrange — 25.09.2026 при Грузии плитка показывала 151 точку всей сети.
+    гео = {
+        "Tbilisi-1": ("GE", "tbilisi"),
+        "Batumi-1": ("GE", "batumi"),
+        "Antalya-1": ("TR", "antalya"),
+    }
+
+    # Act / Assert
+    assert ov._units_in(гео, selection=ov.Selection(country="GE")) == 2
+    assert ov._units_in(гео, selection=ov.Selection(city="batumi")) == 1
+    assert ov._units_in(гео, selection=ov.Selection(country="RS")) == 0
+    assert ov._units_in(гео, selection=ov.Selection(grade="D")) is None

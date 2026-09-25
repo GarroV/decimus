@@ -53,6 +53,8 @@ LANG_LABELS: dict[str, str] = {
 
 NEW_INSPECTION_CALLBACK = "start:new"
 KIND_PREFIX = "start:kind:"
+#: Выбор пиццерии из подсказок справочника (D196): за префиксом — номер варианта.
+UNIT_PICK_PREFIX = "start:unit:"
 LANG_PREFIX = "start:lang:"
 RESUME_CONTINUE_CALLBACK = "start:resume:continue"
 RESUME_NEW_CALLBACK = "start:resume:new"
@@ -91,6 +93,19 @@ def new_inspection_keyboard(lang: str) -> InlineKeyboardMarkup:
             text=t("btn.new_inspection", lang), callback_data=NEW_INSPECTION_CALLBACK
         )
     )
+    return builder.as_markup()
+
+
+def unit_pick_keyboard(names: tuple[str, ...]) -> InlineKeyboardMarkup:
+    """Ближайшие пиццерии справочника — по одной в ряд (D196).
+
+    В данные кнопки уходит номер, а не название: у Telegram предел в 64 байта,
+    и кириллическое имя с номером точки в него не влезает гарантированно.
+    """
+    builder = InlineKeyboardBuilder()
+    for номер, имя in enumerate(names):
+        builder.button(text=имя, callback_data=f"{UNIT_PICK_PREFIX}{номер}")
+    builder.adjust(1)
     return builder.as_markup()
 
 

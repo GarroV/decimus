@@ -19,17 +19,21 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from datetime import date
 
 from src.db import letters as letters_store
-from src.db import queries, retract
-from src.db.config import DATABASE_RETRACTION_URL_VAR, load_retraction_settings
-from src.db.errors import DbError
+from src.db import move, queries, retract
+from src.db.config import load_retraction_settings
+from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow
 from src.domain.models import TEXT_LANGS
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -64,9 +68,30 @@ def retraction_available() -> bool:
 
 def load_registry(*, tenant: str, limit: int) -> Registry:
     """Проверки тенанта, свежие по дате обхода — первыми."""
-    visible = retraction_available()
-    rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=visible)
-    return Registry(rows=tuple(rows), retracted_visible=visible)
+    if retraction_available():
+        try:
+            rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=True)
+            return Registry(rows=tuple(rows), retracted_visible=True)
+        except DbError as exc:
+            _log_admin_read_failed("реестр", exc)
+    rows = queries.list_inspections(tenant=tenant, limit=limit)
+    return Registry(rows=tuple(rows), retracted_visible=False)
+
+
+def _log_admin_read_failed(where: str, exc: DbError) -> None:
+    """Сбой подключения администратора истории — в лог, а экран живёт дальше.
+
+    Настройка необязательная, и ронять из-за неё главный экран нельзя (#307):
+    21.09.2026 неверный адрес этого подключения давал 503 «База недоступна» на
+    всём реестре при живой базе, а в логе не было ни строки. Экран читается
+    обычной ролью — без снятых, — а причина уходит сюда, чтобы её было где
+    найти. Если лежит сама база, обычное чтение упадёт следом и честно даст 503.
+    """
+    logger.warning(
+        "%s: чтение под администратором истории не удалось, показано без снятых: %s",
+        where,
+        exc,
+    )
 
 
 def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
@@ -76,9 +101,12 @@ def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
     когда снятые не видны: «такой проверки нет» и «вам её не видно» снаружи
     неразличимы намеренно (`queries.get_inspection`).
     """
-    return queries.get_inspection(
-        inspection_id, tenant=tenant, include_retracted=retraction_available()
-    )
+    if retraction_available():
+        try:
+            return queries.get_inspection(inspection_id, tenant=tenant, include_retracted=True)
+        except DbError as exc:
+            _log_admin_read_failed("карточка проверки", exc)
+    return queries.get_inspection(inspection_id, tenant=tenant)
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
@@ -183,10 +211,54 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
     return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
 
 
-#: Имя переменной подключения администратора истории — для текста на странице.
-#: Пересказывать её строкой в шаблоне нельзя: переименуют в `db`, а здесь
-#: останется старое имя, и человек пойдёт заводить несуществующую переменную.
-RETRACTION_URL_VAR = DATABASE_RETRACTION_URL_VAR
+def load_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+    """География точек `{название: (страна, город)}` — для отбора реестра.
+
+    Отказ базы здесь — не повод не показать реестр: без географии отбор по
+    стране и городу просто не предлагается, а список проверок остаётся.
+    """
+    try:
+        return queries.unit_geography(tenant=tenant)
+    except DbError as exc:
+        logger.warning("география точек недоступна, отбор по месту не показан: %s", exc)
+        return {}
+
+
+def move_card(
+    inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
+) -> bool:
+    """Перенести проверку по дате и пиццерии (D195). Отказ — `MoveError`.
+
+    Здесь только разбор даты из формы. Обязательность причины, запрет на
+    отклонённую и чужую пиццерию — правила переноса, они живут в
+    `src/db/move.py` и в самой базе.
+    """
+    try:
+        дата = date.fromisoformat((new_date or "").strip())
+    except ValueError:
+        raise MoveError("Дата не указана или указана не в формате ГГГГ-ММ-ДД") from None
+    return move.move_inspection(
+        inspection_id,
+        tenant=tenant,
+        new_date=дата,
+        new_unit_id=new_unit_id,
+        reason=reason,
+        actor=actor,
+    )
+
+
+def load_moves(inspection_id: str, *, tenant: str) -> tuple[move.MoveRecord, ...]:
+    """История переносов карточки, свежие первыми."""
+    return move.list_moves(inspection_id, tenant=tenant)
+
+
+def load_units(*, tenant: str) -> tuple[tuple[str, str], ...]:
+    """Пиццерии справочника для выбора при переносе: `(id, название)` по алфавиту."""
+    return tuple(
+        sorted(
+            ((ид, имя) for имя, ид in queries.unit_ids(tenant=tenant).items()), key=lambda x: x[1]
+        )
+    )
 
 
 def saved_letter(
