@@ -637,6 +637,38 @@ def set_scoring(
         raise _refusal(отказ) from None
 
 
+def load_route(store: Store, *, tenant: str, version: str | None = None) -> dict[str, Any]:
+    """Порядок обхода версии — как его получит аудитор на точке (#384)."""
+    try:
+        return door.route(tenant=tenant, store=store, version=version or tip_version(store))
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_route_zones(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    zones: list[str],
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Порядок зон в обходе. Коды сверяет дверь: движок маршрут не читает."""
+    try:
+        return _edit(
+            door.set_route(
+                tenant=tenant,
+                store=store,
+                zones=zones,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def publish_version(store: Store, *, tenant: str, version: str) -> str:
     """Сделать версию действующей — отдельным шагом, а не вместе с правкой (D049).
 

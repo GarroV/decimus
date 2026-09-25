@@ -231,3 +231,25 @@ def diff_zones(
     пропавшие = [c for c in было if c not in стало]
     изменения += [Change(code=c, kind="zone", fields=_fields(было[c], {})) for c in пропавшие]
     return tuple(изменения)
+
+
+def route_order(numbers: Mapping[str, str], current: Sequence[str]) -> list[str]:
+    """Порядок зон из формы «№ в обходе».
+
+    Зоны с номером идут по номеру (равные — в прежнем порядке), без номера или
+    с негодным номером — следом, тоже в прежнем порядке: пустое поле значит
+    «не трогать», а не «в конец» и не «убрать из обхода».
+    """
+    место = {код: i for i, код in enumerate(current)}
+
+    def номер(код: str) -> float | None:
+        try:
+            return float((numbers.get(код) or "").strip().replace(",", "."))
+        except ValueError:
+            return None
+
+    с_номером = sorted(
+        (код for код in current if номер(код) is not None),
+        key=lambda код: (номер(код), место[код]),
+    )
+    return с_номером + [код for код in current if номер(код) is None]

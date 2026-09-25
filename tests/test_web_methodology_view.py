@@ -104,3 +104,18 @@ def test_разница_зон_видит_долю() -> None:
         [{"code": "hall", "share_pct": "10"}], [{"code": "hall", "share_pct": "12"}]
     )
     assert (c.code, c.kind, c.fields) == ("hall", "zone", (("share_pct", "10", "12"),))
+
+
+def test_порядок_обхода_по_номерам_а_без_номера_следом() -> None:
+    # Arrange — сейчас: hall, kitchen, dough, facade.
+    сейчас = ["hall", "kitchen", "dough", "facade"]
+
+    # Act — кухню первой, зал вторым; тесто и фасад без номера.
+    порядок = mv.route_order({"kitchen": "1", "hall": "2", "dough": "", "facade": "x"}, сейчас)
+
+    # Assert
+    assert порядок == ["kitchen", "hall", "dough", "facade"]
+
+
+def test_равные_номера_сохраняют_прежний_порядок() -> None:
+    assert mv.route_order({"a": "1", "b": "1"}, ["b", "a"]) == ["b", "a"]

@@ -34,6 +34,25 @@
     }
     if (handled) event.preventDefault();
   });
+  // «Набрано» под долями зон — подсказка при вводе, а не проверка: сумму
+  // судит движок, и версию с несошедшейся он не примет.
+  var sharesForm = document.querySelector("[data-mx-shares]");
+  var sumCell = document.querySelector("[data-mx-share-sum]");
+  function recount() {
+    var total = 0;
+    var ok = true;
+    sharesForm.querySelectorAll("[data-mx-share]").forEach(function (input) {
+      var raw = input.value.trim().replace(",", ".");
+      if (raw === "") return;
+      var n = Number(raw);
+      if (isNaN(n)) ok = false; else total += n;
+    });
+    sumCell.textContent = ok ? (Math.round(total * 100) / 100) + "%" : "—";
+  }
+  if (sharesForm && sumCell) {
+    sharesForm.addEventListener("input", recount);
+    recount();
+  }
   // Выбранный пункт — на виду: после перехода стрелкой список не должен
   // оставлять его за краем экрана.
   var current = document.querySelector(".mx-row.is-on");
