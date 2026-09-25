@@ -407,6 +407,160 @@ def restore_item(
         raise _refusal(отказ) from None
 
 
+# --- зоны: состав и доли (T348) ------------------------------------------------
+#
+# Своих правил здесь нет: всё идёт дверями MCP (T313), теми же, что у пунктов.
+# Экран добавляет ровно одно — разбор того, что человек напечатал в форме.
+
+
+def _share(value: str | None, *, zone: str) -> float:
+    """Доля зоны числом. Не число — отказ, а не подставленный ноль.
+
+    Доля — вес зоны в оценке, то есть цена ответа. Ноль вместо непонятного
+    ввода сделал бы зону бесплатной, и проверка посчиталась бы по не той цене
+    молча. Запятая принимается наравне с точкой: человек печатает «33,3».
+    """
+    text = _maybe(value)
+    if text is None:
+        raise MethodologyRefused(
+            f"Доля зоны «{zone}» не заполнена. Доли задаются набором сразу и обязаны сойтись к 100%"
+        )
+    try:
+        return float(text.replace(",", "."))
+    except ValueError:
+        raise MethodologyRefused(
+            f"Доля зоны «{zone}» — «{text}», а это не число. Доля задаёт вес зоны "
+            f"в оценке, поэтому подставить вместо непонятного ввода ноль нельзя"
+        ) from None
+
+
+def add_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    name_ru: str,
+    name_en: str | None = None,
+    share: str | None = None,
+    equal_shares: bool = False,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Завести зону — новой версией методики.
+
+    Что делать с долями, форма обязана сказать явно: либо уравнять доли всех
+    зон, либо назвать долю новой. Иначе сумма перестанет сходиться к 100%, и
+    версию не примет уже движок — на экран это вернётся отказом, а не тишиной.
+    """
+    try:
+        return _edit(
+            door.add_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                name_ru=name_ru,
+                name_en=_maybe(name_en),
+                share=_share(share, zone=code) if _maybe(share) is not None else None,
+                equal_shares=equal_shares or None,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def rename_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    name_ru: str | None = None,
+    name_en: str | None = None,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Переименовать зону. Код зоны не меняется никогда — им она связана с пунктами."""
+    try:
+        return _edit(
+            door.rename_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                name_ru=_maybe(name_ru),
+                name_en=_maybe(name_en),
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_zone_shares(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    shares: Mapping[str, str | None],
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Задать доли зон набором сразу.
+
+    Набором, а не по одной: доли складываются в 100%, и правка одной доли до
+    расчёта не дошла бы вовсе — версию с несошедшейся суммой хранилище не
+    примет. Поэтому форма отдаёт все доли разом, а отказ приходит один.
+    """
+    разобранные = {код: _share(значение, zone=код) for код, значение in shares.items()}
+    try:
+        return _edit(
+            door.set_zone_shares(
+                tenant=tenant,
+                store=store,
+                shares=разобранные,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def remove_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    equal_shares: bool = False,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Убрать зону. Её доля освобождается, и раздать её за человека нельзя.
+
+    `equal_shares` уравнивает доли оставшихся; без него доли остаются как были,
+    сумма не сходится и версия не принимается. Это не придирка формы, а то же
+    правило двери: расклад весов называет управляющая компания.
+    """
+    try:
+        return _edit(
+            door.remove_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                equal_shares=equal_shares or None,
+                keep_shares=None if equal_shares else True,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def publish_version(store: Store, *, tenant: str, version: str) -> str:
     """Сделать версию действующей — отдельным шагом, а не вместе с правкой (D049).
 

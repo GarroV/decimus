@@ -243,9 +243,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             period=request.args.get("period", "all").strip()[:8],
             sort=request.args.get("sort", "score").strip()[:8],
         )
-        snapshot = overview_data.load(
-            tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection
-        )
+        snapshot = overview_data.load(tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection)
         registry_path = section("registry").path
 
         def отбор(**изменения: str) -> str:
@@ -274,6 +272,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 if значение and умолчания.get(ключ) != значение
             }
             return url_for("overview", **живые)
+
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         среднее = (
             t("overview.tile.note.average_none", _lang(conf))
@@ -309,15 +308,15 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="average",
-                value="—" if snapshot.average is None or not snapshot.comparable
+                value="—"
+                if snapshot.average is None or not snapshot.comparable
                 else f"{snapshot.average:.1f}",
                 note=среднее,
                 href=registry_path,
                 # Движение показывается только там, где его есть с чем
                 # сравнить И где сравнение законно: ряд одного издания
                 # методики против такого же ряда прошлого периода (T349).
-                delta="" if snapshot.average_delta is None
-                else f"{snapshot.average_delta:+.1f}",
+                delta="" if snapshot.average_delta is None else f"{snapshot.average_delta:+.1f}",
                 tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
             ),
             overview_data.Tile(
@@ -364,9 +363,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 label=t("overview.filter.period", язык),
                 empty_title=t("overview.period.all", язык),
                 current="" if selection.period == "all" else selection.period,
-                values=tuple(
-                    (код, None) for код in overview_data.PERIODS if код != "all"
-                ),
+                values=tuple((код, None) for код in overview_data.PERIODS if код != "all"),
                 href=lambda значение: отбор(period=значение or "all"),
                 title=lambda код: t("overview.period." + код, язык),
             )
@@ -850,6 +847,88 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             ),
         )
         return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/zones")
+    def methodology_zone_add() -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.add_zone(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=(form.get("code") or "").strip(),
+                name_ru=(form.get("name_ru") or "").strip(),
+                name_en=form.get("name_en"),
+                share=form.get("share"),
+                equal_shares=bool(form.get("equal_shares")),
+                note=form.get("note"),
+                version_name=form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/zones/shares")
+    def methodology_zone_shares() -> str:
+        refuse_foreign_origin()
+        # Доли приезжают полями `share_<код>` и отправляются ВСЕ разом: сумма
+        # обязана сойтись к 100%, поэтому правка одной доли до расчёта не дошла
+        # бы вовсе — версию с несошедшейся суммой хранилище не примет.
+        доли = {
+            имя[len("share_") :]: значение
+            for имя, значение in request.form.items()
+            if имя.startswith("share_")
+        }
+        итог = _apply(
+            conf,
+            lambda store, автор: method.set_zone_shares(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                shares=доли,
+                note=request.form.get("note"),
+                version_name=request.form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/zones/<code>/rename")
+    def methodology_zone_rename(code: str) -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.rename_zone(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=code,
+                name_ru=form.get("name_ru"),
+                name_en=form.get("name_en"),
+                note=form.get("note"),
+                version_name=form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
+    @app.post(f"{путь}/zones/<code>/remove")
+    def methodology_zone_remove(code: str) -> str:
+        refuse_foreign_origin()
+        form = request.form
+        итог = _apply(
+            conf,
+            lambda store, автор: method.remove_zone(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                code=code,
+                equal_shares=bool(form.get("equal_shares")),
+                note=form.get("note"),
+                version_name=form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
     @app.post(f"{путь}/publish")
     def methodology_publish() -> str:
