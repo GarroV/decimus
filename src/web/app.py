@@ -30,6 +30,7 @@ from src.domain.kinds import kind_title
 from . import accounts, assets, auth, letter_draft, view
 from . import inspections as data
 from . import methodology as method
+from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
 from .config import Settings, load_settings
@@ -149,6 +150,16 @@ def _wip_view(key: str) -> Any:
 
     render.__name__ = f"wip_{key}"
     return render
+
+
+def _url(endpoint: str, **params: Any) -> str:
+    """`url_for` для параметров, собранных словарём.
+
+    Заглушки Flask типизируют `url_for(**dict[str, str])` против его булевых
+    `_external`/`_scheme`, и каждый такой вызов светился ошибкой типов. Смысл
+    тот же — это только честная сигнатура для вызова со словарём.
+    """
+    return url_for(endpoint, **params)
 
 
 @dataclass(frozen=True)
@@ -276,7 +287,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 for ключ, значение in параметры.items()
                 if значение and умолчания.get(ключ) != значение
             }
-            return url_for("overview", **живые)
+            return _url("overview", **живые)
 
         def в_реестр(city: str | None = None) -> str:
             """Проверки этого среза в разделе «Проверки» — клик по городу (24.09.2026).
@@ -291,7 +302,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 "grade": selection.grade,
                 "lang": _lang(conf),
             }
-            return url_for("registry", **{к: з for к, з in параметры.items() if з})
+            return _url("registry", **{к: з for к, з in параметры.items() if з})
 
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         среднее = (
@@ -507,7 +518,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 **изменения,
             }
             живые = {ключ: значение for ключ, значение in параметры.items() if значение}
-            return url_for("registry", **живые)
+            return _url("registry", **живые)
 
         язык = _lang(conf)
         # Буквы — шкалой со счётом по выборке: сколько проверок за каждой.
@@ -879,6 +890,22 @@ def _render_card(
     )
 
 
+def _joined(form: Any, name: str, sep: str) -> str | None:
+    """Плашки выбора (несколько значений одного поля) — в ячейку методики.
+
+    Классы пишутся через `;`, зоны через `,` — как их читает движок. «Все зоны»
+    (`*`) поглощает остальные: пункт «все зоны + кухня» это просто все зоны.
+    Ничего не выбрано — `None`, то есть «не трогать»: так поле не приходит
+    вовсе из формы, где его нет.
+    """
+    значения = [v.strip() for v in form.getlist(name) if v and v.strip()]
+    if not значения:
+        return None
+    if name == "zones" and mview.ALL_ZONES in значения:
+        return mview.ALL_ZONES
+    return sep.join(значения)
+
+
 def _register_methodology(app: Flask, conf: Settings) -> None:
     """Раздел «Методика»: состав чек-листа, правка, публикация отдельным шагом.
 
@@ -898,8 +925,10 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=None, failure=None)
 
     @app.get(f"{путь}/items/<code>")
-    def methodology_item(code: str) -> str:
-        return _render_item(conf, code=code, notice=None, failure=None)
+    def methodology_item(code: str) -> Response:
+        # Карточка пункта теперь — панель экрана чек-листа (D197). Старый адрес
+        # живёт перенаправлением: на него ведут ссылки из писем и журналов.
+        return redirect(_url("methodology", **request.args.to_dict(), item=code))
 
     @app.post(f"{путь}/items")
     def methodology_add() -> str:
@@ -913,11 +942,11 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 author=автор,
                 process=(form.get("process") or "").strip(),
                 question_ru=(form.get("question_ru") or "").strip(),
-                levels=(form.get("levels") or "").strip(),
+                levels=_joined(form, "levels", ";") or "",
                 code=form.get("code"),
                 process_en=form.get("process_en"),
                 question_en=form.get("question_en"),
-                zones=form.get("zones"),
+                zones=_joined(form, "zones", ","),
                 days=form.get("days"),
                 criteria=form.get("criteria"),
                 kind=form.get("kind"),
@@ -942,15 +971,15 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 process_en=form.get("process_en"),
                 question_ru=form.get("question_ru"),
                 question_en=form.get("question_en"),
-                levels=form.get("levels"),
-                zones=form.get("zones"),
+                levels=_joined(form, "levels", ";"),
+                zones=_joined(form, "zones", ","),
                 days=form.get("days"),
                 criteria=form.get("criteria"),
                 note=form.get("note"),
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/disable")
     def methodology_disable(code: str) -> str:
@@ -966,7 +995,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=request.form.get("version_name"),
             ),
         )
-        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/restore")
     def methodology_restore(code: str) -> str:
@@ -982,7 +1011,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=request.form.get("version_name"),
             ),
         )
-        return _render_item(conf, code=code, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/publish")
     def methodology_publish() -> str:
@@ -992,7 +1021,9 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         if state.store is None:
             return _render_methodology(conf, notice=None, failure=None)
         try:
-            опубликована = method.publish_version(state.store, tenant=conf.tenant, version=version)
+            # Публикуется версия ПОКАЗАННОГО чек-листа, а не корня хранилища (#382).
+            склад = method.store_for(state.store, _который(request))
+            опубликована = method.publish_version(склад, tenant=conf.tenant, version=version)
         except MethodologyRefused as отказ:
             return _render_methodology(conf, notice=None, failure=str(отказ))
         return _render_methodology(
@@ -1173,20 +1204,44 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
 
 
-def _render_methodology(conf: Settings, *, notice: str | None, failure: str | None) -> str:
-    """Состав выбранной версии, список версий и формы правки.
+def _который_показан(перечень: list[Any], попросили: str | None) -> str | None:
+    """Код чек-листа на экране: названный в адресе или применённый к проду.
+
+    Код держится в КАЖДОМ адресе и действии экрана явно (#382): до 25.09.2026
+    формы правки теряли `?checklist=`, и правка открытого чернового чек-листа
+    молча записывалась в боевой.
+    """
+    if попросили:
+        return попросили
+    return next((c.code for c in перечень if c.in_production), None)
+
+
+def _render_methodology(
+    conf: Settings,
+    *,
+    notice: str | None,
+    failure: str | None,
+    item: str | None = None,
+) -> str:
+    """Чек-лист в три колонки (D197): чек-листы, пункты, панель пункта.
 
     Хранилище не настроено — страница называет незаданные переменные поимённо и
-    состава не показывает вовсе: пустая таблица читалась бы как «чек-лист пуст».
+    состава не показывает вовсе: пустой список читался бы как «чек-лист пуст».
+    Панель — часть той же страницы и того же адреса (`?item=`): её можно
+    переслать ссылкой, обновить и открыть без скрипта.
     """
     state = method.load_store()
     if state.store is None:
         return render_template("methodology/unset.html", missing=state.missing)
+    lang = _lang(conf)
     попросили = (request.args.get("version") or "").strip() or None
-    # Какой чек-лист смотрим. Не назван — тот, что применён к проду: экран
-    # открывался так до множественности и обязан открываться так и дальше.
     try:
-        склад = method.store_for(state.store, _который(request))
+        перечень = method.checklists_overview(state.store)
+    except MethodologyRefused as отказ:
+        перечень, failure = [], failure or str(отказ)
+    код = _который_показан(перечень, _который(request))
+    try:
+        склад = method.store_for(state.store, код)
     except MethodologyRefused as отказ:
         склад, failure = state.store, failure or str(отказ)
     try:
@@ -1194,46 +1249,122 @@ def _render_methodology(conf: Settings, *, notice: str | None, failure: str | No
     except MethodologyRefused as отказ:
         состав = method.load_composition(склад, tenant=conf.tenant)
         failure = failure or str(отказ)
+    отбор = mview.parse_filter(request.args)
+    выбран = item or (request.args.get("item") or "").strip() or None
+    новый = request.args.get("new") == "1" and состав.is_latest
+
+    def адрес(**изменения: str) -> str:
+        """Адрес этого экрана с тем же чек-листом, версией и отбором."""
+        параметры = {
+            "checklist": код or "",
+            "version": попросили or "",
+            "q": отбор.q,
+            "level": отбор.level,
+            "zone": отбор.zone,
+            "off": "1" if отбор.off else "",
+            "group": "" if отбор.group == mview.GROUPINGS[0] else отбор.group,
+            "item": выбран or "",
+            "lang": lang,
+            **изменения,
+        }
+        return _url("methodology", **{к: з for к, з in параметры.items() if з})
+
+    def действие(endpoint: str, **ключи: str) -> str:
+        """Адрес формы: несёт тот же чек-лист и отбор, чтобы итог лёг на тот же экран."""
+        параметры = {
+            "checklist": код or "",
+            "q": отбор.q,
+            "level": отбор.level,
+            "zone": отбор.zone,
+            "off": "1" if отбор.off else "",
+            "group": "" if отбор.group == mview.GROUPINGS[0] else отбор.group,
+            "lang": lang,
+        }
+        живые = {к: з for к, з in параметры.items() if з}
+        return _url(endpoint, **ключи, **живые)
+
+    видимые = mview.select(состав.items, отбор)
+    зоны = {
+        z.get("code", ""): (z.get(f"name_{lang}") or z.get("name_ru") or z.get("code", ""))
+        for z in состав.zones
+    }
+    карточка = None
+    if выбран and not новый:
+        try:
+            карточка = method.load_item(склад, tenant=conf.tenant, code=выбран, version=попросили)[
+                "item"
+            ]
+        except MethodologyRefused as отказ:
+            failure = failure or str(отказ)
+    раньше, позже = mview.neighbours(видимые, выбран or "")
     return render_template(
         "methodology/index.html",
         composition=состав,
+        checklists=перечень,
+        checklist_code=код,
         needs_name=method.needs_set_name(состав),
-        columns=method.ITEM_COLUMNS,
         kinds=method.ITEM_KINDS,
         max_note=method.MAX_NOTE,
+        item_filter=отбор,
+        groups=mview.group(видимые, отбор.group),
+        shown=len(видимые),
+        total=sum(1 for x in состав.items if отбор.off or not mview.is_off(x)),
+        picks=_methodology_picks(состав, отбор, адрес, зоны, lang),
+        zone_names=зоны,
+        level_choices=mview.level_options(состав.items),
+        zone_choices=mview.zone_options(состав.items, состав.zones),
+        levels_of=mview.levels_of,
+        zones_of=mview.zones_of,
+        is_off=mview.is_off,
+        selected=выбран,
+        card=карточка,
+        adding=новый,
+        prev_href=адрес(item=раньше) if раньше else None,
+        next_href=адрес(item=позже) if позже else None,
+        href=адрес,
+        action=действие,
         notice=notice,
         failure=failure,
     )
 
 
-def _render_item(conf: Settings, *, code: str, notice: str | None, failure: str | None) -> str:
-    """Пункт целиком: все колонки, критерии и правка.
-
-    Правка показывается только у самой свежей записанной версии. У старой её
-    быть не может: дверь стакает правку на свежую, и форма под старым составом
-    обещала бы поправить то, что на экране, а поправила бы другое.
-    """
-    state = method.load_store()
-    if state.store is None:
-        return render_template("methodology/unset.html", missing=state.missing)
-    попросили = (request.args.get("version") or "").strip() or None
-    try:
-        склад = method.store_for(state.store, _который(request))
-        карточка = method.load_item(склад, tenant=conf.tenant, code=code, version=попросили)
-    except MethodologyRefused as отказ:
-        return _render_methodology(conf, notice=None, failure=str(отказ))
-    версия = str(карточка["version"])
-    состав = method.load_composition(склад, tenant=conf.tenant)
-    return render_template(
-        "methodology/item.html",
-        item=карточка["item"],
-        version=версия,
-        latest=состав.latest,
-        current=состав.current,
-        needs_name=method.needs_set_name(состав),
-        max_note=method.MAX_NOTE,
-        notice=notice,
-        failure=failure,
+def _methodology_picks(
+    состав: Any,
+    отбор: mview.ItemFilter,
+    адрес: Callable[..., str],
+    зоны: dict[str, str],
+    lang: str,
+) -> tuple[Pick, ...]:
+    """Чипы над списком пунктов: класс, зона, группировка."""
+    return (
+        _pick(
+            label=t("methodology.pick.level", lang),
+            empty_title=t("methodology.pick.level.all", lang),
+            current=отбор.level,
+            values=mview.level_options(состав.items),
+            href=lambda значение: адрес(level=значение, item=""),
+        ),
+        _pick(
+            label=t("methodology.pick.zone", lang),
+            empty_title=t("methodology.pick.zone.all", lang),
+            current=отбор.zone,
+            values=mview.zone_options(состав.items, состав.zones),
+            href=lambda значение: адрес(zone=значение, item=""),
+            title=lambda код: зоны.get(код, код),
+        ),
+        Pick(
+            label=t("methodology.pick.group", lang),
+            current="" if отбор.group == mview.GROUPINGS[0] else отбор.group,
+            current_title=t(f"methodology.group.{отбор.group}", lang),
+            options=tuple(
+                PickOption(
+                    title=t(f"methodology.group.{g}", lang),
+                    href=адрес(group="" if g == mview.GROUPINGS[0] else g),
+                    selected=g == отбор.group,
+                )
+                for g in mview.GROUPINGS
+            ),
+        ),
     )
 
 

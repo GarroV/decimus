@@ -89,7 +89,7 @@
       </nav>
     {% endif %}
 
-    <main class="page shell__main">
+    <main class="page{% block page_class %}{% endblock %} shell__main">
       {% block body %}{% endblock %}
     </main>
   </div>

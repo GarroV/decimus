@@ -270,3 +270,56 @@ def test_оба_языка_интерфейса(клиент: FlaskClient) -> No
 
     assert "Versions" in английская
     assert "Версии" in русская
+
+
+# --- экран в три колонки (D197) -------------------------------------------------
+
+
+def test_пункт_открывается_панелью_по_адресу(клиент: FlaskClient) -> None:
+    # Arrange
+    войти(клиент)
+
+    # Act — адрес панели можно переслать: он сам открывает пункт.
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+
+    # Assert — панель с правкой этого пункта, листание к соседу, закрытие.
+    assert 'class="mx-panel__code mono">CLN01<' in страница
+    assert 'action="/admin/items/CLN01?' in страница
+    assert "data-mx-next" in страница
+    assert "data-mx-close" in страница
+
+
+def test_старый_адрес_пункта_ведёт_в_панель(клиент: FlaskClient) -> None:
+    войти(клиент)
+    ответ = клиент.get("/admin/items/CLN02?lang=en")
+    assert ответ.status_code == 302
+    assert "item=CLN02" in (ответ.headers.get("Location") or "")
+
+
+def test_поиск_сужает_список(клиент: FlaskClient) -> None:
+    # Arrange
+    войти(клиент)
+
+    # Act
+    страница = клиент.get("/admin?q=CLN02").get_data(as_text=True)
+
+    # Assert
+    assert 'data-mx-item="CLN02"' in страница
+    assert 'data-mx-item="CLN01"' not in страница
+
+
+def test_правка_плашками_классов_пишет_их_через_точку_с_запятой(клиент: FlaskClient) -> None:
+    # Arrange — плашки приходят несколькими значениями одного поля.
+    войти(клиент)
+    состояние = method.load_store()
+    assert состояние.store is not None
+
+    # Act
+    ответ = клиент.post(
+        "/admin/items/CLN01", data={"levels": ["D1", "D2"]}, headers={"Origin": СВОЙ}
+    )
+
+    # Assert — записано в формате методики, а не одним первым значением.
+    assert ответ.status_code == 200
+    пункт = method.load_item(состояние.store, tenant=ТЕНАНТ, code="CLN01")["item"]
+    assert пункт["levels"] == "D1;D2"

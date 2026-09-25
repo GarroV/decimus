@@ -987,10 +987,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.version.badge.published": {"ru": "действует", "en": "in effect"},
     "methodology.version.badge.draft": {"ru": "не опубликована", "en": "not published"},
-    "methodology.draft.title": {
-        "ru": "Есть записанная версия, которой движок ещё не видит",
-        "en": "A stored version the engine does not read yet",
-    },
     "methodology.draft.text": {
         "ru": (
             "Записана {latest}, а проверки считаются по {current}. Публикация переставляет "
@@ -1045,7 +1041,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.versions.title": {"ru": "Версии", "en": "Versions"},
     "methodology.versions.col.version": {"ru": "Версия", "en": "Version"},
-    "methodology.versions.col.name": {"ru": "Набор", "en": "Set"},
     "methodology.versions.col.day": {"ru": "Издана", "en": "Issued"},
     "methodology.versions.hint": {
         "ru": "Версии не удаляются никогда: по ним посчитаны отчёты. Откат — публикация прежней.",
@@ -1055,15 +1050,58 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.items.title": {"ru": "Пункты", "en": "Items"},
-    "methodology.col.id": {"ru": "Код", "en": "Code"},
-    "methodology.col.kind": {"ru": "Вид строки", "en": "Row kind"},
-    "methodology.col.process_ru": {"ru": "Процесс", "en": "Process"},
-    "methodology.col.question_ru": {"ru": "Формулировка", "en": "Wording"},
-    "methodology.col.levels": {"ru": "Классы", "en": "Levels"},
-    "methodology.col.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.col.days": {"ru": "Срок, дней", "en": "Days"},
+    # Экран чек-листа в три колонки (D197).
+    "methodology.lists.title": {"ru": "Чек-листы", "en": "Checklists"},
+    "methodology.lists.prod": {"ru": "в проде", "en": "in production"},
+    "methodology.lists.manage": {
+        "ru": "Завести чек-лист, сменить состояние, применить к проду",
+        "en": "Create a checklist, change its state, apply to production",
+    },
+    "methodology.search.placeholder": {
+        "ru": "Код или слово из формулировки",
+        "en": "Code or a word from the wording",
+    },
+    "methodology.pick.level": {"ru": "Класс", "en": "Level"},
+    "methodology.pick.level.all": {"ru": "все", "en": "all"},
+    "methodology.pick.zone": {"ru": "Зона", "en": "Zone"},
+    "methodology.pick.zone.all": {"ru": "все", "en": "all"},
+    "methodology.pick.group": {"ru": "Группы", "en": "Groups"},
+    "methodology.group.process": {"ru": "по процессу", "en": "by process"},
+    "methodology.group.zone": {"ru": "по зоне", "en": "by zone"},
+    "methodology.group.level": {"ru": "по классу", "en": "by level"},
+    "methodology.off.toggle": {"ru": "Выключенные", "en": "Disabled"},
+    "methodology.off.badge": {"ru": "выключен", "en": "disabled"},
+    "methodology.shown": {"ru": "Показано {shown} из {total}", "en": "{shown} of {total}"},
+    "methodology.add.open": {"ru": "+ Пункт", "en": "+ Item"},
+    "methodology.none.title": {
+        "ru": "Под отбор не попал ни один пункт",
+        "en": "No item matches the filter",
+    },
+    "methodology.none.reset": {"ru": "Снять отбор", "en": "Clear the filter"},
+    "methodology.zone.all": {"ru": "Все зоны", "en": "All zones"},
+    "methodology.days.short": {"ru": "{days} дн.", "en": "{days} d"},
+    "methodology.days.long": {"ru": "{days} дн. на устранение", "en": "{days} days to fix"},
+    "methodology.days.now": {"ru": "немедленно", "en": "immediately"},
+    "methodology.panel.title": {"ru": "Пункт", "en": "Item"},
+    "methodology.panel.close": {"ru": "Закрыть", "en": "Close"},
+    "methodology.panel.prev": {"ru": "Предыдущий пункт", "en": "Previous item"},
+    "methodology.panel.next": {"ru": "Следующий пункт", "en": "Next item"},
+    "methodology.panel.keys": {
+        "ru": "↑ ↓ — соседний пункт · Esc — закрыть · / — поиск",
+        "en": "↑ ↓ — neighbour item · Esc — close · / — search",
+    },
+    "methodology.panel.empty": {
+        "ru": "Выберите пункт в списке — здесь откроется всё, что нужно для правки.",
+        "en": "Pick an item in the list — everything needed to edit it opens here.",
+    },
+    "methodology.prop.levels": {"ru": "Классы", "en": "Levels"},
+    "methodology.prop.zones": {"ru": "Зоны", "en": "Zones"},
+    "methodology.prop.days": {"ru": "Срок", "en": "Deadline"},
+    "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
+    "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
+    "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.prop.save": {"ru": "Записать версию", "en": "Record a version"},
     "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
-    "methodology.zones.col.code": {"ru": "Код", "en": "Code"},
     "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
     "methodology.zones.col.share": {"ru": "Доля, %", "en": "Share, %"},
     "methodology.zones.hint": {
@@ -1094,12 +1132,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.add.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
-    "methodology.edit.title": {"ru": "Поправить пункт", "en": "Edit the item"},
-    "methodology.edit.hint": {
-        "ru": "Меняются только заполненные поля. Пустое поле означает «не трогать».",
-        "en": "Only the fields you fill in are changed. An empty field means «leave as is».",
-    },
-    "methodology.edit.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
     "methodology.disable.submit": {"ru": "Выключить пункт", "en": "Switch the item off"},
     "methodology.disable.hint": {
         "ru": (
@@ -1127,10 +1159,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Semicolon-separated, e.g. D1;D2 — the levels this item can be recorded at.",
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.field.zones.hint": {
-        "ru": "Коды зон через точку с запятой; * — пункт встречается в любой зоне.",
-        "en": "Zone codes, semicolon-separated; * means the item appears in any zone.",
-    },
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
     "methodology.field.days.hint": {
         "ru": (
@@ -1187,14 +1215,11 @@ TEXTS: dict[str, dict[str, str]] = {
             "section is unaffected."
         ),
     },
-    "methodology.item.title": {"ru": "Пункт {code}", "en": "Item {code}"},
-    "methodology.item.back": {"ru": "К составу", "en": "Back to the composition"},
     "methodology.item.criteria.title": {"ru": "Критерии", "en": "Criteria"},
     "methodology.item.criteria.empty": {
         "ru": "Критериев у пункта нет — класс нарушения выводить не из чего.",
         "en": "The item has no criteria — there is nothing to derive the level from.",
     },
-    "methodology.item.fields.title": {"ru": "Как пункт записан", "en": "How the item is stored"},
     "error.not_found.title": {"ru": "Страницы нет", "en": "No such page"},
     "error.not_found.text": {
         "ru": "Такого адреса в админке нет. Разделы — в навигации слева.",
