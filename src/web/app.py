@@ -23,6 +23,7 @@ from werkzeug.wrappers import Response
 
 from src.db import directory
 from src.db.errors import DbError, MoveError, RetractionError
+from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
@@ -33,6 +34,7 @@ from . import overview as overview_data
 from . import unit_card as unit_data
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
+from .geo_names import city_title, country_title
 from .origin import refuse_foreign_origin
 from .sections import SECTIONS, check_registry, section, visible_sections
 from .texts import UI_LANGS, lang_or_default, t
@@ -100,6 +102,9 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "lang": lang,
             "langs": UI_LANGS,
             "t": lambda key, **params: t(key, lang, **params),
+            # Страна и город в справочнике — коды; на экран они идут словом.
+            "city_title": lambda code: city_title(code, lang),
+            "country_title": lambda code: country_title(code, lang),
             # Разделы ОТФИЛЬТРОВАНЫ по роли, а не спрятаны разметкой:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
@@ -273,6 +278,21 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             }
             return url_for("overview", **живые)
 
+        def в_реестр(city: str | None = None) -> str:
+            """Проверки этого среза в разделе «Проверки» — клик по городу (24.09.2026).
+
+            Разбивка отвечает «где плохо», а за ответом человек идёт к самим
+            проверкам: сужать тот же экран было тупиком — те же плитки, меньше
+            строк. Период в реестр не уходит: там его отбора нет.
+            """
+            параметры = {
+                "country": selection.country,
+                "city": city or "",
+                "grade": selection.grade,
+                "lang": _lang(conf),
+            }
+            return url_for("registry", **{к: з for к, з in параметры.items() if з})
+
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         среднее = (
             t("overview.tile.note.average_none", _lang(conf))
@@ -336,7 +356,10 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                     empty_title=t("overview.filter.all_countries", язык),
                     current=selection.country,
                     values=snapshot.countries,
-                    href=lambda значение: отбор(country=значение),
+                    # Смена страны сбрасывает город: город другой страны в
+                    # отборе дал бы пустую выборку без единого объяснения.
+                    href=lambda значение: отбор(country=значение, city=""),
+                    title=lambda код: country_title(код, язык),
                 )
             )
         if snapshot.cities:
@@ -347,6 +370,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                     current=selection.city,
                     values=snapshot.cities,
                     href=lambda значение: отбор(city=значение),
+                    title=lambda код: city_title(код, язык),
                 )
             )
         чипы.append(
@@ -388,6 +412,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             lang=_lang(conf),
             selection=selection,
             select_url=отбор,
+            registry_url=в_реестр,
             periods=tuple(overview_data.PERIODS),
             plans_path=section("plans").path,
             item_titles=_item_titles(conf, _lang(conf)),
@@ -453,14 +478,34 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # но страницу не роняет.
         буква = request.args.get("grade", "").strip().upper()[:1]
         вид = request.args.get("kind", "").strip()[:20]
+        # Страна и город — по справочнику точек, кодами: сюда приводит клик по
+        # городу на «Обзоре», и реестр обязан показать ровно эти проверки.
+        страна = request.args.get("country", "").strip().upper()[:2]
+        город = request.args.get("city", "").strip()[:80]
+        гео = data.load_geography(tenant=conf.tenant)
+
+        def место(row: InspectionRow) -> tuple[str, str]:
+            страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
+            return страна_точки or "", город_точки or ""
+
         строки = tuple(
             row
             for row in registry_data.rows
-            if (not буква or row.grade == буква) and (not вид or row.kind == вид)
+            if (not буква or row.grade == буква)
+            and (not вид or row.kind == вид)
+            and (not страна or место(row)[0] == страна)
+            and (not город or место(row)[1] == город)
         )
 
         def отбор(**изменения: str) -> str:
-            параметры = {"grade": буква, "kind": вид, "lang": _lang(conf), **изменения}
+            параметры = {
+                "country": страна,
+                "city": город,
+                "grade": буква,
+                "kind": вид,
+                "lang": _lang(conf),
+                **изменения,
+            }
             живые = {ключ: значение for ключ, значение in параметры.items() if значение}
             return url_for("registry", **живые)
 
@@ -474,7 +519,46 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             (код, sum(1 for row in registry_data.rows if row.kind == код))
             for код in dict.fromkeys(row.kind for row in registry_data.rows)
         )
-        чипы = [
+        чипы = []
+        страны = tuple(
+            (код, sum(1 for row in registry_data.rows if место(row)[0] == код))
+            for код in sorted({место(row)[0] for row in registry_data.rows} - {""})
+        )
+        # Города — только выбранной страны, как и на «Обзоре».
+        города = tuple(
+            (код, sum(1 for row in registry_data.rows if место(row)[1] == код))
+            for код in sorted(
+                {
+                    место(row)[1]
+                    for row in registry_data.rows
+                    if not страна or место(row)[0] == страна
+                }
+                - {""}
+            )
+        )
+        if страны:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.country", язык),
+                    empty_title=t("overview.filter.all_countries", язык),
+                    current=страна,
+                    values=страны,
+                    href=lambda значение: отбор(country=значение, city=""),
+                    title=lambda код: country_title(код, язык),
+                )
+            )
+        if города:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.city", язык),
+                    empty_title=t("overview.filter.all_cities", язык),
+                    current=город,
+                    values=города,
+                    href=lambda значение: отбор(city=значение),
+                    title=lambda код: city_title(код, язык),
+                )
+            )
+        чипы.append(
             _pick(
                 label=t("overview.filter.grade", язык),
                 empty_title=t("overview.filter.all_grades", язык),
@@ -482,7 +566,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 values=буквы,
                 href=lambda значение: отбор(grade=значение),
             )
-        ]
+        )
         if виды:
             чипы.append(
                 _pick(

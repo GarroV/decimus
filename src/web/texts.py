@@ -68,8 +68,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.y1": {"ru": "год", "en": "a year"},
     "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
     "overview.breakdown.hint": {
-        "ru": "клик — сузить выборку",
-        "en": "click to narrow the selection",
+        "ru": "клик — проверки города",
+        "en": "click — the city's inspections",
     },
     "overview.breakdown.city": {"ru": "Город", "en": "City"},
     "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
