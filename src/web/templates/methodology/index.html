@@ -211,7 +211,9 @@
           <th class="is-text">{{ t('methodology.zones.col.code') }}</th>
           <th class="is-text">{{ t('methodology.zones.col.name') }}</th>
           <th>{{ t('methodology.zones.col.share') }}</th>
-          <th class="is-text">{{ t('methodology.zones.col.actions') }}</th>
+          {% if composition.is_latest %}
+            <th class="is-text">{{ t('methodology.zones.col.actions') }}</th>
+          {% endif %}
         </tr>
       </thead>
       <tbody>
@@ -220,6 +222,7 @@
             <td class="is-text">{{ zone.get('code', '—') }}</td>
             <td class="is-text">{{ zone.get('name_ru') or zone.get('name_en') or '—' }}</td>
             <td class="is-num">{{ zone.get('share_pct') or '—' }}</td>
+            {% if composition.is_latest %}
             <td class="is-text">
               {# Формы лежат в ячейке, а не оборачивают строку: <form> вокруг <tr>
                  разметкой не разрешён, и вложить их в форму долей ниже тоже нельзя. #}
@@ -262,13 +265,14 @@
                 </form>
               </details>
             </td>
+            {% endif %}
           </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 
-  {% if composition.zones %}
+  {% if composition.zones and composition.is_latest %}
     <div class="section mt-gap">
       <div class="section__head">
         <h2 class="section__title">{{ t('methodology.zones.shares.title') }}</h2>
@@ -293,6 +297,7 @@
     </div>
   {% endif %}
 
+  {% if composition.is_latest %}
   <div class="section mt-gap">
     <div class="section__head">
       <h2 class="section__title">{{ t('methodology.zones.add.title') }}</h2>
@@ -320,6 +325,7 @@
       <button class="btn btn--primary" type="submit">{{ t('methodology.zones.add.submit') }}</button>
     </form>
   </div>
+  {% endif %}
 
   <div class="section mt-gap">
     <div class="section__head">
