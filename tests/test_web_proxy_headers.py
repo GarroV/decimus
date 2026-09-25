@@ -22,8 +22,8 @@ from typing import Any
 import pytest
 from waitress import serve
 
-from src.web.__main__ import _proxy_options
 from src.web.config import Settings
+from src.web.proxy import _proxy_options
 
 КЛЮЧ = "ключ-подписи-длиной-не-меньше-тридцати-двух-знаков"
 
