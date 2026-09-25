@@ -101,31 +101,34 @@ async def test_analyze_button_sends_the_frame_with_an_empty_comment(
     assert photo is not None, "разбор голого кадра без самого кадра не имеет смысла"
 
 
-async def test_кадр_с_комментарием_уходит_в_модель_без_картинки(
+async def test_кадр_с_комментарием_уходит_в_модель_вместе_с_картинкой(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Есть комментарий — разбирается комментарий, кадр в модель не идёт (D081).
+    """Кадр с подписью модель видит вместе со словами (D181, снят D081).
 
-    Проверяется двумя фактами сразу, и второй важнее первого: картинки нет в
-    вызове разбора И кадр даже не скачивался у телеграма. Скачивание без
-    отправки было бы тихой платой временем за байты, которые никому не нужны.
+    Боевой случай 25.09.2026: «просроченный чизкейк на витрине», дата на
+    наклейке — и модель, не видевшая кадра, занизила класс. Теперь кадр
+    скачивается и уходит тем же вызовом, а в запрос идёт время отправки, чтобы
+    просрочку по наклейке было чем посчитать.
     """
     started()
-    asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
+    calls: list[dict[str, object]] = []
+
+    def fake(note: str, photo: object = None, zone_hint: object = None, **kw: object) -> object:
+        calls.append({"note": note, "photos": kw.get("photos"), "sent_at": kw.get("sent_at")})
+        return suggestion(candidate("CLN05", "D1", "hot_kitchen"))
+
+    monkeypatch.setattr("src.bot.routers.record.classify", fake)
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    # По словам не виден КЛАСС — грязь это или поломка, — и материал уходит
-    # модели. Подпись вроде «печь в нагаре» до неё не доходит вовсе: сверка со
-    # списком нарушений пишет сразу (T121), а зону ей теперь даёт словарь карты
-    # кадров (T263), так что отказа «зона не названа» больше не случается.
     await feed(dp, bot, photo_message("frame-1", caption="печь, посмотри что тут", message_id=501))
 
-    assert len(asked) == 1
-    note, photo, _zone, _lang = asked[0]
-    assert note == "печь, посмотри что тут"
-    assert photo is None, "кадр с комментарием всё ещё оплачивается как разбор с картинкой"
-    assert [type(c).__name__ for c in session.calls].count("GetFile") == 0
+    assert len(calls) == 1
+    assert calls[0]["note"] == "печь, посмотри что тут"
+    assert len(calls[0]["photos"] or ()) == 1, "кадр с подписью не ушёл в модель"  # type: ignore[arg-type]
+    assert calls[0]["sent_at"], "время отправки не ушло в запрос — просрочку считать нечем"
+    assert [type(c).__name__ for c in session.calls].count("GetFile") == 1
 
 
 async def test_comment_after_the_frame_cancels_the_question(

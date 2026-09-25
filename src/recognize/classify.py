@@ -62,14 +62,24 @@ def needs_photo(note: str) -> bool:
     return not note.strip()
 
 
-#: Сколько кадров делают материал пачкой (D180). Один кадр с комментарием
-#: по-прежнему разбирается по словам (D081).
+#: Сколько кадров делают материал пачкой (D180). Пачка — это то, что обходит
+#: быстрый путь по словам; кадры в модель уходят при любом их числе (D181).
 ALBUM_MIN_FRAMES = 2
 
 
 def album_mode(note: str, frames: int) -> bool:
-    """Пачка кадров с комментарием: модель смотрит и слова, и кадры (D180)."""
+    """Пачка кадров с комментарием (D180): быстрый путь по словам её не пишет."""
     return bool(note.strip()) and frames >= ALBUM_MIN_FRAMES
+
+
+def framed(note: str, frames: int) -> bool:
+    """Кадры с комментарием уходят в модель вместе со словами (D180, D181).
+
+    Любое число кадров, начиная с одного: D081 («есть комментарий — кадр в
+    модель не идёт») снят владельцем после боевого случая 25.09.2026 — дата
+    просрочки была на наклейке, а модель кадра не видела и занизила класс.
+    """
+    return bool(note.strip()) and frames >= 1
 
 
 def _candidate(record: dict[str, Any]) -> Candidate | None:
@@ -150,6 +160,7 @@ def classify(
     model: str | None = None,
     chat_id: int | None,
     photos: Sequence[bytes] = (),
+    sent_at: str = "",
 ) -> Suggestion:
     """Предложить записи по комментарию аудитора. Решение остаётся за ним.
 
@@ -163,7 +174,7 @@ def classify(
     в `AUDIT_DATA_DIR` сейчас. Пустой чат (`config.NO_CHAT`) — законное
     «проверки нет»: так зовут замеры по выгрузкам `examples/`.
     """
-    album = album_mode(note, len(photos))
+    album = framed(note, len(photos))
     cfg = settings or load_recognize_settings()
     picked = shortlist(note, zone_hint, chat_id=chat_id)
     picks = picks_for(picked.codes, chat_id=chat_id)
@@ -180,6 +191,7 @@ def classify(
             with_photo=use_photo,
             chat_id=chat_id,
             album_frames=len(photos) if album else 0,
+            sent_at=sent_at,
         ),
         schema=response_schema(picks, [z.code for z in zones], album=album),
         photo=photo if use_photo and not album else None,
