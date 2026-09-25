@@ -113,6 +113,15 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0022_web_password_change.sql": (
         "sql1:985220a127c41ea2fd388fc3737670e2acdfbfb82d99e01d8619edb2b635a718"
     ),
+    "0023_inspection_checklist_code.sql": (
+        "sql1:f4dd0e5a2cc14660e40cd35b99b78448ed0dc0ce6db92e1e25ae139ce3e39f03"
+    ),
+    "0024_finding_repeat.sql": (
+        "sql1:fd334753344578aabe9d4a114f8dfce5081d389f8c9c1bf98a603f91b58e498c"
+    ),
+    "0025_inspection_moves.sql": (
+        "sql1:64b75c8660b7aaab2ceb60c2675cfc32dad983e350ead2330b9e414002de82a4"
+    ),
 }
 
 

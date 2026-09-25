@@ -43,10 +43,10 @@ from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
     ROLES,
     change_password,
-    set_email,
     create_account,
     disable_account,
     list_accounts,
+    set_email,
     set_role,
 )
 from src.web.config import WEB_TENANT_VAR  # noqa: E402

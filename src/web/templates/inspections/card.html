@@ -29,7 +29,7 @@
   {% endif %}
   {% if failure %}
     <div class="note note--error mt-gap">
-      <div><div class="note__title">{{ t('retract.failed', reason=failure) }}</div></div>
+      <div><div class="note__title">{{ failure }}</div></div>
     </div>
   {% endif %}
 
@@ -66,7 +66,7 @@
       </div>
       <div class="card__fact">
         <div class="card__fact-label">{{ t('card.fact.city') }}</div>
-        <div>{{ head.city or '—' }}</div>
+        <div>{{ city_title(head.city) or '—' }}</div>
       </div>
       <div class="card__fact">
         <div class="card__fact-label">{{ t('card.fact.partner') }}</div>
@@ -90,73 +90,64 @@
     </div>
   </div>
 
-  <div class="section mt-gap">
-    <div class="section__head"><h2 class="section__title">{{ t('card.zones.title') }}</h2></div>
-    <div class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th class="is-text">{{ t('card.zones.col.zone') }}</th>
-            <th>{{ t('card.zones.col.share') }}</th>
-            <th>{{ t('card.zones.col.loss') }}</th>
-            <th>{{ t('card.zones.col.left') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for zone in zones %}
-            <tr>
-              <td class="is-text">
-                {{ zone.name }}
-                <span class="meta">{{ zone.code }}</span>
-                {% if zone.zeroed %}<span class="tag tag--err tag--micro">{{ t('card.zones.zeroed') }}</span>{% endif %}
-              </td>
-              <td class="is-num">{{ zone.share }}</td>
-              <td class="is-num">{{ zone.loss }}</td>
-              <td class="is-num">{{ zone.left }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  {# ── Потери по блокам чек-листа ────────────────────────────────────────
+     Полосой, а не колонкой цифр (D190). Колонка «доля / потеря / остаток»
+     требовала читать три числа и держать их в голове, чтобы понять, где
+     выжжено больше; полоса отвечает на это первым взглядом, а числа остаются
+     рядом — записанными, ни одно из них не пересчитано. #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('card.zones.title') }}</div>
+      <div class="ov-card__count">{{ t('card.zones.total', loss=detail.deductions) }}</div>
     </div>
-  </div>
-
-  <div class="section">
-    <div class="section__head"><h2 class="section__title">{{ t('card.findings.title') }}</h2></div>
-    {% if detail.findings %}
-      <div class="table-wrap">
-        <table class="table">
-          <thead>
-            <tr>
-              <th>{{ t('card.findings.col.n') }}</th>
-              <th class="is-text">{{ t('card.findings.col.code') }}</th>
-              <th class="is-text">{{ t('card.findings.col.level') }}</th>
-              <th class="is-text">{{ t('card.findings.col.zone') }}</th>
-              <th class="is-text">{{ t('card.findings.col.text') }}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for finding in detail.findings %}
-              <tr>
-                <td class="is-num">{{ finding.n }}</td>
-                <td class="is-text">{{ finding.code }}</td>
-                <td class="is-text"><span class="tag {{ level_tone(finding.level) }} tag--micro">{{ finding.level }}</span></td>
-                <td class="is-text">
-                  {{ finding.zone }}
-                  {% if finding.zone_unusual %}<span class="tag tag--warn tag--micro tag--dashed">{{ t('card.findings.zone_unusual') }}</span>{% endif %}
-                </td>
-                <td class="is-text">
-                  <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
-                  <div class="meta">{{ t('card.findings.speech_lang', lang=finding.lang) }}</div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    {% for zone in zones %}
+      <div class="zone-row{% if zone.zeroed %} is-zeroed{% endif %}">
+        <span class="zone-row__name">
+          {{ zone.name }}
+          <span class="zone-row__meta">
+            {{ zone.code }} · {{ t('card.zones.col.share') }}: {{ zone.share }}
+            {%- if zone.zeroed %} · {{ t('card.zones.zeroed') }}{% endif %}
+          </span>
+        </span>
+        <span class="ov-bar">
+          <span class="ov-bar__part" style="flex:{{ zone.fill }};background:var(--err)"></span>
+          <span class="ov-bar__part" style="flex:{{ 100 - zone.fill }}"></span>
+        </span>
+        <span class="ov-num ov-num--strong{% if zone.fill %} ov-num--err{% endif %}">−{{ zone.loss }}</span>
+        <span class="ov-num zone-row__left">{{ zone.left }}</span>
       </div>
+    {% endfor %}
+  </section>
+
+  {# ── Записи ────────────────────────────────────────────────────────────
+     Списком, а не таблицей: главное в записи — её формулировка, и в колонке
+     таблицы она сжималась до ширины ячейки. Класс нарушения стоит слева
+     меткой — это одно из двух мест на весь продукт, где разрешён сильный
+     цвет (бриф на визуал). #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('card.findings.title') }}</div>
+      <div class="ov-card__count">{{ head.findings_count }}</div>
+    </div>
+    {% if detail.findings %}
+      {% for finding in detail.findings %}
+        <div class="find-row">
+          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
+          <span class="find-row__num">{{ finding.n }}</span>
+          <span class="find-row__main">
+            <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
+            <span class="find-row__meta">
+              {{ finding.code }} · {{ finding.zone }}
+              {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
+              · {{ t('card.findings.speech_lang', lang=finding.lang) }}
+            </span>
+          </span>
+        </div>
+      {% endfor %}
     {% else %}
-      <div class="empty"><p class="empty__text">{{ t('card.findings.empty') }}</p></div>
+      <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
     {% endif %}
-  </div>
+  </section>
 
   {% if detail.info %}
     <div class="section">
@@ -165,6 +156,56 @@
         {% for row in detail.info %}
           <div><span class="meta">{{ row.code }}</span><div>{{ row.text }}</div></div>
         {% endfor %}
+      </div></div>
+    </div>
+  {% endif %}
+
+  {#
+    Перенос (D195): меняет «когда и где», а не документ. История показывается
+    всем, кто видит карточку; форма — только администратору и только при
+    живой истории: перенос без следа база не примет, и форма, которая заведомо
+    упадёт, хуже отсутствующей.
+  #}
+  {% if moves %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('move.history.title') }}</h2></div>
+      <div class="card"><div class="card__body stack">
+        {% for m in moves %}
+          <div>
+            <div>{{ t('move.history.line', unit_from=m.old_unit, date_from=m.old_date, unit_to=m.new_unit, date_to=m.new_date) }}</div>
+            <div class="meta">{{ t('move.history.meta', at=m.moved_at, who=m.moved_by, reason=m.reason) }}</div>
+          </div>
+        {% endfor %}
+      </div></div>
+    </div>
+  {% elif not moves_known and may_retract %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('move.history.unknown') }}</div></div></div>
+  {% endif %}
+
+  {% if may_move %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('move.title') }}</h2></div>
+      <div class="card"><div class="card__body">
+        <p class="field-note">{{ t('move.hint') }}</p>
+        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/move') }}?lang={{ lang }}" class="row mt-gap">
+          <label>
+            <span class="field-label">{{ t('move.date_label') }}</span>
+            <input class="input" type="date" name="date" required value="{{ head.inspection_date }}">
+          </label>
+          <label>
+            <span class="field-label">{{ t('move.unit_label') }}</span>
+            <select class="input" name="unit" required>
+              {% for unit_id, unit_name in units %}
+                <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+              {% endfor %}
+            </select>
+          </label>
+          <label class="grow">
+            <span class="field-label">{{ t('move.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">
+          </label>
+          <button class="btn" type="submit">{{ t('move.submit') }}</button>
+        </form>
       </div></div>
     </div>
   {% endif %}
@@ -182,13 +223,6 @@
           <button class="btn btn--danger" type="submit">{{ t('retract.submit') }}</button>
         </form>
       </div></div>
-    </div>
-  {% elif not may_retract %}
-    <div class="note note--warn">
-      <div>
-        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
-        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
-      </div>
     </div>
   {% endif %}
 {% endblock %}

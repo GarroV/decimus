@@ -467,7 +467,7 @@ def test_журнал_дописывается_а_не_переписывает�
     _добавить(хранилище)
     _добавить(хранилище, code="TST02", version_name=None)
 
-    строки = (хранилище.root / JOURNAL_FILE).read_text(encoding="utf-8").strip().splitlines()
+    строки = (хранилище.home / JOURNAL_FILE).read_text(encoding="utf-8").strip().splitlines()
     assert len(строки) >= 3
     for строка in строки:
         json.loads(строка)
@@ -478,7 +478,7 @@ def test_секретов_и_токенов_в_журнале_нет(храни�
     чем он себя предъявил."""
     _добавить(хранилище)
 
-    текст = (хранилище.root / JOURNAL_FILE).read_text(encoding="utf-8")
+    текст = (хранилище.home / JOURNAL_FILE).read_text(encoding="utf-8")
     assert "Authorization" not in текст
     assert "Bearer" not in текст
 
@@ -494,7 +494,7 @@ def test_хранилище_заводит_нулевую_версию_из_бо
 
     assert исходная is not None
     assert исходная.startswith("local-")
-    каталог = хранилище.root / VERSIONS_DIR / исходная
+    каталог = хранилище.home / VERSIONS_DIR / исходная
     assert (каталог / "checklist.csv").read_text(encoding="utf-8") == ЧЕКЛИСТ
 
 
@@ -553,7 +553,7 @@ def test_пункт_без_раздела_критериев_отдаётся_с
     """Критериев может не быть — у служебных пунктов их и не бывает. Это не
     отказ: отказ здесь означал бы, что половина методики нечитаема."""
     исходная = current_version(хранилище)
-    (хранилище.root / VERSIONS_DIR / исходная / "criteria.md").unlink()
+    (хранилище.home / VERSIONS_DIR / исходная / "criteria.md").unlink()
 
     assert read_item(хранилище, code="CLN01")["criteria"] == ""
 
@@ -858,7 +858,7 @@ def test_журнал_на_версию_которой_нет_основой_н�
     последняя = read_journal(хранилище)[-1]["version"]
     import shutil as _shutil
 
-    _shutil.rmtree(хранилище.root / VERSIONS_DIR / str(последняя))
+    _shutil.rmtree(хранилище.home / VERSIONS_DIR / str(последняя))
 
     итог = _добавить(хранилище, code="TST02", version_name="imf")
 
@@ -875,7 +875,7 @@ def test_без_журнала_основой_становится_действ�
     """Журнал могут стереть, а хранилище от этого работать не перестаёт: без
     записей основой служит то, на что смотрит указатель."""
     действующая = current_version(хранилище)
-    (хранилище.root / JOURNAL_FILE).unlink()
+    (хранилище.home / JOURNAL_FILE).unlink()
 
     итог = _добавить(хранилище, code="TST01")
 
@@ -884,7 +884,7 @@ def test_без_журнала_основой_становится_действ�
 
 def test_посторонний_файл_в_хранилище_версией_не_считается(хранилище: Store) -> None:
     current_version(хранилище)
-    (хранилище.root / VERSIONS_DIR / "заметка.txt").write_text("привет", encoding="utf-8")
+    (хранилище.home / VERSIONS_DIR / "заметка.txt").write_text("привет", encoding="utf-8")
 
     assert all(версия.version != "заметка.txt" for версия in versions(хранилище))
 

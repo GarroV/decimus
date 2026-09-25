@@ -46,14 +46,14 @@ from typing import Any
 
 from ..db.models import InspectionDetail
 from ..domain.config import DATA_FILES
-from ..domain.edition import SHELF_DIR
+from ..domain.edition import SHELF_DIR, shelf_dirs
 from ..domain.kinds import kind_title
 from ..domain.models import TEXT_LANGS
 from ..domain.version import compose, edition_of
 from .engine_call import AUDIT_SCRIPT as AUDIT_SCRIPT
 from .engine_call import ENGINE_TIMEOUT_SEC as ENGINE_TIMEOUT_SEC
 from .engine_call import VERSIONS_DIR as VERSIONS_DIR
-from .engine_call import EngineCallError
+from .engine_call import EngineCallError, edition_dirs
 from .engine_call import check_version as _check_version
 from .engine_call import clean as _clean
 from .engine_call import to_log as _log_paths_common
@@ -110,7 +110,7 @@ COVER_FIELDS = ("auditor", "city", "partner", "contact")
 #: человек не может ничем, поэтому блок «отправлять как есть нельзя» горел на
 #: КАЖДОМ письме — и учил пролистывать себя вместе с настоящими поводами
 #: (подставленный срок плана, формулировки на чужом языке, находки без слов).
-#: Владелец прочёл ровно это: «зачем оно? только с толку сбивает».
+#: Владелец счёл эту оговорку сбивающей с толку, а не помогающей.
 LETTER_COVER_CAVEATS = ("city",)
 
 #: Чего не хватает письму, когда информационной части у записанной проверки нет
@@ -461,18 +461,32 @@ def pinned(version: str, papers: Papers) -> tuple[Path, str] | None:
     по-разному, а решает, что с ними делать, по-прежнему вызывающий.
     """
     хотим = check_version(version)
-    хранилище = None if papers.store is None else papers.store / VERSIONS_DIR / хотим
-    полка = None if papers.shelf is None else papers.shelf / хотим
+    # Мест в хранилище стало много: чек-листов теперь несколько, и издание
+    # лежит у своего (T341). Годным считается тот каталог, чьё содержимое и
+    # есть это издание, — поэтому перебор безопасен и не требует знать, какому
+    # чек-листу проверка принадлежала.
+    места = [] if papers.store is None else edition_dirs(papers.store, хотим)
+    хранилище = next((м for м in места if м.is_dir() and edition_of(м, DATA_FILES) == хотим), None)
+    названные = [м for м in места if м.is_dir()]
+    # Полка тоже стала многоместной: снимки лежат у своего чек-листа (T346),
+    # а снятые раньше — в корне полки. Кода чек-листа здесь нет и взяться
+    # ему неоткуда: проверка помечена изданием, а не кодом.
+    полки = [] if papers.shelf is None else shelf_dirs(papers.shelf, хотим)
+    полка = next((п for п in полки if edition_of(п, DATA_FILES) == хотим), None)
 
     # Оба каталога, НАЗВАННЫЕ изданием, разбираются до ответа, а не до первого
     # совпадения. Самозванец, оставшийся за спиной удачного ответа, — это
     # по-прежнему сломанное хранилище, и молчать о нём нельзя оттого, что
     # выручила соседняя полка. Стоит это одного лишнего чтения методики и
     # только когда оба каталога на месте: отсутствующий отвечает сразу.
-    в_хранилище = None if хранилище is None else edition_of(хранилище, DATA_FILES)
-    на_полке = None if полка is None else edition_of(полка, DATA_FILES)
+    в_хранилище = None if хранилище is None else хотим
+    на_полке = None if полка is None else хотим
 
-    for каталог, оказалось in ((хранилище, в_хранилище), (полка, на_полке)):
+    самозванцы: list[tuple[Path | None, str | None]] = [
+        (каталог, edition_of(каталог, DATA_FILES)) for каталог in названные
+    ]
+    самозванцы += [(каталог, edition_of(каталог, DATA_FILES)) for каталог in полки]
+    for каталог, оказалось in самозванцы:
         if каталог is not None and оказалось != хотим and каталог.is_dir():
             # Отказ агенту от этого не меняется — «этого издания на машине
             # нет», и путь с диска в ответ не уходит (T120). Но человек, у

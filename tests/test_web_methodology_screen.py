@@ -270,3 +270,239 @@ def test_оба_языка_интерфейса(клиент: FlaskClient) -> No
 
     assert "Versions" in английская
     assert "Версии" in русская
+
+
+# --- экран в три колонки (D197) -------------------------------------------------
+
+
+def test_пункт_открывается_панелью_по_адресу(клиент: FlaskClient) -> None:
+    # Arrange
+    войти(клиент)
+
+    # Act — адрес панели можно переслать: он сам открывает пункт.
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+
+    # Assert — панель с правкой этого пункта, листание к соседу, закрытие.
+    assert 'class="mx-panel__code mono">CLN01<' in страница
+    assert 'action="/admin/items/CLN01?' in страница
+    assert "data-mx-next" in страница
+    assert "data-mx-close" in страница
+
+
+def test_старый_адрес_пункта_ведёт_в_панель(клиент: FlaskClient) -> None:
+    войти(клиент)
+    ответ = клиент.get("/admin/items/CLN02?lang=en")
+    assert ответ.status_code == 302
+    assert "item=CLN02" in (ответ.headers.get("Location") or "")
+
+
+def test_поиск_сужает_список(клиент: FlaskClient) -> None:
+    # Arrange
+    войти(клиент)
+
+    # Act
+    страница = клиент.get("/admin?q=CLN02").get_data(as_text=True)
+
+    # Assert
+    assert 'data-mx-item="CLN02"' in страница
+    assert 'data-mx-item="CLN01"' not in страница
+
+
+def test_правка_плашками_классов_пишет_их_через_точку_с_запятой(клиент: FlaskClient) -> None:
+    # Arrange — плашки приходят несколькими значениями одного поля.
+    войти(клиент)
+    состояние = method.load_store()
+    assert состояние.store is not None
+
+    # Act
+    ответ = клиент.post(
+        "/admin/items/CLN01", data={"levels": ["D1", "D2"]}, headers={"Origin": СВОЙ}
+    )
+
+    # Assert — записано в формате методики, а не одним первым значением.
+    assert ответ.status_code == 200
+    пункт = method.load_item(состояние.store, tenant=ТЕНАНТ, code="CLN01")["item"]
+    assert пункт["levels"] == "D1;D2"
+
+
+def test_панель_показывает_как_часто_пункт_нарушают(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    from datetime import date
+
+    from src.db.models import ItemUsage
+    from src.web import inspections as data
+
+    сводка = ItemUsage(
+        code="CLN01",
+        records=3,
+        units=2,
+        inspections=2,
+        last_date=date(2026, 9, 23),
+        by_level=(("D1", 3),),
+        top_units=(("Tbilisi-1", "u-1", 2), ("Batumi-1", "u-2", 1)),
+    )
+    monkeypatch.setattr(data, "load_item_usage", lambda **_: сводка)
+    войти(клиент)
+
+    # Act
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+
+    # Assert
+    assert "Записей: 3 · точек: 2 · проверок: 2" in страница
+    assert 'href="/units/u-1' in страница
+
+
+def test_без_базы_панель_говорит_что_сводки_нет(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.web import inspections as data
+
+    monkeypatch.setattr(data, "load_item_usage", lambda **_: None)
+    войти(клиент)
+    страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
+    assert "Сводка недоступна" in страница
+    assert 'action="/admin/items/CLN01?' in страница, "без сводки пропала и правка"
+
+
+def test_разница_перед_публикацией_видит_правку_критериев(клиент: FlaskClient) -> None:
+    """Критерии лежат отдельным файлом и в состав не входят: разница без них
+    назвала бы правку критериев «изменений нет»."""
+    # Arrange — записать версию, где изменены ТОЛЬКО критерии.
+    войти(клиент)
+    клиент.post(
+        "/admin/items/CLN01",
+        data={"criteria": "Новый критерий: ни одной лужи."},
+        headers={"Origin": СВОЙ},
+    )
+
+    # Act
+    страница = клиент.get("/admin?diff=1").get_data(as_text=True)
+
+    # Assert
+    assert "mx-change--changed" in страница
+    assert "<ins>Новый критерий: ни одной лужи.</ins>" in страница
+
+
+# --- зоны: правятся с экрана, и только на последней версии (T348) ----------------
+
+
+def test_на_старой_версии_зоны_не_правятся(клиент: FlaskClient) -> None:
+    """Старая версия читается, но не правится — то же правило, что у пунктов.
+
+    Правка старой версии либо промах, либо откат; неотличимыми их делать нельзя.
+    """
+    войти(клиент)
+    состояние = method.load_store()
+    assert состояние.store is not None
+    исходная = method.published_version(состояние.store)
+    method.add_zone(
+        состояние.store,
+        tenant=ТЕНАНТ,
+        author=АВТОР,
+        code="terrace",
+        name_ru="Терраса",
+        equal_shares=True,
+    )
+
+    страница = клиент.get(f"/admin?version={исходная}").get_data(as_text=True)
+
+    assert 'action="/admin/zones?' not in страница
+    assert 'action="/admin/zones/shares?' not in страница
+
+
+def test_несошедшиеся_доли_возвращают_отказ_на_экран(клиент: FlaskClient) -> None:
+    """Отказ движка обязан доехать до человека словами, а не тихим успехом."""
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/zones/shares",
+        data={"share_fridge": "10", "share_hall": "10"},
+        headers={"Origin": "http://localhost"},
+    )
+
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    # Сторожим БЛОК отказа, а не слово «100»: сотня есть на этой странице всегда
+    # (доли действующих зон), и проверка на неё была зелёной даже с выброшенным
+    # отказом — проверено внесением порчи 25.09.
+    assert 'class="note note--error' in страница, "отказ не доехал до экрана"
+
+
+# --- развесовка в панели: доли, порядок обхода, зона (T348) -----------------------
+
+ПОСЛАНО = {"Origin": "http://localhost"}
+
+
+def _зоны_последней() -> dict[str, str]:
+    состояние = method.load_store()
+    assert состояние.store is not None
+    версия = method.latest_version(состояние.store)
+    зоны = method.zones_of_version(состояние.store, tenant=ТЕНАНТ, version=версия)
+    return {z["code"]: z["share_pct"] for z in зоны}
+
+
+def _обход() -> list[str]:
+    состояние = method.load_store()
+    assert состояние.store is not None
+    return [z["code"] for z in method.load_route(состояние.store, tenant=ТЕНАНТ)["zones"]]
+
+
+def test_доли_из_панели_записываются_новой_версией(клиент: FlaskClient) -> None:
+    """Доли неравные (51/49): обмен равных долей не отличил бы запись от пустой правки."""
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/zones/shares", data={"share_fridge": "51", "share_dough": "49"}, headers=ПОСЛАНО
+    )
+
+    assert 'class="note note--error' not in ответ.get_data(as_text=True)
+    assert {к: float(v) for к, v in _зоны_последней().items()} == {"fridge": 51.0, "dough": 49.0}
+
+
+def test_порядок_обхода_из_панели_переставляет_зоны(клиент: FlaskClient) -> None:
+    войти(клиент)
+    было = _обход()
+    assert было == ["fridge", "dough"]
+
+    клиент.post(
+        "/admin/route",
+        data={"zone": было, "order_fridge": "2", "order_dough": "1"},
+        headers=ПОСЛАНО,
+    )
+
+    assert _обход() == ["dough", "fridge"]
+
+
+def test_панель_зоны_открывается_по_адресу(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    страница = клиент.get("/admin?zone_card=dough").get_data(as_text=True)
+
+    assert 'action="/admin/zones/dough/rename?' in страница
+    assert 'action="/admin/zones/dough/remove?' in страница
+
+
+def test_у_неизданной_методики_формы_развесовки_спрашивают_имя_набора(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Без имени набора хранилище откажет первой же правке (D050) — поле обязано быть
+    в каждой форме развесовки, а не только у пунктов."""
+    from mcp_checklist_harness import build_methodology
+
+    monkeypatch.setenv(method.DATA_VAR, str(build_methodology(tmp_path / "неизданная")))
+    monkeypatch.setenv(method.STORE_VAR, str(tmp_path / "хранилище-неизданной"))
+    войти(клиент)
+
+    for адрес in ("/admin", "/admin?zone_card=dough"):
+        страница = клиент.get(адрес).get_data(as_text=True)
+        формы = [
+            ф
+            for ф in страница.split("<form")[1:]
+            if "/admin/zones" in ф.split(">")[0] or "/admin/scoring" in ф.split(">")[0]
+        ]
+        assert формы, f"{адрес}: форм развесовки нет"
+        for форма in формы:
+            тело = форма.split("</form>")[0]
+            assert 'name="version_name"' in тело, f"{адрес}: без имени набора: {тело[:80]}"

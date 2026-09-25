@@ -40,8 +40,186 @@ TEXTS: dict[str, dict[str, str]] = {
     "app.tenant_label": {"ru": "Тенант", "en": "Tenant"},
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
+    "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
+    # Названия окон периода — подписи; сами окна живут кодами в
+    # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
+    "overview.assign": {"ru": "Назначить проверку", "en": "Schedule an audit"},
+    "overview.scope.all": {"ru": "Вся сеть", "en": "The whole network"},
+    "overview.scope.sub": {
+        "ru": "{units} точек · {inspections} проверок · {period}",
+        "en": "{units} units · {inspections} inspections · {period}",
+    },
+    "overview.filter.title": {"ru": "Выборка", "en": "Selection"},
+    "overview.filter.country": {"ru": "Страна", "en": "Country"},
+    "overview.filter.city": {"ru": "Город", "en": "City"},
+    "overview.filter.grade": {"ru": "Буква", "en": "Grade"},
+    "overview.filter.period": {"ru": "Период", "en": "Period"},
+    "overview.filter.reset": {"ru": "Сбросить", "en": "Reset"},
+    # Подписи «все …» вместо «любая»: у русских названий отборов разный род
+    # («страна» женский, «город» мужской), и одно слово на всех читается
+    # как опечатка ровно в половине случаев.
+    "overview.filter.all_countries": {"ru": "Все страны", "en": "All countries"},
+    "overview.filter.all_cities": {"ru": "Все города", "en": "All cities"},
+    "overview.filter.all_grades": {"ru": "Все буквы", "en": "All grades"},
+    "overview.period.all": {"ru": "всё время", "en": "all time"},
+    "overview.period.d30": {"ru": "30 дней", "en": "30 days"},
+    "overview.period.d90": {"ru": "90 дней", "en": "90 days"},
+    "overview.period.y1": {"ru": "год", "en": "a year"},
+    "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
+    "overview.breakdown.hint": {
+        "ru": "клик — проверки города",
+        "en": "click — the city's inspections",
+    },
+    "overview.breakdown.city": {"ru": "Город", "en": "City"},
+    "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
+    "overview.breakdown.average": {"ru": "Средняя", "en": "Average"},
+    "overview.breakdown.grades": {"ru": "Буквы", "en": "Grades"},
+    "overview.breakdown.critical": {"ru": "D3", "en": "D3"},
+    "overview.breakdown.nocity": {"ru": "Без города", "en": "No city"},
+    "overview.breakdown.empty": {
+        "ru": "За выбранный период проверок нет — разбивать нечего.",
+        "en": "No inspections in the selected period — nothing to break down.",
+    },
+    "overview.breakdown.incomparable": {
+        "ru": "разные издания методики",
+        "en": "different methodology editions",
+    },
+    "overview.sort": {"ru": "Сортировка", "en": "Sort"},
+    "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
+    "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
+    "overview.sort.date": {"ru": "по дате проверки", "en": "by inspection date"},
+    "overview.sort.unit": {"ru": "по названию", "en": "by name"},
+    "overview.points.title": {"ru": "Точки выборки", "en": "Units in the selection"},
+    "overview.points.hint": {
+        "ru": "последняя проверка каждой точки",
+        "en": "the latest inspection of each unit",
+    },
+    "overview.points.unit": {"ru": "Точка", "en": "Unit"},
+    "overview.points.city": {"ru": "Город", "en": "City"},
+    "overview.points.grade": {"ru": "Буква", "en": "Grade"},
+    "overview.points.score": {"ru": "Оценка", "en": "Score"},
+    "overview.points.delta": {"ru": "Δ", "en": "Δ"},
+    "overview.points.zone": {"ru": "Слабая зона", "en": "Weakest zone"},
+    "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
+    "overview.points.empty": {
+        "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
+        "en": "No inspected unit in this selection. Clear part of the filter.",
+    },
+    "overview.points.nodelta": {
+        "ru": "первая сравнимая проверка",
+        "en": "first comparable inspection",
+    },
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
+    # ── Обзор сети (T354) ───────────────────────────────────────────────
+    # Причина повода — КОД, а фраза собирается здесь: причина одна на оба
+    # языка, а текст у каждого свой. Склейка фразы в шаблоне или в слое данных
+    # означала бы печатать мимо словаря.
+    "overview.kicker": {
+        "ru": "Аналитика сети · {tenant}",
+        "en": "Network analytics · {tenant}",
+    },
+    "overview.lead": {
+        "ru": "Куда смотреть сегодня: что сеть теряет, где это повторяется и какие точки просели.",
+        "en": "Where to look today: what the network loses, where it repeats, "
+        "and which units slipped.",
+    },
+    "overview.tile.unchecked": {"ru": "Не проверено", "en": "Not inspected"},
+    "overview.tile.note.unchecked": {
+        "ru": "точек без проверки за период",
+        "en": "units with no inspection in the period",
+    },
+    "overview.problem.critical": {
+        "ru": "сожжена зона: критических {count}",
+        "en": "a zone burned: {count} critical",
+    },
+    "overview.problem.dropped": {
+        "ru": "просела против прошлой проверки на {delta}",
+        "en": "dropped {delta} against the previous inspection",
+    },
+    "overview.problem.low_grade": {"ru": "оценка ниже порога", "en": "score below threshold"},
+    "overview.units.hint2": {
+        "ru": "Сожжённые зоны, падение оценки, слабая буква",
+        "en": "Burned zones, dropped scores, weak grades",
+    },
+    "overview.tile.units": {"ru": "Точек в справочнике", "en": "Units on file"},
+    "overview.tile.inspections": {"ru": "Проверок", "en": "Inspections"},
+    "overview.tile.average": {"ru": "Средняя оценка", "en": "Average score"},
+    "overview.tile.critical": {"ru": "С критическими", "en": "With critical"},
+    "overview.tile.note.units": {"ru": "проверено {checked}", "en": "{checked} inspected"},
+    "overview.tile.note.inspections": {"ru": "в реестре", "en": "in the registry"},
+    "overview.tile.note.average": {
+        "ru": "по записанным процентам",
+        "en": "over recorded percentages",
+    },
+    "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
+    "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
+    "overview.incomparable.title": {
+        "ru": "Средняя по этой выборке не считается",
+        "en": "No average for this selection",
+    },
+    "overview.incomparable.text": {
+        "ru": "Проверки посчитаны по разным ставкам или разным чек-листам: одно число по ним "
+        "было бы средним по несравнимому. Разбивка ниже остаётся верной — она не усредняет.",
+        "en": "These inspections were scored under different rates or checklists: a single number "
+        "would average the incomparable. The breakdown below still holds — it averages nothing.",
+    },
+    "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
+    "overview.attention.count": {"ru": "поводов: {count}", "en": "{count} pending"},
+    "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
+    "overview.attention.hint": {
+        "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
+        "en": "Burned zones and dropped scores, most urgent first",
+    },
+    "overview.attention.empty": {
+        "ru": "Поводов нет: критических нарушений и оценок ниже порога в выборке не записано.",
+        "en": "Nothing pending: no critical findings and no below-threshold scores recorded here.",
+    },
+    "overview.why.critical": {
+        "ru": "критических нарушений: {detail}",
+        "en": "critical findings: {detail}",
+    },
+    "overview.why.low_grade": {"ru": "оценка {detail} %", "en": "score {detail}%"},
+    "overview.zones.title": {
+        "ru": "Где сеть теряет проценты",
+        "en": "Where the network loses points",
+    },
+    "overview.zones.hint": {
+        "ru": "Сумма потерь по зонам — что лечить системно",
+        "en": "Losses summed by zone — what to fix systemically",
+    },
+    "overview.zones.spread": {
+        "ru": "точек: {units} · проверок: {inspections}",
+        "en": "units: {units} · inspections: {inspections}",
+    },
+    "overview.zones.empty": {
+        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
+        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
+    },
+    "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
+    "overview.systemic.hint": {
+        "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
+        "en": "One item across many units — a candidate for training or a methodology fix",
+    },
+    "overview.systemic.spread": {
+        "ru": "точек: {units} · записей: {records}",
+        "en": "units: {units} · records: {records}",
+    },
+    "overview.systemic.empty": {
+        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
+        "en": "No repeats: no item was breached at more than one unit.",
+    },
+    "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
+    "overview.units.hint": {
+        "ru": "Снизу вверх по записанной оценке",
+        "en": "Lowest recorded score first",
+    },
+    "overview.units.findings": {"ru": "записей: {count}", "en": "records: {count}"},
+    "overview.units.empty": {
+        "ru": "Проверок в выборке нет — показывать нечего.",
+        "en": "No inspections in this selection — nothing to show.",
+    },
     "section.overview.title": {"ru": "Обзор", "en": "Overview"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Планы", "en": "Action plans"},
@@ -129,6 +307,75 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The calendar and inspection planning are out of the current scope (decision D139).",
     },
     # --- реестр проверок ---------------------------------------------------
+    # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
+    "unit.back": {"ru": "‹ Аналитика сети", "en": "‹ Network analytics"},
+    "unit.title": {"ru": "Карточка точки", "en": "Unit card"},
+    "unit.meta": {"ru": "{city} · партнёр {partner}", "en": "{city} · partner {partner}"},
+    "unit.meta.no_partner": {
+        "ru": "{city} · партнёр не назначен",
+        "en": "{city} · no partner assigned",
+    },
+    "unit.audits": {"ru": "проверок: {n}", "en": "audits: {n}"},
+    "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
+    "unit.tile.orders": {"ru": "Открытых предписаний", "en": "Open orders"},
+    "unit.tile.orders.wip": {
+        "ru": "предписаний в системе пока нет — раздел в разработке",
+        "en": "orders do not exist in the system yet — section in progress",
+    },
+    "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
+    "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
+    "unit.movement.hint": {
+        "ru": "клик по столбику — открыть отчёт",
+        "en": "click a bar to open the report",
+    },
+    # Обрезанная ось преувеличивает разницу, поэтому граница названа вслух:
+    # столбики 89 и 99 на шкале от нуля выглядят одинаковыми, а на шкале от
+    # 85 — вдвое разными, и читатель обязан знать, какую картинку он видит.
+    "unit.movement.scale": {"ru": "шкала от {floor}%", "en": "scale starts at {floor}%"},
+    "unit.movement.mixed": {
+        "ru": "Проверки разных изданий методики — высоту столбиков сравнивать нельзя",
+        "en": "Audits from different methodology editions — bar heights are not comparable",
+    },
+    "unit.movement.empty": {
+        "ru": "Проверок по этой точке ещё не было",
+        "en": "This unit has not been audited yet",
+    },
+    "unit.weak": {"ru": "Слабые блоки последней проверки", "en": "Weak zones of the last audit"},
+    "unit.weak.open": {"ru": "Открыть отчёт целиком", "en": "Open the full report"},
+    "unit.weak.empty": {
+        "ru": "В последней проверке потерь по зонам не записано",
+        "en": "The last audit recorded no zone losses",
+    },
+    "unit.weak.zeroed": {"ru": "зона обнулена", "en": "zone zeroed"},
+    "unit.weak.share": {"ru": "доля {share}%", "en": "share {share}%"},
+    "unit.findings": {"ru": "Записи последней проверки", "en": "Records of the last audit"},
+    "unit.findings.empty": {"ru": "Записей нет", "en": "No records"},
+    "unit.repeats": {"ru": "Повторяющиеся нарушения", "en": "Repeating violations"},
+    # Подпись утверждает правило методики, и после D191 оно настоящее: повтор
+    # вычитает удвоенную ставку. Удвоение применяется по пометке аудитора в
+    # конкретной проверке, а этот блок показывает наблюдение по истории кодов
+    # — пометка до базы ещё не доведена (#359), поэтому «столько-то раз» здесь
+    # означает «встречалось», а не «посчитано вдвое».
+    "unit.repeats.note": {
+        "ru": "{n} последних проверок, слева старая. Повтор стоит вдвое дороже",
+        "en": "last {n} audits, oldest on the left. A repeat costs twice as much",
+    },
+    "unit.repeats.times": {"ru": "раз: {n}", "en": "times: {n}"},
+    # Два разных утверждения, и путать их нельзя: «встречалось» — наблюдение по
+    # истории кодов, «засчитано вдвое» — решение аудитора, записанное в
+    # проверке и повлиявшее на цену (#359).
+    "unit.repeats.doubled": {"ru": "из них вдвое: {n}", "en": "charged double: {n}"},
+    "unit.finding.doubled": {"ru": "вычет удвоен", "en": "deduction doubled"},
+    "unit.repeats.empty": {
+        "ru": "Ни одно нарушение не повторялось",
+        "en": "No violation repeated",
+    },
+    "unit.plan": {"ru": "План проверок точки", "en": "Audit plan for the unit"},
+    "unit.plan.wip": {
+        "ru": "Планов проверок в системе пока нет — раздел в разработке",
+        "en": "Audit plans do not exist in the system yet — section in progress",
+    },
+    "unit.not_found": {"ru": "Такой точки нет", "en": "No such unit"},
     "registry.lead": {
         "ru": (
             "Проведённые проверки. Процент, буква и разбивка показаны такими, какими их "
@@ -139,8 +386,21 @@ TEXTS: dict[str, dict[str, str]] = {
             "engine computed them when the inspection was closed — nothing is recomputed here."
         ),
     },
+    "registry.kicker": {"ru": "Реестр", "en": "Registry"},
+    "registry.all_kinds": {"ru": "Все виды", "en": "All kinds"},
+    "registry.filtered_out.title": {
+        "ru": "Под этот отбор не подошла ни одна проверка",
+        "en": "No inspection matches this filter",
+    },
+    "registry.filtered_out.text": {
+        "ru": "В реестре проверки есть — их отсёк отбор выше. Снимите часть условий.",
+        "en": (
+            "The registry does have inspections — the filter above cut them out. "
+            "Clear some conditions."
+        ),
+    },
     "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
-    "registry.retracted_count": {"ru": "снятых: {count}", "en": "retracted: {count}"},
+    "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.checklist": {"ru": "чек-лист {version}", "en": "checklist {version}"},
@@ -155,29 +415,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "В историю этого тенанта ещё не слита ни одна завершённая проверка.",
         "en": "No completed inspection has been pushed into this tenant's history yet.",
     },
-    "registry.retracted_hidden.title": {
-        "ru": "Снятые проверки не видны",
-        "en": "Retracted inspections are not visible",
-    },
-    "registry.retracted_hidden.text": {
-        "ru": (
-            "Подключение администратора истории ({var}) не задано. Это не значит, что снятых "
-            "проверок нет, — это значит, что отсюда их не видно, и снять проверку тоже нельзя."
-        ),
-        "en": (
-            "The history administrator connection ({var}) is not configured. That does not mean "
-            "there are no retracted inspections — it means they are invisible here, and "
-            "retraction is unavailable too."
-        ),
-    },
     # «Завершена» и только. Слово «заморожена» стояло здесь за свойство, которое
     # в силе и никуда не уходит: записанная проверка не пересчитывается правкой
     # чек-листа задним числом. Но на карточке оно читается непонятным
-    # техническим статусом — владелец дословно: «странная информация, я ее не
-    # понимаю и пользователь ее тоже не поймет» (D172). Свойство объясняется
+    # техническим статусом: владелец назвал его непонятным и для себя, и для
+    # пользователя (D172). Свойство объясняется
     # там, где человек правит методику, а не рядом с оценкой.
     "state.sealed": {"ru": "Завершена", "en": "Completed"},
-    "state.retracted": {"ru": "Снята", "en": "Retracted"},
+    "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К реестру", "en": "Back to the registry"},
     "card.meta": {
@@ -199,6 +444,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.zones.col.share": {"ru": "Доля", "en": "Share"},
     "card.zones.col.loss": {"ru": "Потеряно", "en": "Lost"},
     "card.zones.col.left": {"ru": "Осталось", "en": "Left"},
+    "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},
     "card.findings.col.n": {"ru": "№", "en": "No."},
@@ -217,35 +463,72 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.not_found.text": {
         "ru": (
             "Такой проверки у тенанта нет. Тот же ответ приходит на проверку другого тенанта "
-            "и на снятую, когда снятые не видны, — и это намеренно."
+            "и на отклонённую, когда отклонённые не видны, — и это намеренно."
         ),
         "en": (
             "There is no such inspection for this tenant. The same answer comes for another "
-            "tenant's inspection and for a retracted one when retracted are invisible — "
+            "tenant's inspection and for a rejected one when rejected are invisible — "
             "deliberately so."
         ),
     },
-    # --- снятие проверки ---------------------------------------------------
-    "retract.title": {"ru": "Снять проверку из истории", "en": "Retract from history"},
+    # --- исправление даты и пиццерии (D195; в коде — move) --------------------------
+    "move.title": {"ru": "Исправить дату или пиццерию", "en": "Correct the date or pizzeria"},
+    "move.hint": {
+        "ru": (
+            "Если при заведении проверки ошиблись датой или пиццерией — исправьте здесь. "
+            "Записи, оценка и буква не меняются. Каждое исправление остаётся в истории "
+            "вместе с причиной."
+        ),
+        "en": (
+            "If the inspection was filed with the wrong date or pizzeria, correct it here. "
+            "Findings, score and grade do not change. Every correction is kept in the "
+            "history with its reason."
+        ),
+    },
+    "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
+    "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "move.reason_label": {"ru": "Что было не так", "en": "What was wrong"},
+    "move.submit": {"ru": "Исправить", "en": "Correct"},
+    "move.done": {"ru": "Исправлено.", "en": "Corrected."},
+    "move.same": {
+        "ru": "Дата и пиццерия уже такие — исправлять нечего.",
+        "en": "The date and pizzeria are already set — nothing to correct.",
+    },
+    "move.failed": {"ru": "Исправить не удалось: {reason}", "en": "Correction failed: {reason}"},
+    "move.history.title": {"ru": "История исправлений", "en": "Correction history"},
+    "move.history.line": {
+        "ru": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+        "en": "{unit_from}, {date_from} → {unit_to}, {date_to}",
+    },
+    "move.history.meta": {
+        "ru": "{at} · {who} · {reason}",
+        "en": "{at} · {who} · {reason}",
+    },
+    "move.history.unknown": {
+        "ru": "История исправлений сейчас недоступна — исправлять до её возвращения нельзя.",
+        "en": "The correction history is unavailable — corrections are disabled until it is back.",
+    },
+    # --- отклонение проверки (код остаётся retract, D194) ------------------
+    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.hint": {
         "ru": (
-            "Снятие — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
+            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
             "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
         ),
         "en": (
-            "Retraction marks, it does not delete: the row stays in history with its reason, "
+            "Rejection marks, it does not delete: the row stays in history with its reason, "
             "is invisible to the ordinary role, and the photos are purged from storage. "
             "A reason is required."
         ),
     },
-    "retract.reason_label": {"ru": "Причина снятия", "en": "Reason for retraction"},
-    "retract.submit": {"ru": "Снять проверку", "en": "Retract inspection"},
+    "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
+    "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.done": {
-        "ru": "Проверка снята. Кадров убрано: {photos}.",
-        "en": "The inspection is retracted. Photos purged: {photos}.",
+        "ru": "Проверка отклонена. Кадров убрано: {photos}.",
+        "en": "The inspection is rejected. Photos purged: {photos}.",
     },
-    "retract.failed": {"ru": "Снять не удалось: {reason}", "en": "Retraction failed: {reason}"},
-    "retract.banner.title": {"ru": "Проверка снята", "en": "This inspection is retracted"},
+    "retract.failed": {"ru": "Отклонить не удалось: {reason}", "en": "Rejection failed: {reason}"},
+    "retract.banner.title": {"ru": "Проверка отклонена", "en": "This inspection is rejected"},
     "retract.banner.text": {
         "ru": (
             "Причина: {reason}. Оценка не участвует в аналитике, письмо и PDF по ней не "
@@ -418,6 +701,29 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
+    # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
+    # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
+    # делает, — иначе человек закроет экран, считая письмо ушедшим.
+    "letter.gmail.submit": {"ru": "В черновики Google", "en": "Save to Google drafts"},
+    "letter.gmail.ok": {
+        "ru": "Черновик лежит в вашей почте — отправьте его оттуда.",
+        "en": "The draft is in your mailbox — send it from there.",
+    },
+    "letter.gmail.failed": {
+        "ru": "Черновик не создан. Письмо сохранено — попробуйте ещё раз.",
+        "en": "The draft was not created. The letter is saved — please try again.",
+    },
+    "letter.gmail.denied": {
+        "ru": "Доступ к почте не выдан — черновика нет. Письмо сохранено.",
+        "en": "Mail access was not granted — no draft was created. The letter is saved.",
+    },
+    "letter.gmail.unavailable": {
+        "ru": "Почта на этом стенде не настроена — черновик создать некуда. Письмо сохранено.",
+        "en": (
+            "Mail is not configured on this stand — there is nowhere to put a draft. "
+            "The letter is saved."
+        ),
+    },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     # --- люди проекта (T338, #322) -----------------------------------------
     "users.lead": {
@@ -538,6 +844,120 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.count": {"ru": "Пунктов: {count}", "en": "{count} items"},
+    # --- чек-листы как сущности (T347) ---------------------------------------
+    #
+    # Продукт несёт не один эталон, а много: девелоперский аудит, аудит РНД,
+    # любой другой. Тексты разводят две вещи, которые смешать легче всего:
+    # СОСТОЯНИЕ чек-листа («годен к употреблению») и ПРИМЕНЕНИЕ к проду («по
+    # нему идут проверки»). Первых может быть несколько, второй ровно один.
+    "checklists.title": {"ru": "Чек-листы", "en": "Checklists"},
+    "checklists.lead": {
+        "ru": (
+            "Виды проверок, заведённые в системе. По одному из них идут проверки — он "
+            "помечен «в проде»; остальные живут рядом и не мешают ему. Новый заводится с "
+            "нуля: пустой список вопросов, одна зона, бланк ставок — и дальше наполняется "
+            "как обычная методика."
+        ),
+        "en": (
+            "The kinds of audit this system holds. Inspections are scored against one of "
+            "them — the one marked 'in production'; the others live alongside and do not "
+            "affect it. A new one starts from scratch: no questions, one zone, blank "
+            "rates — and is then filled in like any methodology."
+        ),
+    },
+    "checklists.count": {"ru": "Чек-листов: {count}", "en": "{count} checklists"},
+    "checklists.empty": {
+        "ru": "Ни одного чек-листа ещё не заведено.",
+        "en": "No checklist has been created yet.",
+    },
+    "checklists.col.code": {"ru": "Код", "en": "Code"},
+    "checklists.col.name": {"ru": "Название", "en": "Name"},
+    "checklists.col.state": {"ru": "Состояние", "en": "State"},
+    "checklists.col.version": {"ru": "Издание", "en": "Edition"},
+    "checklists.col.actions": {"ru": "Действия", "en": "Actions"},
+    "checklists.state.draft": {"ru": "черновик", "en": "draft"},
+    "checklists.state.active": {"ru": "в работе", "en": "active"},
+    "checklists.state.retired": {"ru": "снят", "en": "retired"},
+    "checklists.state.submit": {"ru": "Сохранить", "en": "Save"},
+    "checklists.state.set": {
+        "ru": "Чек-лист {checklist}: состояние теперь «{state}»",
+        "en": "Checklist {checklist} is now {state}",
+    },
+    "checklists.in_production": {"ru": "в проде", "en": "in production"},
+    "checklists.new.title": {"ru": "Завести чек-лист", "en": "Create a checklist"},
+    "checklists.new.text": {
+        "ru": (
+            "Новый чек-лист рождается пустым черновиком, а не копией существующего: копия "
+            "разошлась бы с оригиналом с первой правки, оставаясь на него похожей. Пока в "
+            "нём нет ни одного вопроса, к проду он не применяется."
+        ),
+        "en": (
+            "A new checklist is born an empty draft, not a copy of an existing one: a copy "
+            "drifts from its original on the first edit while still looking like it. While "
+            "it holds no questions it cannot be applied to production."
+        ),
+    },
+    "checklists.new.code": {"ru": "Код", "en": "Code"},
+    "checklists.new.code.hint": {
+        "ru": (
+            "Строчные латинские буквы, цифры, дефис и подчёркивание. Код не меняется "
+            "никогда: им чек-лист связан с уже проведёнными проверками."
+        ),
+        "en": (
+            "Lowercase Latin letters, digits, hyphen and underscore. The code never "
+            "changes: it ties the checklist to inspections already scored by it."
+        ),
+    },
+    "checklists.new.name_ru": {"ru": "Название по-русски", "en": "Russian name"},
+    "checklists.new.name_en": {"ru": "Название по-английски", "en": "English name"},
+    "checklists.new.submit": {"ru": "Завести", "en": "Create"},
+    "checklists.created": {
+        "ru": "Чек-лист {checklist} заведён черновиком. Вопросов в нём пока нет.",
+        "en": "Checklist {checklist} created as a draft. It holds no questions yet.",
+    },
+    "checklists.apply.open": {"ru": "Применить к проду…", "en": "Apply to production…"},
+    "checklists.apply.title": {"ru": "Применение к проду", "en": "Applying to production"},
+    "checklists.apply.lead": {
+        "ru": (
+            "После применения проверки считаются по этому чек-листу. Уже проведённые "
+            "остаются на своём и не пересчитываются: отчёт, отправленный партнёру, задним "
+            "числом не меняется."
+        ),
+        "en": (
+            "Once applied, inspections are scored against this checklist. Those already "
+            "scored stay on their own and are not recalculated: a report already sent to a "
+            "partner does not change retroactively."
+        ),
+    },
+    "checklists.apply.now": {"ru": "Сейчас в проде", "en": "In production now"},
+    "checklists.apply.will": {"ru": "Будет в проде", "en": "Will be in production"},
+    "checklists.apply.version": {"ru": "Издание", "en": "Edition"},
+    "checklists.apply.items": {"ru": "Вопросов с нарушениями", "en": "Items that hold violations"},
+    "checklists.apply.zones": {"ru": "Зоны и доли", "en": "Zones and shares"},
+    "checklists.apply.rates": {"ru": "Ставки вычета", "en": "Deduction rates"},
+    "checklists.apply.start": {"ru": "Старт: {pct}%", "en": "Start: {pct}%"},
+    "checklists.apply.nothing": {
+        "ru": "Показывать нечего: опубликованного издания нет.",
+        "en": "Nothing to show: there is no published edition.",
+    },
+    "checklists.apply.warning": {
+        "ru": (
+            "Сверьте цифры выше. Ролей у учёток нет: применить может всякий вошедший, и "
+            "поймать ошибку можно только здесь — правом её не остановить. След применения "
+            "с вашим логином остаётся в журнале чек-листа."
+        ),
+        "en": (
+            "Check the figures above. Accounts have no roles: anyone signed in can apply, "
+            "and this screen is the only place an error can be caught — no permission "
+            "stops it. The change is recorded in the checklist journal under your login."
+        ),
+    },
+    "checklists.apply.submit": {"ru": "Применить к проду", "en": "Apply to production"},
+    "checklists.apply.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "checklists.applied": {
+        "ru": "Чек-лист {checklist} применён к проду: проверки считаются по нему.",
+        "en": "Checklist {checklist} is applied to production: inspections are scored by it.",
+    },
     "methodology.store.missing.title": {
         "ru": "Хранилище версий методики не настроено",
         "en": "The methodology version store is not configured",
@@ -567,10 +987,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.version.badge.published": {"ru": "действует", "en": "in effect"},
     "methodology.version.badge.draft": {"ru": "не опубликована", "en": "not published"},
-    "methodology.draft.title": {
-        "ru": "Есть записанная версия, которой движок ещё не видит",
-        "en": "A stored version the engine does not read yet",
-    },
     "methodology.draft.text": {
         "ru": (
             "Записана {latest}, а проверки считаются по {current}. Публикация переставляет "
@@ -625,7 +1041,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.versions.title": {"ru": "Версии", "en": "Versions"},
     "methodology.versions.col.version": {"ru": "Версия", "en": "Version"},
-    "methodology.versions.col.name": {"ru": "Набор", "en": "Set"},
     "methodology.versions.col.day": {"ru": "Издана", "en": "Issued"},
     "methodology.versions.hint": {
         "ru": "Версии не удаляются никогда: по ним посчитаны отчёты. Откат — публикация прежней.",
@@ -635,27 +1050,164 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.items.title": {"ru": "Пункты", "en": "Items"},
-    "methodology.col.id": {"ru": "Код", "en": "Code"},
-    "methodology.col.kind": {"ru": "Вид строки", "en": "Row kind"},
-    "methodology.col.process_ru": {"ru": "Процесс", "en": "Process"},
-    "methodology.col.question_ru": {"ru": "Формулировка", "en": "Wording"},
-    "methodology.col.levels": {"ru": "Классы", "en": "Levels"},
-    "methodology.col.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.col.days": {"ru": "Срок, дней", "en": "Days"},
+    # Экран чек-листа в три колонки (D197).
+    "methodology.lists.title": {"ru": "Чек-листы", "en": "Checklists"},
+    "methodology.lists.prod": {"ru": "в проде", "en": "in production"},
+    "methodology.lists.manage": {
+        "ru": "Завести чек-лист, сменить состояние, применить к проду",
+        "en": "Create a checklist, change its state, apply to production",
+    },
+    "methodology.search.placeholder": {
+        "ru": "Код или слово из формулировки",
+        "en": "Code or a word from the wording",
+    },
+    "methodology.pick.level": {"ru": "Класс", "en": "Level"},
+    "methodology.pick.level.all": {"ru": "все", "en": "all"},
+    "methodology.pick.zone": {"ru": "Зона", "en": "Zone"},
+    "methodology.pick.zone.all": {"ru": "все", "en": "all"},
+    "methodology.pick.group": {"ru": "Группы", "en": "Groups"},
+    "methodology.group.process": {"ru": "по процессу", "en": "by process"},
+    "methodology.group.zone": {"ru": "по зоне", "en": "by zone"},
+    "methodology.group.level": {"ru": "по классу", "en": "by level"},
+    "methodology.off.toggle": {"ru": "Выключенные", "en": "Disabled"},
+    "methodology.off.badge": {"ru": "выключен", "en": "disabled"},
+    "methodology.shown": {"ru": "Показано {shown} из {total}", "en": "{shown} of {total}"},
+    "methodology.add.open": {"ru": "+ Пункт", "en": "+ Item"},
+    "methodology.none.title": {
+        "ru": "Под отбор не попал ни один пункт",
+        "en": "No item matches the filter",
+    },
+    "methodology.none.reset": {"ru": "Снять отбор", "en": "Clear the filter"},
+    "methodology.zone.all": {"ru": "Все зоны", "en": "All zones"},
+    "methodology.zone.order": {"ru": "№", "en": "#"},
+    "methodology.zone.typed": {"ru": "Набрано", "en": "Typed"},
+    "methodology.zone.save_order": {"ru": "Записать порядок обхода", "en": "Record walk order"},
+    "methodology.zone.items": {"ru": "Пункты", "en": "Items"},
+    "methodology.zone.items.count": {
+        "ru": "проверяется пунктов: {count} — показать",
+        "en": "{count} items check it — show",
+    },
+    "methodology.days.short": {"ru": "{days} дн.", "en": "{days} d"},
+    "methodology.days.long": {"ru": "{days} дн. на устранение", "en": "{days} days to fix"},
+    "methodology.days.now": {"ru": "немедленно", "en": "immediately"},
+    "methodology.panel.title": {"ru": "Пункт", "en": "Item"},
+    "methodology.panel.close": {"ru": "Закрыть", "en": "Close"},
+    "methodology.panel.prev": {"ru": "Предыдущий пункт", "en": "Previous item"},
+    "methodology.panel.next": {"ru": "Следующий пункт", "en": "Next item"},
+    "methodology.panel.keys": {
+        "ru": "↑ ↓ — соседний пункт · Esc — закрыть · / — поиск",
+        "en": "↑ ↓ — neighbour item · Esc — close · / — search",
+    },
+    "methodology.panel.empty": {
+        "ru": "Выберите пункт в списке — здесь откроется всё, что нужно для правки.",
+        "en": "Pick an item in the list — everything needed to edit it opens here.",
+    },
+    "methodology.prop.levels": {"ru": "Классы", "en": "Levels"},
+    "methodology.prop.zones": {"ru": "Зоны", "en": "Zones"},
+    "methodology.prop.days": {"ru": "Срок", "en": "Deadline"},
+    "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
+    "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
+    "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.diff.open": {"ru": "Что изменится", "en": "What will change"},
+    "methodology.diff.title": {
+        "ru": "Что изменится при публикации",
+        "en": "What publishing changes",
+    },
+    "methodology.diff.lead": {
+        "ru": "Действует {current}, записана {latest}. Ниже — всё, чем они различаются.",
+        "en": "{current} is in force, {latest} is recorded. Below is everything that differs.",
+    },
+    "methodology.diff.none": {
+        "ru": (
+            "Пункты и зоны не различаются: версии отличаются только служебно — "
+            "именем набора или датой издания."
+        ),
+        "en": (
+            "Items and zones are the same: the versions differ only "
+            "in the set name or edition date."
+        ),
+    },
+    "methodology.diff.kind.added": {"ru": "новый", "en": "new"},
+    "methodology.diff.kind.removed": {"ru": "убран", "en": "removed"},
+    "methodology.diff.kind.disabled": {"ru": "выключен", "en": "disabled"},
+    "methodology.diff.kind.restored": {"ru": "возвращён", "en": "restored"},
+    "methodology.diff.kind.changed": {"ru": "изменён", "en": "changed"},
+    "methodology.diff.kind.zone": {"ru": "зона", "en": "zone"},
+    "methodology.usage.title": {"ru": "Как часто нарушают", "en": "How often it is breached"},
+    "methodology.usage.summary": {
+        "ru": "Записей: {records} · точек: {units} · проверок: {inspections}",
+        "en": "Records: {records} · units: {units} · inspections: {inspections}",
+    },
+    "methodology.usage.last": {"ru": "последний раз {day}", "en": "last on {day}"},
+    "methodology.usage.never": {
+        "ru": "В сданных проверках этого чек-листа ни разу не нарушен.",
+        "en": "Never breached in the finalised inspections of this checklist.",
+    },
+    "methodology.usage.unknown": {
+        "ru": "Сводка недоступна: база проверок не отвечает. Правке пункта это не мешает.",
+        "en": "No summary: the inspections database does not answer. Editing is not affected.",
+    },
+    "methodology.prop.save": {"ru": "Записать версию", "en": "Record a version"},
     "methodology.zones.title": {"ru": "Зоны", "en": "Zones"},
-    "methodology.zones.col.code": {"ru": "Код", "en": "Code"},
     "methodology.zones.col.name": {"ru": "Название", "en": "Name"},
     "methodology.zones.col.share": {"ru": "Доля, %", "en": "Share, %"},
     "methodology.zones.hint": {
         "ru": (
-            "Зоны и их доли правятся пока не отсюда, а из разговора с агентом: доли "
-            "задаются набором сразу, потому что обязаны сойтись к 100%."
+            "Доля — вес зоны в оценке. Доли задаются набором сразу, потому что обязаны "
+            "сойтись к 100%: версию с несошедшейся суммой движок считать откажется. "
+            "Каждая правка записывается новой версией и вступает в силу публикацией."
         ),
         "en": (
-            "Zones and their shares are not edited here yet, only from the agent "
-            "conversation: shares are set as a whole because they must add up to 100%."
+            "A share is the weight of a zone in the score. Shares are set as a whole "
+            "because they must add up to 100%: the engine refuses an edition whose "
+            "shares do not. Every edit is written as a new edition and takes effect "
+            "only when published."
         ),
     },
+    "methodology.rates.title": {"ru": "Ставки вычетов", "en": "Deduction rates"},
+    "methodology.rates.hint": {
+        "ru": (
+            "Ставка — цена нарушения. Пустое поле означает «не трогать»: ноль здесь "
+            "настоящая ставка, и спутать их нельзя. Пороги букв и режим D3 живут в том "
+            "же файле, но отсюда не правятся — они заданы списком правил с порядком "
+            "проверки, и поле на порог соврало бы про их устройство."
+        ),
+        "en": (
+            "A rate is the price of a violation. An empty field means «leave as is»: "
+            "zero here is a real rate, and the two must not be confused. Grade "
+            "thresholds and the D3 mode live in the same file but are not edited here — "
+            "they are a list of ordered rules, and a field per threshold would "
+            "misrepresent them."
+        ),
+    },
+    "methodology.rates.start": {"ru": "Начальный процент", "en": "Starting percentage"},
+    "methodology.rates.d1": {"ru": "Ставка D1", "en": "D1 rate"},
+    "methodology.rates.d2": {"ru": "Ставка D2", "en": "D2 rate"},
+    "methodology.rates.repeat": {
+        "ru": "Повтор дороже во столько раз",
+        "en": "Repeat costs this many times more",
+    },
+    "methodology.rates.submit": {"ru": "Записать ставки", "en": "Save rates"},
+    "methodology.zones.col.actions": {"ru": "Что можно", "en": "Actions"},
+    "methodology.zones.shares.title": {"ru": "Доли зон", "en": "Zone shares"},
+    "methodology.zones.shares.submit": {"ru": "Записать доли", "en": "Save shares"},
+    "methodology.zones.rename.submit": {"ru": "Переименовать", "en": "Rename"},
+    "methodology.zones.remove.submit": {"ru": "Убрать зону", "en": "Remove zone"},
+    "methodology.zones.remove.equal": {
+        "ru": "Уравнять доли оставшихся",
+        "en": "Even out the remaining shares",
+    },
+    "methodology.zones.add.title": {"ru": "Завести зону", "en": "Add a zone"},
+    "methodology.zones.add.code": {"ru": "Код зоны", "en": "Zone code"},
+    "methodology.zones.add.name_ru": {"ru": "Название (ru)", "en": "Name (ru)"},
+    "methodology.zones.add.name_en": {"ru": "Название (en)", "en": "Name (en)"},
+    "methodology.zones.add.share": {"ru": "Доля, %", "en": "Share, %"},
+    "methodology.zones.add.equal": {
+        "ru": "Уравнять доли всех зон",
+        "en": "Even out the shares of all zones",
+    },
+    "methodology.zones.add.submit": {"ru": "Завести", "en": "Add"},
+    "methodology.zones.note": {"ru": "Зачем правка", "en": "Why this edit"},
     "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
     "methodology.empty.text": {
         "ru": "В этой версии методики нет ни одного пункта.",
@@ -674,12 +1226,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.add.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
-    "methodology.edit.title": {"ru": "Поправить пункт", "en": "Edit the item"},
-    "methodology.edit.hint": {
-        "ru": "Меняются только заполненные поля. Пустое поле означает «не трогать».",
-        "en": "Only the fields you fill in are changed. An empty field means «leave as is».",
-    },
-    "methodology.edit.submit": {"ru": "Записать новой версией", "en": "Store as a new version"},
     "methodology.disable.submit": {"ru": "Выключить пункт", "en": "Switch the item off"},
     "methodology.disable.hint": {
         "ru": (
@@ -703,14 +1249,15 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
     "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
     "methodology.field.levels.hint": {
-        "ru": "Через точку с запятой, например D1;D2 — какими классами пункт вообще бывает.",
-        "en": "Semicolon-separated, e.g. D1;D2 — the levels this item can be recorded at.",
+        "ru": (
+            "Какими классами пункт вообще бывает. D0 — информационная запись: на оценку не влияет."
+        ),
+        "en": (
+            "The levels this item can be recorded at. "
+            "D0 is an information record: it does not affect the score."
+        ),
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
-    "methodology.field.zones.hint": {
-        "ru": "Коды зон через точку с запятой; * — пункт встречается в любой зоне.",
-        "en": "Zone codes, semicolon-separated; * means the item appears in any zone.",
-    },
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
     "methodology.field.days.hint": {
         "ru": (
@@ -767,14 +1314,11 @@ TEXTS: dict[str, dict[str, str]] = {
             "section is unaffected."
         ),
     },
-    "methodology.item.title": {"ru": "Пункт {code}", "en": "Item {code}"},
-    "methodology.item.back": {"ru": "К составу", "en": "Back to the composition"},
     "methodology.item.criteria.title": {"ru": "Критерии", "en": "Criteria"},
     "methodology.item.criteria.empty": {
         "ru": "Критериев у пункта нет — класс нарушения выводить не из чего.",
         "en": "The item has no criteria — there is nothing to derive the level from.",
     },
-    "methodology.item.fields.title": {"ru": "Как пункт записан", "en": "How the item is stored"},
     "error.not_found.title": {"ru": "Страницы нет", "en": "No such page"},
     "error.not_found.text": {
         "ru": "Такого адреса в админке нет. Разделы — в навигации слева.",
