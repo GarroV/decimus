@@ -1100,6 +1100,31 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.prop.process": {"ru": "Процесс", "en": "Process"},
     "methodology.prop.wording": {"ru": "Формулировка", "en": "Wording"},
     "methodology.prop.edit": {"ru": "Изменить", "en": "Change"},
+    "methodology.diff.open": {"ru": "Что изменится", "en": "What will change"},
+    "methodology.diff.title": {
+        "ru": "Что изменится при публикации",
+        "en": "What publishing changes",
+    },
+    "methodology.diff.lead": {
+        "ru": "Действует {current}, записана {latest}. Ниже — всё, чем они различаются.",
+        "en": "{current} is in force, {latest} is recorded. Below is everything that differs.",
+    },
+    "methodology.diff.none": {
+        "ru": (
+            "Пункты и зоны не различаются: версии отличаются только служебно — "
+            "именем набора или датой издания."
+        ),
+        "en": (
+            "Items and zones are the same: the versions differ only "
+            "in the set name or edition date."
+        ),
+    },
+    "methodology.diff.kind.added": {"ru": "новый", "en": "new"},
+    "methodology.diff.kind.removed": {"ru": "убран", "en": "removed"},
+    "methodology.diff.kind.disabled": {"ru": "выключен", "en": "disabled"},
+    "methodology.diff.kind.restored": {"ru": "возвращён", "en": "restored"},
+    "methodology.diff.kind.changed": {"ru": "изменён", "en": "changed"},
+    "methodology.diff.kind.zone": {"ru": "зона", "en": "zone"},
     "methodology.usage.title": {"ru": "Как часто нарушают", "en": "How often it is breached"},
     "methodology.usage.summary": {
         "ru": "Записей: {records} · точек: {units} · проверок: {inspections}",
