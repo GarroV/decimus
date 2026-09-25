@@ -32,6 +32,7 @@ from .catalogue import (
     find,
 )
 from .checklist import Store
+from .checklist_layout import for_code as for_checklist
 from .errors import McpError, ToolError
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
@@ -217,12 +218,24 @@ def _call_tool(
     # Хранилище подставляется ПО ВИДУ, каждому своё: правящему инструменту —
     # только то, что пришло с правом на правку. Общая переменная «какое-нибудь
     # хранилище» открыла бы правку читательским правом одной опечаткой.
-    прочее: dict[str, Any] = {}
-    if spec.kind == KIND_CHECKLIST:
-        прочее = {"store": checklist}
-    elif spec.kind == KIND_CHECKLIST_SOURCE:
-        прочее = {"store": source}
+    методика = spec.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE)
+    # Хранилища здесь уже не может не быть: заслоны выше отказали бы. Но `None`
+    # сюда всё равно не пропускается — заслон и подстановка стоят порознь, и
+    # опечатка в первом не должна открывать дорогу второму.
+    база = (checklist if spec.kind == KIND_CHECKLIST else source) if методика else None
+    if методика and база is None:
+        return _tool_text(CHECKLIST_CLOSED, failed=True)
+    код = arguments.get("checklist") if методика else None
+    if методика:
+        arguments = {имя: значение for имя, значение in arguments.items() if имя != "checklist"}
     try:
+        # «Какой чек-лист» — общий параметр всех инструментов методики, и
+        # снимается он здесь, у входа: обработчик получает хранилище, уже
+        # наведённое на нужный чек-лист, и о множественности не знает вовсе.
+        # Наведение стоит ВНУТРИ того же перехвата, что и вызов обработчика:
+        # оно читает диск, и сломанное хранилище обязано приезжать отказом
+        # методики, а не сбоем разбора запроса.
+        прочее: dict[str, Any] = {} if база is None else {"store": for_checklist(база, код)}
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
         return _tool_text(str(отказ), failed=True)

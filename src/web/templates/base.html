@@ -1,9 +1,18 @@
 {#
-  Каркас админки: шапка, боковая навигация из реестра разделов, содержимое.
+  Каркас админки: шапка, навигация столбцом слева, содержимое, нижняя
+  панель для телефона.
 
-  Навигация строится ИЗ ДАННЫХ (`src/web/sections.py`), а не перечислением в
-  разметке: признак «построен / не построен» живёт в одном месте, и лента
-  «в разработке» не может разойтись с фактом (D138).
+  НАВИГАЦИЯ СЛЕВА — решение владельца D192 поверх прототипа (D190). В
+  прототипе она идёт строкой в шапке, так её и построили 24.09.2026, и в тот
+  же день владелец вернул столбец: боковая навигация адекватнее. Золотые ленты
+  «в разработке» при этом НЕ возвращаются — бриф разрешает сильный цвет только
+  на букве оценки и классе нарушения, «иначе тревожным становится всё сразу»,
+  а лент было семь на один экран. Непостроенный раздел приглушён.
+
+  Навигация по-прежнему строится ИЗ ДАННЫХ (`src/web/sections.py`), а не
+  перечислением в разметке: признак «построен / не построен» живёт в одном
+  месте и не может разойтись с фактом (D138). Непостроенный раздел из карты не
+  прячется — он приглушён и открывается честной страницей «ещё в разработке».
 
   Названия разделов берутся по ключу `section.<код>.title` — ключ остаётся
   кодом, переводится только название (конституция, принцип 5).
@@ -11,86 +20,98 @@
 <html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{{ t('app.name') }} · {% block title %}{{ t('app.mark') }}{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
+  <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
 </head>
 <body>
-  <div class="appbar">
-    <div class="appbar__brand">
-      <span class="appbar__brand-name">{{ t('app.name') }}</span>
-      <span class="appbar__brand-mark">Dodo</span>
-    </div>
-    <span class="tag tag--neutral tag--micro">{{ t('app.mark') }}</span>
-    <div class="appbar__spacer"></div>
-    {#
-      Тенант, кто вошёл и выход показываются только вошедшему. Форме входа
-      знать про арендатора незачем, а неопознанному человеку и подавно: код
-      арендатора — это уже сведение о стенде.
-    #}
-    {% if account %}
-      <div class="tenant">
-        <div>
-          <div class="tenant__name">{{ tenant }}</div>
-          <div class="tenant__meta">{{ t('app.tenant_label') }}</div>
+  <header class="topbar">
+    <div class="topbar__inner">
+      <div class="topbar__brand">
+        <span class="topbar__name">{{ t('app.name') }}</span>
+        <span class="topbar__mark">Dodo</span>
+      </div>
+
+      {#
+        Тенант, кто вошёл и выход показываются только вошедшему. Форме входа
+        знать про арендатора незачем, а неопознанному человеку и подавно: код
+        арендатора — это уже сведение о стенде.
+      #}
+      {% if account %}
+        <div class="topbar__tenant" title="{{ t('app.tenant_label') }}">{{ tenant }}</div>
+      {% endif %}
+
+      <div class="topbar__spacer"></div>
+
+      <div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
+        {% for code in langs %}
+          {% if code == lang %}
+            <span class="btn btn--sm" aria-current="true">{{ code|upper }}</span>
+          {% else %}
+            <a class="btn btn--sm btn--ghost" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if account %}
+        <div class="whoami">
+          <div class="whoami__name">{{ account.login }}</div>
+          <div class="whoami__meta">{{ t('auth.signed_in') }}</div>
         </div>
-      </div>
-      <div class="whoami">
-        <div class="whoami__name">{{ account.login }}</div>
-        <div class="whoami__meta">{{ t('auth.signed_in') }}</div>
-      </div>
-    {% endif %}
-    <div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
-      {% for code in langs %}
-        {% if code == lang %}
-          <span class="btn btn--sm" aria-current="true">{{ code|upper }}</span>
-        {% else %}
-          <a class="btn btn--sm btn--ghost" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
-        {% endif %}
-      {% endfor %}
+        {#
+          Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
+          чужой странице, выбив человека из админки без единого его движения.
+        #}
+        <form class="logout" method="post" action="{{ url(logout_path) }}">
+          <button class="btn btn--sm btn--ghost" type="submit">{{ t('auth.logout') }}</button>
+        </form>
+      {% endif %}
     </div>
-    {#
-      Выход — форма, а не ссылка: по ссылке его запустила бы картинка на чужой
-      странице, выбив человека из админки без единого его движения.
-    #}
-    {% if account %}
-      <form class="logout" method="post" action="{{ url(logout_path) }}">
-        <button class="btn btn--sm btn--ghost" type="submit">{{ t('auth.logout') }}</button>
-      </form>
-    {% endif %}
-  </div>
+  </header>
 
   <div class="shell">
     {% if account %}
-    <nav class="sidenav shell__nav">
-      {% for item in sections %}
-        {% set title = t('section.' ~ item.key ~ '.title') %}
-        {% set href = url(item.path) ~ '?lang=' ~ lang %}
-        <span class="sidenav__wrap">
-          {% if not item.built %}<span class="tape tape--nav" aria-hidden="true"></span>{% endif %}
+      <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
+        {% for item in sections %}
+          {% set title = t('section.' ~ item.key ~ '.title') %}
           {% if item.path == current_path %}
-            <span class="sidenav__current">{{ title }}</span>
+            <span class="sidenav__current" aria-current="page">{{ title }}</span>
           {% else %}
-            <a class="sidenav__item{% if not item.built %} sidenav__item--wip{% endif %}" href="{{ href }}">
-              <span class="grow">{{ title }}</span>
-              {% if not item.built %}<span class="tag tag--warn tag--micro tag--dashed nowrap">{{ t('nav.wip') }}</span>{% endif %}
-            </a>
+            <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
+               href="{{ url(item.path) }}?lang={{ lang }}"
+               {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ title }}</a>
           {% endif %}
-        </span>
-      {% endfor %}
-    </nav>
+        {% endfor %}
+      </nav>
     {% endif %}
 
-    <main class="shell__main">
-      <div class="page">
-        <div class="page__body">
-          {% block body %}{% endblock %}
-        </div>
-      </div>
+    <main class="page{% block page_class %}{% endblock %} shell__main">
+      {% block body %}{% endblock %}
     </main>
   </div>
+
+  {#
+    Нижняя панель — для телефона: бриф требует, чтобы основные действия
+    доставались большим пальцем одной руки, а строка навигации в шапке на
+    узком экране до него не дотягивается. На десктопе панель скрыта.
+
+    Разделы здесь ВСЕ, а не только построенные, и панель прокручивается вбок.
+    Показывать с телефона три раздела из девяти значило бы, что остальные с
+    телефона недостижимы вовсе, — а «не построен» и «до него нельзя дойти» это
+    разные вещи: первое видно по приглушению, второе выглядит как пропажа.
+  #}
+  {% if account %}
+    <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
+      {% for item in sections %}
+        <a class="tabbar__item{% if item.path == current_path %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
+           href="{{ url(item.path) }}?lang={{ lang }}"
+           {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ t('section.' ~ item.key ~ '.title') }}</a>
+      {% endfor %}
+    </nav>
+  {% endif %}
 </body>
 </html>

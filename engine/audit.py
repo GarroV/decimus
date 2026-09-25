@@ -17,11 +17,11 @@
         заведённых до T177, и на другой язык такое слово не переводится
   audit.py meta [--unit ...] [--city ...] [--partner ...] [--auditor ...] [--kind ...] [--date ...] [--lang ...]
         поправить шапку уже начатой проверки, не трогая зафиксированные записи
-  audit.py add --qid PRD01 --level D2 --zone fridge [--photo путь] [--comment "..."] [--evidence "..."]
+  audit.py add --qid PRD01 --level D2 --zone fridge [--photo путь] [--comment "..."] [--evidence "..."] [--repeat]
         зафиксировать нарушение (можно повторять одно и то же qid в разных зонах).
         --photo можно указать несколько раз или через запятую — все ракурсы одного
         нарушения идут в одну запись
-  audit.py edit --n N [--qid PRD01] [--level D2] [--zone fridge] [--evidence "..."] [--comment "..."]
+  audit.py edit --n N [--qid PRD01] [--level D2] [--zone fridge] [--evidence "..."] [--comment "..."] [--repeat|--no-repeat]
         поправить уже зафиксированное нарушение #N. Синонимы из контракта блока:
         --code = --qid, --text = --evidence. Меняются только переданные поля
   audit.py photo N --add путь1,путь2 [--clear]
@@ -559,7 +559,7 @@ def cmd_add(a):
     if a.zone not in zc:
         sys.exit(f"Нет зоны {a.zone}. Доступны: {', '.join(sorted(zc))}")
     allowed = zone_codes(r, zones)
-    # Зону, которую назвал человек, движок принимает (D177: зона — там, где
+    # Зону, которую назвал человек, движок принимает (D206: зона — там, где
     # продукт). Отказ остаётся для зоны, выведенной машиной (T271): там он и
     # ловил пункт про печь, уехавший в холодный цех.
     unusual = a.zone not in allowed
@@ -572,8 +572,13 @@ def cmd_add(a):
     # поднят до максимума выданных номеров при чтении состояния (T295).
     n = int(st["seq"]) + 1
     st["seq"] = n
+    # Повтор ставит ЧЕЛОВЕК. Движок считает одну проверку и истории точки не
+    # видит: догадаться, что нарушение было и в прошлый раз, он не может, а
+    # угадывать цену нельзя. Подсказать повтор — дело поверхности, у которой
+    # история есть; фиксирует его аудитор (D191, CLAUDE.md).
     f = {"n": n, "qid": qid, "level": lvl, "zone": a.zone, "photos": split_photos(a.photo),
-         "comment": a.comment or "", "evidence": a.evidence or ""}
+         "comment": a.comment or "", "evidence": a.evidence or "",
+         "repeat": bool(getattr(a, "repeat", False))}
     if unusual:
         f["zone_unusual"] = True
     st["findings"].append(f)
@@ -608,10 +613,11 @@ def cmd_edit(a):
     if f is None:
         sys.exit(f"Нарушения #{a.n} нет. Есть: {known_numbers(st)}")
     changed = [k for k, v in (("qid", a.qid), ("level", a.level), ("zone", a.zone),
-                              ("evidence", a.evidence), ("comment", a.comment)) if v is not None]
+                              ("evidence", a.evidence), ("comment", a.comment),
+                              ("repeat", getattr(a, "repeat", None))) if v is not None]
     if not changed:
         sys.exit("Нечего менять: укажите хотя бы одно из "
-                 "--qid/--level/--zone/--evidence/--comment")
+                 "--qid/--level/--zone/--evidence/--comment/--repeat")
     cl = {r["id"]: r for r in load_checklist()}
     zones = load_zones()
     zc = {z["code"] for z in zones}
@@ -628,7 +634,7 @@ def cmd_edit(a):
     allowed = zone_codes(r, zones)
     unusual = zone not in allowed
     # Зону оставили прежней, а она уже стояла нетипичной по слову человека —
-    # правка класса или текста не обязана её заново подтверждать (D177).
+    # правка класса или текста не обязана её заново подтверждать (D206).
     kept = a.zone is None and qid == f["qid"] and bool(f.get("zone_unusual"))
     if unusual and not (a.zone_by_person or kept):
         sys.exit(zone_refusal(qid, zone, allowed))
@@ -638,8 +644,14 @@ def cmd_edit(a):
         f["evidence"] = a.evidence
     if a.comment is not None:
         f["comment"] = a.comment
+    # Пометка повтора — отдельное решение о цене записи (D191), поэтому правка
+    # формулировки её не трогает: аудитор поправил слова, а не передумал про
+    # повтор. Снять пометку так же обязательно, как поставить: ошибка в ней
+    # стоит партнёру денег, и исправлять её переписыванием записи нельзя.
+    if getattr(a, "repeat", None) is not None:
+        f["repeat"] = bool(a.repeat)
     # Пометка «зона нетипична» — у зоны вне списка пункта, названной человеком
-    # (D177). Зона в списке пункта — пометки нет.
+    # (D206). Зона в списке пункта — пометки нет.
     if unusual:
         f["zone_unusual"] = True
     else:
@@ -765,6 +777,13 @@ def compute(st, cl_rows, zones, cfg):
                 counted = False
             else:
                 cost = float(pen.get(lvl, 0))
+                # D191: повтор нарушения предыдущей проверки стоит дороже.
+                # Множитель — такая же ставка, как сами вычеты, поэтому живёт
+                # в scoring.json; файла без него (проверка, посчитанная старым
+                # набором ставок) это правило не касается — там множителя нет,
+                # и цена остаётся прежней, а не удваивается молча.
+                if f.get("repeat"):
+                    cost *= float(cfg.get("repeat_multiplier", 1.0))
         days = min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
         due = (inspected + timedelta(days=days)).isoformat()
         items.append({**f, "photos": photos_of(f), "question_ru": r.get("question_ru", ""), "question_en": r.get("question_en", ""),
@@ -920,19 +939,23 @@ def main():
     ad.add_argument("--qid", required=True); ad.add_argument("--level", required=True)
     ad.add_argument("--zone", required=True)
     ad.add_argument("--zone-by-person", action="store_true",
-                    help="зону назвал человек: вне списка пункта принимается с пометкой (D177)")
+                    help="зону назвал человек: вне списка пункта принимается с пометкой (D206)")
     ad.add_argument("--photo", action="append",
                     help="путь к фото; можно указать несколько раз или через запятую")
     ad.add_argument("--comment"); ad.add_argument("--evidence")
+    ad.add_argument("--repeat", action="store_true",
+                    help="нарушение повторяет запись предыдущей проверки: вычет удваивается (D191)")
     ad.set_defaults(fn=cmd_add)
     ed = s.add_parser("edit")
     ed.add_argument("--n", type=int, required=True)
     ed.add_argument("--qid", "--code", dest="qid")
     ed.add_argument("--level"); ed.add_argument("--zone")
     ed.add_argument("--zone-by-person", action="store_true",
-                    help="зону назвал человек: вне списка пункта принимается с пометкой (D177)")
+                    help="зону назвал человек: вне списка пункта принимается с пометкой (D206)")
     ed.add_argument("--evidence", "--text", dest="evidence")
     ed.add_argument("--comment")
+    ed.add_argument("--repeat", action=argparse.BooleanOptionalAction, default=None,
+                    help="отметить (--repeat) или снять (--no-repeat) повтор: вычет удваивается")
     ed.set_defaults(fn=cmd_edit)
     ph = s.add_parser("photo"); ph.add_argument("n", type=int)
     ph.add_argument("--add", action="append"); ph.add_argument("--clear", action="store_true")

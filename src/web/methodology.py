@@ -34,7 +34,9 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp import checklist_tools as door
+from src.mcp import checklists as lists_door
 from src.mcp.checklist import Store, current_version, tip_version
+from src.mcp.checklist_layout import ACTIVE, DRAFT, RETIRED, for_code
 from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
 from src.mcp.errors import McpError
 
@@ -53,11 +55,6 @@ ITEM_KINDS = door.ITEM_KINDS
 #: Предел пояснения к правке — тоже у двери: журнал один, и правило длины у
 #: него одно.
 MAX_NOTE = door.MAX_NOTE
-
-#: Колонки, которые экран показывает отдельными столбцами. Всё остальное, что
-#: управляющая компания завела в файле сама (T109), видно в карточке пункта
-#: строка за строкой: прятать чужие колонки экран не вправе.
-ITEM_COLUMNS = ("id", "kind", "process_ru", "question_ru", "levels", "zones", "days")
 
 
 @dataclass(frozen=True)
@@ -86,6 +83,9 @@ class Composition:
     items: tuple[Mapping[str, str], ...]
     zones: tuple[Mapping[str, str], ...]
     versions: tuple[Mapping[str, Any], ...]
+    #: Ставки вычетов этой версии: начальный процент, цена классов, множитель
+    #: повтора. Читаются из файла версии — своей арифметики у экрана нет.
+    rates: Mapping[str, Any]
 
     @property
     def is_latest(self) -> bool:
@@ -148,9 +148,9 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
     """
     try:
         versions = door.checklist_versions(tenant=tenant, store=store)
-        listing = door.checklist_items(
-            tenant=tenant, store=store, version=version or str(versions["latest"])
-        )
+        показанная = version or str(versions["latest"])
+        listing = door.checklist_items(tenant=tenant, store=store, version=показанная)
+        ставки = door.scoring(tenant=tenant, store=store, version=показанная)
     except McpError as отказ:
         raise _refusal(отказ) from None
     return Composition(
@@ -160,7 +160,38 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
         items=tuple(listing["items"]),
         zones=tuple(listing["zones"]),
         versions=tuple(versions["versions"]),
+        rates=ставки,
     )
+
+
+def full_items(store: Store, *, tenant: str, version: str) -> tuple[dict[str, str], ...]:
+    """Пункты версии ВМЕСТЕ с критериями — для разницы перед публикацией.
+
+    Состав (`load_composition`) критериев не несёт: они лежат отдельным файлом.
+    Разница без них назвала бы правку критериев «изменений нет» — поэтому
+    здесь каждый пункт читается целиком. Дорого на каждом открытии экрана,
+    поэтому зовётся только по запросу разницы.
+    """
+    try:
+        listing = door.checklist_items(tenant=tenant, store=store, version=version)
+        return tuple(
+            dict(
+                door.checklist_item(
+                    tenant=tenant, store=store, code=str(item.get("id", "")), version=version
+                )["item"]
+            )
+            for item in listing["items"]
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def zones_of_version(store: Store, *, tenant: str, version: str) -> tuple[Mapping[str, str], ...]:
+    """Зоны и доли версии — как лежат в файле."""
+    try:
+        return tuple(door.checklist_items(tenant=tenant, store=store, version=version)["zones"])
+    except McpError as отказ:
+        raise _refusal(отказ) from None
 
 
 def needs_set_name(composition: Composition) -> bool:
@@ -405,6 +436,239 @@ def restore_item(
         raise _refusal(отказ) from None
 
 
+# --- зоны: состав и доли (T348) ------------------------------------------------
+#
+# Своих правил здесь нет: всё идёт дверями MCP (T313), теми же, что у пунктов.
+# Экран добавляет ровно одно — разбор того, что человек напечатал в форме.
+
+
+def _share(value: str | None, *, zone: str) -> float:
+    """Доля зоны числом. Не число — отказ, а не подставленный ноль.
+
+    Доля — вес зоны в оценке, то есть цена ответа. Ноль вместо непонятного
+    ввода сделал бы зону бесплатной, и проверка посчиталась бы по не той цене
+    молча. Запятая принимается наравне с точкой: человек печатает «33,3».
+    """
+    text = _maybe(value)
+    if text is None:
+        raise MethodologyRefused(
+            f"Доля зоны «{zone}» не заполнена. Доли задаются набором сразу и обязаны сойтись к 100%"
+        )
+    try:
+        return float(text.replace(",", "."))
+    except ValueError:
+        raise MethodologyRefused(
+            f"Доля зоны «{zone}» — «{text}», а это не число. Доля задаёт вес зоны "
+            f"в оценке, поэтому подставить вместо непонятного ввода ноль нельзя"
+        ) from None
+
+
+def add_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    name_ru: str,
+    name_en: str | None = None,
+    share: str | None = None,
+    equal_shares: bool = False,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Завести зону — новой версией методики.
+
+    Что делать с долями, форма обязана сказать явно: либо уравнять доли всех
+    зон, либо назвать долю новой. Иначе сумма перестанет сходиться к 100%, и
+    версию не примет уже движок — на экран это вернётся отказом, а не тишиной.
+    """
+    try:
+        return _edit(
+            door.add_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                name_ru=name_ru,
+                name_en=_maybe(name_en),
+                share=_share(share, zone=code) if _maybe(share) is not None else None,
+                equal_shares=equal_shares or None,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def rename_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    name_ru: str | None = None,
+    name_en: str | None = None,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Переименовать зону. Код зоны не меняется никогда — им она связана с пунктами."""
+    try:
+        return _edit(
+            door.rename_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                name_ru=_maybe(name_ru),
+                name_en=_maybe(name_en),
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_zone_shares(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    shares: Mapping[str, str | None],
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Задать доли зон набором сразу.
+
+    Набором, а не по одной: доли складываются в 100%, и правка одной доли до
+    расчёта не дошла бы вовсе — версию с несошедшейся суммой хранилище не
+    примет. Поэтому форма отдаёт все доли разом, а отказ приходит один.
+    """
+    разобранные = {код: _share(значение, zone=код) for код, значение in shares.items()}
+    try:
+        return _edit(
+            door.set_zone_shares(
+                tenant=tenant,
+                store=store,
+                shares=разобранные,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def remove_zone(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    equal_shares: bool = False,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Убрать зону. Её доля освобождается, и раздать её за человека нельзя.
+
+    `equal_shares` уравнивает доли оставшихся; без него доли остаются как были,
+    сумма не сходится и версия не принимается. Это не придирка формы, а то же
+    правило двери: расклад весов называет управляющая компания.
+    """
+    try:
+        return _edit(
+            door.remove_zone(
+                tenant=tenant,
+                store=store,
+                code=code,
+                equal_shares=equal_shares or None,
+                keep_shares=None if equal_shares else True,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_scoring(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    start_pct: str | None = None,
+    d1: str | None = None,
+    d2: str | None = None,
+    repeat_multiplier: str | None = None,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Задать ставки вычетов новой версией методики.
+
+    Пустое поле означает «не трогать», а не ноль: ноль — настоящая ставка,
+    и спутать их значило бы обнулить цену класса молча.
+    """
+
+    def цифра(значение: str | None, *, что: str) -> float | None:
+        текст = _maybe(значение)
+        if текст is None:
+            return None
+        try:
+            return float(текст.replace(",", "."))
+        except ValueError:
+            raise MethodologyRefused(
+                f"{что} — «{текст}», а это не число. Ставка задаёт цену нарушения, "
+                f"поэтому подставить вместо непонятного ввода ноль нельзя"
+            ) from None
+
+    try:
+        return _edit(
+            door.set_scoring(
+                tenant=tenant,
+                store=store,
+                start_pct=цифра(start_pct, что="Начальный процент"),
+                d1=цифра(d1, что="Ставка D1"),
+                d2=цифра(d2, что="Ставка D2"),
+                repeat_multiplier=цифра(repeat_multiplier, что="Множитель повтора"),
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def load_route(store: Store, *, tenant: str, version: str | None = None) -> dict[str, Any]:
+    """Порядок обхода версии — как его получит аудитор на точке (#384)."""
+    try:
+        return door.route(tenant=tenant, store=store, version=version or tip_version(store))
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_route_zones(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    zones: list[str],
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Порядок зон в обходе. Коды сверяет дверь: движок маршрут не читает."""
+    try:
+        return _edit(
+            door.set_route(
+                tenant=tenant,
+                store=store,
+                zones=zones,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def publish_version(store: Store, *, tenant: str, version: str) -> str:
     """Сделать версию действующей — отдельным шагом, а не вместе с правкой (D049).
 
@@ -416,3 +680,102 @@ def publish_version(store: Store, *, tenant: str, version: str) -> str:
     except McpError as отказ:
         raise _refusal(отказ) from None
     return str(итог["published"])
+
+
+# --- чек-листы как сущности (T347) --------------------------------------------
+#
+# Здесь же, а не своим модулем: дверь веба в хранилище методики ровно одна, и
+# это проверяется сборкой (`tests/test_web_bounds.py`). Вторая дверь означала бы
+# два разных представления об одном хранилище — ровно то, чего вся конструкция
+# избегает.
+
+#: Состояния чек-листа, в порядке жизни: черновик → в работе → снят.
+CHECKLIST_STATES = (DRAFT, ACTIVE, RETIRED)
+
+
+@dataclass(frozen=True)
+class Difference:
+    """«Сейчас в проде вот этот, будет вот этот» — то, что человек видит до кнопки."""
+
+    current: lists_door.Summary | None
+    candidate: lists_door.Summary | None
+
+
+def store_for(store: Store, code: str | None) -> Store:
+    """Хранилище, наведённое на чек-лист с экрана — или на применённый к проду.
+
+    Тот же ход, что у точки входа MCP (`rpc`), и та же функция: экран, знающий
+    про чек-листы своё, однажды показал бы не то, что правит агент.
+    """
+    try:
+        return for_code(store, code)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def checklists_overview(store: Store) -> list[lists_door.Overview]:
+    """Все чек-листы хранилища. Пусто — пустой список, а не отказ.
+
+    Нетронутое хранилище дверь заводит сама (`checklists.overview`): иначе
+    первый заход на экран показал бы «чек-листов нет» на площадке, где
+    методика есть и по ней считают, — пустой перечень читался бы как факт о
+    продукте.
+    """
+    try:
+        return lists_door.overview(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def checklist_difference(store: Store) -> Difference:
+    """Что стоит в проде сейчас и что встанет, если применить этот чек-лист."""
+    try:
+        сейчас, кандидат = lists_door.difference(store)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+    return Difference(current=сейчас, candidate=кандидат)
+
+
+def create_checklist(
+    store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
+) -> Any:
+    """Завести чек-лист с нуля. Рождается черновиком и к проду не идёт."""
+    целевое = store_for(store, code)
+    try:
+        return lists_door.create(
+            целевое, tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def rename_checklist(
+    store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
+) -> Any:
+    """Поменять названия. Код не меняется ничем и никогда."""
+    try:
+        return lists_door.rename(
+            store_for(store, code), tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_checklist_state(store: Store, *, tenant: str, author: str, code: str, state: str) -> Any:
+    """Черновик / в работе / снят."""
+    try:
+        return lists_door.set_state(store_for(store, code), tenant=tenant, state=state, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def apply_checklist(store: Store, *, tenant: str, author: str, code: str) -> dict[str, object]:
+    """Применить чек-лист к проду: по нему пойдут проверки.
+
+    Заслоны — в двери: пустой, снятый и без опубликованного издания к проду не
+    идут. Экран их не повторяет, он их показывает.
+    """
+    try:
+        return lists_door.apply_to_production(store_for(store, code), tenant=tenant, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None

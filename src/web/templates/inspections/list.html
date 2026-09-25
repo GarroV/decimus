@@ -1,74 +1,90 @@
 {#
-  Реестр проведённых проверок.
+  Реестр проведённых проверок. Облик — прототип владельца (D190): список
+  строк-карточек, а не таблица.
+
+  ПОЧЕМУ НЕ ТАБЛИЦА. Восемь колонок читались слева направо одинаково
+  внимательно, и главное в строке — точка, её буква и её оценка — весило
+  столько же, сколько имя аудитора. В прототипе строка устроена иначе: буква
+  крупным знаком слева, точка и оценка одной строкой, всё остальное — мелкой
+  мета-строкой под ними. На узком экране это к тому же переносится, а таблица
+  из восьми колонок — нет.
 
   Процент и буква печатаются такими, какими они лежат в базе. Ни одного
   действия над ними в шаблоне нет и быть не может — на экран приходит уже
   подготовленная строка (`src/web/view.py`).
 #}{% extends "base.html" %}
+{% from "_pick.html" import pick %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
 
 {% block body %}
-  <div class="section">
-    <div class="section__head">
-      <h1 class="section__title">{{ t('section.registry.title') }}</h1>
-      <span class="section__num">
-        {{ t('registry.count', count=registry.rows|length) }}{% if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
-      </span>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('registry.kicker') }}</div>
+      <h1 class="ov-head__title">{{ t('section.registry.title') }}</h1>
+      <div class="ov-head__sub">{{ t('registry.lead') }}</div>
     </div>
-    <p class="section__lead">{{ t('registry.lead') }}</p>
   </div>
 
-  {% if not registry.retracted_visible %}
-    <div class="note note--warn mt-gap">
-      <div>
-        <div class="note__title">{{ t('registry.retracted_hidden.title') }}</div>
-        <div class="note__text">{{ t('registry.retracted_hidden.text', var=retraction_var) }}</div>
-      </div>
-    </div>
-  {% endif %}
+  {# Отбор реестра — теми же выпадающими чипами, что на обзоре: один язык
+     отбора на весь продукт, а не свой на каждом экране. #}
+  <div class="ov-filters">
+    <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
+    {% for chip in picks %}{{ pick(chip) }}{% endfor %}
+    <span class="ov-filters__gap"></span>
+    <a class="ov-chip ov-chip--reset{% if not (grade or kind) %} is-idle{% endif %}"
+       href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
+    <span class="ov-card__count">
+      {{ t('registry.count', count=rows|length) }}{% if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
+    </span>
+  </div>
 
-  {% if registry.rows %}
-    <div class="table-wrap mt-gap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th class="is-text">{{ t('registry.col.grade') }}</th>
-            <th class="is-text">{{ t('registry.col.unit') }}</th>
-            <th>{{ t('registry.col.score') }}</th>
-            <th>{{ t('registry.col.date') }}</th>
-            <th class="is-text">{{ t('registry.col.kind') }}</th>
-            <th class="is-text">{{ t('registry.col.auditor') }}</th>
-            <th>{{ t('registry.col.findings') }}</th>
-            <th class="is-text">{{ t('registry.col.status') }}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in registry.rows %}
-            <tr{% if row.retracted %} class="row-mark row-mark--frozen"{% endif %}>
-              <td class="is-text">
-                <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
-              </td>
-              <td class="is-text">
-                <a href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">{{ row.unit_name }}</a>
-                <div class="meta">{% if row.city %}{{ row.city }} · {% endif %}{{ t('registry.checklist', version=row.checklist_version) }}</div>
-              </td>
-              <td class="is-num">{{ row.pct }}</td>
-              <td class="is-num">{{ row.inspection_date }}</td>
-              <td class="is-text">{{ kind_title(row.kind, lang) }}</td>
-              <td class="is-text">{{ row.auditor or '—' }}</td>
-              <td class="is-num">{{ row.findings_count }}</td>
-              <td class="is-text">
-                {% if row.retracted %}
-                  <span class="tag tag--err tag--micro">{{ t('state.retracted') }}</span>
-                  <div class="meta">{{ row.retraction_reason }}</div>
-                {% else %}
-                  <span class="tag tag--neutral tag--micro">{{ t('state.sealed') }}</span>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+  {#
+    Плашки «снятые проверки не видны» здесь больше нет (D193): роль
+    администратора истории на площадке не заведена (#305), значит снять
+    проверку не мог никто и снятых нет. Предупреждение о невозможном — шум.
+  #}
+
+  {% if rows %}
+    <section class="ov-card ov-card--wide">
+      {% for row in rows %}
+        <a class="ins-row{% if row.retracted %} is-frozen{% endif %}"
+           href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
+          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+          <span class="ins-row__main">
+            <span class="ins-row__title">
+              <span class="ins-row__unit">{{ row.unit_name }}</span>
+              <span class="ins-row__score">{{ row.pct }}</span>
+            </span>
+            <span class="ins-row__meta">
+              {{ row.inspection_date }} ·
+              {{ kind_title(row.kind, lang) }} ·
+              {% if row.city %}{{ city_title(row.city) }} · {% endif %}
+              {{ row.auditor or '—' }} ·
+              {{ t('registry.col.findings') }}: {{ row.findings_count }} ·
+              {{ t('registry.checklist', version=row.checklist_version) }}
+            </span>
+          </span>
+          {# Состояние — точкой и словом. Снятая проверка обязана отличаться от
+             запечатанной с одного взгляда: её числа в отчёт не идут. #}
+          <span class="ins-row__state">
+            {% if row.retracted %}
+              <span class="ov-dot ov-dot--err"></span>
+              <span class="ins-row__state-text">{{ t('state.retracted') }}</span>
+            {% else %}
+              <span class="ov-dot ov-dot--ok"></span>
+              <span class="ins-row__state-text">{{ t('state.sealed') }}</span>
+            {% endif %}
+          </span>
+          <span class="ins-row__go">›</span>
+        </a>
+      {% endfor %}
+    </section>
+  {% elif registry.rows %}
+    {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
+       реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
+    <div class="empty mt-gap">
+      <div class="empty__title">{{ t('registry.filtered_out.title') }}</div>
+      <p class="empty__text">{{ t('registry.filtered_out.text') }}</p>
     </div>
   {% else %}
     <div class="empty mt-gap">

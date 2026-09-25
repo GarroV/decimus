@@ -46,13 +46,12 @@ import csv
 import json
 import os
 import re
-import secrets
 import shutil
 import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime
 from pathlib import Path
 
@@ -77,39 +76,42 @@ from ..report.engine_call import (
 from ..report.engine_call import check_version as _check_version_common
 from ..report.engine_call import clean as _clean_common
 from ..report.engine_call import to_log as _to_log_common
+from .checklist_layout import (
+    ACTIVE,
+    CURRENT_LINK,
+    DEFAULT_CODE,
+    DEFAULT_NAMES,
+    DEFAULT_SPACE,
+    IN_LOG,
+    JOURNAL_FILE,
+    TMP_DIR,
+    Meta,
+    applied,
+    guard_link,
+    guard_prod_link,
+    known,
+    migrate,
+    point_prod_at,
+    read_meta,
+    swap_link,
+    write_meta,
+)
+from .checklist_layout import Store as Store  # раскладка знает, ГДЕ лежит чек-лист
 from .errors import ChecklistError, EngineNoVerdictError
 
 #: Подкаталог со снимками версий. Отдельный уровень, чтобы указатель и журнал
 #: не лежали среди версий и не притворялись одной из них.
 
 
-#: Указатель на действующую версию — символическая ссылка. Ссылка, а не копия:
-#: публикация обязана быть одним неделимым действием, иначе движок однажды
-#: прочитает наполовину переписанную методику.
-CURRENT_LINK = "current"
-
-#: Журнал правок. Строка на событие, дописывается и не переписывается.
-JOURNAL_FILE = "journal.jsonl"
+#: Указатель на действующее издание и журнал правок переехали в раскладку
+#: (`checklist_layout`): ссылка, а не копия, и строка на событие — свойства
+#: хранилища, а не этого модуля.
 
 #: Карта слов внутри версии методики. Имя берётся у того, кто её читает
 #: (`src.recognize.cues.CUES_FILE`), а не пишется здесь второй раз: разошлись
 #: бы, и правка легла бы в файл, которого продукт не открывает.
 CUES_FILE = RECOGNIZE_CUES_FILE
 
-#: Где собираются кандидаты. Внутри хранилища, чтобы принятая версия въезжала
-#: на место переименованием, а не копированием через границу файловой системы.
-TMP_DIR = ".tmp"
-
-
-#: Хвост отказа, объясняющий, куда делся путь.
-#:
-#: Ответ инструмента уходит в модель, то есть за пределы машины, и абсолютный
-#: путь в нём показывает устройство каталогов деплоя и имя пользователя, под
-#: которым поднят сервер (T120, issue #96). Вырезать путь молча нельзя: тому,
-#: кто держит сервер, чинить тогда нечего. Поэтому агенту достаётся причина
-#: словами и именами переменных, а путь — логу процесса, который остаётся на
-#: машине.
-IN_LOG = "Какие именно каталоги — в логе сервера: он остаётся на машине"
 
 #: Имя набора, которое НАЗЫВАЕТ АГЕНТ, заводя новый набор: строчные латинские
 #: буквы, цифры, дефис и подчёркивание. Имя попадает в идентификатор версии, а
@@ -163,17 +165,8 @@ def _to_log(повод: str, **пути: Path) -> None:
     _to_log_common(повод, метка="mcp", **пути)
 
 
-@dataclass(frozen=True)
-class Store:
-    """Куда пишем версии и что сегодня читает движок.
-
-    `live` — каталог методики продукта (`AUDIT_DATA_DIR`). Хранилище его
-    только читает: из него берётся нулевая версия, и по нему же проверяется,
-    увидит ли движок публикацию вообще.
-    """
-
-    root: Path
-    live: Path
+#: `Store` живёт в раскладке (`checklist_layout`) и приходит сюда импортом:
+#: она описывает, ГДЕ лежит чек-лист, а этот модуль — что с ним делать.
 
 
 @dataclass(frozen=True)
@@ -428,15 +421,15 @@ def _journal(store: Store, record: dict[str, object]) -> None:
     кто её сделал. Токена в нём нет — только код арендатора, которым тот
     представлен на сервере.
     """
-    store.root.mkdir(parents=True, exist_ok=True)
+    store.home.mkdir(parents=True, exist_ok=True)
     строка = json.dumps({"at": datetime.now(UTC).isoformat(), **record}, ensure_ascii=False)
-    with (store.root / JOURNAL_FILE).open("a", encoding="utf-8") as f:
+    with (store.home / JOURNAL_FILE).open("a", encoding="utf-8") as f:
         f.write(строка + "\n")
 
 
 def read_journal(store: Store) -> list[dict[str, object]]:
-    """Журнал целиком, событиями по порядку. Нет журнала — пусто, а не отказ."""
-    path = store.root / JOURNAL_FILE
+    """Журнал ЭТОГО чек-листа, событиями по порядку. Нет журнала — пусто, а не отказ."""
+    path = store.home / JOURNAL_FILE
     if not path.is_file():
         return []
     события: list[dict[str, object]] = []
@@ -451,11 +444,17 @@ def read_journal(store: Store) -> list[dict[str, object]]:
 
 
 def _versions_root(store: Store) -> Path:
-    return store.root / VERSIONS_DIR
+    return store.home / VERSIONS_DIR
 
 
 def _link(store: Store) -> Path:
-    return store.root / CURRENT_LINK
+    """Указатель ЭТОГО чек-листа на опубликованное издание.
+
+    Не тот же, что `<store>/current`: верхний говорит, по какому чек-листу идут
+    проверки, этот — какое издание чек-листа опубликовано. Разведены они
+    намеренно: издание черновика публикуется, не трогая прод.
+    """
+    return store.home / CURRENT_LINK
 
 
 def _current_id(store: Store) -> str:
@@ -495,6 +494,21 @@ def _bootstrap(store: Store) -> str:
             shutil.copytree(live, снимок)
             os.replace(снимок, цель)
     _point_at(store, version)
+    if read_meta(store) is None:
+        write_meta(
+            store,
+            Meta(
+                code=store.code,
+                name_ru=DEFAULT_NAMES[0],
+                name_en=DEFAULT_NAMES[1],
+                state=ACTIVE,
+            ),
+        )
+    # Первый чек-лист хранилища становится применённым к проду: до него по нему
+    # и так шли все проверки, и оставить верхний указатель пустым значило бы
+    # сломать `AUDIT_DATA_DIR`, который на него смотрит.
+    if applied(store.root) is None:
+        point_prod_at(store)
     _journal(
         store,
         {
@@ -517,26 +531,26 @@ def _point_at(store: Store, version: str) -> None:
     удалить и создать заново означало бы окно, в котором движок читает
     методику по несуществующему пути.
     """
-    link = _link(store)
-    if link.exists() and not link.is_symlink():
-        _to_log("на месте указателя не ссылка", MCP_CHECKLIST_STORE=store.root)
-        raise ChecklistError(
-            f"На месте указателя действующей версии — файла «{CURRENT_LINK}» в хранилище "
-            f"MCP_CHECKLIST_STORE — лежит не ссылка. Хранилище версий методики собрано не им: "
-            f"уберите этот файл или укажите под хранилище другой каталог. {IN_LOG}"
+    try:
+        guard_link(
+            _link(store),
+            что=f"действующего издания чек-листа «{store.code}» в хранилище MCP_CHECKLIST_STORE",
+            подсказка=(
+                "Хранилище версий методики собрано не этим механизмом: уберите этот файл или "
+                f"укажите под хранилище другой каталог. {IN_LOG}"
+            ),
         )
-    # Имя временной ссылки уникально: одно и то же имя два раза не займут ни
-    # два потока сервера, ни два процесса, ни брошенная ссылка после падения.
-    временный = store.root / f".{CURRENT_LINK}.{os.getpid()}.{secrets.token_hex(6)}"
-    os.symlink(os.path.join(VERSIONS_DIR, version), временный)
-    os.replace(временный, link)
+    except ChecklistError:
+        _to_log("на месте указателя не ссылка", MCP_CHECKLIST_STORE=store.root)
+        raise
+    swap_link(_link(store), os.path.join(VERSIONS_DIR, version))
 
 
 class _holder:
     """Временный каталог внутри хранилища — чтобы принятая версия въезжала переименованием."""
 
     def __init__(self, store: Store) -> None:
-        self._tmp = store.root / TMP_DIR
+        self._tmp = store.home / TMP_DIR
         self._tmp.mkdir(parents=True, exist_ok=True)
         self._path: Path | None = None
 
@@ -550,9 +564,29 @@ class _holder:
 
 
 def _ensure(store: Store) -> str:
-    """Действующая версия. Хранилища ещё нет — оно заводится здесь."""
+    """Опубликованное издание этого чек-листа. Хранилища ещё нет — оно заводится здесь.
+
+    Здесь же стоит миграция однослойного хранилища: она идемпотентна и дешева
+    (одна проверка каталога), а место у неё единственное — иначе половина
+    дверей ходила бы в перенесённое хранилище, а половина в прежнее.
+    """
+    try:
+        guard_prod_link(store.root)
+    except ChecklistError:
+        _to_log("на месте указателя не ссылка", MCP_CHECKLIST_STORE=store.root)
+        raise
+    migrate(replace(store, space=DEFAULT_SPACE, code=DEFAULT_CODE))
     if _link(store).is_symlink():
         return _current_id(store)
+    # Снимком боевой методики заводится только ПЕРВЫЙ чек-лист: для второго
+    # брать эту методику неоткуда и незачем — он рождается с нуля из бланка
+    # (`create_checklist`), а молчаливая копия чужого эталона под своим кодом
+    # была бы худшим из ответов.
+    if known(store.root):
+        raise ChecklistError(
+            f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
+            f"checklists, завести новый — create_checklist"
+        )
     return _bootstrap(store)
 
 
@@ -1027,9 +1061,13 @@ def publish(store: Store, *, tenant: str, version: str) -> dict[str, object]:
     """
     прежняя = _ensure(store)
     цель = _version_dir(store, version)
+    # Сторож стоит только над чек-листом, ПРИМЕНЁННЫМ к проду. У остальных
+    # движок методику и не читает — это их нормальное состояние, а не беда:
+    # издание черновика публикуется внутри чек-листа и прода не касается.
+    в_проде = applied(store.root) == (store.space, store.code)
     если_читает = os.path.realpath(store.live)
     если_указатель = os.path.realpath(_link(store))
-    if если_читает != если_указатель:
+    if в_проде and если_читает != если_указатель:
         _to_log(
             "движок читает методику не из хранилища версий",
             AUDIT_DATA_DIR=store.live,
@@ -1056,11 +1094,25 @@ def publish(store: Store, *, tenant: str, version: str) -> dict[str, object]:
             "note": None,
         },
     )
+    # Что именно случилось, зависит от того, применён ли чек-лист к проду, и
+    # ответ обязан это различать: «движок теперь читает это» и «издание
+    # опубликовано внутри чек-листа, которым сейчас не считают» — разные
+    # новости, и вторая, сказанная первыми словами, была бы неправдой.
+    стало = (
+        f"checklist version {цель.name} is now the one the audit engine reads"
+        if в_проде
+        else (
+            f"checklist version {цель.name} is now the published edition of checklist "
+            f"{store.code}, which is not the one applied to production"
+        )
+    )
     return {
         "published": цель.name,
         "previous": прежняя,
+        "checklist": store.code,
+        "applied_to_production": в_проде,
         "status": (
-            f"checklist version {цель.name} is now the one the audit engine reads; "
-            f"inspections already scored stay on their own version and are not recalculated"
+            f"{стало}; inspections already scored stay on their own version and are not "
+            f"recalculated"
         ),
     }
