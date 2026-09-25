@@ -1131,3 +1131,6 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-change__field del, .mx-change__field ins { grid-column: 2; text-decoration: none; padding: var(--space-1) var(--space-3); border-radius: var(--r-mark); white-space: pre-wrap; }
 .mx-change__field del { background: var(--surface-3); color: var(--ink-3); text-decoration: line-through; }
 .mx-change__field ins { background: var(--accent-soft); }
+.mx-zones__num { width: 4.5rem; text-align: right; }
+.mx-zones td { vertical-align: middle; }
+.mx-zones tfoot td { font-weight: var(--w-semibold); }

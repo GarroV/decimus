@@ -1095,6 +1095,25 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         )
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
+    @app.post(f"{путь}/route")
+    def methodology_route() -> str:
+        refuse_foreign_origin()
+        form = request.form
+        номера = {ключ[len("order_") :]: form[ключ] for ключ in form if ключ.startswith("order_")}
+        сейчас = [код for код in form.getlist("zone") if код]
+        итог = _apply(
+            conf,
+            lambda store, автор: method.set_route_zones(
+                store,
+                tenant=conf.tenant,
+                author=автор,
+                zones=mview.route_order(номера, сейчас),
+                note=form.get("note"),
+                version_name=form.get("version_name"),
+            ),
+        )
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+
     @app.post(f"{путь}/scoring")
     def methodology_scoring() -> str:
         refuse_foreign_origin()
@@ -1412,6 +1431,14 @@ def _render_methodology(
             )
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
+    открыта_зона = (request.args.get("zone_card") or "").strip()
+    зона = next((z for z in состав.zones if z.get("code") == открыта_зона), None)
+    обход: list[dict[str, Any]] = []
+    if карточка is None and not новый:
+        try:
+            обход = list(method.load_route(склад, tenant=conf.tenant, version=попросили)["zones"])
+        except MethodologyRefused as отказ:
+            failure = failure or str(отказ)
     сводка = (
         data.load_item_usage(tenant=conf.tenant, code=выбран, checklist=код or "")
         if карточка is not None and выбран
@@ -1441,6 +1468,9 @@ def _render_methodology(
         card=карточка,
         usage=сводка,
         changes=разница,
+        route_zones=обход,
+        zone_card=зона,
+        zone_items=dict(mview.zone_options(состав.items, состав.zones)).get(открыта_зона, 0),
         adding=новый,
         prev_href=адрес(item=раньше) if раньше else None,
         next_href=адрес(item=позже) if позже else None,

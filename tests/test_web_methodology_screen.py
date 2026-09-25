@@ -384,6 +384,7 @@ def test_разница_перед_публикацией_видит_правк�
     assert "mx-change--changed" in страница
     assert "<ins>Новый критерий: ни одной лужи.</ins>" in страница
 
+
 # --- зоны: правятся с экрана, и только на последней версии (T348) ----------------
 
 
@@ -397,7 +398,11 @@ def test_на_старой_версии_зоны_не_правятся(клие�
     assert состояние.store is not None
     исходная = method.published_version(состояние.store)
     method.add_zone(
-        состояние.store, tenant=ТЕНАНТ, author=АВТОР, code="terrace", name_ru="Терраса",
+        состояние.store,
+        tenant=ТЕНАНТ,
+        author=АВТОР,
+        code="terrace",
+        name_ru="Терраса",
         equal_shares=True,
     )
 
@@ -423,3 +428,81 @@ def test_несошедшиеся_доли_возвращают_отказ_на_
     # (доли действующих зон), и проверка на неё была зелёной даже с выброшенным
     # отказом — проверено внесением порчи 25.09.
     assert 'class="note note--error' in страница, "отказ не доехал до экрана"
+
+
+# --- развесовка в панели: доли, порядок обхода, зона (T348) -----------------------
+
+ПОСЛАНО = {"Origin": "http://localhost"}
+
+
+def _зоны_последней() -> dict[str, str]:
+    состояние = method.load_store()
+    assert состояние.store is not None
+    версия = method.latest_version(состояние.store)
+    зоны = method.zones_of_version(состояние.store, tenant=ТЕНАНТ, version=версия)
+    return {z["code"]: z["share_pct"] for z in зоны}
+
+
+def _обход() -> list[str]:
+    состояние = method.load_store()
+    assert состояние.store is not None
+    return [z["code"] for z in method.load_route(состояние.store, tenant=ТЕНАНТ)["zones"]]
+
+
+def test_доли_из_панели_записываются_новой_версией(клиент: FlaskClient) -> None:
+    """Доли неравные (51/49): обмен равных долей не отличил бы запись от пустой правки."""
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/zones/shares", data={"share_fridge": "51", "share_dough": "49"}, headers=ПОСЛАНО
+    )
+
+    assert 'class="note note--error' not in ответ.get_data(as_text=True)
+    assert {к: float(v) for к, v in _зоны_последней().items()} == {"fridge": 51.0, "dough": 49.0}
+
+
+def test_порядок_обхода_из_панели_переставляет_зоны(клиент: FlaskClient) -> None:
+    войти(клиент)
+    было = _обход()
+    assert было == ["fridge", "dough"]
+
+    клиент.post(
+        "/admin/route",
+        data={"zone": было, "order_fridge": "2", "order_dough": "1"},
+        headers=ПОСЛАНО,
+    )
+
+    assert _обход() == ["dough", "fridge"]
+
+
+def test_панель_зоны_открывается_по_адресу(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    страница = клиент.get("/admin?zone_card=dough").get_data(as_text=True)
+
+    assert 'action="/admin/zones/dough/rename?' in страница
+    assert 'action="/admin/zones/dough/remove?' in страница
+
+
+def test_у_неизданной_методики_формы_развесовки_спрашивают_имя_набора(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Без имени набора хранилище откажет первой же правке (D050) — поле обязано быть
+    в каждой форме развесовки, а не только у пунктов."""
+    from mcp_checklist_harness import build_methodology
+
+    monkeypatch.setenv(method.DATA_VAR, str(build_methodology(tmp_path / "неизданная")))
+    monkeypatch.setenv(method.STORE_VAR, str(tmp_path / "хранилище-неизданной"))
+    войти(клиент)
+
+    for адрес in ("/admin", "/admin?zone_card=dough"):
+        страница = клиент.get(адрес).get_data(as_text=True)
+        формы = [
+            ф
+            for ф in страница.split("<form")[1:]
+            if "/admin/zones" in ф.split(">")[0] or "/admin/scoring" in ф.split(">")[0]
+        ]
+        assert формы, f"{адрес}: форм развесовки нет"
+        for форма in формы:
+            тело = форма.split("</form>")[0]
+            assert 'name="version_name"' in тело, f"{адрес}: без имени набора: {тело[:80]}"

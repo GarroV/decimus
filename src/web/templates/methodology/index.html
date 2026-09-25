@@ -110,7 +110,7 @@
     {% endif %}
   </div>
 
-  <div class="mx{% if card or adding or changes is not none %} has-panel{% endif %}">
+  <div class="mx{% if card or adding or changes is not none or zone_card %} has-panel{% endif %}">
     {# --- 1. Чек-листы ------------------------------------------------------ #}
     <nav class="mx-col mx-lists" aria-label="{{ t('methodology.lists.title') }}">
       <div class="mx-col__head">{{ t('methodology.lists.title') }}</div>
@@ -446,25 +446,132 @@
           <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
         </form>
 
+      {% elif zone_card %}
+        {% set zcode = zone_card.get('code', '') %}
+        <div class="mx-panel__head">
+          <div class="grow"><span class="mx-panel__code mono">{{ zcode }}</span></div>
+          <a class="mx-panel__close" href="{{ href() }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+        </div>
+        <div class="mx-panel__title">{{ zone_names.get(zcode, zcode) }}</div>
+        {% if zone_card.get('name_en') %}<div class="mx-panel__sub">{{ zone_card.get('name_en') }}</div>{% endif %}
+        <dl class="mx-props">
+          <div class="mx-prop"><dt>{{ t('methodology.zones.col.share') }}</dt><dd>{{ zone_card.get('share_pct') or '—' }}</dd></div>
+          <div class="mx-prop"><dt>{{ t('methodology.zone.items') }}</dt>
+            <dd><a href="{{ href(zone=zcode, item='') }}">{{ t('methodology.zone.items.count', count=zone_items) }}</a></dd></div>
+        </dl>
+        {% if composition.is_latest %}
+          <div class="mx-panel__foot">
+            <form class="mx-edit__form" method="post" action="{{ action('methodology_zone_rename', code=zcode) }}">
+              <label class="field-label">{{ t('methodology.zones.add.name_ru') }}
+                <input class="input" name="name_ru" type="text" value="{{ zone_card.get('name_ru') or '' }}"></label>
+              <label class="field-label">{{ t('methodology.zones.add.name_en') }}
+                <input class="input" name="name_en" type="text" value="{{ zone_card.get('name_en') or '' }}"></label>
+              {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+              <input class="input" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.zones.note') }}">
+              <button class="btn btn--primary" type="submit">{{ t('methodology.zones.rename.submit') }}</button>
+            </form>
+            <form class="mx-edit__form" method="post" action="{{ action('methodology_zone_remove', code=zcode) }}">
+              <label class="mx-choice"><input name="equal_shares" type="checkbox" value="1"> {{ t('methodology.zones.remove.equal') }}</label>
+              {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+              <input class="input" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.zones.note') }}">
+              <button class="btn btn--danger" type="submit">{{ t('methodology.zones.remove.submit') }}</button>
+            </form>
+          </div>
+        {% endif %}
+
       {% else %}
         <p class="mx-panel__hint">{{ t('methodology.panel.empty') }}</p>
 
+        {#
+          Развесовка — здесь, в панели, рядом со списком: зоны в порядке ОБХОДА,
+          как их получит аудитор. Доля — вес зоны в оценке; сумму к 100%
+          проверяет движок и версию с несошедшейся не примет. «Набрано» под
+          таблицей — подсказка при вводе (`methodology.js`), а не утверждение о
+          методике: экран её не хранит и ни на что не опирается.
+        #}
         <div class="mx-col__head">{{ t('methodology.zones.title') }}</div>
         <p class="field-note">{{ t('methodology.zones.hint') }}</p>
-        <table class="table mx-table">
-          <thead><tr>
-            <th class="is-text">{{ t('methodology.zones.col.name') }}</th>
-            <th>{{ t('methodology.zones.col.share') }}</th>
-          </tr></thead>
-          <tbody>
-            {% for zone in composition.zones %}
-              <tr>
-                <td class="is-text">{{ zone_names.get(zone.get('code', ''), '—') }} <span class="mx-muted mono">{{ zone.get('code', '') }}</span></td>
-                <td class="is-num">{{ zone.get('share_pct') or '—' }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+        {% if composition.is_latest %}<form method="post" action="{{ action('methodology_zone_shares') }}" data-mx-shares>{% endif %}
+          <table class="table mx-table mx-zones">
+            <thead><tr>
+              <th>{{ t('methodology.zone.order') }}</th>
+              <th class="is-text">{{ t('methodology.zones.col.name') }}</th>
+              <th>{{ t('methodology.zones.col.share') }}</th>
+            </tr></thead>
+            <tbody>
+              {% for z in route_zones %}
+                {% set zc = z.get('code', '') %}
+                {% set zrow = composition.zones | selectattr('code', 'equalto', zc) | first %}
+                <tr>
+                  <td>
+                    <input type="hidden" name="zone" value="{{ zc }}">
+                    {% if composition.is_latest %}
+                      <input class="input input--num mx-zones__num" name="order_{{ zc }}" type="number" min="0" step="1" value="{{ loop.index }}" aria-label="{{ t('methodology.zone.order') }}: {{ zone_names.get(zc, zc) }}">
+                    {% else %}{{ loop.index }}{% endif %}
+                  </td>
+                  <td class="is-text"><a href="{{ href(zone_card=zc, item='') }}">{{ zone_names.get(zc, zc) }}</a> <span class="mx-muted mono">{{ zc }}</span></td>
+                  <td class="is-num">
+                    {% if composition.is_latest %}
+                      <input class="input input--num mx-zones__num" name="share_{{ zc }}" type="text" inputmode="decimal" value="{{ (zrow or {}).get('share_pct') or '' }}" data-mx-share aria-label="{{ t('methodology.zones.col.share') }}: {{ zone_names.get(zc, zc) }}">
+                    {% else %}{{ (zrow or {}).get('share_pct') or '—' }}{% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+            {% if composition.is_latest %}
+              <tfoot><tr>
+                <td></td>
+                <td class="is-text mx-muted">{{ t('methodology.zone.typed') }}</td>
+                <td class="is-num" data-mx-share-sum>—</td>
+              </tr></tfoot>
+            {% endif %}
+          </table>
+          {% if composition.is_latest %}
+            <div class="mx-edit__form">
+              {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+              <input class="input" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.zones.note') }}">
+              <div class="row row--tight">
+                <button class="btn btn--primary" type="submit">{{ t('methodology.zones.shares.submit') }}</button>
+                <button class="btn" type="submit" formaction="{{ action('methodology_route') }}">{{ t('methodology.zone.save_order') }}</button>
+              </div>
+            </div>
+          </form>
+          {% endif %}
+
+        {% if composition.is_latest %}
+          <details class="mx-edit mt-gap">
+            <summary class="mx-edit__open">{{ t('methodology.zones.add.title') }}</summary>
+            <form class="mx-edit__form" method="post" action="{{ action('methodology_zone_add') }}">
+              <input class="input" name="code" type="text" spellcheck="false" required placeholder="{{ t('methodology.zones.add.code') }}">
+              <input class="input" name="name_ru" type="text" required placeholder="{{ t('methodology.zones.add.name_ru') }}">
+              <input class="input" name="name_en" type="text" placeholder="{{ t('methodology.zones.add.name_en') }}">
+              <input class="input input--num" name="share" type="text" inputmode="decimal" placeholder="{{ t('methodology.zones.add.share') }}">
+              <label class="mx-choice"><input name="equal_shares" type="checkbox" value="1"> {{ t('methodology.zones.add.equal') }}</label>
+              {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+              <input class="input" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.zones.note') }}">
+              <button class="btn btn--primary" type="submit">{{ t('methodology.zones.add.submit') }}</button>
+            </form>
+          </details>
+
+          {# Ставки: поля заполнены нынешними, очищенное поле — «не трогать». #}
+          <div class="mx-col__head">{{ t('methodology.rates.title') }}</div>
+          <p class="field-note">{{ t('methodology.rates.hint') }}</p>
+          <form class="mx-edit__form" method="post" action="{{ action('methodology_scoring') }}">
+            <dl class="mx-props mx-rates">
+              <div class="mx-prop"><dt><label for="rate-start">{{ t('methodology.rates.start') }}</label></dt>
+                <dd><input class="input input--num" id="rate-start" name="start_pct" type="text" inputmode="decimal" value="{{ composition.rates.get('start_pct') or '' }}"></dd></div>
+              <div class="mx-prop"><dt><label for="rate-d1">{{ t('methodology.rates.d1') }}</label></dt>
+                <dd><input class="input input--num" id="rate-d1" name="d1" type="text" inputmode="decimal" value="{{ composition.rates.get('penalty', {}).get('D1') or '' }}"></dd></div>
+              <div class="mx-prop"><dt><label for="rate-d2">{{ t('methodology.rates.d2') }}</label></dt>
+                <dd><input class="input input--num" id="rate-d2" name="d2" type="text" inputmode="decimal" value="{{ composition.rates.get('penalty', {}).get('D2') or '' }}"></dd></div>
+              <div class="mx-prop"><dt><label for="rate-repeat">{{ t('methodology.rates.repeat') }}</label></dt>
+                <dd><input class="input input--num" id="rate-repeat" name="repeat_multiplier" type="text" inputmode="decimal" value="{{ composition.rates.get('repeat_multiplier') or '' }}"></dd></div>
+            </dl>
+            {% if needs_name %}<input class="input" name="version_name" type="text" required placeholder="{{ t('methodology.field.version_name') }}">{% endif %}
+            <input class="input" name="note" type="text" maxlength="{{ max_note }}" placeholder="{{ t('methodology.zones.note') }}">
+            <button class="btn btn--primary" type="submit">{{ t('methodology.rates.submit') }}</button>
+          </form>
+        {% endif %}
 
         <div class="mx-col__head">{{ t('methodology.versions.title') }}</div>
         <p class="field-note">{{ t('methodology.versions.hint') }}</p>
@@ -488,173 +595,6 @@
       {% endif %}
     </aside>
   </div>
-
-  {% if composition.zones and composition.is_latest %}
-    <div class="section mt-gap">
-      <div class="section__head">
-        <h2 class="section__title">{{ t('methodology.zones.shares.title') }}</h2>
-      </div>
-      <form class="form-grid form-grid--dense mt-gap" method="post" action="{{ action('methodology_zone_shares') }}">
-        {# Поля по всем зонам разом: доли обязаны сойтись к 100%, и правка по
-           одной доле до расчёта не дошла бы вовсе — версию не примет движок. #}
-        {% for zone in composition.zones %}
-          <div class="field">
-            <label class="field-label" for="share-{{ zone.get('code') }}">
-              {{ zone.get('name_ru') or zone.get('name_en') or zone.get('code') }}</label>
-            <input class="input input--num" id="share-{{ zone.get('code') }}"
-                   name="share_{{ zone.get('code') }}" type="text" inputmode="decimal"
-                   value="{{ zone.get('share_pct') or '' }}">
-          </div>
-        {% endfor %}
-
-        <div class="field field--wide">
-          <label class="field-label" for="shares-note">{{ t('methodology.zones.note') }}</label>
-          <input class="input" id="shares-note" name="note" type="text">
-        </div>
-
-        <button class="btn btn--primary" type="submit">
-          {{ t('methodology.zones.shares.submit') }}</button>
-      </form>
-    </div>
-  {% endif %}
-
-  {% if composition.is_latest %}
-    <div class="section mt-gap">
-      <div class="section__head">
-        <h2 class="section__title">{{ t('methodology.rates.title') }}</h2>
-      </div>
-      <p class="section__lead">{{ t('methodology.rates.hint') }}</p>
-      <form class="form-grid form-grid--dense mt-gap" method="post" action="{{ action('methodology_scoring') }}">
-        {# Поля заполнены нынешними ставками, чтобы человек правил видя, что есть,
-           а не вслепую. Очищенное поле означает «не трогать» — так устроена дверь. #}
-        <div class="field">
-          <label class="field-label" for="rate-start">{{ t('methodology.rates.start') }}</label>
-          <input class="input input--num" id="rate-start" name="start_pct" type="text"
-                 inputmode="decimal" value="{{ composition.rates.get('start_pct') or '' }}">
-        </div>
-
-        <div class="field">
-          <label class="field-label" for="rate-d1">{{ t('methodology.rates.d1') }}</label>
-          <input class="input input--num" id="rate-d1" name="d1" type="text" inputmode="decimal"
-                 value="{{ composition.rates.get('penalty', {}).get('D1') or '' }}">
-        </div>
-
-        <div class="field">
-          <label class="field-label" for="rate-d2">{{ t('methodology.rates.d2') }}</label>
-          <input class="input input--num" id="rate-d2" name="d2" type="text" inputmode="decimal"
-                 value="{{ composition.rates.get('penalty', {}).get('D2') or '' }}">
-        </div>
-
-        <div class="field">
-          <label class="field-label" for="rate-repeat">{{ t('methodology.rates.repeat') }}</label>
-          <input class="input input--num" id="rate-repeat" name="repeat_multiplier" type="text"
-                 inputmode="decimal" value="{{ composition.rates.get('repeat_multiplier') or '' }}">
-        </div>
-
-        <div class="field field--wide">
-          <label class="field-label" for="rate-note">{{ t('methodology.zones.note') }}</label>
-          <input class="input" id="rate-note" name="note" type="text">
-        </div>
-
-        <button class="btn btn--primary" type="submit">{{ t('methodology.rates.submit') }}</button>
-      </form>
-    </div>
-  {% endif %}
-
-  {% if composition.is_latest %}
-  <div class="section mt-gap">
-    <div class="section__head">
-      <h2 class="section__title">{{ t('methodology.zones.add.title') }}</h2>
-    </div>
-    <form class="form-grid mt-gap" method="post" action="{{ action('methodology_zone_add') }}">
-      <div class="field field--narrow">
-        <label class="field-label" for="zone-code">{{ t('methodology.zones.add.code') }}</label>
-        <input class="input" id="zone-code" name="code" type="text" spellcheck="false" required>
-      </div>
-
-      <div class="field field--narrow">
-        <label class="field-label" for="zone-share">{{ t('methodology.zones.add.share') }}</label>
-        <input class="input input--num" id="zone-share" name="share" type="text" inputmode="decimal">
-      </div>
-
-      <div class="field">
-        <label class="field-label" for="zone-name-ru">{{ t('methodology.zones.add.name_ru') }}</label>
-        <input class="input" id="zone-name-ru" name="name_ru" type="text" required>
-      </div>
-
-      <div class="field">
-        <label class="field-label" for="zone-name-en">{{ t('methodology.zones.add.name_en') }}</label>
-        <input class="input" id="zone-name-en" name="name_en" type="text">
-      </div>
-
-      <div class="field field--wide">
-        <label class="choice" for="zone-equal">
-          <input id="zone-equal" name="equal_shares" type="checkbox" value="1">
-          {{ t('methodology.zones.add.equal') }}</label>
-      </div>
-
-      <div class="field field--wide">
-        <label class="field-label" for="zone-note">{{ t('methodology.zones.note') }}</label>
-        <input class="input" id="zone-note" name="note" type="text">
-      </div>
-
-      <button class="btn btn--primary" type="submit">{{ t('methodology.zones.add.submit') }}</button>
-    </form>
-  </div>
-  {% endif %}
-
-  {% if composition.zones and composition.is_latest %}
-    <div class="section mt-gap">
-      <div class="section__head">
-        <h2 class="section__title">{{ t('methodology.zones.rename.submit') }}</h2>
-      </div>
-      {# Переименование и снятие — под списком зон, а не в ячейке таблицы: таблица
-         зон стоит в узкой колонке справа, формы в неё не помещаются. #}
-      {% for zone in composition.zones %}
-        <details class="mt-gap">
-          <summary>{{ zone.get('name_ru') or zone.get('name_en') or zone.get('code') }}
-            <span class="mx-muted mono">{{ zone.get('code') }}</span></summary>
-          <form class="form-grid mt-gap" method="post"
-                action="{{ action('methodology_zone_rename', code=zone.get('code')) }}">
-            <div class="field">
-              <label class="field-label" for="rename-ru-{{ zone.get('code') }}">
-                {{ t('methodology.zones.add.name_ru') }}</label>
-              <input class="input" id="rename-ru-{{ zone.get('code') }}" name="name_ru"
-                     type="text" value="{{ zone.get('name_ru') or '' }}">
-            </div>
-            <div class="field">
-              <label class="field-label" for="rename-en-{{ zone.get('code') }}">
-                {{ t('methodology.zones.add.name_en') }}</label>
-              <input class="input" id="rename-en-{{ zone.get('code') }}" name="name_en"
-                     type="text" value="{{ zone.get('name_en') or '' }}">
-            </div>
-            <div class="field field--wide">
-              <label class="field-label" for="rename-note-{{ zone.get('code') }}">
-                {{ t('methodology.zones.note') }}</label>
-              <input class="input" id="rename-note-{{ zone.get('code') }}" name="note" type="text">
-            </div>
-            <button class="btn btn--primary" type="submit">
-              {{ t('methodology.zones.rename.submit') }}</button>
-          </form>
-          <form class="form-grid form-grid--single mt-gap" method="post"
-                action="{{ action('methodology_zone_remove', code=zone.get('code')) }}">
-            <div class="field">
-              <label class="choice" for="remove-equal-{{ zone.get('code') }}">
-                <input id="remove-equal-{{ zone.get('code') }}" name="equal_shares"
-                       type="checkbox" value="1">
-                {{ t('methodology.zones.remove.equal') }}</label>
-            </div>
-            <div class="field">
-              <label class="field-label" for="remove-note-{{ zone.get('code') }}">
-                {{ t('methodology.zones.note') }}</label>
-              <input class="input" id="remove-note-{{ zone.get('code') }}" name="note" type="text">
-            </div>
-            <button class="btn" type="submit">{{ t('methodology.zones.remove.submit') }}</button>
-          </form>
-        </details>
-      {% endfor %}
-    </div>
-  {% endif %}
 
   <script src="{{ url_for('static', filename='methodology.js') }}" defer></script>
 {% endblock %}
