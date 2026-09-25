@@ -893,3 +893,159 @@ a.ov-table__row:hover { background: var(--surface-3); }
   .pt-head__actions .btn { flex: 1 1 auto; text-align: center; }
   .pt-bars { height: 7rem; }
 }
+
+/* ── Чек-лист в три колонки (D197) ────────────────────────────────────────
+   Чек-листы · пункты · панель пункта. Список пунктов прокручивается ВМЕСТЕ
+   со страницей — до 25.09.2026 состав сидел в окне 486px со своей прокруткой
+   («обрезанное окно»). Своя прокрутка осталась только у колонок по краям:
+   они липнут к верху, чтобы панель правки была на виду при любом месте списка. */
+.page--wide { max-width: 110rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .95em; }
+.mx-muted { color: var(--ink-3); }
+
+.mx-version {
+  display: flex; gap: var(--space-7); align-items: center;
+  padding: var(--space-5) var(--space-7);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+}
+.mx-version.is-draft { border-color: var(--warn-mark); background: var(--surface-2); }
+.mx-version__title { font-weight: var(--w-semibold); margin-right: var(--space-3); }
+.mx-version__meta { font-size: var(--fs-meta); color: var(--ink-2); margin-top: var(--space-1); }
+
+.mx {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr) minmax(24rem, 30rem);
+  gap: var(--space-7);
+  align-items: start;
+}
+.mx-col {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  min-width: 0;
+}
+.mx-lists, .mx-panel {
+  position: sticky; top: calc(var(--space-12) + var(--space-7));
+  max-height: calc(100vh - var(--space-12) - var(--space-10));
+  overflow: auto;
+}
+.mx-col__head {
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-semibold);
+  padding: var(--space-6) var(--space-6) var(--space-3);
+}
+
+.mx-list {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4) var(--space-6); color: inherit; text-decoration: none;
+  border-left: 3px solid transparent;
+}
+.mx-list:hover { background: var(--surface-3); }
+.mx-list.is-on { background: var(--accent-soft); border-left-color: var(--accent); }
+.mx-list__name { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.mx-list__meta { font-size: var(--fs-meta); color: var(--ink-2); display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.mx-lists__manage { display: block; padding: var(--space-6); font-size: var(--fs-meta); border-top: 1px solid var(--line-2); }
+
+.mx-items { padding-bottom: var(--space-4); }
+.mx-toolbar {
+  display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;
+  padding: var(--space-6) var(--space-6) 0;
+}
+.mx-toolbar--chips { padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); }
+.mx-search { flex: 1 1 16rem; }
+.mx-search .input { width: 100%; }
+.mx-count { margin-left: auto; font-size: var(--fs-meta); color: var(--ink-3); }
+
+.mx-group__head {
+  position: sticky; top: calc(var(--space-12) + var(--space-3)); z-index: 1;
+  display: flex; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-3); border-bottom: 1px solid var(--line);
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); color: var(--ink-2);
+}
+.mx-group__count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.mx-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto 3.5rem;
+  gap: var(--space-5); align-items: baseline;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--line-2);
+  color: inherit; text-decoration: none; font-size: var(--fs-dense); line-height: var(--lh-dense);
+  border-left: 3px solid transparent;
+}
+.mx-row:hover { background: var(--surface-2); }
+.mx-row.is-on { background: var(--accent-soft); border-left-color: var(--accent); }
+.mx-row.is-off { color: var(--ink-3); }
+.mx-row.is-off .mx-row__text { text-decoration: line-through; }
+.mx-row__code { color: var(--accent); }
+.mx-row__levels { display: flex; gap: var(--space-2); }
+.mx-row__days { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.mx-panel { padding: 0 var(--space-7) var(--space-7); }
+.mx-panel__head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0 calc(var(--space-7) * -1); padding: var(--space-6) var(--space-7);
+  background: var(--surface); border-bottom: 1px solid var(--line-2);
+}
+.mx-panel__code { font-weight: var(--w-semibold); margin-right: var(--space-3); }
+.mx-panel__nav, .mx-panel__close {
+  display: inline-grid; place-items: center; width: 2rem; height: 2rem;
+  border-radius: var(--r-control); color: var(--ink-2); text-decoration: none;
+}
+.mx-panel__nav:hover, .mx-panel__close:hover { background: var(--surface-3); color: var(--ink); }
+.mx-panel__title { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--w-semibold); margin-top: var(--space-7); }
+.mx-panel__sub { color: var(--ink-2); margin-top: var(--space-3); }
+.mx-panel__hint { color: var(--ink-2); padding: var(--space-7) 0; }
+.mx-panel__foot { margin-top: var(--space-7); padding-top: var(--space-7); border-top: 1px solid var(--line-2); display: grid; gap: var(--space-4); }
+.mx-keys { margin-top: var(--space-7); font-size: var(--fs-micro); color: var(--ink-3); }
+
+.mx-props { margin: var(--space-7) 0 0; display: grid; }
+.mx-prop {
+  display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-5);
+  padding: var(--space-5) 0; border-bottom: 1px solid var(--line-2);
+}
+.mx-prop--block { grid-template-columns: 1fr; }
+.mx-prop dt { font-size: var(--fs-meta); color: var(--ink-3); padding-top: var(--space-1); }
+.mx-prop dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; }
+.mx-prop dd > .criteria { width: 100%; }
+
+.mx-edit { flex-basis: 100%; }
+.mx-edit__open {
+  display: inline; cursor: pointer; list-style: none;
+  font-size: var(--fs-meta); color: var(--accent);
+}
+.mx-edit__open::-webkit-details-marker { display: none; }
+.mx-edit[open] > .mx-edit__open { color: var(--ink-3); }
+.mx-edit__form {
+  display: grid; gap: var(--space-4); margin-top: var(--space-4);
+  padding: var(--space-6); background: var(--surface-2); border-radius: var(--r-control);
+}
+.mx-edit__form .field-label { display: grid; gap: var(--space-2); }
+.mx-choices { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.mx-choice {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-5); border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  font-size: var(--fs-dense); cursor: pointer; background: var(--surface);
+}
+.mx-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.mx-table { width: 100%; margin-bottom: var(--space-7); }
+
+/* Ноутбук: колонка чек-листов уходит строкой над списком. */
+@media (max-width: 80rem) {
+  .mx { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); }
+  .mx-lists {
+    grid-column: 1 / -1; position: static; max-height: none;
+    display: flex; flex-wrap: wrap; align-items: stretch;
+  }
+  .mx-lists .mx-col__head { flex-basis: 100%; }
+  .mx-list { border-left: 0; border-bottom: 3px solid transparent; }
+  .mx-list.is-on { border-bottom-color: var(--accent); }
+  .mx-lists__manage { border-top: 0; margin-left: auto; align-self: center; }
+}
+/* Телефон и узкое окно: одна колонка; открытая панель — первой, под ней список. */
+@media (max-width: 52rem) {
+  .mx { grid-template-columns: minmax(0, 1fr); }
+  .mx-panel { position: static; max-height: none; }
+  .mx.has-panel .mx-panel { order: -1; }
+  .mx-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .mx-row__levels, .mx-row__days { display: none; }
+}
