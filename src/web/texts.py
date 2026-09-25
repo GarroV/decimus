@@ -1155,8 +1155,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.field.question_en": {"ru": "Формулировка, en", "en": "Wording, en"},
     "methodology.field.levels": {"ru": "Классы", "en": "Levels"},
     "methodology.field.levels.hint": {
-        "ru": "Через точку с запятой, например D1;D2 — какими классами пункт вообще бывает.",
-        "en": "Semicolon-separated, e.g. D1;D2 — the levels this item can be recorded at.",
+        "ru": "Какими классами пункт вообще бывает. D0 — информационная запись: на оценку не влияет.",
+        "en": "The levels this item can be recorded at. D0 is an information record: it does not affect the score.",
     },
     "methodology.field.zones": {"ru": "Зоны", "en": "Zones"},
     "methodology.field.days": {"ru": "Срок устранения, дней", "en": "Days to fix"},
