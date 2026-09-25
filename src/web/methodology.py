@@ -88,6 +88,9 @@ class Composition:
     items: tuple[Mapping[str, str], ...]
     zones: tuple[Mapping[str, str], ...]
     versions: tuple[Mapping[str, Any], ...]
+    #: Ставки вычетов этой версии: начальный процент, цена классов, множитель
+    #: повтора. Читаются из файла версии — своей арифметики у экрана нет.
+    rates: Mapping[str, Any]
 
     @property
     def is_latest(self) -> bool:
@@ -150,9 +153,9 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
     """
     try:
         versions = door.checklist_versions(tenant=tenant, store=store)
-        listing = door.checklist_items(
-            tenant=tenant, store=store, version=version or str(versions["latest"])
-        )
+        показанная = version or str(versions["latest"])
+        listing = door.checklist_items(tenant=tenant, store=store, version=показанная)
+        ставки = door.scoring(tenant=tenant, store=store, version=показанная)
     except McpError as отказ:
         raise _refusal(отказ) from None
     return Composition(
@@ -162,6 +165,7 @@ def load_composition(store: Store, *, tenant: str, version: str | None = None) -
         items=tuple(listing["items"]),
         zones=tuple(listing["zones"]),
         versions=tuple(versions["versions"]),
+        rates=ставки,
     )
 
 
@@ -553,6 +557,53 @@ def remove_zone(
                 code=code,
                 equal_shares=equal_shares or None,
                 keep_shares=None if equal_shares else True,
+                note=_signed(author, note),
+                version_name=_maybe(version_name),
+            )
+        )
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_scoring(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    start_pct: str | None = None,
+    d1: str | None = None,
+    d2: str | None = None,
+    repeat_multiplier: str | None = None,
+    note: str | None = None,
+    version_name: str | None = None,
+) -> Edit:
+    """Задать ставки вычетов новой версией методики.
+
+    Пустое поле означает «не трогать», а не ноль: ноль — настоящая ставка,
+    и спутать их значило бы обнулить цену класса молча.
+    """
+
+    def цифра(значение: str | None, *, что: str) -> float | None:
+        текст = _maybe(значение)
+        if текст is None:
+            return None
+        try:
+            return float(текст.replace(",", "."))
+        except ValueError:
+            raise MethodologyRefused(
+                f"{что} — «{текст}», а это не число. Ставка задаёт цену нарушения, "
+                f"поэтому подставить вместо непонятного ввода ноль нельзя"
+            ) from None
+
+    try:
+        return _edit(
+            door.set_scoring(
+                tenant=tenant,
+                store=store,
+                start_pct=цифра(start_pct, что="Начальный процент"),
+                d1=цифра(d1, что="Ставка D1"),
+                d2=цифра(d2, что="Ставка D2"),
+                repeat_multiplier=цифра(repeat_multiplier, что="Множитель повтора"),
                 note=_signed(author, note),
                 version_name=_maybe(version_name),
             )

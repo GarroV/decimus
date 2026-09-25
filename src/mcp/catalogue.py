@@ -952,6 +952,78 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_CHECKLIST,
     ),
     ToolSpec(
+        name="scoring",
+        description=(
+            "Read the deduction rates of a checklist edition: the starting "
+            "percentage, the price of each violation class and the repeat "
+            "multiplier. These are read from the edition's file, never "
+            "recalculated — a score always comes from the engine. Grade "
+            "thresholds and the D3 mode live in the same file but are not "
+            "returned here, because they are not editable through set_scoring "
+            "either, and showing them beside editable fields would promise "
+            "otherwise."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {"version": _CHECKLIST_VERSION_PROPERTY},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.scoring,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="set_scoring",
+        description=(
+            "Set the deduction rates of the checklist: starting percentage, "
+            "the price of a D1 and of a D2 violation, and how much more a "
+            "repeated violation costs. What is not named is left untouched, "
+            "and naming nothing at all is refused rather than stored as an "
+            "edition identical to the previous one. A rate is the price of a "
+            "violation — the same nature as a zone share, counted by class "
+            "instead of by zone. Grade thresholds and the D3 mode are NOT "
+            "changed by this tool: they are an ordered list of rules and are "
+            "edited in the file. As with every checklist-editing tool, the "
+            "change is stored as a NEW checklist version and is not published "
+            "automatically (publish_checklist_version does that)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "start_pct": {
+                    "type": "number",
+                    "description": (
+                        "Percentage an inspection starts from before any "
+                        "deduction, normally 100."
+                    ),
+                },
+                "d1": {
+                    "type": "number",
+                    "description": "Percentage points deducted for a D1 violation.",
+                },
+                "d2": {
+                    "type": "number",
+                    "description": "Percentage points deducted for a D2 violation.",
+                },
+                "repeat_multiplier": {
+                    "type": "number",
+                    "description": (
+                        "How much more a violation repeated from the point's "
+                        "previous inspection costs; 2 means twice. Never below "
+                        "1 — that would make a repeat cheaper than the first "
+                        "time, the opposite of what the rule is for."
+                    ),
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.set_scoring,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
         name="rename_zone",
         description=(
             "Rename a zone: change the Russian and/or English name the "

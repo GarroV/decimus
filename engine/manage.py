@@ -20,6 +20,10 @@
   manage.py zone-rename hot_kitchen [--name-ru "..."] [--name-en "..."]
         переименовать зону. Код зоны не трогается никогда: им зона связана с
         пунктами чек-листа и с записанными проверками.
+  manage.py scoring-set [--start 100] [--d1 0.5] [--d2 2] [--repeat 2]
+        задать ставки вычетов и начальный процент. Не названное не трогается;
+        пороги букв и режим D3 эта команда не меняет вовсе. Ставка — цена
+        нарушения, поэтому негодное значение останавливает команду до записи.
   manage.py validate                     проверить целостность файлов
   manage.py import-xlsx файл.xlsx [--keep-zones] [--drop-extra-columns]
         пересобрать чек-лист из выгрузки шаблона IMF (Template_CL). --keep-zones
@@ -475,6 +479,58 @@ def зоны_из_файла():
     return rows, {(r.get("code") or "").strip() for r in rows}
 
 
+def cmd_scoring_set(a):
+    # Ставка вычета — цена нарушения, то есть то же самое, что доля зоны: не
+    # оформление, а деньги партнёра и буква в отчёте. Поэтому здесь нет ни
+    # одной подстановки по умолчанию: не названное не трогается, названное
+    # проверяется, а негодное останавливает команду до записи файла.
+    путь = data_path("scoring.json")
+    with open(путь, encoding="utf-8") as f:
+        правила = json.load(f)
+
+    def число(значение, *, что, минимум, максимум=None):
+        try:
+            n = float(str(значение).replace(",", "."))
+        except ValueError:
+            sys.exit(f"{что}: «{значение}» не число")
+        if n < минимум or (максимум is not None and n > максимум):
+            предел = f"от {минимум:g} до {максимум:g}" if максимум is not None else f"не меньше {минимум:g}"
+            sys.exit(f"{что}: {n:g} вне допустимого ({предел})")
+        return n
+
+    изменения = []
+    if a.start is not None:
+        было = правила.get("start_pct")
+        правила["start_pct"] = число(a.start, что="начальный процент", минимум=0, максимум=100)
+        изменения.append(f"начальный процент {было} → {правила['start_pct']:g}")
+    for ключ, значение in (("D1", a.d1), ("D2", a.d2)):
+        if значение is None:
+            continue
+        было = правила.setdefault("penalty", {}).get(ключ)
+        правила["penalty"][ключ] = число(значение, что=f"ставка {ключ}", минимум=0, максимум=100)
+        изменения.append(f"ставка {ключ} {было} → {правила['penalty'][ключ]:g}")
+    if a.repeat is not None:
+        было = правила.get("repeat_multiplier")
+        # Множитель меньше единицы сделал бы повтор ДЕШЕВЛЕ первого раза —
+        # ровно наоборот тому, ради чего он заведён (D191).
+        правила["repeat_multiplier"] = число(a.repeat, что="множитель повтора", минимум=1)
+        изменения.append(f"множитель повтора {было} → {правила['repeat_multiplier']:g}")
+
+    if not изменения:
+        sys.exit(
+            "Не названо ни одной ставки. Команда ничего не меняет молча: "
+            "укажите --start, --d1, --d2 или --repeat"
+        )
+
+    d = target_dir(create=True)
+    for строка in изменения:
+        print(строка)
+    with open(os.path.join(d, "scoring.json"), "w", encoding="utf-8") as f:
+        json.dump(правила, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+    print("ставки записаны; пороги букв и режим D3 не тронуты")
+
+
 def cmd_zone_share(a):
     # Доля зоны — вес «где нам важнее», то есть цена ответа, а не оформление.
     # Поэтому правятся ТОЛЬКО названные зоны: раздать остальное за управляющую
@@ -830,6 +886,12 @@ def main():
     zr.add_argument("--keep-shares", action="store_true", help="доли остальных зон не трогать")
     zr.add_argument("--equal-shares", action="store_true", help="уравнять доли ВСЕХ оставшихся зон на 100/N")
     zr.set_defaults(fn=cmd_zone_remove)
+    sc = s.add_parser("scoring-set")
+    sc.add_argument("--start", help="начальный процент проверки")
+    sc.add_argument("--d1", help="ставка вычета за нарушение класса D1")
+    sc.add_argument("--d2", help="ставка вычета за нарушение класса D2")
+    sc.add_argument("--repeat", help="во сколько раз дороже повтор нарушения (D191)")
+    sc.set_defaults(fn=cmd_scoring_set)
     zs = s.add_parser("zone-share")
     zs.add_argument("--shares", required=True, help="доли зон набором: код=доля через запятую")
     zs.set_defaults(fn=cmd_zone_share)

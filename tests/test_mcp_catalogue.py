@@ -65,6 +65,8 @@ from src.mcp.catalogue import (
     # формулировки не влияет вовсе, а движок этот файл не читает.
     "route",
     "set_route",
+    "scoring",
+    "set_scoring",
     "publish_checklist_version",
     "photo_cues",
     "add_photo_cue",
@@ -142,10 +144,10 @@ from src.mcp.catalogue import (
 )
 
 
-def test_каталог_содержит_ровно_тридцать_девять_инструментов_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_сорок_один_инструмент_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 39
+    assert len(TOOLS) == 41
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -293,7 +295,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 39
+    assert len(перечень) == 41
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 
