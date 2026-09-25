@@ -65,6 +65,31 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Название пиццерии? Введите текстом.",
         "en": "Which pizzeria? Type the name.",
     },
+    # --- пиццерия из справочника (D196) ---
+    "start.unit_suggest": {
+        "ru": (
+            "Пиццерии «{typed}» нет в справочнике. Может быть, одна из этих? "
+            "Или введите название точнее."
+        ),
+        "en": (
+            "“{typed}” is not in the pizzeria directory. Is it one of these? "
+            "Or type the name more precisely."
+        ),
+    },
+    "start.unit_unknown": {
+        "ru": (
+            "Пиццерии «{typed}» нет в справочнике, и похожих тоже нет. Проверьте название. "
+            "Если пиццерия новая — её сначала заводит администратор."
+        ),
+        "en": (
+            "“{typed}” is not in the pizzeria directory, and nothing similar is. Check the name. "
+            "A new pizzeria has to be added by an administrator first."
+        ),
+    },
+    "start.unit_pick_gone": {
+        "ru": "Эти варианты уже неактуальны. Введите название пиццерии ещё раз.",
+        "en": "These options are out of date. Type the pizzeria name again.",
+    },
     "start.unit_empty": {
         "ru": "Название пиццерии пустое. Введите текстом, как оно должно стоять в отчёте.",
         "en": "The name is empty. Type it as it should appear in the report.",
@@ -606,7 +631,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "❓ {question}",
         "en": "❓ {question}",
     },
-    # Увиденное на кадрах пачки сверх слов аудитора (D180). Заголовок говорит
+    # Увиденное на кадрах пачки сверх слов аудитора (D208). Заголовок говорит
     # прямо, что это догадка по кадрам: аудитор этого не произносил.
     "record.also_seen": {
         "ru": "На кадрах видно ещё — вы об этом не говорили. Записать что-то из этого?\n\n{lines}",
@@ -813,6 +838,29 @@ TEXTS: dict[str, dict[str, str]] = {
     "edit.changed_info": {
         "ru": "Поправлено. #{n} {code} · {level} замер · {zone}",
         "en": "Updated. #{n} {code} · {level} measurement · {zone}",
+    },
+    # Состояние называется словами, а не молча меняет цену: аудитор видит одну
+    # кнопку-переключатель и по ответу узнаёт, в каком состоянии запись (#359).
+    "edit.repeat_on": {
+        "ru": "#{n}: отмечено как повтор — вычет за запись удвоен",
+        "en": "#{n}: marked as a repeat — the deduction is doubled",
+    },
+    "edit.repeat_off": {
+        "ru": "#{n}: пометка повтора снята — вычет обычный",
+        "en": "#{n}: repeat mark removed — the deduction is back to normal",
+    },
+    # Подсказка приносит ФАКТ и не делает вывода: тот же код мог относиться к
+    # другому объекту, а исправленное и снова сломавшееся — не то же самое, что
+    # не исправленное вовсе. Цену назначает аудитор кнопкой (#359, D191).
+    "record.repeat_seen": {
+        "ru": (
+            "Такой же пункт был в прошлой проверке этой точки. "
+            "Если нарушение то же и не устранено — кнопка «Повтор ×2» удвоит вычет."
+        ),
+        "en": (
+            "The same item was recorded in this unit's previous inspection. "
+            "If it is the same unresolved issue, the “Repeat ×2” button doubles the deduction."
+        ),
     },
     "edit.dropped": {
         "ru": "Запись #{n} удалена.",
@@ -1700,6 +1748,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.zone": {"ru": "Зона", "en": "Zone"},
     "btn.level": {"ru": "Класс", "en": "Class"},
     "btn.text": {"ru": "Формулировка", "en": "Wording"},
+    "btn.repeat": {"ru": "Повтор ×2", "en": "Repeat ×2"},
     "btn.drop": {"ru": "Удалить", "en": "Delete"},
     # Кнопки информационной части (T158).
     "btn.yes": {"ru": "Да", "en": "Yes"},

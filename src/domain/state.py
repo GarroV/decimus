@@ -432,6 +432,10 @@ def _finding(
         comment=str(raw.get("comment") or ""),
         photos=[str(p) for p in photos],
         zone_unusual=bool(raw.get("zone_unusual")),
+        # Пометка повтора лежит в самой записи движка: цену за неё назначает
+        # он же (D191). Её отсутствие — «не отмечено»: у проверок, записанных
+        # до правила, отметить повтор было нечем (#359).
+        repeat=bool(raw.get("repeat")),
         source=sources.get(int(raw["n"]), ""),
         words=words.get(int(raw["n"]), ""),
         # Предложение разворачивается в четыре поля здесь, а не на границе с

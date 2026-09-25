@@ -55,10 +55,25 @@ from .version import VERSION_FILE, compose, edition_of, is_one_segment
 
 logger = logging.getLogger(__name__)
 
-#: Полка снимков внутри каталога состояния: `STATE_DIR/methodology/<издание>/`.
+#: Полка снимков внутри каталога состояния: `STATE_DIR/methodology/<код>/<издание>/`.
+#: Уровень кода появился с множественностью чек-листов (T346, D177): имя
+#: издания выводится из содержимого методики, поэтому два разных чек-листа
+#: однажды дадут одинаковое имя. В плоской полке второй не упал бы — он
+#: опознал бы чужой снимок как свой по отпечатку, и проверка посчиталась бы
+#: по чужой методике.
 #: Не `checklist_data`: так называется форк методики, который движок подхватывает
 #: сам, и папка с таким именем в каталоге состояния — отказ на старте (T024).
 SHELF_DIR = "methodology"
+
+#: Код чек-листа, которым является существующая методика (D181). Он уезжает в
+#: базу к каждой проведённой проверке и не меняется никогда, поэтому служит
+#: умолчанием везде, где кода ещё не передают.
+#:
+#: Живёт здесь, а не в `checklist.py`: тот импортирует эту сторону сам
+#: (`pin`), и объявление там замкнуло бы импорт в кольцо. То же значение
+#: объявлено в `src/mcp/checklist_layout.py` — два дома у одного кода это
+#: дрейф, и он заведён отдельной задачей.
+DEFAULT_CODE = "bizdev"
 
 #: Что входит в снимок. `DATA_FILES` — сама методика (то же, из чего считается
 #: отпечаток), плюс файл издания: без него снимок опознавался бы как `local-…`
@@ -66,9 +81,46 @@ SHELF_DIR = "methodology"
 SNAPSHOT_FILES = (*DATA_FILES, VERSION_FILE)
 
 
-def shelf(settings: Settings) -> Path:
-    """Каталог, в котором лежат снимки изданий."""
+def shelf(settings: Settings, code: str = DEFAULT_CODE) -> Path:
+    """Каталог, в котором лежат снимки изданий этого чек-листа."""
+    return settings.state_dir / SHELF_DIR / code
+
+
+def _flat_shelf(settings: Settings) -> Path:
+    """Полка до уровня кода: `STATE_DIR/methodology/<издание>/`.
+
+    Читается, но не пишется. Снимки, снятые до T346, лежат здесь, и ими
+    помечены уже записанные проверки: перестать их находить значит собрать
+    письмо партнёру не по той методике — или не собрать вовсе. Новые снимки
+    туда не кладутся, поэтому старая полка вымывается сама.
+    """
     return settings.state_dir / SHELF_DIR
+
+
+def shelf_dirs(shelf_root: Path, version: str) -> list[Path]:
+    """Где на полке может лежать это издание — все места сразу.
+
+    Полка стала двухуровневой (T346), а снимки, снятые до неё, лежат прямо в
+    корне; и то и другое читается. Перебор нужен потребителю, который знает
+    издание, но не знает код чек-листа: письмо собирается по отметке проверки,
+    а отметка — это издание, кода в ней нет.
+
+    Годность решает не очередь, а отпечаток у вызывающего: годится тот
+    каталог, чьё СОДЕРЖИМОЕ и есть это издание, кто бы его ни положил. Тот же
+    порядок и по той же причине держит хранилище версий MCP
+    (`report.engine_call.edition_dirs`).
+
+    Имя издания вызывающий проверяет до вызова: свои куски пути берутся с
+    диска, подставить `..` сюда нечем.
+    """
+    места = [shelf_root / version]
+    if shelf_root.is_dir():
+        места += [
+            код / version
+            for код in sorted(k for k in shelf_root.iterdir() if k.is_dir())
+            if not код.name.startswith(".")
+        ]
+    return места
 
 
 def _identifies(path: Path, version: str) -> bool:
@@ -95,12 +147,24 @@ def _identifies(path: Path, version: str) -> bool:
     return прочитано == version
 
 
-def snapshot(settings: Settings, version: str) -> Path | None:
-    """Годный снимок этого издания или `None`, если его нет."""
+def snapshot(settings: Settings, version: str, code: str = DEFAULT_CODE) -> Path | None:
+    """Годный снимок этого издания или `None`, если его нет.
+
+    Ищется сперва на полке своего чек-листа, затем — только для кода по
+    умолчанию — на старой плоской полке: до T346 чек-лист был один, и снимки
+    прошлых изданий лежат там. Чужому коду плоская полка не предлагается: её
+    содержимое принадлежит методике бизнес-девелопера, а не всякому, кто
+    спросил.
+    """
     if not is_one_segment(version):
         return None
-    path = shelf(settings) / version
-    return path if _identifies(path, version) else None
+    path = shelf(settings, code) / version
+    if _identifies(path, version):
+        return path
+    if code != DEFAULT_CODE:
+        return None
+    прежний = _flat_shelf(settings) / version
+    return прежний if _identifies(прежний, version) else None
 
 
 def _copy(source: Path, target: Path) -> None:
@@ -129,7 +193,7 @@ def _copy(source: Path, target: Path) -> None:
         shutil.rmtree(holder, ignore_errors=True)
 
 
-def keep(settings: Settings) -> str:
+def keep(settings: Settings, code: str = DEFAULT_CODE) -> str:
     """Снять снимок действующей методики и вернуть издание, которым он опознан.
 
     Возвращаемое издание — то, которым помечается проверка. Считается оно по
@@ -143,12 +207,12 @@ def keep(settings: Settings) -> str:
     """
     source = Path(os.path.realpath(settings.data_dir))
     version = compose(source, DATA_FILES)
-    if snapshot(settings, version) is not None:
+    if snapshot(settings, version, code) is not None:
         return version
     if not is_one_segment(version):
         logger.warning("издание %s не годится в имя каталога — снимок не снят", version)
         return version
-    target = shelf(settings) / version
+    target = shelf(settings, code) / version
     if target.exists():
         # Каталог под этим именем есть, но снимком не опознан: испорчен, снят
         # порванным копированием или подложен. Держать его незачем — имя

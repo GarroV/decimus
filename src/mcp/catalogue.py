@@ -29,7 +29,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_source, checklist_tools, phrases, retraction, tools
+from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -167,6 +167,21 @@ _CHECKLIST_VERSION_PROPERTY: dict[str, object] = {
     ),
 }
 
+#: Какой чек-лист. Хранилище несёт их много (T341, D183), и каждый инструмент
+#: методики обязан уметь сказать, о каком речь. Не назван — тот, что применён к
+#: проду: старые вызовы агента продолжают работать слово в слово, а новые
+#: называют чек-лист явно.
+_CHECKLIST_CODE_PROPERTY: dict[str, object] = {
+    "type": "string",
+    "description": (
+        "Code of the checklist to work with, as returned by checklists "
+        "('checklist' field). Omit to work with the checklist currently "
+        "applied to production — the one inspections are scored against. The "
+        "code never changes: it is what ties a checklist to the inspections "
+        "already scored by it."
+    ),
+}
+
 #: Имя набора методики — общее для всех шести правящих инструментов: назвать
 #: один раз, дальше оно наследуется от предыдущей версии.
 _VERSION_NAME_PROPERTY: dict[str, object] = {
@@ -258,7 +273,12 @@ TOOLS: tuple[ToolSpec, ...] = (
             "and finding count exactly as they were recorded when that "
             "inspection was completed — nothing is recalculated here. "
             "Optionally filter by unit name and by the date range the "
-            "inspections took place in."
+            "inspections took place in. "
+            "Every answer carries a `comparability` field: inspections scored "
+            "under different checklists, or under editions whose scoring rules "
+            "changed, do not belong in one series — averaging or ranking "
+            "across them is meaningless, and the field says where the series "
+            "breaks."
         ),
         input_schema={
             "type": "object",
@@ -285,7 +305,10 @@ TOOLS: tuple[ToolSpec, ...] = (
             "recent inspection first — a series of percentages and letter "
             "grades exactly as recorded at the time of each inspection. No "
             "trend, average, or difference between entries is computed here; "
-            "the caller compares the series itself."
+            "the caller compares the series itself. Before comparing, read the "
+            "`comparability` field: a series whose scoring rules changed "
+            "between editions is not a trend, and the field says where it "
+            "breaks."
         ),
         input_schema={
             "type": "object",
@@ -306,7 +329,11 @@ TOOLS: tuple[ToolSpec, ...] = (
             "many inspections and units, total findings, the distribution of "
             "recorded letter grades, and the best- and worst-scoring recorded "
             "inspections. No average score is computed — that number was "
-            "never recorded by the audit engine, so it is not invented here."
+            "never recorded by the audit engine, so it is not invented here. "
+            "The `comparability` field says whether the summarized inspections "
+            "were scored the same way at all: different checklists, or "
+            "editions whose scoring rules changed, make the grade distribution "
+            "a mix of incomparable series."
         ),
         input_schema={
             "type": "object",
@@ -922,6 +949,78 @@ TOOLS: tuple[ToolSpec, ...] = (
             "additionalProperties": False,
         },
         handler=checklist_tools.set_zone_shares,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="scoring",
+        description=(
+            "Read the deduction rates of a checklist edition: the starting "
+            "percentage, the price of each violation class and the repeat "
+            "multiplier. These are read from the edition's file, never "
+            "recalculated — a score always comes from the engine. Grade "
+            "thresholds and the D3 mode live in the same file but are not "
+            "returned here, because they are not editable through set_scoring "
+            "either, and showing them beside editable fields would promise "
+            "otherwise."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {"version": _CHECKLIST_VERSION_PROPERTY},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.scoring,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="set_scoring",
+        description=(
+            "Set the deduction rates of the checklist: starting percentage, "
+            "the price of a D1 and of a D2 violation, and how much more a "
+            "repeated violation costs. What is not named is left untouched, "
+            "and naming nothing at all is refused rather than stored as an "
+            "edition identical to the previous one. A rate is the price of a "
+            "violation — the same nature as a zone share, counted by class "
+            "instead of by zone. Grade thresholds and the D3 mode are NOT "
+            "changed by this tool: they are an ordered list of rules and are "
+            "edited in the file. As with every checklist-editing tool, the "
+            "change is stored as a NEW checklist version and is not published "
+            "automatically (publish_checklist_version does that)."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "start_pct": {
+                    "type": "number",
+                    "description": (
+                        "Percentage an inspection starts from before any "
+                        "deduction, normally 100."
+                    ),
+                },
+                "d1": {
+                    "type": "number",
+                    "description": "Percentage points deducted for a D1 violation.",
+                },
+                "d2": {
+                    "type": "number",
+                    "description": "Percentage points deducted for a D2 violation.",
+                },
+                "repeat_multiplier": {
+                    "type": "number",
+                    "description": (
+                        "How much more a violation repeated from the point's "
+                        "previous inspection costs; 2 means twice. Never below "
+                        "1 — that would make a repeat cheaper than the first "
+                        "time, the opposite of what the rule is for."
+                    ),
+                },
+                "version_name": _VERSION_NAME_PROPERTY,
+                "note": _NOTE_PROPERTY,
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklist_tools.set_scoring,
         kind=KIND_CHECKLIST,
     ),
     ToolSpec(
@@ -1557,7 +1656,148 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_RETRACTION,
         history=True,
     ),
+    ToolSpec(
+        name="checklists",
+        description=(
+            "List every checklist the store holds: code, names, state (draft "
+            "/ active / retired) and which one is applied to production. "
+            "State and production are different things: 'active' means a "
+            "checklist is fit for use and several may be, while 'applied to "
+            "production' is a pointer and there is exactly one. Checklists "
+            "are never deleted — a retired one stays listed, because "
+            "inspections were scored by it."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.checklists,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="checklist_meta",
+        description=(
+            "Read one checklist's card: code, both names, state, whether it "
+            "is applied to production and which edition it publishes. Name "
+            "the checklist with 'checklist'; omit it to read the one applied "
+            "to production."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.checklist_meta,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="create_checklist",
+        description=(
+            "Create a new checklist from the blank: an empty item list, one "
+            "zone at 100 per cent and blank scoring rates. Not a copy of an "
+            "existing checklist — a copy drifts from its original on the "
+            "first edit while still looking like it. The new checklist is "
+            "born a draft and scores nothing until items are added; a "
+            "checklist without items cannot be applied to production, because "
+            "it would hand a partner 100 per cent without asking a single "
+            "question. The code is given in 'checklist' and never changes."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "name_ru": {
+                    "type": "string",
+                    "description": "Name shown to Russian-speaking people.",
+                },
+                "name_en": {
+                    "type": "string",
+                    "description": "Name shown to English-speaking people.",
+                },
+            },
+            "required": ["checklist", "name_ru", "name_en"],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.create_checklist,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="rename_checklist",
+        description=(
+            "Change a checklist's names. Names are wording and are translated "
+            "and edited freely; the code is the link to inspections already "
+            "scored and to stored editions, and it changes by nothing."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "name_ru": {"type": "string", "description": "New Russian name."},
+                "name_en": {"type": "string", "description": "New English name."},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.rename_checklist,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="set_checklist_state",
+        description=(
+            "Set a checklist's state: draft, active or retired. Retiring is "
+            "how a checklist is taken out of use — there is no deletion, "
+            "because deleting would take the history of everything scored by "
+            "it. A checklist applied to production cannot be retired: apply "
+            "another one first."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "enum": ["draft", "active", "retired"],
+                    "description": "The state to set.",
+                },
+            },
+            "required": ["state"],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.set_checklist_state,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="apply_checklist",
+        description=(
+            "Apply a checklist to production: inspections are scored against "
+            "it from now on. One movement — the store pointer is moved — and "
+            "the rollback is applying the previous one. Inspections already "
+            "scored stay on their own checklist and edition and are never "
+            "recalculated. Refused for a retired checklist, for one with no "
+            "published edition, and for one with no items that can hold a "
+            "violation."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.apply_checklist,
+        kind=KIND_CHECKLIST,
+    ),
 )
+
+#: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним
+#: местом, а не двадцатью четырьмя объявлениями. Перечислять его в каждой схеме
+#: значило бы, что следующий инструмент забудет его молча, и агент получит
+#: отказ разбора аргументов вместо работы (#271: инструмент уже надо вносить в
+#: три места).
+for _спец in TOOLS:
+    if _спец.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE):
+        _свойства = _спец.input_schema.setdefault("properties", {})
+        if isinstance(_свойства, dict):
+            _свойства.setdefault("checklist", _CHECKLIST_CODE_PROPERTY)
 
 #: Индекс по имени — `find()` вызывается на каждый запрос `tools/call`,
 #: а линейный проход по всем записям каталога пересчитывать незачем.

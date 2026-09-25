@@ -7,14 +7,22 @@
    значит, токена не хватает, и заводить его надо в GarroV/forma.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-/* ── Раскладка: навигация слева, содержимое справа ───────────────
-   Разделов девять, и у непостроенных рядом стоит лента — в строку шапки
-   это не помещается, поэтому боковая навигация ядра (.sidenav). */
+/* ── Фон приложения ──────────────────────────────────────────────────────
+   Ядро красит холст в `--canvas` (#E4E4E7): заметно серый, и экраны аудита на
+   нём выглядят тускло — решение владельца 24.09.2026, дословно: «замени серый
+   фон на белый, что за тоска».
 
-.shell { display: flex; align-items: stretch; min-height: calc(100vh - 52px); }
-.shell__nav { flex: 0 0 auto; }
-.shell__main { flex: 1 1 auto; min-width: 0; }
-.shell__main .page { width: 100%; }
+   Здесь НЕ появляется свой хекс: холст берёт значение уже существующего
+   токена поверхности, то есть остаётся значением ядра (правило слоя выше).
+   Тёмная тема переезжает вместе с ним и остаётся согласованной: там
+   `--surface` — это #121214, а не белый.
+
+   Правка локальна для DECIMUS намеренно. `--canvas` живёт в dodo-ds.css,
+   который здесь только копия канона `GarroV/forma` (D136): смена значения там
+   побелила бы холст всей линейки, а это решение об облике трёх продуктов, а
+   не об одном экране. Владелец захочет того же везде — правим forma и
+   раскатываем `tools/spread.py`, а это переопределение снимаем. */
+:root { --canvas: var(--surface); }
 
 /* ── Лента «в разработке» ────────────────────────────────────────
    Строительная лента, а не метка: непостроенное обязано выглядеть
@@ -49,8 +57,6 @@
   font-weight: var(--w-bold); color: var(--warn-ink);
 }
 
-.sidenav__item--wip { opacity: .82; }
-.sidenav__wrap { display: block; }
 
 /* ── Метка буквы оценки ──────────────────────────────────────────
    Буква — одно из двух мест, где продукт берёт сильный цвет
@@ -161,17 +167,88 @@
   font-weight: var(--w-semibold);
 }
 
+/* Форма правки методики. Раньше это был столбец одинаковых полей во всю
+   ширину: код пункта и формулировка на двух языках получали одинаковую
+   строку, и восемь полей подряд читались простынёй. Теперь сетка, а ширина
+   поля следует из того, что в него пишут (бриф: «форма должна следовать из
+   того, что на самом деле решают на экране»), и пара ru/en стоит рядом —
+   бриф просит править формулировки сразу на двух языках, а не одну под
+   другой. */
 .form-grid {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5) var(--space-6);
   margin-top: var(--space-6);
-  max-width: 640px;
+  max-width: 760px;
+  align-items: start;
 }
 
+.field { min-width: 0; }
+/* Формулировка, критерии и примечание — во всю ширину формы: их читают
+   строкой, а не сравнивают глазами с соседом. */
+.field--wide { grid-column: 1 / -1; }
+/* Код, срок, доля: короткое значение в длинном поле выглядит ошибкой ввода. */
+.field--narrow .input { max-width: 14ch; }
+
 .form-grid .input { width: 100%; }
-.form-grid .field-label { margin-top: var(--space-5); }
-.form-grid .btn { margin-top: var(--space-7); align-self: flex-start; }
+.form-grid .field-note { margin-top: var(--space-2); }
+.form-grid .btn { grid-column: 1 / -1; margin-top: var(--space-4); justify-self: start; }
+
+/* Форма в ячейке таблицы (переименование и снятие зоны) — колонка: две
+   колонки в узкой ячейке дали бы поля в два символа шириной. */
+.form-grid--single { grid-template-columns: minmax(0, 1fr); max-width: none; }
+
+/* Форма из коротких числовых полей — доли зон, ставки вычетов. Их правят
+   пачкой и сравнивают между собой, поэтому в ряд встаёт столько, сколько
+   влезает, а не ровно два. */
+.form-grid--dense { grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr)); }
+
+/* Форма в правой панели идёт колонкой: столбец панели узкий, и две колонки
+   дали бы в нём поля шириной в пару символов. */
+.mx-panel .form-grid {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: none;
+}
+
+/* Значение, которое показывают, но не правят (код пункта). Поле ввода с
+   `disabled` на его месте обещало бы правку, которой нет. */
+.field-static {
+  font-family: var(--font-num);
+  padding: var(--space-3) 0;
+}
+
+/* Набор из нескольких значений — флажками, а не строкой с точкой с запятой:
+   синтаксис в поле ввода человек набирает по памяти и ошибается молча. */
+.choice-set {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.choice {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color var(--t-state), background var(--t-state);
+}
+
+.choice:hover { border-color: var(--accent); }
+.choice:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.choice:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: minmax(0, 1fr); }
+  .field--wide { grid-column: auto; }
+}
 
 /* Критерии приходят разметкой методики — показываем как написаны, не
    переверстывая: класс нарушения выводится из них дословно. */
@@ -241,3 +318,819 @@
 }
 .note__list li + li { margin-top: var(--space-2); }
 .note--warn .note__list { color: var(--warn-ink); }
+
+/* ═══ ОБЗОР СЕТИ ═════════════════════════════════════════════════════════
+   Облик перенесён с прототипа владельца (D188, D190): карточка со скруглением
+   экрана, шапка с подзаголовком, плотные строки-списки. Своих цветов и
+   размеров здесь нет — всё через токены ядра, иначе экран отвяжется от
+   дизайн-системы при первой же правке палитры.
+
+   Плитки сверху КЛИКАБЕЛЬНЫ и сужают выборку. Это не украшение: бриф
+   запрещает «шаблонный дашборд-вид с четырьмя одинаковыми плитками», и
+   отличие ровно здесь — цифра, из которой нельзя провалиться в список, на
+   вопрос «куда смотреть сегодня» не отвечает. */
+
+.ov-head { display: flex; align-items: flex-end; gap: var(--space-4); flex-wrap: wrap; }
+.ov-head__main { flex: 1; min-width: 14rem; }
+.ov-head__kicker {
+  font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ov-head__title {
+  font-family: var(--font-num);
+  font-size: var(--fs-title);
+  font-weight: var(--w-semibold);
+  letter-spacing: -.03em;
+  margin-top: var(--space-2);
+}
+.ov-head__sub { font-size: var(--fs-body); color: var(--ink-2); margin-top: var(--space-2); }
+
+/* Полоса плиток. Ширина колонки задаётся сеткой, а не числом плиток:
+   блок, под который нет данных, не показывается вовсе, и полоса не должна
+   от этого разъезжаться. */
+.ov-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+.ov-tile {
+  display: block;
+  text-align: left;
+  padding: var(--space-4);
+  border-radius: var(--r-control);
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: inherit;
+  text-decoration: none;
+}
+.ov-tile:hover { border-color: var(--accent-line); }
+.ov-tile__label { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-2); }
+.ov-tile__value {
+  display: block;
+  font-family: var(--font-num);
+  font-size: var(--fs-display);
+  font-weight: var(--w-semibold);
+  line-height: 1;
+  letter-spacing: -.03em;
+  margin-top: var(--space-3);
+  font-variant-numeric: tabular-nums;
+}
+.ov-tile__note { font-size: var(--fs-micro); line-height: var(--lh-meta); color: var(--ink-3); margin-top: var(--space-2); }
+/* Плитки различаются на вид, и различие несёт смысл: цветом помечено
+   только то, что требует действия, — бриф разрешает сильный цвет там, где он
+   значит, а не украшает. Спокойная плитка остаётся спокойной. */
+.ov-tile--err { border-color: var(--err-line); background: var(--err-soft); }
+.ov-tile--err .ov-tile__value { color: var(--err); }
+.ov-tile--warn { border-color: var(--warn-line); background: var(--warn-soft); }
+.ov-tile--warn .ov-tile__value { color: var(--warn-ink); }
+.ov-tile--ok { border-color: var(--ok-line); }
+.ov-tile--ok .ov-tile__value { color: var(--ok); }
+/* Движение рядом с числом, а не вместо него: «88,0» отвечает «сколько»,
+   «−2,4» — «куда», и одно без другого на этом экране бесполезно. */
+.ov-tile__delta {
+  font-family: var(--font-num);
+  font-size: var(--fs-meta);
+  font-weight: var(--w-semibold);
+  letter-spacing: 0;
+  margin-left: var(--space-2);
+  color: var(--ink-3);
+}
+.ov-tile--err .ov-tile__delta { color: var(--err); }
+
+/* Двухколоночная сетка карточек; на телефоне складывается в одну колонку
+   правилом ниже, а не медиазапросом на каждую карточку. */
+.ov-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+  margin-top: var(--space-5);
+}
+
+.ov-card {
+  border-radius: var(--r-screen);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.ov-card__head { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line-2); }
+.ov-card__title { font-weight: var(--w-semibold); font-size: var(--fs-lead); }
+.ov-card__hint { font-size: var(--fs-meta); color: var(--ink-3); margin-top: var(--space-1); }
+.ov-card__empty { padding: var(--space-5); font-size: var(--fs-meta); color: var(--ink-3); }
+
+.ov-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+  color: inherit;
+  text-decoration: none;
+}
+.ov-row:last-child { border-bottom: 0; }
+a.ov-row:hover { background: var(--surface-3); }
+.ov-row__name { flex: 1; min-width: 9rem; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ov-row__meta { font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-1); }
+.ov-row__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-dense);
+  font-weight: var(--w-semibold);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 3.5rem;
+}
+
+/* Полоса долей: ширина сегмента — это и есть число, поэтому подпись рядом
+   не дублируется, а дополняет (сколько именно). */
+.ov-bar { display: flex; height: .5rem; border-radius: var(--r-pill); overflow: hidden; background: var(--surface-3); min-width: 6rem; flex: 1; }
+.ov-bar__part { display: block; }
+
+/* Точка-маркер повода. Единственный сильный цвет на экране, и он несёт смысл:
+   бриф разрешает цвет на букве оценки и классе нарушения, а повод — это и
+   есть класс нарушения, вынесенный на обзор. */
+.ov-dot { width: .5rem; height: .5rem; border-radius: 50%; flex: none; margin-top: var(--space-2); }
+.ov-dot--err { background: var(--err); }
+.ov-dot--warn { background: var(--warn); }
+
+/* ── Панель выборки ─────────────────────────────────────────────────────
+   Отбор — ссылки, а не форма: срез живёт в адресе и отправляется коллеге
+   ссылкой. Поэтому чип и выглядит ссылкой-таблеткой, а выбранный помечен
+   заливкой, а не отдельным цветом текста: цвет на этом экране занят буквой
+   оценки и классом нарушения. */
+.ov-filters {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+  padding: var(--space-3);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+.ov-filters__label {
+  font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: var(--space-1);
+}
+.ov-filters__gap { flex: 1; min-width: var(--space-3); }
+.ov-chips { display: inline-flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; }
+.ov-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  color: var(--ink-2);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ov-chip:hover { border-color: var(--accent-line); }
+.ov-chip.is-on { background: var(--accent); border-color: var(--accent); color: var(--ink-inverse); }
+.ov-chip__num { font-family: var(--font-num); font-variant-numeric: tabular-nums; opacity: .7; }
+.ov-chip--reset { background: var(--surface-3); border-color: transparent; }
+
+.ov-head__cta { flex: none; white-space: nowrap; }
+.ov-card--wide { margin-top: var(--space-5); }
+.ov-card__count {
+  margin-left: auto;
+  font-family: var(--font-num);
+  font-size: var(--fs-meta);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.ov-card__head { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+
+/* ── Таблицы разбивки и точек ───────────────────────────────────────────
+   Колонки заданы сеткой, а не таблицей: строка целиком — ссылка, и `<a>`
+   внутри `<tr>` разметкой не выражается. Узкий экран прокручивает таблицу
+   вбок в своей обёртке, а не ломает остальную страницу. */
+/* Прокрутка вбок принадлежит ТАБЛИЦЕ, а не карточке: у карточки
+   `overflow: hidden` ради скруглённых углов, и без собственной прокрутки
+   последняя колонка на узком экране обрезается молча — видно только то, что
+   влезло, и человек не знает, что там было ещё. */
+.ov-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ov-card:has(.ov-table) { overflow: visible; }
+.ov-table__head,
+.ov-table__row {
+  display: grid;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+}
+.ov-table--breakdown .ov-table__head,
+.ov-table--breakdown .ov-table__row {
+  grid-template-columns: minmax(7rem, 1fr) 4rem 5rem 4rem minmax(5rem, 8rem) 3rem;
+  min-width: 34rem;
+}
+.ov-table--points .ov-table__head,
+.ov-table--points .ov-table__row {
+  grid-template-columns: minmax(9rem, 1.4fr) minmax(6rem, 1fr) 4rem 5rem 4rem minmax(8rem, 1fr) 7rem;
+  min-width: 48rem;
+}
+.ov-table__head {
+  background: var(--surface-3);
+  font: var(--w-semibold) var(--fs-micro) / var(--lh-meta) var(--font-ui);
+  letter-spacing: .11em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.ov-table__row { color: inherit; text-decoration: none; }
+.ov-table__row:last-child { border-bottom: 0; }
+a.ov-table__row:hover { background: var(--surface-3); }
+.ov-cell__name { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ov-cell__muted { font-size: var(--fs-meta); color: var(--ink-2); }
+.ov-num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  justify-self: end;
+  font-size: var(--fs-meta);
+}
+.ov-num--strong { font-size: var(--fs-dense); font-weight: var(--w-semibold); }
+.ov-num--err { color: var(--err); }
+
+/* Полоса букв — ШКАЛА: A слева, D справа, порядок не зависит от выборки.
+   Сегменты красятся теми же классами, что буква в таблице, поэтому цвет
+   буквы и цвет её доли не могут разойтись. */
+.ov-gradebar { display: flex; gap: 2px; height: 1rem; border-radius: var(--r-pill); overflow: hidden; }
+.ov-gradebar__part { display: block; }
+.ov-gradebar__part.tag--ok { background: var(--ok); }
+.ov-gradebar__part.tag--neutral { background: var(--ink-3); }
+.ov-gradebar__part.tag--warn { background: var(--warn); }
+.ov-gradebar__part.tag--err { background: var(--err); }
+
+/* ═══ КАРКАС ═════════════════════════════════════════════════════════════
+   Шапка сверху, навигация СТОЛБЦОМ СЛЕВА (D192), содержимое справа. В
+   прототипе навигация шла строкой в шапке (D188, D190); владелец вернул
+   столбец — он адекватнее. Золотые ленты «в разработке» не вернулись: бриф
+   оставляет сильный цвет букве оценки и классу нарушения, больше нигде.
+
+   Непостроенный раздел из карты не исчезает: он приглушён яркостью, а не
+   помечен плашкой. Спрятать его нельзя решением D138, кричать о нём семь раз
+   на экране — нельзя брифом. */
+
+.topbar {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 40;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+/* Шапка во всю ширину, а не в колонку содержимого: бренд стоит над столбцом
+   навигации, иначе при широком окне он уезжает вправо от своего меню. */
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+.topbar .whoami { white-space: nowrap; }
+.topbar .logout { flex: none; }
+.topbar__brand { display: inline-flex; align-items: baseline; gap: var(--space-2); }
+.topbar__name { font-weight: var(--w-bold); letter-spacing: -.01em; }
+.topbar__mark { font-size: var(--fs-meta); color: var(--ink-3); }
+.topbar__tenant {
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.topbar__spacer { flex: 1; min-width: .5rem; }
+
+/* Переход между разделами без белой вспышки. Каждый раздел — отдельная
+   страница с сервера, и без этого браузер на миг показывал пустой холст между
+   старой и новой. Шапка и столбец навигации названы отдельно: они одинаковы
+   на всех страницах и остаются на месте, плавно сменяется только содержимое.
+   Браузер, который правила не знает, просто переходит как раньше. */
+@view-transition { navigation: auto; }
+.topbar { view-transition-name: topbar; }
+.shell__nav { view-transition-name: sidenav; }
+::view-transition-group(root) { animation-duration: .12s; }
+@media (prefers-reduced-motion: reduce) {
+  @view-transition { navigation: none; }
+}
+
+/* Высота шапки нужна столбцу навигации: он прилипает сразу под ней. */
+:root { --topbar-h: 2.75rem; }
+
+.shell { display: flex; align-items: flex-start; }
+.shell__nav {
+  flex: 0 0 auto;
+  position: sticky;
+  top: var(--topbar-h);
+  min-height: calc(100vh - var(--topbar-h));
+}
+.shell__main { flex: 1 1 auto; min-width: 0; }
+/* Непостроенный раздел: тише остальных, но открывается и виден. */
+.sidenav__item.is-wip { color: var(--ink-empty); }
+.sidenav__item.is-wip:hover { color: var(--ink-3); }
+
+.page {
+  max-width: 85rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4) calc(var(--space-9) * 2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* Нижняя панель телефона. На десктопе её нет вовсе — не спрятана, а не
+   отрисована: скрытая панель всё равно занимала бы фокус с клавиатуры. */
+.tabbar { display: none; }
+
+@media (max-width: 52rem) {
+  .shell__nav { display: none; }
+  .whoami { display: none; }
+  .tabbar {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 50;
+    display: flex;
+    justify-content: space-around;
+    gap: var(--space-1);
+    padding: var(--space-2) var(--space-3);
+    padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+    background: var(--surface-2);
+    border-top: 1px solid var(--line);
+  }
+  /* Панель прокручивается вбок: разделов девять, и сжимать их в нечитаемые
+   огрызки хуже, чем дать провести пальцем. Полоса прокрутки скрыта — она
+   съедает высоту панели, а жест работает и без неё. */
+.tabbar { overflow-x: auto; scrollbar-width: none; }
+.tabbar::-webkit-scrollbar { display: none; }
+/* Непостроенный раздел приглушён так же, как в столбце слева: одна и та же пометка
+   на обоих поверхностях, иначе с телефона он выглядит рабочим. */
+.tabbar__item.is-wip { opacity: .45; }
+.tabbar__item {
+  flex: none;
+  white-space: nowrap;
+    flex: 1;
+    text-align: center;
+    padding: var(--space-2);
+    border-radius: var(--r-control);
+    font-size: var(--fs-micro);
+    font-weight: var(--w-semibold);
+    color: var(--ink-3);
+    text-decoration: none;
+    min-height: var(--tap-min);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
+}
+
+/* ═══ СТРОКА РЕЕСТРА ═════════════════════════════════════════════════════
+   Не таблица, а список (D190). Порядок веса в строке задан размером, а не
+   местом: буква крупным знаком, точка и оценка рядом, всё остальное — мелкой
+   мета-строкой. На узком экране мета переносится, а строка остаётся
+   читаемой — восемь колонок таблицы так не умели. */
+
+.ins-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  color: inherit;
+  text-decoration: none;
+  flex-wrap: wrap;
+}
+.ins-row:last-child { border-bottom: 0; }
+.ins-row:hover { background: var(--surface-3); }
+.ins-row__grade {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: var(--r-control);
+  font-family: var(--font-num);
+  font-size: var(--fs-lead);
+  font-weight: var(--w-semibold);
+  flex: none;
+}
+.ins-row__main { flex: 1; min-width: 11rem; }
+.ins-row__title { display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
+.ins-row__unit { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.ins-row__score {
+  font-family: var(--font-num);
+  font-size: var(--fs-lead);
+  font-weight: var(--w-semibold);
+  font-variant-numeric: tabular-nums;
+}
+.ins-row__meta { display: block; font-size: var(--fs-meta); color: var(--ink-3); margin-top: var(--space-1); }
+.ins-row__state { display: inline-flex; align-items: center; gap: var(--space-2); flex: none; }
+.ins-row__state .ov-dot { margin-top: 0; }
+.ins-row__state-text { font-size: var(--fs-micro); font-weight: var(--w-semibold); color: var(--ink-2); }
+.ins-row__go { font-size: var(--fs-lead); color: var(--ink-3); flex: none; }
+/* Снятая проверка приглушена целиком: её числа в отчёт не идут, и строка
+   не должна читаться наравне с запечатанными. */
+.ins-row.is-frozen { opacity: .62; }
+.ov-dot--ok { background: var(--ok); }
+
+/* ═══ КАРТОЧКА ПРОВЕРКИ ══════════════════════════════════════════════════
+   Зоны — полосами, записи — списком (D190). Числа рядом с полосой остаются
+   записанными: полоса показывает, ГДЕ выжжено, число — СКОЛЬКО. */
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+.zone-row:last-child { border-bottom: 0; }
+.zone-row__name { flex: 1; min-width: 9rem; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.zone-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-1); }
+.zone-row__left { color: var(--ink-3); min-width: 3rem; }
+/* Обнулённая зона — её доля сгорела целиком, и строка обязана отличаться от
+   просто дорогой: это разные вещи для разговора с партнёром. */
+.zone-row.is-zeroed .zone-row__name { color: var(--err); }
+
+.find-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+}
+.find-row:last-child { border-bottom: 0; }
+.find-row__level { flex: none; }
+.find-row__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  min-width: 1.5rem;
+  font-variant-numeric: tabular-nums;
+}
+.find-row__main { flex: 1; min-width: 12rem; }
+.find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
+.find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
+
+/* ── Повод, требующий решения ───────────────────────────────────────────
+   Строка-действие: слева индикатор срочности, посередине повод, справа
+   кнопка, ведущая туда, где повод закрывают. */
+.att-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-2);
+  flex-wrap: wrap;
+}
+.att-row:last-child { border-bottom: 0; }
+.att-row__main { flex: 1; min-width: 12rem; color: inherit; text-decoration: none; }
+.att-row__main:hover .att-row__unit { text-decoration: underline; }
+.att-row__unit { display: block; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.att-row__what { display: block; font-size: var(--fs-meta); color: var(--ink-2); margin-top: var(--space-1); }
+.att-row__when {
+  display: block;
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  font-weight: var(--w-semibold);
+  margin-top: var(--space-2);
+  color: var(--ink-3);
+}
+.att-row__when--err { color: var(--err); }
+.att-row__when--warn { color: var(--warn-ink); }
+
+/* ── Выпадающий чип отбора ──────────────────────────────────────────────
+   Построен на `<details>`, без единой строки JS: панель обязана открываться
+   и там, где скрипт не загрузился. Стрелка поворачивается через `[open]` —
+   состояние держит сам браузер, а не класс, который кто-то забудет снять. */
+.pick { position: relative; display: inline-block; }
+.pick > summary { list-style: none; cursor: pointer; user-select: none; }
+.pick > summary::-webkit-details-marker { display: none; }
+.pick__caret { font-size: .7em; opacity: .7; }
+.pick[open] .pick__caret { transform: rotate(180deg); display: inline-block; }
+.pick__menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 60;
+  min-width: 13rem;
+  max-height: 18rem;
+  overflow: auto;
+  padding: var(--space-2);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-pop, 0 18px 44px rgba(8, 8, 10, .18));
+}
+.pick__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--r-inner, 10px);
+  font-size: var(--fs-meta);
+  font-weight: var(--w-semibold);
+  color: var(--ink);
+  text-decoration: none;
+  min-height: 2.5rem;
+}
+.pick__item:hover { background: var(--surface-3); }
+.pick__item.is-on { background: var(--accent-soft); color: var(--accent); }
+.pick__label { flex: 1; }
+.pick__count { font-family: var(--font-num); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+/* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
+   сдвигает панель ровно под рукой. */
+.ov-chip--reset.is-idle { opacity: .45; }
+
+/* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
+   Столбики движения оценки, отметки повторов и шапка с действиями. Высоту
+   столбика считает `src/web/unit_card.py` и отдаёт готовым процентом: CSS
+   здесь только рисует, ничего не выводя из оценки сам. */
+.pt-back {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  color: var(--ink-3);
+  font-size: var(--fs-meta);
+  text-decoration: none;
+}
+.pt-back:hover { color: var(--accent); }
+
+.pt-head__tiles { margin-top: var(--space-3); }
+.pt-head__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Полоса движения: столбики одной высоты поля, выровненные по низу. Поле
+   фиксированной высоты нужно затем, чтобы процент столбика был от чего
+   считать: у контейнера без высоты `height: 62%` не значит ничего. */
+.pt-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  height: 9rem;
+  margin: var(--space-3) 0 var(--space-2);
+  overflow-x: auto;
+}
+.pt-bars__col {
+  display: flex;
+  flex: 1 1 0;
+  min-width: 2.75rem;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  height: 100%;
+  text-decoration: none;
+  color: inherit;
+}
+.pt-bars__num {
+  font-family: var(--font-num);
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+}
+.pt-bars__bar {
+  width: 100%;
+  border-radius: var(--r-inner) var(--r-inner) 0 0;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-bottom: 0;
+  transition: background 120ms ease;
+}
+.pt-bars__col:hover .pt-bars__bar { background: var(--accent); }
+/* Столбик другого издания методики штрихуется: его высота стоит рядом с
+   соседями, но сравнивать её с ними нельзя — сменились ставки, а не работа
+   точки (T349). Цветом это не показать: цвет читается как оценка. */
+.pt-bars__bar--other {
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2),
+    var(--surface-2) 3px,
+    var(--line) 3px,
+    var(--line) 6px
+  );
+  border-color: var(--line-2);
+}
+.pt-bars__date {
+  font-size: var(--fs-micro);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+/* Отметки повторов: по точке на проверку окна, слева старая. Заполненная —
+   нарушение записано в той проверке. */
+.pt-marks {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+}
+.pt-marks__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--line-2);
+  background: transparent;
+}
+/* Обводка — нарушение в той проверке записано. Это наблюдение. */
+.pt-marks__dot--seen {
+  border-color: var(--err-line);
+}
+/* Заливка — аудитор отметил повтор, и вычет за запись удвоен. Это решение о
+   цене, а не совпадение кода: показывать его так же, как наблюдение, значит
+   выдавать одно за другое. */
+.pt-marks__dot--doubled {
+  background: var(--err);
+  border-color: var(--err-line);
+}
+.pt-doubled { color: var(--err); }
+
+@media (max-width: 52rem) {
+  /* На телефоне строка блока перестраивается в карточку: имя сверху, цифры
+     под ним. Бриф требует работу с телефона на каждом экране, а строка из
+     четырёх колонок на 390 точках уезжает вбок. */
+  .pt-head__actions .btn { flex: 1 1 auto; text-align: center; }
+  .pt-bars { height: 7rem; }
+}
+
+/* ── Чек-лист в три колонки (D197) ────────────────────────────────────────
+   Чек-листы · пункты · панель пункта. Список пунктов прокручивается ВМЕСТЕ
+   со страницей — до 25.09.2026 состав сидел в окне 486px со своей прокруткой
+   («обрезанное окно»). Своя прокрутка осталась только у колонок по краям:
+   они липнут к верху, чтобы панель правки была на виду при любом месте списка. */
+.page--wide { max-width: 110rem; }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .95em; }
+.mx-muted { color: var(--ink-3); }
+
+.mx-version {
+  display: flex; gap: var(--space-7); align-items: center;
+  padding: var(--space-5) var(--space-7);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+}
+.mx-version.is-draft { border-color: var(--warn-mark); background: var(--surface-2); }
+.mx-version__title { font-weight: var(--w-semibold); margin-right: var(--space-3); }
+.mx-version__meta { font-size: var(--fs-meta); color: var(--ink-2); margin-top: var(--space-1); }
+
+.mx {
+  display: grid;
+  grid-template-columns: 15rem minmax(0, 1fr) minmax(24rem, 30rem);
+  gap: var(--space-7);
+  align-items: start;
+}
+.mx-col {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  min-width: 0;
+}
+.mx-lists, .mx-panel {
+  position: sticky; top: calc(var(--space-12) + var(--space-7));
+  max-height: calc(100vh - var(--space-12) - var(--space-10));
+  overflow: auto;
+}
+.mx-col__head {
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: .06em;
+  text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-semibold);
+  padding: var(--space-6) var(--space-6) var(--space-3);
+}
+
+.mx-list {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-4) var(--space-6); color: inherit; text-decoration: none;
+  border-left: 3px solid transparent;
+}
+.mx-list:hover { background: var(--surface-3); }
+.mx-list.is-on { background: var(--accent-soft); border-left-color: var(--accent); }
+.mx-list__name { font-weight: var(--w-semibold); font-size: var(--fs-dense); }
+.mx-list__meta { font-size: var(--fs-meta); color: var(--ink-2); display: flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+.mx-lists__manage { display: block; padding: var(--space-6); font-size: var(--fs-meta); border-top: 1px solid var(--line-2); }
+
+.mx-items { padding-bottom: var(--space-4); }
+.mx-toolbar {
+  display: flex; gap: var(--space-4); align-items: center; flex-wrap: wrap;
+  padding: var(--space-6) var(--space-6) 0;
+}
+.mx-toolbar--chips { padding-bottom: var(--space-5); border-bottom: 1px solid var(--line); }
+.mx-search { flex: 1 1 16rem; }
+.mx-search .input { width: 100%; }
+.mx-count { margin-left: auto; font-size: var(--fs-meta); color: var(--ink-3); }
+
+.mx-group__head {
+  position: sticky; top: calc(var(--space-12) + var(--space-3)); z-index: 1;
+  display: flex; justify-content: space-between; gap: var(--space-4);
+  padding: var(--space-4) var(--space-6);
+  background: var(--surface-3); border-bottom: 1px solid var(--line);
+  font-size: var(--fs-meta); font-weight: var(--w-semibold); color: var(--ink-2);
+}
+.mx-group__count { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.mx-row {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) auto 3.5rem;
+  gap: var(--space-5); align-items: baseline;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--line-2);
+  color: inherit; text-decoration: none; font-size: var(--fs-dense); line-height: var(--lh-dense);
+  border-left: 3px solid transparent;
+}
+.mx-row:hover { background: var(--surface-2); }
+.mx-row.is-on { background: var(--accent-soft); border-left-color: var(--accent); }
+.mx-row.is-off { color: var(--ink-3); }
+.mx-row.is-off .mx-row__text { text-decoration: line-through; }
+.mx-row__code { color: var(--accent); }
+.mx-row__levels { display: flex; gap: var(--space-2); }
+.mx-row__days { text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+
+.mx-panel { padding: 0 var(--space-7) var(--space-7); }
+.mx-panel__head {
+  position: sticky; top: 0; z-index: 1;
+  display: flex; align-items: center; gap: var(--space-4);
+  margin: 0 calc(var(--space-7) * -1); padding: var(--space-6) var(--space-7);
+  background: var(--surface); border-bottom: 1px solid var(--line-2);
+}
+.mx-panel__code { font-weight: var(--w-semibold); margin-right: var(--space-3); }
+.mx-panel__nav, .mx-panel__close {
+  display: inline-grid; place-items: center; width: 2rem; height: 2rem;
+  border-radius: var(--r-control); color: var(--ink-2); text-decoration: none;
+}
+.mx-panel__nav:hover, .mx-panel__close:hover { background: var(--surface-3); color: var(--ink); }
+.mx-panel__title { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--w-semibold); margin-top: var(--space-7); }
+.mx-panel__sub { color: var(--ink-2); margin-top: var(--space-3); }
+.mx-panel__hint { color: var(--ink-2); padding: var(--space-7) 0; }
+.mx-panel__foot { margin-top: var(--space-7); padding-top: var(--space-7); border-top: 1px solid var(--line-2); display: grid; gap: var(--space-4); }
+.mx-keys { margin-top: var(--space-7); font-size: var(--fs-micro); color: var(--ink-3); }
+
+.mx-props { margin: var(--space-7) 0 0; display: grid; }
+.mx-prop {
+  display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-5);
+  padding: var(--space-5) 0; border-bottom: 1px solid var(--line-2);
+}
+.mx-prop--block { grid-template-columns: 1fr; }
+.mx-prop dt { font-size: var(--fs-meta); color: var(--ink-3); padding-top: var(--space-1); }
+.mx-prop dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; }
+.mx-prop dd > .criteria { width: 100%; }
+
+.mx-edit { flex-basis: 100%; }
+.mx-edit__open {
+  display: inline; cursor: pointer; list-style: none;
+  font-size: var(--fs-meta); color: var(--accent);
+}
+.mx-edit__open::-webkit-details-marker { display: none; }
+.mx-edit[open] > .mx-edit__open { color: var(--ink-3); }
+.mx-edit__form {
+  display: grid; gap: var(--space-4); margin-top: var(--space-4);
+  padding: var(--space-6); background: var(--surface-2); border-radius: var(--r-control);
+}
+.mx-edit__form .field-label { display: grid; gap: var(--space-2); }
+.mx-choices { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.mx-choice {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-5); border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  font-size: var(--fs-dense); cursor: pointer; background: var(--surface);
+}
+.mx-choice:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.mx-table { width: 100%; margin-bottom: var(--space-7); }
+
+/* Ноутбук: колонка чек-листов уходит строкой над списком. */
+@media (max-width: 80rem) {
+  .mx { grid-template-columns: minmax(0, 1fr) minmax(22rem, 26rem); }
+  .mx-lists {
+    grid-column: 1 / -1; position: static; max-height: none;
+    display: flex; flex-wrap: wrap; align-items: stretch;
+  }
+  .mx-lists .mx-col__head { flex-basis: 100%; }
+  .mx-list { border-left: 0; border-bottom: 3px solid transparent; }
+  .mx-list.is-on { border-bottom-color: var(--accent); }
+  .mx-lists__manage { border-top: 0; margin-left: auto; align-self: center; }
+}
+/* Телефон и узкое окно: одна колонка; открытая панель — первой, под ней список. */
+@media (max-width: 52rem) {
+  .mx { grid-template-columns: minmax(0, 1fr); }
+  .mx-panel { position: static; max-height: none; }
+  .mx.has-panel .mx-panel { order: -1; }
+  .mx-row { grid-template-columns: 4.5rem minmax(0, 1fr); }
+  .mx-row__levels, .mx-row__days { display: none; }
+}
+/* Шапка раздела над полосой версии — без нижнего отступа дизайн-системы:
+   между ними ничего нет, и 48px читались пустым местом, где что-то пропало. */
+.page--wide > .section { margin-bottom: 0; }
+.mx-usage { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; }
+.mx-usage__top { margin: var(--space-4) 0 0; padding-left: var(--space-8); font-size: var(--fs-dense); display: grid; gap: var(--space-2); width: 100%; }
+.mx-change { padding: var(--space-6) 0; border-bottom: 1px solid var(--line-2); display: grid; gap: var(--space-3); }
+.mx-change__head { display: flex; gap: var(--space-4); align-items: center; font-weight: var(--w-semibold); }
+.mx-change__field { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-1) var(--space-5); font-size: var(--fs-dense); }
+.mx-change__field del, .mx-change__field ins { grid-column: 2; text-decoration: none; padding: var(--space-1) var(--space-3); border-radius: var(--r-mark); white-space: pre-wrap; }
+.mx-change__field del { background: var(--surface-3); color: var(--ink-3); text-decoration: line-through; }
+.mx-change__field ins { background: var(--accent-soft); }
+.mx-zones__num { width: 4.5rem; text-align: right; }
+.mx-zones td { vertical-align: middle; }
+.mx-zones tfoot td { font-weight: var(--w-semibold); }

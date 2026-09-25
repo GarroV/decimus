@@ -91,11 +91,12 @@ _INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) 
 _INSERT_FINDING_SQL = """
 insert into findings (
     inspection_id, n, code, level, zone, zone_unusual, source, words,
-    suggested_code, suggested_level, suggested_zone, suggested_confidence
+    suggested_code, suggested_level, suggested_zone, suggested_confidence, repeat
 ) values (
     %(inspection_id)s, %(n)s, %(code)s, %(level)s, %(zone)s, %(zone_unusual)s, %(source)s,
     %(words)s,
-    %(suggested_code)s, %(suggested_level)s, %(suggested_zone)s, %(suggested_confidence)s
+    %(suggested_code)s, %(suggested_level)s, %(suggested_zone)s, %(suggested_confidence)s,
+    %(repeat)s
 )
 returning id
 """
@@ -378,6 +379,10 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     "zone_unusual": finding.zone_unusual,
                     "source": getattr(finding, "source", None),
                     "words": _words(finding),
+                    # Пометка повтора переносится как факт проверки: цену за
+                    # запись назначил аудитор, и база обязана помнить решение,
+                    # а не выводить его заново (#359).
+                    "repeat": bool(getattr(finding, "repeat", False)),
                     **_suggestion(finding),
                 },
             )

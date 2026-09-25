@@ -288,6 +288,14 @@ def test_перечень_инструментов_отдаётся_целико
         # и правки в этих двух нет вовсе
         "checklist_source",
         "checklist_source_item",
+        # чек-лист как сущность (T344): хранилище несёт их много, и все шесть
+        # закрыты тем же правом методики — это те же чек-листы
+        "checklists",
+        "checklist_meta",
+        "create_checklist",
+        "rename_checklist",
+        "set_checklist_state",
+        "apply_checklist",
         # методика — чтение версий и правка (T098), закрыта отдельной настройкой
         "checklist_versions",
         "checklist_items",
@@ -304,6 +312,8 @@ def test_перечень_инструментов_отдаётся_целико
         # порядок обхода точки (T317) — чтение и правка тем же правом
         "route",
         "set_route",
+        "scoring",
+        "set_scoring",
         "publish_checklist_version",
         # карта слов — правка версиями (T144)
         "photo_cues",

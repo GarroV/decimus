@@ -1,0 +1,110 @@
+{#
+  Перечень чек-листов: какие есть, в каком они состоянии и по какому идут
+  проверки.
+
+  Состояние и применение к проду разведены намеренно и показаны порознь. «В
+  работе» говорит, что чек-лист годен к употреблению, и таких может быть
+  несколько; «применён к проду» — указатель, и он ровно один. Слить их в одну
+  колонку значило бы обещать выбор, которого пока нет (D178).
+
+  Кнопки «применить» здесь нет: применение идёт через страницу разницы —
+  ролей в продукте нет (D182), и ошибку ловит показ «сейчас вот этот, будет
+  вот этот», а не право.
+#}{% extends "base.html" %}
+{% block title %}{{ t('checklists.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('checklists.title') }}</h1>
+      <span class="section__num">{{ t('checklists.count', count=checklists|length) }}</span>
+    </div>
+    <p class="section__lead">{{ t('checklists.lead') }}</p>
+  </div>
+
+  {% if notice %}
+    <div class="note note--ok mt-gap" role="status">
+      <div><div class="note__title">{{ notice }}</div></div>
+    </div>
+  {% endif %}
+  {% if failure %}
+    <div class="note note--error mt-gap" role="alert">
+      <div><div class="note__title">{{ t('methodology.failed', reason=failure) }}</div></div>
+    </div>
+  {% endif %}
+
+  <div class="card mt-gap">
+    <table class="table">
+      <thead>
+        <tr>
+          <th>{{ t('checklists.col.code') }}</th>
+          <th>{{ t('checklists.col.name') }}</th>
+          <th>{{ t('checklists.col.state') }}</th>
+          <th>{{ t('checklists.col.version') }}</th>
+          <th>{{ t('checklists.col.actions') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in checklists %}
+          <tr>
+            <td><code>{{ item.code }}</code></td>
+            <td>
+              <a href="{{ url_for('methodology') }}?checklist={{ item.code }}">{{ item.name_ru }}</a>
+              <div class="card__meta">{{ item.name_en }}</div>
+            </td>
+            <td>
+              <span class="tag tag--micro">{{ t('checklists.state.' ~ item.state) }}</span>
+              {% if item.applied_to_production %}
+                <span class="tag tag--ok tag--micro">{{ t('checklists.in_production') }}</span>
+              {% endif %}
+            </td>
+            <td>{% if item.version %}<code>{{ item.version }}</code>{% else %}—{% endif %}</td>
+            <td>
+              <form method="post"
+                    action="{{ url_for('checklists_state', code=item.code) }}"
+                    class="row row--tight">
+                <select name="state" aria-label="{{ t('checklists.col.state') }}">
+                  {% for state in states %}
+                    <option value="{{ state }}" {% if state == item.state %}selected{% endif %}>
+                      {{ t('checklists.state.' ~ state) }}
+                    </option>
+                  {% endfor %}
+                </select>
+                <button type="submit" class="btn btn--ghost">{{ t('checklists.state.submit') }}</button>
+              </form>
+              {% if not item.applied_to_production %}
+                <a class="btn btn--ghost mt-tight"
+                   href="{{ url_for('checklists_apply_preview', code=item.code) }}">
+                  {{ t('checklists.apply.open') }}
+                </a>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5">{{ t('checklists.empty') }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="card mt-gap">
+    <div class="card__head"><div class="card__title">{{ t('checklists.new.title') }}</div></div>
+    <p class="card__meta">{{ t('checklists.new.text') }}</p>
+    <form method="post" action="{{ url_for('checklists') }}" class="form">
+      <label class="field">
+        <span class="field__label">{{ t('checklists.new.code') }}</span>
+        <input type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}">
+        <span class="field__hint">{{ t('checklists.new.code.hint') }}</span>
+      </label>
+      <label class="field">
+        <span class="field__label">{{ t('checklists.new.name_ru') }}</span>
+        <input type="text" name="name_ru" required>
+      </label>
+      <label class="field">
+        <span class="field__label">{{ t('checklists.new.name_en') }}</span>
+        <input type="text" name="name_en" required>
+      </label>
+      <button type="submit" class="btn">{{ t('checklists.new.submit') }}</button>
+    </form>
+  </div>
+{% endblock %}
