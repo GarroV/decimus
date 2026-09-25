@@ -32,6 +32,7 @@ from typing import Any
 from . import checklist as store_api
 from . import photo_cues as cues_api
 from . import route as route_api
+from . import scoring as scoring_api
 from . import suggestions as proposals_api
 from . import tools as reads
 from . import uncovered as uncovered_api
@@ -505,6 +506,58 @@ def rename_zone(
         command="zone-rename",
         positional=code,
         options={"name-ru": name_ru, "name-en": name_en},
+        version_name=version_name,
+        note=note,
+    )
+
+
+# --- ставки вычетов и начальный процент (T348) --------------------------------
+
+
+def scoring(*, tenant: str, store: Store, version: str | None = None) -> dict[str, Any]:
+    """Ставки этой версии — как они лежат в файле, без единого пересчёта."""
+    del tenant  # право на методику проверено на входе, по коду арендатора
+    return scoring_api.read(store, version=version)
+
+
+def set_scoring(
+    *,
+    tenant: str,
+    store: Store,
+    start_pct: float | None = None,
+    d1: float | None = None,
+    d2: float | None = None,
+    repeat_multiplier: float | None = None,
+    version_name: str | None = None,
+    note: str | None = None,
+) -> dict[str, Any]:
+    """Задать ставки вычетов и начальный процент новой версией методики.
+
+    Ставка — цена нарушения: та же природа, что у доли зоны, только считается
+    не по зонам, а по классам. Не названное не трогается, и это здесь важнее
+    обычного — в `scoring.json` рядом живут пороги букв и режим D3, которых
+    эта дверь не касается вовсе.
+
+    Пороги букв правятся пока только файлом: они заданы списком правил с
+    порядком проверки, и форма «поле на порог» соврала бы про их устройство.
+    """
+    if all(значение is None for значение in (start_pct, d1, d2, repeat_multiplier)):
+        raise ChecklistError(
+            "Не названо ни одной ставки: скажите начальный процент, D1, D2 или "
+            "множитель повтора. Пустая правка завела бы версию, ничем не "
+            "отличающуюся от предыдущей"
+        )
+    return _change(
+        store,
+        tenant=tenant,
+        tool="set_scoring",
+        command="scoring-set",
+        options={
+            "start": start_pct,
+            "d1": d1,
+            "d2": d2,
+            "repeat": repeat_multiplier,
+        },
         version_name=version_name,
         note=note,
     )

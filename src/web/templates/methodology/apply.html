@@ -1,0 +1,74 @@
+{#
+  Разница перед применением к проду: «сейчас в проде вот этот, будет вот этот».
+
+  Это не украшение и не подтверждение «вы уверены?». Ролей в продукте нет
+  (D182), применение к проду отдельного права не получает, и от ошибки право
+  не спасает — у ошибающегося оно как раз есть. Настоящая защита здесь одна:
+  человек видит цифры до того, как нажал, — сколько вопросов, какие зоны с
+  какими долями, по каким ставкам считается вычет.
+
+  Ни одного числа собственного производства: всё напечатано так, как лежит в
+  файлах методики. Оценку этот экран не считает и считать не будет — её
+  считает движок.
+#}{% extends "base.html" %}
+{% block title %}{{ t('checklists.apply.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('checklists.apply.title') }}</h1>
+    </div>
+    <p class="section__lead">{{ t('checklists.apply.lead') }}</p>
+  </div>
+
+  {% if failure %}
+    <div class="note note--error mt-gap" role="alert">
+      <div><div class="note__title">{{ t('methodology.failed', reason=failure) }}</div></div>
+    </div>
+  {% endif %}
+
+  {% macro сводка(итог, заголовок) %}
+    <div class="card">
+      <div class="card__head"><div class="card__title">{{ заголовок }}</div></div>
+      {% if итог %}
+        <div class="card__meta"><code>{{ итог.checklist }}</code> · {{ итог.name_ru }}</div>
+        <dl class="pairs">
+          <dt>{{ t('checklists.apply.version') }}</dt>
+          <dd><code>{{ итог.version }}</code></dd>
+          <dt>{{ t('checklists.apply.items') }}</dt>
+          <dd>{{ итог.items }}</dd>
+          <dt>{{ t('checklists.apply.zones') }}</dt>
+          <dd>
+            {% for code, share in итог.zones %}
+              <div><code>{{ code }}</code> — {{ share }}%</div>
+            {% else %}—{% endfor %}
+          </dd>
+          <dt>{{ t('checklists.apply.rates') }}</dt>
+          <dd>
+            {{ t('checklists.apply.start', pct=итог.start_pct) }}
+            {% for уровень, ставка in итог.penalty %}
+              <div>{{ уровень }} — {{ ставка }}</div>
+            {% endfor %}
+          </dd>
+        </dl>
+      {% else %}
+        <p class="card__meta">{{ t('checklists.apply.nothing') }}</p>
+      {% endif %}
+    </div>
+  {% endmacro %}
+
+  <div class="grid grid--two mt-gap">
+    {{ сводка(difference.current, t('checklists.apply.now')) }}
+    {{ сводка(difference.candidate, t('checklists.apply.will')) }}
+  </div>
+
+  <div class="card mt-gap">
+    <p class="card__meta">{{ t('checklists.apply.warning') }}</p>
+    <form method="post" action="{{ url_for('checklists_apply', code=code) }}" class="row row--tight">
+      <button type="submit" class="btn">{{ t('checklists.apply.submit') }}</button>
+      <a class="btn btn--ghost" href="{{ url_for('checklists') }}">
+        {{ t('checklists.apply.cancel') }}
+      </a>
+    </form>
+  </div>
+{% endblock %}

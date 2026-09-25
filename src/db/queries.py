@@ -33,8 +33,8 @@ from typing import Any
 import psycopg
 
 from .config import check_environment, load_retraction_settings
-from .errors import DbError
-from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
+from .errors import DbError, StorageError
+from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow, ItemUsage
 from .units import normalize_unit_name
 
 #: Сколько строк отдаётся, если предел не назвали. Сотня — это и есть
@@ -66,7 +66,10 @@ select
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
-    i.retracted_at, i.retraction_reason
+    i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
@@ -86,7 +89,10 @@ select
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
-    i.retracted_at, i.retraction_reason
+    i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
@@ -105,6 +111,9 @@ select
     (select count(*) from findings f where f.inspection_id = i.id),
     i.pushed_at, i.auditor, i.city, i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
+    -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
+    -- между колонками сдвинула бы всё правее неё молча.
+    i.checklist_code,
     i.deductions, i.counts, i.by_zone
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -130,7 +139,8 @@ select
         and t.field = 'text' and t.lang = i.speech_lang),
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang)
+        and t.field = 'comment' and t.lang = i.speech_lang),
+    f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -150,7 +160,8 @@ select
         and t.field = 'text' and t.lang = i.speech_lang),
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
-        and t.field = 'comment' and t.lang = i.speech_lang)
+        and t.field = 'comment' and t.lang = i.speech_lang),
+    f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
@@ -171,6 +182,33 @@ from inspection_info
 where inspection_id = %(id)s
 order by position
 """
+
+
+def _detail_parts(
+    колонки: dict[str, int], row: Any
+) -> tuple[float, dict[str, Any], dict[str, Any]]:
+    """Разбивка оценки из строки карточки — по именам колонок, а не по их номерам.
+
+    Позиционный разбор здесь уже ломался молча: колонка, приписанная в конец
+    списка (`checklist_code`, T345), сдвинула разбивку на единицу, и карточка
+    проверки перестала читаться вовсе — разбором, а не понятным отказом. Номер
+    колонки знает только тот, кто держит в голове весь `select`; имя знает
+    драйвер.
+
+    Отсутствие колонки — отказ, а не ноль: разбивка уезжает в документ
+    партнёру, и нулевые вычеты в нём выглядят как безупречная проверка.
+    """
+    недостающие = [имя for имя in ("deductions", "counts", "by_zone") if имя not in колонки]
+    if недостающие:
+        raise StorageError(
+            f"В ответе базы нет колонок разбивки оценки: {', '.join(недостающие)}. "
+            f"Карточка проверки без них — это документ партнёру с пустыми вычетами"
+        )
+    return (
+        float(row[колонки["deductions"]]),
+        dict(row[колонки["counts"]]),
+        dict(row[колонки["by_zone"]]),
+    )
 
 
 def _row_to_inspection(row: Any) -> InspectionRow:
@@ -208,6 +246,11 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         # проверку ИМЕННО как снятую, а не как обычную.
         retracted=row[16] is not None,
         retraction_reason=str(row[17] or ""),
+        # Код чек-листа приезжает последним и потому не двигает ничего выше
+        # (T345). `or "bizdev"` — для строк, залитых до миграции программно:
+        # пустой код у записанной проверки означал бы «не знаем, по чему
+        # проверяли», а такого состояния у неё не бывает.
+        checklist_code=str(row[18] or "bizdev"),
     )
 
 
@@ -250,6 +293,10 @@ def _row_to_finding(row: Any) -> FindingRow:
         suggested_confidence=None if row[15] is None else float(row[15]),
         text=row[16],
         comment=row[17],
+        # Пометка повтора (#359). Умолчание колонки — `false`, то есть «не
+        # отмечено»: у записанной проверки состояния «неизвестно, был ли
+        # повтор» не бывает.
+        repeat=bool(row[18]),
     )
 
 
@@ -431,6 +478,7 @@ def get_inspection(
     ):
         cur.execute(_GET_INSPECTION_SQL, {"tenant": tenant_code, "id": ident})
         row = cur.fetchone()
+        колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
         if row is None:
             return None
         # Находки читаются тем же соединением и в той же транзакции: между
@@ -443,11 +491,17 @@ def get_inspection(
         # документом, а не шапкой одной проверки и сроком другой.
         cur.execute(_INFO_OF_INSPECTION_SQL, {"id": ident})
         info = cur.fetchall()
+    # Разбивка берётся ПО ИМЕНИ колонки, а не по её номеру. Номер здесь уже
+    # ломался молча: приписка `checklist_code` в конец списка колонок (T345)
+    # сдвинула разбивку на единицу, и чтение карточки стало падать разбором
+    # «could not convert string to float: 'bizdev'». Имена отдаёт сам драйвер
+    # (`cur.description`), поэтому следующая приписка ничего не сдвинет.
+    deductions, counts, by_zone = _detail_parts(колонки, row)
     return InspectionDetail(
         inspection=_row_to_inspection(row),
-        deductions=float(row[18]),
-        counts=dict(row[19]),
-        by_zone=dict(row[20]),
+        deductions=deductions,
+        counts=counts,
+        by_zone=by_zone,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
     )
@@ -481,3 +535,460 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> l
         )
         rows = cur.fetchall()
     return [_row_to_finding(row) for row in rows]
+
+
+# ─── Сводка по сети: агрегаты, а не чтение карточек по одной ────────────────
+#
+# Экран «Обзор» (T354) показывает сеть целиком: где она теряет проценты, какие
+# пункты нарушаются на многих точках, какие точки проблемные. Собирать это из
+# карточек нельзя: на 390 точках это 390 запросов на один экран, а данные уже
+# лежат в форме, пригодной для группировки.
+#
+# ОЦЕНКА ЗДЕСЬ НЕ СЧИТАЕТСЯ. Запросы складывают то, что движок УЖЕ записал:
+# `by_zone` разложен им при завершении проверки, `pct` и `grade` взяты оттуда
+# же. Ни процента, ни буквы, ни вычета эти запросы не выводят.
+
+
+def _narrowing(city: str, country: str, grade: str) -> dict[str, str | None]:
+    """Отбор для агрегатов: пустое значение становится NULL, то есть «все».
+
+    Разница принципиальная. Пустая строка, доехав до запроса как значение,
+    сравнивалась бы с городом и не совпала бы ни с одной строкой — экран
+    показал бы пустоту и не сказал, почему. NULL в условии
+    `%(city)s::text is null or u.city = %(city)s` отключает сужение целиком.
+    """
+    return {
+        "city": city or None,
+        "country": country or None,
+        "grade": grade or None,
+    }
+
+
+_ZONE_LOSSES_SQL = """
+select
+    zone.key as code,
+    max(zone.value ->> 'name_ru') as name_ru,
+    max(zone.value ->> 'name_en') as name_en,
+    sum((zone.value ->> 'loss')::numeric) as loss,
+    count(distinct i.id) as inspections,
+    count(distinct i.unit_id) as units
+from inspections i
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+     cross join lateral jsonb_each(i.by_zone) as zone
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+  and jsonb_typeof(zone.value) = 'object'
+  and (zone.value ->> 'loss') is not null
+group by zone.key
+order by loss desc, zone.key
+limit %(limit)s
+"""
+
+# Формулировка берётся из САМОЙ СВЕЖЕЙ записи этого пункта, а не из методики:
+# экран сводит проверки разных изданий, и одной формулировки пункта у них нет,
+# а перевод пункта живёт в хранилище методики, куда веб за этим не ходит. Текст
+# при этом — на языке РЕЧИ той проверки, где он записан (конституция, принцип
+# языков), поэтому язык возвращается рядом с ним и печатается у текста.
+_SYSTEMIC_SQL = """
+with записи as (
+    select
+        f.code,
+        f.level,
+        i.unit_id,
+        i.inspection_date,
+        i.speech_lang,
+        (select t.text from translations t
+          where t.entity_type = 'finding' and t.entity_id = f.id
+            and t.field = 'text' and t.lang = i.speech_lang) as text
+    from findings f
+         join inspections i on i.id = f.inspection_id
+         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+      and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+),
+свежие as (
+    select distinct on (code, level) code, level, text, speech_lang
+    from записи
+    where text is not null and text <> ''
+    order by code, level, inspection_date desc
+)
+select
+    записи.code,
+    записи.level,
+    count(*) as records,
+    count(distinct записи.unit_id) as units,
+    coalesce(max(свежие.text), '') as text,
+    coalesce(max(свежие.speech_lang), '') as lang
+from записи
+     left join свежие on свежие.code = записи.code and свежие.level = записи.level
+group by записи.code, записи.level
+order by units desc, records desc, записи.code
+limit %(limit)s
+"""
+
+_UNITS_TOTAL_SQL = """
+select count(*) from units where tenant_code = %(tenant)s
+"""
+
+
+def zone_losses(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+    limit: int = DEFAULT_LIMIT,
+) -> list[tuple[str, str, str, float, int, int]]:
+    """Потери по зонам: `(код, имя ru, имя en, вычет, проверок, точек)`.
+
+    Имя зоны берётся из того же снимка `by_zone`, а не из нынешней методики:
+    проверка заморожена вместе с формулировками своей версии, и подпись из
+    сегодняшнего справочника подменила бы название, под которым зону смотрели.
+
+    Вычет берётся из `by_zone`, куда его положил движок, и только сложением.
+    Зона, у которой в снимке нет числа вычета, в ответ не попадает: нулём её
+    подменять нельзя — «зона без потерь» и «зона, про которую эта проверка
+    ничего не записала» на экране читаются одинаково, а значат разное.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("потери по зонам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _ZONE_LOSSES_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": _require_limit(limit),
+                # Пустая строка означает «не сужать» и приходит в запрос как
+                # NULL: условие `%(city)s::text is null or ...` тогда истинно
+                # для всех строк. Пустую строку сравнивать с городом нельзя —
+                # она отсекла бы всё, молча и целиком.
+                **_narrowing(city, country, grade),
+            },
+        )
+        return [
+            (str(code), str(ru or code), str(en or code), float(loss), int(insp), int(units))
+            for code, ru, en, loss, insp, units in cur.fetchall()
+        ]
+
+
+def systemic_findings(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+    limit: int = DEFAULT_LIMIT,
+) -> list[tuple[str, str, int, int, str, str]]:
+    """Нарушения по пунктам: `(код, класс, записей, точек, формулировка, язык)`.
+
+    Порядок — по числу ТОЧЕК, а не записей: один пункт, нарушенный на двадцати
+    точках, — это методика или обучение, а двадцать записей по одному пункту на
+    одной точке — это одна точка. Сортировка по записям смешала бы эти случаи.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("нарушения по пунктам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _SYSTEMIC_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                "limit": _require_limit(limit),
+                # Пустая строка означает «не сужать» и приходит в запрос как
+                # NULL: условие `%(city)s::text is null or ...` тогда истинно
+                # для всех строк. Пустую строку сравнивать с городом нельзя —
+                # она отсекла бы всё, молча и целиком.
+                **_narrowing(city, country, grade),
+            },
+        )
+        return [
+            (str(code), str(level), int(records), int(units), str(text or ""), str(lang or ""))
+            for code, level, records, units, text, lang in cur.fetchall()
+        ]
+
+
+def units_total(*, tenant: str) -> int:
+    """Сколько точек у арендатора в справочнике — всего, а не «с проверками».
+
+    Считается отдельно от проверок намеренно: «проверено 12 из 150» и
+    «проверено 12» — разные утверждения, и первое возможно только если знать
+    знаменатель.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("число точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNITS_TOTAL_SQL, {"tenant": tenant_code})
+        row = cur.fetchone()
+        return int(row[0]) if row else 0
+
+
+_CLASS_COUNTS_SQL = """
+select
+    f.inspection_id,
+    f.level,
+    count(*) as records
+from findings f
+     join inspections i on i.id = f.inspection_id
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+group by f.inspection_id, f.level
+"""
+
+
+def class_counts(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+) -> dict[str, dict[str, int]]:
+    """Сколько находок каждого класса в каждой проверке периода.
+
+    Одним запросом на весь период, а не по запросу на проверку: экран сети
+    показывает десятки проверок сразу, и чтение по строке превратило бы один
+    экран в десятки походов в базу.
+
+    Ответ — словарь `{id проверки: {класс: число}}`. Проверка без находок в нём
+    отсутствует, и это честнее нулей: «находок не заводили» и «находок нет»
+    различаются, а ноль их бы склеил. Потребитель читает через `.get`.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("счётчики классов") as conn, conn.cursor() as cur:
+        cur.execute(
+            _CLASS_COUNTS_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
+        счёт: dict[str, dict[str, int]] = {}
+        for inspection_id, level, records in cur.fetchall():
+            счёт.setdefault(str(inspection_id), {})[str(level)] = int(records)
+        return счёт
+
+
+_UNIT_GEOGRAPHY_SQL = """
+select u.name, u.country, u.city
+from units u
+where u.tenant_code = %(tenant)s
+"""
+
+
+_UNIT_IDS_SQL = """
+select u.name, u.id
+from units u
+where u.tenant_code = %(tenant)s
+"""
+
+
+_PREVIOUS_CODES_SQL = """
+select f.code
+from findings f
+where f.inspection_id = (
+    select i.id
+    from inspections i
+    join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and u.name = %(unit)s
+      and i.retracted_at is null
+    order by i.inspection_date desc, i.pushed_at desc
+    limit 1
+)
+"""
+
+
+def previous_codes(*, tenant: str, unit: str) -> set[str]:
+    """Коды нарушений ПРЕДЫДУЩЕЙ проверки точки — основа подсказки о повторе.
+
+    Отдаётся ровно факт: какие пункты были записаны в последней проверке этой
+    точки. Вывод «значит это повтор» здесь не делается и сделан быть не может —
+    тот же код мог относиться к другому объекту, а исправленное и снова
+    сломавшееся отличается от неисправленного. Решение о цене принимает
+    аудитор (D191, конституция: «модель предлагает, фиксирует человек»).
+
+    Предыдущая — одна, последняя по дате обхода: правило говорит про
+    предыдущую проверку, а не «когда-нибудь за год». Снятые проверки в счёт не
+    идут: снятая проверка не является показанием о точке.
+
+    Пустое множество — прошлых проверок нет либо точка чужая. Это одно и то же
+    для подсказки: подсказывать нечем.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("коды предыдущей проверки") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_CODES_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        return {str(код) for (код,) in cur.fetchall()}
+
+
+def unit_ids(*, tenant: str) -> dict[str, str]:
+    """Идентификаторы точек справочника: `{название: id}`.
+
+    Нужны экранам, чтобы ссылаться на точку идентификатором, а не названием:
+    название правят и переводят, и ссылка, собранная из него, ломается молча
+    (CLAUDE.md, «сущности связывать кодами, никогда формулировками»).
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("идентификаторы точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNIT_IDS_SQL, {"tenant": tenant_code})
+        return {str(name): str(ид) for name, ид in cur.fetchall()}
+
+
+def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+    """География точек справочника: `{название: (код страны, город)}`.
+
+    География берётся у ТОЧКИ, а не у проверки. Город в проверке — то, что
+    ввёл аудитор в поле шапки, и он пишется свободной строкой; город точки
+    ведётся справочником и переживает опечатку в одной проверке. Срез сети по
+    городу, собранный из шапок, разъехался бы на «Belgrade» и «Белград».
+
+    Страна кодом, город строкой — как в базе (0017) и по той же причине:
+    формулировки переводятся, коды нет.
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("география точек") as conn, conn.cursor() as cur:
+        cur.execute(_UNIT_GEOGRAPHY_SQL, {"tenant": tenant_code})
+        return {
+            str(name): (str(country or ""), str(city or ""))
+            for name, country, city in cur.fetchall()
+        }
+
+
+_WORST_ZONES_SQL = """
+select distinct on (i.id)
+    i.id,
+    zone.key as code,
+    zone.value ->> 'name_ru' as name_ru,
+    zone.value ->> 'name_en' as name_en,
+    (zone.value ->> 'loss')::numeric as loss
+from inspections i
+     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+     cross join lateral jsonb_each(i.by_zone) as zone
+where i.tenant_code = %(tenant)s
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+  and jsonb_typeof(zone.value) = 'object'
+  and (zone.value ->> 'loss') is not null
+order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
+"""
+
+
+def worst_zones(
+    *,
+    tenant: str,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+) -> dict[str, tuple[str, str, str, float]]:
+    """Самая дорогая зона каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
+
+    Имя зоны — из снимка самой проверки, а не из нынешней методики: проверка
+    заморожена вместе со своими формулировками, и подпись из сегодняшнего
+    справочника подменила бы название, под которым зону смотрели.
+
+    Зона выбирается по НАИБОЛЬШЕМУ вычету, а не по числу находок: экран
+    отвечает на вопрос «где потеряно больше всего процентов», и три мелких
+    замечания в одной зоне не перевешивают одного дорогого в другой.
+    """
+    tenant_code = _require_tenant(tenant)
+    _require_window(date_from, date_to)
+    with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
+        cur.execute(
+            _WORST_ZONES_SQL,
+            {
+                "tenant": tenant_code,
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
+        return {
+            str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
+            for inspection_id, code, ru, en, loss in cur.fetchall()
+        }
+
+
+#: Сколько точек показывать в сводке пункта: больше — уже список, а не ответ.
+ITEM_USAGE_TOP = 5
+
+#: Записи пункта — только из СДАННЫХ и НЕОТКЛОНЁННЫХ проверок своего чек-листа.
+#: Отклонённые роли приложения не видны и по политике (0010), но условие стоит
+#: и здесь: запрос не должен становиться неверным оттого, под какой ролью его
+#: однажды позовут. Код пункта принадлежит своему чек-листу: `CLN01` двух
+#: чек-листов — разные пункты.
+_ITEM_RECORDS = """
+    from findings f
+         join inspections i on i.id = f.inspection_id
+         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and f.code = %(code)s
+      and i.checklist_code = %(checklist)s
+      and i.status = 'finalized'
+      and i.retracted_at is null
+"""
+
+_ITEM_SUMMARY_SQL = (
+    "select count(*), count(distinct i.unit_id), count(distinct i.id), max(i.inspection_date)"
+    + _ITEM_RECORDS
+)
+_ITEM_LEVELS_SQL = "select f.level, count(*)" + _ITEM_RECORDS + " group by f.level order by f.level"
+_ITEM_TOP_SQL = (
+    "select u.name, u.id, count(*) as records"
+    + _ITEM_RECORDS
+    + " group by u.name, u.id order by records desc, u.name limit %(limit)s"
+)
+
+
+def item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage:
+    """Сколько раз пункт нарушен, на скольких точках и когда последний раз (D197)."""
+    tenant_code = _require_tenant(tenant)
+    код = code.strip().upper()
+    параметры: dict[str, object] = {
+        "tenant": tenant_code,
+        "code": код,
+        "checklist": checklist.strip(),
+        "limit": ITEM_USAGE_TOP,
+    }
+    with _reading("сводка пункта") as conn, conn.cursor() as cur:
+        cur.execute(_ITEM_SUMMARY_SQL, параметры)
+        записей, точек, проверок, последняя = cur.fetchone() or (0, 0, 0, None)
+        cur.execute(_ITEM_LEVELS_SQL, параметры)
+        по_классам = tuple((str(level), int(n)) for level, n in cur.fetchall())
+        cur.execute(_ITEM_TOP_SQL, параметры)
+        частые = tuple((str(name), str(ид), int(n)) for name, ид, n in cur.fetchall())
+    return ItemUsage(
+        code=код,
+        records=int(записей),
+        units=int(точек),
+        inspections=int(проверок),
+        last_date=последняя,
+        by_level=по_классам,
+        top_units=частые,
+    )

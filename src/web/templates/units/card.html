@@ -1,0 +1,180 @@
+{#
+  Карточка точки — экран одной пиццерии (прототип владельца, экран «point»,
+  T355). Отвечает на три вопроса: где точка сейчас, куда движется, что у неё
+  не чинится.
+
+  ПОРЯДОК БЛОКОВ — ИЗ ПРОТОТИПА: шапка с оценкой и кнопками, движение оценки
+  рядом со слабыми блоками последней проверки, записи последней проверки,
+  повторяющиеся нарушения рядом с планом.
+
+  Ни одного вычисления в шаблоне. Проценты, буквы, доли и потери приходят
+  готовыми из `src/web/unit_card.py`, который их тоже не считает: движок
+  посчитал — база записала — экран показал.
+
+  Блок, под который в базе нет данных, говорит об этом словами и не исчезает:
+  исчезнувший блок читается как «здесь всё в порядке». Блок, сущности которого
+  в системе ещё нет (предписания, планы), честно помечен «в разработке» — так
+  же, как помечены разделы в шапке.
+#}{% extends "base.html" %}
+{% block title %}{{ data.name }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <a class="pt-back" href="{{ url(overview_path) }}?lang={{ lang }}">{{ t('unit.back') }}</a>
+      <div class="ov-head__kicker">{{ t('unit.title') }}</div>
+      <h1 class="ov-head__title">{{ data.name }}</h1>
+      <div class="ov-head__sub">
+        {% if data.partner %}
+          {{ t('unit.meta', city=city_title(data.city) or country_title(data.country), partner=data.partner) }}
+        {% else %}
+          {{ t('unit.meta.no_partner', city=city_title(data.city) or country_title(data.country)) }}
+        {% endif %}
+        · {{ t('unit.audits', n=data.audits_count) }}
+      </div>
+    </div>
+
+    <div class="ov-tiles pt-head__tiles">
+      <div class="ov-tile">
+        <div class="ov-tile__label">{{ t('unit.tile.score') }}</div>
+        <div class="ov-tile__value">
+          {% if data.last %}
+            <span class="grade grade--lg grade--{{ grade_tone(data.last.grade) }}">{{ data.last.grade }}</span>
+            <span class="ov-num ov-num--strong">{{ '%.1f'|format(data.last.pct) }}%</span>
+          {% else %}
+            <span class="muted">—</span>
+          {% endif %}
+        </div>
+      </div>
+      {# Предписаний как сущности в системе ещё нет (T357). Плитка с нулём
+         соврала бы: ноль означает «проверено, открытых нет», а здесь нечего
+         проверять. Поэтому прочерк и честная подпись. #}
+      <div class="ov-tile">
+        <div class="ov-tile__label">{{ t('unit.tile.orders') }}</div>
+        <div class="ov-tile__value"><span class="muted">—</span></div>
+        <div class="ov-tile__note">{{ t('unit.tile.orders.wip') }}</div>
+      </div>
+    </div>
+
+    <div class="pt-head__actions">
+      {% if data.last %}
+        <a class="btn" href="{{ url(registry_path ~ '/' ~ data.last.id) }}?lang={{ lang }}">{{ t('unit.last') }}</a>
+      {% endif %}
+      <a class="btn btn--primary" href="{{ url(plans_path) }}?lang={{ lang }}">{{ t('overview.assign') }}</a>
+    </div>
+  </div>
+
+  <div class="ov-grid">
+    <div class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('unit.movement') }}</div>
+        <div class="ov-card__hint">{{ t('unit.movement.hint') }}</div>
+      </div>
+      {% if data.bars %}
+        <div class="pt-bars">
+          {% for bar in data.bars %}
+            <a class="pt-bars__col" href="{{ url(registry_path ~ '/' ~ bar.inspection_id) }}?lang={{ lang }}"
+               title="{{ bar.on }} · {{ '%.1f'|format(bar.pct) }}% · {{ bar.grade }}">
+              <span class="pt-bars__num">{{ '%.1f'|format(bar.pct) }}</span>
+              <span class="pt-bars__bar{% if not bar.comparable %} pt-bars__bar--other{% endif %}"
+                    style="height: {{ bar.height }}%"></span>
+              <span class="pt-bars__date">{{ bar.on.strftime('%d.%m') }}</span>
+              <span class="grade grade--{{ grade_tone(bar.grade) }}">{{ bar.grade }}</span>
+            </a>
+          {% endfor %}
+        </div>
+        <div class="ov-card__hint">{{ t('unit.movement.scale', floor='%g'|format(data.floor)) }}</div>
+        {% if not data.comparable %}
+          <div class="note note--warn">{{ t('unit.movement.mixed') }}</div>
+        {% endif %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('unit.movement.empty') }}</div>
+      {% endif %}
+    </div>
+
+    <div class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('unit.weak') }}</div>
+        {% if data.last %}
+          <a class="ov-card__hint" href="{{ url(registry_path ~ '/' ~ data.last.id) }}?lang={{ lang }}">{{ t('unit.weak.open') }}</a>
+        {% endif %}
+      </div>
+      {% if data.weak %}
+        {% for zone in data.weak %}
+          <div class="ov-row">
+            <span class="ov-row__name">{{ zone.name }}</span>
+            <span class="ov-row__meta">{{ t('unit.weak.share', share='%g'|format(zone.share)) }}</span>
+            {% if zone.zeroed %}<span class="ov-dot ov-dot--err">{{ t('unit.weak.zeroed') }}</span>{% endif %}
+            <span class="ov-row__num ov-num--err">−{{ '%.1f'|format(zone.loss) }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('unit.weak.empty') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('unit.findings') }}</div>
+      <div class="ov-card__count">{{ data.last_findings|length }}</div>
+    </div>
+    {% if data.last_findings %}
+      {% for f in data.last_findings %}
+        <div class="find-row">
+          <span class="find-row__level grade grade--{{ level_tone(f.level) }}">{{ f.level }}</span>
+          <span class="find-row__main">
+            <span class="find-row__text">{{ item_titles.get(f.code, f.text or f.code) }}</span>
+            <span class="find-row__meta">
+              {{ f.code }} · {{ f.zone }}
+              {% if f.repeat %} · <span class="pt-doubled">{{ t('unit.finding.doubled') }}</span>{% endif %}
+            </span>
+          </span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('unit.findings.empty') }}</div>
+    {% endif %}
+  </div>
+
+  <div class="ov-grid">
+    <div class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('unit.repeats') }}</div>
+        <div class="ov-card__hint">{{ t('unit.repeats.note', n=window) }}</div>
+      </div>
+      {% if data.repeats %}
+        {% for r in data.repeats %}
+          <div class="ov-row">
+            <span class="ov-row__name">{{ item_titles.get(r.code, r.text or r.code) }}</span>
+            <span class="ov-row__meta">{{ r.code }} · {{ r.zone }}</span>
+            {# Три состояния клетки, а не два: пусто — нарушения в той проверке
+               не записано; обводка — записано (наблюдение); заливка — аудитор
+               отметил повтор и вычет удвоен (факт расчёта). #}
+            <span class="pt-marks">
+              {% for mark in r.marks %}
+                <span class="pt-marks__dot pt-marks__dot--{{ mark }}"></span>
+              {% endfor %}
+            </span>
+            <span class="ov-row__num">
+              {{ t('unit.repeats.times', n=r.times) }}
+              {% if r.doubled %}<span class="ov-cell__muted">{{ t('unit.repeats.doubled', n=r.doubled) }}</span>{% endif %}
+            </span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('unit.repeats.empty') }}</div>
+      {% endif %}
+    </div>
+
+    {# Планов проверок в базе не существует (T357/T358 ещё не построены).
+       Блок стоит на месте прототипа и говорит об этом словами: убранный блок
+       читался бы как «планов у точки нет», а это разные утверждения. #}
+    <div class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('unit.plan') }}</div>
+      </div>
+      <div class="ov-card__empty">{{ t('unit.plan.wip') }}</div>
+    </div>
+  </div>
+{% endblock %}

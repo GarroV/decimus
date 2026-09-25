@@ -22,7 +22,7 @@ from __future__ import annotations
 import inspect
 
 from src.mcp import checklist_source as checklist_source_module
-from src.mcp import checklist_tools
+from src.mcp import checklist_tools, checklists_tools
 from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
 from src.mcp import tools as tools_module
@@ -65,6 +65,8 @@ from src.mcp.catalogue import (
     # формулировки не влияет вовсе, а движок этот файл не читает.
     "route",
     "set_route",
+    "scoring",
+    "set_scoring",
     "publish_checklist_version",
     "photo_cues",
     "add_photo_cue",
@@ -109,12 +111,26 @@ from src.mcp.catalogue import (
     "repoint_learned_phrase",
 }
 
+#: Чек-лист как СУЩНОСТЬ (T344): перечень, заведение с нуля, состояние,
+#: применение к проду. Открывается правом методики — это те же чек-листы, — но
+#: обработчики живут своим модулем `src.mcp.checklists_tools`, потому что
+#: правят они не методику внутри чек-листа, а сам чек-лист.
+ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ = {
+    "checklists",
+    "checklist_meta",
+    "create_checklist",
+    "rename_checklist",
+    "set_checklist_state",
+    "apply_checklist",
+}
+
 ИМЕНА_ИНСТРУМЕНТОВ = (
     ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
     | ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ
     | ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА
     | ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ
     | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ
+    | ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ
 )
 
 #: Кто ходит в базу проверок. Инструменты проверок — все, и с ними один
@@ -128,10 +144,10 @@ from src.mcp.catalogue import (
 )
 
 
-def test_каталог_содержит_ровно_тридцать_три_инструмента_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_сорок_один_инструмент_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
     инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 33
+    assert len(TOOLS) == 41
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -172,7 +188,10 @@ def test_свойства_схемы_совпадают_с_сигнатурой_
             "tenant",
             "store",
         }
-        параметры_схемы = set(spec.input_schema["properties"])
+        # `checklist` называет собеседник, а снимает точка входа (T344):
+        # обработчику приходит хранилище, уже наведённое на нужный чек-лист,
+        # поэтому в сигнатуре его нет и быть не должно.
+        параметры_схемы = set(spec.input_schema["properties"]) - {"checklist"}
         assert параметры_схемы == параметры_обработчика, spec.name
 
 
@@ -185,7 +204,9 @@ def test_required_согласован_со_схемой_и_с_сигнатур�
         свойства = set(spec.input_schema["properties"])
         обязательные = set(spec.input_schema["required"])
         assert обязательные <= свойства, spec.name
-        for имя_параметра in свойства:
+        # `checklist` снимает точка входа (T344), обработчику он не приходит:
+        # сверять его с сигнатурой не с чем.
+        for имя_параметра in свойства - {"checklist"}:
             без_умолчания = параметры_обработчика[имя_параметра].default is inspect.Parameter.empty
             assert без_умолчания == (имя_параметра in обязательные), (spec.name, имя_параметра)
 
@@ -197,7 +218,12 @@ def test_вид_инструмента_соответствует_его_гру�
     обычный токен, а инструмент проверок с `KIND_CHECKLIST` — наоборот, стал
     бы недоступен тем, кому доступны только проверки."""
     for spec in TOOLS:
-        if spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ:
+        if (
+            spec.name
+            in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ
+            | ИМЕНА_ИНСТРУМЕНТОВ_КАРТЫ
+            | ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ
+        ):
             assert spec.kind == KIND_CHECKLIST, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА:
             assert spec.kind == KIND_CHECKLIST_SOURCE, spec.name
@@ -238,6 +264,12 @@ def test_обработчик_взят_из_правильного_модуля(
             # взятый из `checklist_tools`, вернул бы правку под читательским
             # правом, и снаружи это выглядело бы как работающее чтение.
             assert spec.handler.__module__ == checklist_source_module.__name__, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЧЕКЛИСТОВ:
+            # Чек-лист как сущность правится своим модулем: там нет ни одной
+            # строки про пункты и зоны, и наоборот. Обработчик, переехавший
+            # отсюда в соседний модуль, означал бы, что заведение чек-листа
+            # делает то же, что правка его состава.
+            assert spec.handler.__module__ == checklists_tools.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ:
             assert spec.handler.__module__ == checklist_tools.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
@@ -263,7 +295,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 33
+    assert len(перечень) == 41
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

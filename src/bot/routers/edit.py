@@ -37,6 +37,7 @@ from ..keyboards import (
     EDIT_LEVEL,
     EDIT_LEVEL_PREFIX,
     EDIT_PREFIX,
+    EDIT_REPEAT,
     EDIT_TEXT,
     EDIT_ZONE,
     EDIT_ZONE_PREFIX,
@@ -100,6 +101,7 @@ def build_edit_router() -> Router:
         lang: str,
         *,
         zone_by_person: bool = False,
+        repeat: bool | None = None,
         **fields: str,
     ) -> None:
         if sealed.is_sealed(chat_id):
@@ -111,10 +113,14 @@ def build_edit_router() -> Router:
         before = _finding(chat_id, n)
         try:
             await asyncio.to_thread(
-                partial(domain.edit_finding, zone_by_person=zone_by_person),
-                chat_id,
-                n,
-                **fields,
+                partial(
+                    domain.edit_finding,
+                    chat_id,
+                    n,
+                    zone_by_person=zone_by_person,
+                    repeat=repeat,
+                    **fields,
+                )
             )
         except DomainError as exc:
             # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
@@ -199,6 +205,16 @@ def build_edit_router() -> Router:
         if what == EDIT_DROP:
             await drop(message, chat_id, n, lang)
             return
+        if what == EDIT_REPEAT:
+            # Переключатель, а не «поставить»: аудитор видит одну кнопку и не
+            # обязан помнить, в каком состоянии запись. Состояние он узнаёт из
+            # ответа — молчаливая смена цены заставила бы нажать второй раз.
+            стало_повтором = not finding.repeat
+            await apply(message, chat_id, n, lang, repeat=стало_повтором)
+            await message.answer(
+                t("edit.repeat_on" if стало_повтором else "edit.repeat_off", lang, n=n)
+            )
+            return
         if what == EDIT_ZONE:
             zones = [(zone.code, zone.title(lang)) for zone in domain.list_zones(chat_id=chat_id)]
             await message.answer(
@@ -230,7 +246,7 @@ def build_edit_router() -> Router:
         raw, _, zone = (callback.data or "").removeprefix(EDIT_ZONE_PREFIX).partition(":")
         if not raw.isdigit() or not zone:
             return
-        # Зону выбрал человек кнопкой — движок примет её и вне списка пункта (D177).
+        # Зону выбрал человек кнопкой — движок примет её и вне списка пункта (D206).
         await apply(message, chat_id, int(raw), lang, zone=zone, zone_by_person=True)
 
     @router.callback_query(F.data.startswith(EDIT_LEVEL_PREFIX))

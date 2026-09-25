@@ -91,6 +91,10 @@ from src.mcp.rpc import handle
     # у правки не увидеть (T317).
     "route": {},
     "set_route": {"zones": ["dough", "fridge"], "version_name": "imf"},
+    # Ставки: годная правка — одна названная цифра; пустой вызов дверь отвергает
+    # сама, и успешного ответа у неё батарея не увидела бы (T348).
+    "scoring": {},
+    "set_scoring": {"d1": 0.75, "version_name": "imf"},
     "publish_checklist_version": {"version": None},
     "photo_cues": {},
     "add_photo_cue": {
@@ -111,6 +115,20 @@ from src.mcp.rpc import handle
         "version_name": "imf",
     },
     "photo_cue_suggestions": {},
+    # Чек-лист как сущность (T344). Годные аргументы доводят и до успеха
+    # (перечень читается всегда), и до отказов заведения и применения — все
+    # они обязаны быть без путей: отказ называет переменную окружения, а
+    # каталоги уходят в лог процесса.
+    "checklists": {},
+    "checklist_meta": {},
+    "create_checklist": {
+        "checklist": "rnd",
+        "name_ru": "Аудит РНД",
+        "name_en": "RnD audit",
+    },
+    "rename_checklist": {"name_ru": "Проверка бизнес-девелопера", "name_en": "BizDev audit"},
+    "set_checklist_state": {"state": "draft"},
+    "apply_checklist": {},
     # Накопитель непокрытых формулировок (T270). Годные аргументы доводят и до
     # успеха (накопителя нет — законная пустота), и до отказа окружения на
     # стендах без каталога состояния; и то и другое обязано быть без путей.
@@ -173,12 +191,24 @@ from src.mcp.rpc import handle
     "rename_zone": {"code": "терраса", "name_ru": "Терраса"},
     "route": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "set_route": {"zones": ["terrace"]},
+    "scoring": {"version": ЗАГЛУШКА_ВЕРСИИ},
+    # Ни одной названной ставки — отказ двери, а не версия, ничем не
+    # отличающаяся от предыдущей.
+    "set_scoring": {},
     "photo_cues": {"version": ЗАГЛУШКА_ВЕРСИИ},
     "add_photo_cue": {"section": "Чистата", "phrase": "Пятно", "codes": ["CLN01"]},
     "edit_photo_cue": {"phrase": "Стена в потёках", "codes": ["ZZZ99"]},
     "remove_photo_cue": {"phrase": "Потолок"},
     "set_photo_cue_zone": {"phrase": "Стена в потёках", "zone": "hall"},
     "publish_checklist_version": {"version": ЗАГЛУШКА_ВЕРСИИ},
+    # Код чек-листа становится куском пути внутри хранилища: побег по нему
+    # обязан приходить отказом, и отказ обязан быть без путей.
+    "checklists": {"checklist": "../побег"},
+    "checklist_meta": {"checklist": "нет-такого"},
+    "create_checklist": {"checklist": "ПРОПИСНЫМИ", "name_ru": "Х", "name_en": "X"},
+    "rename_checklist": {"checklist": "нет-такого", "name_ru": "Х", "name_en": "X"},
+    "set_checklist_state": {"state": "неизвестное"},
+    "apply_checklist": {"checklist": "нет-такого"},
     # Порог назван процентами вместо доли: отказ приходит до базы и до
     # движка, и по тексту видно, что шкала не та, — а не пустая выдача
     # «промахов не найдено», которая читается как измеренное качество.

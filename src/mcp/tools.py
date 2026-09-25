@@ -33,6 +33,7 @@ from datetime import date
 
 from ..db.errors import ConfigError as DbConfigError
 from ..db.models import FindingRow, InspectionDetail, InspectionRow
+from . import comparability
 from .errors import ToolError
 
 #: Формат даты в аргументах инструментов. ISO и только он: «15.08.2026» и
@@ -367,6 +368,19 @@ def _limit_note(*, limit: int, truncated: bool, subject: str) -> str:
     )
 
 
+def _series(rows: Sequence[InspectionRow]) -> tuple[dict[str, object], str]:
+    """Признак сравнимости ряда и приписка к `status`, если ряду есть что сказать.
+
+    Приписка идёт именно в `status`, а не только отдельным полем: строку
+    состояния читают всегда, вложенное поле — когда о нём знают. Разрыв ряда,
+    замеченный только тем, кто его искал, ничем не отличается от незамеченного
+    (T349, #337).
+    """
+    признак = comparability.of(rows)
+    примечание = str(признак.get("note") or "")
+    return признак, (f" {примечание}" if примечание else "")
+
+
 def _grades(rows: Iterable[InspectionRow]) -> dict[str, int]:
     """Распределение ЗАПИСАННЫХ букв. Новых букв здесь не появляется."""
     counts: dict[str, int] = {}
@@ -416,6 +430,7 @@ def list_inspections(
     rows_limit = _require_limit(limit)
     since, until = parse_window(date_from, date_to)
     page = _read(tenant=tenant, unit=unit, date_from=since, date_to=until, limit=rows_limit)
+    признак, приписка = _series(page.rows)
     return {
         "tenant": tenant,
         "filters": {
@@ -426,8 +441,10 @@ def list_inspections(
         },
         "count": len(page.rows),
         "truncated": page.truncated,
+        comparability.FIELD: признак,
         "status": _found(len(page.rows))
-        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections"),
+        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections")
+        + приписка,
         "inspections": [_inspection(row) for row in page.rows],
     }
 
@@ -440,13 +457,16 @@ def unit_history(*, tenant: str, unit: str, limit: int | None = None) -> dict[st
     """
     name = _require_unit(unit)
     page = _read(tenant=tenant, unit=name, limit=_require_limit(limit))
+    признак, приписка = _series(page.rows)
     return {
         "tenant": tenant,
         "unit": name,
         "count": len(page.rows),
         "truncated": page.truncated,
+        comparability.FIELD: признак,
         "status": _found(len(page.rows))
-        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections"),
+        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections")
+        + приписка,
         "history": [_history_entry(row) for row in page.rows],
     }
 
@@ -469,6 +489,7 @@ def network_summary(
     rows = page.rows
     best = max(rows, key=lambda row: row.pct, default=None)
     worst = min(rows, key=lambda row: row.pct, default=None)
+    признак, приписка = _series(rows)
     return {
         "tenant": tenant,
         "window": {
@@ -483,8 +504,10 @@ def network_summary(
         "worst": _brief(worst) if worst is not None else None,
         "by_unit": _by_unit(rows),
         "truncated": page.truncated,
+        comparability.FIELD: признак,
         "status": _found(len(rows))
-        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections"),
+        + _limit_note(limit=page.limit, truncated=page.truncated, subject="inspections")
+        + приписка,
     }
 
 
