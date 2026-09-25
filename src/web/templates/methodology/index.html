@@ -211,6 +211,7 @@
           <th class="is-text">{{ t('methodology.zones.col.code') }}</th>
           <th class="is-text">{{ t('methodology.zones.col.name') }}</th>
           <th>{{ t('methodology.zones.col.share') }}</th>
+          <th class="is-text">{{ t('methodology.zones.col.actions') }}</th>
         </tr>
       </thead>
       <tbody>
@@ -219,10 +220,105 @@
             <td class="is-text">{{ zone.get('code', '—') }}</td>
             <td class="is-text">{{ zone.get('name_ru') or zone.get('name_en') or '—' }}</td>
             <td class="is-num">{{ zone.get('share_pct') or '—' }}</td>
+            <td class="is-text">
+              {# Формы лежат в ячейке, а не оборачивают строку: <form> вокруг <tr>
+                 разметкой не разрешён, и вложить их в форму долей ниже тоже нельзя. #}
+              <details>
+                <summary>{{ t('methodology.zones.rename.submit') }}</summary>
+                <form class="form-grid mt-gap" method="post"
+                      action="/admin/zones/{{ zone.get('code') }}/rename?lang={{ lang }}">
+                  <label class="field-label" for="rename-ru-{{ zone.get('code') }}">
+                    {{ t('methodology.zones.add.name_ru') }}</label>
+                  <input class="input" id="rename-ru-{{ zone.get('code') }}" name="name_ru"
+                         type="text" value="{{ zone.get('name_ru') or '' }}">
+
+                  <label class="field-label" for="rename-en-{{ zone.get('code') }}">
+                    {{ t('methodology.zones.add.name_en') }}</label>
+                  <input class="input" id="rename-en-{{ zone.get('code') }}" name="name_en"
+                         type="text" value="{{ zone.get('name_en') or '' }}">
+
+                  <label class="field-label" for="rename-note-{{ zone.get('code') }}">
+                    {{ t('methodology.zones.note') }}</label>
+                  <input class="input" id="rename-note-{{ zone.get('code') }}" name="note" type="text">
+
+                  <button class="btn btn--primary" type="submit">
+                    {{ t('methodology.zones.rename.submit') }}</button>
+                </form>
+              </details>
+              <details>
+                <summary>{{ t('methodology.zones.remove.submit') }}</summary>
+                <form class="form-grid mt-gap" method="post"
+                      action="/admin/zones/{{ zone.get('code') }}/remove?lang={{ lang }}">
+                  <label class="field-label" for="remove-equal-{{ zone.get('code') }}">
+                    <input id="remove-equal-{{ zone.get('code') }}" name="equal_shares"
+                           type="checkbox" value="1">
+                    {{ t('methodology.zones.remove.equal') }}</label>
+
+                  <label class="field-label" for="remove-note-{{ zone.get('code') }}">
+                    {{ t('methodology.zones.note') }}</label>
+                  <input class="input" id="remove-note-{{ zone.get('code') }}" name="note" type="text">
+
+                  <button class="btn" type="submit">{{ t('methodology.zones.remove.submit') }}</button>
+                </form>
+              </details>
+            </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
+  </div>
+
+  {% if composition.zones %}
+    <div class="section mt-gap">
+      <div class="section__head">
+        <h2 class="section__title">{{ t('methodology.zones.shares.title') }}</h2>
+      </div>
+      <form class="form-grid mt-gap" method="post" action="/admin/zones/shares?lang={{ lang }}">
+        {# Поля по всем зонам разом: доли обязаны сойтись к 100%, и правка по
+           одной доле до расчёта не дошла бы вовсе — версию не примет движок. #}
+        {% for zone in composition.zones %}
+          <label class="field-label" for="share-{{ zone.get('code') }}">
+            {{ zone.get('name_ru') or zone.get('name_en') or zone.get('code') }}</label>
+          <input class="input input--num" id="share-{{ zone.get('code') }}"
+                 name="share_{{ zone.get('code') }}" type="text" inputmode="decimal"
+                 value="{{ zone.get('share_pct') or '' }}">
+        {% endfor %}
+
+        <label class="field-label" for="shares-note">{{ t('methodology.zones.note') }}</label>
+        <input class="input" id="shares-note" name="note" type="text">
+
+        <button class="btn btn--primary" type="submit">
+          {{ t('methodology.zones.shares.submit') }}</button>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="section mt-gap">
+    <div class="section__head">
+      <h2 class="section__title">{{ t('methodology.zones.add.title') }}</h2>
+    </div>
+    <form class="form-grid mt-gap" method="post" action="/admin/zones?lang={{ lang }}">
+      <label class="field-label" for="zone-code">{{ t('methodology.zones.add.code') }}</label>
+      <input class="input" id="zone-code" name="code" type="text" spellcheck="false" required>
+
+      <label class="field-label" for="zone-name-ru">{{ t('methodology.zones.add.name_ru') }}</label>
+      <input class="input" id="zone-name-ru" name="name_ru" type="text" required>
+
+      <label class="field-label" for="zone-name-en">{{ t('methodology.zones.add.name_en') }}</label>
+      <input class="input" id="zone-name-en" name="name_en" type="text">
+
+      <label class="field-label" for="zone-share">{{ t('methodology.zones.add.share') }}</label>
+      <input class="input input--num" id="zone-share" name="share" type="text" inputmode="decimal">
+
+      <label class="field-label" for="zone-equal">
+        <input id="zone-equal" name="equal_shares" type="checkbox" value="1">
+        {{ t('methodology.zones.add.equal') }}</label>
+
+      <label class="field-label" for="zone-note">{{ t('methodology.zones.note') }}</label>
+      <input class="input" id="zone-note" name="note" type="text">
+
+      <button class="btn btn--primary" type="submit">{{ t('methodology.zones.add.submit') }}</button>
+    </form>
   </div>
 
   <div class="section mt-gap">

@@ -1046,14 +1046,37 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.zones.col.share": {"ru": "Доля, %", "en": "Share, %"},
     "methodology.zones.hint": {
         "ru": (
-            "Зоны и их доли правятся пока не отсюда, а из разговора с агентом: доли "
-            "задаются набором сразу, потому что обязаны сойтись к 100%."
+            "Доля — вес зоны в оценке. Доли задаются набором сразу, потому что обязаны "
+            "сойтись к 100%: версию с несошедшейся суммой движок считать откажется. "
+            "Каждая правка записывается новой версией и вступает в силу публикацией."
         ),
         "en": (
-            "Zones and their shares are not edited here yet, only from the agent "
-            "conversation: shares are set as a whole because they must add up to 100%."
+            "A share is the weight of a zone in the score. Shares are set as a whole "
+            "because they must add up to 100%: the engine refuses an edition whose "
+            "shares do not. Every edit is written as a new edition and takes effect "
+            "only when published."
         ),
     },
+    "methodology.zones.col.actions": {"ru": "Что можно", "en": "Actions"},
+    "methodology.zones.shares.title": {"ru": "Доли зон", "en": "Zone shares"},
+    "methodology.zones.shares.submit": {"ru": "Записать доли", "en": "Save shares"},
+    "methodology.zones.rename.submit": {"ru": "Переименовать", "en": "Rename"},
+    "methodology.zones.remove.submit": {"ru": "Убрать зону", "en": "Remove zone"},
+    "methodology.zones.remove.equal": {
+        "ru": "Уравнять доли оставшихся",
+        "en": "Even out the remaining shares",
+    },
+    "methodology.zones.add.title": {"ru": "Завести зону", "en": "Add a zone"},
+    "methodology.zones.add.code": {"ru": "Код зоны", "en": "Zone code"},
+    "methodology.zones.add.name_ru": {"ru": "Название (ru)", "en": "Name (ru)"},
+    "methodology.zones.add.name_en": {"ru": "Название (en)", "en": "Name (en)"},
+    "methodology.zones.add.share": {"ru": "Доля, %", "en": "Share, %"},
+    "methodology.zones.add.equal": {
+        "ru": "Уравнять доли всех зон",
+        "en": "Even out the shares of all zones",
+    },
+    "methodology.zones.add.submit": {"ru": "Завести", "en": "Add"},
+    "methodology.zones.note": {"ru": "Зачем правка", "en": "Why this edit"},
     "methodology.empty.title": {"ru": "Пунктов нет", "en": "No items"},
     "methodology.empty.text": {
         "ru": "В этой версии методики нет ни одного пункта.",
