@@ -612,3 +612,18 @@ def test_строка_разбивки_ведёт_в_реестр_проверо
     assert 'href="/inspections?city=tbilisi' in страница
     assert "Тбилиси" in страница
     assert ">tbilisi<" not in страница
+
+
+def test_точки_справочника_считаются_в_выбранном_месте() -> None:
+    # Arrange — 25.09.2026 при Грузии плитка показывала 151 точку всей сети.
+    гео = {
+        "Tbilisi-1": ("GE", "tbilisi"),
+        "Batumi-1": ("GE", "batumi"),
+        "Antalya-1": ("TR", "antalya"),
+    }
+
+    # Act / Assert
+    assert ov._units_in(гео, selection=ov.Selection(country="GE")) == 2
+    assert ov._units_in(гео, selection=ov.Selection(city="batumi")) == 1
+    assert ov._units_in(гео, selection=ov.Selection(country="RS")) == 0
+    assert ov._units_in(гео, selection=ov.Selection(grade="D")) is None
