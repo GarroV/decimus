@@ -34,7 +34,7 @@ import psycopg
 
 from .config import check_environment, load_retraction_settings
 from .errors import DbError, StorageError
-from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
+from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow, ItemUsage
 from .units import normalize_unit_name
 
 #: Сколько строк отдаётся, если предел не назвали. Сотня — это и есть
@@ -933,3 +933,62 @@ def worst_zones(
             str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
             for inspection_id, code, ru, en, loss in cur.fetchall()
         }
+
+
+#: Сколько точек показывать в сводке пункта: больше — уже список, а не ответ.
+ITEM_USAGE_TOP = 5
+
+#: Записи пункта — только из СДАННЫХ и НЕОТКЛОНЁННЫХ проверок своего чек-листа.
+#: Отклонённые роли приложения не видны и по политике (0010), но условие стоит
+#: и здесь: запрос не должен становиться неверным оттого, под какой ролью его
+#: однажды позовут. Код пункта принадлежит своему чек-листу: `CLN01` двух
+#: чек-листов — разные пункты.
+_ITEM_RECORDS = """
+    from findings f
+         join inspections i on i.id = f.inspection_id
+         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and f.code = %(code)s
+      and i.checklist_code = %(checklist)s
+      and i.status = 'finalized'
+      and i.retracted_at is null
+"""
+
+_ITEM_SUMMARY_SQL = (
+    "select count(*), count(distinct i.unit_id), count(distinct i.id), max(i.inspection_date)"
+    + _ITEM_RECORDS
+)
+_ITEM_LEVELS_SQL = "select f.level, count(*)" + _ITEM_RECORDS + " group by f.level order by f.level"
+_ITEM_TOP_SQL = (
+    "select u.name, u.id, count(*) as records"
+    + _ITEM_RECORDS
+    + " group by u.name, u.id order by records desc, u.name limit %(limit)s"
+)
+
+
+def item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage:
+    """Сколько раз пункт нарушен, на скольких точках и когда последний раз (D197)."""
+    tenant_code = _require_tenant(tenant)
+    код = code.strip().upper()
+    параметры: dict[str, object] = {
+        "tenant": tenant_code,
+        "code": код,
+        "checklist": checklist.strip(),
+        "limit": ITEM_USAGE_TOP,
+    }
+    with _reading("сводка пункта") as conn, conn.cursor() as cur:
+        cur.execute(_ITEM_SUMMARY_SQL, параметры)
+        записей, точек, проверок, последняя = cur.fetchone() or (0, 0, 0, None)
+        cur.execute(_ITEM_LEVELS_SQL, параметры)
+        по_классам = tuple((str(level), int(n)) for level, n in cur.fetchall())
+        cur.execute(_ITEM_TOP_SQL, параметры)
+        частые = tuple((str(name), str(ид), int(n)) for name, ид, n in cur.fetchall())
+    return ItemUsage(
+        code=код,
+        records=int(записей),
+        units=int(точек),
+        inspections=int(проверок),
+        last_date=последняя,
+        by_level=по_классам,
+        top_units=частые,
+    )

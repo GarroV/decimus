@@ -102,6 +102,7 @@
       {% endif %}
     </div>
     {% if composition.unpublished %}
+      <a class="btn" href="{{ href(diff='1', item='', new='') }}">{{ t('methodology.diff.open') }}</a>
       <form method="post" action="{{ action('methodology_publish') }}">
         <input type="hidden" name="version" value="{{ composition.latest }}">
         <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
@@ -109,7 +110,7 @@
     {% endif %}
   </div>
 
-  <div class="mx{% if card or adding %} has-panel{% endif %}">
+  <div class="mx{% if card or adding or changes is not none %} has-panel{% endif %}">
     {# --- 1. Чек-листы ------------------------------------------------------ #}
     <nav class="mx-col mx-lists" aria-label="{{ t('methodology.lists.title') }}">
       <div class="mx-col__head">{{ t('methodology.lists.title') }}</div>
@@ -348,6 +349,31 @@
               <dd>{{ value or '—' }}</dd>
             </div>
           {% endfor %}
+          {#
+            Сводка — по сданным неотклонённым проверкам этого чек-листа: по ней
+            видно, работает пункт или мёртвый. Счёт записей, а не оценка.
+          #}
+          <div class="mx-prop mx-prop--block">
+            <dt>{{ t('methodology.usage.title') }}</dt>
+            <dd>
+              {% if usage is none %}
+                <p class="field-note">{{ t('methodology.usage.unknown') }}</p>
+              {% elif usage.records == 0 %}
+                <p class="field-note">{{ t('methodology.usage.never') }}</p>
+              {% else %}
+                <div class="mx-usage">
+                  <span>{{ t('methodology.usage.summary', records=usage.records, units=usage.units, inspections=usage.inspections) }}</span>
+                  {% for level, n in usage.by_level %}<span class="tag tag--neutral tag--micro">{{ level }} × {{ n }}</span>{% endfor %}
+                  {% if usage.last_date %}<span class="mx-muted">{{ t('methodology.usage.last', day=usage.last_date.isoformat()) }}</span>{% endif %}
+                </div>
+                <ol class="mx-usage__top">
+                  {% for name, unit_id, n in usage.top_units %}
+                    <li><a href="{{ url_for('unit', unit_id=unit_id, lang=lang) }}">{{ name }}</a> <span class="mx-muted">× {{ n }}</span></li>
+                  {% endfor %}
+                </ol>
+              {% endif %}
+            </dd>
+          </div>
         </dl>
 
         {% if composition.is_latest %}
@@ -373,6 +399,52 @@
           </div>
         {% endif %}
         <p class="mx-keys">{{ t('methodology.panel.keys') }}</p>
+
+      {% elif changes is not none %}
+        {#
+          Разница действующей и свежей записанной версии — то, что начнёт
+          считать движок после кнопки «Опубликовать». Критерии сравниваются
+          тоже: без них правка критериев выглядела бы как «изменений нет».
+        #}
+        {% set field_title = {
+          'question_ru': t('methodology.field.question_ru'), 'question_en': t('methodology.field.question_en'),
+          'process_ru': t('methodology.field.process'), 'process_en': t('methodology.field.process_en'),
+          'levels': t('methodology.prop.levels'), 'zones': t('methodology.prop.zones'),
+          'days': t('methodology.prop.days'), 'criteria': t('methodology.item.criteria.title'),
+          'share_pct': t('methodology.zones.col.share'), 'name_ru': t('methodology.zones.col.name'),
+        } %}
+        <div class="mx-panel__head">
+          <div class="grow mx-panel__title">{{ t('methodology.diff.title') }}</div>
+          <a class="mx-panel__close" href="{{ href() }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+        </div>
+        <p class="field-note">{{ t('methodology.diff.lead', current=composition.current, latest=composition.latest) }}</p>
+        {% for c in changes %}
+          <div class="mx-change mx-change--{{ c.kind }}">
+            <div class="mx-change__head">
+              {% if c.kind == 'zone' %}
+                <span class="mono">{{ zone_names.get(c.code, c.code) }}</span>
+              {% elif c.kind == 'removed' %}
+                <span class="mono">{{ c.code }}</span>
+              {% else %}
+                <a class="mono" href="{{ href(item=c.code) }}">{{ c.code }}</a>
+              {% endif %}
+              <span class="tag tag--micro {% if c.kind in ('removed', 'disabled') %}tag--err{% elif c.kind in ('added', 'restored') %}tag--ok{% else %}tag--neutral{% endif %}">{{ t('methodology.diff.kind.' ~ c.kind) }}</span>
+            </div>
+            {% for name, old, new in c.fields %}
+              <div class="mx-change__field">
+                <span class="mx-muted">{{ field_title.get(name, name) }}</span>
+                <del>{{ old or '—' }}</del>
+                <ins>{{ new or '—' }}</ins>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <p class="mx-panel__hint">{{ t('methodology.diff.none') }}</p>
+        {% endfor %}
+        <form class="mx-panel__foot" method="post" action="{{ action('methodology_publish') }}">
+          <input type="hidden" name="version" value="{{ composition.latest }}">
+          <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
+        </form>
 
       {% else %}
         <p class="mx-panel__hint">{{ t('methodology.panel.empty') }}</p>

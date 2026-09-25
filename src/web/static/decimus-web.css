@@ -1123,3 +1123,11 @@ a.ov-table__row:hover { background: var(--surface-3); }
 /* Шапка раздела над полосой версии — без нижнего отступа дизайн-системы:
    между ними ничего нет, и 48px читались пустым местом, где что-то пропало. */
 .page--wide > .section { margin-bottom: 0; }
+.mx-usage { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: baseline; }
+.mx-usage__top { margin: var(--space-4) 0 0; padding-left: var(--space-8); font-size: var(--fs-dense); display: grid; gap: var(--space-2); width: 100%; }
+.mx-change { padding: var(--space-6) 0; border-bottom: 1px solid var(--line-2); display: grid; gap: var(--space-3); }
+.mx-change__head { display: flex; gap: var(--space-4); align-items: center; font-weight: var(--w-semibold); }
+.mx-change__field { display: grid; grid-template-columns: 7.5rem minmax(0, 1fr); gap: var(--space-1) var(--space-5); font-size: var(--fs-dense); }
+.mx-change__field del, .mx-change__field ins { grid-column: 2; text-decoration: none; padding: var(--space-1) var(--space-3); border-radius: var(--r-mark); white-space: pre-wrap; }
+.mx-change__field del { background: var(--surface-3); color: var(--ink-3); text-decoration: line-through; }
+.mx-change__field ins { background: var(--accent-soft); }
