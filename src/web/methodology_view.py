@@ -157,3 +157,77 @@ def zone_options(
         for code in (z.get("code") or "" for z in zones)
         if code
     )
+
+
+# --- разница версий: что изменится при публикации ---------------------------------
+
+#: Поля пункта, которые сравниваются и называются человеку. Прочие колонки
+#: (заведённые управляющей компанией, T109) сравниваются тоже — своим именем.
+_FIELD_ORDER = (
+    "question_ru",
+    "question_en",
+    "process_ru",
+    "process_en",
+    "levels",
+    "zones",
+    "days",
+    "criteria",
+)
+
+
+@dataclass(frozen=True)
+class Change:
+    """Одно отличие между версиями.
+
+    `kind`: `added`, `removed`, `disabled`, `restored`, `changed` — у пункта;
+    `zone` — у зоны. `fields` — `(поле, было, стало)`.
+    """
+
+    code: str
+    kind: str
+    fields: tuple[tuple[str, str, str], ...] = ()
+
+
+def _fields(old: Item, new: Item) -> tuple[tuple[str, str, str], ...]:
+    имена = [f for f in _FIELD_ORDER if f in old or f in new]
+    имена += sorted((set(old) | set(new)) - set(_FIELD_ORDER) - {"id", "kind"})
+    return tuple(
+        (f, old.get(f) or "", new.get(f) or "")
+        for f in имена
+        if (old.get(f) or "").strip() != (new.get(f) or "").strip()
+    )
+
+
+def diff_items(old: Sequence[Item], new: Sequence[Item]) -> tuple[Change, ...]:
+    """Отличия пунктов, в порядке новой версии; удалённые — в конце."""
+    было = {i.get("id") or "": i for i in old}
+    стало = {i.get("id") or "": i for i in new}
+    изменения: list[Change] = []
+    for code, item in стало.items():
+        прежний = было.get(code)
+        if прежний is None:
+            изменения.append(Change(code=code, kind="added"))
+            continue
+        if is_off(item) != is_off(прежний):
+            изменения.append(Change(code=code, kind="disabled" if is_off(item) else "restored"))
+        поля = _fields(прежний, item)
+        if поля:
+            изменения.append(Change(code=code, kind="changed", fields=поля))
+    изменения += [Change(code=c, kind="removed") for c in было if c not in стало]
+    return tuple(изменения)
+
+
+def diff_zones(
+    old: Sequence[Mapping[str, str]], new: Sequence[Mapping[str, str]]
+) -> tuple[Change, ...]:
+    """Отличия зон: доля, названия; зона появилась или пропала."""
+    было = {z.get("code") or "": z for z in old}
+    стало = {z.get("code") or "": z for z in new}
+    изменения = [
+        Change(code=c, kind="zone", fields=_fields(было.get(c, {}), z))
+        for c, z in стало.items()
+        if _fields(было.get(c, {}), z)
+    ]
+    пропавшие = [c for c in было if c not in стало]
+    изменения += [Change(code=c, kind="zone", fields=_fields(было[c], {})) for c in пропавшие]
+    return tuple(изменения)
