@@ -9,9 +9,26 @@
 
 from __future__ import annotations
 
+import ipaddress
 from typing import Any
 
 from .config import Settings
+
+
+def _адрес_звена(host: str) -> str:
+    """С какого адреса приходит своё звено.
+
+    На петле звено — сама петля: сервер принимает только её. В проде сервер
+    слушает сеть контейнера (`WEB_LISTEN_NETWORK`, D211), и общий прокси
+    приходит с адреса docker-сети, который заранее не известен и меняется при
+    пересоздании. Назвать звеном `0.0.0.0` значило бы не доверять никому:
+    `waitress` сравнивает адрес соединения, а с `0.0.0.0` никто не приходит, —
+    и заслон происхождения снова отвечал бы 403 на каждый вход (27.09.2026,
+    первый вход после переезда на VPS). Поэтому в сети доверяется любой сосед:
+    порт наружу не опубликован, и до сервера доходят только контейнеры своего
+    проекта и прокси по сети `edge-decimus`.
+    """
+    return host if ipaddress.ip_address(host).is_loopback or host == "localhost" else "*"
 
 
 def _proxy_options(settings: Settings) -> dict[str, Any]:
@@ -41,7 +58,7 @@ def _proxy_options(settings: Settings) -> dict[str, Any]:
     if settings.url_prefix:
         опции["url_prefix"] = settings.url_prefix
     if settings.trusted_proxies > 0:
-        опции["trusted_proxy"] = settings.host
+        опции["trusted_proxy"] = _адрес_звена(settings.host)
         опции["trusted_proxy_count"] = settings.trusted_proxies
         опции["trusted_proxy_headers"] = {
             "x-forwarded-for",

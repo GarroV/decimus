@@ -17,6 +17,7 @@ from __future__ import annotations
 import socket
 import threading
 from collections.abc import Iterator
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -145,3 +146,13 @@ def test_путь_общего_входа_доезжает_корнем_прил
     увиденное = _спросить(адрес + "audit/inspections")
 
     assert увиденное == "нет|нет|/audit"
+
+
+def test_в_сети_контейнера_звено_узнаётся_с_любого_адреса() -> None:
+    """В проде сервер слушает 0.0.0.0, а прокси приходит с адреса docker-сети."""
+    сетевые = replace(настройки(звенья=1), host="0.0.0.0")  # noqa: S104 — так слушает прод
+    assert _proxy_options(сетевые)["trusted_proxy"] == "*"
+
+
+def test_на_петле_звено_остаётся_петлёй() -> None:
+    assert _proxy_options(настройки(звенья=1))["trusted_proxy"] == "127.0.0.1"
