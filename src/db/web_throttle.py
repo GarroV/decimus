@@ -142,7 +142,28 @@ _FORGET_SQL = """
      where tenant_code = %s and scope = %s and key_fingerprint = %s
 """
 
-_DROP_STALE_SQL = "delete from web_login_attempts where updated_at < %s"
+#: Попутная чистка давних строк. Три ограничения, и каждое закрывает своё:
+#:
+#: - `for update skip locked` — строку, которую держит встречная попытка,
+#:   чистка пропускает, а не ждёт. Без этого две попытки по давним ключам
+#:   запирали друг друга: каждая записывала свою строку, потом видела давней
+#:   чужую и вставала её ждать (T331, #300: DeadlockDetected → 500 на форме
+#:   входа). Пропущенная строка никуда не денется — её уберёт следующая попытка;
+#: - свой арендатор — чистка не трогает чужие счётчики;
+#: - потолок на одну попытку — накопившийся хвост не превращает вход в долгую
+#:   уборку: он рассасывается за несколько попыток.
+_DROP_STALE_SQL = """
+    delete from web_login_attempts
+     where ctid in (
+         select ctid from web_login_attempts
+          where tenant_code = %s and updated_at < %s
+          limit %s
+            for update skip locked
+     )
+"""
+
+#: Сколько давних строк убирает одна попытка входа.
+DROP_STALE_BATCH = 100
 
 
 @dataclass(frozen=True)
@@ -353,7 +374,7 @@ def attempt_transaction(*, tenant: str, keys: _Keys) -> Iterator[AttemptStore]:
         # Чистка идёт попутно и под ту же запись: отдельного расписания у
         # админки нет, а таблица иначе растёт ровно от того, что в неё пишет
         # посторонний, — то есть неограниченно.
-        cur.execute(_DROP_STALE_SQL, (забыть_старше,))
+        cur.execute(_DROP_STALE_SQL, (tenant, забыть_старше, DROP_STALE_BATCH))
 
 
 def forget_counter(*, tenant: str, scope: str, fingerprint: str) -> None:
