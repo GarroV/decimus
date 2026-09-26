@@ -766,8 +766,12 @@ Remove-Item -Recurse -Force C:\projects\decimus
 
 > Проверено 26.09.2026 подъёмом с нуля на ноутбуке (Docker 29, Compose v5):
 > выдуманное окружение, свой проект compose, внешняя сеть прокси сымитирована.
-> Отличие от сервера одно — образ MinIO (см. §8.2). Восстановление базы по
-> §8.4 проверено тем же стендом, перенос томов — нет. На самом VPS не проверено.
+> Отличие от сервера одно — образ MinIO (см. §8.2).
+>
+> **Переезд выполнен 26.09.2026 по этому разделу** (коммит 2116a72): админка и
+> MCP отвечают по новым адресам, база совпала по 18 таблицам, MinIO и `state`
+> перенесены, бот опрашивает с VPS без 409. На MUSPELHEIM бот остановлен
+> (`restart=no`), остальное оставлено живым как откат.
 
 Прежние разделы описывают MUSPELHEIM (Windows, звенья socat, туннель). На VPS
 этого нет: TLS и адреса держит общий Caddy площадки. У каждого проекта своя сеть к нему —
@@ -790,20 +794,21 @@ Remove-Item -Recurse -Force C:\projects\decimus
 Приложение слушает сеть контейнера только по явному ключу
 `WEB_LISTEN_NETWORK=1` / `MCP_LISTEN_NETWORK=1` (без него — отказ на старте,
 правило петли D100 для MUSPELHEIM не отменено). Прод-надстройка ставит ключи
-сама. Сеть `edge-decimus` подключает надстройка из vps-infra (пишет площадка),
-примерно так:
+сама. Сеть `edge-decimus` подключает надстройка площадки: канон —
+`vps-infra/projects/decimus/compose.edge.yaml`, на сервере —
+`/srv/decimus/compose.edge.yaml`. По сути:
 
 ```yaml
 services:
   web:
-    networks: [default, edge]
+    networks: {default: {}, edge: {aliases: [decimus-web]}}
   mcp:
-    networks: [default, edge]
+    networks: {default: {}, edge: {aliases: [decimus-mcp]}}
 networks:
   edge: {name: edge-decimus, external: true}
 ```
 
-Цели Caddy — сервисные имена в `edge-decimus`: `web:8267` и `mcp:8265`. Порты на хосте остаются
+Цели Caddy — псевдонимы в `edge-decimus`: `decimus-web:8267` и `decimus-mcp:8265`. Порты на хосте остаются
 только на `127.0.0.1` (`WEB_HOST_PORT` 8268, `MCP_HOST_PORT` 8266) — для смоука
 с сервера. `ports: !reset []` в надстройке площадки тоже допустим, но тогда
 смоук скрипта ниже не найдёт порт.
@@ -827,7 +832,7 @@ ssh muspelheim docker save quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z quay
 
 ```bash
 cd /srv/decimus
-DECIMUS_OVERLAYS=/srv/vps-infra/projects/decimus/compose.vps.yml scripts/prod-update.sh
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 ```
 
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
@@ -875,13 +880,13 @@ dc ps; dc logs -f bot
 docker exec decimus-infra-db-1 pg_dump -U dodo_audit -d dodo_audit_service -Fc -f /tmp/decimus.dump
 docker cp decimus-infra-db-1:/tmp/decimus.dump .
 # VPS: 1) пустой стенд с ролями и схемой
-DECIMUS_OVERLAYS=... scripts/prod-update.sh
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 # 2) приложения стоят, база восстанавливается поверх
 dc stop bot web mcp
 docker cp decimus.dump decimus-db-1:/tmp/
 docker exec decimus-db-1 pg_restore -U dodo_audit -d dodo_audit_service --clean --if-exists --no-owner /tmp/decimus.dump
 # 3) накат того, чего на MUSPELHEIM ещё не было, и подъём
-DECIMUS_OVERLAYS=... scripts/prod-update.sh
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 ```
 
 Тома (на MUSPELHEIM с остановленными bot и storage-live, чтобы архив был
