@@ -193,8 +193,7 @@ def _set_geography(dsn: str) -> None:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         for spec in DEMO_INSPECTIONS:
             cur.execute(
-                "update units set country = %s, city = %s "
-                "where tenant_code = %s and name = %s",
+                "update units set country = %s, city = %s where tenant_code = %s and name = %s",
                 (spec.country, spec.city, DEMO_TENANT, spec.unit),
             )
 

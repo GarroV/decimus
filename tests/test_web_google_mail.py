@@ -161,9 +161,7 @@ def test_отказ_прав_объясняется_словами_а_не_об�
         raise Отказ("forbidden")
 
     with pytest.raises(GoogleMailError) as сбой:
-        create_draft(
-            "токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель
-        )
+        create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)
     assert "согласие" in str(сбой.value).lower()
 
 
@@ -172,6 +170,4 @@ def test_ответ_без_номера_черновика_не_выдаётся
         return ОтветЗаглушка(json.dumps({"message": {"id": "m-1"}}).encode())
 
     with pytest.raises(GoogleMailError):
-        create_draft(
-            "токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель
-        )
+        create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)

@@ -993,8 +993,7 @@ TOOLS: tuple[ToolSpec, ...] = (
                 "start_pct": {
                     "type": "number",
                     "description": (
-                        "Percentage an inspection starts from before any "
-                        "deduction, normally 100."
+                        "Percentage an inspection starts from before any deduction, normally 100."
                     ),
                 },
                 "d1": {
