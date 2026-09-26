@@ -7,7 +7,7 @@
 # Надстройки площадки (подключение к общему прокси из vps-infra) передаются
 # списком через двоеточие:
 #
-#   DECIMUS_OVERLAYS=/srv/vps-infra/projects/decimus/compose.vps.yml scripts/prod-update.sh
+#   DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 #
 # PULL=0 — не тянуть код (проверка стека с нуля на своей машине).
 #
