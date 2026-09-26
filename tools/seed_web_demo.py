@@ -94,12 +94,17 @@ class DemoInspection:
     kind: str
     #: (код пункта, класс, зона, формулировка) — коды из demo/data/checklist.csv.
     findings: tuple[tuple[str, str, str, str], ...]
+    #: Коды, которые аудитор отметил повтором: вычет за них удвоен (D191).
+    #: Совпадение кода с прошлой проверкой повтором само не делает — это
+    #: решение человека, поэтому в наборе есть и совпавший код без отметки.
+    repeats: frozenset[str] = frozenset()
 
 
 #: Демо-сеть: номера чатов из того же заведомо вымышленного диапазона, что у
 #: `seed_demo.DEMO_CHAT_ID`, — коллизия с боевым чатом исключена по построению.
 #: Даты фиксированы ради идемпотентности (см. шапку), состав находок подобран
-#: так, чтобы реестр показывал разные буквы, а не одну строку трижды.
+#: так, чтобы реестр показывал разные буквы, а не одну строку трижды, а у
+#: двух точек была история — движение оценки и повторы (#362).
 DEMO_INSPECTIONS = (
     DemoInspection(
         chat_id=999_000_000_101,
@@ -142,6 +147,56 @@ DEMO_INSPECTIONS = (
             ("DEM10", "D2", "staff", "Handwashing sink without paper towels at shift start."),
             ("DEM02", "D1", "facade", "Entrance door glass with visible hand marks at midday."),
         ),
+    ),
+    # История точек (#362): одна проверка на точку не показывает ни движения
+    # оценки, ни повторов, ни удвоенного вычета — эти экраны выглядели пустыми,
+    # и «не построено» не отличалось от «показывать нечего». У точки №1 ряд из
+    # трёх проверок: DEM03 повторён и засчитан дважды, DEM06 засчитан через
+    # проверку, DEM07 совпал кодом, но повтором НЕ отмечен (другая коробка —
+    # на карточке это «видели», а не «вдвое»). У №2 вторая проверка с одним
+    # засчитанным повтором.
+    DemoInspection(
+        chat_id=999_000_000_104,
+        unit="Demo Pizzeria #1",
+        country="RS",
+        city="Demo City",
+        auditor="Demo Auditor",
+        date="2026-08-26",
+        kind="planned",
+        findings=(
+            ("DEM03", "D1", "dining", "Same window table still stained, scratch not polished out."),
+            ("DEM07", "D1", "storage", "One sack of flour left directly on the floor by the door."),
+            ("DEM04", "D2", "dining", "Menu board still lists a pizza removed from the offer."),
+        ),
+        repeats=frozenset({"DEM03"}),
+    ),
+    DemoInspection(
+        chat_id=999_000_000_105,
+        unit="Demo Pizzeria #1",
+        country="RS",
+        city="Demo City",
+        auditor="Demo Auditor",
+        date="2026-09-09",
+        kind="planned",
+        findings=(
+            ("DEM03", "D1", "dining", "Window table stain is back after the last clean-up."),
+            ("DEM06", "D2", "kitchen", "Sauce splashes on the prep counter again, dried in."),
+        ),
+        repeats=frozenset({"DEM03", "DEM06"}),
+    ),
+    DemoInspection(
+        chat_id=999_000_000_106,
+        unit="Demo Pizzeria #2",
+        country="RS",
+        city="Demo City",
+        auditor="Demo Auditor",
+        date="2026-09-16",
+        kind="repeat",
+        findings=(
+            ("DEM08", "D1", "storage", "Opened sauce container still missing an opening date."),
+            ("DEM10", "D1", "staff", "Paper towels ran out at the handwashing sink mid-shift."),
+        ),
+        repeats=frozenset({"DEM08"}),
     ),
 )
 
@@ -217,7 +272,7 @@ def _build(spec: DemoInspection) -> None:
         tenant=DEMO_TENANT,
     )
     for code, level, zone, evidence in spec.findings:
-        domain.add_finding(spec.chat_id, code, level, zone, evidence)
+        domain.add_finding(spec.chat_id, code, level, zone, evidence, repeat=code in spec.repeats)
 
 
 def seed() -> list[str]:
