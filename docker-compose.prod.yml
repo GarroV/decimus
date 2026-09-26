@@ -88,8 +88,11 @@ services:
   storage-live:
     profiles: !reset []
 
-  storage-init:
-    profiles: !reset []
+  # Корзину заводит одноразовая служба; в постоянный набор она не входит
+  # намеренно: `up -d --wait` считает вышедший контейнер провалом даже с кодом
+  # 0, и подъём краснел бы на каждом обновлении. Её запускает явно
+  # scripts/prod-update.sh (`run --rm storage-init`), повторный запуск
+  # безвреден.
 
   demo-seed:
     <<: *prod-env-file
