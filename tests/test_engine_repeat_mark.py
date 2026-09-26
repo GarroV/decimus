@@ -40,9 +40,10 @@ def test_пометка_ставится_после_записи(started: Callab
 
 
 def test_пометка_снимается(started: Callable[..., Run], workdir: Path) -> None:
-    assert started(
-        "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-    ).code == 0
+    assert (
+        started("add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat").code
+        == 0
+    )
 
     r = started("edit", "--n", "1", "--no-repeat")
 
@@ -66,9 +67,10 @@ def test_правка_одной_пометкой_не_считается_пус
 def test_правка_других_полей_пометку_не_трогает(started: Callable[..., Run], workdir: Path) -> None:
     # Пометка — отдельное решение о цене. Правка формулировки её снимать не
     # должна: аудитор поправил слова, а не передумал про повтор.
-    assert started(
-        "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-    ).code == 0
+    assert (
+        started("add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat").code
+        == 0
+    )
 
     assert started("edit", "--n", "1", "--evidence", "другая формулировка").code == 0
 

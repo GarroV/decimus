@@ -72,6 +72,7 @@ def test_правка_долей_не_публикует(хранилище: Sto
     assert method.latest_version(хранилище) == правка.version
     assert правка.version != действующая_до
 
+
 def test_ставка_не_число_это_отказ_а_не_тихий_ноль(хранилище: Store) -> None:
     """Ставка — цена нарушения: ноль вместо непонятного ввода обесценил бы класс."""
     with pytest.raises(MethodologyRefused) as отказ:

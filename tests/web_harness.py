@@ -44,9 +44,7 @@ from src.web.config import Settings
 class Учётка:
     """То немногое, что страницам нужно знать о вошедшем."""
 
-    def __init__(
-        self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor"
-    ) -> None:
+    def __init__(self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor") -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
         self.tenant = tenant

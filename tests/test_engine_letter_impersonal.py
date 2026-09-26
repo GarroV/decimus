@@ -62,9 +62,7 @@ def test_письмо_не_подписано_и_не_обращается_по_
     def движок(скрипт: Path, *args: str) -> Run:
         return run_engine(скрипт, *args, cwd=рабочая, state=состояние, data_dir=DATA)
 
-    r = движок(
-        AUDIT, "init", "--unit", "Тестовая", "--auditor", АУДИТОР, "--date", "2026-08-21"
-    )
+    r = движок(AUDIT, "init", "--unit", "Тестовая", "--auditor", АУДИТОР, "--date", "2026-08-21")
     assert r.code == 0, r.text
 
     if состав != "без находок":

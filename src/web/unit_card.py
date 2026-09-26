@@ -127,8 +127,7 @@ def _bars(
                 grade=row.grade,
                 height=round(max(МИНИМУМ_СТОЛБИКА, min(100.0, доля)), 1),
                 comparable=(
-                    издание is None
-                    or (row.checklist_code, row.checklist_version) == издание
+                    издание is None or (row.checklist_code, row.checklist_version) == издание
                 ),
             )
         )
