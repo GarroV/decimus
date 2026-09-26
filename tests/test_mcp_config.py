@@ -241,3 +241,29 @@ def test_непустая_карта_без_базы_работает_как_п�
     settings = load_settings({MCP_TOKENS_VAR: f"partner={'z' * 32}", MCP_HOST_VAR: "127.0.0.1"})
 
     assert settings.tenants == ("partner",)
+
+
+# --- прослушивание сети контейнера за общим прокси (переезд на VPS) --------
+
+
+@pytest.mark.parametrize("адрес", ["0.0.0.0", "::", "172.18.0.5"])  # noqa: S104
+def test_сетевой_адрес_только_по_явному_ключу(адрес: str) -> None:
+    """За общим Caddy петля недостижима, а звена нет; без ключа — прежний отказ."""
+    assert _настройки(MCP_HOST=адрес, MCP_LISTEN_NETWORK="1").host == адрес
+
+
+def test_ключ_не_делает_адресом_имя() -> None:
+    with pytest.raises(McpConfigError):
+        _настройки(MCP_HOST="example.com", MCP_LISTEN_NETWORK="1")
+
+
+@pytest.mark.parametrize("ключ", ["", "0"])
+def test_выключенный_ключ_оставляет_петлю(ключ: str) -> None:
+    with pytest.raises(McpConfigError, match="петл"):
+        _настройки(MCP_HOST="0.0.0.0", MCP_LISTEN_NETWORK=ключ)  # noqa: S104
+
+
+@pytest.mark.parametrize("ключ", ["yes", "true", "2"])
+def test_опечатка_в_ключе_это_отказ_а_не_тихое_нет(ключ: str) -> None:
+    with pytest.raises(McpConfigError, match="MCP_LISTEN_NETWORK"):
+        _настройки(MCP_LISTEN_NETWORK=ключ)
