@@ -111,15 +111,26 @@ async def test_album_timer_failure_is_logged_and_does_not_kill_the_bot(
     # комментарий, и проверка «бот жив» ниже попадала в него, а не в ожидание.
     dp = build_dispatcher(SETTINGS, on_material=refuse, album_window=0.5)
 
-    with caplog.at_level(logging.ERROR, logger="src.bot.routers.material"):
-        await feed(dp, bot, photo_message("boom-1", caption="подпись", media_group_id="boom"))
-        await feed(dp, bot, photo_message("boom-2", media_group_id="boom"))
-        # Ждём событие, а не фиксированный срок: на загруженной машине
-        # фоновое закрытие альбома не укладывалось в 0.1 с, и тест плавал.
-        # Потолок — чтобы отсутствие записи всё же падало, а не висело.
-        async with asyncio.timeout(5):
-            while not any("не удалось закрыть альбом" in r.message for r in caplog.records):
-                await asyncio.sleep(0.01)
+    # Ждём событие, а не фиксированный срок: на загруженной машине фоновое
+    # закрытие альбома не укладывалось в 0.1 с, и тест плавал. Событие ставит
+    # обработчик журнала; потолок — чтобы отсутствие записи падало, а не висело.
+    записано = asyncio.Event()
+
+    class Сигнал(logging.Handler):
+        def emit(self, record: logging.LogRecord) -> None:
+            if "не удалось закрыть альбом" in record.getMessage():
+                записано.set()
+
+    журнал = logging.getLogger("src.bot.routers.material")
+    сигнал = Сигнал()
+    журнал.addHandler(сигнал)
+    try:
+        with caplog.at_level(logging.ERROR, logger="src.bot.routers.material"):
+            await feed(dp, bot, photo_message("boom-1", caption="подпись", media_group_id="boom"))
+            await feed(dp, bot, photo_message("boom-2", media_group_id="boom"))
+            await asyncio.wait_for(записано.wait(), timeout=5)
+    finally:
+        журнал.removeHandler(сигнал)
 
     assert any("не удалось закрыть альбом" in r.message for r in caplog.records)
 
