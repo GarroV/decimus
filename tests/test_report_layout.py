@@ -16,6 +16,7 @@ import shutil
 import subprocess
 from collections.abc import Callable
 from pathlib import Path
+from urllib.parse import unquote
 
 import pytest
 from conftest import ROOT, TEST_DATA, Run
@@ -60,7 +61,10 @@ def test_шрифт_подключён_абсолютным_путём(
 ) -> None:
     html = html_of(report)
     assert "@font-face" in html, "шрифт отчёта не подключён вовсе"
-    assert f"file://{ШРИФТЫ}/DejaVuSans.ttf" in html.replace("%20", " "), (
+    # Адрес в `url(...)` закодирован (`quote`), как и положено URL: кириллица
+    # и пробелы в пути копии приходят в HTML как %D0…/%20. Сравнивается
+    # раскодированный текст, иначе тест падает на любой не-ASCII копии (#369).
+    assert f"file://{ШРИФТЫ}/DejaVuSans.ttf" in unquote(html), (
         "шрифт подключён не абсолютным путём к файлу в проекте"
     )
 
