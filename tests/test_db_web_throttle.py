@@ -27,11 +27,13 @@ from src.db.web_throttle import (  # noqa: E402
     SCOPE_LOGIN,
     Attempt,
     admit_attempt,
+    attempt_transaction,
     canonical_address,
     key_fingerprint,
     load_counter,
     note_success,
 )
+from src.db.web_throttle import _keys as ключи_попытки  # noqa: E402
 
 pytestmark = requires_db
 
@@ -104,6 +106,62 @@ def test_старые_строки_убираются_попутно(db_env: str
         )
         row = cur.fetchone()
     assert row is not None and row[0] == 0
+
+
+def test_попутная_чистка_не_трогает_чужого_арендатора(db_env: str, pg_dsn: str) -> None:
+    """Давние строки соседа убирает его собственный вход, а не наш (T331)."""
+    admit_attempt(tenant=ЧУЖОЙ, address=АДРЕС, login="соседский")
+    отмотать(pg_dsn, FORGET_AFTER + timedelta(minutes=1))
+    попытка()
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select count(*) from web_login_attempts"
+            " where tenant_code = %s and key_fingerprint = %s",
+            (ЧУЖОЙ, key_fingerprint("соседский")),
+        )
+        row = cur.fetchone()
+    assert row is not None and row[0] == 1, "чистка одного арендатора сняла счётчик другого"
+
+
+def test_встречные_попытки_по_давним_ключам_не_запирают_друг_друга(
+    db_env: str, pg_dsn: str
+) -> None:
+    """Попутная чистка не ждёт строк, которые держит чужая попытка (T331, #300).
+
+    Два человека возвращаются после перерыва: у обоих строки счётчика давние.
+    Каждая попытка сначала записывает СВОЮ строку (та перестаёт быть давней, но
+    запись ещё не видна соседу), а потом чистит давние — и видит давней чужую.
+    Чистка без `skip locked` встаёт ждать соседа, сосед — её: взаимная
+    блокировка, и один из двоих получает 500 на форме входа.
+
+    Барьер стоит ровно между записью и чисткой: тело `with` и есть этот
+    промежуток. Без барьера порядок случаен и тест зеленеет на сломанном коде.
+    """
+    for логин in ("первый", "второй"):
+        admit_attempt(tenant=ТЕНАНТ, address=АДРЕС, login=логин)
+    отмотать(pg_dsn, FORGET_AFTER + timedelta(minutes=1))
+
+    записали = threading.Barrier(2)
+    ошибки: list[BaseException] = []
+
+    def войти(логин: str) -> None:
+        try:
+            with attempt_transaction(
+                tenant=ТЕНАНТ, keys=ключи_попытки(АДРЕС + логин, логин)
+            ) as rows:
+                rows.bump(scope=SCOPE_LOGIN, fingerprint=key_fingerprint(логин))
+                записали.wait(timeout=30)
+        except BaseException as exc:  # поток иначе падает молча
+            ошибки.append(exc)
+
+    нити = [threading.Thread(target=войти, args=(л,)) for л in ("первый", "второй")]
+    for нить in нити:
+        нить.start()
+    for нить in нити:
+        нить.join(timeout=60)
+
+    assert not any(нить.is_alive() for нить in нити), "попытки повисли друг на друге"
+    assert not ошибки, f"встречные попытки заперли друг друга: {ошибки[0]!r}"
 
 
 # --- в базу не уезжает ничего лишнего ---------------------------------------
