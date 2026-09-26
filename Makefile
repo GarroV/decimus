@@ -1,7 +1,20 @@
-.PHONY: check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: bootstrap check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
+
+# Окружение прогона с нуля — в свежем клоне или рабочей копии (git worktree),
+# где `.venv` нет: он не лежит в git (#393). Интерпретатор назван явно, потому
+# что `python3` на машине бывает 3.9, а проекту нужен 3.12 (`requires-python`),
+# и со старым pip editable-установка падает, оставляя `.venv` без pytest.
+# Последняя строка проверяет результат, а не отсутствие ошибки.
+PYTHON ?= python3.12
+
+bootstrap:
+	$(PYTHON) -m venv .venv
+	$(VENV)/pip install -q --upgrade pip
+	$(VENV)/pip install -q -e '.[dev]'
+	$(VENV)/pytest --version
 
 # Полный набор проверок. Прогоняется перед сдачей блока.
 #
