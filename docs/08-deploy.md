@@ -765,12 +765,14 @@ Remove-Item -Recurse -Force C:\projects\decimus
 ## 8. Прод на Linux (VPS) — переезд с MUSPELHEIM
 
 > Проверено 26.09.2026 подъёмом с нуля на ноутбуке (Docker 29, Compose v5):
-> выдуманное окружение, свой проект compose, сеть `edge` сымитирована.
-> Отличие от сервера одно — образ MinIO (см. §8.2). На самом VPS не проверено.
+> выдуманное окружение, свой проект compose, внешняя сеть прокси сымитирована.
+> Отличие от сервера одно — образ MinIO (см. §8.2). Восстановление базы по
+> §8.4 проверено тем же стендом, перенос томов — нет. На самом VPS не проверено.
 
 Прежние разделы описывают MUSPELHEIM (Windows, звенья socat, туннель). На VPS
-этого нет: TLS и адреса держит общий Caddy площадки в сети `edge`, а наружу
-сервисы не публикуют ни одного порта. Надстройка —
+этого нет: TLS и адреса держит общий Caddy площадки. У каждого проекта своя сеть к нему —
+`edge-decimus` (vps-infra#7, проекты друг друга не видят), а наружу сервисы не
+публикуют ни одного порта. Надстройка —
 [`docker-compose.prod.yml`](../docker-compose.prod.yml), почему она устроена
 так — в её шапке.
 
@@ -788,19 +790,20 @@ Remove-Item -Recurse -Force C:\projects\decimus
 Приложение слушает сеть контейнера только по явному ключу
 `WEB_LISTEN_NETWORK=1` / `MCP_LISTEN_NETWORK=1` (без него — отказ на старте,
 правило петли D100 для MUSPELHEIM не отменено). Прод-надстройка ставит ключи
-сама. Сеть `edge` подключает надстройка из vps-infra, по образцу multa:
+сама. Сеть `edge-decimus` подключает надстройка из vps-infra (пишет площадка),
+примерно так:
 
 ```yaml
 services:
   web:
-    networks: {default: {}, edge: {aliases: [decimus-web]}}
+    networks: [default, edge]
   mcp:
-    networks: {default: {}, edge: {aliases: [decimus-mcp]}}
+    networks: [default, edge]
 networks:
-  edge: {external: true}
+  edge: {name: edge-decimus, external: true}
 ```
 
-Цели Caddy: `decimus-web:8267` и `decimus-mcp:8265`. Порты на хосте остаются
+Цели Caddy — сервисные имена в `edge-decimus`: `web:8267` и `mcp:8265`. Порты на хосте остаются
 только на `127.0.0.1` (`WEB_HOST_PORT` 8268, `MCP_HOST_PORT` 8266) — для смоука
 с сервера. `ports: !reset []` в надстройке площадки тоже допустим, но тогда
 смоук скрипта ниже не найдёт порт.
@@ -832,9 +835,8 @@ DECIMUS_OVERLAYS=/srv/vps-infra/projects/decimus/compose.vps.yml scripts/prod-up
 база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
 накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401).
 Один и тот же порядок для первого подъёма и для каждого обновления: накат
-идемпотентен, корзина заводится с `--ignore-existing`. Первым подъёмом скрипт
-запускается **после** переноса данных (§8.4), иначе накат создаст пустую схему
-поверх той, что ещё не восстановлена.
+идемпотентен, корзина заводится с `--ignore-existing`. Первый подъём с переносом
+базы — порядок в §8.4.
 
 Руками — тем же набором файлов:
 
@@ -854,28 +856,33 @@ dc ps; dc logs -f bot
 
 | Что | Объём (25.09) | Как |
 |---|---|---|
-| База `dodo_audit_service` | ~9 МБ | `pg_dump -Fc` на MUSPELHEIM → `pg_restore` в пустую базу на VPS до наката |
+| База `dodo_audit_service` | ~9 МБ | `pg_dump -Fc` на MUSPELHEIM → `pg_restore --clean` на VPS после первого наката (ниже) |
 | MinIO, том `storage-data` | 22 МБ | архив тома |
 | Состояние бота, том `state` | мало | архив тома (идущие проверки, `access/roster.json`) |
 | Кадры для разбора, том `frames` | — | не переносить: срок 7 дней, бот наполнит сам (D179) |
 | Методика, `C:\projects\decimus\data` | — | `scp -r` в `/srv/decimus/data` |
 | Демо | — | не переносить, пересевается (`demo-seed`) |
 
-База (роли и пароли ролей заводит накат из `DATABASE_*_PASSWORD` окружения VPS,
-поэтому переносится только сама база, без ролей):
+База. Роли `dodo_audit_app` и `dodo_audit_admin` создаёт накат (миграции
+0004, 0010), а журнал миграций едет внутри дампа. Поэтому порядок строго такой:
+**накат на пустую базу → восстановление поверх → повторный накат.** Дамп в
+пустую базу до наката оставил бы базу без ролей навсегда: журнал из дампа
+скажет «всё применено», и накат их уже не создаст. Проверено 26.09.2026 на
+стенде с нуля: права роли приложения после такого порядка на месте.
 
 ```bash
 # MUSPELHEIM
 docker exec decimus-infra-db-1 pg_dump -U dodo_audit -d dodo_audit_service -Fc -f /tmp/decimus.dump
 docker cp decimus-infra-db-1:/tmp/decimus.dump .
-# VPS: база поднята, накат ещё НЕ запускался
-dc up -d --wait db
+# VPS: 1) пустой стенд с ролями и схемой
+DECIMUS_OVERLAYS=... scripts/prod-update.sh
+# 2) приложения стоят, база восстанавливается поверх
+dc stop bot web mcp
 docker cp decimus.dump decimus-db-1:/tmp/
-docker exec decimus-db-1 pg_restore -U dodo_audit -d dodo_audit_service --no-owner --role=dodo_audit /tmp/decimus.dump
+docker exec decimus-db-1 pg_restore -U dodo_audit -d dodo_audit_service --clean --if-exists --no-owner /tmp/decimus.dump
+# 3) накат того, чего на MUSPELHEIM ещё не было, и подъём
+DECIMUS_OVERLAYS=... scripts/prod-update.sh
 ```
-
-Права роли приложения выдаёт накат — поэтому `prod-update.sh` после
-восстановления, а не до.
 
 Тома (на MUSPELHEIM с остановленными bot и storage-live, чтобы архив был
 целым):
@@ -883,7 +890,8 @@ docker exec decimus-db-1 pg_restore -U dodo_audit -d dodo_audit_service --no-own
 ```bash
 # MUSPELHEIM, для каждого тома: storage-data, state
 docker run --rm -v decimus-infra_storage-data:/v -v "$PWD":/out alpine:3.22 tar -czf /out/storage-data.tgz -C /v .
-# VPS: создать том тем именем, которое ждёт проект, и развернуть
+# VPS: том тем именем, которое ждёт проект (compose предупредит, что том
+# создан не им, — это ожидаемо), и развернуть до подъёма bot и storage-live
 docker volume create decimus_storage-data
 docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /in/storage-data.tgz -C /v
 ```
