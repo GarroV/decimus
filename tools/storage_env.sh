@@ -25,8 +25,21 @@ value_for() {
         S3_ACCESS_KEY_ID) echo "decimus-storage" ;;
         S3_ENDPOINT_URL) echo "http://storage-live:9000" ;;
         S3_REGION) echo "us-east-1" ;;
-        *) LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 40 ;;
+        *) secret ;;
     esac
+}
+
+# Конечный кусок случайных байтов, а не `tr </dev/urandom | head`: под
+# pipefail обрезка потока роняет tr по SIGPIPE, и set -e молча завершал
+# скрипт, ничего не дописав.
+secret() {
+    local raw
+    raw=$(head -c 1024 /dev/urandom | LC_ALL=C tr -dc 'A-Za-z0-9')
+    if [ "${#raw}" -lt 40 ]; then
+        echo "не удалось получить случайный ключ" >&2
+        exit 1
+    fi
+    echo "${raw:0:40}"
 }
 
 added=()

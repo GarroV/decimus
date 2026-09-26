@@ -39,8 +39,9 @@ echo "версия кода: $sha"
 step "сборка образа с версией $sha"
 BUILD_SHA="$sha" "${compose[@]}" --profile backup build
 
-step "база"
-"${compose[@]}" up -d --wait db
+step "база и хранилище"
+"${compose[@]}" up -d --wait db storage-live
+"${compose[@]}" run --rm storage-init
 
 # Накат до подъёма приложений: новый код на старой схеме — это отказ админки,
 # а не «доедет само». Накат идемпотентен, повторный запуск ничего не ломает.
