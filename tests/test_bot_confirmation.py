@@ -106,12 +106,20 @@ async def test_album_timer_failure_is_logged_and_does_not_kill_the_bot(
         raise RuntimeError("разбор недоступен")
 
     bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS, on_material=refuse, album_window=0.01)
+    # Окно с запасом: при 0.01 с медленная машина успевала закрыть альбом
+    # между двумя кадрами — первый уходил одиночкой, второй оставался ждать
+    # комментарий, и проверка «бот жив» ниже попадала в него, а не в ожидание.
+    dp = build_dispatcher(SETTINGS, on_material=refuse, album_window=0.5)
 
     with caplog.at_level(logging.ERROR, logger="src.bot.routers.material"):
         await feed(dp, bot, photo_message("boom-1", caption="подпись", media_group_id="boom"))
         await feed(dp, bot, photo_message("boom-2", media_group_id="boom"))
-        await asyncio.sleep(0.1)
+        # Ждём событие, а не фиксированный срок: на загруженной машине
+        # фоновое закрытие альбома не укладывалось в 0.1 с, и тест плавал.
+        # Потолок — чтобы отсутствие записи всё же падало, а не висело.
+        async with asyncio.timeout(5):
+            while not any("не удалось закрыть альбом" in r.message for r in caplog.records):
+                await asyncio.sleep(0.01)
 
     assert any("не удалось закрыть альбом" in r.message for r in caplog.records)
 
