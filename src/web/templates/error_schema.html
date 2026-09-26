@@ -1,0 +1,13 @@
+{# Отставшая схема — не упавшая база: база жива, но код новее её (#351).
+   Лечится накатом миграций, поэтому страница называет именно это, а не
+   «База недоступна», с которой человек пошёл бы искать упавший сервер. #}
+{% extends "base.html" %}
+{% block title %}{{ t('error.schema.title') }}{% endblock %}
+{% block body %}
+  <div class="note note--error">
+    <div>
+      <div class="note__title">{{ t('error.schema.title') }}</div>
+      <div class="note__text">{{ t('error.schema.text', total=total) }}</div>
+    </div>
+  </div>
+{% endblock %}
