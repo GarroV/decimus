@@ -32,6 +32,7 @@ WEB_TENANT_VAR = "WEB_TENANT"
 WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ переменной, а не значение
 WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
+WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -109,15 +110,37 @@ def _parse_url_prefix(raw: str) -> str:
     return f"/{путь}"
 
 
-def _parse_host(raw: str) -> str:
+def _parse_listen_network(raw: str) -> bool:
+    """Разрешено ли слушать сеть контейнера, а не только петлю.
+
+    Нужен там, где перед админкой стоит общий прокси в сети контейнеров, а
+    звена-посредника нет (VPS, общий Caddy в сети `edge`): петля контейнера
+    оттуда недостижима. Порт при этом на хост не публикуется — достижим он
+    ровно так же, как раньше через звено. Любое значение, кроме пусто, `0` и
+    `1`, — отказ: опечатка не должна тихо означать «нет» или «да».
+    """
+    value = raw.strip()
+    if value in ("", "0"):
+        return False
+    if value == "1":
+        return True
+    raise WebConfigError(
+        f"Значение {WEB_LISTEN_NETWORK_VAR}={value} не понято: ожидается 1 (слушать сеть "
+        f"контейнера за общим прокси) или пусто/0 (только петля)"
+    )
+
+
+def _parse_host(raw: str, *, listen_network: bool = False) -> str:
     host = raw.strip() or DEFAULT_HOST
     if host == "localhost":
         return host
     try:
-        loopback = ipaddress.ip_address(host).is_loopback
+        адрес = ipaddress.ip_address(host)
     except ValueError:
-        loopback = False
-    if not loopback:
+        raise WebConfigError(f"Адрес {WEB_HOST_VAR}={host} не IP-адрес") from None
+    if listen_network:
+        return host
+    if not адрес.is_loopback:
         raise WebConfigError(
             f"Адрес {WEB_HOST_VAR}={host} не петля. Наружу админка выходит туннелем (D100), "
             f"а не открытым портом: площадка общая, и опубликованный порт отдал бы соседям "
@@ -208,7 +231,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     src = os.environ if env is None else env
     secret_key, ephemeral = _parse_secret_key(src.get(WEB_SECRET_KEY_VAR) or "")
     return Settings(
-        host=_parse_host(src.get(WEB_HOST_VAR) or ""),
+        host=_parse_host(
+            src.get(WEB_HOST_VAR) or "",
+            listen_network=_parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or ""),
+        ),
         port=_parse_port(src.get(WEB_PORT_VAR) or ""),
         tenant=_parse_tenant(src.get(WEB_TENANT_VAR) or ""),
         ui_lang=default_ui_lang(src),
