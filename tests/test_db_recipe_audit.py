@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -89,6 +89,7 @@ def test_снятая_проверка_из_счёта_не_пропадает(
     то есть разрешение снять совместимость на базе, где снимать её нельзя.
     """
     inspection_id = _слить()
+    accept_pushed(retraction_env, inspection_id)
     retract_inspection(inspection_id, tenant=АРЕНДАТОР, reason="правил ошибку в шапке")
 
     отчёт = audit_legacy_recipes(pg_dsn)
@@ -156,6 +157,7 @@ def test_администратор_истории_считать_может(
     здесь читался бы как «таких строк нет».
     """
     inspection_id = _слить()
+    accept_pushed(retraction_env, inspection_id)
     retract_inspection(inspection_id, tenant=АРЕНДАТОР, reason="правил ошибку в шапке")
 
     отчёт = audit_legacy_recipes(retraction_env)

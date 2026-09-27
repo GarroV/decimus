@@ -777,6 +777,20 @@ a.ov-table__row:hover { background: var(--surface-3); }
   border-bottom: 1px solid var(--line-2);
 }
 .find-row:last-child { border-bottom: 0; }
+
+/* Лист вычитки на приёмке (D199): зона сворачивается, кадры — миниатюрами. */
+.review-zone > summary { cursor: pointer; list-style: none; }
+.review-zone > summary::-webkit-details-marker { display: none; }
+.review-zone[open] > summary { background: var(--surface-2); }
+.review-photo {
+  display: inline-block;
+  margin: var(--space-2) var(--space-2) 0 0;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-inner);
+  object-fit: cover;
+}
 .find-row__level { flex: none; }
 .find-row__num {
   font-family: var(--font-num);

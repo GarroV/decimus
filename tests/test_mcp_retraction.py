@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 pytest.importorskip("psycopg")
 
@@ -45,14 +45,23 @@ def retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return set_retraction_env(db_env, monkeypatch)
 
 
-def _проверка(chat_id: int, *, точка: str = ТОЧКА, арендатор: str = АРЕНДАТОР) -> str:
-    """Настоящая проверка через контракт `domain`, затем слив в базу."""
+def _проверка(
+    chat_id: int, *, точка: str = ТОЧКА, арендатор: str = АРЕНДАТОР, admin_dsn: str
+) -> str:
+    """Настоящая проверка через контракт `domain`, слитая и ПРИНЯТАЯ (D199).
+
+    Инструменты чтения и `retraction.retract_inspection` действуют на
+    запечатанную ('finalized') проверку — слив кладёт её лишь на приёмку
+    ('draft'), поэтому помощник подтверждает её тем же путём, что и админка.
+    """
     from src.db.push import push_inspection
     from src.domain import add_finding, start_inspection
 
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(admin_dsn, ident)
+    return ident
 
 
 def _подтверждение(ident: str, *, арендатор: str = АРЕНДАТОР) -> dict[str, str]:
@@ -86,7 +95,7 @@ def test_снятие_отдаёт_записанную_причину_и_опи
     Человек, читающий пересказ агента, обязан узнать бумагу, которой лишился
     партнёр: точку, дату и оценку — записанную, а не пересчитанную.
     """
-    ident = _проверка(501)
+    ident = _проверка(501, admin_dsn=retraction_env)
 
     ответ = _снять(ident)
 
@@ -112,8 +121,8 @@ def test_снятая_проверка_пропадает_из_каждого_ч
     Поэтому перебираются все читающие инструменты сразу: инструмент, который
     начнёт показывать снятое, покраснеет здесь.
     """
-    снятая = _проверка(502)
-    живая = _проверка(503, точка="Белград-2")
+    снятая = _проверка(502, admin_dsn=retraction_env)
+    живая = _проверка(503, точка="Белград-2", admin_dsn=retraction_env)
     _снять(снятая)
 
     список = reads.list_inspections(tenant=АРЕНДАТОР)
@@ -151,7 +160,7 @@ def test_чужая_дата_в_подтверждении_ничего_не_с�
     domain_env: Path, retraction_env: str
 ) -> None:
     """Промах по идентификатору обязан упереться в подтверждение, а не в снятие."""
-    ident = _проверка(504)
+    ident = _проверка(504, admin_dsn=retraction_env)
     подтверждение = _подтверждение(ident)
 
     with pytest.raises(ToolError) as отказ:
@@ -173,7 +182,7 @@ def test_чужая_дата_в_подтверждении_ничего_не_с�
 def test_чужая_точка_в_подтверждении_ничего_не_снимает(
     domain_env: Path, retraction_env: str
 ) -> None:
-    ident = _проверка(505)
+    ident = _проверка(505, admin_dsn=retraction_env)
     подтверждение = _подтверждение(ident)
 
     with pytest.raises(ToolError, match="не отклонена"):
@@ -197,7 +206,7 @@ def test_имя_точки_сверяется_ключом_продукта_а_�
     (`db.units.normalize_unit_name`): своё второе правило означало бы, что
     подтверждение не принимает имя, под которым проверка и лежит.
     """
-    ident = _проверка(506)
+    ident = _проверка(506, admin_dsn=retraction_env)
     подтверждение = _подтверждение(ident)
 
     ответ = retraction.retract_inspection(
@@ -219,7 +228,7 @@ def test_подтверждение_без_внятного_ответа_это_
     domain_env: Path, retraction_env: str, поле: str, значение: str
 ) -> None:
     """Пустое подтверждение — не «подтверждения не требуется»."""
-    ident = _проверка(507)
+    ident = _проверка(507, admin_dsn=retraction_env)
     аргументы = {**_подтверждение(ident), поле: значение}
 
     with pytest.raises(ToolError):
@@ -235,7 +244,7 @@ def test_чужая_проверка_отвечает_тем_же_что_нес�
     domain_env: Path, retraction_env: str
 ) -> None:
     """Разные ответы дали бы перебору идентификаторов состав чужой истории."""
-    чужая = _проверка(508, арендатор="сосед")
+    чужая = _проверка(508, арендатор="сосед", admin_dsn=retraction_env)
 
     with pytest.raises(ToolError) as отказ:
         retraction.retract_inspection(
@@ -272,7 +281,7 @@ def test_уже_снятая_называет_записанную_причин�
     """
     from src.db.queries import get_inspection
 
-    ident = _проверка(509)
+    ident = _проверка(509, admin_dsn=retraction_env)
     _снять(ident)
 
     with pytest.raises(ToolError) as отказ:
@@ -288,7 +297,7 @@ def test_причина_не_названа_отказ_говорит_чего_�
     domain_env: Path, retraction_env: str
 ) -> None:
     """Отказ приходит словами блока `db`: правило живёт там, пересказ разошёлся бы."""
-    ident = _проверка(510)
+    ident = _проверка(510, admin_dsn=retraction_env)
 
     with pytest.raises(ToolError) as отказ:
         _снять(ident, причина="   ")
@@ -297,40 +306,59 @@ def test_причина_не_названа_отказ_говорит_чего_�
     assert "D089" in str(отказ.value)
 
 
-def test_незапечатанная_проверка_снятию_не_подлежит(
-    domain_env: Path, pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch
+def test_черновик_на_приёмке_снятию_не_подлежит_и_виден_как_незнакомая_проверка(
+    domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Слив, оборванный до печати, — это черновик, а не выданный документ.
+    """Проверка на приёмке (черновик) снятию не подлежит (D199).
 
-    Печать снимается под ролью, СОЗДАВШЕЙ базу, а не под администратором
-    истории: тому выданы ровно две колонки (`retracted_at`,
-    `retraction_reason`), и правка `status` запрещена ему привилегией. Это не
-    помеха тесту, а подтверждение заслона: администратор снимает проверку, но
-    не распечатывает её обратно.
+    До решения D199 черновика после слива не существовало вовсе — слив сразу
+    печатал проверку, и этот тест НАМЕРЕННО откатывал `status` сырым SQL под
+    ролью, создавшей базу (администратору истории такая правка запрещена
+    привилегией), чтобы вручную воспроизвести обрыв до печати. С D199 это
+    состояние воспроизводить не нужно: слив сам кладёт проверку в `draft`.
+    Прежний приём с сырым SQL к тому же перестал бы работать: заслон
+    `guard_inspection_acceptance` (миграция `0026`) НАМЕРЕННО запрещает
+    откатывать уже принятую проверку назад в черновик тем же путём.
+
+    Сообщение изменилось вместе с состоянием, и это не ослабление проверки.
+    `_detail` (подтверждение снятия) читает проверку глазами администратора
+    истории через `get_inspection(..., include_retracted=True)` БЕЗ
+    `include_on_review` — черновик ею не виден, и отказ здесь тот же самый
+    намеренно неразличимый «такой проверки у этого доступа нет»
+    (`UNKNOWN_INSPECTION`), что и для чужого арендатора или случайного UUID.
+    Отдельное сообщение «не запечатана» никуда не делось — оно живёт в
+    `src/db/retract.py` и проверено на уровне блока `db`
+    (`test_db_retraction.py`, `test_db_retraction_policies.py`); здесь же
+    важно ровно то, что вынесено в имя теста: снять черновик через MCP
+    нельзя, и это на практике даже строже прежнего — вызывающий не узнаёт из
+    ответа даже того, что такая проверка вообще существует.
     """
-    import psycopg
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
 
     set_retraction_env(db_env, monkeypatch)
-    ident = _проверка(511)
-    подтверждение = _подтверждение(ident)
-    with psycopg.connect(pg_dsn) as conn:
-        # Печать снимается сырым SQL намеренно: продуктового пути «распечатать
-        # обратно» нет и не будет, а состояние, в которое слив попадает при
-        # обрыве, воспроизвести чем-то надо.
-        conn.execute("update inspections set status = 'draft' where id = %s", (ident,))
-        conn.commit()
+    start_inspection(511, unit=ТОЧКА, kind="planned", report_lang="ru", tenant=АРЕНДАТОР)
+    add_finding(511, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
+    ident = push_inspection(511)
 
     with pytest.raises(ToolError) as отказ:
-        retraction.retract_inspection(tenant=АРЕНДАТОР, id=ident, reason=ПРИЧИНА, **подтверждение)
+        retraction.retract_inspection(
+            tenant=АРЕНДАТОР,
+            id=ident,
+            reason=ПРИЧИНА,
+            confirm_unit=ТОЧКА,
+            confirm_date="2026-08-15",
+        )
 
-    assert "запечат" in str(отказ.value).lower()
+    assert ident in str(отказ.value)
+    assert "не существует" in str(отказ.value)
 
 
 def test_снятие_без_подключения_администратора_называет_переменную(
     domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Отказ настройки не должен читаться как «такой проверки нет»."""
-    ident = _проверка(512)
+    ident = _проверка(512, admin_dsn=db_env)
     monkeypatch.delenv("DATABASE_RETRACTION_URL", raising=False)
 
     with pytest.raises(ToolError) as отказ:
@@ -367,7 +395,7 @@ def test_текст_отказа_драйвера_в_ответ_не_попад�
     import src.db.retract as снятие_блока
     from src.db.errors import RetractionError
 
-    ident = _проверка(513)
+    ident = _проверка(513, admin_dsn=retraction_env)
 
     def упасть(*_: object, **__: object) -> None:
         raise RetractionError(f"Снятие не удалось (OperationalError): {ЧУЖОЙ_ТЕКСТ}") from (
@@ -397,7 +425,7 @@ def test_отказ_по_существу_доезжает_словами_бло
     import src.db.retract as снятие_блока
     from src.db.errors import RetractionError
 
-    ident = _проверка(514)
+    ident = _проверка(514, admin_dsn=retraction_env)
     сказано = "на неё уже сослались как на исходную — сперва разобраться со ссылающимися"
 
     def отказать(*_: object, **__: object) -> None:
@@ -421,7 +449,7 @@ def test_повтор_с_пустой_причиной_говорит_про_с�
     про «не названа причина» здесь увёл бы человека к полю, которое ни на что
     не влияет, вместо главного: снимать нечего.
     """
-    ident = _проверка(515)
+    ident = _проверка(515, admin_dsn=retraction_env)
     _снять(ident)
 
     with pytest.raises(ToolError) as отказ:

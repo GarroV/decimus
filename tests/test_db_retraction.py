@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import RETRACTION_URL_VAR, set_retraction_env
+from db_harness import RETRACTION_URL_VAR, accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -44,11 +44,20 @@ def retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return set_retraction_env(db_env, monkeypatch)
 
 
-def _проверка(chat_id: int, *, точка: str = ТОЧКА, арендатор: str = "default") -> str:
-    """Настоящая проверка через контракт `domain`, затем слив в базу."""
+def _проверка(
+    chat_id: int, *, точка: str = ТОЧКА, арендатор: str = "default", admin_dsn: str,
+) -> str:
+    """Настоящая ПРИНЯТАЯ проверка через контракт `domain` (D199).
+
+    `retract_inspection` снимает только запечатанную ('finalized') проверку —
+    слив кладёт её на приёмку ('draft'), поэтому помощник подтверждает её тем
+    же путём, что и админка, прежде чем вернуть идентификатор.
+    """
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(admin_dsn, ident)
+    return ident
 
 
 def _строка(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> tuple[Any, ...] | None:
@@ -62,7 +71,7 @@ def _строка(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> tuple[Any
 
 def test_снятие_ставит_пометку_и_записывает_причину(domain_env: Path, retraction_env: str) -> None:
     """Строка остаётся на месте: снятие — пометка, а не удаление (D089)."""
-    ident = _проверка(401)
+    ident = _проверка(401, admin_dsn=retraction_env)
 
     снятие = retract_inspection(ident, tenant="default", reason=ПРИЧИНА)
 
@@ -87,7 +96,7 @@ def test_причина_снятия_обязательна(domain_env: Path, re
     случившийся после записи, был бы худшим исходом — он выглядит как «ничего
     не произошло».
     """
-    ident = _проверка(402)
+    ident = _проверка(402, admin_dsn=retraction_env)
 
     for пустая in ("", "   ", "\n\t"):
         with pytest.raises(RetractionError) as отказ:
@@ -102,7 +111,7 @@ def test_причина_обрезается_по_краям_но_не_пере�
     domain_env: Path, retraction_env: str
 ) -> None:
     """Причину пишет человек: внешние пробелы — не часть причины, а всё прочее — часть."""
-    ident = _проверка(403)
+    ident = _проверка(403, admin_dsn=retraction_env)
 
     снятие = retract_inspection(ident, tenant="default", reason=f"  {ПРИЧИНА}  ")
 
@@ -120,7 +129,7 @@ def test_снятие_повторяемо_и_причину_не_перепис
     вызов её переписывал, снятие стало бы способом менять основание после
     того, как партнёру уже сказали.
     """
-    ident = _проверка(404)
+    ident = _проверка(404, admin_dsn=retraction_env)
     первое = retract_inspection(ident, tenant="default", reason=ПРИЧИНА)
 
     второе = retract_inspection(ident, tenant="default", reason="совсем другая причина")
@@ -138,7 +147,7 @@ def test_снятие_повторяемо_и_причину_не_перепис
 
 def test_чужую_проверку_снять_нельзя(domain_env: Path, retraction_env: str) -> None:
     """Арендатор — не украшение вызова: снять можно только своё."""
-    чужая = _проверка(405, точка="Будапешт-1", арендатор="partner-b")
+    чужая = _проверка(405, точка="Будапешт-1", арендатор="partner-b", admin_dsn=retraction_env)
 
     with pytest.raises(RetractionError) as отказ:
         retract_inspection(чужая, tenant="default", reason=ПРИЧИНА)
@@ -175,8 +184,8 @@ def test_снять_то_на_что_сослались_нельзя(
     отдаёт (D029), а форма в схеме есть с самого начала — и снятие обязано её
     учитывать уже сейчас, а не с того дня, когда появится источник данных.
     """
-    исходная = _проверка(406)
-    повторная = _проверка(407, точка="Белград-2")
+    исходная = _проверка(406, admin_dsn=retraction_env)
+    повторная = _проверка(407, точка="Белград-2", admin_dsn=retraction_env)
     with psycopg.connect(pg_dsn) as conn:
         conn.execute(
             "update inspections set repeat_of_id = %s where id = %s", (исходная, повторная)
@@ -198,8 +207,8 @@ def test_снять_то_на_что_сослались_нельзя(
 
 def test_снятой_проверки_в_истории_не_видно(domain_env: Path, retraction_env: str) -> None:
     """Снятая проверка выбывает из истории точки — ради этого снятие и делают."""
-    снятая = _проверка(408)
-    живая = _проверка(409, точка="Белград-2")
+    снятая = _проверка(408, admin_dsn=retraction_env)
+    живая = _проверка(409, точка="Белград-2", admin_dsn=retraction_env)
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
     видно = {строка.id for строка in list_inspections(tenant="default")}
@@ -212,7 +221,7 @@ def test_администратор_видит_снятую_и_видит_что
     domain_env: Path, retraction_env: str
 ) -> None:
     """«Снятой не видно» и «снятой не было» — разные ответы, и второй был бы ложью."""
-    снятая = _проверка(410)
+    снятая = _проверка(410, admin_dsn=retraction_env)
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
     строки = {
@@ -230,7 +239,7 @@ def test_живая_проверка_снятой_не_помечена(domain_e
     Без него проверка выше была бы зелена и на коде, который помечает снятым
     что угодно, — а такой код прятал бы из истории всё.
     """
-    живая = _проверка(411)
+    живая = _проверка(411, admin_dsn=retraction_env)
 
     строки = {
         строка.id: строка for строка in list_inspections(tenant="default", include_retracted=True)
@@ -244,7 +253,7 @@ def test_снятая_проверка_по_идентификатору_отв�
     domain_env: Path, retraction_env: str
 ) -> None:
     """Тому, кто снятых не видит, они и не существуют — тот же ответ, что у чужой."""
-    ident = _проверка(412)
+    ident = _проверка(412, admin_dsn=retraction_env)
     retract_inspection(ident, tenant="default", reason=ПРИЧИНА)
 
     assert get_inspection(ident, tenant="default") is None
@@ -260,8 +269,8 @@ def test_находки_снятой_проверки_из_истории_точ
     domain_env: Path, retraction_env: str
 ) -> None:
     """Отозванный документ, посчитанный за повтор, — требование по пропавшему основанию."""
-    снятая = _проверка(413)
-    _проверка(414)
+    снятая = _проверка(413, admin_dsn=retraction_env)
+    _проверка(414, admin_dsn=retraction_env)
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
     находки = findings_by_unit(tenant="default", unit=ТОЧКА)
@@ -283,10 +292,11 @@ def test_после_снятия_ту_же_проверку_можно_слит�
     уникальный индекс и падал отказом «Postgres не вернул строку после INSERT»,
     не сказав ни слова о снятии.
     """
-    первый = _проверка(415)
+    первый = _проверка(415, admin_dsn=retraction_env)
     retract_inspection(первый, tenant="default", reason=ПРИЧИНА)
 
     второй = push_inspection(415)
+    accept_pushed(retraction_env, второй)
 
     assert второй != первый, "слив вернул снятую проверку вместо новой"
     видно = {строка.id for строка in list_inspections(tenant="default")}
@@ -299,7 +309,7 @@ def test_повторный_слив_живой_проверки_дубля_по
     domain_env: Path, retraction_env: str
 ) -> None:
     """Встречное утверждение к предыдущему: частичность индекса не отменила сверку."""
-    первый = _проверка(416)
+    первый = _проверка(416, admin_dsn=retraction_env)
 
     assert push_inspection(416) == первый
 
@@ -311,7 +321,7 @@ def test_без_подключения_администратора_снятие
     domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Право видеть снятое живёт в базе: без своей роли снимать нечем."""
-    ident = _проверка(417)
+    ident = _проверка(417, admin_dsn=db_env)
     monkeypatch.delenv(RETRACTION_URL_VAR, raising=False)
 
     with pytest.raises(ConfigError) as отказ:
@@ -324,10 +334,12 @@ def test_без_подключения_администратора_снятых
     domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """«Снятых нет» вместо «вам их не видно» — тихий ответ, который никто не перепроверит."""
-    _проверка(418)
+    _проверка(418, admin_dsn=db_env)
     monkeypatch.delenv(RETRACTION_URL_VAR, raising=False)
 
     with pytest.raises(ConfigError):
         list_inspections(tenant="default", include_retracted=True)
     with pytest.raises(ConfigError):
-        get_inspection(str(_проверка(419)), tenant="default", include_retracted=True)
+        get_inspection(
+            str(_проверка(419, admin_dsn=db_env)), tenant="default", include_retracted=True,
+        )

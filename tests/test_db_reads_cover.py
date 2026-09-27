@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -42,9 +43,18 @@ pytestmark = requires_db
 
 
 def _проверка(
-    chat_id: int, *, точка: str = "Белград-1", шапка: dict[str, str] | None = None
+    chat_id: int,
+    *,
+    точка: str = "Белград-1",
+    шапка: dict[str, str] | None = None,
+    db_env: str,
 ) -> str:
-    """Завершённая проверка с заполненной шапкой — через контракт домена."""
+    """Завершённая и ПРИНЯТАЯ проверка с заполненной шапкой (D199).
+
+    Слив кладёт проверку на приёмку, а `get_inspection`/`list_inspections` по
+    умолчанию видят только принятые — помощник подтверждает её тем же путём,
+    что и админка.
+    """
     поля = ШАПКА if шапка is None else шапка
     start_inspection(
         chat_id,
@@ -58,7 +68,9 @@ def _проверка(
         contact=поля["contact"],
     )
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(db_env, ident)
+    return ident
 
 
 def test_чтение_по_идентификатору_отдаёт_шапку_письма(domain_env: Path, db_env: str) -> None:
@@ -68,7 +80,7 @@ def test_чтение_по_идентификатору_отдаёт_шапку_
     (`getattr(detail.inspection, поле, "")`), поэтому непрочитанное поле не
     падает, а превращается в прочерк в подписи письма партнёру.
     """
-    ident = _проверка(701)
+    ident = _проверка(701, db_env=db_env)
 
     прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
 
@@ -88,7 +100,7 @@ def test_список_проверок_отдаёт_шапку_письма(doma
     Письмо собирается по `get_inspection`, но список — это первое, что видит
     спрашивающий, и «аудитор: пусто» там читается как «аудитора не записали».
     """
-    _проверка(702)
+    _проверка(702, db_env=db_env)
 
     строки = list_inspections(tenant=АРЕНДАТОР)
 
@@ -107,7 +119,7 @@ def test_выборка_по_точке_отдаёт_шапку_письма(dom
     один из них: тогда шапка есть, пока не назвали точку, и пропадает ровно у
     того, кто спрашивает про конкретную пиццерию.
     """
-    _проверка(703, точка="Ниш-1")
+    _проверка(703, точка="Ниш-1", db_env=db_env)
 
     строки = list_inspections(tenant=АРЕНДАТОР, unit="Ниш-1")
 
@@ -128,7 +140,7 @@ def test_незаполненная_шапка_остаётся_пустой_а_
     «поля нет» обязаны выглядеть одинаково — пустой строкой, а не `None`,
     который у потребителя превратился бы в слово «None» в подписи письма.
     """
-    ident = _проверка(704, шапка=dict.fromkeys(ШАПКА, ""))
+    ident = _проверка(704, шапка=dict.fromkeys(ШАПКА, ""), db_env=db_env)
 
     прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
 

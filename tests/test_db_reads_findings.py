@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -48,8 +49,9 @@ def _проверка_с_находками(
     дата: str = "2026-03-01",
     speech_lang: str = "ru",
     находки: tuple[tuple[str, str], ...] = (),
+    db_env: str,
 ) -> str:
-    """Завершённая проверка через официальный контракт домена, а не прямой INSERT.
+    """Завершённая и ПРИНЯТАЯ проверка через официальный контракт домена (D199).
 
     `находки` — пары «зона, текст», добавляются в переданном порядке кодом
     `CLN03` уровня `D1`: одного кода и уровня хватает, чтобы проверить порядок
@@ -59,6 +61,10 @@ def _проверка_с_находками(
     которой методика не даёт, и односложный `CLN05` (только горячий цех) сделал
     бы неисполнимой саму оснастку: ей нужны разные зоны под одним кодом, чтобы
     проверять порядок находок, а не разбор методики.
+
+    Слив кладёт проверку на приёмку, а `get_inspection`/`findings_by_unit` по
+    умолчанию видят только принятые — помощник подтверждает её тем же путём,
+    что и админка.
     """
     start_inspection(
         chat_id,
@@ -71,7 +77,9 @@ def _проверка_с_находками(
     )
     for zone, text in находки:
         add_finding(chat_id, code="CLN03", level="D1", zone=zone, text=text)
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(db_env, ident)
+    return ident
 
 
 def test_шапка_проверки_совпадает_с_записанным(domain_env: Path, db_env: str) -> None:
@@ -84,6 +92,7 @@ def test_шапка_проверки_совпадает_с_записанным(
         unit="Белград-1",
         дата="2026-03-01",
         находки=(("hot_kitchen", "нагар на печи"), ("cold_kitchen", "грязный стол")),
+        db_env=db_env,
     )
     ожидаемая_версия = checklist_version()
     оценка = domain_score(chat_id)
@@ -112,6 +121,7 @@ def test_разбивка_оценки_совпадает_со_score_движк�
     insp_id = _проверка_с_находками(
         chat_id,
         находки=(("hot_kitchen", "нагар на печи"), ("dough", "мука на полу")),
+        db_env=db_env,
     )
     оценка = domain_score(chat_id)
 
@@ -143,6 +153,7 @@ def test_находки_идут_по_номеру_по_возрастанию(d
             ("hot_kitchen", "находка два"),
             ("dough", "находка три"),
         ),
+        db_env=db_env,
     )
 
     прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
@@ -163,7 +174,9 @@ def test_находка_без_комментария_это_None_а_не_пус
     """Пустая строка вместо `None` выглядела бы так, будто аудитор осознанно
     написал «ничего», хотя он просто не оставил комментария к находке."""
     chat_id = 504
-    insp_id = _проверка_с_находками(chat_id, находки=(("hot_kitchen", "нагар на печи"),))
+    insp_id = _проверка_с_находками(
+        chat_id, находки=(("hot_kitchen", "нагар на печи"),), db_env=db_env
+    )
 
     прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
 
@@ -189,6 +202,7 @@ def test_source_пусто_без_записи_и_comment_со_слов_ауди
         source=SOURCE_COMMENT,
     )
     insp_id = push_inspection(chat_id)
+    accept_pushed(db_env, insp_id)
 
     прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
 
@@ -212,6 +226,7 @@ def test_lang_находки_это_язык_речи_проверки(domain_en
         chat_id,
         speech_lang="en",
         находки=(("hot_kitchen", "burnt oven surface"),),
+        db_env=db_env,
     )
 
     прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
@@ -227,7 +242,7 @@ def test_проверка_без_находок_читается(domain_env: Pat
     `None` вместо разбора выглядел бы как «такой проверки нет», хотя она есть
     и хотя бы её шапку партнёр должен получить."""
     chat_id = 507
-    insp_id = _проверка_с_находками(chat_id, находки=())
+    insp_id = _проверка_с_находками(chat_id, находки=(), db_env=db_env)
 
     прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
 
@@ -256,11 +271,13 @@ def test_findings_by_unit_свежие_проверки_впереди(domain_en
         508,
         дата="2026-01-10",
         находки=(("hot_kitchen", "старая находка раз"), ("dough", "старая находка два")),
+        db_env=db_env,
     )
     свежая = _проверка_с_находками(
         509,
         дата="2026-02-20",
         находки=(("staff", "свежая находка"),),
+        db_env=db_env,
     )
 
     находки = findings_by_unit(tenant=АРЕНДАТОР, unit="Белград-1")
@@ -279,6 +296,7 @@ def test_findings_by_unit_называет_проверку_в_каждой_ст
         510,
         дата="2026-03-05",
         находки=(("hot_kitchen", "нагар на печи"),),
+        db_env=db_env,
     )
 
     находки = findings_by_unit(tenant=АРЕНДАТОР, unit="Белград-1")
@@ -299,6 +317,7 @@ def test_findings_by_unit_нормализует_но_не_ищет_по_син�
         511,
         дата="2026-04-01",
         находки=(("hot_kitchen", "нагар на печи"),),
+        db_env=db_env,
     )
     upsert_unit("Белград 2", aliases=("БГ2",), tenant=АРЕНДАТОР)
 

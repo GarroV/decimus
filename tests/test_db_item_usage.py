@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 pytest.importorskip("psycopg")
 
@@ -34,18 +34,22 @@ def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
 ЗОНЫ = ("hot_kitchen", "cold_kitchen", "dough")
 
 
-def _проверка(chat_id: int, точка: str, записей: int) -> str:
+def _проверка(chat_id: int, точка: str, записей: int, *, admin_dsn: str) -> str:
+    """Завершённая и ПРИНЯТАЯ проверка (D199): `item_usage` считает только
+    принятые ('finalized') — слив кладёт проверку лишь на приёмку."""
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant="default")
     for зона in ЗОНЫ[:записей]:
         add_finding(chat_id, code=ПУНКТ, level="D1", zone=зона, text="подтёки на стене")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(admin_dsn, ident)
+    return ident
 
 
 def test_сводка_пункта_не_считает_отклонённую(domain_env: Path, admin_env: str) -> None:
     # Arrange — две сданные проверки на двух точках и одна отклонённая.
-    _проверка(901, "Белград-1", 2)
-    _проверка(902, "Белград-2", 1)
-    лишняя = _проверка(903, "Белград-2", 3)
+    _проверка(901, "Белград-1", 2, admin_dsn=admin_env)
+    _проверка(902, "Белград-2", 1, admin_dsn=admin_env)
+    лишняя = _проверка(903, "Белград-2", 3, admin_dsn=admin_env)
     retract_inspection(лишняя, tenant="default", reason="дубль")
 
     # Act
@@ -60,7 +64,7 @@ def test_сводка_пункта_не_считает_отклонённую(do
 
 def test_пункт_чужого_чеклиста_не_смешивается(domain_env: Path, db_env: str) -> None:
     # Arrange
-    _проверка(904, "Белград-1", 1)
+    _проверка(904, "Белград-1", 1, admin_dsn=db_env)
 
     # Act
     сводка = item_usage(tenant="default", code=ПУНКТ, checklist="rnd")

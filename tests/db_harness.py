@@ -104,6 +104,26 @@ def set_retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return dsn
 
 
+
+def accept_pushed(db_env: str, *ids: str) -> None:
+    """Подтвердить слитые проверки так, как это делает человек на приёмке (D199).
+
+    Слив кладёт проверку на приёмку, и в историю — в списки, обзор, находки
+    точки — она попадает только после подтверждения. Тесту, которому нужна
+    именно история, приходится подтвердить проверку тем же путём, что и
+    админке: под ролью администратора истории. Без `ids` — все ждущие.
+    """
+    import psycopg
+
+    with psycopg.connect(admin_role_dsn(db_env)) as conn:
+        conn.execute(
+            "update inspections set status = 'finalized', accepted_at = now(), "
+            "accepted_by = 'test' where status = 'draft' and retracted_at is null "
+            "and (%(all)s or id = any(%(ids)s::uuid[]))",
+            {"all": not ids, "ids": list(ids)},
+        )
+        conn.commit()
+
 #: Роли, которые заводит накат: приложение (`0004`) и администратор истории
 #: (`0010`). Список нужен переименованию ниже, и он же сторожит сам себя —
 #: роль, которой не нашлось ни в одном файле миграций, считается опечаткой и

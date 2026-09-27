@@ -27,6 +27,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -131,6 +132,7 @@ def test_чтение_отдаёт_предложение_и_говорит_чт
         suggested_confidence=0.5,
     )
     ident = push_inspection(902)
+    accept_pushed(db_env, ident)
 
     подробно = get_inspection(ident, tenant=АРЕНДАТОР)
 
@@ -164,6 +166,7 @@ def test_совпавшее_предложение_не_считается_пр�
         suggested_confidence=0.97,
     )
     ident = push_inspection(903)
+    accept_pushed(db_env, ident)
 
     подробно = get_inspection(ident, tenant=АРЕНДАТОР)
 
@@ -182,6 +185,7 @@ def test_запись_без_предложения_не_выглядит_исп
     _проверка(904)
 
     ident = push_inspection(904)
+    accept_pushed(db_env, ident)
 
     подробно = get_inspection(ident, tenant=АРЕНДАТОР)
     assert подробно is not None
@@ -206,6 +210,7 @@ def test_пустая_строка_не_выдаётся_за_ответ_мод�
     _с_предложением(monkeypatch, состояние, suggested_code="  ", suggested_zone="")
 
     ident = push_inspection(910)
+    accept_pushed(db_env, ident)
 
     (запись,) = _строки(
         db_env,
@@ -236,7 +241,8 @@ def test_находки_точки_тоже_несут_предложение(
         suggested_zone="hot_kitchen",
         suggested_confidence=0.31,
     )
-    push_inspection(905)
+    ident = push_inspection(905)
+    accept_pushed(db_env, ident)
 
     (находка,) = findings_by_unit(tenant=АРЕНДАТОР, unit=ТОЧКА)
 
