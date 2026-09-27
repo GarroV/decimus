@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -130,6 +131,9 @@ def test_чтение_отдаёт_код_и_по_нему_есть_слово_�
     """
     _проверка(804)
     ident = push_inspection(804)
+    # Список и чтение по идентификатору по умолчанию видят только принятые
+    # проверки (D199) — слив кладёт лишь на приёмку.
+    accept_pushed(db_env, ident)
 
     подробно = get_inspection(ident, tenant=АРЕНДАТОР)
     (строка,) = list_inspections(tenant=АРЕНДАТОР)

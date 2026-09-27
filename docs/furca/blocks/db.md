@@ -544,9 +544,11 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0011_mcp_personal_access.sql` | личный доступ к MCP: круг допущенных `mcp_admins` и их токены `mcp_tokens` — обе пометкой, не удалением; значение токена в схеме не помещается физически, колонка `fingerprint` принимает только отпечаток SHA-256 (64 шестнадцатеричных знака), у человека живым может быть ровно один токен (частичный уникальный индекс) (T253, решения D098, D099) |
 | `src/db/migrations/0012_phrase_aliases.sql` | карта синонимов формулировок: таблица `phrase_aliases` (ключ «арендатор + язык + нормализованная формулировка» → код пункта), закрытый список источников записи, роли приложения выданы только `select` и `insert` — переписать или удалить заведённый синоним ей нечем (T284, D119; правка — под ролью администратора, `0013`) |
 | `src/db/migrations/0013_phrase_alias_curation.sql` | правка карты синонимов: пометка снятия с обязательной причиной и след правки (куда строка вела раньше, зачем переправили), `select` и `update` шести колонок роли `dodo_audit_admin` — ключ карты, сказанное человеком и происхождение записи неприкосновенны; роли приложения права не расширены (T292) |
+| `src/db/migrations/0026_inspection_acceptance.sql` | этап приёмки (D199): `draft` = на приёмке, `finalized` = принята; `accepted_at`/`accepted_by`; триггер `inspections_acceptance_guarded` — подтверждает только администратор истории, обратного хода нет |
+| `src/db/accept.py` | `accept_inspection` — подтверждение проверки на приёмке под ролью администратора истории (D199) |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `AcceptError`, `SynonymError` |
 | `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из

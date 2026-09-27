@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -37,10 +37,14 @@ def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return set_retraction_env(db_env, monkeypatch)
 
 
-def _проверка(chat_id: int, *, точка: str = ТОЧКА) -> str:
+def _проверка(chat_id: int, *, точка: str = ТОЧКА, admin_dsn: str) -> str:
+    """Завершённая и ПРИНЯТАЯ проверка (D199): `move_inspection` переносит
+    только запечатанную ('finalized') — слив кладёт её лишь на приёмку."""
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant="default")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(admin_dsn, ident)
+    return ident
 
 
 def _id_точки(название: str) -> str:
@@ -59,8 +63,8 @@ def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int
 
 def test_перенос_меняет_шапку_и_оставляет_след(domain_env: Path, admin_env: str) -> None:
     # Arrange
-    ident = _проверка(801)
-    _проверка(802, точка=ДРУГАЯ)  # заводит вторую точку в справочнике
+    ident = _проверка(801, admin_dsn=admin_env)
+    _проверка(802, точка=ДРУГАЯ, admin_dsn=admin_env)  # заводит вторую точку в справочнике
     до = get_inspection(ident, tenant="default")
     assert до is not None
 
@@ -96,7 +100,7 @@ def test_перенос_меняет_шапку_и_оставляет_след(d
 
 def test_перенос_в_то_же_место_следа_не_оставляет(domain_env: Path, admin_env: str) -> None:
     # Arrange
-    ident = _проверка(803)
+    ident = _проверка(803, admin_dsn=admin_env)
     до = get_inspection(ident, tenant="default")
     assert до is not None
 
@@ -119,7 +123,7 @@ def test_перенос_в_то_же_место_следа_не_оставляе
 
 
 def test_без_причины_перенос_отказан(domain_env: Path, admin_env: str) -> None:
-    ident = _проверка(804)
+    ident = _проверка(804, admin_dsn=admin_env)
     with pytest.raises(MoveError, match="повод"):
         move_inspection(
             ident,
@@ -132,7 +136,7 @@ def test_без_причины_перенос_отказан(domain_env: Path, a
 
 
 def test_отклонённую_не_переносят(domain_env: Path, admin_env: str) -> None:
-    ident = _проверка(805)
+    ident = _проверка(805, admin_dsn=admin_env)
     retract_inspection(ident, tenant="default", reason="дубль")
     with pytest.raises(MoveError, match="отклонена"):
         move_inspection(
@@ -146,7 +150,7 @@ def test_отклонённую_не_переносят(domain_env: Path, admin_
 
 
 def test_чужой_пиццерии_перенос_отказан(domain_env: Path, admin_env: str) -> None:
-    ident = _проверка(806)
+    ident = _проверка(806, admin_dsn=admin_env)
     with pytest.raises(MoveError, match="справочнике"):
         move_inspection(
             ident,
@@ -163,7 +167,7 @@ def test_чужой_пиццерии_перенос_отказан(domain_env: P
 
 def test_прямая_правка_шапки_без_причины_отказана_базой(domain_env: Path, admin_env: str) -> None:
     # Arrange — мимо move_inspection, сырым SQL под администратором истории.
-    ident = _проверка(807)
+    ident = _проверка(807, admin_dsn=admin_env)
 
     # Act / Assert — след обязателен, и держит его триггер.
     with pytest.raises(psycopg.errors.CheckViolation):
@@ -177,7 +181,7 @@ def test_прямая_правка_шапки_без_причины_отказа
 
 def test_историю_нельзя_дописать_руками(domain_env: Path, admin_env: str) -> None:
     # Arrange
-    ident = _проверка(808)
+    ident = _проверка(808, admin_dsn=admin_env)
     точка = _id_точки(ТОЧКА)
 
     # Act / Assert — прямой записи в историю не выдано даже администратору.
@@ -193,7 +197,7 @@ def test_историю_нельзя_дописать_руками(domain_env: P
 
 def test_обычная_роль_шапку_сданной_не_правит(domain_env: Path, db_env: str) -> None:
     # Arrange
-    ident = _проверка(809)
+    ident = _проверка(809, admin_dsn=db_env)
 
     # Act — роль приложения: политика 0004/0010 молча не видит строки для записи.
     обновлено = _выполнить(
@@ -206,7 +210,7 @@ def test_обычная_роль_шапку_сданной_не_правит(dom
 
 def test_администратор_не_правит_содержимое(domain_env: Path, admin_env: str) -> None:
     # Arrange — перенос открыл две колонки шапки, и только их.
-    ident = _проверка(810)
+    ident = _проверка(810, admin_dsn=admin_env)
 
     # Act / Assert
     with pytest.raises(psycopg.errors.InsufficientPrivilege):

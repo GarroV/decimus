@@ -22,12 +22,12 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import directory
-from src.db.errors import DbError, MoveError, RetractionError
+from src.db.errors import AcceptError, DbError, MoveError, RetractionError
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import accounts, assets, auth, letter_draft, view
+from . import accounts, assets, auth, letter_draft, review, view
 from . import inspections as data
 from . import methodology as method
 from . import methodology_view as mview
@@ -74,6 +74,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
+    review.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     _register_errors(app)
@@ -808,6 +809,26 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
+    @app.post(f"{section('registry').path}/<inspection_id>/accept")
+    def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Подтвердить проверку на приёмке (D199). Только администратор."""
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            data.accept_card(
+                inspection_id, tenant=conf.tenant, actor=вошедший.login if вошедший else ""
+            )
+        except AcceptError as exc:
+            failure = t("accept.failed", _lang(conf), reason=str(exc))
+        else:
+            notice = t("accept.done", _lang(conf))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Перенести проверку по дате и пиццерии (D195). Только администратор."""
@@ -870,9 +891,25 @@ def _render_card(
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
+        and not detail.inspection.on_review
+    )
+    можно_подтвердить = (
+        админ
+        and data.retraction_available()
+        and detail.inspection.on_review
+        and not detail.inspection.retracted
+    )
+    # Лист вычитки — только на приёмке (D199): у принятой проверки вычитывать
+    # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
+    лист = (
+        review.load_sheet(detail.inspection, detail.findings, tenant=conf.tenant, lang=lang)
+        if detail.inspection.on_review
+        else None
     )
     return render_template(
         "inspections/card.html",
+        sheet=лист,
+        photos=review.load_photos(inspection_id, tenant=conf.tenant) if лист else {},
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
@@ -885,6 +922,7 @@ def _render_card(
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
         may_retract=data.retraction_available() and админ,
+        may_accept=можно_подтвердить,
         notice=notice,
         failure=failure,
     )

@@ -75,6 +75,9 @@ FORCE_VAR = "SEED_WEB_DEMO_FORCE"
 #: берётся та же роль, что катит схему.
 ADMIN_URL_VAR = "DATABASE_ADMIN_URL"
 
+#: Подключение администратора истории — им демо-проверки принимаются (D199).
+RETRACTION_URL_VAR = "DATABASE_RETRACTION_URL"
+
 #: Хосты, которые считаются местными.
 LOCAL_HOSTS = frozenset({"", "localhost", "127.0.0.1", "::1", "host.docker.internal", "db"})
 
@@ -180,6 +183,30 @@ def _reset(app_dsn: str) -> int:
         return cur.rowcount
 
 
+def _accept(app_dsn: str, ids: list[str]) -> None:
+    """Принять демо-проверки, как их принял бы человек на приёмке (D199).
+
+    Слив кладёт проверку на приёмку, и без этого шага демо-сеть была бы пустой:
+    обзор, карточки точек и реестр показывают только принятые. Самая свежая
+    проверка остаётся ждать — так демо показывает и сам этап приёмки.
+
+    Принимать вправе только член роли администратора истории (триггер `0026`):
+    берётся её подключение, а без него — владельца схемы, как у сноса.
+    """
+    dsn = (
+        (os.environ.get(RETRACTION_URL_VAR) or "").strip()
+        or (os.environ.get(ADMIN_URL_VAR) or "").strip()
+        or app_dsn
+    )
+    _require_local_dsn(dsn)
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "update inspections set status = 'finalized', accepted_at = now(), "
+            "accepted_by = 'demo' where tenant_code = %s and id = any(%s::uuid[])",
+            (DEMO_TENANT, ids),
+        )
+
+
 def _set_geography(dsn: str) -> None:
     """Проставить демо-точкам страну и город.
 
@@ -243,8 +270,13 @@ def seed() -> list[str]:
         score = domain.score(spec.chat_id)
         ids.append(inspection_id)
         print(f"{spec.unit} — {spec.date}: {score.pct:g}% grade {score.grade}, id={inspection_id}")
+    свежая = max(range(len(DEMO_INSPECTIONS)), key=lambda i: DEMO_INSPECTIONS[i].date)
+    _accept(app_dsn, [ident for i, ident in enumerate(ids) if i != свежая])
     _set_geography(app_dsn)
-    print(f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}")
+    print(
+        f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}; "
+        f"{DEMO_INSPECTIONS[свежая].unit} {DEMO_INSPECTIONS[свежая].date} is awaiting review"
+    )
     return ids
 
 

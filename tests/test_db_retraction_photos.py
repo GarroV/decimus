@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 boto3 = pytest.importorskip("boto3")
@@ -100,12 +100,20 @@ def настоящий_s3(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[S3P
         yield S3PhotoStorage(settings), client
 
 
-def _проверка_с_кадрами(chat_id: int, *, кадры: tuple[str, ...]) -> str:
+def _проверка_с_кадрами(chat_id: int, *, кадры: tuple[str, ...], admin_dsn: str) -> str:
+    """Проверка с кадрами, слитая и ПРИНЯТАЯ на приёмке (D199).
+
+    `retract_inspection` снимает только запечатанную ('finalized') проверку —
+    слив кладёт её лишь на приёмку ('draft'), поэтому помощник подтверждает её
+    тем же путём, что и админка, прежде чем вернуть идентификатор.
+    """
     start_inspection(chat_id, unit=ТОЧКА, kind="planned", report_lang="ru")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     for file_id in кадры:
         attach_photo(chat_id, 1, file_id)
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(admin_dsn, ident)
+    return ident
 
 
 def _строки(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:
@@ -124,7 +132,7 @@ def test_кадры_снятой_проверки_убраны_из_хранил
 ) -> None:
     """Объектов в хранилище нет, строки кадров на месте, путь в них записан."""
     склад, читатель = настоящий_s3
-    ident = _проверка_с_кадрами(501, кадры=tuple(КАДРЫ))
+    ident = _проверка_с_кадрами(501, кадры=tuple(КАДРЫ), admin_dsn=retraction_env)
     assert upload_photos(ident, fetch=_кадр, storage=склад) == 2
     assert len(_ключи_в_хранилище(читатель)) == 2
 
@@ -149,7 +157,7 @@ def test_уборка_повторяема_и_второй_раз_ничего_�
 ) -> None:
     """Повторное снятие доделывает уборку, а не платит за уже убранное дважды."""
     склад, _ = настоящий_s3
-    ident = _проверка_с_кадрами(502, кадры=("tg-file-101",))
+    ident = _проверка_с_кадрами(502, кадры=("tg-file-101",), admin_dsn=retraction_env)
     upload_photos(ident, fetch=_кадр, storage=склад)
     первое = retract_inspection(ident, tenant="default", reason=ПРИЧИНА, storage=склад)
 
@@ -164,7 +172,7 @@ def test_невыгруженный_кадр_убирать_нечего_и_от
 ) -> None:
     """«Убран» на кадре, которого в хранилище не было, — записанная неправда."""
     склад, _ = настоящий_s3
-    ident = _проверка_с_кадрами(503, кадры=("tg-file-101",))
+    ident = _проверка_с_кадрами(503, кадры=("tg-file-101",), admin_dsn=retraction_env)
 
     снятие = retract_inspection(ident, tenant="default", reason=ПРИЧИНА, storage=склад)
 
@@ -187,7 +195,7 @@ def test_отказ_хранилища_не_прячется_а_пометка_�
     из-за недоступного хранилища значило бы вернуть отозванный отчёт в историю.
     """
     склад, читатель = настоящий_s3
-    ident = _проверка_с_кадрами(504, кадры=("tg-file-101",))
+    ident = _проверка_с_кадрами(504, кадры=("tg-file-101",), admin_dsn=retraction_env)
     upload_photos(ident, fetch=_кадр, storage=склад)
     отказавший = ОтказавшийСклад()
 
@@ -215,7 +223,7 @@ def test_ссылка_не_того_вида_останавливает_убор
     программно, D035).
     """
     склад, _ = настоящий_s3
-    ident = _проверка_с_кадрами(505, кадры=("tg-file-101",))
+    ident = _проверка_с_кадрами(505, кадры=("tg-file-101",), admin_dsn=retraction_env)
     upload_photos(ident, fetch=_кадр, storage=склад)
     with psycopg.connect(pg_dsn) as conn:
         conn.execute(
@@ -235,9 +243,9 @@ def test_кадры_чужой_проверки_уборка_не_трогает
 ) -> None:
     """Без этого «убрано два» было бы зелено и на коде, убирающем всё подряд."""
     склад, читатель = настоящий_s3
-    снимаемая = _проверка_с_кадрами(506, кадры=("tg-file-101",))
+    снимаемая = _проверка_с_кадрами(506, кадры=("tg-file-101",), admin_dsn=retraction_env)
     upload_photos(снимаемая, fetch=_кадр, storage=склад)
-    соседняя = _проверка_с_кадрами(507, кадры=("tg-file-102",))
+    соседняя = _проверка_с_кадрами(507, кадры=("tg-file-102",), admin_dsn=retraction_env)
     upload_photos(соседняя, fetch=_кадр, storage=склад)
 
     retract_inspection(снимаемая, tenant="default", reason=ПРИЧИНА, storage=склад)
@@ -288,7 +296,7 @@ def test_без_подмены_склад_собирается_из_окруже
     monkeypatch.setenv("S3_ACCESS_KEY_ID", "ключ-теста")
     monkeypatch.setenv("S3_SECRET_ACCESS_KEY", "секрет-теста")
     monkeypatch.setenv("S3_ENDPOINT_URL", АДРЕС_ХРАНИЛИЩА)
-    ident = _проверка_с_кадрами(508, кадры=("tg-file-101",))
+    ident = _проверка_с_кадрами(508, кадры=("tg-file-101",), admin_dsn=retraction_env)
     upload_photos(ident, fetch=_кадр, storage=склад)
 
     снятие = retract_inspection(ident, tenant="default", reason=ПРИЧИНА)

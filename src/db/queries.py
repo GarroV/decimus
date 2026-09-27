@@ -69,12 +69,15 @@ select
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
-    i.checklist_code
+    i.checklist_code,
+    -- Этап приёмки (D199, 0026) — тоже в конец и по той же причине.
+    i.status, i.accepted_at, i.accepted_by
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (i.status = 'draft') = %(on_review)s
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
 """
@@ -92,12 +95,15 @@ select
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
-    i.checklist_code
+    i.checklist_code,
+    -- Этап приёмки (D199, 0026) — тоже в конец и по той же причине.
+    i.status, i.accepted_at, i.accepted_by
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (i.status = 'draft') = %(on_review)s
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
 """
@@ -114,10 +120,12 @@ select
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
+    i.status, i.accepted_at, i.accepted_by,
     i.deductions, i.counts, i.by_zone
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and i.id = %(id)s
+  and (%(include_on_review)s or i.status = 'finalized')
 """
 
 # Формулировки лежат строками `(entity_type, entity_id, field, lang)` (D025) и
@@ -166,6 +174,7 @@ from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
+  and i.status = 'finalized'
 order by i.inspection_date desc, i.pushed_at desc, f.n
 limit %(limit)s
 """
@@ -251,6 +260,12 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         # пустой код у записанной проверки означал бы «не знаем, по чему
         # проверяли», а такого состояния у неё не бывает.
         checklist_code=str(row[18] or "bizdev"),
+        # Этап приёмки (D199): `draft` теперь не миг внутри транзакции слива, а
+        # проверка, ждущая вычитки. Принятые до появления этапа отметки о
+        # приёмке не имеют — пустая строка, а не выдуманное время.
+        on_review=row[19] == "draft",
+        accepted_at=row[20].isoformat() if row[20] is not None else "",
+        accepted_by=str(row[21] or ""),
     )
 
 
@@ -402,6 +417,7 @@ def list_inspections(
     date_to: date | None = None,
     limit: int = DEFAULT_LIMIT,
     include_retracted: bool = False,
+    on_review: bool = False,
 ) -> list[InspectionRow]:
     """Проверки одного арендатора, свежие по дате обхода — первыми.
 
@@ -429,6 +445,11 @@ def list_inspections(
     (`DATABASE_RETRACTION_URL`), и тогда в выдаче появляются снятые — помеченные
     как снятые, с причиной. Не задано подключение — отказ, а не тихая выдача
     без них: «снятых нет» и «вам их не видно» разные ответы.
+
+    `on_review` выбирает ОДНУ из двух очередей, а не расширяет выдачу (D199):
+    по умолчанию — только принятые, то есть история сети; `True` — только
+    ждущие вычитки. Смешанной выдачи нет намеренно: проверка до подтверждения
+    не часть истории, и реестр показывает её отдельным списком.
     """
     tenant_code = _require_tenant(tenant)
     rows_limit = _require_limit(limit)
@@ -438,6 +459,7 @@ def list_inspections(
         "limit": rows_limit,
         "date_from": date_from,
         "date_to": date_to,
+        "on_review": on_review,
     }
     with (
         _reading("список проверок", as_admin=include_retracted) as conn,
@@ -452,7 +474,11 @@ def list_inspections(
 
 
 def get_inspection(
-    inspection_id: str, *, tenant: str, include_retracted: bool = False
+    inspection_id: str,
+    *,
+    tenant: str,
+    include_retracted: bool = False,
+    include_on_review: bool = False,
 ) -> InspectionDetail | None:
     """Одна проверка арендатора целиком: шапка, разбивка оценки и находки.
 
@@ -469,6 +495,10 @@ def get_inspection(
     подключение администратора истории. Без него снятая проверка отвечает
     `None` — тем же ответом, что несуществующая, и это не небрежность: тому,
     кто снятых не видит, они и не существуют.
+
+    Проверка на приёмке (D199) по умолчанию отвечает `None` тем же ответом:
+    до подтверждения она не документ сети, и агент или аналитика не должны
+    выдать её за таковой. Экран приёмки просит её явно — `include_on_review`.
     """
     tenant_code = _require_tenant(tenant)
     ident = _require_inspection_id(inspection_id)
@@ -476,7 +506,10 @@ def get_inspection(
         _reading("проверку по идентификатору", as_admin=include_retracted) as conn,
         conn.cursor() as cur,
     ):
-        cur.execute(_GET_INSPECTION_SQL, {"tenant": tenant_code, "id": ident})
+        cur.execute(
+            _GET_INSPECTION_SQL,
+            {"tenant": tenant_code, "id": ident, "include_on_review": include_on_review},
+        )
         row = cur.fetchone()
         колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
         if row is None:
@@ -576,6 +609,7 @@ from inspections i
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -608,6 +642,7 @@ with записи as (
          join inspections i on i.id = f.inspection_id
          join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
     where i.tenant_code = %(tenant)s
+      and i.status = 'finalized'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -745,6 +780,7 @@ from findings f
      join inspections i on i.id = f.inspection_id
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -887,6 +923,7 @@ from inspections i
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)

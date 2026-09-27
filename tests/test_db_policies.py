@@ -23,6 +23,7 @@ from typing import Any
 
 import pytest
 from conftest import APP_ROLE, requires_db
+from db_harness import accept_pushed, admin_role_dsn
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -32,11 +33,17 @@ from src.domain import add_finding, attach_photo, start_inspection  # noqa: E402
 pytestmark = requires_db
 
 
-def _завершённая(chat_id: int = 301) -> str:
-    """Проверка, слитая продуктовым путём: она и есть «документ, ушедший партнёру»."""
+def _завершённая(db_env: str, chat_id: int = 301) -> str:
+    """Проверка, слитая продуктовым путём и принятая на приёмке (D199).
+
+    Она и есть «документ, ушедший партнёру»: заморожено то, что принято, а не
+    то, что только слито.
+    """
     start_inspection(chat_id, unit="Белград-1", kind="planned", report_lang="ru")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(db_env, ident)
+    return ident
 
 
 def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -82,17 +89,8 @@ def test_историю_схемы_приложению_не_отдали(db_env
 # --- сама проверка -----------------------------------------------------------
 
 
-def test_слив_запечатывает_проверку(domain_env: Path, db_env: str) -> None:
-    """Черновик не переживает транзакцию слива: наружу выходит только запечатанное."""
-    inspection_id = _завершённая()
-
-    статус = _строка(db_env, "select status from inspections where id = %s", (inspection_id,))
-
-    assert статус == ("finalized",)
-
-
 def test_завершённую_проверку_нельзя_переписать(domain_env: Path, db_env: str) -> None:
-    inspection_id = _завершённая()
+    inspection_id = _завершённая(db_env)
     было = _строка(db_env, "select pct, grade from inspections where id = %s", (inspection_id,))
 
     затронуто = _выполнить(
@@ -107,7 +105,7 @@ def test_завершённую_проверку_нельзя_переписат
 
 
 def test_завершённую_проверку_нельзя_удалить(domain_env: Path, db_env: str) -> None:
-    inspection_id = _завершённая()
+    inspection_id = _завершённая(db_env)
 
     затронуто = _выполнить(db_env, "delete from inspections where id = %s", (inspection_id,))
 
@@ -119,7 +117,7 @@ def test_находку_завершённой_проверки_нельзя_п�
     domain_env: Path, db_env: str
 ) -> None:
     """Тело документа — те же слова партнёру, что и шапка."""
-    inspection_id = _завершённая()
+    inspection_id = _завершённая(db_env)
 
     правка = _выполнить(
         db_env,
@@ -144,7 +142,7 @@ def test_в_завершённую_проверку_нельзя_дописат�
     Отказ на вставке, в отличие от правки, громкий: `with check` не пропускает
     новую строку явной ошибкой, а не тихим нулём.
     """
-    inspection_id = _завершённая()
+    inspection_id = _завершённая(db_env)
 
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _выполнить(
@@ -158,7 +156,7 @@ def test_в_завершённую_проверку_нельзя_дописат�
 def test_формулировки_завершённой_проверки_заморожены(domain_env: Path, db_env: str) -> None:
     """Текст находки — это и есть отчёт. Заморозить только числа значило бы
     оставить возможность переписать документ, не тронув ни одной цифры."""
-    inspection_id = _завершённая()
+    inspection_id = _завершённая(db_env)
 
     правка = _выполнить(
         db_env,
@@ -189,6 +187,7 @@ def test_кадр_завершённой_проверки_нельзя_удал�
     add_finding(302, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     attach_photo(302, 1, "file-302")
     inspection_id = push_inspection(302)
+    accept_pushed(db_env, inspection_id)
 
     удаление = _выполнить(db_env, "delete from photos where inspection_id = %s", (inspection_id,))
 
@@ -268,8 +267,12 @@ def test_незапечатанную_проверку_править_можно
     правка_черновика = _выполнить(
         db_env, "update inspections set pct = 91 where id = %s", (черновик_id,)
     )
+    # Печатает теперь только администратор истории, с подписью (D199, 0026).
     печать = _выполнить(
-        db_env, "update inspections set status = 'finalized' where id = %s", (черновик_id,)
+        admin_role_dsn(db_env),
+        "update inspections set status = 'finalized', accepted_at = now(), "
+        "accepted_by = 'test' where id = %s",
+        (черновик_id,),
     )
     правка_после = _выполнить(
         db_env, "update inspections set pct = 100 where id = %s", (черновик_id,)

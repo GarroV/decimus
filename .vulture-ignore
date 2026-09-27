@@ -180,6 +180,8 @@ home
 registry
 card
 do_retract
+do_accept
+inspection_photo
 letter
 export_letter
 _db_down

@@ -36,6 +36,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -70,12 +71,16 @@ def _строки(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> list[tupl
         return cur.fetchall()
 
 
-def _проверка(chat_id: int, *, words: str = СЛОВА) -> str:
-    """Настоящая завершённая проверка с одной записью — и слить её.
+def _проверка(chat_id: int, *, words: str = СЛОВА, db_env: str) -> str:
+    """Настоящая завершённая и ПРИНЯТАЯ проверка с одной записью (D199).
 
     Ничего не подменяется: слова идут тем же путём, каким их кладёт бот
     (`add_finding(..., words=...)`, `src/bot/routers/record.py`). Подмена
     состояния проверяла бы фантазию этого файла о домене, а не слив.
+
+    Слив кладёт проверку на приёмку — `get_inspection`/`findings_by_unit` и
+    заморозка `0004` действуют только на принятую, поэтому помощник
+    подтверждает её тем же путём, что и админка.
     """
     start_inspection(
         chat_id,
@@ -94,7 +99,9 @@ def _проверка(chat_id: int, *, words: str = СЛОВА) -> str:
         source="comment",
         words=words,
     )
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(db_env, ident)
+    return ident
 
 
 def test_сырые_слова_ложатся_рядом_с_записью(domain_env: Path, db_env: str) -> None:
@@ -107,7 +114,7 @@ def test_сырые_слова_ложатся_рядом_с_записью(domai
     местами, они выглядели бы работающей выборкой, в которой управляющая
     компания правит карту слов по нашему же тексту, а не по сказанному.
     """
-    ident = _проверка(1851)
+    ident = _проверка(1851, db_env=db_env)
 
     (запись,) = _строки(
         db_env,
@@ -130,7 +137,7 @@ def test_чтение_по_идентификатору_отдаёт_слова_
     намеренно: привяжись слова к языку отчёта — сербская речь уехала бы в
     выборку помеченной русской, и заметить это было бы нечем.
     """
-    ident = _проверка(1852)
+    ident = _проверка(1852, db_env=db_env)
 
     подробно = get_inspection(ident, tenant=АРЕНДАТОР)
 
@@ -147,7 +154,7 @@ def test_находки_точки_тоже_несут_слова(domain_env: Pa
     (T165): «что у этой точки модель называет не так и какими словами это
     описал человек».
     """
-    _проверка(1853)
+    _проверка(1853, db_env=db_env)
 
     (находка,) = findings_by_unit(tenant=АРЕНДАТОР, unit=ТОЧКА)
 
@@ -162,7 +169,7 @@ def test_запись_без_слов_не_выглядит_речью(domain_en
     отличить «слов не было» от «запись старая» можно источником записи — так
     же, как это делает домен.
     """
-    ident = _проверка(1854, words="")
+    ident = _проверка(1854, words="", db_env=db_env)
 
     (запись,) = _строки(db_env, "select words from findings where inspection_id = %s", (ident,))
     assert запись[0] is None, "отсутствие слов записано в базу чем-то, что похоже на речь"
@@ -179,7 +186,7 @@ def test_молчание_не_речь(domain_env: Path, db_env: str) -> None:
     для управляющей компании она стала бы «фразой аудитора», у которой не
     прочитать ни слова, и отличить её от настоящей потери было бы нечем.
     """
-    ident = _проверка(1855, words="   \n\t ")
+    ident = _проверка(1855, words="   \n\t ", db_env=db_env)
 
     (запись,) = _строки(db_env, "select words from findings where inspection_id = %s", (ident,))
 
@@ -195,7 +202,7 @@ def test_слова_записываются_дословно(domain_env: Path, 
     произнесли. Пустой её при этом считает `strip` — но считает, а не делает.
     """
     сказанное = "  жир на полке,\n  ну то есть это чистота  "
-    ident = _проверка(1856, words=сказанное)
+    ident = _проверка(1856, words=сказанное, db_env=db_env)
 
     (запись,) = _строки(db_env, "select words from findings where inspection_id = %s", (ident,))
 
@@ -257,7 +264,7 @@ def test_записанные_слова_нельзя_переписать(domai
     отчитывается «затронуто 0 строк» и не падает. Поэтому проверяется и число
     строк, и само значение: «не упало» здесь не значит ничего.
     """
-    ident = _проверка(1858)
+    ident = _проверка(1858, db_env=db_env)
 
     with psycopg.connect(db_env) as conn, conn.cursor() as cur:
         cur.execute(

@@ -28,7 +28,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.db.errors import DbError, MoveError, RetractionError
+from src.db.errors import AcceptError, DbError, MoveError, RetractionError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
 from src.db.retract import Retraction
@@ -779,3 +779,139 @@ def test_отказ_переноса_показан_текстом(
 
     # Assert
     assert "Исправить не удалось: Не назван повод исправления" in ответ.get_data(as_text=True)
+
+
+# --- этап приёмки (D199) -----------------------------------------------------
+
+
+def _приёмка(monkeypatch: pytest.MonkeyPatch, *, ждёт: bool = True) -> list[dict[str, Any]]:
+    вызовы: list[dict[str, Any]] = []
+
+    def подтвердить(inspection_id: str, **kw: Any) -> None:
+        вызовы.append({"id": inspection_id, **kw})
+
+    monkeypatch.setattr(data, "accept_card", подтвердить)
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
+    monkeypatch.setattr(data, "load_units", lambda **_: ())
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка(on_review=ждёт)))
+    return вызовы
+
+
+@админ
+def test_администратор_подтверждает_и_подпись_берётся_из_сессии(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    вызовы = _приёмка(monkeypatch)
+
+    # Act — подпись из формы не принимается: её подставляет вход.
+    ответ = стенд.post(
+        "/inspections/x/accept", data={"actor": "подлог"}, headers={"Origin": "http://localhost"}
+    )
+
+    # Assert
+    assert ответ.status_code == 200
+    assert вызовы == [{"id": "x", "tenant": ТЕНАНТ, "actor": ЛОГИН}]
+    assert "Проверка принята." in ответ.get_data(as_text=True)
+
+
+@админ
+def test_ждущая_проверка_показана_с_плашкой_и_кнопкой_без_переноса(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _приёмка(monkeypatch)
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert — подтвердить можно, переносить и отклонять до приёмки нечего.
+    assert "Проверка на приёмке" in страница
+    assert "/accept?lang=" in страница
+    assert "/move?lang=" not in страница
+    assert "/retract?lang=" not in страница
+
+
+@админ
+def test_принятой_проверке_кнопки_подтверждения_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch, ждёт=False)
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+    assert "/accept?lang=" not in страница
+    assert "Проверка на приёмке" not in страница
+
+
+def test_аудитор_не_подтверждает(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange
+    вызовы = _приёмка(monkeypatch)
+
+    # Act
+    ответ = стенд.post("/inspections/x/accept", headers={"Origin": "http://localhost"})
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert ответ.status_code == 403
+    assert вызовы == []
+    assert "/accept" not in страница
+
+
+@админ
+def test_отказ_подтверждения_показан_текстом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _приёмка(monkeypatch)
+
+    def отказать(*_a: Any, **_k: Any) -> None:
+        raise AcceptError("Проверка x уже принята — подтверждать второй раз нечего")
+
+    monkeypatch.setattr(data, "accept_card", отказать)
+
+    # Act
+    ответ = стенд.post("/inspections/x/accept", headers={"Origin": "http://localhost"})
+
+    # Assert
+    assert "уже принята" in ответ.get_data(as_text=True)
+
+
+def test_реестр_показывает_ждущих_приёмки_отдельным_блоком(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    ждущая = шапка(unit_name="Ждущая точка", on_review=True)
+    monkeypatch.setattr(
+        data, "load_registry", lambda **_: data.Registry((шапка(),), True, review=(ждущая,))
+    )
+
+    # Act
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    # Assert
+    assert "Ждут приёмки · 1" in страница
+    assert "Ждущая точка" in страница
+
+
+def test_кадр_проверки_отдаётся_картинкой_а_чужой_или_убранный_404(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    from src.db import photo_reads
+
+    запросы: list[tuple[str, str, str]] = []
+
+    def прочитать(inspection_id: str, photo_id: str, *, tenant: str) -> bytes | None:
+        запросы.append((inspection_id, photo_id, tenant))
+        return b"\xff\xd8jpeg" if photo_id == "p-1" else None
+
+    monkeypatch.setattr(photo_reads, "read_photo", прочитать)
+
+    # Act
+    есть = стенд.get("/inspections/x/photos/p-1")
+    нет = стенд.get("/inspections/x/photos/p-2")
+
+    # Assert — арендатор берётся из настроек стенда, а не из адреса.
+    assert (есть.status_code, есть.mimetype, есть.data) == (200, "image/jpeg", b"\xff\xd8jpeg")
+    assert "private" in есть.headers["Cache-Control"]
+    assert нет.status_code == 404
+    assert запросы[0] == ("x", "p-1", ТЕНАНТ)

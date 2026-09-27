@@ -63,6 +63,14 @@ class PhotoStorage(Protocol):
         а не тот, кто его зовёт.
         """
 
+    def get(self, key: str) -> bytes:
+        """Прочитать объект целиком. Нужен вычитке на приёмке (D199).
+
+        Отказ — `StorageError`, в том числе когда объекта нет: вызывающий
+        читает только выгруженный и не убранный кадр, и пропажа объекта —
+        сбой, а не «кадра нет».
+        """
+
     def delete(self, key: str) -> None:
         """Убрать объект из хранилища.
 
@@ -126,6 +134,18 @@ class S3PhotoStorage:
         # Открытая ссылка для человека собирается по этой из конфигурации
         # хранилища в момент показа, а не хранится.
         return f"s3://{self._bucket}/{key}"
+
+    def get(self, key: str) -> bytes:
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        try:
+            ответ = self._client.get_object(Bucket=self._bucket, Key=key)
+            return bytes(ответ["Body"].read())
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не отдало объект {key} из корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
 
     def delete(self, key: str) -> None:
         """Убрать объект. Отсутствующего объекта достаточно, чтобы считать дело сделанным.
