@@ -24,11 +24,13 @@ from collections.abc import Iterator
 from datetime import date
 from typing import Any
 
+import psycopg
 import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
 from src.db.errors import AcceptError, DbError, MoveError, RetractionError
+from src.db.migrate import discover_migrations
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
 from src.db.retract import Retraction
@@ -463,6 +465,32 @@ def test_недоступная_база_показана_страницей_а_
     # Assert
     assert ответ.status_code == 503
     assert "связь с базой не установлена" in ответ.get_data(as_text=True)
+
+
+@pytest.mark.parametrize("причина", [psycopg.errors.UndefinedColumn, psycopg.errors.UndefinedTable])
+def test_отставшая_схема_названа_своим_именем_а_не_недоступной_базой(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, причина: type[psycopg.Error]
+) -> None:
+    # Arrange — 24.09.2026 площадка отставала на четыре миграции, и каждый
+    # экран говорил «База недоступна» при живой базе (#351).
+    def падать(**_: Any) -> data.Registry:
+        try:
+            raise причина("column i.checklist_code does not exist")
+        except psycopg.Error as exc:
+            raise DbError(f"Не удалось прочитать реестр ({type(exc).__name__})") from exc
+
+    monkeypatch.setattr(data, "load_registry", падать)
+
+    # Act
+    ответ = стенд.get("/inspections")
+
+    # Assert
+    текст = ответ.get_data(as_text=True)
+    assert ответ.status_code == 503
+    assert "Схема базы отстала от кода" in текст
+    assert "База недоступна" not in текст
+    assert f"в коде их {len(discover_migrations())}" in текст
+    assert "does not exist" not in текст, "текст драйвера наружу не уходит"
 
 
 def test_страницы_не_встраиваются_в_чужой_документ(стенд: FlaskClient) -> None:

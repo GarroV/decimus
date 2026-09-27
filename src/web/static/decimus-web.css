@@ -141,7 +141,10 @@
    этот блок не трогает. */
 
 @media (max-width: 767px) {
-  .appbar .btn { width: auto; font-size: var(--fs-dense); }
+  /* `.topbar` — нынешняя шапка (D190); `.appbar` — прежняя. Правило стояло
+     только на прежнем имени, шапка сменила класс, и на 390 px RU и EN снова
+     растягивались по 91 px, распирая страницу вбок (#360). */
+  .appbar .btn, .topbar .btn { width: auto; font-size: var(--fs-dense); }
   .langpick, .logout { flex: 0 0 auto; }
   .whoami { padding-right: 0; }
   .logout { margin-left: 0; }
@@ -404,7 +407,10 @@
    правилом ниже, а не медиазапросом на каждую карточку. */
 .ov-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(26rem, 1fr));
+  /* `min(26rem, 100%)`, а не голые 26rem: минимум колонки не может быть
+     шире самой сетки. Иначе на 320 px колонка вставала в 338 px и карточки
+     «Обзора» и карточки точки распирали страницу вбок (#360). */
+  grid-template-columns: repeat(auto-fit, minmax(min(26rem, 100%), 1fr));
   gap: var(--space-4);
   align-items: start;
   margin-top: var(--space-5);

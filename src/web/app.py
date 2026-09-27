@@ -17,12 +17,14 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+import psycopg
 from flask import Flask, redirect, render_template, request, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import directory
 from src.db.errors import AcceptError, DbError, MoveError, RetractionError
+from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
@@ -1622,6 +1624,27 @@ def _register_frame_ban(app: Flask) -> None:
         return response
 
 
+#: Ответы драйвера, которые означают «код новее схемы», а не отказ базы: код
+#: обратился к столбцу или таблице, которых в базе нет. Лечится накатом
+#: миграций, и сообщение обязано сказать именно это (#351).
+_SCHEMA_LAG_ERRORS = (psycopg.errors.UndefinedColumn, psycopg.errors.UndefinedTable)
+
+
+def _schema_lags(exc: BaseException) -> bool:
+    """Отказ базы на деле — отставшая схема? Смотрит цепочку причин.
+
+    Слой `db` отдаёт наружу только тип ошибки драйвера (в её тексте бывает
+    строка подключения), а сам драйверный отказ лежит в `__cause__`. Поэтому
+    узнаётся он здесь, по типу, и ни одна строка драйвера на экран не уходит.
+    """
+    причина: BaseException | None = exc
+    while причина is not None:
+        if isinstance(причина, _SCHEMA_LAG_ERRORS):
+            return True
+        причина = причина.__cause__
+    return False
+
+
 def _register_errors(app: Flask) -> None:
     """Отказы показываются страницей, а не трассировкой.
 
@@ -1632,6 +1655,8 @@ def _register_errors(app: Flask) -> None:
 
     @app.errorhandler(DbError)
     def _db_down(exc: DbError) -> tuple[str, int]:
+        if _schema_lags(exc):
+            return render_template("error_schema.html", total=len(discover_migrations())), 503
         return render_template("error_db.html", reason=str(exc)), 503
 
     @app.errorhandler(MethodologyRefused)

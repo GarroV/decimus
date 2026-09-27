@@ -18,16 +18,15 @@ from conftest import Run
 def test_повторная_запись_помечена_в_отчёте(
     started: Callable[..., Run], report: Callable[..., Run]
 ) -> None:
-    assert started(
-        "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-    ).code == 0
+    assert (
+        started("add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat").code
+        == 0
+    )
 
     r = report("html")
 
     assert r.code == 0, r.text
-    assert "повтор — вычет удвоен" in r.out, (
-        "у записи нет пометки, объясняющей удвоенный вычет"
-    )
+    assert "повтор — вычет удвоен" in r.out, "у записи нет пометки, объясняющей удвоенный вычет"
 
 
 def test_обычная_запись_пометки_не_получает(

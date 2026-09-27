@@ -887,6 +887,22 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "История проверок не прочиталась: {reason}",
         "en": "The inspection history could not be read: {reason}",
     },
+    "error.schema.title": {
+        "ru": "Схема базы отстала от кода",
+        "en": "The database schema is behind the code",
+    },
+    "error.schema.text": {
+        "ru": (
+            "База отвечает, но в ней нет столбца или таблицы, к которым "
+            "обращается эта версия админки: миграции накатаны не все. "
+            "Накатите оставшиеся (make migrate) — в коде их {total}."
+        ),
+        "en": (
+            "The database is up, but it lacks a column or table this version "
+            "of the admin relies on: not every migration has been applied. "
+            "Apply the rest (make migrate) — the code has {total}."
+        ),
+    },
     # --- методика: состав чек-листа и его версии (T320) --------------------
     # Слово «версия» здесь несёт весь смысл раздела: правка НИКОГДА не меняет
     # действующую методику, она кладёт рядом новую версию (D049, D050).

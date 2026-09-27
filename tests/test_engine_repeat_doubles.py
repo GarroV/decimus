@@ -47,17 +47,18 @@ class TestЦенаПовтора:
         assert оценка(started)["deductions"] == 2.0
 
     def test_повторная_D2_стоит_вдвое(self, started: Callable[..., Run]) -> None:
-        r = started(
-            "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-        )
+        r = started("add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat")
         assert r.code == 0, r.text
 
         assert оценка(started)["deductions"] == 4.0, "повтор посчитан по обычной ставке"
 
     def test_повторная_D1_стоит_вдвое(self, started: Callable[..., Run]) -> None:
-        assert started(
-            "add", "--qid", "PRD05", "--level", "D1", "--zone", "hot_kitchen", "--repeat"
-        ).code == 0
+        assert (
+            started(
+                "add", "--qid", "PRD05", "--level", "D1", "--zone", "hot_kitchen", "--repeat"
+            ).code
+            == 0
+        )
 
         assert оценка(started)["deductions"] == 1.0
 
@@ -66,16 +67,17 @@ class TestЦенаПовтора:
     ) -> None:
         # Человек, открывший файл проверки, обязан видеть, за что удвоено:
         # цифра, объяснение которой нигде не записано, спорна по определению.
-        assert started(
-            "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-        ).code == 0
+        assert (
+            started(
+                "add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
+            ).code
+            == 0
+        )
 
         st = json.loads((workdir / "inspection.json").read_text(encoding="utf-8"))
         assert st["findings"][0].get("repeat") is True
 
-    def test_без_пометки_цена_прежняя(
-        self, started: Callable[..., Run], workdir: Path
-    ) -> None:
+    def test_без_пометки_цена_прежняя(self, started: Callable[..., Run], workdir: Path) -> None:
         # Обратная сторона того же: записи без пометки дорожать не должны,
         # иначе правило задним числом переоценит всё записанное раньше.
         assert started("add", "--qid", "PRD05", "--level", "D2", "--zone", "hot_kitchen").code == 0
@@ -163,9 +165,7 @@ class TestМножитель:
 
 
 class TestГраницы:
-    def test_повтор_не_удваивает_обнулённую_зону(
-        self, started: Callable[..., Run]
-    ) -> None:
+    def test_повтор_не_удваивает_обнулённую_зону(self, started: Callable[..., Run]) -> None:
         # D3 сжигает долю зоны целиком. Удваивать тут нечего: доля зоны — не
         # вычет за запись, и умножение её на два выдало бы потерю больше, чем
         # зона вообще стоит.
@@ -175,15 +175,16 @@ class TestГраницы:
         разбивка = оценка(started)["zones"]["hot_kitchen"]
         assert разбивка["loss"] == разбивка["share"]
 
-    def test_повтор_в_зоне_с_D3_не_считается_дважды(
-        self, started: Callable[..., Run]
-    ) -> None:
+    def test_повтор_в_зоне_с_D3_не_считается_дважды(self, started: Callable[..., Run]) -> None:
         # Записи в зоне с D3 в цену не идут вовсе (`skip_other_violations_in_d3_zone`).
         # Удвоение нуля обязано остаться нулём, а не воскресить запись.
         assert started("add", "--qid", "PRD05", "--level", "D3", "--zone", "hot_kitchen").code == 0
-        assert started(
-            "add", "--qid", "PRD09", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
-        ).code == 0
+        assert (
+            started(
+                "add", "--qid", "PRD09", "--level", "D2", "--zone", "hot_kitchen", "--repeat"
+            ).code
+            == 0
+        )
 
         разбивка = оценка(started)["zones"]["hot_kitchen"]
         assert разбивка["loss"] == разбивка["share"]

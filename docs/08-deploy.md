@@ -1,5 +1,10 @@
 # Подъём на сервер
 
+> **Прод с 26.09.2026 — VPS, §8.** Разделы 1–7 описывают площадку MUSPELHEIM,
+> **было до 26.09**: там остались стенд разработки (mac-stands) и приёмник
+> ночного бэкапа VPS, а старые боевые контейнеры держатся откатом до проверки
+> владельцем (#352). Команды §1–§7 для прода не применять.
+
 > Документ ведётся руками. Пишется под первый подъём продукта (задача T073) и
 > проверен сухим прогоном 04.09.2026 — все команды ниже либо выполнены на
 > ноутбуке, либо помечены как непроверенные.
@@ -761,3 +766,208 @@ Remove-Item -Recurse -Force C:\projects\decimus
 - Закрыть T073 и её задачу в трекере — **после** смоука, а не после `up -d`.
 - Записать в журнал стройки, что именно проверено на сервере и чем.
 - Сказать владельцу, что проверку можно потрогать, и как именно.
+
+## 8. Прод на Linux (VPS) — переезд с MUSPELHEIM
+
+> Проверено 26.09.2026 подъёмом с нуля на ноутбуке (Docker 29, Compose v5):
+> выдуманное окружение, свой проект compose, внешняя сеть прокси сымитирована.
+> Отличие от сервера одно — образ MinIO (см. §8.2).
+>
+> **Переезд выполнен 26.09.2026 по этому разделу** (коммит 2116a72): админка и
+> MCP отвечают по новым адресам, база совпала по 18 таблицам, MinIO и `state`
+> перенесены, бот опрашивает с VPS без 409. На MUSPELHEIM бот остановлен
+> (`restart=no`), остальное оставлено живым как откат.
+
+Прежние разделы описывают MUSPELHEIM (Windows, звенья socat, туннель). На VPS
+этого нет: TLS и адреса держит общий Caddy площадки. У каждого проекта своя сеть к нему —
+`edge-decimus` (vps-infra#7, проекты друг друга не видят), а наружу сервисы не
+публикуют ни одного порта. Надстройка —
+[`docker-compose.prod.yml`](../docker-compose.prod.yml), почему она устроена
+так — в её шапке.
+
+| Что | Где |
+|---|---|
+| Админка | `https://decimus.95-111-249-216.sslip.io` → `web:8267` |
+| MCP | `https://mcp.decimus.95-111-249-216.sslip.io` → `mcp:8265` |
+| Каталог | `/srv/decimus` (клон репозитория, ветка `main`) |
+| Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
+| Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
+| Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_storage-data`, `decimus_state`, `decimus_frames` |
+
+### 8.1. Подключение к прокси — надстройка площадки
+
+Приложение слушает сеть контейнера только по явному ключу
+`WEB_LISTEN_NETWORK=1` / `MCP_LISTEN_NETWORK=1` (без него — отказ на старте,
+правило петли D100 для MUSPELHEIM не отменено). Прод-надстройка ставит ключи
+сама. Сеть `edge-decimus` подключает надстройка площадки: канон —
+`vps-infra/projects/decimus/compose.edge.yaml`, на сервере —
+`/srv/decimus/compose.edge.yaml`. По сути:
+
+```yaml
+services:
+  web:
+    networks: {default: {}, edge: {aliases: [decimus-web]}}
+  mcp:
+    networks: {default: {}, edge: {aliases: [decimus-mcp]}}
+networks:
+  edge: {name: edge-decimus, external: true}
+```
+
+Цели Caddy — псевдонимы в `edge-decimus`: `decimus-web:8267` и `decimus-mcp:8265`. Порты на хосте остаются
+только на `127.0.0.1` (`WEB_HOST_PORT` 8268, `MCP_HOST_PORT` 8266) — для смоука
+с сервера. `ports: !reset []` в надстройке площадки тоже допустим, но тогда
+смоук скрипта ниже не найдёт порт.
+
+**`WEB_TRUSTED_PROXIES=1` обязателен:** перед админкой одно своё звено —
+Caddy. Без ключа все приходят с адреса Caddy, и ограничитель перебора пароля
+становится общим на всех (T325).
+
+### 8.2. Образ MinIO — перенести с MUSPELHEIM (#396)
+
+Закреплённые образы `quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z` и
+`quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z` реестры больше не отдают (401 /
+denied, проверено 26.09.2026). На MUSPELHEIM они в кэше. Перенос тем же тегом,
+compose менять не нужно:
+
+```bash
+ssh muspelheim docker save quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z | ssh <vps> docker load
+```
+
+### 8.3. Подъём и обновление — одна команда
+
+```bash
+cd /srv/decimus
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
+```
+
+[`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
+`git pull --ff-only` → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
+база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
+накат миграций → `up -d --wait` → смоук (`/login` 200, MCP без токена 401).
+Один и тот же порядок для первого подъёма и для каждого обновления: накат
+идемпотентен, корзина заводится с `--ignore-existing`. Первый подъём с переносом
+базы — порядок в §8.4.
+
+Руками — тем же набором файлов:
+
+```bash
+dc() { docker compose -f docker-compose.yml -f docker-compose.prod.yml -f "$DECIMUS_OVERLAYS" "$@"; }
+dc ps; dc logs -f bot
+```
+
+**Никогда `down -v`** — это снос базы, хранилища и состояния.
+
+### 8.4. Перенос данных
+
+Порядок: остановить бота на MUSPELHEIM → снять данные → поднять на VPS.
+Бот на long polling, два процесса с одним токеном дают 409 Conflict и делят
+сообщения (как у multa, §4.3): **бот на MUSPELHEIM стоит, пока не поднят на VPS,
+и после этого не поднимается**.
+
+| Что | Объём (25.09) | Как |
+|---|---|---|
+| База `dodo_audit_service` | ~9 МБ | `pg_dump -Fc` на MUSPELHEIM → `pg_restore --clean` на VPS после первого наката (ниже) |
+| MinIO, том `storage-data` | 22 МБ | архив тома |
+| Состояние бота, том `state` | мало | архив тома (идущие проверки, `access/roster.json`) |
+| Кадры для разбора, том `frames` | — | не переносить: срок 7 дней, бот наполнит сам (D179) |
+| Методика, `C:\projects\decimus\data` | — | `scp -r` в `/srv/decimus/data` |
+| Демо | — | не переносить, пересевается (`demo-seed`) |
+
+База. Роли `dodo_audit_app` и `dodo_audit_admin` создаёт накат (миграции
+0004, 0010), а журнал миграций едет внутри дампа. Поэтому порядок строго такой:
+**накат на пустую базу → восстановление поверх → повторный накат.** Дамп в
+пустую базу до наката оставил бы базу без ролей навсегда: журнал из дампа
+скажет «всё применено», и накат их уже не создаст. Проверено 26.09.2026 на
+стенде с нуля: права роли приложения после такого порядка на месте.
+
+```bash
+# MUSPELHEIM
+docker exec decimus-infra-db-1 pg_dump -U dodo_audit -d dodo_audit_service -Fc -f /tmp/decimus.dump
+docker cp decimus-infra-db-1:/tmp/decimus.dump .
+# VPS: 1) пустой стенд с ролями и схемой
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
+# 2) приложения стоят, база восстанавливается поверх
+dc stop bot web mcp
+docker cp decimus.dump decimus-db-1:/tmp/
+docker exec decimus-db-1 pg_restore -U dodo_audit -d dodo_audit_service --clean --if-exists --no-owner /tmp/decimus.dump
+# 3) накат того, чего на MUSPELHEIM ещё не было, и подъём
+DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
+```
+
+Тома (на MUSPELHEIM с остановленными bot и storage-live, чтобы архив был
+целым):
+
+```bash
+# MUSPELHEIM, для каждого тома: storage-data, state
+docker run --rm -v decimus-infra_storage-data:/v -v "$PWD":/out alpine:3.22 tar -czf /out/storage-data.tgz -C /v .
+# VPS: том тем именем, которое ждёт проект (compose предупредит, что том
+# создан не им, — это ожидаемо), и развернуть до подъёма bot и storage-live
+docker volume create decimus_storage-data
+docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /in/storage-data.tgz -C /v
+```
+
+Сверка после подъёма: число проверок в реестре админки и последняя
+завершённая проверка открываются с фотографиями; бот на `/version` отвечает
+версией VPS.
+
+### 8.5. Бэкапы на VPS
+
+**Сейчас (26.09):** ночной бэкап площадки VPS уходит restic'ом на MUSPELHEIM —
+база, MinIO, `state`, `.env`. Ниже — что из этого закрывает сам продукт.
+
+- **База:** у службы `db` метка `backup.pgdump=true` — её ищет дамп площадки.
+- **`decimus_storage-data` и `decimus_state` — не дампы Postgres**, меткой не
+  помечены: соглашения о бэкапе томов на VPS пока нет. До него — выгрузка
+  состояния `dc --profile backup run --rm -T state-backup` по cron (§4.7,
+  `BACKUP_DIR`) и архив тома MinIO тем же способом, что в §8.4.
+
+### 8.6. Что стало с обвязкой MUSPELHEIM
+
+| Было | Стало |
+|---|---|
+| Незакоммиченный override с путями `C:\` и именами `decimus-infra_*` | `docker-compose.prod.yml` + надстройка площадки |
+| Второй проект `decimus-web` с пустой базой (#352) | не воссоздаётся: веб в проекте `decimus`, база одна |
+| Звенья `web-link`, `link`, туннель | выключены, наружу — Caddy |
+| `scripts/deploy.sh` (PowerShell через ssh) | `scripts/prod-update.sh` на сервере |
+| `tools/storage_env.ps1` | `tools/storage_env.sh .env` — дописывает ключи хранилища, секрет не печатает |
+| `C:\backups\pg_backup.ps1` | дамп площадки по метке |
+| Задача планировщика для `state-backup` | cron (§8.5) |
+| Деплой-скрипт с паролем в открытом виде (#395) | не переносится; учётку сменить (§8.7) |
+
+Остальные `.ps1` на MUSPELHEIM вне git и в репозиторий не попадали: всё, что
+они делали для прода, покрыто строками выше. Скрипт, которого в таблице нет,
+на VPS не нужен.
+
+### 8.7. Смена учётки из #395 — делает владелец
+
+Шаги без самого секрета (детали — в приватном advisory):
+
+1. Определить учётку, чей пароль лежит в скрипте (видно в самом скрипте на
+   MUSPELHEIM).
+2. Если это учётка админки — сменить пароль, прежние сессии гаснут сами:
+   `dc exec web python tools/web_user.py password <логин> --tenant <арендатор>`
+   (пароль спрашивается без эха). Делать на VPS после переноса базы — иначе
+   смена останется на MUSPELHEIM.
+3. Если это роль базы — новый `DATABASE_*_PASSWORD` в `.env` VPS (и тот же
+   пароль в строке соответствующего `DATABASE_*_URL`), затем
+   `scripts/prod-update.sh`: накат переставит пароль роли.
+4. Удалить скрипт на MUSPELHEIM после переезда; закрыть advisory и #395.
+
+### 8.8. Google Console — адреса возврата (за владельцем)
+
+Адреса временные: с постоянным доменом на Cloudflare меняются оба адреса ниже и
+`BOT_MCP_URL`.
+
+Клиент `decimus-web`, **Authorized redirect URIs** — добавить (прежние не
+убирать, пока MUSPELHEIM не выключен):
+
+```
+https://decimus.95-111-249-216.sslip.io/auth/google/callback
+https://decimus.95-111-249-216.sslip.io/auth/google/mail
+```
+
+В `.env` VPS: `GOOGLE_REDIRECT_URI` и `GOOGLE_MAIL_REDIRECT_URI` — те же строки,
+`WEB_URL_PREFIX` пустой (у админки свой адрес). Пути заданы в коде:
+`GOOGLE_CALLBACK_PATH` (`src/web/auth.py`), `MAIL_CALLBACK_PATH`
+(`src/web/letter_draft.py`). `BOT_MCP_URL` —
+`https://mcp.decimus.95-111-249-216.sslip.io/`.

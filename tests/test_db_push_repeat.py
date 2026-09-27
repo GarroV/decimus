@@ -37,9 +37,7 @@ def _строки(dsn: str, sql: str, params: tuple[object, ...] = ()) -> list[t
 
 def _проверка_с_повтором(chat_id: int) -> None:
     start_inspection(chat_id, unit="Белград-1", kind="planned", report_lang="ru")
-    add_finding(
-        chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар", repeat=True
-    )
+    add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар", repeat=True)
     add_finding(chat_id, code="CLN06", level="D1", zone="hot_kitchen", text="течь")
 
 

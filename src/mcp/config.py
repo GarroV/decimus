@@ -45,6 +45,7 @@ logger = logging.getLogger(__name__)
 MCP_TOKENS_VAR = "MCP_TOKENS"
 MCP_HOST_VAR = "MCP_HOST"
 MCP_PORT_VAR = "MCP_PORT"
+MCP_LISTEN_NETWORK_VAR = "MCP_LISTEN_NETWORK"
 
 #: Где хранилище версий методики. Пусто — инструменты методики выключены
 #: целиком: до задачи T098 весь MCP был только чтением проверок, и запись в
@@ -257,16 +258,36 @@ def _parse_tokens(raw: str) -> dict[str, str]:
     return tokens
 
 
-def _parse_host(raw: str) -> str:
-    """Адрес прослушивания. Только петля — и это проверка, а не договорённость."""
+def _parse_listen_network(raw: str) -> bool:
+    """Разрешено ли слушать сеть контейнера за общим прокси (VPS, сеть `edge`).
+
+    Тот же ключ и та же причина, что у админки (`src/web/config.py`): петля
+    контейнера из сети прокси недостижима, а звена-посредника на VPS нет. Порт
+    на хост не публикуется. Любое значение, кроме пусто, `0` и `1`, — отказ.
+    """
+    value = raw.strip()
+    if value in ("", "0"):
+        return False
+    if value == "1":
+        return True
+    raise McpConfigError(
+        f"Значение {MCP_LISTEN_NETWORK_VAR}={value} не понято: ожидается 1 (слушать сеть "
+        f"контейнера за общим прокси) или пусто/0 (только петля)"
+    )
+
+
+def _parse_host(raw: str, *, listen_network: bool = False) -> str:
+    """Адрес прослушивания. Петля — если сеть контейнера не разрешена явно."""
     host = raw.strip() or DEFAULT_HOST
     if host == "localhost":
         return host
     try:
-        loopback = ipaddress.ip_address(host).is_loopback
+        адрес = ipaddress.ip_address(host)
     except ValueError:
-        loopback = False
-    if not loopback:
+        адрес = None
+    if listen_network and адрес is not None:
+        return host
+    if адрес is None or not адрес.is_loopback:
         raise McpConfigError(
             f"Адрес {MCP_HOST_VAR}={host} не петля. Сервер отдаёт проверки партнёров по "
             f"личному токену, а площадка общая: наружу он не публикуется (T095)"
@@ -423,7 +444,10 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     return Settings(
         tokens=tokens,
         tenants=tenants,
-        host=_parse_host(src.get(MCP_HOST_VAR) or ""),
+        host=_parse_host(
+            src.get(MCP_HOST_VAR) or "",
+            listen_network=_parse_listen_network(src.get(MCP_LISTEN_NETWORK_VAR) or ""),
+        ),
         port=_parse_port(src.get(MCP_PORT_VAR) or ""),
         checklist_store=store,
         checklist_tenants=checklist_tenants,

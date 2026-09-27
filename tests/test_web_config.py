@@ -108,3 +108,37 @@ def test_unknown_ui_lang_is_text_error_not_config_error() -> None:
     env = {"WEB_TENANT": "belgrade", "WEB_UI_LANG": "de"}
     with pytest.raises(WebTextError):
         load_settings(env)
+
+
+# --- прослушивание сети контейнера за общим прокси (переезд на VPS) --------
+
+
+@pytest.mark.parametrize("raw", ["0.0.0.0", "::", "172.18.0.5"])  # noqa: S104
+def test_network_host_is_accepted_only_with_explicit_opt_in(raw: str) -> None:
+    """За общим Caddy в сети контейнеров петля недостижима, а звена нет (VPS).
+
+    Разрешение только явным ключом: без него прежний отказ сохраняется, и
+    ошибка в конфигурации не открывает админку в сеть молча.
+    """
+    env = {"WEB_TENANT": "belgrade", "WEB_HOST": raw, "WEB_LISTEN_NETWORK": "1"}
+    assert load_settings(env).host == raw
+
+
+def test_opt_in_does_not_accept_a_non_address() -> None:
+    env = {"WEB_TENANT": "belgrade", "WEB_HOST": "не-адрес", "WEB_LISTEN_NETWORK": "1"}
+    with pytest.raises(WebConfigError):
+        load_settings(env)
+
+
+@pytest.mark.parametrize("flag", ["", "0"])
+def test_opt_in_off_keeps_the_loopback_rule(flag: str) -> None:
+    env = {"WEB_TENANT": "belgrade", "WEB_HOST": "0.0.0.0", "WEB_LISTEN_NETWORK": flag}  # noqa: S104
+    with pytest.raises(WebConfigError):
+        load_settings(env)
+
+
+@pytest.mark.parametrize("flag", ["yes", "true", "2"])
+def test_opt_in_typo_is_config_error_not_silent_no(flag: str) -> None:
+    env = {"WEB_TENANT": "belgrade", "WEB_LISTEN_NETWORK": flag}
+    with pytest.raises(WebConfigError, match="WEB_LISTEN_NETWORK"):
+        load_settings(env)
