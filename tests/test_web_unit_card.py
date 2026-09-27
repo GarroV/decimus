@@ -97,12 +97,20 @@ class TestШкала:
         assert столбики[1].height == 100.0
 
     def test_столбик_другого_издания_помечен_несравнимым(self) -> None:
-        ряд = (
-            проверка(ид="a", когда=date(2026, 3, 1), pct=90.0, издание="2025.01"),
-            проверка(ид="b", когда=date(2026, 9, 1), pct=95.0, издание="2026.09"),
-        )
-        столбики = unit_card._bars(ряд, floor=80.0, издание=("bizdev", "2026.09"))
-        assert [b.comparable for b in столбики] == [False, True]
+        from src.web import pricing
+
+        pricing.use_reader({"2025.01": "p1", "2026.09": "p2", "2026.10": "p2"}.get)
+        try:
+            ряд = (
+                проверка(ид="a", когда=date(2026, 3, 1), pct=90.0, издание="2025.01"),
+                проверка(ид="b", когда=date(2026, 9, 1), pct=95.0, издание="2026.09"),
+                проверка(ид="c", когда=date(2026, 9, 9), pct=96.0, издание="2026.10"),
+            )
+            столбики = unit_card._bars(ряд, floor=80.0, издание=pricing.price_key(ряд[2]))
+        finally:
+            pricing.use_reader(None)
+        # Другое издание той же цены (#405) ряд не рвёт; другая цена — рвёт.
+        assert [b.comparable for b in столбики] == [False, True, True]
 
 
 class TestСлабыеБлоки:

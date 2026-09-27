@@ -15,6 +15,7 @@ from datetime import date
 
 from ..db import queries
 from ..db.models import FindingRow, InspectionRow
+from .pricing import price_key
 
 #: Сколько последних проверок показывает полоса движения и по скольким
 #: считается повтор. Цифра из прототипа владельца: шесть обходов — это около
@@ -126,9 +127,7 @@ def _bars(
                 pct=row.pct,
                 grade=row.grade,
                 height=round(max(МИНИМУМ_СТОЛБИКА, min(100.0, доля)), 1),
-                comparable=(
-                    издание is None or (row.checklist_code, row.checklist_version) == издание
-                ),
+                comparable=(издание is None or price_key(row) == издание),
             )
         )
     return tuple(столбики)
@@ -220,7 +219,8 @@ def load(*, tenant: str, unit: str, lang: str = "ru", окно: int = ОКНО) 
     # старой к новой, как в любом графике времени.
     по_времени = tuple(reversed(ряд))
     последняя = ряд[0]
-    издание = (последняя.checklist_code, последняя.checklist_version)
+    # Ключ цены, а не имя издания (#405): переиздание формулировок ряд не рвёт.
+    издание = price_key(последняя)
     floor = _floor(по_времени)
     столбики = _bars(по_времени, floor=floor, издание=издание)
     detail = queries.get_inspection(последняя.id, tenant=tenant)

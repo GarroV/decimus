@@ -627,3 +627,61 @@ def test_точки_справочника_считаются_в_выбранн�
     assert ov._units_in(гео, selection=ov.Selection(city="batumi")) == 1
     assert ov._units_in(гео, selection=ov.Selection(country="RS")) == 0
     assert ov._units_in(гео, selection=ov.Selection(grade="D")) is None
+
+
+# ── Ряд рвётся на смене цены, а не на смене издания (#405, D187) ─────────
+
+
+@pytest.fixture
+def цены():
+    """Читатель цены издания без методики на диске: имя → отпечаток."""
+    from src.web import pricing
+
+    таблица: dict[str, str | None] = {}
+    pricing.use_reader(таблица.get)
+    yield таблица
+    pricing.use_reader(None)
+
+
+def test_издания_одной_цены_усредняются(цены) -> None:
+    """Прод, 28.09: переиздание формулировок цены не меняло, а средняя пропадала."""
+    # Arrange — два издания, одна цена.
+    цены.update({"local-b9e1": "p1", "local-9155": "p1"})
+    ряд = (
+        проверка("Tbilisi-1", 89.0, "C", версия="local-9155", когда=date(2026, 9, 21)),
+        проверка("Tbilisi-1", 90.0, "D", версия="local-b9e1", когда=date(2026, 9, 17)),
+    )
+
+    # Act
+    сравнимо = ov._comparable(ряд)
+    точки = ov._points(ряд, geo={}, counts={}, worst={})
+
+    # Assert
+    assert сравнимо is True
+    assert точки[0].delta == -1.0
+
+
+def test_издания_разной_цены_не_усредняются(цены) -> None:
+    # Arrange — сменилась ставка: цена другая.
+    цены.update({"local-9155": "p1", "local-0c57": "p2"})
+    ряд = (
+        проверка("Batumi-1", 85.5, "D", версия="local-0c57", когда=date(2026, 9, 24)),
+        проверка("Batumi-1", 95.5, "B", версия="local-9155", когда=date(2026, 9, 23)),
+    )
+
+    # Act / Assert
+    assert ov._comparable(ряд) is False
+    assert ov._points(ряд, geo={}, counts={}, worst={})[0].delta is None
+
+
+def test_издание_без_методики_на_машине_сравнимым_не_считается(цены) -> None:
+    """Незнание за совпадение не выдаётся: ключом становится имя издания."""
+    # Arrange — цена одного издания известна, другого нет.
+    цены.update({"local-9155": "p1"})
+    ряд = (
+        проверка("Ереван-1", 90.0, "B", версия="local-9155", когда=date(2026, 9, 25)),
+        проверка("Ереван-1", 91.0, "B", версия="local-dead", когда=date(2026, 9, 1)),
+    )
+
+    # Act / Assert
+    assert ov._comparable(ряд) is False
