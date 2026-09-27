@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -290,6 +291,8 @@ def test_demo_stand_starts_the_bot_in_english() -> None:
         capture_output=True,
         text=True,
         check=False,
+        # Пример окружения вместо настоящего: в свежей копии `.env` нет (#397).
+        env={**os.environ, "DECIMUS_ENV_FILE": ".env.example"},
     )
     assert result.returncode == 0, "docker compose config не собрался"
     services = json.loads(result.stdout)["services"]
