@@ -546,9 +546,10 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0013_phrase_alias_curation.sql` | правка карты синонимов: пометка снятия с обязательной причиной и след правки (куда строка вела раньше, зачем переправили), `select` и `update` шести колонок роли `dodo_audit_admin` — ключ карты, сказанное человеком и происхождение записи неприкосновенны; роли приложения права не расширены (T292) |
 | `src/db/migrations/0026_inspection_acceptance.sql` | этап приёмки (D199): `draft` = на приёмке, `finalized` = принята; `accepted_at`/`accepted_by`; триггер `inspections_acceptance_guarded` — подтверждает только администратор истории, обратного хода нет |
 | `src/db/accept.py` | `accept_inspection` — подтверждение проверки на приёмке под ролью администратора истории (D199) |
+| `src/db/revise.py` | `revise_finding`, `Revision` — правка записи ждущей проверки вместе с оценкой, посчитанной движком, одной транзакцией под ролью приложения; у принятой отказ (D200) |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `AcceptError`, `SynonymError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `AcceptError`, `ReviseError`, `SynonymError` |
 | `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из

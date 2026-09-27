@@ -23,13 +23,13 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import directory
-from src.db.errors import AcceptError, DbError, MoveError, RetractionError
+from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import accounts, assets, auth, letter_draft, review, view
+from . import accounts, assets, auth, letter_draft, review, revision, view
 from . import inspections as data
 from . import methodology as method
 from . import methodology_view as mview
@@ -831,6 +831,31 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             notice = t("accept.done", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
+    @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
+    def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Исправить запись ждущей проверки с пересчётом (D200). Только администратор."""
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            revision.revise_card(
+                inspection_id,
+                finding_id,
+                tenant=conf.tenant,
+                code=request.form.get("code") or "",
+                level=request.form.get("level") or "",
+                zone=request.form.get("zone") or "",
+                text=request.form.get("text") or "",
+            )
+        except ReviseError as exc:
+            failure = t("revise.failed", _lang(conf), reason=str(exc))
+        else:
+            notice = t("revise.done", _lang(conf))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Перенести проверку по дате и пиццерии (D195). Только администратор."""
@@ -925,6 +950,9 @@ def _render_card(
         kind=_kind_title(detail.inspection.kind, lang),
         may_retract=data.retraction_available() and админ,
         may_accept=можно_подтвердить,
+        # Править записи вправе тот же, кто подтверждает, и ровно до подтверждения.
+        may_revise=можно_подтвердить,
+        levels=("D1", "D2", "D3"),
         notice=notice,
         failure=failure,
     )

@@ -51,6 +51,7 @@ build_letter(chat_id: int) -> str                       # шаблон по на
 | `src/report/build.py` | `build_pdf`, `build_letter` и проверка наблюдаемого результата |
 | `src/report/engine.py` | вызов `engine/report.py` подпроцессом, окружение (методика — издания ТОЙ проверки, T169), рабочий каталог и повтор не состоявшегося старта |
 | `src/report/photos.py` | ссылка на кадр → файл: карта для движка и список потерь |
+| `src/report/rescore.py` | `rescore` — пересчёт записанной проверки движком (`audit.py score --json`) по методике её версии; для правки на приёмке (D200) |
 | `src/report/errors.py` | `ReportError`, `PdfNotBuilt`, `PhotoMissing` |
 
 Разметки отчёта, выбора шаблона письма и расчёта оценки в блоке нет: всё это

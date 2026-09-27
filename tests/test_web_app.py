@@ -29,13 +29,14 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.db.errors import AcceptError, DbError, MoveError, RetractionError
+from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
 from src.db.migrate import discover_migrations
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
 from src.db.retract import Retraction
 from src.web import inspections as data
 from src.web import overview as overview_data
+from src.web import review, revision
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.sections import SECTIONS
 
@@ -943,3 +944,103 @@ def test_кадр_проверки_отдаётся_картинкой_а_чуж
     assert "private" in есть.headers["Cache-Control"]
     assert нет.status_code == 404
     assert запросы[0] == ("x", "p-1", ТЕНАНТ)
+
+
+# --- правка записи на приёмке (D200) ------------------------------------------
+
+
+def _правка(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    вызовы: list[dict[str, Any]] = []
+
+    def исправить(inspection_id: str, finding_id: str, **kw: Any) -> None:
+        вызовы.append({"id": inspection_id, "finding": finding_id, **kw})
+
+    _приёмка(monkeypatch)
+    monkeypatch.setattr(revision, "revise_card", исправить)
+    return вызовы
+
+
+ИСПРАВЛЕНИЕ = {"code": "CLN05", "level": "D2", "zone": "KITCHEN", "text": "пол в зале"}
+
+
+@админ
+def test_администратор_исправляет_запись_и_видит_пересчёт(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    вызовы = _правка(monkeypatch)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/findings/f1/revise",
+        data=ИСПРАВЛЕНИЕ,
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert ответ.status_code == 200
+    assert вызовы == [{"id": "x", "finding": "f1", "tenant": ТЕНАНТ, **ИСПРАВЛЕНИЕ}]
+    assert "Запись исправлена, оценка пересчитана." in ответ.get_data(as_text=True)
+
+
+def test_аудитор_записи_не_исправляет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    вызовы = _правка(monkeypatch)
+    ответ = стенд.post(
+        "/inspections/x/findings/f1/revise",
+        data=ИСПРАВЛЕНИЕ,
+        headers={"Origin": "http://localhost"},
+    )
+    assert ответ.status_code == 403
+    assert вызовы == []
+
+
+@админ
+def test_отказ_правки_показан_текстом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _правка(monkeypatch)
+
+    def отказать(*_a: Any, **_k: Any) -> None:
+        raise ReviseError("Класс D3 для пункта CLN05 не предусмотрен")
+
+    monkeypatch.setattr(revision, "revise_card", отказать)
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/findings/f1/revise",
+        data=ИСПРАВЛЕНИЕ,
+        headers={"Origin": "http://localhost"},
+    )
+
+    # Assert
+    assert "Запись не исправлена: Класс D3 для пункта CLN05 не предусмотрен" in ответ.get_data(
+        as_text=True
+    )
+
+
+@админ
+def test_на_листе_приёмки_у_записи_есть_форма_правки(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — лист собирается из настоящего build_sheet, чек-лист подменён.
+    _приёмка(monkeypatch)
+    пункты = ({"id": "CLN02", "kind": "violation", "question_ru": "Пол", "zones": "*"},)
+    зоны = ({"code": "KITCHEN", "name_ru": "Кухня", "name_en": "Kitchen"},)
+    monkeypatch.setattr(
+        review,
+        "load_sheet",
+        lambda _h, findings, **kw: review.build_sheet(
+            items=пункты, zones=зоны, findings=findings, lang=kw["lang"]
+        ),
+    )
+    monkeypatch.setattr(review, "load_photos", lambda *_a, **_k: {})
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "/findings/f1/revise?lang=" in страница
+    assert "Сохранить и пересчитать" in страница
