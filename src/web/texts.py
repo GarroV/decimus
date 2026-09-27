@@ -488,6 +488,25 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "review.item.clean": {"ru": "Чисто", "en": "Clean"},
     "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
+    # --- правка записи на приёмке (D200) ---------------------------------------
+    "revise.open": {"ru": "Исправить запись {n}", "en": "Correct record {n}"},
+    "revise.item": {"ru": "Пункт", "en": "Item"},
+    "revise.level": {"ru": "Класс", "en": "Class"},
+    "revise.zone": {"ru": "Зона", "en": "Zone"},
+    "revise.text": {"ru": "Формулировка", "en": "Wording"},
+    "revise.hint": {
+        "ru": "После сохранения оценка пересчитывается движком по методике этой проверки.",
+        "en": "Saving recalculates the score with the engine, using this inspection's checklist.",
+    },
+    "revise.submit": {"ru": "Сохранить и пересчитать", "en": "Save and recalculate"},
+    "revise.done": {
+        "ru": "Запись исправлена, оценка пересчитана.",
+        "en": "The record is corrected and the score recalculated.",
+    },
+    "revise.failed": {
+        "ru": "Запись не исправлена: {reason}",
+        "en": "The record was not corrected: {reason}",
+    },
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К реестру", "en": "Back to the registry"},
     "card.meta": {

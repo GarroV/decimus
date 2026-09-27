@@ -382,6 +382,11 @@ def state_json(detail: InspectionDetail, *, lang: str) -> str:
                     "photos": [],
                     "comment": находка.comment or "",
                     "evidence": находка.text or "",
+                    # Повтор удваивает вычет (D191). Без него сверка оценки
+                    # считала бы проверку с повтором дешевле записанной и
+                    # отказывала в письме — ровно на тех точках, где нарушение
+                    # вернулось.
+                    "repeat": находка.repeat,
                 }
                 for находка in detail.findings
             ],

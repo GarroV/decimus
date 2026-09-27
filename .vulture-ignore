@@ -181,6 +181,7 @@ registry
 card
 do_retract
 do_accept
+do_revise
 inspection_photo
 letter
 export_letter
@@ -205,6 +206,8 @@ methodology_publish
 # неотличимо от «не прочитано никем».
 retracted_visible
 retracted_count
+# Отметка приёмки (D199): время — подсказка у плашки «Принята» на карточке.
+accepted_at
 # Признак «показана самая свежая записанная версия» — по нему шаблон решает,
 # показывать формы правки или предупреждение о старой версии (T320).
 is_latest

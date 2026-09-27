@@ -69,6 +69,9 @@ class Sheet:
     #: пункт снят или записан в чужую для него зону. Их не прячут — вычитывающий
     #: должен увидеть их первыми.
     unplaced: tuple[FindingRow, ...]
+    #: Пункты нарушений версии `(код, вопрос)` — выбор пункта в форме правки
+    #: записи (D200). Тот же порядок, что в таблице чек-листа.
+    catalogue: tuple[tuple[str, str], ...] = ()
 
 
 def _zones_of(item: Mapping[str, str], all_zones: Iterable[str]) -> tuple[str, ...]:
@@ -96,11 +99,13 @@ def build_sheet(
     записи = tuple(findings)
     размещённые: set[str] = set()
     по_зонам: dict[str, list[SheetItem]] = {код: [] for код in коды_зон}
+    перечень: list[tuple[str, str]] = []
     for item in items:
         if (item.get("kind") or VIOLATION).strip() != VIOLATION:
             continue
         код = str(item.get("id", ""))
         вопрос = str(item.get(f"question_{lang}") or item.get("question_ru") or код)
+        перечень.append((код, вопрос))
         for зона in _zones_of(item, коды_зон):
             if зона not in по_зонам:
                 continue
@@ -117,7 +122,24 @@ def build_sheet(
             for код, z in zip(коды_зон, зоны, strict=True)
         ),
         unplaced=tuple(f for f in записи if f.id not in размещённые),
+        catalogue=tuple(перечень),
     )
+
+
+def checklist_of(head: InspectionRow, *, tenant: str) -> method.Composition:
+    """Состав чек-листа той версии, по которой проверку считали.
+
+    Отказ — `MethodologyRefused`, в том числе когда хранилище методики не
+    задано: «чек-листа нет» и «не прочитали» снаружи различать незачем, а
+    чинить — да, и поимённо названная переменная уходит в текст отказа.
+    """
+    state = method.load_store()
+    if state.store is None:
+        raise MethodologyRefused(
+            f"хранилище методики не задано: {', '.join(state.missing)}"
+        )
+    store = method.store_for(state.store, head.checklist_code)
+    return method.load_composition(store, tenant=tenant, version=head.checklist_version)
 
 
 def load_sheet(
@@ -129,13 +151,8 @@ def load_sheet(
     раньше, а причина уходит в лог. Выдумывать «всё чисто» при недоступном
     чек-листе нельзя — это выглядело бы как вычитанная проверка.
     """
-    state = method.load_store()
-    if state.store is None:
-        logger.warning("лист вычитки: хранилище методики не задано (%s)", state.missing)
-        return None
     try:
-        store = method.store_for(state.store, head.checklist_code)
-        состав = method.load_composition(store, tenant=tenant, version=head.checklist_version)
+        состав = checklist_of(head, tenant=tenant)
     except MethodologyRefused as exc:
         logger.warning(
             "лист вычитки: чек-лист %s версии %s не прочитан: %s",
