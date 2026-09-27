@@ -32,22 +32,13 @@
 
 name: decimus
 
-x-prod-env-file: &prod-env-file
-  # Путь к файлу окружения — переменной, по умолчанию `.env` рядом с этим
-  # файлом. Нужна для проверки стека с нуля на машине разработчика, где
-  # настоящего `.env` нет и заводить его ради прогона нельзя.
-  env_file: !override
-    - ${DECIMUS_ENV_FILE:-.env}
-
 services:
   bot:
-    <<: *prod-env-file
     depends_on:
       db:
         condition: service_healthy
 
   mcp:
-    <<: *prod-env-file
     environment:
       MCP_HOST: 0.0.0.0
       MCP_LISTEN_NETWORK: "1"
@@ -58,7 +49,6 @@ services:
         condition: service_healthy
 
   web:
-    <<: *prod-env-file
     profiles: !reset []
     environment:
       WEB_HOST: 0.0.0.0
@@ -94,9 +84,3 @@ services:
   # scripts/prod-update.sh (`run --rm storage-init`), повторный запуск
   # безвреден.
 
-  demo-seed:
-    <<: *prod-env-file
-  demo:
-    <<: *prod-env-file
-  state-backup:
-    <<: *prod-env-file

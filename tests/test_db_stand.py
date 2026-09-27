@@ -64,7 +64,8 @@ def compose(*args: str) -> subprocess.CompletedProcess[str]:
     # рабочей копии, а на площадке в ней стоит `tunnel` (T256). Унаследованная,
     # она включала бы профиль сама, и проверка состава стенда отвечала бы на
     # вопрос про чужую настройку, а не про файл.
-    окружение = {**os.environ, "COMPOSE_PROFILES": ""}
+    # Пример окружения вместо настоящего: в свежей копии его нет (#397).
+    окружение = {**os.environ, "COMPOSE_PROFILES": "", "DECIMUS_ENV_FILE": ".env.example"}
     return subprocess.run(  # noqa: S603 — аргументы собираем сами, ввода извне нет
         ["docker", "compose", "-p", PROJECT, *args],  # noqa: S607 — docker из PATH
         cwd=str(ROOT),
