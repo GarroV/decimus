@@ -145,3 +145,22 @@ class S3PhotoStorage:
                 f"Хранилище не убрало объект {key} из корзины {self._bucket} "
                 f"({type(exc).__name__}): {exc}"
             ) from exc
+
+    def get(self, key: str) -> bytes:
+        """Прочитать объект целиком — для выдачи отчёта из админки (D204).
+
+        Отсутствующий объект здесь — отказ, а не пустые байты: строка в
+        `reports` пишется только после того, как файл лёг (`upload_report`),
+        значит пропажа объекта — поломка хранилища, и человек должен узнать
+        об этом словами, а не получить пустой документ.
+        """
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        try:
+            ответ = self._client.get_object(Bucket=self._bucket, Key=key)
+            return ответ["Body"].read()
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не отдало объект {key} из корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
