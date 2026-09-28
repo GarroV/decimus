@@ -1530,7 +1530,7 @@ def _render_methodology(
         перечень, failure = [], failure or str(отказ)
     код = _который_показан(перечень, _который(request))
     try:
-        колонка = method.checklist_rail(state.store)
+        колонка = method.checklist_rail(state.store, перечень)
     except MethodologyRefused:
         колонка = ()
     try:
@@ -1559,9 +1559,14 @@ def _render_methodology(
     панель = панель if панель in METHODOLOGY_PANELS and not выбран and not новый else ""
 
     def адрес(**изменения: str) -> str:
-        """Адрес этого экрана с тем же чек-листом, версией и отбором."""
+        """Адрес этого экрана с тем же чек-листом, версией и отбором.
+
+        Чек-лист не назван в адресе (режим выбора на телефоне) — не называется и
+        в ссылках: иначе панель, открытая из списка, закрывалась бы на чек-лист
+        по умолчанию, а не обратно на список.
+        """
         параметры = {
-            "checklist": код or "",
+            "checklist": (код or "") if _который(request) else "",
             "version": попросили or "",
             "q": отбор.q,
             "level": отбор.level,
