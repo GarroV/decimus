@@ -128,6 +128,7 @@ from src.mcp.rpc import handle
     },
     "rename_checklist": {"name_ru": "Проверка бизнес-девелопера", "name_en": "BizDev audit"},
     "set_checklist_state": {"state": "draft"},
+    "set_checklist_bot_access": {"in_bot": True},
     "apply_checklist": {},
     # Накопитель непокрытых формулировок (T270). Годные аргументы доводят и до
     # успеха (накопителя нет — законная пустота), и до отказа окружения на
@@ -208,6 +209,7 @@ from src.mcp.rpc import handle
     "create_checklist": {"checklist": "ПРОПИСНЫМИ", "name_ru": "Х", "name_en": "X"},
     "rename_checklist": {"checklist": "нет-такого", "name_ru": "Х", "name_en": "X"},
     "set_checklist_state": {"state": "неизвестное"},
+    "set_checklist_bot_access": {"checklist": "нет-такого", "in_bot": True},
     "apply_checklist": {"checklist": "нет-такого"},
     # Порог назван процентами вместо доли: отказ приходит до базы и до
     # движка, и по тексту видно, что шкала не та, — а не пустая выдача
