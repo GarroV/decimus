@@ -694,16 +694,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     # --- люди проекта (T338, #322) -----------------------------------------
-    "users.lead": {
-        "ru": (
-            "Кто заведён в админке этого арендатора. Отключённые остаются в "
-            "списке: вопрос «у кого был доступ» задают после инцидента."
-        ),
-        "en": (
-            "Who has an account in this tenant's admin. Disabled people stay "
-            "on the list: «who had access» is a question asked after an incident."
-        ),
-    },
     "users.count": {"ru": "{count} чел.", "en": "{count} people"},
     "users.unknown": {
         "ru": "Список сейчас недоступен — это не значит, что людей нет.",
@@ -835,30 +825,11 @@ TEXTS: dict[str, dict[str, str]] = {
     # СОСТОЯНИЕ чек-листа («годен к употреблению») и ПРИМЕНЕНИЕ к проду («по
     # нему идут проверки»). Первых может быть несколько, второй ровно один.
     "checklists.title": {"ru": "Чек-листы", "en": "Checklists"},
-    "checklists.lead": {
-        "ru": (
-            "Виды проверок, заведённые в системе. По одному из них идут проверки — он "
-            "помечен «в проде»; остальные живут рядом и не мешают ему. Новый заводится с "
-            "нуля: пустой список вопросов, одна зона, бланк ставок — и дальше наполняется "
-            "как обычная методика."
-        ),
-        "en": (
-            "The kinds of audit this system holds. Inspections are scored against one of "
-            "them — the one marked 'in production'; the others live alongside and do not "
-            "affect it. A new one starts from scratch: no questions, one zone, blank "
-            "rates — and is then filled in like any methodology."
-        ),
-    },
-    "checklists.count": {"ru": "Чек-листов: {count}", "en": "{count} checklists"},
     "checklists.empty": {
         "ru": "Ни одного чек-листа ещё не заведено.",
         "en": "No checklist has been created yet.",
     },
-    "checklists.col.code": {"ru": "Код", "en": "Code"},
-    "checklists.col.name": {"ru": "Название", "en": "Name"},
     "checklists.col.state": {"ru": "Состояние", "en": "State"},
-    "checklists.col.version": {"ru": "Издание", "en": "Edition"},
-    "checklists.col.actions": {"ru": "Действия", "en": "Actions"},
     "checklists.state.draft": {"ru": "черновик", "en": "draft"},
     "checklists.state.active": {"ru": "в работе", "en": "active"},
     "checklists.state.retired": {"ru": "снят", "en": "retired"},
@@ -870,16 +841,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "checklists.in_production": {"ru": "в проде", "en": "in production"},
     "checklists.new.title": {"ru": "Завести чек-лист", "en": "Create a checklist"},
     "checklists.new.text": {
-        "ru": (
-            "Новый чек-лист рождается пустым черновиком, а не копией существующего: копия "
-            "разошлась бы с оригиналом с первой правки, оставаясь на него похожей. Пока в "
-            "нём нет ни одного вопроса, к проду он не применяется."
-        ),
-        "en": (
-            "A new checklist is born an empty draft, not a copy of an existing one: a copy "
-            "drifts from its original on the first edit while still looking like it. While "
-            "it holds no questions it cannot be applied to production."
-        ),
+        "ru": "Рождается пустым черновиком; к проду — когда появятся вопросы",
+        "en": "Starts as an empty draft; goes to production once it has questions",
     },
     "checklists.new.code": {"ru": "Код", "en": "Code"},
     "checklists.new.code.hint": {
@@ -902,16 +865,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "checklists.apply.open": {"ru": "Применить к проду…", "en": "Apply to production…"},
     "checklists.apply.title": {"ru": "Применение к проду", "en": "Applying to production"},
     "checklists.apply.lead": {
-        "ru": (
-            "После применения проверки считаются по этому чек-листу. Уже проведённые "
-            "остаются на своём и не пересчитываются: отчёт, отправленный партнёру, задним "
-            "числом не меняется."
-        ),
-        "en": (
-            "Once applied, inspections are scored against this checklist. Those already "
-            "scored stay on their own and are not recalculated: a report already sent to a "
-            "partner does not change retroactively."
-        ),
+        "ru": "Новые проверки пойдут по нему. Уже проведённые не пересчитываются.",
+        "en": "New inspections will follow it. Past inspections are not rescored.",
     },
     "checklists.apply.now": {"ru": "Сейчас в проде", "en": "In production now"},
     "checklists.apply.will": {"ru": "Будет в проде", "en": "Will be in production"},
@@ -919,22 +874,19 @@ TEXTS: dict[str, dict[str, str]] = {
     "checklists.apply.items": {"ru": "Вопросов с нарушениями", "en": "Items that hold violations"},
     "checklists.apply.zones": {"ru": "Зоны и доли", "en": "Zones and shares"},
     "checklists.apply.rates": {"ru": "Ставки вычета", "en": "Deduction rates"},
-    "checklists.apply.start": {"ru": "Старт: {pct}%", "en": "Start: {pct}%"},
+    "checklists.apply.checklist": {"ru": "Чек-лист", "en": "Checklist"},
+    "checklists.apply.same": {
+        "ru": "Это издание уже в проде — применять нечего.",
+        "en": "This edition is already in production — nothing to apply.",
+    },
+    "checklists.apply.start_row": {"ru": "Начальный процент", "en": "Starting percentage"},
     "checklists.apply.nothing": {
         "ru": "Показывать нечего: опубликованного издания нет.",
         "en": "Nothing to show: there is no published edition.",
     },
     "checklists.apply.warning": {
-        "ru": (
-            "Сверьте цифры выше. Ролей у учёток нет: применить может всякий вошедший, и "
-            "поймать ошибку можно только здесь — правом её не остановить. След применения "
-            "с вашим логином остаётся в журнале чек-листа."
-        ),
-        "en": (
-            "Check the figures above. Accounts have no roles: anyone signed in can apply, "
-            "and this screen is the only place an error can be caught — no permission "
-            "stops it. The change is recorded in the checklist journal under your login."
-        ),
+        "ru": "Отличия подсвечены. В журнале чек-листа останется ваш логин.",
+        "en": "Differences are highlighted. Your login stays in the checklist log.",
     },
     "checklists.apply.submit": {"ru": "Применить к проду", "en": "Apply to production"},
     "checklists.apply.cancel": {"ru": "Отмена", "en": "Cancel"},
@@ -973,12 +925,12 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.version.badge.draft": {"ru": "не опубликована", "en": "not published"},
     "methodology.draft.text": {
         "ru": (
-            "Записана {latest}, а проверки считаются по {current}. Публикация переставляет "
-            "указатель и на уже посчитанные проверки не действует."
+            "Новые проверки пойдут по правкам после публикации. Уже посчитанные "
+            "проверки она не меняет."
         ),
         "en": (
-            "{latest} is stored, while inspections are scored by {current}. Publishing moves "
-            "the pointer and does not touch inspections already scored."
+            "New inspections follow the edits once published. Inspections already "
+            "scored stay as they are."
         ),
     },
     "methodology.publish.submit": {"ru": "Опубликовать", "en": "Publish"},
@@ -995,6 +947,10 @@ TEXTS: dict[str, dict[str, str]] = {
             "Version {version} is stored and accepted by the engine, but inspections are "
             "still scored by the published one: publish it as a separate step."
         ),
+    },
+    "methodology.item.missing": {
+        "ru": "Пункта {code} в этой версии нет — открыт весь список.",
+        "en": "Item {code} is not in this version — showing the full list.",
     },
     "methodology.failed": {
         "ru": "Правка не принята: {reason}",

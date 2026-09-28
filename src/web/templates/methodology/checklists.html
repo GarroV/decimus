@@ -14,12 +14,11 @@
 {% block title %}{{ t('checklists.title') }}{% endblock %}
 
 {% block body %}
-  <div class="section">
-    <div class="section__head">
-      <h1 class="section__title">{{ t('checklists.title') }}</h1>
-      <span class="section__num">{{ t('checklists.count', count=checklists|length) }}</span>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('section.admin.title') }}</div>
+      <h1 class="ov-head__title">{{ t('checklists.title') }}</h1>
     </div>
-    <p class="section__lead">{{ t('checklists.lead') }}</p>
   </div>
 
   {% if notice %}
@@ -33,78 +32,59 @@
     </div>
   {% endif %}
 
-  <div class="card mt-gap">
-    <table class="table">
-      <thead>
-        <tr>
-          <th>{{ t('checklists.col.code') }}</th>
-          <th>{{ t('checklists.col.name') }}</th>
-          <th>{{ t('checklists.col.state') }}</th>
-          <th>{{ t('checklists.col.version') }}</th>
-          <th>{{ t('checklists.col.actions') }}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for item in checklists %}
-          <tr>
-            <td><code>{{ item.code }}</code></td>
-            <td>
-              <a href="{{ url_for('methodology') }}?checklist={{ item.code }}">{{ item.name_ru }}</a>
-              <div class="card__meta">{{ item.name_en }}</div>
-            </td>
-            <td>
-              <span class="tag tag--micro">{{ t('checklists.state.' ~ item.state) }}</span>
-              {% if item.applied_to_production %}
-                <span class="tag tag--ok tag--micro">{{ t('checklists.in_production') }}</span>
-              {% endif %}
-            </td>
-            <td>{% if item.version %}<code>{{ item.version }}</code>{% else %}—{% endif %}</td>
-            <td>
-              <form method="post"
-                    action="{{ url_for('checklists_state', code=item.code) }}"
-                    class="row row--tight">
-                <select name="state" aria-label="{{ t('checklists.col.state') }}">
-                  {% for state in states %}
-                    <option value="{{ state }}" {% if state == item.state %}selected{% endif %}>
-                      {{ t('checklists.state.' ~ state) }}
-                    </option>
-                  {% endfor %}
-                </select>
-                <button type="submit" class="btn btn--ghost">{{ t('checklists.state.submit') }}</button>
-              </form>
-              {% if not item.applied_to_production %}
-                <a class="btn btn--ghost mt-tight"
-                   href="{{ url_for('checklists_apply_preview', code=item.code) }}">
-                  {{ t('checklists.apply.open') }}
-                </a>
-              {% endif %}
-            </td>
-          </tr>
-        {% else %}
-          <tr><td colspan="5">{{ t('checklists.empty') }}</td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
+  {# Строка на чек-лист: имя ведёт в его состав, справа — состояние и
+     применение. Издание (хэш) — подсказкой к имени: в строке оно читалось
+     мусором, а нужно только при разборе. Колонок нет: таблица на пять
+     столбцов ради одной-двух строк разъезжалась и не читалась. #}
+  <section class="ov-card ov-card--wide">
+    {% for item in checklists %}
+      <div class="ins-row cl-row">
+        <span class="ins-row__main">
+          <span class="ins-row__title">
+            <a class="ins-row__unit" href="{{ url_for('methodology') }}?checklist={{ item.code }}"
+               {% if item.version %}title="{{ item.version }}"{% endif %}>{{ item.name_ru if lang == 'ru' else (item.name_en or item.name_ru) }}</a>
+            {% if item.in_production %}
+              <span class="tag tag--ok tag--micro">{{ t('checklists.in_production') }}</span>
+            {% endif %}
+          </span>
+          <span class="ins-row__meta">
+            <span class="mono">{{ item.code }}</span>
+            · {{ item.name_en if lang == 'ru' else item.name_ru }}
+          </span>
+        </span>
+        <form method="post" action="{{ url_for('checklists_state', code=item.code) }}" class="row row--tight">
+          <select class="input input--sm" name="state" aria-label="{{ t('checklists.col.state') }}">
+            {% for state in states %}
+              <option value="{{ state }}" {% if state == item.state %}selected{% endif %}>{{ t('checklists.state.' ~ state) }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn btn--sm btn--ghost">{{ t('checklists.state.submit') }}</button>
+        </form>
+        {% if not item.in_production %}
+          <a class="btn btn--sm" href="{{ url_for('checklists_apply_preview', code=item.code) }}">{{ t('checklists.apply.open') }}</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('checklists.empty') }}</div>
+    {% endfor %}
+  </section>
 
-  <div class="card mt-gap">
-    <div class="card__head"><div class="card__title">{{ t('checklists.new.title') }}</div></div>
-    <p class="card__meta">{{ t('checklists.new.text') }}</p>
-    <form method="post" action="{{ url_for('checklists') }}" class="form">
-      <label class="field">
-        <span class="field__label">{{ t('checklists.new.code') }}</span>
-        <input type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}">
-        <span class="field__hint">{{ t('checklists.new.code.hint') }}</span>
-      </label>
-      <label class="field">
-        <span class="field__label">{{ t('checklists.new.name_ru') }}</span>
-        <input type="text" name="name_ru" required>
-      </label>
-      <label class="field">
-        <span class="field__label">{{ t('checklists.new.name_en') }}</span>
-        <input type="text" name="name_en" required>
-      </label>
-      <button type="submit" class="btn">{{ t('checklists.new.submit') }}</button>
+  {# Новый — одной строкой полей. Почему пустой, а не копия, и что значит код,
+     сказано подсказками у полей, а не абзацем над формой. #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('checklists.new.title') }}</div>
+      <div class="ov-card__hint">{{ t('checklists.new.text') }}</div>
+    </div>
+    <form method="post" action="{{ url_for('checklists') }}" class="row row--tight cl-new">
+      <input class="input cl-new__code mono" type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}"
+             placeholder="{{ t('checklists.new.code') }}" aria-label="{{ t('checklists.new.code') }}">
+      <input class="input cl-new__name" type="text" name="name_ru" required
+             placeholder="{{ t('checklists.new.name_ru') }}" aria-label="{{ t('checklists.new.name_ru') }}">
+      <input class="input cl-new__name" type="text" name="name_en" required
+             placeholder="{{ t('checklists.new.name_en') }}" aria-label="{{ t('checklists.new.name_en') }}">
+      <button type="submit" class="btn btn--primary">{{ t('checklists.new.submit') }}</button>
     </form>
-  </div>
+    <p class="field-note cl-new__hint">{{ t('checklists.new.code.hint') }}</p>
+  </section>
 {% endblock %}

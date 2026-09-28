@@ -14,11 +14,12 @@
 {% block title %}{{ t('checklists.apply.title') }}{% endblock %}
 
 {% block body %}
-  <div class="section">
-    <div class="section__head">
-      <h1 class="section__title">{{ t('checklists.apply.title') }}</h1>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <a class="pt-back" href="{{ url_for('checklists') }}">‹ {{ t('checklists.title') }}</a>
+      <h1 class="ov-head__title">{{ t('checklists.apply.title') }}</h1>
+      <div class="ov-head__sub">{{ t('checklists.apply.lead') }}</div>
     </div>
-    <p class="section__lead">{{ t('checklists.apply.lead') }}</p>
   </div>
 
   {% if failure %}
@@ -27,48 +28,56 @@
     </div>
   {% endif %}
 
-  {% macro сводка(итог, заголовок) %}
-    <div class="card">
-      <div class="card__head"><div class="card__title">{{ заголовок }}</div></div>
-      {% if итог %}
-        <div class="card__meta"><code>{{ итог.checklist }}</code> · {{ итог.name_ru }}</div>
-        <dl class="pairs">
-          <dt>{{ t('checklists.apply.version') }}</dt>
-          <dd><code>{{ итог.version }}</code></dd>
-          <dt>{{ t('checklists.apply.items') }}</dt>
-          <dd>{{ итог.items }}</dd>
-          <dt>{{ t('checklists.apply.zones') }}</dt>
-          <dd>
-            {% for code, share in итог.zones %}
-              <div><code>{{ code }}</code> — {{ share }}%</div>
-            {% else %}—{% endfor %}
-          </dd>
-          <dt>{{ t('checklists.apply.rates') }}</dt>
-          <dd>
-            {{ t('checklists.apply.start', pct=итог.start_pct) }}
-            {% for уровень, ставка in итог.penalty %}
-              <div>{{ уровень }} — {{ ставка }}</div>
-            {% endfor %}
-          </dd>
-        </dl>
-      {% else %}
-        <p class="card__meta">{{ t('checklists.apply.nothing') }}</p>
-      {% endif %}
-    </div>
+  {# Одна таблица «сейчас / будет», а не две карточки подряд: сверять
+     приходится построчно, и отличие подсвечено строкой, а не спрятано в
+     двух одинаковых на вид столбцах текста. #}
+  {% set now = difference.current %}
+  {% set will = difference.candidate %}
+  {% set now_zones = dict(now.zones) if now else {} %}
+  {% set will_zones = dict(will.zones) if will else {} %}
+  {% set now_rates = dict(now.penalty) if now else {} %}
+  {% set will_rates = dict(will.penalty) if will else {} %}
+  {% macro line(label, a, b, mono=false) %}
+    <tr class="{% if a != b %}ap-diff{% endif %}">
+      <th scope="row">{{ label }}</th>
+      <td{% if mono %} class="mono"{% endif %}>{{ '—' if a is none or a == '' else a }}</td>
+      <td{% if mono %} class="mono"{% endif %}>{{ '—' if b is none or b == '' else b }}</td>
+    </tr>
   {% endmacro %}
+  <section class="ov-card ov-card--wide">
+    <table class="table ap-table">
+      <thead>
+        <tr>
+          <th></th>
+          <th>{{ t('checklists.apply.now') }}</th>
+          <th>{{ t('checklists.apply.will') }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ line(t('checklists.apply.checklist'), now.name_ru if now else none, will.name_ru if will else none) }}
+        {{ line(t('checklists.apply.version'), now.version if now else none, will.version if will else none, mono=true) }}
+        {{ line(t('checklists.apply.items'), now.items if now else none, will.items if will else none) }}
+        {% for code in (now_zones.keys()|list + will_zones.keys()|list)|unique %}
+          {{ line(code, (now_zones.get(code) ~ '%') if code in now_zones else none, (will_zones.get(code) ~ '%') if code in will_zones else none) }}
+        {% endfor %}
+        {{ line(t('checklists.apply.start_row'), (now.start_pct ~ '%') if now else none, (will.start_pct ~ '%') if will else none) }}
+        {% for level in (now_rates.keys()|list + will_rates.keys()|list)|unique %}
+          {{ line(level, now_rates.get(level), will_rates.get(level)) }}
+        {% endfor %}
+      </tbody>
+    </table>
+    {% if not will %}
+      <div class="ov-card__empty">{{ t('checklists.apply.nothing') }}</div>
+    {% endif %}
+  </section>
 
-  <div class="grid grid--two mt-gap">
-    {{ сводка(difference.current, t('checklists.apply.now')) }}
-    {{ сводка(difference.candidate, t('checklists.apply.will')) }}
-  </div>
-
-  <div class="card mt-gap">
-    <p class="card__meta">{{ t('checklists.apply.warning') }}</p>
-    <form method="post" action="{{ url_for('checklists_apply', code=code) }}" class="row row--tight">
-      <button type="submit" class="btn">{{ t('checklists.apply.submit') }}</button>
-      <a class="btn btn--ghost" href="{{ url_for('checklists') }}">
-        {{ t('checklists.apply.cancel') }}
-      </a>
-    </form>
-  </div>
+  {% set same = now and will and now.checklist == will.checklist and now.version == will.version %}
+  {% if same %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('checklists.apply.same') }}</div></div></div>
+  {% endif %}
+  <form method="post" action="{{ url_for('checklists_apply', code=code) }}" class="row row--tight mt-gap">
+    <button type="submit" class="btn btn--primary" {% if not will or same %}disabled{% endif %}>{{ t('checklists.apply.submit') }}</button>
+    <a class="btn btn--ghost" href="{{ url_for('checklists') }}">{{ t('checklists.apply.cancel') }}</a>
+    <span class="field-note">{{ t('checklists.apply.warning') }}</span>
+  </form>
 {% endblock %}

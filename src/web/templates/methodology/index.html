@@ -43,9 +43,9 @@
 {# Имя версии для человека: имя набора, а хэш — мелко рядом, для сверки. #}
 {% macro version_label(version) %}
   {%- set named = (composition.versions | selectattr('version', 'equalto', version) | first) -%}
-  {%- if named and named.name -%}<span class="mx-ver__name">{{ named.name }}</span>
-  {%- else -%}<span class="mx-ver__name mx-muted">{{ t('methodology.version.unnamed') }}</span>{%- endif -%}
-  <span class="mx-ver__id mono">{{ version }}</span>
+  {#- Идентификатор версии — подсказкой: хэш в строке читался мусором. -#}
+  {%- if named and named.name -%}<span class="mx-ver__name" title="{{ version }}">{{ named.name }}</span>
+  {%- else -%}<span class="mx-ver__name mx-muted" title="{{ version }}">{{ t('methodology.version.unnamed') }}</span>{%- endif -%}
 {% endmacro %}
 
 {# Хвост формы записи: имя набора (если нужно), зачем правим, кнопка. #}
@@ -184,6 +184,9 @@
     </div>
   </div>
 
+  {% if missing_item %}
+    <div class="note note--warn mt-gap" role="status"><div><div class="note__text">{{ t('methodology.item.missing', code=missing_item) }}</div></div></div>
+  {% endif %}
   <div class="mx-ver">
     <span class="mx-muted">{{ t('methodology.version.in_effect') }}:</span> {{ version_label(composition.current) }}
     {% if composition.version != composition.current %}
@@ -196,7 +199,7 @@
     <div class="note note--warn mx-draft" role="status">
       <div class="grow">
         <div class="note__title">{{ t('methodology.version.draft_bar') }}</div>
-        <div class="note__text">{{ t('methodology.draft.text', latest=composition.latest, current=composition.current) }}</div>
+        <div class="note__text">{{ t('methodology.draft.text') }}</div>
       </div>
       <a class="btn" href="{{ href(diff='1', item='', new='') }}" data-mx-open>{{ t('methodology.diff.open') }}</a>
       <form method="post" action="{{ action('methodology_publish') }}">
