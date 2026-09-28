@@ -1068,10 +1068,56 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "{count} items check it — show",
     },
     "methodology.rail.title": {"ru": "Чек-листы", "en": "Checklists"},
-    "methodology.rail.bot": {"ru": "Бот", "en": "Bot"},
-    "methodology.rail.bot_none": {"ru": "ни одного", "en": "none"},
-    "methodology.rail.bot_manage": {"ru": "Настроить", "en": "Manage"},
-    "methodology.rail.bot_mark": {"ru": "бот", "en": "bot"},
+    "methodology.rail.bot": {"ru": "Доступ в боте", "en": "Bot access"},
+    "methodology.rail.bot_manage": {"ru": "Настроить доступ", "en": "Manage access"},
+    "methodology.rail.bot_mark": {"ru": "доступен в боте", "en": "available in the bot"},
+    "methodology.bot.count": {"ru": "{on} из {total}", "en": "{on} of {total}"},
+    "methodology.bot.lead": {
+        "ru": "Аудиторы начинают проверку по:",
+        "en": "Auditors start an inspection with:",
+    },
+    "methodology.bot.none": {
+        "ru": "Бот сейчас не даст начать проверку: ни один чек-лист не открыт.",
+        "en": "The bot won't start an inspection now: no checklist is open.",
+    },
+    "methodology.bot.explain": {
+        "ru": "Здесь решается, по каким чек-листам аудиторы начинают проверку в боте. "
+        "Открыт один — бот не спрашивает. Несколько — предложит выбрать кнопками. "
+        "Ни одного — бот скажет, что начать не по чему.",
+        "en": "This decides which checklists auditors can start an inspection with in the bot. "
+        "One open — the bot doesn't ask. Several — it offers buttons. "
+        "None — the bot says there is nothing to start with.",
+    },
+    "methodology.bot.running": {
+        "ru": "Идущие проверки переключение не трогает: они досчитываются по чек-листу, "
+        "с которым начаты.",
+        "en": "Inspections in progress are not affected: they finish on the checklist "
+        "they were started with.",
+    },
+    "methodology.bot.items": {"ru": "пунктов: {count}", "en": "items: {count}"},
+    "methodology.bot.on": {"ru": "в боте", "en": "in bot"},
+    "methodology.bot.off": {"ru": "выключен", "en": "off"},
+    "methodology.bot.toggle": {"ru": "Доступ в боте: {name}", "en": "Bot access: {name}"},
+    "methodology.bot.why.draft": {"ru": "черновик", "en": "draft"},
+    "methodology.bot.why.draft.hint": {
+        "ru": "Переведите в работу — черновик ещё правят",
+        "en": "Set it to active — a draft is still being edited",
+    },
+    "methodology.bot.why.retired": {"ru": "снят", "en": "retired"},
+    "methodology.bot.why.retired.hint": {
+        "ru": "Снятый чек-лист в бот не открывается",
+        "en": "A retired checklist can't be opened in the bot",
+    },
+    "methodology.bot.why.unpublished": {"ru": "не опубликован", "en": "not published"},
+    "methodology.bot.why.unpublished.hint": {
+        "ru": "Опубликуйте записанную версию — бот берёт только опубликованное",
+        "en": "Publish the recorded version — the bot only uses published ones",
+    },
+    "methodology.bot.why.empty": {"ru": "нет пунктов", "en": "no items"},
+    "methodology.bot.why.empty.hint": {
+        "ru": "Нет ни одного пункта с нарушением — такой чек-лист дал бы 100%",
+        "en": "No item can be violated — such a checklist would always give 100%",
+    },
     "methodology.rail.new": {"ru": "+ Новый", "en": "+ New"},
     "methodology.rail.retired": {"ru": "Снятые ({count})", "en": "Retired ({count})"},
     "methodology.col.code": {"ru": "Код", "en": "Code"},

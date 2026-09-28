@@ -634,12 +634,13 @@ def set_bot_access(store: Store, *, tenant: str, on: bool, by: str | None = None
                 f"черновик ещё правят, и аудитор получил бы вопросы, которых завтра не будет"
             )
     else:
-        карточка = read_meta(store)
-        if карточка is None:
+        есть = read_meta(store)
+        if есть is None:
             raise ChecklistError(
                 f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
                 f"checklists"
             )
+        карточка = есть
     _settle_inherited(store)
     карточка = read_meta(store) or карточка
     новая = replace(карточка, in_bot=on)

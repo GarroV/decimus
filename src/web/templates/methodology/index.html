@@ -165,21 +165,33 @@
 {% macro rail_row(r) %}
   <a class="mx-rail__row{% if r.code == checklist_code %} is-on{% endif %}" href="{{ url_for('methodology', checklist=r.code, lang=lang) }}"{% if r.code == checklist_code %} aria-current="page"{% endif %}>
     <span class="mx-rail__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
-    <span class="mx-rail__meta">{{ r.items if r.items is not none else '—' }} · {{ t('checklists.state.' ~ r.state) }}{% if r.in_bot %} · <span class="mx-rail__bot-mark">{{ t('methodology.rail.bot_mark') }}</span>{% endif %}</span>
+    <span class="mx-rail__meta">{{ r.items if r.items is not none else '—' }} · {{ t('checklists.state.' ~ r.state) }}{% if r.in_bot %}<span class="mx-rail__bot-mark" title="{{ t('methodology.rail.bot_mark') }}">{{ icon('tg') }}<span class="mx-sr">{{ t('methodology.rail.bot_mark') }}</span></span>{% endif %}</span>
   </a>
 {% endmacro %}
 
 {% block body %}
   <div class="mx-shell{% if picking %} mx-shell--pick{% endif %}">
   <aside class="mx-rail" aria-label="{{ t('methodology.rail.title') }}">
-    {# Блок «Бот» — отдельно от списка (D223): весь доступ виден одной строкой.
-       Настоящая настройка доступа — волна 3; до неё это чек-лист прода. #}
-    <div class="mx-rail__bot">
-      <div class="mx-rail__head">{{ t('methodology.rail.bot') }}</div>
-      {% set in_bot = rail | selectattr('in_bot') | list %}
-      <div class="mx-rail__bot-list">{% for r in in_bot %}{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}{% if not loop.last %}, {% endif %}{% else %}{{ t('methodology.rail.bot_none') }}{% endfor %}</div>
-      <a class="mx-rail__link" href="{{ url_for('checklists', lang=lang) }}">{{ t('methodology.rail.bot_manage') }}</a>
-    </div>
+    {# Блок «Бот» — отдельно от списка (D223): весь доступ виден сразу, а
+       настраивается панелью справа, не обходя чек-листы по одному. #}
+    {% set in_bot = rail | selectattr('in_bot') | list %}
+    {% set alive = rail | rejectattr('state', 'equalto', 'retired') | list %}
+    <section class="mx-botcard{% if not in_bot %} is-empty{% endif %}" aria-labelledby="mx-botcard-title">
+      <div class="mx-botcard__head">
+        <span class="mx-botcard__icon" aria-hidden="true">{{ icon('tg') }}</span>
+        <span class="mx-botcard__title" id="mx-botcard-title">{{ t('methodology.rail.bot') }}</span>
+        <span class="mx-botcard__count">{{ t('methodology.bot.count', on=in_bot|length, total=alive|length) }}</span>
+      </div>
+      {% if in_bot %}
+        <p class="mx-botcard__lead">{{ t('methodology.bot.lead') }}</p>
+        <ul class="mx-botcard__list">
+          {% for r in in_bot %}<li>{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</li>{% endfor %}
+        </ul>
+      {% else %}
+        <p class="mx-botcard__warn">{{ icon('warn') }}<span>{{ t('methodology.bot.none') }}</span></p>
+      {% endif %}
+      <a class="btn btn--sm mx-botcard__btn{% if panel == 'bot' %} is-on{% endif %}" href="{{ href(panel='bot', item='') }}" data-mx-open>{{ t('methodology.rail.bot_manage') }}</a>
+    </section>
     <div class="mx-rail__head mx-rail__head--list">
       <span>{{ t('methodology.rail.title') }}</span>
       <a class="btn btn--sm" href="{{ href(panel='new', item='') }}" data-mx-open>{{ t('methodology.rail.new') }}</a>
@@ -202,7 +214,7 @@
       <details class="pick mx-switch" name="pick">
         <summary class="mx-switch__btn" aria-label="{{ t('methodology.bar.switch') }}">
           <span>{{ (here.name_ru if lang == 'ru' else (here.name_en or here.name_ru)) if here else (checklist_code or '—') }}</span>
-          {% if here and here.in_production %}<span class="tag tag--ok tag--micro">{{ t('methodology.lists.prod') }}</span>{% endif %}
+          {% if here and here.in_bot %}<span class="tag tag--ok tag--micro">{{ t('methodology.bot.on') }}</span>{% endif %}
           <span class="pick__caret" aria-hidden="true">▾</span>
         </summary>
         <div class="pick__menu" role="menu">
@@ -214,6 +226,8 @@
               {% if c.code == checklist_code %}<span class="pick__mark" aria-hidden="true">✓</span>{% endif %}
             </a>
           {% endfor %}
+          {# Колонку прячет ширина (<1024px) — доступ в боте уходит сюда же, в переключатель. #}
+          <a class="pick__item mx-switch__manage" href="{{ href(panel='bot', item='') }}">{{ t('methodology.rail.bot_manage') }}</a>
           <a class="pick__item mx-switch__manage" href="{{ url_for('checklists', lang=lang) }}">{{ t('methodology.lists.manage') }}</a>
         </div>
       </details>
@@ -623,6 +637,39 @@
             <p class="field-note">{{ t('checklists.new.code.hint') }}</p>
             <div><button type="submit" class="btn btn--primary">{{ t('checklists.new.submit') }}</button></div>
           </form>
+        </div>
+      {% elif panel == 'bot' %}
+        {# Панель «Бот» (волна 3): весь доступ пространства одной таблицей. Каждый
+           переключатель — своя форма: без скрипта всё работает так же. #}
+        <header class="mx-drawer__head">
+          <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.rail.bot') }}</div>
+          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
+        </header>
+        <div class="mx-drawer__body">
+          <p class="field-note">{{ t('methodology.bot.explain') }}</p>
+          <ul class="mx-botlist">
+            {% for r in rail %}
+              <li class="mx-botlist__row{% if r.state == 'retired' %} is-retired{% endif %}">
+                <div class="mx-botlist__what">
+                  <span class="mx-botlist__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
+                  <span class="mx-botlist__meta">{{ t('checklists.state.' ~ r.state) }} · {{ t('methodology.bot.items', count=r.items if r.items is not none else 0) }}</span>
+                </div>
+                {% if r.in_bot or not r.bot_block %}
+                  <form method="post" action="{{ action('methodology_bot', code=r.code) }}">
+                    <input type="hidden" name="on" value="{{ '0' if r.in_bot else '1' }}">
+                    <button type="submit" class="mx-toggle{% if r.in_bot %} is-on{% endif %}" role="switch" aria-checked="{{ 'true' if r.in_bot else 'false' }}"
+                            aria-label="{{ t('methodology.bot.toggle', name=(r.name_ru if lang == 'ru' else (r.name_en or r.name_ru))) }}">
+                      <span class="mx-toggle__track" aria-hidden="true"><span class="mx-toggle__knob"></span></span>
+                      <span class="mx-toggle__text">{{ t('methodology.bot.on') if r.in_bot else t('methodology.bot.off') }}</span>
+                    </button>
+                  </form>
+                {% else %}
+                  <span class="mx-botlist__why" title="{{ t('methodology.bot.why.' ~ r.bot_block ~ '.hint') }}">{{ t('methodology.bot.why.' ~ r.bot_block) }}</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+          <p class="field-note">{{ t('methodology.bot.running') }}</p>
         </div>
       {% elif panel == 'versions' %}
         <header class="mx-drawer__head">

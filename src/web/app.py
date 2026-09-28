@@ -1356,6 +1356,33 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             failure=None,
         )
 
+    @app.post(f"{section('admin').path}/bot/<code>")
+    def methodology_bot(code: str) -> str | Response:
+        """Переключатель панели «Бот»: открыть чек-лист в боте или закрыть (волна 3)."""
+        refuse_foreign_origin()
+        state = method.load_store()
+        if state.store is None:
+            return _render_methodology(conf, notice=None, failure=None, panel="bot")
+        try:
+            method.set_bot_access(
+                state.store,
+                tenant=conf.tenant,
+                author=_author(conf),
+                code=code,
+                on=request.form.get("on") == "1",
+            )
+        except MethodologyRefused as отказ:
+            return _render_methodology(conf, notice=None, failure=str(отказ), panel="bot")
+        остаться = (request.args.get("checklist") or "").strip()
+        return redirect(
+            _url(
+                "methodology",
+                panel="bot",
+                lang=_lang(conf),
+                **({"checklist": остаться} if остаться else {}),
+            )
+        )
+
     @app.get(f"{путь}/<code>/apply")
     def checklists_apply_preview(code: str) -> str:
         """Разница до применения. Отдельной страницей, а не всплывающим вопросом:
@@ -1474,7 +1501,7 @@ def _который_показан(перечень: list[Any], попросил
 
 
 #: Панели «Методики» помимо пункта: адрес `?panel=`.
-METHODOLOGY_PANELS = ("scoring", "versions", "new")
+METHODOLOGY_PANELS = ("scoring", "versions", "new", "bot")
 
 
 def _render_methodology(
