@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
@@ -26,7 +27,10 @@ import psycopg
 
 from .config import check_environment, load_storage_settings
 from .errors import PushError, StorageError
-from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
+from .previews import PREVIEW_CONTENT_TYPE, make_preview
+from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key, preview_key
+
+logger = logging.getLogger(__name__)
 
 #: Кто умеет достать байты кадра по его идентификатору в телеграме. `None` —
 #: кадра больше нет; это не исключение, а обычный исход (файл протух, телеграм
@@ -41,7 +45,7 @@ order by created_at, id
 """
 
 _MARK_UPLOADED_SQL = """
-update photos set storage_path = %s, uploaded_at = now() where id = %s
+update photos set storage_path = %s, preview_path = %s, uploaded_at = now() where id = %s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
@@ -59,6 +63,25 @@ def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> No
             raise PushError(
                 f"В базе нет проверки {inspection_id} — выгружать кадры некуда и незачем"
             )
+
+
+def _put_preview(store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes) -> str | None:
+    """Положить сжатую копию кадра (D219) и вернуть ссылку — или `None`.
+
+    Копия кладётся ДО записи строки: после неё строка заморожена
+    (`photos_uploaded_only_once`), и дописать копию было бы уже нельзя.
+
+    Кадр, который не читается как изображение, копии не получает, но и
+    выгрузку не валит: оригинал — доказательство и уезжает всё равно, а копия
+    нужна только для показа. Это сказано в лог, а не проглочено молча.
+    Отказ самого хранилища — отказ выгрузки, как у оригинала.
+    """
+    try:
+        копия = make_preview(data)
+    except StorageError as exc:
+        logger.warning("кадр %s проверки %s без сжатой копии: %s", photo_id, inspection_id, exc)
+        return None
+    return store.put(preview_key(inspection_id, photo_id), копия, content_type=PREVIEW_CONTENT_TYPE)
 
 
 def upload_photos(
@@ -104,8 +127,9 @@ def upload_photos(
                     continue
                 key = object_key(inspection_id, str(photo_id))
                 uri = store.put(key, data, content_type=PHOTO_CONTENT_TYPE)
+                preview_uri = _put_preview(store, inspection_id, str(photo_id), data)
                 with conn.cursor() as cur:
-                    cur.execute(_MARK_UPLOADED_SQL, (uri, photo_id))
+                    cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))
                 conn.commit()
                 uploaded += 1
     except PushError:

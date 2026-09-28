@@ -72,7 +72,7 @@ _SELECT_RETRACTED_AT_SQL = "select retracted_at from inspections where id = %s"
 #: null`) сюда не попадает: убирать нечего, и отметка «убран» на нём была бы
 #: неправдой.
 _SELECT_STORED_PHOTOS_SQL = """
-select id, storage_path
+select id, storage_path, preview_path
 from photos
 where inspection_id = %s and storage_path is not null and purged_at is null
 order by created_at, id
@@ -236,10 +236,15 @@ def _purge_photos(
     склад = storage if storage is not None else _default_storage()
 
     убрано = 0
-    for photo_id, storage_path in кадры:
-        ключ = _object_key(str(storage_path), photo_id=str(photo_id))
+    for photo_id, storage_path, preview_path in кадры:
+        # Сжатая копия (D219) уходит вместе с оригиналом: снятая проверка
+        # убирается из хранилища целиком, и копия «навсегда» к ней не относится.
+        ключи = [_object_key(str(storage_path), photo_id=str(photo_id))]
+        if preview_path:
+            ключи.append(_object_key(str(preview_path), photo_id=str(photo_id)))
         try:
-            склад.delete(ключ)
+            for ключ in ключи:
+                склад.delete(ключ)
         except StorageError as exc:
             # Наружу у снятия один тип отказа. Ловится именно `StorageError`, а
             # не `Exception`: широкий перехват подменял бы собой и ошибку в

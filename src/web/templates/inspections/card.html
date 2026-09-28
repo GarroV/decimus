@@ -19,8 +19,18 @@
       подпроцессе, и карточка, ждущая этой сборки, открывалась бы секундами
       там, где сейчас открывается сразу.
     #}
-    <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
+    <div class="row row--tight">
+      {# PDF — тот самый файл, что получил аудитор (D204); кнопка только когда
+         он сохранён: ссылка, ведущая в отказ, хуже её отсутствия. #}
+      {% if report %}
+        <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/report') }}?lang={{ lang }}">{{ t('card.report.download') }}</a>
+      {% endif %}
+      <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
+    </div>
   </div>
+  {% if not report and not failure %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none') if report_known else t('card.report.unknown') }}</div></div></div>
+  {% endif %}
 
   {% if notice %}
     <div class="note note--ok mt-gap">
@@ -137,8 +147,18 @@
       {% set mixed_speech = detail.findings|map(attribute='lang')|unique|list|length > 1 %}
       {% set zone_names = {} %}
       {% for zone in zones %}{% set _ = zone_names.update({zone.code: zone.name}) %}{% endfor %}
+      {#
+        Кадры записи (D219) — под раскрытием: развернул запись — видишь фото.
+        Сжатая копия, достаточная, чтобы было видно; по щелчку открывается
+        отдельно во всю величину копии. Запись без кадров не раскрывается —
+        раскрытие в пустоту хуже его отсутствия.
+      #}
+      {% if not photos_known %}
+        <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
+      {% endif %}
       {% for finding in detail.findings %}
-        <div class="find-row">
+        {% set shots = photos.get(finding.id, ()) %}
+        {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
           <span class="find-row__main">
@@ -149,22 +169,49 @@
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
             </span>
           </span>
+        {% if shots %}
+            <span class="find-row__shots">{{ t('card.findings.photos', n=shots|length) }}</span>
+          </summary>
+          <div class="find-row__gallery">
+            {% for shot in shots %}
+              {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
+              <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
+            {% endfor %}
+          </div>
+        </details>
+        {% else %}
         </div>
+        {% endif %}
       {% endfor %}
     {% else %}
       <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
     {% endif %}
   </section>
 
-  {% if detail.info %}
-    <div class="section">
-      <div class="section__head"><h2 class="section__title">{{ t('card.info.title') }}</h2></div>
-      <div class="card"><div class="card__body stack">
-        {% for row in detail.info %}
-          <div><span class="meta">{{ row.code }}</span><div>{{ row.text }}</div></div>
-        {% endfor %}
-      </div></div>
-    </div>
+  {# ── Информационная часть ──────────────────────────────────────────────
+     Вопрос и ответ рядом: код без вопроса человеку ничего не говорит, а «Да»
+     без вопроса не значит ничего (замечание владельца 28.09). Вопрос — из
+     методики ТОЙ версии, по которой прошла проверка; код остаётся мелкой
+     пометкой для сверки. Ответ дословно, на языке записи. #}
+  {% if info %}
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('card.info.title') }}</div>
+        <div class="ov-card__count">{{ info|length }}</div>
+      </div>
+      {% if not info_titles_found %}
+        <div class="ov-card__empty">{{ t('card.info.no_methodology') }}</div>
+      {% endif %}
+      {% for row in info %}
+        <div class="info-row">
+          <div class="info-row__question">
+            {% if row.question %}{{ row.question }}{% else %}<span class="muted">{{ row.code }}</span>{% endif %}
+            <span class="info-row__code">{{ row.code }}{% if info_titles_found and not row.question %} · {{ t('card.info.no_question') }}{% endif %}</span>
+          </div>
+          <div class="info-row__answer">{{ row.answer or '—' }}</div>
+        </div>
+      {% endfor %}
+    </section>
   {% endif %}
 
   {#

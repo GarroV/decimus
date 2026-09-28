@@ -80,6 +80,31 @@ def object_key(inspection_id: str, photo_id: str) -> str:
     return f"inspections/{inspection_id}/{photo_id}.jpg"
 
 
+#: Начало ссылки в хранилище (`S3PhotoStorage.put`).
+_URI_PREFIX = "s3://"
+
+
+def key_of_uri(storage_path: str) -> str:
+    """Ключ объекта из ссылки `s3://корзина/ключ`. Не та форма — отказ, а не догадка.
+
+    Корзина из ссылки не берётся: её называет конфигурация (`S3_BUCKET`), и
+    переезд хранилища — правка окружения, а не каждой строки (D054).
+    """
+    хвост = storage_path[len(_URI_PREFIX) :] if storage_path.startswith(_URI_PREFIX) else ""
+    if "/" not in хвост:
+        raise StorageError(f"Ссылка не в форме s3://корзина/ключ: {storage_path}")
+    return хвост.split("/", 1)[1]
+
+
+def preview_key(inspection_id: str, photo_id: str) -> str:
+    """Ключ сжатой копии кадра (D219) — рядом с оригиналом, своим именем.
+
+    Отдельное имя, а не перезапись оригинала: оригинал удаляется по D202/D213
+    своим ключом, и уборка не должна знать про копию, чтобы её не задеть.
+    """
+    return f"inspections/{inspection_id}/previews/{photo_id}.jpg"
+
+
 class S3PhotoStorage:
     """Драйвер поверх S3-совместимого API.
 
@@ -143,5 +168,24 @@ class S3PhotoStorage:
         except (BotoCoreError, ClientError) as exc:
             raise StorageError(
                 f"Хранилище не убрало объект {key} из корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
+
+    def get(self, key: str) -> bytes:
+        """Прочитать объект целиком — для выдачи отчёта из админки (D204).
+
+        Отсутствующий объект здесь — отказ, а не пустые байты: строка в
+        `reports` пишется только после того, как файл лёг (`upload_report`),
+        значит пропажа объекта — поломка хранилища, и человек должен узнать
+        об этом словами, а не получить пустой документ.
+        """
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        try:
+            ответ = self._client.get_object(Bucket=self._bucket, Key=key)
+            return ответ["Body"].read()
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не отдало объект {key} из корзины {self._bucket} "
                 f"({type(exc).__name__}): {exc}"
             ) from exc

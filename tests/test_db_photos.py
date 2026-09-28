@@ -275,3 +275,47 @@ def test_отказ_поставщика_превращается_в_отказ_
         )
         with pytest.raises(StorageError, match="no-such-bucket"):
             склад.put("inspections/x/y.jpg", b"frame", content_type="image/jpeg")
+
+
+def test_у_кадра_ложится_сжатая_копия_и_читается_только_своим_арендатором(
+    domain_env: Path, db_env: str
+) -> None:
+    """D219: копия пишется той же выгрузкой и отдаётся через проверку арендатора."""
+    import io
+
+    from PIL import Image
+
+    from src.db.previews import finding_previews, preview_bytes
+    from src.db.storage import preview_key
+
+    снимок = io.BytesIO()
+    Image.new("RGB", (3000, 2000), (200, 40, 40)).save(снимок, format="JPEG", quality=95)
+    настоящий = {"tg-real-jpeg": снимок.getvalue()}
+
+    inspection_id = _проверка_с_кадрами(31, кадры=tuple(настоящий))
+    склад = ЗаписнойСклад()
+    upload_photos(inspection_id, fetch=настоящий.get, storage=склад)
+
+    ((photo_id, finding_id, preview_path, tenant),) = _строки(
+        db_env,
+        "select p.id, p.finding_id, p.preview_path, i.tenant_code from photos p "
+        "join inspections i on i.id = p.inspection_id where p.inspection_id = %s",
+        (inspection_id,),
+    )
+    ключ = preview_key(inspection_id, str(photo_id))
+    assert preview_path == f"s3://{КОРЗИНА}/{ключ}"
+    assert len(склад.положено[ключ]) < len(настоящий["tg-real-jpeg"])
+
+    class Читатель:
+        def get(self, key: str) -> bytes:
+            return склад.положено[key]
+
+    assert finding_previews(inspection_id, tenant=str(tenant)) == {
+        str(finding_id): (str(photo_id),)
+    }
+    assert (
+        preview_bytes(inspection_id, str(photo_id), tenant=str(tenant), storage=Читатель())
+        == склад.положено[ключ]
+    )
+    assert finding_previews(inspection_id, tenant="someone-else") == {}
+    assert preview_bytes(inspection_id, str(photo_id), tenant="someone-else") is None

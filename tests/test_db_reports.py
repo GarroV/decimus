@@ -176,3 +176,32 @@ def test_ключ_объекта_повторяем_для_одних_и_тех_
     другой = report_object_key("insp-1", "abc123")
     assert один == другой
     assert report_object_key("insp-1", "abc123") != report_object_key("insp-2", "abc123")
+
+
+def test_последний_отчёт_выдаётся_своему_арендатору_и_не_выдаётся_чужому(
+    domain_env: Path, db_env: str
+) -> None:
+    """У `reports` своего арендатора нет — его проверяет присоединение проверки.
+
+    Без этого админка отдала бы документ чужой управляющей компании по
+    угаданному идентификатору (D204).
+    """
+    from src.db.reports import fetch_report, latest_report
+
+    inspection_id = _проверка(910_020)
+    склад = ЗаписнойСклад()
+    upload_report(inspection_id, data=ОТЧЁТ, storage=склад)
+    последний = upload_report(inspection_id, data=ДРУГОЙ_ОТЧЁТ, storage=склад)
+    (свой,) = _строки(db_env, "select tenant_code from inspections where id = %s", (inspection_id,))
+
+    найденный = latest_report(inspection_id, tenant=str(свой[0]))
+    assert найденный is not None
+    # Последний по времени — пересобранный, а не первый.
+    assert найденный.storage_path == последний.storage_path
+
+    class Читатель:
+        def get(self, key: str) -> bytes:
+            return склад.положено[key]
+
+    assert fetch_report(найденный, storage=Читатель()) == ДРУГОЙ_ОТЧЁТ
+    assert latest_report(inspection_id, tenant="someone-else") is None
