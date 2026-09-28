@@ -24,7 +24,7 @@ from dataclasses import dataclass
 from datetime import date
 
 from src.db import letters as letters_store
-from src.db import move, queries, reports, retract
+from src.db import move, previews, queries, reports, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
@@ -357,3 +357,13 @@ def load_report(inspection_id: str, *, tenant: str) -> reports.ReportRef | None:
 def report_bytes(ref: reports.ReportRef) -> bytes:
     """Сам файл отчёта из хранилища — ТОТ, что получил аудитор, без пересборки."""
     return reports.fetch_report(ref)
+
+
+def load_previews(inspection_id: str, *, tenant: str) -> dict[str, tuple[str, ...]]:
+    """Кадры со сжатой копией по записям проверки (D218)."""
+    return previews.finding_previews(inspection_id, tenant=tenant)
+
+
+def preview_bytes(inspection_id: str, photo_id: str, *, tenant: str) -> bytes | None:
+    """Сжатая копия одного кадра — или `None`, если её у этой проверки нет."""
+    return previews.preview_bytes(inspection_id, photo_id, tenant=tenant)

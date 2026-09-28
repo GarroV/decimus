@@ -420,6 +420,11 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This inspection has no findings.",
     },
     "card.info.title": {"ru": "Информационная часть", "en": "Information part"},
+    "card.findings.photos": {"ru": "Фото: {n}", "en": "Photos: {n}"},
+    "card.findings.photos_unknown": {
+        "ru": "Фото к записям сейчас не показать: база не ответила.",
+        "en": "Photos for the findings cannot be shown right now: the database did not answer.",
+    },
     "card.info.no_question": {
         "ru": "Формулировка вопроса не найдена в методике этой проверки",
         "en": "The question wording is not in this inspection's methodology",

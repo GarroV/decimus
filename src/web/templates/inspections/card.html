@@ -147,8 +147,18 @@
       {% set mixed_speech = detail.findings|map(attribute='lang')|unique|list|length > 1 %}
       {% set zone_names = {} %}
       {% for zone in zones %}{% set _ = zone_names.update({zone.code: zone.name}) %}{% endfor %}
+      {#
+        Кадры записи (D218) — под раскрытием: развернул запись — видишь фото.
+        Сжатая копия, достаточная, чтобы было видно; по щелчку открывается
+        отдельно во всю величину копии. Запись без кадров не раскрывается —
+        раскрытие в пустоту хуже его отсутствия.
+      #}
+      {% if not photos_known %}
+        <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
+      {% endif %}
       {% for finding in detail.findings %}
-        <div class="find-row">
+        {% set shots = photos.get(finding.id, ()) %}
+        {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
           <span class="find-row__main">
@@ -159,7 +169,19 @@
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
             </span>
           </span>
+        {% if shots %}
+            <span class="find-row__shots">{{ t('card.findings.photos', n=shots|length) }}</span>
+          </summary>
+          <div class="find-row__gallery">
+            {% for shot in shots %}
+              {% set src = url('/inspections/' ~ head.id ~ '/photos/' ~ shot) %}
+              <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
+            {% endfor %}
+          </div>
+        </details>
+        {% else %}
         </div>
+        {% endif %}
       {% endfor %}
     {% else %}
       <div class="ov-card__empty">{{ t('card.findings.empty') }}</div>
