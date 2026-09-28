@@ -43,24 +43,26 @@ class Section:
     #: экране, а признак здесь — чтобы навигация не звала человека туда, куда
     #: его не пустят: ссылка, ведущая в отказ, выглядит как поломка продукта.
     admin_only: bool = False
+    #: Иконка пункта в левой панели — имя из набора линейки (`icons.py`).
+    icon: str = "doc"
 
 
 #: Девять разделов прототипа в порядке прототипа. Построены два — «Проверки»
 #: (T319) и «Методика» (T320): объём спринта — базовая часть веб-версии
 #: (D133), а не вся она.
 SECTIONS: tuple[Section, ...] = (
-    Section(key="overview", path="/overview", built=True),
-    Section(key="registry", path="/inspections", built=True),
-    Section(key="plans", path="/plans", built=False),
-    Section(key="orders", path="/orders", built=False),
-    Section(key="country", path="/country", built=False),
-    Section(key="calendar", path="/calendar", built=False),
-    Section(key="admin", path="/admin", built=True),
-    Section(key="tenants", path="/tenants", built=False),
+    Section(key="overview", path="/overview", built=True, icon="home"),
+    Section(key="registry", path="/inspections", built=True, icon="task"),
+    Section(key="plans", path="/plans", built=False, icon="timeline"),
+    Section(key="orders", path="/orders", built=False, icon="flag"),
+    Section(key="country", path="/country", built=False, icon="globe"),
+    Section(key="calendar", path="/calendar", built=False, icon="cal"),
+    Section(key="admin", path="/admin", built=True, icon="book"),
+    Section(key="tenants", path="/tenants", built=False, icon="board"),
     # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток
     # жило в командной строке, и владелец попросил перенести его на экран.
-    Section(key="users", path="/users", built=True, admin_only=True),
-    Section(key="mini", path="/mini", built=False),
+    Section(key="users", path="/users", built=True, admin_only=True, icon="team"),
+    Section(key="mini", path="/mini", built=False, icon="tg"),
 )
 
 
@@ -111,6 +113,19 @@ def check_registry(with_screens: Iterable[str]) -> None:
             f"{', '.join(sorted(extra))}. Снимите ленту «в разработке» в "
             f"src/web/sections.py (D138)"
         )
+
+
+def current_section(path: str) -> str | None:
+    """Ключ раздела, которому принадлежит адрес: самый длинный совпавший путь.
+
+    Карточка `/inspections/<id>` принадлежит «Проверкам», `/admin/...` —
+    «Методике». Точное совпадение, как было, на вложенных страницах не
+    подсвечивало ничего, и человек терял, где он.
+    """
+    подходят = [
+        item for item in SECTIONS if path == item.path or path.startswith(item.path.rstrip("/") + "/")
+    ]
+    return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
 
 def visible_sections(account: object | None) -> tuple[Section, ...]:
