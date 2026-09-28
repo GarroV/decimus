@@ -42,8 +42,8 @@ from . import unit_card as unit_data
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
-from .origin import refuse_foreign_origin
 from .icons import icon
+from .origin import refuse_foreign_origin
 from .sections import SECTIONS, check_registry, current_section, section, visible_sections
 from .texts import UI_LANGS, lang_or_default, t
 

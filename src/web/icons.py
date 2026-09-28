@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -27,10 +28,19 @@ SVG = (
 )
 
 
+#: Путь SVG — только команды и числа. Проверяется при загрузке: в разметку
+#: значение идёт без экранирования, и всё прочее в нём — отказ.
+PATH_DATA = re.compile(r"[MmLlHhVvCcSsQqTtAaZz0-9 .,\-]+")
+
+
 @lru_cache(maxsize=1)
 def _paths() -> dict[str, str]:
     raw = json.loads(ICONS_PATH.read_text(encoding="utf-8"))
-    return {name: d for name, d in raw.items() if not name.startswith("_")}
+    paths = {name: d for name, d in raw.items() if not name.startswith("_")}
+    чужие = sorted(name for name, d in paths.items() if not PATH_DATA.fullmatch(d))
+    if чужие:
+        raise ValueError(f"В {ICONS_PATH.name} не пути SVG: {', '.join(чужие)}")
+    return paths
 
 
 def icon(name: str, width: float = 1.7) -> Markup:
@@ -38,4 +48,5 @@ def icon(name: str, width: float = 1.7) -> Markup:
     paths = _paths()
     if name not in paths:
         raise KeyError(f"Иконки «{name}» нет в {ICONS_PATH.name}; есть: {', '.join(sorted(paths))}")
-    return Markup(SVG.format(d=paths[name], width=width))
+    # Безопасно: путь проверен PATH_DATA, ширина — число.
+    return Markup(SVG.format(d=paths[name], width=float(width)))  # noqa: S704
