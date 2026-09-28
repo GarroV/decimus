@@ -1032,6 +1032,45 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-switch .pick__label { display: grid; gap: 2px; }
 .mx-switch__manage { border-top: 1px solid var(--line-2); color: var(--accent); }
 
+/* Колонка чек-листов слева, правка справа (D221). Колонка липнет к верху и
+   прокручивается своей прокруткой, только если чек-листов больше, чем влезает. */
+.mx-shell { display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.mx-main { min-width: 0; }
+.mx-rail {
+  position: sticky; top: calc(var(--topbar-h) + var(--space-5));
+  display: grid; gap: var(--space-1); align-content: start;
+  max-height: calc(100vh - var(--topbar-h) - var(--space-9)); overflow-y: auto;
+}
+.mx-rail__bot {
+  display: grid; gap: var(--space-2); margin-bottom: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
+}
+.mx-rail__bot-list { font-size: var(--fs-dense); color: var(--ink); }
+.mx-rail__link { font-size: var(--fs-meta); }
+.mx-rail__head {
+  font-size: var(--fs-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase;
+  font-weight: var(--w-semibold); color: var(--ink-3);
+}
+.mx-rail__head--list { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
+.mx-rail__row {
+  display: grid; gap: 2px; padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-control); color: var(--ink); text-decoration: none;
+  box-shadow: inset 3px 0 0 transparent;
+  transition: background var(--t-state), box-shadow var(--t-state);
+}
+.mx-rail__row:hover { background: var(--surface-2); text-decoration: none; color: var(--ink); }
+.mx-rail__row:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--accent); }
+.mx-rail__row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.mx-rail__name { font-size: var(--fs-dense); line-height: var(--lh-dense); overflow-wrap: anywhere; }
+.mx-rail__meta { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.mx-rail__bot-mark { color: var(--ok); font-weight: var(--w-semibold); }
+.mx-rail__retired { margin-top: var(--space-4); padding-top: var(--space-4); }
+/* Пока колонка на экране, название в шапке — просто заголовок: переключатель
+   дублировал бы колонку. Он возвращается, когда колонку прячет ширина. */
+.mx-shell .mx-switch .pick__caret { display: none; }
+.mx-shell .mx-switch__btn { pointer-events: none; }
+
 /* Версия — строкой под шапкой. Имя набора крупно, идентификатор мелко: он
    нужен для сверки, а не для чтения. */
 .mx-ver { margin-top: var(--space-3); font-size: var(--fs-meta); display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: baseline; }
@@ -1240,6 +1279,24 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-table { width: 100%; margin-bottom: var(--space-5); }
 .mx-table tr.is-on td { background: var(--accent-soft); }
 
+/* Колонка над подложкой панели (60) и вровень с панелью (61, она позже в DOM и
+   при наложении сверху): при открытом пункте по колонке можно уйти в другой
+   чек-лист, а не закрыть панель (D221).
+   На этой ширине панель (560px справа) колонку не накрывает. */
+@media (min-width: 1280px) {
+  .mx-rail { z-index: 61; }
+}
+@media (max-width: 1279px) {
+  .mx-shell { grid-template-columns: 13rem minmax(0, 1fr); gap: var(--space-5); }
+  .mx-rail__meta { display: none; }
+}
+@media (max-width: 1023px) {
+  .mx-shell { grid-template-columns: minmax(0, 1fr); }
+  .mx-rail { display: none; }
+  .mx-shell .mx-switch .pick__caret { display: inline; }
+  .mx-shell .mx-switch__btn { pointer-events: auto; }
+}
+
 /* Узкое окно: панель на весь экран, строка списка — код и текст. */
 @media (max-width: 52rem) {
   .mx-drawer { width: 100vw; max-width: none; border-left: 0; }
@@ -1252,6 +1309,9 @@ a.ov-table__row:hover { background: var(--surface-3); }
   .mx-search { max-width: none; flex-basis: 100%; }
   .mx-record__row { flex-direction: column; }
   .mx-record__row .input, .mx-record__row .btn { width: 100%; }
+  .mx-shell--pick .mx-rail { display: grid; position: static; max-height: none; }
+  .mx-shell--pick .mx-rail__meta { display: block; }
+  .mx-shell--pick .mx-main { display: none; }
 }
 /* Шапка раздела без нижнего отступа дизайн-системы. */
 .page--wide > .section { margin-bottom: 0; }
