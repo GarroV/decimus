@@ -1,13 +1,12 @@
 {#
-  Каркас админки: шапка, навигация столбцом слева, содержимое, нижняя
-  панель для телефона.
+  Каркас админки: панель слева, содержимое, нижняя панель для телефона.
 
-  НАВИГАЦИЯ СЛЕВА — решение владельца D192 поверх прототипа (D190). В
-  прототипе она идёт строкой в шапке, так её и построили 24.09.2026, и в тот
-  же день владелец вернул столбец: боковая навигация адекватнее. Золотые ленты
-  «в разработке» при этом НЕ возвращаются — бриф разрешает сильный цвет только
-  на букве оценки и классе нарушения, «иначе тревожным становится всё сразу»,
-  а лент было семь на один экран. Непостроенный раздел приглушён.
+  ЭТАЛОН — SWARM BRAIN (решение владельца 28.09.2026, D228; в MERIDIUS —
+  D164): «и поведение и визуал сворма ставим эталоном». Поэтому шапки над
+  содержимым больше нет: марка продукта с тенантом, поиск с ⌘K, разделы с
+  иконками, тема, язык и пользователь с выходом — всё в левой панели, как у
+  Swarm. Вид панели — ядро дизайн-системы (`.sidenav` в dodo-ds.css), а не
+  этот файл; навигация столбцом слева — D192.
 
   Навигация по-прежнему строится ИЗ ДАННЫХ (`src/web/sections.py`), а не
   перечислением в разметке: признак «построен / не построен» живёт в одном
@@ -23,68 +22,98 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{{ t('app.name') }} · {% block title %}{{ t('app.mark') }}{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  {#
+    Тема ставится ДО первой отрисовки, иначе тёмная мигает светлой на каждом
+    переходе. Выбор человека — в localStorage, «как в системе» — отсутствие
+    записи (как в Swarm).
+  #}
+  <script>!function(){try{var m=matchMedia("(prefers-color-scheme: dark)"),k="decimus-theme",a=function(){var t=null;try{t=localStorage.getItem(k)}catch(e){}document.documentElement.dataset.theme=t==="dark"||(t!=="light"&&m.matches)?"dark":"light"};a();m.addEventListener("change",a)}catch(e){}}()</script>
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
   <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='shell.js') }}" defer></script>
 </head>
 <body>
-  <header class="topbar">
-    <div class="topbar__inner">
-      <div class="topbar__brand">
-        <span class="topbar__name">{{ t('app.name') }}</span>
-        <span class="topbar__mark">Dodo</span>
-      </div>
-
-      {#
-        Тенант, кто вошёл и выход показываются только вошедшему. Форме входа
-        знать про арендатора незачем, а неопознанному человеку и подавно: код
-        арендатора — это уже сведение о стенде.
-      #}
-      {% if account %}
-        <div class="topbar__tenant" title="{{ t('app.tenant_label') }}">{{ tenant }}</div>
-      {% endif %}
-
-      <div class="topbar__spacer"></div>
-
-      <div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
-        {% for code in langs %}
-          {% if code == lang %}
-            <span class="btn btn--sm" aria-current="true">{{ code|upper }}</span>
-          {% else %}
-            <a class="btn btn--sm btn--ghost" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
-          {% endif %}
-        {% endfor %}
-      </div>
-
-      {% if account %}
-        <div class="whoami">
-          <div class="whoami__name">{{ account.login }}</div>
+  {% if not account %}
+    {#
+      До входа панели нет: разделы неопознанному человеку не показываются, а
+      код тенанта — уже сведение о стенде. Остаются марка и выбор языка.
+    #}
+    <header class="topbar">
+      <div class="topbar__inner">
+        <div class="topbar__brand">
+          <span class="topbar__name">{{ t('app.name') }}</span>
+          <span class="topbar__mark">Dodo</span>
         </div>
-        {#
-          Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
-          чужой странице, выбив человека из админки без единого его движения.
-        #}
-        <form class="logout" method="post" action="{{ url(logout_path) }}">
-          <button class="btn btn--sm btn--ghost" type="submit">{{ t('auth.logout') }}</button>
-        </form>
-      {% endif %}
-    </div>
-  </header>
+        <div class="topbar__spacer"></div>
+        {% include "_langpick.html" %}
+      </div>
+    </header>
+  {% endif %}
 
   <div class="shell">
     {% if account %}
       <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
-        {% for item in sections %}
-          {% set title = t('section.' ~ item.key ~ '.title') %}
-          {% if item.path == current_path %}
-            <span class="sidenav__current" aria-current="page">{{ title }}</span>
-          {% else %}
-            <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
-               href="{{ url(item.path) }}?lang={{ lang }}"
-               {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ title }}</a>
-          {% endif %}
-        {% endfor %}
+        <a class="sidenav__brand" href="{{ url('/overview') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
+          <img class="sidenav__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+          <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
+        </a>
+
+        {#
+          Поиск ведёт в реестр проверок по названию пиццерии. Обычная форма:
+          без скрипта работает так же, скрипт добавляет только ⌘K и Esc.
+        #}
+        <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
+          <input type="hidden" name="lang" value="{{ lang }}">
+          <label class="sidenav__field" title="{{ t('nav.search') }}">
+            {{ icon('search') }}
+            <input type="search" name="q" data-hotkey="k" placeholder="{{ t('nav.search') }}"
+                   aria-label="{{ t('nav.search') }}"
+                   value="{{ request.args.get('q', '') if current_key == 'registry' else '' }}">
+            <span class="kbd" aria-hidden="true">⌘K</span>
+          </label>
+        </form>
+
+        <div class="sidenav__list">
+          {% for item in sections %}
+            {% set title = t('section.' ~ item.key ~ '.title') %}
+            {% if item.path == current_path %}
+              <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></span>
+            {% elif item.key == current_key %}
+              {# Вложенная страница раздела: пункт подсвечен и ведёт на раздел. #}
+              <a class="sidenav__current" aria-current="location" href="{{ url(item.path) }}?lang={{ lang }}" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></a>
+            {% else %}
+              <a class="sidenav__item{% if not item.built %} is-wip{% endif %}"
+                 href="{{ url(item.path) }}?lang={{ lang }}"
+                 title="{{ title }}{% if not item.built %} · {{ t('nav.wip') }}{% endif %}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></a>
+            {% endif %}
+          {% endfor %}
+        </div>
+
+        <div class="sidenav__foot">
+          <div class="sidenav__theme" role="radiogroup" aria-label="{{ t('nav.theme') }}">
+            <span class="sidenav__theme-label">{{ t('nav.theme') }}</span>
+            {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}
+              <button type="button" role="radio" aria-checked="{{ 'true' if value == 'system' else 'false' }}"
+                      data-theme-value="{{ value }}" title="{{ t('nav.theme.' ~ value) }}"
+                      aria-label="{{ t('nav.theme.' ~ value) }}">{{ icon(name) }}</button>
+            {% endfor %}
+          </div>
+          {% include "_langpick.html" %}
+        </div>
+
+        <div class="sidenav__user">
+          <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
+          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.admin') if account.role == 'admin' else t('nav.role.auditor') }}</small></span>
+          {#
+            Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
+            чужой странице, выбив человека из админки без единого его движения.
+          #}
+          <form class="logout" method="post" action="{{ url(logout_path) }}">
+            <button class="icon-btn icon-btn--sm" type="submit" title="{{ t('auth.logout') }}" aria-label="{{ t('auth.logout') }}">{{ icon('arrow') }}</button>
+          </form>
+        </div>
       </nav>
     {% endif %}
 
@@ -94,21 +123,20 @@
   </div>
 
   {#
-    Нижняя панель — для телефона: бриф требует, чтобы основные действия
-    доставались большим пальцем одной руки, а строка навигации в шапке на
-    узком экране до него не дотягивается. На десктопе панель скрыта.
+    Нижняя панель — для телефона (уже 720px, как у Swarm): бриф требует,
+    чтобы основные действия доставались большим пальцем одной руки. На
+    компьютере её нет.
 
-    Разделы здесь ВСЕ, а не только построенные, и панель прокручивается вбок.
-    Показывать с телефона три раздела из девяти значило бы, что остальные с
-    телефона недостижимы вовсе, — а «не построен» и «до него нельзя дойти» это
-    разные вещи: первое видно по приглушению, второе выглядит как пропажа.
+    Недостроенного в ней нет (D217): десять пунктов не помещались. Карта
+    продукта целиком остаётся в боковом меню компьютера (D138).
   #}
   {% if account %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
       {% for item in sections %}
-        <a class="tabbar__item{% if item.path == current_path %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
+        <a class="tabbar__item{% if item.key == current_key %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
            href="{{ url(item.path) }}?lang={{ lang }}"
-           {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ t('section.' ~ item.key ~ '.title') }}</a>
+           {% if item.key == current_key %}aria-current="page"{% endif %}
+           {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
       {% endfor %}
     </nav>
   {% endif %}

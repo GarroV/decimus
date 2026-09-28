@@ -42,8 +42,9 @@ from . import unit_card as unit_data
 from .config import Settings, load_settings
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
+from .icons import icon
 from .origin import refuse_foreign_origin
-from .sections import SECTIONS, check_registry, section, visible_sections
+from .sections import SECTIONS, check_registry, current_section, section, visible_sections
 from .texts import UI_LANGS, lang_or_default, t
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,11 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
             "sections": visible_sections(account),
+            # Текущий раздел — по началу адреса, а не по точному совпадению:
+            # карточка проверки `/inspections/<id>` живёт в «Проверках», и
+            # панель слева обязана это показывать, как Swarm (D164).
+            "current_key": current_section(request.path),
+            "icon": icon,
             "tenant": conf.tenant,
             "current_path": request.path,
             # Внутренние ссылки собираются ЭТИМ, а не склейкой строк в шаблоне.
@@ -521,6 +527,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # городу на «Обзоре», и реестр обязан показать ровно эти проверки.
         страна = request.args.get("country", "").strip().upper()[:2]
         город = request.args.get("city", "").strip()[:80]
+        # Поиск из левой панели: часть названия пиццерии, без учёта регистра.
+        искомое = request.args.get("q", "").strip()[:80]
         гео = data.load_geography(tenant=conf.tenant)
 
         def место(row: InspectionRow) -> tuple[str, str]:
@@ -534,10 +542,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             and (not вид or row.kind == вид)
             and (not страна or место(row)[0] == страна)
             and (not город or место(row)[1] == город)
+            and (not искомое or искомое.casefold() in row.unit_name.casefold())
         )
 
         def отбор(**изменения: str) -> str:
             параметры = {
+                "q": искомое,
                 "country": страна,
                 "city": город,
                 "grade": буква,

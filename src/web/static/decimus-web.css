@@ -94,8 +94,19 @@
 .nowrap { white-space: nowrap; }
 .mt-gap { margin-top: var(--space-7); }
 
-/* Переключатель языка в шапке: язык — параметр продукта, и он виден. */
-.langpick { display: inline-flex; gap: var(--space-1); }
+/* Переключатель языка: до входа — в шапке, после — внизу левой панели.
+   Язык — параметр продукта, и он виден. Вид — как переключатель темы
+   рядом: мягкая заливка у текущего. */
+.langpick { display: inline-flex; align-items: center; gap: var(--space-1); padding: 0 var(--space-2); }
+.langpick__on, .langpick__off { display: inline-grid; place-items: center; min-width: 28px; height: 28px; padding: 0 var(--space-3); border-radius: 7px; font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-medium); }
+.langpick__on { background: var(--accent-soft); color: var(--accent); }
+.langpick__off { color: var(--ink-3); }
+.langpick__off:hover { background: var(--surface); color: var(--ink); text-decoration: none; }
+/* Панель свёрнута до иконок (720–1099px): языки встают столбиком, иначе
+   второй вылезает за край 56px. */
+@media (max-width: 1099px) {
+  .sidenav .langpick { flex-direction: column; padding: 0; }
+}
 
 /* ── Вход (T323) ─────────────────────────────────────────────────
    Своих цветов и размеров здесь нет: карточка, поля и кнопка —
@@ -123,32 +134,11 @@
   padding-top: var(--space-4); margin-top: var(--space-7);
 }
 
-/* Кто вошёл и выход — в шапке, рядом с арендатором и по его образцу. */
-.whoami { display: flex; align-items: center; gap: var(--space-5); padding-right: var(--space-6); }
-.whoami__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); text-align: right; }
-.logout { display: inline-flex; margin-left: var(--space-3); }
+/* Выход — иконкой в блоке пользователя внизу панели, как у Swarm. */
+.logout { display: inline-flex; margin-left: auto; }
+.icon-btn--sm { width: 28px; height: 28px; }
+.icon-btn--sm svg { width: 15px; height: 15px; }
 
-/* ── Шапка на телефоне ────────────────────────────────────────────
-   Ядро на узком экране растягивает КАЖДУЮ кнопку на всю ширину
-   (`dodo-ds.css`, `.btn { width: 100% }`) — это верно для кнопок
-   внутри страницы и неверно для шапки: там их несколько в ряд, и
-   растянутые они наезжают друг на друга. Поймано сверкой снимков на
-   390 px: «EN» и «Выйти» рисовались одна поверх другой и не читались.
-
-   Правится в слое продукта, а не правкой ядра: ядро — копия из
-   `forma`, и расхождение с каноном стоит дороже одного правила здесь.
-   Высота нажатия (`min-height: var(--tap-min)`) остаётся ядровой — её
-   этот блок не трогает. */
-
-@media (max-width: 767px) {
-  /* `.topbar` — нынешняя шапка (D190); `.appbar` — прежняя. Правило стояло
-     только на прежнем имени, шапка сменила класс, и на 390 px RU и EN снова
-     растягивались по 91 px, распирая страницу вбок (#360). */
-  .appbar .btn, .topbar .btn { width: auto; font-size: var(--fs-dense); }
-  .langpick, .logout { flex: 0 0 auto; }
-  .whoami { padding-right: 0; }
-  .logout { margin-left: 0; }
-}
 
 /* ── Правка методики (T320) ──────────────────────────────────────
    Формы состава чек-листа спрятаны под раскрывашку браузера, а не под свой
@@ -577,15 +567,15 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .ov-gradebar__part.tag--err { background: var(--err); }
 
 /* ═══ КАРКАС ═════════════════════════════════════════════════════════════
-   Шапка сверху, навигация СТОЛБЦОМ СЛЕВА (D192), содержимое справа. В
-   прототипе навигация шла строкой в шапке (D188, D190); владелец вернул
-   столбец — он адекватнее. Золотые ленты «в разработке» не вернулись: бриф
-   оставляет сильный цвет букве оценки и классу нарушения, больше нигде.
+   Эталон — Swarm Brain (D228): панель слева во всю высоту окна, содержимое
+   справа, шапки над содержимым нет. Вид панели — ядро (`.sidenav`), здесь
+   только раскладка. Навигация столбцом — D192.
 
    Непостроенный раздел из карты не исчезает: он приглушён яркостью, а не
    помечен плашкой. Спрятать его нельзя решением D138, кричать о нём семь раз
    на экране — нельзя брифом. */
 
+/* Шапка — только до входа: марка и язык. */
 .topbar {
   position: sticky;
   top: env(safe-area-inset-top, 0px);
@@ -593,115 +583,89 @@ a.ov-table__row:hover { background: var(--surface-3); }
   background: var(--surface-2);
   border-bottom: 1px solid var(--line);
 }
-/* Шапка во всю ширину, а не в колонку содержимого: бренд стоит над столбцом
-   навигации, иначе при широком окне он уезжает вправо от своего меню. */
-.topbar__inner {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) var(--space-4);
-}
-.topbar .whoami { white-space: nowrap; }
-.topbar .logout { flex: none; }
+.topbar__inner { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-7); }
 .topbar__brand { display: inline-flex; align-items: baseline; gap: var(--space-2); }
-.topbar__name { font-weight: var(--w-bold); letter-spacing: -.01em; }
+.topbar__name { font-weight: var(--w-bold); letter-spacing: .04em; }
 .topbar__mark { font-size: var(--fs-meta); color: var(--ink-3); }
-.topbar__tenant {
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--line);
-  border-radius: var(--r-pill);
-  font-size: var(--fs-micro);
-  font-weight: var(--w-semibold);
-  color: var(--ink-2);
-  white-space: nowrap;
-}
 .topbar__spacer { flex: 1; min-width: .5rem; }
 
 /* Переход между разделами без белой вспышки. Каждый раздел — отдельная
    страница с сервера, и без этого браузер на миг показывал пустой холст между
-   старой и новой. Шапка и столбец навигации названы отдельно: они одинаковы
-   на всех страницах и остаются на месте, плавно сменяется только содержимое.
-   Браузер, который правила не знает, просто переходит как раньше. */
+   старой и новой. Панель названа отдельно: она одинакова на всех страницах и
+   остаётся на месте, плавно сменяется только содержимое. */
 @view-transition { navigation: auto; }
-.topbar { view-transition-name: topbar; }
 .shell__nav { view-transition-name: sidenav; }
 ::view-transition-group(root) { animation-duration: .12s; }
 @media (prefers-reduced-motion: reduce) {
   @view-transition { navigation: none; }
 }
 
-/* Высота шапки нужна столбцу навигации: он прилипает сразу под ней. */
-:root { --topbar-h: 2.75rem; }
+/* Шапки после входа нет, но имя осталось: на него опираются липкие колонки
+   экранов (методика). Ноль — они прилипают к верху окна. */
+:root { --topbar-h: 0px; }
 
-.shell { display: flex; align-items: flex-start; }
-.shell__nav {
-  flex: 0 0 auto;
-  position: sticky;
-  top: var(--topbar-h);
-  min-height: calc(100vh - var(--topbar-h));
-}
+.shell { display: flex; align-items: flex-start; min-height: 100vh; }
+.shell__nav { position: sticky; top: 0; height: 100vh; }
 .shell__main { flex: 1 1 auto; min-width: 0; }
 /* Непостроенный раздел: тише остальных, но открывается и виден. */
 .sidenav__item.is-wip { color: var(--ink-empty); }
 .sidenav__item.is-wip:hover { color: var(--ink-3); }
+/* Вложенная страница раздела: пункт подсвечен, но это ссылка на раздел. */
+a.sidenav__current { cursor: pointer; }
+a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 /* Кнопка в непостроенный раздел (D139) приглушена так же, как его пункт меню. */
 .btn.is-wip { color: var(--ink-3); background: transparent; border-style: dashed; box-shadow: none; }
 
 .page {
   max-width: 85rem;
   margin: 0 auto;
-  padding: var(--space-5) var(--space-4) calc(var(--space-9) * 2);
+  padding: var(--space-9) var(--space-9) calc(var(--space-9) * 2);
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-7);
 }
 
-/* Нижняя панель телефона. На десктопе её нет вовсе — не спрятана, а не
-   отрисована: скрытая панель всё равно занимала бы фокус с клавиатуры. */
+/* Нижняя панель телефона — ниже 720px, как у Swarm. На компьютере её нет
+   вовсе: скрытая панель всё равно занимала бы фокус с клавиатуры. */
 .tabbar { display: none; }
 
-@media (max-width: 52rem) {
+@media (max-width: 719px) {
   .shell__nav { display: none; }
-  .whoami { display: none; }
+  .page { padding: var(--space-6) var(--space-7) calc(var(--space-12) + var(--tap-min)); }
   .tabbar {
     position: fixed;
     left: 0; right: 0; bottom: 0;
     z-index: 50;
     display: flex;
-    justify-content: space-around;
     gap: var(--space-1);
     padding: var(--space-2) var(--space-3);
     padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
     background: var(--surface-2);
     border-top: 1px solid var(--line);
+    overflow-x: auto;
+    scrollbar-width: none;
   }
-  /* Панель прокручивается вбок: разделов девять, и сжимать их в нечитаемые
-   огрызки хуже, чем дать провести пальцем. Полоса прокрутки скрыта — она
-   съедает высоту панели, а жест работает и без неё. */
-.tabbar { overflow-x: auto; scrollbar-width: none; }
-.tabbar::-webkit-scrollbar { display: none; }
-/* Непостроенный раздел приглушён так же, как в столбце слева: одна и та же пометка
-   на обоих поверхностях, иначе с телефона он выглядит рабочим. */
-/* На телефоне в нижней полосе недостроенного нет: десять пунктов, из них
-   шесть заглушек, не помещались, и до «Методики» приходилось листать. Карта
-   продукта целиком остаётся в боковом меню компьютера (D138, D217). */
-.tabbar__item.is-wip { display: none; }
-.tabbar__item {
-  flex: none;
-  white-space: nowrap;
-    flex: 1;
-    text-align: center;
-    padding: var(--space-2);
-    border-radius: var(--r-control);
-    font-size: var(--fs-micro);
-    font-weight: var(--w-semibold);
-    color: var(--ink-3);
-    text-decoration: none;
-    min-height: var(--tap-min);
+  .tabbar::-webkit-scrollbar { display: none; }
+  /* Недостроенного в нижней полосе нет (D217): карта продукта целиком — в
+     боковом меню компьютера (D138). */
+  .tabbar__item.is-wip { display: none; }
+  .tabbar__item {
+    flex: 1 0 auto;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2px;
+    min-height: var(--tap-min);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--r-control);
+    font-size: 10.5px;
+    font-weight: var(--w-medium);
+    color: var(--ink-3);
+    white-space: nowrap;
   }
+  .tabbar__item svg { width: 18px; height: 18px; }
+  .tabbar__item:hover { text-decoration: none; color: var(--ink); }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
 }
 
@@ -1192,14 +1156,14 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-layer.is-open { display: block; }
 .mx-scrim {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(10, 13, 17, .12);
+  background: var(--overlay-soft);
 }
 .mx-drawer {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
   width: 560px; max-width: 96vw;
   display: flex; flex-direction: column;
   background: var(--surface); border-left: 1px solid var(--line);
-  box-shadow: -18px 0 44px rgba(8, 8, 10, .10);
+  box-shadow: var(--sh-modal);
 }
 /* Выезд — только когда панель открывается из закрытого состояния: листание
    пунктов стрелками не должно дёргать её каждый раз (`methodology.js`). */
@@ -1213,24 +1177,27 @@ a.ov-table__row:hover { background: var(--surface-3); }
 
 .mx-drawer__head {
   display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-7);
+  padding: var(--space-5) var(--space-5) var(--space-5) 18px;
   border-bottom: 1px solid var(--line);
 }
 .mx-drawer__id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.mx-drawer__code { font-weight: var(--w-semibold); font-size: var(--fs-body); }
+.mx-drawer__code { font-weight: var(--w-semibold); font-size: 16px; line-height: 22px; letter-spacing: -.01em; }
 .mx-drawer__dirty { font-size: var(--fs-micro); color: var(--warn-ink); }
 /* Снизу без отступа: к низу прилипает полоса записи, и отступ под ней
    показывал бы прокручиваемый текст в щели. Воздух внизу даёт `.mx-keys`. */
-.mx-drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-7) 0; }
+.mx-drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 0; }
 .mx-drawer__body > :last-child { margin-bottom: var(--space-9); }
 .mx-drawer__title { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--w-semibold); }
 .mx-drawer__foot { margin-top: var(--space-7); }
 
 .mx-icon {
-  display: inline-grid; place-items: center; width: 36px; height: 36px;
-  border-radius: var(--r-control); color: var(--ink-2); text-decoration: none;
+  display: inline-grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 7px; color: var(--ink-2); text-decoration: none;
   transition: background var(--t-state), color var(--t-state);
 }
+.mx-icon svg { width: 18px; height: 18px; }
+.mx-icon--up svg { transform: rotate(-90deg); }
+.mx-icon--down svg { transform: rotate(90deg); }
 .mx-icon:hover { background: var(--surface-3); color: var(--ink); text-decoration: none; }
 .mx-icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mx-icon[aria-disabled="true"] { opacity: .3; pointer-events: none; }

@@ -347,9 +347,9 @@
             {% else %}<span class="tag tag--neutral tag--micro">{{ kind_title(card.get('kind')) }}</span>{% endif %}
             <span class="mx-drawer__dirty" data-mx-dirty hidden>{{ t('methodology.drawer.dirty') }}</span>
           </div>
-          <a class="mx-icon" href="{{ prev_href or '#' }}" {% if prev_href %}data-mx-prev data-mx-open{% else %}aria-disabled="true"{% endif %} aria-label="{{ t('methodology.panel.prev') }}">↑</a>
-          <a class="mx-icon" href="{{ next_href or '#' }}" {% if next_href %}data-mx-next data-mx-open{% else %}aria-disabled="true"{% endif %} aria-label="{{ t('methodology.panel.next') }}">↓</a>
-          <a class="mx-icon" href="{{ href(item='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon mx-icon--up" href="{{ prev_href or '#' }}" {% if prev_href %}data-mx-prev data-mx-open{% else %}aria-disabled="true"{% endif %} aria-label="{{ t('methodology.panel.prev') }}">{{ icon('cright') }}</a>
+          <a class="mx-icon mx-icon--down" href="{{ next_href or '#' }}" {% if next_href %}data-mx-next data-mx-open{% else %}aria-disabled="true"{% endif %} aria-label="{{ t('methodology.panel.next') }}">{{ icon('cright') }}</a>
+          <a class="mx-icon" href="{{ href(item='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <form method="post" action="{{ action('methodology_edit', code=code) }}" data-mx-form>
@@ -408,7 +408,7 @@
       {% elif adding %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.add.title') }}</div>
-          <a class="mx-icon" href="{{ href(new='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(new='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('methodology.add.hint') }}</p>
@@ -432,7 +432,7 @@
         } %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.diff.title') }}</div>
-          <a class="mx-icon" href="{{ href(diff='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(diff='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('methodology.diff.lead', current=composition.current, latest=composition.latest) }}</p>
@@ -465,8 +465,8 @@
         {% set zcode = zone_card.get('code', '') %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__id"><span class="mx-drawer__code mono" id="mx-drawer-title">{{ zcode }}</span></div>
-          <a class="mx-icon" href="{{ href(zone_card='', panel='scoring') }}" data-mx-open aria-label="{{ t('methodology.bar.scoring') }}">←</a>
-          <a class="mx-icon" href="{{ href(zone_card='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(zone_card='', panel='scoring') }}" data-mx-open aria-label="{{ t('methodology.bar.scoring') }}">{{ icon('cleft') }}</a>
+          <a class="mx-icon" href="{{ href(zone_card='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <div class="mx-drawer__title">{{ zone_names.get(zcode, zcode) }}</div>
@@ -498,7 +498,7 @@
       {% elif panel == 'scoring' %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.bar.scoring') }}</div>
-          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('methodology.scoring.lead') }}</p>
@@ -599,7 +599,7 @@
         {# Новый чек-лист (D222): форма той же двери, что на перечне; рождается черновиком. #}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('checklists.new.title') }}</div>
-          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('checklists.new.text') }}</p>
@@ -619,7 +619,7 @@
       {% elif panel == 'versions' %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.versions.title') }}</div>
-          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('methodology.versions.hint') }}</p>

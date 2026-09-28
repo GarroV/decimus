@@ -1,0 +1,10 @@
+{# Выбор языка интерфейса: текущий — не ссылка. #}
+<div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
+  {% for code in langs %}
+    {% if code == lang %}
+      <span class="langpick__on" aria-current="true">{{ code|upper }}</span>
+    {% else %}
+      <a class="langpick__off" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
+    {% endif %}
+  {% endfor %}
+</div>
