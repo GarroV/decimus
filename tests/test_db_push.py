@@ -193,3 +193,54 @@ def test_старую_проверку_без_версии_можно_слить
         db_env, "select checklist_version from inspections where id = %s", (inspection_id,)
     )
     assert найдена[0] in ("", None), "версия должна остаться пустой, а не быть придуманной"
+
+
+def test_проверка_ложится_в_базу_со_своим_чек_листом(
+    domain_env: Path, db_env: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Волна 3: код чек-листа приходит из проверки, а не из умолчания базы `bizdev`."""
+    import os
+    import shutil
+    from dataclasses import replace
+    from datetime import date
+
+    from src.mcp.checklist import Store, apply_change, current_version, publish
+    from src.mcp.checklists import create, set_bot_access, set_state
+
+    методика = tmp_path / "методика"
+    shutil.copytree(os.environ["AUDIT_DATA_DIR"], методика)
+    monkeypatch.setenv("AUDIT_DATA_DIR", str(методика))
+    store = Store(root=tmp_path / "хранилище", live=методика)
+    current_version(store)
+    rnd = replace(store, code="rnd")
+    create(rnd, tenant="t", name_ru="Аудит РНД", name_en="RnD", today=date(2026, 9, 28))
+    правка = apply_change(
+        rnd,
+        tenant="t",
+        tool="add_checklist_item",
+        command="add",
+        options={
+            "id": "RND01",
+            "process": "Проба",
+            "question-ru": "Тесто соответствует техкарте",
+            "levels": "D1",
+            "zones": "all",
+            "days": 5,
+            "criteria": "D1: проба",
+        },
+        today=date(2026, 9, 28),
+    )
+    assert правка.version is not None
+    publish(rnd, tenant="t", version=правка.version)
+    set_state(rnd, tenant="t", state="active")
+    set_bot_access(rnd, tenant="t", on=True)
+    monkeypatch.setenv("MCP_CHECKLIST_STORE", str(store.root))
+    start_inspection(21, unit="Белград-1", kind="planned", report_lang="ru", checklist_code="rnd")
+    add_finding(21, code="RND01", level="D1", zone="all", text="тесто не по техкарте")
+
+    inspection_id = push_inspection(21)
+
+    (код,) = _строки(
+        db_env, "select checklist_code from inspections where id = %s", (inspection_id,)
+    )
+    assert код == ("rnd",)
