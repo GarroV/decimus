@@ -794,6 +794,37 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
 .find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
 
+/* Запись с кадрами раскрывается (D218): строка та же, что у записи без них,
+   справа — сколько кадров, под ней — лента копий. */
+.find-row--photos { display: block; padding: 0; }
+.find-row__summary {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  cursor: pointer;
+  list-style: none;
+}
+.find-row__summary::-webkit-details-marker { display: none; }
+.find-row__summary:hover { background: var(--surface-2); }
+.find-row__summary:focus-visible { outline: 2px solid var(--ink-2); outline-offset: -2px; }
+.find-row__shots { flex: none; font-size: var(--fs-micro); color: var(--ink-2); white-space: nowrap; }
+.find-row__shots::after { content: " ▾"; }
+.find-row--photos[open] .find-row__shots::after { content: " ▴"; }
+.find-row__gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-3);
+  padding: 0 var(--space-5) var(--space-4);
+}
+.find-row__gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line-2);
+}
+
 /* ── Поле информационной части ─────────────────────────────────────────
    Вопрос слева, ответ справа: короткий ответ («Да», дата) читается рядом со
    своим вопросом, длинный переносится в своей колонке. На узком экране —

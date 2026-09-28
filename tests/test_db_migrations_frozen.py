@@ -122,6 +122,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0025_inspection_moves.sql": (
         "sql1:64b75c8660b7aaab2ceb60c2675cfc32dad983e350ead2330b9e414002de82a4"
     ),
+    "0026_photo_previews.sql": (
+        "sql1:50703c77f4e1171536a01e0c39d05834199c097f058559357d02794eb00bea1d"
+    ),
 }
 
 

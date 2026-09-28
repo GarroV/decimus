@@ -40,6 +40,7 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, *, report: ReportRef | None) ->
     monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
     monkeypatch.setattr(data, "load_report", lambda *_a, **_k: report)
     monkeypatch.setattr(data, "report_bytes", lambda _ref: ОТЧЁТ)
+    monkeypatch.setattr(data, "load_previews", lambda *_a, **_k: {})
     monkeypatch.setattr(data.info_titles, "titles", lambda *_a, **_k: (ВОПРОСЫ, FOUND))
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -124,3 +125,48 @@ def test_чужой_проверки_нет_и_файла_нет(
     ответ = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/report")
     assert ответ.status_code == 404
     assert ответ.data != ОТЧЁТ
+
+
+КАДР = "22222222-2222-2222-2222-222222222222"
+КОПИЯ = b"\xff\xd8\xff preview jpeg bytes"
+
+
+def _с_кадрами(monkeypatch: pytest.MonkeyPatch, клиент: FlaskClient, находка: str) -> None:
+    monkeypatch.setattr(data, "load_previews", lambda *_a, **_k: {находка: (КАДР,)})
+
+
+def test_запись_с_кадрами_раскрывается_и_показывает_копию(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    находка = карточка(шапка()).findings[0].id
+    _с_кадрами(monkeypatch, с_отчётом, находка)
+    html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+    assert "<details" in html
+    assert f"/inspections/{ПРОВЕРКА}/photos/{КАДР}" in html
+    assert "Photos: 1" in html
+
+
+def test_без_кадров_раскрытия_нет(с_отчётом: FlaskClient) -> None:
+    html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+    assert "<details" not in html
+
+
+def test_копия_кадра_отдаётся_картинкой_и_не_в_общий_кэш(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(data, "preview_bytes", lambda *_a, **_k: КОПИЯ)
+    ответ = с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/{КАДР}")
+    assert ответ.status_code == 200
+    assert ответ.mimetype == "image/jpeg"
+    assert ответ.data == КОПИЯ
+    assert ответ.headers["Cache-Control"].startswith("private")
+
+
+def test_чужой_или_несуществующий_кадр_404(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(data, "preview_bytes", lambda *_a, **_k: None)
+    assert с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/{КАДР}").status_code == 404
+    # Не идентификатор — 404 до базы, а не отказ разбора в ней.
+    assert с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/../../etc").status_code == 404
+    assert с_отчётом.get(f"/inspections/{ПРОВЕРКА}/photos/not-a-uuid").status_code == 404

@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import io
 import logging
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -673,6 +674,31 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             download_name=_report_name(detail.inspection),
         )
 
+    @app.get(f"{section('registry').path}/<inspection_id>/photos/<photo_id>")
+    def photo(inspection_id: str, photo_id: str) -> FlaskResponse | tuple[str, int]:
+        """Сжатая копия кадра записи (D218) — по проверке и арендатору, не по ключу.
+
+        Кадр отдаётся только через проверку этого арендатора: адрес хранилища
+        наружу не уходит вовсе, и угаданный идентификатор чужого кадра
+        отвечает тем же 404, что несуществующий.
+        """
+        if not (_is_uuid(inspection_id) and _is_uuid(photo_id)):
+            return "", 404
+        try:
+            копия = data.preview_bytes(inspection_id, photo_id, tenant=conf.tenant)
+        except DbError as exc:
+            logger.warning("кадр %s проверки %s не выдан: %s", photo_id, inspection_id, exc)
+            return "", 503
+        if копия is None:
+            return "", 404
+        ответ = FlaskResponse(копия, mimetype="image/jpeg")
+        # Копия неизменна (строка заморожена после выгрузки), поэтому браузер
+        # может держать её долго — но только у себя: кадр кухни партнёра не
+        # должен оседать в общих кэшах по дороге.
+        ответ.headers["Cache-Control"] = "private, max-age=86400"
+        ответ.headers["X-Content-Type-Options"] = "nosniff"
+        return ответ
+
     @app.get(f"{section('registry').path}/<inspection_id>/letter")
     def letter(inspection_id: str) -> str | tuple[str, int]:
         lang = _lang(conf)
@@ -945,10 +971,20 @@ def _render_card(
         отчёт = None
         отчёт_известен = False
     поля, методика_полей = data.load_info(detail, lang=lang)
+    # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
+    # роняет, записи показываются без кадров, и это сказано словами.
+    try:
+        кадры = data.load_previews(inspection_id, tenant=conf.tenant)
+        кадры_известны = True
+    except DbError:
+        кадры = {}
+        кадры_известны = False
     return render_template(
         "inspections/card.html",
         report=отчёт,
         report_known=отчёт_известен,
+        photos=кадры,
+        photos_known=кадры_известны,
         info=поля,
         info_titles_found=методика_полей == FOUND,
         moves=переносы,
@@ -1645,6 +1681,15 @@ def _letter_file(text: str, inspection_id: str) -> FlaskResponse:
     ответ.headers["Content-Disposition"] = f'attachment; filename="{_letter_name(inspection_id)}"'
     ответ.headers["X-Content-Type-Options"] = "nosniff"
     return ответ
+
+
+def _is_uuid(value: str) -> bool:
+    """Похоже ли на идентификатор. Иначе база отказала бы разбором, а не «нет»."""
+    try:
+        uuid.UUID(value)
+    except ValueError:
+        return False
+    return True
 
 
 def _card_refusal(

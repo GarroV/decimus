@@ -26,7 +26,7 @@ import psycopg
 
 from .config import check_environment, load_storage_settings
 from .errors import DbError, PushError, StorageError
-from .storage import PhotoStorage, S3PhotoStorage
+from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
 #: Чем отдаётся отчёт. Записывается в базу, а не угадывается при выдаче:
 #: документ партнёру, открытый браузером как текст, — это ровно то, что
@@ -146,9 +146,6 @@ order by r.created_at desc
 limit 1
 """
 
-#: Начало ссылки в хранилище (`S3PhotoStorage.put`).
-_URI_PREFIX = "s3://"
-
 
 @dataclass(frozen=True)
 class ReportRef:
@@ -189,21 +186,10 @@ def latest_report(inspection_id: str, *, tenant: str) -> ReportRef | None:
     )
 
 
-def report_key(storage_path: str) -> str:
-    """Ключ объекта из ссылки `s3://корзина/ключ`.
-
-    Корзина из ссылки не берётся: её называет конфигурация (`S3_BUCKET`), и
-    переезд хранилища — правка окружения, а не каждой строки (D054).
-    """
-    if not storage_path.startswith(_URI_PREFIX) or "/" not in storage_path[len(_URI_PREFIX) :]:
-        raise StorageError(f"Ссылка на отчёт не в форме s3://корзина/ключ: {storage_path}")
-    return storage_path[len(_URI_PREFIX) :].split("/", 1)[1]
-
-
 def fetch_report(ref: ReportRef, *, storage: ReportReader | None = None) -> bytes:
     """Байты отчёта из хранилища. Пустой объект — отказ, а не пустой PDF."""
     store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
-    data = store.get(report_key(ref.storage_path))
+    data = store.get(key_of_uri(ref.storage_path))
     if not data:
         raise StorageError(f"Хранилище отдало пустой объект вместо отчёта: {ref.storage_path}")
     return data
