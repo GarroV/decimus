@@ -13,12 +13,14 @@ Node не требуется вовсе — стиль приезжает гот
 
 from __future__ import annotations
 
+import io
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
 import psycopg
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request, send_file, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -28,6 +30,7 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
+from src.report.info_titles import FOUND
 
 from . import accounts, assets, auth, letter_draft, pricing, view
 from . import inspections as data
@@ -41,6 +44,8 @@ from .geo_names import city_title, country_title
 from .origin import refuse_foreign_origin
 from .sections import SECTIONS, check_registry, section, visible_sections
 from .texts import UI_LANGS, lang_or_default, t
+
+logger = logging.getLogger(__name__)
 
 #: Сколько проверок читается в реестр за раз. Предел у чтения обязателен
 #: (`queries.DEFAULT_LIMIT`), и здесь он назван явно, чтобы менять его правкой
@@ -637,6 +642,37 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     def card(inspection_id: str) -> str | tuple[str, int]:
         return _render_card(inspection_id, conf=conf, notice=None, failure=None)
 
+    @app.get(f"{section('registry').path}/<inspection_id>/report")
+    def report(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Готовый PDF проверки — тот самый файл, что получил аудитор (D204).
+
+        Пересборки нет намеренно: она дала бы второй документ, и вопрос «что
+        на руках у партнёра» снова остался бы без ответа (T336). Проверка
+        спрашивается ДО файла — она же проверяет арендатора.
+        """
+        lang = _lang(conf)
+        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        if detail is None:
+            return render_template("inspections/not_found.html"), 404
+        try:
+            ref = data.load_report(inspection_id, tenant=conf.tenant)
+            if ref is None:
+                return _card_refusal(
+                    inspection_id, conf=conf, text=t("card.report.none", lang), status=404
+                )
+            файл = data.report_bytes(ref)
+        except DbError as exc:
+            logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
+            return _card_refusal(
+                inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
+            )
+        return send_file(
+            io.BytesIO(файл),
+            mimetype=ref.content_type,
+            as_attachment=True,
+            download_name=_report_name(detail.inspection),
+        )
+
     @app.get(f"{section('registry').path}/<inspection_id>/letter")
     def letter(inspection_id: str) -> str | tuple[str, int]:
         lang = _lang(conf)
@@ -899,8 +935,22 @@ def _render_card(
         and data.retraction_available()
         and not detail.inspection.retracted
     )
+    # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
+    # хуже отсутствующей. Отказ базы здесь карточку не роняет, а честно
+    # говорит, что наличие отчёта сейчас неизвестно (как у истории переносов).
+    try:
+        отчёт = data.load_report(inspection_id, tenant=conf.tenant)
+        отчёт_известен = True
+    except DbError:
+        отчёт = None
+        отчёт_известен = False
+    поля, методика_полей = data.load_info(detail, lang=lang)
     return render_template(
         "inspections/card.html",
+        report=отчёт,
+        report_known=отчёт_известен,
+        info=поля,
+        info_titles_found=методика_полей == FOUND,
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
@@ -1595,6 +1645,24 @@ def _letter_file(text: str, inspection_id: str) -> FlaskResponse:
     ответ.headers["Content-Disposition"] = f'attachment; filename="{_letter_name(inspection_id)}"'
     ответ.headers["X-Content-Type-Options"] = "nosniff"
     return ответ
+
+
+def _card_refusal(
+    inspection_id: str, *, conf: Settings, text: str, status: int
+) -> str | tuple[str, int]:
+    """Карточка с отказом наверху и кодом ответа отказа, а не 200."""
+    страница = _render_card(inspection_id, conf=conf, notice=None, failure=text)
+    return страница if isinstance(страница, tuple) else (страница, status)
+
+
+def _report_name(head: InspectionRow) -> str:
+    """Имя файла отчёта для человека: точка и дата, как их ищут в папке загрузок.
+
+    Кавычки и переводы строки из названия точки убраны: название приходит из
+    справочника, и в заголовке ответа оно не должно становиться разметкой.
+    """
+    точка = "".join(знак for знак in head.unit_name if знак.isprintable() and знак not in '"\\/')
+    return f"{точка.strip() or 'inspection'} {head.inspection_date}.pdf"
 
 
 def _letter_name(inspection_id: str) -> str:

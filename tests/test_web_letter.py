@@ -40,6 +40,7 @@ from src.report.letters import (
     FROM_SNAPSHOT,
     PLAN_DUE_FIELD,
     LetterError,
+    Papers,
 )
 from src.web import inspections as data
 
@@ -75,7 +76,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
-    monkeypatch.setattr(data, "letter_sources", lambda: None)
+    monkeypatch.setattr(data, "letter_sources", lambda: Papers(live=None, store=None))
     monkeypatch.setattr(data, "build_letter", lambda *_a, **_k: собранное())
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     with собрать(tenant=ТЕНАНТ).test_client() as client:

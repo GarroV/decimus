@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import hashlib
 from dataclasses import dataclass
+from datetime import datetime
+from typing import Protocol
 
 import psycopg
 
 from .config import check_environment, load_storage_settings
-from .errors import PushError
+from .errors import DbError, PushError, StorageError
 from .storage import PhotoStorage, S3PhotoStorage
 
 #: Чем отдаётся отчёт. Записывается в базу, а не угадывается при выдаче:
@@ -126,3 +128,82 @@ def upload_report(
         conn.commit()
 
     return StoredReport(storage_path=uri, size_bytes=len(data), already=False)
+
+
+# ── Выдача отчёта из админки (D204, #317) ──────────────────────────────────
+#
+# Арендатор проверяется ПРИСОЕДИНЕНИЕМ проверки, а не доверием к вызывающему:
+# у `reports` своей колонки арендатора нет, и запрос без этого отдал бы
+# документ чужой управляющей компании по угаданному идентификатору.
+# Последний по времени — потому что пересобранный отчёт (без потерянного кадра)
+# ложится новой строкой, а прежний остаётся историей.
+_LATEST_REPORT_SQL = """
+select r.storage_path, r.content_type, r.size_bytes, r.created_at
+from reports r
+join inspections i on i.id = r.inspection_id
+where r.inspection_id = %(id)s and i.tenant_code = %(tenant)s
+order by r.created_at desc
+limit 1
+"""
+
+#: Начало ссылки в хранилище (`S3PhotoStorage.put`).
+_URI_PREFIX = "s3://"
+
+
+@dataclass(frozen=True)
+class ReportRef:
+    """Последний сохранённый отчёт проверки — ссылка, а не сам файл."""
+
+    storage_path: str
+    content_type: str
+    size_bytes: int
+    created_at: datetime
+
+
+class ReportReader(Protocol):
+    """Чтение объекта из хранилища — всё, что нужно выдаче отчёта."""
+
+    def get(self, key: str) -> bytes: ...
+
+
+def latest_report(inspection_id: str, *, tenant: str) -> ReportRef | None:
+    """Последний отчёт проверки этого арендатора, или `None`, если его нет.
+
+    `None` — это ответ «отчёт не сохранён» (проверка проведена до T336 или
+    отчёт не доехал), и он честно отличается от отказа базы: отказ — `DbError`.
+    """
+    settings = check_environment()
+    try:
+        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+            cur.execute(_LATEST_REPORT_SQL, {"id": inspection_id, "tenant": tenant})
+            row = cur.fetchone()
+    except psycopg.Error as exc:
+        raise DbError(f"Не удалось прочитать отчёт проверки ({type(exc).__name__})") from exc
+    if row is None:
+        return None
+    return ReportRef(
+        storage_path=str(row[0]),
+        content_type=str(row[1]),
+        size_bytes=int(row[2]),
+        created_at=row[3],
+    )
+
+
+def report_key(storage_path: str) -> str:
+    """Ключ объекта из ссылки `s3://корзина/ключ`.
+
+    Корзина из ссылки не берётся: её называет конфигурация (`S3_BUCKET`), и
+    переезд хранилища — правка окружения, а не каждой строки (D054).
+    """
+    if not storage_path.startswith(_URI_PREFIX) or "/" not in storage_path[len(_URI_PREFIX) :]:
+        raise StorageError(f"Ссылка на отчёт не в форме s3://корзина/ключ: {storage_path}")
+    return storage_path[len(_URI_PREFIX) :].split("/", 1)[1]
+
+
+def fetch_report(ref: ReportRef, *, storage: ReportReader | None = None) -> bytes:
+    """Байты отчёта из хранилища. Пустой объект — отказ, а не пустой PDF."""
+    store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
+    data = store.get(report_key(ref.storage_path))
+    if not data:
+        raise StorageError(f"Хранилище отдало пустой объект вместо отчёта: {ref.storage_path}")
+    return data

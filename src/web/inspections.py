@@ -24,11 +24,12 @@ from dataclasses import dataclass
 from datetime import date
 
 from src.db import letters as letters_store
-from src.db import move, queries, retract
+from src.db import move, queries, reports, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.domain.models import TEXT_LANGS
+from src.report import info_titles
 from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
@@ -312,3 +313,47 @@ def remember_letter(
     же, где запись. Вторая копия правил разошлась бы с первой молча.
     """
     return letters_store.save_letter(inspection_id, body=body, lang=lang, saved_by=saved_by)
+
+
+@dataclass(frozen=True)
+class InfoLine:
+    """Одно поле информационной части для экрана: вопрос и ответ рядом.
+
+    Код без вопроса человеку ничего не говорит, а ответ «Да» без вопроса не
+    значит вовсе ничего (замечание владельца 28.09). Вопрос берётся из методики
+    той версии, которой помечена проверка; нет её — `question` пуст, и экран
+    говорит это словами, а не подставляет формулировку другой версии.
+    """
+
+    code: str
+    question: str | None
+    answer: str
+
+
+def load_info(detail: InspectionDetail, *, lang: str) -> tuple[tuple[InfoLine, ...], str]:
+    """Поля информационной части с формулировками вопросов и исход поиска методики.
+
+    Язык вопроса — язык интерфейса, если методика на нём заведена, иначе язык
+    отчёта: вопрос — подпись вокруг ответа, а ответ показывается дословно,
+    как записан (`InfoRow`). Своего правила подписей здесь нет — оно общее с
+    MCP и живёт в `src/report/info_titles.py`.
+    """
+    язык = lang if lang in TEXT_LANGS else detail.inspection.report_lang
+    подписи, исход = info_titles.titles(
+        detail.inspection.checklist_version, lang=язык, papers=letter_sources()
+    )
+    строки = tuple(
+        InfoLine(code=row.code, question=подписи.get(row.code.strip().upper()), answer=row.text)
+        for row in detail.info
+    )
+    return строки, исход
+
+
+def load_report(inspection_id: str, *, tenant: str) -> reports.ReportRef | None:
+    """Последний сохранённый PDF проверки (D204) — ссылка, без самого файла."""
+    return reports.latest_report(inspection_id, tenant=tenant)
+
+
+def report_bytes(ref: reports.ReportRef) -> bytes:
+    """Сам файл отчёта из хранилища — ТОТ, что получил аудитор, без пересборки."""
+    return reports.fetch_report(ref)

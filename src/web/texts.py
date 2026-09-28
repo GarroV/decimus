@@ -420,6 +420,41 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This inspection has no findings.",
     },
     "card.info.title": {"ru": "Информационная часть", "en": "Information part"},
+    "card.info.no_question": {
+        "ru": "Формулировка вопроса не найдена в методике этой проверки",
+        "en": "The question wording is not in this inspection's methodology",
+    },
+    "card.info.no_methodology": {
+        "ru": (
+            "Методики той версии, по которой прошла проверка, на сервере нет — вопросы "
+            "показаны кодами. Формулировку из другой версии не подставляем: это был бы "
+            "другой вопрос."
+        ),
+        "en": (
+            "The methodology version this inspection was scored by is not on the server, "
+            "so questions are shown by code. Wording from another version is not "
+            "substituted: it would be a different question."
+        ),
+    },
+    "card.report.download": {"ru": "Скачать PDF", "en": "Download PDF"},
+    "card.report.none": {
+        "ru": (
+            "PDF этой проверки не сохранён: проверка проведена до того, как отчёты начали "
+            "храниться на сервере, или отчёт не доехал до хранилища."
+        ),
+        "en": (
+            "This inspection's PDF is not stored: the inspection predates server-side "
+            "report storage, or the report did not reach the storage."
+        ),
+    },
+    "card.report.unknown": {
+        "ru": "Есть ли PDF этой проверки, сейчас неизвестно: база не ответила.",
+        "en": "Whether this inspection has a PDF is unknown: the database did not answer.",
+    },
+    "card.report.failed": {
+        "ru": "PDF не выдан: хранилище или база не ответили. Попробуйте позже.",
+        "en": "The PDF could not be served: storage or database did not answer. Try again later.",
+    },
     "card.not_found.title": {"ru": "Проверка не найдена", "en": "Inspection not found"},
     "card.not_found.text": {
         "ru": (
