@@ -385,18 +385,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
     "card.build.title": {"ru": "Сборка чек-листа", "en": "Checklist build"},
     "card.build.checklist": {"ru": "Чек-лист", "en": "Checklist"},
-    "card.build.edition": {"ru": "Сборка", "en": "Build"},
-    "card.build.shape": {"ru": "Пункты и веса", "en": "Items and weights"},
-    "card.build.shape_unknown": {
-        "ru": "файлов сборки на сервере нет",
-        "en": "build files are not on the server",
-    },
-    "card.build.hint": {
-        "ru": "Проверки с одинаковыми «пунктами и весами» считаются одним чек-листом "
-        "и складываются в одну среднюю, даже если сборки разные.",
-        "en": "Inspections with the same “items and weights” count as one checklist "
-        "and share one average, even if the builds differ.",
-    },
+    "card.build.since": {"ru": "Действует с", "en": "In use since"},
+    "card.build.since_unknown": {"ru": "дата неизвестна", "en": "date unknown"},
     "card.meta": {
         "ru": "{date} · {kind} · {checklist}",
         "en": "{date} · {kind} · {checklist}",

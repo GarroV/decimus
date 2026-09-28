@@ -254,25 +254,37 @@ def test_карточка_печатает_разбивку_записанной
     assert "92" not in видимое
 
 
-def test_карточка_называет_сборку_чек_листа(
+def test_карточка_называет_сборку_датой_а_не_номером(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange — D218: какая сборка посчитала проверку, видно в справке карточки.
-    from src.web import pricing
+    # Arrange — D218: неизданная сборка своей даты не несёт, и справка берёт
+    # день первой проверки по ней; номер сборки человеку ничего не говорит.
+    from datetime import date
 
     деталь = карточка(шапка())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
-    pricing.use_reader(lambda _версия: "abc123def456")
-    try:
-        # Act
-        страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
-    finally:
-        pricing.use_reader(None)
+    monkeypatch.setattr(data, "load_edition_since", lambda **_k: date(2026, 9, 17))
+
+    # Act
+    страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
 
     # Assert
     assert "Сборка чек-листа" in страница
-    assert f"<code>{деталь.inspection.checklist_version}</code>" in страница
-    assert "<code>abc123def456</code>" in страница
+    assert ">2026-09-17</dd>" in страница
+    assert f">{деталь.inspection.checklist_version}<" not in страница
+
+
+def test_справка_о_сборке_без_базы_не_роняет_карточку(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    деталь = карточка(шапка())
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+    monkeypatch.setattr(data, "load_edition_since", lambda **_k: None)
+
+    ответ = стенд.get(f"/inspections/{деталь.inspection.id}")
+
+    assert ответ.status_code == 200
+    assert "дата неизвестна" in ответ.get_data(as_text=True)
 
 
 # --- «снятых нет» против «вам их не видно» --------------------------------

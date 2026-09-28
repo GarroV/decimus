@@ -915,7 +915,8 @@ def _render_card(
         checklist_name=_checklist_names(lang).get(
             detail.inspection.checklist_code, detail.inspection.checklist_code
         ),
-        build_shape=pricing.edition_shape(detail.inspection.checklist_version),
+        build_since=pricing.edition_day(detail.inspection.checklist_version)
+        or data.load_edition_since(tenant=conf.tenant, version=detail.inspection.checklist_version),
         may_retract=data.retraction_available() and админ,
         notice=notice,
         failure=failure,

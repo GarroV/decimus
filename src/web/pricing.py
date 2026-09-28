@@ -23,7 +23,9 @@ from collections.abc import Callable
 from functools import lru_cache
 
 from src.db.models import InspectionRow
+from src.domain.errors import ConfigError
 from src.domain.shape import scoring_shape
+from src.domain.version import published
 from src.report.letters import LetterError, pinned, sources
 
 #: Читатель цены издания: имя издания → отпечаток или `None`. Подменяется в
@@ -53,10 +55,14 @@ def use_reader(reader: ShapeReader | None) -> None:
     _reader = _shape if reader is None else reader
 
 
-def edition_shape(version: str) -> str | None:
-    """Отпечаток пунктов и весов издания для справки в карточке проверки
-    (D218); `None` — каталога издания на машине нет."""
-    return _reader(version)
+def edition_day(version: str) -> str | None:
+    """День публикации изданной сборки (`ГГГГ-ММ-ДД`); у неизданной — `None`."""
+    try:
+        найдено = pinned(version, sources())
+        издание = published(найдено[0]) if найдено else None
+    except (LetterError, ConfigError):
+        return None
+    return издание[1] if издание else None
 
 
 def price_key(row: InspectionRow) -> tuple[str, str]:
