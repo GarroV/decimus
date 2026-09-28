@@ -8,7 +8,7 @@
 
 **Tech Stack:** Flask + Jinja, CSS на токенах `dodo-ds.css`, `methodology.js` без сборки, pytest + `tests/web_harness.py`.
 
-**Spec:** `docs/superpowers/specs/2026-09-28-checklist-admin-design.md` (согласована, D226), раздел «Экран».
+**Spec:** `docs/superpowers/specs/2026-09-28-checklist-admin-design.md` (согласована, D227), раздел «Экран».
 
 ## Global Constraints
 
@@ -43,7 +43,7 @@
 - [ ] **Step 1: Failing test**
 
 ```python
-"""D221: колонка чек-листов — порядок, число пунктов, метка «бот»."""
+"""D222: колонка чек-листов — порядок, число пунктов, метка «бот»."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -79,7 +79,7 @@ RAIL_ORDER = {ACTIVE: 0, DRAFT: 1, RETIRED: 2}
 
 @dataclass(frozen=True)
 class RailRow:
-    """Строка колонки чек-листов (D221)."""
+    """Строка колонки чек-листов (D222)."""
 
     code: str
     name_ru: str
@@ -105,7 +105,7 @@ def checklist_rail(store: Store) -> tuple[RailRow, ...]:
 (`ACTIVE`, `DRAFT`, `RETIRED` уже импортированы рядом с `CHECKLIST_STATES`, `methodology.py:693`; если нет — импортировать оттуда же, откуда берётся `CHECKLIST_STATES`.)
 
 - [ ] **Step 4:** тот же прогон → PASS. Порча: убрать `sorted(...)` → тест краснеет; вернуть.
-- [ ] **Step 5:** `git commit -m "feat(web): строки колонки чек-листов (D221)"`
+- [ ] **Step 5:** `git commit -m "feat(web): строки колонки чек-листов (D222)"`
 
 ---
 
@@ -167,7 +167,7 @@ def test_без_чек_листа_в_адресе_экран_помечен_вы
 - [ ] **Step 2:** прогон → FAIL (нет `mx-rail`).
 - [ ] **Step 3:** правки `app.py`, шаблона, текстов по описанию выше.
 - [ ] **Step 4:** `./.venv/bin/python -m pytest tests/test_web_*.py -q` → всё зелёное (в том числе `test_web_checklists_screen.py:172` — на `/admin?checklist=rnd` нет `CLN01`: колонка кодов пунктов не показывает).
-- [ ] **Step 5:** commit `feat(web): «Методика» — колонка чек-листов слева (D221)`.
+- [ ] **Step 5:** commit `feat(web): «Методика» — колонка чек-листов слева (D222)`.
 
 ---
 
@@ -197,7 +197,7 @@ def test_заведение_с_экрана_методики_открывает_
 
 (`СВОЙ` — заголовок своего источника из `tests/web_harness.py`, его ждёт `refuse_foreign_origin`.)
 
-- [ ] **Step 2:** FAIL. **Step 3:** реализация. **Step 4:** `tests/test_web_*.py` зелёные; порча — убрать `back`-ветку → второй тест краснеет. **Step 5:** commit `feat(web): новый чек-лист — панелью на экране «Методики» (D221)`.
+- [ ] **Step 2:** FAIL. **Step 3:** реализация. **Step 4:** `tests/test_web_*.py` зелёные; порча — убрать `back`-ветку → второй тест краснеет. **Step 5:** commit `feat(web): новый чек-лист — панелью на экране «Методики» (D222)`.
 
 ---
 
@@ -207,7 +207,7 @@ def test_заведение_с_экрана_методики_открывает_
 - Modify: `src/web/static/decimus-web.css` — блок после `.mx-bar` (~1015) и медиа-запросы в конце блока `mx-` (~1244).
 
 ```css
-/* Колонка чек-листов слева, правка справа (D221). */
+/* Колонка чек-листов слева, правка справа (D222). */
 .mx-shell { display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .mx-rail {
   position: sticky; top: calc(var(--topbar-h) + var(--space-5));
@@ -244,7 +244,7 @@ def test_заведение_с_экрана_методики_открывает_
 
 Проверить, что `z-index: 62` колонки выше `.mx-scrim` (60) и что `position: sticky` + `z-index` на `.mx-rail` действительно поднимает её над фиксированной подложкой (стекинг-контекст `.shell`/`.page` — если нет, поднять `.mx-shell` `position: relative; z-index: 62` в том же медиа-запросе и оставить `.mx-drawer` 61 → поднять до 63). Решается осмотром, Task 5.
 
-- [ ] **Step 1:** правка CSS. **Step 2:** `tests/test_web_*.py` зелёные (стили тестами не меряются). **Step 3:** commit `feat(web): колонка чек-листов — адаптив 1280/1024/телефон (D221)`.
+- [ ] **Step 1:** правка CSS. **Step 2:** `tests/test_web_*.py` зелёные (стили тестами не меряются). **Step 3:** commit `feat(web): колонка чек-листов — адаптив 1280/1024/телефон (D222)`.
 
 ---
 
@@ -256,4 +256,4 @@ def test_заведение_с_экрана_методики_открывает_
 - [ ] **Step 1:** поднять стенд осмотра (`scratchpad/mxview/serve.py` из сессии 28.09, `VIEW_ROLE=admin VIEW_TENANT=demo`, порт 8399) и отдать осмотр субагенту с chrome-devtools на 1920, 1440, 1100, 900, 390 px. Проверить: колонка видна/узкая/скрыта по ширинам; клик по чек-листу в колонке при открытой панели пункта ведёт на чек-лист (≥1280); панель не закрывает колонку на ≥1280; телефон `/admin` — список, `/admin?checklist=bizdev` — чек-лист; `scrollWidth == clientWidth` на всех ширинах.
 - [ ] **Step 2:** поправить найденное; повторить осмотр.
 - [ ] **Step 3:** обновить `docs/12-web-admin.md` по списку выше; прогнать `make test` (тестовая база MUSPELHEIM, `.env` из основного клона — симлинком в worktree, D212).
-- [ ] **Step 4:** commit `docs: «Методика» — колонка чек-листов и заведение панелью (D221)`; PR в `main`, выкатка — по «да» владельца.
+- [ ] **Step 4:** commit `docs: «Методика» — колонка чек-листов и заведение панелью (D222)`; PR в `main`, выкатка — по «да» владельца.

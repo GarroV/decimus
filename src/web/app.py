@@ -1211,7 +1211,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
     def checklists_create() -> str | Response:
         refuse_foreign_origin()
         form = request.form
-        # Форма панели «Методики» (D221) возвращает человека туда же, откуда он заводил.
+        # Форма панели «Методики» (D222) возвращает человека туда же, откуда он заводил.
         с_методики = form.get("back") == "admin"
         state = method.load_store()
         if state.store is None:
@@ -1510,7 +1510,7 @@ def _render_methodology(
         "methodology/index.html",
         composition=состав,
         checklists=перечень,
-        # Колонка слева (D221). Без чек-листа в адресе экран помечен выбором:
+        # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.
         rail=колонка,
         picking=not _который(request),
