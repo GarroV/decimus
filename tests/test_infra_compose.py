@@ -574,3 +574,20 @@ def test_database_is_marked_for_the_platform_backup() -> None:
         "сервис db не помечен backup.pgdump=true: попадание базы проверок в дампы "
         "площадки держится только на имени образа postgres"
     )
+
+
+@requires_docker
+def test_bot_reads_the_methodology_store_read_only(resolved: dict[str, dict]) -> None:
+    """Волна 3, #430: бот берёт чек-листы из того же хранилища, куда пишет админка.
+
+    Без тома публикация из «Методики» переставляла указатель, а бот продолжал
+    проверять по каталогу хоста — «опубликовано» при неизменном боте.
+    """
+    бот = resolved["bot"]
+    # Админка монтирует именованный том `methodology` (#404); у бота — он же.
+    assert mounts(бот).get("/app/methodology") == "methodology", (
+        "бот и админка смотрят в разные хранилища версий"
+    )
+    том = next(v for v in бот["volumes"] if v["target"] == "/app/methodology")
+    assert том.get("read_only") is True, "бот обязан читать хранилище, а не писать в него"
+    assert бот["environment"].get("MCP_CHECKLIST_STORE") == "/app/methodology"
