@@ -18,6 +18,9 @@ from .version import published
 
 DATA_DIR_VAR = "AUDIT_DATA_DIR"
 STATE_DIR_VAR = "STATE_DIR"
+#: Хранилище версий методики (D049, D183). Необязательна: без неё бот работает
+#: по одному чек-листу из AUDIT_DATA_DIR, как до волны 3.
+CHECKLIST_STORE_VAR = "MCP_CHECKLIST_STORE"
 
 #: Файлы методики. Движок при нехватке файла тихо берёт его из своей копии
 #: данных (`engine/../data`), то есть считает по смеси двух методик, — поэтому
@@ -64,6 +67,9 @@ class Settings:
     data_dir: Path
     state_dir: Path
     audit_script: Path
+    #: Хранилище версий методики — откуда бот берёт чек-листы, открытые в боте
+    #: (волна 3). `None` — не задано: один чек-лист `bizdev` из `data_dir`.
+    checklist_store: Path | None = None
 
 
 def _required_path(env: Mapping[str, str], name: str) -> Path:
@@ -78,6 +84,11 @@ def _required_path(env: Mapping[str, str], name: str) -> Path:
     # симлинками (и в разработке, и томом контейнера). Разворачивать их означало
     # бы показывать в отказах путь, которого человек у себя не увидит.
     return Path(os.path.abspath(os.path.expanduser(raw)))
+
+
+def _optional_path(env: Mapping[str, str], name: str) -> Path | None:
+    raw = (env.get(name) or "").strip()
+    return Path(os.path.abspath(os.path.expanduser(raw))) if raw else None
 
 
 def assert_no_checklist_fork(where: Path) -> None:
@@ -102,6 +113,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         data_dir=_required_path(src, DATA_DIR_VAR),
         state_dir=_required_path(src, STATE_DIR_VAR),
         audit_script=_REPO_ROOT / "engine" / "audit.py",
+        checklist_store=_optional_path(src, CHECKLIST_STORE_VAR),
     )
 
 

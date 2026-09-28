@@ -54,6 +54,7 @@ from .checklist_layout import (
     applied,
     check_slug,
     check_state,
+    in_bot_of,
     known,
     point_prod_at,
     read_meta,
@@ -110,22 +111,6 @@ def _meta_or_default(store: Store) -> Meta:
     if карточка is not None:
         return карточка
     return Meta(code=store.code, name_ru=store.code, name_en=store.code, state=ACTIVE)
-
-
-def in_bot_of(карточка: Meta, space: str, code: str, в_проде: tuple[str, str] | None) -> bool:
-    """Доступен ли чек-лист в боте — с учётом карточек до волны 3.
-
-    Флаг карточки решает, когда он записан. Нет ключа — наследуем прежний смысл:
-    в боте тот, на кого смотрит верхний указатель `current`. Так хранилище
-    прода после выката показывает ровно то, по чему проверки шли вчера, и
-    мигрировать его не нужно. Снятый и черновик в боте не бывают, что бы ни
-    стояло во флаге: флаг — намерение, «в работе» — годность.
-    """
-    if карточка.state != ACTIVE:
-        return False
-    if карточка.in_bot is not None:
-        return карточка.in_bot
-    return в_проде == (space, code)
 
 
 def _published_edition(store: Store) -> str | None:

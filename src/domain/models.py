@@ -181,6 +181,9 @@ class Inspection:
     checklist_version: str
     tenant: str
     city: str = ""
+    #: Код чек-листа, по которому идёт проверка (волна 3). До неё чек-лист был
+    #: один, и проверки без кода — это он.
+    checklist_code: str = "bizdev"
     partner: str = ""
     contact: str = ""
     auditor: str = ""
