@@ -1130,6 +1130,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .mx-botlist__what { display: grid; gap: 2px; min-width: 0; }
 .mx-botlist__name { font-size: var(--fs-dense); color: var(--ink); overflow-wrap: anywhere; }
 .mx-botlist__meta { font-size: var(--fs-micro); color: var(--ink-3); }
+.mx-botlist__stuck { font-size: var(--fs-meta); color: var(--warn-ink); }
 .mx-botlist__why {
   flex: none; font-size: var(--fs-micro); color: var(--ink-3);
   padding: 2px var(--space-3); border: 1px dashed var(--line-strong); border-radius: 999px; cursor: help;

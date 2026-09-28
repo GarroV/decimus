@@ -62,7 +62,16 @@ def available(settings: Settings) -> list[BotChecklist]:
 
     Чек-лист без опубликованного издания сюда не попадает, даже с флагом: снять
     с него снимок нечем. Снятый и черновик не попадают по `in_bot_of`.
+
+    Годность перепроверяется на каждом чтении теми же заслонами, что у
+    переключателя (`bot_block`): флаг ставится однажды, а издания публикуются
+    потом сколько угодно, и пустое издание открытого чек-листа дало бы проверку
+    без единого вопроса — 100% и высшую оценку партнёру.
     """
+    # Отложенный импорт: `src.mcp.checklists` тянет `src.domain.config`, а пакет
+    # `src.domain` при загрузке тянет этот модуль — на верхнем уровне вышел бы круг.
+    from src.mcp.checklists import bot_block
+
     root = settings.checklist_store
     if root is None or not root.is_dir() or not known(root):
         return _legacy(settings)
@@ -71,8 +80,11 @@ def available(settings: Settings) -> list[BotChecklist]:
     for space, code in known(root):
         if space != DEFAULT_SPACE:
             continue
-        карточка = read_meta(Store(root=root, live=settings.data_dir, space=space, code=code))
+        store = Store(root=root, live=settings.data_dir, space=space, code=code)
+        карточка = read_meta(store)
         if карточка is None or not in_bot_of(карточка, space, code, в_проде):
+            continue
+        if bot_block(store) is not None:
             continue
         источник = root / space / code / CURRENT_LINK
         if not источник.is_dir():

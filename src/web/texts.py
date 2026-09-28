@@ -1098,6 +1098,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.bot.on": {"ru": "в боте", "en": "in bot"},
     "methodology.bot.off": {"ru": "выключен", "en": "off"},
     "methodology.bot.toggle": {"ru": "Доступ в боте: {name}", "en": "Bot access: {name}"},
+    "methodology.bot.stuck": {
+        "ru": "Открыт, но бот его не даёт: {why}",
+        "en": "Open, but the bot doesn't offer it: {why}",
+    },
     "methodology.bot.why.draft": {"ru": "черновик", "en": "draft"},
     "methodology.bot.why.draft.hint": {
         "ru": "Переведите в работу — черновик ещё правят",

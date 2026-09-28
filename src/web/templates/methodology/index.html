@@ -653,14 +653,17 @@
                 <div class="mx-botlist__what">
                   <span class="mx-botlist__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
                   <span class="mx-botlist__meta">{{ t('checklists.state.' ~ r.state) }} · {{ t('methodology.bot.items', count=r.items if r.items is not none else 0) }}</span>
+                  {% if r.wants_bot and r.bot_block %}
+                    <span class="mx-botlist__stuck">{{ t('methodology.bot.stuck', why=t('methodology.bot.why.' ~ r.bot_block)) }}</span>
+                  {% endif %}
                 </div>
-                {% if r.in_bot or not r.bot_block %}
+                {% if r.wants_bot or not r.bot_block %}
                   <form method="post" action="{{ action('methodology_bot', code=r.code) }}">
-                    <input type="hidden" name="on" value="{{ '0' if r.in_bot else '1' }}">
-                    <button type="submit" class="mx-toggle{% if r.in_bot %} is-on{% endif %}" role="switch" aria-checked="{{ 'true' if r.in_bot else 'false' }}"
+                    <input type="hidden" name="on" value="{{ '0' if r.wants_bot else '1' }}">
+                    <button type="submit" class="mx-toggle{% if r.wants_bot %} is-on{% endif %}" role="switch" aria-checked="{{ 'true' if r.wants_bot else 'false' }}"
                             aria-label="{{ t('methodology.bot.toggle', name=(r.name_ru if lang == 'ru' else (r.name_en or r.name_ru))) }}">
                       <span class="mx-toggle__track" aria-hidden="true"><span class="mx-toggle__knob"></span></span>
-                      <span class="mx-toggle__text">{{ t('methodology.bot.on') if r.in_bot else t('methodology.bot.off') }}</span>
+                      <span class="mx-toggle__text">{{ t('methodology.bot.on') if r.wants_bot else t('methodology.bot.off') }}</span>
                     </button>
                   </form>
                 {% else %}

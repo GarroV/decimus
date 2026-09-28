@@ -742,12 +742,17 @@ class RailRow:
     name_ru: str
     name_en: str
     state: str
-    #: Доступен аудиторам в боте (волна 3): флаг карточки и «в работе».
+    #: Бот действительно даёт начать по нему проверку (волна 3): флаг поднят и
+    #: заслонов нет. Этим числом говорит блок «Доступ в боте».
     in_bot: bool
     #: Пунктов с нарушением в опубликованном издании; `None` — издания нет.
     items: int | None
     #: Почему в бот открыть нельзя — код (`checklists.BOT_BLOCK_*`), `None` — можно.
     bot_block: str | None = None
+    #: Флаг методиста «открыть в боте». Бывает поднят у негодного чек-листа —
+    #: если после открытия опубликовали пустое издание; такой флаг переключатель
+    #: обязан уметь снять.
+    wants_bot: bool = False
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
@@ -780,9 +785,10 @@ def checklist_rail(store: Store) -> tuple[RailRow, ...]:
                 name_ru=c.name_ru,
                 name_en=c.name_en,
                 state=c.state,
-                in_bot=c.in_bot,
+                in_bot=c.in_bot and нельзя is None,
                 items=сводка.items if сводка else None,
                 bot_block=нельзя,
+                wants_bot=c.in_bot,
             )
         )
     return tuple(sorted(строки, key=_rail_key))
