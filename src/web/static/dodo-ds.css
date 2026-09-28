@@ -1,4 +1,4 @@
-/* forma dodo/core/dodo-ds.css sha256:765e6eb03eec441ca767656dfd96a0ed183b87cb1e131daa6beedeea0db5a2ca — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/core/dodo-ds.css sha256:813f51cfd2e256915068c56ffa38b1f1eea5f7571b0984286ac8e5231e392637 — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DODO — ЕДИНАЯ ДИЗАЙН-СИСТЕМА ТРЁХ ПРОДУКТОВ
    Собрана 17.09.2026 из двух источников:
@@ -6,8 +6,11 @@
        каталог: слой бренда + токены + компоненты + доменный слой P&L;
      • visual-kit.css — MERIDIUS (чек-листы), куда система пришла из P&L
        по решению D013: «берём визуальный язык, структуру экранов — нет».
-   Третий потребитель — DECIMUS (аудиты сети): до сборки жил на своей
-   палитре (#5B57F2, Manrope, радиусы 12px) и подлежит переводу на эту.
+   Третий потребитель — DECIMUS (аудиты сети).
+
+   28.09.2026 эталоном линейки стал Swarm Brain — единственный продукт с
+   живыми пользователями (MERIDIUS D164): палитра, шрифты, радиусы, левая
+   панель и выдвижная панель справа взяты оттуда. Разбор — docs/decisions.md.
 
    Родословная у файлов одна, поэтому сборка — не компромисс двух вкусов,
    а снятие расхождений, накопленных при копировании. Что разошлось и как
@@ -104,60 +107,117 @@
         типографики уехали в продукт, файлов не было вовсе, и владелец
         увидел старый на вид экран.
 
-   Начертания переменные (один файл несёт все веса диапазона), подмножества
-   разделены `unicode-range`: кириллица не скачивается на латинском экране.
-   Space Grotesk кириллицы не имеет вовсе — он держит только числа, и это его
-   работа: см. --font-num. Обновление: файлы взяты из Google Fonts (лицензия
-   OFL), пересобираются тем же способом, каким собраны, — запросом CSS c
-   `family=Manrope:wght@400..800&family=Space+Grotesk:wght@400..700`. */
+   Эталон линейки — Swarm Brain (решение владельца 28.09.2026, MERIDIUS D164):
+   интерфейс набирается Golos Text, служебное — счётчики, роли, метаданные,
+   подсказки клавиш — IBM Plex Mono. Golos переменный (один файл на все веса),
+   Plex Mono статичный: 400, 500, 600. Подмножества разделены `unicode-range`:
+   кириллица не скачивается на латинском экране. Файлы — из fontsource
+   (лицензия OFL): `@fontsource-variable/golos-text`, `@fontsource/ibm-plex-mono`.
+   Manrope и Space Grotesk (D188) сняты вместе со сменой эталона. */
 
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Golos Text';
   font-style: normal;
-  font-weight: 400 800;
+  font-weight: 400 900;
   font-display: swap;
-  src: url('fonts/manrope-latin.woff2') format('woff2');
+  src: url('fonts/golos-text-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Golos Text';
   font-style: normal;
-  font-weight: 400 800;
+  font-weight: 400 900;
   font-display: swap;
-  src: url('fonts/manrope-latin-ext.woff2') format('woff2');
+  src: url('fonts/golos-text-latin-ext.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Golos Text';
   font-style: normal;
-  font-weight: 400 800;
+  font-weight: 400 900;
   font-display: swap;
-  src: url('fonts/manrope-cyrillic.woff2') format('woff2');
+  src: url('fonts/golos-text-cyrillic.woff2') format('woff2');
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 @font-face {
-  font-family: 'Manrope';
+  font-family: 'Golos Text';
   font-style: normal;
-  font-weight: 400 800;
+  font-weight: 400 900;
   font-display: swap;
-  src: url('fonts/manrope-cyrillic-ext.woff2') format('woff2');
+  src: url('fonts/golos-text-cyrillic-ext.woff2') format('woff2');
   unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
 }
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'IBM Plex Mono';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: url('fonts/space-grotesk-latin.woff2') format('woff2');
+  src: url('fonts/ibm-plex-mono-latin-400.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: 'Space Grotesk';
+  font-family: 'IBM Plex Mono';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: url('fonts/space-grotesk-latin-ext.woff2') format('woff2');
+  src: url('fonts/ibm-plex-mono-latin-ext-400.woff2') format('woff2');
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-cyrillic-400.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-latin-500.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-latin-ext-500.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-cyrillic-500.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-latin-600.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-latin-ext-600.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('fonts/ibm-plex-mono-cyrillic-600.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
 }
 
 /* ═══ СЛОЙ 1. ТОКЕНЫ ЯДРА ════════════════════════════════════════════════ */
@@ -166,33 +226,33 @@
 
 :root {
   /* ── Поверхности ─────────────────────────────────────────── */
-  --canvas:          #E4E4E7;   /* фон приложения */
+  --canvas:          #F7F9FB;   /* фон приложения */
   --surface:         #FFFFFF;   /* таблицы, карточки, поповеры */
-  --surface-2:       #FAFAFA;   /* итоги, зоны только для чтения */
-  --surface-3:       #F4F4F5;   /* шапка таблицы, тулбар */
-  --surface-head:    #E4E4E7;   /* закреплённые ячейки шапки */
+  --surface-2:       #F7F9FB;   /* итоги, зоны только для чтения */
+  --surface-3:       #F1F4F7;   /* шапка таблицы, тулбар */
+  --surface-head:    #ECEFF3;   /* закреплённые ячейки шапки */
   --surface-glass:   rgba(255, 255, 255, .72);   /* шапка приложения поверх прокрутки */
 
   /* ── Текст ───────────────────────────────────────────────── */
-  --ink:             #121214;   /* числа и основной текст */
-  --ink-2:           #52525B;   /* подписи, второстепенное */
-  --ink-3:           #636369;   /* надстрочные, метаданные — затемнён до порога доступности (D044): 5,97 на --surface, 4,70 на --canvas */
-  --ink-empty:       #A1A1AA;   /* «нет значения» — только для прочерка */
+  --ink:             #1B2028;   /* числа и основной текст */
+  --ink-2:           #5C6672;   /* подписи, второстепенное */
+  --ink-3:           #656E7A;   /* надстрочные, метаданные — затемнён до порога доступности (D044): 5,97 на --surface, 4,70 на --canvas */
+  --ink-empty:       #A3AAB4;   /* «нет значения» — только для прочерка */
   --ink-inverse:     #FFFFFF;
 
   /* ── Линии ───────────────────────────────────────────────── */
-  --line:            #E4E4E7;   /* строки таблицы, границы блоков */
-  --line-2:          #F4F4F5;   /* колонки внутри группы */
-  --line-strong:     #D4D4D8;   /* границы групп колонок, закреплённые края */
-  --line-control:    #D4D4D8;   /* поля и кнопки */
-  --line-control-2:  #A1A1AA;   /* наведение, пунктир выгрузки */
+  --line:            #ECEFF3;   /* строки таблицы, границы блоков */
+  --line-2:          #F3F5F8;   /* колонки внутри группы */
+  --line-strong:     #DCE1E7;   /* границы групп колонок, закреплённые края */
+  --line-control:    #DCE1E7;   /* поля и кнопки */
+  --line-control-2:  #B4BCC6;   /* наведение, пунктир выгрузки */
 
   /* ── Акцент ──────────────────────────────────────────────── */
-  --accent:          #5B57F2;
-  --accent-hover:    #6F6BF5;
-  --accent-press:    #4A46D6;
-  --accent-soft:     #EEEDFE;
-  --accent-line:     #D6D4FB;
+  --accent:          #1F4E9C;
+  --accent-hover:    #2A5DB0;
+  --accent-press:    #173D7C;
+  --accent-soft:     #E8EEF8;   /* акцентный текст на ней обязан проходить порог: 6,86 */
+  --accent-line:     #C9D9F0;
 
   /* ── Внимание ────────────────────────────────────────────
      Родство с брендом теперь несёт сам акцент (D188), поэтому янтарь
@@ -210,10 +270,10 @@
   --up:              #0E7A51;
 
   /* ── Ошибка и падение ────────────────────────────────────── */
-  --err:             #A63A25;
-  --err-soft:        #FBE7E2;
-  --err-line:        #F2CFC6;
-  --down:            #A63A25;
+  --err:             #C53030;
+  --err-soft:        #FBE9E9;
+  --err-line:        #F3CACA;
+  --down:            #C53030;
 
   /* ── Категориальные тона ─────────────────────────────────────
      Не статус, а вид сущности: регистр учёта (Maximus), тип
@@ -229,20 +289,22 @@
 
 
   /* ── Служебные поверхности компонентов ───────────────────── */
-  --seg-track:            #D4D4D8;  /* дорожка переключателя среза */
-  --surface-selected:     #F5F4FE;  /* выбранная строка инбокса */
-  --overlay:              rgba(9, 9, 11, .5);
+  --seg-track:            #ECEFF3;  /* дорожка переключателя среза */
+  --surface-selected:     #E8EEF8;  /* выбранная строка инбокса */
+  --overlay:              rgba(10, 13, 17, .5);
+  --overlay-soft:         rgba(10, 13, 17, .12);  /* подложка выдвижной панели: фон виден */
+  --glow-sm:              0 0 0 transparent;      /* неон текущего пункта — только в тёмной */
 
 
 
   /* ── Типографика ─────────────────────────────────────────── */
-  --font-ui:  'Manrope', 'Segoe UI', system-ui, sans-serif;
-  /* Числа набираются НЕ моноширинным: Space Grotesk с табличными цифрами даёт
-     ту же колонку (знак одной ширины), но не выпадает из интерфейса плотностью
-     и рисунком. Моноширинный годился, пока язык строился вокруг ведомости;
-     у Decimus числа стоят рядом с текстом на карточках, и моно там читается
-     вставкой из другого документа (D188). */
-  --font-num: 'Space Grotesk', 'Manrope', system-ui, sans-serif;
+  --font-ui:  'Golos Text', 'Segoe UI', system-ui, sans-serif;
+  /* Числа — тем же Golos с табличными цифрами (.num): колонка ровная, а текст
+     и число рядом на карточке не выглядят вставками из разных документов.
+     Моноширинный — для служебного, как в Swarm: счётчики в меню, роль под
+     именем, подсказка клавиш, идентификаторы (D164). */
+  --font-num:  'Golos Text', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   --fs-display: 20px;   --lh-display: 26px;   /* h1 экрана */
   --fs-title:   16px;   --lh-title:   22px;   /* заголовок блока */
@@ -280,20 +342,20 @@
 
   /* ── Радиусы ─────────────────────────────────────────────── */
   --r-mark:     4px;   /* чекбоксы, цветные метки */
-  --r-control: 10px;   /* кнопки, поля */
-  --r-block:   12px;   /* карточки, таблицы, поповеры */
-  --r-screen:  18px;   /* диалоги, внешняя рамка экрана */
+  --r-control: 8px;   /* кнопки, поля */
+  --r-block:   10px;   /* карточки, таблицы, поповеры */
+  --r-screen:  14px;   /* диалоги, внешняя рамка экрана */
   --r-pill:   999px;   /* срез, фильтры, метки — форма говорит «выбирается» */
 
   /* ── Тени ────────────────────────────────────────────────── */
   --sh-xs:    0 1px 2px rgba(8, 8, 10, .05);
   --sh-card:  0 1px 2px rgba(8, 8, 10, .05), 0 10px 28px -14px rgba(8, 8, 10, .12);
   --sh-pop:   0 2px 6px rgba(8, 8, 10, .06), 0 18px 44px -12px rgba(8, 8, 10, .18);
-  --sh-modal: 0 40px 90px -28px rgba(8, 8, 10, .38);
+  --sh-modal: 0 22px 70px rgba(10, 13, 17, .3);
 
   /* ── Фокус: виден всегда, мышь не нужна ──────────────────── */
-  --focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 4px rgba(91, 87, 242, .45);
-  --focus-soft: rgba(91, 87, 242, .14);   /* мягкое кольцо на полях ввода */
+  --focus-ring: 0 0 0 2px #FFFFFF, 0 0 0 4px rgba(31, 78, 156, .45);
+  --focus-soft: rgba(31, 78, 156, .14);   /* мягкое кольцо на полях ввода */
   --focus-outline: 2px solid var(--accent);
 
   /* ── Движение ────────────────────────────────────────────── */
@@ -334,33 +396,33 @@
 
 [data-theme="dark"] {
   /* ── Поверхности ─────────────────────────────────────────── */
-  --canvas:          #08080A;
-  --surface:         #121214;
-  --surface-2:       #18181B;
-  --surface-3:       #1F1F23;
-  --surface-head:    #26262A;
-  --surface-glass:   rgba(18, 18, 20, .72);
+  --canvas:          #070A10;
+  --surface:         #0D1220;
+  --surface-2:       #131A2E;
+  --surface-3:       #172036;
+  --surface-head:    #1E2A45;
+  --surface-glass:   rgba(13, 18, 32, .72);
 
   /* ── Текст ───────────────────────────────────────────────── */
-  --ink:             #F4F4F5;
-  --ink-2:           #A1A1AA;
-  --ink-3:           #8E8E96;   /* осветлён до порога доступности (D044) */
-  --ink-empty:       #52525B;
-  --ink-inverse:     #08080A;
+  --ink:             #EAF2FF;
+  --ink-2:           #93A4C3;
+  --ink-3:           #8093B8;   /* осветлён до порога доступности (D044) */
+  --ink-empty:       #4A5A7A;
+  --ink-inverse:     #04121A;
 
   /* ── Линии ───────────────────────────────────────────────── */
-  --line:            #26262A;
-  --line-2:          #1C1C20;
-  --line-strong:     #3F3F46;
-  --line-control:    #3F3F46;
-  --line-control-2:  #52525B;
+  --line:            #1E2A45;
+  --line-2:          #172036;
+  --line-strong:     #2A3A5C;
+  --line-control:    #2A3A5C;
+  --line-control-2:  #3B4F78;
 
   /* ── Акцент ──────────────────────────────────────────────── */
-  --accent:          #8E8AFF;
-  --accent-hover:    #A5A2FF;
-  --accent-press:    #B9B7FF;
-  --accent-soft:     #1E1B3A;
-  --accent-line:     #35316B;
+  --accent:          #00E5FF;
+  --accent-hover:    #5CEBFF;
+  --accent-press:    #8FF2FF;
+  --accent-soft:     #0A2230;
+  --accent-line:     #134A5C;
 
   /* ── Внимание ────────────────────────────────────────────── */
   --warn:            #E8C77A;
@@ -376,10 +438,10 @@
   --up:              #4ED08F;
 
   /* ── Ошибка и падение ────────────────────────────────────── */
-  --err:             #FF8A73;
-  --err-soft:        #2A1512;
-  --err-line:        #55302C;
-  --down:            #FF8A73;
+  --err:             #E05252;
+  --err-soft:        #2A1216;
+  --err-line:        #55282E;
+  --down:            #E05252;
 
   /* ── Категориальные тона ─────────────────────────────────────── */
   --cat-violet:      #C88BF5;
@@ -391,9 +453,11 @@
 
 
   /* ── Служебные поверхности компонентов ───────────────────── */
-  --seg-track:            #26262A;
-  --surface-selected:     #1E1B3A;
-  --overlay:              rgba(4, 4, 6, .72);
+  --seg-track:            #1E2A45;
+  --surface-selected:     #0A2230;
+  --overlay:              rgba(4, 6, 10, .72);
+  --overlay-soft:         rgba(4, 6, 10, .35);
+  --glow-sm:              0 0 10px rgba(0, 229, 255, .55), 0 0 22px rgba(0, 229, 255, .2);
 
 
 
@@ -403,8 +467,8 @@
   --sh-pop:   0 2px 6px rgba(0, 0, 0, .5), 0 16px 40px -12px rgba(0, 0, 0, .7);
   --sh-modal: 0 40px 90px -28px rgba(0, 0, 0, .8);
 
-  --focus-ring: 0 0 0 2px #08080A, 0 0 0 4px rgba(142, 138, 255, .55);
-  --focus-soft: rgba(142, 138, 255, .30);
+  --focus-ring: 0 0 0 2px #070A10, 0 0 0 4px rgba(0, 229, 255, .55);
+  --focus-soft: rgba(0, 229, 255, .22);
 }
 
 /* Тёмная тема не печатается: бумага всегда белая. */
@@ -922,18 +986,136 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
 .card__body { padding: var(--space-7); }
 
 /* ── Боковая навигация ───────────────────────────────────────────
-   Как в чек-листах: раздел — надстрочной прописной, пункт без рамок и
-   без иконок ради иконок, текущий — мягкая заливка и полоса слева
-   внутренней тенью (рамка ломала бы скругление). */
+   Эталон — левая панель Swarm Brain (D164). Сверху марка продукта с
+   подписью пространства, под ней поиск с подсказкой ⌘K, дальше пункты:
+   иконка 16px, подпись, тихий счётчик моноширинным справа. Текущий —
+   мягкая заливка и полоса 2px слева внутренней тенью (рамка ломала бы
+   скругление), в тёмной теме — ещё и неон. Внизу: тема, служебные
+   пункты, пользователь. Ширина 216px; от 720 до 1099px панель
+   сворачивается до 56px иконок, подписи уходят в title. Ниже 720px
+   панели нет — там нижняя полоса вкладок продукта.
 
-.sidenav { display: flex; flex-direction: column; gap: 2px; min-width: 216px; padding: var(--space-7) var(--space-5); background: var(--surface); border-right: 1px solid var(--line); }
-.sidenav__group { padding: var(--space-7) var(--space-6) var(--space-3); font-size: var(--fs-micro); letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-bold); }
+     <nav class="sidenav">
+       <a class="sidenav__brand">  img.sidenav__logo  .sidenav__name > b + small
+       <form class="sidenav__search"> label.sidenav__field > svg input kbd.kbd
+       <div class="sidenav__list">  .sidenav__group  a.sidenav__item | span.sidenav__current
+       <div class="sidenav__foot">  .sidenav__theme  a.sidenav__item …
+       <div class="sidenav__user">  .avatar  .sidenav__who > b + small
+*/
+
+.sidenav { display: flex; flex-direction: column; width: 216px; flex-shrink: 0; min-height: 0; background: var(--surface-2); border-right: 1px solid var(--line); }
+.sidenav__brand { display: flex; align-items: center; gap: var(--space-5); padding: 14px var(--space-7); border-bottom: 1px solid var(--line); color: var(--ink); }
+.sidenav__brand:hover { text-decoration: none; color: var(--ink); }
+.sidenav__logo { width: 28px; height: 28px; flex-shrink: 0; border-radius: 7px; }
+.sidenav__name { display: flex; flex-direction: column; min-width: 0; }
+.sidenav__name b { font-size: 13.5px; line-height: 18px; font-weight: var(--w-bold); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidenav__name small { font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.sidenav__search { padding: var(--space-5) var(--space-4) 0; }
+.sidenav__field { display: flex; align-items: center; gap: var(--space-4); height: 30px; padding: 0 var(--space-5); border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink-3); transition: border-color var(--t-state) var(--ease); }
+.sidenav__field:hover { border-color: var(--line-control-2); }
+.sidenav__field:focus-within { border-color: var(--accent); }
+.sidenav__field svg { width: 13px; height: 13px; flex-shrink: 0; }
+.sidenav__field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; }
+.sidenav__field input::placeholder { color: var(--ink-3); }
+.sidenav__field input:not(:placeholder-shown) + .kbd { display: none; }
+
+.sidenav__list { display: flex; flex-direction: column; gap: 2px; flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-5) var(--space-4); }
+.sidenav__group { padding: var(--space-6) var(--space-5) var(--space-2); font-size: var(--fs-micro); letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: var(--w-semibold); }
 .sidenav__group:first-child { padding-top: var(--space-2); }
-.sidenav__item { display: flex; align-items: center; gap: var(--space-5); min-height: 38px; padding: 0 var(--space-6); border-radius: var(--r-control); color: var(--ink-2); font-size: var(--fs-lead); }
-.sidenav__item:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.sidenav__item, .sidenav__current { position: relative; display: flex; align-items: center; gap: var(--space-5); width: 100%; height: 34px; padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; font: inherit; font-size: 13.5px; text-align: left; white-space: nowrap; cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.sidenav__item { color: var(--ink-2); }
+.sidenav__item:hover { background: var(--surface); color: var(--ink); text-decoration: none; }
 /* Инвариант: текущий пункт — span[aria-current], не ссылка. */
-.sidenav__current { display: flex; align-items: center; gap: var(--space-5); min-height: 38px; padding: 0 var(--space-6); border-radius: var(--r-control); background: var(--accent-soft); color: var(--accent); font-size: var(--fs-lead); font-weight: var(--w-semibold); box-shadow: inset 3px 0 0 var(--accent); }
-.sidenav__count { margin-left: auto; font-family: var(--font-num); font-size: var(--fs-num-sm); color: var(--ink-3); }
+.sidenav__current { background: var(--accent-soft); color: var(--accent); font-weight: var(--w-semibold); box-shadow: inset 2px 0 0 var(--accent), var(--glow-sm); cursor: default; }
+.sidenav__item svg, .sidenav__current svg { width: 16px; height: 16px; flex-shrink: 0; }
+.sidenav__label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sidenav__count { margin-left: auto; font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-regular); color: var(--ink-3); }
+
+.sidenav__foot { display: flex; flex-direction: column; gap: 2px; padding: var(--space-4); border-top: 1px solid var(--line); }
+.sidenav__theme { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); padding: 0 var(--space-2); }
+.sidenav__theme-label { flex: 1; font-size: 12px; color: var(--ink-3); }
+.sidenav__theme button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); cursor: pointer; }
+.sidenav__theme button:hover { background: var(--surface); color: var(--ink); }
+.sidenav__theme button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
+.sidenav__theme svg { width: 15px; height: 15px; }
+
+.sidenav__user { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--line); }
+.sidenav__who { display: flex; flex-direction: column; min-width: 0; }
+.sidenav__who b { font-size: 13px; line-height: 17px; font-weight: var(--w-semibold); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sidenav__who small { font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+
+@media (max-width: 1099px) {
+  .sidenav { width: 56px; }
+  .sidenav__brand { justify-content: center; padding-left: 0; padding-right: 0; }
+  .sidenav__name, .sidenav__label, .sidenav__group, .sidenav__who, .sidenav__theme-label, .sidenav__field input, .sidenav__field .kbd { display: none; }
+  .sidenav__field { justify-content: center; padding: 0; }
+  .sidenav__item, .sidenav__current { justify-content: center; padding: 0; }
+  .sidenav__count { position: absolute; top: 2px; right: 4px; font-size: 9.5px; }
+  .sidenav__theme { flex-direction: column; }
+  .sidenav__user { justify-content: center; padding-left: 0; padding-right: 0; }
+}
+
+/* ── Подсказка клавиши и аватар ─────────────────────────────────── */
+
+.kbd { display: inline-block; padding: 0 var(--space-2); border: 1px solid var(--line-strong); border-bottom-width: 2px; border-radius: var(--r-mark); font-family: var(--font-mono); font-size: 10px; line-height: 14px; color: var(--ink-3); }
+.avatar { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-size: 10px; font-weight: var(--w-bold); }
+
+/* ── Выдвижная панель справа ──────────────────────────────────────
+   Эталон — «Изменить задачу» Swarm Brain (D164): работа с элементом
+   списка, не уводя со страницы. Список остаётся виден под лёгкой
+   подложкой; 560px, во всю высоту, граница только слева. Шапка:
+   заголовок, действия-иконки (удалить, закрыть); прокручивается только
+   тело. Закрывают Esc, крестик и клик по подложке — это обязанность
+   продукта, CSS даёт только вид.
+
+     <div class="drawer-layer">
+       <a|button class="drawer-scrim" aria-label="Закрыть">
+       <aside class="drawer" role="dialog" aria-labelledby="…">
+         <header class="drawer__head"> h2.drawer__title  .drawer__actions > .icon-btn
+         <div class="drawer__body"> …  .prow …
+         <footer class="drawer__foot"> (необязателен)
+*/
+
+.drawer-layer { position: fixed; inset: 0; z-index: 50; }
+.drawer-scrim { position: absolute; inset: 0; background: var(--overlay-soft); border: 0; animation: drawer-fade var(--t-pop) var(--ease) both; }
+.drawer { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; width: 560px; max-width: 96vw; height: 100dvh; background: var(--surface); border-left: 1px solid var(--line); box-shadow: var(--sh-modal); animation: drawer-in var(--t-pop) var(--ease) both; }
+.drawer__head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-6); padding: var(--space-5) 18px; border-bottom: 1px solid var(--line); }
+.drawer__title { margin: 0; font-size: 16px; line-height: 22px; font-weight: var(--w-semibold); letter-spacing: -.01em; color: var(--ink); }
+.drawer__actions { display: flex; align-items: center; gap: var(--space-2); flex-shrink: 0; }
+.drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px; }
+.drawer__foot { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-4); padding: var(--space-6) 18px; border-top: 1px solid var(--line); background: var(--surface-2); }
+.drawer__section { padding: var(--space-6) 0; border-top: 1px solid var(--line); }
+.drawer__section:first-child { border-top: 0; padding-top: 0; }
+.drawer__section-title { margin: 0 0 var(--space-4); font-size: var(--fs-lead); font-weight: var(--w-semibold); color: var(--ink); }
+
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-2); cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.icon-btn:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.icon-btn--danger:hover { color: var(--err); }
+.icon-btn svg { width: 18px; height: 18px; }
+
+@keyframes drawer-in { from { opacity: 0; transform: translateX(2rem); } }
+@keyframes drawer-fade { from { opacity: 0; } }
+
+@media (max-width: 719px) {
+  .drawer { width: 100vw; max-width: 100vw; border-left: 0; }
+}
+
+/* ── Строка свойства ──────────────────────────────────────────────
+   Иконка и подпись слева, значение справа — как свойства задачи в
+   Swarm. Нажимается вся строка; пустое значение — прочерком. */
+
+.props { display: flex; flex-direction: column; gap: 2px; }
+.prow { display: flex; align-items: center; gap: var(--space-5); width: 100%; min-height: 34px; padding: 0 var(--space-4); border: 1px solid transparent; border-radius: var(--r-block); background: transparent; color: var(--ink); font: inherit; text-align: left; }
+a.prow:hover, button.prow:hover, label.prow:hover { background: var(--surface-2); text-decoration: none; color: var(--ink); }
+.prow__label { display: flex; align-items: center; gap: var(--space-5); flex-shrink: 0; font-size: 12.5px; color: var(--ink-2); }
+.prow__label svg { width: 15px; height: 15px; color: var(--ink-3); }
+.prow__value { margin-left: auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-body); font-weight: var(--w-medium); color: var(--ink); }
+.prow__value--empty { color: var(--ink-3); font-weight: var(--w-regular); }
+
+@media (prefers-reduced-motion: reduce) {
+  .drawer, .drawer-scrim { animation: none; }
+}
 
 /* ── Метка ───────────────────────────────────────────────────────
    Обобщение трёх независимых изобретений одной формы: .role (P&L),

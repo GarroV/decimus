@@ -623,7 +623,7 @@ def test_адрес_без_отпечатка_перепроверяется(с�
 
 def test_шрифт_кешируется_на_неделю_без_отпечатка(стенд: FlaskClient) -> None:
     # Act
-    ответ = стенд.get("/static/fonts/manrope-cyrillic.woff2")
+    ответ = стенд.get("/static/fonts/golos-text-cyrillic.woff2")
 
     # Assert
     assert ответ.status_code == 200
