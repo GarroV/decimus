@@ -360,7 +360,7 @@ def report_bytes(ref: reports.ReportRef) -> bytes:
 
 
 def load_previews(inspection_id: str, *, tenant: str) -> dict[str, tuple[str, ...]]:
-    """Кадры со сжатой копией по записям проверки (D218)."""
+    """Кадры со сжатой копией по записям проверки (D219)."""
     return previews.finding_previews(inspection_id, tenant=tenant)
 
 

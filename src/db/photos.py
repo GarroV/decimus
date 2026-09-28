@@ -66,7 +66,7 @@ def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> No
 
 
 def _put_preview(store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes) -> str | None:
-    """Положить сжатую копию кадра (D218) и вернуть ссылку — или `None`.
+    """Положить сжатую копию кадра (D219) и вернуть ссылку — или `None`.
 
     Копия кладётся ДО записи строки: после неё строка заморожена
     (`photos_uploaded_only_once`), и дописать копию было бы уже нельзя.

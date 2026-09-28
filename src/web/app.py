@@ -676,7 +676,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.get(f"{section('registry').path}/<inspection_id>/photos/<photo_id>")
     def photo(inspection_id: str, photo_id: str) -> FlaskResponse | tuple[str, int]:
-        """Сжатая копия кадра записи (D218) — по проверке и арендатору, не по ключу.
+        """Сжатая копия кадра записи (D219) — по проверке и арендатору, не по ключу.
 
         Кадр отдаётся только через проверку этого арендатора: адрес хранилища
         наружу не уходит вовсе, и угаданный идентификатор чужого кадра

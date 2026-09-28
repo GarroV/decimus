@@ -141,14 +141,14 @@ def test_запись_с_кадрами_раскрывается_и_показы
     находка = карточка(шапка()).findings[0].id
     _с_кадрами(monkeypatch, с_отчётом, находка)
     html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
-    assert "<details" in html
+    assert "find-row--photos" in html
     assert f"/inspections/{ПРОВЕРКА}/photos/{КАДР}" in html
     assert "Photos: 1" in html
 
 
 def test_без_кадров_раскрытия_нет(с_отчётом: FlaskClient) -> None:
     html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
-    assert "<details" not in html
+    assert "find-row--photos" not in html
 
 
 def test_копия_кадра_отдаётся_картинкой_и_не_в_общий_кэш(

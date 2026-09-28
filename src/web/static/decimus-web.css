@@ -794,7 +794,7 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .find-row__text { font-size: var(--fs-dense); line-height: var(--lh-body); }
 .find-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-2); }
 
-/* Запись с кадрами раскрывается (D218): строка та же, что у записи без них,
+/* Запись с кадрами раскрывается (D219): строка та же, что у записи без них,
    справа — сколько кадров, под ней — лента копий. */
 .find-row--photos { display: block; padding: 0; }
 .find-row__summary {
