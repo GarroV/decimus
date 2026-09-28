@@ -603,7 +603,8 @@
         </header>
         <div class="mx-drawer__body">
           <p class="field-note">{{ t('checklists.new.text') }}</p>
-          <form method="post" action="{{ url_for('checklists_create') }}?lang={{ lang }}" class="form-grid">
+          {# Адрес — через `action`: он несёт `?checklist=`, и отказ вернёт человека на тот же чек-лист (#382). #}
+          <form method="post" action="{{ action('checklists_create') }}" class="form-grid">
             <input type="hidden" name="back" value="admin">
             <label><span class="field-label">{{ t('checklists.new.name_ru') }}</span>
               <input class="input" type="text" name="name_ru" required autocomplete="off"></label>

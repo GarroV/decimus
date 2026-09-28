@@ -255,3 +255,25 @@ def test_отказ_заведения_с_методики_остаётся_в_�
     assert "mx-layer is-open" in страница
     assert 'name="name_ru"' in страница
     assert "note--error" in страница
+
+
+def test_отказ_заведения_возвращает_на_тот_же_чек_лист(клиент: FlaskClient) -> None:
+    """#382 в новом месте: форма без `?checklist=` вернула бы человека в боевой."""
+    войти(клиент)
+    клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd", "name_ru": "Аудит РНД", "name_en": "RnD audit"},
+        headers={"Origin": СВОЙ},
+    )
+    панель = клиент.get("/admin?checklist=rnd&panel=new").get_data(as_text=True)
+    действие = панель.split('name="back"', 1)[0].rsplit("<form", 1)[1]
+    адрес = действие.split('action="', 1)[1].split('"', 1)[0].replace("&amp;", "&")
+
+    ответ = клиент.post(
+        адрес,
+        data={"code": "Плохой код", "name_ru": "Х", "name_en": "X", "back": "admin"},
+        headers={"Origin": СВОЙ},
+    )
+
+    страница = ответ.get_data(as_text=True)
+    assert 'class="mx-rail__row is-on" href="/admin?checklist=rnd' in страница

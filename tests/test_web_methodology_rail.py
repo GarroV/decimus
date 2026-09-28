@@ -45,3 +45,18 @@ def test_колонка_в_работе_раньше_черновиков_сня
     assert строки[0].items and строки[0].items > 0
     # Черновик рождается изданием из бланка: пунктов с нарушением у него ноль.
     assert строки[1].items == 0
+
+
+def test_битый_чек_лист_не_роняет_колонку(хранилище: method.Store) -> None:
+    """Испорченные ставки одного чек-листа — «—» в его строке, а не 500 всего экрана."""
+    method.checklists_overview(хранилище)
+    method.create_checklist(
+        хранилище, tenant="default", author="t", code="rnd", name_ru="РНД", name_en="RnD"
+    )
+    for ставки in (хранилище.root / "hq" / "rnd").rglob("scoring.json"):
+        ставки.write_text("{ не json", encoding="utf-8")
+
+    строки = {r.code: r for r in method.checklist_rail(хранилище)}
+
+    assert строки["rnd"].items is None
+    assert строки["bizdev"].items and строки["bizdev"].items > 0
