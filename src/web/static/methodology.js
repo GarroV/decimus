@@ -185,4 +185,17 @@
   initPanel();
   remember();
   window.addEventListener("pagehide", remember);
+
+  // --- Липкий блок поиска ------------------------------------------------
+  // Метка «прилип»: нулевой щуп стоит прямо над блоком, ушёл за верх окна —
+  // блок прилип. Без скрипта блок липнет так же, просто без тени.
+  (function () {
+    var probe = document.querySelector("[data-mx-stick-probe]");
+    var stick = document.querySelector("[data-mx-stick]");
+    if (!probe || !stick || !("IntersectionObserver" in window)) return;
+    new IntersectionObserver(function (entries) {
+      var e = entries[0];
+      stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < 0);
+    }).observe(probe);
+  })();
 })();
