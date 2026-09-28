@@ -254,6 +254,27 @@ def test_карточка_печатает_разбивку_записанной
     assert "92" not in видимое
 
 
+def test_карточка_называет_сборку_чек_листа(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — D218: какая сборка посчитала проверку, видно в справке карточки.
+    from src.web import pricing
+
+    деталь = карточка(шапка())
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+    pricing.use_reader(lambda _версия: "abc123def456")
+    try:
+        # Act
+        страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
+    finally:
+        pricing.use_reader(None)
+
+    # Assert
+    assert "Сборка чек-листа" in страница
+    assert f"<code>{деталь.inspection.checklist_version}</code>" in страница
+    assert "<code>abc123def456</code>" in страница
+
+
 # --- «снятых нет» против «вам их не видно» --------------------------------
 
 
