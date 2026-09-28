@@ -685,3 +685,25 @@ def test_издание_без_методики_на_машине_сравним
 
     # Act / Assert
     assert ov._comparable(ряд) is False
+
+
+def test_пункт_на_одной_точке_системным_не_считается(monkeypatch: pytest.MonkeyPatch) -> None:
+    """«Системные» — пункт, нарушенный на двух точках и больше.
+
+    Пункт на одной точке — это одна точка, её показывают «Проблемные точки».
+    До правки блок перечислял всё подряд, и на демо все шесть «системных»
+    стояли с подписью «точек: 1».
+    """
+
+    # Arrange
+    class База(ЗаписнаяБаза):
+        def systemic_findings(self, **kw: object) -> list[tuple[str, str, int, int, str, str]]:
+            return [("K-1", "D1", 5, 3, "", ""), ("K-2", "D1", 4, 1, "", "")]
+
+    monkeypatch.setattr(ov, "queries", База())
+
+    # Act
+    данные = ov.load(tenant=ТЕНАНТ, limit=50, today=date(2026, 9, 24))
+
+    # Assert
+    assert [item.code for item in данные.systemic] == ["K-1"]

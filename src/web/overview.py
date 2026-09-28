@@ -27,6 +27,9 @@ from .pricing import price_key
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
 TOP = 6
+#: С какого числа точек нарушение пункта считается системным. Пункт на одной
+#: точке — это одна точка, и её уже показывают «Проблемные точки».
+SYSTEMIC_MIN_UNITS = 2
 
 #: Класс, сжигающий долю зоны целиком. Живёт кодом, не словом (D025).
 CRITICAL = "D3"
@@ -600,6 +603,9 @@ def load(
             for code, level, records, units, text, lang in queries.systemic_findings(
                 tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
             )
+            # Запрос отдаёт пункты по убыванию числа точек, поэтому отсев после
+            # предела не теряет ни одного системного.
+            if units >= SYSTEMIC_MIN_UNITS
         ),
         attention=_attention(rows, counts=counts),
         problem_units=tuple(sorted(rows, key=lambda r: r.pct)[:TOP]),

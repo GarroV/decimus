@@ -211,6 +211,25 @@ def _pick(
     return Pick(label=label, current=current, current_title=выбранное, options=tuple(опции))
 
 
+def _checklist_names(lang: str) -> dict[str, str]:
+    """Имена чек-листов по коду — для строки реестра, где есть только код.
+
+    Хранилище не настроено или отказало — пусто, и строка покажет код: реестр
+    проверок не про методику и из-за неё не падает.
+    """
+    state = method.load_store()
+    if state.store is None:
+        return {}
+    try:
+        перечень = method.checklists_overview(state.store)
+    except MethodologyRefused:
+        return {}
+    return {
+        item.code: (item.name_ru if lang == "ru" else item.name_en) or item.name_ru or item.code
+        for item in перечень
+    }
+
+
 def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
     """Формулировки пунктов методики по коду — для экранов, где есть только код.
 
@@ -598,6 +617,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             picks=tuple(чипы),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
+            # Чек-лист в строке называется, только когда их в реестре больше
+            # одного: иначе это одно и то же слово в каждой строке. Издание
+            # (хэш) в строку не идёт — оно на карточке проверки.
+            checklist_names=(
+                _checklist_names(язык) if len({row.checklist_code for row in строки}) > 1 else None
+            ),
             # Буквы — шкалой, а не по частоте: полоса отбора не должна менять
             # порядок от выборки к выборке (то же правило, что на обзоре).
             grades=("A", "B", "C", "D"),
@@ -886,6 +911,9 @@ def _render_card(
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         kind=_kind_title(detail.inspection.kind, lang),
+        checklist_name=_checklist_names(lang).get(
+            detail.inspection.checklist_code, detail.inspection.checklist_code
+        ),
         may_retract=data.retraction_available() and админ,
         notice=notice,
         failure=failure,

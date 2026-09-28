@@ -51,8 +51,17 @@
       </div>
       <div class="head-line__grow">
         <div class="card__title">{{ head.unit_name }}</div>
-        <div class="card__meta">{{ t('card.meta', date=head.inspection_date, kind=kind, version=head.checklist_version) }}</div>
-        <div class="meta">{{ t('card.score.note', deductions=detail.deductions, findings=head.findings_count) }}</div>
+        {# Издание методики — подсказкой к имени чек-листа: хэш в строке
+           читается как мусор, а нужен он только при разборе расхождений. #}
+        <div class="card__meta" title="{{ head.checklist_version }}">{{ t('card.meta', date=head.inspection_date, kind=kind, checklist=checklist_name) }}</div>
+        {# Сколько вычтено и записи по классам — одной строкой: отдельный блок
+           «Записи по классам» под шапкой занимал целый ряд ради трёх меток. #}
+        <div class="meta row row--tight head-line__counts">
+          <span>{{ t('card.score.note', deductions=detail.deductions) }}</span>
+          {% for line in counts %}
+            <span class="tag {{ line.tone }}">{{ line.level }}<span class="tag__note">{{ line.count }}</span></span>
+          {% endfor %}
+        </div>
       </div>
       <span class="tag {% if head.retracted %}tag--err{% else %}tag--neutral{% endif %} tag--micro">
         {{ t('state.retracted') if head.retracted else t('state.sealed') }}
@@ -68,26 +77,18 @@
         <div class="card__fact-label">{{ t('card.fact.city') }}</div>
         <div>{{ city_title(head.city) or '—' }}</div>
       </div>
-      <div class="card__fact">
-        <div class="card__fact-label">{{ t('card.fact.partner') }}</div>
-        <div>{{ head.partner or '—' }}</div>
-      </div>
+      {% if head.partner %}
+        <div class="card__fact">
+          <div class="card__fact-label">{{ t('card.fact.partner') }}</div>
+          <div>{{ head.partner }}</div>
+        </div>
+      {% endif %}
       <div class="card__fact">
         <div class="card__fact-label">{{ t('card.fact.report_lang') }}</div>
         <div>{{ head.report_lang }}</div>
       </div>
     </div>
 
-    <div class="card__body">
-      <div class="card__fact-label">{{ t('card.counts.title') }}</div>
-      <div class="row row--tight mt-gap">
-        {% for line in counts %}
-          <span class="tag {{ line.tone }}">{{ line.level }}<span class="tag__note">{{ line.count }}</span></span>
-        {% else %}
-          <span class="muted">—</span>
-        {% endfor %}
-      </div>
-    </div>
   </div>
 
   {# ── Потери по блокам чек-листа ────────────────────────────────────────
@@ -105,7 +106,7 @@
         <span class="zone-row__name">
           {{ zone.name }}
           <span class="zone-row__meta">
-            {{ zone.code }} · {{ t('card.zones.col.share') }}: {{ zone.share }}
+            {{ t('card.zones.col.share') }}: {{ zone.share }}
             {%- if zone.zeroed %} · {{ t('card.zones.zeroed') }}{% endif %}
           </span>
         </span>
@@ -113,8 +114,11 @@
           <span class="ov-bar__part" style="flex:{{ zone.fill }};background:var(--err)"></span>
           <span class="ov-bar__part" style="flex:{{ 100 - zone.fill }}"></span>
         </span>
-        <span class="ov-num ov-num--strong{% if zone.fill %} ov-num--err{% endif %}">−{{ zone.loss }}</span>
-        <span class="ov-num zone-row__left">{{ zone.left }}</span>
+        {# Зона без потерь — ноль, а не «−0.0»: минус перед нулём читается
+           как потеря, которой не было. #}
+        <span class="ov-num ov-num--strong{% if zone.fill %} ov-num--err{% else %} ov-cell__muted{% endif %}"
+              title="{{ t('card.zones.col.loss') }}">{% if zone.fill %}−{{ zone.loss }}{% else %}0{% endif %}</span>
+        <span class="ov-num zone-row__left" title="{{ t('card.zones.col.left') }}">{{ zone.left }}</span>
       </div>
     {% endfor %}
   </section>
@@ -130,6 +134,11 @@
       <div class="ov-card__count">{{ head.findings_count }}</div>
     </div>
     {% if detail.findings %}
+      {# Язык речи — только когда он в проверке не один: иначе это одна и та
+         же пометка в каждой строке. Зона — именем, а не кодом. #}
+      {% set mixed_speech = detail.findings|map(attribute='lang')|unique|list|length > 1 %}
+      {% set zone_names = {} %}
+      {% for zone in zones %}{% set _ = zone_names.update({zone.code: zone.name}) %}{% endfor %}
       {% for finding in detail.findings %}
         <div class="find-row">
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
@@ -137,9 +146,9 @@
           <span class="find-row__main">
             <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
             <span class="find-row__meta">
-              {{ finding.code }} · {{ finding.zone }}
+              {{ finding.code }} · {{ zone_names.get(finding.zone, finding.zone) }}
               {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
-              · {{ t('card.findings.speech_lang', lang=finding.lang) }}
+              {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
             </span>
           </span>
         </div>
