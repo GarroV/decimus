@@ -102,6 +102,11 @@
 .langpick__on { background: var(--accent-soft); color: var(--accent); }
 .langpick__off { color: var(--ink-3); }
 .langpick__off:hover { background: var(--surface); color: var(--ink); text-decoration: none; }
+/* Панель свёрнута до иконок (720–1099px): языки встают столбиком, иначе
+   второй вылезает за край 56px. */
+@media (max-width: 1099px) {
+  .sidenav .langpick { flex-direction: column; padding: 0; }
+}
 
 /* ── Вход (T323) ─────────────────────────────────────────────────
    Своих цветов и размеров здесь нет: карточка, поля и кнопка —
@@ -1151,14 +1156,14 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .mx-layer.is-open { display: block; }
 .mx-scrim {
   position: fixed; inset: 0; z-index: 60;
-  background: rgba(10, 13, 17, .12);
+  background: var(--overlay-soft);
 }
 .mx-drawer {
   position: fixed; top: 0; right: 0; bottom: 0; z-index: 61;
   width: 560px; max-width: 96vw;
   display: flex; flex-direction: column;
   background: var(--surface); border-left: 1px solid var(--line);
-  box-shadow: -18px 0 44px rgba(8, 8, 10, .10);
+  box-shadow: var(--sh-modal);
 }
 /* Выезд — только когда панель открывается из закрытого состояния: листание
    пунктов стрелками не должно дёргать её каждый раз (`methodology.js`). */
@@ -1172,24 +1177,27 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 
 .mx-drawer__head {
   display: flex; align-items: center; gap: var(--space-2);
-  padding: var(--space-4) var(--space-5) var(--space-4) var(--space-7);
+  padding: var(--space-5) var(--space-5) var(--space-5) 18px;
   border-bottom: 1px solid var(--line);
 }
 .mx-drawer__id { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.mx-drawer__code { font-weight: var(--w-semibold); font-size: var(--fs-body); }
+.mx-drawer__code { font-weight: var(--w-semibold); font-size: 16px; line-height: 22px; letter-spacing: -.01em; }
 .mx-drawer__dirty { font-size: var(--fs-micro); color: var(--warn-ink); }
 /* Снизу без отступа: к низу прилипает полоса записи, и отступ под ней
    показывал бы прокручиваемый текст в щели. Воздух внизу даёт `.mx-keys`. */
-.mx-drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: var(--space-6) var(--space-7) 0; }
+.mx-drawer__body { flex: 1; min-height: 0; overflow-y: auto; padding: 14px 18px 0; }
 .mx-drawer__body > :last-child { margin-bottom: var(--space-9); }
 .mx-drawer__title { font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--w-semibold); }
 .mx-drawer__foot { margin-top: var(--space-7); }
 
 .mx-icon {
-  display: inline-grid; place-items: center; width: 36px; height: 36px;
-  border-radius: var(--r-control); color: var(--ink-2); text-decoration: none;
+  display: inline-grid; place-items: center; width: 40px; height: 40px;
+  border-radius: 7px; color: var(--ink-2); text-decoration: none;
   transition: background var(--t-state), color var(--t-state);
 }
+.mx-icon svg { width: 18px; height: 18px; }
+.mx-icon--up svg { transform: rotate(-90deg); }
+.mx-icon--down svg { transform: rotate(90deg); }
 .mx-icon:hover { background: var(--surface-3); color: var(--ink); text-decoration: none; }
 .mx-icon:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .mx-icon[aria-disabled="true"] { opacity: .3; pointer-events: none; }
