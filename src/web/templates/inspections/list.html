@@ -21,7 +21,6 @@
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('registry.kicker') }}</div>
       <h1 class="ov-head__title">{{ t('section.registry.title') }}</h1>
-      <div class="ov-head__sub">{{ t('registry.lead') }}</div>
     </div>
   </div>
 
@@ -60,21 +59,20 @@
               {{ kind_title(row.kind, lang) }} ·
               {% if row.city %}{{ city_title(row.city) }} · {% endif %}
               {{ row.auditor or '—' }} ·
-              {{ t('registry.col.findings') }}: {{ row.findings_count }} ·
-              {{ t('registry.checklist', version=row.checklist_version) }}
+              {{ t('registry.col.findings') }}: {{ row.findings_count }}
+              {%- if checklist_names is not none %} · {{ checklist_names.get(row.checklist_code, row.checklist_code) }}{% endif %}
             </span>
           </span>
-          {# Состояние — точкой и словом. Снятая проверка обязана отличаться от
-             запечатанной с одного взгляда: её числа в отчёт не идут. #}
-          <span class="ins-row__state">
-            {% if row.retracted %}
+          {# Состояние называется только у снятой проверки: её числа в отчёт
+             не идут, и отличаться она обязана с одного взгляда. «Завершена»
+             в каждой обычной строке — одно и то же слово, которое прячет то
+             единственное, что здесь надо увидеть. #}
+          {% if row.retracted %}
+            <span class="ins-row__state">
               <span class="ov-dot ov-dot--err"></span>
               <span class="ins-row__state-text">{{ t('state.retracted') }}</span>
-            {% else %}
-              <span class="ov-dot ov-dot--ok"></span>
-              <span class="ins-row__state-text">{{ t('state.sealed') }}</span>
-            {% endif %}
-          </span>
+            </span>
+          {% endif %}
           <span class="ins-row__go">›</span>
         </a>
       {% endfor %}

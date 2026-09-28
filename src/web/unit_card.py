@@ -10,7 +10,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from datetime import date
 
 from ..db import queries
@@ -96,6 +97,9 @@ class UnitCard:
     weak: tuple[WeakZone, ...] = ()
     last_findings: tuple[FindingRow, ...] = ()
     repeats: tuple[Repeat, ...] = ()
+    #: Имена зон последней проверки по коду: записи и повторы несут код зоны,
+    #: а человеку показывается имя.
+    zone_names: Mapping[str, str] = field(default_factory=dict)
 
 
 def _floor(rows: tuple[InspectionRow, ...]) -> float:
@@ -131,6 +135,15 @@ def _bars(
             )
         )
     return tuple(столбики)
+
+
+def _zone_names(by_zone: Mapping[str, object], *, lang: str) -> dict[str, str]:
+    """Имя каждой зоны снимка по коду; нет имени — код."""
+    имена: dict[str, str] = {}
+    for код, снимок in by_zone.items():
+        if isinstance(снимок, dict):
+            имена[код] = str(снимок.get("name_en" if lang == "en" else "name_ru") or код)
+    return имена
 
 
 def _weak(by_zone: dict[str, object], *, lang: str, limit: int = 5) -> tuple[WeakZone, ...]:
@@ -243,4 +256,5 @@ def load(*, tenant: str, unit: str, lang: str = "ru", окно: int = ОКНО) 
         weak=_weak(detail.by_zone if detail else {}, lang=lang),
         last_findings=tuple(detail.findings) if detail else (),
         repeats=_repeats(находки, окно=tuple(row.id for row in по_времени)),
+        zone_names=_zone_names(detail.by_zone if detail else {}, lang=lang),
     )

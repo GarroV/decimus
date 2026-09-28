@@ -25,17 +25,13 @@
       <h1 class="ov-head__title">
         {{ city_title(selection.city) or country_title(selection.country) or t('overview.scope.all') }}
       </h1>
-      <div class="ov-head__sub">
-        {{ t('overview.scope.sub',
-              units=data.units_total,
-              inspections=data.inspections|length,
-              period=t('overview.period.' ~ selection.period)) }}
-      </div>
+      {# Подстроки «N точек · N проверок · период» здесь нет: те же числа
+         стоят в плитках строкой ниже, а период — в чипе выборки. #}
     </div>
-    {# Кнопка ведёт в раздел планирования. Раздел ещё не построен и скажет об
-       этом честной страницей: кнопка, которая никуда не ведёт, врёт сильнее,
-       чем кнопка, ведущая в «ещё в разработке». #}
-    <a class="btn btn--primary ov-head__cta" href="{{ url(plans_path) }}?lang={{ lang }}">
+    {# Кнопка ведёт в раздел планирования. Раздел не строится (D139) и скажет
+       об этом честной страницей, а сама кнопка приглушена, как пункт меню
+       того же раздела: главная кнопка экрана не должна вести в заглушку. #}
+    <a class="btn ov-head__cta is-wip" href="{{ url(plans_path) }}?lang={{ lang }}" title="{{ t('nav.wip') }}">
       {{ t('overview.assign') }}
     </a>
   </div>
@@ -140,11 +136,11 @@
       </div>
       {% if data.zone_losses %}
         {% for zone in data.zone_losses %}
-          <div class="ov-row">
-            <span class="ov-row__name">
-              {{ zone.name_ru if lang == "ru" else zone.name_en }}
-              <span class="ov-row__meta">{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}</span>
-            </span>
+          {# Охват зоны — подсказкой, а не подписью: у всех зон он почти всегда
+             один и тот же, и строка из пяти одинаковых «точек: 3 · проверок: 6»
+             читалась шумом и переносилась. #}
+          <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+            <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
             <span class="ov-bar">
               <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
               <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
@@ -187,7 +183,6 @@
                 {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
               </span>
             </span>
-            <span class="ov-row__num">{{ item.units }}</span>
           </div>
         {% endfor %}
       {% else %}

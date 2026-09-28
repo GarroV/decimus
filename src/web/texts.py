@@ -46,10 +46,6 @@ TEXTS: dict[str, dict[str, str]] = {
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
     "overview.assign": {"ru": "Назначить проверку", "en": "Schedule an audit"},
     "overview.scope.all": {"ru": "Вся сеть", "en": "The whole network"},
-    "overview.scope.sub": {
-        "ru": "{units} точек · {inspections} проверок · {period}",
-        "en": "{units} units · {inspections} inspections · {period}",
-    },
     "overview.filter.title": {"ru": "Выборка", "en": "Selection"},
     "overview.filter.country": {"ru": "Страна", "en": "Country"},
     "overview.filter.city": {"ru": "Город", "en": "City"},
@@ -280,7 +276,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "auth.logout": {"ru": "Выйти", "en": "Sign out"},
-    "auth.signed_in": {"ru": "Вошли", "en": "Signed in"},
     # --- экран непостроенного раздела (D138) -------------------------------
     "wip.title": {"ru": "Раздел ещё в разработке", "en": "This section is not built yet"},
     "wip.text": {
@@ -308,20 +303,11 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     # --- реестр проверок ---------------------------------------------------
     # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
-    "unit.back": {"ru": "‹ Аналитика сети", "en": "‹ Network analytics"},
+    "unit.back": {"ru": "‹ Обзор", "en": "‹ Overview"},
     "unit.title": {"ru": "Карточка точки", "en": "Unit card"},
     "unit.meta": {"ru": "{city} · партнёр {partner}", "en": "{city} · partner {partner}"},
-    "unit.meta.no_partner": {
-        "ru": "{city} · партнёр не назначен",
-        "en": "{city} · no partner assigned",
-    },
     "unit.audits": {"ru": "проверок: {n}", "en": "audits: {n}"},
     "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
-    "unit.tile.orders": {"ru": "Открытых предписаний", "en": "Open orders"},
-    "unit.tile.orders.wip": {
-        "ru": "предписаний в системе пока нет — раздел в разработке",
-        "en": "orders do not exist in the system yet — section in progress",
-    },
     "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
     "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
     "unit.movement.hint": {
@@ -341,7 +327,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This unit has not been audited yet",
     },
     "unit.weak": {"ru": "Слабые блоки последней проверки", "en": "Weak zones of the last audit"},
-    "unit.weak.open": {"ru": "Открыть отчёт целиком", "en": "Open the full report"},
     "unit.weak.empty": {
         "ru": "В последней проверке потерь по зонам не записано",
         "en": "The last audit recorded no zone losses",
@@ -370,22 +355,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ни одно нарушение не повторялось",
         "en": "No violation repeated",
     },
-    "unit.plan": {"ru": "План проверок точки", "en": "Audit plan for the unit"},
-    "unit.plan.wip": {
-        "ru": "Планов проверок в системе пока нет — раздел в разработке",
-        "en": "Audit plans do not exist in the system yet — section in progress",
-    },
     "unit.not_found": {"ru": "Такой точки нет", "en": "No such unit"},
-    "registry.lead": {
-        "ru": (
-            "Проведённые проверки. Процент, буква и разбивка показаны такими, какими их "
-            "посчитал движок при завершении проверки, — здесь ничего не пересчитывается."
-        ),
-        "en": (
-            "Completed inspections. Percentage, grade and breakdown are shown exactly as the "
-            "engine computed them when the inspection was closed — nothing is recomputed here."
-        ),
-    },
     "registry.kicker": {"ru": "Реестр", "en": "Registry"},
     "registry.all_kinds": {"ru": "Все виды", "en": "All kinds"},
     "registry.filtered_out.title": {
@@ -403,7 +373,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
-    "registry.checklist": {"ru": "чек-лист {version}", "en": "checklist {version}"},
     "registry.col.score": {"ru": "Итог, %", "en": "Total, %"},
     "registry.col.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.col.kind": {"ru": "Вид", "en": "Kind"},
@@ -424,10 +393,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "state.sealed": {"ru": "Завершена", "en": "Completed"},
     "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     # --- карточка проверки -------------------------------------------------
-    "card.back": {"ru": "К реестру", "en": "Back to the registry"},
+    "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
     "card.meta": {
-        "ru": "{date} · {kind} · чек-лист {version}",
-        "en": "{date} · {kind} · checklist {version}",
+        "ru": "{date} · {kind} · {checklist}",
+        "en": "{date} · {kind} · {checklist}",
     },
     "card.fact.auditor": {"ru": "Аудитор", "en": "Auditor"},
     "card.fact.city": {"ru": "Город", "en": "City"},
@@ -435,10 +404,9 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.fact.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
     "card.score.unit": {"ru": "%", "en": "%"},
     "card.score.note": {
-        "ru": "Вычтено {deductions} % · записей {findings}",
-        "en": "Deducted {deductions} % · findings {findings}",
+        "ru": "Вычтено {deductions} %",
+        "en": "Deducted {deductions} %",
     },
-    "card.counts.title": {"ru": "Записи по классам", "en": "Findings by class"},
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
     "card.zones.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.zones.col.share": {"ru": "Доля", "en": "Share"},

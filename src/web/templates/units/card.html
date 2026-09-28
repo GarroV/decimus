@@ -28,7 +28,7 @@
         {% if data.partner %}
           {{ t('unit.meta', city=city_title(data.city) or country_title(data.country), partner=data.partner) }}
         {% else %}
-          {{ t('unit.meta.no_partner', city=city_title(data.city) or country_title(data.country)) }}
+          {{ city_title(data.city) or country_title(data.country) }}
         {% endif %}
         · {{ t('unit.audits', n=data.audits_count) }}
       </div>
@@ -46,21 +46,16 @@
           {% endif %}
         </div>
       </div>
-      {# Предписаний как сущности в системе ещё нет (T357). Плитка с нулём
-         соврала бы: ноль означает «проверено, открытых нет», а здесь нечего
-         проверять. Поэтому прочерк и честная подпись. #}
-      <div class="ov-tile">
-        <div class="ov-tile__label">{{ t('unit.tile.orders') }}</div>
-        <div class="ov-tile__value"><span class="muted">—</span></div>
-        <div class="ov-tile__note">{{ t('unit.tile.orders.wip') }}</div>
-      </div>
+      {# Плитки «Открытых предписаний» здесь нет, пока нет предписаний
+         (T357): прочерк с подписью «раздел в разработке» занимал полшапки и
+         ничего не сообщал о точке. Вернётся вместе с разделом. #}
     </div>
 
     <div class="pt-head__actions">
       {% if data.last %}
         <a class="btn" href="{{ url(registry_path ~ '/' ~ data.last.id) }}?lang={{ lang }}">{{ t('unit.last') }}</a>
       {% endif %}
-      <a class="btn btn--primary" href="{{ url(plans_path) }}?lang={{ lang }}">{{ t('overview.assign') }}</a>
+      <a class="btn is-wip" href="{{ url(plans_path) }}?lang={{ lang }}" title="{{ t('nav.wip') }}">{{ t('overview.assign') }}</a>
     </div>
   </div>
 
@@ -83,7 +78,7 @@
             </a>
           {% endfor %}
         </div>
-        <div class="ov-card__hint">{{ t('unit.movement.scale', floor='%g'|format(data.floor)) }}</div>
+        <div class="ov-card__hint pt-bars__scale">{{ t('unit.movement.scale', floor='%g'|format(data.floor)) }}</div>
         {% if not data.comparable %}
           <div class="note note--warn">{{ t('unit.movement.mixed') }}</div>
         {% endif %}
@@ -95,9 +90,6 @@
     <div class="ov-card">
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('unit.weak') }}</div>
-        {% if data.last %}
-          <a class="ov-card__hint" href="{{ url(registry_path ~ '/' ~ data.last.id) }}?lang={{ lang }}">{{ t('unit.weak.open') }}</a>
-        {% endif %}
       </div>
       {% if data.weak %}
         {% for zone in data.weak %}
@@ -122,11 +114,11 @@
     {% if data.last_findings %}
       {% for f in data.last_findings %}
         <div class="find-row">
-          <span class="find-row__level grade grade--{{ level_tone(f.level) }}">{{ f.level }}</span>
+          <span class="tag {{ level_tone(f.level) }} find-row__level">{{ f.level }}</span>
           <span class="find-row__main">
             <span class="find-row__text">{{ item_titles.get(f.code, f.text or f.code) }}</span>
             <span class="find-row__meta">
-              {{ f.code }} · {{ f.zone }}
+              {{ f.code }} · {{ data.zone_names.get(f.zone, f.zone) }}
               {% if f.repeat %} · <span class="pt-doubled">{{ t('unit.finding.doubled') }}</span>{% endif %}
             </span>
           </span>
@@ -147,7 +139,7 @@
         {% for r in data.repeats %}
           <div class="ov-row">
             <span class="ov-row__name">{{ item_titles.get(r.code, r.text or r.code) }}</span>
-            <span class="ov-row__meta">{{ r.code }} · {{ r.zone }}</span>
+            <span class="ov-row__meta">{{ r.code }} · {{ data.zone_names.get(r.zone, r.zone) }}</span>
             {# Три состояния клетки, а не два: пусто — нарушения в той проверке
                не записано; обводка — записано (наблюдение); заливка — аудитор
                отметил повтор и вычет удвоен (факт расчёта). #}
@@ -167,14 +159,8 @@
       {% endif %}
     </div>
 
-    {# Планов проверок в базе не существует (T357/T358 ещё не построены).
-       Блок стоит на месте прототипа и говорит об этом словами: убранный блок
-       читался бы как «планов у точки нет», а это разные утверждения. #}
-    <div class="ov-card">
-      <div class="ov-card__head">
-        <div class="ov-card__title">{{ t('unit.plan') }}</div>
-      </div>
-      <div class="ov-card__empty">{{ t('unit.plan.wip') }}</div>
-    </div>
+    {# Блока «План проверок точки» нет, пока нет планов (T357/T358, D139):
+       карточка со словами «раздел в разработке» — это пустое место, которое
+       надо прочесть. О недостроенном и так говорит приглушённое меню. #}
   </div>
 {% endblock %}
