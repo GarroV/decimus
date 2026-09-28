@@ -1071,10 +1071,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   border-radius: var(--r-control); background: var(--accent-soft); color: var(--accent);
 }
 .mx-botcard__icon svg { width: 16px; height: 16px; }
-.mx-botcard__title { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); }
+.mx-botcard__title { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); white-space: nowrap; }
 .mx-botcard__count {
   margin-left: auto; font-size: var(--fs-meta); color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .mx-botcard__lead { margin: 0; font-size: var(--fs-meta); color: var(--ink-3); }
 .mx-botcard__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
@@ -1098,7 +1098,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 }
 .mx-rail__head {
   font-size: var(--fs-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase;
-  font-weight: var(--w-semibold); color: var(--ink-3);
+  font-weight: var(--w-semibold); color: var(--ink-3); white-space: nowrap;
 }
 .mx-rail__head--list { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
 /* На телефоне кнопки растягиваются во всю ширину (`dodo-ds`); эта — нет: она живёт в строке заголовка. */
@@ -1392,7 +1392,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   .mx-rail { z-index: 61; }
 }
 @media (max-width: 1279px) {
-  .mx-shell { grid-template-columns: 13rem minmax(0, 1fr); gap: var(--space-5); }
+  .mx-shell { grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-5); }
   .mx-rail__meta { display: none; }
 }
 @media (max-width: 1023px) {
