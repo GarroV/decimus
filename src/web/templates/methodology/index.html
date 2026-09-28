@@ -23,6 +23,7 @@
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
 {% block title %}{{ t('section.admin.title') }}{% endblock %}
+{% block page_class %} page--wide{% endblock %}
 
 {% set editable = composition.is_latest %}
 {% set drawer_open = card or adding or changes is not none or zone_card or panel %}
