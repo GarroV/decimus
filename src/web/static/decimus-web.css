@@ -1067,10 +1067,10 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-group__count { font-variant-numeric: tabular-nums; }
 .mx-row {
   display: grid;
-  grid-template-columns: 5rem minmax(0, 1fr) auto 4rem;
+  grid-template-columns: 4.5rem minmax(0, 1fr) 7.5rem 4rem;
   gap: var(--space-5); align-items: center;
-  min-height: var(--row, 44px);
-  padding: var(--space-3) var(--space-6);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-6);
   border-bottom: 1px solid var(--line-2);
   color: var(--ink); text-decoration: none; font-size: var(--fs-dense); line-height: var(--lh-dense);
   box-shadow: inset 3px 0 0 transparent;
@@ -1083,7 +1083,15 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-row.is-off .mx-row__text { text-decoration: line-through; }
 .mx-row__code { color: var(--ink-3); font-size: var(--fs-meta); }
 .mx-row.is-on .mx-row__code { color: var(--accent); }
-.mx-row__levels { display: flex; gap: var(--space-2); }
+.mx-row__levels { display: grid; grid-template-columns: repeat(3, 2.25rem); gap: var(--space-2); justify-items: start; }
+.mx-slot { display: block; }
+/* Подписи столбцов: без них «D1 D2» и «10 дн.» справа читались загадкой. */
+.mx-row--head {
+  min-height: 0; padding-top: var(--space-3); padding-bottom: var(--space-3);
+  font-size: var(--fs-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase;
+  font-weight: var(--w-semibold); color: var(--ink-3); background: var(--surface);
+}
+.mx-row--head:hover { background: var(--surface); }
 .mx-row__days { text-align: right; color: var(--ink-3); font-size: var(--fs-meta); font-variant-numeric: tabular-nums; }
 
 /* Слой панели. Без открытой панели его нет вовсе — ни в раскладке, ни для
@@ -1236,7 +1244,7 @@ a.ov-table__row:hover { background: var(--surface-3); }
 @media (max-width: 52rem) {
   .mx-drawer { width: 100vw; max-width: none; border-left: 0; }
   .mx-row { grid-template-columns: 4rem minmax(0, 1fr); }
-  .mx-row__levels, .mx-row__days { display: none; }
+  .mx-row__levels, .mx-row__lvhead, .mx-row__days { display: none; }
   .mx-pair { grid-template-columns: 1fr; }
   .mx-prop { grid-template-columns: 1fr; gap: var(--space-1); }
   .mx-toolbar { position: static; }
