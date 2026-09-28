@@ -139,6 +139,10 @@ class Meta:
     name_ru: str
     name_en: str
     state: str
+    #: Доступен ли аудиторам в боте (волна 3, D221). `None` — ключа в карточке
+    #: нет: так выглядит каждая карточка до волны 3, и тогда «в боте» тот, на
+    #: кого смотрит верхний указатель `current` (`checklists.in_bot_of`).
+    in_bot: bool | None = None
 
 
 def check_slug(value: str, *, что: str) -> str:
@@ -214,19 +218,25 @@ def read_meta(store: Store) -> Meta | None:
         name_ru=str(тело.get("name_ru") or ""),
         name_en=str(тело.get("name_en") or ""),
         state=str(тело.get("state") or ACTIVE),
+        in_bot=тело["in_bot"] if isinstance(тело.get("in_bot"), bool) else None,
     )
 
 
 def write_meta(store: Store, meta: Meta) -> None:
     """Записать карточку целиком. Запись атомарна: полкарточки не бывает."""
     store.home.mkdir(parents=True, exist_ok=True)
+    поля: dict[str, object] = {
+        "code": meta.code,
+        "name_ru": meta.name_ru,
+        "name_en": meta.name_en,
+        "state": meta.state,
+    }
+    # Нет решения — нет ключа: пустой ключ читался бы как «не в боте» и снял
+    # бы с бота чек-лист, по которому сегодня идут проверки.
+    if meta.in_bot is not None:
+        поля["in_bot"] = meta.in_bot
     тело = json.dumps(
-        {
-            "code": meta.code,
-            "name_ru": meta.name_ru,
-            "name_en": meta.name_en,
-            "state": meta.state,
-        },
+        поля,
         ensure_ascii=False,
         indent=2,
     )

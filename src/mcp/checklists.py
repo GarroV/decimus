@@ -40,6 +40,7 @@ from .checklist import (
     _point_at,
     _version_dir,
     current_version,
+    tip_version,
 )
 from .checklist_layout import (
     ACTIVE,
@@ -83,6 +84,8 @@ class Overview:
     state: str
     in_production: bool
     version: str | None
+    #: Доступен аудиторам в боте (волна 3): флаг карточки и «в работе».
+    in_bot: bool = False
 
 
 def _signed(note: str, by: str | None) -> str:
@@ -107,6 +110,22 @@ def _meta_or_default(store: Store) -> Meta:
     if карточка is not None:
         return карточка
     return Meta(code=store.code, name_ru=store.code, name_en=store.code, state=ACTIVE)
+
+
+def in_bot_of(карточка: Meta, space: str, code: str, в_проде: tuple[str, str] | None) -> bool:
+    """Доступен ли чек-лист в боте — с учётом карточек до волны 3.
+
+    Флаг карточки решает, когда он записан. Нет ключа — наследуем прежний смысл:
+    в боте тот, на кого смотрит верхний указатель `current`. Так хранилище
+    прода после выката показывает ровно то, по чему проверки шли вчера, и
+    мигрировать его не нужно. Снятый и черновик в боте не бывают, что бы ни
+    стояло во флаге: флаг — намерение, «в работе» — годность.
+    """
+    if карточка.state != ACTIVE:
+        return False
+    if карточка.in_bot is not None:
+        return карточка.in_bot
+    return в_проде == (space, code)
 
 
 def _published_edition(store: Store) -> str | None:
@@ -149,6 +168,7 @@ def overview(store: Store) -> list[Overview]:
                 state=карточка.state,
                 in_production=в_проде == (space, code),
                 version=_published_edition(свой),
+                in_bot=in_bot_of(карточка, space, code, в_проде),
             )
         )
     return ответ
@@ -376,11 +396,10 @@ def rename(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
             f"checklists"
         )
-    новая = Meta(
-        code=карточка.code,
+    новая = replace(
+        карточка,
         name_ru=(name_ru or карточка.name_ru).strip() or карточка.name_ru,
         name_en=(name_en or карточка.name_en).strip() or карточка.name_en,
-        state=карточка.state,
     )
     write_meta(store, новая)
     _journal(
@@ -418,9 +437,7 @@ def set_state(store: Store, *, tenant: str, state: str, by: str | None = None) -
             f"Чек-лист «{store.code}» применён к проду — по нему идут проверки, и снять его "
             f"значит считать по снятой методике. Сначала примените к проду другой"
         )
-    новая = Meta(
-        code=карточка.code, name_ru=карточка.name_ru, name_en=карточка.name_en, state=хотим
-    )
+    новая = replace(карточка, state=хотим)
     write_meta(store, новая)
     _journal(
         store,
@@ -437,14 +454,13 @@ def set_state(store: Store, *, tenant: str, state: str, by: str | None = None) -
     return _overview_of(store, новая)
 
 
-def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> dict[str, object]:
-    """Применить чек-лист к проду: по нему пойдут проверки.
+def _fit_for_inspections(store: Store) -> tuple[Meta, str, int]:
+    """Годен ли чек-лист к проверкам — или отказ, почему нет (#339).
 
-    Одно движение — перестановка верхнего указателя. Повторной сверки методики
-    движком здесь нет: она уже прошла, когда издание создавалось. А вот заслоны
-    есть, и они не про формат, а про смысл (#339).
+    Одни заслоны на два действия: применить к проду и открыть в боте. Они не
+    про формат, а про смысл — годный по формату, но пустой чек-лист дал бы
+    партнёру 100% и высшую оценку.
     """
-    _alive(store)
     карточка = read_meta(store)
     if карточка is None:
         raise ChecklistError(
@@ -469,17 +485,24 @@ def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> 
             f"оценку — то есть сбой вышел бы наружу не ошибкой, а хорошей новостью. Заведите "
             f"пункты и примените снова"
         )
+    return карточка, издание, вопросов
+
+
+def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> dict[str, object]:
+    """Применить чек-лист к проду: по нему пойдут проверки.
+
+    Одно движение — перестановка верхнего указателя. Повторной сверки методики
+    движком здесь нет: она уже прошла, когда издание создавалось. А вот заслоны
+    есть, и они не про формат, а про смысл (#339).
+    """
+    _alive(store)
+    карточка, издание, вопросов = _fit_for_inspections(store)
     прежний = applied(store.root)
     point_prod_at(store)
     if карточка.state == DRAFT:
         write_meta(
             store,
-            Meta(
-                code=карточка.code,
-                name_ru=карточка.name_ru,
-                name_en=карточка.name_en,
-                state=ACTIVE,
-            ),
+            replace(карточка, state=ACTIVE),
         )
     _journal(
         store,
@@ -515,6 +538,7 @@ def _overview_of(store: Store, карточка: Meta) -> Overview:
         state=карточка.state,
         in_production=applied(store.root) == (store.space, store.code),
         version=_published_edition(store),
+        in_bot=in_bot_of(карточка, store.space, store.code, applied(store.root)),
     )
 
 
@@ -530,3 +554,106 @@ __all__ = [
     "set_state",
     "summary",
 ]
+
+
+# --- доступ в боте (волна 3) -------------------------------------------------
+
+#: Почему чек-лист нельзя открыть в боте — кодом, чтобы экран сказал это на
+#: своём языке одним словом. `None` — можно.
+BOT_BLOCK_DRAFT, BOT_BLOCK_RETIRED, BOT_BLOCK_UNPUBLISHED, BOT_BLOCK_EMPTY = (
+    "draft",
+    "retired",
+    "unpublished",
+    "empty",
+)
+
+
+def bot_block(store: Store) -> str | None:
+    """Код причины, по которой чек-лист нельзя открыть в боте, или `None`.
+
+    Те же заслоны, что у `set_bot_access`, но без отказа: экран панели «Бот»
+    показывает причину вместо переключателя, а не даёт нажать и отказывает.
+    """
+    карточка = _meta_or_default(store)
+    if карточка.state == RETIRED:
+        return BOT_BLOCK_RETIRED
+    if карточка.state == DRAFT:
+        return BOT_BLOCK_DRAFT
+    издание = _published_edition(store)
+    if издание is None:
+        return BOT_BLOCK_UNPUBLISHED
+    if _violations(_version_dir(store, издание)) == 0:
+        # Новый чек-лист рождается с опубликованным пустым бланком. Пункты,
+        # записанные после, живут в неопубликованной версии — и сказать «нет
+        # пунктов» человеку, который их только что завёл, значило бы соврать.
+        последняя = tip_version(store)
+        if последняя != издание and _violations(_version_dir(store, последняя)) > 0:
+            return BOT_BLOCK_UNPUBLISHED
+        return BOT_BLOCK_EMPTY
+    return None
+
+
+def _settle_inherited(store: Store) -> None:
+    """Записать всем карточкам их наследованный флаг — один раз, перед первым решением.
+
+    Пока ни у одной карточки ключа нет, «в боте» определяет указатель `current`.
+    Первое же явное решение по одному чек-листу иначе оставило бы остальным
+    старый смысл, а он читается от указателя — и включение второго чек-листа
+    молча сняло бы с бота первый. Поэтому до первой записи прежнее положение
+    фиксируется у всех явным значением.
+    """
+    в_проде = applied(store.root)
+    карточки = []
+    for space, code in known(store.root):
+        свой = replace(store, space=space, code=code)
+        карточка = read_meta(свой)
+        if карточка is None:
+            continue
+        if карточка.in_bot is not None:
+            return
+        карточки.append((свой, карточка, в_проде == (space, code)))
+    for свой, карточка, было in карточки:
+        write_meta(свой, replace(карточка, in_bot=было))
+
+
+def set_bot_access(store: Store, *, tenant: str, on: bool, by: str | None = None) -> Overview:
+    """Открыть чек-лист аудиторам в боте или закрыть.
+
+    Открыть можно только годный к проверкам и в работе (#339): черновик ещё
+    правят, снятый считать не следует, пустой дал бы 100%. Закрыть можно любой,
+    и последний тоже — тогда бот прямо скажет аудитору, что начать не по чему
+    (спека, раздел «Бот»). Идущие проверки это не трогает: они считаются по
+    снимку, снятому на старте.
+    """
+    _alive(store)
+    if on:
+        карточка, _, _ = _fit_for_inspections(store)
+        if карточка.state != ACTIVE:
+            raise ChecklistError(
+                f"Чек-лист «{store.code}» — черновик. В бот открывается только чек-лист в работе: "
+                f"черновик ещё правят, и аудитор получил бы вопросы, которых завтра не будет"
+            )
+    else:
+        карточка = read_meta(store)
+        if карточка is None:
+            raise ChecklistError(
+                f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
+                f"checklists"
+            )
+    _settle_inherited(store)
+    карточка = read_meta(store) or карточка
+    новая = replace(карточка, in_bot=on)
+    write_meta(store, новая)
+    _journal(
+        store,
+        {
+            "tenant": tenant,
+            "tool": "set_bot_access",
+            "outcome": "accepted",
+            "base_version": None,
+            "version": None,
+            "refusal": None,
+            "note": _signed("открыт в боте" if on else "закрыт в боте", by),
+        },
+    )
+    return _overview_of(store, новая)
