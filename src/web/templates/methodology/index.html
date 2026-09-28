@@ -629,11 +629,11 @@
           <form method="post" action="{{ action('checklists_create') }}" class="form-grid">
             <input type="hidden" name="back" value="admin">
             <label><span class="field-label">{{ t('checklists.new.name_ru') }}</span>
-              <input class="input" type="text" name="name_ru" required autocomplete="off"></label>
+              <input class="input" type="text" name="name_ru" required autocomplete="off" value="{{ request.form.get('name_ru', '') }}"></label>
             <label><span class="field-label">{{ t('checklists.new.name_en') }}</span>
-              <input class="input" type="text" name="name_en" required autocomplete="off"></label>
+              <input class="input" type="text" name="name_en" required autocomplete="off" value="{{ request.form.get('name_en', '') }}" data-mx-code-from></label>
             <label><span class="field-label">{{ t('checklists.new.code') }}</span>
-              <input class="input mono" type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}" autocomplete="off"></label>
+              <input class="input mono" type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}" autocomplete="off" value="{{ request.form.get('code', '') }}" data-mx-code></label>
             <p class="field-note">{{ t('checklists.new.code.hint') }}</p>
             <div><button type="submit" class="btn btn--primary">{{ t('checklists.new.submit') }}</button></div>
           </form>
