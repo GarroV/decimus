@@ -1034,7 +1034,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/shares")
     def methodology_zone_shares() -> str:
@@ -1058,7 +1058,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=request.form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/rename")
     def methodology_zone_rename(code: str) -> str:
@@ -1077,7 +1077,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/remove")
     def methodology_zone_remove(code: str) -> str:
@@ -1095,7 +1095,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/route")
     def methodology_route() -> str:
@@ -1114,7 +1114,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/scoring")
     def methodology_scoring() -> str:
@@ -1134,7 +1134,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 version_name=form.get("version_name"),
             ),
         )
-        return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
+        return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/publish")
     def methodology_publish() -> str:
@@ -1339,14 +1339,19 @@ def _который_показан(перечень: list[Any], попросил
     return next((c.code for c in перечень if c.in_production), None)
 
 
+#: Панели «Методики» помимо пункта: адрес `?panel=`.
+METHODOLOGY_PANELS = ("scoring", "versions")
+
+
 def _render_methodology(
     conf: Settings,
     *,
     notice: str | None,
     failure: str | None,
     item: str | None = None,
+    panel: str | None = None,
 ) -> str:
-    """Чек-лист в три колонки (D197): чек-листы, пункты, панель пункта.
+    """Чек-лист: пункты во всю ширину и выезжающая справа панель (D197).
 
     Хранилище не настроено — страница называет незаданные переменные поимённо и
     состава не показывает вовсе: пустой список читался бы как «чек-лист пуст».
@@ -1375,6 +1380,11 @@ def _render_methodology(
     отбор = mview.parse_filter(request.args)
     выбран = item or (request.args.get("item") or "").strip() or None
     новый = request.args.get("new") == "1" and состав.is_latest
+    # Панели экрана, которые не про пункт: настройка оценки (зоны, обход,
+    # ставки) и перечень версий. До редизайна они жили в «пустой» правой
+    # колонке и пропадали, как только выбирали пункт.
+    панель = panel or (request.args.get("panel") or "").strip()
+    панель = панель if панель in METHODOLOGY_PANELS and not выбран and not новый else ""
 
     def адрес(**изменения: str) -> str:
         """Адрес этого экрана с тем же чек-листом, версией и отбором."""
@@ -1436,7 +1446,7 @@ def _render_methodology(
     открыта_зона = (request.args.get("zone_card") or "").strip()
     зона = next((z for z in состав.zones if z.get("code") == открыта_зона), None)
     обход: list[dict[str, Any]] = []
-    if карточка is None and not новый:
+    if панель == "scoring":
         try:
             обход = list(method.load_route(склад, tenant=conf.tenant, version=попросили)["zones"])
         except MethodologyRefused as отказ:
@@ -1466,6 +1476,7 @@ def _render_methodology(
         levels_of=mview.levels_of,
         zones_of=mview.zones_of,
         is_off=mview.is_off,
+        plain=mview.plain_question,
         selected=выбран,
         card=карточка,
         usage=сводка,
@@ -1474,12 +1485,16 @@ def _render_methodology(
         zone_card=зона,
         zone_items=dict(mview.zone_options(состав.items, состав.zones)).get(открыта_зона, 0),
         adding=новый,
+        panel=панель,
         prev_href=адрес(item=раньше) if раньше else None,
         next_href=адрес(item=позже) if позже else None,
         href=адрес,
         action=действие,
         notice=notice,
         failure=failure,
+        # Ответ на запись формы идёт по адресу действия (`/admin/items/…`), и
+        # меню не узнало бы по нему свой раздел: путь — экранный.
+        current_path=url_for("methodology")[len(request.script_root) :],
     )
 
 

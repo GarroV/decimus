@@ -283,7 +283,7 @@ def test_пункт_открывается_панелью_по_адресу(кл
     страница = клиент.get("/admin?item=CLN01").get_data(as_text=True)
 
     # Assert — панель с правкой этого пункта, листание к соседу, закрытие.
-    assert 'class="mx-panel__code mono">CLN01<' in страница
+    assert 'class="mx-drawer__code mono" id="mx-drawer-title">CLN01<' in страница
     assert 'action="/admin/items/CLN01?' in страница
     assert "data-mx-next" in страница
     assert "data-mx-close" in страница
@@ -495,7 +495,8 @@ def test_у_неизданной_методики_формы_развесовк�
     monkeypatch.setenv(method.STORE_VAR, str(tmp_path / "хранилище-неизданной"))
     войти(клиент)
 
-    for адрес in ("/admin", "/admin?zone_card=dough"):
+    # Развесовка — в панели «Настройка оценки» (`?panel=scoring`), а не в пустой колонке.
+    for адрес in ("/admin?panel=scoring", "/admin?zone_card=dough"):
         страница = клиент.get(адрес).get_data(as_text=True)
         формы = [
             ф
