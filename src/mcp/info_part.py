@@ -45,31 +45,16 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..db.models import InspectionDetail
-from ..domain.models import TEXT_LANGS, pick_text
-from .checklist import _rows, _to_log
+from ..domain.models import TEXT_LANGS
+from ..report.info_titles import FOUND as FOUND
+from ..report.info_titles import NOT_A_NAME, NOT_AT_HAND
+from ..report.info_titles import titles as _titles
 from .errors import ToolError
-from .letters import Papers, pinned
+from .letters import Papers
 
-#: Колонка методики с кодом пункта. Та же, что читает движок и хранилище
-#: версий (`checklist._rows` отбирает строки по ней же).
-CODE_COLUMN = "id"
-
-#: Файл методики, в котором лежат формулировки пунктов.
-ITEMS_FILE = "checklist.csv"
-
-#: Почему подписи есть — или почему их нет. Три случая, и слить их в «нет» и
-#: есть дефект T243: до него негодный идентификатор версии приезжал читающему
-#: теми же словами, что отсутствующее издание, и человек шёл искать снимок,
-#: которого никто не терял.
-#:
-#: * `FOUND` — методика той версии на машине есть, подписи взяты из неё;
-#: * `NOT_AT_HAND` — издание не опознано: каталога нет, он неполон или его
-#:   содержимое этим изданием не является (сверку ведёт `pinned`, T236);
-#: * `NOT_A_NAME` — идентификатор версии в самой проверке именем каталога быть
-#:   не может, то есть искать нечего и негде: чинить надо запись, а не диск.
-FOUND = "found"
-NOT_AT_HAND = "not-at-hand"
-NOT_A_NAME = "not-a-name"
+#: Правило подписей — код, версия методики, три исхода (`FOUND`,
+#: `NOT_AT_HAND`, `NOT_A_NAME`) — общее с карточкой веба и живёт в
+#: `src/report/info_titles.py`. Здесь только словарь ответа инструмента.
 
 
 @dataclass(frozen=True)
@@ -103,54 +88,6 @@ def check_lang(asked: str | None) -> str | None:
             f"подставленный вместо них русский читался бы как перевод"
         )
     return значение
-
-
-def _titles(version: str, *, lang: str, papers: Papers) -> tuple[dict[str, str], str]:
-    """Подписи пунктов по кодам из методики этой версии и что с самой методикой.
-
-    Второе значение отделено от пустого словаря намеренно: «методики этой
-    версии на машине нет» и «методика есть, а такого пункта в ней нет» — разные
-    ответы человеку, и по пустому словарю их не различить. Значений у него три,
-    а не два (`FOUND`, `NOT_AT_HAND`, `NOT_A_NAME`): третье добавлено на T243 —
-    негодный идентификатор версии до него был неотличим от потерянного снимка.
-
-    Язык проверяется ещё раз, хотя язык отчёта проверен при заведении проверки
-    (`domain.state`): значение приходит из базы, а инструмент чтения не имеет
-    права падать на строке, которую туда положили не мы.
-
-    По той же причине здесь ловится отказ `pinned` на негодном идентификаторе:
-    карточка читается и без единого файла методики, и отказ вместо записанных
-    ответов означал бы, что испорченная строка в базе прячет от человека
-    документ, который уже ушёл партнёру.
-    """
-    if lang not in TEXT_LANGS:
-        return {}, NOT_AT_HAND
-    try:
-        найдено = pinned(version, papers)
-    except ToolError:
-        return {}, NOT_A_NAME
-    if найдено is None:
-        return {}, NOT_AT_HAND
-    каталог, _ = найдено
-    try:
-        строки = _rows(каталог / ITEMS_FILE)
-    except OSError:
-        # Путь остаётся в логе процесса, а не в ответе агента (T120). Молча
-        # это глотать нельзя: снимок версии без файла пунктов — поломка
-        # хранилища, и починить её можно только зная, где смотреть.
-        _to_log("методику версии проверки не прочитать", методика=каталог)
-        return {}, NOT_AT_HAND
-    подписи: dict[str, str] = {}
-    for строка in строки:
-        код = (строка.get(CODE_COLUMN) or "").strip().upper()
-        подпись = pick_text(
-            строка.get("question_ru", ""), строка.get("question_en", ""), lang
-        ).strip()
-        # Первое вхождение кода, а не последнее: движок читает дубль так же —
-        # берёт первый и предупреждает. Строка-комментарий пропускается там же.
-        if код and not код.startswith("#") and подпись:
-            подписи.setdefault(код, подпись)
-    return подписи, FOUND
 
 
 def _note(поля: list[dict[str, object]], *, методика: str) -> str:
