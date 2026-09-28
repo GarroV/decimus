@@ -212,3 +212,46 @@ def test_пункт_заводится_в_показанный_чеклист_а
     assert ответ.status_code == 200
     assert "RND01" in клиент.get("/admin?checklist=rnd").get_data(as_text=True)
     assert "RND01" not in клиент.get("/admin").get_data(as_text=True), "пункт ушёл в прод"
+
+
+# --- заведение панелью на «Методике» (D221) --------------------------------------
+
+
+def test_панель_заведения_только_по_адресу(клиент: FlaskClient) -> None:
+    """Форма рендерится лишь при открытой панели: иначе на экране появилась бы
+    вторая форма `/admin/checklists`, и её взял бы не тот, кто ждал."""
+    войти(клиент)
+
+    assert 'name="name_ru"' not in клиент.get("/admin").get_data(as_text=True)
+    assert 'name="name_ru"' in клиент.get("/admin?panel=new").get_data(as_text=True)
+
+
+def test_заведение_с_методики_открывает_новый_чек_лист(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd2", "name_ru": "РНД-2", "name_en": "RnD-2", "back": "admin"},
+        headers={"Origin": СВОЙ},
+    )
+
+    assert ответ.status_code == 302
+    assert "/admin?checklist=rnd2" in (ответ.headers.get("Location") or "")
+
+
+def test_отказ_заведения_с_методики_остаётся_в_панели(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    ответ = клиент.post(
+        "/admin/checklists",
+        data={"code": "Плохой код", "name_ru": "Х", "name_en": "X", "back": "admin"},
+        headers={"Origin": СВОЙ},
+    )
+
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200
+    # Ответ — «Методика» с открытой панелью заведения и причиной, а не страница
+    # перечня: человек остаётся там, откуда заводил.
+    assert "mx-layer is-open" in страница
+    assert 'name="name_ru"' in страница
+    assert "note--error" in страница

@@ -1208,9 +1208,11 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         return _render_checklists(conf, notice=None, failure=None)
 
     @app.post(путь)
-    def checklists_create() -> str:
+    def checklists_create() -> str | Response:
         refuse_foreign_origin()
         form = request.form
+        # Форма панели «Методики» (D221) возвращает человека туда же, откуда он заводил.
+        с_методики = form.get("back") == "admin"
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
@@ -1224,7 +1226,12 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 name_en=(form.get("name_en") or "").strip(),
             )
         except MethodologyRefused as отказ:
+            if с_методики:
+                return _render_methodology(conf, notice=None, failure=str(отказ), panel="new")
             return _render_checklists(conf, notice=None, failure=str(отказ))
+        if с_методики:
+            # Заведённый с «Методики» открывается сразу: его и собирались наполнять.
+            return redirect(_url("methodology", checklist=заведён.code, lang=_lang(conf)))
         return _render_checklists(
             conf,
             notice=t("checklists.created", _lang(conf), checklist=заведён.code),
@@ -1371,7 +1378,7 @@ def _который_показан(перечень: list[Any], попросил
 
 
 #: Панели «Методики» помимо пункта: адрес `?panel=`.
-METHODOLOGY_PANELS = ("scoring", "versions")
+METHODOLOGY_PANELS = ("scoring", "versions", "new")
 
 
 def _render_methodology(
