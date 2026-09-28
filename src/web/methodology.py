@@ -27,6 +27,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -41,6 +42,8 @@ from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
 from src.mcp.errors import McpError
 
 from .errors import MethodologyRefused
+
+logger = logging.getLogger(__name__)
 
 #: Имена переменных окружения — для текста на странице. Пересказывать их
 #: строкой в шаблоне нельзя: переименуют в `mcp`, а здесь останется старое имя,
@@ -759,7 +762,10 @@ def checklist_rail(store: Store) -> tuple[RailRow, ...]:
     for c in checklists_overview(store):
         try:
             сводка = lists_door.summary(for_code(store, c.code))
-        except McpError:
+        except (McpError, OSError, ValueError, AttributeError) as сбой:
+            # Сводка читает файлы издания; испорченный файл одного чек-листа —
+            # «—» в его строке и запись в журнал, а не 500 всего экрана.
+            logger.warning("сводка чек-листа %s для колонки не собралась: %s", c.code, сбой)
             сводка = None
         строки.append(
             RailRow(
