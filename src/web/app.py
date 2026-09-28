@@ -1400,6 +1400,10 @@ def _render_methodology(
         перечень, failure = [], failure or str(отказ)
     код = _который_показан(перечень, _который(request))
     try:
+        колонка = method.checklist_rail(state.store)
+    except MethodologyRefused:
+        колонка = ()
+    try:
         склад = method.store_for(state.store, код)
     except MethodologyRefused as отказ:
         склад, failure = state.store, failure or str(отказ)
@@ -1499,6 +1503,10 @@ def _render_methodology(
         "methodology/index.html",
         composition=состав,
         checklists=перечень,
+        # Колонка слева (D221). Без чек-листа в адресе экран помечен выбором:
+        # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.
+        rail=колонка,
+        picking=not _который(request),
         checklist_code=код,
         needs_name=method.needs_set_name(состав),
         kinds=method.ITEM_KINDS,

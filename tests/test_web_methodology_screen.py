@@ -507,3 +507,38 @@ def test_у_неизданной_методики_формы_развесовк�
         for форма in формы:
             тело = форма.split("</form>")[0]
             assert 'name="version_name"' in тело, f"{адрес}: без имени набора: {тело[:80]}"
+
+
+# --- колонка чек-листов слева (D221) -------------------------------------------
+
+
+def _колонка(страница: str) -> str:
+    return страница.split('<aside class="mx-rail"', 1)[1].split("</aside>", 1)[0]
+
+
+def test_колонка_называет_чек_листы_и_отмечает_показанный(клиент: FlaskClient) -> None:
+    # Arrange — рядом с боевым заведён черновик «rnd».
+    войти(клиент)
+    клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd", "name_ru": "Аудит РНД", "name_en": "RnD audit"},
+        headers={"Origin": СВОЙ},
+    )
+
+    # Act
+    колонка = _колонка(клиент.get("/admin?checklist=rnd").get_data(as_text=True))
+
+    # Assert — оба чек-листа ссылками обычного перехода, показанный отмечен.
+    assert 'href="/admin?checklist=bizdev' in колонка
+    assert 'class="mx-rail__row is-on" href="/admin?checklist=rnd' in колонка
+    assert "Аудит РНД" in колонка
+    # Переход по чек-листу — полная страница: подмена слоя панели не обновила бы
+    # ни колонку, ни шапку, ни список (`methodology.js`).
+    assert "data-mx-item" not in колонка
+
+
+def test_без_чек_листа_в_адресе_экран_помечен_выбором(клиент: FlaskClient) -> None:
+    войти(клиент)
+
+    assert "mx-shell--pick" in клиент.get("/admin").get_data(as_text=True)
+    assert "mx-shell--pick" not in клиент.get("/admin?checklist=bizdev").get_data(as_text=True)
