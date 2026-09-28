@@ -272,6 +272,11 @@
 
   {# --- Пункты во всю ширину --------------------------------------------- #}
   <section class="mx-items" aria-label="{{ t('methodology.items.title') }}">
+    {# Поиск и подписи столбцов липнут одним блоком к верху окна: по
+       отдельности подписи уезжали, а строка поиска висела с зазором, в
+       котором проезжали пункты. Метку «прилип» ставит methodology.js. #}
+    <span class="mx-stick__probe" aria-hidden="true" data-mx-stick-probe></span>
+    <div class="mx-stick" data-mx-stick>
     <div class="mx-toolbar">
       <form class="mx-search" method="get" action="{{ url_for('methodology') }}" role="search">
         {% for name, value in [('checklist', checklist_code), ('version', request.args.get('version')), ('level', item_filter.level), ('zone', item_filter.zone), ('off', '1' if item_filter.off else ''), ('group', request.args.get('group')), ('lang', lang)] if value %}
@@ -294,6 +299,9 @@
         <span class="mx-row__lvhead">{{ t('methodology.col.levels') }}</span>
         <span class="mx-row__days">{{ t('methodology.col.days') }}</span>
       </div>
+    {% endif %}
+    </div>
+    {% if groups %}
       {% for g in groups %}
         <div class="mx-group">
           <div class="mx-group__head">

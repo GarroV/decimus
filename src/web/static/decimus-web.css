@@ -1101,12 +1101,22 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   margin-top: var(--space-7);
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
 }
+/* Липкий блок: поиск + подписи столбцов. Прилипает к самому верху окна —
+   шапки над содержимым нет (D228), и любой зазор сверху показывал бы
+   проезжающие под ним пункты. Прилипший блок теряет скругление (иначе в
+   углах видно список) и получает тень — так видно, что под ним есть ещё. */
+.mx-stick {
+  position: sticky; top: var(--topbar-h); z-index: 3;
+  background: var(--surface);
+  border-radius: var(--r-block) var(--r-block) 0 0;
+  transition: box-shadow var(--t-state);
+}
+.mx-stick.is-stuck { border-radius: 0; box-shadow: 0 6px 16px -8px rgb(0 0 0 / .45); }
+.mx-stick__probe { display: block; height: 0; }
 .mx-toolbar {
-  position: sticky; top: var(--space-12); z-index: 2;
   display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: center;
   padding: var(--space-5) var(--space-6);
-  background: var(--surface); border-bottom: 1px solid var(--line);
-  border-radius: var(--r-block) var(--r-block) 0 0;
+  border-bottom: 1px solid var(--line);
 }
 .mx-search { flex: 1 1 18rem; max-width: 28rem; }
 .mx-search .input { width: 100%; }
