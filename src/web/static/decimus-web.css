@@ -1055,20 +1055,54 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   display: grid; gap: var(--space-1); align-content: start;
   max-height: calc(100vh - var(--topbar-h) - var(--space-9)); overflow-y: auto;
 }
-.mx-rail__bot {
-  display: grid; gap: var(--space-2); margin-bottom: var(--space-5);
-  padding: var(--space-4) var(--space-5);
+/* Блок «Доступ в боте» наверху колонки (D223, волна 3). Отдельная карточка с
+   иконкой и счётчиком: до неё блок читался ещё одним чек-листом с ссылкой
+   «Настроить», и было непонятно, что это доступ аудиторов. Ноль открытых —
+   предупреждение, а не пустое место: бот в таком положении проверку не начнёт. */
+.mx-botcard {
+  display: grid; gap: var(--space-3); margin-bottom: var(--space-6);
+  padding: var(--space-5);
   background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
 }
-.mx-rail__bot-list { font-size: var(--fs-dense); color: var(--ink); }
-.mx-rail__link { font-size: var(--fs-meta); }
+.mx-botcard.is-empty { border-color: var(--warn-line); background: var(--warn-soft); }
+.mx-botcard__head { display: flex; align-items: center; gap: var(--space-3); }
+.mx-botcard__icon {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; flex: none;
+  border-radius: var(--r-control); background: var(--accent-soft); color: var(--accent);
+}
+.mx-botcard__icon svg { width: 16px; height: 16px; }
+.mx-botcard__title { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); }
+.mx-botcard__count {
+  margin-left: auto; font-size: var(--fs-meta); color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+.mx-botcard__lead { margin: 0; font-size: var(--fs-meta); color: var(--ink-3); }
+.mx-botcard__list { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+.mx-botcard__list li {
+  display: flex; gap: var(--space-3); align-items: baseline;
+  font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink); overflow-wrap: anywhere;
+}
+.mx-botcard__list li::before {
+  content: ""; flex: none; width: 7px; height: 7px; border-radius: 50%;
+  background: var(--ok); transform: translateY(-1px);
+}
+.mx-botcard__warn {
+  margin: 0; display: flex; gap: var(--space-3); align-items: flex-start;
+  font-size: var(--fs-meta); line-height: var(--lh-dense); color: var(--warn-ink);
+}
+.mx-botcard__warn svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+.mx-botcard__btn { justify-self: start; width: auto; }
+.mx-sr {
+  position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip: rect(0 0 0 0); white-space: nowrap;
+}
 .mx-rail__head {
   font-size: var(--fs-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase;
   font-weight: var(--w-semibold); color: var(--ink-3);
 }
 .mx-rail__head--list { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
 /* На телефоне кнопки растягиваются во всю ширину (`dodo-ds`); эта — нет: она живёт в строке заголовка. */
-.mx-rail__head--list .btn { width: auto; flex: none; }
+.mx-rail__head--list .btn { width: auto; flex: none; text-transform: none; letter-spacing: normal; }
 .mx-rail__row {
   display: grid; gap: 2px; padding: var(--space-3) var(--space-4);
   border-radius: var(--r-control); color: var(--ink); text-decoration: none;
@@ -1080,7 +1114,49 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .mx-rail__row.is-on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
 .mx-rail__name { font-size: var(--fs-dense); line-height: var(--lh-dense); overflow-wrap: anywhere; }
 .mx-rail__meta { font-size: var(--fs-micro); color: var(--ink-3); font-variant-numeric: tabular-nums; }
-.mx-rail__bot-mark { color: var(--ok); font-weight: var(--w-semibold); }
+.mx-rail__bot-mark {
+  display: inline-flex; vertical-align: -2px; margin-left: var(--space-2); color: var(--ok);
+}
+.mx-rail__bot-mark svg { width: 13px; height: 13px; }
+
+/* Панель «Бот»: чек-лист слева, переключатель справа. Нельзя — причина
+   одним словом на месте переключателя, подсказка — во всплывающей строке. */
+.mx-botlist { margin: var(--space-5) 0; padding: 0; list-style: none; border-top: 1px solid var(--line-2); }
+.mx-botlist__row {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-5);
+  padding: var(--space-4) 0; border-bottom: 1px solid var(--line-2);
+}
+.mx-botlist__row.is-retired { opacity: .6; }
+.mx-botlist__what { display: grid; gap: 2px; min-width: 0; }
+.mx-botlist__name { font-size: var(--fs-dense); color: var(--ink); overflow-wrap: anywhere; }
+.mx-botlist__meta { font-size: var(--fs-micro); color: var(--ink-3); }
+.mx-botlist__why {
+  flex: none; font-size: var(--fs-micro); color: var(--ink-3);
+  padding: 2px var(--space-3); border: 1px dashed var(--line-strong); border-radius: 999px; cursor: help;
+}
+.mx-toggle {
+  flex: none; display: inline-flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-2); margin: calc(var(--space-2) * -1);
+  background: none; border: 0; border-radius: var(--r-control); cursor: pointer;
+  font: inherit; font-size: var(--fs-meta); color: var(--ink-3);
+}
+.mx-toggle:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.mx-toggle__track {
+  position: relative; width: 34px; height: 20px; border-radius: 999px;
+  background: var(--surface-3); border: 1px solid var(--line-strong);
+  transition: background var(--t-state), border-color var(--t-state);
+}
+.mx-toggle__knob {
+  position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%;
+  background: var(--ink-3); transition: transform var(--t-state), background var(--t-state);
+}
+.mx-toggle.is-on { color: var(--ok); }
+.mx-toggle.is-on .mx-toggle__track { background: var(--ok-soft); border-color: var(--ok-line); }
+.mx-toggle.is-on .mx-toggle__knob { transform: translateX(14px); background: var(--ok); }
+.mx-toggle__text { min-width: 5.5em; text-align: left; }
+@media (prefers-reduced-motion: reduce) {
+  .mx-toggle__track, .mx-toggle__knob { transition: none; }
+}
 .mx-rail__retired { margin-top: var(--space-4); padding-top: var(--space-4); }
 /* Пока колонка на экране, название в шапке — просто заголовок: переключатель
    дублировал бы колонку. Он возвращается, когда колонку прячет ширина. */

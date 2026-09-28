@@ -742,10 +742,12 @@ class RailRow:
     name_ru: str
     name_en: str
     state: str
-    #: Волна 2 — «применён к проду»; доступ в боте (волна 3) заменит этот признак.
+    #: Доступен аудиторам в боте (волна 3): флаг карточки и «в работе».
     in_bot: bool
     #: Пунктов с нарушением в опубликованном издании; `None` — издания нет.
     items: int | None
+    #: Почему в бот открыть нельзя — код (`checklists.BOT_BLOCK_*`), `None` — можно.
+    bot_block: str | None = None
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
@@ -767,14 +769,20 @@ def checklist_rail(store: Store) -> tuple[RailRow, ...]:
             # «—» в его строке и запись в журнал, а не 500 всего экрана.
             logger.warning("сводка чек-листа %s для колонки не собралась: %s", c.code, сбой)
             сводка = None
+        try:
+            нельзя = lists_door.bot_block(for_code(store, c.code))
+        except (McpError, OSError, ValueError) as сбой:
+            logger.warning("годность чек-листа %s к боту не прочиталась: %s", c.code, сбой)
+            нельзя = lists_door.BOT_BLOCK_EMPTY
         строки.append(
             RailRow(
                 code=c.code,
                 name_ru=c.name_ru,
                 name_en=c.name_en,
                 state=c.state,
-                in_bot=c.in_production,
+                in_bot=c.in_bot,
                 items=сводка.items if сводка else None,
+                bot_block=нельзя,
             )
         )
     return tuple(sorted(строки, key=_rail_key))
@@ -830,5 +838,17 @@ def apply_checklist(store: Store, *, tenant: str, author: str, code: str) -> dic
     """
     try:
         return lists_door.apply_to_production(store_for(store, code), tenant=tenant, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_bot_access(store: Store, *, tenant: str, author: str, code: str, on: bool) -> object:
+    """Открыть чек-лист аудиторам в боте или закрыть (волна 3).
+
+    Заслоны — в двери (#339): черновик, снятый, неопубликованный и пустой в бот
+    не открываются. Экран их не повторяет, он показывает причину заранее.
+    """
+    try:
+        return lists_door.set_bot_access(store_for(store, code), tenant=tenant, on=on, by=author)
     except McpError as отказ:
         raise _refusal(отказ) from None
