@@ -727,6 +727,53 @@ def checklists_overview(store: Store) -> list[lists_door.Overview]:
         raise _refusal(отказ) from None
 
 
+#: Порядок групп в колонке чек-листов: годное к работе — сверху, снятое — внизу.
+RAIL_ORDER = {ACTIVE: 0, DRAFT: 1, RETIRED: 2}
+
+
+@dataclass(frozen=True)
+class RailRow:
+    """Строка колонки чек-листов слева на «Методике» (D221)."""
+
+    code: str
+    name_ru: str
+    name_en: str
+    state: str
+    #: Волна 2 — «применён к проду»; доступ в боте (волна 3) заменит этот признак.
+    in_bot: bool
+    #: Пунктов с нарушением в опубликованном издании; `None` — издания нет.
+    items: int | None
+
+
+def _rail_key(row: RailRow) -> tuple[int, str]:
+    return (RAIL_ORDER.get(row.state, len(RAIL_ORDER)), row.name_ru.casefold())
+
+
+def checklist_rail(store: Store) -> tuple[RailRow, ...]:
+    """Чек-листы для колонки: в работе → черновики → снятые, внутри — по названию.
+
+    Сводка чек-листа без опубликованного издания — не отказ экрана, а «—»:
+    чек-лист в колонке обязан быть виден, иначе его не найти.
+    """
+    строки = []
+    for c in checklists_overview(store):
+        try:
+            сводка = lists_door.summary(for_code(store, c.code))
+        except McpError:
+            сводка = None
+        строки.append(
+            RailRow(
+                code=c.code,
+                name_ru=c.name_ru,
+                name_en=c.name_en,
+                state=c.state,
+                in_bot=c.in_production,
+                items=сводка.items if сводка else None,
+            )
+        )
+    return tuple(sorted(строки, key=_rail_key))
+
+
 def checklist_difference(store: Store) -> Difference:
     """Что стоит в проде сейчас и что встанет, если применить этот чек-лист."""
     try:
