@@ -1066,7 +1066,7 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "methodology.items.title": {"ru": "Пункты", "en": "Items"},
-    # Экран чек-листа в три колонки (D197).
+    # Экран чек-листа: список и панель справа (D197).
     "methodology.lists.title": {"ru": "Чек-листы", "en": "Checklists"},
     "methodology.lists.prod": {"ru": "в проде", "en": "in production"},
     "methodology.lists.manage": {
@@ -1110,6 +1110,37 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.panel.close": {"ru": "Закрыть", "en": "Close"},
     "methodology.panel.prev": {"ru": "Предыдущий пункт", "en": "Previous item"},
     "methodology.panel.next": {"ru": "Следующий пункт", "en": "Next item"},
+    "methodology.bar.scoring": {"ru": "Настройка оценки", "en": "Scoring setup"},
+    "methodology.bar.switch": {"ru": "Другой чек-лист", "en": "Another checklist"},
+    "methodology.scoring.lead": {
+        "ru": "Зоны в порядке обхода, их доли в оценке и ставки вычетов. "
+        "Каждая запись — новая версия; считать по ней начнут после публикации.",
+        "en": "Zones in walk order, their shares of the score and deduction rates. "
+        "Every save is a new version; scoring switches to it after publishing.",
+    },
+    "methodology.version.in_effect": {"ru": "Действует", "en": "In effect"},
+    "methodology.version.unnamed": {"ru": "набор без имени", "en": "unnamed set"},
+    "methodology.version.draft_bar": {
+        "ru": "Записаны правки, которые ещё не действуют",
+        "en": "Recorded edits are not in effect yet",
+    },
+    "methodology.kind.violation": {"ru": "нарушение", "en": "violation"},
+    "methodology.kind.info": {"ru": "сведения", "en": "information"},
+    "methodology.kind.aggregate": {"ru": "итоговая строка", "en": "summary row"},
+    "methodology.drawer.wording": {"ru": "Формулировка", "en": "Wording"},
+    "methodology.drawer.record_hint": {
+        "ru": "Правка ляжет новой версией рядом с действующей. "
+        "Считать по ней начнут после публикации.",
+        "en": "The edit is recorded as a new version next to the one in effect. "
+        "Scoring uses it after publishing.",
+    },
+    "methodology.drawer.dirty": {"ru": "Есть незаписанные правки", "en": "Unsaved edits"},
+    "methodology.drawer.more": {"ru": "Ещё действия", "en": "More actions"},
+    "methodology.drawer.leave": {
+        "ru": "В панели есть незаписанные правки. Уйти без записи?",
+        "en": "The panel has unsaved edits. Leave without recording them?",
+    },
+    "methodology.days.unit": {"ru": "дн. на устранение", "en": "days to fix"},
     "methodology.panel.keys": {
         "ru": "↑ ↓ — соседний пункт · Esc — закрыть · / — поиск",
         "en": "↑ ↓ — neighbour item · Esc — close · / — search",
