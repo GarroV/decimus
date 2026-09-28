@@ -20,7 +20,7 @@
 | Увидеть реестр проведённых проверок сети | `/inspections` | `src/db/queries.py: list_inspections` |
 | Сузить реестр по стране, городу, букве, виду; прийти в него кликом по городу с «Обзора» | `/inspections?country=GE&city=tbilisi&grade=D` | `src/web/app.py: registry`, география — `src/db/queries.py: unit_geography` |
 | Открыть проверку целиком: шапка, разбивка оценки, записи, информационная часть (вопрос из методики версии проверки рядом с ответом) | `/inspections/<id>` | `src/db/queries.py: get_inspection`, вопросы — `src/report/info_titles.py` |
-| Развернуть запись в карточке и увидеть прикреплённые фото — сжатой копией (D218); по щелчку копия открывается отдельно | `/inspections/<id>` → `/inspections/<id>/photos/<photo_id>` | `src/db/previews.py: finding_previews`, `preview_bytes` |
+| Развернуть запись в карточке и увидеть прикреплённые фото — сжатой копией (D219); по щелчку копия открывается отдельно | `/inspections/<id>` → `/inspections/<id>/photos/<photo_id>` | `src/db/previews.py: finding_previews`, `preview_bytes` |
 | Скачать PDF проверки — тот самый файл, что получил аудитор, без пересборки (D204). Кнопка только при сохранённом отчёте; нет его — сказано словами | `/inspections/<id>/report` | `src/db/reports.py: latest_report`, `fetch_report` |
 | Отклонить проверку с обязательной причиной | там же, форма внизу карточки | `src/db/retract.py: retract_inspection` (D086, D089) |
 | Открыть письмо партнёру по проверке, поправить текст, выгрузить файлом или положить в черновики своей почты | `/inspections/<id>/letter` | `src/report/letters.py: build` (T321), `src/web/letter_draft.py` (T352) |

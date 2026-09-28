@@ -237,7 +237,7 @@ def _purge_photos(
 
     убрано = 0
     for photo_id, storage_path, preview_path in кадры:
-        # Сжатая копия (D218) уходит вместе с оригиналом: снятая проверка
+        # Сжатая копия (D219) уходит вместе с оригиналом: снятая проверка
         # убирается из хранилища целиком, и копия «навсегда» к ней не относится.
         ключи = [_object_key(str(storage_path), photo_id=str(photo_id))]
         if preview_path:
