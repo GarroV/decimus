@@ -109,3 +109,62 @@ def test_английский_интерфейс_отвечает_своими_�
 
     assert "Bot access" in страница
     assert "Доступ в боте" not in страница
+
+
+def _опубликовать(store: Any, **правка: Any) -> None:
+    from datetime import date
+
+    from src.mcp.checklist import apply_change, publish
+
+    итог = apply_change(store, tenant=ТЕНАНТ, today=date(2026, 9, 28), **правка)
+    assert итог.accepted and итог.version is not None, итог
+    publish(store, tenant=ТЕНАНТ, version=итог.version)
+
+
+def test_открытый_с_пустым_изданием_не_считается_открытым_и_снимается(
+    клиент: FlaskClient,
+) -> None:
+    """Флаг поднят, а издание потом опубликовали пустым: блок не врёт, флаг снимается."""
+    from dataclasses import replace
+
+    from src.mcp.checklists import set_bot_access, set_state
+
+    войти(клиент)
+    клиент.post("/admin/bot/bizdev", data={"on": "0"}, headers={"Origin": СВОЙ})
+    клиент.post(
+        "/admin/checklists",
+        data={"code": "rnd", "name_ru": "Аудит РНД", "name_en": "RnD audit"},
+        headers={"Origin": СВОЙ},
+    )
+    rnd = replace(method.load_store().store, code="rnd")  # type: ignore[type-var]
+    _опубликовать(
+        rnd,
+        tool="add_checklist_item",
+        command="add",
+        options={
+            "id": "RND01",
+            "process": "Проба",
+            "question-ru": "Проба пера",
+            "levels": "D1",
+            "zones": "all",
+            "days": 5,
+            "criteria": "D1: проба",
+        },
+    )
+    set_state(rnd, tenant=ТЕНАНТ, state="active")
+    set_bot_access(rnd, tenant=ТЕНАНТ, on=True)
+    _опубликовать(
+        rnd, tool="remove_checklist_item", command="remove", positional="RND01", options={}
+    )
+
+    строка = {r.code: r for r in method.checklist_rail(method.load_store().store)}["rnd"]  # type: ignore[arg-type]
+    assert строка.wants_bot is True and строка.in_bot is False
+    страница = клиент.get("/admin?panel=bot").get_data(as_text=True)
+    assert "Бот сейчас не даст начать проверку" in страница, "блок посчитал пустой открытым"
+    assert "бот его не даёт" in страница
+    assert 'action="/admin/bot/rnd' in страница, "застрявший флаг обязан сниматься"
+
+    клиент.post("/admin/bot/rnd", data={"on": "0"}, headers={"Origin": СВОЙ})
+
+    строка = {r.code: r for r in method.checklist_rail(method.load_store().store)}["rnd"]  # type: ignore[arg-type]
+    assert строка.wants_bot is False

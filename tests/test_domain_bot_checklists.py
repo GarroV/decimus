@@ -143,3 +143,28 @@ def test_ни_одного_открытого_бот_прямо_говорит(�
 
     with pytest.raises(DomainError, match="не по чему"):
         _начать()
+
+
+def test_опубликовали_пустое_издание_открытого_бот_его_не_даёт(хранилище: Store) -> None:
+    """Заслон пустоты стоит и на чтении, а не только на переключателе.
+
+    Флаг «в боте» ставится один раз, а издания публикуются потом сколько угодно.
+    Пустое издание открытого чек-листа дало бы проверку без единого вопроса —
+    и 100% с высшей оценкой партнёру.
+    """
+    rnd = replace(хранилище, code="rnd")
+    правка = apply_change(
+        rnd,
+        tenant=АРЕНДАТОР,
+        tool="remove_checklist_item",
+        command="remove",
+        positional="RND01",
+        options={},
+        today=СЕГОДНЯ,
+    )
+    assert правка.accepted and правка.version is not None, правка
+    publish(rnd, tenant=АРЕНДАТОР, version=правка.version)
+
+    assert [c.code for c in available(check_environment())] == ["bizdev"]
+    with pytest.raises(DomainError, match="больше не открыт"):
+        _начать("rnd")
