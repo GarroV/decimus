@@ -1,4 +1,4 @@
-/* forma dodo/core/dodo-ds.css sha256:813f51cfd2e256915068c56ffa38b1f1eea5f7571b0984286ac8e5231e392637 — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/core/dodo-ds.css sha256:7f3fe2241b972907402e0539ea4653ae86357e60758cab98f4d04b5f9ab012b0 — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DODO — ЕДИНАЯ ДИЗАЙН-СИСТЕМА ТРЁХ ПРОДУКТОВ
    Собрана 17.09.2026 из двух источников:
@@ -1048,8 +1048,15 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
 @media (max-width: 1099px) {
   .sidenav { width: 56px; }
   .sidenav__brand { justify-content: center; padding-left: 0; padding-right: 0; }
-  .sidenav__name, .sidenav__label, .sidenav__group, .sidenav__who, .sidenav__theme-label, .sidenav__field input, .sidenav__field .kbd { display: none; }
+  .sidenav__name, .sidenav__label, .sidenav__group, .sidenav__who, .sidenav__theme-label, .sidenav__field .kbd { display: none; }
+  /* Поле не прячется, а сжимается в ноль: скрытое `display: none` не берёт
+     фокус, и ⌘K в свёрнутой панели молча не работал бы. В фокусе поле
+     раскрывается поверх содержимого, как в Swarm. */
+  .sidenav__search { position: relative; }
   .sidenav__field { justify-content: center; padding: 0; }
+  .sidenav__field input { flex: 0 0 0; width: 0; padding: 0; }
+  .sidenav__field:focus-within { position: absolute; left: var(--space-4); z-index: 50; width: 260px; justify-content: flex-start; padding: 0 var(--space-5); box-shadow: var(--sh-pop); }
+  .sidenav__field:focus-within input { flex: 1; width: auto; }
   .sidenav__item, .sidenav__current { justify-content: center; padding: 0; }
   .sidenav__count { position: absolute; top: 2px; right: 4px; font-size: 9.5px; }
   .sidenav__theme { flex-direction: column; }
