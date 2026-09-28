@@ -966,6 +966,28 @@ _ITEM_TOP_SQL = (
 )
 
 
+#: С какого дня сборка чек-листа в работе — день первой проверки по ней (D218).
+#: Неизданная сборка (`local-…`) своей даты не несёт нигде, и человеку номер
+#: сборки ничего не говорит; день первой проверки — говорит. Снятые не в счёт:
+#: для того, кто их не видит, их не было.
+_EDITION_FIRST_USED_SQL = """
+select min(i.inspection_date)
+from inspections i
+where i.tenant_code = %(tenant)s
+  and i.checklist_version = %(version)s
+  and i.retracted_at is null
+"""
+
+
+def edition_first_used(*, tenant: str, version: str) -> date | None:
+    """День первой проверки по этой сборке чек-листа; `None` — проверок нет."""
+    tenant_code = _require_tenant(tenant)
+    with _reading("первую проверку по сборке") as conn, conn.cursor() as cur:
+        cur.execute(_EDITION_FIRST_USED_SQL, {"tenant": tenant_code, "version": version.strip()})
+        row = cur.fetchone()
+    return row[0] if row else None
+
+
 def item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage:
     """Сколько раз пункт нарушен, на скольких точках и когда последний раз (D197)."""
     tenant_code = _require_tenant(tenant)

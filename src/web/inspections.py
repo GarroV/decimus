@@ -237,6 +237,18 @@ def load_item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage | No
         return None
 
 
+def load_edition_since(*, tenant: str, version: str) -> date | None:
+    """С какого дня сборка в работе — для справки карточки (D218). `None` — база молчит.
+
+    Справка — подсказка, а не документ: отказ базы карточку не роняет.
+    """
+    try:
+        return queries.edition_first_used(tenant=tenant, version=version)
+    except DbError as exc:
+        logger.warning("первая проверка по сборке %s недоступна: %s", version, exc)
+        return None
+
+
 def move_card(
     inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
 ) -> bool:
