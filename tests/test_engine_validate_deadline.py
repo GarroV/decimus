@@ -30,7 +30,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-from conftest import ROOT, Run, run_engine
+from conftest import ROOT, Run, requires_data, run_engine
 
 MANAGE = ROOT / "engine" / "manage.py"
 
@@ -131,6 +131,7 @@ def test_пункт_без_нарушения_без_срока_остаётся
     assert итог.code == 0, f"validate отказал на законном D0 без срока: {итог.out}"
 
 
+@requires_data
 def test_боевая_методика_проверку_проходит() -> None:
     """Сторож от правки, которая чинит тест ценой рабочей методики."""
     итог = run_engine(MANAGE, "validate", cwd=ROOT, env_extra={"CHECKLIST_DIR": str(ROOT / "data")})

@@ -1407,6 +1407,13 @@ def _render_methodology(
         failure = failure or str(отказ)
     отбор = mview.parse_filter(request.args)
     выбран = item or (request.args.get("item") or "").strip() or None
+    # Пункт из адреса, которого в этой версии нет (старая ссылка, другой
+    # чек-лист), — не отказ правки: панель просто не открывается, а экран
+    # говорит одной строкой, чего не нашёл. До D217 здесь вставал красный
+    # отказ хранилища с именами инструментов агента.
+    пропал = None
+    if выбран and выбран not in {str(i.get("id", "")) for i in состав.items}:
+        пропал, выбран = выбран, None
     новый = request.args.get("new") == "1" and состав.is_latest
     # Панели экрана, которые не про пункт: настройка оценки (зоны, обход,
     # ставки) и перечень версий. До редизайна они жили в «пустой» правой
@@ -1514,6 +1521,7 @@ def _render_methodology(
         zone_items=dict(mview.zone_options(состав.items, состав.zones)).get(открыта_зона, 0),
         adding=новый,
         panel=панель,
+        missing_item=пропал,
         prev_href=адрес(item=раньше) if раньше else None,
         next_href=адрес(item=позже) if позже else None,
         href=адрес,

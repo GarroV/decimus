@@ -682,7 +682,10 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .tabbar::-webkit-scrollbar { display: none; }
 /* Непостроенный раздел приглушён так же, как в столбце слева: одна и та же пометка
    на обоих поверхностях, иначе с телефона он выглядит рабочим. */
-.tabbar__item.is-wip { opacity: .45; }
+/* На телефоне в нижней полосе недостроенного нет: десять пунктов, из них
+   шесть заглушек, не помещались, и до «Методики» приходилось листать. Карта
+   продукта целиком остаётся в боковом меню компьютера (D138, D217). */
+.tabbar__item.is-wip { display: none; }
 .tabbar__item {
   flex: none;
   white-space: nowrap;
@@ -975,6 +978,21 @@ a.ov-table__row:hover { background: var(--surface-3); }
      четырёх колонок на 390 точках уезжает вбок. */
   .pt-head__actions .btn { flex: 1 1 auto; text-align: center; }
   .pt-bars { height: 7rem; }
+  /* Кнопка в непостроенный раздел на телефоне не нужна: во всю ширину она
+     занимала первый экран ради заглушки. */
+  .ov-head__cta.is-wip, .pt-head__actions .btn.is-wip { display: none; }
+  /* Таблица точек на телефоне — без города и даты: семь колонок уезжали
+     вбок, и «слабая зона» с датой читались только прокруткой. Город и дата
+     остаются в карточке точки, куда ведёт строка. */
+  .ov-table--points .ov-table__head,
+  .ov-table--points .ov-table__row {
+    grid-template-columns: minmax(7rem, 1.4fr) 2.5rem 3.5rem 3rem minmax(5rem, 1fr);
+    min-width: 0;
+  }
+  .ov-table--points .ov-table__head > :nth-child(2),
+  .ov-table--points .ov-table__row > :nth-child(2),
+  .ov-table--points .ov-table__head > :nth-child(7),
+  .ov-table--points .ov-table__row > :nth-child(7) { display: none; }
 }
 
 /* ── Чек-лист в три колонки (D197) ────────────────────────────────────────
@@ -1242,3 +1260,19 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-new .mx-in, .mx-new .mx-q { border-color: var(--line-control); background: var(--surface); }
 .mx-new .mx-q { margin-left: 0; width: 100%; }
 .mx-new .mx-q--en { margin-top: var(--space-3); }
+
+/* ── Перечень чек-листов ────────────────────────────────────────────────
+   Строки — как в реестре; поле состояния и поля нового чек-листа — те же
+   поля, что по всей админке, а не голые браузерные. */
+.input--sm { height: var(--control-h-sm); font-size: var(--fs-dense); width: auto; padding-top: 0; padding-bottom: 0; }
+.cl-row .ins-row__unit { color: inherit; text-decoration: none; }
+.cl-row .ins-row__unit:hover { text-decoration: underline; }
+.cl-new { padding: var(--space-4) var(--space-5) 0; }
+.cl-new .input { width: auto; }
+.cl-new__code { width: 14ch; flex: none; }
+.cl-new__name { flex: 1 1 14rem; min-width: 0; }
+.cl-new__hint { padding: var(--space-2) var(--space-5) var(--space-4); margin: 0; }
+.ap-table th { text-align: left; }
+.ap-table th[scope=row] { font-weight: var(--w-regular); color: var(--ink-2); width: 30%; }
+.ap-table tr.ap-diff td { font-weight: var(--w-semibold); background: var(--warn-soft, var(--surface-3)); }
+.users-add { align-items: flex-end; }

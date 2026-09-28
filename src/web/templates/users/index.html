@@ -7,12 +7,11 @@
 {% block title %}{{ t('section.users.title') }}{% endblock %}
 
 {% block body %}
-  <div class="section">
-    <div class="section__head">
-      <h1 class="section__title">{{ t('section.users.title') }}</h1>
-      <span class="section__num">{{ t('users.count', count=people|length) }}</span>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <h1 class="ov-head__title">{{ t('section.users.title') }}</h1>
+      <div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>
     </div>
-    <p class="section__lead">{{ t('users.lead') }}</p>
   </div>
 
   {% if added %}
@@ -58,27 +57,9 @@
     </div>
   {% endif %}
 
-  <div class="card mt-gap">
-    <h2 class="card__title">{{ t('users.add.title') }}</h2>
-    <form method="post" action="{{ url(users_path ~ '/add') }}?lang={{ lang }}" class="row">
-      <label class="grow">
-        <span class="field-label">{{ t('users.add.login') }}</span>
-        <input class="input" name="login" required autocomplete="off"
-               pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false">
-      </label>
-      <label>
-        <span class="field-label">{{ t('users.add.role') }}</span>
-        <select class="input" name="role">
-          {% for код in roles %}
-            <option value="{{ код }}">{{ t('users.role.' ~ код) }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button class="btn btn--primary" type="submit">{{ t('users.add.submit') }}</button>
-    </form>
-    <p class="field-note">{{ t('users.add.hint') }}</p>
-  </div>
 
+  {# Список — первым: экран открывают посмотреть, у кого доступ, а заводят
+     человека реже. Отключённые остаются в списке приглушёнными. #}
   {% if people %}
     <div class="table-wrap mt-gap">
       <table class="table">
@@ -118,4 +99,26 @@
       </table>
     </div>
   {% endif %}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.add.title') }}</div></div>
+    <div class="card__body">
+    <form method="post" action="{{ url(users_path ~ '/add') }}?lang={{ lang }}" class="row users-add">
+      <label class="grow">
+        <span class="field-label">{{ t('users.add.login') }}</span>
+        <input class="input" name="login" required autocomplete="off"
+               pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false">
+      </label>
+      <label>
+        <span class="field-label">{{ t('users.add.role') }}</span>
+        <select class="input" name="role">
+          {% for код in roles %}
+            <option value="{{ код }}">{{ t('users.role.' ~ код) }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <button class="btn btn--primary" type="submit">{{ t('users.add.submit') }}</button>
+    </form>
+    <p class="field-note">{{ t('users.add.hint') }}</p>
+    </div>
+  </section>
 {% endblock %}
