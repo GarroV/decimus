@@ -595,6 +595,26 @@
           {% endif %}
         </div>
 
+      {% elif panel == 'new' %}
+        {# Новый чек-лист (D221): форма той же двери, что на перечне; рождается черновиком. #}
+        <header class="mx-drawer__head">
+          <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('checklists.new.title') }}</div>
+          <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>
+        </header>
+        <div class="mx-drawer__body">
+          <p class="field-note">{{ t('checklists.new.text') }}</p>
+          <form method="post" action="{{ url_for('checklists_create') }}?lang={{ lang }}" class="form-grid">
+            <input type="hidden" name="back" value="admin">
+            <label><span class="field-label">{{ t('checklists.new.name_ru') }}</span>
+              <input class="input" type="text" name="name_ru" required autocomplete="off"></label>
+            <label><span class="field-label">{{ t('checklists.new.name_en') }}</span>
+              <input class="input" type="text" name="name_en" required autocomplete="off"></label>
+            <label><span class="field-label">{{ t('checklists.new.code') }}</span>
+              <input class="input mono" type="text" name="code" required pattern="[a-z0-9][a-z0-9_-]{0,31}" autocomplete="off"></label>
+            <p class="field-note">{{ t('checklists.new.code.hint') }}</p>
+            <div><button type="submit" class="btn btn--primary">{{ t('checklists.new.submit') }}</button></div>
+          </form>
+        </div>
       {% elif panel == 'versions' %}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('methodology.versions.title') }}</div>
