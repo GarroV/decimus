@@ -22,6 +22,8 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from src import domain
+from src.domain.bot_checklists import BotChecklist, available
+from src.domain.config import check_environment
 from src.domain.errors import DomainError
 
 from .. import sealed, sidecar
@@ -29,6 +31,7 @@ from ..auditor import auditor_name, auditor_name_was_shortened
 from ..config import BotSettings
 from ..inspection import read_inspection
 from ..keyboards import (
+    CHECKLIST_PREFIX,
     KIND_PREFIX,
     KIND_TITLES,
     LANG_LABELS,
@@ -38,6 +41,7 @@ from ..keyboards import (
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
     UNIT_PICK_PREFIX,
+    checklist_keyboard,
     kind_keyboard,
     kind_title,
     lang_keyboard,
@@ -120,6 +124,42 @@ async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
     await message.answer(t("start.ask_unit", lang))
 
 
+def _open_checklists() -> list[BotChecklist] | None:
+    """Открытые в боте чек-листы — или `None`, если их не прочитать."""
+    try:
+        return available(check_environment())
+    except (DomainError, OSError, ValueError):
+        logger.exception("список чек-листов для бота не прочитался")
+        return None
+
+
+async def _ask_checklist(message: Message, state: FSMContext, lang: str) -> None:
+    """Первый шаг мастера (волна 3): по какому чек-листу проверка.
+
+    Открыт один — не спрашиваем, как до волны 3. Несколько — кнопки с
+    названиями на языке интерфейса. Ни одного — прямо говорим, что начать не
+    по чему и кто это чинит, и мастер дальше не идёт.
+    """
+    открыты = _open_checklists()
+    if открыты is None:
+        await state.clear()
+        await message.answer(t("start.failed", lang))
+        return
+    if not открыты:
+        await state.clear()
+        await message.answer(t("start.no_checklists", lang))
+        return
+    if len(открыты) == 1:
+        await state.update_data(checklist=открыты[0].code)
+        await _ask_unit(message, state, lang)
+        return
+    await state.set_state(StartFlow.waiting_checklist)
+    await message.answer(
+        t("start.ask_checklist", lang),
+        reply_markup=checklist_keyboard([(c.code, c.name(lang)) for c in открыты]),
+    )
+
+
 def build_start_router(
     settings: BotSettings,
     pending: PendingStore | None = None,
@@ -178,12 +218,12 @@ def build_start_router(
             # осознанно. Второй раз пугать его нечем, а тупик здесь означал бы,
             # что выхода нет и после нажатия единственной предложенной кнопки.
             logger.exception("состояние чата %s не читается", message.chat.id)
-            await _ask_unit(message, state, lang)
+            await _ask_checklist(message, state, lang)
             return
         if inspection is not None:
             await _offer_resume(message, inspection, lang)
             return
-        await _ask_unit(message, state, lang)
+        await _ask_checklist(message, state, lang)
 
     @router.callback_query(F.data == RESUME_CONTINUE_CALLBACK)
     async def on_resume_continue(callback: CallbackQuery, state: FSMContext) -> None:
@@ -230,7 +270,7 @@ def build_start_router(
         message = callback.message
         if not isinstance(message, Message):
             return
-        await _ask_unit(message, state, chat_ui_lang(message.chat.id))
+        await _ask_checklist(message, state, chat_ui_lang(message.chat.id))
 
     @router.callback_query(F.data == SEALED_DROP_CALLBACK)
     async def on_sealed_drop(callback: CallbackQuery, state: FSMContext) -> None:
@@ -362,6 +402,26 @@ def build_start_router(
         """
         await message.answer(t("start.unit_expected", chat_ui_lang(message.chat.id)))
 
+    @router.callback_query(
+        StateFilter(StartFlow.waiting_checklist), F.data.startswith(CHECKLIST_PREFIX)
+    )
+    async def on_checklist(callback: CallbackQuery, state: FSMContext) -> None:
+        await callback.answer()
+        message = callback.message
+        if not isinstance(message, Message):
+            return
+        lang = chat_ui_lang(message.chat.id)
+        code = (callback.data or "").removeprefix(CHECKLIST_PREFIX)
+        открыты = _open_checklists() or []
+        if code not in {c.code for c in открыты}:
+            # Методист закрыл чек-лист, пока аудитор смотрел на кнопки: не
+            # подменяем соседним молча, а показываем свежий список.
+            await message.answer(t("start.checklist_gone", lang))
+            await _ask_checklist(message, state, lang)
+            return
+        await state.update_data(checklist=code)
+        await _ask_unit(message, state, lang)
+
     @router.callback_query(StateFilter(StartFlow.waiting_kind), F.data.startswith(KIND_PREFIX))
     async def on_kind(callback: CallbackQuery, state: FSMContext) -> None:
         await callback.answer()
@@ -430,6 +490,9 @@ def build_start_router(
                 ui_lang=report_lang,
                 speech_lang=report_lang,
                 auditor=auditor,
+                # Выбран на первом шаге; пусто — открыт был один, и домен
+                # возьмёт его сам (или откажет, если за это время открыли второй).
+                checklist_code=str(data.get("checklist") or "") or None,
             )
         except DomainError:
             # Отказ движка приходит стеком с путями к его файлам: он написан
