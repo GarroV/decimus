@@ -1053,6 +1053,8 @@ a.ov-table__row:hover { background: var(--surface-3); }
   font-weight: var(--w-semibold); color: var(--ink-3);
 }
 .mx-rail__head--list { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: 0 var(--space-4) var(--space-3); }
+/* На телефоне кнопки растягиваются во всю ширину (`dodo-ds`); эта — нет: она живёт в строке заголовка. */
+.mx-rail__head--list .btn { width: auto; flex: none; }
 .mx-rail__row {
   display: grid; gap: 2px; padding: var(--space-3) var(--space-4);
   border-radius: var(--r-control); color: var(--ink); text-decoration: none;
