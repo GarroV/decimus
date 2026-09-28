@@ -123,7 +123,9 @@ def current_section(path: str) -> str | None:
     подсвечивало ничего, и человек терял, где он.
     """
     подходят = [
-        item for item in SECTIONS if path == item.path or path.startswith(item.path.rstrip("/") + "/")
+        item
+        for item in SECTIONS
+        if path == item.path or path.startswith(item.path.rstrip("/") + "/")
     ]
     return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
