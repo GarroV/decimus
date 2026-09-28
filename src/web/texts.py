@@ -150,17 +150,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "over recorded percentages",
     },
     "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
+    # Средней нет, потому что в выборке разные чек-листы — другие пункты или
+    # веса (D218). Причина одной строкой в самой плитке, без плашки.
+    "overview.tile.note.average_mixed": {"ru": "разные чек-листы", "en": "different checklists"},
     "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
-    "overview.incomparable.title": {
-        "ru": "Средняя по этой выборке не считается",
-        "en": "No average for this selection",
-    },
-    "overview.incomparable.text": {
-        "ru": "Проверки посчитаны по разным ставкам или разным чек-листам: одно число по ним "
-        "было бы средним по несравнимому. Разбивка ниже остаётся верной — она не усредняет.",
-        "en": "These inspections were scored under different rates or checklists: a single number "
-        "would average the incomparable. The breakdown below still holds — it averages nothing.",
-    },
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     "overview.attention.count": {"ru": "поводов: {count}", "en": "{count} pending"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
@@ -318,10 +311,6 @@ TEXTS: dict[str, dict[str, str]] = {
     # столбики 89 и 99 на шкале от нуля выглядят одинаковыми, а на шкале от
     # 85 — вдвое разными, и читатель обязан знать, какую картинку он видит.
     "unit.movement.scale": {"ru": "шкала от {floor}%", "en": "scale starts at {floor}%"},
-    "unit.movement.mixed": {
-        "ru": "Проверки разных изданий методики — высоту столбиков сравнивать нельзя",
-        "en": "Audits from different methodology editions — bar heights are not comparable",
-    },
     "unit.movement.empty": {
         "ru": "Проверок по этой точке ещё не было",
         "en": "This unit has not been audited yet",
@@ -394,6 +383,20 @@ TEXTS: dict[str, dict[str, str]] = {
     "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
+    "card.build.title": {"ru": "Сборка чек-листа", "en": "Checklist build"},
+    "card.build.checklist": {"ru": "Чек-лист", "en": "Checklist"},
+    "card.build.edition": {"ru": "Сборка", "en": "Build"},
+    "card.build.shape": {"ru": "Пункты и веса", "en": "Items and weights"},
+    "card.build.shape_unknown": {
+        "ru": "файлов сборки на сервере нет",
+        "en": "build files are not on the server",
+    },
+    "card.build.hint": {
+        "ru": "Проверки с одинаковыми «пунктами и весами» считаются одним чек-листом "
+        "и складываются в одну среднюю, даже если сборки разные.",
+        "en": "Inspections with the same “items and weights” count as one checklist "
+        "and share one average, even if the builds differ.",
+    },
     "card.meta": {
         "ru": "{date} · {kind} · {checklist}",
         "en": "{date} · {kind} · {checklist}",

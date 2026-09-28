@@ -51,9 +51,7 @@
       </div>
       <div class="head-line__grow">
         <div class="card__title">{{ head.unit_name }}</div>
-        {# Издание методики — подсказкой к имени чек-листа: хэш в строке
-           читается как мусор, а нужен он только при разборе расхождений. #}
-        <div class="card__meta" title="{{ head.checklist_version }}">{{ t('card.meta', date=head.inspection_date, kind=kind, checklist=checklist_name) }}</div>
+        <div class="card__meta">{{ t('card.meta', date=head.inspection_date, kind=kind, checklist=checklist_name) }}</div>
         {# Сколько вычтено и записи по классам — одной строкой: отдельный блок
            «Записи по классам» под шапкой занимал целый ряд ради трёх меток. #}
         <div class="meta row row--tight head-line__counts">
@@ -218,6 +216,19 @@
       </div></div>
     </div>
   {% endif %}
+
+  {# Сборка чек-листа — свёрнутой справкой внизу (D218): хэш в шапке читается
+     как мусор, а нужен он при разборе расхождений. «Пункты и веса» — тот же
+     отпечаток, по которому обзор решает, складываются ли проверки в ряд. #}
+  <details class="mx-more">
+    <summary>{{ t('card.build.title') }}</summary>
+    <dl class="kv mt-gap">
+      <div><dt class="muted">{{ t('card.build.checklist') }}</dt><dd>{{ checklist_name }}</dd></div>
+      <div><dt class="muted">{{ t('card.build.edition') }}</dt><dd><code>{{ head.checklist_version }}</code></dd></div>
+      <div><dt class="muted">{{ t('card.build.shape') }}</dt><dd>{% if build_shape %}<code>{{ build_shape }}</code>{% else %}{{ t('card.build.shape_unknown') }}{% endif %}</dd></div>
+    </dl>
+    <p class="field-note">{{ t('card.build.hint') }}</p>
+  </details>
 
   {% if may_retract and not head.retracted %}
     <div class="section">

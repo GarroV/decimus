@@ -69,15 +69,6 @@
     {% endfor %}
   </div>
 
-  {% if not data.comparable %}
-    <div class="note note--warn mt-gap">
-      <div>
-        <div class="note__title">{{ t('overview.incomparable.title') }}</div>
-        <div class="note__text">{{ t('overview.incomparable.text') }}</div>
-      </div>
-    </div>
-  {% endif %}
-
   <div class="ov-grid">
     {# ── Разбивка по городам ───────────────────────────────────────────── #}
     <section class="ov-card">

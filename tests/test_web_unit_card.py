@@ -287,11 +287,12 @@ class TestЭкран:
         страница = self.показать(стенд, monkeypatch, self.снимок())
         assert "85" in страница and "шкала от" in страница
 
-    def test_ряд_разных_изданий_методики_предупреждает(
+    def test_ряд_разных_чек_листов_без_плашки(
         self, стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        # D218: столбик другого чек-листа помечен цветом, плашки под ним нет.
         страница = self.показать(стенд, monkeypatch, self.снимок(comparable=False))
-        assert "сравнивать нельзя" in страница
+        assert "сравнивать нельзя" not in страница
 
     def test_пустые_блоки_говорят_словами_а_не_исчезают(
         self, стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch

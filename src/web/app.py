@@ -29,7 +29,7 @@ from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 
-from . import accounts, assets, auth, letter_draft, view
+from . import accounts, assets, auth, letter_draft, pricing, view
 from . import inspections as data
 from . import methodology as method
 from . import methodology_view as mview
@@ -326,11 +326,12 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             return _url("registry", **{к: з for к, з in параметры.items() if з})
 
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
-        среднее = (
-            t("overview.tile.note.average_none", _lang(conf))
-            if snapshot.average is None or not snapshot.comparable
-            else t("overview.tile.note.average", _lang(conf))
-        )
+        if snapshot.average is None:
+            среднее = t("overview.tile.note.average_none", _lang(conf))
+        elif not snapshot.comparable:
+            среднее = t("overview.tile.note.average_mixed", _lang(conf))
+        else:
+            среднее = t("overview.tile.note.average", _lang(conf))
         # Плиток пять, и они РАЗНЫЕ на вид: бриф прямо запрещает полосу
         # одинаковых плиток, и различие здесь несёт смысл, а не украшает —
         # цветом помечено только то, что требует действия.
@@ -914,6 +915,7 @@ def _render_card(
         checklist_name=_checklist_names(lang).get(
             detail.inspection.checklist_code, detail.inspection.checklist_code
         ),
+        build_shape=pricing.edition_shape(detail.inspection.checklist_version),
         may_retract=data.retraction_available() and админ,
         notice=notice,
         failure=failure,
