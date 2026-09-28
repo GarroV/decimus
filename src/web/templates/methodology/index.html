@@ -159,7 +159,7 @@
   <textarea class="mx-criteria" id="f-criteria" name="criteria" rows="6" data-mx-grow>{{ item.get('criteria') or '' }}</textarea>
 {% endmacro %}
 
-{# Строка колонки чек-листов (D221). Обычный переход страницы, без
+{# Строка колонки чек-листов (D222). Обычный переход страницы, без
    `data-mx-open`: подмена слоя панели не обновила бы ни колонку, ни шапку,
    ни список пунктов (`methodology.js`). #}
 {% macro rail_row(r) %}
@@ -172,7 +172,7 @@
 {% block body %}
   <div class="mx-shell{% if picking %} mx-shell--pick{% endif %}">
   <aside class="mx-rail" aria-label="{{ t('methodology.rail.title') }}">
-    {# Блок «Бот» — отдельно от списка (D222): весь доступ виден одной строкой.
+    {# Блок «Бот» — отдельно от списка (D223): весь доступ виден одной строкой.
        Настоящая настройка доступа — волна 3; до неё это чек-лист прода. #}
     <div class="mx-rail__bot">
       <div class="mx-rail__head">{{ t('methodology.rail.bot') }}</div>
@@ -596,7 +596,7 @@
         </div>
 
       {% elif panel == 'new' %}
-        {# Новый чек-лист (D221): форма той же двери, что на перечне; рождается черновиком. #}
+        {# Новый чек-лист (D222): форма той же двери, что на перечне; рождается черновиком. #}
         <header class="mx-drawer__head">
           <div class="grow mx-drawer__code" id="mx-drawer-title">{{ t('checklists.new.title') }}</div>
           <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">✕</a>

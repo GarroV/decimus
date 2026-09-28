@@ -736,7 +736,7 @@ RAIL_ORDER = {ACTIVE: 0, DRAFT: 1, RETIRED: 2}
 
 @dataclass(frozen=True)
 class RailRow:
-    """Строка колонки чек-листов слева на «Методике» (D221)."""
+    """Строка колонки чек-листов слева на «Методике» (D222)."""
 
     code: str
     name_ru: str
