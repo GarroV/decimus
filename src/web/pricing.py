@@ -7,7 +7,7 @@
 проверкам, посчитанным одинаково (прод, 28.09: семь проверок на трёх изданиях
 с одними ставками).
 
-Ключ ряда — «код чек-листа + оценочная форма издания» (`domain.shape`), то же
+Ключ ряда — «код чек-листа + пункты и веса издания» (`domain.shape`, D218), то же
 правило, что у агента (`src/mcp/comparability.py`). Каталог издания ищется тем
 же `pinned`, которым собирается письмо: хранилище версий, боевая методика или
 полка снимков бота.
@@ -51,6 +51,12 @@ def use_reader(reader: ShapeReader | None) -> None:
     """Подменить читателя цены (`None` — вернуть настоящего)."""
     global _reader
     _reader = _shape if reader is None else reader
+
+
+def edition_shape(version: str) -> str | None:
+    """Отпечаток пунктов и весов издания для справки в карточке проверки
+    (D218); `None` — каталога издания на машине нет."""
+    return _reader(version)
 
 
 def price_key(row: InspectionRow) -> tuple[str, str]:

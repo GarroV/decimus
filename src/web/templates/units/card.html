@@ -79,9 +79,6 @@
           {% endfor %}
         </div>
         <div class="ov-card__hint pt-bars__scale">{{ t('unit.movement.scale', floor='%g'|format(data.floor)) }}</div>
-        {% if not data.comparable %}
-          <div class="note note--warn">{{ t('unit.movement.mixed') }}</div>
-        {% endif %}
       {% else %}
         <div class="ov-card__empty">{{ t('unit.movement.empty') }}</div>
       {% endif %}

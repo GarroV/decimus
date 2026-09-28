@@ -1221,6 +1221,10 @@ a.ov-table__row:hover { background: var(--surface-3); }
 .mx-more > summary::-webkit-details-marker { display: none; }
 .mx-more > summary::before { content: "▸ "; color: var(--ink-3); }
 .mx-more[open] > summary::before { content: "▾ "; }
+/* Справка «ключ — значение» (сборка чек-листа в карточке проверки, D218). */
+.kv { display: grid; gap: var(--space-2); margin: 0; font-size: var(--fs-meta); }
+.kv > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-3); }
+.kv dd { margin: 0; overflow-wrap: anywhere; }
 .mx-danger .btn--primary { background: var(--err); border-color: var(--err); }
 
 .mx-keys { margin-top: var(--space-8); font-size: var(--fs-micro); color: var(--ink-3); }

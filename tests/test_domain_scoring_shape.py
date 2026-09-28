@@ -158,15 +158,18 @@ def test_ставка_вычета_рвёт_ряд(data_copy: Path) -> None:
     assert scoring_shape(data_copy) != было
 
 
-def test_порог_буквы_рвёт_ряд(data_copy: Path) -> None:
-    """Процент остался прежним, а буква у той же проверки стала другой.
+def test_правило_движка_ряд_не_рвёт(data_copy: Path) -> None:
+    """D218, #421: чек-лист — это пункты и веса, правила движка в него не входят.
 
-    Буква — то, чем сводку и читают: распределение букв по сети собирается
-    именно из неё.
+    Случай прода 28.09: издание 0c57 отличалось от 9155 только добавленным
+    `repeat_multiplier`, ни одна проверка повтора не содержала — и обзор
+    прятал среднюю по семи одинаково посчитанным проверкам.
     """
     было = scoring_shape(data_copy)
 
     def правка(тело: dict[str, object]) -> None:
+        тело["repeat_multiplier"] = 3.0
+        тело["start_pct"] = 90.0
         правила = тело["grades"]["rules"]  # type: ignore[index]
         for правило in правила:  # type: ignore[union-attr]
             if "pct_at_least" in правило["if"]:
@@ -176,15 +179,7 @@ def test_порог_буквы_рвёт_ряд(data_copy: Path) -> None:
 
     _правка_json(data_copy, правка)
 
-    assert scoring_shape(data_copy) != было
-
-
-def test_начальный_процент_рвёт_ряд(data_copy: Path) -> None:
-    было = scoring_shape(data_copy)
-
-    _правка_json(data_copy, lambda тело: тело.update({"start_pct": 90.0}))
-
-    assert scoring_shape(data_copy) != было
+    assert scoring_shape(data_copy) == было
 
 
 def test_доля_зоны_рвёт_ряд(data_copy: Path) -> None:
