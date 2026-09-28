@@ -41,6 +41,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
+    "nav.theme": {"ru": "Тема", "en": "Theme"},
+    "nav.theme.system": {"ru": "Как в системе", "en": "System"},
+    "nav.theme.light": {"ru": "Светлая", "en": "Light"},
+    "nav.theme.dark": {"ru": "Тёмная", "en": "Dark"},
+    "nav.role.admin": {"ru": "Админ", "en": "Admin"},
+    "nav.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
