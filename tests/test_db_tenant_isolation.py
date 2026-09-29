@@ -25,7 +25,7 @@ from src.db.directory import resolve_unit, upsert_unit  # noqa: E402 — пос�
 
 pytestmark = requires_db
 
-СВОЙ = "default"
+СВОЙ = "HQ"  # тенант УК (D234)
 ЧУЖОЙ = "partner"
 
 

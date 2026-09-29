@@ -266,7 +266,7 @@ def main(argv: list[str] | None = None) -> int:
 
     s = под.add_parser("sites", help="загрузить точки с сайтов стран")
     s.add_argument("--country", action="append", help="код страны; можно несколько")
-    s.add_argument("--tenant", default="default")
+    s.add_argument("--tenant", default="HQ")
     s.add_argument("--dry-run", action="store_true", help="показать и не писать")
     s.set_defaults(функция=команда_sites)
 
@@ -276,12 +276,12 @@ def main(argv: list[str] | None = None) -> int:
     a.add_argument("--city")
     a.add_argument("--code", help="код точки во внешнем источнике")
     a.add_argument("--alias", action="append", help="синоним; можно несколько")
-    a.add_argument("--tenant", default="default")
+    a.add_argument("--tenant", default="HQ")
     a.set_defaults(функция=команда_add)
 
     ls = под.add_parser("list", help="показать справочник")
     ls.add_argument("--country", help="показать одну страну")
-    ls.add_argument("--tenant", default="default")
+    ls.add_argument("--tenant", default="HQ")
     ls.set_defaults(функция=команда_list)
 
     args = парсер.parse_args(argv)

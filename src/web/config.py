@@ -23,6 +23,8 @@ import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from src.domain.tenants import canonical_tenant
+
 from .errors import WebConfigError
 from .texts import default_ui_lang
 
@@ -165,7 +167,7 @@ def _parse_port(raw: str) -> int:
 
 
 def _parse_tenant(raw: str) -> str:
-    tenant = raw.strip()
+    tenant = canonical_tenant(raw)
     if not tenant:
         raise WebConfigError(
             f"Не задана переменная окружения {WEB_TENANT_VAR}. Чью историю показывает этот "
