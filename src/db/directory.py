@@ -217,6 +217,7 @@ def upsert_unit(
     Отказ — `PushError`: справочник ведётся тем же блоком и теми же правилами,
     что слив, и вызывающему не нужно знать про второй тип ошибки.
     """
+    tenant = canonical_tenant(tenant)
     settings = check_environment()
     key = normalize_unit_name(name)
     if not key:
