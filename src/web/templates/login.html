@@ -10,79 +10,73 @@
 
 {% block body %}
   {#
-    Вход через Google — главной плашкой, пароль — рядом (замечание владельца
-    29.09): у большинства допущенных рабочая почта Google, и первое, что они
-    видят, должно быть их дверью. Пароль остаётся запасной дверью: гугловая
-    почта есть не у всех, кого сюда пустят, и отнимать у них вход нельзя.
+    Вход через Google — слева, логин и пароль — справа, без лишних слов
+    (замечание владельца 29.09: «виджет гугла и справа 2 окна ввода… лаконично»).
+    Пароль остаётся запасной дверью: гугловая почта есть не у всех, кого сюда
+    пустят, и отнимать у них вход нельзя.
 
-    Плашки нет вовсе, если реквизиты приложения не заданы: стенд без них
-    работает паролем, как работал, а мёртвая кнопка «Войти через Google»
-    выглядела бы поломкой продукта. Тогда карточка — одна колонка, как раньше.
+    Кнопки Google нет вовсе, если реквизиты приложения не заданы: стенд без
+    них работает паролем, как работал, а мёртвая кнопка выглядела бы поломкой.
+    Тогда карточка — одна колонка с формой.
   #}
   <div class="login{% if google_enabled %} login--split{% endif %}">
-    <div class="login__head">
-      <h1 class="section__title">{{ t('auth.title') }}</h1>
-      <p class="login__lead">{{ t('auth.lead') }}</p>
-    </div>
+    <h1 class="section__title login__head">{{ t('auth.title') }}</h1>
+    {% if not google_enabled %}<p class="login__lead">{{ t('auth.lead') }}</p>{% endif %}
 
-    {% if google_enabled %}
-      <section class="login__google" aria-labelledby="login-google-title">
-        <h2 class="login__google-title" id="login-google-title">{{ t('auth.google.title') }}</h2>
-        <p class="login__google-hint">{{ t('auth.google.hint') }}</p>
-        <a class="btn login__google-btn" href="{{ url_for('google_start') }}?lang={{ lang }}">
-          <svg class="login__google-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-            <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-            <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-            <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-            <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-          </svg>
-          {{ t('auth.google') }}
-        </a>
-      </section>
+    {#
+      Запрет и «не подошло» — разные сообщения намеренно: человеку, который
+      упёрся в счётчик, нужно знать, сколько ждать, а не «проверьте пароль».
+
+      Поля при этом НЕ гасятся, и это не недосмотр. Запрет стоит на паре
+      «адрес + логин», а форму видит и тот, кого он не касается: сосед по
+      выходу в сеть, другой логин, вернувшийся через час человек. Погашенная
+      форма закрыла бы вход им, а запертому не добавила бы ни секунды — его
+      попытка всё равно не доходит до сверки пароля.
+    #}
+    {% if locked_minutes %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.locked', minutes=locked_minutes) }}</div></div>
+      </div>
+    {% elif failed %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.failed') }}</div></div>
+      </div>
     {% endif %}
 
-    <section class="login__password" aria-label="{{ t('auth.password.title') }}">
-      {% if google_enabled %}
-        <h2 class="login__password-title">{{ t('auth.password.title') }}</h2>
-      {% endif %}
+    {% if google_enabled %}
+      <div class="login__google">
+        <a class="btn login__google-btn" href="{{ url_for('google_start') }}?lang={{ lang }}">
+          <svg class="login__google-mark" viewBox="0 0 48 48" aria-hidden="true" focusable="false">
+              <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+              <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+              <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+              <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+            </svg>
+          {{ t('auth.google') }}
+        </a>
+      </div>
+      <div class="login__or" aria-hidden="true"><span>{{ t('auth.or') }}</span></div>
+    {% endif %}
 
-      {#
-        Запрет и «не подошло» — разные сообщения намеренно: человеку, который
-        упёрся в счётчик, нужно знать, сколько ждать, а не «проверьте пароль».
+    {#
+      Введённое обратно не подставляется: среди него пароль, и вернувшийся в
+      разметку, он уезжает в кэш браузера и в снимок экрана.
 
-        Поля при этом НЕ гасятся, и это не недосмотр. Запрет стоит на паре
-        «адрес + логин», а форму видит и тот, кого он не касается: сосед по
-        выходу в сеть, другой логин, вернувшийся через час человек. Погашенная
-        форма закрыла бы вход им, а запертому не добавила бы ни секунды — его
-        попытка всё равно не доходит до сверки пароля.
-      #}
-      {% if locked_minutes %}
-        <div class="note note--error mt-gap" role="alert">
-          <div><div class="note__title">{{ t('auth.locked', minutes=locked_minutes) }}</div></div>
-        </div>
-      {% elif failed %}
-        <div class="note note--error mt-gap" role="alert">
-          <div><div class="note__title">{{ t('auth.failed') }}</div></div>
-        </div>
-      {% endif %}
+      Подписи полей скрыты с экрана, но остаются для чтеца экрана: подсказка
+      внутри поля пропадает при вводе и подписью не считается.
+    #}
+    <form class="login__form" method="post" action="{{ url_for('login') }}?lang={{ lang }}">
+      <label class="sr-only" for="login">{{ t('auth.login') }}</label>
+      <input class="input" id="login" name="login" type="text" placeholder="{{ t('auth.login') }}"
+             autocomplete="username" autocapitalize="none" spellcheck="false"
+             {% if not google_enabled %}autofocus{% endif %} required>
 
-      {#
-        Введённое обратно не подставляется: среди него пароль, и вернувшийся в
-        разметку, он уезжает в кэш браузера и в снимок экрана.
-      #}
-      <form class="login__form" method="post" action="{{ url_for('login') }}?lang={{ lang }}">
-        <label class="field-label" for="login">{{ t('auth.login') }}</label>
-        <input class="input" id="login" name="login" type="text"
-               autocomplete="username" autocapitalize="none" spellcheck="false"
-               {% if not google_enabled %}autofocus{% endif %} required>
+      <label class="sr-only" for="password">{{ t('auth.password') }}</label>
+      <input class="input" id="password" name="password" type="password" placeholder="{{ t('auth.password') }}"
+             autocomplete="current-password" required>
 
-        <label class="field-label" for="password">{{ t('auth.password') }}</label>
-        <input class="input" id="password" name="password" type="password"
-               autocomplete="current-password" required>
-
-        <button class="btn{% if not google_enabled %} btn--primary{% endif %}" type="submit">{{ t('auth.submit') }}</button>
-      </form>
-    </section>
+      <button class="btn{% if not google_enabled %} btn--primary{% endif %}" type="submit">{{ t('auth.submit') }}</button>
+    </form>
 
     <p class="login__aside">{{ t('auth.aside') }}</p>
   </div>
