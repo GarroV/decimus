@@ -27,8 +27,8 @@ from src.bot.keyboards import (
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
-    UNIT_KEEP,
-    UNIT_PICK_PREFIX,
+    UNIT_NEW_PREFIX,
+    UNIT_NEW_YES,
 )
 from src.bot.unit_pick import UnitMatch
 from src.domain import get_state, start_inspection
@@ -92,12 +92,12 @@ async def test_wizard_asks_unit_then_kind_then_language(domain_env: object) -> N
 
 
 async def test_wizard_creates_inspection_with_typed_unit(domain_env: object) -> None:
-    """D051: пиццерия вводится текстом, справочника в MVP нет."""
+    """Пиццерия вводится текстом (D051), а пишется городом по-английски и номером (D233)."""
     await walk_through_wizard(unit="Белград 2")
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
-    assert inspection.unit == "Белград 2"
+    assert inspection.unit == "Belgrade-2"  # D233: город по-английски и номер
     # Вид проверки записан КОДОМ (T152): слово живёт только в шапке для
     # движка и на кнопке мастера, а сама проверка связывается кодом.
     assert inspection.kind == "planned"
@@ -203,17 +203,25 @@ async def test_start_new_asks_unit_and_replaces_only_after_full_wizard(
 
     replaced = get_state(CHAT_ID)
     assert replaced is not None
-    assert replaced.unit == "Белград 3"
+    assert replaced.unit == "Belgrade-3"
     assert replaced.report_lang == "en"
 
 
-# --- пиццерия: справочник подсказывает, но не запирает (D230) ------------------
+# --- пиццерия: город по-английски и номер, новую заводит УК (D233) -----------
 
 
-def _справочник(monkeypatch: pytest.MonkeyPatch, match: object) -> None:
+def _справочник(monkeypatch: pytest.MonkeyPatch, match: object) -> list[dict[str, object]]:
     from src.bot.routers import start as start_router
 
-    monkeypatch.setattr(start_router, "match_unit", lambda _typed: match)
+    заведено: list[dict[str, object]] = []
+
+    def завести(name: str, **kw: object) -> str:
+        заведено.append({"name": name, **kw})
+        return "u-new"
+
+    monkeypatch.setattr(start_router, "match_unit", lambda _typed, **_kw: match)
+    monkeypatch.setattr(start_router, "upsert_unit", завести)
+    return заведено
 
 
 async def _до_названия(unit: str) -> tuple[object, object, object]:
@@ -225,49 +233,88 @@ async def _до_названия(unit: str) -> tuple[object, object, object]:
     return bot, session, dp
 
 
-async def test_незнакомая_пиццерия_без_похожих_принимается_как_написана(
-    domain_env: object, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Arrange — справочник прочитан, точки в нём нет и похожих нет.
-    _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
-
-    # Act
-    bot, session, dp = await _до_названия("Ереван-2")
-
-    # Assert — мастер пошёл дальше, к виду проверки, а не отказал.
-    assert set(session.keyboard_data()) == {f"start:kind:{code}" for code in KIND_TITLES}
+async def _до_конца(bot: object, dp: object) -> None:
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:lang:ru"))
-    inspection = get_state(CHAT_ID)
-    assert inspection is not None and inspection.unit == "Ереван-2"
 
 
-async def test_при_похожих_можно_оставить_написанное(
+async def test_знакомая_пиццерия_на_любом_языке_берётся_из_справочника(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
-    _справочник(monkeypatch, UnitMatch(name=None, suggestions=("Ереван-1",), checked=True))
+    заведено = _справочник(monkeypatch, UnitMatch(name="Yerevan-2", suggestions=(), checked=True))
 
     # Act
-    bot, session, dp = await _до_названия("Yerevan-3")
-    кнопки = session.keyboard_data()
-    await feed(dp, bot, callback_query(f"{UNIT_PICK_PREFIX}{UNIT_KEEP}"))
-    await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    bot, _session, dp = await _до_названия("ереван 2")
+    await _до_конца(bot, dp)
 
-    # Assert — подсказка и выход «как написано» стоят рядом; выбран второй.
-    assert кнопки == [f"{UNIT_PICK_PREFIX}0", f"{UNIT_PICK_PREFIX}{UNIT_KEEP}"]
+    # Assert
     inspection = get_state(CHAT_ID)
-    assert inspection is not None and inspection.unit == "Yerevan-3"
+    assert inspection is not None and inspection.unit == "Yerevan-2"
+    assert заведено == []
 
 
-async def test_подсказку_по_прежнему_можно_выбрать(
+async def test_новую_пиццерию_уk_заводит_в_справочник_страны(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    _справочник(monkeypatch, UnitMatch(name=None, suggestions=("Ереван-1",), checked=True))
-    bot, _session, dp = await _до_названия("Ереван1")
-    await feed(dp, bot, callback_query(f"{UNIT_PICK_PREFIX}0"))
-    await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    # Arrange — Подгорицы-2 в справочнике нет.
+    заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+
+    # Act
+    bot, session, dp = await _до_названия("ПОдгорица-2")
+    вопрос, кнопки = session.last_text, session.keyboard_data()
+    await feed(dp, bot, callback_query(f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}"))
+    await _до_конца(bot, dp)
+
+    # Assert
+    assert "Новая пиццерия?" in вопрос and "Podgorica-2" in вопрос and "Черногория" in вопрос
+    assert кнопки == [f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}", f"{UNIT_NEW_PREFIX}no"]
+    assert заведено == [
+        {
+            "name": "Podgorica-2",
+            "aliases": ("ПОдгорица-2",),
+            "country": "ME",
+            "city": "podgorica",
+            "tenant": "default",
+        }
+    ]
     inspection = get_state(CHAT_ID)
-    assert inspection is not None and inspection.unit == "Ереван-1"
+    assert inspection is not None and inspection.unit == "Podgorica-2"
+
+
+async def test_нет_значит_ввести_заново_и_ничего_не_заводится(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+    bot, session, dp = await _до_названия("Podgorica-2")
+    await feed(dp, bot, callback_query(f"{UNIT_NEW_PREFIX}no"))
+    assert заведено == []
+    assert get_state(CHAT_ID) is None
+    assert "пиццерии" in session.last_text.lower()
+
+
+async def test_без_номера_бот_просит_город_и_номер(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+    _bot, session, _dp = await _до_названия("Земун")
+    assert "городом и номером" in session.last_text
+    assert заведено == [] and get_state(CHAT_ID) is None
+
+
+async def test_партнёр_новую_пиццерию_не_заводит(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — проверяющий пишет от тенанта партнёра.
+    from src.bot.routers import start as start_router
+
+    заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+    monkeypatch.setattr(start_router, "bot_tenant", lambda _m: "partner-a")
+
+    # Act
+    _bot, session, _dp = await _до_названия("Podgorica-2")
+
+    # Assert — вопроса «Новая пиццерия?» нет, точка не заведена, проверки нет.
+    assert "только управляющая компания" in session.last_text
+    assert f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}" not in session.keyboard_data()
+    assert заведено == [] and get_state(CHAT_ID) is None
