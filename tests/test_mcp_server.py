@@ -295,6 +295,7 @@ def test_перечень_инструментов_отдаётся_целико
         "create_checklist",
         "rename_checklist",
         "set_checklist_state",
+        "set_checklist_bot_access",
         "apply_checklist",
         # методика — чтение версий и правка (T098), закрыта отдельной настройкой
         "checklist_versions",

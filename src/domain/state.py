@@ -24,6 +24,7 @@ import tempfile
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -497,6 +498,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         ui_lang=str(block.get("ui_lang") or DEFAULT_LANG),
         speech_lang=str(block.get("speech_lang") or DEFAULT_LANG),
         checklist_version=str(block.get("checklist_version") or ""),
+        checklist_code=str(block.get("checklist_code") or edition.DEFAULT_CODE),
         tenant=canonical_tenant(str(block.get("tenant") or DEFAULT_TENANT)),
         city=str(meta.get("city") or ""),
         partner=str(meta.get("partner") or ""),
@@ -533,8 +535,12 @@ def start_inspection(
     contact: str = "",
     auditor: str = "",
     tenant: str = DEFAULT_TENANT,
+    checklist_code: str | None = None,
 ) -> Inspection:
     """Начать проверку в чате.
+
+    `checklist_code` — чек-лист из открытых в боте (волна 3). Не назван —
+    годится, только если открыт ровно один; назван закрытый — отказ.
 
     Существующее состояние движок затирает целиком и молча — спрашивать
     аудитора «продолжить или начать заново» обязан бот (задача T052), поэтому
@@ -586,7 +592,15 @@ def start_inspection(
     # Снимок не сняли — проверка всё равно начинается: она вернётся к поведению
     # T148 (сверка на подсчёте), а не пустить аудитора на точку из-за неполадки
     # с диском дороже. Отметка при этом честная — издание действующей методики.
-    version = edition.keep(settings)
+    from .bot_checklists import pick
+
+    выбран = pick(settings, checklist_code)
+    # Каталог издания разворачивается ОДИН раз: публикация переставляет
+    # указатель, и снимок со стартом движка иначе могли бы взять разные издания.
+    # Без хранилища это `AUDIT_DATA_DIR` — поведение до волны 3 не меняется.
+    источник = Path(os.path.realpath(выбран.source))
+    version = edition.keep(settings, выбран.code, источник)
+    init_settings = replace(settings, data_dir=источник)
     # Свои языки проверяем до вызова: иначе проверка окажется начатой, а поля
     # блока — нет, и состояние останется наполовину заполненным.
     block = {
@@ -595,10 +609,11 @@ def start_inspection(
         "tenant": tenant,
         "kind": kind,
         "checklist_version": version,
+        "checklist_code": выбран.code,
         "ui_lang": _clean_lang(ui_lang, "язык интерфейса"),
         "speech_lang": _clean_lang(speech_lang, "язык речи аудитора"),
     }
-    run_audit(args, chat_id=chat_id, settings=settings, create=True)
+    run_audit(args, chat_id=chat_id, settings=init_settings, create=True)
     patch_domain_block(state_file(chat_id, settings), block)
     started = read_state(chat_id, settings)
     if started is None:
@@ -650,10 +665,22 @@ def assert_checklist_version(chat_id: int, settings: Settings) -> None:
     state = read_state(chat_id, settings)
     if state is None or not state.checklist_version:
         return
+    code = state.checklist_code
+    if edition.snapshot(settings, state.checklist_version, code) is not None:
+        return
+    if code != edition.DEFAULT_CODE:
+        # Действующая методика — `bizdev`; сверять с ней проверку другого
+        # чек-листа бессмысленно. Снимка нет — `edition.data_dir` уже отказал
+        # бы понятным текстом, здесь тот же смысл.
+        raise ChecklistVersionMismatch(
+            f"Проверка идёт по чек-листу «{code}», издание {state.checklist_version}, а снимка "
+            f"этого издания рядом с проверкой нет — посчитать её не по чему. Решает человек: "
+            f"перевести проверку на действующее издание чек-листа (sync_checklist_version)",
+            recorded=state.checklist_version,
+            current="",
+        )
     current = checklist_version()
     if state.checklist_version == current:
-        return
-    if edition.snapshot(settings, state.checklist_version) is not None:
         return
     raise ChecklistVersionMismatch(
         f"Проверка начата по методике {state.checklist_version}, а движок сейчас читает "
@@ -693,7 +720,10 @@ def sync_checklist_version(chat_id: int) -> Inspection:
         raise InspectionNotStarted(
             f"В этом чате проверка не начата — нет {path}. Переводить нечего"
         )
-    current = edition.keep(settings)
+    from .bot_checklists import source_for
+
+    code = edition.recorded_code(chat_id, settings)
+    current = edition.keep(settings, code, source_for(settings, code))
     with state_lock(path):
         raw = _read_raw(path)
         block = dict(raw.get(DOMAIN_KEY) or {})
