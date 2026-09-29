@@ -65,26 +65,24 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Название пиццерии? Введите текстом.",
         "en": "Which pizzeria? Type the name.",
     },
-    # --- пиццерия из справочника (D196) ---
+    # --- пиццерия: справочник подсказывает, но не запирает (D230) ---
     "start.unit_suggest": {
         "ru": (
-            "Пиццерии «{typed}» нет в справочнике. Может быть, одна из этих? "
-            "Или введите название точнее."
+            "Пиццерии «{typed}» в справочнике нет. Может быть, одна из этих? "
+            "Если нет — запишите как написали."
         ),
         "en": (
             "“{typed}” is not in the pizzeria directory. Is it one of these? "
-            "Or type the name more precisely."
+            "If not, keep the name as you typed it."
         ),
     },
-    "start.unit_unknown": {
-        "ru": (
-            "Пиццерии «{typed}» нет в справочнике, и похожих тоже нет. Проверьте название. "
-            "Если пиццерия новая — её сначала заводит администратор."
-        ),
-        "en": (
-            "“{typed}” is not in the pizzeria directory, and nothing similar is. Check the name. "
-            "A new pizzeria has to be added by an administrator first."
-        ),
+    "start.unit_keep": {
+        "ru": "Записать «{typed}»",
+        "en": "Keep “{typed}”",
+    },
+    "start.unit_new": {
+        "ru": "Пиццерии «{typed}» в справочнике нет — записал как написано.",
+        "en": "“{typed}” is not in the pizzeria directory — kept as typed.",
     },
     "start.unit_pick_gone": {
         "ru": "Эти варианты уже неактуальны. Введите название пиццерии ещё раз.",

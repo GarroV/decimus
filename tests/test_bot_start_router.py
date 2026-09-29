@@ -27,7 +27,10 @@ from src.bot.keyboards import (
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
+    UNIT_KEEP,
+    UNIT_PICK_PREFIX,
 )
+from src.bot.unit_pick import UnitMatch
 from src.domain import get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
@@ -202,3 +205,69 @@ async def test_start_new_asks_unit_and_replaces_only_after_full_wizard(
     assert replaced is not None
     assert replaced.unit == "Белград 3"
     assert replaced.report_lang == "en"
+
+
+# --- пиццерия: справочник подсказывает, но не запирает (D230) ------------------
+
+
+def _справочник(monkeypatch: pytest.MonkeyPatch, match: object) -> None:
+    from src.bot.routers import start as start_router
+
+    monkeypatch.setattr(start_router, "match_unit", lambda _typed: match)
+
+
+async def _до_названия(unit: str) -> tuple[object, object, object]:
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message(unit))
+    return bot, session, dp
+
+
+async def test_незнакомая_пиццерия_без_похожих_принимается_как_написана(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — справочник прочитан, точки в нём нет и похожих нет.
+    _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
+
+    # Act
+    bot, session, dp = await _до_названия("Ереван-2")
+
+    # Assert — мастер пошёл дальше, к виду проверки, а не отказал.
+    assert set(session.keyboard_data()) == {f"start:kind:{code}" for code in KIND_TITLES}
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:ru"))
+    inspection = get_state(CHAT_ID)
+    assert inspection is not None and inspection.unit == "Ереван-2"
+
+
+async def test_при_похожих_можно_оставить_написанное(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _справочник(monkeypatch, UnitMatch(name=None, suggestions=("Ереван-1",), checked=True))
+
+    # Act
+    bot, session, dp = await _до_названия("Yerevan-3")
+    кнопки = session.keyboard_data()
+    await feed(dp, bot, callback_query(f"{UNIT_PICK_PREFIX}{UNIT_KEEP}"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:ru"))
+
+    # Assert — подсказка и выход «как написано» стоят рядом; выбран второй.
+    assert кнопки == [f"{UNIT_PICK_PREFIX}0", f"{UNIT_PICK_PREFIX}{UNIT_KEEP}"]
+    inspection = get_state(CHAT_ID)
+    assert inspection is not None and inspection.unit == "Yerevan-3"
+
+
+async def test_подсказку_по_прежнему_можно_выбрать(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _справочник(monkeypatch, UnitMatch(name=None, suggestions=("Ереван-1",), checked=True))
+    bot, _session, dp = await _до_названия("Ереван1")
+    await feed(dp, bot, callback_query(f"{UNIT_PICK_PREFIX}0"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:ru"))
+    inspection = get_state(CHAT_ID)
+    assert inspection is not None and inspection.unit == "Ереван-1"

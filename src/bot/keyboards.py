@@ -55,6 +55,8 @@ NEW_INSPECTION_CALLBACK = "start:new"
 KIND_PREFIX = "start:kind:"
 #: Выбор пиццерии из подсказок справочника (D196): за префиксом — номер варианта.
 UNIT_PICK_PREFIX = "start:unit:"
+#: Хвост кнопки «записать как написано» на шаге пиццерии (D230).
+UNIT_KEEP = "keep"
 LANG_PREFIX = "start:lang:"
 RESUME_CONTINUE_CALLBACK = "start:resume:continue"
 RESUME_NEW_CALLBACK = "start:resume:new"
@@ -96,15 +98,18 @@ def new_inspection_keyboard(lang: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def unit_pick_keyboard(names: tuple[str, ...]) -> InlineKeyboardMarkup:
-    """Ближайшие пиццерии справочника — по одной в ряд (D196).
+def unit_pick_keyboard(names: tuple[str, ...], *, keep_label: str) -> InlineKeyboardMarkup:
+    """Ближайшие пиццерии справочника и «записать как написано» — по одной в ряд (D230).
 
     В данные кнопки уходит номер, а не название: у Telegram предел в 64 байта,
     и кириллическое имя с номером точки в него не влезает гарантированно.
+    Последняя кнопка оставляет написанное: справочник подсказывает, но не
+    запирает (D230 отменяет запрет D196).
     """
     builder = InlineKeyboardBuilder()
     for номер, имя in enumerate(names):
         builder.button(text=имя, callback_data=f"{UNIT_PICK_PREFIX}{номер}")
+    builder.button(text=keep_label, callback_data=f"{UNIT_PICK_PREFIX}{UNIT_KEEP}")
     builder.adjust(1)
     return builder.as_markup()
 
