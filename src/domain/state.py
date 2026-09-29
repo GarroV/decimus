@@ -40,6 +40,7 @@ from .errors import (
 )
 from .kinds import kind_title
 from .models import SOURCES, TEXT_LANGS, Finding, InfoAnswer, Inspection, Suggestion
+from .tenants import HQ_TENANT, canonical_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +79,7 @@ HISTORY_KEY = "version_history"
 
 #: Арендатор по умолчанию. Функций мультиарендности в MVP нет (решение D005),
 #: но поле есть с первого дня: задним числом его в готовые проверки не вписать.
-DEFAULT_TENANT = "default"
+DEFAULT_TENANT = HQ_TENANT
 
 LANG_CODE = re.compile(r"^[a-z]{2}$")
 
@@ -496,7 +497,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         ui_lang=str(block.get("ui_lang") or DEFAULT_LANG),
         speech_lang=str(block.get("speech_lang") or DEFAULT_LANG),
         checklist_version=str(block.get("checklist_version") or ""),
-        tenant=str(block.get("tenant") or DEFAULT_TENANT),
+        tenant=canonical_tenant(str(block.get("tenant") or DEFAULT_TENANT)),
         city=str(meta.get("city") or ""),
         partner=str(meta.get("partner") or ""),
         contact=str(meta.get("contact") or ""),
