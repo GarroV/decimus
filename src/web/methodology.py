@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -759,23 +759,31 @@ def _rail_key(row: RailRow) -> tuple[int, str]:
     return (RAIL_ORDER.get(row.state, len(RAIL_ORDER)), row.name_ru.casefold())
 
 
-def checklist_rail(store: Store) -> tuple[RailRow, ...]:
+def checklist_rail(
+    store: Store, перечень: list[lists_door.Overview] | None = None
+) -> tuple[RailRow, ...]:
     """Чек-листы для колонки: в работе → черновики → снятые, внутри — по названию.
 
     Сводка чек-листа без опубликованного издания — не отказ экрана, а «—»:
     чек-лист в колонке обязан быть виден, иначе его не найти.
+
+    Перечень, уже собранный страницей, передаётся сюда же: второй обход
+    хранилища за один рендер ничего нового не скажет. Хранилище наводится на
+    пространство строки, а не только на код: с пространствами (волна 1) одни
+    и те же коды живут в разных.
     """
     строки = []
-    for c in checklists_overview(store):
+    for c in перечень if перечень is not None else checklists_overview(store):
+        свой = replace(store, space=c.space, code=c.code)
         try:
-            сводка = lists_door.summary(for_code(store, c.code))
+            сводка = lists_door.summary(свой)
         except (McpError, OSError, ValueError, AttributeError) as сбой:
             # Сводка читает файлы издания; испорченный файл одного чек-листа —
             # «—» в его строке и запись в журнал, а не 500 всего экрана.
             logger.warning("сводка чек-листа %s для колонки не собралась: %s", c.code, сбой)
             сводка = None
         try:
-            нельзя = lists_door.bot_block(for_code(store, c.code))
+            нельзя = lists_door.bot_block(свой)
         except (McpError, OSError, ValueError) as сбой:
             logger.warning("годность чек-листа %s к боту не прочиталась: %s", c.code, сбой)
             нельзя = lists_door.BOT_BLOCK_EMPTY
