@@ -243,10 +243,11 @@ TEXTS: dict[str, dict[str, str]] = {
     # дверь ради красоты схемы нельзя.
     "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
     "auth.google.hint": {
-        "ru": "Рабочей почтой, на которую вас завели. Незнакомая почта доступа не даёт.",
-        "en": "Use the work email your account was created with. Unknown emails get no access.",
+        "ru": "Та почта, на которую вас завели. С незнакомой почты доступа нет.",
+        "en": "The email your account was created with. Unknown emails get no access.",
     },
-    "auth.or": {"ru": "или", "en": "or"},
+    "auth.google.title": {"ru": "Рабочей почтой Google", "en": "With your work Google account"},
+    "auth.password.title": {"ru": "Или логином и паролем", "en": "Or with login and password"},
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",

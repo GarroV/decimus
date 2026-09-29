@@ -24,12 +24,21 @@ import time
 import urllib.parse
 import urllib.request
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 
 GOOGLE_CLIENT_ID_VAR = "GOOGLE_CLIENT_ID"
 GOOGLE_CLIENT_SECRET_VAR = "GOOGLE_CLIENT_SECRET"  # noqa: S105 — ИМЯ переменной
 GOOGLE_REDIRECT_URI_VAR = "GOOGLE_REDIRECT_URI"
+#: Адрес возврата для входа через временный фронт Cloudflare (D236, #424): в
+#: странах, где `sslip.io` заблокирован, возврат на основной адрес до человека
+#: не доходит. Не задан — фронт входит только паролем.
+GOOGLE_FRONT_REDIRECT_URI_VAR = "GOOGLE_FRONT_REDIRECT_URI"
+
+#: Метку ставит вход площадки (Caddy) только запросу, пришедшему через фронт с
+#: верным ключом; присланную снаружи он снимает. Подделка метки ничего не
+#: даёт: она выбирает лишь адрес возврата, а его сверяет сам Google.
+FRONT_MARKER_HEADER = "X-Decimus-Front"
 
 AUTHORIZATION_ENDPOINT = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token"  # noqa: S105 — адрес, не секрет
@@ -64,6 +73,18 @@ class GoogleSettings:
     client_id: str
     client_secret: str
     redirect_uri: str
+    front_redirect_uri: str | None = None
+
+
+def for_request(settings: GoogleSettings, *, via_front: bool) -> GoogleSettings:
+    """Реквизиты с тем адресом возврата, на который браузер этого человека дойдёт.
+
+    Адрес возврата обязан совпасть в двух местах — в уходе к Google и в обмене
+    кода, — поэтому выбирается одной функцией по одному признаку запроса.
+    """
+    if via_front and settings.front_redirect_uri:
+        return replace(settings, redirect_uri=settings.front_redirect_uri)
+    return settings
 
 
 @dataclass(frozen=True)
@@ -89,8 +110,12 @@ def load_google_settings(env: Mapping[str, str] | None = None) -> GoogleSettings
     redirect_uri = (src.get(GOOGLE_REDIRECT_URI_VAR) or "").strip()
     if not (client_id and client_secret and redirect_uri):
         return None
+    front = (src.get(GOOGLE_FRONT_REDIRECT_URI_VAR) or "").strip() or None
     return GoogleSettings(
-        client_id=client_id, client_secret=client_secret, redirect_uri=redirect_uri
+        client_id=client_id,
+        client_secret=client_secret,
+        redirect_uri=redirect_uri,
+        front_redirect_uri=front,
     )
 
 
