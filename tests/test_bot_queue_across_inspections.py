@@ -73,7 +73,7 @@ SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_I
 OVEN = "печь грязная"
 
 
-def started(unit: str = "Первая точка") -> None:
+def started(unit: str = "Первая точка-1") -> None:
     start_inspection(CHAT_ID, unit, "planned", "ru", ui_lang="ru")
 
 
@@ -104,7 +104,7 @@ async def test_кадр_новой_проверки_не_забирает_сло
     await feed(dp, bot, text_message(OVEN))
     assert t("material.waiting_photo", "ru") in session.last_text, "слова не придержаны"
 
-    await start_new_inspection(dp, bot, "Вторая точка")
+    await start_new_inspection(dp, bot, "Вторая точка-2")
     session.clear()
 
     await feed(dp, bot, photo_message("frame-new"))
@@ -129,7 +129,7 @@ async def test_слова_новой_проверки_не_забирают_ка
     await feed(dp, bot, photo_message("frame-old"))
     assert session.last_text == t("material.photo_taken", "ru"), "кадр не встал в очередь"
 
-    await start_new_inspection(dp, bot, "Вторая точка")
+    await start_new_inspection(dp, bot, "Вторая точка-2")
     session.clear()
 
     await feed(dp, bot, text_message(OVEN))
@@ -188,7 +188,7 @@ async def test_после_сданного_отчёта_следующая_пр�
     await build_report(dp, bot)
     assert sidecar.handed_over(CHAT_ID), "проверка не сдана — тест проверяет не то"
 
-    await start_new_inspection(dp, bot, "Вторая точка")
+    await start_new_inspection(dp, bot, "Вторая точка-2")
     calls.clear()
     session.clear()
 
@@ -217,7 +217,7 @@ async def test_убрать_из_чата_очередь_забывает(
     await feed(dp, bot, callback_query(SEALED_DROP_CALLBACK))
 
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
-    await feed(dp, bot, text_message("Вторая точка"))
+    await feed(dp, bot, text_message("Вторая точка-2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:lang:ru"))
     calls.clear()

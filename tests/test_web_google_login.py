@@ -189,3 +189,38 @@ def test_неподтверждённая_почта_не_пускает_даж�
 
     assert ответ.status_code == 401
     assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
+
+
+ФРОНТ = "https://decimus.front.example/auth/google/callback"
+
+
+def test_через_фронт_google_получает_адрес_фронта_и_тот_же_при_обмене(
+    monkeypatch: pytest.MonkeyPatch, обмен: Обмен
+) -> None:
+    """D236: адрес возврата обязан совпасть в уходе к Google и в обмене кода."""
+    from dataclasses import replace
+    from urllib.parse import parse_qs, urlsplit
+
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    с_фронтом = replace(РЕКВИЗИТЫ, front_redirect_uri=ФРОНТ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: с_фронтом)
+    monkeypatch.setattr(auth, "find_by_email", lambda email, *, tenant: Учётка(tenant=tenant))
+    monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
+    виденные: list[str] = []
+    исходный = обмен.__call__
+
+    def запомнить(settings: GoogleSettings, *, code: str) -> GoogleIdentity:
+        виденные.append(settings.redirect_uri)
+        return исходный(settings, code=code)
+
+    monkeypatch.setattr(auth, "exchange_code", запомнить)
+    метка_фронта = {auth.FRONT_MARKER_HEADER: "1"}
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        ушли = client.get(auth.GOOGLE_START_PATH, headers=метка_фронта).headers["Location"]
+        assert parse_qs(urlsplit(ушли).query)["redirect_uri"] == [ФРОНТ]
+        state = parse_qs(urlsplit(ушли).query)["state"][0]
+        client.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=c&state={state}", headers=метка_фронта)
+        assert виденные == [ФРОНТ]
+
+        прямо = client.get(auth.GOOGLE_START_PATH).headers["Location"]
+        assert parse_qs(urlsplit(прямо).query)["redirect_uri"] == [РЕКВИЗИТЫ.redirect_uri]

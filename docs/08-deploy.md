@@ -976,3 +976,35 @@ https://decimus.95-111-249-216.sslip.io/auth/google/mail
 `GOOGLE_CALLBACK_PATH` (`src/web/auth.py`), `MAIL_CALLBACK_PATH`
 (`src/web/letter_draft.py`). `BOT_MCP_URL` —
 `https://mcp.decimus.95-111-249-216.sslip.io/`.
+
+### 8.9. Временный фронт Cloudflare (D236, #424)
+
+В части стран `sslip.io` заблокирован по решению властей: провайдер отдаёт свою
+заглушку и свой сертификат. Пока нет своего домена, рядом с основным адресом
+работает фронт на адресе Cloudflare — основной адрес при этом остаётся.
+
+| Что | Фронт | Куда пересылает |
+|---|---|---|
+| Админка | `https://decimus.vasiliy-garro.workers.dev` | `decimus.95-111-249-216.sslip.io` |
+| MCP | `https://decimus-mcp.vasiliy-garro.workers.dev` | `mcp.decimus.95-111-249-216.sslip.io` |
+
+Код — `front/src/index.js`, настройки — `front/wrangler.admin.jsonc` и
+`front/wrangler.mcp.jsonc`, выкладка `npx wrangler deploy -c <файл>` из `front/`.
+
+**Адрес посетителя.** За Worker'ом все посетители пришли бы с адресов Cloudflare,
+а счётчик неудачных входов считает по адресу. Поэтому Worker передаёт адрес в
+`X-Decimus-Client-IP` вместе с ключом фронта (`X-Decimus-Front-Key`), и Caddy
+ставит его в `X-Forwarded-For` только при верном ключе
+(`GarroV/vps-infra: edge/sites/decimus.caddy`). Ключ лежит в двух местах и больше
+нигде: секрет `FRONT_KEY` у обоих Worker'ов и `/srv/edge/sites/decimus-front.snippet`
+на VPS (в git не попадает). Сменить ключ — записать новый в оба места, затем
+`docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile` в `/srv/edge`.
+Проверено 29.09: через фронт, напрямую и с подделанным ключом счётчик видит
+настоящий адрес посетителя.
+
+**Вход через Google через фронт.** Нужен второй адрес возврата: в `.env` VPS
+`GOOGLE_FRONT_REDIRECT_URI=https://decimus.vasiliy-garro.workers.dev/auth/google/callback`,
+и та же строка — в **Authorized redirect URIs** клиента `decimus-web` в Google
+Console (за владельцем). Метку фронта (`X-Decimus-Front`) ставит только Caddy;
+без переменной фронт входит паролем. Черновик письма в Gmail через фронт не
+заведён — у него свой адрес возврата (`GOOGLE_MAIL_REDIRECT_URI`).
