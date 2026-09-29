@@ -57,12 +57,12 @@ DEFAULT_TENANT = "default"
 _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
-    ui_lang, speech_lang, checklist_version, auditor, city, partner, contact,
+    ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
     pct, grade, deductions, counts, by_zone, source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
-    %(auditor)s, %(city)s, %(partner)s, %(contact)s, %(pct)s, %(grade)s,
+    %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s, %(pct)s, %(grade)s,
     %(deductions)s, %(counts)s, %(by_zone)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
@@ -343,6 +343,9 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                 "ui_lang": inspection.ui_lang,
                 "speech_lang": inspection.speech_lang,
                 "checklist_version": inspection.checklist_version,
+                # Код чек-листа из проверки (волна 3), а не умолчание базы: с
+                # несколькими чек-листами в боте умолчание `bizdev` соврало бы.
+                "checklist_code": inspection.checklist_code,
                 "auditor": inspection.auditor,
                 "city": inspection.city,
                 "partner": inspection.partner,
