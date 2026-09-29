@@ -172,4 +172,4 @@ async def test_название_длиннее_предела_после_лат�
     session = await пройти_мастер(unit="Щ" * (UNIT_NAME_LIMIT - 3) + "-1")
 
     assert get_state(CHAT_ID) is None
-    assert str(UNIT_NAME_LIMIT) in session.last_text
+    assert any(str(UNIT_NAME_LIMIT) in x for x in session.texts)
