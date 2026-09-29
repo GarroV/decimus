@@ -30,7 +30,7 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -742,39 +742,61 @@ class RailRow:
     name_ru: str
     name_en: str
     state: str
-    #: Волна 2 — «применён к проду»; доступ в боте (волна 3) заменит этот признак.
+    #: Бот действительно даёт начать по нему проверку (волна 3): флаг поднят и
+    #: заслонов нет. Этим числом говорит блок «Доступ в боте».
     in_bot: bool
     #: Пунктов с нарушением в опубликованном издании; `None` — издания нет.
     items: int | None
+    #: Почему в бот открыть нельзя — код (`checklists.BOT_BLOCK_*`), `None` — можно.
+    bot_block: str | None = None
+    #: Флаг методиста «открыть в боте». Бывает поднят у негодного чек-листа —
+    #: если после открытия опубликовали пустое издание; такой флаг переключатель
+    #: обязан уметь снять.
+    wants_bot: bool = False
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
     return (RAIL_ORDER.get(row.state, len(RAIL_ORDER)), row.name_ru.casefold())
 
 
-def checklist_rail(store: Store) -> tuple[RailRow, ...]:
+def checklist_rail(
+    store: Store, перечень: list[lists_door.Overview] | None = None
+) -> tuple[RailRow, ...]:
     """Чек-листы для колонки: в работе → черновики → снятые, внутри — по названию.
 
     Сводка чек-листа без опубликованного издания — не отказ экрана, а «—»:
     чек-лист в колонке обязан быть виден, иначе его не найти.
+
+    Перечень, уже собранный страницей, передаётся сюда же: второй обход
+    хранилища за один рендер ничего нового не скажет. Хранилище наводится на
+    пространство строки, а не только на код: с пространствами (волна 1) одни
+    и те же коды живут в разных.
     """
     строки = []
-    for c in checklists_overview(store):
+    for c in перечень if перечень is not None else checklists_overview(store):
+        свой = replace(store, space=c.space, code=c.code)
         try:
-            сводка = lists_door.summary(for_code(store, c.code))
+            сводка = lists_door.summary(свой)
         except (McpError, OSError, ValueError, AttributeError) as сбой:
             # Сводка читает файлы издания; испорченный файл одного чек-листа —
             # «—» в его строке и запись в журнал, а не 500 всего экрана.
             logger.warning("сводка чек-листа %s для колонки не собралась: %s", c.code, сбой)
             сводка = None
+        try:
+            нельзя = lists_door.bot_block(свой)
+        except (McpError, OSError, ValueError) as сбой:
+            logger.warning("годность чек-листа %s к боту не прочиталась: %s", c.code, сбой)
+            нельзя = lists_door.BOT_BLOCK_EMPTY
         строки.append(
             RailRow(
                 code=c.code,
                 name_ru=c.name_ru,
                 name_en=c.name_en,
                 state=c.state,
-                in_bot=c.in_production,
+                in_bot=c.in_bot and нельзя is None,
                 items=сводка.items if сводка else None,
+                bot_block=нельзя,
+                wants_bot=c.in_bot,
             )
         )
     return tuple(sorted(строки, key=_rail_key))
@@ -830,5 +852,17 @@ def apply_checklist(store: Store, *, tenant: str, author: str, code: str) -> dic
     """
     try:
         return lists_door.apply_to_production(store_for(store, code), tenant=tenant, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
+def set_bot_access(store: Store, *, tenant: str, author: str, code: str, on: bool) -> object:
+    """Открыть чек-лист аудиторам в боте или закрыть (волна 3).
+
+    Заслоны — в двери (#339): черновик, снятый, неопубликованный и пустой в бот
+    не открываются. Экран их не повторяет, он показывает причину заранее.
+    """
+    try:
+        return lists_door.set_bot_access(store_for(store, code), tenant=tenant, on=on, by=author)
     except McpError as отказ:
         raise _refusal(отказ) from None

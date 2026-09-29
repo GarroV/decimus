@@ -185,4 +185,58 @@
   initPanel();
   remember();
   window.addEventListener("pagehide", remember);
+
+  // --- Липкий блок поиска ------------------------------------------------
+  // Метка «прилип»: нулевой щуп стоит прямо над блоком, ушёл за верх окна —
+  // блок прилип. Без скрипта блок липнет так же, просто без тени.
+  (function () {
+    var probe = document.querySelector("[data-mx-stick-probe]");
+    var stick = document.querySelector("[data-mx-stick]");
+    if (!probe || !stick || !("IntersectionObserver" in window)) return;
+    new IntersectionObserver(function (entries) {
+      var e = entries[0];
+      stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < 0);
+    }).observe(probe);
+  })();
+  // --- Переключатель в шапке при видимой колонке --------------------------
+  // Шире 1023px чек-листы видны колонкой, и переключатель в шапке — просто
+  // заголовок: мышью он не нажимается (CSS). Клавиатура обязана видеть то же
+  // самое — иначе Tab заходит в «мёртвый» заголовок и открывает меню.
+  (function () {
+    var summary = document.querySelector(".mx-shell .mx-switch__btn");
+    if (!summary || !window.matchMedia) return;
+    var wide = window.matchMedia("(min-width: 1024px)");
+    function sync() {
+      if (wide.matches) {
+        summary.setAttribute("tabindex", "-1");
+        summary.parentElement.open = false;
+      } else {
+        summary.removeAttribute("tabindex");
+      }
+    }
+    sync();
+    if (wide.addEventListener) wide.addEventListener("change", sync);
+  })();
+
+  // --- Код нового чек-листа из английского названия ------------------------
+  // Подставляется, пока код не трогали руками: правка кода — решение человека,
+  // и перетирать её следующей буквой названия нельзя. Проверку формата делает
+  // `pattern` поля и дверь на сервере; здесь только удобство.
+  function slug(text) {
+    return text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 32).replace(/-+$/, "");
+  }
+  document.addEventListener("input", function (event) {
+    var field = event.target;
+    var form = field.form;
+    if (!form) return;
+    var code = form.querySelector("[data-mx-code]");
+    if (!code) return;
+    if (field === code) {
+      code.dataset.mxTouched = code.value ? "1" : "";
+      return;
+    }
+    if (field.hasAttribute("data-mx-code-from") && !code.dataset.mxTouched) {
+      code.value = slug(field.value);
+    }
+  });
 })();

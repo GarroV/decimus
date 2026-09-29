@@ -1766,6 +1766,31 @@ TOOLS: tuple[ToolSpec, ...] = (
         kind=KIND_CHECKLIST,
     ),
     ToolSpec(
+        name="set_checklist_bot_access",
+        description=(
+            "Open a checklist to auditors in the Telegram bot, or close it. "
+            "Several checklists can be open at once: with one open the bot "
+            "starts an inspection without asking, with several it offers "
+            "buttons, with none it says there is nothing to start with. "
+            "Opening is refused for a draft, a retired checklist, one with no "
+            "published edition and one with no items that can hold a violation. "
+            "Inspections in progress are not affected."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "in_bot": {
+                    "type": "boolean",
+                    "description": "true — open in the bot, false — close.",
+                },
+            },
+            "required": ["in_bot"],
+            "additionalProperties": False,
+        },
+        handler=checklists_tools.set_checklist_bot_access,
+        kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
         name="apply_checklist",
         description=(
             "Apply a checklist to production: inspections are scored against "
