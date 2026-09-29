@@ -23,6 +23,8 @@ from uuid import UUID
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .config import check_environment
 from .errors import PushError
 from .units import normalize_unit_name
@@ -30,7 +32,7 @@ from .units import normalize_unit_name
 #: Арендатор по умолчанию — то же значение, что у `push.DEFAULT_TENANT` и у
 #: `domain.state.DEFAULT_TENANT`. Импортировать чужую внутреннюю константу ради
 #: одной строки дороже, чем закрепить значение тестом (так же сделано в push).
-DEFAULT_TENANT = "default"
+DEFAULT_TENANT = HQ_TENANT
 
 
 @dataclass(frozen=True)
@@ -140,6 +142,7 @@ def resolve_unit_id(
     и своё подключение здесь означало бы решение о точке, принятое вне той
     транзакции, которая её же и пишет.
     """
+    tenant = canonical_tenant(tenant)
     key = normalize_unit_name(name)
     if not key:
         return None
@@ -151,6 +154,7 @@ def resolve_unit_id(
 
 def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
     """То же, но со своим подключением и полной карточкой точки."""
+    tenant = canonical_tenant(tenant)
     settings = check_environment()
     key = normalize_unit_name(name)
     if not key:
@@ -178,6 +182,7 @@ def list_units(*, tenant: str = DEFAULT_TENANT, country: str | None = None) -> l
     виде. Точки без страны в страновой срез не попадают — и это верно: «страна
     не проставлена» не значит «страна эта».
     """
+    tenant = canonical_tenant(tenant)
     settings = check_environment()
     код = (country or "").strip().upper() or None
     try:

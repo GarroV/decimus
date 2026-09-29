@@ -12,6 +12,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .errors import BotConfigError, BotTextError
 from .invites import INVITES_VAR, Invite, parse_invites
 from .texts import DEFAULT_UI_LANG, UI_LANG_VAR, default_ui_lang
@@ -48,7 +50,7 @@ MCP_TENANT_VAR = "BOT_MCP_TENANT"
 #: Это не догадка, а то же самое значение: функций мультиарендности в MVP нет
 #: (решение D005), и токен, открывающий что-то другое, не открывал бы ничего.
 #: Стенд, сменивший арендатора проверок, обязан сменить и этот.
-DEFAULT_MCP_TENANT = "default"
+DEFAULT_MCP_TENANT = HQ_TENANT
 #: Язык интерфейса до начала проверки (T131). Имя и разбор живут в `texts.py`,
 #: рядом с самим каталогом языков, — здесь только проверка на старте.
 
@@ -195,7 +197,7 @@ def _parse_mcp_tenant(raw: str) -> str:
     подстановка догадки: другого арендатора у проверок MVP не бывает (D005), и
     токен, открывающий что-то ещё, открывал бы пустоту.
     """
-    return raw.strip() or DEFAULT_MCP_TENANT
+    return canonical_tenant(raw) or DEFAULT_MCP_TENANT
 
 
 def _parse_ui_lang(env: Mapping[str, str]) -> str:

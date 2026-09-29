@@ -37,6 +37,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.domain.tenants import canonical_tenant
+
 from .errors import AuthError, McpConfigError
 
 logger = logging.getLogger(__name__)
@@ -327,7 +329,7 @@ def _parse_checklist(
     """
     store_raw = (src.get(MCP_CHECKLIST_STORE_VAR) or "").strip()
     сказано = _SEPARATORS.split(src.get(MCP_CHECKLIST_TENANTS_VAR) or "")
-    named = tuple(sorted({x.strip() for x in сказано if x.strip()}))
+    named = tuple(sorted({canonical_tenant(x) for x in сказано if x.strip()}))
     if not store_raw and not named:
         return None, (), None
     if not store_raw:

@@ -25,6 +25,7 @@ from src.domain import get_state
 from src.domain import score as domain_score
 from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.models import Finding, Inspection, Score
+from src.domain.tenants import HQ_TENANT
 
 from .config import check_environment
 from .directory import resolve_unit_id
@@ -37,7 +38,7 @@ from .units import normalize_unit_name
 #: здесь допустить нельзя, но импортировать внутреннюю переменную домена ради
 #: одной строки — цена выше пользы, поэтому значение продублировано как
 #: строковый литерал и закреплено тестом на конкретное значение "default".
-DEFAULT_TENANT = "default"
+DEFAULT_TENANT = HQ_TENANT
 
 # `where retracted_at is null` в `on conflict` — не украшение, а обязательная
 # часть указания на индекс: с миграции `0010` отпечаток уникален только среди

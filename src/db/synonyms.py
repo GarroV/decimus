@@ -28,11 +28,13 @@ from typing import Any
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .config import check_environment, load_retraction_settings
 from .errors import SynonymError
 
 #: Арендатор по умолчанию — то же значение, что у `directory.DEFAULT_TENANT`.
-DEFAULT_TENANT = "default"
+DEFAULT_TENANT = HQ_TENANT
 
 #: Происхождение записи кодом, не формулировкой (конституция, принцип 5).
 #: `learned` — накоплено машиной на непрямом совпадении (D119); `manual` —
@@ -264,6 +266,7 @@ def lookup_phrase(text: str, *, lang: str, tenant: str = DEFAULT_TENANT) -> Phra
     потерянной базе система молча разучивается и переспрашивает аудитора
     заново — то самое, от чего уходит D119.
     """
+    tenant = canonical_tenant(tenant)
     key = normalize_phrase(text)
     if not key:
         return None
@@ -298,6 +301,7 @@ def remember_phrase(
     но и вреда от лишнего вызова нет: известный синоним вернётся исходом
     `ALREADY_KNOWN` и второй строки не заведёт.
     """
+    tenant = canonical_tenant(tenant)
     key = normalize_phrase(text)
     if not key:
         raise SynonymError("Формулировка пустая — синонимом её не заведёшь")
@@ -379,6 +383,7 @@ def list_phrases(
     роли приложения не от кого. Разграничение здесь в другом — править карту
     роль приложения не может вовсе.
     """
+    tenant = canonical_tenant(tenant)
     settings = check_environment()
     code = item_code.strip() if item_code else None
     params = {
@@ -539,6 +544,7 @@ def retract_phrase(
     Повторный вызов записанную причину не переписывает (`ALREADY_RETRACTED`):
     иначе снятие превратилось бы в способ править основание задним числом.
     """
+    tenant = canonical_tenant(tenant)
     key = _require_key(text)
     причина = _require_reason(reason, действие="снятия синонима")
     settings = load_retraction_settings()
@@ -576,6 +582,7 @@ def repoint_phrase(
     исправленный синоним обязан отличаться от изначально верного, иначе разбор
     промахов модели упирается в карту, где все строки выглядят правильными.
     """
+    tenant = canonical_tenant(tenant)
     key = _require_key(text)
     code = _require_item_code(item_code)
     причина = _require_reason(reason, действие="правки синонима")

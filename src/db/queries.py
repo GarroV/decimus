@@ -32,6 +32,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.tenants import canonical_tenant
+
 from .config import check_environment, load_retraction_settings
 from .errors import DbError, StorageError
 from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow, ItemUsage
@@ -307,7 +309,7 @@ def _require_tenant(tenant: str) -> str:
     список: ошибка вызывающего выглядела бы как «проверок нет». Это худший из
     исходов — он не чинится, потому что его никто не замечает.
     """
-    code = (tenant or "").strip()
+    code = canonical_tenant(tenant or "")
     if not code:
         raise DbError(
             "Не задан арендатор, чьи проверки читаем. Выборка без него отдала бы "
