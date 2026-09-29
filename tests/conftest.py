@@ -197,6 +197,10 @@ def domain_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     state = tmp_path / "state"
     monkeypatch.setenv("AUDIT_DATA_DIR", str(TEST_DATA))
     monkeypatch.setenv("STATE_DIR", str(state))
+    # Хранилище версий из окружения разработчика превратило бы мастер бота в
+    # выбор между его чек-листами (волна 3): тесты, которые о нём не знают,
+    # видят один чек-лист, как в проде до хранилища.
+    monkeypatch.delenv("MCP_CHECKLIST_STORE", raising=False)
     monkeypatch.chdir(tmp_path)
     return state
 

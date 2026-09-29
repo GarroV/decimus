@@ -53,6 +53,9 @@ LANG_LABELS: dict[str, str] = {
 
 NEW_INSPECTION_CALLBACK = "start:new"
 KIND_PREFIX = "start:kind:"
+#: Выбор чек-листа на старте (волна 3). В данные кнопки уходит код: он
+#: латиницей и не длиннее 32 знаков, в предел Telegram 64 байта влезает.
+CHECKLIST_PREFIX = "start:cl:"
 #: Кнопки вопроса «Новая пиццерия?» (D233).
 UNIT_NEW_PREFIX = "start:unit-new:"
 UNIT_NEW_YES = "yes"
@@ -104,6 +107,15 @@ def unit_new_keyboard(lang: str) -> InlineKeyboardMarkup:
         text=t("start.unit_new_yes", lang), callback_data=f"{UNIT_NEW_PREFIX}{UNIT_NEW_YES}"
     )
     builder.button(text=t("start.unit_new_no", lang), callback_data=f"{UNIT_NEW_PREFIX}no")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def checklist_keyboard(choices: list[tuple[str, str]]) -> InlineKeyboardMarkup:
+    """Чек-листы, открытые в боте, — по одной кнопке в ряд: (код, название)."""
+    builder = InlineKeyboardBuilder()
+    for code, name in choices:
+        builder.button(text=name, callback_data=f"{CHECKLIST_PREFIX}{code}")
     builder.adjust(1)
     return builder.as_markup()
 

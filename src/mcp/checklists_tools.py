@@ -29,6 +29,7 @@ def _row(чеклист: api.Overview) -> dict[str, Any]:
         "name_en": чеклист.name_en,
         "state": чеклист.state,
         "applied_to_production": чеклист.in_production,
+        "in_bot": чеклист.in_bot,
         "version": чеклист.version,
     }
 
@@ -112,6 +113,19 @@ def set_checklist_state(*, tenant: str, store: Store, state: str) -> dict[str, A
     return {
         "tenant": tenant,
         "status": f"checklist {стало.code} is now {стало.state}",
+        **_row(стало),
+    }
+
+
+def set_checklist_bot_access(*, tenant: str, store: Store, in_bot: bool) -> dict[str, Any]:
+    """Открыть чек-лист аудиторам в боте или закрыть (волна 3)."""
+    стало = api.set_bot_access(store, tenant=tenant, on=in_bot)
+    return {
+        "tenant": tenant,
+        "status": (
+            f"checklist {стало.code} is {'open' if стало.in_bot else 'closed'} in the bot; "
+            f"inspections in progress finish on the checklist they started with"
+        ),
         **_row(стало),
     }
 
