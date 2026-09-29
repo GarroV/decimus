@@ -50,9 +50,12 @@ from src.db.web_throttle import Verdict, admit_attempt, note_success
 
 from .config import Settings
 from .google_auth import (
+    FRONT_MARKER_HEADER,
     GoogleAuthError,
+    GoogleSettings,
     authorization_url,
     exchange_code,
+    for_request,
     load_google_settings,
     new_state,
 )
@@ -228,7 +231,7 @@ def install(app: Flask, conf: Settings) -> None:
         if google is None:
             return redirect(url_for("login"))
         метка = new_state()
-        ответ = redirect(authorization_url(google, state=метка))
+        ответ = redirect(authorization_url(_google_here(google), state=метка))
         # Метка кладётся В КУКУ, а не в память процесса: стенд может работать
         # несколькими воркерами, и возврат придёт не обязательно в тот, что
         # уводил.
@@ -283,7 +286,7 @@ def install(app: Flask, conf: Settings) -> None:
             return отказано
 
         try:
-            кто = exchange_code(google, code=код)
+            кто = exchange_code(_google_here(google), code=код)
         except GoogleAuthError:
             return отказано
 
@@ -345,3 +348,8 @@ def install(app: Flask, conf: Settings) -> None:
         ответ = redirect(url_for("login"))
         ответ.delete_cookie(COOKIE_NAME, path="/")
         return ответ
+
+
+def _google_here(google: GoogleSettings) -> GoogleSettings:
+    """Реквизиты Google под адрес, с которого пришёл этот запрос (D236)."""
+    return for_request(google, via_front=request.headers.get(FRONT_MARKER_HEADER) == "1")

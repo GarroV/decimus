@@ -1,0 +1,9 @@
+// Фронт MCP: https://decimus-mcp.vasiliy-garro.workers.dev
+// Ключ фронта — секретом: `npx wrangler secret put FRONT_KEY -c wrangler.mcp.jsonc`.
+{
+  "name": "decimus-mcp",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "vars": { "ORIGIN_HOST": "mcp.decimus.95-111-249-216.sslip.io" }
+}
