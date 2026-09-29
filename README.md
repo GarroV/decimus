@@ -28,7 +28,7 @@
 **Где живёт (с 26.09.2026).** Прод — VPS Contabo, каталог `/srv/decimus`:
 админка `https://decimus.95-111-249-216.sslip.io`, MCP
 `https://mcp.decimus.95-111-249-216.sslip.io`, бот, база, MinIO — один проект
-compose `decimus` за общим Caddy площадки. Ночной бэкап VPS уходит restic'ом на
+compose `decimus` за общим Caddy площадки. Там, где `sslip.io` заблокирован, — временный фронт Cloudflare: `https://decimus.vasiliy-garro.workers.dev` и `https://decimus-mcp.vasiliy-garro.workers.dev` (D236, `docs/08-deploy.md` §8.9). Ночной бэкап VPS уходит restic'ом на
 MUSPELHEIM: база, MinIO, `state`, `.env`. Стенд разработки остаётся на
 MUSPELHEIM (mac-stands). Как устроено, как обновлять и как переносили —
 [`docs/08-deploy.md` §8](docs/08-deploy.md#8-прод-на-linux-vps--переезд-с-muspelheim).
