@@ -37,6 +37,7 @@ from ..keyboards import (
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    UNIT_KEEP,
     UNIT_PICK_PREFIX,
     kind_keyboard,
     kind_title,
@@ -110,7 +111,7 @@ async def _offer_resume(message: Message, inspection: domain.Inspection, lang: s
 
 async def _unit_chosen(message: Message, state: FSMContext, lang: str, unit: str) -> None:
     """Пиццерия определена — дальше вид проверки."""
-    await state.update_data(unit=unit, unit_suggestions=None)
+    await state.update_data(unit=unit, unit_suggestions=None, unit_typed=None)
     await state.set_state(StartFlow.waiting_kind)
     await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
@@ -293,30 +294,37 @@ def build_start_router(
             # а по байтам уже почти весь бюджет имени файла разом (T128).
             await message.answer(t("start.unit_too_long_bytes", lang))
             return
-        # Пиццерия — из справочника, а не из написанного (D196).
+        # Справочник подсказывает, но не запирает (D230): совпало — берём точку
+        # справочника, нет — принимаем написанное, а сводит его администратор.
         сверка = await asyncio.to_thread(match_unit, unit)
-        if сверка.checked and сверка.name is None:
-            await state.update_data(unit_suggestions=list(сверка.suggestions))
-            if сверка.suggestions:
-                await message.answer(
-                    t("start.unit_suggest", lang, typed=unit),
-                    reply_markup=unit_pick_keyboard(сверка.suggestions),
-                )
-            else:
-                await message.answer(t("start.unit_unknown", lang, typed=unit))
+        if сверка.checked and сверка.name is None and сверка.suggestions:
+            await state.update_data(unit_suggestions=list(сверка.suggestions), unit_typed=unit)
+            await message.answer(
+                t("start.unit_suggest", lang, typed=unit),
+                reply_markup=unit_pick_keyboard(
+                    сверка.suggestions, keep_label=t("start.unit_keep", lang, typed=unit)
+                ),
+            )
             return
+        if сверка.checked and сверка.name is None:
+            await message.answer(t("start.unit_new", lang, typed=unit))
         await _unit_chosen(message, state, lang, сверка.name or unit)
 
     @router.callback_query(StateFilter(StartFlow.waiting_unit), F.data.startswith(UNIT_PICK_PREFIX))
     async def on_unit_pick(callback: CallbackQuery, state: FSMContext) -> None:
-        """Аудитор выбрал пиццерию из подсказок справочника (D196)."""
+        """Аудитор выбрал пиццерию из подсказок или оставил написанное (D196, D230)."""
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
             return
         lang = chat_ui_lang(message.chat.id)
-        варианты = (await state.get_data()).get("unit_suggestions") or []
+        данные = await state.get_data()
+        варианты = данные.get("unit_suggestions") or []
         номер = (callback.data or "").removeprefix(UNIT_PICK_PREFIX)
+        написано = данные.get("unit_typed")
+        if номер == UNIT_KEEP and isinstance(написано, str) and написано:
+            await _unit_chosen(message, state, lang, написано)
+            return
         if not номер.isdigit() or int(номер) >= len(варианты):
             # Кнопка из старого сообщения: вариантов, к которым она относилась,
             # уже нет — угадывать по номеру нельзя.
