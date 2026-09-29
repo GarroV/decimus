@@ -138,3 +138,23 @@ def match_in(typed: str, units: list[tuple[str, tuple[str, ...], bool]]) -> Unit
         if имя not in варианты:
             варианты.append(имя)
     return UnitMatch(name=None, suggestions=tuple(варианты[:SUGGESTIONS_LIMIT]), checked=True)
+
+
+#: Тенант управляющей компании: только он заводит новые пиццерии (D233).
+#: Партнёры из своих тенантов выбирают из справочника, но не пополняют его.
+UK_TENANT = directory.DEFAULT_TENANT
+
+
+def bot_tenant(_message: object) -> str:
+    """Тенант, от имени которого пишет бот.
+
+    Сегодня каждая проверка из бота ложится в тенант УК — выбора тенанта у
+    бота нет. Появятся в боте партнёры — тенант будет браться здесь, а запрет
+    заводить пиццерии (`may_add_units`) уже стоит.
+    """
+    return UK_TENANT
+
+
+def may_add_units(tenant: str) -> bool:
+    """Заводить новые пиццерии может только управляющая компания (D233)."""
+    return tenant == UK_TENANT
