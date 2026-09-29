@@ -149,6 +149,24 @@ TEXTS: dict[str, dict[str, str]] = {
             "I am still waiting for the name: send it in your next message."
         ),
     },
+    "start.ask_checklist": {
+        "ru": "По какому чек-листу проверка?",
+        "en": "Which checklist is this inspection for?",
+    },
+    "start.checklist_gone": {
+        "ru": "Этот чек-лист только что закрыли в боте. Вот те, что открыты сейчас:",
+        "en": "That checklist was just closed in the bot. These are open now:",
+    },
+    "start.no_checklists": {
+        "ru": (
+            "Начать проверку сейчас не по чему: ни один чек-лист не открыт в боте. "
+            "Его открывает методист в админке — «Методика» → «Доступ в боте»."
+        ),
+        "en": (
+            "There is nothing to start an inspection with: no checklist is open in the bot. "
+            "A methodologist opens one in the admin — Methodology → Bot access."
+        ),
+    },
     "start.ask_kind": {
         "ru": "Вид проверки?",
         "en": "Inspection type?",

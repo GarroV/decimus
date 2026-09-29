@@ -51,6 +51,7 @@ from typing import Any
 
 from .config import DATA_FILES, Settings
 from .engine import DOMAIN_KEY, state_file
+from .errors import ChecklistVersionMismatch
 from .version import VERSION_FILE, compose, edition_of, is_one_segment
 
 logger = logging.getLogger(__name__)
@@ -193,7 +194,7 @@ def _copy(source: Path, target: Path) -> None:
         shutil.rmtree(holder, ignore_errors=True)
 
 
-def keep(settings: Settings, code: str = DEFAULT_CODE) -> str:
+def keep(settings: Settings, code: str = DEFAULT_CODE, source: Path | None = None) -> str:
     """Снять снимок действующей методики и вернуть издание, которым он опознан.
 
     Возвращаемое издание — то, которым помечается проверка. Считается оно по
@@ -205,7 +206,9 @@ def keep(settings: Settings, code: str = DEFAULT_CODE) -> str:
     поведению T148 (сверка на подсчёте и отказ). Отказать на старте значило бы
     не пустить аудитора на точку из-за неполадки с диском, а это дороже.
     """
-    source = Path(os.path.realpath(settings.data_dir))
+    # Откуда снимать: каталог издания выбранного чек-листа (волна 3) или, по
+    # умолчанию, действующая методика — как было, пока чек-лист был один.
+    source = Path(os.path.realpath(source if source is not None else settings.data_dir))
     version = compose(source, DATA_FILES)
     if snapshot(settings, version, code) is not None:
         return version
@@ -234,31 +237,43 @@ def keep(settings: Settings, code: str = DEFAULT_CODE) -> str:
     return version
 
 
-def recorded(chat_id: int, settings: Settings) -> str:
-    """Издание, которым помечена проверка этого чата. Нет проверки — пусто.
+def _domain_block(chat_id: int, settings: Settings) -> dict[str, Any]:
+    """Блок домена из файла состояния — или пустой, если читать нечего.
 
     Файл читается напрямую, а не через `state.read_state`: тот зовёт разбор
-    всей проверки, а разбор зовёт методику — то есть этот же модуль. Пустая
-    строка здесь означает одно: пометки нет, и работать надо по действующей
-    методике, как работали до версионирования.
-
-    Испорченный файл состояния здесь не отказ: об этом внятно отказывает
+    всей проверки, а разбор зовёт методику — то есть этот же модуль.
+    Испорченный файл здесь не отказ: об этом внятно отказывает
     `state.read_state`, и вторая формулировка того же отказа, прилетевшая
     раньше, увела бы человека не туда.
     """
     path = state_file(chat_id, settings)
     if not path.is_file():
-        return ""
+        return {}
     try:
         raw: Any = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
-        return ""
+        return {}
     if not isinstance(raw, dict):
-        return ""
+        return {}
     block = raw.get(DOMAIN_KEY)
-    if not isinstance(block, dict):
-        return ""
-    return str(block.get("checklist_version") or "")
+    return block if isinstance(block, dict) else {}
+
+
+def recorded(chat_id: int, settings: Settings) -> str:
+    """Издание, которым помечена проверка этого чата. Нет проверки — пусто.
+
+    Пустая строка означает одно: пометки нет, и работать надо по действующей
+    методике, как работали до версионирования.
+    """
+    return str(_domain_block(chat_id, settings).get("checklist_version") or "")
+
+
+def recorded_code(chat_id: int, settings: Settings) -> str:
+    """Код чек-листа проверки этого чата (волна 3). Не записан — `bizdev`.
+
+    Проверки, начатые до волны 3, кода не несут: чек-лист тогда был один.
+    """
+    return str(_domain_block(chat_id, settings).get("checklist_code") or DEFAULT_CODE)
 
 
 def data_dir(chat_id: int, settings: Settings) -> Path:
@@ -279,10 +294,23 @@ def data_dir(chat_id: int, settings: Settings) -> Path:
     version = recorded(chat_id, settings)
     if not version:
         return settings.data_dir
-    if version == compose(settings.data_dir, DATA_FILES):
+    code = recorded_code(chat_id, settings)
+    if code == DEFAULT_CODE and version == compose(settings.data_dir, DATA_FILES):
         return settings.data_dir
-    kept = snapshot(settings, version)
-    return kept if kept is not None else settings.data_dir
+    kept = snapshot(settings, version, code)
+    if kept is not None:
+        return kept
+    if code != DEFAULT_CODE:
+        # Действующая методика — это `bizdev`. Молча считать по ней проверку
+        # другого чек-листа значило бы выдать чужие вопросы и чужую оценку за её.
+        raise ChecklistVersionMismatch(
+            f"Проверка идёт по чек-листу «{code}», издание {version}, а снимка этого издания "
+            f"рядом с проверкой нет — вести её не по чему. Решает человек: перевести проверку "
+            f"на действующее издание чек-листа (sync_checklist_version)",
+            recorded=version,
+            current="",
+        )
+    return settings.data_dir
 
 
 def pin(chat_id: int, settings: Settings) -> Settings:
