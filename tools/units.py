@@ -56,7 +56,7 @@ from src.db.errors import PushError
     "GE": ("Грузия", "dodopizza.ge"),
     "HR": ("Хорватия", "dodopizza.hr"),
     "ID": ("Индонезия", "dodopizza.co.id"),
-    "KG": ("Киргизия", "dodopizza.kg"),
+    "KG": ("Кыргызстан", "dodopizza.kg"),
     "LT": ("Литва", "dodopizza.lt"),
     "ME": ("Черногория", "dodopizza.me"),
     "MN": ("Монголия", "dodo-pizza.mn/en"),
