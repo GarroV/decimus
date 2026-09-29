@@ -27,7 +27,15 @@ export default {
     }
     const front = new URL(request.url);
     const origin = `https://${env.ORIGIN_HOST}`;
-    const upstream = new URL(front.pathname + front.search, origin);
+    // Хост сервера закреплён, а не собран из пути: `new URL("//evil.com/x", origin)`
+    // читает путь как адрес другого сайта, и запрос ушёл бы туда вместе с
+    // ключом фронта. Путь только присваивается, итог сверяется ещё раз.
+    const upstream = new URL(origin);
+    upstream.pathname = front.pathname.replace(/^\/+/, "/");
+    upstream.search = front.search;
+    if (upstream.origin !== origin) {
+      return new Response("bad request", { status: 400 });
+    }
 
     const headers = new Headers(request.headers);
     for (const name of ["Origin", "Referer"]) {
