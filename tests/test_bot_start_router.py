@@ -275,7 +275,7 @@ async def test_новую_пиццерию_уk_заводит_в_справоч�
             "aliases": ("ПОдгорица-2",),
             "country": "ME",
             "city": "podgorica",
-            "tenant": "default",
+            "tenant": "HQ",
         }
     ]
     inspection = get_state(CHAT_ID)

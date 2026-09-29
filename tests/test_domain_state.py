@@ -120,7 +120,7 @@ def test_форма_состояния_готова_к_мультиарендн�
     начать()
     состояние = get_state(42)
     assert состояние is not None
-    assert состояние.tenant == "default"
+    assert состояние.tenant == "HQ"  # тенант УК (D234)
     assert начать(7, tenant="dodo-rs").tenant == "dodo-rs"
 
 
