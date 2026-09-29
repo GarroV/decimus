@@ -115,7 +115,7 @@ async def test_название_длиннее_предела_не_приним�
 
 async def test_название_в_предел_принимается(domain_env: Path) -> None:
     """Предел не должен мешать живым названиям — на границе всё работает."""
-    session = await пройти_мастер("ru", unit="П" * UNIT_NAME_LIMIT)
+    session = await пройти_мастер("ru", unit="П" * (UNIT_NAME_LIMIT - 2) + "-1")
 
     проверка = get_state(CHAT_ID)
     assert проверка is not None and len(проверка.unit) == UNIT_NAME_LIMIT
