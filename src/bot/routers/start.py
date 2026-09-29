@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import asdict
 
 from aiogram import F, Router
 from aiogram.dispatcher.event.bases import SkipHandler
@@ -22,7 +23,11 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from src import domain
+from src.db.directory import upsert_unit
+from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.geo import COUNTRIES
+from src.domain.unit_name import UnitName, canonical_unit
 
 from .. import sealed, sidecar
 from ..auditor import auditor_name, auditor_name_was_shortened
@@ -37,21 +42,22 @@ from ..keyboards import (
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
-    UNIT_PICK_PREFIX,
+    UNIT_NEW_PREFIX,
+    UNIT_NEW_YES,
     kind_keyboard,
     kind_title,
     lang_keyboard,
     new_inspection_keyboard,
     resume_keyboard,
     sealed_keyboard,
-    unit_pick_keyboard,
+    unit_new_keyboard,
 )
 from ..lang import chat_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
-from ..unit_pick import match_unit
+from ..unit_pick import UK_TENANT, bot_tenant, match_unit, may_add_units
 
 logger = logging.getLogger(__name__)
 
@@ -110,9 +116,17 @@ async def _offer_resume(message: Message, inspection: domain.Inspection, lang: s
 
 async def _unit_chosen(message: Message, state: FSMContext, lang: str, unit: str) -> None:
     """Пиццерия определена — дальше вид проверки."""
-    await state.update_data(unit=unit, unit_suggestions=None)
+    await state.update_data(unit=unit, unit_new=None, unit_typed=None)
     await state.set_state(StartFlow.waiting_kind)
     await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
+
+
+def _where(имя: UnitName, lang: str) -> str:
+    """Страна точки словом для вопроса «Новая пиццерия?»; незнакомая — пусто."""
+    if имя.country is None:
+        return ""
+    names = COUNTRIES.get(имя.country, {})
+    return f" ({names.get(lang) or names.get('en') or имя.country})"
 
 
 async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
@@ -293,36 +307,73 @@ def build_start_router(
             # а по байтам уже почти весь бюджет имени файла разом (T128).
             await message.answer(t("start.unit_too_long_bytes", lang))
             return
-        # Пиццерия — из справочника, а не из написанного (D196).
-        сверка = await asyncio.to_thread(match_unit, unit)
-        if сверка.checked and сверка.name is None:
-            await state.update_data(unit_suggestions=list(сверка.suggestions))
-            if сверка.suggestions:
-                await message.answer(
-                    t("start.unit_suggest", lang, typed=unit),
-                    reply_markup=unit_pick_keyboard(сверка.suggestions),
-                )
-            else:
-                await message.answer(t("start.unit_unknown", lang, typed=unit))
+        # Имя точки — город по-английски и номер, как бы его ни написали (D233).
+        имя = canonical_unit(unit)
+        if имя is None:
+            await message.answer(t("start.unit_need_number", lang, typed=unit))
             return
-        await _unit_chosen(message, state, lang, сверка.name or unit)
+        if len(имя.name) > UNIT_NAME_LIMIT:
+            # Латиница бывает длиннее написанного («Щ» → «shch»): предел имени
+            # файла отчёта сверяется с тем, что ляжет в шапку, а не с вводом.
+            await message.answer(t("start.unit_too_long", lang, limit=UNIT_NAME_LIMIT))
+            return
+        сверка = await asyncio.to_thread(match_unit, имя.name, tenant=UK_TENANT)
+        if сверка.name is not None or not сверка.checked:
+            # Совпало со справочником — или справочник недоступен, и тогда не
+            # повод держать аудитора на точке: имя уже каноническое.
+            await _unit_chosen(message, state, lang, сверка.name or имя.name)
+            return
+        if not may_add_units(bot_tenant(message)):
+            await message.answer(t("start.unit_new_partner", lang, name=имя.name))
+            return
+        await state.update_data(unit_new=asdict(имя), unit_typed=unit)
+        await message.answer(
+            t("start.unit_new_ask", lang, name=имя.name, where=_where(имя, lang)),
+            reply_markup=unit_new_keyboard(lang),
+        )
 
-    @router.callback_query(StateFilter(StartFlow.waiting_unit), F.data.startswith(UNIT_PICK_PREFIX))
-    async def on_unit_pick(callback: CallbackQuery, state: FSMContext) -> None:
-        """Аудитор выбрал пиццерию из подсказок справочника (D196)."""
+    @router.callback_query(StateFilter(StartFlow.waiting_unit), F.data.startswith(UNIT_NEW_PREFIX))
+    async def on_unit_new(callback: CallbackQuery, state: FSMContext) -> None:
+        """«Новая пиццерия?» — да заводит её в справочник страны, нет — ввести заново (D233)."""
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
             return
         lang = chat_ui_lang(message.chat.id)
-        варианты = (await state.get_data()).get("unit_suggestions") or []
-        номер = (callback.data or "").removeprefix(UNIT_PICK_PREFIX)
-        if not номер.isdigit() or int(номер) >= len(варианты):
-            # Кнопка из старого сообщения: вариантов, к которым она относилась,
-            # уже нет — угадывать по номеру нельзя.
+        данные = await state.get_data()
+        сырое = данные.get("unit_new")
+        if not isinstance(сырое, dict):
+            # Кнопка из старого сообщения: к какой точке она относилась, уже не узнать.
             await message.answer(t("start.unit_pick_gone", lang))
             return
-        await _unit_chosen(message, state, lang, str(варианты[int(номер)]))
+        if (callback.data or "").removeprefix(UNIT_NEW_PREFIX) != UNIT_NEW_YES:
+            await state.update_data(unit_new=None, unit_typed=None)
+            await _ask_unit(message, state, lang)
+            return
+        if not may_add_units(bot_tenant(message)):
+            await message.answer(t("start.unit_new_partner", lang, name=сырое["name"]))
+            return
+        имя = UnitName(**сырое)
+        написано = str(данные.get("unit_typed") or "")
+        синонимы = (написано,) if написано and написано != имя.name else ()
+        try:
+            await asyncio.to_thread(
+                upsert_unit,
+                имя.name,
+                aliases=синонимы,
+                country=имя.country,
+                city=имя.city,
+                tenant=UK_TENANT,
+            )
+        except DbError as exc:
+            # Точка всё равно заведётся по имени при сливе проверки; страну и
+            # город тогда допишет администратор. Держать аудитора незачем.
+            logger.warning("новая пиццерия %s не записана в справочник: %s", имя.name, exc)
+        else:
+            await message.answer(
+                t("start.unit_added", lang, name=имя.name, where=_where(имя, lang))
+            )
+        await _unit_chosen(message, state, lang, имя.name)
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, F.text.startswith("/"))
     async def on_unit_command(message: Message) -> None:

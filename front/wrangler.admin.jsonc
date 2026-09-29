@@ -1,0 +1,9 @@
+// Фронт веб-админки: https://decimus.vasiliy-garro.workers.dev
+// Ключ фронта — секретом: `npx wrangler secret put FRONT_KEY -c wrangler.admin.jsonc`.
+{
+  "name": "decimus",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  "vars": { "ORIGIN_HOST": "decimus.95-111-249-216.sslip.io" }
+}
