@@ -242,12 +242,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # у партнёра почта может оказаться не гугловой, и отнимать единственную
     # дверь ради красоты схемы нельзя.
     "auth.google": {"ru": "Войти через Google", "en": "Sign in with Google"},
-    "auth.google.hint": {
-        "ru": "Та почта, на которую вас завели. С незнакомой почты доступа нет.",
-        "en": "The email your account was created with. Unknown emails get no access.",
-    },
-    "auth.google.title": {"ru": "Рабочей почтой Google", "en": "With your work Google account"},
-    "auth.password.title": {"ru": "Или логином и паролем", "en": "Or with login and password"},
+    "auth.or": {"ru": "или", "en": "or"},
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",
