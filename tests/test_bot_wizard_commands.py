@@ -95,7 +95,7 @@ async def test_мастер_после_команды_ждёт_название_
     await feed(dp, bot, callback_query("start:lang:ru"))
 
     state = get_state(CHAT_ID)
-    assert state is not None and state.unit == "Белград 2", (
+    assert state is not None and state.unit == "Belgrade-2", (
         "мастер после команды название не принял"
     )
 

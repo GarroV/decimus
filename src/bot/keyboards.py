@@ -53,8 +53,6 @@ LANG_LABELS: dict[str, str] = {
 
 NEW_INSPECTION_CALLBACK = "start:new"
 KIND_PREFIX = "start:kind:"
-#: Выбор пиццерии из подсказок справочника (D196): за префиксом — номер варианта.
-UNIT_PICK_PREFIX = "start:unit:"
 #: Кнопки вопроса «Новая пиццерия?» (D233).
 UNIT_NEW_PREFIX = "start:unit-new:"
 UNIT_NEW_YES = "yes"
