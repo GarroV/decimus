@@ -65,24 +65,30 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Название пиццерии? Введите текстом.",
         "en": "Which pizzeria? Type the name.",
     },
-    # --- пиццерия: справочник подсказывает, но не запирает (D230) ---
-    "start.unit_suggest": {
+    # --- пиццерия: город по-английски и номер, новую заводит УК (D233) ---
+    "start.unit_need_number": {
+        "ru": "Назовите пиццерию городом и номером — например, «Ереван-2» или «Yerevan-2».",
+        "en": "Name the pizzeria by city and number — for example, “Yerevan-2”.",
+    },
+    "start.unit_new_ask": {
+        "ru": "Пиццерии «{name}»{where} в справочнике нет. Новая пиццерия?",
+        "en": "“{name}”{where} is not in the pizzeria directory. Is it a new pizzeria?",
+    },
+    "start.unit_new_yes": {"ru": "Да, новая", "en": "Yes, it is new"},
+    "start.unit_new_no": {"ru": "Нет, ввести заново", "en": "No, type it again"},
+    "start.unit_added": {
+        "ru": "Пиццерия «{name}» добавлена в справочник{where}.",
+        "en": "“{name}” is added to the pizzeria directory{where}.",
+    },
+    "start.unit_new_partner": {
         "ru": (
-            "Пиццерии «{typed}» в справочнике нет. Может быть, одна из этих? "
-            "Если нет — запишите как написали."
+            "Пиццерии «{name}» в справочнике нет. Новую пиццерию заводит только "
+            "управляющая компания — проверьте название или обратитесь в УК."
         ),
         "en": (
-            "“{typed}” is not in the pizzeria directory. Is it one of these? "
-            "If not, keep the name as you typed it."
+            "“{name}” is not in the pizzeria directory. Only the management company "
+            "adds new pizzerias — check the name or contact them."
         ),
-    },
-    "start.unit_keep": {
-        "ru": "Записать «{typed}»",
-        "en": "Keep “{typed}”",
-    },
-    "start.unit_new": {
-        "ru": "Пиццерии «{typed}» в справочнике нет — записал как написано.",
-        "en": "“{typed}” is not in the pizzeria directory — kept as typed.",
     },
     "start.unit_pick_gone": {
         "ru": "Эти варианты уже неактуальны. Введите название пиццерии ещё раз.",

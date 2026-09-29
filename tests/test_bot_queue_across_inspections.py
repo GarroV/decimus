@@ -217,7 +217,7 @@ async def test_убрать_из_чата_очередь_забывает(
     await feed(dp, bot, callback_query(SEALED_DROP_CALLBACK))
 
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
-    await feed(dp, bot, text_message("Вторая точка"))
+    await feed(dp, bot, text_message("Вторая точка-2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:lang:ru"))
     calls.clear()

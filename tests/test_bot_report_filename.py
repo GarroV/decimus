@@ -139,7 +139,8 @@ async def test_название_в_60_кириллических_знаков_п
     domain_env: Path,
 ) -> None:
     """Старое поведение не сломано: живым названиям байтовый предел не мешает."""
-    session = await пройти_мастер(unit="П" * UNIT_NAME_LIMIT)
+    # Имя точки — город и номер (D233); «П» латиницей — одна буква, длина та же.
+    session = await пройти_мастер(unit="П" * (UNIT_NAME_LIMIT - 2) + "-1")
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
@@ -154,9 +155,21 @@ async def test_худший_случай_название_и_имя_на_пре�
     domain_env: Path,
 ) -> None:
     """Название точки на пределе + имя профиля на пределе — вместе, не порознь."""
-    await пройти_мастер(unit="П" * UNIT_NAME_LIMIT, full_name="И" * 200)
+    await пройти_мастер(unit="П" * (UNIT_NAME_LIMIT - 2) + "-1", full_name="И" * 200)
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
     имя = имя_файла_отчёта(inspection.unit, inspection.auditor, inspection.date)
     assert len(имя.encode("utf-8")) <= 255, "худший достижимый случай не влезает в предел ext4"
+
+
+async def test_название_длиннее_предела_после_латиницы_не_принимается(domain_env: Path) -> None:
+    """«Щ» латиницей — четыре буквы: 60 знаков ввода становятся 230 в имени точки.
+
+    Предел сверяется с именем, которое ляжет в шапку и в имя файла, иначе
+    сборка отчёта упала бы в самом конце проверки (D233, T128).
+    """
+    session = await пройти_мастер(unit="Щ" * (UNIT_NAME_LIMIT - 3) + "-1")
+
+    assert get_state(CHAT_ID) is None
+    assert str(UNIT_NAME_LIMIT) in session.last_text
