@@ -15,7 +15,16 @@
 
   Названия разделов берутся по ключу `section.<код>.title` — ключ остаётся
   кодом, переводится только название (конституция, принцип 5).
-#}<!doctype html>
+#}{% macro theme_pick() %}
+  <div class="sidenav__theme" role="radiogroup" aria-label="{{ t('nav.theme') }}">
+    <span class="sidenav__theme-label">{{ t('nav.theme') }}</span>
+    {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}
+      <button type="button" role="radio" aria-checked="{{ 'true' if value == 'system' else 'false' }}"
+              data-theme-value="{{ value }}" title="{{ t('nav.theme.' ~ value) }}"
+              aria-label="{{ t('nav.theme.' ~ value) }}">{{ icon(name) }}</button>
+    {% endfor %}
+  </div>
+{% endmacro %}<!doctype html>
 <html lang="{{ lang }}">
 <head>
   <meta charset="utf-8">
@@ -43,12 +52,30 @@
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__brand">
+          <img class="topbar__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
           <span class="topbar__name">{{ t('app.name') }}</span>
           <span class="topbar__mark">Dodo</span>
         </div>
         <div class="topbar__spacer"></div>
         {% include "_langpick.html" %}
       </div>
+    </header>
+  {% endif %}
+
+  {% if account %}
+    {#
+      Полоса телефона: ниже 720px левой панели нет, и тема с языком были
+      на телефоне недоступны вовсе. Здесь марка и те же два переключателя —
+      те же элементы, что в панели, а не свои копии.
+    #}
+    <header class="mbar">
+      <a class="mbar__brand" href="{{ url('/overview') }}?lang={{ lang }}">
+        <img class="topbar__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <span class="topbar__name">{{ t('app.name') }}</span>
+      </a>
+      <span class="topbar__spacer"></span>
+      {{ theme_pick() }}
+      {% include "_langpick.html" %}
     </header>
   {% endif %}
 
@@ -92,15 +119,13 @@
         </div>
 
         <div class="sidenav__foot">
-          <div class="sidenav__theme" role="radiogroup" aria-label="{{ t('nav.theme') }}">
-            <span class="sidenav__theme-label">{{ t('nav.theme') }}</span>
-            {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}
-              <button type="button" role="radio" aria-checked="{{ 'true' if value == 'system' else 'false' }}"
-                      data-theme-value="{{ value }}" title="{{ t('nav.theme.' ~ value) }}"
-                      aria-label="{{ t('nav.theme.' ~ value) }}">{{ icon(name) }}</button>
-            {% endfor %}
+          {{ theme_pick() }}
+          {# Язык — строкой под темой и тем же устройством: подпись слева,
+             капсула справа (владелец 30.09.2026: «пилюлей как в сворме»). #}
+          <div class="sidenav__lang">
+            <span class="sidenav__lang-label">{{ t('nav.lang.short') }}</span>
+            {% include "_langpick.html" %}
           </div>
-          {% include "_langpick.html" %}
         </div>
 
         <div class="sidenav__user">
