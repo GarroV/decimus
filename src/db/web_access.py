@@ -23,6 +23,14 @@
 ровно в том браузере, где нажали кнопку: снятая копия куки работала бы до
 конца срока, и отозвать её было бы нечем. Выход помечает строку закрытой, а
 снять эту пометку не может никто — заслон стоит в схеме (`0014`).
+
+**ЛОГИН И ПОЧТА ЕДИНЫЕ НА ВСЮ СИСТЕМУ, НЕ НА АРЕНДАТОРА (D282, `0028`).** Один
+человек — одна учётка, и её пространство — просто поле строки (`tenant_code`),
+а не то, чем опознание фильтрует поиск. `authenticate`, `find_by_email` и
+`resolve_session` ищут по всей базе: партнёр входит через тот же адрес, что и
+УК, и получает своё пространство вместе с опознанием. Заведение, отключение,
+роль и пароль остаются операциями ОДНОГО пространства (`tenant=` в их
+сигнатуре) — это не граница входа, а то, чьими руками человека завели.
 """
 
 from __future__ import annotations
@@ -95,7 +103,7 @@ _INSERT_USER_SQL = """
 _SELECT_USER_SQL = """
     select id, login, tenant_code, password_hash, role
       from web_users
-     where tenant_code = %s and login = %s and disabled_at is null
+     where login = %s and disabled_at is null
 """
 
 _LIST_USERS_SQL = """
@@ -139,7 +147,7 @@ _SET_EMAIL_SQL = """
 _SELECT_USER_BY_EMAIL_SQL = """
     select id, login, tenant_code, role
       from web_users
-     where tenant_code = %s and email = %s and disabled_at is null
+     where email = %s and disabled_at is null
 """
 
 _OPEN_SESSION_SQL = """
@@ -159,7 +167,6 @@ _RESOLVE_SESSION_SQL = """
        and s.closed_at is null
        and s.expires_at > now()
        and u.disabled_at is null
-       and u.tenant_code = %s
 """
 
 _CLOSE_SESSION_SQL = """
@@ -432,8 +439,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
             cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
         except psycopg.errors.UniqueViolation as exc:
             raise AccessError(
-                f"Учётка «{имя}» у арендатора «{tenant}» уже есть. Сменить пароль "
-                f"существующей эта команда не умеет — отключите старую и заведите новую"
+                f"Логин «{имя}» уже занят — логины единые на всю систему. Возьмите другой"
             ) from exc
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
@@ -533,14 +539,12 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
             # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
             # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
             # там, где была опечатка в логине.
-            raise EmailTakenError(
-                f"почта {значение} уже привязана к другой учётке арендатора {tenant}"
-            ) from занято
+            raise EmailTakenError(f"почта {значение} уже привязана к другой учётке") from занято
         return cur.rowcount > 0
 
 
-def find_by_email(email: str, *, tenant: str) -> Account | None:
-    """Почта от Google → учётка. Незнакомая, отключённая, чужой арендатор — `None`.
+def find_by_email(email: str) -> Account | None:
+    """Почта от Google → учётка. Незнакомая или отключённая — `None`.
 
     **Это и есть круг допущенных.** Google подтверждает, что человек владеет
     почтой, и ничего больше: кому можно в админку, решает эта строка в базе.
@@ -550,38 +554,40 @@ def find_by_email(email: str, *, tenant: str) -> Account | None:
     Отключённые не проходят по тому же условию, что и при входе паролем:
     отзыв доступа обязан закрывать ВСЕ двери сразу, иначе он не отзыв.
 
-    Арендатор приходит из окружения стенда, а не из почты: домен почты не
-    говорит, чью историю человеку видно.
+    **Пространство приходит из строки учётки (D282).** Почта, как и логин,
+    единая на всю систему: опознание ищет её во всей базе, а не в границах
+    тенанта стенда — стенд УК опознаёт учётку партнёра ровно так же, как свою.
     """
     try:
         приведённая = normalize_email(email)
     except ValueError:
         return None
     with _connected("опознать по почте") as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_USER_BY_EMAIL_SQL, (tenant, приведённая))
+        cur.execute(_SELECT_USER_BY_EMAIL_SQL, (приведённая,))
         row = cur.fetchone()
     if row is None:
         return None
     return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
 
 
-def authenticate(login: str, password: str, *, tenant: str) -> Account | None:
-    """Логин и пароль → учётка. Не тот пароль, нет такой учётки, чужой арендатор — `None`.
+def authenticate(login: str, password: str) -> Account | None:
+    """Логин и пароль → учётка. Не тот пароль и нет такой учётки — `None`.
 
-    **Все три отказа неотличимы снаружи, и это намеренно.** Иначе форма входа
-    сама сообщает перебором, какие логины заведены.
+    **Оба отказа неотличимы снаружи, и это намеренно.** Иначе форма входа сама
+    сообщает перебором, какие логины заведены.
 
     Незнакомый логин всё равно стоит одного вычисления scrypt. Без этого ответ
     «такого нет» приходил бы мгновенно, а «пароль не тот» — через десятки
     миллисекунд, и разница по времени рассказала бы ровно то, что предыдущий
     абзац запрещает говорить словами.
 
-    Арендатор приходит из окружения стенда, а не от человека: подставить его
-    в форму мог бы кто угодно, и это была бы не граница арендаторов, а её
-    отсутствие.
+    **Пространство приходит из строки учётки (D282).** Логин единый на всю
+    систему: опознание ищет его во всей базе, а не в границах тенанта стенда —
+    один адрес входа пускает в любое пространство ту учётку, которой оно
+    принадлежит.
     """
     with _connected("сверить учётку") as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_USER_SQL, (tenant, login.strip().lower()))
+        cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
         row = cur.fetchone()
     if row is None:
         password_hash(password)
@@ -601,8 +607,8 @@ def open_session(account: Account) -> OpenedSession:
     return OpenedSession(token=token, expires_at=row[0])
 
 
-def resolve_session(token: str, *, tenant: str) -> Account | None:
-    """Токен из куки → кто вошёл. Закрытая, просроченная и чужая сессия — `None`.
+def resolve_session(token: str) -> Account | None:
+    """Токен из куки → кто вошёл. Закрытая, просроченная или чужая учётка — `None`.
 
     Спрашивается на КАЖДЫЙ запрос, а не запоминается на входе: отключение
     учётки и выход обязаны действовать немедленно, а снятый однажды ответ —
@@ -612,9 +618,13 @@ def resolve_session(token: str, *, tenant: str) -> Account | None:
     «эта кука не действует», а упавшая база означает «мы не смогли посмотреть»,
     и выдать второе за первое — молча выбросить из админки всех и объяснить
     это каждому неверным словом.
+
+    **Пространство приходит из строки учётки (D282).** Сессия несёт своё
+    пространство в `Account.tenant`, а не сверяется с тенантом стенда: один
+    адрес входа обязан впускать учётку любого пространства.
     """
     with _connected("сверить сессию") as conn, conn.cursor() as cur:
-        cur.execute(_RESOLVE_SESSION_SQL, (session_fingerprint(token), tenant))
+        cur.execute(_RESOLVE_SESSION_SQL, (session_fingerprint(token),))
         row = cur.fetchone()
     if row is None:
         return None

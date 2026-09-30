@@ -58,7 +58,7 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(
         auth,
         "find_by_email",
-        lambda email, *, tenant: Учётка(tenant=tenant) if email == ПОЧТА_СВОЯ else None,
+        lambda email: Учётка(tenant=ТЕНАНТ) if email == ПОЧТА_СВОЯ else None,
     )
     monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -204,7 +204,7 @@ def test_через_фронт_google_получает_адрес_фронта_�
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     с_фронтом = replace(РЕКВИЗИТЫ, front_redirect_uri=ФРОНТ)
     monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: с_фронтом)
-    monkeypatch.setattr(auth, "find_by_email", lambda email, *, tenant: Учётка(tenant=tenant))
+    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant=ТЕНАНТ))
     monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
     виденные: list[str] = []
     исходный = обмен.__call__
