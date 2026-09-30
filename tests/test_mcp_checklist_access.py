@@ -45,7 +45,13 @@ from src.mcp.server import _checklist_for, build_server
 
 ТОКЕН_УК = "u" * MIN_TOKEN_LENGTH
 ТОКЕН_ПАРТНЁРА = "p" * MIN_TOKEN_LENGTH
-УК = "укашка"
+# "HQ", а не прежняя "укашка" (волна 1, #340): `_checklist_for` теперь наводит
+# хранилище в `space_of(tenant)`, а тот требует годный слаг пространства —
+# кириллица им не была бы. `space_of("HQ")` приводится к "hq" (`DEFAULT_SPACE`),
+# и весь файл продолжает работать слово в слово. Партнёра это не касается:
+# `_checklist_for` у него отказывает раньше, на `may_manage_checklist`, до
+# всякого обращения к `space_of`.
+УК = "HQ"
 ПАРТНЁР = "партнёр-б"
 
 
