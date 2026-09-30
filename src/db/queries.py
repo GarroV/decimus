@@ -36,7 +36,14 @@ from src.domain.tenants import canonical_tenant
 
 from .config import check_environment, load_retraction_settings
 from .errors import DbError, StorageError
-from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow, ItemUsage
+from .models import (
+    FindingRow,
+    InfoRow,
+    InspectionDetail,
+    InspectionRow,
+    ItemUsage,
+    PreviousInspection,
+)
 from .units import normalize_unit_name
 
 #: Сколько строк отдаётся, если предел не назвали. Сотня — это и есть
@@ -807,11 +814,9 @@ where u.tenant_code = %(tenant)s
 """
 
 
-_PREVIOUS_CODES_SQL = """
-select f.code
-from findings f
-where f.inspection_id = (
-    select i.id
+_PREVIOUS_INSPECTION_SQL = """
+with прошлая as (
+    select i.id, i.inspection_date
     from inspections i
     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
     where i.tenant_code = %(tenant)s
@@ -820,29 +825,38 @@ where f.inspection_id = (
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
+select прошлая.inspection_date, f.code
+from прошлая
+left join findings f on f.inspection_id = прошлая.id and f.level <> 'D0'
 """
 
 
-def previous_codes(*, tenant: str, unit: str) -> set[str]:
-    """Коды нарушений ПРЕДЫДУЩЕЙ проверки точки — основа подсказки о повторе.
+def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
+    """Предыдущая проверка точки и её нарушения — основа вопроса о повторе.
 
-    Отдаётся ровно факт: какие пункты были записаны в последней проверке этой
-    точки. Вывод «значит это повтор» здесь не делается и сделан быть не может —
-    тот же код мог относиться к другому объекту, а исправленное и снова
-    сломавшееся отличается от неисправленного. Решение о цене принимает
-    аудитор (D191, конституция: «модель предлагает, фиксирует человек»).
+    Отдаётся ровно факт: когда был прошлый обход и какие пункты тогда были
+    записаны нарушениями. Вывод «значит это повтор» здесь не делается и сделан
+    быть не может — тот же код мог относиться к другому объекту, а исправленное
+    и снова сломавшееся отличается от неисправленного. Решение о цене принимает
+    проверяющий (D191, D255: «конечное решение принимал проверяющий»).
 
     Предыдущая — одна, последняя по дате обхода: правило говорит про
     предыдущую проверку, а не «когда-нибудь за год». Снятые проверки в счёт не
-    идут: снятая проверка не является показанием о точке.
+    идут: снятая проверка не является показанием о точке. Информационные
+    записи (`D0`) нарушениями не считаются и в коды не попадают.
 
-    Пустое множество — прошлых проверок нет либо точка чужая. Это одно и то же
-    для подсказки: подсказывать нечем.
+    `None` — прошлых проверок нет либо точка чужая. Для вопроса это одно и то
+    же: спрашивать не о чем.
     """
     tenant_code = _require_tenant(tenant)
-    with _reading("коды предыдущей проверки") as conn, conn.cursor() as cur:
-        cur.execute(_PREVIOUS_CODES_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
-        return {str(код) for (код,) in cur.fetchall()}
+    with _reading("предыдущая проверка точки") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_INSPECTION_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        rows = cur.fetchall()
+    if not rows:
+        return None
+    return PreviousInspection(
+        date=rows[0][0], codes=frozenset(str(код) for _, код in rows if код is not None)
+    )
 
 
 def unit_ids(*, tenant: str) -> dict[str, str]:
