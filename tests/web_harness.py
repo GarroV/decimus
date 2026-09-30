@@ -145,11 +145,18 @@ def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Сч
 def подменить_двери(
     monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str = "auditor"
 ) -> dict[str, list[Any]]:
-    """Двери опознания, подменённые на границе модуля. Пишут, кого звали."""
+    """Двери опознания, подменённые на границе модуля. Пишут, кого звали.
+
+    `tenant` — пространство УЧЁТКИ, которую отдают двери при удаче: именно оно
+    едет в возвращаемой `Учётка`. Тенант стенда задаёт `собрать(tenant=...)` —
+    это вторая, независимая настройка: с D282 учётка любого пространства
+    входит через любой стенд, и опознание своего тенанта стенда больше не
+    знает вовсе.
+    """
     зовы: dict[str, list[Any]] = {"authenticate": [], "open": [], "resolve": [], "close": []}
 
-    def _authenticate(login: str, password: str, *, tenant: str) -> Учётка | None:
-        зовы["authenticate"].append((login, password, tenant))
+    def _authenticate(login: str, password: str) -> Учётка | None:
+        зовы["authenticate"].append((login, password))
         if login == ЛОГИН and password == ПАРОЛЬ:
             return Учётка(tenant=tenant, role=role)
         return None
@@ -158,8 +165,8 @@ def подменить_двери(
         зовы["open"].append(account.login)
         return Сессия()
 
-    def _resolve(token: str, *, tenant: str) -> Учётка | None:
-        зовы["resolve"].append((token, tenant))
+    def _resolve(token: str) -> Учётка | None:
+        зовы["resolve"].append((token,))
         return Учётка(tenant=tenant, role=role) if token == ТОКЕН else None
 
     def _close(token: str) -> bool:
