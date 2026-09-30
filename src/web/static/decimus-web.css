@@ -667,9 +667,10 @@ a.ov-table__row:hover { background: var(--surface-2); }
 /* Раскрытая строка страны и её история (D260). История — продолжение строки,
    а не новая карточка: тот же фон, что у открытой строки, и отступ слева,
    чтобы читалось «это внутри Батуми-1», а не соседний блок таблицы. */
-.ov-table__row.is-open { background: var(--accent-soft); border-bottom-color: transparent; }
+.ov-table__row.is-open { background: var(--surface-2); border-bottom-color: transparent; box-shadow: inset 3px 0 0 var(--accent); }
 .ov-history {
   background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
   border-bottom: 1px solid var(--line-2);
   padding: var(--space-3) 0 var(--space-4) var(--space-7);
 }

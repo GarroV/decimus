@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 
 import pytest
-from test_web_overview import ПУСТО, строка
+from test_web_overview import ПУСТО, снимок, строка
 
 from src.web import country as cn
 from src.web import overview as ov
@@ -29,6 +29,21 @@ def test_страна_уходит_в_отбор_обзора(monkeypatch: pytes
     cn.load(tenant="HQ", limit=10, code="GE", selection=ov.Selection(period="d90", country="RS"))
     assert видели["selection"].country == "GE"
     assert видели["selection"].period == "d90"
+
+
+def test_мусорный_код_не_показывает_всю_сеть(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Пустой код в отборе «Обзора» значит «не сужать»: экран страны с кодом
+    # `<script>` показал бы цифры всей сети под видом страновых.
+    monkeypatch.setattr(cn.overview, "load", lambda **_: снимок())
+    вид = cn.load(tenant="HQ", limit=10, code="", selection=ov.Selection(), unit_id="u-1")
+    данные = вид.snapshot
+    assert (данные.inspections, данные.points, данные.systemic, данные.zone_losses) == (
+        (),
+        (),
+        (),
+        (),
+    )
+    assert (данные.units_total, данные.unchecked, вид.unit_id) == (0, 0, "")
 
 
 def test_история_точки_из_того_же_снимка(monkeypatch: pytest.MonkeyPatch) -> None:
