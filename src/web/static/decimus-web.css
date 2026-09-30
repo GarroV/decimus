@@ -1241,6 +1241,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
    прокручивается своей прокруткой, только если чек-листов больше, чем влезает. */
 .mx-shell { display: grid; grid-template-columns: 18rem minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .mx-main { min-width: 0; }
+/* «Все страны» — назад к колонке на узком экране, где колонка спрятана.
+   Шире колонка видна сама, и ссылка лишняя. */
+.cn-back { display: none; font-size: var(--fs-meta); color: var(--ink-3); text-decoration: none; margin-bottom: var(--space-3); }
+@media (max-width: 1023px) { .cn-back { display: inline-block; } }
 .mx-rail {
   position: sticky; top: calc(var(--topbar-h) + var(--space-5));
   display: grid; gap: var(--space-1); align-content: start;
