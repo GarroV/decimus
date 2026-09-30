@@ -106,6 +106,15 @@ def test_occupied_by_с_skip_не_спорит_сама_с_собой(domain_env
     assert refusal.occupied_by(CHAT_ID, "CLN05", "hot_kitchen") == finding
 
 
+def test_D0_пару_не_занимает_ни_в_occupied_by_ни_в_occupied_pairs(domain_env: Path) -> None:
+    """#444: у информационной записи вычета нет, предложение не помечается занятым."""
+    начата()
+    domain.add_finding(CHAT_ID, "INF09", "D0", "hot_kitchen", "печь 240")
+
+    assert refusal.occupied_by(CHAT_ID, "INF09", "hot_kitchen") is None
+    assert ("INF09", "hot_kitchen") not in refusal.occupied_pairs(CHAT_ID)
+
+
 # --- not_recorded / not_changed при свободной паре ------------------------------
 
 

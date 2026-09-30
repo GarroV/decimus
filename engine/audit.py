@@ -566,7 +566,7 @@ def cmd_add(a):
     if unusual and not a.zone_by_person:
         sys.exit(zone_refusal(qid, a.zone, allowed))
     st = load_state()
-    check_pair_free(st, qid, a.zone)
+    check_pair_free(st, qid, a.zone, lvl)
     # Счётчик сквозной: номера аудитор называет вслух, переиспользовать нельзя.
     # Максимум живых записей здесь не годится — `drop` его уносит; счётчик уже
     # поднят до максимума выданных номеров при чтении состояния (T295).
@@ -598,9 +598,20 @@ def known_numbers(st):
     return ", ".join(f"#{f['n']}" for f in st["findings"]) or "ни одной записи"
 
 
-def check_pair_free(st, qid, zone, skip_n=None):
-    """Пара «пункт + зона» уникальна: один и тот же пункт в одной зоне — одно нарушение."""
+def check_pair_free(st, qid, zone, level, skip_n=None):
+    """Пара «пункт + зона» уникальна: один и тот же пункт в одной зоне — одно нарушение.
+
+    Запись уровня D0 пару не занимает и занятой ею не считается (#444): вычета у
+    неё нет, а уникальность нужна против двойного вычета. Два аппарата одного
+    пункта в одной зоне (INF10: морозильник после линии начинки в горячем цехе)
+    — две записи, в отчёте отдельными строками. Временная мера до карточки
+    пиццерии (#446).
+    """
+    if level == "D0":
+        return
     for f in st["findings"]:
+        if f["level"] == "D0":
+            continue
         if f["n"] != skip_n and f["qid"] == qid and f["zone"] == zone:
             sys.exit(f"{qid} в зоне {zone} уже зафиксировано — запись #{f['n']}. "
                      f"Доснимите фото (audit.py photo {f['n']} --add ...) "
@@ -638,7 +649,7 @@ def cmd_edit(a):
     kept = a.zone is None and qid == f["qid"] and bool(f.get("zone_unusual"))
     if unusual and not (a.zone_by_person or kept):
         sys.exit(zone_refusal(qid, zone, allowed))
-    check_pair_free(st, qid, zone, skip_n=f["n"])
+    check_pair_free(st, qid, zone, lvl, skip_n=f["n"])
     f["qid"], f["level"], f["zone"] = qid, lvl, zone
     if a.evidence is not None:
         f["evidence"] = a.evidence
