@@ -13,7 +13,7 @@
 
 {% block body %}
   <div class="row row--tight row--between">
-    <a class="btn btn--sm btn--ghost" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
+    <a class="back" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
     {#
       Письмо — отдельный экран, а не блок здесь. Оно собирается движком в
       подпроцессе, и карточка, ждущая этой сборки, открывалась бы секундами

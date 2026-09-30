@@ -1,4 +1,4 @@
-/* forma dodo/core/dodo-ds.css sha256:7f3fe2241b972907402e0539ea4653ae86357e60758cab98f4d04b5f9ab012b0 — не править здесь, правка идёт в GarroV/forma */
+/* forma dodo/core/dodo-ds.css sha256:d986a2ebaf5172fc8ed1d935ec9a5747dec4d104cf173fc767e3cd420c587443 — не править здесь, правка идёт в GarroV/forma */
 /* ═══════════════════════════════════════════════════════════════════════════
    DODO — ЕДИНАЯ ДИЗАЙН-СИСТЕМА ТРЁХ ПРОДУКТОВ
    Собрана 17.09.2026 из двух источников:
@@ -236,7 +236,7 @@
   /* ── Текст ───────────────────────────────────────────────── */
   --ink:             #1B2028;   /* числа и основной текст */
   --ink-2:           #5C6672;   /* подписи, второстепенное */
-  --ink-3:           #656E7A;   /* надстрочные, метаданные — затемнён до порога доступности (D044): 5,97 на --surface, 4,70 на --canvas */
+  --ink-3:           #5F6874;   /* надстрочные, метаданные — затемнён до порога доступности (D044): 5,97 на --surface, 4,70 на --canvas */
   --ink-empty:       #A3AAB4;   /* «нет значения» — только для прочерка */
   --ink-inverse:     #FFFFFF;
 
@@ -999,7 +999,7 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
        <a class="sidenav__brand">  img.sidenav__logo  .sidenav__name > b + small
        <form class="sidenav__search"> label.sidenav__field > svg input kbd.kbd
        <div class="sidenav__list">  .sidenav__group  a.sidenav__item | span.sidenav__current
-       <div class="sidenav__foot">  .sidenav__theme  a.sidenav__item …
+       <div class="sidenav__foot">  .sidenav__theme  .sidenav__lang > .langpill  a.sidenav__item …
        <div class="sidenav__user">  .avatar  .sidenav__who > b + small
 */
 
@@ -1014,7 +1014,7 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
 .sidenav__search { padding: var(--space-5) var(--space-4) 0; }
 .sidenav__field { display: flex; align-items: center; gap: var(--space-4); height: 30px; padding: 0 var(--space-5); border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface); color: var(--ink-3); transition: border-color var(--t-state) var(--ease); }
 .sidenav__field:hover { border-color: var(--line-control-2); }
-.sidenav__field:focus-within { border-color: var(--accent); }
+.sidenav__field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-soft); }
 .sidenav__field svg { width: 13px; height: 13px; flex-shrink: 0; }
 .sidenav__field input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; }
 .sidenav__field input::placeholder { color: var(--ink-3); }
@@ -1037,8 +1037,26 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
 .sidenav__theme-label { flex: 1; font-size: 12px; color: var(--ink-3); }
 .sidenav__theme button { display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); cursor: pointer; }
 .sidenav__theme button:hover { background: var(--surface); color: var(--ink); }
-.sidenav__theme button[aria-checked="true"] { background: var(--accent-soft); color: var(--accent); }
+.sidenav__theme button[aria-checked="true"], .sidenav__theme button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .sidenav__theme svg { width: 15px; height: 15px; }
+
+/* Язык интерфейса — пилюлей рядом с темой (владелец DECIMUS 30.09.2026:
+   «переключение языка сделай более адекватным, пилюлей как в сворме»).
+   Строка устроена как тема над ней: подпись слева, выбор справа, — а сам
+   выбор — одна капсула с двумя сегментами, текущий залит мягким акцентом,
+   как текущая тема и текущий пункт. Две отдельные буквы без общей рамки,
+   как было, читались подписями, а не переключателем.
+   Капсула — `.langpill`, она же стоит на экране входа, где панели нет.
+   Сегменты — кнопки с aria-pressed: язык выбирают, а не переходят по
+   ссылке, и читалка должна сказать «нажата», а не «ссылка». */
+.sidenav__lang { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); padding: 0 var(--space-2); }
+.sidenav__lang-label { flex: 1; font-size: 12px; color: var(--ink-3); }
+
+.langpill { display: inline-flex; align-items: center; gap: 2px; margin: 0; padding: 2px; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface); }
+.langpill__item { display: inline-grid; place-items: center; min-width: 34px; height: 24px; padding: 0 var(--space-4); border: 0; border-radius: var(--r-pill); background: transparent; color: var(--ink-3); font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-semibold); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.langpill__item:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.langpill__item[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); cursor: default; }
+.langpill__item:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 
 .sidenav__user { display: flex; align-items: center; gap: var(--space-4); padding: var(--space-5) var(--space-6); border-top: 1px solid var(--line); }
 .sidenav__who { display: flex; flex-direction: column; min-width: 0; }
@@ -1060,6 +1078,10 @@ a:hover { color: var(--accent-press); text-decoration: underline; }
   .sidenav__item, .sidenav__current { justify-content: center; padding: 0; }
   .sidenav__count { position: absolute; top: 2px; right: 4px; font-size: 9.5px; }
   .sidenav__theme { flex-direction: column; }
+  /* В 56px две буквы в ряд не входят: капсула встаёт столбиком. */
+  .sidenav__lang { flex-direction: column; padding: 0; }
+  .sidenav__lang-label { display: none; }
+  .sidenav__lang .langpill { flex-direction: column; }
   .sidenav__user { justify-content: center; padding-left: 0; padding-right: 0; }
 }
 
