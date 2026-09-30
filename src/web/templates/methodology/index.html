@@ -207,6 +207,11 @@
   </aside>
   <div class="mx-main">
   {# --- Шапка: чек-лист, версия, действия ---------------------------------- #}
+  {# Верх стоит на месте целиком (владелец 30.09.2026): шапка с действиями и
+     строка версии липнут к верху окна, под ними — липкий блок поиска.
+     Высоту верха скрипт кладёт в --mx-top-h, чтобы блок поиска вставал под
+     ним, а не под край окна. #}
+  <div class="mx-top" data-mx-top>
   <div class="mx-bar">
     <div class="mx-bar__title">
       <h1 class="section__title">{{ t('section.admin.title') }}</h1>
@@ -250,6 +255,7 @@
     {% if composition.version != composition.current %}
       <span class="mx-muted">· {{ t('methodology.version.viewing', version='') }}</span> {{ version_label(composition.version) }}
     {% endif %}
+  </div>
   </div>
 
   {% if composition.unpublished %}
