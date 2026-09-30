@@ -360,6 +360,24 @@ def stub_classify(monkeypatch: Any, result: Suggestion | Exception) -> Calls:
     return calls
 
 
+def stub_merge(monkeypatch: Any, result: str | Exception) -> Calls:
+    """Подменить дешёвую модель сведения комментария (#443).
+
+    Возвращает список вызовов `(прежний текст, новые слова, язык)`: пустой —
+    модель не звали.
+    """
+    calls = Calls()
+
+    def fake(previous: str, words: str, **kw: object) -> str:
+        calls.append((previous, words, kw.get("lang")))
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr("src.bot.merged.merge_wording", fake)
+    return calls
+
+
 def stub_transcribe(monkeypatch: Any, result: str | Exception) -> Calls:
     """Подменить расшифровку голоса — в обоих местах, где бот её зовёт.
 
