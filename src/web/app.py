@@ -325,11 +325,11 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             return _url("overview", **живые)
 
         def в_реестр(city: str | None = None) -> str:
-            """Проверки этого среза в разделе «Проверки» — клик по городу (24.09.2026).
+            """Проверки этого среза в разделе «Проверки».
 
-            Разбивка отвечает «где плохо», а за ответом человек идёт к самим
-            проверкам: сужать тот же экран было тупиком — те же плитки, меньше
-            строк. Период в реестр не уходит: там его отбора нет.
+            С 30.09.2026 клик по городу ведёт в страну (D260, `в_страну`);
+            сюда — только город без страны в справочнике: экрана страны с
+            пустым кодом не бывает. Период в реестр не уходит: там его отбора нет.
             """
             параметры = {
                 "country": selection.country,
@@ -338,6 +338,19 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 "lang": _lang(conf),
             }
             return _url("registry", **{к: з for к, з in параметры.items() if з})
+
+        def в_страну(country: str, **параметры: str) -> str:
+            """Экран страны с этим срезом (D260). Период уезжает вместе с человеком.
+
+            Буква не уезжает: строка точки и город уже названы, и отбор буквой
+            на экране страны спрятал бы соседние пиццерии без объяснения.
+            """
+            живые = {
+                "period": selection.period if selection.period != "all" else "",
+                "lang": _lang(conf),
+                **параметры,
+            }
+            return _url("country", code=country, **{к: з for к, з in живые.items() if з})
 
         критических = sum(1 for item in snapshot.attention if item.why == "critical")
         if snapshot.average is None:
@@ -460,8 +473,8 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             selection=selection,
             select_url=отбор,
             registry_url=в_реестр,
+            country_url=в_страну,
             periods=tuple(overview_data.PERIODS),
-            plans_path=section("plans").path,
             item_titles=_item_titles(conf, _lang(conf)),
             # Идентификаторы точек нужны таблице, чтобы строка вела в карточку
             # точки, а не в последний отчёт: по прототипу владельца клик по

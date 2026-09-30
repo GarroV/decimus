@@ -75,8 +75,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.y1": {"ru": "год", "en": "a year"},
     "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
     "overview.breakdown.hint": {
-        "ru": "клик — проверки города",
-        "en": "click — the city's inspections",
+        "ru": "клик — город на экране страны",
+        "en": "click — the city on the country screen",
     },
     "overview.breakdown.city": {"ru": "Город", "en": "City"},
     "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
