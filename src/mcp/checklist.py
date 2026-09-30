@@ -587,6 +587,14 @@ def _ensure(store: Store) -> str:
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
             f"checklists, завести новый — create_checklist"
         )
+    # Снимком боевой методики заводится только пространство УК (D226: копии без
+    # правки нет): нетронутое пространство партнёра не получает молчаливую
+    # копию эталона только потому, что кто-то заглянул в него первым.
+    if store.space != DEFAULT_SPACE:
+        raise ChecklistError(
+            f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
+            f"checklists, завести новый — create_checklist"
+        )
     return _bootstrap(store)
 
 
