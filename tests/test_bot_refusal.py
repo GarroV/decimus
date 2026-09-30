@@ -11,10 +11,11 @@
 него английский. Случай при этом частый: тот же пункт в той же зоне аудитор
 снимает дважды за обход.
 
-Проверяется здесь три вещи и все три — про то, что бот говорит своими словами:
-командной строки и кода зоны в чате нет, пункт и зона названы по-человечески,
-а «поправить» и «доснять» делаются кнопками той записи, которая пару заняла.
-Сам текст движка при этом не теряется — он уходит в журнал.
+Проверяется здесь то, что бот говорит своими словами: командной строки и кода
+зоны в чате нет, пункт и зона названы по-человечески, а «поправить» делается
+кнопками той записи, которая пару заняла. С #443 кадр в занятую пару при
+фиксации ложится в ту запись (`tests/test_bot_merge_frames.py`), и отказ
+занятой пары остался у правки.
 """
 
 from __future__ import annotations
@@ -88,72 +89,9 @@ async def test_отказ_не_зовёт_аудитора_в_командную
     assert "--add" not in сказанное and "--n" not in сказанное
 
 
-async def test_отказ_называет_пункт_и_зону_по_человечески(domain_env: Path) -> None:
-    """Ни кода зоны, ни голого кода пункта — вопрос чек-листа и название зоны."""
-    session = await повторить_ту_же_фиксацию()
-
-    отказ = next(text for text in session.texts if text.startswith("Не записал"))
-    assert отказ == t(
-        "record.duplicate",
-        "ru",
-        n=1,
-        item=domain.get_item("CLN05").question("ru"),
-        zone=zone_title("hot_kitchen", "ru", chat_id=CHAT_ID),
-    )
-    assert "hot_kitchen" not in отказ, "зона названа кодом, а не по-человечески"
-
-
-async def test_под_отказом_стоят_кнопки_той_записи_что_заняла_пару(domain_env: Path) -> None:
-    """«Доснимите фото» и «поправьте её» из совета движка делаются кнопками."""
-    session = await повторить_ту_же_фиксацию()
-
-    assert кнопки_под(session, "Не записал") == [
-        "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        "edit:1:repeat",
-        "edit:1:drop",
-    ], "кнопки ведут не к той записи, которая заняла пару"
-
-
-async def test_отказ_говорит_на_языке_интерфейса(domain_env: Path) -> None:
-    """Английский интерфейс — английский отказ. Язык параметр, а не константа."""
-    session = await повторить_ту_же_фиксацию("en")
-
-    отказ = next(text for text in session.texts if text.startswith("Not recorded"))
-    assert отказ == t(
-        "record.duplicate",
-        "en",
-        n=1,
-        item=domain.get_item("CLN05").question("en"),
-        zone=zone_title("hot_kitchen", "en", chat_id=CHAT_ID),
-    )
-
-
-async def test_текст_движка_уходит_в_журнал_а_не_в_чат(
-    domain_env: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    """Совет движка не потерян: его читает тот, кто чинит, а не тот, кто на точке."""
-    начата()
-    занять_пару()
-    bot, session = make_bot()
-
-    with caplog.at_level("WARNING"):
-        await feed(
-            build_dispatcher(SETTINGS),
-            bot,
-            photo_message("frame-2", caption="печь в нагаре, тепловой участок"),
-        )
-
-    assert "audit.py" not in "\n".join(session.texts)
-    assert "audit.py" in caplog.text, "разбор отказа не записан в журнал"
-
-
-async def test_отказ_не_заканчивается_тупиком(domain_env: Path) -> None:
-    """Материал после отказа уходит дальше — это поведение T121 не тронуто."""
-    session = await повторить_ту_же_фиксацию()
-
-    assert t("record.thinking", "ru") in session.texts, "после отказа материал никуда не пошёл"
+# Кадр в занятую пару при ФИКСАЦИИ отказом больше не становится (#443, D243,
+# D247): он ложится в занявшую запись. Это поведение — в
+# `tests/test_bot_merge_frames.py`; здесь остаётся отказ правки.
 
 
 # --- то же самое при правке записи ------------------------------------------
@@ -184,9 +122,6 @@ async def test_правка_в_занятую_зону_отвечает_по_ч�
     assert "audit.py" not in session.last_text
     assert кнопки_под(session, "Не поправил") == [
         "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        "edit:1:repeat",
         "edit:1:drop",
     ]
 

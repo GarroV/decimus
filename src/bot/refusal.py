@@ -13,9 +13,11 @@
 читает тот, кто чинит.
 
 **Занятая пара «пункт + зона» — не ошибка, а частый случай.** Тот же пункт в
-той же зоне аудитор снимает дважды за обход. Такой отказ разбирается отдельно:
-называется номер уже существующей записи, а под сообщением встают её кнопки
-правки — «доснять фото» и «поправить» из совета движка ровно ими и делаются.
+той же зоне аудитор снимает дважды за обход. С #443 (D243, D247) кадр в занятую
+пару отказом не становится вовсе: он ложится в занявшую запись (`bot.merged`).
+Отказ занятой пары остался у правки (`not_changed`) и у материала без кадров:
+тогда называется уже существующая запись, а под сообщением встают её кнопки
+правки.
 """
 
 from __future__ import annotations
@@ -58,6 +60,11 @@ def item_title(code: str, lang: str, *, chat_id: int) -> str:
         return code
 
 
+def _holds_pair(finding: domain.Finding) -> bool:
+    """Занимает ли запись пару «пункт + зона». D0 не занимает (#444): вычета нет."""
+    return finding.level != "D0"
+
+
 def occupied_by(
     chat_id: int, code: str, zone: str, *, skip: int | None = None
 ) -> domain.Finding | None:
@@ -75,7 +82,9 @@ def occupied_by(
     if inspection is None:
         return None
     for finding in inspection.findings:
-        if finding.n != skip and finding.code == code and finding.zone == zone:
+        if not _holds_pair(finding) or finding.n == skip:
+            continue
+        if finding.code == code and finding.zone == zone:
             return finding
     return None
 
@@ -102,6 +111,8 @@ def occupied_pairs(chat_id: int) -> dict[tuple[str, str], int]:
     # обязаны совпасть — иначе аудитор пойдёт править не ту запись.
     pairs: dict[tuple[str, str], int] = {}
     for finding in inspection.findings:
+        if not _holds_pair(finding):
+            continue
         pairs.setdefault((finding.code, finding.zone), finding.n)
     return pairs
 
