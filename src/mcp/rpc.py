@@ -244,12 +244,28 @@ def _aimed(spec: ToolSpec, база: Store, *, tenant: str, код: str | None) 
     3. Кода нет в своём пространстве, но он ЕСТЬ в пространстве УК — партнёр
        назвал код эталона (или другого чек-листа УК), который сам же видит в
        своём `checklists` (D283, D285): это не чужое по прямому адресу, это
-       ВИДИМОЕ чужое с попыткой правки. Инструменту, которому код не нужен
-       (`needs_checklist=False`, т.е. только `checklist_meta` — `checklists`
-       код не смотрит вовсе) — отвечаем чтением эталона. Любому другому —
-       явный отказ `ETALON_READONLY_FOR_PARTNER`, а не тихая подмена на
-       «не найден»: это было бы неотличимо от порчи данных агентом, который
+       ВИДИМОЕ чужое. Ограничение по ruling — только на ПРАВКУ: партнёр
+       вправе прочитать эталон целиком (карточку, состав, ставки, маршрут,
+       карту слов — всё содержимое методики, не только `checklist_meta`).
+       Решает это `ToolSpec.writes` — отдельный флаг от `needs_checklist`,
+       который отвечает на другой вопрос (обязателен ли код). Инструмент,
+       который НЕ пишет (`writes=False`, полный список — читатели уровня
+       хранилища `checklists`/`checklist_meta` и все читатели содержимого
+       методики: `checklist_versions`, `checklist_items`, `checklist_item`,
+       `scoring`, `route`, `photo_cues`, `photo_cue_suggestions`,
+       `uncovered_phrases`, `learned_phrases`) — получает `Store` эталона и
+       читает его. Любой ПИШУЩИЙ (`writes=True`, умолчание) получает явный
+       отказ `ETALON_READONLY_FOR_PARTNER`, а не тихую подмену на «не
+       найден»: это было бы неотличимо от порчи данных агентом, который
        только что получил этот же код в перечне.
+
+       (Ревью Task 2, круг 2: до этого ворота стояли на `needs_checklist`,
+       что случайно отказывало в ЧТЕНИИ восьми инструментам содержимого
+       методики текстом «не поправить отсюда» — они код не пишут вовсе.
+       `tests/test_mcp_catalogue.py`
+       (`test_флаг_writes_снят_ровно_у_читающих_инструментов_методики`)
+       держит список читателей явным именным перечнем, а не выводит его из
+       кода, — забытый у нового инструмента флаг иначе прошёл бы молча.)
     """
     if spec.kind == KIND_CHECKLIST_SOURCE:
         return for_checklist(replace(база, space=DEFAULT_SPACE), код)
@@ -263,7 +279,7 @@ def _aimed(spec: ToolSpec, база: Store, *, tenant: str, код: str | None) 
         return кандидат
     эталон = replace(база, space=DEFAULT_SPACE, code=код)
     if exists(эталон):
-        if spec.needs_checklist:
+        if spec.writes:
             raise ToolError(ETALON_READONLY_FOR_PARTNER.format(код=код))
         return эталон
     return кандидат

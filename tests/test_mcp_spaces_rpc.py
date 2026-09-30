@@ -22,6 +22,17 @@
   плана), а не «не найден» — «не найден» остаётся ТОЛЬКО для кода, которого
   нет вообще нигде, включая код чужого ПАРТНЁРА (партнёры друг другу не
   видны, и это неотличимо от выдумки).
+
+Круг 2 (re-review): отказ в круге 1 был подвешен на `needs_checklist` — флаг,
+который решает СОВСЕМ ДРУГОЙ вопрос (обязателен ли код без наведения на
+эталон), а не «пишет ли инструмент». Из-за этого восемь читателей СОДЕРЖИМОГО
+методики (`checklist_items`, `checklist_item`, `scoring`, `route`,
+`photo_cues`, `photo_cue_suggestions`, `uncovered_phrases`,
+`learned_phrases`, плюс `checklist_versions`) отвечали партнёру на явный код
+эталона тем же отказом «эталон правит только УК», хотя ничего не пишут —
+ruling ограничивает только ПРАВКУ. Заслон переведён на новый, отдельный флаг
+`ToolSpec.writes`; ниже — по два читателя содержимого на эталоне (успех) и
+негативный прогон обеих сторон заслона.
 """
 
 from __future__ import annotations
@@ -35,6 +46,7 @@ from typing import Any
 import pytest
 from mcp_checklist_harness import build_methodology
 
+from src.mcp import checklist_tools
 from src.mcp.checklist import Store, current_version, read_journal, tip_version
 from src.mcp.checklist_layout import read_meta
 from src.mcp.checklists import create
@@ -239,3 +251,36 @@ def test_партнёр_на_код_чужого_партнёра_тот_же_о
     assert _текст(выдуманный) == шаблон.format(код="nope-9000")
     # AM попытку GE тоже не почувствовал: её чек-лист не найден, а не тронут.
     assert read_meta(чужой_партнёр) == карточка_до
+
+
+# --- круг 2 (re-review): отказ — только записи, а не всякому needs_checklist=True ---
+
+
+def test_чтение_пунктов_эталона_партнёром_это_успех_а_не_отказ_записи(
+    настройки: Settings,
+) -> None:
+    """`checklist_items` ничего не пишет (`writes=False`), значит явный код
+    эталона ей отвечает содержимым, а не `ETALON_READONLY_FOR_PARTNER` — тем
+    же ответом, что дал бы прямой вызов обработчика на пространстве УК."""
+    эталон = _чек_лист_store(настройки, space="hq", code="bizdev")
+
+    ответ = _вызов("checklist_items", {"checklist": "bizdev"}, настройки)
+
+    assert ответ["result"].get("isError") is not True
+    assert json.loads(_текст(ответ)) == checklist_tools.checklist_items(
+        tenant=ПАРТНЁР, store=эталон
+    )
+
+
+def test_чтение_ставок_эталона_партнёром_это_успех_а_не_отказ_записи(
+    настройки: Settings,
+) -> None:
+    """Второй читающий инструмент содержимого методики (`scoring`,
+    `writes=False`) — тот же довод, другой обработчик: заслон снят не на
+    одном инструменте, а на всём классе «не пишет»."""
+    эталон = _чек_лист_store(настройки, space="hq", code="bizdev")
+
+    ответ = _вызов("scoring", {"checklist": "bizdev"}, настройки)
+
+    assert ответ["result"].get("isError") is not True
+    assert json.loads(_текст(ответ)) == checklist_tools.scoring(tenant=ПАРТНЁР, store=эталон)
