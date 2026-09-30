@@ -40,7 +40,7 @@ def test_история_точки_из_того_же_снимка(monkeypatch: 
     )
     monkeypatch.setattr(cn.overview, "load", lambda **_: данные)
     вид = cn.load(tenant="HQ", limit=10, code="GE", selection=ov.Selection(), unit_id="u-1")
-    assert вид.unit_name == "Батуми-1"
+    assert (вид.unit_id, вид.unit_name) == ("u-1", "Батуми-1")
     assert [r.id for r in вид.history] == [первая.id, вторая.id]
 
 

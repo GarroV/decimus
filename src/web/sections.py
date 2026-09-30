@@ -55,7 +55,7 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="registry", path="/inspections", built=True, icon="task"),
     Section(key="plans", path="/plans", built=False, icon="timeline"),
     Section(key="orders", path="/orders", built=False, icon="flag"),
-    Section(key="country", path="/country", built=False, icon="globe"),
+    Section(key="country", path="/country", built=True, icon="globe"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
     Section(key="tenants", path="/tenants", built=False, icon="board"),
