@@ -1244,7 +1244,14 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 /* «Все страны» — назад к колонке на узком экране, где колонка спрятана.
    Шире колонка видна сама, и ссылка лишняя. */
 .cn-back { display: none; font-size: var(--fs-meta); color: var(--ink-3); text-decoration: none; margin-bottom: var(--space-3); }
-@media (max-width: 1023px) { .cn-back { display: inline-block; } }
+@media (max-width: 1023px) {
+  .cn-back { display: inline-block; }
+  /* Без страны в адресе на узком экране — только колонка стран, как у
+     «Методики»; рабочая зона с первой страной видна лишь шире 1023px. */
+  .cn-shell.mx-shell--pick .mx-rail { display: grid; position: static; max-height: none; }
+  .cn-shell.mx-shell--pick .mx-rail__meta { display: block; }
+  .cn-shell.mx-shell--pick .mx-main { display: none; }
+}
 .mx-rail {
   position: sticky; top: calc(var(--topbar-h) + var(--space-5));
   display: grid; gap: var(--space-1); align-content: start;
