@@ -36,7 +36,7 @@ from bot_harness import (
 from src.bot import view
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
-from src.bot.keyboards import fixed_keyboard
+from src.bot.keyboards import edit_keyboard
 from src.bot.phrases import synonyms
 from src.bot.refusal import item_title
 from src.db.synonyms import LEARNED, REMEMBERED, PhraseAlias, PhraseMemory
@@ -180,8 +180,8 @@ async def test_известная_формулировка_пишет_запис
         zone_from_item=True,
     ), "запись по накопленному синониму показана чужим блоком"
     assert session.keyboard_data() == [
-        b.callback_data for row in fixed_keyboard(запись.n, "ru").inline_keyboard for b in row
-    ], "выхода к модели под записью без подтверждения нет"
+        b.callback_data for row in edit_keyboard(запись.n, "ru").inline_keyboard for b in row
+    ], "под записью без подтверждения не те кнопки (D254: зона и удаление)"
 
 
 async def test_накопленное_второй_строки_не_заводит(

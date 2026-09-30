@@ -109,9 +109,6 @@ async def test_под_отказом_стоят_кнопки_той_записи
 
     assert кнопки_под(session, "Не записал") == [
         "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        "edit:1:repeat",
         "edit:1:drop",
     ], "кнопки ведут не к той записи, которая заняла пару"
 
@@ -184,9 +181,6 @@ async def test_правка_в_занятую_зону_отвечает_по_ч�
     assert "audit.py" not in session.last_text
     assert кнопки_под(session, "Не поправил") == [
         "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        "edit:1:repeat",
         "edit:1:drop",
     ]
 

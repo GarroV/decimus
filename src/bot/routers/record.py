@@ -30,9 +30,11 @@
 пунктом промахивается, и без кнопки промах становится тихим. Отсюда два
 требования, которые здесь важнее самой правки. Показ записи обязан быть **виден**
 — его собирает `view.fixed_block` из вопроса пункта, слов аудитора и строки
-карты. И рядом с записью обязан остаться **выход к модели**: правка кода пункта
-в чате не предусмотрена, а те же слова снова поднимут тот же пункт, поэтому без
-«Разобрать моделью» неверный код чинить было бы нечем.
+карты. И у записи обязан быть **выход к другому пункту**: те же слова снова
+поднимут тот же пункт. До D254 им была кнопка «Разобрать моделью» под записью;
+теперь — ответ на сообщение о записи словами (`routers/correct.py`): по ответу
+пункт ищется заново, а не нашёлся — открывается ручной перечень. Обработчик
+кнопки оставлен для уже отправленных сообщений.
 
 **Зона берётся из слов аудитора** (D047), последняя названная запоминается и
 подставляется догадкой (D048). Отдельного шага «выберите зону» в потоке нет —
@@ -73,6 +75,7 @@ from src.recognize.models import UNKNOWN_ZONE, Candidate
 from src.recognize.transcribe import transcribe
 
 from .. import frame_copies, journal, refusal, repeats, sealed, sidecar, view
+from ..dates import DATE_FORMAT
 from ..inspection import read_inspection
 from ..keyboards import (
     ANALYZE_PREFIX,
@@ -92,9 +95,9 @@ from ..keyboards import (
     analyze_keyboard,
     candidates_keyboard,
     edit_keyboard,
-    fixed_keyboard,
     levels_keyboard,
     manual_keyboard,
+    repeat_keyboard,
     zone_conflict_keyboard,
     zones_keyboard,
 )
@@ -104,7 +107,7 @@ from ..pending import Offer, PendingStore, Proposal
 from ..photos import fetch_bytes
 from ..phrases import Learned, learn, recall
 from ..shown import remember as remember_shown
-from ..shown import remember_origin, tell_refusal
+from ..shown import remember_origin, remember_repeat_ask, tell_refusal
 from ..texts import t
 from ..zones import DICTIONARY, WORDS, ZoneConflict, allowed_zones, resolve_zone
 
@@ -457,8 +460,9 @@ async def _try_fast(
     предложения больше нет, и упереться в отказ молча аудитор не должен.
 
     Предложение запоминается ПОСЛЕ удачной записи: оно живёт здесь только ради
-    кнопки «Разобрать моделью» под ней. Не записалось — и кнопке нечего
-    разбирать: материал уже у модели.
+    кнопки «Разобрать моделью». Под новыми записями её нет (D254), но под уже
+    отправленными она висит, и нажатие обязано работать. Не записалось — и
+    кнопке нечего разбирать: материал уже у модели.
     """
     saved = await _save(
         message,
@@ -519,8 +523,8 @@ async def _try_learned(
     держится на одном: сказанное однажды не переспрашивается второй раз.
 
     Подтверждения у этой записи нет — ровно как у записи по словам (D064), и
-    по той же причине под ней стоит выход к модели: код пункта правкой не
-    меняется, а те же слова поднимут тот же синоним. Показывается она своим
+    неверный пункт чинится так же: ответом на сообщение о записи словами (D254),
+    потому что те же слова поднимут тот же синоним. Показывается она своим
     блоком (`view.learned_block`): строки карты кадров здесь не было, и
     подписать накопленное ею значило бы соврать.
 
@@ -1191,14 +1195,15 @@ async def _save(
     зоне аудитор снимает дважды за обход. Поэтому предложение после отказа не
     выбрасывается, и человек выбирает другого кандидата, а не пересылает кадр.
 
-    Само сообщение нужно вызывающему, а не только признак удачи: под ним живут
-    и карта правки ответом (T204), и кнопка «Разобрать моделью», которую надо
-    привязать именно к этой записи (T206).
+    Само сообщение нужно вызывающему, а не только признак удачи: к нему
+    привязаны карта правки ответом (T204) и предложение для кнопки «Разобрать
+    моделью» (T206) — её под новыми записями нет (D254), но под отправленными
+    раньше она висит и обязана работать.
 
     `auto` не пуст, когда запись легла по словам сама, без подтверждения (T121,
     D064). Тогда и показ другой: не одна строка, а блок с вопросом пункта,
-    словами аудитора и строкой карты, и под ним — выход к модели рядом с
-    правками. Подтверждённая запись такого блока не получает: её пункт аудитор
+    словами аудитора и строкой карты; кнопки под ним те же, что у любой записи
+    (D254). Подтверждённая запись такого блока не получает: её пункт аудитор
     уже прочитал на кнопке, а таблица после каждого кадра запрещена
     (`docs/06-mvp-bot.md`, шаг 5).
 
@@ -1252,6 +1257,9 @@ async def _save(
     перестал бы существовать ровно в том случае, ради которого сигнал и собирают.
     """
     zone_from_item = False
+    # Пункт правимой записи ДО правки: вопрос о повторе после правки задаётся,
+    # только если пункт сменился (D255).
+    before_code = _code_of(chat_id, correcting)
     if not zone_spoken:
         # Зону аудитор не называл. У пункта она бывает известна из самой
         # методики: 59 пунктов из 136 живут ровно в одной зоне, и пункт про печь
@@ -1382,9 +1390,8 @@ async def _save(
     )
     if correcting is not None:
         # Правка ответом (T204): показ собран из тех же частей, но заголовком
-        # говорит, что записи не прибавилось. Кнопки — те же, что были под
-        # записью: правка не отменяет ни зоны, ни класса, ни удаления, а после
-        # сверки оставляет и выход к модели.
+        # говорит, что записи не прибавилось. Кнопки — те же, что под любой
+        # записью (D254): зона и удаление.
         sent = await message.answer(
             view.corrected_block(
                 shown,
@@ -1395,11 +1402,7 @@ async def _save(
                 zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
-            # Запись без подтверждения — и поправленная тем же путём — обязана
-            # держать выход к модели: код пункта правка в чате не меняет.
-            reply_markup=(edit_keyboard if auto is None and not learned else fixed_keyboard)(
-                finding.n, lang
-            ),
+            reply_markup=edit_keyboard(finding.n, lang),
         )
     elif auto is not None:
         sent = await message.answer(
@@ -1412,12 +1415,12 @@ async def _save(
                 zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
-            reply_markup=fixed_keyboard(finding.n, lang),
+            reply_markup=edit_keyboard(finding.n, lang),
         )
     elif learned:
         # Пункт подняла карта синонимов (T285): строки карты кадров здесь не
-        # было, и показывать её нечем — блок свой, а кнопки те же, что у записи
-        # по словам.
+        # было, и показывать её нечем — блок свой, а кнопки те же, что у любой
+        # записи.
         sent = await message.answer(
             view.learned_block(
                 shown,
@@ -1427,7 +1430,7 @@ async def _save(
                 zone_from_cues=zone_from_cues,
                 zone_from_item=zone_from_item,
             ),
-            reply_markup=fixed_keyboard(finding.n, lang),
+            reply_markup=edit_keyboard(finding.n, lang),
         )
     else:
         # Подтверждённая запись показывается не строкой, а блоком (T135): к
@@ -1471,21 +1474,51 @@ async def _save(
         # платить ими за задержку ответа аудитору на точке незачем. Запись уже
         # сделана и уже показана, а память — дело следующего разбора.
         await asyncio.to_thread(_remember_words, chat_id, code=code, words=words)
-    if correcting is None and await asyncio.to_thread(
-        repeats.seen_before, saved, code=shown.code, level=shown.level
-    ):
-        # Подсказка о повторе (#359, D191). Стоит ПОСЛЕ показа записи и по той
-        # же причине, что и память синонимов: поход в базу — это десятки
-        # миллисекунд, и задерживать ими ответ аудитору на точке незачем.
+    if not shown.repeat and (correcting is None or before_code != shown.code):
+        # Вопрос о повторе (D255, уточняет D191): система сама замечает, что в
+        # этой пиццерии этот пункт уже был нарушением на прошлой проверке, и
+        # спрашивает проверяющего, считать ли запись ×2. Без его «да» запись
+        # повтором не считается — решение за человеком.
         #
-        # Отдельным сообщением, а не строкой в блоке записи: блок говорит, что
-        # записано, а подсказка — что известно про прошлый раз. Вмешать её в
-        # блок значило бы выдать наблюдение системы за часть записи, которой
-        # аудитор ещё не принимал (принцип 3 конституции). Правка (`correcting`)
-        # подсказки не получает: запись уже показывалась, и повторять
-        # наблюдение на каждое исправление формулировки — шум.
-        await message.answer(t("record.repeat_seen", lang))
+        # Стоит ПОСЛЕ показа записи и по той же причине, что и память синонимов:
+        # поход в базу — это десятки миллисекунд, и задерживать ими ответ
+        # аудитору на точке незачем. Отдельным сообщением, а не строкой в блоке
+        # записи: блок говорит, что записано, а вопрос — что известно про
+        # прошлый раз и чего система не решает сама.
+        #
+        # Правка ответом спрашивает, только если пункт сменился: о прежнем
+        # пункте вопрос уже задавали, и повторять его на каждое исправление
+        # формулировки — шум.
+        await _ask_repeat(message, chat_id, saved, shown, lang)
     return sent
+
+
+def _code_of(chat_id: int, n: int | None) -> str | None:
+    """Код пункта записи #`n` — или ничего, если записи нет или номер не задан."""
+    if n is None:
+        return None
+    inspection = read_inspection(chat_id)
+    finding = None if inspection is None else inspection.finding(n)
+    return None if finding is None else finding.code
+
+
+async def _ask_repeat(
+    message: Message,
+    chat_id: int,
+    saved: domain.Inspection | None,
+    shown: domain.Finding,
+    lang: str,
+) -> None:
+    """Спросить, считать ли запись повтором, если пункт был в прошлой проверке (D255)."""
+    when = await asyncio.to_thread(repeats.seen_before, saved, code=shown.code, level=shown.level)
+    if when is None:
+        return
+    journal.note(chat_id, "repeat_asked", n=shown.n, code=shown.code, previous=when.isoformat())
+    asked = await message.answer(
+        t("record.repeat_ask", lang, n=shown.n, date=when.strftime(DATE_FORMAT)),
+        reply_markup=repeat_keyboard(shown.n, shown.code, lang),
+    )
+    remember_repeat_ask(chat_id, asked, shown.n, shown.code)
 
 
 def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Router:
@@ -1528,9 +1561,10 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
     async def on_model(callback: CallbackQuery) -> None:
         """«Разобрать моделью»: сверка по словам ответила не то или не на всё.
 
-        После T121 стоит под уже сделанной записью и остаётся единственным
-        способом починить неверный ПУНКТ: правка в чате меняет зону, класс и
-        формулировку, но не код, а те же слова снова поднимут тот же пункт.
+        С D254 под новыми записями этой кнопки нет — неверный пункт чинится
+        ответом на сообщение о записи словами (`routers/correct.py`). Обработчик
+        оставлен ради уже отправленных сообщений: кнопка висит под ними в
+        переписке, и нажатие на неё обязано работать, а не молчать.
 
         Сама запись при этом не трогается. Разбор её не удаляет и не правит: он
         предлагает кандидатов, и что делать с прежней записью, решает аудитор
