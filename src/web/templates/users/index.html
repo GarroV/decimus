@@ -62,7 +62,7 @@
      человека реже. Отключённые остаются в списке приглушёнными. #}
   {% if people %}
     <div class="table-wrap mt-gap">
-      <table class="table">
+      <table class="table table--list">
         <thead>
           <tr>
             <th class="is-text">{{ t('users.col.login') }}</th>
@@ -84,7 +84,7 @@
                   {{ t('users.state.active') }}
                 {% endif %}
               </td>
-              <td>{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
+              <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
                 {% if not человек.disabled_at and человек.login != account.login %}
                   <form method="post" action="{{ url(users_path ~ '/disable') }}?lang={{ lang }}">

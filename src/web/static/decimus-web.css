@@ -342,7 +342,7 @@
   border-radius: var(--r-block) var(--r-block) 0 0;
 }
 .lt__title { flex: 1 1 18rem; min-width: 0; }
-.lt__name { margin: 0; font-size: var(--fs-title); line-height: var(--lh-title); font-weight: var(--w-bold); letter-spacing: -.01em; }
+.lt__name { margin: 0; font-size: var(--fs-display); line-height: var(--lh-display); font-weight: var(--w-bold); letter-spacing: -.02em; }
 .lt__meta {
   display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-5); margin-top: var(--space-1);
   font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3);
@@ -374,7 +374,7 @@
 .lt__foot {
   display: grid; gap: var(--space-2);
   padding: 0 var(--space-7) var(--space-6);
-  font-size: var(--fs-micro); line-height: var(--lh-micro); color: var(--ink-3);
+  font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3);
 }
 .lt__state--ok { color: var(--ok); font-weight: var(--w-semibold); }
 
@@ -560,6 +560,13 @@ a.ov-row:hover { background: var(--surface-2); }
    есть класс нарушения, вынесенный на обзор. */
 .ov-dot { width: .5rem; height: .5rem; border-radius: 50%; flex: none; margin-top: var(--space-2); }
 .ov-dot--err { background: var(--err); }
+/* Точка с подписью («зона обнулена»). Подпись — рядом с точкой, а не внутри
+   неё: внутри 8px-кружка текст вылезал и наезжал на число потери справа. */
+.ov-flag {
+  display: inline-flex; align-items: center; gap: var(--space-3); flex: none;
+  font-size: var(--fs-micro); font-weight: var(--w-semibold); color: var(--err); white-space: nowrap;
+}
+.ov-flag .ov-dot { margin-top: 0; }
 .ov-dot--warn { background: var(--warn); }
 
 /* ── Панель выборки ─────────────────────────────────────────────────────
@@ -708,6 +715,8 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
   color: var(--ink-3); text-decoration: none;
 }
 .back:hover { color: var(--accent); text-decoration: none; }
+/* Внутри шапки экрана — отдельной строкой над надстрочной меткой, а не вплотную к ней. */
+.ov-head .back { display: flex; width: max-content; margin-bottom: var(--space-4); }
 
 /* ═══ КАРКАС ═════════════════════════════════════════════════════════════
    Эталон — Swarm Brain (D228): панель слева во всю высоту окна, содержимое
@@ -1075,6 +1084,9 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   display: flex;
   flex: 1 1 0;
   min-width: 2.75rem;
+  /* Столбик не шире 4rem: одна проверка иначе растягивалась во всю ширину
+     карточки плоской полосой и не читалась столбиком. */
+  max-width: 4rem;
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
@@ -1614,3 +1626,24 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .ap-table th[scope=row] { font-weight: var(--w-regular); color: var(--ink-2); width: 30%; }
 .ap-table tr.ap-diff td { font-weight: var(--w-semibold); background: var(--warn-soft); }
 .users-add { align-items: flex-end; }
+
+/* Таблица-перечень (люди): у `.table` ядра ячейки текста без полей — она
+   построена под денежные таблицы, где поля даёт закреплённая колонка имени.
+   Здесь строки читают, а не сверяют: поля и подписи — как у таблиц «Обзора». */
+.table--list { table-layout: auto; }
+.table--list thead th {
+  padding: var(--space-4) var(--space-7);
+  font-size: var(--fs-micro); letter-spacing: .11em; text-transform: uppercase; color: var(--ink-3);
+}
+.table--list td { height: 44px; padding: 0 var(--space-7); font-size: var(--fs-dense); }
+.table--list td.is-num { padding: 0 var(--space-7); }
+
+/* Тёмная тема: встроенные значки полей браузера (календарь у даты) тоже
+   тёмные, иначе они рисуются чёрным по тёмному и пропадают. */
+:root[data-theme="dark"] { color-scheme: dark; }
+
+@media (max-width: 719px) {
+  /* Факты карточки проверки на телефоне — в две колонки: в четыре подписи
+     вроде «ЯЗЫК ОТЧЁТА» ломались по слову на строку. */
+  .card__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
