@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -47,6 +48,7 @@ from typing import Any
 from ..db.models import InspectionDetail
 from ..domain.config import DATA_FILES
 from ..domain.edition import SHELF_DIR, shelf_dirs
+from ..domain.geo import CITIES
 from ..domain.kinds import kind_title
 from ..domain.models import TEXT_LANGS
 from ..domain.version import compose, edition_of
@@ -112,6 +114,9 @@ COVER_FIELDS = ("auditor", "city", "partner", "contact")
 #: (подставленный срок плана, формулировки на чужом языке, находки без слов).
 #: Владелец счёл эту оговорку сбивающей с толку, а не помогающей.
 LETTER_COVER_CAVEATS = ("city",)
+
+#: Код города справочника: латиница в нижнем регистре (`batumi`, `novisad`).
+_CITY_CODE = re.compile(r"[a-z]+")
 
 #: Чего не хватает письму, когда информационной части у записанной проверки нет
 #: вовсе (T200). Названо отдельным именем, а не строкой по месту: его читают в
@@ -283,7 +288,25 @@ def _lang(detail: InspectionDetail, asked: str | None) -> str:
     return value
 
 
-def _cover(detail: InspectionDetail) -> tuple[dict[str, str], list[str]]:
+def _city_word(value: str, lang: str) -> str:
+    """Город для людей: код справочника — названием на языке письма (#460).
+
+    Мастер бота города больше не спрашивает (D233), и слой чтения подставляет
+    на место пустого `inspections.city` код города пиццерии из справочника
+    (`units.city`: `batumi`, `beograd`). Код переводится словом здесь, а не в
+    базе: связь идёт кодом, перевод — словом (конституция, принцип 5).
+    Записанное словами (старые проверки, «Батуми») уезжает как записано;
+    незнакомый код — с заглавной буквы, как в админке (`web.geo_names`).
+    """
+    if not _CITY_CODE.fullmatch(value):
+        return value
+    names = CITIES.get(value)
+    if names is None:
+        return value[:1].upper() + value[1:]
+    return names.get(lang) or names.get("en") or value
+
+
+def _cover(detail: InspectionDetail, *, lang: str) -> tuple[dict[str, str], list[str]]:
     """Шапка письма и перечень того, чего слой чтения не отдал.
 
     `getattr` со значением по умолчанию, а не обращение к полю: перечень
@@ -292,6 +315,7 @@ def _cover(detail: InspectionDetail) -> tuple[dict[str, str], list[str]]:
     полной сама, без правки здесь.
     """
     шапка = {поле: str(getattr(detail.inspection, поле, "") or "") for поле in COVER_FIELDS}
+    шапка["city"] = _city_word(шапка["city"], lang)
     return шапка, [поле for поле, значение in шапка.items() if not значение]
 
 
@@ -354,7 +378,7 @@ def state_json(detail: InspectionDetail, *, lang: str) -> str:
     Ответ уходит дословно и не переводится: движок печатает его как записан на
     любом языке письма, а срок вдобавок читается человеком, а не машиной.
     """
-    шапка, _ = _cover(detail)
+    шапка, _ = _cover(detail, lang=lang)
     строка = detail.inspection
     return json.dumps(
         {
@@ -695,7 +719,7 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
     """
     язык = _lang(detail, lang)
     каталог, откуда = _methodology(detail.inspection.checklist_version, papers)
-    _, пусто_в_шапке = _cover(detail)
+    _, пусто_в_шапке = _cover(detail, lang=язык)
     шапки_нет = [поле for поле in пусто_в_шапке if поле in LETTER_COVER_CAVEATS]
     срока_нет = not detail.info
     языки_находок = _wording_langs(detail, lang=язык)

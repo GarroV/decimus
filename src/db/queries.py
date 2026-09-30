@@ -74,7 +74,9 @@ select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
-    i.pushed_at, i.auditor, i.city, i.partner, i.contact,
+    -- Город: записанный в проверке, а пустой — город пиццерии из справочника
+    -- кодом (#460): мастер бота города больше не спрашивает (D233).
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
@@ -97,7 +99,9 @@ select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
-    i.pushed_at, i.auditor, i.city, i.partner, i.contact,
+    -- Город: записанный в проверке, а пустой — город пиццерии из справочника
+    -- кодом (#460): мастер бота города больше не спрашивает (D233).
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
@@ -118,7 +122,9 @@ select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
     (select count(*) from findings f where f.inspection_id = i.id),
-    i.pushed_at, i.auditor, i.city, i.partner, i.contact,
+    -- Город: записанный в проверке, а пустой — город пиццерии из справочника
+    -- кодом (#460): мастер бота города больше не спрашивает (D233).
+    i.pushed_at, i.auditor, coalesce(nullif(i.city, ''), u.city, ''), i.partner, i.contact,
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
