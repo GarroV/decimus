@@ -12,6 +12,9 @@
 роняет прогон. Тот же приём уже применён в сборке отчёта: `report.build_pdf`
 принимает готовую карту «ссылка → файл», а не угадывает её сам.
 
+Оригинал кадра не хранится (D250, D253): в хранилище лежит только сжатая
+копия, чёткая настолько, чтобы по кадру было видно, что где и какие проблемы.
+
 Пропавший кадр не проходит молча. Выгрузка, вернувшая «успех» с половиной
 кадров, оставила бы в базе часть ссылок мёртвыми навсегда и никому об этом не
 сказала — а именно от этого задача и заводилась.
@@ -28,7 +31,7 @@ import psycopg
 from .config import check_environment, load_storage_settings
 from .errors import PushError, StorageError
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
-from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key, preview_key
+from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +68,38 @@ def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> No
             )
 
 
-def _put_preview(store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes) -> str | None:
-    """Положить сжатую копию кадра (D219) и вернуть ссылку — или `None`.
+def _put_photo(
+    store: PhotoStorage, inspection_id: str, photo_id: str, data: bytes
+) -> tuple[str, str | None]:
+    """Положить кадр в хранилище одним объектом и вернуть `(storage_path, preview_path)`.
 
-    Копия кладётся ДО записи строки: после неё строка заморожена
-    (`photos_uploaded_only_once`), и дописать копию было бы уже нельзя.
+    Оригинал не хранится (D250, D253): в хранилище уходит только сжатая копия
+    (D219), и обе ссылки в строке кадра указывают на этот один объект, поэтому
+    любой читатель — показ в админке, снятие проверки — находит его по своей
+    колонке и ничего не знает про изменение.
 
-    Кадр, который не читается как изображение, копии не получает, но и
-    выгрузку не валит: оригинал — доказательство и уезжает всё равно, а копия
-    нужна только для показа. Это сказано в лог, а не проглочено молча.
-    Отказ самого хранилища — отказ выгрузки, как у оригинала.
+    Кадр, который не читается как изображение, копии не получает, а оригинала
+    больше нет как страховки: выбросить его значило бы потерять доказательство.
+    Поэтому он уезжает как есть, `preview_path` остаётся пустым (показывать
+    нечего, как и раньше), и это сказано в лог, а не проглочено молча.
+    Отказ самого хранилища — отказ выгрузки.
+
+    Кладётся ДО записи строки: после неё строка заморожена
+    (`photos_uploaded_only_once`), и дописать ссылку было бы уже нельзя.
     """
+    key = object_key(inspection_id, photo_id)
     try:
         копия = make_preview(data)
     except StorageError as exc:
-        logger.warning("кадр %s проверки %s без сжатой копии: %s", photo_id, inspection_id, exc)
-        return None
-    return store.put(preview_key(inspection_id, photo_id), копия, content_type=PREVIEW_CONTENT_TYPE)
+        logger.warning(
+            "кадр %s проверки %s не читается как изображение, лёг как есть: %s",
+            photo_id,
+            inspection_id,
+            exc,
+        )
+        return store.put(key, data, content_type=PHOTO_CONTENT_TYPE), None
+    uri = store.put(key, копия, content_type=PREVIEW_CONTENT_TYPE)
+    return uri, uri
 
 
 def upload_photos(
@@ -125,9 +143,7 @@ def upload_photos(
                 if data is None:
                     missing.append(str(file_id))
                     continue
-                key = object_key(inspection_id, str(photo_id))
-                uri = store.put(key, data, content_type=PHOTO_CONTENT_TYPE)
-                preview_uri = _put_preview(store, inspection_id, str(photo_id), data)
+                uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
                 with conn.cursor() as cur:
                     cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))
                 conn.commit()

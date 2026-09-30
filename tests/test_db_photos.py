@@ -286,7 +286,6 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
     from PIL import Image
 
     from src.db.previews import finding_previews, preview_bytes
-    from src.db.storage import preview_key
 
     снимок = io.BytesIO()
     Image.new("RGB", (3000, 2000), (200, 40, 40)).save(снимок, format="JPEG", quality=95)
@@ -302,9 +301,16 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
         "join inspections i on i.id = p.inspection_id where p.inspection_id = %s",
         (inspection_id,),
     )
-    ключ = preview_key(inspection_id, str(photo_id))
+    ключ = object_key(inspection_id, str(photo_id))
+    # D253: оригинала нет — в хранилище один объект на кадр, и он сжатый; обе
+    # колонки ссылаются на него.
+    assert list(склад.положено) == [ключ]
     assert preview_path == f"s3://{КОРЗИНА}/{ключ}"
     assert len(склад.положено[ключ]) < len(настоящий["tg-real-jpeg"])
+    ((storage_path,),) = _строки(
+        db_env, "select storage_path from photos where id = %s", (photo_id,)
+    )
+    assert storage_path == preview_path
 
     class Читатель:
         def get(self, key: str) -> bytes:
@@ -319,3 +325,23 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
     )
     assert finding_previews(inspection_id, tenant="someone-else") == {}
     assert preview_bytes(inspection_id, str(photo_id), tenant="someone-else") is None
+
+
+def test_кадр_не_картинка_ложится_как_есть_а_копии_у_него_нет(
+    domain_env: Path, db_env: str
+) -> None:
+    """D253: без оригинала нечитаемый кадр не теряется, но и показывать его нечем."""
+    inspection_id = _проверка_с_кадрами(32, кадры=("tg-file-001",))
+    склад = ЗаписнойСклад()
+
+    upload_photos(inspection_id, fetch=_кадр, storage=склад)
+
+    ((photo_id, storage_path, preview_path),) = _строки(
+        db_env,
+        "select id, storage_path, preview_path from photos where inspection_id = %s",
+        (inspection_id,),
+    )
+    ключ = object_key(inspection_id, str(photo_id))
+    assert склад.положено == {ключ: КАДРЫ["tg-file-001"]}
+    assert storage_path == f"s3://{КОРЗИНА}/{ключ}"
+    assert preview_path is None
