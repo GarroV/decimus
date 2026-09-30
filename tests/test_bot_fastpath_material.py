@@ -101,7 +101,9 @@ def assert_recorded_from_words(asked: Calls, session: RecordingSession, photos: 
     assert finding.source == SOURCE_COMMENT
     assert finding.photos == photos, "кадры к записи прикрепились не те и не в том порядке"
     assert CLEAR in session.last_text, "слова аудитора не дошли до сообщения целиком"
-    assert MODEL_CALLBACK in session.keyboard_data(), "под записью нет выхода к модели"
+    assert MODEL_CALLBACK not in session.keyboard_data(), (
+        "под записью снова «Разобрать моделью» (D254)"
+    )
 
 
 async def test_быстрый_путь_срабатывает_на_подписи_к_кадру(

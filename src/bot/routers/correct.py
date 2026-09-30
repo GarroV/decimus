@@ -23,6 +23,13 @@
 уходит дальше по роутерам нетронутым — `SkipHandler`, тем же приёмом, что и
 брошенный вопрос о новой формулировке (`routers/edit.py`).
 
+**Короткий ответ, который о пункте не говорит, в разбор не идёт** (D254, D255):
+«класс D2» меняет класс, «не повтор» снимает пометку повтора, «повтор» ставит
+её, а «да»/«нет» ответом на вопрос «считать повтором?» отвечают на вопрос. Эти
+ответы узнаются целиком (`reply_words`); фраза, где есть что-то ещё, идёт в
+разбор как раньше. Кнопки «Класс», «Формулировка», «Повтор ×2» из-под записи
+сняты (D254), и правка словами — их замена.
+
 Кадр в этом разборе не участвует: у ответа его нет, а у записи он уже есть.
 Прикреплять к правке нечего, и модель смотрит на слова человека — как и велит
 D081.
@@ -38,11 +45,12 @@ from aiogram.types import Message
 
 from src import domain
 
-from .. import sealed, sidecar
+from .. import reply_words, sealed, sidecar
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
 from ..pending import PendingStore
 from ..texts import t
+from .edit import answer_repeat, apply_edit, set_repeat
 from .record import analyze, hear_voice
 
 logger = logging.getLogger(__name__)
@@ -60,6 +68,48 @@ def _addressed(message: Message) -> int | None:
     return sidecar.record_of(message.chat.id, replied.message_id)
 
 
+def _asked(message: Message) -> sidecar.RepeatAsk | None:
+    """Вопрос о повторе, на который отвечает аудитор, — или ничего (D255)."""
+    replied = message.reply_to_message
+    if replied is None:
+        return None
+    return sidecar.repeat_ask_of(message.chat.id, replied.message_id)
+
+
+async def _short_answer(
+    message: Message,
+    chat_id: int,
+    n: int,
+    ask: sidecar.RepeatAsk | None,
+    note: str,
+    lang: str,
+) -> bool:
+    """Ответ, который правит запись без разбора (D254, D255). Возврат — обработан ли.
+
+    Ответ на вопрос о повторе разбором не бывает никогда: «да» или «нет», а
+    иначе бот переспрашивает. Отправь его в разбор — «в прошлый раз было
+    иначе» завело бы пункт заново вместо ответа на вопрос.
+    """
+    if ask is not None:
+        answer = reply_words.yes_no(note)
+        if answer is None:
+            await message.answer(t("record.repeat_unclear", lang, n=n))
+        else:
+            await answer_repeat(message, chat_id, n, ask.code, lang, yes=answer)
+        return True
+    mark = reply_words.repeat_mark(note)
+    if mark is not None:
+        await set_repeat(message, chat_id, n, lang, repeat=mark)
+        return True
+    level = reply_words.spoken_level(note)
+    if level is not None:
+        # Класс, которого пункт не допускает, отвергнет движок, и отказ уйдёт
+        # аудитору как есть (`apply_edit`).
+        await apply_edit(message, chat_id, n, lang, level=level)
+        return True
+    return False
+
+
 def build_correct_router(*, pending: PendingStore) -> Router:
     """Роутер правки ответом. Стоит ДО приёма материала — иначе ответ уедет
     комментарием к ждущему кадру, и вместо правки появится вторая запись."""
@@ -68,7 +118,8 @@ def build_correct_router(*, pending: PendingStore) -> Router:
     @router.message(F.reply_to_message, F.voice | (F.text & ~F.text.startswith("/")))
     async def on_reply(message: Message) -> None:
         chat_id = message.chat.id
-        n = _addressed(message)
+        ask = _asked(message)
+        n = ask.n if ask is not None else _addressed(message)
         if n is None:
             # Не про запись — пусть работает прежнее связывание комментария.
             raise SkipHandler
@@ -98,6 +149,8 @@ def build_correct_router(*, pending: PendingStore) -> Router:
             note = heard.strip()
         if not note:
             await message.answer(t("correct.empty", lang, n=n))
+            return
+        if await _short_answer(message, chat_id, n, ask, note, lang):
             return
 
         await analyze(

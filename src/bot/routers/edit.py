@@ -1,9 +1,14 @@
-"""Правки записи прямо в чате: зона, класс, формулировка, удаление (T056).
+"""Правки записи прямо в чате: кнопки «Зона» и «Удалить», ответ на вопрос о повторе (T056).
 
 Аудитор идёт по точке с телефоном в одной руке, поэтому правка — это нажатие
-кнопки под подтверждением, а не команда с номером записи. Команда всё же есть
-одна: `/undo` снимает последнюю запись, когда подтверждение уже уехало вверх по
-переписке.
+кнопки под записью, а не команда с номером записи. Кнопок под записью две
+(D254): зона и удаление. Класс, формулировка и другой пункт правятся ответом на
+сообщение бота словами (`routers/correct.py`); повтор бот спрашивает сам, и
+«да»/«нет» на этот вопрос тоже обрабатываются здесь (D255). Обработчики снятых
+кнопок «Класс», «Формулировка», «Повтор ×2» оставлены: эти кнопки висят под уже
+отправленными сообщениями, и нажатие на них обязано работать. Команда есть
+одна: `/undo` снимает последнюю запись, когда сообщение о ней уже уехало вверх
+по переписке.
 
 Процент после правки аудитору не показывается (T162, решение владельца D072:
 «показывать только в конце»). Пересчитывается он по-прежнему движком и виден в
@@ -41,6 +46,8 @@ from ..keyboards import (
     EDIT_TEXT,
     EDIT_ZONE,
     EDIT_ZONE_PREFIX,
+    REPEAT_NO_PREFIX,
+    REPEAT_YES_PREFIX,
     edit_keyboard,
     levels_keyboard,
     zones_keyboard,
@@ -83,6 +90,115 @@ def _finding(chat_id: int, n: int) -> domain.Finding | None:
     return None if inspection is None else inspection.finding(n)
 
 
+async def apply_edit(
+    message: Message,
+    chat_id: int,
+    n: int,
+    lang: str,
+    *,
+    zone_by_person: bool = False,
+    repeat: bool | None = None,
+    **fields: str,
+) -> None:
+    """Поправить запись и показать её заново; отказ движка — аудитору как есть.
+
+    Одна дверь на все правки — кнопкой, ответом словами, ответом на вопрос о
+    повторе: запрет сданного отчёта, журнал и разбор отказа живут здесь, и
+    вторая копия разошлась бы с первой на первой же правке.
+    """
+    if sealed.is_sealed(chat_id):
+        # Правка записанного — тоже правка отчёта, а он уже у получателя
+        # (T201, D080). Кнопки под записями остаются в переписке навсегда,
+        # поэтому запрет стоит здесь, а не только на входе в проверку.
+        await sealed.refuse(message, lang)
+        return
+    before = _finding(chat_id, n)
+    try:
+        await asyncio.to_thread(
+            partial(
+                domain.edit_finding,
+                chat_id,
+                n,
+                zone_by_person=zone_by_person,
+                repeat=repeat,
+                **fields,
+            )
+        )
+    except DomainError as exc:
+        # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
+        # сюда чаще всего сменой зоны: пункт тот же, место уже занято.
+        journal.note(chat_id, "edit_refused", n=n, fields=fields, reason=str(exc))
+        told = refusal.not_changed(
+            chat_id,
+            n,
+            code="" if before is None else before.code,
+            zone=fields.get("zone") or ("" if before is None else before.zone),
+            lang=lang,
+            exc=exc,
+        )
+        # Тот же отказ и то же правило, что при фиксации (T227): он назвал
+        # запись, значит ответом на него правят её.
+        await tell_refusal(message, chat_id, told, lang)
+        return
+    # Названная руками зона НЕ становится догадкой для следующего кадра
+    # (T264, #218): память о прошлой записи снята как источник зоны целиком.
+    # Правка говорит о ТОЙ записи и ни о чём больше.
+    journal.note(
+        chat_id,
+        "edited",
+        n=n,
+        fields=fields,
+        before=None if before is None else journal.finding(before),
+    )
+    await show_changed(message, chat_id, n, lang)
+
+
+async def set_repeat(message: Message, chat_id: int, n: int, lang: str, *, repeat: bool) -> None:
+    """Поставить или снять пометку повтора и сказать об этом словами (D191, D255).
+
+    Состояние называется, а не меняется молча: цена записи изменилась вдвое, и
+    аудитор должен это прочитать, а не вычислить.
+    """
+    finding = _finding(chat_id, n)
+    if finding is None:
+        await message.answer(t("edit.gone", lang, n=n))
+        return
+    if finding.repeat == repeat:
+        await message.answer(t("edit.repeat_on" if repeat else "edit.repeat_off", lang, n=n))
+        return
+    await apply_edit(message, chat_id, n, lang, repeat=repeat)
+    after = _finding(chat_id, n)
+    if after is not None and after.repeat == repeat:
+        await message.answer(t("edit.repeat_on" if repeat else "edit.repeat_off", lang, n=n))
+
+
+async def answer_repeat(
+    message: Message, chat_id: int, n: int, code: str, lang: str, *, yes: bool
+) -> None:
+    """Ответ проверяющего на вопрос «считать повтором?» (D255).
+
+    Вопрос задан о ПУНКТЕ: запись с тех пор поправили на другой — «да» на
+    старый вопрос удвоило бы вычет за то, чего в прошлый раз не было, поэтому
+    такой ответ снимается со словами, а не применяется.
+    """
+    finding = _finding(chat_id, n)
+    if finding is None:
+        await message.answer(t("edit.gone", lang, n=n))
+        return
+    if finding.code != code:
+        await message.answer(t("record.repeat_stale", lang, n=n))
+        return
+    if yes:
+        await set_repeat(message, chat_id, n, lang, repeat=True)
+        return
+    if finding.repeat:
+        # «Нет» после «да» — передумал: пометка снимается тем же ответом.
+        await set_repeat(message, chat_id, n, lang, repeat=False)
+        return
+    journal.note(chat_id, "repeat_declined", n=n, code=code)
+    await message.answer(t("record.repeat_declined", lang, n=n))
+
+
 def build_edit_router() -> Router:
     """Роутер правок. Состояния хранит диспетчер, записи — движок."""
     router = Router(name="edit")
@@ -93,62 +209,6 @@ def build_edit_router() -> Router:
             return None
         chat_id = message.chat.id
         return message, chat_id, chat_ui_lang(chat_id)
-
-    async def apply(
-        message: Message,
-        chat_id: int,
-        n: int,
-        lang: str,
-        *,
-        zone_by_person: bool = False,
-        repeat: bool | None = None,
-        **fields: str,
-    ) -> None:
-        if sealed.is_sealed(chat_id):
-            # Правка записанного — тоже правка отчёта, а он уже у получателя
-            # (T201, D080). Кнопки под записями остаются в переписке навсегда,
-            # поэтому запрет стоит здесь, а не только на входе в проверку.
-            await sealed.refuse(message, lang)
-            return
-        before = _finding(chat_id, n)
-        try:
-            await asyncio.to_thread(
-                partial(
-                    domain.edit_finding,
-                    chat_id,
-                    n,
-                    zone_by_person=zone_by_person,
-                    repeat=repeat,
-                    **fields,
-                )
-            )
-        except DomainError as exc:
-            # Тот же разбор, что и при фиксации (T127). Занятая пара приходит
-            # сюда чаще всего сменой зоны: пункт тот же, место уже занято.
-            journal.note(chat_id, "edit_refused", n=n, fields=fields, reason=str(exc))
-            told = refusal.not_changed(
-                chat_id,
-                n,
-                code="" if before is None else before.code,
-                zone=fields.get("zone") or ("" if before is None else before.zone),
-                lang=lang,
-                exc=exc,
-            )
-            # Тот же отказ и то же правило, что при фиксации (T227): он назвал
-            # запись, значит ответом на него правят её.
-            await tell_refusal(message, chat_id, told, lang)
-            return
-        # Названная руками зона НЕ становится догадкой для следующего кадра
-        # (T264, #218): память о прошлой записи снята как источник зоны целиком.
-        # Правка говорит о ТОЙ записи и ни о чём больше.
-        journal.note(
-            chat_id,
-            "edited",
-            n=n,
-            fields=fields,
-            before=None if before is None else journal.finding(before),
-        )
-        await show_changed(message, chat_id, n, lang)
 
     @router.message(Command("undo"))
     async def on_undo(message: Message) -> None:
@@ -209,11 +269,10 @@ def build_edit_router() -> Router:
             # Переключатель, а не «поставить»: аудитор видит одну кнопку и не
             # обязан помнить, в каком состоянии запись. Состояние он узнаёт из
             # ответа — молчаливая смена цены заставила бы нажать второй раз.
-            стало_повтором = not finding.repeat
-            await apply(message, chat_id, n, lang, repeat=стало_повтором)
-            await message.answer(
-                t("edit.repeat_on" if стало_повтором else "edit.repeat_off", lang, n=n)
-            )
+            #
+            # Под новыми записями этой кнопки нет (D254, D255): повтор бот
+            # спрашивает сам. Обработчик живёт ради уже отправленных сообщений.
+            await set_repeat(message, chat_id, n, lang, repeat=not finding.repeat)
             return
         if what == EDIT_ZONE:
             zones = [(zone.code, zone.title(lang)) for zone in domain.list_zones(chat_id=chat_id)]
@@ -236,6 +295,25 @@ def build_edit_router() -> Router:
             await state.update_data(edit_n=n)
             await message.answer(t("edit.ask_text", lang, n=n))
 
+    @router.callback_query(
+        F.data.startswith(REPEAT_YES_PREFIX) | F.data.startswith(REPEAT_NO_PREFIX)
+    )
+    async def on_repeat_answer(callback: CallbackQuery) -> None:
+        """Да/нет под вопросом о повторе (D255)."""
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        data = callback.data or ""
+        yes = data.startswith(REPEAT_YES_PREFIX)
+        raw, _, code = data.removeprefix(REPEAT_YES_PREFIX if yes else REPEAT_NO_PREFIX).partition(
+            ":"
+        )
+        if not raw.isdigit() or not code:
+            return
+        await answer_repeat(message, chat_id, int(raw), code, lang, yes=yes)
+
     @router.callback_query(F.data.startswith(EDIT_ZONE_PREFIX))
     async def on_zone(callback: CallbackQuery) -> None:
         await callback.answer()
@@ -247,7 +325,7 @@ def build_edit_router() -> Router:
         if not raw.isdigit() or not zone:
             return
         # Зону выбрал человек кнопкой — движок примет её и вне списка пункта (D206).
-        await apply(message, chat_id, int(raw), lang, zone=zone, zone_by_person=True)
+        await apply_edit(message, chat_id, int(raw), lang, zone=zone, zone_by_person=True)
 
     @router.callback_query(F.data.startswith(EDIT_LEVEL_PREFIX))
     async def on_level(callback: CallbackQuery) -> None:
@@ -259,7 +337,7 @@ def build_edit_router() -> Router:
         raw, _, level = (callback.data or "").removeprefix(EDIT_LEVEL_PREFIX).partition(":")
         if not raw.isdigit() or not level:
             return
-        await apply(message, chat_id, int(raw), lang, level=level)
+        await apply_edit(message, chat_id, int(raw), lang, level=level)
 
     @router.message(StateFilter(EditFlow.waiting_text), F.text, ~F.text.startswith("/"))
     async def on_new_text(message: Message, state: FSMContext) -> None:
@@ -273,7 +351,7 @@ def build_edit_router() -> Router:
             await message.answer(t("edit.ask_text", lang, n=n))
             return
         await state.clear()
-        await apply(message, chat_id, n, lang, text=wording)
+        await apply_edit(message, chat_id, n, lang, text=wording)
 
     @router.message(StateFilter(EditFlow.waiting_text))
     async def on_anything_else(message: Message, state: FSMContext) -> None:

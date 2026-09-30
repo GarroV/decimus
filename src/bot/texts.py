@@ -585,7 +585,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "{title}\n\n"
             "В отчёт: «{note}»\n"
             "Строка карты: «{cue}»\n\n"
-            "Пункт не тот или в словах есть ещё нарушение — «Разобрать моделью»; "
+            "Пункт, класс или формулировка не те — ответьте на это сообщение словами; "
             "лишнюю запись уберите кнопкой «Удалить»."
         ),
         "en": (
@@ -594,7 +594,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "{title}\n\n"
             "Into the report: “{note}”\n"
             "Map line: “{cue}”\n\n"
-            "Wrong item, or your words name another violation — “Analyze with the model”; "
+            "Wrong item, class or wording — reply to this message in words; "
             "drop a record you do not need with “Delete”."
         ),
     },
@@ -614,7 +614,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "{line}{guess}\n"
             "{title}\n\n"
             "В отчёт: «{note}»\n\n"
-            "Пункт не тот или в словах есть ещё нарушение — «Разобрать моделью»; "
+            "Пункт, класс или формулировка не те — ответьте на это сообщение словами; "
             "лишнюю запись уберите кнопкой «Удалить»."
         ),
         "en": (
@@ -623,8 +623,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "{line}{guess}\n"
             "{title}\n\n"
             "Into the report: \u201c{note}\u201d\n\n"
-            "Wrong item, or your words name another violation — \u201cAnalyze with the "
-            "model\u201d; drop a record you do not need with \u201cDelete\u201d."
+            "Wrong item, class or wording — reply to this message in words; "
+            "drop a record you do not need with \u201cDelete\u201d."
         ),
     },
     "record.candidate_line": {
@@ -827,13 +827,13 @@ TEXTS: dict[str, dict[str, str]] = {
             "Не записал: это уже зафиксировано.\n\n"
             "#{n} · {item}\n"
             "Зона: {zone}\n\n"
-            "Если нашли что-то ещё — поправьте запись #{n} кнопками ниже."
+            "Если нашли что-то ещё — поправьте запись #{n} ответом на это сообщение."
         ),
         "en": (
             "Not recorded: this is already on the list.\n\n"
             "#{n} · {item}\n"
             "Zone: {zone}\n\n"
-            "Found something else — fix record #{n} with the buttons below."
+            "Found something else — fix record #{n} by replying to this message."
         ),
     },
     "record.failed": {
@@ -871,18 +871,32 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "#{n}: пометка повтора снята — вычет обычный",
         "en": "#{n}: repeat mark removed — the deduction is back to normal",
     },
-    # Подсказка приносит ФАКТ и не делает вывода: тот же код мог относиться к
-    # другому объекту, а исправленное и снова сломавшееся — не то же самое, что
-    # не исправленное вовсе. Цену назначает аудитор кнопкой (#359, D191).
-    "record.repeat_seen": {
+    # Вопрос приносит ФАКТ и не делает вывода (D255): тот же код мог относиться
+    # к другому объекту, а исправленное и снова сломавшееся — не то же самое,
+    # что не исправленное вовсе. Решает проверяющий — «да» или «нет».
+    "record.repeat_ask": {
         "ru": (
-            "Такой же пункт был в прошлой проверке этой точки. "
-            "Если нарушение то же и не устранено — кнопка «Повтор ×2» удвоит вычет."
+            "В прошлый раз ({date}) этот пункт уже был нарушением в этой пиццерии — "
+            "считать запись #{n} повтором, ×2?"
         ),
         "en": (
-            "The same item was recorded in this unit's previous inspection. "
-            "If it is the same unresolved issue, the “Repeat ×2” button doubles the deduction."
+            "Last time ({date}) this item was already a violation at this pizzeria — "
+            "count record #{n} as a repeat, ×2?"
         ),
+    },
+    "record.repeat_declined": {
+        "ru": "#{n}: не повтор — вычет обычный",
+        "en": "#{n}: not a repeat — the deduction is normal",
+    },
+    "record.repeat_unclear": {
+        "ru": "Считать запись #{n} повтором? Ответьте «да» или «нет».",
+        "en": "Count record #{n} as a repeat? Answer “yes” or “no”.",
+    },
+    # Запись поправили на другой пункт после вопроса: «да» на него удвоило бы
+    # вычет за то, чего в прошлый раз не было.
+    "record.repeat_stale": {
+        "ru": "Запись #{n} с тех пор поправлена на другой пункт — этот вопрос о повторе снят.",
+        "en": "Record #{n} has since been changed to another item — this repeat question is off.",
     },
     "edit.dropped": {
         "ru": "Запись #{n} удалена.",
@@ -903,11 +917,11 @@ TEXTS: dict[str, dict[str, str]] = {
     "edit.duplicate": {
         "ru": (
             "Не поправил: {item} в зоне «{zone}» уже записано — #{n}.\n\n"
-            "Поправьте её кнопками ниже или выберите другую зону."
+            "Поправьте её ответом на это сообщение или выберите другую зону."
         ),
         "en": (
             "Not updated: {item} in “{zone}” is already recorded — #{n}.\n\n"
-            "Fix that one with the buttons below, or pick another zone."
+            "Fix that one by replying to this message, or pick another zone."
         ),
     },
     "edit.failed": {
@@ -1233,7 +1247,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.fix_skip": {"ru": "Оставить как есть", "en": "Leave as is"},
     "btn.manual": {"ru": "Выбрать пункт", "en": "Pick an item"},
     "btn.skip": {"ru": "Не записывать", "en": "Skip"},
-    "btn.model": {"ru": "Разобрать моделью", "en": "Analyze with the model"},
     "btn.more": {"ru": "Дальше", "en": "Next"},
     # Расхождение названной зоны со словарём объектов (T266). Название зоны
     # подставляется в подпись: «зона объекта» без имени заставляло бы аудитора
@@ -1702,7 +1715,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "\n"
             "4. Запись неверна — ответить (reply) на сообщение бота с этой записью и написать, "
             "что там на самом деле. Бот подберёт пункт заново.\n"
-            "Точечная правка — кнопки под записью: «Зона», «Класс», «Формулировка», «Удалить».\n"
+            "Класс — ответом «класс D2». Под записью — кнопки «Зона» и «Удалить».\n"
+            "Пункт был нарушением в прошлой проверке — бот спросит, считать ли повтором (×2). "
+            "Снять пометку — ответить «не повтор».\n"
             "/undo — снять последнюю запись.\n"
             "\n"
             "5. /records — что записано, кадры без записи, слова без кадра. Проверку не "
@@ -1738,7 +1753,9 @@ TEXTS: dict[str, dict[str, str]] = {
             "\n"
             "4. A record is wrong — reply to the bot’s message with that record and write what "
             "is actually there. The bot matches the item again.\n"
-            "Point fixes — the buttons under the record: “Zone”, “Class”, “Wording”, “Delete”.\n"
+            "The class — reply “class D2”. Under the record — “Zone” and “Delete”.\n"
+            "The item was a violation at the previous inspection — the bot asks whether to "
+            "count a repeat (×2). To remove the mark, reply “not a repeat”.\n"
             "/undo — remove the last record.\n"
             "\n"
             "5. /records — what is recorded, photos with no record, words waiting for a photo. "
@@ -1768,9 +1785,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},
     "btn.back": {"ru": "Назад", "en": "Back"},
     "btn.zone": {"ru": "Зона", "en": "Zone"},
-    "btn.level": {"ru": "Класс", "en": "Class"},
-    "btn.text": {"ru": "Формулировка", "en": "Wording"},
-    "btn.repeat": {"ru": "Повтор ×2", "en": "Repeat ×2"},
     "btn.drop": {"ru": "Удалить", "en": "Delete"},
     # Кнопки информационной части (T158).
     "btn.yes": {"ru": "Да", "en": "Yes"},

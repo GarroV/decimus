@@ -72,6 +72,22 @@ def remember(chat_id: int, sent: Message | None, n: int) -> None:
     )
 
 
+def remember_repeat_ask(chat_id: int, sent: Message | None, n: int, code: str) -> None:
+    """Запомнить сообщение с вопросом о повторе записи #`n` (D255).
+
+    Отказ заметок гасится по тому же правилу: вопрос уже задан, и кнопки
+    «Да»/«Нет» под ним работают без заметок — теряется только ответ словами.
+    """
+    if sent is None:
+        return
+    _quietly(
+        lambda: sidecar.remember_repeat_ask(chat_id, sent.message_id, n, code),
+        chat_id,
+        n,
+        "ответ словами на вопрос о повторе работать не будет",
+    )
+
+
 def remember_origin(chat_id: int, message_id: int | None, n: int) -> None:
     """Запомнить сообщение аудитора, из которого выросла запись #`n` (T205).
 

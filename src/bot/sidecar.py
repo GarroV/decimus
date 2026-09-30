@@ -123,6 +123,22 @@ class RecordMessage:
 
 
 @dataclass(frozen=True)
+class RepeatAsk:
+    """Вопрос «считать повтором?» и запись, о которой он задан (D255).
+
+    Отдельно от `RecordMessage`, потому что ответ на него значит другое: «да»
+    здесь ставит пометку повтора, а ответ на показ записи правит саму запись.
+    Код пункта хранится рядом с номером намеренно: вопрос задан о ПУНКТЕ,
+    который был в прошлой проверке. Поправили запись на другой пункт — «да» на
+    старый вопрос удвоило бы вычет за то, чего в прошлый раз не было.
+    """
+
+    message_id: int
+    n: int
+    code: str
+
+
+@dataclass(frozen=True)
 class Notes:
     """Заметки одной проверки: все присланные кадры и карты сообщений.
 
@@ -141,6 +157,9 @@ class Notes:
     #: По ним кадр, присланный ответом на свои же слова, попадает в ту запись,
     #: о которой эти слова были.
     origins: tuple[RecordMessage, ...] = ()
+    #: Вопросы «считать повтором?» (D255): ответ «да» на такое сообщение ставит
+    #: записи пометку повтора.
+    repeat_asks: tuple[RepeatAsk, ...] = ()
     #: Сколько записей было в проверке, когда бот отдал аудитору отчёт.
     #: `NEVER_HANDED_OVER` — отчёт не отдавался.
     #:
@@ -197,6 +216,21 @@ def _messages_from_raw(raw: Any, path: Path, what: str) -> tuple[RecordMessage, 
         raise BotNotesError(f"{what} в заметках {path} не похожа на карту") from exc
 
 
+def _repeat_asks_from_raw(raw: Any, path: Path) -> tuple[RepeatAsk, ...]:
+    """Карта вопросов о повторе из файла. Непонятная форма — отказ (как у карт выше)."""
+    if raw is None:
+        return ()
+    try:
+        return tuple(
+            RepeatAsk(message_id=int(item["message_id"]), n=int(item["n"]), code=str(item["code"]))
+            for item in raw
+        )
+    except (TypeError, KeyError, ValueError) as exc:
+        raise BotNotesError(
+            f"Карта вопросов о повторе в заметках {path} не похожа на карту"
+        ) from exc
+
+
 def _handed_over_from_raw(raw: Any, path: Path) -> int:
     """Признак сдачи из файла. Непонятное значение — отказ, а не «не сдавалась».
 
@@ -231,6 +265,7 @@ def _parse(raw: dict[str, Any], path: Path) -> Notes:
         frames=_frames_from_raw(raw.get("frames"), path),
         records=_messages_from_raw(raw.get("records"), path, "Карта сообщений о записях"),
         origins=_messages_from_raw(raw.get("origins"), path, "Карта сообщений аудитора"),
+        repeat_asks=_repeat_asks_from_raw(raw.get("repeat_asks"), path),
         handed_over_findings=_handed_over_from_raw(raw.get("handed_over_findings"), path),
     )
 
@@ -277,6 +312,9 @@ def _write(chat_id: int, notes: Notes) -> None:
         ],
         "records": [{"message_id": r.message_id, "n": r.n} for r in notes.records],
         "origins": [{"message_id": r.message_id, "n": r.n} for r in notes.origins],
+        "repeat_asks": [
+            {"message_id": r.message_id, "n": r.n, "code": r.code} for r in notes.repeat_asks
+        ],
         "handed_over_findings": notes.handed_over_findings,
     }
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".bot-notes-", suffix=".tmp")
@@ -421,6 +459,26 @@ def remember_origin(chat_id: int, message_id: int, n: int) -> None:
         return replace(notes, origins=(*notes.origins, добавляемое))
 
     _change(chat_id, дополнить)
+
+
+def remember_repeat_ask(chat_id: int, message_id: int, n: int, code: str) -> None:
+    """Запомнить, каким сообщением задан вопрос о повторе записи #`n` (D255)."""
+
+    def дополнить(notes: Notes) -> Notes | None:
+        добавляемое = RepeatAsk(message_id=message_id, n=n, code=code)
+        if добавляемое in notes.repeat_asks:
+            return None
+        return replace(notes, repeat_asks=(*notes.repeat_asks, добавляемое))
+
+    _change(chat_id, дополнить)
+
+
+def repeat_ask_of(chat_id: int, message_id: int) -> RepeatAsk | None:
+    """Вопрос о повторе, заданный этим сообщением бота, — или ничего."""
+    for known in reversed(read(chat_id).repeat_asks):
+        if known.message_id == message_id:
+            return known
+    return None
 
 
 def _last_for(messages: tuple[RecordMessage, ...], message_id: int) -> int | None:
