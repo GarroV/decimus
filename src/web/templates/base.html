@@ -17,7 +17,6 @@
   кодом, переводится только название (конституция, принцип 5).
 #}{% macro theme_pick() %}
   <div class="sidenav__theme" role="radiogroup" aria-label="{{ t('nav.theme') }}">
-    <span class="sidenav__theme-label">{{ t('nav.theme') }}</span>
     {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}
       <button type="button" role="radio" aria-checked="{{ 'true' if value == 'system' else 'false' }}"
               data-theme-value="{{ value }}" title="{{ t('nav.theme.' ~ value) }}"
@@ -120,12 +119,12 @@
         </div>
 
         <div class="sidenav__foot">
-          {{ theme_pick() }}
-          {# Язык — строкой под темой и тем же устройством: подпись слева,
-             капсула справа (владелец 30.09.2026: «пилюлей как в сворме»). #}
-          <div class="sidenav__lang">
-            <span class="sidenav__lang-label">{{ t('nav.lang.short') }}</span>
-            {% include "_langpick.html" %}
+          {# Тема и язык — две капсулы одной строкой, без подписей (владелец
+             30.09.2026: «я просил и язык и тему сделать пилюлей. при этом без
+             надписей»). Название выбора — в aria-label группы и title. #}
+          <div class="sidenav__prefs">
+            {{ theme_pick() }}
+            <div class="sidenav__lang">{% include "_langpick.html" %}</div>
           </div>
         </div>
 

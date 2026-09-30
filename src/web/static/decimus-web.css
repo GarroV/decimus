@@ -775,7 +775,6 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
   /* Ядро ставит тему столбиком при свёрнутой панели (<1100px); в полосе
      телефона места вдоль строки хватает. */
   .mbar .sidenav__theme { flex-direction: row; margin: 0; padding: 0; }
-  .mbar .sidenav__theme-label { display: none; }
 }
 
 /* Переход между разделами без белой вспышки. Каждый раздел — отдельная
