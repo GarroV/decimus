@@ -222,10 +222,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "country.kicker": {"ru": "Страна", "en": "Country"},
     "country.rail.title": {"ru": "Страны", "en": "Countries"},
-    "country.choose.hint": {
-        "ru": "Выберите страну в колонке слева.",
-        "en": "Pick a country in the column on the left.",
-    },
     "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
     "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
     "country.choose.empty": {

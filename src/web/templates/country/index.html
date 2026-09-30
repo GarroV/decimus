@@ -13,10 +13,11 @@
 {% block body %}
 {# Раскладка как у «Методики» (владелец 30.09.2026): слева колонка стран,
    справа — выбранная страна. Классы колонки общие с «Методикой» (`mx-shell`,
-   `mx-rail`): одна раскладка — одни правила, включая узкий экран, где без
-   выбранной страны видна только колонка (`mx-shell--pick`), а на экране
-   страны колонка прячется и назад ведёт ссылка «‹ Страны». #}
-<div class="mx-shell{% if view is none %} mx-shell--pick{% endif %}">
+   `mx-rail`): одна раскладка — одни правила. Рабочая зона не пустует: без
+   страны в адресе в ней первая страна колонки, а экран помечен выбором
+   (`mx-shell--pick`) — на узком экране тогда видна только колонка. На экране
+   страны колонка там прячется, и назад ведёт ссылка «‹ Страны». #}
+<div class="mx-shell cn-shell{% if view is none or picking %} mx-shell--pick{% endif %}">
   <aside class="mx-rail" aria-label="{{ t('country.rail.title') }}">
     <div class="mx-rail__head mx-rail__head--list">
       <span>{{ t('country.rail.title') }}</span>
@@ -37,7 +38,6 @@
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
       <h1 class="ov-head__title">{{ t('country.choose.title') }}</h1>
-      <div class="ov-card__hint">{{ t('country.choose.hint') }}</div>
     </div>
   </div>
 {% else %}
