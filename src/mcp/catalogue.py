@@ -82,6 +82,19 @@ class ToolSpec:
     #: у продукта есть, и на нём такой инструмент ответил бы «промахов не
     #: найдено» вместо «читать неоткуда».
     history: bool = False
+    #: Инструмент методики (`kind=KIND_CHECKLIST`), которому обязателен код
+    #: чек-листа, когда его наводят в пространство партнёра (волна 1, #340).
+    #:
+    #: По умолчанию `True`: правящий инструмент без кода в чужом для эталона
+    #: пространстве не должен молча уйти неизвестно куда — отказ обязан
+    #: назвать причину (`rpc.NAME_THE_CHECKLIST`). Но `checklists` и
+    #: `checklist_meta` — читатели уровня хранилища, а не уровня чек-листа: им
+    #: код не нужен, чтобы ответить (`checklists` — перечень, `checklist_meta`
+    #: без кода читает применённый к проду). Тот же общий заслон отказал бы
+    #: партнёру даже в перечне его собственных чек-листов, которого он
+    #: спросил, чтобы код УЗНАТЬ, — испортив дверь, которой этот код и
+    #: называют (preflight Н1).
+    needs_checklist: bool = True
 
 
 def _date_property(*, meaning: str) -> dict[str, object]:
@@ -1658,13 +1671,16 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="checklists",
         description=(
-            "List every checklist the store holds: code, names, state (draft "
-            "/ active / retired) and which one is applied to production. "
-            "State and production are different things: 'active' means a "
-            "checklist is fit for use and several may be, while 'applied to "
-            "production' is a pointer and there is exactly one. Checklists "
-            "are never deleted — a retired one stays listed, because "
-            "inspections were scored by it."
+            "List the checklists visible to this tenant: code, names, state "
+            "(draft / active / retired) and which one is applied to "
+            "production. HQ sees every checklist in the store; a partner "
+            "sees its own plus HQ's. State and production are different "
+            "things: 'active' means a checklist is fit for use and several "
+            "may be, while 'applied to production' is a pointer and there is "
+            "exactly one. Checklists are never deleted — a retired one stays "
+            "listed, because inspections were scored by it. No 'checklist' "
+            "argument is needed to call this — it lists checklists, it does "
+            "not name one."
         ),
         input_schema={
             "type": "object",
@@ -1674,14 +1690,18 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.checklists,
         kind=KIND_CHECKLIST,
+        needs_checklist=False,
     ),
     ToolSpec(
         name="checklist_meta",
         description=(
             "Read one checklist's card: code, both names, state, whether it "
             "is applied to production and which edition it publishes. Name "
-            "the checklist with 'checklist'; omit it to read the one applied "
-            "to production."
+            "the checklist with 'checklist'. For the HQ tenant, omitting it "
+            "reads the one applied to production; a partner has no "
+            "production pointer of its own, so omitting it there looks for "
+            "the default code in the partner's own space and answers 'not "
+            "found' if there is none — name the checklist explicitly."
         ),
         input_schema={
             "type": "object",
@@ -1691,6 +1711,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.checklist_meta,
         kind=KIND_CHECKLIST,
+        needs_checklist=False,
     ),
     ToolSpec(
         name="create_checklist",

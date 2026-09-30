@@ -26,6 +26,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
 from .checklist import Store
+from .checklist_layout import DEFAULT_SPACE, space_of
 from .config import Settings, resolve_access
 from .errors import AuthError
 from .install import INSTALL_CONTENT_TYPE, INSTALL_PATH, InstallScriptError, install_script
@@ -305,13 +306,18 @@ def _checklist_for(settings: Settings, tenant: str) -> Store | None:
     Право спрашивается здесь, на входе, по коду арендатора, разобранному из
     токена, — то есть на той же двери, что и граница арендаторов. Отдельного
     способа получить это право нет: ниже по коду `None` подменить нечем.
+
+    Хранилище сразу наводится на пространство арендатора (`space_of`, волна 1,
+    #340): правка партнёра адресуется в его пространство здесь, на входе, а не
+    решается ниже по коду вместе с кодом чек-листа — иначе у обработчика был бы
+    способ получить хранилище чужого пространства одной опечаткой в аргументе.
     """
     хранилище, методика = settings.checklist_store, settings.data_dir
     if хранилище is None or методика is None:
         return None
     if not settings.may_manage_checklist(tenant):
         return None
-    return Store(root=хранилище, live=методика)
+    return Store(root=хранилище, live=методика, space=space_of(tenant))
 
 
 def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
@@ -325,13 +331,18 @@ def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
     `None` здесь — не «не открыто», а «читать неоткуда»: право на чтение имеет
     всякий заведённый арендатор, и отказывает этот путь только на сервере, где
     методика не настроена вовсе.
+
+    Пространство здесь всегда `DEFAULT_SPACE`, а не `space_of(tenant)`: эталон
+    один на всю сеть и лежит в пространстве УК, и партнёр читает его оттуда, а
+    не из своего (волна 1, #340) — партнёрского эталона не существует, есть
+    только чужая партнёру методика УК.
     """
     хранилище, методика = settings.checklist_store, settings.data_dir
     if хранилище is None or методика is None:
         return None
     if not settings.may_read_checklist(tenant):
         return None
-    return Store(root=хранилище, live=методика)
+    return Store(root=хранилище, live=методика, space=DEFAULT_SPACE)
 
 
 def build_server(settings: Settings) -> ThreadingHTTPServer:
