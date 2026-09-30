@@ -33,7 +33,7 @@ from .catalogue import (
     find,
 )
 from .checklist import Store
-from .checklist_layout import DEFAULT_SPACE, space_of
+from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .errors import McpError, ToolError
 
@@ -192,6 +192,23 @@ NAME_THE_CHECKLIST = (
     "наводится ни на какой чек-лист, перечень отдаёт checklists"
 )
 
+#: Отказ правящему инструменту, названному кодом чек-листа эталона УК из
+#: пространства партнёра (волна 1, ревью Task 2: контролёр против брифа).
+#: Текст — дословно из «Глобальных ограничений» плана
+#: (`docs/superpowers/plans/2026-09-30-spaces-wave1.md`): «Правка эталона из
+#: пространства партнёра — «эталон правит только УК»». Бриф Task 2 заводил тот
+#: же случай как «не найден» — чужой код неотличим от несуществующего. Но
+#: эталон партнёру НЕ чужой: `checklists` показывает его строку (D283, D285),
+#: и молчаливое «не найден» на код, который сам же перечень только что
+#: назвал, выглядело бы как порча данных, а не как граница прав. Правящему
+#: инструменту он поэтому отвечает отказом по существу — «эту сущность нельзя
+#: изменить отсюда», а не выдумкой, что её не существует.
+ETALON_READONLY_FOR_PARTNER = (
+    "Эталон правит только УК: чек-лист «{код}» — не ваш, а общий эталон сети. Прочитать его "
+    "карточку можно (checklist_meta), а содержимое — источником (checklist_source), но не "
+    "поправить отсюда"
+)
+
 
 def _aimed(spec: ToolSpec, база: Store, *, tenant: str, код: str | None) -> Store:
     """Навести хранилище на чек-лист: исходник — эталон УК, правка — только своё пространство.
@@ -214,13 +231,42 @@ def _aimed(spec: ToolSpec, база: Store, *, tenant: str, код: str | None) 
     код не нужен для ответа (`ToolSpec.needs_checklist=False`, preflight Н1):
     им отказ на этой двери запретил бы ровно то, зачем их и открыли партнёру
     без кода, — перечень чек-листов и карточку чек-листа по умолчанию.
+
+    Код, названный ЯВНО, но которого нет в своём пространстве, — три разных
+    случая, а не один «не найден» (ревью Task 2, controller ruling):
+
+    1. Код есть в своём пространстве → правка/чтение как обычно, ниже до сюда
+       не доходит.
+    2. Кода нет нигде, в том числе в пространстве УК, — партнёр просто
+       ошибся или назвал код чужого партнёра (коды партнёров друг для друга
+       не резервируются, `checklists.create`). Неотличимо от выдумки — «не
+       найден», как и было (обработчик отвечает этим текстом сам, ниже).
+    3. Кода нет в своём пространстве, но он ЕСТЬ в пространстве УК — партнёр
+       назвал код эталона (или другого чек-листа УК), который сам же видит в
+       своём `checklists` (D283, D285): это не чужое по прямому адресу, это
+       ВИДИМОЕ чужое с попыткой правки. Инструменту, которому код не нужен
+       (`needs_checklist=False`, т.е. только `checklist_meta` — `checklists`
+       код не смотрит вовсе) — отвечаем чтением эталона. Любому другому —
+       явный отказ `ETALON_READONLY_FOR_PARTNER`, а не тихая подмена на
+       «не найден»: это было бы неотличимо от порчи данных агентом, который
+       только что получил этот же код в перечне.
     """
     if spec.kind == KIND_CHECKLIST_SOURCE:
         return for_checklist(replace(база, space=DEFAULT_SPACE), код)
     свой = replace(база, space=space_of(tenant))
-    if код is None and свой.space != DEFAULT_SPACE and spec.needs_checklist:
-        raise ToolError(NAME_THE_CHECKLIST)
-    return for_checklist(свой, код)
+    if код is None:
+        if свой.space != DEFAULT_SPACE and spec.needs_checklist:
+            raise ToolError(NAME_THE_CHECKLIST)
+        return for_checklist(свой, код)
+    кандидат = for_checklist(свой, код)
+    if свой.space == DEFAULT_SPACE or exists(кандидат):
+        return кандидат
+    эталон = replace(база, space=DEFAULT_SPACE, code=код)
+    if exists(эталон):
+        if spec.needs_checklist:
+            raise ToolError(ETALON_READONLY_FOR_PARTNER.format(код=код))
+        return эталон
+    return кандидат
 
 
 def _call_tool(
