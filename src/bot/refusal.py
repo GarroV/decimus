@@ -58,6 +58,11 @@ def item_title(code: str, lang: str, *, chat_id: int) -> str:
         return code
 
 
+def _holds_pair(finding: domain.Finding) -> bool:
+    """Занимает ли запись пару «пункт + зона». D0 не занимает (#444): вычета нет."""
+    return finding.level != "D0"
+
+
 def occupied_by(
     chat_id: int, code: str, zone: str, *, skip: int | None = None
 ) -> domain.Finding | None:
@@ -75,7 +80,9 @@ def occupied_by(
     if inspection is None:
         return None
     for finding in inspection.findings:
-        if finding.n != skip and finding.code == code and finding.zone == zone:
+        if not _holds_pair(finding) or finding.n == skip:
+            continue
+        if finding.code == code and finding.zone == zone:
             return finding
     return None
 
@@ -102,6 +109,8 @@ def occupied_pairs(chat_id: int) -> dict[tuple[str, str], int]:
     # обязаны совпасть — иначе аудитор пойдёт править не ту запись.
     pairs: dict[tuple[str, str], int] = {}
     for finding in inspection.findings:
+        if not _holds_pair(finding):
+            continue
         pairs.setdefault((finding.code, finding.zone), finding.n)
     return pairs
 

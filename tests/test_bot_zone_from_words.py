@@ -82,6 +82,11 @@ def начата() -> None:
         ("на внешнем контуре здания мусор", "facade"),
         ("the low-temperature cabinet door does not close", "freezer"),
         ("dirt on the floor in the heat station", "hot_kitchen"),
+        # D244, #444: сокращения цехов — целым словом, в любом регистре.
+        ("холодильник ГЦ", "hot_kitchen"),
+        ("морозильник хц", "cold_kitchen"),
+        ("в ГЦ грязно", "hot_kitchen"),
+        ("Полы в ХЦ, не убрано.", "cold_kitchen"),
     ],
 )
 def test_зона_читается_из_слов_аудитора(domain_env: Path, слова: str, зона: str) -> None:
@@ -95,6 +100,10 @@ def test_зона_читается_из_слов_аудитора(domain_env: Pa
         "нагар на подине печи",
         "просрочка чизкейк",
         "мусор в углу",
+        # «гц» и «хц» внутри чужих слов зоной не считаются.
+        "пгцх мусор",
+        "хцг в углу",
+        "мегагерц",
     ],
 )
 def test_слова_без_зоны_зоны_не_дают(domain_env: Path, слова: str) -> None:
@@ -245,3 +254,7 @@ async def test_названная_словами_зона_догадкой_не_
     assert запись is not None and запись.findings
     assert запись.findings[-1].zone == "hot_kitchen"
     assert t("record.fixed_zone_from_cues", "ru").strip() not in session.last_text
+
+
+def test_два_сокращения_разом_зоной_не_считаются(domain_env: Path) -> None:
+    assert zones.zone_from_words("из ГЦ в ХЦ носят продукт", chat_id=CHAT_ID) is None
