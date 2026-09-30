@@ -1557,13 +1557,9 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .mx-table { width: 100%; margin-bottom: var(--space-5); }
 .mx-table tr.is-on td { background: var(--accent-soft); }
 
-/* Колонка над подложкой панели (60) и вровень с панелью (61, она позже в DOM и
-   при наложении сверху): при открытом пункте по колонке можно уйти в другой
-   чек-лист, а не закрыть панель (D222).
-   На этой ширине панель (560px справа) колонку не накрывает. */
-@media (min-width: 1280px) {
-  .mx-rail { z-index: 61; }
-}
+/* Колонка чек-листов — ПОД подложкой открытой панели, как и всё остальное
+   (D279): открытый пункт — единственное, что в фокусе. До D279 колонка стояла
+   над подложкой (z-index 61, D222), чтобы из панели уходить в другой чек-лист. */
 @media (max-width: 1279px) {
   .mx-shell { grid-template-columns: 15rem minmax(0, 1fr); gap: var(--space-5); }
   .mx-rail__meta { display: none; }
