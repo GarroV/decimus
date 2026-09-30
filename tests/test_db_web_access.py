@@ -122,16 +122,16 @@ def test_отключённая_учётка_не_опознаётся(обе_р
     assert authenticate("director", ПАРОЛЬ) is None
 
 
-# --- границы арендатора -----------------------------------------------------
+# --- логин единый на систему (D282) ------------------------------------------
+# Ревью Task 4 круг 1, Minor 4: раздел «границы арендатора» держал ровно один
+# тест и про ту же историю — логин не повторяется. Перенесён сюда, одним
+# разделом с глобальной уникальностью, а не отдельной границей.
 
 
 def test_логин_внутри_одного_тенанта_не_повторяется(обе_роли: str) -> None:
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     with pytest.raises(AccessError):
         create_account("director", tenant=ТЕНАНТ, password="второй-пароль-подлиннее")
-
-
-# --- логин единый на систему (D282) ------------------------------------------
 
 
 def test_логин_один_на_всю_систему(обе_роли: str) -> None:
@@ -172,15 +172,32 @@ def test_почта_одна_на_всю_систему(обе_роли: str) ->
 
 
 def test_миграция_отказывает_на_двойниках(pg_dsn: str) -> None:
-    """Двойник логина — отказ наката, а не выбор одного наугад."""
+    """Двойник логина ИЛИ почты — отказ наката, а не выбор одного наугад.
+
+    Обе ветки проверки (ревью Task 4 круг 1, Minor 2: ветка почты раньше не
+    исполнялась ни разу) — отдельными подключениями: `conn.rollback()` внутри
+    неявной транзакции psycopg откатывает и сам `create temp table`, поэтому
+    второй сценарий заводит временную таблицу заново.
+    """
     import pathlib
 
     sql = pathlib.Path("src/db/migrations/0028_login_across_spaces.sql").read_text(encoding="utf-8")
     проверка = sql.split("create unique index", 1)[0]
+
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
         cur.execute("create temp table web_users (login text, email text, tenant_code text)")
         cur.execute("insert into web_users values ('director', null, 'A'), ('director', null, 'B')")
         with pytest.raises(psycopg.errors.RaiseException, match="нескольких пространствах"):
+            cur.execute(проверка)
+        conn.rollback()
+
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("create temp table web_users (login text, email text, tenant_code text)")
+        cur.execute(
+            "insert into web_users values "
+            "('a1', 'p@example.org', 'A'), ('b1', 'p@example.org', 'B')"
+        )
+        with pytest.raises(psycopg.errors.RaiseException, match="Почта привязана"):
             cur.execute(проверка)
         conn.rollback()
 
@@ -405,6 +422,23 @@ def test_почта_опознаёт_живую_учётку(обе_роли: st
     assert учётка is not None
     assert учётка.login == "director"
     assert учётка.tenant == ТЕНАНТ
+
+
+def test_почта_находит_учётку_чужого_пространства(обе_роли: str) -> None:
+    """Симметрично логину (D282, ревью Task 4 круг 1, Minor 1а): почта ищется
+    по всей базе, а не в тенанте того, кто спрашивает, — и находит ровно одну
+    учётку, ту, что в ДРУГОМ пространстве."""
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+    set_email("partner", tenant=ЧУЖОЙ, email=ПОЧТА)
+
+    учётка = find_by_email(ПОЧТА)
+
+    assert учётка is not None
+    assert учётка.login == "partner"
+    assert учётка.tenant == ЧУЖОЙ
+    # Ровно один человек, а не выбор из нескольких: глобальная уникальность
+    # почты (`web_users_email_global_uq`) держит это схемой, а не удачей.
+    assert len(list_accounts(tenant=ЧУЖОЙ)) == 1
 
 
 def test_регистр_и_пробелы_в_почте_не_плодят_второго_человека(обе_роли: str) -> None:

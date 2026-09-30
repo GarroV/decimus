@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from typing import Any
 
 import pytest
+from flask import Response
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, ПАРОЛЬ, СВОЙ, ТОКЕН, войти, подменить_двери, собрать
 
@@ -260,13 +261,41 @@ def test_дверь_опознания_зовут_с_логином_и_паро�
 def test_стенд_уК_впускает_учётку_партнёра_в_её_пространство(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Один адрес входа на все пространства: партнёр входит и на стенде УК."""
+    """Один адрес входа на все пространства: партнёр входит и на стенде УК.
+
+    Аргументов дверей мало (ревью Task 4, круг 1, Important 2): регрессия
+    вида «сверить `account.tenant` со стендом» оставила бы их зелёными, хотя
+    главный сценарий D282 был бы сломан. Проверяется ИСХОД — вход не уводит
+    обратно на форму, страница отдаётся, а пространство, которое видит само
+    приложение (`auth.current_account()` внутри запроса), — пространство
+    УЧЁТКИ партнёра, а не тенант стенда.
+    """
     зовы = подменить_двери(monkeypatch, tenant="GE")
-    with собрать(tenant="HQ").test_client() as client:
-        войти(client)
-        client.get("/inspections")
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    app = собрать(tenant="HQ")
+    увиденные_пространства: list[str] = []
+
+    @app.after_request
+    def _запомнить_пространство_вошедшего(response: Response) -> Response:
+        учётка = auth.current_account()
+        if учётка is not None:
+            увиденные_пространства.append(учётка.tenant)
+        return response
+
+    with app.test_client() as client:
+        вход = войти(client)
+        assert вход.status_code == 302
+        assert auth.LOGIN_PATH not in (вход.headers.get("Location") or ""), (
+            "успешный вход увёл обратно на форму"
+        )
+        ответ = client.get("/inspections")
+        assert ответ.status_code == 200
+
     assert зовы["authenticate"] == [(ЛОГИН, ПАРОЛЬ)]
     assert зовы["resolve"] and all(len(зов) == 1 for зов in зовы["resolve"])
+    assert увиденные_пространства == ["GE"], (
+        "приложение обязано увидеть пространство УЧЁТКИ, а не тенант стенда"
+    )
 
 
 def test_вход_за_туннелем_проходит_а_понижение_схемы_нет(стенд: FlaskClient) -> None:
