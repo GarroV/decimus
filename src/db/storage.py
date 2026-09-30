@@ -33,7 +33,7 @@ if TYPE_CHECKING:  # pragma: no cover — только для проверки �
 #: (`src/bot/photos.py` сохраняет их как `photo-NNN.jpg`). Отдельного разбора
 #: формата здесь нет намеренно: угадывать тип по байтам ради поля, у которого
 #: одно значение, — работа без потребителя.
-PHOTO_CONTENT_TYPE = "image/jpeg"
+PHOTO_CONTENT_TYPE = "image/jpeg"  # кадр, не читаемый Pillow, кладётся как пришёл
 
 
 @dataclass(frozen=True)
@@ -97,10 +97,11 @@ def key_of_uri(storage_path: str) -> str:
 
 
 def preview_key(inspection_id: str, photo_id: str) -> str:
-    """Ключ сжатой копии кадра (D219) — рядом с оригиналом, своим именем.
+    """Ключ отдельной сжатой копии кадра (D219), выгруженного ДО D253.
 
-    Отдельное имя, а не перезапись оригинала: оригинал удаляется по D202/D213
-    своим ключом, и уборка не должна знать про копию, чтобы её не задеть.
+    Новые кадры отдельной копии не имеют: `photos.storage_path` и `preview_path`
+    указывают на один объект по `object_key`. Этот ключ нужен только для кадров
+    старой выгрузки (оригинал + копия) и для доливщика `tools/backfill_previews.py`.
     """
     return f"inspections/{inspection_id}/previews/{photo_id}.jpg"
 
