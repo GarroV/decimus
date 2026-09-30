@@ -72,9 +72,9 @@ services:
     profiles: !reset []
 
   # Том MinIO (`decimus_storage-data`) и том состояния бота (`decimus_state`)
-  # меткой бэкапа площадки не помечены: соглашения о метке для томов на VPS
-  # нет, а придуманная метка выглядела бы бэкапом, которого нет. Что бэкапить —
-  # docs/08-deploy.md, §8.
+  # бэкапит площадка: они перечислены в `/etc/vps-backup/targets.conf` на VPS
+  # (канон — GarroV/vps-infra), ночной `vps-backup` кладёт их через restic на
+  # MUSPELHEIM. Меток на томах нет — список целей живёт там, а не здесь (#456).
   storage-live:
     profiles: !reset []
 
