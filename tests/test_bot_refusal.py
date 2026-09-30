@@ -122,9 +122,6 @@ async def test_правка_в_занятую_зону_отвечает_по_ч�
     assert "audit.py" not in session.last_text
     assert кнопки_под(session, "Не поправил") == [
         "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        "edit:1:repeat",
         "edit:1:drop",
     ]
 
