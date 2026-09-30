@@ -1697,11 +1697,14 @@ TOOLS: tuple[ToolSpec, ...] = (
         description=(
             "Read one checklist's card: code, both names, state, whether it "
             "is applied to production and which edition it publishes. Name "
-            "the checklist with 'checklist'. For the HQ tenant, omitting it "
-            "reads the one applied to production; a partner has no "
-            "production pointer of its own, so omitting it there looks for "
-            "the default code in the partner's own space and answers 'not "
-            "found' if there is none — name the checklist explicitly."
+            "the checklist with 'checklist' — any code a call to checklists "
+            "just listed for this tenant works here, including HQ's own "
+            "(a partner may read HQ's card, only not edit it). For the HQ "
+            "tenant, omitting it reads the one applied to production; a "
+            "partner has no production pointer of its own, so omitting it "
+            "there looks for the default code in the partner's own space "
+            "and answers 'not found' if there is none — name the checklist "
+            "explicitly."
         ),
         input_schema={
             "type": "object",
