@@ -802,6 +802,7 @@ Remove-Item -Recurse -Force C:\projects\decimus
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_storage-data`, `decimus_state`, `decimus_frames` |
+| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://100.64.116.67:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются: выгрузка повторяема, остаток доливается следующей сдачей. Служба `storage-live` и том `decimus_storage-data` на VPS остались откатом (данные на 30.09) |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
@@ -921,14 +922,14 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 
 ### 8.5. Бэкапы на VPS
 
-**Сейчас (26.09):** ночной бэкап площадки VPS уходит restic'ом на MUSPELHEIM —
-база, MinIO, `state`, `.env`. Ниже — что из этого закрывает сам продукт.
+**Сейчас (30.09):** ночной бэкап площадки VPS уходит restic'ом на MUSPELHEIM —
+база, `state`, `.env`; список целей — `/etc/vps-backup/targets.conf` (канон
+`GarroV/vps-infra`). Кадры не бэкапятся (D259). Ниже — что из этого закрывает сам продукт.
 
 - **База:** у службы `db` метка `backup.pgdump=true` — её ищет дамп площадки.
-- **`decimus_storage-data` и `decimus_state` — не дампы Postgres**, меткой не
-  помечены: соглашения о бэкапе томов на VPS пока нет. До него — выгрузка
-  состояния `dc --profile backup run --rm -T state-backup` по cron (§4.7,
-  `BACKUP_DIR`) и архив тома MinIO тем же способом, что в §8.4.
+- **`decimus_state` — не дамп Postgres**, меткой не помечен: его берёт площадка
+  строкой `vol decimus-state decimus_state` в `targets.conf`. Том кадров
+  `decimus_storage-data` оттуда убран 30.09 — живые кадры на MUSPELHEIM и без бэкапа (D259).
 
 ### 8.6. Что стало с обвязкой MUSPELHEIM
 
