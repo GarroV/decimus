@@ -23,6 +23,20 @@ from .overview import Overview, Selection
 #: Код страны справочника — две латинские буквы (`GE`, `RS`).
 _CODE = re.compile(r"[A-Z]{2}")
 
+#: Снимок страны, которой нет: ни проверок, ни точек, ни потерь.
+_EMPTY = Overview(
+    units_total=0,
+    inspections=(),
+    grades=(),
+    average=None,
+    comparable=True,
+    comparability_note="",
+    zone_losses=(),
+    systemic=(),
+    attention=(),
+    problem_units=(),
+)
+
 
 @dataclass(frozen=True)
 class CountryView:
@@ -52,7 +66,14 @@ def load(
     unit_id: str = "",
     today: date | None = None,
 ) -> CountryView:
-    """Снимок страны и, если попросили, история одной её точки."""
+    """Снимок страны и, если попросили, история одной её точки.
+
+    Непонятный код (`normalize_code` вернул пусто) — пустой снимок без похода
+    в базу. Пустая страна в отборе «Обзора» значит «не сужать», и экран
+    страны показал бы под видом страновых цифры всей сети.
+    """
+    if not code:
+        return CountryView(code="", snapshot=_EMPTY)
     snapshot = overview.load(
         tenant=tenant, limit=limit, selection=replace(selection, country=code), today=today
     )
