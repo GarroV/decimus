@@ -34,6 +34,7 @@ from src.domain.kinds import kind_title
 from src.report.info_titles import FOUND
 
 from . import accounts, assets, auth, letter_draft, pricing, view
+from . import country as country_data
 from . import inspections as data
 from . import methodology as method
 from . import methodology_view as mview
@@ -62,7 +63,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "admin", "users")
+SCREENS = ("overview", "registry", "country", "admin", "users")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -80,6 +81,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _register_sections(app)
     _register_overview(app, conf)
+    _register_country(app, conf)
     _register_units(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
@@ -466,6 +468,130 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             # точке открывает точку. Связь идёт идентификатором справочника —
             # название в ссылке сломалось бы на первой же правке названия.
             unit_ids=snapshot.unit_ids,
+        )
+
+
+def _register_country(app: Flask, conf: Settings) -> None:
+    """Раздел «Страна»: работа с одной страной (D260, D262).
+
+    Экран — «Обзор» с отбором по стране; своих подсчётов у него нет. Отбор
+    живёт в адресе, как на «Обзоре»: ссылку на «Грузия, за 90 дней, Батуми-1
+    раскрыта» отправляют коллеге, и он видит ровно это.
+    """
+
+    @app.get(section("country").path, endpoint="country_index")
+    def country_index() -> Any:
+        страны = country_data.countries(tenant=conf.tenant)
+        if len(страны) == 1:
+            # Язык переезжает, только если его выбрали в адресе: иначе
+            # переход в единственную страну вешал бы `?lang=` умолчания.
+            язык = {"lang": _lang(conf)} if request.args.get("lang") else {}
+            return redirect(_url("country", code=страны[0][0], **язык))
+        return render_template("country/index.html", view=None, choices=страны)
+
+    @app.get(section("country").path + "/<code>", endpoint="country")
+    def country(code: str) -> str:
+        язык = _lang(conf)
+        # Код страны из адреса — ввод снаружи: регистр приводится, чужое
+        # сужает выборку в пустоту, и экран говорит об этом словами, а не 500.
+        код = country_data.normalize_code(code)
+        selection = overview_data.Selection(
+            city=request.args.get("city", "").strip()[:80],
+            grade=request.args.get("grade", "").strip().upper()[:1],
+            period=request.args.get("period", "all").strip()[:8],
+            sort=request.args.get("sort", "score").strip()[:8],
+        )
+        вид = country_data.load(
+            tenant=conf.tenant,
+            limit=REGISTRY_LIMIT,
+            code=код,
+            selection=selection,
+            unit_id=request.args.get("unit", "").strip()[:64],
+        )
+
+        def отбор(**изменения: str) -> str:
+            """Адрес того же экрана с изменённым срезом; умолчания выпадают."""
+            параметры = {
+                "city": selection.city,
+                "grade": selection.grade,
+                "period": selection.period,
+                "sort": selection.sort,
+                "unit": вид.unit_id,
+                "lang": язык,
+                **изменения,
+            }
+            умолчания = {"period": "all", "sort": "score"}
+            живые = {к: з for к, з in параметры.items() if з and умолчания.get(к) != з}
+            return _url("country", code=код or "-", **живые)
+
+        def раскрыть(unit_id: str) -> str:
+            """Строка точки: раскрыть её, а раскрытую — свернуть. Якорь — к строке."""
+            if unit_id == вид.unit_id:
+                return отбор(unit="")
+            return отбор(unit=unit_id) + f"#unit-{unit_id}"
+
+        чипы = []
+        страны = country_data.countries(tenant=conf.tenant)
+        # Выбор страны — в шапке (спека, «Шапка»). Одна страна — чипа нет:
+        # выбирать не из чего. Смена страны сбрасывает весь срез: город и
+        # раскрытая точка другой страны дали бы пустоту без объяснения.
+        if len(страны) > 1:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.country", язык),
+                    empty_title=t("overview.filter.all_countries", язык),
+                    current=код,
+                    values=страны,
+                    href=lambda значение: (
+                        _url("country", code=значение, lang=язык)
+                        if значение
+                        else _url("country_index", lang=язык)
+                    ),
+                    title=lambda код_страны: country_title(код_страны, язык),
+                )
+            )
+        if вид.snapshot.cities:
+            чипы.append(
+                _pick(
+                    label=t("overview.filter.city", язык),
+                    empty_title=t("overview.filter.all_cities", язык),
+                    current=selection.city,
+                    values=вид.snapshot.cities,
+                    href=lambda значение: отбор(city=значение, unit=""),
+                    title=lambda код_города: city_title(код_города, язык),
+                )
+            )
+        чипы.append(
+            _pick(
+                label=t("overview.filter.grade", язык),
+                empty_title=t("overview.filter.all_grades", язык),
+                current=selection.grade,
+                values=вид.snapshot.grades,
+                href=lambda значение: отбор(grade=значение, unit=""),
+            )
+        )
+        чипы.append(
+            _pick(
+                label=t("overview.filter.period", язык),
+                empty_title=t("overview.period.all", язык),
+                current="" if selection.period == "all" else selection.period,
+                values=tuple((к, None) for к in overview_data.PERIODS if к != "all"),
+                href=lambda значение: отбор(period=значение or "all", unit=""),
+                title=lambda к: t("overview.period." + к, язык),
+            )
+        )
+        return render_template(
+            "country/index.html",
+            view=вид,
+            picks=tuple(чипы),
+            selection=selection,
+            select_url=отбор,
+            open_url=раскрыть,
+            reset_url=_url("country", code=код or "-", lang=язык),
+            registry_path=section("registry").path,
+            grade_tone=view.grade_tone,
+            level_tone=view.level_tone,
+            item_titles=_item_titles(conf, язык),
         )
 
 
