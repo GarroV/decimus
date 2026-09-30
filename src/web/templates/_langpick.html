@@ -1,10 +1,19 @@
-{# Выбор языка интерфейса: текущий — не ссылка. #}
-<div class="langpick" role="group" aria-label="{{ t('nav.lang') }}">
-  {% for code in langs %}
-    {% if code == lang %}
-      <span class="langpick__on" aria-current="true">{{ code|upper }}</span>
-    {% else %}
-      <a class="langpick__off" href="{{ url(current_path) }}?lang={{ code }}">{{ code|upper }}</a>
-    {% endif %}
+{#
+  Выбор языка интерфейса — пилюлей ядра (`.langpill`, forma 30.09.2026):
+  одна капсула, текущий сегмент залит мягким акцентом, как текущая тема рядом.
+
+  Форма GET, а не ссылки: сегмент — кнопка с aria-pressed, читалка говорит
+  «нажата», а не «ссылка». Работает без скрипта. Прочие параметры адреса
+  (отбор, страница) едут скрытыми полями: смена языка не должна сбрасывать
+  выборку, которую человек только что собрал.
+#}
+<form class="langpill" method="get" action="{{ url(current_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
+  {% for key, value in request.args.items(multi=True) if key != 'lang' %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
   {% endfor %}
-</div>
+  {% for code in langs %}
+    <button class="langpill__item" type="submit" name="lang" value="{{ code }}"
+            aria-pressed="{{ 'true' if code == lang else 'false' }}"
+            title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
+  {% endfor %}
+</form>
