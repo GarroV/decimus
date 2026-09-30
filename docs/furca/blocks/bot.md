@@ -259,6 +259,9 @@ item_title(code, lang, *, chat_id)               # вопрос пункта и�
 not_recorded(chat_id, *, code, zone, lang, exc) -> Refusal
 not_changed(chat_id, n, *, code, zone, lang, exc) -> Refusal
 
+# src/bot/merged.py                              # кадр в занятую пару — в ту запись (#443, D247)
+into_taken(message, chat_id, taken, *, file_ids, words, lang, origin, reason) -> Message | None
+
 # src/bot/shown.py                               # карта «сообщение → запись» (T204, T205)
 remember(chat_id, sent, n) / remember_origin(chat_id, message_id, n)
 tell_refusal(message, chat_id, told, lang) -> Message
@@ -624,6 +627,7 @@ main() -> None                                   # точка входа `python
 | `src/bot/lang.py` | Языки чата, на которых нельзя упасть: испорченное состояние не отнимает речь |
 | `src/bot/phrases.py` | Карта синонимов формулировок со стороны разговора (T285): когда спрашивать накопленное и когда пополнять. Отказ базы наружу не выходит |
 | `src/bot/refusal.py` | Отказ движка человеческими словами: пункт, зона, занявшая пару запись |
+| `src/bot/merged.py` | Кадр в занятую пару «пункт + зона» — в занявшую запись, текст записи сводит дешёвая модель, сообщение — показ записи (#443, D243, D247) |
 | `src/bot/pending.py` | Что ждёт нажатия кнопки — только в памяти, и это осознанно |
 | `src/bot/photos.py` | Скачивание кадров и голоса из телеграма; карта кадров для сборки отчёта |
 | `src/bot/view.py` | Строки, которые читает аудитор: подтверждение, список записей, кандидаты |

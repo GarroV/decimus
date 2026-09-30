@@ -579,14 +579,15 @@ async def test_measurement_stays_a_measurement_after_an_edit(
     assert "замер" in session.last_text
 
 
-async def test_refused_record_keeps_the_other_candidates_on_the_table(
+async def test_taken_candidate_puts_the_frame_into_the_existing_record(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Отказ движка не выбрасывает предложение: аудитор выбирает другого кандидата.
+    """Кандидат с занятой парой — кадр ложится в ту запись, второй не появляется.
 
-    Тот же пункт в той же зоне аудитор снимает дважды за обход — движок вторую
-    запись справедливо отвергает. Если бы предложение при этом пропадало, кадр
-    пришлось бы присылать заново, стоя на точке.
+    Тот же пункт в той же зоне аудитор снимает дважды за обход. До #443 движок
+    вторую запись отвергал, и кадр оставался без записи; теперь он становится
+    ещё одним фото занявшей пару записи (D243, D247), а предложение закрыто, как
+    после любой фиксации: кадр уже использован.
     """
     started()
     stub_classify(
@@ -608,13 +609,11 @@ async def test_refused_record_keeps_the_other_candidates_on_the_table(
     await feed(dp, bot, photo_message("frame-1", caption="печь всё ещё в том же виде"))
     session.clear()
     await feed(dp, bot, callback("rec:pick:0"))
-    assert session.last_text.startswith("Не записал")
+    assert session.last_text.startswith("📎 Добавил фото")
 
-    # Второй кандидат по-прежнему жив.
-    await feed(dp, bot, callback("rec:pick:1"))
     state = get_state(CHAT_ID)
     assert state is not None
-    assert [f.code for f in state.findings] == ["CLN05", "PRD01"]
+    assert [(f.code, f.photos) for f in state.findings] == [("CLN05", ["frame-0", "frame-1"])]
 
 
 # --- пути отказа: что бот делает, когда что-то пошло не так ---

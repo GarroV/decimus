@@ -324,6 +324,24 @@ def _язык_интерфейса_не_протекает_из_оболочки
     monkeypatch.delenv(UI_LANG_VAR, raising=False)
 
 
+@pytest.fixture(autouse=True)
+def _сведение_комментария_не_уходит_в_сеть(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Дешёвая модель сведения комментария (#443) в тестах не зовётся никогда.
+
+    Кадр в занятую пару идёт через `src.bot.merged.merge_wording`, и без
+    подмены тест с ключом в оболочке ушёл бы к провайдеру, а без ключа —
+    проверял бы отказ по «ключ не задан», то есть не то. По умолчанию модель
+    «недоступна»; тест, которому нужен её ответ, подменяет её сам
+    (`bot_harness.stub_merge`) поверх этой.
+    """
+    from src.recognize.errors import ModelUnavailable
+
+    def недоступна(previous: str, words: str, **kw: object) -> str:
+        raise ModelUnavailable("сведение комментария в тестах не подменено")
+
+    monkeypatch.setattr("src.bot.merged.merge_wording", недоступна)
+
+
 @pytest.fixture
 def pg_dsn() -> Iterator[str]:
     """DSN одноразовой базы данных со свежо накатанной схемой блока `db`.
