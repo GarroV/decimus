@@ -203,7 +203,7 @@ def install(app: Flask, conf: Settings) -> None:
             return render_template("login.html", failed=True, locked_minutes=None), 401
         note_success(tenant=conf.tenant, address=адрес, login=имя)
         session = open_session(account)
-        return remember(redirect(url_for("registry")), session)
+        return remember(redirect(url_for("home")), session)
 
     google = load_google_settings()
     state_signer = URLSafeTimedSerializer(
@@ -312,7 +312,7 @@ def install(app: Flask, conf: Settings) -> None:
             login=account.login,
         )
         session = open_session(account)
-        return очистить_метку(remember(redirect(url_for("registry")), session))
+        return очистить_метку(remember(redirect(url_for("home")), session))
 
     def отказ_входа() -> tuple[str, int]:
         """Один и тот же отказ на все осечки возврата.

@@ -204,13 +204,13 @@ def test_навигация_показывает_карту_продукта_ц�
         assert раздел.path in страница, раздел.key
 
 
-def test_корень_ведёт_в_единственный_построенный_раздел(стенд: FlaskClient) -> None:
+def test_корень_ведёт_в_обзор(стенд: FlaskClient) -> None:
     # Act
     ответ = стенд.get("/")
 
     # Assert
     assert ответ.status_code == 302
-    assert ответ.headers["Location"].endswith("/inspections")
+    assert ответ.headers["Location"].endswith("/overview")
 
 
 # --- оценка не пересчитывается --------------------------------------------
