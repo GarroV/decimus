@@ -510,9 +510,11 @@ def _register_units(app: Flask, conf: Settings) -> None:
 def _register_registry(app: Flask, conf: Settings) -> None:
     """Раздел «Проверки»: реестр, карточка, снятие."""
 
+    # Стартовый экран — «Обзор», а не реестр: общая картина прежде списка.
+    # Вход тоже ведёт сюда (через `home`), чтобы выбор жил в одном месте.
     @app.get("/")
     def home() -> Response:
-        return redirect(url_for("registry"))
+        return redirect(url_for("overview"))
 
     @app.get(section("registry").path)
     def registry() -> str:
