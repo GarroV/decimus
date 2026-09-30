@@ -148,3 +148,17 @@ def test_смена_языка_оставляет_страну_и_раскрыт
     assert 'action="/country/GE"' in страница
     assert '<input type="hidden" name="unit" value="u-1">' in страница
     assert '<input type="hidden" name="period" value="d90">' in страница
+
+
+def test_на_экране_страны_слева_колонка_всех_стран_и_выбранная_отмечена(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Раскладка как у «Методики»: слева страны, справа выбранная (владелец 30.09.2026)."""
+    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
+    колонка = страница.split('class="mx-rail', 1)[1].split("</aside>", 1)[0]
+    assert "/country/GE" in колонка and "/country/RS" in колонка
+    отмеченная = колонка.split('aria-current="page"', 1)[0].rsplit("<a ", 1)[1]
+    assert "/country/GE" in отмеченная
+    # Выбор страны живёт в колонке — чипа «Страна» в отборе больше нет.
+    assert "Все страны" not in страница.split('class="mx-main', 1)[1]
