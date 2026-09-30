@@ -500,10 +500,15 @@ def _register_country(app: Flask, conf: Settings) -> None:
             # переход в единственную страну вешал бы `?lang=` умолчания.
             язык = {"lang": _lang(conf)} if request.args.get("lang") else {}
             return redirect(_url("country", code=страны[0][0], **язык))
-        return render_template("country/index.html", view=None, choices=страны)
+        if not страны:
+            return render_template("country/index.html", view=None, choices=страны)
+        # Рабочая зона не пустует, как в «Методике»: без страны в адресе
+        # справа сразу первая страна колонки (самая большая). Экран помечен
+        # выбором — на телефоне первым идёт список стран, а не эта страна.
+        return country(страны[0][0], picking=True)
 
     @app.get(section("country").path + "/<code>", endpoint="country")
-    def country(code: str) -> str:
+    def country(code: str, picking: bool = False) -> str:
         язык = _lang(conf)
         # Код страны из адреса — ввод снаружи: регистр приводится, чужое
         # сужает выборку в пустоту, и экран говорит об этом словами, а не 500.
@@ -582,6 +587,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
             "country/index.html",
             view=вид,
             choices=страны,
+            picking=picking,
             picks=tuple(чипы),
             selection=selection,
             select_url=отбор,
