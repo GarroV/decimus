@@ -7,7 +7,7 @@
 
 | Файл здесь | Оригинал в `forma` | Коммит-источник |
 |---|---|---|
-| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `a73d0fc` (ветка `feat/lang-pill`, до слияния в main forma) |
+| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `a73d0fc` (main forma с 30.09.2026) |
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
 | `icons.json` | `dodo/core/icons.json` | `f70045d` |
@@ -15,9 +15,9 @@
 Ядро обновлено 30.09.2026 той же раскаткой из ветки forma `feat/lang-pill`
 (#461): переключатель языка пилюлей `.langpill` и строка `.sidenav__lang`,
 плюс три мелкие правки main forma после `f70045d` (кольцо фокуса поиска,
-`--ink-3`, подсветка темы по `aria-pressed`). Пока ветка не влита в main
-forma, `diff` ниже с клоном forma на main покажет расхождение — сверять с
-веткой. Остальные файлы — от 28.09.
+`--ink-3`, подсветка темы по `aria-pressed`). Ветка влита в main forma
+30.09.2026 (D293), `diff` ниже сверяется с клоном forma на main. Остальные
+файлы — от 28.09.
 
 Копия обновлена 28.09.2026 раскаткой `python tools/spread.py --apply --to=decimus=<worktree>`
 из клона `forma`: эталоном линейки стал Swarm Brain — палитра, Golos Text + IBM
