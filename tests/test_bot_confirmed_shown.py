@@ -102,23 +102,16 @@ async def test_подтверждённая_запись_показывает_т
 async def test_под_записью_остались_кнопки_правки(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Показ стал шире, а править запись по-прежнему нечем, кроме этих кнопок (T056)."""
+    """Под показом записи — две кнопки правки, «Зона» и «Удалить» (T056, D254)."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
     await confirm_model_candidate(dp, bot, monkeypatch)
 
-    assert session.keyboard_data() == [
-        "edit:1:zone",
-        "edit:1:level",
-        "edit:1:text",
-        # Повтор правит не формулировку, а цену записи (#359, D191) — и потому
-        # стоит здесь же: цена меняется вдвое, и ошибиться в ней так же легко,
-        # как в классе, а снимать пометку обязано быть так же просто.
-        "edit:1:repeat",
-        "edit:1:drop",
-    ]
+    # D254: под записью только зона и удаление. Класс, формулировка и пункт
+    # правятся ответом словами, повтор бот спрашивает сам (D255).
+    assert session.keyboard_data() == ["edit:1:zone", "edit:1:drop"]
 
 
 async def test_пункт_не_повторяется_дважды_когда_текст_записи_и_есть_вопрос_пункта(

@@ -239,9 +239,13 @@ def _purge_photos(
     for photo_id, storage_path, preview_path in кадры:
         # Сжатая копия (D219) уходит вместе с оригиналом: снятая проверка
         # убирается из хранилища целиком, и копия «навсегда» к ней не относится.
+        # У кадров после D253 обе ссылки указывают на один объект — ключи
+        # сводятся к множеству, порядок сохраняется.
         ключи = [_object_key(str(storage_path), photo_id=str(photo_id))]
         if preview_path:
-            ключи.append(_object_key(str(preview_path), photo_id=str(photo_id)))
+            ключ_копии = _object_key(str(preview_path), photo_id=str(photo_id))
+            if ключ_копии not in ключи:
+                ключи.append(ключ_копии)
         try:
             for ключ in ключи:
                 склад.delete(ключ)

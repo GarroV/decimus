@@ -209,14 +209,13 @@ async def test_фраза_с_двумя_нарушениями_показыва�
     assert "…" not in shown, "многоточие: слова всё-таки урезаны"
 
 
-async def test_под_записью_есть_и_правка_и_выход_к_модели(
+async def test_под_записью_только_зона_и_удаление(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Замена подтверждению: поправить или удалить — и разобрать заново.
+    """D254: под записью две кнопки — «Зона» и «Удалить».
 
-    Правка кода пункта в чате не предусмотрена (`routers/edit.py`), а те же
-    слова снова поднимут тот же пункт. Без «Разобрать моделью» рядом с записью
-    неверный код чинился бы удалением и повтором по кругу.
+    Класс, формулировка и другой пункт правятся ответом на сообщение словами
+    (`routers/correct.py`); пять кнопок в ряд на телефоне обрезались.
     """
     started()
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
@@ -225,20 +224,17 @@ async def test_под_записью_есть_и_правка_и_выход_к_�
 
     await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
 
-    buttons = session.keyboard_data()
-    assert MODEL_CALLBACK in buttons, "выхода к модели нет — неверный код не починить"
-    for what in ("zone", "level", "text", "drop"):
-        assert f"{EDIT_PREFIX}1:{what}" in buttons, f"под записью нет правки «{what}»"
+    assert session.keyboard_data() == [f"{EDIT_PREFIX}1:zone", f"{EDIT_PREFIX}1:drop"]
 
 
-async def test_отказ_движка_не_оставляет_тупика_а_передаёт_модели(
+async def test_тот_же_пункт_вторым_кадром_ложится_в_запись_без_модели(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Тот же пункт в той же зоне второй раз движок не берёт — и это обычный исход.
+    """Тот же пункт в той же зоне второй раз — это второе фото той же записи.
 
-    Раньше отказ приходил на нажатие, и рядом оставались кнопки. Теперь нажатия
-    нет, и молча упереться в отказ аудитор не должен: причина названа, а
-    материал уходит в разбор моделью — там пункт можно выбрать другой.
+    До #443 движок отказывал, а материал уходил в разбор моделью. Теперь кадр
+    ложится в занявшую пару запись (D243, D247), и модель разбора не нужна:
+    пункт уже найден словами аудитора.
     """
     started()
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN12", "D1", "hot_kitchen")))
@@ -252,9 +248,9 @@ async def test_отказ_движка_не_оставляет_тупика_а_�
     await feed(dp, bot, photo_message("frame-2", caption=CLEAR))
 
     assert len(findings()) == 1, "движок взял тот же пункт в ту же зону дважды"
-    assert any(text.startswith("Не записал:") for text in session.texts), "отказ не назван"
-    assert len(asked) == 1, "после отказа материал никуда не пошёл — тупик"
-    assert f"{PICK_PREFIX}0" in session.keyboard_data()
+    assert findings()[0].photos == ["frame-1", "frame-2"], "второй кадр не лёг в запись"
+    assert any(text.startswith("📎 Добавил фото") for text in session.texts), "не сказано"
+    assert asked == [], "кадр в занятую запись зачем-то ушёл в разбор моделью"
 
 
 async def test_кнопка_разобрать_моделью_отдаёт_модели_тот_же_материал(

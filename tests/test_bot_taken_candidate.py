@@ -1,12 +1,10 @@
 """Занятый пункт в перечне помечен, а не предложен молча (T137, issue #108).
 
-Сцена целиком. Аудитор снимает то, что уже записал. Сверка со списком нарушений
-поднимает тот же пункт в той же зоне, движок отказывает, и бот честно говорит
-«уже зафиксировано» (`record.duplicate`). Дальше материал уходит модели — и это
-задумано: на кадре бывает второе нарушение, и упереться в отказ молча аудитор не
-должен. Неверно другое: модель предлагает **тот же самый** пункт, и в перечне он
-ничем не отличается от остальных. Нажатие даст второй отказ подряд — по тому же
-поводу, о котором продукт только что сказал сам.
+Сцена целиком. Аудитор снимает то, что уже записал, и просит разобрать кадр
+моделью. Модель предлагает **тот же самый** пункт в той же зоне, и в перечне он
+не должен ничем не отличаться от остальных: аудитор обязан видеть, что такая
+запись уже есть. С #443 (D243, D247) нажатие на такой пункт положит кадр в ту
+запись, а не заведёт вторую, — пометка говорит, куда именно он ляжет.
 
 Пометка идёт по ПАРЕ «пункт + зона», а не по одному коду. Тот же пункт в другой
 зоне — законная и частая запись (движок отказывает именно на паре), и пометить
@@ -35,7 +33,7 @@ from bot_harness import callback_query as callback
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.domain import add_finding, get_state, start_inspection
+from src.domain import add_finding, start_inspection
 
 pytestmark = pytest.mark.asyncio
 
@@ -51,25 +49,19 @@ SETTINGS = BotSettings(
 CLEAR = "печь грязная"
 
 
-async def test_после_отказа_модель_предлагает_занятый_пункт_с_пометкой(
+async def test_модель_предлагает_занятый_пункт_с_пометкой(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Сам дефект, целиком: запись, второй такой же кадр, отказ, перечень модели."""
+    """Сам дефект: запись есть, модель по второму кадру предлагает ту же пару."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
     stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen", "Печь в нагаре")))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, photo_message("frame-1", caption=CLEAR))
-    state = get_state(CHAT_ID)
-    assert state is not None
-    assert len(state.findings) == 1, "сверка со списком не записала — тест проверяет не то"
+    await feed(dp, bot, photo_message("frame-2", message_id=501))
+    await feed(dp, bot, callback("rec:analyze:501"))
 
-    session.clear()
-    await feed(dp, bot, photo_message("frame-2", caption=CLEAR))
-
-    told = " ".join(session.texts)
-    assert t("record.duplicate", "ru", n=1, item="", zone="")[:20] in told, "отказа не было"
     assert t("record.candidate_taken", "ru", n=1) in session.last_text
 
 
@@ -94,8 +86,8 @@ async def test_занятый_кандидат_остаётся_нажимаем
 ) -> None:
     """Кнопку не убираем: уход к модели задуман, и выбор остаётся за человеком.
 
-    Нажатие приведёт к отказу с кнопками правки уже существующей записи (T127) —
-    это законный путь «доснять фото» или «поправить», а не тупик. Пропади кнопка,
+    Нажатие положит кадр в уже существующую запись (#443, D243) — это законный
+    путь «доснять фото», а не тупик. Пропади кнопка,
     поехали бы и номера остальных кандидатов.
     """
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")

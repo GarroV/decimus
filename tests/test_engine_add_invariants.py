@@ -159,3 +159,60 @@ def test_init_обнуляет_счётчик_новой_проверки(
     audit("init", "--unit", "Другая", "--date", "2026-08-22")
     audit("add", "--qid", "CLN05", "--level", "D1", "--zone", "hot_kitchen")
     assert numbers(workdir) == [1], "новая проверка началась не с первого номера"
+
+
+def запись_D0(n: int, qid: str, zone: str) -> dict:
+    """D0-запись на пункте с нарушениями: `add` её не создаст, а состояние допускает."""
+    return {**старая_запись(n, qid, zone), "level": "D0"}
+
+
+def test_D0_одного_пункта_в_одной_зоне_не_отклоняется_как_дубль(
+    started: Callable[..., Run], workdir: Path
+) -> None:
+    """#444: второй аппарат в той же зоне — вторая запись, вычета у D0 нет."""
+    r1 = started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
+                 "--comment", "печь у линии начинки 240")
+    r2 = started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
+                 "--comment", "печь после линии начинки 235")
+    assert r1.code == 0 and r2.code == 0, (r1.text, r2.text)
+    assert numbers(workdir) == [1, 2]
+
+
+def test_D0_не_занимает_пару_у_нарушения(started: Callable[..., Run], workdir: Path) -> None:
+    """Информационная запись не мешает нарушению того же пункта и зоны."""
+    положить_старое_состояние(workdir, [запись_D0(1, "CLN06", "hot_kitchen")])
+    r = started("add", "--qid", "CLN06", "--level", "D1", "--zone", "hot_kitchen")
+    assert r.code == 0, r.text
+    assert numbers(workdir) == [1, 2]
+
+
+def test_D1_в_паре_с_D0_по_прежнему_отклоняется_вторым_D1(
+    started: Callable[..., Run], workdir: Path
+) -> None:
+    положить_старое_состояние(workdir, [запись_D0(1, "CLN06", "hot_kitchen")])
+    started("add", "--qid", "CLN06", "--level", "D1", "--zone", "hot_kitchen")
+    r = started("add", "--qid", "CLN06", "--level", "D1", "--zone", "hot_kitchen")
+    assert r.code != 0 and "#2" in r.text, r.text
+    assert numbers(workdir) == [1, 2]
+
+
+def test_правка_в_D1_занятой_пары_отклоняется(
+    started: Callable[..., Run], workdir: Path
+) -> None:
+    положить_старое_состояние(
+        workdir, [старая_запись(1, "CLN06", "hot_kitchen"), запись_D0(2, "CLN06", "hot_kitchen")]
+    )
+    r = started("edit", "--n", "2", "--level", "D1")
+    assert r.code != 0 and "#1" in r.text, r.text
+
+
+def test_D0_несколько_в_одной_зоне_печатаются_отдельными_строками(
+    started: Callable[..., Run], report: Callable[..., Run]
+) -> None:
+    started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
+            "--comment", "первый аппарат 240")
+    started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
+            "--comment", "второй аппарат 235")
+    r = report("html")
+    assert r.code == 0, r.text
+    assert "первый аппарат 240" in r.out and "второй аппарат 235" in r.out

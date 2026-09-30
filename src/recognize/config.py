@@ -19,6 +19,7 @@ from .errors import RecognizeConfigError
 
 MODEL_VAR = "RECOGNIZE_MODEL"
 TRANSCRIBE_MODEL_VAR = "RECOGNIZE_TRANSCRIBE_MODEL"
+MERGE_MODEL_VAR = "RECOGNIZE_MERGE_MODEL"
 API_KEY_VAR = "OPENAI_API_KEY"
 TIMEOUT_VAR = "RECOGNIZE_TIMEOUT"
 MIN_CONFIDENCE_VAR = "RECOGNIZE_MIN_CONFIDENCE"
@@ -32,6 +33,13 @@ DEFAULT_MODEL = "gpt-5.6-sol"
 
 #: Транскрипция голосовых — решение D008.
 DEFAULT_TRANSCRIBE_MODEL = "gpt-4o-mini-transcribe"
+
+#: Сведение комментария записи, когда к ней лёг ещё один кадр (#443, D247):
+#: прежний текст и новые слова аудитора — в одну фразу. Задача текстовая и
+#: короткая, картинок в ней нет, поэтому владелец просил дешёвую модель, а не
+#: флагман. Самая дешёвая текстовая модель провайдера по его каталогу на
+#: 30.09.2026 (developers.openai.com/api/docs/models): $0.1 / $0.5 за 1M токенов.
+DEFAULT_MERGE_MODEL = "gpt-6-luna"
 
 DEFAULT_TIMEOUT = 90.0
 
@@ -74,6 +82,9 @@ class RecognizeSettings:
     min_confidence: float
     max_candidates: int
     ffmpeg: str
+    #: С умолчанием, а не обязательным полем: настройки собирают и тесты, и
+    #: замеры, и сведению комментария (#443) они не нужны.
+    merge_model: str = DEFAULT_MERGE_MODEL
 
 
 def _number(env: Mapping[str, str], name: str, default: float) -> float:
@@ -101,4 +112,5 @@ def load_recognize_settings(env: Mapping[str, str] | None = None) -> RecognizeSe
         min_confidence=_number(src, MIN_CONFIDENCE_VAR, DEFAULT_MIN_CONFIDENCE),
         max_candidates=int(_number(src, MAX_CANDIDATES_VAR, DEFAULT_MAX_CANDIDATES)),
         ffmpeg=(src.get(FFMPEG_VAR) or "").strip() or "ffmpeg",
+        merge_model=(src.get(MERGE_MODEL_VAR) or "").strip() or DEFAULT_MERGE_MODEL,
     )
