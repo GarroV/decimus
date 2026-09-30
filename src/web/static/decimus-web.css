@@ -1373,8 +1373,20 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
    шапки над содержимым нет (D228), и любой зазор сверху показывал бы
    проезжающие под ним пункты. Прилипший блок теряет скругление (иначе в
    углах видно список) и получает тень — так видно, что под ним есть ещё. */
+/* Верх «Методики» — шапка и строка версии — стоит на месте, фоном страницы:
+   под ним проезжают пункты, и прозрачный верх показывал бы их сквозь себя.
+   На телефоне верх переносится в несколько строк и съел бы пол-экрана —
+   там он прокручивается, как раньше. */
+.mx-top {
+  position: sticky; top: var(--topbar-h); z-index: 4;
+  background: var(--canvas);
+  padding: var(--space-4) 0 var(--space-5);
+}
+@media (max-width: 767px) {
+  .mx-top { position: static; padding: 0; }
+}
 .mx-stick {
-  position: sticky; top: var(--topbar-h); z-index: 3;
+  position: sticky; top: calc(var(--topbar-h) + var(--mx-top-h, 0px)); z-index: 3;
   background: var(--surface);
   border-radius: var(--r-block) var(--r-block) 0 0;
   transition: box-shadow var(--t-state);

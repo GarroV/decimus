@@ -192,11 +192,28 @@
   (function () {
     var probe = document.querySelector("[data-mx-stick-probe]");
     var stick = document.querySelector("[data-mx-stick]");
-    if (!probe || !stick || !("IntersectionObserver" in window)) return;
-    new IntersectionObserver(function (entries) {
-      var e = entries[0];
-      stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < 0);
-    }).observe(probe);
+    var top = document.querySelector("[data-mx-top]");
+    // Высота неподвижного верха: блок поиска встаёт под ним. На телефоне верх
+    // прокручивается (CSS), и тогда отступ нулевой.
+    function topHeight() {
+      if (!top || getComputedStyle(top).position !== "sticky") return 0;
+      return Math.ceil(top.getBoundingClientRect().height);
+    }
+    var watcher = null;
+    function place() {
+      var h = topHeight();
+      document.documentElement.style.setProperty("--mx-top-h", h + "px");
+      if (!probe || !stick || !("IntersectionObserver" in window)) return;
+      if (watcher) watcher.disconnect();
+      watcher = new IntersectionObserver(function (entries) {
+        var e = entries[0];
+        stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < h + 1);
+      }, { rootMargin: "-" + (h + 1) + "px 0px 0px 0px" });
+      watcher.observe(probe);
+    }
+    place();
+    if (top && "ResizeObserver" in window) new ResizeObserver(place).observe(top);
+    else window.addEventListener("resize", place);
   })();
   // --- Переключатель в шапке при видимой колонке --------------------------
   // Шире 1023px чек-листы видны колонкой, и переключатель в шапке — просто
