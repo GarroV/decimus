@@ -28,12 +28,8 @@
       {# Подстроки «N точек · N проверок · период» здесь нет: те же числа
          стоят в плитках строкой ниже, а период — в чипе выборки. #}
     </div>
-    {# Кнопка ведёт в раздел планирования. Раздел не строится (D139) и скажет
-       об этом честной страницей, а сама кнопка приглушена, как пункт меню
-       того же раздела: главная кнопка экрана не должна вести в заглушку. #}
-    <a class="btn ov-head__cta is-wip" href="{{ url(plans_path) }}?lang={{ lang }}" title="{{ t('nav.wip') }}">
-      {{ t('overview.assign') }}
-    </a>
+    {# Кнопки «Назначить проверку» здесь нет (D260): назначение — действие УК,
+       и оно придёт в раздел действий УК вместе с планом проверок. #}
   </div>
 
   {# ── Выборка ───────────────────────────────────────────────────────────
@@ -87,7 +83,11 @@
             <span class="ov-num">{{ t('overview.breakdown.critical') }}</span>
           </div>
           {% for row in data.breakdown %}
-            <a class="ov-table__row" href="{{ registry_url(city=row.city) }}">
+            {# Город ведёт в страну с выбранным городом (D260): там его пиццерии
+               и их история. Город без страны в справочнике — в «Проверки»,
+               как раньше: экрана страны с пустым кодом не бывает. #}
+            <a class="ov-table__row"
+               href="{{ country_url(row.country, city=row.city) if row.country else registry_url(city=row.city) }}">
               <span class="ov-cell__name">{{ city_title(row.city) or t('overview.breakdown.nocity') }}</span>
               <span class="ov-num">{{ row.units }}</span>
               <span class="ov-num ov-num--strong"
@@ -268,14 +268,14 @@
           <span>{{ t('overview.points.zone') }}</span>
           <span class="ov-num">{{ t('overview.points.date') }}</span>
         </div>
-        {# Клик по строке открывает КАРТОЧКУ ТОЧКИ (прототип владельца): вопрос
-           «что с этой пиццерией» шире, чем «как прошёл последний обход».
-           Точки нет в справочнике — строка по-прежнему ведёт в отчёт, это
-           лучше мёртвой строки. #}
+        {# Клик по строке открывает СТРАНУ С РАСКРЫТОЙ ТОЧКОЙ (D260): там её
+           история проверок и переход в карточку. У точки нет страны в
+           справочнике — в карточку точки, как раньше; точки нет в справочнике
+           вовсе — в отчёт, это лучше мёртвой строки. #}
         {% for point in data.points %}
           {% set unit_id = unit_ids.get(point.unit) %}
           <a class="ov-table__row"
-             href="{{ url('/units/' ~ unit_id) if unit_id else url(registry_path ~ '/' ~ point.inspection_id) }}">
+             href="{% if unit_id and point.country %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
             <span class="ov-cell__name">{{ point.unit }}</span>
             <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
             <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>

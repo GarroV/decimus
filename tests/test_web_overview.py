@@ -29,6 +29,7 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db.models import InspectionRow
 from src.web import app as app_mod
 from src.web import overview as ov
+from src.web.texts import t as _t
 
 ПУСТО = ov.Overview(
     units_total=0,
@@ -582,7 +583,7 @@ def test_при_выбранной_стране_города_только_её()
     assert города == (("antalya", 1),)
 
 
-def test_строка_разбивки_ведёт_в_реестр_проверок_города(
+def test_город_без_страны_в_разбивке_ведёт_в_реестр_проверок_города(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
@@ -590,7 +591,7 @@ def test_строка_разбивки_ведёт_в_реестр_проверо
         breakdown=(
             ov.CityRow(
                 city="tbilisi",
-                country="GE",
+                country="",
                 units=3,
                 inspections=2,
                 average=90.0,
@@ -605,7 +606,8 @@ def test_строка_разбивки_ведёт_в_реестр_проверо
     # Act
     страница = показать(стенд, monkeypatch, данные)
 
-    # Assert — ссылка несёт код города, а на экране город словом.
+    # Assert — без страны экрана страны нет (D260): ссылка в реестр с кодом
+    # города, а на экране город словом.
     assert 'href="/inspections?city=tbilisi' in страница
     assert "Тбилиси" in страница
     assert ">tbilisi<" not in страница
@@ -704,3 +706,68 @@ def test_пункт_на_одной_точке_системным_не_счит�
 
     # Assert
     assert [item.code for item in данные.systemic] == ["K-1"]
+
+
+# --- «Обзор» ведёт в страну (D260) --------------------------------------------
+
+
+def точка(unit: str, country: str, city: str) -> ov.PointRow:
+    return ov.PointRow(
+        unit=unit,
+        city=city,
+        country=country,
+        inspection_id="11111111-2222-3333-4444-000000000009",
+        when=date(2026, 9, 20),
+        grade="B",
+        pct=90.0,
+        delta=None,
+        worst_zone_ru="",
+        worst_zone_en="",
+        critical=0,
+    )
+
+
+def t_ru(key: str) -> str:
+    return _t(key, "ru")
+
+
+def test_точка_на_обзоре_ведёт_в_страну_с_раскрытой_точкой(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    данные = снимок(points=(точка("Батуми-1", "GE", "batumi"),), unit_ids={"Батуми-1": "u-1"})
+    страница = показать(стенд, monkeypatch, данные)
+    assert "/country/GE?" in страница and "unit=u-1" in страница
+    assert "#unit-u-1" in страница
+
+
+def test_точка_без_страны_ведёт_в_карточку_как_раньше(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    данные = снимок(points=(точка("Без-1", "", ""),), unit_ids={"Без-1": "u-9"})
+    страница = показать(стенд, monkeypatch, данные)
+    assert "/units/u-9" in страница
+    assert "/country/?" not in страница and "/country/-" not in страница
+
+
+def test_город_в_разбивке_ведёт_в_страну_с_городом(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    город = ov.CityRow(
+        city="batumi",
+        country="GE",
+        units=1,
+        inspections=1,
+        average=90.0,
+        comparable=True,
+        grades=(("B", 1),),
+        critical=0,
+    )
+    страница = показать(стенд, monkeypatch, снимок(breakdown=(город,)))
+    assert "/country/GE?" in страница and "city=batumi" in страница
+
+
+def test_назначить_проверку_на_обзоре_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    страница = показать(стенд, monkeypatch, снимок())
+    assert t_ru("overview.assign") not in страница

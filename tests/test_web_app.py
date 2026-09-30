@@ -34,6 +34,7 @@ from src.db.migrate import discover_migrations
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
 from src.db.retract import Retraction
+from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
@@ -131,6 +132,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
+    monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
@@ -162,7 +164,7 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 6
+    assert len(непостроенные) == 5
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key

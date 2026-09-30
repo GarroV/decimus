@@ -1,0 +1,180 @@
+{#
+  Экран «Страна» — работа с одной страной (D260, D262). Ни одного вычисления:
+  всё приходит из `src/web/country.py`, который берёт цифры «Обзора» с отбором
+  по стране, — движок посчитал, база записала, экран показал.
+
+  Блоков предписаний, экшн-планов и плана проверок здесь нет, пока их нет в
+  продукте (D217): ни заглушкой, ни пустой рамкой. Они придут своими волнами
+  спеки. Действий УК на экране тоже нет (D264).
+#}{% extends "base.html" %}
+{% from "_pick.html" import pick %}
+{% block title %}{{ t('section.country.title') }}{% endblock %}
+
+{% block body %}
+{% if view is none %}
+  {# ── Выбор страны: адрес без кода. Одна страна — сюда не попадают, их
+     сразу переводит в неё маршрут. #}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
+      <h1 class="ov-head__title">{{ t('country.choose.title') }}</h1>
+    </div>
+  </div>
+  <section class="ov-card">
+    {% if choices %}
+      {% for code, n in choices %}
+        <a class="ov-row" href="{{ url('/country/' ~ code) }}?lang={{ lang }}">
+          <span class="ov-row__name">
+            {{ country_title(code) or code }}
+            <span class="ov-row__meta">{{ t('country.choose.units', n=n) }}</span>
+          </span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>
+    {% endif %}
+  </section>
+{% else %}
+  {% set data = view.snapshot %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
+      <h1 class="ov-head__title">{{ country_title(view.code) or '—' }}</h1>
+      <div class="ov-card__hint">
+        {{ t('country.summary',
+             inspections=data.inspections|length,
+             average=('—' if data.average is none or not data.comparable else '%.1f'|format(data.average)),
+             unchecked=data.unchecked) }}
+      </div>
+    </div>
+  </div>
+
+  {# Отбор — ссылками, как на «Обзоре»: срез живёт в адресе. Страна здесь не
+     фильтр, а сам экран, поэтому она в адресе пути, а не в `?country=`. #}
+  <div class="ov-filters">
+    <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
+    {% for chip in picks %}{{ pick(chip) }}{% endfor %}
+    <span class="ov-filters__gap"></span>
+    <a class="ov-chip ov-chip--reset{% if not selection.narrowed %} is-idle{% endif %}"
+       href="{{ reset_url }}">{{ t('overview.filter.reset') }}</a>
+  </div>
+
+  {# ── Пиццерии страны ──────────────────────────────────────────────────
+     Строка раскрывает историю точки прямо под собой (D260): вопрос «что с
+     этой пиццерией» решается на месте, а карточка точки — на шаг глубже.
+     Точки нет в справочнике — строка ведёт в отчёт, это лучше мёртвой. #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.units.title') }}</div>
+      <div class="ov-card__hint">{{ t('country.units.hint') }}</div>
+      <div class="ov-card__count">{{ data.points|length }}</div>
+    </div>
+    {% if data.points %}
+      <div class="ov-table ov-table--points">
+        <div class="ov-table__head">
+          <span>{{ t('overview.points.unit') }}</span>
+          <span>{{ t('overview.points.city') }}</span>
+          <span class="ov-num">{{ t('overview.points.grade') }}</span>
+          <span class="ov-num">{{ t('overview.points.score') }}</span>
+          <span class="ov-num">{{ t('overview.points.delta') }}</span>
+          <span>{{ t('overview.points.zone') }}</span>
+          <span class="ov-num">{{ t('overview.points.date') }}</span>
+        </div>
+        {% for point in data.points %}
+          {% set unit_id = data.unit_ids.get(point.unit, '') %}
+          {% set is_open = unit_id and unit_id == view.unit_id %}
+          <a class="ov-table__row{% if is_open %} is-open{% endif %}"
+             {% if unit_id %}id="unit-{{ unit_id }}" href="{{ open_url(unit_id) }}" aria-expanded="{{ 'true' if is_open else 'false' }}"
+             {% else %}href="{{ url(registry_path ~ '/' ~ point.inspection_id) }}?lang={{ lang }}"{% endif %}>
+            <span class="ov-cell__name">{{ point.unit }}</span>
+            <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
+            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
+            <span class="ov-num ov-num--strong">{{ '%.1f'|format(point.pct) }}</span>
+            <span class="ov-num{% if point.delta is not none and point.delta < 0 %} ov-num--err{% endif %}"
+                  {% if point.delta is none %}title="{{ t('overview.points.nodelta') }}"{% endif %}>
+              {{ '—' if point.delta is none else ('%+.1f'|format(point.delta)) }}
+            </span>
+            <span class="ov-cell__muted">{{ (point.worst_zone_ru if lang == 'ru' else point.worst_zone_en) or '—' }}</span>
+            <span class="ov-num ov-cell__muted">{{ point.when }}</span>
+          </a>
+          {% if is_open %}
+            <div class="ov-history">
+              <div class="ov-history__title">{{ t('country.history.title') }} · {{ view.unit_name }}</div>
+              {% for row in view.history %}
+                <a class="ov-row" href="{{ url(registry_path ~ '/' ~ row.id) }}?lang={{ lang }}">
+                  <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+                  <span class="ov-row__name">
+                    {{ row.inspection_date }}
+                    {% if loop.first %}<span class="ov-row__meta">{{ t('country.history.latest') }}</span>{% endif %}
+                  </span>
+                  <span class="ov-row__num">{{ '%.1f'|format(row.pct) }}</span>
+                </a>
+              {% endfor %}
+              <div class="ov-history__actions">
+                <a class="btn btn--sm" href="{{ url('/units/' ~ view.unit_id) }}?lang={{ lang }}">{{ t('country.history.card') }}</a>
+                <a class="btn btn--sm" href="{{ open_url(view.unit_id) }}">{{ t('country.history.close') }}</a>
+              </div>
+            </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.units.empty') }}</div>
+    {% endif %}
+  </section>
+
+  <div class="ov-grid">
+    {# ── Что системно болит: пункты, нарушенные в нескольких пиццериях.
+       Подпись — как на «Обзоре»: пункт методики, иначе формулировка
+       свежей записи, иначе код. #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('country.systemic.title') }}</div>
+      </div>
+      {% if data.systemic %}
+        {% for item in data.systemic %}
+          <div class="ov-row">
+            <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
+            <span class="ov-row__name">
+              {% if item_titles.get(item.code) %}
+                {{ item_titles.get(item.code) }}
+              {% elif item.text %}
+                <span lang="{{ item.lang }}">{{ item.text }}</span>
+              {% else %}
+                {{ item.code }}
+              {% endif %}
+              <span class="ov-row__meta">
+                {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
+                {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
+              </span>
+            </span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('country.systemic.empty') }}</div>
+      {% endif %}
+    </section>
+
+    {# ── Где страна теряет больше всего ─────────────────────────────── #}
+    <section class="ov-card">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('country.zones.title') }}</div>
+      </div>
+      {% if data.zone_losses %}
+        {% for zone in data.zone_losses %}
+          <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+            <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
+            <span class="ov-bar">
+              <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
+              <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
+            </span>
+            <span class="ov-row__num">−{{ '%.1f'|format(zone.loss) }}</span>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="ov-card__empty">{{ t('country.zones.empty') }}</div>
+      {% endif %}
+    </section>
+  </div>
+{% endif %}
+{% endblock %}
