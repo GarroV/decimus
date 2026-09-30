@@ -67,6 +67,21 @@ SPOKEN: dict[str, tuple[str, ...]] = {
     "freezer": ("морозилка",),
 }
 
+#: Сокращения цехов, как их произносят и пишут аудиторы (D244, #444): «ГЦ» —
+#: горячий цех, «ХЦ» — холодный. Основа короче `MIN_STEM`, поэтому через `stems`
+#: они не проходят и ищутся отдельно — только целым словом, а не внутри чужого
+#: («гц» в середине слова не срабатывает). Регистр не важен. Код зоны, которого
+#: нет в издании проверки, сокращение молча пропускает.
+ABBREVIATIONS: dict[str, str] = {
+    "гц": "hot_kitchen",
+    "хц": "cold_kitchen",
+}
+
+#: Вес сокращения при споре имён: как у названия из двух слов («горячий цех»),
+#: потому что оно и есть такое название целиком. Оборудование, названное в той
+#: же фразе («холодильник ГЦ»), зону не перебивает.
+_ABBREVIATION_WEIGHT = 2
+
 #: Чем разрезается название зоны на самостоятельные имена: составное имя зоны —
 #: это два имени одного места, и произносят их по отдельности.
 _SPLIT = re.compile(r"[/,]|\sи\s|\sand\s")
@@ -178,7 +193,9 @@ def zone_from_words(note: str, *, chat_id: int | None) -> str | None:
     («в холодном») весит одно слово по устройству.
     """
     words = stems(note)
-    if not words:
+    spoken_words, _ = words_and_gaps(note)
+    abbreviated = {ABBREVIATIONS[w] for w in spoken_words if w in ABBREVIATIONS}
+    if not words and not abbreviated:
         return None
     named = phrases(chat_id=chat_id)
     # Длина совпавшего имени — мера того, насколько это имя произнесли, а не
@@ -188,6 +205,8 @@ def zone_from_words(note: str, *, chat_id: int | None) -> str | None:
         for name in names:
             if name <= words:
                 best[code] = max(best.get(code, 0), len(name))
+    for code in abbreviated & named.keys():
+        best[code] = max(best.get(code, 0), _ABBREVIATION_WEIGHT)
     if not best:
         # Имя целиком не названо — место могли назвать определением («в
         # холодном»). Ветка стоит ПОСЛЕ полного имени, а не соревнуется с ним:
