@@ -92,6 +92,10 @@ def available(settings: Settings, *, tenant: str) -> list[BotChecklist]:
             continue
         if space == своё and not in_bot_of(карточка, space, code, в_проде):
             continue
+        # Не «в работе» у эталона отсекает и следующая строка (`bot_block`
+        # заводит на этом `BOT_BLOCK_DRAFT`/`BOT_BLOCK_RETIRED`) — проверка
+        # оставлена явной, а не убрана: годность эталона партнёру не должна
+        # держаться на одной строке чужого модуля (Review Minor №3).
         if space != своё and карточка.state != ACTIVE:
             continue
         if bot_block(store) is not None:
@@ -129,10 +133,28 @@ def source_for(settings: Settings, code: str, *, space: str = DEFAULT_SPACE) -> 
     источник = root / space / code / CURRENT_LINK
     if not источник.is_dir():
         raise DomainError(
-            f"У чек-листа «{code}» нет опубликованного издания в хранилище {root} — "
+            f"У чек-листа «{space}/{code}» нет опубликованного издания в хранилище {root} — "
             f"проверку по нему вести не по чему"
         )
     return источник
+
+
+def space_for(settings: Settings, tenant: str, code: str) -> str:
+    """Пространство, где физически лежит издание кода у этого тенанта.
+
+    Своё пространство первым, эталон УК следом — тот же порядок, что у
+    `available` (Review Minor №1): правило «где искать» живёт в одном месте, а
+    не повторяется у каждого вызывающего. Код не найден ни там, ни там —
+    отдаём своё: `source_for` по нему откажет понятным текстом, который
+    назовёт именно то пространство, где искали (Review Minor №2).
+    """
+    root = settings.checklist_store
+    где = bot_spaces(canonical_tenant(tenant))
+    if root is not None:
+        for кандидат in где:
+            if (root / кандидат / code / CURRENT_LINK).is_dir():
+                return кандидат
+    return где[0]
 
 
 def pick(settings: Settings, code: str | None, *, tenant: str) -> BotChecklist:
@@ -145,9 +167,14 @@ def pick(settings: Settings, code: str | None, *, tenant: str) -> BotChecklist:
     """
     открыты = available(settings, tenant=tenant)
     if not открыты:
+        # Причина не одна: свой чек-лист открывает методист галочкой «Доступ
+        # в боте», а эталон УК становится видимым сам — переводом в работу и
+        # публикацией (D285). Партнёру, у которого не годен именно эталон,
+        # текст только про галочку соврал бы про причину (Review Minor №4).
         raise DomainError(
-            "Ни один чек-лист не открыт в боте — начать проверку не по чему. Чек-лист в бот "
-            "открывает методист в админке: «Методика» → «Доступ в боте»"
+            "Начать проверку не по чему: ни один чек-лист сейчас не годится. Свой чек-лист в "
+            "бот открывает методист в админке — «Методика» → «Доступ в боте»; эталон "
+            "становится видимым сам, когда его перевели в работу и опубликовали"
         )
     if code is None:
         if len(открыты) == 1:
