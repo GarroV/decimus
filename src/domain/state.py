@@ -594,7 +594,7 @@ def start_inspection(
     # с диском дороже. Отметка при этом честная — издание действующей методики.
     from .bot_checklists import pick
 
-    выбран = pick(settings, checklist_code)
+    выбран = pick(settings, checklist_code, tenant=tenant)
     # Каталог издания разворачивается ОДИН раз: публикация переставляет
     # указатель, и снимок со стартом движка иначе могли бы взять разные издания.
     # Без хранилища это `AUDIT_DATA_DIR` — поведение до волны 3 не меняется.
@@ -696,6 +696,27 @@ def assert_checklist_version(chat_id: int, settings: Settings) -> None:
     )
 
 
+def _checklist_space(settings: Settings, tenant: str, code: str) -> str:
+    """Пространство, где искать действующее издание кода при переводе проверки.
+
+    Своё пространство тенанта пробуется первым, эталон УК — следом, тем же
+    порядком, что у `bot_checklists.available`: партнёрский код живёт у
+    партнёра, а искать его в `hq` значило бы не найти вовсе (Review Н4). Без
+    хранилища или без совпадения годится умолчание — `source_for` без
+    хранилища его всё равно не читает.
+    """
+    # Отложенный импорт по той же причине, что и у `bot_checklists`: модуль
+    # тянет `src.report`, а тот на верхнем уровне читает `settings_for` отсюда
+    # же — на верхнем уровне вышел бы круг.
+    from src.mcp.checklist_layout import CURRENT_LINK, DEFAULT_SPACE, bot_spaces
+
+    root = settings.checklist_store
+    for кандидат in bot_spaces(canonical_tenant(tenant)):
+        if root is not None and (root / кандидат / code / CURRENT_LINK).is_dir():
+            return кандидат
+    return DEFAULT_SPACE
+
+
 def sync_checklist_version(chat_id: int) -> Inspection:
     """Перевести проверку на действующую методику, оставив след в ней самой.
 
@@ -723,7 +744,13 @@ def sync_checklist_version(chat_id: int) -> Inspection:
     from .bot_checklists import source_for
 
     code = edition.recorded_code(chat_id, settings)
-    current = edition.keep(settings, code, source_for(settings, code))
+    # Пространство ищем по тенанту ЭТОЙ проверки, не по умолчанию: код партнёра
+    # лежит в его собственном пространстве, а не в `hq`, и `source_for` без
+    # пространства искал бы там, где чек-листа партнёра нет (Review Н4).
+    состояние = read_state(chat_id, settings)
+    тенант = состояние.tenant if состояние is not None else HQ_TENANT
+    пространство = _checklist_space(settings, тенант, code)
+    current = edition.keep(settings, code, source_for(settings, code, space=пространство))
     with state_lock(path):
         raw = _read_raw(path)
         block = dict(raw.get(DOMAIN_KEY) or {})

@@ -29,6 +29,7 @@ from src.domain.bot_checklists import BotChecklist, available
 from src.domain.config import check_environment
 from src.domain.errors import DomainError
 from src.domain.geo import COUNTRIES
+from src.domain.tenants import HQ_TENANT
 from src.domain.unit_name import UnitName, canonical_unit
 
 from .. import sealed, sidecar
@@ -139,9 +140,13 @@ async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
 
 
 def _open_checklists() -> list[BotChecklist] | None:
-    """Открытые в боте чек-листы — или `None`, если их не прочитать."""
+    """Открытые в боте чек-листы — или `None`, если их не прочитать.
+
+    Тенант пока всегда УК (T340): бот сам пространств ещё не знает, это
+    заведёт задача 12, которая заменит его на пространство аудитора.
+    """
     try:
-        return available(check_environment())
+        return available(check_environment(), tenant=HQ_TENANT)
     except (DomainError, OSError, ValueError):
         logger.exception("список чек-листов для бота не прочитался")
         return None
