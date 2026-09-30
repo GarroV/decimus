@@ -135,3 +135,23 @@ def test_незаполненная_шапка_остаётся_пустой_а_
     assert прочитано is not None
     строка = прочитано.inspection
     assert (строка.auditor, строка.city, строка.partner, строка.contact) == ("", "", "", "")
+
+
+def test_пустой_город_проверки_берётся_из_справочника_пиццерий(
+    domain_env: Path, db_env: str
+) -> None:
+    """Мастер бота города больше не спрашивает (D233): город — из `units.city` (#460).
+
+    Без этого письмо по каждой новой проверке горело плашкой «не восстановлен
+    город», хотя справочник знал его всегда.
+    """
+    from src.db.directory import upsert_unit
+
+    upsert_unit("Батуми-1", country="GE", city="batumi", tenant=АРЕНДАТОР)
+    ident = _проверка(705, точка="Батуми-1", шапка=dict.fromkeys(ШАПКА, ""))
+
+    прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
+
+    assert прочитано is not None
+    assert прочитано.inspection.city == "batumi"
+    assert прочитано.inspection.auditor == "", "подставляется только город"
