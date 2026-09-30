@@ -8,6 +8,7 @@ import pytest
 from PIL import Image
 
 from src.db.errors import StorageError
+from src.db.photos import _put_photo
 from src.db.previews import PREVIEW_MAX_SIDE, make_preview
 from src.db.storage import key_of_uri, preview_key
 
@@ -53,3 +54,36 @@ def test_ключ_копии_отдельный_от_оригинала_и_чи�
     assert key_of_uri(f"s3://inspection-frames/{ключ}") == ключ
     with pytest.raises(StorageError):
         key_of_uri("https://storage.example/inspection-frames/key")
+
+
+class _Склад:
+    def __init__(self) -> None:
+        self.положено: dict[str, bytes] = {}
+
+    def put(self, key: str, data: bytes, *, content_type: str) -> str:
+        self.положено[key] = data
+        return f"s3://b/{key}"
+
+
+def test_выгрузка_кадра_кладёт_один_сжатый_объект_и_обе_ссылки_на_него() -> None:
+    склад = _Склад()
+    исходный = _кадр(4000, 3000)
+
+    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", исходный)
+
+    assert len(склад.положено) == 1
+    assert storage_uri == preview_uri == "s3://b/inspections/i-1/p-1.jpg"
+    (лежит,) = склад.положено.values()
+    assert len(лежит) < len(исходный)
+    with Image.open(io.BytesIO(лежит)) as к:
+        assert max(к.size) == PREVIEW_MAX_SIDE
+
+
+def test_нечитаемый_кадр_не_теряется_но_копии_не_получает() -> None:
+    склад = _Склад()
+
+    storage_uri, preview_uri = _put_photo(склад, "i-1", "p-1", b"not an image")
+
+    assert склад.положено == {"inspections/i-1/p-1.jpg": b"not an image"}
+    assert storage_uri == "s3://b/inspections/i-1/p-1.jpg"
+    assert preview_uri is None
