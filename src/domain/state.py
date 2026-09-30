@@ -696,27 +696,6 @@ def assert_checklist_version(chat_id: int, settings: Settings) -> None:
     )
 
 
-def _checklist_space(settings: Settings, tenant: str, code: str) -> str:
-    """Пространство, где искать действующее издание кода при переводе проверки.
-
-    Своё пространство тенанта пробуется первым, эталон УК — следом, тем же
-    порядком, что у `bot_checklists.available`: партнёрский код живёт у
-    партнёра, а искать его в `hq` значило бы не найти вовсе (Review Н4). Без
-    хранилища или без совпадения годится умолчание — `source_for` без
-    хранилища его всё равно не читает.
-    """
-    # Отложенный импорт по той же причине, что и у `bot_checklists`: модуль
-    # тянет `src.report`, а тот на верхнем уровне читает `settings_for` отсюда
-    # же — на верхнем уровне вышел бы круг.
-    from src.mcp.checklist_layout import CURRENT_LINK, DEFAULT_SPACE, bot_spaces
-
-    root = settings.checklist_store
-    for кандидат in bot_spaces(canonical_tenant(tenant)):
-        if root is not None and (root / кандидат / code / CURRENT_LINK).is_dir():
-            return кандидат
-    return DEFAULT_SPACE
-
-
 def sync_checklist_version(chat_id: int) -> Inspection:
     """Перевести проверку на действующую методику, оставив след в ней самой.
 
@@ -741,15 +720,17 @@ def sync_checklist_version(chat_id: int) -> Inspection:
         raise InspectionNotStarted(
             f"В этом чате проверка не начата — нет {path}. Переводить нечего"
         )
-    from .bot_checklists import source_for
+    from .bot_checklists import source_for, space_for
 
     code = edition.recorded_code(chat_id, settings)
     # Пространство ищем по тенанту ЭТОЙ проверки, не по умолчанию: код партнёра
     # лежит в его собственном пространстве, а не в `hq`, и `source_for` без
-    # пространства искал бы там, где чек-листа партнёра нет (Review Н4).
+    # пространства искал бы там, где чек-листа партнёра нет (Review Н4). Само
+    # правило «где искать» — в `bot_checklists.space_for`, тем же порядком, что
+    # у `available`, а не повторено здесь второй раз (Review Minor №1).
     состояние = read_state(chat_id, settings)
     тенант = состояние.tenant if состояние is not None else HQ_TENANT
-    пространство = _checklist_space(settings, тенант, code)
+    пространство = space_for(settings, тенант, code)
     current = edition.keep(settings, code, source_for(settings, code, space=пространство))
     with state_lock(path):
         raw = _read_raw(path)
