@@ -75,8 +75,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.period.y1": {"ru": "год", "en": "a year"},
     "overview.breakdown.title": {"ru": "Разбивка по городам", "en": "Breakdown by city"},
     "overview.breakdown.hint": {
-        "ru": "клик — проверки города",
-        "en": "click — the city's inspections",
+        "ru": "клик — город на экране страны",
+        "en": "click — the city on the country screen",
     },
     "overview.breakdown.city": {"ru": "Город", "en": "City"},
     "overview.breakdown.units": {"ru": "Точек", "en": "Units"},
@@ -219,6 +219,46 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.units.empty": {
         "ru": "Проверок в выборке нет — показывать нечего.",
         "en": "No inspections in this selection — nothing to show.",
+    },
+    "country.kicker": {"ru": "Страна", "en": "Country"},
+    "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
+    "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
+    "country.choose.empty": {
+        "ru": "В справочнике нет ни одной пиццерии со страной.",
+        "en": "No pizzeria in the directory has a country.",
+    },
+    "country.summary": {
+        "ru": "Проверок: {inspections} · средняя: {average} · не проверено точек: {unchecked}",
+        "en": "Inspections: {inspections} · average: {average} · units not inspected: {unchecked}",
+    },
+    "country.units.title": {"ru": "Пиццерии страны", "en": "Pizzerias of the country"},
+    "country.units.hint": {
+        "ru": "Последняя проверка каждой точки. Нажмите строку — откроется история проверок.",
+        "en": "Latest inspection of each unit. Click a row to open its inspection history.",
+    },
+    "country.units.empty": {
+        "ru": "В этой стране за выбранный период проверок нет.",
+        "en": "No inspections in this country for the selected period.",
+    },
+    "country.history.title": {"ru": "История проверок", "en": "Inspection history"},
+    "country.history.latest": {"ru": "последняя", "en": "latest"},
+    "country.history.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
+    "country.history.close": {"ru": "Свернуть", "en": "Collapse"},
+    "country.systemic.title": {
+        "ru": "Что системно болит в стране",
+        "en": "Systemic issues in the country",
+    },
+    "country.systemic.empty": {
+        "ru": "Пунктов, нарушенных сразу в нескольких пиццериях, нет.",
+        "en": "No item is violated in more than one pizzeria.",
+    },
+    "country.zones.title": {
+        "ru": "Где страна теряет больше всего",
+        "en": "Where the country loses most",
+    },
+    "country.zones.empty": {
+        "ru": "Потерь по зонам за период нет.",
+        "en": "No zone losses for the period.",
     },
     "section.overview.title": {"ru": "Обзор", "en": "Overview"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
