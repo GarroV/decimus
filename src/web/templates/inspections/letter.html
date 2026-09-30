@@ -13,149 +13,147 @@
 {% block title %}{{ t('letter.title') }}{% endblock %}
 
 {% block body %}
-  <div class="row row--tight">
-    <a class="btn btn--sm btn--ghost" href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}">‹ {{ t('letter.back') }}</a>
-  </div>
+  <a class="back" href="{{ url('/inspections/' ~ head.id) }}?lang={{ lang }}">‹ {{ t('letter.back') }}</a>
 
-  <div class="section mt-gap">
-    <div class="section__head">
-      <h2 class="section__title">{{ t('letter.title') }}</h2>
-      <span class="meta">{{ head.unit_name }} · {{ head.inspection_date }}</span>
-    </div>
-    <p class="field-note">{{ t('letter.lead') }}</p>
-    {#
-      Язык ПИСЬМА, а не интерфейса: партнёру пишут на его языке. Перечень
-      приезжает из методики — свой список предложил бы язык, которого в ней
-      нет.
-    #}
-    <div class="row row--tight mt-gap">
-      <span class="field-label">{{ t('letter.lang.pick') }}</span>
-      {% for код in letter_langs %}
-        <a class="btn btn--sm {% if код == letter_lang %}btn--primary{% else %}btn--ghost{% endif %}"
-           href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&letter_lang={{ код }}">{{ код }}</a>
-      {% endfor %}
-    </div>
-    <p class="field-note">{{ t('letter.lang.note') }}</p>
-  </div>
+  {#
+    ОДНО ОКНО, управление наверху (владелец 30.09.2026: «не нужна такая
+    большая шапка и при этом элемента управления внизу. подними все это,
+    сделай адекватное окно»). Шапка окна — имя, предмет, язык письма и все
+    действия одной полосой; она липнет к верху, поэтому кнопки на виду при
+    любой длине письма. Под ней — только текст. Пояснения, которые раньше
+    стояли абзацами над письмом, ушли в подвал окна мелким шрифтом: их
+    читают один раз, а письмо правят каждый день.
 
+    Форма — всё окно целиком: кнопки в шапке принадлежат ей, а не висят
+    отдельно от поля, которое отправляют.
+  #}
   {% if letter.failure %}
-    <div class="note note--error mt-gap">
+    <div class="note note--error">
       <div>
         <div class="note__title">{{ t('letter.failed.title') }}</div>
         <div class="note__text">{{ letter.failure }}</div>
       </div>
     </div>
   {% else %}
-    {% if letter.ready %}
-      <div class="note note--ok mt-gap">
-        <div>
-          <div class="note__title">{{ t('letter.ready.title') }}</div>
-          <div class="note__text">{{ t('letter.ready.text') }}</div>
+    {% set правится = saved and not show_draft %}
+    <form class="lt" method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">
+      <div class="lt__head">
+        <div class="lt__title">
+          <h1 class="lt__name">{{ t('letter.title') }}</h1>
+          <div class="lt__meta">
+            <span>{{ head.unit_name }} · {{ head.inspection_date }}</span>
+            <span class="lt__score" title="{{ t('letter.meta.score') }}">{{ head.pct }}{{ t('card.score.unit') }} · {{ head.grade }}</span>
+            <span title="{{ t('letter.meta.source') }}">{{ t('letter.meta.source') }}: {{ source }}</span>
+          </div>
         </div>
-      </div>
-    {% else %}
-      <div class="note note--warn mt-gap">
-        <div>
-          <div class="note__title">{{ t('letter.caveats.title') }}</div>
-          <div class="note__text">{{ t('letter.caveats.lead') }}</div>
-          <ul class="note__list">
-            {% for caveat in caveats %}<li>{{ caveat }}</li>{% endfor %}
-          </ul>
+        {#
+          Язык ПИСЬМА, а не интерфейса: партнёру пишут на его языке. Перечень
+          приезжает из методики — свой список предложил бы язык, которого в
+          ней нет. Выбор пересобирает письмо, поэтому это переход (ссылка), а
+          не поле формы.
+        #}
+        <div class="lt__lang" title="{{ t('letter.lang.note') }}">
+          <span class="lt__lang-label">{{ t('letter.meta.lang') }}</span>
+          <span class="seg" role="group" aria-label="{{ t('letter.lang.pick') }}">
+            {# Текущий — тоже ссылка: она пересобирает письмо заново на том же
+               языке, и перечень языков методики остаётся полным. #}
+            {% for код in letter_langs %}
+              <a class="{{ 'seg__current' if код == letter_lang else 'seg__item' }}"
+                 {% if код == letter_lang %}aria-current="true"{% endif %}
+                 href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&letter_lang={{ код }}">{{ код }}</a>
+            {% endfor %}
+          </span>
         </div>
-      </div>
-    {% endif %}
+        <div class="lt__actions">
+          {#
+            Сохранение и выгрузка — РАЗНЫЕ действия, и каждое названо своей
+            кнопкой. Одна кнопка со скрытым переключателем отличала бы их
+            только полем, которого не видно, а промах человек замечал бы уже
+            после того, как письмо ушло не туда.
 
-    <div class="card mt-gap">
-      <div class="card__facts">
-        <div class="card__fact">
-          <div class="card__fact-label">{{ t('letter.meta.lang') }}</div>
-          <div>{{ letter.lang }}</div>
-        </div>
-        <div class="card__fact">
-          <div class="card__fact-label">{{ t('letter.meta.source') }}</div>
-          <div>{{ source }}</div>
-        </div>
-        <div class="card__fact">
-          <div class="card__fact-label">{{ t('letter.meta.score') }}</div>
-          <div>{{ head.pct }}{{ t('card.score.unit') }} · {{ head.grade }}</div>
+            Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
+            записывает и не отменяет, а только показывает свежесобранный
+            движком текст. Показывается лишь тогда, когда есть от чего
+            возвращаться.
+
+            Черновик в почте вошедшего: та же форма, свой адрес. Письмо
+            фиксируется до ухода за согласием, поэтому кнопка не теряет
+            правку, даже если человек откажется в окне Google.
+          #}
+          {% if правится %}
+            <a class="btn btn--ghost" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
+          {% endif %}
+          <button class="btn" type="submit"
+                  formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
+          <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
+          <button class="btn btn--primary" type="submit"
+                  formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
         </div>
       </div>
 
-      <div class="card__body">
-        {% if gmail_outcome == 'ok' %}
-          <p class="note note--ok">{{ t('letter.gmail.ok') }}</p>
-        {% elif gmail_outcome == 'denied' %}
-          <p class="note note--warn">{{ t('letter.gmail.denied') }}</p>
-        {% elif gmail_outcome == 'unavailable' %}
-          <p class="note note--warn">{{ t('letter.gmail.unavailable') }}</p>
-        {% elif gmail_outcome == 'failed' %}
-          <p class="note note--warn">{{ t('letter.gmail.failed') }}</p>
-        {% endif %}
-        {% if save_outcome == 'ok' %}
-          <p class="note note--ok">{{ t('letter.save.ok') }}</p>
-        {% elif save_outcome == 'failed' %}
-          <p class="note note--warn">{{ t('letter.save.failed') }}</p>
+      {# Сообщения окна — под шапкой, над текстом: итог последнего действия
+         и то, почему письмо нельзя отправлять как есть. #}
+      {% set outcome = {
+        'ok': ('ok', t('letter.gmail.ok')), 'denied': ('warn', t('letter.gmail.denied')),
+        'unavailable': ('warn', t('letter.gmail.unavailable')), 'failed': ('warn', t('letter.gmail.failed')),
+      }.get(gmail_outcome) %}
+      {% if outcome or save_outcome or not letter.ready or show_draft %}
+        <div class="lt__notes">
+          {% if outcome %}<p class="note note--{{ outcome[0] }}">{{ outcome[1] }}</p>{% endif %}
+          {% if save_outcome == 'ok' %}
+            <p class="note note--ok">{{ t('letter.save.ok') }}</p>
+          {% elif save_outcome == 'failed' %}
+            <p class="note note--warn">{{ t('letter.save.failed') }}</p>
+          {% endif %}
+          {% if not letter.ready %}
+            <div class="note note--warn">
+              <div>
+                <div class="note__title">{{ t('letter.caveats.title') }}</div>
+                <div class="note__text">{{ t('letter.caveats.lead') }}</div>
+                <ul class="note__list">
+                  {% for caveat in caveats %}<li>{{ caveat }}</li>{% endfor %}
+                </ul>
+              </div>
+            </div>
+          {% endif %}
+          {% if saved and show_draft %}
+            <p class="note note--info">{{ t('letter.draft.shown') }}</p>
+          {% endif %}
+        </div>
+      {% endif %}
+
+      <label class="lt__body">
+        <span class="sr-only">{{ t('letter.edit.label') }}</span>
+        {#
+          Письмо уезжает партнёру как есть, поэтому и правится как есть: поле
+          показывает ровно тот текст, который собрал движок, без разметки
+          вокруг и без переносов от себя.
+
+          Показывается ЗАФИКСИРОВАННОЕ письмо, если оно есть, и заготовка
+          движка — если его нет. Заготовка пересобирается каждый раз и от
+          пересборки меняется; у партнёра же на руках один текст, и подменять
+          его сегодняшней пересборкой значит отвечать на «что мы отправили»
+          правдоподобной неправдой.
+        #}
+        <textarea class="lt__text" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if правится else letter.lang }}">{{ saved.body if правится else letter.text }}</textarea>
+      </label>
+      <input type="hidden" name="letter_lang" value="{{ letter_lang }}">
+
+      <div class="lt__foot">
+        {% if letter.ready %}
+          <span><b class="lt__state lt__state--ok">{{ t('letter.ready.title') }}</b> {{ t('letter.ready.text') }}</span>
         {% endif %}
         {% if not saved_known %}
-          <p class="field-note">{{ t('letter.saved.unknown') }}</p>
+          <span>{{ t('letter.saved.unknown') }}</span>
         {% elif saved %}
           {# Кем и когда — вопрос, который задают через год, а не сегодня. #}
-          <p class="field-note">{{ t('letter.saved.note', who=saved.saved_by, when=saved.created_at.strftime('%d.%m.%Y %H:%M')) }}</p>
+          <span>{{ t('letter.saved.note', who=saved.saved_by, when=saved.created_at.strftime('%d.%m.%Y %H:%M')) }}</span>
         {% else %}
-          <p class="field-note">{{ t('letter.saved.none') }}</p>
+          <span>{{ t('letter.saved.none') }}</span>
         {% endif %}
-        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}" class="stack">
-          <label>
-            <span class="field-label">{{ t('letter.edit.label') }}</span>
-            {#
-              Письмо уезжает партнёру как есть, поэтому и правится как есть:
-              поле показывает ровно тот текст, который собрал движок, без
-              разметки вокруг и без переносов от себя.
-            #}
-            {#
-              Показывается ЗАФИКСИРОВАННОЕ письмо, если оно есть, и заготовка
-              движка — если его нет. Заготовка пересобирается каждый раз и от
-              пересборки меняется; у партнёра же на руках один текст, и
-              подменять его сегодняшней пересборкой значит отвечать на «что мы
-              отправили» правдоподобной неправдой.
-            #}
-            {% set правится = saved and not show_draft %}
-            <textarea class="input input--area" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if правится else letter.lang }}">{{ saved.body if правится else letter.text }}</textarea>
-          </label>
-          <p class="field-note">{{ t('letter.edit.hint') }}</p>
-          <input type="hidden" name="letter_lang" value="{{ letter_lang }}">
-          <div class="row">
-            {#
-              Сохранение и выгрузка — РАЗНЫЕ действия, и каждое названо своей
-              кнопкой. Одна кнопка со скрытым переключателем отличала бы их
-              только полем, которого не видно, а промах человек замечал бы уже
-              после того, как письмо ушло не туда.
-            #}
-            <button class="btn btn--primary" type="submit"
-                    formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
-            <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
-            {#
-              Черновик в почте вошедшего: та же форма, свой адрес. Письмо
-              фиксируется до ухода за согласием, поэтому кнопка не теряет
-              правку, даже если человек откажется в окне Google.
-            #}
-            <button class="btn" type="submit"
-                    formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
-            {#
-              Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
-              записывает и не отменяет, а только показывает свежесобранный
-              движком текст. Показывается лишь тогда, когда есть от чего
-              возвращаться, иначе предлагала бы вернуться к тому, что уже в поле.
-            #}
-            {% if saved and not show_draft %}
-              <a class="btn" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
-            {% endif %}
-          </div>
-          {% if saved and show_draft %}
-            <p class="field-note">{{ t('letter.draft.shown') }}</p>
-          {% endif %}
-        </form>
+        <span>{{ t('letter.edit.hint') }}</span>
+        <span>{{ t('letter.lead') }} {{ t('letter.lang.note') }}</span>
       </div>
-    </div>
+    </form>
   {% endif %}
 {% endblock %}

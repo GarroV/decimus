@@ -7,10 +7,17 @@
 
 | Файл здесь | Оригинал в `forma` | Коммит-источник |
 |---|---|---|
-| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `f70045d` |
+| `dodo-ds.css` | `dodo/core/dodo-ds.css` | `a73d0fc` (ветка `feat/lang-pill`, до слияния в main forma) |
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
 | `icons.json` | `dodo/core/icons.json` | `f70045d` |
+
+Ядро обновлено 30.09.2026 той же раскаткой из ветки forma `feat/lang-pill`
+(#461): переключатель языка пилюлей `.langpill` и строка `.sidenav__lang`,
+плюс три мелкие правки main forma после `f70045d` (кольцо фокуса поиска,
+`--ink-3`, подсветка темы по `aria-pressed`). Пока ветка не влита в main
+forma, `diff` ниже с клоном forma на main покажет расхождение — сверять с
+веткой. Остальные файлы — от 28.09.
 
 Копия обновлена 28.09.2026 раскаткой `python tools/spread.py --apply --to=decimus=<worktree>`
 из клона `forma`: эталоном линейки стал Swarm Brain — палитра, Golos Text + IBM
@@ -18,7 +25,7 @@ Plex Mono, радиусы, левая и выдвижная панели, наб
 от 28.09.2026 в `dodo/docs/decisions.md` там). Отпечатки скопированного:
 
 ```
-c9a7553f5599550a1408e1d75aa2ea4c5eb2af0f7cf1598ea7c0c40007c586dd  dodo-ds.css
+c4f2fc04475ef38dbfe7668bd2bb77247a1d48c50e0bdec10131c5152490d784  dodo-ds.css
 1ffcb01978cdccc944efffb8e34ceccc33df5a23357c805568c50695708a2db5  decimus-domain.css
 eb0a543c0105e06f99e7c7f439c542039737c8dc940a62e266d306b38ae41be3  icons.json
 70cf502d77aa23c8a573db8853f20a8db705d18414d170f257a9e939113aad47  fonts/golos-text-cyrillic-ext.woff2
