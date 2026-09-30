@@ -802,7 +802,7 @@ Remove-Item -Recurse -Force C:\projects\decimus
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_storage-data`, `decimus_state`, `decimus_frames` |
-| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://100.64.116.67:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются: выгрузка повторяема, остаток доливается следующей сдачей. Служба `storage-live` и том `decimus_storage-data` на VPS остались откатом (данные на 30.09) |
+| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://100.64.116.67:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются. Что при этом происходит со сдачей и доливаются ли кадры потом — не проверено (#459). Служба `storage-live` и том `decimus_storage-data` на VPS остались откатом (данные на 30.09) |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
