@@ -13,10 +13,20 @@
 между разбором и ответом проходят минуты, и за это время аудитор успевает
 прислать ещё кадр.
 
-**Пункт ищется заново, тем же путём.** Сверка со списком нарушений, а если она
-не сошлась — модель, а если и модель молчит — ручной перечень. Своей дороги для
-правки нет намеренно: одни и те же слова обязаны давать один и тот же ответ, а
-две дороги разошлись бы молча.
+**Ответ не короткий — сначала решается, правит ли он текст той же записи** (#454,
+D294, D295).
+«Не ранч, а терияки» — это правка формулировки, а не новое нарушение. Дешёвая
+модель получает запись целиком (пункт, класс, зону, текст) и слова аудитора
+(`src/recognize/revise.py`) и отвечает одним из двух. Правка текста меняет
+только формулировку той же записи — общей дверью правок (`apply_edit`); пункт,
+класс и зона не трогаются. Другое нарушение идёт дальше, в разбор. Модель
+отказала — запись не меняется, и бот говорит об этом словами: уйди такой ответ
+в разбор, вместо правки молча завелась бы другая запись.
+
+**Другое нарушение — пункт ищется заново, тем же путём.** Сверка со списком
+нарушений, а если она не сошлась — модель, а если и модель молчит — ручной
+перечень. Своей дороги для выбора пункта нет намеренно: одни и те же слова
+обязаны давать один и тот же ответ, а две дороги разошлись бы молча.
 
 **Ответ не на запись работает как раньше.** Аудитор отвечает и на свои кадры
 (связывание комментария, T053), и на служебные сообщения бота. Такой ответ
@@ -26,8 +36,8 @@
 **Короткий ответ, который о пункте не говорит, в разбор не идёт** (D254, D255):
 «класс D2» меняет класс, «не повтор» снимает пометку повтора, «повтор» ставит
 её, а «да»/«нет» ответом на вопрос «считать повтором?» отвечают на вопрос. Эти
-ответы узнаются целиком (`reply_words`); фраза, где есть что-то ещё, идёт в
-разбор как раньше. Кнопки «Класс», «Формулировка», «Повтор ×2» из-под записи
+ответы узнаются целиком (`reply_words`); фраза, где есть что-то ещё, идёт к
+модели правки (выше). Кнопки «Класс», «Формулировка», «Повтор ×2» из-под записи
 сняты (D254), и правка словами — их замена.
 
 Кадр в этом разборе не участвует: у ответа его нет, а у записи он уже есть.
@@ -37,6 +47,7 @@ D081.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiogram import F, Router
@@ -44,12 +55,17 @@ from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.types import Message
 
 from src import domain
+from src.recognize.errors import RecognizeError
+from src.recognize.revise import Revision, revise_finding
 
-from .. import reply_words, sealed, sidecar
+from .. import refusal, reply_words, sealed, sidecar
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
 from ..pending import PendingStore
+from ..shown import remember as remember_shown
+from ..shown import remember_origin
 from ..texts import t
+from ..view import zone_title
 from .edit import answer_repeat, apply_edit, set_repeat
 from .record import analyze, hear_voice
 
@@ -110,6 +126,71 @@ async def _short_answer(
     return False
 
 
+async def _revision(
+    chat_id: int, finding: domain.Finding, note: str, report_lang: str
+) -> Revision | None:
+    """Что слова аудитора делают с записью — или ничего, если модель отказала.
+
+    Пункт и зона уходят модели словами на языке отчёта: формулировка, которую
+    она вернёт, ляжет в отчёт, и язык у неё тот же (как у сведения, `merged`).
+    """
+    try:
+        return await asyncio.to_thread(
+            revise_finding,
+            item_code=finding.code,
+            item_text=refusal.item_title(finding.code, report_lang, chat_id=chat_id),
+            level=finding.level,
+            zone=f"{finding.zone} ({zone_title(finding.zone, report_lang, chat_id=chat_id)})",
+            wording=finding.text,
+            words=note,
+            lang=report_lang,
+        )
+    except RecognizeError:
+        logger.warning(
+            "правка записи #%s в чате %s ответом не разобрана моделью — запись прежняя",
+            finding.n,
+            chat_id,
+            exc_info=True,
+        )
+        return None
+
+
+async def _revise(
+    message: Message,
+    chat_id: int,
+    finding: domain.Finding,
+    note: str,
+    *,
+    lang: str,
+    report_lang: str,
+) -> bool:
+    """Правка текста той же записи (D294). Возврат — обработан ли ответ.
+
+    Не обработан ровно один исход — «другое нарушение»: его разбирает прежний
+    путь. Отказ модели обработан: запись прежняя, аудитору сказано, а в разбор
+    ответ не идёт (D295).
+    """
+    n = finding.n
+    revision = await _revision(chat_id, finding, note, report_lang)
+    if revision is None:
+        await message.answer(t("correct.revise_failed", lang, n=n))
+        return True
+    if revision.kind == "other":
+        return False
+    await apply_edit(message, chat_id, n, lang, text=revision.text)
+    inspection = read_inspection(chat_id)
+    after = None if inspection is None else inspection.finding(n)
+    if after is None or after.text != revision.text:
+        # Отказ движка `apply_edit` уже сказал аудитору сам.
+        return True
+    sent = await message.answer(t("correct.revised", lang, n=n, text=revision.text))
+    # Ответом на подтверждение правят ту же запись (T204), а кадр ответом на
+    # свои слова ложится в неё же (T205) — как у правки через разбор.
+    remember_shown(chat_id, sent, n)
+    remember_origin(chat_id, message.message_id, n)
+    return True
+
+
 def build_correct_router(*, pending: PendingStore) -> Router:
     """Роутер правки ответом. Стоит ДО приёма материала — иначе ответ уедет
     комментарием к ждущему кадру, и вместо правки появится вторая запись."""
@@ -151,6 +232,11 @@ def build_correct_router(*, pending: PendingStore) -> Router:
             await message.answer(t("correct.empty", lang, n=n))
             return
         if await _short_answer(message, chat_id, n, ask, note, lang):
+            return
+        finding = inspection.finding(n)
+        if finding is not None and await _revise(
+            message, chat_id, finding, note, lang=lang, report_lang=inspection.report_lang
+        ):
             return
 
         await analyze(

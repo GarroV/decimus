@@ -548,6 +548,27 @@ TEXTS: dict[str, dict[str, str]] = {
             "I could not tell what to change in record #{n}. Say in words what is actually there."
         ),
     },
+    # Ответ поправил только формулировку той же записи (#454, D294): пункт,
+    # класс и зона прежние. Новый текст показывается целиком — правило 1
+    # фиксации: аудитор видит, что уйдёт в отчёт, и ответом на это сообщение
+    # правит снова.
+    "correct.revised": {
+        "ru": "✏️ Поправил запись #{n}: «{text}»\n\nСнова не то — ответьте на это сообщение.",
+        "en": "✏️ Record #{n} updated: “{text}”\n\nStill wrong — reply to this message.",
+    },
+    # Модель правки не ответила или ответила подозрительно (D295). Запись не
+    # тронута, и в разбор заново ответ не ушёл — иначе вместо правки молча
+    # завелась бы другая запись.
+    "correct.revise_failed": {
+        "ru": (
+            "Не получилось поправить запись #{n} — она прежняя. "
+            "Скажите иначе или ответьте на запись ещё раз."
+        ),
+        "en": (
+            "I could not update record #{n} — it is unchanged. "
+            "Say it differently or reply to the record again."
+        ),
+    },
     "record.corrected": {
         "ru": (
             "✏️ Поправил запись #{n} по вашему ответу.\n\n"
