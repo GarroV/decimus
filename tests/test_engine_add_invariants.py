@@ -170,10 +170,28 @@ def test_D0_одного_пункта_в_одной_зоне_не_отклоня
     started: Callable[..., Run], workdir: Path
 ) -> None:
     """#444: второй аппарат в той же зоне — вторая запись, вычета у D0 нет."""
-    r1 = started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
-                 "--comment", "печь у линии начинки 240")
-    r2 = started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
-                 "--comment", "печь после линии начинки 235")
+    r1 = started(
+        "add",
+        "--qid",
+        "INF09",
+        "--level",
+        "D0",
+        "--zone",
+        "hot_kitchen",
+        "--comment",
+        "печь у линии начинки 240",
+    )
+    r2 = started(
+        "add",
+        "--qid",
+        "INF09",
+        "--level",
+        "D0",
+        "--zone",
+        "hot_kitchen",
+        "--comment",
+        "печь после линии начинки 235",
+    )
     assert r1.code == 0 and r2.code == 0, (r1.text, r2.text)
     assert numbers(workdir) == [1, 2]
 
@@ -196,9 +214,7 @@ def test_D1_в_паре_с_D0_по_прежнему_отклоняется_вт�
     assert numbers(workdir) == [1, 2]
 
 
-def test_правка_в_D1_занятой_пары_отклоняется(
-    started: Callable[..., Run], workdir: Path
-) -> None:
+def test_правка_в_D1_занятой_пары_отклоняется(started: Callable[..., Run], workdir: Path) -> None:
     положить_старое_состояние(
         workdir, [старая_запись(1, "CLN06", "hot_kitchen"), запись_D0(2, "CLN06", "hot_kitchen")]
     )
@@ -209,10 +225,28 @@ def test_правка_в_D1_занятой_пары_отклоняется(
 def test_D0_несколько_в_одной_зоне_печатаются_отдельными_строками(
     started: Callable[..., Run], report: Callable[..., Run]
 ) -> None:
-    started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
-            "--comment", "первый аппарат 240")
-    started("add", "--qid", "INF09", "--level", "D0", "--zone", "hot_kitchen",
-            "--comment", "второй аппарат 235")
+    started(
+        "add",
+        "--qid",
+        "INF09",
+        "--level",
+        "D0",
+        "--zone",
+        "hot_kitchen",
+        "--comment",
+        "первый аппарат 240",
+    )
+    started(
+        "add",
+        "--qid",
+        "INF09",
+        "--level",
+        "D0",
+        "--zone",
+        "hot_kitchen",
+        "--comment",
+        "второй аппарат 235",
+    )
     r = report("html")
     assert r.code == 0, r.text
     assert "первый аппарат 240" in r.out and "второй аппарат 235" in r.out
