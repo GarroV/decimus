@@ -179,11 +179,9 @@ class Overview:
     grades: tuple[tuple[str, int], ...]
     average: float | None
     comparable: bool
-    comparability_note: str
     zone_losses: tuple[ZoneLoss, ...]
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
-    problem_units: tuple[InspectionRow, ...]
     problems: tuple[PointRow, ...] = ()
     #: Движение средней против такого же периода перед этим. `None` — не с чем
     #: или нельзя сравнивать.
@@ -585,7 +583,6 @@ def load(
         grades=_grades(rows),
         average=_average(rows),
         comparable=_comparable(rows),
-        comparability_note="",
         zone_losses=tuple(
             ZoneLoss(
                 code=code,
@@ -608,7 +605,6 @@ def load(
             if units >= SYSTEMIC_MIN_UNITS
         ),
         attention=_attention(rows, counts=counts),
-        problem_units=tuple(sorted(rows, key=lambda r: r.pct)[:TOP]),
         problems=_problems(точки),
         average_delta=_movement(rows, было),
         # Точки справочника, по которым за период нет ни одной проверки.
