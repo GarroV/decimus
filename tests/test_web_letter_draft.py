@@ -62,7 +62,7 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     следы: dict[str, list[Any]] = {"remember": [], "draft": [], "token": []}
 
-    monkeypatch.setattr(data, "load_card", lambda _id, *, tenant: карточка())
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
 
     def _remember(inspection_id: str, *, body: str, lang: str, saved_by: str) -> SavedLetter:
         следы["remember"].append((inspection_id, body, lang, saved_by))

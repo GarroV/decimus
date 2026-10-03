@@ -27,6 +27,8 @@ from flask import Flask
 from flask.testing import FlaskClient
 
 from src.db import web_throttle
+from src.db.reach import Reach
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth
 from src.web.app import create_app
 from src.web.config import Settings
@@ -177,11 +179,23 @@ def подменить_двери(
     monkeypatch.setattr(auth, "open_session", _open)
     monkeypatch.setattr(auth, "resolve_session", _resolve)
     monkeypatch.setattr(auth, "close_session", _close)
+    # Охват вошедшего (волна 1, #340) у партнёра читает его страны из базы.
+    # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
+    # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.
+    monkeypatch.setattr(auth, "reach_of", охват_без_базы)
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.
     подменить_счётчики(monkeypatch)
     return зовы
+
+
+def охват_без_базы(tenant: str) -> Reach:
+    """Охват пространства без похода в базу: УК — всё, партнёр — страна его кода."""
+    код = canonical_tenant(tenant)
+    if код == HQ_TENANT:
+        return Reach(код, None, None)
+    return Reach(код, None, (код,))
 
 
 def собрать(*, tenant: str, ui_lang: str = "ru") -> Flask:
