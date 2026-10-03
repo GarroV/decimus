@@ -13,7 +13,9 @@
 
 from __future__ import annotations
 
+import ast
 import re
+from pathlib import Path
 from types import ModuleType
 
 from src.db import directory, move, previews, queries, reports
@@ -97,3 +99,67 @@ def test_строка_вместо_охвата_это_отказ() -> None:
         queries.list_inspections(reach="HQ")  # type: ignore[arg-type]
     with pytest.raises(DbError, match="охват"):
         directory.list_units(reach="GE")  # type: ignore[arg-type]
+
+
+#: Чтения по идентификатору проверки без охвата: допустимы ТОЛЬКО после того,
+#: как карточку той же проверки отобрал `_GET_INSPECTION_SQL` (п.4 ревью #340).
+_БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ = ("_FINDINGS_OF_INSPECTION_SQL", "_INFO_OF_INSPECTION_SQL")
+
+
+def _вызовы_execute(узел: ast.AST) -> list[tuple[int, str]]:
+    """`(строка, имя запроса)` каждого `cur.execute(<ИМЯ>_SQL, …)` внутри узла."""
+    return [
+        (вызов.lineno, вызов.args[0].id)
+        for вызов in ast.walk(узел)
+        if isinstance(вызов, ast.Call)
+        and isinstance(вызов.func, ast.Attribute)
+        and вызов.func.attr == "execute"
+        and вызов.args
+        and isinstance(вызов.args[0], ast.Name)
+    ]
+
+
+def test_находки_по_идентификатору_читаются_только_после_карточки_по_охвату() -> None:
+    """Исключение из охвата держится на одном вызывающем — второй его бы прорвал.
+
+    Находки и сведения проверки читаются по её идентификатору без `REACH_SQL`,
+    потому что единственный вызывающий, `get_inspection`, тем же курсором уже
+    отобрал карточку по охвату и вышел, если её нет. Новый вызов этих запросов
+    где-либо ещё — чтение чужой проверки по перебору идентификаторов.
+    """
+    корень = Path(queries.__file__).resolve().parents[2] / "src"
+    чужие = [
+        str(путь.relative_to(корень.parent))
+        for путь in корень.rglob("*.py")
+        if путь.name != "queries.py" or путь.parent.name != "db"
+        if any(имя in путь.read_text(encoding="utf-8") for имя in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ)
+    ]
+    assert чужие == [], "запросы без охвата зовут вне queries.py: " + ", ".join(чужие)
+
+    дерево = ast.parse(Path(queries.__file__).read_text(encoding="utf-8"))
+    функции = {у.name: у for у in ast.walk(дерево) if isinstance(у, ast.FunctionDef)}
+    зовущие = sorted(
+        имя
+        for имя, функция in функции.items()
+        if any(запрос in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ for _, запрос in _вызовы_execute(функция))
+    )
+    assert зовущие == ["get_inspection"], f"запросы без охвата зовут: {зовущие}"
+
+    вызовы = _вызовы_execute(функции["get_inspection"])
+    карточка = [строка for строка, запрос in вызовы if запрос == "_GET_INSPECTION_SQL"]
+    assert len(карточка) == 1, "get_inspection больше не читает карточку по охвату"
+    выход = [
+        у.lineno
+        for у in ast.walk(функции["get_inspection"])
+        if isinstance(у, ast.If)
+        and isinstance(у.body[0], ast.Return)
+        and isinstance(у.test, ast.Compare)
+        and isinstance(у.test.ops[0], ast.Is)
+    ]
+    assert выход and min(выход) > карточка[0], "нет выхода `if row is None: return` после карточки"
+    раньше = [
+        запрос
+        for строка, запрос in вызовы
+        if запрос in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ and строка < min(выход)
+    ]
+    assert раньше == [], "читают до проверки карточки по охвату: " + ", ".join(раньше)
