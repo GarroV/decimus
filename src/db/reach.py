@@ -90,7 +90,14 @@ def countries_of(tenant: str) -> tuple[str, ...]:
 
 def reach_of(tenant: str) -> Reach:
     """Охват пространства. Партнёр без стран не видит ничего — закрыто по умолчанию."""
-    код = canonical_tenant(tenant)
+    код = canonical_tenant(tenant or "")
+    if not код:
+        # Пустое пространство — отказ до похода в базу: «чьи страны» без
+        # пространства не спрашивают, а пустая выдача выдала бы себя за ответ.
+        raise DbError(
+            "Не задано пространство (арендатор), чей охват читаем. Выборка без "
+            "него отдала бы либо чужие проверки, либо пустоту вместо ошибки"
+        )
     if код == HQ_TENANT:
         return Reach(tenant=код, tenants=None, countries=None)
     return Reach(tenant=код, tenants=None, countries=countries_of(код))

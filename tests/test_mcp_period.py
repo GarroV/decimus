@@ -30,6 +30,7 @@ from db_harness import пространства_для_теста, точка_п
 pytest.importorskip("psycopg")
 
 import src.db.queries as queries
+import src.db.reach as reach
 from src.db.push import push_inspection
 from src.domain import add_finding, start_inspection
 from src.mcp.tools import list_inspections, network_summary, unit_history
@@ -69,6 +70,9 @@ def записанные_вызовы(monkeypatch: pytest.MonkeyPatch) -> list[d
         return []
 
     monkeypatch.setattr(queries, "list_inspections", запись)
+    # Охват партнёра читает его страны из базы (#340); здесь база не нужна —
+    # проверяется, с чем позвали слой чтения, а не что он ответил.
+    monkeypatch.setattr(reach, "reach_of", lambda t: reach.Reach(t, None, (АРЕНДАТОР,)))
     return вызовы
 
 

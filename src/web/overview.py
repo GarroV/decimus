@@ -21,7 +21,7 @@ from datetime import date, timedelta
 
 from src.db import queries
 from src.db.models import InspectionRow
-from src.db.reach import own_reach
+from src.db.reach import Reach
 
 from .pricing import price_key
 
@@ -530,7 +530,7 @@ def _geo_choices(
 
 def load(
     *,
-    tenant: str,
+    reach: Reach,
     limit: int,
     selection: Selection = БЕЗ_ОТБОРА,
     today: date | None = None,
@@ -548,7 +548,7 @@ def load(
         "country": selection.country,
         "grade": selection.grade,
     }
-    охват = own_reach(tenant)  # мост до задачи 6: охват вошедшего
+    охват = reach
     geo = queries.unit_geography(reach=охват)
     ид_точек = queries.unit_ids(reach=охват)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)

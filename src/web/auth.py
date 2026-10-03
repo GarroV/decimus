@@ -36,6 +36,7 @@ from flask import Flask, g, make_response, redirect, render_template, request, u
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
+from src.db.reach import Reach, reach_of
 from src.db.web_access import (
     SESSION_TTL,
     Account,
@@ -47,6 +48,7 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.tenants import canonical_tenant
 
 from .config import Settings
 from .google_auth import (
@@ -100,6 +102,36 @@ CURRENT = "account"
 def current_account() -> Account | None:
     """Кто сейчас на странице. `None` — никого, и до страницы дело не дошло."""
     return getattr(g, CURRENT, None)
+
+
+#: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
+REACH = "reach"
+
+
+def current_tenant() -> str:
+    """Пространство вошедшего — для записи (D283).
+
+    Без вошедшего — ошибка кода, а не «покажем УК»: маршрут, дошедший сюда без
+    человека, прошёл мимо заслона, и молчаливый тенант по умолчанию спрятал бы это.
+    """
+    account = current_account()
+    if account is None:
+        raise RuntimeError("current_tenant() вызван без вошедшего: маршрут прошёл мимо заслона")
+    return canonical_tenant(account.tenant)
+
+
+def is_own(tenant_code: str) -> bool:
+    """Запись принадлежит пространству вошедшего — писать можно только такую (D283)."""
+    return canonical_tenant(tenant_code) == current_tenant()
+
+
+def current_reach() -> Reach:
+    """Охват вошедшего — для чтения (D283, D289). Считается один раз на запрос."""
+    охват = getattr(g, REACH, None)
+    if охват is None:
+        охват = reach_of(current_tenant())
+        setattr(g, REACH, охват)
+    return охват
 
 
 def install(app: Flask, conf: Settings) -> None:
