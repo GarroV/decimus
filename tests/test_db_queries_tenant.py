@@ -20,6 +20,8 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
+from db_harness import привязать_пространства, точка_пространства  # noqa: E402
+
 from src.db.errors import DbError  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import (  # noqa: E402
@@ -28,16 +30,25 @@ from src.db.queries import (  # noqa: E402
     MAX_LIMIT,
     list_inspections,
 )
+from src.db.reach import own_reach, reach_of  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР_А = "партнёр-а"
-АРЕНДАТОР_Б = "партнёр-б"
+# Коды пространств совпадают с кодами их стран (волна 1, D284): точки партнёров
+# заводятся в справочнике УК этой страны, пространства привязаны к ней.
+АРЕНДАТОР_А = "GE"
+АРЕНДАТОР_Б = "AM"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(pg_dsn: str) -> None:
+    привязать_пространства(pg_dsn, АРЕНДАТОР_А, АРЕНДАТОР_Б)
 
 
 def _проверка(chat_id: int, *, арендатор: str, точка: str = "Белград-1") -> str:
     """Завершённая проверка нужного арендатора через официальный контракт домена."""
+    точка_пространства(точка, tenant=арендатор)
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     return push_inspection(chat_id)
@@ -48,7 +59,7 @@ def test_выборка_не_отдаёт_проверки_чужого_арен
     id_а = _проверка(101, арендатор=АРЕНДАТОР_А, точка="Белград-1")
     id_б = _проверка(102, арендатор=АРЕНДАТОР_Б, точка="Ниш-1")
 
-    свои = list_inspections(tenant=АРЕНДАТОР_А)
+    свои = list_inspections(reach=own_reach(АРЕНДАТОР_А))
 
     коды = {строка.tenant_code for строка in свои}
     assert коды == {АРЕНДАТОР_А}, (
@@ -60,15 +71,15 @@ def test_выборка_не_отдаёт_проверки_чужого_арен
 
 
 def test_выборка_по_точке_не_отдаёт_чужого_арендатора(domain_env: Path, db_env: str) -> None:
-    """Одинаковое название точки у двух арендаторов — самый вероятный случай.
+    """Одна пиццерия, два проверяющих — самый вероятный случай при одном справочнике.
 
-    «Белград-1» есть и у управляющей компании, и у партнёра: фильтр только по
-    названию склеил бы две разные пиццерии в одну историю.
+    «Белград-1» из страны партнёра проверяет и УК (D289): фильтр только по
+    названию склеил бы две истории — своего пространства и чужого — в одну.
     """
     id_а = _проверка(103, арендатор=АРЕНДАТОР_А, точка="Белград-1")
-    _проверка(104, арендатор=АРЕНДАТОР_Б, точка="Белград-1")
+    _проверка(104, арендатор="HQ", точка="Белград-1")
 
-    свои = list_inspections(tenant=АРЕНДАТОР_А, unit="Белград-1")
+    свои = list_inspections(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1")
 
     assert [строка.id for строка in свои] == [id_а]
     assert {строка.tenant_code for строка in свои} == {АРЕНДАТОР_А}
@@ -90,8 +101,8 @@ def test_пустой_арендатор_это_отказ_а_не_пустой_
 ) -> None:
     """Пустая строка совпала бы ни с чем и вернула бы пустой список — то есть
     ошибка вызывающего выглядела бы как «проверок нет»."""
-    with pytest.raises(DbError, match="рендатор"):
-        list_inspections(tenant=пустой)
+    with pytest.raises(DbError, match="охват"):
+        list_inspections(reach=own_reach(пустой))
 
 
 def test_у_выдачи_есть_предел_и_он_настраивается(domain_env: Path, db_env: str) -> None:
@@ -99,8 +110,8 @@ def test_у_выдачи_есть_предел_и_он_настраиваетс�
     _проверка(106, арендатор=АРЕНДАТОР_А, точка="Ниш-1")
     _проверка(107, арендатор=АРЕНДАТОР_А, точка="Ниш-2")
 
-    assert len(list_inspections(tenant=АРЕНДАТОР_А, limit=2)) == 2
-    assert len(list_inspections(tenant=АРЕНДАТОР_А, unit="Белград-1", limit=1)) == 1
+    assert len(list_inspections(reach=own_reach(АРЕНДАТОР_А), limit=2)) == 2
+    assert len(list_inspections(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1", limit=1)) == 1
     assert DEFAULT_LIMIT > 0, "предел по умолчанию обязан быть конечным числом"
 
 
@@ -108,7 +119,7 @@ def test_у_выдачи_есть_предел_и_он_настраиваетс�
 def test_бессмысленный_предел_это_отказ(domain_env: Path, db_env: str, предел: int) -> None:
     """Ноль вернул бы пустоту, а миллион — тот же полный проход под видом предела."""
     with pytest.raises(DbError, match="редел"):
-        list_inspections(tenant=АРЕНДАТОР_А, limit=предел)
+        list_inspections(reach=own_reach(АРЕНДАТОР_А), limit=предел)
 
 
 def test_недоступная_база_это_отказ_а_не_пустой_список(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -120,18 +131,26 @@ def test_недоступная_база_это_отказ_а_не_пустой_
     monkeypatch.setenv("DATABASE_URL", "postgresql://nouser@127.0.0.1:1/nodb?connect_timeout=2")
 
     with pytest.raises(DbError, match="список проверок"):
-        list_inspections(tenant=АРЕНДАТОР_А)
+        list_inspections(reach=own_reach(АРЕНДАТОР_А))
 
 
 # --- план запроса ------------------------------------------------------------
 
+# Своя точка партнёра принимает проверки только в стране его пространства
+# (сторож 0030, ревью #340, п.3): пространство привязано к стране, точка — в ней.
 _НАПОЛНИТЬ_SQL = """
 insert into tenants (code) values (%(tenant)s) on conflict (code) do nothing
 """
 
+_СТРАНА_SQL = """
+insert into space_countries (country, tenant_code) values (%(tenant)s, %(tenant)s)
+on conflict do nothing
+"""
+
 _ТОЧКА_SQL = """
-insert into units (tenant_code, name, name_normalized)
-values (%(tenant)s, 'Нагрузочная', 'нагрузочная')
+insert into units (tenant_code, name, name_normalized, country)
+values (%(tenant)s, 'Нагрузочная', 'нагрузочная',
+       (select min(country) from space_countries where tenant_code = %(tenant)s))
 returning id
 """
 
@@ -152,6 +171,7 @@ from generate_series(1, %(сколько)s) g
 def _насыпать(dsn: str, *, арендатор: str, сколько: int) -> None:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(_НАПОЛНИТЬ_SQL, {"tenant": арендатор})
+        cur.execute(_СТРАНА_SQL, {"tenant": арендатор})
         cur.execute(_ТОЧКА_SQL, {"tenant": арендатор})
         row = cur.fetchone()
         assert row is not None
@@ -178,21 +198,25 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
     _насыпать(pg_dsn, арендатор=АРЕНДАТОР_А, сколько=8000)
     _насыпать(pg_dsn, арендатор=АРЕНДАТОР_Б, сколько=2000)
 
-    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
-        cur.execute(
-            "explain " + _LIST_ALL_SQL,
-            {
-                "tenant": АРЕНДАТОР_А,
-                "limit": DEFAULT_LIMIT,
-                "date_from": None,
-                "date_to": None,
-            },
-        )
-        план = "\n".join(строка[0] for строка in cur.fetchall())
+    # Два охвата: свой тенант (изоляция партнёров) и вся сеть (УК, D283). Тенант
+    # приходит массивом, и под `= any(...)` Postgres 16 не берёт порядок дат из
+    # индекса «тенант + дата»; ведёт индекс по дате обхода (миграция 0030).
+    for охват in (own_reach(АРЕНДАТОР_А), reach_of("HQ")):
+        with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+            cur.execute(
+                "explain " + _LIST_ALL_SQL,
+                {
+                    **охват.params(),
+                    "limit": DEFAULT_LIMIT,
+                    "date_from": None,
+                    "date_to": None,
+                },
+            )
+            план = "\n".join(строка[0] for строка in cur.fetchall())
 
-    assert "Seq Scan on inspections" not in план, (
-        f"выборка проверок арендатора читает таблицу целиком:\n{план}"
-    )
-    assert "inspections_tenant_date_idx" in план, (
-        f"выборка не пользуется составным индексом по арендатору и дате обхода:\n{план}"
-    )
+        assert "Seq Scan on inspections" not in план, (
+            f"выборка проверок {охват} читает таблицу целиком:\n{план}"
+        )
+        assert "inspections_date_idx" in план, (
+            f"выборка {охват} не пользуется индексом по дате обхода:\n{план}"
+        )

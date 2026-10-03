@@ -7,6 +7,7 @@ from dataclasses import replace
 import pytest
 from test_web_overview import ПУСТО, снимок, строка
 
+from src.db.reach import own_reach
 from src.web import country as cn
 from src.web import overview as ov
 
@@ -26,7 +27,12 @@ def test_страна_уходит_в_отбор_обзора(monkeypatch: pytes
         return ПУСТО
 
     monkeypatch.setattr(cn.overview, "load", снимок)
-    cn.load(tenant="HQ", limit=10, code="GE", selection=ov.Selection(period="d90", country="RS"))
+    cn.load(
+        reach=own_reach("HQ"),
+        limit=10,
+        code="GE",
+        selection=ov.Selection(period="d90", country="RS"),
+    )
     assert видели["selection"].country == "GE"
     assert видели["selection"].period == "d90"
 
@@ -35,7 +41,7 @@ def test_мусорный_код_не_показывает_всю_сеть(monke
     # Пустой код в отборе «Обзора» значит «не сужать»: экран страны с кодом
     # `<script>` показал бы цифры всей сети под видом страновых.
     monkeypatch.setattr(cn.overview, "load", lambda **_: снимок())
-    вид = cn.load(tenant="HQ", limit=10, code="", selection=ov.Selection(), unit_id="u-1")
+    вид = cn.load(reach=own_reach("HQ"), limit=10, code="", selection=ov.Selection(), unit_id="u-1")
     данные = вид.snapshot
     assert (данные.inspections, данные.points, данные.systemic, данные.zone_losses) == (
         (),
@@ -54,7 +60,9 @@ def test_история_точки_из_того_же_снимка(monkeypatch: 
         ПУСТО, inspections=(первая, чужая, вторая), unit_ids={"Батуми-1": "u-1", "Тбилиси-2": "u-2"}
     )
     monkeypatch.setattr(cn.overview, "load", lambda **_: данные)
-    вид = cn.load(tenant="HQ", limit=10, code="GE", selection=ov.Selection(), unit_id="u-1")
+    вид = cn.load(
+        reach=own_reach("HQ"), limit=10, code="GE", selection=ov.Selection(), unit_id="u-1"
+    )
     assert (вид.unit_id, вид.unit_name) == ("u-1", "Батуми-1")
     assert [r.id for r in вид.history] == [первая.id, вторая.id]
 
@@ -65,7 +73,9 @@ def test_чужой_или_мусорный_unit_ничего_не_раскры�
     )
     monkeypatch.setattr(cn.overview, "load", lambda **_: данные)
     for мусор in ("u-999", "<script>", ""):
-        вид = cn.load(tenant="HQ", limit=10, code="GE", selection=ov.Selection(), unit_id=мусор)
+        вид = cn.load(
+            reach=own_reach("HQ"), limit=10, code="GE", selection=ov.Selection(), unit_id=мусор
+        )
         assert (вид.unit_id, вид.unit_name, вид.history) == ("", "", ())
 
 
@@ -77,4 +87,4 @@ def test_список_стран_по_справочнику(monkeypatch: pytest
         "Без-1": ("", ""),
     }
     monkeypatch.setattr(cn.queries, "unit_geography", lambda **_: гео)
-    assert cn.countries(tenant="HQ") == (("GE", 2), ("RS", 1))
+    assert cn.countries(reach=own_reach("HQ")) == (("GE", 2), ("RS", 1))

@@ -235,7 +235,7 @@ insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, pct, grade, source_fingerprint, status
 ) values (
-    'default', %s, 555, 'planned', current_date, 'ru', 'ru', 'ru', 'v1',
+    'HQ', %s, 555, 'planned', current_date, 'ru', 'ru', 'ru', 'v1',
     90.0, 'B', 'черновик-555', 'draft'
 )
 returning id
@@ -252,10 +252,10 @@ def test_незапечатанную_проверку_править_можно
     различает именно статус — и что дверь односторонняя.
     """
     with psycopg.connect(db_env) as conn, conn.cursor() as cur:
-        cur.execute("insert into tenants (code) values ('default') on conflict do nothing")
+        cur.execute("insert into tenants (code) values ('HQ') on conflict do nothing")
         cur.execute(
             "insert into units (tenant_code, name, name_normalized) "
-            "values ('default', 'Черновая', 'черновая') returning id"
+            "values ('HQ', 'Черновая', 'черновая') returning id"
         )
         row = cur.fetchone()
         assert row is not None

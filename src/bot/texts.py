@@ -80,6 +80,24 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Пиццерия «{name}» добавлена в справочник{where}.",
         "en": "“{name}” is added to the pizzeria directory{where}.",
     },
+    "access.linked": {
+        "ru": "Бот привязан к учётке {login}. Можно начинать проверку: /start",
+        "en": "The bot is linked to the account {login}. You can start an inspection: /start",
+    },
+    "access.link_invalid": {
+        "ru": "Ссылка недействительна. Получите новую на странице «Пользователи» в админке.",
+        "en": "This link is not valid. Get a new one on the Users page of the admin.",
+    },
+    "access.foreign_space": {
+        "ru": (
+            "Эта проверка ведётся в другом пространстве. "
+            "Свою проверку начните в личном чате с ботом."
+        ),
+        "en": (
+            "This inspection belongs to another space. "
+            "Start your own in a private chat with the bot."
+        ),
+    },
     "start.unit_new_partner": {
         "ru": (
             "Пиццерии «{name}» в справочнике нет. Новую пиццерию заводит только "

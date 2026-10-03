@@ -29,10 +29,9 @@ from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
 from src import domain
 
 from . import frame_copies
-from .access import AccessMiddleware
+from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
-from .invites import StaticInvites
 from .lang import chat_ui_lang
 from .material import MaterialStore
 from .pending import PendingStore
@@ -143,6 +142,7 @@ def build_dispatcher(
     album_window: float = ALBUM_WINDOW_SECONDS,
     on_material: MaterialHandler | None = None,
     roster: Roster | None = None,
+    bindings: BindingCache | None = None,
 ) -> Dispatcher:
     """Диспетчер со всеми роутерами и мидлварью доступа.
 
@@ -163,16 +163,22 @@ def build_dispatcher(
     # раствориться в aiogram (T126).
     dispatcher.errors.register(on_unexpected_error)
 
-    # Имя приглашённого названо приглашением, но ручная запись сильнее: правка
-    # `AUDITOR_NAMES` обязана перебивать то, что когда-то стояло в приглашении,
-    # иначе исправить имя в шапке отчёта можно было бы только правкой файла
-    # состояния (#230).
+    # Имя из связок, собранных по приглашениям до D286, нужно шапке отчёта; ручная
+    # запись `AUDITOR_NAMES` сильнее — иначе исправить имя можно было бы только
+    # правкой файла состояния (#230).
     if roster is not None:
         settings = replace(settings, auditor_names={**roster.names(), **settings.auditor_names})
 
-    access = AccessMiddleware(settings.allowed_ids, StaticInvites(settings.invites), roster)
+    access = AccessMiddleware(
+        settings.allowed_ids, bindings if bindings is not None else BindingCache(), roster
+    )
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
+    # После доступа: внешние мидлвари идут в порядке регистрации, а заслону
+    # чата нужно пространство человека, которое кладёт доступ (D286).
+    space_guard = ChatSpaceMiddleware()
+    dispatcher.message.outer_middleware(space_guard)
+    dispatcher.callback_query.outer_middleware(space_guard)
 
     store = MaterialStore()
     pending = PendingStore()
@@ -382,9 +388,9 @@ async def start_polling() -> None:
     # Методика проверяется до первого сообщения: пустой чек-лист читался бы как
     # честный ответ «нарушений нет», а узнать об этом на точке — поздно.
     domain_settings = domain.check_environment()
-    # Связки «юзернейм → ID» читаются один раз при подъёме и дальше
-    # дополняются самой мидлварью, сразу ложась на диск (#230). Каталог
-    # состояния здесь уже проверен — раньше него читать нечего.
+    # Связки «юзернейм → ID», собранные по приглашениям до D286, читаются один
+    # раз при подъёме — совместимость до снятия. Каталог состояния здесь уже
+    # проверен — раньше него читать нечего.
     roster = Roster.load(domain_settings.state_dir)
     bot = create_bot(settings)
     await announce_commands(bot, circle_at_startup(settings))

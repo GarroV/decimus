@@ -21,6 +21,7 @@ from datetime import date, timedelta
 
 from src.db import queries
 from src.db.models import InspectionRow
+from src.db.reach import Reach
 
 from .pricing import price_key
 
@@ -529,7 +530,7 @@ def _geo_choices(
 
 def load(
     *,
-    tenant: str,
+    reach: Reach,
     limit: int,
     selection: Selection = БЕЗ_ОТБОРА,
     today: date | None = None,
@@ -547,12 +548,13 @@ def load(
         "country": selection.country,
         "grade": selection.grade,
     }
-    geo = queries.unit_geography(tenant=tenant)
-    ид_точек = queries.unit_ids(tenant=tenant)
-    counts = queries.class_counts(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
-    worst = queries.worst_zones(tenant=tenant, date_from=date_from, date_to=date_to, **узко)
+    охват = reach
+    geo = queries.unit_geography(reach=охват)
+    ид_точек = queries.unit_ids(reach=охват)
+    counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
+    worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
     весь_ряд = tuple(
-        queries.list_inspections(tenant=tenant, limit=limit, date_from=date_from, date_to=date_to)
+        queries.list_inspections(reach=охват, limit=limit, date_from=date_from, date_to=date_to)
     )
     rows = tuple(row for row in весь_ряд if _fits(row, selection=selection, geo=geo))
     # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
@@ -563,7 +565,7 @@ def load(
         tuple(
             row
             for row in queries.list_inspections(
-                tenant=tenant, limit=limit, date_from=было_от, date_to=было_до
+                reach=охват, limit=limit, date_from=было_от, date_to=было_до
             )
             if _fits(row, selection=selection, geo=geo)
         )
@@ -572,12 +574,12 @@ def load(
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
     losses = queries.zone_losses(
-        tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
+        reach=охват, date_from=date_from, date_to=date_to, limit=TOP, **узко
     )
     всего = sum(строка[3] for строка in losses) or 1.0
     страны, города = _geo_choices(geo, selection=selection)
     в_месте = _units_in(geo, selection=selection)
-    всего_точек = queries.units_total(tenant=tenant) if в_месте is None else в_месте
+    всего_точек = queries.units_total(reach=охват) if в_месте is None else в_месте
     return Overview(
         units_total=всего_точек,
         unit_ids=ид_точек,
@@ -601,7 +603,7 @@ def load(
         systemic=tuple(
             Systemic(code=code, level=level, records=records, units=units, text=text, lang=lang)
             for code, level, records, units, text, lang in queries.systemic_findings(
-                tenant=tenant, date_from=date_from, date_to=date_to, limit=TOP, **узко
+                reach=охват, date_from=date_from, date_to=date_to, limit=TOP, **узко
             )
             # Запрос отдаёт пункты по убыванию числа точек, поэтому отсев после
             # предела не теряет ни одного системного.

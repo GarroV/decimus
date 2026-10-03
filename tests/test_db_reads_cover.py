@@ -24,11 +24,14 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.push import push_inspection  # noqa: E402 — после importorskip намеренно
 from src.db.queries import get_inspection, list_inspections  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "шапка"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 
 #: Шапка проверки так, как её задаёт мастер бота. Значения разные и непустые:
 #: одинаковые не отличили бы перепутанные местами колонки, а пустые — снятую
@@ -70,7 +73,7 @@ def test_чтение_по_идентификатору_отдаёт_шапку_
     """
     ident = _проверка(701)
 
-    прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
+    прочитано = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert прочитано is not None, "проверка не прочиталась — дальше сверять нечего"
     строка = прочитано.inspection
@@ -90,7 +93,7 @@ def test_список_проверок_отдаёт_шапку_письма(doma
     """
     _проверка(702)
 
-    строки = list_inspections(tenant=АРЕНДАТОР)
+    строки = list_inspections(reach=own_reach(АРЕНДАТОР))
 
     assert len(строки) == 1, "проверка не попала в список — дальше сверять нечего"
     строка = строки[0]
@@ -109,7 +112,7 @@ def test_выборка_по_точке_отдаёт_шапку_письма(dom
     """
     _проверка(703, точка="Ниш-1")
 
-    строки = list_inspections(tenant=АРЕНДАТОР, unit="Ниш-1")
+    строки = list_inspections(reach=own_reach(АРЕНДАТОР), unit="Ниш-1")
 
     assert len(строки) == 1, "проверка не нашлась по точке — дальше сверять нечего"
     строка = строки[0]
@@ -130,7 +133,7 @@ def test_незаполненная_шапка_остаётся_пустой_а_
     """
     ident = _проверка(704, шапка=dict.fromkeys(ШАПКА, ""))
 
-    прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
+    прочитано = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert прочитано is not None
     строка = прочитано.inspection
@@ -150,7 +153,7 @@ def test_пустой_город_проверки_берётся_из_справ
     upsert_unit("Батуми-1", country="GE", city="batumi", tenant=АРЕНДАТОР)
     ident = _проверка(705, точка="Батуми-1", шапка=dict.fromkeys(ШАПКА, ""))
 
-    прочитано = get_inspection(ident, tenant=АРЕНДАТОР)
+    прочитано = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert прочитано is not None
     assert прочитано.inspection.city == "batumi"

@@ -12,10 +12,17 @@
 запросом. Иначе демо разъехалось бы с продуктом на первой же правке движка или
 схемы — ровно то, чего избегает `seed_demo` (см. его шапку).
 
-**Тенант `demo`, а не `default`.** Демо обязано быть отличимо от боевого
-одним взглядом на реестр, а не по названию точки. Веб-админка показывает ровно
-один тенант (`WEB_TENANT`), поэтому демо-строки не могут подмешаться в историю
-партнёров даже случайно.
+**Демо — пространство партнёра `demo` (D287).** Демо обязано быть отличимо от
+боевого одним взглядом на реестр, а не по названию точки. Как всякий партнёр,
+оно привязано к странам своих точек (`space_countries`), а сами точки лежат в
+едином справочнике УК (D284): посев заводит их туда со страной и городом и
+только потом сливает проверки. Код `demo` строчными правилу кода пространства
+(`src/db/spaces.py`) не отвечает — это единственное пространство вне правила,
+заведённое посевом в обход `create_space`, как и до пространств.
+
+Страна, уже привязанная к другому пространству той же базы, пропускается с
+сообщением, и проверки её точек не сливаются: демо на общей тестовой базе
+соседствует с чужими данными, и отнимать у соседа страну посев не вправе.
 
 **Сид отказывается писать в неместную базу.** `DATABASE_URL`, указывающий не на
 петлю, — это почти наверняка площадка или база владельца, и выдуманные проверки
@@ -60,8 +67,12 @@ import seed_demo  # noqa: E402 -- путь к репозиторию выста�
 
 from src import domain  # noqa: E402
 from src.db.config import check_environment  # noqa: E402
+from src.db.directory import upsert_unit  # noqa: E402
+from src.db.errors import AccessError  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.spaces import bind_countries  # noqa: E402
 from src.domain.engine import chat_dir  # noqa: E402
+from src.domain.tenants import HQ_TENANT  # noqa: E402
 
 #: Тенант демо-истории. Почему не `default` — в шапке модуля.
 DEMO_TENANT = "demo"
@@ -235,22 +246,31 @@ def _reset(app_dsn: str) -> int:
         return cur.rowcount
 
 
-def _set_geography(dsn: str) -> None:
-    """Проставить демо-точкам страну и город.
+def _directory() -> None:
+    """Завести демо-точки в справочник УК со страной и городом (D284).
 
-    Отдельным шагом после слива, а не внутри него: проверка не знает
-    географии точки — её ведёт справочник, и слив трогать эти колонки не
-    вправе. Без этого шага экран сети нечем сузить: панель отбора показывает
-    страну и город, а у демо-точек они пусты, и панель выглядит сломанной,
-    хотя работает верно.
+    Партнёр точек не заводит: слив его проверки ищет точку в справочнике УК и
+    без неё отказывает. Повторяемо — `upsert_unit` обновляет заведённую.
     """
+    for spec in DEMO_INSPECTIONS:
+        upsert_unit(spec.unit, country=spec.country, city=spec.city, tenant=HQ_TENANT)
+
+
+def _bind_demo(dsn: str) -> frozenset[str]:
+    """Завести пространство `demo` и привязать его к странам точек. Вернуть его страны."""
     _require_local_dsn(dsn)
-    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
-        for spec in DEMO_INSPECTIONS:
-            cur.execute(
-                "update units set country = %s, city = %s where tenant_code = %s and name = %s",
-                (spec.country, spec.city, DEMO_TENANT, spec.unit),
-            )
+    with psycopg.connect(dsn) as conn:
+        conn.execute(
+            "insert into tenants (code, name) values (%s, %s) on conflict (code) do nothing",
+            (DEMO_TENANT, "Demo partner"),
+        )
+    свои: set[str] = set()
+    for страна in sorted({spec.country for spec in DEMO_INSPECTIONS}):
+        try:
+            свои.update(bind_countries(DEMO_TENANT, (страна,)))
+        except AccessError as exc:
+            print(f"Country {страна} skipped: {exc}")
+    return frozenset(свои)
 
 
 def _build(spec: DemoInspection) -> None:
@@ -288,8 +308,15 @@ def seed() -> list[str]:
     if removed:
         print(f"Previous demo history removed: {removed} inspections")
 
+    admin_dsn = (os.environ.get(ADMIN_URL_VAR) or "").strip() or app_dsn
+    страны = _bind_demo(admin_dsn)
+    _directory()
+
     ids: list[str] = []
     for spec in DEMO_INSPECTIONS:
+        if spec.country not in страны:
+            print(f"{spec.unit} — skipped: country {spec.country} is not the demo space's")
+            continue
         _build(spec)
         # Версия методики: у синтетического чек-листа демо её нет, и это не
         # случайность, а свойство набора — слив такой проверки разрешается явно.
@@ -297,7 +324,6 @@ def seed() -> list[str]:
         score = domain.score(spec.chat_id)
         ids.append(inspection_id)
         print(f"{spec.unit} — {spec.date}: {score.pct:g}% grade {score.grade}, id={inspection_id}")
-    _set_geography(app_dsn)
     print(f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}")
     return ids
 

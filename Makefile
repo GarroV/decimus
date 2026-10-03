@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest cov image regress web web-up web-demo web-user web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: bootstrap check test test-honest cov image regress web web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -354,6 +354,17 @@ web-demo:
 #   make web-user ARGS="disable director --tenant demo"
 web-user:
 	$(VENV)/python tools/web_user.py $(ARGS)
+
+# Пространства и их страны (волна 1, #340, D284). Пространство — новый заказчик,
+# а не новый сотрудник: продукт его не заводит, только эта цель, под ролью
+# ВЛАДЕЛЬЦА СХЕМЫ (DATABASE_ADMIN_URL). Одна страна — один партнёр; у УК стран нет.
+# Учётку в незаведённом пространстве web-user не заводит — сначала эта цель.
+#
+#   make space ARGS="add GE --name 'Партнёр Грузия'"
+#   make space ARGS="countries GE GE"
+#   make space ARGS="list"
+space:
+	$(VENV)/python tools/space.py $(ARGS)
 
 # ЗАПРЕТ НА ВХОД: посмотреть и снять (T328, решение D158). Ограничитель перебора
 # запирает вход после серии неудач, и до T328 запрет проходил только по времени

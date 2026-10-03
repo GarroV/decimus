@@ -16,6 +16,7 @@ from datetime import date
 
 from src.db import queries
 from src.db.models import InspectionRow
+from src.db.reach import Reach
 
 from . import overview
 from .overview import Overview, Selection
@@ -59,7 +60,7 @@ def normalize_code(raw: str) -> str:
 
 def load(
     *,
-    tenant: str,
+    reach: Reach,
     limit: int,
     code: str,
     selection: Selection,
@@ -75,7 +76,7 @@ def load(
     if not code:
         return CountryView(code="", snapshot=_EMPTY)
     snapshot = overview.load(
-        tenant=tenant, limit=limit, selection=replace(selection, country=code), today=today
+        reach=reach, limit=limit, selection=replace(selection, country=code), today=today
     )
     имя = next((name for name, uid in snapshot.unit_ids.items() if uid == unit_id and unit_id), "")
     history = tuple(row for row in snapshot.inspections if имя and row.unit_name == имя)
@@ -86,10 +87,10 @@ def load(
     )
 
 
-def countries(*, tenant: str) -> tuple[tuple[str, int], ...]:
+def countries(*, reach: Reach) -> tuple[tuple[str, int], ...]:
     """Страны справочника с числом точек, крупные сверху. Точка без страны не считается."""
     счёт: dict[str, int] = {}
-    for country, _city in queries.unit_geography(tenant=tenant).values():
+    for country, _city in queries.unit_geography(reach=reach).values():
         if country:
             счёт[country] = счёт.get(country, 0) + 1
     return tuple(sorted(счёт.items(), key=lambda пара: (-пара[1], пара[0])))

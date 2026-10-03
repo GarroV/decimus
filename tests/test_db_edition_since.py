@@ -16,6 +16,7 @@ pytest.importorskip("psycopg")
 
 from src.db.push import push_inspection
 from src.db.queries import edition_first_used, get_inspection
+from src.db.reach import own_reach
 from src.db.retract import retract_inspection
 from src.domain import start_inspection
 
@@ -35,19 +36,20 @@ def _сданная(chat_id: int) -> str:
 def test_дата_сборки_без_снятой_и_без_чужой(domain_env: Path, admin_env: str) -> None:
     # Arrange
     ид = _сданная(911)
-    проверка = get_inspection(ид, tenant="default")
+    проверка = get_inspection(ид, reach=own_reach("default"))
     assert проверка is not None
     сборка = проверка.inspection.checklist_version
 
     # Act / Assert — своя сборка: день её проверки.
     assert (
-        edition_first_used(tenant="default", version=сборка) == проверка.inspection.inspection_date
+        edition_first_used(reach=own_reach("default"), version=сборка)
+        == проверка.inspection.inspection_date
     )
     # Чужая сборка дня не получает.
-    assert edition_first_used(tenant="default", version="local-000000000000") is None
+    assert edition_first_used(reach=own_reach("default"), version="local-000000000000") is None
 
     # Снятая проверка в счёт не идёт: других по сборке нет — дня нет. Держит
     # это прежде всего роль чтения — снятых она не видит вовсе; фильтр в
     # запросе — второй замок (порча фильтра этот тест не роняет, проверено).
     retract_inspection(ид, tenant="default", reason="дубль")
-    assert edition_first_used(tenant="default", version=сборка) is None
+    assert edition_first_used(reach=own_reach("default"), version=сборка) is None

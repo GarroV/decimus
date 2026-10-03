@@ -21,7 +21,9 @@ import psycopg
 
 from .config import load_retraction_settings
 from .errors import MoveError
-from .queries import _reading, _require_inspection_id, _require_tenant
+from .queries import _require_inspection_id, _require_tenant
+from .reach import Reach, require_reach
+from .reading import reading as _reading
 
 _SELECT_HEAD_SQL = """
 select status, retracted_at, inspection_date, unit_id
@@ -29,7 +31,17 @@ from inspections
 where id = %(id)s and tenant_code = %(tenant)s
 """
 
-_UNIT_OF_TENANT_SQL = "select 1 from units where id = %(unit)s and tenant_code = %(tenant)s"
+# Годная точка переноса — та же, что пропускает сторож схемы (миграция 0030):
+# точка своего тенанта либо справочника УК из стран пространства (D284). Сверка
+# здесь — ради понятного отказа до записи; граница — триггер.
+_UNIT_OF_TENANT_SQL = """
+select 1 from units u
+where u.id = %(unit)s
+  and (u.tenant_code = %(tenant)s
+       or (u.tenant_code = 'HQ' and exists (
+           select 1 from space_countries s
+            where s.tenant_code = %(tenant)s and s.country = u.country)))
+"""
 
 _MOVE_SQL = """
 update inspections
@@ -41,9 +53,13 @@ _LIST_MOVES_SQL = """
 select m.moved_at, m.moved_by, m.reason, m.old_date, m.new_date,
        uo.name as old_unit, un.name as new_unit
 from inspection_moves m
+join inspections i on i.id = m.inspection_id
+join units u on u.id = i.unit_id
 join units uo on uo.id = m.old_unit_id
 join units un on un.id = m.new_unit_id
-where m.inspection_id = %(id)s and m.tenant_code = %(tenant)s
+where m.inspection_id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 order by m.moved_at desc, m.id desc
 """
 
@@ -134,7 +150,7 @@ def _apply(
             raise MoveError(f"Проверка {ident} отклонена — отклонённую не исправляют")
         cur.execute(_UNIT_OF_TENANT_SQL, {"unit": new_unit_id, "tenant": tenant})
         if cur.fetchone() is None:
-            raise MoveError("Такой пиццерии в справочнике этого арендатора нет")
+            raise MoveError("Такой пиццерии в справочнике этого пространства нет")
         if дата == new_date and str(точка) == new_unit_id:
             return False
         # `set_config(..., true)` — то же, что `set local`: живёт до конца
@@ -153,12 +169,12 @@ def _apply(
     return True
 
 
-def list_moves(inspection_id: str, *, tenant: str) -> tuple[MoveRecord, ...]:
+def list_moves(inspection_id: str, *, reach: Reach) -> tuple[MoveRecord, ...]:
     """История переносов проверки, свежие первыми. Пусто — переносов не было."""
     ident = _require_inspection_id(inspection_id)
-    tenant_code = _require_tenant(tenant)
+    охват = require_reach(reach)
     with _reading("историю переносов") as conn, conn.cursor() as cur:
-        cur.execute(_LIST_MOVES_SQL, {"id": ident, "tenant": tenant_code})
+        cur.execute(_LIST_MOVES_SQL, {"id": ident, **охват.params()})
         строки = cur.fetchall()
     return tuple(
         MoveRecord(

@@ -83,11 +83,16 @@
           {% if правится %}
             <a class="btn btn--ghost" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
           {% endif %}
+          {# Черновик, выгрузка и фиксация — запись от имени пространства: у
+             проверки, которую вошедший только читает (УК у партнёра, D283),
+             кнопок нет — сервер такую запись всё равно отклонит (#340). #}
+          {% if own %}
           <button class="btn" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
           <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
           <button class="btn btn--primary" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
+          {% endif %}
         </div>
       </div>
 
@@ -151,7 +156,7 @@
         {% else %}
           <span>{{ t('letter.saved.none') }}</span>
         {% endif %}
-        <span>{{ t('letter.edit.hint') }}</span>
+        {% if own %}<span>{{ t('letter.edit.hint') }}</span>{% endif %}
         <span>{{ t('letter.lead') }} {{ t('letter.lang.note') }}</span>
       </div>
     </form>

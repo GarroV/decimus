@@ -126,6 +126,21 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:3372b2fd11d89e9cfc98b0114b3a4b8acab6c2f5bd3af2a0290c7ef5e42deb3b"
     ),
     "0027_tenant_hq.sql": ("sql1:b5cf4026d3470e9c6d3e08a70939ff371febb474238b2b15315444cd490eff75"),
+    # Заведена вместе с файлом (Задача 4, D282) и нигде ещё не применена.
+    "0028_login_across_spaces.sql": (
+        "sql1:507a7b446138c839b21cb94dd5b55cb569a8bc24671ef410929505a2b22192c7"
+    ),
+    # Заведены вместе с файлами (Задача 5, D283, D284) и нигде ещё не применены.
+    "0029_space_countries.sql": (
+        "sql1:268227e7e441a600a4013e726f1c0f9886d1c651904f2c3e7e535354c39afac9"
+    ),
+    "0030_inspection_unit_of_space.sql": (
+        "sql1:cfd51bd4a0ba241962fcfbc92d6ef0906b0fed372295fcb7f91873462866527c"
+    ),
+    # Заведена вместе с файлом (Задача 9, D286) и нигде ещё не применена.
+    "0031_bot_bindings.sql": (
+        "sql1:78af39fa30505d3950be07b9eaed310efc3098994efe0d2221542da7ddfda5c8"
+    ),
 }
 
 
