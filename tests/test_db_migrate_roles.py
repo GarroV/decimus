@@ -212,6 +212,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # имени владельца схемы; появится здесь INSERT — и роль сможет дописать
     # «перенос», которого не было.
     "inspection_moves": {"SELECT"},
+    # Привязка бота (`0031`, D286): ссылки и привязки заводятся и читаются,
+    # но не удаляются; правятся только пометки погашения и отвязки (ниже).
+    "bot_link_tokens": {"SELECT", "INSERT"},
+    "bot_bindings": {"SELECT", "INSERT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -221,6 +225,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
 #: выпуска не правятся ни одним запросом, потому что права на них нет (`0011`).
 APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "mcp_tokens": {"UPDATE": {"revoked_at", "revoked_by"}},
+    # Погашение ссылки и отвязка бота (`0031`): отпечаток, учётка и срок не
+    # правятся ничем, иначе погашенную ссылку можно было бы перевыпустить.
+    "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
+    "bot_bindings": {"UPDATE": {"unbound_at"}},
     "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
