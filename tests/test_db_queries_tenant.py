@@ -136,13 +136,21 @@ def test_недоступная_база_это_отказ_а_не_пустой_
 
 # --- план запроса ------------------------------------------------------------
 
+# Своя точка партнёра принимает проверки только в стране его пространства
+# (сторож 0030, ревью #340, п.3): пространство привязано к стране, точка — в ней.
 _НАПОЛНИТЬ_SQL = """
 insert into tenants (code) values (%(tenant)s) on conflict (code) do nothing
 """
 
+_СТРАНА_SQL = """
+insert into space_countries (country, tenant_code) values (%(tenant)s, %(tenant)s)
+on conflict do nothing
+"""
+
 _ТОЧКА_SQL = """
-insert into units (tenant_code, name, name_normalized)
-values (%(tenant)s, 'Нагрузочная', 'нагрузочная')
+insert into units (tenant_code, name, name_normalized, country)
+values (%(tenant)s, 'Нагрузочная', 'нагрузочная',
+       (select min(country) from space_countries where tenant_code = %(tenant)s))
 returning id
 """
 
@@ -163,6 +171,7 @@ from generate_series(1, %(сколько)s) g
 def _насыпать(dsn: str, *, арендатор: str, сколько: int) -> None:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(_НАПОЛНИТЬ_SQL, {"tenant": арендатор})
+        cur.execute(_СТРАНА_SQL, {"tenant": арендатор})
         cur.execute(_ТОЧКА_SQL, {"tenant": арендатор})
         row = cur.fetchone()
         assert row is not None
