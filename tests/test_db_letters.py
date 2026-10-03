@@ -39,7 +39,7 @@ def test_зафиксированное_письмо_читается_обрат
 ) -> None:
     inspection_id = _проверка(920_001)
 
-    save_letter(inspection_id, body=ПИСЬМО, lang="ru", saved_by="director")
+    save_letter(inspection_id, tenant="HQ", body=ПИСЬМО, lang="ru", saved_by="director")
     прочитанное = latest_letter(inspection_id)
 
     assert прочитанное is not None
@@ -65,8 +65,8 @@ def test_новая_фиксация_не_затирает_прежнюю_а_с�
 ) -> None:
     inspection_id = _проверка(920_003)
 
-    save_letter(inspection_id, body=ПИСЬМО, lang="ru", saved_by="director")
-    save_letter(inspection_id, body=ПРАВЛЕНОЕ, lang="ru", saved_by="director")
+    save_letter(inspection_id, tenant="HQ", body=ПИСЬМО, lang="ru", saved_by="director")
+    save_letter(inspection_id, tenant="HQ", body=ПРАВЛЕНОЕ, lang="ru", saved_by="director")
 
     последнее = latest_letter(inspection_id)
     assert последнее is not None
@@ -90,7 +90,7 @@ def test_пустое_письмо_не_фиксируется_вовсе(domain
     # ровно тогда, когда кто-то спрашивает, что получил партнёр.
     for пустое in ("", "   ", "\n\t "):
         with pytest.raises(PushError):
-            save_letter(inspection_id, body=пустое, lang="ru", saved_by="director")
+            save_letter(inspection_id, tenant="HQ", body=пустое, lang="ru", saved_by="director")
 
     assert latest_letter(inspection_id) is None
 
@@ -101,10 +101,10 @@ def test_письмо_без_языка_или_без_автора_не_фикс
     # Язык — параметр, никогда не константа (`CLAUDE.md`): письмо без языка
     # через год не скажет, на каком языке его читал партнёр.
     with pytest.raises(PushError):
-        save_letter(inspection_id, body=ПИСЬМО, lang="  ", saved_by="director")
+        save_letter(inspection_id, tenant="HQ", body=ПИСЬМО, lang="  ", saved_by="director")
     # «Кто зафиксировал» спрашивают через год, когда спросить уже некого.
     with pytest.raises(PushError):
-        save_letter(inspection_id, body=ПИСЬМО, lang="ru", saved_by="")
+        save_letter(inspection_id, tenant="HQ", body=ПИСЬМО, lang="ru", saved_by="")
 
     assert latest_letter(inspection_id) is None
 
@@ -113,10 +113,21 @@ def test_письмо_несуществующей_проверки_не_лож�
     with pytest.raises(PushError):
         save_letter(
             "00000000-0000-0000-0000-000000000000",
+            tenant="HQ",
             body=ПИСЬМО,
             lang="ru",
             saved_by="director",
         )
+
+
+def test_письмо_к_проверке_другого_пространства_не_ложится(domain_env: Path, db_env: str) -> None:
+    """Ревью #340, п.7: сверка пространства стоит в самом запросе записи."""
+    inspection_id = _проверка(920_009)
+
+    with pytest.raises(PushError, match="нет в истории пространства"):
+        save_letter(inspection_id, tenant="GE", body=ПИСЬМО, lang="ru", saved_by="ge-admin")
+
+    assert latest_letter(inspection_id) is None, "письмо чужого пространства не записано"
 
 
 def test_письмо_спрашивается_на_своём_языке_а_не_какое_нашлось(
@@ -124,7 +135,7 @@ def test_письмо_спрашивается_на_своём_языке_а_н�
 ) -> None:
     inspection_id = _проверка(920_006)
 
-    save_letter(inspection_id, body=ПИСЬМО, lang="ru", saved_by="director")
+    save_letter(inspection_id, tenant="HQ", body=ПИСЬМО, lang="ru", saved_by="director")
 
     # Партнёру другой страны пишут на его языке, и зафиксированное русское для
     # него не «то же письмо, но переведут потом», а чужой текст. Без отбора по
@@ -136,7 +147,7 @@ def test_письмо_спрашивается_на_своём_языке_а_н�
     assert на_русском is not None
     assert на_русском.body == ПИСЬМО
 
-    save_letter(inspection_id, body=ПРАВЛЕНОЕ, lang="sr", saved_by="director")
+    save_letter(inspection_id, tenant="HQ", body=ПРАВЛЕНОЕ, lang="sr", saved_by="director")
 
     # Каждый язык живёт своей записью: правка сербского не трогает русское.
     сербское = latest_letter(inspection_id, lang="sr")

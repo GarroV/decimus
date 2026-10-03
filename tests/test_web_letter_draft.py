@@ -24,6 +24,7 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 
 from src.db.letters import SavedLetter
 from src.db.models import InspectionDetail, InspectionRow
+from src.domain.tenants import canonical_tenant
 from src.web import inspections as data
 from src.web import letter_draft
 from src.web.google_mail import DRAFT_SCOPE
@@ -64,7 +65,10 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
 
     monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
 
-    def _remember(inspection_id: str, *, body: str, lang: str, saved_by: str) -> SavedLetter:
+    def _remember(
+        inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
+    ) -> SavedLetter:
+        assert tenant == canonical_tenant(ТЕНАНТ), "письмо фиксируется в пространстве вошедшего"
         следы["remember"].append((inspection_id, body, lang, saved_by))
         return SavedLetter(
             id="l-1", body=body, lang=lang, saved_by=saved_by, created_at=datetime.now()
