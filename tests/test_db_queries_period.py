@@ -69,11 +69,17 @@ def _проверка(chat_id: int, *, арендатор: str, дата: str, �
 #: настоящих данных, — проверка плана на такой заливке ничего не проверяет.
 ТОЧЕК = 40
 
+# Своя точка партнёра принимает проверки только в стране его пространства
+# (сторож 0030, ревью #340, п.3): пространство привязано к стране, точка — в ней.
 _ТОЧКИ_SQL = """
-insert into units (tenant_code, name, name_normalized)
-select %(tenant)s, 'Точка ' || g, 'точка ' || g
+insert into units (tenant_code, name, name_normalized, country)
+select %(tenant)s, 'Точка ' || g, 'точка ' || g,
+       (select min(country) from space_countries where tenant_code = %(tenant)s)
 from generate_series(1, %(точек)s) g
 """
+
+#: Страна пространства для заливки: своя у каждого арендатора.
+_СТРАНА_ЗАЛИВКИ = {АРЕНДАТОР_А: СТРАНА_А, АРЕНДАТОР_Б: "ME"}
 
 # Одна дата слива на всю историю — это и есть D035: заливка идёт одним заходом,
 # и `pushed_at` перестаёт различать проверки. Дата обхода при этом у каждой
@@ -108,6 +114,11 @@ def _залить_историю(dsn: str, *, арендатор: str, скол�
         cur.execute(
             "insert into tenants (code) values (%(tenant)s) on conflict (code) do nothing",
             {"tenant": арендатор},
+        )
+        cur.execute(
+            "insert into space_countries (country, tenant_code) values (%s, %s) "
+            "on conflict do nothing",
+            (_СТРАНА_ЗАЛИВКИ[арендатор], арендатор),
         )
         cur.execute(_ТОЧКИ_SQL, {"tenant": арендатор, "точек": ТОЧЕК})
         cur.execute(

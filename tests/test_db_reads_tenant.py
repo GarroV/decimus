@@ -185,9 +185,12 @@ def test_пустое_название_точки_это_отказ(domain_env: 
 #: что на настоящих данных, — и проверка плана на такой заливке проверяет не то.
 ТОЧЕК = 40
 
+# Своя точка партнёра принимает проверки только в стране его пространства
+# (сторож 0030, ревью #340, п.3): пространство привязано к стране, точка — в ней.
 _ТОЧКИ_SQL = """
-insert into units (tenant_code, name, name_normalized)
-select %(tenant)s, 'Точка ' || g, 'точка ' || g
+insert into units (tenant_code, name, name_normalized, country)
+select %(tenant)s, 'Точка ' || g, 'точка ' || g,
+       (select min(country) from space_countries where tenant_code = %(tenant)s)
 from generate_series(1, %(точек)s) g
 """
 
@@ -223,6 +226,11 @@ def _насыпать(dsn: str, *, арендатор: str, сколько: int)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
             "insert into tenants (code) values (%(tenant)s) on conflict (code) do nothing",
+            {"tenant": арендатор},
+        )
+        cur.execute(
+            "insert into space_countries (country, tenant_code) values (%(tenant)s, %(tenant)s) "
+            "on conflict do nothing",
             {"tenant": арендатор},
         )
         cur.execute(_ТОЧКИ_SQL, {"tenant": арендатор, "точек": ТОЧЕК})
