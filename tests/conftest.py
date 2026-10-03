@@ -343,6 +343,20 @@ def _сведение_комментария_не_уходит_в_сеть(monke
 
 
 @pytest.fixture(autouse=True)
+def _бот_без_базы_не_знает_привязок(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Опознание бота по привязке без базы отвечает «привязки не было» (ревью #340, п.6).
+
+    Отказ базы привязок бот читает как отказ в доступе, и тест бота без базы
+    иначе не дошёл бы ни до одного обработчика. «Не было привязки» — ответ,
+    при котором действует прежний пропуск из окружения, как и до D286. Тест,
+    которому нужна привязка, передаёт свою `BindingCache(standing=…)`.
+    """
+    from src.db.bot_links import NEVER_BOUND
+
+    monkeypatch.setattr("src.bot.access._standing_from_db", lambda _tg: NEVER_BOUND)
+
+
+@pytest.fixture(autouse=True)
 def _правка_ответом_не_уходит_в_сеть(monkeypatch: pytest.MonkeyPatch) -> None:
     """Дешёвая модель правки ответом (#454) в тестах не зовётся никогда.
 

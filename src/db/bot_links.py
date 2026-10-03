@@ -63,7 +63,17 @@ _RESOLVE_BY_USER_SQL = """
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.unbound_at is null and u.disabled_at is null and u.id = %s
 """
-
+# Положение Telegram ID: живая привязка впереди, иначе последняя из бывших.
+# Бывшая — снятая отвязкой или на отключённой учётке: такой ID путь
+# совместимости не пускает (ревью #340, п.5).
+_STANDING_SQL = """
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at,
+           (b.unbound_at is null and u.disabled_at is null) as live
+      from bot_bindings b join web_users u on u.id = b.user_id
+     where b.telegram_id = %s
+     order by live desc, b.bound_at desc
+     limit 1
+"""
 
 _LIVE_BINDINGS_SQL = """
     select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
@@ -89,6 +99,26 @@ class Binding:
     login: str
     tenant: str
     bound_at: datetime
+
+
+@dataclass(frozen=True)
+class Standing:
+    """Положение Telegram ID: живая привязка — и была ли привязка когда-либо.
+
+    `binding is None and ever_bound` — привязку сняли или учётку отключили:
+    такого человека не пускает уже ничто, в том числе путь совместимости.
+    """
+
+    binding: Binding | None
+    ever_bound: bool
+
+    @classmethod
+    def live(cls, binding: Binding) -> Standing:
+        return cls(binding=binding, ever_bound=True)
+
+
+#: Привязки не было никогда.
+NEVER_BOUND = Standing(binding=None, ever_bound=False)
 
 
 def _fingerprint(token: str) -> str:
@@ -137,6 +167,18 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
 def resolve(telegram_id: int) -> Binding | None:
     """Живая привязка этого Telegram ID к живой учётке — или `None`."""
     return _one(_RESOLVE_BY_TELEGRAM_SQL, telegram_id, "опознать Telegram ID")
+
+
+def standing(telegram_id: int) -> Standing:
+    """Живая привязка этого Telegram ID — или след бывшей, или её отсутствие."""
+    with _connected("опознать Telegram ID") as conn, conn.cursor() as cur:
+        cur.execute(_STANDING_SQL, (telegram_id,))
+        row = cur.fetchone()
+    if row is None:
+        return NEVER_BOUND
+    if not row[5]:
+        return Standing(binding=None, ever_bound=True)
+    return Standing.live(_binding(row))
 
 
 def binding_of(user_id: str) -> Binding | None:

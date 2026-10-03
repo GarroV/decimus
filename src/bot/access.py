@@ -14,9 +14,13 @@
    причины отказа и не подсказывает, чем отказ вызван.
 2. Живая привязка — пространство УЧЁТКИ, к которой привязан Telegram ID.
 3. Совместимость до снятия (вопрос 2): `ALLOWED_TELEGRAM_IDS` и связки
-   `roster.json`, собранные до D286, — сотрудник УК. Только если привязки нет:
-   привязанный к учётке партнёра работает как партнёр, даже если его ID есть
-   в окружении.
+   `roster.json`, собранные до D286, — сотрудник УК. Только если привязки НЕ
+   БЫЛО НИКОГДА: привязанный к учётке партнёра работает как партнёр, даже если
+   его ID есть в окружении, а отвязанный или с отключённой учёткой не пускается
+   вовсе (ревью #340, п.5). Каждый пуск по совместимости — строка в журнале.
+
+База привязок молчит — последний ответ годен не дольше `BINDING_STALE_MAX`,
+дальше отказ всем, кого нечем сверить (п.6).
 
 Пространство человека кладётся в `data[SPACE_KEY]`; обработчик получает его
 параметром `space`. Второй заслон, `ChatSpaceMiddleware`, не пускает апдейт к
@@ -35,7 +39,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Chat, Message, TelegramObject
 
 from src.db import bot_links
-from src.db.bot_links import LINK_PREFIX, Binding
+from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -54,6 +58,9 @@ SPACE_KEY = "space"
 #: Сколько живёт ответ «чья привязка»: не ходить в базу на каждый кадр альбома.
 #: Столько же после отвязки в вебе бот ещё пускает человека в прежнее пространство.
 BINDING_TTL = timedelta(seconds=60)
+#: Сколько последний ответ годен, пока база привязок не отвечает. Дальше —
+#: отказ: отключённая за это время учётка не должна работать ботом и дальше.
+BINDING_STALE_MAX = timedelta(minutes=10)
 
 
 def is_allowed(user_id: int | None, allowed_ids: frozenset[int]) -> bool:
@@ -65,40 +72,52 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+def _standing_from_db(telegram_id: int) -> Standing:
+    """Положение из базы. Отдельной функцией модуля — её подменяют тесты бота без базы."""
+    return bot_links.standing(telegram_id)
+
+
 class BindingCache:
     """Опознание по привязке с коротким кэшем и запасным ответом при отказе базы.
 
     Запасной ответ — затем, чтобы аудитор на точке не остался без бота из-за
-    базы (вопрос 3): прежде доступ от базы не зависел вовсе (`roster.json`), и
-    это свойство сохраняется для уже узнанных. Незнакомого при отказе базы не
-    пускаем: узнать его нечем.
+    короткого сбоя базы (вопрос 3). Он годен не дольше `BINDING_STALE_MAX` от
+    последнего ответа базы: дольше нечем узнать, не отключили ли учётку, и
+    тогда — отказ (ревью #340, п.6). Незнакомого при отказе базы не пускаем:
+    узнать его нечем.
     """
 
     def __init__(
         self,
-        resolve: Callable[[int], Binding | None] = bot_links.resolve,
+        standing: Callable[[int], Standing] | None = None,
         ttl: timedelta = BINDING_TTL,
         now: Callable[[], datetime] = _utc_now,
+        stale_max: timedelta = BINDING_STALE_MAX,
     ) -> None:
-        self._resolve = resolve
+        self._standing = standing if standing is not None else _standing_from_db
         self._ttl = ttl
         self._now = now
-        self._known: dict[int, tuple[datetime, str | None]] = {}
+        self._stale_max = stale_max
+        self._known: dict[int, tuple[datetime, Standing]] = {}
 
-    def space_of(self, telegram_id: int) -> str | None:
-        """Пространство привязанной учётки — или `None`, если привязки нет."""
+    def standing_of(self, telegram_id: int) -> Standing | None:
+        """Положение Telegram ID — или `None`: база молчит, а годного ответа нет."""
         сейчас = self._now()
         было = self._known.get(telegram_id)
         if было is not None and сейчас - было[0] < self._ttl:
             return было[1]
         try:
-            привязка = self._resolve(telegram_id)
+            ответ = self._standing(telegram_id)
         except DbError:
+            if было is not None and сейчас - было[0] < self._stale_max:
+                logger.warning(
+                    "привязки не прочитались, Telegram ID %s — по последнему ответу", telegram_id
+                )
+                return было[1]
             logger.warning(
-                "привязки не прочитались, Telegram ID %s — по последнему ответу", telegram_id
+                "привязки не прочитались, Telegram ID %s — годного ответа нет, отказ", telegram_id
             )
-            return было[1] if было is not None else None
-        ответ = canonical_tenant(привязка.tenant) if привязка is not None else None
+            return None
         self._known[telegram_id] = (сейчас, ответ)
         return ответ
 
@@ -156,16 +175,32 @@ class AccessMiddleware(BaseMiddleware):
         await _answer(event, "access.linked", login=привязка.login)
 
     def _space_of(self, user_id: int) -> str | None:
-        if self._bindings is not None:
-            привязан = self._bindings.space_of(user_id)
-            if привязан is not None:
-                return привязан
+        положение = (
+            self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND
+        )
+        if положение is None:
+            # База молчит дольше допустимого: ни привязку, ни её отсутствие
+            # сверить нечем — совместимость тоже не применяется (п.6).
+            return None
+        if положение.binding is not None:
+            return canonical_tenant(положение.binding.tenant)
+        if положение.ever_bound:
+            # Отвязан или учётка отключена: прежний пропуск из окружения не
+            # возвращает того, у кого доступ сняли (п.5).
+            return None
         # Совместимость (вопрос 2): кто пускался до D286 — сотрудник УК. Только
-        # если привязки нет — её проверили выше.
+        # если привязки не было никогда — это проверено выше.
+        откуда = self._compat_source(user_id)
+        if откуда is None:
+            return None
+        logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", user_id, откуда)
+        return HQ_TENANT
+
+    def _compat_source(self, user_id: int) -> str | None:
         if is_allowed(user_id, self._allowed_ids):
-            return HQ_TENANT
+            return "ALLOWED_TELEGRAM_IDS"
         if self._roster is not None and self._roster.knows(user_id):
-            return HQ_TENANT
+            return "roster.json"
         return None
 
 
