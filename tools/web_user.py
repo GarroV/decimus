@@ -39,6 +39,7 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.db.errors import DbError  # noqa: E402
+from src.db.spaces import space_exists  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
     ROLES,
@@ -67,6 +68,21 @@ def _tenant(argument: str | None) -> str:
         raise SystemExit(
             f"Не задан арендатор: передайте --tenant или {WEB_TENANT_VAR} в окружении. "
             f"Чью историю откроет эта учётка — не додумывается"
+        )
+    return tenant
+
+
+def _known_space(tenant: str) -> str:
+    """Заведённое пространство — или отказ (#340).
+
+    Опечатка в `--tenant` раньше молча заводила новое пустое пространство вместе
+    с учёткой: человек входил и видел пустоту, а в базе появлялся заказчик,
+    которого нет. Пространства заводит `make space`, эта команда — только людей.
+    """
+    if not space_exists(tenant):
+        raise SystemExit(
+            f"Пространства «{tenant}» нет. Опечатка в --tenant завела бы новое пустое "
+            f'пространство молча; заведите его явно: make space ARGS="add {tenant} --name ..."'
         )
     return tenant
 
@@ -162,6 +178,9 @@ def main(argv: list[str] | None = None) -> int:
     tenant = _tenant(args.tenant)
 
     try:
+        if args.command != "ensure":
+            # `ensure` — учётка стенда при подъёме; её пространство заводит посев.
+            tenant = _known_space(tenant)
         if args.command == "add":
             account = create_account(args.login, tenant=tenant, password=_password())
             print(f"Учётка заведена: {account.login} · арендатор {account.tenant}")
