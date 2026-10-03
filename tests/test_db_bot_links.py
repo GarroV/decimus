@@ -20,6 +20,7 @@ from src.db.bot_links import (  # noqa: E402
     live_bindings,
     redeem,
     resolve,
+    standing,
     unbind,
 )
 from src.db.web_access import create_account, disable_account  # noqa: E402
@@ -111,6 +112,19 @@ def test_отвязка_и_отключение_снимают_доступ(уч
     redeem(issue_link(учётки["hq"]).token, telegram_id=601)
     disable_account("hq-auditor", tenant="HQ")
     assert resolve(601) is None
+
+
+def test_положение_помнит_снятую_привязку(учётки: dict[str, str]) -> None:
+    """Ревью #340, п.5: отвязанный и с отключённой учёткой — «была привязка»."""
+    assert standing(501).ever_bound is False
+    redeem(issue_link(учётки["ge"]).token, telegram_id=501)
+    живая = standing(501)
+    assert живая.binding is not None and живая.binding.tenant == "GE"
+    unbind(учётки["ge"])
+    assert (standing(501).binding, standing(501).ever_bound) == (None, True)
+    redeem(issue_link(учётки["hq"]).token, telegram_id=601)
+    disable_account("hq-auditor", tenant="HQ")
+    assert (standing(601).binding, standing(601).ever_bound) == (None, True)
 
 
 def test_в_базе_нет_токена_только_отпечаток(учётки: dict[str, str], pg_dsn: str) -> None:

@@ -15,9 +15,15 @@ from aiogram.methods import SendMessage
 from aiogram.types import Chat, Message, TelegramObject, User
 from bot_harness import RecordingSession, make_bot
 
-from src.bot.access import SPACE_KEY, AccessMiddleware, BindingCache, is_allowed
+from src.bot.access import (
+    BINDING_STALE_MAX,
+    SPACE_KEY,
+    AccessMiddleware,
+    BindingCache,
+    is_allowed,
+)
 from src.bot.roster import Roster
-from src.db.bot_links import Binding
+from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.db.errors import AccessError
 from src.domain.tenants import HQ_TENANT
 
@@ -53,8 +59,17 @@ async def _пустить(mw: AccessMiddleware, event: TelegramObject) -> str | 
     return увидено[0][SPACE_KEY] if увидено else None
 
 
-def _кэш(ответы: dict[int, Binding | None]) -> BindingCache:
-    return BindingCache(resolve=lambda tg: ответы.get(tg))
+def _положение(привязка: Binding | None) -> Standing:
+    return NEVER_BOUND if привязка is None else Standing.live(привязка)
+
+
+def _кэш(ответы: dict[int, Binding | None], **настройки: Any) -> BindingCache:
+    return BindingCache(standing=lambda tg: _положение(ответы.get(tg)), **настройки)
+
+
+def _пространство(кэш: BindingCache, tg: int) -> str | None:
+    положение = кэш.standing_of(tg)
+    return None if положение is None or положение.binding is None else положение.binding.tenant
 
 
 def _ответы(session: RecordingSession) -> list[str]:
@@ -137,20 +152,18 @@ async def test_старый_код_тенанта_учётки_читается_
 async def test_отвязка_действует_после_истечения_кэша() -> None:
     сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
     ответы: dict[int, Binding | None] = {501: _привязка(501, "GE")}
-    кэш = BindingCache(
-        resolve=lambda tg: ответы.get(tg), ttl=timedelta(seconds=60), now=lambda: сейчас[0]
-    )
-    assert кэш.space_of(501) == "GE"
+    кэш = _кэш(ответы, ttl=timedelta(seconds=60), now=lambda: сейчас[0])
+    assert _пространство(кэш, 501) == "GE"
     ответы[501] = None
-    assert кэш.space_of(501) == "GE", "в пределах срока кэша — прежний ответ"
+    assert _пространство(кэш, 501) == "GE", "в пределах срока кэша — прежний ответ"
     сейчас[0] += timedelta(seconds=61)
-    assert кэш.space_of(501) is None
+    assert _пространство(кэш, 501) is None
 
 
 async def test_погашенная_ссылка_сбрасывает_кэш() -> None:
     """Партнёр, привязавшийся заново, работает в новом пространстве сразу, без минуты ожидания."""
     ответы: dict[int, Binding | None] = {111: None}
-    кэш = BindingCache(resolve=lambda tg: ответы.get(tg))
+    кэш = _кэш(ответы)
 
     def погасить(_token: str, *, telegram_id: int) -> Binding | None:
         ответы[telegram_id] = _привязка(telegram_id, "GE")
@@ -162,19 +175,67 @@ async def test_погашенная_ссылка_сбрасывает_кэш() -
     assert await _пустить(mw, _msg(111)[0]) == "GE"
 
 
-async def test_при_отказе_базы_узнанный_работает_незнакомый_нет() -> None:
-    """Вопрос 3, по умолчанию: аудитор на точке не остаётся без бота из-за базы."""
-    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
-    живая = [True]
-
-    def resolve(tg: int) -> Binding | None:
+def _кэш_с_отказом(сейчас: list[datetime], живая: list[bool]) -> BindingCache:
+    def standing(tg: int) -> Standing:
         if not живая[0]:
             raise AccessError("база недоступна")
-        return _привязка(tg, "GE") if tg == 501 else None
+        return _положение(_привязка(tg, "GE") if tg == 501 else None)
 
-    кэш = BindingCache(resolve=resolve, ttl=timedelta(seconds=60), now=lambda: сейчас[0])
-    assert кэш.space_of(501) == "GE"
+    return BindingCache(standing=standing, ttl=timedelta(seconds=60), now=lambda: сейчас[0])
+
+
+async def test_при_коротком_отказе_базы_узнанный_работает_незнакомый_нет() -> None:
+    """Вопрос 3: аудитор на точке не остаётся без бота из-за короткого сбоя базы."""
+    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
+    живая = [True]
+    кэш = _кэш_с_отказом(сейчас, живая)
+    assert _пространство(кэш, 501) == "GE"
     живая[0] = False
-    сейчас[0] += timedelta(hours=2)
-    assert кэш.space_of(501) == "GE"
-    assert кэш.space_of(777) is None
+    сейчас[0] += BINDING_STALE_MAX - timedelta(seconds=1)
+    assert _пространство(кэш, 501) == "GE"
+    assert кэш.standing_of(777) is None
+
+
+async def test_долгий_отказ_базы_прежнего_ответа_не_продлевает() -> None:
+    """Ревью #340, п.6: отключённая за время сбоя учётка не работает ботом дальше."""
+    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
+    живая = [True]
+    кэш = _кэш_с_отказом(сейчас, живая)
+    assert _пространство(кэш, 501) == "GE"
+    живая[0] = False
+    сейчас[0] += BINDING_STALE_MAX
+    assert кэш.standing_of(501) is None
+    mw = AccessMiddleware(frozenset({501}), кэш, None)
+    assert await _пустить(mw, _msg(501)[0]) is None, "и совместимость не подхватывает"
+
+
+async def test_при_отказе_базы_совместимость_не_пускает_несверенного() -> None:
+    """Был ли этот ID привязан и отвязан — без базы не узнать, поэтому отказ."""
+    mw = AccessMiddleware(frozenset({111}), _кэш_с_отказом([datetime.now(UTC)], [False]), None)
+    assert await _пустить(mw, _msg(111)[0]) is None
+
+
+@pytest.mark.parametrize("откуда", ["окружение", "связки"])
+async def test_бывшая_привязка_закрывает_путь_совместимости(откуда: str, tmp_path: Path) -> None:
+    """Ревью #340, п.5: отвязанный или с отключённой учёткой не пускается как УК."""
+    path = tmp_path / "access" / "roster.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '{"version": 1, "entries": [{"telegram_id": 111, "username": "apetrov"}]}',
+        encoding="utf-8",
+    )
+    разрешённые = frozenset({111}) if откуда == "окружение" else frozenset()
+    кэш = BindingCache(standing=lambda _tg: Standing(binding=None, ever_bound=True))
+    mw = AccessMiddleware(разрешённые, кэш, Roster.load(tmp_path))
+    assert await _пустить(mw, _msg(111)[0]) is None
+
+
+async def test_каждый_пуск_по_совместимости_пишется_в_журнал(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mw = AccessMiddleware(frozenset({111}), _кэш({}), None)
+    with caplog.at_level("WARNING", logger="src.bot.access"):
+        assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+        assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+    строки = [r.getMessage() for r in caplog.records if "совместимости" in r.getMessage()]
+    assert строки == ["путь совместимости: Telegram ID 111 пущен как УК (ALLOWED_TELEGRAM_IDS)"] * 2

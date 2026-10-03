@@ -15,7 +15,7 @@ from src.bot import unit_pick
 from src.bot.access import BindingCache
 from src.bot.app import build_dispatcher
 from src.bot.keyboards import NEW_INSPECTION_CALLBACK
-from src.db.bot_links import Binding
+from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.domain import get_state, start_inspection
 from src.domain.tenants import HQ_TENANT
 
@@ -23,12 +23,12 @@ pytestmark = pytest.mark.asyncio
 
 
 def _партнёр() -> BindingCache:
-    def resolve(tg: int) -> Binding | None:
+    def standing(tg: int) -> Standing:
         if tg != AUDITOR_ID:
-            return None
-        return Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC))
+            return NEVER_BOUND
+        return Standing.live(Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC)))
 
-    return BindingCache(resolve=resolve)
+    return BindingCache(standing=standing)
 
 
 def _диспетчер() -> Dispatcher:

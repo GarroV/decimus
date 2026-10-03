@@ -32,7 +32,7 @@ from src.bot.keyboards import (
     UNIT_NEW_YES,
 )
 from src.bot.unit_pick import UnitMatch
-from src.db.bot_links import Binding
+from src.db.bot_links import Binding, Standing
 from src.domain import get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
@@ -312,7 +312,7 @@ async def test_партнёр_новую_пиццерию_не_заводит(
     # Arrange — бот проверяющего привязан к учётке партнёра (D286).
     заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
     партнёр = BindingCache(
-        resolve=lambda tg: Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC))
+        standing=lambda tg: Standing.live(Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC)))
     )
 
     # Act
