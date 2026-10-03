@@ -87,8 +87,6 @@ on conflict (tenant_code, name_normalized) do update set name = excluded.name
 returning id
 """
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
-
 _INSERT_FINDING_SQL = """
 insert into findings (
     inspection_id, n, code, level, zone, zone_unusual, source, words,
@@ -298,6 +296,18 @@ def _push_info(cur: psycopg.Cursor[Any], inspection: Inspection, *, inspection_i
         место += 1
 
 
+def _unit_refused(unit: str, tenant_code: str) -> PushError:
+    """Один отказ на «точки нет в справочнике» и «точка чужой страны» (ревью #340, п.10).
+
+    Различие подсказало бы партнёру, что пиццерия с таким названием в сети
+    есть, только не в его странах.
+    """
+    return PushError(
+        f"Пиццерии «{unit}» нет в справочнике стран пространства {tenant_code}. "
+        f"Новую пиццерию заводит только УК (D234)"
+    )
+
+
 def _unit_of_inspection(
     conn: psycopg.Connection[Any],
     cur: psycopg.Cursor[Any],
@@ -315,7 +325,8 @@ def _unit_of_inspection(
     Партнёр ищет точку в справочнике УК и точек не заводит (D234, D284, #471):
     справочник у сети один. Не нашлось — отказ, а не новая пиццерия. Страну
     точки сверяет сторож схемы (миграция 0030): точка чужой страны даёт отказ
-    базы, и он уходит наружу `PushError`, как прочие отказы слива.
+    базы на вставке проверки, и `_push` отвечает на него тем же текстом, что
+    на точку вне справочника (`_unit_refused`).
 
     УК, не найдя точку, заводит её по нормализованному названию, как и раньше:
     справочник может быть не заполнен, и это не повод отказать в сливе.
@@ -323,10 +334,7 @@ def _unit_of_inspection(
     if tenant_code != HQ_TENANT:
         unit_id = resolve_unit_id(conn, inspection.unit, tenant=HQ_TENANT)
         if unit_id is None:
-            raise PushError(
-                f"Пиццерии «{inspection.unit}» нет в справочнике страны пространства "
-                f"{tenant_code}. Новую пиццерию заводит только УК (D234)"
-            )
+            raise _unit_refused(inspection.unit, tenant_code)
         return unit_id
     unit_id = resolve_unit_id(conn, inspection.unit, tenant=tenant_code)
     if unit_id is None:
@@ -357,36 +365,45 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
             if row is not None:
                 return str(row[0])
 
-        cur.execute(_INSERT_TENANT_SQL, (tenant_code,))
+        # Пространство не заводится сливом: его код пришёл из файла проверки, а
+        # пространства заводит команда (`make space`). Незаведённое — отказ
+        # ссылки на `tenants` или сторожа точки, а не новая строка (#340).
         unit_id = _unit_of_inspection(conn, cur, inspection, tenant_code=tenant_code)
 
-        cur.execute(
-            _INSERT_INSPECTION_SQL,
-            {
-                "tenant_code": tenant_code,
-                "unit_id": unit_id,
-                "chat_id": inspection.chat_id,
-                "kind": inspection.kind,
-                "inspection_date": inspection_date,
-                "report_lang": inspection.report_lang,
-                "ui_lang": inspection.ui_lang,
-                "speech_lang": inspection.speech_lang,
-                "checklist_version": inspection.checklist_version,
-                # Код чек-листа из проверки (волна 3), а не умолчание базы: с
-                # несколькими чек-листами в боте умолчание `bizdev` соврало бы.
-                "checklist_code": inspection.checklist_code,
-                "auditor": inspection.auditor,
-                "city": inspection.city,
-                "partner": inspection.partner,
-                "contact": inspection.contact,
-                "pct": result.pct,
-                "grade": result.grade,
-                "deductions": result.deductions,
-                "counts": Json(dict(result.counts)),
-                "by_zone": Json(_by_zone_payload(result)),
-                "source_fingerprint": fingerprint,
-            },
-        )
+        try:
+            cur.execute(
+                _INSERT_INSPECTION_SQL,
+                {
+                    "tenant_code": tenant_code,
+                    "unit_id": unit_id,
+                    "chat_id": inspection.chat_id,
+                    "kind": inspection.kind,
+                    "inspection_date": inspection_date,
+                    "report_lang": inspection.report_lang,
+                    "ui_lang": inspection.ui_lang,
+                    "speech_lang": inspection.speech_lang,
+                    "checklist_version": inspection.checklist_version,
+                    # Код чек-листа из проверки (волна 3), а не умолчание базы: с
+                    # несколькими чек-листами в боте умолчание `bizdev` соврало бы.
+                    "checklist_code": inspection.checklist_code,
+                    "auditor": inspection.auditor,
+                    "city": inspection.city,
+                    "partner": inspection.partner,
+                    "contact": inspection.contact,
+                    "pct": result.pct,
+                    "grade": result.grade,
+                    "deductions": result.deductions,
+                    "counts": Json(dict(result.counts)),
+                    "by_zone": Json(_by_zone_payload(result)),
+                    "source_fingerprint": fingerprint,
+                },
+            )
+        except psycopg.errors.RaiseException as exc:
+            # На вставке проверки так отказывает только сторож точки (миграция
+            # 0030): точка не из стран пространства. Ответ тот же, что у точки,
+            # которой нет в справочнике, — иначе отказ подтверждал бы, что такая
+            # пиццерия в сети есть (ревью #340, п.10).
+            raise _unit_refused(inspection.unit, tenant_code) from exc
         inserted = cur.fetchone()
         if inserted is None:
             # Отпечаток уже есть в базе — тот же слив уже случился раньше.

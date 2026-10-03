@@ -12,6 +12,11 @@
 -- команда (задача 13), а не продукт. Читают таблицу охват чтения
 -- (`src/db/reach.py`) и сторож проверки из 0030.
 
+-- Пространство УК есть всегда, и заводит его схема, а не первый слив: слив
+-- пространств не заводит — их код приходит из файла проверки (ревью #340).
+-- В базе, прошедшей 0027 со строкой `default`, строка `HQ` уже есть.
+insert into tenants (code) values ('HQ') on conflict (code) do nothing;
+
 create table space_countries (
     country text primary key check (country ~ '^[A-Z]{2}$'),
     tenant_code text not null references tenants (code) check (tenant_code <> 'HQ'),

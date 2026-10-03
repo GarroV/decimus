@@ -9,6 +9,8 @@ from pathlib import Path
 import pytest
 from aiogram import Dispatcher
 from bot_harness import AUDITOR_ID, CHAT_ID, callback_query, feed, make_bot, text_message
+from conftest import requires_db
+from db_harness import привязать_страну, точка_справочника
 from test_bot_start_router import settings
 
 from src.bot import unit_pick
@@ -90,3 +92,27 @@ async def test_проверка_партнёра_начинается_в_его_
     await feed(dp, bot, callback_query("start:lang:ru"))
     состояние = get_state(CHAT_ID)
     assert состояние is not None and состояние.tenant == "GE"
+
+
+@requires_db
+async def test_партнёру_чужая_страна_и_вне_справочника_отвечают_одним_текстом(
+    domain_env: Path, pg_dsn: str, db_env: str
+) -> None:
+    """Ревью #340, п.10: ответ не подтверждает, что пиццерия в сети есть.
+
+    Справочник настоящий: Batumi-1 (GE) и Yerevan-1 (AM), партнёр — GE.
+    """
+    точка_справочника("Batumi-1", country="GE", city="Batumi")
+    точка_справочника("Yerevan-1", country="AM", city="Yerevan")
+    привязать_страну(pg_dsn, tenant="GE", country="GE")
+    ответы = []
+    for точка in ("Yerevan-1", "Yerevan-99"):
+        bot, session = make_bot()
+        dp = _диспетчер()
+        await feed(dp, bot, text_message("/start"))
+        await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+        await feed(dp, bot, text_message(точка))
+        ответы.append(session.last_text.replace(точка, "…"))
+        assert get_state(CHAT_ID) is None
+    assert ответы[0] == ответы[1]
+    assert "только" in ответы[0], ответы[0]
