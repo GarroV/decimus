@@ -14,11 +14,12 @@
 from __future__ import annotations
 
 import ast
+import inspect
 import re
 from pathlib import Path
 from types import ModuleType
 
-from src.db import directory, move, previews, queries, reports
+from src.db import directory, move, previews, push, queries, reports
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
 
 #: Запросы по проверкам без условия охвата — только по имени и с причиной.
@@ -163,3 +164,12 @@ def test_находки_по_идентификатору_читаются_то�
         if запрос in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ and строка < min(выход)
     ]
     assert раньше == [], "читают до проверки карточки по охвату: " + ", ".join(раньше)
+
+
+def test_слив_не_заводит_пространство() -> None:
+    """Код пространства приходит из файла проверки — заводит пространства команда.
+
+    Сверка по тексту, а не по базе: отказ слива откатывает транзакцию целиком,
+    и вставка в `tenants` следа бы не оставила — тест по базе зеленел бы и с ней.
+    """
+    assert "into tenants" not in inspect.getsource(push).lower()

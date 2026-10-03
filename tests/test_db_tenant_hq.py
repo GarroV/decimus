@@ -93,8 +93,10 @@ def test_на_свежей_базе_переименовывать_нечего(
     with empty_database() as dsn:
         apply_migrations(dsn)
         with psycopg.connect(dsn) as conn, conn.cursor() as cur:
-            cur.execute("select count(*) from tenants")
-            assert cur.fetchone() == (0,)
+            # Переименовывать нечего — `default` не появляется. Строка `HQ` одна:
+            # пространство УК заводит схема (0029), а не первый слив (#340).
+            cur.execute("select array_agg(code order by code) from tenants")
+            assert cur.fetchone() == (["HQ"],)
 
 
 @pytest.mark.parametrize(

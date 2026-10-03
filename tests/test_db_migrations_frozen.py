@@ -132,7 +132,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Заведены вместе с файлами (Задача 5, D283, D284) и нигде ещё не применены.
     "0029_space_countries.sql": (
-        "sql1:09cc1ec1ea180d371577cfa2d3f59c6627d569c81aeb1b825920706904c3edc5"
+        "sql1:268227e7e441a600a4013e726f1c0f9886d1c651904f2c3e7e535354c39afac9"
     ),
     "0030_inspection_unit_of_space.sql": (
         "sql1:cfd51bd4a0ba241962fcfbc92d6ef0906b0fed372295fcb7f91873462866527c"
