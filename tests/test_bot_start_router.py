@@ -7,7 +7,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
 
 import pytest
 from bot_harness import (
@@ -20,6 +20,7 @@ from bot_harness import (
     text_message,
 )
 
+from src.bot.access import BindingCache
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import (
@@ -31,6 +32,7 @@ from src.bot.keyboards import (
     UNIT_NEW_YES,
 )
 from src.bot.unit_pick import UnitMatch
+from src.db.bot_links import Binding
 from src.domain import get_state, start_inspection
 
 pytestmark = pytest.mark.asyncio
@@ -224,9 +226,11 @@ def _справочник(monkeypatch: pytest.MonkeyPatch, match: object) -> lis
     return заведено
 
 
-async def _до_названия(unit: str) -> tuple[object, object, object]:
+async def _до_названия(
+    unit: str, bindings: BindingCache | None = None
+) -> tuple[object, object, object]:
     bot, session = make_bot()
-    dp = build_dispatcher(settings())
+    dp = build_dispatcher(settings(), bindings=bindings)
     await feed(dp, bot, text_message("/start"))
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message(unit))
@@ -305,14 +309,14 @@ async def test_без_номера_бот_просит_город_и_номер(
 async def test_партнёр_новую_пиццерию_не_заводит(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange — проверяющий пишет от тенанта партнёра.
-    from src.bot.routers import start as start_router
-
+    # Arrange — бот проверяющего привязан к учётке партнёра (D286).
     заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
-    monkeypatch.setattr(start_router, "bot_tenant", lambda _m: "partner-a")
+    партнёр = BindingCache(
+        resolve=lambda tg: Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC))
+    )
 
     # Act
-    _bot, session, _dp = await _до_названия("Podgorica-2")
+    _bot, session, _dp = await _до_названия("Podgorica-2", партнёр)
 
     # Assert — вопроса «Новая пиццерия?» нет, точка не заведена, проверки нет.
     assert "только управляющая компания" in session.last_text
