@@ -44,6 +44,7 @@ from src import db
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import EDIT_PREFIX
+from src.db.reach import own_reach
 from src.domain import Finding, get_state, start_inspection
 from src.recognize.errors import ModelUnavailable
 from src.recognize.models import UNKNOWN_ZONE
@@ -294,7 +295,7 @@ async def test_поправленное_предложение_лежит_в_б�
     await build_report(dp, bot)
 
     assert session.documents, "отчёт не отдан — слива могло и не быть"
-    (строка,) = db.findings_by_unit(tenant="default", unit="Белград 2")
+    (строка,) = db.findings_by_unit(reach=own_reach("default"), unit="Белград 2")
 
     assert (строка.code, строка.zone) == ("CLN03", "cold_kitchen"), (
         "в базу легла не итоговая тройка"
