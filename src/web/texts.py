@@ -814,6 +814,53 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Такого пространства нет. Выберите из списка.",
         "en": "There is no such space. Pick one from the list.",
     },
+    # Привязка бота через веб (D286): одноразовая ссылка своей учётке.
+    "users.col.bot": {"ru": "Бот", "en": "Bot"},
+    "users.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
+    "users.bot.bound": {
+        "ru": "Бот привязан: Telegram ID {id}, с {date}.",
+        "en": "The bot is linked: Telegram ID {id}, since {date}.",
+    },
+    "users.bot.unbound": {
+        "ru": "Бот не привязан. Привяжите его, чтобы проводить проверки в Telegram.",
+        "en": "The bot is not linked. Link it to run inspections in Telegram.",
+    },
+    "users.bot.unknown": {
+        "ru": "Не удалось узнать, привязан ли бот. Это не значит, что не привязан.",
+        "en": "Could not check whether the bot is linked. That does not mean it is not.",
+    },
+    "users.bot.link_submit": {"ru": "Привязать бота", "en": "Link the bot"},
+    "users.bot.link": {
+        "ru": "Откройте эту ссылку в Telegram на своём телефоне — бот привяжется к вашей учётке:",
+        "en": "Open this link in Telegram on your phone — the bot will link to your account:",
+    },
+    "users.bot.until": {
+        "ru": "Ссылка одноразовая и действует 10 минут (до {time}). Новая ссылка отменяет прежнюю.",
+        "en": (
+            "The link works once and for 10 minutes (until {time}). A new link cancels the old one."
+        ),
+    },
+    "users.bot.unset": {
+        "ru": "Привязка бота на этом стенде не настроена: не задана переменная {var}.",
+        "en": "Bot linking is not set up on this server: the {var} variable is not set.",
+    },
+    "users.bot.link_failed": {
+        "ru": "Ссылку выпустить не вышло — база не ответила. Попробуйте ещё раз.",
+        "en": "Could not issue the link — the database did not respond. Try again.",
+    },
+    "users.bot.unlink": {"ru": "Отвязать", "en": "Unlink"},
+    "users.bot.unlinked": {
+        "ru": "Бот отвязан. Этот Telegram больше не проводит проверки от учётки.",
+        "en": "The bot is unlinked. This Telegram no longer runs inspections for the account.",
+    },
+    "users.bot.unlink_missing": {
+        "ru": "Привязки не было — отвязывать нечего.",
+        "en": "There was no link — nothing to unlink.",
+    },
+    "users.bot.unlink_failed": {
+        "ru": "Отвязать не вышло — база не ответила. Попробуйте ещё раз.",
+        "en": "Could not unlink — the database did not respond. Try again.",
+    },
     "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
     "users.self.text": {
         "ru": "Людей заводит и отключает администратор УК.",

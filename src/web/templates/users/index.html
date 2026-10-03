@@ -53,6 +53,51 @@
     </div>
   {% endif %}
 
+  {% if outcome == 'bot_unset' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unset', var=bot_var) }}</div></div>
+  {% elif outcome == 'bot_link_failed' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.link_failed') }}</div></div>
+  {% elif outcome == 'bot_unlinked' %}
+    <div class="note note--ok mt-gap"><div class="note__text">{{ t('users.bot.unlinked') }}</div></div>
+  {% elif outcome == 'bot_unlink_missing' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_missing') }}</div></div>
+  {% elif outcome == 'bot_unlink_failed' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_failed') }}</div></div>
+  {% endif %}
+
+  {# Привязка бота (D286): человек сам связывает свой Telegram со своей
+     учёткой — и тем самым со своим пространством. #}
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.bot.title') }}</div></div>
+    <div class="card__body">
+      {% if bot_link %}
+        {# Ссылка показана ЗДЕСЬ и один раз: в адрес она не попадает, а живёт
+           десять минут и срабатывает однажды. #}
+        <p>{{ t('users.bot.link') }}</p>
+        <p class="pass"><a href="{{ bot_link }}" rel="noopener noreferrer"><code>{{ bot_link }}</code></a></p>
+        <p class="field-note">{{ t('users.bot.until', time=bot_link_until.strftime('%H:%M') if bot_link_until else '') }}</p>
+      {% elif not own_binding_known %}
+        <p class="field-note">{{ t('users.bot.unknown') }}</p>
+      {% elif own_binding %}
+        <p>{{ t('users.bot.bound', id=own_binding.telegram_id, date=own_binding.bound_at.strftime('%Y-%m-%d %H:%M')) }}</p>
+        <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}" class="row">
+          <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
+        </form>
+      {% else %}
+        <p>{{ t('users.bot.unbound') }}</p>
+      {% endif %}
+      {% if not bot_link and own_binding_known %}
+        {% if bot_username %}
+          <form method="post" action="{{ url(users_path ~ '/bot-link') }}?lang={{ lang }}" class="row mt-gap">
+            <button class="btn btn--primary" type="submit">{{ t('users.bot.link_submit') }}</button>
+          </form>
+        {% else %}
+          <p class="field-note">{{ t('users.bot.unset', var=bot_var) }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+
   {% if not manage %}
     {# Не админ УК видит себя: вкладка открыта всем ради привязки бота (D286),
        а управлять людьми может только админ УК (D288). #}
@@ -102,6 +147,7 @@
             <th class="is-text">{{ t('users.col.space') }}</th>
             <th class="is-text">{{ t('users.col.role') }}</th>
             <th class="is-text">{{ t('users.col.state') }}</th>
+            <th class="is-text">{{ t('users.col.bot') }}</th>
             <th>{{ t('users.col.created') }}</th>
             <th></th>
           </tr>
@@ -117,6 +163,19 @@
                   {{ t('users.state.disabled', date=человек.disabled_at.strftime('%Y-%m-%d')) }}
                 {% else %}
                   {{ t('users.state.active') }}
+                {% endif %}
+              </td>
+              <td class="is-text">
+                {% set привязка = bindings.get(человек.id) %}
+                {% if привязка %}
+                  <span class="mono">{{ привязка.telegram_id }}</span>
+                  <span class="mx-muted">{{ привязка.bound_at.strftime('%Y-%m-%d') }}</span>
+                  <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}">
+                    <input type="hidden" name="user_id" value="{{ человек.id }}">
+                    <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
+                  </form>
+                {% else %}
+                  —
                 {% endif %}
               </td>
               <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>

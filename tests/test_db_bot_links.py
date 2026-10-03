@@ -17,6 +17,7 @@ from src.db.bot_links import (  # noqa: E402
     LINK_PREFIX,
     binding_of,
     issue_link,
+    live_bindings,
     redeem,
     resolve,
     unbind,
@@ -135,3 +136,14 @@ def test_погашенную_ссылку_не_воскресить_правк�
 def test_метка_помещается_в_deep_link(учётки: dict[str, str]) -> None:
     метка = LINK_PREFIX + issue_link(учётки["ge"]).token
     assert re.fullmatch(r"[A-Za-z0-9_-]{1,64}", метка)
+
+
+def test_живые_привязки_одним_запросом_по_ключу_учётки(учётки: dict[str, str]) -> None:
+    redeem(issue_link(учётки["ge"]).token, telegram_id=501)
+    redeem(issue_link(учётки["hq"]).token, telegram_id=601)
+    unbind(учётки["hq"])
+
+    живые = live_bindings()
+
+    assert set(живые) == {учётки["ge"]}
+    assert живые[учётки["ge"]].telegram_id == 501

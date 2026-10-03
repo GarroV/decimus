@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ipaddress
 import os
+import re
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -35,6 +36,10 @@ WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ перем
 WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
+#: Имя бота в Telegram без «@» — для ссылки привязки `t.me/<бот>?start=...`
+#: (D286). Необязательна: без неё кнопки «Привязать бота» нет, а вкладка
+#: называет переменную.
+WEB_BOT_USERNAME_VAR = "WEB_BOT_USERNAME"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -92,6 +97,25 @@ class Settings:
     #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
     #: иначе первая же кнопка увела бы человека в корень чужого продукта.
     url_prefix: str = ""
+    #: Имя бота для ссылки привязки (D286); `None` — привязка не настроена.
+    bot_username: str | None = None
+
+
+#: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
+_BOT_USERNAME = re.compile(r"[A-Za-z][A-Za-z0-9_]{4,31}")
+
+
+def _parse_bot_username(raw: str) -> str | None:
+    """Имя бота без «@». Пусто — привязка не настроена; непохожее — отказ запуска."""
+    имя = raw.strip().removeprefix("@")
+    if not имя:
+        return None
+    if not _BOT_USERNAME.fullmatch(имя):
+        raise WebConfigError(
+            f"{WEB_BOT_USERNAME_VAR} — имя бота в Telegram без «@»: 5–32 знака латиницы, "
+            f"цифр и «_». Получено то, что ссылкой привязки не станет"
+        )
+    return имя
 
 
 def _parse_url_prefix(raw: str) -> str:
@@ -244,4 +268,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
+        bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
     )
