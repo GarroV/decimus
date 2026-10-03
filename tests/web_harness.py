@@ -26,7 +26,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import web_throttle
+from src.db import bot_links, web_throttle
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth
@@ -183,6 +183,10 @@ def подменить_двери(
     # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
     # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.
     monkeypatch.setattr(auth, "reach_of", охват_без_базы)
+    # Привязка бота (D286) на вкладке «Пользователи» тоже читает базу: по
+    # умолчанию бот не привязан ни у кого. Наборы про привязку подменяют сами.
+    monkeypatch.setattr(bot_links, "binding_of", lambda _user_id: None)
+    monkeypatch.setattr(bot_links, "live_bindings", lambda: {})
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.
@@ -198,7 +202,7 @@ def охват_без_базы(tenant: str) -> Reach:
     return Reach(код, None, (код,))
 
 
-def собрать(*, tenant: str, ui_lang: str = "ru") -> Flask:
+def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None = None) -> Flask:
     """Приложение с настройками стенда набора."""
     app = create_app(
         Settings(
@@ -207,6 +211,7 @@ def собрать(*, tenant: str, ui_lang: str = "ru") -> Flask:
             tenant=tenant,
             ui_lang=ui_lang,
             secret_key=СЕКРЕТ,
+            bot_username=bot_username,
         )
     )
     app.config.update(TESTING=True)

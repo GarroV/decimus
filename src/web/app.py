@@ -18,6 +18,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -25,7 +26,7 @@ from flask import Flask, abort, redirect, render_template, request, send_file, u
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import directory
+from src.db import bot_links, directory
 from src.db.errors import DbError, MoveError, RetractionError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
@@ -41,7 +42,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
-from .config import Settings, load_settings
+from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
@@ -970,7 +971,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     users_path = section("users").path
 
     def _страница_учёток(
-        *, added: accounts.Added | None = None, outcome: str | None = None, code: int = 200
+        *,
+        added: accounts.Added | None = None,
+        outcome: str | None = None,
+        code: int = 200,
+        bot_link: str | None = None,
+        bot_link_until: datetime | None = None,
     ) -> tuple[str, int]:
         # Перечень людей и форма заведения — только админу УК (D288). Остальные
         # видят свою строку: вкладка открыта всем ради привязки бота (D286).
@@ -978,15 +984,26 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         люди: tuple[accounts.AccountRow, ...] = ()
         пространства: tuple[str, ...] = ()
         перечень_известен = True
+        привязки: dict[str, bot_links.Binding] = {}
         if управляет:
             try:
                 люди = accounts.everyone(tenant=None)
                 пространства = accounts.spaces()
+                привязки = bot_links.live_bindings()
             except DbError:
                 # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
                 # вторая была бы молчаливой ложью на экране, где считают людей
                 # с доступом.
                 перечень_известен = False
+        вошедший = auth.current_account()
+        своя_привязка: bot_links.Binding | None = None
+        привязка_известна = True
+        try:
+            своя_привязка = bot_links.binding_of(вошедший.id) if вошедший else None
+        except DbError:
+            # «Не привязан» и «не смогли узнать» — разные ответы: второй не
+            # предлагает привязать заново то, что, может быть, привязано.
+            привязка_известна = False
         return (
             render_template(
                 "users/index.html",
@@ -998,6 +1015,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 outcome=outcome,
                 roles=accounts.ROLES,
                 users_path=users_path,
+                bindings=привязки,
+                own_binding=своя_привязка,
+                own_binding_known=привязка_известна,
+                bot_username=conf.bot_username,
+                bot_link=bot_link,
+                bot_link_until=bot_link_until,
+                bot_var=WEB_BOT_USERNAME_VAR,
             ),
             code,
         )
@@ -1010,6 +1034,48 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.get(users_path)
     def users() -> FlaskResponse | tuple[str, int]:
         return _страница_учёток()
+
+    @app.post(f"{users_path}/bot-link")
+    def bot_link() -> FlaskResponse | tuple[str, int]:
+        """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
+
+        Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
+        Telegram к выбранному человеку. Ссылка показывается на странице ответа,
+        а не в адресе: адрес оседает в истории браузера и журнале прокси — тот
+        же довод, что у пароля новой учётки.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("выпуск ссылки привязки без вошедшего: маршрут прошёл мимо заслона")
+        if not conf.bot_username:
+            return _страница_учёток(outcome="bot_unset", code=503)
+        try:
+            ссылка = bot_links.issue_link(вошедший.id)
+        except DbError:
+            return _страница_учёток(outcome="bot_link_failed", code=503)
+        return _страница_учёток(
+            bot_link=link_url(conf.bot_username, ссылка.token),
+            bot_link_until=ссылка.expires_at,
+        )
+
+    @app.post(f"{users_path}/bot-unlink")
+    def bot_unlink() -> FlaskResponse | tuple[str, int]:
+        """Отвязать бота: свою привязку — каждый, чужую — только админ УК (D288)."""
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("отвязка бота без вошедшего: маршрут прошёл мимо заслона")
+        чей = (request.form.get("user_id") or "").strip() or вошедший.id
+        if чей != вошедший.id:
+            отказ = _hq_admin_only()
+            if отказ is not None:
+                return отказ
+        try:
+            отвязано = bot_links.unbind(чей)
+        except DbError:
+            return _страница_учёток(outcome="bot_unlink_failed", code=503)
+        return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
 
     @app.post(f"{users_path}/add")
     def add_user() -> FlaskResponse | tuple[str, int]:
@@ -1145,6 +1211,11 @@ def _install_hq_gate(app: Flask) -> None:
             return
         if refused_for(request.path, auth.current_tenant()):
             abort(404)
+
+
+def link_url(bot_username: str, token: str) -> str:
+    """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
+    return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
 
 
 def _hq_admin_only() -> FlaskResponse | None:

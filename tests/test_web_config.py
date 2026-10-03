@@ -142,3 +142,22 @@ def test_opt_in_typo_is_config_error_not_silent_no(flag: str) -> None:
     env = {"WEB_TENANT": "belgrade", "WEB_LISTEN_NETWORK": flag}
     with pytest.raises(WebConfigError, match="WEB_LISTEN_NETWORK"):
         load_settings(env)
+
+
+# --- имя бота для ссылки привязки (D286, волна 1 #340) ----------------------
+
+
+#: Минимальное окружение стенда: без тенанта стенд не поднимается вовсе.
+СТЕНД = {"WEB_TENANT": "HQ"}
+
+
+def test_имя_бота_необязательно_и_снимает_собаку() -> None:
+    assert load_settings(СТЕНД).bot_username is None
+    имя = load_settings({**СТЕНД, "WEB_BOT_USERNAME": " @decimus_bot "}).bot_username
+    assert имя == "decimus_bot"
+
+
+@pytest.mark.parametrize("имя", ["bot", "decimus bot", "https://t.me/x", "дециму_бот"])
+def test_непохожее_имя_бота_это_отказ_запуска(имя: str) -> None:
+    with pytest.raises(WebConfigError, match="WEB_BOT_USERNAME"):
+        load_settings({**СТЕНД, "WEB_BOT_USERNAME": имя})

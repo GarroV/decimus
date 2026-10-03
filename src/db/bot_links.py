@@ -18,6 +18,7 @@ import hashlib
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Any
 
 from .web_access import _connected
 
@@ -61,6 +62,13 @@ _RESOLVE_BY_USER_SQL = """
     select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.unbound_at is null and u.disabled_at is null and u.id = %s
+"""
+
+
+_LIVE_BINDINGS_SQL = """
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
+      from bot_bindings b join web_users u on u.id = b.user_id
+     where b.unbound_at is null and u.disabled_at is null
 """
 
 
@@ -136,6 +144,18 @@ def binding_of(user_id: str) -> Binding | None:
     return _one(_RESOLVE_BY_USER_SQL, user_id, "прочитать привязку бота")
 
 
+def live_bindings() -> dict[str, Binding]:
+    """Все живые привязки, по ключу учётки — для перечня людей у админа УК.
+
+    Одним запросом, а не по строке на человека: перечень людей — сотни строк.
+    """
+    with _connected("прочитать привязки бота") as conn, conn.cursor() as cur:
+        cur.execute(_LIVE_BINDINGS_SQL)
+        строки = cur.fetchall()
+    привязки = (_binding(row) for row in строки)
+    return {привязка.user_id: привязка for привязка in привязки}
+
+
 def unbind(user_id: str) -> bool:
     """Отвязать бота от учётки. `False` — живой привязки не было."""
     with _connected("отвязать бота") as conn, conn.cursor() as cur:
@@ -147,8 +167,10 @@ def _one(sql: str, value: object, зачем: str) -> Binding | None:
     with _connected(зачем) as conn, conn.cursor() as cur:
         cur.execute(sql, (value,))
         row = cur.fetchone()
-    if row is None:
-        return None
+    return None if row is None else _binding(row)
+
+
+def _binding(row: tuple[Any, ...]) -> Binding:
     return Binding(
         telegram_id=int(row[0]),
         user_id=str(row[1]),

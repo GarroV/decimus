@@ -148,9 +148,7 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     админ = getattr(account, "role", None) == "admin"
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(
-        item
-        for item in SECTIONS
-        if (админ or not item.admin_only) and (уК or not item.hq_only)
+        item for item in SECTIONS if (админ or not item.admin_only) and (уК or not item.hq_only)
     )
 
 

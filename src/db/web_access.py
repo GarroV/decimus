@@ -110,7 +110,7 @@ _SELECT_USER_SQL = """
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
-    select login, created_at, disabled_at, role, tenant_code
+    select login, created_at, disabled_at, role, tenant_code, id
       from web_users
      where (%(tenant)s::text is null or tenant_code = %(tenant)s)
      order by tenant_code, login
@@ -222,6 +222,9 @@ class AccountRow:
     #: Пространство учётки (волна 1, #340): экран админа УК показывает людей
     #: всех пространств одним списком.
     tenant: str = ""
+    #: Ключ учётки — для привязки бота на экране людей (D286): привязка
+    #: ссылается на учётку, а не на логин.
+    id: str = ""
 
 
 @dataclass(frozen=True)
@@ -461,7 +464,12 @@ def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
         строки = cur.fetchall()
     return tuple(
         AccountRow(
-            login=str(r[0]), created_at=r[1], disabled_at=r[2], role=str(r[3]), tenant=str(r[4])
+            login=str(r[0]),
+            created_at=r[1],
+            disabled_at=r[2],
+            role=str(r[3]),
+            tenant=str(r[4]),
+            id=str(r[5]),
         )
         for r in строки
     )
