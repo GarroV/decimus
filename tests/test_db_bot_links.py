@@ -7,6 +7,8 @@ Review Focus 1–3 волны 1 (#340): перехват и повтор ссы�
 from __future__ import annotations
 
 import re
+import threading
+import time
 
 import pytest
 from conftest import requires_db
@@ -101,6 +103,62 @@ def test_telegram_чужой_учётки_не_перепривязываетс�
     опознан = resolve(501)
     assert опознан is not None and опознан.tenant == "HQ"
     assert binding_of(учётки["ge"]) is None
+
+
+def test_ссылка_не_сгорает_если_telegram_привязан_к_другой_учётке(
+    учётки: dict[str, str],
+) -> None:
+    """Ревью #340, п.8: отвязал прежнюю учётку — та же ссылка срабатывает."""
+    redeem(issue_link(учётки["hq"]).token, telegram_id=501)
+    ссылка = issue_link(учётки["ge"])
+    assert redeem(ссылка.token, telegram_id=501) is None
+    unbind(учётки["hq"])
+    привязка = redeem(ссылка.token, telegram_id=501)
+    assert привязка is not None and привязка.tenant == "GE"
+
+
+def _ждать_блокировки(pg_dsn: str, сколько: float = 10.0) -> None:
+    """Дождаться, пока чья-то вставка встанет в ожидание чужой транзакции."""
+    срок = time.monotonic() + сколько
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        while time.monotonic() < срок:
+            ждёт = conn.execute("select count(*) from pg_locks where not granted").fetchone()
+            if ждёт is not None and ждёт[0] > 0:
+                return
+            time.sleep(0.05)
+    raise AssertionError("параллельная попытка так и не встала в ожидание")
+
+
+def test_параллельная_привязка_того_же_telegram_даёт_отказ_а_не_ошибку(
+    учётки: dict[str, str], pg_dsn: str
+) -> None:
+    """Ревью #340, п.8: проигравшая гонку попытка — `None`, ссылка цела."""
+    ссылка = issue_link(учётки["ge"])
+    итог: list[object] = []
+    with psycopg.connect(pg_dsn) as соперник:
+        # Соперник привязал тот же Telegram к другой учётке и ещё не закрыл
+        # транзакцию: проверка «занят ли» его строки не видит.
+        соперник.execute(
+            "insert into bot_bindings (telegram_id, user_id) values (501, %s)", (учётки["hq"],)
+        )
+        поток = threading.Thread(
+            target=lambda: итог.append(_попытка(ссылка.token, 501)), daemon=True
+        )
+        поток.start()
+        _ждать_блокировки(pg_dsn)
+    поток.join(timeout=10)
+    assert итог == [None], итог
+    опознан = resolve(501)
+    assert опознан is not None and опознан.tenant == "HQ"
+    unbind(учётки["hq"])
+    assert redeem(ссылка.token, telegram_id=501) is not None, "проигравшая попытка не сожгла ссылку"
+
+
+def _попытка(token: str, telegram_id: int) -> object:
+    try:
+        return redeem(token, telegram_id=telegram_id)
+    except Exception as exc:  # исход гонки и есть предмет теста
+        return exc
 
 
 def test_отвязка_и_отключение_снимают_доступ(учётки: dict[str, str]) -> None:
