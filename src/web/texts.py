@@ -40,7 +40,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "app.tenant_label": {"ru": "Тенант", "en": "Tenant"},
     "nav.wip": {"ru": "в разработке", "en": "in progress"},
     "nav.lang": {"ru": "Язык интерфейса", "en": "Interface language"},
-    "nav.lang.short": {"ru": "Язык", "en": "Language"},
     # Название языка — на нём самом: ищущий свой язык читает его, а не перевод.
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
@@ -221,6 +220,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No inspections in this selection — nothing to show.",
     },
     "country.kicker": {"ru": "Страна", "en": "Country"},
+    "country.rail.title": {"ru": "Страны", "en": "Countries"},
     "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
     "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
     "country.choose.empty": {

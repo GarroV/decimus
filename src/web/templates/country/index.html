@@ -11,30 +11,37 @@
 {% block title %}{{ t('section.country.title') }}{% endblock %}
 
 {% block body %}
+{# Раскладка как у «Методики» (владелец 30.09.2026): слева колонка стран,
+   справа — выбранная страна. Классы колонки общие с «Методикой» (`mx-shell`,
+   `mx-rail`): одна раскладка — одни правила. Рабочая зона не пустует: без
+   страны в адресе в ней первая страна колонки, а экран помечен выбором
+   (`mx-shell--pick`) — на узком экране тогда видна только колонка. На экране
+   страны колонка там прячется, и назад ведёт ссылка «‹ Страны». #}
+<div class="mx-shell cn-shell{% if view is none or picking %} mx-shell--pick{% endif %}">
+  <aside class="mx-rail" aria-label="{{ t('country.rail.title') }}">
+    <div class="mx-rail__head mx-rail__head--list">
+      <span>{{ t('country.rail.title') }}</span>
+    </div>
+    {% for code, n in choices %}
+      {% set on = view is not none and code == view.code %}
+      <a class="mx-rail__row{% if on %} is-on{% endif %}" href="{{ url('/country/' ~ code) }}?lang={{ lang }}"{% if on %} aria-current="page"{% endif %}>
+        <span class="mx-rail__name">{{ country_title(code) or code }}</span>
+        <span class="mx-rail__meta">{{ t('country.choose.units', n=n) }}</span>
+      </a>
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>
+    {% endfor %}
+  </aside>
+  <div class="mx-main">
 {% if view is none %}
-  {# ── Выбор страны: адрес без кода. Одна страна — сюда не попадают, их
-     сразу переводит в неё маршрут. #}
   <div class="ov-head">
     <div class="ov-head__main">
       <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
       <h1 class="ov-head__title">{{ t('country.choose.title') }}</h1>
     </div>
   </div>
-  <section class="ov-card">
-    {% if choices %}
-      {% for code, n in choices %}
-        <a class="ov-row" href="{{ url('/country/' ~ code) }}?lang={{ lang }}">
-          <span class="ov-row__name">
-            {{ country_title(code) or code }}
-            <span class="ov-row__meta">{{ t('country.choose.units', n=n) }}</span>
-          </span>
-        </a>
-      {% endfor %}
-    {% else %}
-      <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>
-    {% endif %}
-  </section>
 {% else %}
+  <a class="cn-back" href="{{ url('/country') }}?lang={{ lang }}">‹ {{ t('country.rail.title') }}</a>
   {% set data = view.snapshot %}
   <div class="ov-head">
     <div class="ov-head__main">
@@ -177,4 +184,6 @@
     </section>
   </div>
 {% endif %}
+  </div>
+</div>
 {% endblock %}

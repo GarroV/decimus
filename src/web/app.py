@@ -501,10 +501,15 @@ def _register_country(app: Flask, conf: Settings) -> None:
             # переход в единственную страну вешал бы `?lang=` умолчания.
             язык = {"lang": _lang(conf)} if request.args.get("lang") else {}
             return redirect(_url("country", code=страны[0][0], **язык))
-        return render_template("country/index.html", view=None, choices=страны)
+        if not страны:
+            return render_template("country/index.html", view=None, choices=страны)
+        # Рабочая зона не пустует, как в «Методике»: без страны в адресе
+        # справа сразу первая страна колонки (самая большая). Экран помечен
+        # выбором — на телефоне первым идёт список стран, а не эта страна.
+        return country(страны[0][0], picking=True)
 
     @app.get(section("country").path + "/<code>", endpoint="country")
-    def country(code: str) -> str:
+    def country(code: str, picking: bool = False) -> str:
         язык = _lang(conf)
         # Код страны из адреса — ввод снаружи: регистр приводится, чужое
         # сужает выборку в пустоту, и экран говорит об этом словами, а не 500.
@@ -545,25 +550,10 @@ def _register_country(app: Flask, conf: Settings) -> None:
             return отбор(unit=unit_id) + f"#unit-{unit_id}"
 
         чипы = []
+        # Выбор страны — колонкой слева, как чек-листы в «Методике» (владелец
+        # 30.09.2026), а не чипом в отборе. Переход в другую страну сбрасывает
+        # весь срез: город и раскрытая точка другой страны дали бы пустоту.
         страны = country_data.countries(tenant=conf.tenant)
-        # Выбор страны — в шапке (спека, «Шапка»). Одна страна — чипа нет:
-        # выбирать не из чего. Смена страны сбрасывает весь срез: город и
-        # раскрытая точка другой страны дали бы пустоту без объяснения.
-        if len(страны) > 1:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.country", язык),
-                    empty_title=t("overview.filter.all_countries", язык),
-                    current=код,
-                    values=страны,
-                    href=lambda значение: (
-                        _url("country", code=значение, lang=язык)
-                        if значение
-                        else _url("country_index", lang=язык)
-                    ),
-                    title=lambda код_страны: country_title(код_страны, язык),
-                )
-            )
         if вид.snapshot.cities:
             чипы.append(
                 _pick(
@@ -597,6 +587,8 @@ def _register_country(app: Flask, conf: Settings) -> None:
         return render_template(
             "country/index.html",
             view=вид,
+            choices=страны,
+            picking=picking,
             picks=tuple(чипы),
             selection=selection,
             select_url=отбор,
