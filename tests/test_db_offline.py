@@ -27,6 +27,7 @@ import src.db as db  # noqa: E402 — после importorskip намеренно
 from src.db.directory import list_units, resolve_unit, upsert_unit  # noqa: E402
 from src.db.errors import PushError  # noqa: E402
 from src.db.photos import upload_photos  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 
 #: Порт 1 на петле: подключения там нет и быть не может, ждать нечего.
 МЁРТВЫЙ_DSN = "postgresql://nobody@127.0.0.1:1/nowhere"
@@ -44,7 +45,7 @@ def test_справочник_при_мёртвой_базе_отдаёт_отк
     with pytest.raises(PushError):
         resolve_unit("Белград 2")
     with pytest.raises(PushError):
-        list_units()
+        list_units(reach=own_reach("HQ"))
     with pytest.raises(PushError):
         upsert_unit("Белград 2", aliases=("БГ2",))
 

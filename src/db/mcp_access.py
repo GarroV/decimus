@@ -225,7 +225,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 
     Наружу уходит ТИП исключения драйвера, а не его текст: в тексте psycopg
     может оказаться строка подключения целиком. Тот же приём и та же причина,
-    что у `queries._reading`.
+    что у `reading.reading`.
     """
     settings = check_environment()
     try:

@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import пространства_для_теста, точка_пространства
 
 pytest.importorskip("psycopg")
 
@@ -33,10 +34,17 @@ from src.db.push import push_inspection
 from src.domain import add_finding, start_inspection
 from src.mcp.tools import list_inspections, network_summary, unit_history
 
-АРЕНДАТОР = "партнёр-а"
+# Код пространства совпадает с кодом его страны (волна 1, D284).
+АРЕНДАТОР = "GE"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    пространства_для_теста(request, АРЕНДАТОР)
 
 
 def _проверка(chat_id: int, *, точка: str = "Белград-1", дата: str) -> str:
+    точка_пространства(точка, tenant=АРЕНДАТОР)
     start_inspection(
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=АРЕНДАТОР, date=дата
     )

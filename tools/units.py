@@ -39,6 +39,7 @@ sys.path.insert(0, str(__import__("pathlib").Path(__file__).resolve().parents[1]
 
 from src.db.directory import list_units, upsert_unit
 from src.db.errors import PushError
+from src.db.reach import reach_of
 
 #: Сайты сети по странам. Код страны — ISO 3166-1 alpha-2, тот же, что ляжет в
 #: `units.country`: связываем кодом, а не названием.
@@ -246,7 +247,7 @@ def команда_add(args: argparse.Namespace) -> int:
 
 
 def команда_list(args: argparse.Namespace) -> int:
-    точки = list_units(tenant=args.tenant, country=args.country)
+    точки = list_units(reach=reach_of(args.tenant), country=args.country)
     if not точки:
         куда = f" в стране {args.country.upper()}" if args.country else ""
         print(f"Справочник арендатора {args.tenant}{куда} пуст")

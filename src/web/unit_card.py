@@ -16,6 +16,7 @@ from datetime import date
 
 from ..db import queries
 from ..db.models import FindingRow, InspectionRow
+from ..db.reach import own_reach
 from .pricing import price_key
 
 #: Сколько последних проверок показывает полоса движения и по скольким
@@ -215,7 +216,7 @@ def _repeats(
 
 def load(*, tenant: str, unit: str, lang: str = "ru", окно: int = ОКНО) -> UnitCard:
     """Снимок одной точки. Пусто — значит проверок не было, и так и сказано."""
-    ряд = tuple(queries.list_inspections(tenant=tenant, unit=unit, limit=max(окно, 1)))
+    ряд = tuple(queries.list_inspections(reach=own_reach(tenant), unit=unit, limit=max(окно, 1)))
     if not ряд:
         return UnitCard(
             name=unit,
@@ -236,13 +237,15 @@ def load(*, tenant: str, unit: str, lang: str = "ru", окно: int = ОКНО) 
     издание = price_key(последняя)
     floor = _floor(по_времени)
     столбики = _bars(по_времени, floor=floor, издание=издание)
-    detail = queries.get_inspection(последняя.id, tenant=tenant)
-    находки = tuple(queries.findings_by_unit(tenant=tenant, unit=unit, limit=окно * 60))
+    detail = queries.get_inspection(последняя.id, reach=own_reach(tenant))
+    находки = tuple(queries.findings_by_unit(reach=own_reach(tenant), unit=unit, limit=окно * 60))
     # География — у точки, а не у шапки проверки: город в шапке аудитор пишет
     # строкой, и «Belgrade» с «Белградом» разъезжаются (docstring
     # `queries.unit_geography`). Пусто в справочнике — показываем шапку, это
     # лучше пустого места, но источником считается справочник.
-    страна, город = queries.unit_geography(tenant=tenant).get(последняя.unit_name, ("", ""))
+    страна, город = queries.unit_geography(reach=own_reach(tenant)).get(
+        последняя.unit_name, ("", "")
+    )
     return UnitCard(
         name=последняя.unit_name,
         city=город or последняя.city,

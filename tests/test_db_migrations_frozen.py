@@ -130,6 +130,13 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0028_login_across_spaces.sql": (
         "sql1:aa6eca059d9813a161c50051e93c57b68fcfe7c3bbbe28c2175db63bfebd6ead"
     ),
+    # Заведены вместе с файлами (Задача 5, D283, D284) и нигде ещё не применены.
+    "0029_space_countries.sql": (
+        "sql1:09cc1ec1ea180d371577cfa2d3f59c6627d569c81aeb1b825920706904c3edc5"
+    ),
+    "0030_inspection_unit_of_space.sql": (
+        "sql1:68b5f101c2ed1133d783045adb2bb630ae9320361f4091adf7f77cd4e45e1f86"
+    ),
 }
 
 

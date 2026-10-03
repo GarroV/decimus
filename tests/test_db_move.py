@@ -21,6 +21,7 @@ from src.db.errors import MoveError  # noqa: E402
 from src.db.move import list_moves, move_inspection  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection, unit_ids  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.db.retract import retract_inspection  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
@@ -44,7 +45,7 @@ def _проверка(chat_id: int, *, точка: str = ТОЧКА) -> str:
 
 
 def _id_точки(название: str) -> str:
-    return unit_ids(tenant="default")[название]
+    return unit_ids(reach=own_reach("default"))[название]
 
 
 def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -61,7 +62,7 @@ def test_перенос_меняет_шапку_и_оставляет_след(d
     # Arrange
     ident = _проверка(801)
     _проверка(802, точка=ДРУГАЯ)  # заводит вторую точку в справочнике
-    до = get_inspection(ident, tenant="default")
+    до = get_inspection(ident, reach=own_reach("default"))
     assert до is not None
 
     # Act
@@ -75,7 +76,7 @@ def test_перенос_меняет_шапку_и_оставляет_след(d
     )
 
     # Assert — шапка другая, документ тот же, след один и полный.
-    после = get_inspection(ident, tenant="default")
+    после = get_inspection(ident, reach=own_reach("default"))
     assert изменено is True
     assert после is not None
     assert после.inspection.unit_name == ДРУГАЯ
@@ -85,7 +86,7 @@ def test_перенос_меняет_шапку_и_оставляет_след(d
         до.inspection.grade,
     )
     assert [f.code for f in после.findings] == [f.code for f in до.findings]
-    [след] = list_moves(ident, tenant="default")
+    [след] = list_moves(ident, reach=own_reach("default"))
     assert (след.old_unit, след.new_unit) == (ТОЧКА, ДРУГАЯ)
     assert (след.old_date, след.new_date) == (
         до.inspection.inspection_date.isoformat(),
@@ -97,7 +98,7 @@ def test_перенос_меняет_шапку_и_оставляет_след(d
 def test_перенос_в_то_же_место_следа_не_оставляет(domain_env: Path, admin_env: str) -> None:
     # Arrange
     ident = _проверка(803)
-    до = get_inspection(ident, tenant="default")
+    до = get_inspection(ident, reach=own_reach("default"))
     assert до is not None
 
     # Act
@@ -112,7 +113,7 @@ def test_перенос_в_то_же_место_следа_не_оставляе
 
     # Assert
     assert изменено is False
-    assert list_moves(ident, tenant="default") == ()
+    assert list_moves(ident, reach=own_reach("default")) == ()
 
 
 # --- отказы -------------------------------------------------------------------------
@@ -172,7 +173,7 @@ def test_прямая_правка_шапки_без_причины_отказа
             "update inspections set inspection_date = %s where id = %s",
             (НОВАЯ_ДАТА, ident),
         )
-    assert list_moves(ident, tenant="default") == ()
+    assert list_moves(ident, reach=own_reach("default")) == ()
 
 
 def test_историю_нельзя_дописать_руками(domain_env: Path, admin_env: str) -> None:

@@ -29,6 +29,7 @@ from src.db import directory
 from src.db.errors import DbError, MoveError, RetractionError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
+from src.db.reach import own_reach
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.report.info_titles import FOUND
@@ -626,7 +627,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
         # запрос по идентификатору — это новая функция слоя базы ради одной
         # строки, и заводить её стоит тогда, когда список станет дорогим.
         точка = next(
-            (u for u in directory.list_units(tenant=conf.tenant) if u.id == unit_id),
+            (u for u in directory.list_units(reach=own_reach(conf.tenant)) if u.id == unit_id),
             None,
         )
         if точка is None:

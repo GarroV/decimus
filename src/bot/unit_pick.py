@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from src.db import directory
 from src.db.errors import DbError
+from src.db.reach import reach_of
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +104,9 @@ class UnitMatch:
 def match_unit(typed: str, *, tenant: str = directory.DEFAULT_TENANT) -> UnitMatch:
     """Сверить написанное со справочником. Отказа не бывает — см. шапку модуля."""
     try:
-        units = directory.list_units(tenant=tenant)
+        # Справочник один (D284): у партнёра — точки его стран, у УК — все.
+        # Страны читаются из базы, и её отказ — тот же `DbError`, что ниже.
+        units = directory.list_units(reach=reach_of(tenant))
     except DbError as exc:
         logger.warning("справочник точек недоступен, название принято как написано: %s", exc)
         return UnitMatch(name=None, suggestions=(), checked=False)

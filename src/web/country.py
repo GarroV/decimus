@@ -16,6 +16,7 @@ from datetime import date
 
 from src.db import queries
 from src.db.models import InspectionRow
+from src.db.reach import own_reach
 
 from . import overview
 from .overview import Overview, Selection
@@ -89,7 +90,7 @@ def load(
 def countries(*, tenant: str) -> tuple[tuple[str, int], ...]:
     """Страны справочника с числом точек, крупные сверху. Точка без страны не считается."""
     счёт: dict[str, int] = {}
-    for country, _city in queries.unit_geography(tenant=tenant).values():
+    for country, _city in queries.unit_geography(reach=own_reach(tenant)).values():
         if country:
             счёт[country] = счёт.get(country, 0) + 1
     return tuple(sorted(счёт.items(), key=lambda пара: (-пара[1], пара[0])))

@@ -38,11 +38,17 @@ insert into inspections (tenant_code, unit_id, chat_id, kind, inspection_date, r
 """
 
 
-def _до_переименования(tmp_path: Path) -> Path:
-    каталог = tmp_path / "migrations"
+def _до_переименования(tmp_path: Path, *, включая: bool = False) -> Path:
+    """Каталог миграций до `МИГРАЦИЯ` (или по неё включительно).
+
+    Верхняя граница нужна и второму накату: состояние, которое сверяет тест, —
+    это состояние сразу после 0027. Следующие миграции его законно меняют
+    (0030 снимает составную ссылку проверки на точку, D284).
+    """
+    каталог = tmp_path / ("migrations-по" if включая else "migrations")
     каталог.mkdir()
     for файл in sorted(MIGRATIONS_DIR.glob("*.sql")):
-        if файл.name < МИГРАЦИЯ:
+        if файл.name < МИГРАЦИЯ or (включая and файл.name == МИГРАЦИЯ):
             shutil.copy(файл, каталог / файл.name)
     return каталог
 
@@ -58,7 +64,7 @@ def test_вся_история_уезжает_в_hq_и_ссылки_целы(tmp
             conn.commit()
 
         # Act
-        применено = apply_migrations(dsn)
+        применено = apply_migrations(dsn, directory=_до_переименования(tmp_path, включая=True))
 
         # Assert
         assert применено == [МИГРАЦИЯ]

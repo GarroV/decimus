@@ -22,6 +22,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .config import check_environment, load_storage_settings
 from .errors import DbError, StorageError
+from .reach import Reach, require_reach
 from .storage import S3PhotoStorage, key_of_uri
 
 #: Длинная сторона копии в пикселях. Меньше — надпись на ценнике и дата на
@@ -54,15 +55,18 @@ def make_preview(data: bytes) -> bytes:
 
 # ── Чтение для админки ─────────────────────────────────────────────────────
 #
-# Арендатор проверяется присоединением проверки: у `photos` своей колонки
-# арендатора нет, и запрос без этого отдал бы кадр чужой управляющей компании
-# по угаданному идентификатору. Убранные кадры (`purged_at`, D089) не
+# Охват проверяется присоединением проверки и её точки: у `photos` своей
+# колонки пространства нет, и запрос без этого отдал бы кадр чужого
+# пространства по угаданному идентификатору (#340). Убранные кадры (`purged_at`, D089) не
 # показываются — их в хранилище уже нет.
 _PREVIEWS_OF_INSPECTION_SQL = """
 select p.finding_id, p.id
 from photos p
 join inspections i on i.id = p.inspection_id
-where p.inspection_id = %(id)s and i.tenant_code = %(tenant)s
+join units u on u.id = i.unit_id
+where p.inspection_id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and p.preview_path is not null and p.purged_at is null
 order by p.created_at, p.id
 """
@@ -71,12 +75,15 @@ _PREVIEW_PATH_SQL = """
 select p.preview_path
 from photos p
 join inspections i on i.id = p.inspection_id
-where p.id = %(photo)s and p.inspection_id = %(id)s and i.tenant_code = %(tenant)s
+join units u on u.id = i.unit_id
+where p.id = %(photo)s and p.inspection_id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and p.preview_path is not null and p.purged_at is null
 """
 
 
-def _read(sql: str, params: dict[str, str]) -> list[tuple[Any, ...]]:
+def _read(sql: str, params: dict[str, object]) -> list[tuple[Any, ...]]:
     settings = check_environment()
     try:
         with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
@@ -86,21 +93,23 @@ def _read(sql: str, params: dict[str, str]) -> list[tuple[Any, ...]]:
         raise DbError(f"Не удалось прочитать кадры проверки ({type(exc).__name__})") from exc
 
 
-def finding_previews(inspection_id: str, *, tenant: str) -> dict[str, tuple[str, ...]]:
+def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, tuple[str, ...]]:
     """Кадры со сжатой копией по записям: идентификатор записи → кадры по порядку."""
     по_записям: dict[str, list[str]] = {}
     for finding_id, photo_id in _read(
-        _PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, "tenant": tenant}
+        _PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, **require_reach(reach).params()}
     ):
         по_записям.setdefault(str(finding_id), []).append(str(photo_id))
     return {запись: tuple(кадры) for запись, кадры in по_записям.items()}
 
 
 def preview_bytes(
-    inspection_id: str, photo_id: str, *, tenant: str, storage: PreviewReader | None = None
+    inspection_id: str, photo_id: str, *, reach: Reach, storage: PreviewReader | None = None
 ) -> bytes | None:
-    """Сжатая копия кадра этой проверки этого арендатора — или `None`, если её нет."""
-    строки = _read(_PREVIEW_PATH_SQL, {"id": inspection_id, "photo": photo_id, "tenant": tenant})
+    """Сжатая копия кадра проверки из охвата читающего — или `None`, если её нет."""
+    строки = _read(
+        _PREVIEW_PATH_SQL, {"id": inspection_id, "photo": photo_id, **require_reach(reach).params()}
+    )
     if not строки:
         return None
     store = storage if storage is not None else S3PhotoStorage(load_storage_settings())

@@ -28,6 +28,7 @@ from src.db.directory import upsert_unit  # noqa: E402 — после importorsk
 from src.db.errors import DbError  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import findings_by_unit, get_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import (  # noqa: E402
     SOURCE_COMMENT,
     add_finding,
@@ -38,7 +39,9 @@ from src.domain import score as domain_score  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "партнёр-находки"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 
 
 def _проверка_с_находками(
@@ -88,7 +91,7 @@ def test_шапка_проверки_совпадает_с_записанным(
     ожидаемая_версия = checklist_version()
     оценка = domain_score(chat_id)
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     шапка = прочитанная.inspection
@@ -115,7 +118,7 @@ def test_разбивка_оценки_совпадает_со_score_движк�
     )
     оценка = domain_score(chat_id)
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     assert прочитанная.deductions == pytest.approx(оценка.deductions)
@@ -145,7 +148,7 @@ def test_находки_идут_по_номеру_по_возрастанию(d
         ),
     )
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     assert [f.n for f in прочитанная.findings] == [1, 2, 3]
@@ -165,7 +168,7 @@ def test_находка_без_комментария_это_None_а_не_пус
     chat_id = 504
     insp_id = _проверка_с_находками(chat_id, находки=(("hot_kitchen", "нагар на печи"),))
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     находка = прочитанная.findings[0]
@@ -190,7 +193,7 @@ def test_source_пусто_без_записи_и_comment_со_слов_ауди
     )
     insp_id = push_inspection(chat_id)
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     # По номеру записи, а не позицией в списке: у этого теста своя забота —
@@ -214,7 +217,7 @@ def test_lang_находки_это_язык_речи_проверки(domain_en
         находки=(("hot_kitchen", "burnt oven surface"),),
     )
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     находка = прочитанная.findings[0]
@@ -229,7 +232,7 @@ def test_проверка_без_находок_читается(domain_env: Pat
     chat_id = 507
     insp_id = _проверка_с_находками(chat_id, находки=())
 
-    прочитанная = get_inspection(insp_id, tenant=АРЕНДАТОР)
+    прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
     assert прочитанная is not None
     assert прочитанная.findings == ()
@@ -245,7 +248,7 @@ def test_кривой_идентификатор_это_отказ_а_не_не_
     (тот же тип исключения, но по другой причине) прошёл бы тест молча.
     """
     with pytest.raises(DbError, match="не похоже на идентификатор"):
-        get_inspection("не-uuid", tenant=АРЕНДАТОР)
+        get_inspection("не-uuid", reach=own_reach(АРЕНДАТОР))
 
 
 def test_findings_by_unit_свежие_проверки_впереди(domain_env: Path, db_env: str) -> None:
@@ -263,7 +266,7 @@ def test_findings_by_unit_свежие_проверки_впереди(domain_en
         находки=(("staff", "свежая находка"),),
     )
 
-    находки = findings_by_unit(tenant=АРЕНДАТОР, unit="Белград-1")
+    находки = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit="Белград-1")
 
     assert [f.inspection_id for f in находки] == [свежая, старая, старая], (
         "свежая по дате обхода проверка обязана идти первой, а внутри проверки — по номеру"
@@ -281,7 +284,7 @@ def test_findings_by_unit_называет_проверку_в_каждой_ст
         находки=(("hot_kitchen", "нагар на печи"),),
     )
 
-    находки = findings_by_unit(tenant=АРЕНДАТОР, unit="Белград-1")
+    находки = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit="Белград-1")
 
     assert len(находки) == 1
     строка = находки[0]
@@ -302,12 +305,12 @@ def test_findings_by_unit_нормализует_но_не_ищет_по_син�
     )
     upsert_unit("Белград 2", aliases=("БГ2",), tenant=АРЕНДАТОР)
 
-    по_обрезанному = findings_by_unit(tenant=АРЕНДАТОР, unit=" белград-1 ")
+    по_обрезанному = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit=" белград-1 ")
     assert [f.inspection_id for f in по_обрезанному] == [insp_id], (
         "нормализация регистра и краёв не сработала при чтении находок точки"
     )
 
-    по_синониму = findings_by_unit(tenant=АРЕНДАТОР, unit="БГ2")
+    по_синониму = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit="БГ2")
     assert по_синониму == [], (
         "выборка нашла точку по синониму — карту синонимов эта функция спрашивать не должна"
     )
@@ -318,7 +321,9 @@ def test_findings_by_unit_неизвестная_точка_это_пустой_
 ) -> None:
     """Точка, которой не было в этой сети, — законный пустой список, а не
     отказ: партнёр мог опечататься в названии, и это не поломка чтения."""
-    assert findings_by_unit(tenant=АРЕНДАТОР, unit="Никогда не существовавшая точка") == []
+    assert (
+        findings_by_unit(reach=own_reach(АРЕНДАТОР), unit="Никогда не существовавшая точка") == []
+    )
 
 
 def test_недоступная_база_это_отказ_а_не_пустота(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -327,6 +332,6 @@ def test_недоступная_база_это_отказ_а_не_пустот�
     monkeypatch.setenv("DATABASE_URL", "postgresql://nouser@127.0.0.1:1/nodb?connect_timeout=2")
 
     with pytest.raises(DbError, match="по идентификатору"):
-        get_inspection(str(uuid.uuid4()), tenant=АРЕНДАТОР)
+        get_inspection(str(uuid.uuid4()), reach=own_reach(АРЕНДАТОР))
     with pytest.raises(DbError, match="находки точки"):
-        findings_by_unit(tenant=АРЕНДАТОР, unit="Белград-1")
+        findings_by_unit(reach=own_reach(АРЕНДАТОР), unit="Белград-1")

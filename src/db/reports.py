@@ -26,6 +26,7 @@ import psycopg
 
 from .config import check_environment, load_storage_settings
 from .errors import DbError, PushError, StorageError
+from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
 #: Чем отдаётся отчёт. Записывается в базу, а не угадывается при выдаче:
@@ -132,16 +133,19 @@ def upload_report(
 
 # ── Выдача отчёта из админки (D204, #317) ──────────────────────────────────
 #
-# Арендатор проверяется ПРИСОЕДИНЕНИЕМ проверки, а не доверием к вызывающему:
-# у `reports` своей колонки арендатора нет, и запрос без этого отдал бы
-# документ чужой управляющей компании по угаданному идентификатору.
+# Охват проверяется ПРИСОЕДИНЕНИЕМ проверки и её точки, а не доверием к
+# вызывающему: у `reports` своей колонки пространства нет, и запрос без этого
+# отдал бы документ чужого пространства по угаданному идентификатору (#340).
 # Последний по времени — потому что пересобранный отчёт (без потерянного кадра)
 # ложится новой строкой, а прежний остаётся историей.
 _LATEST_REPORT_SQL = """
 select r.storage_path, r.content_type, r.size_bytes, r.created_at
 from reports r
 join inspections i on i.id = r.inspection_id
-where r.inspection_id = %(id)s and i.tenant_code = %(tenant)s
+join units u on u.id = i.unit_id
+where r.inspection_id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 order by r.created_at desc
 limit 1
 """
@@ -163,8 +167,8 @@ class ReportReader(Protocol):
     def get(self, key: str) -> bytes: ...
 
 
-def latest_report(inspection_id: str, *, tenant: str) -> ReportRef | None:
-    """Последний отчёт проверки этого арендатора, или `None`, если его нет.
+def latest_report(inspection_id: str, *, reach: Reach) -> ReportRef | None:
+    """Последний отчёт проверки из охвата читающего, или `None`, если его нет.
 
     `None` — это ответ «отчёт не сохранён» (проверка проведена до T336 или
     отчёт не доехал), и он честно отличается от отказа базы: отказ — `DbError`.
@@ -172,7 +176,7 @@ def latest_report(inspection_id: str, *, tenant: str) -> ReportRef | None:
     settings = check_environment()
     try:
         with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_LATEST_REPORT_SQL, {"id": inspection_id, "tenant": tenant})
+            cur.execute(_LATEST_REPORT_SQL, {"id": inspection_id, **require_reach(reach).params()})
             row = cur.fetchone()
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать отчёт проверки ({type(exc).__name__})") from exc
