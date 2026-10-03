@@ -15,12 +15,17 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any
 
+import psycopg
+
 from .web_access import _connected
+
+logger = logging.getLogger(__name__)
 
 #: Сколько живёт ссылка привязки: её открывают сразу, с той же страницы.
 LINK_TTL = timedelta(minutes=10)
@@ -145,6 +150,12 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
     Нет такой, использована, просрочена, учётка отключена, этот Telegram уже
     привязан к другой учётке — снаружи неразличимы: различие подсказало бы
     перехватившему ссылку, что именно не так.
+
+    Погашение и привязка — одна транзакция, и отказ после погашения её
+    откатывает: ссылка не сгорает, если Telegram уже привязан к другой учётке
+    (её хозяин отвяжет прежнюю и откроет ту же ссылку), и не сгорает в гонке
+    двух параллельных попыток — проигравшая получает `None`, а не нарушение
+    уникальности (ревью #340, п.8).
     """
     if not token:
         return None
@@ -156,11 +167,17 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
         user_id = str(row[0])
         cur.execute(_TAKEN_BY_OTHER_SQL, (telegram_id, user_id))
         if cur.fetchone() is not None:
-            # Ссылка при этом погашена: перепривязка чужого Telegram не
-            # срабатывает и со второй попытки той же ссылкой.
+            conn.rollback()
             return None
-        cur.execute(_UNBIND_USER_SQL, (user_id,))
-        cur.execute(_BIND_SQL, (telegram_id, user_id))
+        try:
+            cur.execute(_UNBIND_USER_SQL, (user_id,))
+            cur.execute(_BIND_SQL, (telegram_id, user_id))
+        except psycopg.errors.UniqueViolation:
+            # Параллельная попытка успела привязать этот Telegram или эту
+            # учётку раньше: проверка выше её строки ещё не видела.
+            conn.rollback()
+            logger.warning("гонка привязки Telegram ID %s — попытка откачена", telegram_id)
+            return None
     return resolve(telegram_id)
 
 
