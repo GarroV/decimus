@@ -168,6 +168,9 @@ def test_накат_заводит_роли_без_всесилия(tmp_path: Pa
 APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Справочник правится по делу, но не удаляется: DELETE не выдан (`0004`).
     "tenants": {"SELECT", "INSERT"},
+    # Страны пространства (`0029`, #340) — только чтение: их заводит команда,
+    # а продукт по ним считает охват чтения и сторож точки проверки.
+    "space_countries": {"SELECT"},
     "units": {"SELECT", "INSERT", "UPDATE"},
     "unit_aliases": {"SELECT", "INSERT", "UPDATE"},
     # Документ проверки: полный набор выдан НАМЕРЕННО, держит политика (`0004`).
@@ -236,6 +239,9 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
 ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "units": {"SELECT"},
+    # Страны пространства (`0029`, #340): администратор пишет проверки в обход
+    # продукта (снятие, перенос), и сторож точки проверки читает их его правами.
+    "space_countries": {"SELECT"},
     "inspections": {"SELECT"},
     "findings": {"SELECT"},
     "photos": {"SELECT"},
