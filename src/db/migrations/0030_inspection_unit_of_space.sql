@@ -15,9 +15,11 @@
 -- Синонимы точек (`unit_aliases`) не трогаются: их по-прежнему заводит УК в
 -- своём справочнике, и составная ссылка там остаётся.
 --
--- Функция сторожа работает с правами вызывающего: читать `units` и
--- `space_countries` обеим ролям, которые пишут `inspections`, уже дано
--- (0004, 0010, 0029).
+-- Функция сторожа работает с правами ВЛАДЕЛЬЦА (`security definer`) и с
+-- закреплённым `search_path`: её ответ не должен зависеть от того, какие права
+-- на `units` и `space_countries` есть у роли, которая пишет проверку (роль
+-- приложения — слив, администратор истории — перенос), и от того, какие
+-- объекты эта роль подложила себе в путь поиска.
 
 alter table inspections drop constraint inspections_unit_same_tenant;
 alter table inspections add constraint inspections_unit_id_fkey
@@ -31,7 +33,7 @@ alter table inspection_moves add constraint inspection_moves_old_unit_id_fkey
     foreign key (old_unit_id) references units (id);
 
 create function inspection_unit_of_space() returns trigger
-language plpgsql as $$
+language plpgsql security definer set search_path = pg_catalog, public as $$
 declare
     чья text;
     страна text;
