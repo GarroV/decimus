@@ -18,8 +18,8 @@ upload_photos(inspection_id: str, *, fetch: Callable[[str], bytes | None],
 #   в неизменный текст запроса (S608).
 # reach_of(tenant): УК — Reach("HQ", None, None); партнёр — Reach(t, None,
 #   его страны из space_countries); без стран — ничего (закрыто по умолчанию).
-# own_reach(tenant): только свои проверки — изоляция партнёров в тестах и
-#   мост веба/MCP до задачи 6.
+# own_reach(tenant): только свои проверки — снятие проверки (retraction) и
+#   изоляция партнёров в тестах. Веб и MCP читают по reach_of вошедшего/токена.
 # Чтение принимает reach, запись — tenant (своё пространство). Исключение —
 # previous_inspection(*, tenant, unit): повтор ×2 (D255) по своему пространству.
 list_inspections(*, reach: Reach, unit: str | None = None,
@@ -52,6 +52,28 @@ resolve_unit(name: str, *, tenant: str = "default") -> Unit | None           # �
 list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # справочник УК в охвате
 # слив партнёра ищет точку в справочнике УК и точек не заводит (D234, #471);
 # точку чужой страны не пишет сторож схемы inspections_unit_of_space (0030)
+
+# логин единый на систему (0028, D282): уникальные login и email во всей базе;
+#   накат отказывает на двойниках и называет запрос, которым их найти
+
+# пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
+SpaceRow(code, name, countries: tuple[str, ...], people: int)
+check_space_code(code) -> str      # ^[A-Z][A-Z0-9_-]{1,31}$, не legacy-код
+space_exists(code) -> bool         # роль приложения
+create_space(code, *, name) -> SpaceRow        # совпадение без учёта регистра — отказ
+list_spaces() -> tuple[SpaceRow, ...]
+bind_countries(space, countries) -> tuple[str, ...]   # всё или ничего; страна
+#   другого пространства — AccessError с его кодом; HQ стран не имеет
+# команда: make space ARGS="add|countries|list ..." (tools/space.py)
+
+# привязка бота к учётке (0031, D286) — src/db/bot_links.py, роль приложения
+issue_link(user_id) -> IssuedLink(token, expires_at)   # 10 минут, прежние гаснут;
+#   в базе только отпечаток SHA-256
+redeem(token, *, telegram_id) -> Binding | None        # одна транзакция; None —
+#   один ответ на все отказы; погашение и отвязка односторонние (RLS restrictive)
+resolve(telegram_id) / binding_of(user_id) -> Binding | None
+live_bindings() -> dict[user_id, Binding]   unbind(user_id) -> bool
+# Binding(telegram_id, user_id, login, tenant, bound_at): tenant — из web_users
 
 # карта синонимов формулировок: как сказал аудитор → код пункта (T284, D119)
 lookup_phrase(text: str, *, lang: str, tenant: str = "default") -> PhraseAlias | None

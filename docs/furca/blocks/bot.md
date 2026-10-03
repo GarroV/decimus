@@ -19,19 +19,27 @@
 load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings
 # BotSettings: token, allowed_ids: frozenset[int], mode, ui_lang,
 #              auditor_names: Mapping[int, str],
-#              mcp_owner_id: int | None, mcp_tenant: str
+#              mcp_owner_id: int | None
 # ui_lang — язык стенда до начала проверки (T131), из BOT_UI_LANG.
 # Неизвестный язык — BotConfigError на старте, а не молчаливый русский
 # mcp_owner_id — основатель круга доступа к MCP (T253), из BOT_MCP_OWNER_ID;
 #                пусто — круг не назначен, настройка недоступна никому.
 #                Обязан входить в allowed_ids — иначе отказ на старте
-# mcp_tenant — чью историю открывают токены, которые ВЫПУСКАЕТ этот бот
-#              (BOT_MCP_TENANT); пусто — тот же арендатор, под которым бот
-#              сливает проверки
+# Токен MCP, выпущенный ботом, открывает пространство выпустившего (#340);
+# BOT_MCP_TENANT и BOT_INVITES не читаются
 
-# src/bot/access.py
-is_allowed(user_id: int | None, allowed_ids: frozenset[int]) -> bool
-AccessMiddleware(allowed_ids)          # внешняя мидлварь на message и callback_query
+# src/bot/access.py (D286, волна 1 пространств — #340)
+SPACE_KEY = "space"                    # пространство человека в data; обработчик — параметр space
+BindingCache(resolve=bot_links.resolve, ttl=60 s)   # .space_of(tg) -> str | None; отказ базы —
+                                       # последний ответ узнанному, None незнакомому
+AccessMiddleware(allowed_ids, bindings, roster, redeem=bot_links.redeem)
+                                       # /start link-<токен> → привязка и ответ в тот же чат;
+                                       # привязка → её пространство; ALLOWED_TELEGRAM_IDS и
+                                       # roster.json → HQ, только если привязки нет
+ChatSpaceMiddleware(read_tenant=chat_tenant)   # после доступа: апдейт к проверке чата
+                                       # чужого пространства не доходит до обработчика
+# src/bot/roster.py — связки по приглашениям до D286, только чтение (совместимость)
+# src/bot/unit_pick.py: match_unit(typed, *, tenant), may_add_units(tenant) — только HQ
 
 # src/bot/auditor.py
 auditor_name(user_id, full_name, names) -> str   # T063: проверяющий по Telegram ID
