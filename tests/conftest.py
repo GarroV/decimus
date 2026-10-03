@@ -342,6 +342,24 @@ def _сведение_комментария_не_уходит_в_сеть(monke
     monkeypatch.setattr("src.bot.merged.merge_wording", недоступна)
 
 
+@pytest.fixture(autouse=True)
+def _правка_ответом_не_уходит_в_сеть(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Дешёвая модель правки ответом (#454) в тестах не зовётся никогда.
+
+    Ответ на запись сначала идёт в `src.bot.routers.correct.revise_finding`. По
+    умолчанию модель отвечает «другое нарушение» — тогда ответ идёт прежним
+    разбором заново, и тесты этого разбора проверяют то, что проверяли до
+    #454. Тест, которому нужна правка текста или отказ, подменяет её сам
+    (`bot_harness.stub_revise`) поверх этой.
+    """
+    from src.recognize.revise import Revision
+
+    def другое(**kw: object) -> Revision:
+        return Revision(kind="other", text="")
+
+    monkeypatch.setattr("src.bot.routers.correct.revise_finding", другое)
+
+
 @pytest.fixture
 def pg_dsn() -> Iterator[str]:
     """DSN одноразовой базы данных со свежо накатанной схемой блока `db`.

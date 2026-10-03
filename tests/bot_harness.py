@@ -378,6 +378,23 @@ def stub_merge(monkeypatch: Any, result: str | Exception) -> Calls:
     return calls
 
 
+def stub_revise(monkeypatch: Any, result: Any) -> list[dict[str, Any]]:
+    """Подменить дешёвую модель правки ответом (#454): `Revision` или исключение.
+
+    Возвращает список вызовов — словари аргументов: пустой — модель не звали.
+    """
+    calls: list[dict[str, Any]] = []
+
+    def fake(**kw: object) -> Any:
+        calls.append(kw)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    monkeypatch.setattr("src.bot.routers.correct.revise_finding", fake)
+    return calls
+
+
 def stub_transcribe(monkeypatch: Any, result: str | Exception) -> Calls:
     """Подменить расшифровку голоса — в обоих местах, где бот её зовёт.
 

@@ -142,7 +142,17 @@
     if (!mayLeave()) return;
     open(link.href, true);
   });
-  window.addEventListener("popstate", function () { open(window.location.href, false); });
+  window.addEventListener("popstate", function () {
+    // Шаг назад на другой раздел — дело `nav.js`, здесь только шаги панели.
+    var shown = document.documentElement.dataset.navPath;
+    if (!layer() || (shown && shown !== window.location.pathname)) return;
+    open(window.location.href, false);
+  });
+  // Уход в другой раздел без перезагрузки (`nav.js`): та же защита правки,
+  // что у обычного ухода со страницы.
+  document.addEventListener("decimus:leave", function (event) {
+    if (!mayLeave()) event.preventDefault();
+  });
 
   // --- Клавиши -----------------------------------------------------------
   function press(selector) {
@@ -174,35 +184,59 @@
   // Ответ на запись формы приходит по адресу действия (`/admin/items/…`):
   // обновление страницы повторило бы запись, а меню не узнало бы раздел.
   // Адрес ставится экранный — тот же, что дала бы ссылка на эту панель.
-  var canonical = layer() && layer().dataset.mxCanonical;
-  if (canonical && new URL(canonical, location.href).pathname !== location.pathname) {
-    history.replaceState(null, "", canonical);
+  // Всё ниже до конца файла — настройка экрана: она повторяется, когда на
+  // экран приходят из другого раздела без перезагрузки (`nav.js` шлёт
+  // `decimus:page`). Слушатели на `document` выше ставятся один раз.
+  function initPage() {
+    if (!layer()) return;
+    var canonical = layer().dataset.mxCanonical;
+    if (canonical && new URL(canonical, location.href).pathname !== location.pathname) {
+      history.replaceState(null, "", canonical);
+    }
+    // Выезд — только если панель открылась из закрытого состояния, а не
+    // после записи формы или обновления страницы с панелью.
+    if (isOpen() && !wasOpen()) layer().classList.add("is-entering");
+    initPanel();
+    remember();
+    initSticky();
+    initSwitch();
   }
-
-  // Первая загрузка: выезд — только если панель открылась из закрытого
-  // состояния, а не после записи формы или обновления страницы с панелью.
-  if (isOpen() && !wasOpen()) layer().classList.add("is-entering");
-  initPanel();
-  remember();
   window.addEventListener("pagehide", remember);
 
   // --- Липкий блок поиска ------------------------------------------------
   // Метка «прилип»: нулевой щуп стоит прямо над блоком, ушёл за верх окна —
   // блок прилип. Без скрипта блок липнет так же, просто без тени.
-  (function () {
+  function initSticky() {
     var probe = document.querySelector("[data-mx-stick-probe]");
     var stick = document.querySelector("[data-mx-stick]");
-    if (!probe || !stick || !("IntersectionObserver" in window)) return;
-    new IntersectionObserver(function (entries) {
-      var e = entries[0];
-      stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < 0);
-    }).observe(probe);
-  })();
+    var top = document.querySelector("[data-mx-top]");
+    // Высота неподвижного верха: блок поиска встаёт под ним. На телефоне верх
+    // прокручивается (CSS), и тогда отступ нулевой.
+    function topHeight() {
+      if (!top || getComputedStyle(top).position !== "sticky") return 0;
+      return Math.ceil(top.getBoundingClientRect().height);
+    }
+    var watcher = null;
+    function place() {
+      var h = topHeight();
+      document.documentElement.style.setProperty("--mx-top-h", h + "px");
+      if (!probe || !stick || !("IntersectionObserver" in window)) return;
+      if (watcher) watcher.disconnect();
+      watcher = new IntersectionObserver(function (entries) {
+        var e = entries[0];
+        stick.classList.toggle("is-stuck", !e.isIntersecting && e.boundingClientRect.top < h + 1);
+      }, { rootMargin: "-" + (h + 1) + "px 0px 0px 0px" });
+      watcher.observe(probe);
+    }
+    place();
+    if (top && "ResizeObserver" in window) new ResizeObserver(place).observe(top);
+    else window.addEventListener("resize", place);
+  }
   // --- Переключатель в шапке при видимой колонке --------------------------
   // Шире 1023px чек-листы видны колонкой, и переключатель в шапке — просто
   // заголовок: мышью он не нажимается (CSS). Клавиатура обязана видеть то же
   // самое — иначе Tab заходит в «мёртвый» заголовок и открывает меню.
-  (function () {
+  function initSwitch() {
     var summary = document.querySelector(".mx-shell .mx-switch__btn");
     if (!summary || !window.matchMedia) return;
     var wide = window.matchMedia("(min-width: 1024px)");
@@ -216,7 +250,7 @@
     }
     sync();
     if (wide.addEventListener) wide.addEventListener("change", sync);
-  })();
+  }
 
   // --- Код нового чек-листа из английского названия ------------------------
   // Подставляется, пока код не трогали руками: правка кода — решение человека,
@@ -239,4 +273,7 @@
       code.value = slug(field.value);
     }
   });
+
+  initPage();
+  document.addEventListener("decimus:page", initPage);
 })();

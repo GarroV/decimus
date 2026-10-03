@@ -135,7 +135,7 @@ def test_список_стран_с_одной_страной_сразу_вед�
 
 def test_список_стран_показывает_все(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
-    страница = стенд.get("/country").get_data(as_text=True)
+    страница = открыть(стенд, monkeypatch, данные(), "/country")
     assert "/country/GE" in страница and "/country/RS" in страница
 
 
@@ -148,3 +148,40 @@ def test_смена_языка_оставляет_страну_и_раскрыт
     assert 'action="/country/GE"' in страница
     assert '<input type="hidden" name="unit" value="u-1">' in страница
     assert '<input type="hidden" name="period" value="d90">' in страница
+
+
+def test_на_экране_страны_слева_колонка_всех_стран_и_выбранная_отмечена(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Раскладка как у «Методики»: слева страны, справа выбранная (владелец 30.09.2026)."""
+    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
+    колонка = страница.split('class="mx-rail', 1)[1].split("</aside>", 1)[0]
+    assert "/country/GE" in колонка and "/country/RS" in колонка
+    отмеченная = колонка.split('aria-current="page"', 1)[0].rsplit("<a ", 1)[1]
+    assert "/country/GE" in отмеченная
+    # Выбор страны живёт в колонке — чипа «Страна» в отборе больше нет.
+    assert "Все страны" not in страница.split('class="mx-main', 1)[1]
+
+
+def test_без_страны_в_адресе_справа_первая_страна_а_не_пустота(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Рабочая зона не пустует, как в «Методике» (владелец 30.09.2026, скриншот
+    пустого «Выберите страну»): справа первая страна колонки, экран помечен
+    выбором — на телефоне первым идёт список стран."""
+    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    просили: list[str] = []
+
+    def load(**kw: object) -> cn.CountryView:
+        просили.append(str(kw["code"]))
+        return данные()
+
+    monkeypatch.setattr(app_mod.country_data, "load", load)
+    ответ = стенд.get("/country")
+    assert ответ.status_code == 200, ответ.status_code
+    страница = ответ.get_data(as_text=True)
+    assert просили == ["GE"]
+    assert "Выберите страну" not in страница and "Choose a country" not in страница
+    assert "mx-shell--pick" in страница
+    assert "mx-shell--pick" not in стенд.get("/country/GE").get_data(as_text=True)
