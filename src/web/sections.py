@@ -22,6 +22,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .errors import SectionRegistryError
 
 
@@ -43,6 +45,10 @@ class Section:
     #: экране, а признак здесь — чтобы навигация не звала человека туда, куда
     #: его не пустят: ссылка, ведущая в отказ, выглядит как поломка продукта.
     admin_only: bool = False
+    #: Виден и открывается ТОЛЬКО пространству УК (D264). Заслон — на раздел
+    #: целиком (`refused_for` в `before_request`), а не на каждую кнопку:
+    #: так доступы проще держать, это и был довод владельца.
+    hq_only: bool = False
     #: Иконка пункта в левой панели — имя из набора линейки (`icons.py`).
     icon: str = "doc"
 
@@ -58,10 +64,12 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="country", path="/country", built=True, icon="globe"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
-    Section(key="tenants", path="/tenants", built=False, icon="board"),
+    Section(key="tenants", path="/tenants", built=False, hq_only=True, icon="board"),
     # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток
     # жило в командной строке, и владелец попросил перенести его на экран.
-    Section(key="users", path="/users", built=True, admin_only=True, icon="team"),
+    # Открыт каждому вошедшему (D286): человек видит здесь себя и привязывает
+    # бота; управляет людьми только админ УК — это решает экран (D288).
+    Section(key="users", path="/users", built=True, icon="team"),
     Section(key="mini", path="/mini", built=False, icon="tg"),
 )
 
@@ -138,4 +146,15 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     не звать человека туда, куда его не пустят.
     """
     админ = getattr(account, "role", None) == "admin"
-    return tuple(item for item in SECTIONS if админ or not item.admin_only)
+    уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
+    return tuple(
+        item
+        for item in SECTIONS
+        if (админ or not item.admin_only) and (уК or not item.hq_only)
+    )
+
+
+def refused_for(path: str, tenant: str) -> bool:
+    """Закрыт ли адрес пространству: раздел только для УК, а вошедший не из УК (D264)."""
+    ключ = current_section(path)
+    return ключ is not None and section(ключ).hq_only and canonical_tenant(tenant) != HQ_TENANT

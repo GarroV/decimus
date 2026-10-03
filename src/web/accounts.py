@@ -25,6 +25,7 @@ from src.db.web_access import (
     create_account,
     disable_account,
     list_accounts,
+    list_spaces,
     set_role,
 )
 
@@ -38,6 +39,7 @@ __all__ = [
     "disable",
     "everyone",
     "set_role",
+    "spaces",
 ]
 
 #: Длина сгенерированного пароля в байтах случайности. 18 байт — 24 знака в
@@ -55,8 +57,8 @@ class Added:
     password: str
 
 
-def everyone(*, tenant: str) -> tuple[AccountRow, ...]:
-    """Кто заведён у арендатора, вместе с отключёнными.
+def everyone(*, tenant: str | None) -> tuple[AccountRow, ...]:
+    """Кто заведён у арендатора (`None` — во всех пространствах), вместе с отключёнными.
 
     Отключённые не прячутся: вопрос «у кого был доступ» задают после
     инцидента, и пустое место на него не отвечает.
@@ -69,6 +71,11 @@ def add(login: str, *, tenant: str, role: str = ROLE_AUDITOR) -> Added:
     пароль = secrets.token_urlsafe(_PASSWORD_BYTES)
     заведённая = create_account(login, tenant=tenant, password=пароль, role=role)
     return Added(login=заведённая.login, role=заведённая.role, password=пароль)
+
+
+def spaces() -> tuple[str, ...]:
+    """Коды заведённых пространств: в форму заведения — только из них."""
+    return list_spaces()
 
 
 def disable(login: str, *, tenant: str) -> bool:

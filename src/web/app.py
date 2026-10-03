@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import psycopg
-from flask import Flask, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -46,7 +46,14 @@ from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
-from .sections import SECTIONS, check_registry, current_section, section, visible_sections
+from .sections import (
+    SECTIONS,
+    check_registry,
+    current_section,
+    refused_for,
+    section,
+    visible_sections,
+)
 from .texts import UI_LANGS, lang_or_default, t
 
 logger = logging.getLogger(__name__)
@@ -80,6 +87,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    _install_hq_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -964,19 +972,28 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     def _страница_учёток(
         *, added: accounts.Added | None = None, outcome: str | None = None, code: int = 200
     ) -> tuple[str, int]:
-        try:
-            люди = accounts.everyone(tenant=auth.current_tenant())
-            перечень_известен = True
-        except DbError:
-            # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и вторая
-            # была бы молчаливой ложью на экране, где считают людей с доступом.
-            люди = ()
-            перечень_известен = False
+        # Перечень людей и форма заведения — только админу УК (D288). Остальные
+        # видят свою строку: вкладка открыта всем ради привязки бота (D286).
+        управляет = _hq_admin_only() is None
+        люди: tuple[accounts.AccountRow, ...] = ()
+        пространства: tuple[str, ...] = ()
+        перечень_известен = True
+        if управляет:
+            try:
+                люди = accounts.everyone(tenant=None)
+                пространства = accounts.spaces()
+            except DbError:
+                # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
+                # вторая была бы молчаливой ложью на экране, где считают людей
+                # с доступом.
+                перечень_известен = False
         return (
             render_template(
                 "users/index.html",
+                manage=управляет,
                 people=люди,
                 people_known=перечень_известен,
+                spaces=пространства,
                 added=added,
                 outcome=outcome,
                 roles=accounts.ROLES,
@@ -985,11 +1002,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             code,
         )
 
+    def _пространство_из_формы() -> str | None:
+        """Пространство из формы — только из заведённых; незнакомое — `None`."""
+        выбрано = canonical_tenant((request.form.get("tenant") or "").strip())
+        return выбрано if выбрано and выбрано in accounts.spaces() else None
+
     @app.get(users_path)
     def users() -> FlaskResponse | tuple[str, int]:
-        отказ = _admin_only()
-        if отказ is not None:
-            return отказ
         return _страница_учёток()
 
     @app.post(f"{users_path}/add")
@@ -1000,21 +1019,24 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         браузера и в журнале обратного прокси, то есть перестал бы быть
         паролем ровно в момент показа.
         """
-        отказ = _admin_only()
+        отказ = _hq_admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         роль = request.form.get("role") or accounts.ROLE_AUDITOR
         try:
-            заведённый = accounts.add(логин, tenant=auth.current_tenant(), role=роль)
+            пространство = _пространство_из_формы()
+            if пространство is None:
+                return _страница_учёток(outcome="add_space_unknown", code=400)
+            заведённый = accounts.add(логин, tenant=пространство, role=роль)
         except DbError:
             return _страница_учёток(outcome="add_failed", code=400)
         return _страница_учёток(added=заведённый, outcome="added")
 
     @app.post(f"{users_path}/disable")
     def disable_user() -> FlaskResponse | tuple[str, int]:
-        отказ = _admin_only()
+        отказ = _hq_admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1026,7 +1048,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # пометку изнутри продукта нечем.
             return _страница_учёток(outcome="disable_self", code=400)
         try:
-            отключено = accounts.disable(логин, tenant=auth.current_tenant())
+            # Пространство — из строки учётки в перечне, сверенное с заведёнными:
+            # учётку отключают там, где она живёт, а не в пространстве админа.
+            пространство = _пространство_из_формы()
+            if пространство is None:
+                return _страница_учёток(outcome="disable_missing", code=400)
+            отключено = accounts.disable(логин, tenant=пространство)
         except DbError:
             return _страница_учёток(outcome="disable_failed", code=400)
         return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
@@ -1102,6 +1129,39 @@ def _refuse_unless_own(inspection_id: str) -> FlaskResponse | None:
     if not _own(detail):
         return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
     return None
+
+
+def _install_hq_gate(app: Flask) -> None:
+    """Раздел только для УК отвечает партнёру тем же 404, что несуществующий адрес (D264).
+
+    Заслон на раздел целиком, а не на каждую кнопку внутри: так доступы проще
+    держать — это и был довод владельца. Стоит после заслона входа: без
+    вошедшего туда не доходит ни один закрытый адрес.
+    """
+
+    @app.before_request
+    def _только_уК() -> None:
+        if request.endpoint in auth.OPEN_ENDPOINTS or auth.current_account() is None:
+            return
+        if refused_for(request.path, auth.current_tenant()):
+            abort(404)
+
+
+def _hq_admin_only() -> FlaskResponse | None:
+    """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
+
+    Админ партнёра на вкладке «Пользователи» не управляет никем: его права не
+    построены (D288 открыт), и роль `admin` у учётки партнёра здесь ничего не
+    открывает.
+    """
+    вошедший = auth.current_account()
+    if (
+        вошедший is not None
+        and вошедший.role == accounts.ROLE_ADMIN
+        and canonical_tenant(вошедший.tenant) == HQ_TENANT
+    ):
+        return None
+    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
 def _admin_only() -> FlaskResponse | None:
