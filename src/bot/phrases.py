@@ -36,7 +36,10 @@ from src import domain
 from src.db import synonyms
 from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.tenants import HQ_TENANT
 from src.recognize.shortlist import MANUAL_ONLY
+
+from .inspection import read_inspection
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +84,18 @@ def _applicable(code: str, *, chat_id: int) -> bool:
     return True
 
 
+def _tenant_of(chat_id: int) -> str:
+    """Пространство проверки чата: карта синонимов у каждого пространства своя (#340).
+
+    Проверки нет или она не читается — УК: так карта велась до пространств.
+    """
+    try:
+        состояние = read_inspection(chat_id)
+    except DomainError:
+        return HQ_TENANT
+    return состояние.tenant if состояние is not None else HQ_TENANT
+
+
 def recall(note: str, *, lang: str, chat_id: int) -> Learned | None:
     """Пункт, которым эта формулировка уже кончалась. Не знаем — `None`.
 
@@ -96,7 +111,7 @@ def recall(note: str, *, lang: str, chat_id: int) -> Learned | None:
         # строкой — это запрос на каждый кадр пачки впустую.
         return None
     try:
-        alias = synonyms.lookup_phrase(сказанное, lang=lang)
+        alias = synonyms.lookup_phrase(сказанное, lang=lang, tenant=_tenant_of(chat_id))
     except DbError as exc:
         logger.warning("карта синонимов не ответила (%s): %s", type(exc).__name__, exc)
         return None
@@ -127,7 +142,11 @@ def learn(note: str, *, item_code: str, lang: str, chat_id: int) -> str:
         return ""
     try:
         память = synonyms.remember_phrase(
-            сказанное, item_code=item_code, lang=lang, origin=synonyms.LEARNED
+            сказанное,
+            item_code=item_code,
+            lang=lang,
+            origin=synonyms.LEARNED,
+            tenant=_tenant_of(chat_id),
         )
     except DbError as exc:
         logger.warning(

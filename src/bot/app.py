@@ -142,6 +142,7 @@ def build_dispatcher(
     album_window: float = ALBUM_WINDOW_SECONDS,
     on_material: MaterialHandler | None = None,
     roster: Roster | None = None,
+    bindings: BindingCache | None = None,
 ) -> Dispatcher:
     """Диспетчер со всеми роутерами и мидлварью доступа.
 
@@ -168,7 +169,9 @@ def build_dispatcher(
     if roster is not None:
         settings = replace(settings, auditor_names={**roster.names(), **settings.auditor_names})
 
-    access = AccessMiddleware(settings.allowed_ids, BindingCache(), roster)
+    access = AccessMiddleware(
+        settings.allowed_ids, bindings if bindings is not None else BindingCache(), roster
+    )
     dispatcher.message.outer_middleware(access)
     dispatcher.callback_query.outer_middleware(access)
     # После доступа: внешние мидлвари идут в порядке регистрации, а заслону

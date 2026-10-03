@@ -29,7 +29,6 @@ from src.domain.bot_checklists import BotChecklist, available
 from src.domain.config import check_environment
 from src.domain.errors import DomainError
 from src.domain.geo import COUNTRIES
-from src.domain.tenants import HQ_TENANT
 from src.domain.unit_name import UnitName, canonical_unit
 
 from .. import sealed, sidecar
@@ -62,7 +61,7 @@ from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
-from ..unit_pick import UK_TENANT, bot_tenant, match_unit, may_add_units
+from ..unit_pick import match_unit, may_add_units
 
 logger = logging.getLogger(__name__)
 
@@ -139,27 +138,23 @@ async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
     await message.answer(t("start.ask_unit", lang))
 
 
-def _open_checklists() -> list[BotChecklist] | None:
-    """Открытые в боте чек-листы — или `None`, если их не прочитать.
-
-    Тенант пока всегда УК (T340): бот сам пространств ещё не знает, это
-    заведёт задача 12, которая заменит его на пространство аудитора.
-    """
+def _open_checklists(space: str) -> list[BotChecklist] | None:
+    """Открытые в боте чек-листы пространства аудитора — или `None`, если их не прочитать."""
     try:
-        return available(check_environment(), tenant=HQ_TENANT)
+        return available(check_environment(), tenant=space)
     except (DomainError, OSError, ValueError):
         logger.exception("список чек-листов для бота не прочитался")
         return None
 
 
-async def _ask_checklist(message: Message, state: FSMContext, lang: str) -> None:
+async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: str) -> None:
     """Первый шаг мастера (волна 3): по какому чек-листу проверка.
 
     Открыт один — не спрашиваем, как до волны 3. Несколько — кнопки с
     названиями на языке интерфейса. Ни одного — прямо говорим, что начать не
     по чему и кто это чинит, и мастер дальше не идёт.
     """
-    открыты = _open_checklists()
+    открыты = _open_checklists(space)
     if открыты is None:
         await state.clear()
         await message.answer(t("start.failed", lang))
@@ -224,7 +219,7 @@ def build_start_router(
         await message.answer(t("start.greeting", lang), reply_markup=new_inspection_keyboard(lang))
 
     @router.callback_query(F.data == NEW_INSPECTION_CALLBACK)
-    async def on_new(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_new(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
@@ -237,12 +232,12 @@ def build_start_router(
             # осознанно. Второй раз пугать его нечем, а тупик здесь означал бы,
             # что выхода нет и после нажатия единственной предложенной кнопки.
             logger.exception("состояние чата %s не читается", message.chat.id)
-            await _ask_checklist(message, state, lang)
+            await _ask_checklist(message, state, lang, space)
             return
         if inspection is not None:
             await _offer_resume(message, inspection, lang)
             return
-        await _ask_checklist(message, state, lang)
+        await _ask_checklist(message, state, lang, space)
 
     @router.callback_query(F.data == RESUME_CONTINUE_CALLBACK)
     async def on_resume_continue(callback: CallbackQuery, state: FSMContext) -> None:
@@ -278,7 +273,7 @@ def build_start_router(
         )
 
     @router.callback_query(F.data == RESUME_NEW_CALLBACK)
-    async def on_resume_new(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_resume_new(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         """«Начать новую» — только вход в мастер.
 
         Старая проверка на диске остаётся до последнего шага: аудитор ещё может
@@ -289,7 +284,7 @@ def build_start_router(
         message = callback.message
         if not isinstance(message, Message):
             return
-        await _ask_checklist(message, state, chat_ui_lang(message.chat.id))
+        await _ask_checklist(message, state, chat_ui_lang(message.chat.id), space)
 
     @router.callback_query(F.data == SEALED_DROP_CALLBACK)
     async def on_sealed_drop(callback: CallbackQuery, state: FSMContext) -> None:
@@ -336,7 +331,7 @@ def build_start_router(
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))
-    async def on_unit(message: Message, state: FSMContext) -> None:
+    async def on_unit(message: Message, state: FSMContext, space: str) -> None:
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
         if not unit:
@@ -362,13 +357,13 @@ def build_start_router(
             # файла отчёта сверяется с тем, что ляжет в шапку, а не с вводом.
             await message.answer(t("start.unit_too_long", lang, limit=UNIT_NAME_LIMIT))
             return
-        сверка = await asyncio.to_thread(match_unit, имя.name, tenant=UK_TENANT)
+        сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
         if сверка.name is not None or not сверка.checked:
             # Совпало со справочником — или справочник недоступен, и тогда не
             # повод держать аудитора на точке: имя уже каноническое.
             await _unit_chosen(message, state, lang, сверка.name or имя.name)
             return
-        if not may_add_units(bot_tenant(message)):
+        if not may_add_units(space):
             await message.answer(t("start.unit_new_partner", lang, name=имя.name))
             return
         await state.update_data(unit_new=asdict(имя), unit_typed=unit)
@@ -378,7 +373,7 @@ def build_start_router(
         )
 
     @router.callback_query(StateFilter(StartFlow.waiting_unit), F.data.startswith(UNIT_NEW_PREFIX))
-    async def on_unit_new(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_unit_new(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         """«Новая пиццерия?» — да заводит её в справочник страны, нет — ввести заново (D233)."""
         await callback.answer()
         message = callback.message
@@ -395,7 +390,7 @@ def build_start_router(
             await state.update_data(unit_new=None, unit_typed=None)
             await _ask_unit(message, state, lang)
             return
-        if not may_add_units(bot_tenant(message)):
+        if not may_add_units(space):
             await message.answer(t("start.unit_new_partner", lang, name=сырое["name"]))
             return
         имя = UnitName(**сырое)
@@ -408,7 +403,7 @@ def build_start_router(
                 aliases=синонимы,
                 country=имя.country,
                 city=имя.city,
-                tenant=UK_TENANT,
+                tenant=space,
             )
         except DbError as exc:
             # Точка всё равно заведётся по имени при сливе проверки; страну и
@@ -461,19 +456,19 @@ def build_start_router(
     @router.callback_query(
         StateFilter(StartFlow.waiting_checklist), F.data.startswith(CHECKLIST_PREFIX)
     )
-    async def on_checklist(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_checklist(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
             return
         lang = chat_ui_lang(message.chat.id)
         code = (callback.data or "").removeprefix(CHECKLIST_PREFIX)
-        открыты = _open_checklists() or []
+        открыты = _open_checklists(space) or []
         if code not in {c.code for c in открыты}:
             # Методист закрыл чек-лист, пока аудитор смотрел на кнопки: не
             # подменяем соседним молча, а показываем свежий список.
             await message.answer(t("start.checklist_gone", lang))
-            await _ask_checklist(message, state, lang)
+            await _ask_checklist(message, state, lang, space)
             return
         await state.update_data(checklist=code)
         await _ask_unit(message, state, lang)
@@ -494,7 +489,7 @@ def build_start_router(
         )
 
     @router.callback_query(StateFilter(StartFlow.waiting_lang), F.data.startswith(LANG_PREFIX))
-    async def on_lang(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_lang(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
@@ -546,6 +541,9 @@ def build_start_router(
                 ui_lang=report_lang,
                 speech_lang=report_lang,
                 auditor=auditor,
+                # Пространство того, кто начал (волна 1, #340): в нём проверка
+                # сливается в базу и в нём ищет прошлые проверки точки.
+                tenant=space,
                 # Выбран на первом шаге; пусто — открыт был один, и домен
                 # возьмёт его сам (или откажет, если за это время открыли второй).
                 checklist_code=str(data.get("checklist") or "") or None,

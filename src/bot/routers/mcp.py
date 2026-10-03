@@ -223,7 +223,7 @@ def build_mcp_router(settings: BotSettings) -> Router:
         await message.answer(t("mcp.offer", lang), reply_markup=mcp_setup_keyboard(lang))
 
     @router.callback_query(F.data == MCP_SETUP_SEND)
-    async def on_send(callback: CallbackQuery) -> None:
+    async def on_send(callback: CallbackQuery, space: str) -> None:
         """Готовая команда настройки Claude Desktop — с личным токеном внутри.
 
         Разными сообщениями не для красоты: в телеграме копируется сообщение
@@ -251,7 +251,7 @@ def build_mcp_router(settings: BotSettings) -> Router:
         from src.db.mcp_access import issue_token
 
         try:
-            выпущен = await asyncio.to_thread(issue_token, user.id, tenant=settings.mcp_tenant)
+            выпущен = await asyncio.to_thread(issue_token, user.id, tenant=space)
         except DbError:
             # В журнал — разбор, человеку — что делать. Значения токена нет ни
             # там, ни там: выпуск до него не дошёл.
