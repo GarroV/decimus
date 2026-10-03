@@ -40,7 +40,7 @@ def test_негодный_или_занятый_код_это_отказ(вла�
 
 
 def test_код_без_учёта_регистра_занят(владелец: str) -> None:
-    """Каталог методики — код строчными: «DEMO» и заведённое посевом «demo» делили бы один."""
+    """Каталог методики — код строчными, поэтому DEMO и заведённое посевом demo делили бы один."""
     with psycopg.connect(владелец) as conn:
         conn.execute("insert into tenants (code) values ('demo') on conflict do nothing")
     with pytest.raises(AccessError, match="уже заведено"):
