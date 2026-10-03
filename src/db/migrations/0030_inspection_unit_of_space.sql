@@ -20,6 +20,15 @@
 -- на `units` и `space_countries` есть у роли, которая пишет проверку (роль
 -- приложения — слив, администратор истории — перенос), и от того, какие
 -- объекты эта роль подложила себе в путь поиска.
+--
+-- Ветка «точка своего тенанта» у партнёра тоже требует страну точки из его
+-- `space_countries`: иначе старая точка партнёра Б со страной партнёра А
+-- открывала бы А проверки Б (охват читает по стране точки).
+--
+-- Видимость записанных проверок не переезжает молча: у точки, на которую
+-- ссылаются проверки, нельзя сменить пространство, а страну — сменить с
+-- одной на другую; заполнить пустую страну можно, только если на точку
+-- ссылаются лишь проверки УК (заполнение справочника географией, D196).
 
 alter table inspections drop constraint inspections_unit_same_tenant;
 alter table inspections add constraint inspections_unit_id_fkey
@@ -39,7 +48,10 @@ declare
     страна text;
 begin
     select tenant_code, country into чья, страна from units where id = new.unit_id;
-    if чья = new.tenant_code then
+    if чья = new.tenant_code and (чья = 'HQ' or exists (
+        select 1 from space_countries s
+         where s.tenant_code = new.tenant_code and s.country = страна
+    )) then
         return new;
     end if;
     if чья = 'HQ' and exists (
@@ -55,6 +67,32 @@ end $$;
 create trigger inspections_unit_of_space
     before insert or update of unit_id, tenant_code on inspections
     for each row execute function inspection_unit_of_space();
+
+create function unit_space_frozen() returns trigger
+language plpgsql security definer set search_path = pg_catalog, public as $$
+begin
+    if new.tenant_code is distinct from old.tenant_code
+       and exists (select 1 from inspections i where i.unit_id = old.id) then
+        raise exception using message =
+            'У пиццерии с проверками пространство не меняется: видимость записанных '
+            || 'проверок переехала бы молча';
+    end if;
+    if new.country is distinct from old.country and (
+        (old.country is not null
+         and exists (select 1 from inspections i where i.unit_id = old.id))
+        or exists (select 1 from inspections i
+                    where i.unit_id = old.id and i.tenant_code <> 'HQ')
+    ) then
+        raise exception using message =
+            'У пиццерии с проверками страна не меняется: видимость записанных '
+            || 'проверок переехала бы молча';
+    end if;
+    return new;
+end $$;
+
+create trigger units_space_frozen
+    before update of country, tenant_code on units
+    for each row execute function unit_space_frozen();
 
 -- Чтение по охвату (`src/db/reach.py`) идёт без ведущего тенанта: УК читает всю
 -- сеть, партнёр — пиццерии своих стран, и условие на тенант приходит массивом

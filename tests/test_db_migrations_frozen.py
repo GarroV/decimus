@@ -135,7 +135,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:09cc1ec1ea180d371577cfa2d3f59c6627d569c81aeb1b825920706904c3edc5"
     ),
     "0030_inspection_unit_of_space.sql": (
-        "sql1:fd2757fc0de47d8fab5e6a3773bef78f17d86905f5d64c8f7226ef3f80c661d7"
+        "sql1:cfd51bd4a0ba241962fcfbc92d6ef0906b0fed372295fcb7f91873462866527c"
     ),
     # Заведена вместе с файлом (Задача 9, D286) и нигде ещё не применена.
     "0031_bot_bindings.sql": (
