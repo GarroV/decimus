@@ -188,7 +188,7 @@ def test_миграция_отказывает_на_двойниках(pg_dsn: s
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
         cur.execute("create temp table web_users (login text, email text, tenant_code text)")
         cur.execute("insert into web_users values ('director', null, 'A'), ('director', null, 'B')")
-        with pytest.raises(psycopg.errors.RaiseException, match="нескольких пространствах"):
+        with pytest.raises(psycopg.errors.RaiseException, match="без учёта регистра"):
             cur.execute(проверка)
         conn.rollback()
 
@@ -201,6 +201,44 @@ def test_миграция_отказывает_на_двойниках(pg_dsn: s
         with pytest.raises(psycopg.errors.RaiseException, match="Почта привязана"):
             cur.execute(проверка)
         conn.rollback()
+
+
+@pytest.mark.parametrize(
+    ("строки", "отказ"),
+    [
+        ("('director', null, 'A'), ('Director', null, 'B')", "без учёта регистра"),
+        ("('director', null, 'A'), (' director', null, 'A')", "без учёта регистра"),
+        ("('Director', null, 'A')", "не в приведённом виде"),
+    ],
+)
+def test_миграция_отказывает_на_двойниках_без_учёта_регистра(
+    pg_dsn: str, строки: str, отказ: str
+) -> None:
+    """«Director» и «director» — один человек для входа: двойник, а не два логина.
+
+    Отключённые учётки считаются тоже: уникальный индекс держит все строки. Сами
+    логины в текст отказа не попадают — он уходит в журнал наката.
+    """
+    import pathlib
+
+    sql = pathlib.Path("src/db/migrations/0028_login_across_spaces.sql").read_text(encoding="utf-8")
+    проверка = sql.split("create unique index", 1)[0]
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("create temp table web_users (login text, email text, tenant_code text)")
+        cur.execute(f"insert into web_users values {строки}")  # noqa: S608 — строки наши
+        with pytest.raises(psycopg.errors.RaiseException, match=отказ) as отказано:
+            cur.execute(проверка)
+        assert "director" not in str(отказано.value).lower().split("найти:")[0]
+        conn.rollback()
+
+
+def test_схема_не_принимает_логин_не_в_приведённом_виде(обе_роли: str) -> None:
+    with psycopg.connect(обе_роли) as conn, conn.cursor() as cur:
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute(
+                "insert into web_users (tenant_code, login, password_hash) values (%s, %s, %s)",
+                (ТЕНАНТ, "Director", password_hash(ПАРОЛЬ)),
+            )
 
 
 # --- права роли приложения --------------------------------------------------

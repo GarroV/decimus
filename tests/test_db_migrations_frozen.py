@@ -128,7 +128,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0027_tenant_hq.sql": ("sql1:b5cf4026d3470e9c6d3e08a70939ff371febb474238b2b15315444cd490eff75"),
     # Заведена вместе с файлом (Задача 4, D282) и нигде ещё не применена.
     "0028_login_across_spaces.sql": (
-        "sql1:aa6eca059d9813a161c50051e93c57b68fcfe7c3bbbe28c2175db63bfebd6ead"
+        "sql1:507a7b446138c839b21cb94dd5b55cb569a8bc24671ef410929505a2b22192c7"
     ),
     # Заведены вместе с файлами (Задача 5, D283, D284) и нигде ещё не применены.
     "0029_space_countries.sql": (
