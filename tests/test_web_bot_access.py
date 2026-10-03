@@ -86,7 +86,7 @@ def test_черновик_открыть_в_боте_нельзя_и_экран_
     assert ответ.status_code == 200
     текст = ответ.get_data(as_text=True)
     assert "rnd" in текст and ("черновик" in текст or "нарушение" in текст)
-    строки = {r.code: r for r in method.checklist_rail(method.load_store().store)}  # type: ignore[arg-type]
+    строки = {r.code: r for r in method.checklist_rail(method.load_store().store, tenant=ТЕНАНТ)}  # type: ignore[arg-type]
     assert строки["rnd"].in_bot is False
 
 
@@ -98,7 +98,7 @@ def test_чужой_источник_переключатель_не_прини�
     )
 
     assert ответ.status_code in (400, 403)
-    строки = {r.code: r for r in method.checklist_rail(method.load_store().store)}  # type: ignore[arg-type]
+    строки = {r.code: r for r in method.checklist_rail(method.load_store().store, tenant=ТЕНАНТ)}  # type: ignore[arg-type]
     assert строки["bizdev"].in_bot is True
 
 
@@ -157,7 +157,9 @@ def test_открытый_с_пустым_изданием_не_считаетс
         rnd, tool="remove_checklist_item", command="remove", positional="RND01", options={}
     )
 
-    строка = {r.code: r for r in method.checklist_rail(method.load_store().store)}["rnd"]  # type: ignore[arg-type]
+    строка = {r.code: r for r in method.checklist_rail(method.load_store().store, tenant=ТЕНАНТ)}[
+        "rnd"
+    ]  # type: ignore[arg-type]
     assert строка.wants_bot is True and строка.in_bot is False
     страница = клиент.get("/admin?panel=bot").get_data(as_text=True)
     assert "Бот сейчас не даст начать проверку" in страница, "блок посчитал пустой открытым"
@@ -166,5 +168,7 @@ def test_открытый_с_пустым_изданием_не_считаетс
 
     клиент.post("/admin/bot/rnd", data={"on": "0"}, headers={"Origin": СВОЙ})
 
-    строка = {r.code: r for r in method.checklist_rail(method.load_store().store)}["rnd"]  # type: ignore[arg-type]
+    строка = {r.code: r for r in method.checklist_rail(method.load_store().store, tenant=ТЕНАНТ)}[
+        "rnd"
+    ]  # type: ignore[arg-type]
     assert строка.wants_bot is False

@@ -1018,6 +1018,20 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Опубликована версия {version}. Проверки считаются по ней начиная с этой минуты.",
         "en": "Version {version} is published. Inspections are scored by it from now on.",
     },
+    # Методика по пространству (волна 1, #340; D283). Чужой и несуществующий
+    # чек-лист — один текст: иначе ответ подтверждал бы, что чужое есть.
+    "methodology.not_found": {
+        "ru": "Чек-листа «{code}» нет.",
+        "en": "There is no checklist “{code}”.",
+    },
+    "methodology.etalon_readonly": {
+        "ru": "Эталон правит только УК. Здесь его можно смотреть, но не менять.",
+        "en": "Only HQ edits the reference checklist. You can view it here but not change it.",
+    },
+    "methodology.foreign_readonly": {
+        "ru": "Чек-лист другого пространства открыт только для чтения.",
+        "en": "A checklist of another space is read-only.",
+    },
     "methodology.saved": {
         "ru": (
             "Записана версия {version}. Движок её принял, но проверки считаются "
