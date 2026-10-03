@@ -897,6 +897,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
+            own=_own(detail),
             save_outcome=request.args.get("saved"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,

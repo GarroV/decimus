@@ -744,7 +744,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "мы отправили партнёру."
         ),
         "en": (
-            "An edit survives only if you press \u201cSave the letter\u201d: leaving the "
+            "An edit survives only if you press \u201cSave changes\u201d: leaving the "
             "page without saving loses it. The saved text is the answer to what exactly "
             "we sent the partner."
         ),
