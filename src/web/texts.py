@@ -268,7 +268,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     "section.tenants.title": {"ru": "Проект", "en": "Project"},
-    "section.users.title": {"ru": "Люди", "en": "People"},
+    # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
+    "section.users.title": {"ru": "Пользователи", "en": "Users"},
     "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
     # --- вход, выход, отказ (T323) -----------------------------------------
     # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
@@ -805,6 +806,19 @@ TEXTS: dict[str, dict[str, str]] = {
     "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
     "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
     "users.col.login": {"ru": "Логин", "en": "Login"},
+    # Пространства (волна 1, #340): админ УК видит людей всех пространств и
+    # заводит человека в выбранное (D282, D286).
+    "users.col.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.space_unknown": {
+        "ru": "Такого пространства нет. Выберите из списка.",
+        "en": "There is no such space. Pick one from the list.",
+    },
+    "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
+    "users.self.text": {
+        "ru": "Людей заводит и отключает администратор УК.",
+        "en": "People are added and disabled by an HQ administrator.",
+    },
     "users.col.role": {"ru": "Что можно", "en": "Access"},
     "users.col.state": {"ru": "Состояние", "en": "State"},
     "users.col.created": {"ru": "Заведён", "en": "Added"},

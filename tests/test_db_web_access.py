@@ -35,6 +35,7 @@ from src.db.web_access import (  # noqa: E402
     disable_account,
     find_by_email,
     list_accounts,
+    list_spaces,
     new_session_token,
     normalize_email,
     open_session,
@@ -353,6 +354,19 @@ def test_список_показывает_отключённую_отключё
     строки = list_accounts(tenant=ТЕНАНТ)
     assert [строка.login for строка in строки] == ["director"]
     assert строки[0].disabled_at is not None
+
+
+def test_список_без_пространства_это_люди_всех_пространств(обе_роли: str) -> None:
+    """Админ УК видит людей всех пространств одним списком, с пространством строки (D286)."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ)
+
+    все = {(строка.login, строка.tenant) for строка in list_accounts(tenant=None)}
+    свои = [строка.login for строка in list_accounts(tenant=ТЕНАНТ)]
+
+    assert {("director", ТЕНАНТ), ("partner", ЧУЖОЙ)} <= все
+    assert свои == ["director"]
+    assert {ТЕНАНТ, ЧУЖОЙ} <= set(list_spaces())
 
 
 def test_заведённая_учётка_по_умолчанию_не_админ(обе_роли: str) -> None:

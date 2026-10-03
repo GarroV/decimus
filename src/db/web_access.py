@@ -50,6 +50,7 @@ import psycopg
 from .config import check_environment, load_retraction_settings
 from .errors import AccessError, ConfigError, EmailTakenError
 from .migrate import admin_dsn
+from .reading import reading
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
 #: посреди работы, длиннее — забытая на чужом экране вкладка переживает ночь.
@@ -106,12 +107,16 @@ _SELECT_USER_SQL = """
      where login = %s and disabled_at is null
 """
 
+#: Пустое пространство (`null`) — люди всех пространств: экран админа УК
+#: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
-    select login, created_at, disabled_at, role
+    select login, created_at, disabled_at, role, tenant_code
       from web_users
-     where tenant_code = %s
-     order by login
+     where (%(tenant)s::text is null or tenant_code = %(tenant)s)
+     order by tenant_code, login
 """
+
+_LIST_SPACES_SQL = "select code from tenants order by code"
 
 _DISABLE_USER_SQL = """
     update web_users
@@ -214,6 +219,9 @@ class AccountRow:
     #: оборачивается: единственный читатель — команда обслуживания, и ей нужна
     #: сама дата, а не «да/нет».
     disabled_at: datetime | None
+    #: Пространство учётки (волна 1, #340): экран админа УК показывает людей
+    #: всех пространств одним списком.
+    tenant: str = ""
 
 
 @dataclass(frozen=True)
@@ -446,15 +454,28 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль)
 
 
-def list_accounts(*, tenant: str) -> tuple[AccountRow, ...]:
-    """Кто заведён у этого арендатора. Роль владельца схемы."""
+def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
+    """Кто заведён у этого арендатора; `None` — во всех пространствах. Роль владельца схемы."""
     with _managing("перечислить учётки") as conn, conn.cursor() as cur:
-        cur.execute(_LIST_USERS_SQL, (tenant,))
+        cur.execute(_LIST_USERS_SQL, {"tenant": tenant})
         строки = cur.fetchall()
     return tuple(
-        AccountRow(login=str(r[0]), created_at=r[1], disabled_at=r[2], role=str(r[3]))
+        AccountRow(
+            login=str(r[0]), created_at=r[1], disabled_at=r[2], role=str(r[3]), tenant=str(r[4])
+        )
         for r in строки
     )
+
+
+def list_spaces() -> tuple[str, ...]:
+    """Коды заведённых пространств — для выбора в форме заведения человека.
+
+    Читает роль приложения: таблицу пространств ей читать дано (0004), а
+    администратору истории — нет, и расширять его права ради списка кодов незачем.
+    """
+    with reading("перечень пространств") as conn, conn.cursor() as cur:
+        cur.execute(_LIST_SPACES_SQL)
+        return tuple(str(r[0]) for r in cur.fetchall())
 
 
 def disable_account(login: str, *, tenant: str) -> bool:
