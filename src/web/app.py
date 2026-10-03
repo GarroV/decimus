@@ -943,6 +943,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             data.remember_letter(
                 inspection_id,
+                tenant=auth.current_tenant(),
                 body=текст,
                 lang=письмо_на,
                 saved_by="—" if вошедший is None else вошедший.login,

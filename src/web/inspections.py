@@ -307,14 +307,16 @@ def saved_letter(
 
 
 def remember_letter(
-    inspection_id: str, *, body: str, lang: str, saved_by: str
+    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
 ) -> letters_store.SavedLetter:
     """Зафиксировать письмо так, как его подтвердил человек.
 
     Своей проверки текста здесь нет ни строки — она в `src/db/letters.py`, там
     же, где запись. Вторая копия правил разошлась бы с первой молча.
     """
-    return letters_store.save_letter(inspection_id, body=body, lang=lang, saved_by=saved_by)
+    return letters_store.save_letter(
+        inspection_id, tenant=tenant, body=body, lang=lang, saved_by=saved_by
+    )
 
 
 @dataclass(frozen=True)
