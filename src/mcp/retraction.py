@@ -119,9 +119,10 @@ def _detail(ident: str, *, tenant: str) -> InspectionRow | None:
     """
     from ..db.errors import ConfigError as DbConfigError
     from ..db.queries import get_inspection
+    from ..db.reach import own_reach
 
     try:
-        подробно = get_inspection(ident, tenant=tenant, include_retracted=True)
+        подробно = get_inspection(ident, reach=own_reach(tenant), include_retracted=True)
     except DbConfigError:
         raise ToolError(NOT_CONNECTED) from None
     return None if подробно is None else подробно.inspection

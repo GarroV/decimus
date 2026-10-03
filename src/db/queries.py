@@ -4,15 +4,15 @@
 трогая psql руками; читает отсюда же MCP-сервер (T095, блок `mcp`), и своих
 запросов к базе он не пишет — никто, кроме этого блока, в Postgres не ходит.
 
-**Арендатор — обязательный параметр, а не фильтр** (T110). Схема стала
-мультиарендной миграцией `0002`, а эта точка чтения оставалась общей на всех:
-выборка отдавала проверки всех арендаторов сразу и без предела. Пока арендатор
-в продукте один, течь нечему — но читает отсюда MCP-сервер, который мы сами
-даём в руки агенту партнёра, и необязательный фильтр там однажды не передадут.
-Поэтому у арендатора нет значения по умолчанию: вызов без него не проходит
-вовсе, вместо того чтобы молча отдать чужую историю. То же правило и у чтения
-по идентификатору (T114): угадать идентификатор нельзя, но неугадываемость —
-это надежда, а не защита.
+**Охват — обязательный параметр, а не фильтр** (T110, волна 1 #340). Читает
+отсюда MCP-сервер, который мы сами даём в руки агенту партнёра, и
+необязательный фильтр там однажды не передадут. Поэтому у охвата (`Reach`,
+`src/db/reach.py`) нет значения по умолчанию: вызов без него не проходит
+вовсе, вместо того чтобы молча отдать чужую историю. УК читает всю сеть,
+партнёр — пиццерии своих стран (D283, D289). То же правило и у чтения по
+идентификатору (T114): угадать идентификатор нельзя, но неугадываемость — это
+надежда, а не защита. Исключение одно — `previous_inspection`: повтор ×2
+(D255) считается по проверкам своего пространства и идёт по тенанту.
 
 **Период отбирает база, а не вызывающий поверх прочитанной страницы** (T114).
 Историю за три года зальют одним заходом программно (D035), и `pushed_at` у
@@ -25,16 +25,11 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
 from datetime import date
 from typing import Any
 
-import psycopg
-
 from src.domain.tenants import canonical_tenant
 
-from .config import check_environment, load_retraction_settings
 from .errors import DbError, StorageError
 from .models import (
     FindingRow,
@@ -44,6 +39,9 @@ from .models import (
     ItemUsage,
     PreviousInspection,
 )
+from .reach import Reach
+from .reach import require_reach as _require_reach
+from .reading import reading as _reading
 from .units import normalize_unit_name
 
 #: Сколько строк отдаётся, если предел не назвали. Сотня — это и есть
@@ -61,9 +59,11 @@ MAX_LIMIT = 1000
 # строкой): динамическая сборка текста SQL — ровно то, что ловит S608, и здесь
 # ей взяться неоткуда не по обещанию, а по устройству кода.
 #
-# Точка присоединяется составной ссылкой `(tenant_code, id)` — той самой, что
-# завела миграция `0002`. Так соединение физически не может подтянуть точку
-# другого арендатора, даже если фильтр ниже когда-нибудь потеряется.
+# Точка присоединяется по одному `id` (волна 1, #340, D284): справочник один, и
+# проверка партнёра ссылается на точку справочника УК. Граница чтения — условие
+# охвата `REACH_SQL` (`src/db/reach.py`), вписанное в каждый запрос литералом;
+# что оно есть везде, сверяет `tests/test_db_reach_static.py`. Партнёр видит
+# пиццерии своих стран, кто бы их ни проверял (D289), УК — всю сеть (D283).
 #
 # Границы периода стоят в запросе ВСЕГДА, а не дописываются в текст по
 # необходимости: незаданная граница — это `-infinity`/`infinity`, то есть
@@ -82,18 +82,19 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code
 from inspections i
-join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-where i.tenant_code = %(tenant)s
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
 """
 
-# Фильтр по точке идёт по обеим колонкам составного уникального индекса
-# `units (tenant_code, name_normalized)`. Ведущая колонка — арендатор: без неё
-# индекс не работал бы вовсе, а одноимённые точки двух арендаторов («Белград-1»
-# есть и у управляющей компании, и у партнёра) склеились бы в одну историю.
+# Фильтр по точке — по нормализованному названию в пределах охвата. Справочник
+# один (D284), поэтому одноимённых точек у двух пространств больше не заводится;
+# прежние собственные точки партнёров, если такие есть, охват УК видит рядом с
+# точками справочника — и одноимённые склеились бы в одну историю.
 _LIST_BY_UNIT_SQL = """
 select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
@@ -107,8 +108,10 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code
 from inspections i
-join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 order by i.inspection_date desc, i.pushed_at desc
@@ -131,8 +134,10 @@ select
     i.checklist_code,
     i.deductions, i.counts, i.by_zone
 from inspections i
-join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-where i.tenant_code = %(tenant)s and i.id = %(id)s
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.id = %(id)s
 """
 
 # Формулировки лежат строками `(entity_type, entity_id, field, lang)` (D025) и
@@ -141,7 +146,7 @@ where i.tenant_code = %(tenant)s and i.id = %(id)s
 # переводов, поэтому это точечное чтение, а не N+1.
 #
 # Арендатор здесь не проверяется намеренно: находки берутся у проверки, которую
-# `get_inspection` уже сверил с арендатором, а принадлежать другой проверке
+# `get_inspection` уже сверил с охватом, а принадлежать другой проверке
 # находка не может — это внешний ключ. Второй заслон поверх первого нельзя было
 # бы снять и увидеть красное, то есть проверить его работу стало бы нечем.
 _FINDINGS_OF_INSPECTION_SQL = """
@@ -158,13 +163,13 @@ select
     f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
-join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+join units u on u.id = i.unit_id
 where f.inspection_id = %(id)s
 order by f.n
 """
 
 # Находки одной точки через все её проверки, свежие проверки впереди. Здесь
-# арендатор — единственный заслон, и он проверяется снятием (тест на утечку).
+# охват — единственный заслон, и он проверяется снятием (тест на утечку).
 _FINDINGS_BY_UNIT_SQL = """
 select
     f.id, f.inspection_id, u.name, i.inspection_date, f.n, f.code, f.level,
@@ -179,8 +184,10 @@ select
     f.repeat
 from findings f
 join inspections i on i.id = f.inspection_id
-join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and u.name_normalized = %(unit)s
 order by i.inspection_date desc, i.pushed_at desc, f.n
 limit %(limit)s
 """
@@ -190,7 +197,7 @@ limit %(limit)s
 # разделов документа партнёру: `order by code` переставил бы их при первой же
 # правке порядка вопросов, а заметить это можно было бы только сличением двух
 # бумаг. Арендатор здесь не проверяется по той же причине, что у находок: поля
-# берутся у проверки, которую `get_inspection` уже сверил с арендатором.
+# берутся у проверки, которую `get_inspection` уже сверил с охватом.
 _INFO_OF_INSPECTION_SQL = """
 select code, text
 from inspection_info
@@ -388,43 +395,22 @@ def _require_inspection_id(inspection_id: str) -> str:
         ) from exc
 
 
-@contextmanager
-def _reading(что: str, *, as_admin: bool = False) -> Iterator[psycopg.Connection[Any]]:
-    """Подключение на время чтения; отказ базы — `DbError`, а не пустая выдача.
-
-    Пустой список вместо отказа означал бы «ничего не найдено» — а на деле
-    прочитать не смогли, и это разные ответы. Наружу уходит тип исключения, а
-    не его текст: в тексте драйвера может оказаться строка подключения.
-
-    `as_admin` меняет не запрос, а РОЛЬ, под которой запрос идёт: снятые
-    проверки прячет построчная политика (миграция `0010`), и увидеть их можно
-    только придя администратором истории. Фильтра «показывать ли снятые» в
-    тексте запросов нет и быть не должно — снятый фильтр не краснеет.
-    """
-    settings = load_retraction_settings() if as_admin else check_environment()
-    try:
-        with psycopg.connect(settings.dsn) as conn:
-            yield conn
-    except psycopg.Error as exc:
-        raise DbError(f"Не удалось прочитать {что} ({type(exc).__name__})") from exc
-
-
 def list_inspections(
     *,
-    tenant: str,
+    reach: Reach,
     unit: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = DEFAULT_LIMIT,
     include_retracted: bool = False,
 ) -> list[InspectionRow]:
-    """Проверки одного арендатора, свежие по дате обхода — первыми.
+    """Проверки в охвате читающего, свежие по дате обхода — первыми.
 
-    `tenant` обязателен и значения по умолчанию не имеет намеренно (T110):
-    подстановка «default» выглядела бы работающей ровно до появления второго
-    арендатора, а потом отдала бы агенту партнёра A историю партнёра B.
+    `reach` обязателен и значения по умолчанию не имеет намеренно (T110):
+    подстановка «вся сеть» выглядела бы работающей ровно до первого партнёра,
+    а потом отдала бы агенту партнёра A историю партнёра B.
 
-    `unit` фильтрует по точному названию точки в пределах того же арендатора
+    `unit` фильтрует по точному названию точки в пределах того же охвата
     (по тому же правилу нормализации, что и слив). Карту синонимов (T092) эта
     выборка не спрашивает: «БГ2» здесь не найдёт проверок «Белград 2» — при
     появлении потребителя это отдельная работа, а не молчаливое расширение.
@@ -445,11 +431,11 @@ def list_inspections(
     как снятые, с причиной. Не задано подключение — отказ, а не тихая выдача
     без них: «снятых нет» и «вам их не видно» разные ответы.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     rows_limit = _require_limit(limit)
     _require_window(date_from, date_to)
     params: dict[str, object] = {
-        "tenant": tenant_code,
+        **охват.params(),
         "limit": rows_limit,
         "date_from": date_from,
         "date_to": date_to,
@@ -467,11 +453,11 @@ def list_inspections(
 
 
 def get_inspection(
-    inspection_id: str, *, tenant: str, include_retracted: bool = False
+    inspection_id: str, *, reach: Reach, include_retracted: bool = False
 ) -> InspectionDetail | None:
-    """Одна проверка арендатора целиком: шапка, разбивка оценки и находки.
+    """Одна проверка из охвата читающего целиком: шапка, разбивка оценки и находки.
 
-    `None` — проверки нет либо она принадлежит другому арендатору. Это один и
+    `None` — проверки нет либо она вне охвата. Это один и
     тот же ответ намеренно: «такой проверки нет» и «такая проверка есть, но не
     ваша» — второе подтверждало бы существование чужого документа тому, кто
     перебирает идентификаторы.
@@ -485,13 +471,13 @@ def get_inspection(
     `None` — тем же ответом, что несуществующая, и это не небрежность: тому,
     кто снятых не видит, они и не существуют.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     ident = _require_inspection_id(inspection_id)
     with (
         _reading("проверку по идентификатору", as_admin=include_retracted) as conn,
         conn.cursor() as cur,
     ):
-        cur.execute(_GET_INSPECTION_SQL, {"tenant": tenant_code, "id": ident})
+        cur.execute(_GET_INSPECTION_SQL, {**охват.params(), "id": ident})
         row = cur.fetchone()
         колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
         if row is None:
@@ -522,7 +508,7 @@ def get_inspection(
     )
 
 
-def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> list[FindingRow]:
+def findings_by_unit(*, reach: Reach, unit: str, limit: int = DEFAULT_LIMIT) -> list[FindingRow]:
     """Находки одной точки по всем её проверкам, свежие проверки — первыми.
 
     Отвечает на вопрос «что у этой пиццерии повторяется», но сам повтор здесь
@@ -530,9 +516,9 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> l
     Выведенное тут число («нарушение повторилось четыре раза») никто не
     записывал, а в ответе агента оно немедленно пошло бы как факт проверки.
 
-    Арендатор обязателен по той же причине, что и у списка проверок, и здесь
+    Охват обязателен по той же причине, что и у списка проверок, и здесь
     он единственный заслон: находки достаются через проверки, своей ссылки на
-    арендатора у них нет.
+    пространство у них нет.
 
     Находок СНЯТОЙ проверки эта выборка не отдаёт никому, и флага «показать
     снятые» у неё нет намеренно. Спрашивают её об одном — что у точки
@@ -540,13 +526,13 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int = DEFAULT_LIMIT) -> l
     место: отозванный документ, посчитанный за повтор, превращается в
     требование к партнёру по основанию, которого больше нет.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     name = _require_unit(unit)
     rows_limit = _require_limit(limit)
     with _reading("находки точки") as conn, conn.cursor() as cur:
         cur.execute(
             _FINDINGS_BY_UNIT_SQL,
-            {"tenant": tenant_code, "unit": normalize_unit_name(name), "limit": rows_limit},
+            {**охват.params(), "unit": normalize_unit_name(name), "limit": rows_limit},
         )
         rows = cur.fetchall()
     return [_row_to_finding(row) for row in rows]
@@ -588,9 +574,10 @@ select
     count(distinct i.id) as inspections,
     count(distinct i.unit_id) as units
 from inspections i
-     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+     join units u on u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
-where i.tenant_code = %(tenant)s
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -621,8 +608,9 @@ with записи as (
             and t.field = 'text' and t.lang = i.speech_lang) as text
     from findings f
          join inspections i on i.id = f.inspection_id
-         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-    where i.tenant_code = %(tenant)s
+         join units u on u.id = i.unit_id
+    where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -650,13 +638,15 @@ limit %(limit)s
 """
 
 _UNITS_TOTAL_SQL = """
-select count(*) from units where tenant_code = %(tenant)s
+select count(*) from units u
+where u.tenant_code = 'HQ'
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 """
 
 
 def zone_losses(
     *,
-    tenant: str,
+    reach: Reach,
     date_from: date | None = None,
     date_to: date | None = None,
     city: str = "",
@@ -675,13 +665,13 @@ def zone_losses(
     подменять нельзя — «зона без потерь» и «зона, про которую эта проверка
     ничего не записала» на экране читаются одинаково, а значат разное.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     _require_window(date_from, date_to)
     with _reading("потери по зонам") as conn, conn.cursor() as cur:
         cur.execute(
             _ZONE_LOSSES_SQL,
             {
-                "tenant": tenant_code,
+                **охват.params(),
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": _require_limit(limit),
@@ -700,7 +690,7 @@ def zone_losses(
 
 def systemic_findings(
     *,
-    tenant: str,
+    reach: Reach,
     date_from: date | None = None,
     date_to: date | None = None,
     city: str = "",
@@ -714,13 +704,13 @@ def systemic_findings(
     точках, — это методика или обучение, а двадцать записей по одному пункту на
     одной точке — это одна точка. Сортировка по записям смешала бы эти случаи.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     _require_window(date_from, date_to)
     with _reading("нарушения по пунктам") as conn, conn.cursor() as cur:
         cur.execute(
             _SYSTEMIC_SQL,
             {
-                "tenant": tenant_code,
+                **охват.params(),
                 "date_from": date_from,
                 "date_to": date_to,
                 "limit": _require_limit(limit),
@@ -737,16 +727,16 @@ def systemic_findings(
         ]
 
 
-def units_total(*, tenant: str) -> int:
-    """Сколько точек у арендатора в справочнике — всего, а не «с проверками».
+def units_total(*, reach: Reach) -> int:
+    """Сколько точек справочника в охвате — всего, а не «с проверками».
 
     Считается отдельно от проверок намеренно: «проверено 12 из 150» и
     «проверено 12» — разные утверждения, и первое возможно только если знать
     знаменатель.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     with _reading("число точек") as conn, conn.cursor() as cur:
-        cur.execute(_UNITS_TOTAL_SQL, {"tenant": tenant_code})
+        cur.execute(_UNITS_TOTAL_SQL, охват.params())
         row = cur.fetchone()
         return int(row[0]) if row else 0
 
@@ -758,8 +748,9 @@ select
     count(*) as records
 from findings f
      join inspections i on i.id = f.inspection_id
-     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-where i.tenant_code = %(tenant)s
+     join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -771,7 +762,7 @@ group by f.inspection_id, f.level
 
 def class_counts(
     *,
-    tenant: str,
+    reach: Reach,
     date_from: date | None = None,
     date_to: date | None = None,
     city: str = "",
@@ -788,13 +779,13 @@ def class_counts(
     отсутствует, и это честнее нулей: «находок не заводили» и «находок нет»
     различаются, а ноль их бы склеил. Потребитель читает через `.get`.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     _require_window(date_from, date_to)
     with _reading("счётчики классов") as conn, conn.cursor() as cur:
         cur.execute(
             _CLASS_COUNTS_SQL,
             {
-                "tenant": tenant_code,
+                **охват.params(),
                 "date_from": date_from,
                 "date_to": date_to,
                 **_narrowing(city, country, grade),
@@ -809,14 +800,16 @@ def class_counts(
 _UNIT_GEOGRAPHY_SQL = """
 select u.name, u.country, u.city
 from units u
-where u.tenant_code = %(tenant)s
+where u.tenant_code = 'HQ'
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 """
 
 
 _UNIT_IDS_SQL = """
 select u.name, u.id
 from units u
-where u.tenant_code = %(tenant)s
+where u.tenant_code = 'HQ'
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 """
 
 
@@ -824,7 +817,7 @@ _PREVIOUS_INSPECTION_SQL = """
 with прошлая as (
     select i.id, i.inspection_date
     from inspections i
-    join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+    join units u on u.id = i.unit_id
     where i.tenant_code = %(tenant)s
       and u.name = %(unit)s
       and i.retracted_at is null
@@ -865,20 +858,20 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
     )
 
 
-def unit_ids(*, tenant: str) -> dict[str, str]:
+def unit_ids(*, reach: Reach) -> dict[str, str]:
     """Идентификаторы точек справочника: `{название: id}`.
 
     Нужны экранам, чтобы ссылаться на точку идентификатором, а не названием:
     название правят и переводят, и ссылка, собранная из него, ломается молча
     (CLAUDE.md, «сущности связывать кодами, никогда формулировками»).
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     with _reading("идентификаторы точек") as conn, conn.cursor() as cur:
-        cur.execute(_UNIT_IDS_SQL, {"tenant": tenant_code})
+        cur.execute(_UNIT_IDS_SQL, охват.params())
         return {str(name): str(ид) for name, ид in cur.fetchall()}
 
 
-def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+def unit_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
     """География точек справочника: `{название: (код страны, город)}`.
 
     География берётся у ТОЧКИ, а не у проверки. Город в проверке — то, что
@@ -889,9 +882,9 @@ def unit_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
     Страна кодом, город строкой — как в базе (0017) и по той же причине:
     формулировки переводятся, коды нет.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     with _reading("география точек") as conn, conn.cursor() as cur:
-        cur.execute(_UNIT_GEOGRAPHY_SQL, {"tenant": tenant_code})
+        cur.execute(_UNIT_GEOGRAPHY_SQL, охват.params())
         return {
             str(name): (str(country or ""), str(city or ""))
             for name, country, city in cur.fetchall()
@@ -906,9 +899,10 @@ select distinct on (i.id)
     zone.value ->> 'name_en' as name_en,
     (zone.value ->> 'loss')::numeric as loss
 from inspections i
-     join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
+     join units u on u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
-where i.tenant_code = %(tenant)s
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -922,7 +916,7 @@ order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
 
 def worst_zones(
     *,
-    tenant: str,
+    reach: Reach,
     date_from: date | None = None,
     date_to: date | None = None,
     city: str = "",
@@ -939,13 +933,13 @@ def worst_zones(
     отвечает на вопрос «где потеряно больше всего процентов», и три мелких
     замечания в одной зоне не перевешивают одного дорогого в другой.
     """
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     _require_window(date_from, date_to)
     with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
         cur.execute(
             _WORST_ZONES_SQL,
             {
-                "tenant": tenant_code,
+                **охват.params(),
                 "date_from": date_from,
                 "date_to": date_to,
                 **_narrowing(city, country, grade),
@@ -968,8 +962,9 @@ ITEM_USAGE_TOP = 5
 _ITEM_RECORDS = """
     from findings f
          join inspections i on i.id = f.inspection_id
-         join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
-    where i.tenant_code = %(tenant)s
+         join units u on u.id = i.unit_id
+    where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
       and f.code = %(code)s
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'
@@ -995,27 +990,29 @@ _ITEM_TOP_SQL = (
 _EDITION_FIRST_USED_SQL = """
 select min(i.inspection_date)
 from inspections i
-where i.tenant_code = %(tenant)s
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.checklist_version = %(version)s
   and i.retracted_at is null
 """
 
 
-def edition_first_used(*, tenant: str, version: str) -> date | None:
+def edition_first_used(*, reach: Reach, version: str) -> date | None:
     """День первой проверки по этой сборке чек-листа; `None` — проверок нет."""
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     with _reading("первую проверку по сборке") as conn, conn.cursor() as cur:
-        cur.execute(_EDITION_FIRST_USED_SQL, {"tenant": tenant_code, "version": version.strip()})
+        cur.execute(_EDITION_FIRST_USED_SQL, {**охват.params(), "version": version.strip()})
         row = cur.fetchone()
     return row[0] if row else None
 
 
-def item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage:
+def item_usage(*, reach: Reach, code: str, checklist: str) -> ItemUsage:
     """Сколько раз пункт нарушен, на скольких точках и когда последний раз (D197)."""
-    tenant_code = _require_tenant(tenant)
+    охват = _require_reach(reach)
     код = code.strip().upper()
     параметры: dict[str, object] = {
-        "tenant": tenant_code,
+        **охват.params(),
         "code": код,
         "checklist": checklist.strip(),
         "limit": ITEM_USAGE_TOP,

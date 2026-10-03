@@ -22,9 +22,12 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
+from db_harness import привязать_страну, точка_справочника  # noqa: E402
+
 from src.db.errors import DbError  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import _LIST_ALL_SQL, MAX_LIMIT, list_inspections  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
 pytestmark = requires_db
@@ -32,12 +35,26 @@ pytestmark = requires_db
 АРЕНДАТОР_А = "партнёр-а"
 АРЕНДАТОР_Б = "партнёр-б"
 
+#: Страна пространства `АРЕНДАТОР_А`: проверки сливаются на точки её справочника.
+СТРАНА_А = "RS"
+
+
+@pytest.fixture
+def страна_а(pg_dsn: str) -> None:
+    привязать_страну(pg_dsn, tenant=АРЕНДАТОР_А, country=СТРАНА_А)
+
+
 #: Начало залитой истории. Дальше даты идут подряд по дню на проверку.
 НАЧАЛО = date(2023, 1, 1)
 
 
 def _проверка(chat_id: int, *, арендатор: str, дата: str, точка: str = "Белград-1") -> str:
-    """Завершённая проверка нужного арендатора через официальный контракт домена."""
+    """Завершённая проверка нужного арендатора через официальный контракт домена.
+
+    Точка — справочника УК страны `СТРАНА_А` (D284): партнёр своих точек не
+    заводит. Пространство привязывает к стране фикстура `страна_а`.
+    """
+    точка_справочника(точка, country=СТРАНА_А)
     start_inspection(
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор, date=дата
     )
@@ -123,7 +140,7 @@ def test_период_отбирается_в_базе_а_не_поверх_пр
     окно_с, окно_по = date(2026, 2, 1), date(2026, 2, 28)
     assert (окно_с - НАЧАЛО).days > MAX_LIMIT, "окно должно лежать за потолком чтения"
 
-    строки = list_inspections(tenant=АРЕНДАТОР_А, date_from=окно_с, date_to=окно_по)
+    строки = list_inspections(reach=own_reach(АРЕНДАТОР_А), date_from=окно_с, date_to=окно_по)
 
     даты = [строка.inspection_date for строка in строки]
     assert len(даты) == 28, f"за февраль 2026 прочитано {len(даты)} проверок вместо 28"
@@ -139,7 +156,7 @@ def test_свежими_считаются_проверки_по_дате_обх
     _залить_историю(pg_dsn, арендатор=АРЕНДАТОР_А, сколько=1200)
     последняя = НАЧАЛО + timedelta(days=1199)
 
-    строки = list_inspections(tenant=АРЕНДАТОР_А, limit=3)
+    строки = list_inspections(reach=own_reach(АРЕНДАТОР_А), limit=3)
 
     assert [строка.inspection_date for строка in строки] == [
         последняя,
@@ -154,7 +171,7 @@ def test_период_не_выпускает_за_арендатора(pg_dsn: 
     _залить_историю(pg_dsn, арендатор=АРЕНДАТОР_Б, сколько=40)
 
     строки = list_inspections(
-        tenant=АРЕНДАТОР_А, date_from=НАЧАЛО, date_to=НАЧАЛО + timedelta(days=39)
+        reach=own_reach(АРЕНДАТОР_А), date_from=НАЧАЛО, date_to=НАЧАЛО + timedelta(days=39)
     )
 
     assert {строка.tenant_code for строка in строки} == {АРЕНДАТОР_А}
@@ -164,39 +181,41 @@ def test_период_не_выпускает_за_арендатора(pg_dsn: 
 # --- границы и отказы --------------------------------------------------------
 
 
-def test_период_включает_обе_границы(domain_env: Path, db_env: str) -> None:
+def test_период_включает_обе_границы(domain_env: Path, db_env: str, страна_а: None) -> None:
     """«С 1 по 31 августа» человек понимает включительно, и выборка тоже."""
     свой = _проверка(401, арендатор=АРЕНДАТОР_А, дата="2026-08-15")
     _проверка(402, арендатор=АРЕНДАТОР_А, точка="Ниш-1", дата="2026-08-14")
     _проверка(403, арендатор=АРЕНДАТОР_А, точка="Ниш-2", дата="2026-08-16")
 
     строки = list_inspections(
-        tenant=АРЕНДАТОР_А, date_from=date(2026, 8, 15), date_to=date(2026, 8, 15)
+        reach=own_reach(АРЕНДАТОР_А), date_from=date(2026, 8, 15), date_to=date(2026, 8, 15)
     )
 
     assert [строка.id for строка in строки] == [свой]
 
 
-def test_одна_граница_периода_это_законно(domain_env: Path, db_env: str) -> None:
+def test_одна_граница_периода_это_законно(domain_env: Path, db_env: str, страна_а: None) -> None:
     """«С такого-то числа» и «по такое-то» спрашивают чаще, чем закрытый период."""
     старая = _проверка(404, арендатор=АРЕНДАТОР_А, дата="2024-05-05")
     свежая = _проверка(405, арендатор=АРЕНДАТОР_А, точка="Ниш-1", дата="2026-08-20")
 
-    с_2026 = list_inspections(tenant=АРЕНДАТОР_А, date_from=date(2026, 1, 1))
-    по_2024 = list_inspections(tenant=АРЕНДАТОР_А, date_to=date(2024, 12, 31))
+    с_2026 = list_inspections(reach=own_reach(АРЕНДАТОР_А), date_from=date(2026, 1, 1))
+    по_2024 = list_inspections(reach=own_reach(АРЕНДАТОР_А), date_to=date(2024, 12, 31))
 
     assert [строка.id for строка in с_2026] == [свежая]
     assert [строка.id for строка in по_2024] == [старая]
 
 
-def test_период_работает_и_с_фильтром_по_точке(domain_env: Path, db_env: str) -> None:
+def test_период_работает_и_с_фильтром_по_точке(
+    domain_env: Path, db_env: str, страна_а: None
+) -> None:
     """Оба фильтра сразу — самый частый вопрос: «что было у этой точки летом»."""
     нужная = _проверка(406, арендатор=АРЕНДАТОР_А, точка="Белград-1", дата="2026-08-15")
     _проверка(407, арендатор=АРЕНДАТОР_А, точка="Белград-1", дата="2026-01-15")
     _проверка(408, арендатор=АРЕНДАТОР_А, точка="Ниш-1", дата="2026-08-15")
 
     строки = list_inspections(
-        tenant=АРЕНДАТОР_А,
+        reach=own_reach(АРЕНДАТОР_А),
         unit="Белград-1",
         date_from=date(2026, 8, 1),
         date_to=date(2026, 8, 31),
@@ -209,7 +228,9 @@ def test_перевёрнутый_период_это_отказ_а_не_пус�
     """Перепутанные местами границы вернули бы пустоту, и ошибка вызывающего
     читалась бы как «за этот период проверок нет»."""
     with pytest.raises(DbError, match="ериод"):
-        list_inspections(tenant=АРЕНДАТОР_А, date_from=date(2026, 8, 31), date_to=date(2026, 8, 1))
+        list_inspections(
+            reach=own_reach(АРЕНДАТОР_А), date_from=date(2026, 8, 31), date_to=date(2026, 8, 1)
+        )
 
 
 # --- план запроса ------------------------------------------------------------
@@ -228,7 +249,7 @@ def test_период_идёт_по_индексу_а_не_полным_прох
         cur.execute(
             "explain " + _LIST_ALL_SQL,
             {
-                "tenant": АРЕНДАТОР_А,
+                **own_reach(АРЕНДАТОР_А).params(),
                 "limit": 100,
                 "date_from": НАЧАЛО + timedelta(days=5000),
                 "date_to": НАЧАЛО + timedelta(days=5030),

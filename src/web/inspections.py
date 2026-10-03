@@ -28,6 +28,7 @@ from src.db import move, previews, queries, reports, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
+from src.db.reach import own_reach
 from src.domain.models import TEXT_LANGS
 from src.report import info_titles
 from src.report.letters import LetterError
@@ -71,11 +72,13 @@ def load_registry(*, tenant: str, limit: int) -> Registry:
     """Проверки тенанта, свежие по дате обхода — первыми."""
     if retraction_available():
         try:
-            rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=True)
+            rows = queries.list_inspections(
+                reach=own_reach(tenant), limit=limit, include_retracted=True
+            )
             return Registry(rows=tuple(rows), retracted_visible=True)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
-    rows = queries.list_inspections(tenant=tenant, limit=limit)
+    rows = queries.list_inspections(reach=own_reach(tenant), limit=limit)
     return Registry(rows=tuple(rows), retracted_visible=False)
 
 
@@ -104,10 +107,12 @@ def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
     """
     if retraction_available():
         try:
-            return queries.get_inspection(inspection_id, tenant=tenant, include_retracted=True)
+            return queries.get_inspection(
+                inspection_id, reach=own_reach(tenant), include_retracted=True
+            )
         except DbError as exc:
             _log_admin_read_failed("карточка проверки", exc)
-    return queries.get_inspection(inspection_id, tenant=tenant)
+    return queries.get_inspection(inspection_id, reach=own_reach(tenant))
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
@@ -219,7 +224,7 @@ def load_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
     стране и городу просто не предлагается, а список проверок остаётся.
     """
     try:
-        return queries.unit_geography(tenant=tenant)
+        return queries.unit_geography(reach=own_reach(tenant))
     except DbError as exc:
         logger.warning("география точек недоступна, отбор по месту не показан: %s", exc)
         return {}
@@ -232,7 +237,7 @@ def load_item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage | No
     так же, поэтому отказ базы не роняет экран, а называется на нём строкой.
     """
     try:
-        return queries.item_usage(tenant=tenant, code=code, checklist=checklist)
+        return queries.item_usage(reach=own_reach(tenant), code=code, checklist=checklist)
     except DbError as exc:
         logger.warning("сводка пункта %s недоступна: %s", code, exc)
         return None
@@ -244,7 +249,7 @@ def load_edition_since(*, tenant: str, version: str) -> date | None:
     Справка — подсказка, а не документ: отказ базы карточку не роняет.
     """
     try:
-        return queries.edition_first_used(tenant=tenant, version=version)
+        return queries.edition_first_used(reach=own_reach(tenant), version=version)
     except DbError as exc:
         logger.warning("первая проверка по сборке %s недоступна: %s", version, exc)
         return None
@@ -275,14 +280,15 @@ def move_card(
 
 def load_moves(inspection_id: str, *, tenant: str) -> tuple[move.MoveRecord, ...]:
     """История переносов карточки, свежие первыми."""
-    return move.list_moves(inspection_id, tenant=tenant)
+    return move.list_moves(inspection_id, reach=own_reach(tenant))
 
 
 def load_units(*, tenant: str) -> tuple[tuple[str, str], ...]:
     """Пиццерии справочника для выбора при переносе: `(id, название)` по алфавиту."""
     return tuple(
         sorted(
-            ((ид, имя) for имя, ид in queries.unit_ids(tenant=tenant).items()), key=lambda x: x[1]
+            ((ид, имя) for имя, ид in queries.unit_ids(reach=own_reach(tenant)).items()),
+            key=lambda x: x[1],
         )
     )
 
@@ -351,7 +357,7 @@ def load_info(detail: InspectionDetail, *, lang: str) -> tuple[tuple[InfoLine, .
 
 def load_report(inspection_id: str, *, tenant: str) -> reports.ReportRef | None:
     """Последний сохранённый PDF проверки (D204) — ссылка, без самого файла."""
-    return reports.latest_report(inspection_id, tenant=tenant)
+    return reports.latest_report(inspection_id, reach=own_reach(tenant))
 
 
 def report_bytes(ref: reports.ReportRef) -> bytes:
@@ -361,9 +367,9 @@ def report_bytes(ref: reports.ReportRef) -> bytes:
 
 def load_previews(inspection_id: str, *, tenant: str) -> dict[str, tuple[str, ...]]:
     """Кадры со сжатой копией по записям проверки (D219)."""
-    return previews.finding_previews(inspection_id, tenant=tenant)
+    return previews.finding_previews(inspection_id, reach=own_reach(tenant))
 
 
 def preview_bytes(inspection_id: str, photo_id: str, *, tenant: str) -> bytes | None:
     """Сжатая копия одного кадра — или `None`, если её у этой проверки нет."""
-    return previews.preview_bytes(inspection_id, photo_id, tenant=tenant)
+    return previews.preview_bytes(inspection_id, photo_id, reach=own_reach(tenant))

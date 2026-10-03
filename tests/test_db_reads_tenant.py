@@ -23,6 +23,8 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
+from db_harness import привязать_пространства, точка_пространства  # noqa: E402
+
 from src.db.errors import DbError  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import (  # noqa: E402
@@ -31,12 +33,21 @@ from src.db.queries import (  # noqa: E402
     findings_by_unit,
     get_inspection,
 )
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР_А = "партнёр-а"
-АРЕНДАТОР_Б = "партнёр-б"
+# Коды пространств совпадают с кодами их стран (волна 1, D284): точки партнёров
+# заводятся в справочнике УК этой страны, пространства привязаны к ней.
+АРЕНДАТОР_А = "GE"
+АРЕНДАТОР_Б = "AM"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(pg_dsn: str) -> None:
+    привязать_пространства(pg_dsn, АРЕНДАТОР_А, АРЕНДАТОР_Б)
+
 
 #: Один пункт в одной зоне движок принимает один раз, поэтому несколько
 #: находок разводятся по зонам, а не повторяют одну и ту же запись.
@@ -52,6 +63,7 @@ def _проверка(
     находок: int = 1,
 ) -> str:
     """Завершённая проверка нужного арендатора через официальный контракт домена."""
+    точка_пространства(точка, tenant=арендатор)
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     for номер in range(находок):
         add_finding(chat_id, code="CLN03", level="D1", zone=ЗОНЫ[номер], text=текст)
@@ -73,12 +85,12 @@ def test_проверка_чужого_арендатора_не_читаетс�
     чужая = _проверка(301, арендатор=АРЕНДАТОР_Б, точка="Ниш-1")
     своя = _проверка(302, арендатор=АРЕНДАТОР_А, точка="Белград-1")
 
-    assert get_inspection(чужая, tenant=АРЕНДАТОР_А) is None, (
+    assert get_inspection(чужая, reach=own_reach(АРЕНДАТОР_А)) is None, (
         "чтение по идентификатору отдало проверку чужого арендатора — "
         "через MCP это документ партнёра, который спрашивающий видеть не должен"
     )
 
-    моя = get_inspection(своя, tenant=АРЕНДАТОР_А)
+    моя = get_inspection(своя, reach=own_reach(АРЕНДАТОР_А))
     assert моя is not None, "своя проверка не прочиталась — пустота выше была бы по другой причине"
     assert моя.inspection.id == своя
     assert моя.inspection.tenant_code == АРЕНДАТОР_А
@@ -88,27 +100,27 @@ def test_чужая_проверка_не_отдаёт_и_своих_наход�
     """Отказ обязан быть целым: ни шапки чужой проверки, ни её находок."""
     чужая = _проверка(303, арендатор=АРЕНДАТОР_Б, текст="чужая находка", находок=2)
 
-    assert get_inspection(чужая, tenant=АРЕНДАТОР_А) is None
+    assert get_inspection(чужая, reach=own_reach(АРЕНДАТОР_А)) is None
 
 
 def test_несуществующий_идентификатор_это_пусто_а_не_поломка(domain_env: Path, db_env: str) -> None:
     """Ненайденная проверка — законный ответ `None`, а не исключение."""
-    assert get_inspection(str(uuid.uuid4()), tenant=АРЕНДАТОР_А) is None
+    assert get_inspection(str(uuid.uuid4()), reach=own_reach(АРЕНДАТОР_А)) is None
 
 
 # --- находки точки -----------------------------------------------------------
 
 
 def test_находки_точки_не_отдают_чужого_арендатора(domain_env: Path, db_env: str) -> None:
-    """Одинаковое название точки у двух арендаторов — самый вероятный случай.
+    """Одна пиццерия, два проверяющих — самый вероятный случай при одном справочнике.
 
-    «Белград-1» есть и у управляющей компании, и у партнёра: фильтр только по
-    названию склеил бы находки двух разных пиццерий в один список нарушений.
+    «Белград-1» из страны партнёра проверяет и УК (D289): фильтр только по
+    названию склеил бы находки своего пространства и чужого в один список.
     """
-    _проверка(304, арендатор=АРЕНДАТОР_Б, точка="Белград-1", текст="чужая находка")
     своя = _проверка(305, арендатор=АРЕНДАТОР_А, точка="Белград-1", текст="своя находка")
+    _проверка(304, арендатор="HQ", точка="Белград-1", текст="чужая находка")
 
-    находки = findings_by_unit(tenant=АРЕНДАТОР_А, unit="Белград-1")
+    находки = findings_by_unit(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1")
 
     assert [запись.inspection_id for запись in находки] == [своя]
     assert {запись.text for запись in находки} == {"своя находка"}, (
@@ -138,24 +150,24 @@ def test_пустой_арендатор_это_отказ_а_не_пустая_
 ) -> None:
     """Пустая строка не совпала бы ни с чем: ошибка вызывающего выглядела бы
     как «такой проверки нет» и «нарушений у точки нет»."""
-    with pytest.raises(DbError, match="рендатор"):
-        get_inspection(str(uuid.uuid4()), tenant=пустой)
-    with pytest.raises(DbError, match="рендатор"):
-        findings_by_unit(tenant=пустой, unit="Белград-1")
+    with pytest.raises(DbError, match="охват"):
+        get_inspection(str(uuid.uuid4()), reach=own_reach(пустой))
+    with pytest.raises(DbError, match="охват"):
+        findings_by_unit(reach=own_reach(пустой), unit="Белград-1")
 
 
 def test_у_находок_есть_предел_и_он_настраивается(domain_env: Path, db_env: str) -> None:
     _проверка(306, арендатор=АРЕНДАТОР_А, точка="Белград-1", находок=3)
 
-    assert len(findings_by_unit(tenant=АРЕНДАТОР_А, unit="Белград-1")) == 3
-    assert len(findings_by_unit(tenant=АРЕНДАТОР_А, unit="Белград-1", limit=2)) == 2
+    assert len(findings_by_unit(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1")) == 3
+    assert len(findings_by_unit(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1", limit=2)) == 2
 
 
 @pytest.mark.parametrize("предел", [0, -1, MAX_LIMIT + 1])
 def test_бессмысленный_предел_находок_это_отказ(domain_env: Path, db_env: str, предел: int) -> None:
     """Ноль вернул бы пустоту, а миллион — полный проход под видом предела."""
     with pytest.raises(DbError, match="редел"):
-        findings_by_unit(tenant=АРЕНДАТОР_А, unit="Белград-1", limit=предел)
+        findings_by_unit(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1", limit=предел)
 
 
 @pytest.mark.parametrize("пустая", ["", "   "])
@@ -163,7 +175,7 @@ def test_пустое_название_точки_это_отказ(domain_env: 
     """Пустое название вернуло бы пустой список нарушений — то есть «у этой
     точки всё хорошо» вместо «вы не назвали точку»."""
     with pytest.raises(DbError, match="очк"):
-        findings_by_unit(tenant=АРЕНДАТОР_А, unit=пустая)
+        findings_by_unit(reach=own_reach(АРЕНДАТОР_А), unit=пустая)
 
 
 # --- план запроса ------------------------------------------------------------
@@ -235,7 +247,7 @@ def test_находки_точки_идут_по_индексу_а_не_полн
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
         cur.execute(
             "explain " + _FINDINGS_BY_UNIT_SQL,
-            {"tenant": АРЕНДАТОР_А, "unit": "точка 7", "limit": 100},
+            {**own_reach(АРЕНДАТОР_А).params(), "unit": "точка 7", "limit": 100},
         )
         план = "\n".join(строка[0] for строка in cur.fetchall())
 

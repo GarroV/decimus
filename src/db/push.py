@@ -298,6 +298,46 @@ def _push_info(cur: psycopg.Cursor[Any], inspection: Inspection, *, inspection_i
         место += 1
 
 
+def _unit_of_inspection(
+    conn: psycopg.Connection[Any],
+    cur: psycopg.Cursor[Any],
+    inspection: Inspection,
+    *,
+    tenant_code: str,
+) -> Any:
+    """Точка проверки: из справочника, а у УК — и заведённая по названию.
+
+    Сначала справочник и карта синонимов (T092): «БГ2», введённое на бегу,
+    обязано лечь в ту же точку, что «Белград 2», — иначе у одной пиццерии
+    заводятся две несвязанные истории, а история точки и есть то, ради чего
+    проверки складываются в базу (D035).
+
+    Партнёр ищет точку в справочнике УК и точек не заводит (D234, D284, #471):
+    справочник у сети один. Не нашлось — отказ, а не новая пиццерия. Страну
+    точки сверяет сторож схемы (миграция 0030): точка чужой страны даёт отказ
+    базы, и он уходит наружу `PushError`, как прочие отказы слива.
+
+    УК, не найдя точку, заводит её по нормализованному названию, как и раньше:
+    справочник может быть не заполнен, и это не повод отказать в сливе.
+    """
+    if tenant_code != HQ_TENANT:
+        unit_id = resolve_unit_id(conn, inspection.unit, tenant=HQ_TENANT)
+        if unit_id is None:
+            raise PushError(
+                f"Пиццерии «{inspection.unit}» нет в справочнике страны пространства "
+                f"{tenant_code}. Новую пиццерию заводит только УК (D234)"
+            )
+        return unit_id
+    unit_id = resolve_unit_id(conn, inspection.unit, tenant=tenant_code)
+    if unit_id is None:
+        cur.execute(
+            _UPSERT_UNIT_SQL,
+            (tenant_code, inspection.unit, normalize_unit_name(inspection.unit)),
+        )
+        unit_id = _require_row(cur)[0]
+    return unit_id
+
+
 def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) -> str:
     tenant_code = _tenant_code(inspection)
     fingerprint = compute_fingerprint(inspection, result, tenant_code=tenant_code)
@@ -318,19 +358,7 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                 return str(row[0])
 
         cur.execute(_INSERT_TENANT_SQL, (tenant_code,))
-        # Сначала справочник и карта синонимов (T092): «БГ2», введённое на
-        # бегу, обязано лечь в ту же точку, что «Белград 2», — иначе у одной
-        # пиццерии заводятся две несвязанные истории, а история точки и есть
-        # то, ради чего проверки складываются в базу (D035). Не нашлось —
-        # точка заводится по нормализованному названию, как и раньше: справочник
-        # может быть не заполнен, и это не повод отказать в сливе на точке.
-        unit_id = resolve_unit_id(conn, inspection.unit, tenant=tenant_code)
-        if unit_id is None:
-            cur.execute(
-                _UPSERT_UNIT_SQL,
-                (tenant_code, inspection.unit, normalize_unit_name(inspection.unit)),
-            )
-            unit_id = _require_row(cur)[0]
+        unit_id = _unit_of_inspection(conn, cur, inspection, tenant_code=tenant_code)
 
         cur.execute(
             _INSERT_INSPECTION_SQL,

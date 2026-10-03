@@ -27,6 +27,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
 from .errors import PushError
+from .reach import Reach, require_reach
 from .units import normalize_unit_name
 
 #: Арендатор по умолчанию — то же значение, что у `push.DEFAULT_TENANT` и у
@@ -57,7 +58,9 @@ select u.id, u.name, u.code, coalesce(array_agg(a.alias order by a.alias)
        filter (where a.alias is not null), '{}'), u.country, u.city
 from units u
 left join unit_aliases a on a.unit_id = u.id
-where u.tenant_code = %s and (%s::text is null or u.country = %s)
+where u.tenant_code = 'HQ'
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(country)s::text is null or u.country = %(country)s)
 group by u.id, u.name, u.code, u.country, u.city
 order by u.country nulls last, u.city nulls last, u.name
 """
@@ -174,20 +177,23 @@ def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
     return _row_to_unit(row, aliases)
 
 
-def list_units(*, tenant: str = DEFAULT_TENANT, country: str | None = None) -> list[Unit]:
-    """Справочник арендатора с синонимами, целиком или одной страной.
+def list_units(*, reach: Reach, country: str | None = None) -> list[Unit]:
+    """Справочник в охвате читающего с синонимами, целиком или одной страной.
+
+    Справочник у сети один — у УК (D284): партнёр видит его точки своих стран,
+    УК — все. Своих точек у партнёра нет, и заводить их продукт не даёт.
 
     `country` — код ISO 3166-1 alpha-2; регистр приводится здесь, потому что
     код приходит из адреса страницы и от человека, а в базе он лежит в одном
     виде. Точки без страны в страновой срез не попадают — и это верно: «страна
     не проставлена» не значит «страна эта».
     """
-    tenant = canonical_tenant(tenant)
+    охват = require_reach(reach)
     settings = check_environment()
     код = (country or "").strip().upper() or None
     try:
         with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_SELECT_UNITS_SQL, (tenant, код, код))
+            cur.execute(_SELECT_UNITS_SQL, {**охват.params(), "country": код})
             rows = cur.fetchall()
     except psycopg.Error as exc:
         raise PushError(f"Справочник точек недоступен ({type(exc).__name__}): {exc}") from exc

@@ -30,6 +30,7 @@ from src.db.config import load_storage_settings  # noqa: E402
 from src.db.errors import ConfigError, PushError, StorageError  # noqa: E402
 from src.db.photos import upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.db.storage import S3PhotoStorage, StorageSettings, object_key  # noqa: E402
 from src.domain import add_finding, attach_photo, start_inspection  # noqa: E402
 
@@ -316,15 +317,17 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
         def get(self, key: str) -> bytes:
             return склад.положено[key]
 
-    assert finding_previews(inspection_id, tenant=str(tenant)) == {
+    assert finding_previews(inspection_id, reach=own_reach(str(tenant))) == {
         str(finding_id): (str(photo_id),)
     }
     assert (
-        preview_bytes(inspection_id, str(photo_id), tenant=str(tenant), storage=Читатель())
+        preview_bytes(
+            inspection_id, str(photo_id), reach=own_reach(str(tenant)), storage=Читатель()
+        )
         == склад.положено[ключ]
     )
-    assert finding_previews(inspection_id, tenant="someone-else") == {}
-    assert preview_bytes(inspection_id, str(photo_id), tenant="someone-else") is None
+    assert finding_previews(inspection_id, reach=own_reach("someone-else")) == {}
+    assert preview_bytes(inspection_id, str(photo_id), reach=own_reach("someone-else")) is None
 
 
 def test_кадр_не_картинка_ложится_как_есть_а_копии_у_него_нет(

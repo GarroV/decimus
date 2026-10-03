@@ -22,12 +22,14 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import пространства_для_теста, точка_пространства
 
 pytest.importorskip("psycopg")
 
 from src.db.push import push_inspection
 from src.db.queries import MAX_LIMIT
 from src.db.queries import list_inspections as db_list_inspections
+from src.db.reach import own_reach
 from src.domain import add_finding, score, start_inspection
 from src.mcp.errors import ToolError
 from src.mcp.tools import (
@@ -39,8 +41,16 @@ from src.mcp.tools import (
 
 pytestmark = requires_db
 
-АРЕНДАТОР_А = "партнёр-а"
-АРЕНДАТОР_Б = "партнёр-б"
+# Коды пространств совпадают с кодами их стран (волна 1, D284): точки партнёров
+# заводятся в справочнике УК этой страны, пространства привязаны к ней.
+АРЕНДАТОР_А = "GE"
+АРЕНДАТОР_Б = "AM"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    пространства_для_теста(request, АРЕНДАТОР_А, АРЕНДАТОР_Б)
+
 
 #: Один пункт в одной зоне движок принимает один раз, поэтому несколько
 #: находок разводятся по зонам, а не повторяют одну и ту же запись. Код для них
@@ -58,6 +68,7 @@ def _проверка(
     находок: int = 1,
 ) -> str:
     """Завершённая проверка нужного арендатора через официальный контракт домена."""
+    точка_пространства(точка, tenant=арендатор)
     start_inspection(
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор, date=дата
     )
@@ -83,9 +94,13 @@ def test_список_не_отдаёт_проверки_чужого_аренд
 
 
 def test_одноимённая_точка_двух_арендаторов_не_склеивается(domain_env: Path, db_env: str) -> None:
-    """«Белград-1» есть и у управляющей компании, и у партнёра."""
+    """«Белград-1» из страны партнёра проверяют и УК, и партнёр (D284, один справочник).
+
+    Охват здесь — свой тенант (мост до задачи 6): проверки УК той же точки в
+    выдачу партнёра не попадают, и склейки двух историй нет.
+    """
     id_а = _проверка(203, арендатор=АРЕНДАТОР_А, точка="Белград-1")
-    _проверка(204, арендатор=АРЕНДАТОР_Б, точка="Белград-1")
+    _проверка(204, арендатор="HQ", точка="Белград-1")
 
     свои = list_inspections(tenant=АРЕНДАТОР_А, unit="Белград-1")
     история = unit_history(tenant=АРЕНДАТОР_А, unit="Белград-1")
@@ -155,10 +170,12 @@ def test_сводка_не_выводит_новых_чисел_об_оценк�
 
     сводка = network_summary(tenant=АРЕНДАТОР_А)
 
-    записанные = {строка.pct for строка in db_list_inspections(tenant=АРЕНДАТОР_А)}
+    записанные = {строка.pct for строка in db_list_inspections(reach=own_reach(АРЕНДАТОР_А))}
     assert сводка["best"]["pct"] in записанные
     assert сводка["worst"]["pct"] in записанные
-    записанные_буквы = {строка.grade for строка in db_list_inspections(tenant=АРЕНДАТОР_А)}
+    записанные_буквы = {
+        строка.grade for строка in db_list_inspections(reach=own_reach(АРЕНДАТОР_А))
+    }
     assert set(сводка["grades"]) <= записанные_буквы
     выдуманные = {"average", "avg", "mean", "average_pct", "grade", "network_grade", "trend"}
     assert not выдуманные & set(сводка), f"в сводке появилось выведенное число: {сводка.keys()}"
@@ -359,7 +376,7 @@ def test_письмо_собирается_по_записанной_прове�
     """Проверка уже завершена и слита, состояния чата под неё больше нет —
     письмо собирается из записанного, и оценка в нём та, что записал движок."""
     ident = _проверка(230, арендатор=АРЕНДАТОР_А, точка="Белград-1")
-    записано = db_list_inspections(tenant=АРЕНДАТОР_А, unit="Белград-1")[0]
+    записано = db_list_inspections(reach=own_reach(АРЕНДАТОР_А), unit="Белград-1")[0]
 
     ответ = inspection_letter(tenant=АРЕНДАТОР_А, id=ident)
 
