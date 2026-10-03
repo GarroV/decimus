@@ -31,7 +31,7 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.tenants import canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
 from . import accounts, assets, auth, letter_draft, pricing, view
@@ -236,7 +236,7 @@ def _checklist_names(lang: str) -> dict[str, str]:
     if state.store is None:
         return {}
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused:
         return {}
     return {
@@ -1447,7 +1447,14 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             return _render_methodology(conf, notice=None, failure=None)
         try:
             # Публикуется версия ПОКАЗАННОГО чек-листа, а не корня хранилища (#382).
-            склад = method.store_for(state.store, _который(request))
+            склад = method.store_for(
+                state.store,
+                _который(request),
+                tenant=auth.current_tenant(),
+                space=_которое_пространство(request),
+                write=True,
+                lang=_lang(conf),
+            )
             опубликована = method.publish_version(
                 склад, tenant=auth.current_tenant(), version=version
             )
@@ -1489,6 +1496,13 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
+        if auth.current_tenant() != HQ_TENANT:
+            # Чек-листы заводит УК (D283): у партнёра заведения нет — он
+            # работает по эталону и читает его.
+            отказ_заведения = t("methodology.etalon_readonly", _lang(conf))
+            if с_методики:
+                return _render_methodology(conf, notice=None, failure=отказ_заведения, panel="new")
+            return _render_checklists(conf, notice=None, failure=отказ_заведения)
         try:
             заведён = method.create_checklist(
                 state.store,
@@ -1523,6 +1537,8 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 tenant=auth.current_tenant(),
                 author=_author(conf),
                 code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
                 state=(request.form.get("state") or "").strip(),
             )
         except MethodologyRefused as отказ:
@@ -1546,6 +1562,8 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 tenant=auth.current_tenant(),
                 author=_author(conf),
                 code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
                 on=request.form.get("on") == "1",
             )
         except MethodologyRefused as отказ:
@@ -1567,7 +1585,17 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return render_template("methodology/unset.html", missing=state.missing)
-        целевое = method.store_for(state.store, code)
+        try:
+            целевое = method.store_for(
+                state.store,
+                code,
+                tenant=auth.current_tenant(),
+                space=_которое_пространство(request),
+                write=False,
+                lang=_lang(conf),
+            )
+        except MethodologyRefused as отказ:
+            return _render_checklists(conf, notice=None, failure=str(отказ))
         return render_template(
             "methodology/apply.html",
             code=code,
@@ -1583,7 +1611,12 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             return _render_checklists(conf, notice=None, failure=None)
         try:
             итог = method.apply_checklist(
-                state.store, tenant=auth.current_tenant(), author=_author(conf), code=code
+                state.store,
+                tenant=auth.current_tenant(),
+                author=_author(conf),
+                code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(conf, notice=None, failure=str(отказ))
@@ -1605,7 +1638,7 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
     if state.store is None:
         return render_template("methodology/unset.html", missing=state.missing)
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
         return render_template(
             "methodology/checklists.html",
@@ -1641,6 +1674,16 @@ def _который(запрос: Any) -> str | None:
     return (запрос.args.get("checklist") or "").strip() or None
 
 
+def _которое_пространство(запрос: Any) -> str | None:
+    """Пространство чек-листа из адреса (`?space=`) — УК открывает чек-лист партнёра.
+
+    Не названо — `None`: чек-лист ищется в своём пространстве, а у партнёра
+    следом в эталоне (`checklist_layout.locate`). Чужое пространство в адресе
+    не открывает ничего: `locate` сверяет его с тем, что вошедшему видно.
+    """
+    return (запрос.args.get("space") or "").strip() or None
+
+
 def _author(conf: Settings) -> str:
     """Кто правит — для журнала хранилища.
 
@@ -1659,7 +1702,15 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
     if state.store is None:
         return _Итог()
     try:
-        правка = действие(method.store_for(state.store, _который(request)), _author(conf))
+        склад = method.store_for(
+            state.store,
+            _который(request),
+            tenant=auth.current_tenant(),
+            space=_которое_пространство(request),
+            write=True,
+            lang=_lang(conf),
+        )
+        правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
         return _Итог(failure=str(отказ))
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
@@ -1702,17 +1753,26 @@ def _render_methodology(
     lang = _lang(conf)
     попросили = (request.args.get("version") or "").strip() or None
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
         перечень, failure = [], failure or str(отказ)
     код = _который_показан(перечень, _который(request))
     try:
-        колонка = method.checklist_rail(state.store, перечень)
+        колонка = method.checklist_rail(state.store, перечень, tenant=auth.current_tenant())
     except MethodologyRefused:
         колонка = ()
     try:
-        склад = method.store_for(state.store, код)
+        склад = method.store_for(
+            state.store,
+            код,
+            tenant=auth.current_tenant(),
+            space=_которое_пространство(request),
+            write=False,
+            lang=lang,
+        )
     except MethodologyRefused as отказ:
+        # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
+        # который виден всем (D283): пустой экран читался бы как поломка.
         склад, failure = state.store, failure or str(отказ)
     try:
         состав = method.load_composition(склад, tenant=auth.current_tenant(), version=попросили)
@@ -1744,6 +1804,7 @@ def _render_methodology(
         """
         параметры = {
             "checklist": (код or "") if _который(request) else "",
+            "space": _которое_пространство(request) or "",
             "version": попросили or "",
             "q": отбор.q,
             "level": отбор.level,
@@ -1760,6 +1821,7 @@ def _render_methodology(
         """Адрес формы: несёт тот же чек-лист и отбор, чтобы итог лёг на тот же экран."""
         параметры = {
             "checklist": код or "",
+            "space": _которое_пространство(request) or "",
             "q": отбор.q,
             "level": отбор.level,
             "zone": отбор.zone,
@@ -1822,6 +1884,9 @@ def _render_methodology(
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.
         rail=колонка,
+        # Своё пространство вошедшего: ссылки на чек-листы другого пространства
+        # несут его в адресе, а переключатели бота — только у своих (D283).
+        own_space=method.own_space(auth.current_tenant()),
         picking=not _который(request),
         checklist_code=код,
         needs_name=method.needs_set_name(состав),
