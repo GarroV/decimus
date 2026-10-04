@@ -105,6 +105,9 @@ def install(app: Flask, conf: Settings) -> None:
             return render_template("users/forbidden.html"), 403
 
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
+        if detail.inspection.on_review:
+            # Непринятая проверка (D199) — письмо не фиксируется и в почту не уходит.
+            return к_письму(inspection_id, lang=письмо_на, исход="on_review")
         текст = request.form.get("text") or ""
         вошедший = auth.current_account()
 
@@ -200,6 +203,10 @@ def install(app: Flask, conf: Settings) -> None:
             # Черновик письма — запись от имени пространства: по проверке,
             # которую вошедший только читает (D283), — отказ.
             return render_template("users/forbidden.html"), 403
+        if detail.inspection.on_review:
+            # Возврат от Google — второй вход в ту же запись, его можно позвать
+            # и руками: непринятая проверка (D199) черновика не получает и здесь.
+            return к_письму(inspection_id, lang=письмо_на, исход="on_review")
 
         # Из ЗАФИКСИРОВАННОГО письма, а не из заготовки: заготовка
         # пересобирается и к этому моменту могла бы дать другой текст, чем

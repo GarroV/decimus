@@ -314,6 +314,9 @@ def test_письмо_открывается_и_у_ждущей_приёмки(
     # Act
     ответ = стенд.get("/inspections/x/letter")
 
-    # Assert
+    # Assert — смотреть можно; отказ сохранения и почты объясняется словами.
     assert ответ.status_code == 200
     assert "Your inspection scored 92%." in ответ.get_data(as_text=True)
+    for отказ in ("saved=on_review", "gmail=on_review"):
+        страница = стенд.get(f"/inspections/x/letter?{отказ}").get_data(as_text=True)
+        assert "Проверка ещё не подтверждена" in страница, отказ

@@ -694,6 +694,16 @@ TEXTS: dict[str, dict[str, str]] = {
     # (Q010, D035), письмо уходит из почты руками. Кнопка отвечает на «вот
     # текст, который мы считаем отправленным», и обещать большее ей нельзя.
     "letter.save.submit": {"ru": "Сохранить изменения", "en": "Save changes"},
+    "letter.on_review": {
+        "ru": (
+            "Проверка ещё не подтверждена — письмо можно смотреть, но не сохранить "
+            "и не отправить в Gmail, пока проверку не примут"
+        ),
+        "en": (
+            "The inspection is not accepted yet — the letter can be viewed, but not "
+            "saved or sent to Gmail until the inspection is accepted"
+        ),
+    },
     "letter.save.ok": {
         "ru": "Письмо сохранено — теперь видно, какой текст ушёл партнёру",
         "en": "Letter saved — the text sent to the partner is now on record",
