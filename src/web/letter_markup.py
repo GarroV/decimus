@@ -240,18 +240,9 @@ class _Cleaner(HTMLParser):
         self._out.append(_escape_text(data))
         self._at_line_start = data.endswith("\n")
 
-    # Комментарии, `<!DOCTYPE>`, `<?…?>`, `<![CDATA[…]]>` — не текст письма.
-    def handle_comment(self, data: str) -> None:
-        return
-
-    def handle_decl(self, decl: str) -> None:
-        return
-
-    def handle_pi(self, data: str) -> None:
-        return
-
-    def unknown_decl(self, data: str) -> None:
-        return
+    # Комментарии, `<!DOCTYPE>`, `<?…?>`, `<![CDATA[…]]>` не переопределены
+    # намеренно: у `HTMLParser` их обработчики ничего не делают, то есть в
+    # вывод они не попадают — это и нужно (проверено тестом).
 
     def result(self) -> str:
         self.close()

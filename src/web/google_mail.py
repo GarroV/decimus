@@ -34,6 +34,7 @@ from src.web.google_auth import (
     TOKEN_ENDPOINT,
     GoogleSettings,
 )
+from src.web.letter_markup import to_email_html, to_plain
 
 #: Право завести черновик и ничего больше: ни чтения ящика, ни отправки.
 #: `gmail.modify` и `https://mail.google.com/` тоже подошли бы — и оба дают
@@ -119,9 +120,17 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
     return " · ".join(часть for часть in части if часть)
 
 
-def mime_message(*, to: str, subject: str, body: str) -> str:
-    """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
-    if not body.strip():
+def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
+    """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
+
+    `body` — разметка письма (`src/web/letter_markup.py`), и чистится она
+    ЗДЕСЬ, а не только при сохранении: запись могла лечь в базу в обход
+    экрана, и в почту партнёра не уезжает ничего, что не прошло белый список.
+    Ту же сборку берёт выгрузка файлом — у двух выходов одного письма одна
+    сборка, иначе их вид разошёлся бы молча.
+    """
+    текст = to_plain(body)
+    if not текст.strip():
         raise GoogleMailError("письмо пустое — черновик не заводится")
 
     письмо = EmailMessage()
@@ -134,8 +143,16 @@ def mime_message(*, to: str, subject: str, body: str) -> str:
     # неотправляемым, поэтому его просто нет.
     if to.strip():
         письмо["To"] = to.strip()
-    письмо.set_content(body)
+    # Текстовая часть первой: по RFC 2046 части `alternative` идут от простой
+    # к богатой, и клиент показывает последнюю, которую умеет.
+    письмо.set_content(текст)
+    письмо.add_alternative(to_email_html(body), subtype="html")
+    return письмо
 
+
+def mime_message(*, to: str, subject: str, body: str) -> str:
+    """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
+    письмо = letter_message(to=to, subject=subject, body=body)
     return base64.urlsafe_b64encode(письмо.as_bytes()).decode().rstrip("=")
 
 

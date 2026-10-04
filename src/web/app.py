@@ -35,7 +35,7 @@ from src.domain.kinds import kind_title
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
-from . import accounts, assets, auth, letter_draft, pricing, view
+from . import accounts, assets, auth, letter_draft, letter_markup, pricing, view
 from . import country as country_data
 from . import inspections as data
 from . import methodology as method
@@ -45,6 +45,7 @@ from . import unit_card as unit_data
 from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
+from .google_mail import GoogleMailError, draft_subject, letter_message
 from .icons import icon
 from .origin import refuse_foreign_origin
 from .sections import (
@@ -127,6 +128,10 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Страна и город в справочнике — коды; на экран они идут словом.
             "city_title": lambda code: city_title(code, lang),
             "country_title": lambda code: country_title(code, lang),
+            # Письмо партнёру выводится разметкой ТОЛЬКО через белый список, и
+            # чистится в момент вывода: запись в базе не принимается на слово.
+            # Шаблон ставит `|safe` строго на результат этой функции.
+            "letter_html": letter_markup.sanitize,
             # Разделы ОТФИЛЬТРОВАНЫ по роли, а не спрятаны разметкой:
             # ссылка, ведущая в отказ, выглядит как поломка продукта, а
             # проверка внутри шаблона расходится с заслоном на экране молча.
@@ -891,14 +896,25 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # зафиксированное письмо остаётся на месте и остаётся видно, кем и
         # когда оно записано. Новая правка ложится новой записью.
         показать_заготовку = request.args.get("draft") == "1"
+        # Поле правит РАЗМЕТКУ письма (`letter_markup`): заготовка движка —
+        # простой текст и становится разметкой экранированием, записанное
+        # письмо уже разметка и проходит белый список заново.
+        правится = записанное is not None and not показать_заготовку
+        разметка = (
+            letter_markup.sanitize(записанное.body)
+            if правится and записанное is not None
+            else letter_markup.from_plain(собранное.text or "")
+        )
         return render_template(
             "inspections/letter.html",
             letter=собранное,
+            letter_markup=разметка,
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
             own=_own(detail),
             save_outcome=request.args.get("saved"),
+            export_outcome=request.args.get("export"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
             letter_langs=data.LETTER_LANGS,
@@ -908,7 +924,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{section('registry').path}/<inspection_id>/letter")
-    def export_letter(inspection_id: str) -> FlaskResponse | tuple[str, int]:
+    def export_letter(inspection_id: str) -> FlaskResponse | Response | tuple[str, int]:
         refuse_foreign_origin()
         # Проверка существует и принадлежит этому арендатору — спрашивается
         # ДО того, как что-то отдаётся. Иначе страница выгрузки превратилась
@@ -919,8 +935,31 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return render_template("inspections/not_found.html"), 404
         if not _own(head):
             return render_template("users/forbidden.html"), 403
-        текст = request.form.get("text") or ""
-        return _letter_file(текст, inspection_id)
+        разметка = letter_markup.sanitize(request.form.get("text") or "")
+        письмо_на = request.form.get("letter_lang") or head.inspection.report_lang
+        try:
+            письмо = letter_message(
+                to=head.inspection.contact,
+                subject=draft_subject(
+                    city=head.inspection.city,
+                    date=str(head.inspection.inspection_date),
+                    lang=письмо_на,
+                ),
+                body=разметка,
+            )
+        except GoogleMailError:
+            # Пустое письмо файлом не отдаётся: скачанный пустой файл выглядит
+            # письмом ровно до того, как его откроют.
+            return redirect(
+                url_for(
+                    "letter", inspection_id=inspection_id, letter_lang=письмо_на, export="empty"
+                ),
+                code=303,
+            )
+        # Просьба к почтовому клиенту открыть файл как неотправленное письмо,
+        # а не как пришедшее (понимают Outlook и Thunderbird).
+        письмо["X-Unsent"] = "1"
+        return _letter_file(письмо.as_bytes(), inspection_id)
 
     @app.post(f"{section('registry').path}/<inspection_id>/letter/save")
     def save_letter(inspection_id: str) -> Response | FlaskResponse | tuple[str, int] | str:
@@ -2099,21 +2138,25 @@ def _methodology_picks(
     )
 
 
-def _letter_file(text: str, inspection_id: str) -> FlaskResponse:
-    """Правленое письмо — файлом, который человек приложит к почте.
+def _letter_file(eml: bytes, inspection_id: str) -> FlaskResponse:
+    """Правленое письмо — файлом `.eml`, который открывается почтой как письмо.
+
+    Внутри та же сборка, что у черновика Google (`letter_message`): HTML-часть
+    с форматированием и честная текстовая. `X-Unsent: 1` просит почтовый
+    клиент открыть файл как неотправленное письмо, а не как пришедшее.
 
     Отправки из системы нет и в этой задаче не заводится: письмо формируется в
     почте и отправляется человеком руками (Q010, D035). Выгрузка — ровно мост
     между экраном и почтой, а не тихое начало собственной рассылки.
 
     Текст приезжает от человека и уезжает ему же обратно, поэтому отдаётся
-    вложением, простым текстом и с запретом угадывать тип: без этого браузер
+    вложением, прошедшим белый список разметки, и с запретом угадывать тип: без этого браузер
     вправе показать присланное как страницу с адреса самой админки.
     """
     # `mimetype`, а не готовый `Content-Type`: кодировку Flask дописывает сам, и
     # написанная здесь вручную уехала бы в заголовок дважды
     # (`text/plain; charset=utf-8; charset=utf-8` — поймано смоуком снаружи).
-    ответ = FlaskResponse(text, mimetype="text/plain")
+    ответ = FlaskResponse(eml, mimetype="message/rfc822")
     ответ.headers["Content-Disposition"] = f'attachment; filename="{_letter_name(inspection_id)}"'
     ответ.headers["X-Content-Type-Options"] = "nosniff"
     return ответ
@@ -2153,7 +2196,7 @@ def _letter_name(inspection_id: str) -> str:
     строки в нём — это уже не имя файла, а дописанный заголовок.
     """
     чистое = "".join(знак for знак in inspection_id if знак.isalnum() or знак in "-_")[:64]
-    return f"letter-{чистое or 'inspection'}.txt"
+    return f"letter-{чистое or 'inspection'}.eml"
 
 
 def _kind_title(code: str, lang: str) -> str:
