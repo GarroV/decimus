@@ -11,6 +11,35 @@
 #}{% extends "base.html" %}
 {% block title %}{{ head.unit_name }}{% endblock %}
 
+{% macro revise_form(finding) %}
+  {# Форма правки записи на приёмке (D200). Одна на запись в чек-листе и на
+     запись вне его: запись, перенесённую в необычную зону, иначе нельзя было
+     бы поправить обратно. #}
+  <details class="review-revise">
+    <summary class="field-note">{{ t('revise.open', n=finding.n) }}</summary>
+    <form method="post" class="stack mt-gap"
+          action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
+      <label><span class="field-label">{{ t('revise.item') }}</span>
+        <select class="input" name="code">
+          {% for code, question in sheet.catalogue %}
+            <option value="{{ code }}"{% if code == finding.code %} selected{% endif %}>{{ code }} — {{ question }}</option>
+          {% endfor %}
+        </select></label>
+      <label><span class="field-label">{{ t('revise.level') }}</span>
+        <select class="input" name="level">
+          {% for lvl in levels %}<option{% if lvl == finding.level %} selected{% endif %}>{{ lvl }}</option>{% endfor %}
+        </select></label>
+      <label><span class="field-label">{{ t('revise.zone') }}</span>
+        <select class="input" name="zone">
+          {% for z in sheet.zones %}<option value="{{ z.code }}"{% if z.code == finding.zone %} selected{% endif %}>{{ z.name }}</option>{% endfor %}
+        </select></label>
+      <label><span class="field-label">{{ t('revise.text') }}</span>
+        <textarea class="input" name="text" required maxlength="1000" rows="2" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
+      <p class="field-note">{{ t('revise.hint') }}</p>
+      <button class="btn" type="submit">{{ t('revise.submit') }}</button>
+    </form>
+  </details>
+{% endmacro %}
 {% block body %}
   <div class="row row--tight row--between">
     <a class="back" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
@@ -222,6 +251,7 @@
           <div class="note__title">{{ t('review.sheet.unplaced', count=sheet.unplaced|length) }}</div>
           {% for finding in sheet.unplaced %}
             <div class="note__text">{{ finding.n }} · {{ finding.code }} · {{ finding.zone }} — <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></div>
+            {% if may_revise %}{{ revise_form(finding) }}{% endif %}
           {% endfor %}
         </div></div>
       {% endif %}
@@ -245,32 +275,7 @@
                 <span class="find-row__meta">{{ item.code }}</span>
                 {% for finding in item.findings %}
                   <span class="find-row__meta">{{ finding.n }} · <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></span>
-                  {% if may_revise %}
-                    <details class="review-revise">
-                      <summary class="field-note">{{ t('revise.open', n=finding.n) }}</summary>
-                      <form method="post" class="stack mt-gap"
-                            action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
-                        <label><span class="field-label">{{ t('revise.item') }}</span>
-                          <select class="input" name="code">
-                            {% for code, question in sheet.catalogue %}
-                              <option value="{{ code }}"{% if code == finding.code %} selected{% endif %}>{{ code }} — {{ question }}</option>
-                            {% endfor %}
-                          </select></label>
-                        <label><span class="field-label">{{ t('revise.level') }}</span>
-                          <select class="input" name="level">
-                            {% for lvl in levels %}<option{% if lvl == finding.level %} selected{% endif %}>{{ lvl }}</option>{% endfor %}
-                          </select></label>
-                        <label><span class="field-label">{{ t('revise.zone') }}</span>
-                          <select class="input" name="zone">
-                            {% for z in sheet.zones %}<option value="{{ z.code }}"{% if z.code == finding.zone %} selected{% endif %}>{{ z.name }}</option>{% endfor %}
-                          </select></label>
-                        <label><span class="field-label">{{ t('revise.text') }}</span>
-                          <textarea class="input" name="text" required maxlength="1000" rows="2" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
-                        <p class="field-note">{{ t('revise.hint') }}</p>
-                        <button class="btn" type="submit">{{ t('revise.submit') }}</button>
-                      </form>
-                    </details>
-                  {% endif %}
+                  {% if may_revise %}{{ revise_form(finding) }}{% endif %}
                   {% for photo_id in photos.get(finding.id, ()) %}
                     <a href="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
                       <img class="review-photo" src="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}"
