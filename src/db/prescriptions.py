@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 import uuid
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -137,6 +138,11 @@ def check_draft(draft: Draft, *, on: date) -> Draft:
         raise PrescriptionError("Нет темы письма")
     if len(тема) > MAX_SUBJECT:
         raise PrescriptionError(f"Тема длиннее {MAX_SUBJECT} знаков")
+    if any(unicodedata.category(ch) == "Cc" for ch in тема):
+        # Тема уходит заголовком письма: перевод строки в ней — подмена заголовков.
+        raise PrescriptionError(
+            "В теме письма перевод строки или служебный знак — тема одной строкой"
+        )
     if not текст:
         raise PrescriptionError("Нет текста письма — вставьте его")
     if len(текст) > MAX_BODY:

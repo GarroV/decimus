@@ -43,7 +43,9 @@ create table prescriptions (
     due_on date not null,
     -- Адреса через запятую, как их вписал сотрудник; на отправке не пусто.
     recipients text not null default '' check (length(recipients) <= 2000),
-    subject text not null check (length(btrim(subject)) between 1 and 300),
+    -- Без управляющих знаков: тема уходит заголовком письма, CR/LF в ней — подмена заголовков.
+    subject text not null check (length(btrim(subject)) between 1 and 300
+                                 and subject !~ '[[:cntrl:]]'),
     body text not null check (length(btrim(body)) between 1 and 20000),
     status text not null default 'draft' check (status in ('draft', 'issued', 'closed')),
     created_by text not null check (length(btrim(created_by)) > 0),
@@ -72,6 +74,8 @@ create table prescriptions (
 create index prescriptions_open_idx on prescriptions (due_on, created_at)
     where status <> 'closed';
 create index prescriptions_country_idx on prescriptions (country, created_at);
+-- Закрытые (`prescriptions._CLOSED_SQL`): свежие сверху, по частичному индексу.
+create index prescriptions_closed_idx on prescriptions (closed_at desc) where status = 'closed';
 
 -- Пиццерии предписания. Пусто — вся страна.
 create table prescription_units (
@@ -139,6 +143,30 @@ comment on table prescription_events is
 comment on table country_recipients is
     'Адресаты предписаний страны, запомненные на последней отправке (D275).';
 
+-- ── Замок предписания ───────────────────────────────────────────────────────
+-- Переходы (отправка, закрытие), правка связей и ответ партнёра берут один
+-- транзакционный advisory-замок по id предписания и читают статус ПОСЛЕ него.
+-- Без замка ответ, чей триггер прочёл «действует» до коммита параллельного
+-- закрытия, ложился на закрытое: вставка ответа и закрытие строками не
+-- конфликтуют (key share против no key update).
+
+create function lock_prescription(ident uuid) returns void
+    language sql
+    set search_path = pg_catalog, public, pg_temp
+as $$
+    select pg_advisory_xact_lock(hashtextextended(ident::text, 0));
+$$;
+
+-- «Сегодня» для срока — по UTC, как `src/db/prescriptions.today()`: у полуночи
+-- `current_date` сессии и UTC расходились бы на день.
+create function prescription_today() returns date
+    language sql
+    stable
+    set search_path = pg_catalog, public, pg_temp
+as $$
+    select (now() at time zone 'UTC')::date;
+$$;
+
 -- ── Переходы предписания ────────────────────────────────────────────────────
 
 create function guard_prescription() returns trigger
@@ -164,6 +192,7 @@ begin
         return new;
     end if;
 
+    perform public.lock_prescription(old.id);
     if new.id is distinct from old.id or new.country is distinct from old.country
        or new.created_by is distinct from old.created_by
        or new.created_at is distinct from old.created_at then
@@ -231,7 +260,7 @@ begin
         raise exception 'у предписания % нет адресатов', old.id
             using errcode = 'check_violation';
     end if;
-    if new.due_on < current_date then
+    if new.due_on < public.prescription_today() then
         raise exception 'срок предписания % уже прошёл', old.id
             using errcode = 'check_violation';
     end if;
@@ -276,9 +305,14 @@ declare
     статус text;
     страна text;
 begin
+    perform public.lock_prescription(чья);
     select p.status, p.country into статус, страна from public.prescriptions p where p.id = чья;
     if статус is distinct from 'draft' then
         raise exception 'пиццерии меняют только у черновика (сейчас %)', coalesce(статус, 'нет предписания')
+            using errcode = 'check_violation';
+    end if;
+    if btrim(coalesce(current_setting('decimus.prescription_actor', true), '')) = '' then
+        raise exception 'связи черновика % правят с подписью (decimus.prescription_actor)', чья
             using errcode = 'check_violation';
     end if;
     if tg_op = 'DELETE' then
@@ -308,9 +342,14 @@ declare
     статус text;
     страна text;
 begin
+    perform public.lock_prescription(чья);
     select p.status, p.country into статус, страна from public.prescriptions p where p.id = чья;
     if статус is distinct from 'draft' then
         raise exception 'основания меняют только у черновика (сейчас %)', coalesce(статус, 'нет предписания')
+            using errcode = 'check_violation';
+    end if;
+    if btrim(coalesce(current_setting('decimus.prescription_actor', true), '')) = '' then
+        raise exception 'связи черновика % правят с подписью (decimus.prescription_actor)', чья
             using errcode = 'check_violation';
     end if;
     if tg_op = 'DELETE' then
@@ -344,6 +383,7 @@ declare
     статус text;
     страна text;
 begin
+    perform public.lock_prescription(new.prescription_id);
     select p.status, p.country into статус, страна
     from public.prescriptions p where p.id = new.prescription_id;
     if статус is distinct from 'issued' then
@@ -409,12 +449,39 @@ begin
 end;
 $$;
 
+-- Правка связей черновика — «edited» в историю, одно на транзакцию: при
+-- заведении черновика уже есть «created», при правке полей — «edited» строки.
+create function log_prescription_link() returns trigger
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+    чья uuid := case when tg_op = 'DELETE' then old.prescription_id else new.prescription_id end;
+begin
+    if not exists (
+        select 1 from public.prescription_events e where e.prescription_id = чья and e.at = now()
+    ) then
+        insert into public.prescription_events (prescription_id, action, actor, detail)
+        values (чья, 'edited', btrim(current_setting('decimus.prescription_actor', true)), tg_table_name);
+    end if;
+    return null;
+end;
+$$;
+
 revoke all on function log_prescription() from public;
+revoke all on function log_prescription_link() from public;
 revoke all on function log_prescription_reply() from public;
 
 create trigger prescriptions_logged
     after insert or update on prescriptions
     for each row execute function log_prescription();
+create trigger prescription_units_logged
+    after insert or delete on prescription_units
+    for each row execute function log_prescription_link();
+create trigger prescription_inspections_logged
+    after insert or delete on prescription_inspections
+    for each row execute function log_prescription_link();
 create trigger prescription_replies_logged
     after insert on prescription_replies
     for each row execute function log_prescription_reply();

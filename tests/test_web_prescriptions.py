@@ -248,14 +248,8 @@ def test_у_отправленного_нет_кнопки_в_gmail_а_есть_
     assert "Закрыть предписание" in страница
 
 
-def test_возврат_от_google_партнёру_не_отправляет(
-    партнёр: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Возврат — общий адрес `/auth/google/mail`; раздел УК его не прикрывает.
-
-    Кука похода подписана секретом стенда — здесь она собрана им же, как будто
-    партнёр как-то её получил: возврат всё равно отказывает сам.
-    """
+def _кука_похода(клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, state: str = "м") -> str:
+    """Подписанная кука похода за почтой — собрана секретом стенда."""
     import hashlib
 
     from itsdangerous import URLSafeTimedSerializer
@@ -276,12 +270,62 @@ def test_возврат_от_google_партнёру_не_отправляет(
         salt=letter_draft.MAIL_STATE_SALT,
         signer_kwargs={"digest_method": hashlib.sha256},
     )
-    партнёр.set_cookie(
+    клиент.set_cookie(
         letter_draft.MAIL_STATE_COOKIE,
-        подписант.dumps({"state": "м", "kind": web_rx.MAIL_KIND, "id": ИД, "lang": "ru"}),
+        подписант.dumps({"state": state, "kind": web_rx.MAIL_KIND, "id": ИД, "lang": "ru"}),
     )
+    return letter_draft.MAIL_STATE_COOKIE
+
+
+def _кука_снята(ответ: Any, имя: str) -> bool:
+    return any(
+        h.startswith(f"{имя}=;") and ("Max-Age=0" in h or "1970" in h)
+        for h in ответ.headers.getlist("Set-Cookie")
+    )
+
+
+def test_возврат_от_google_партнёру_не_отправляет(
+    партнёр: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Возврат — общий адрес `/auth/google/mail`; раздел УК его не прикрывает.
+
+    Кука похода подписана секретом стенда — здесь она собрана им же, как будто
+    партнёр как-то её получил: возврат всё равно отказывает сам.
+    """
+    кука = _кука_похода(партнёр, monkeypatch)
 
     ответ = партнёр.get("/auth/google/mail?state=м&code=к")
 
     assert ответ.status_code == 404
     assert зовы["issue"] == []
+    assert _кука_снята(ответ, кука), "кука похода пережила отказ"
+
+
+@pytest.mark.parametrize(
+    "запрос",
+    [
+        "/auth/google/mail?state=м&error=access_denied",
+        "/auth/google/mail?state=чужая&code=к",
+        "/auth/google/mail?state=м",
+    ],
+    ids=["отказ в доступе", "не та метка", "нет кода"],
+)
+def test_кука_похода_снимается_на_любом_исходе(
+    уК: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch, запрос: str
+) -> None:
+    кука = _кука_похода(уК, monkeypatch)
+
+    ответ = уК.get(запрос)
+
+    assert ответ.status_code in (302, 303)
+    assert зовы["issue"] == []
+    assert _кука_снята(ответ, кука), "кука похода пережила исход без отправки"
+
+
+def test_форма_говорит_сколько_проверок_показано(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    основание = rx.Choice(id=ИД, title="Batumi-1 · 2026-09-02", detail="A")
+    monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), (основание,)))
+    страница = уК.get("/actions/prescriptions/new?country=GE&lang=ru").get_data(as_text=True)
+    assert f"Последние {rx.BASES_LIMIT} принятых проверок" in страница

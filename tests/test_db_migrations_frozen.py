@@ -162,7 +162,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Предписания (волна 3, T361). Заведена вместе с файлом, нигде не применена.
     "0037_prescriptions.sql": (
-        "sql1:933a2a507c5c0ea5a2251751ac6901661c82a9f6b333a0775caca71e7cd40c59"
+        "sql1:43d57b3c91055a750ab725a703950240dd1bfec580248da175a760d73b6fdd09"
     ),
 }
 

@@ -19,7 +19,11 @@ import psycopg
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .action_plans import clean_file_name
-from .config import load_retraction_settings, load_storage_settings
+from .config import (
+    load_prescription_max_replies,
+    load_retraction_settings,
+    load_storage_settings,
+)
 from .errors import IssuedDraftLostError, PrescriptionError, StorageError
 from .prescriptions import (
     ONE_SQL,
@@ -59,7 +63,16 @@ _INSERT_BASE_SQL = (
 )
 _DELETE_UNITS_SQL = "delete from prescription_units where prescription_id = %s"
 _DELETE_BASES_SQL = "delete from prescription_inspections where prescription_id = %s"
-_LOCK_SQL = "select status, country from prescriptions where id = %s for update"
+#: Замок предписания (0037 `lock_prescription`): тот же ключ, что у триггеров.
+#: Берётся ПЕРВЫМ, до замка строки, во всех дверях — иначе ответ (замок → ключ
+#: строки) и закрытие (строка → замок) взаимно ждали бы друг друга.
+_ADVISORY_SQL = "select lock_prescription(%s::uuid)"
+_LOCK_SQL = "select status, country from prescriptions where id = %s for no key update"
+#: Пределы ожидания на соединениях УК: занятая база — внятный отказ, а не
+#: зависший экран. Пока письмо кладётся в Gmail, транзакция стоит открытой —
+#: её держит свой предел (у Gmail свой сетевой таймаут, `google_auth`).
+_TIMEOUTS_SQL = "set lock_timeout = '5s'; set statement_timeout = '15s'"
+_IDLE_SQL = "set local idle_in_transaction_session_timeout = '30s'"
 _SIGN_SQL = "select set_config('decimus.prescription_actor', %s, true)"
 _UPDATE_SQL = """
 update prescriptions
@@ -74,14 +87,17 @@ where id = %(id)s
 """
 
 # Ответ: статус предписания в охвате отвечающего, охват — тем же литералом.
-# Замка нет: `for update` требует права UPDATE, которого у роли приложения нет
-# и быть не должно. Гонку с закрытием держит триггер вставки ответа (0037).
+# Строку не запираем (`for update` требует права UPDATE, которого у роли
+# приложения нет): гонку с закрытием держит advisory-замок предписания — его
+# берут и эта дверь, и триггер ответа, и переходы (0037).
 _HEAD_FOR_REPLY_SQL = """
 select p.status
 from prescriptions p
 where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
   and p.id = %(id)s
 """
+
+_COUNT_REPLIES_SQL = "select count(*) from prescription_replies where prescription_id = %s"
 
 _INSERT_REPLY_SQL = """
 insert into prescription_replies
@@ -105,7 +121,10 @@ def _actor(actor: str) -> str:
 
 def _admin(what: str) -> psycopg.Connection[Any]:
     try:
-        return psycopg.connect(load_retraction_settings().dsn)
+        conn = psycopg.connect(load_retraction_settings().dsn)
+        conn.execute(_TIMEOUTS_SQL)
+        conn.commit()
+        return conn
     except psycopg.Error as exc:
         raise PrescriptionError(f"{what}: база не на связи ({type(exc).__name__})") from exc
 
@@ -113,6 +132,8 @@ def _admin(what: str) -> psycopg.Connection[Any]:
 def _translate(what: str, exc: psycopg.Error) -> PrescriptionError:
     # Тип, а не текст драйвера: в тексте бывает адрес базы, а отказ — на экране.
     # Отказ триггера — исключение: его текст написан для человека (0037).
+    if isinstance(exc, psycopg.errors.LockNotAvailable | psycopg.errors.QueryCanceled):
+        return PrescriptionError(f"{what} не удалось: база занята. Ничего не изменено, повторите")
     if isinstance(exc, psycopg.errors.RaiseException | psycopg.errors.CheckViolation):
         причина = getattr(exc.diag, "message_primary", None) or type(exc).__name__
         return PrescriptionError(f"{what} не удалось: {причина}. Ничего не изменено")
@@ -147,6 +168,7 @@ def create_draft(draft: Draft, *, actor: str) -> str:
             if row is None:
                 raise PrescriptionError("Предписание не легло в базу")
             ident = str(row[0])
+            cur.execute(_SIGN_SQL, (who,))
             _links(cur, ident, чистый)
             conn.commit()
             return ident
@@ -155,6 +177,7 @@ def create_draft(draft: Draft, *, actor: str) -> str:
 
 
 def _locked(cur: psycopg.Cursor[Any], ident: str) -> tuple[str, str]:
+    cur.execute(_ADVISORY_SQL, (ident,))
     cur.execute(_LOCK_SQL, (ident,))
     row = cur.fetchone()
     if row is None:
@@ -201,13 +224,14 @@ PutDraft = Callable[[Prescription], None]
 
 
 def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescription:
-    """Положить письмо черновиком в почту сотрудника и отметить предписание «действует».
+    """Отметить предписание «действует» и положить письмо черновиком в почту сотрудника.
 
-    Под замком строки: письмо собирается из того, что лежит в базе, и в той
-    же транзакции предписание фиксируется — между ними текст поменяться не
-    может. Не легло в почту (`put_draft` бросил) — откат, предписание остаётся
-    черновиком. Легло, а отметка не легла — `IssuedDraftLostError`: в почте
-    лежит черновик, который надо удалить.
+    Порядок — база, потом почта, потом коммит. Под замком строка переводится в
+    «действует», и триггер сверяет всё, что держит база (страна пиццерий,
+    отклонённые и перенесённые основания, адресаты, срок). Отказ базы — письмо
+    в почту не кладётся вовсе. Не легло в почту (`put_draft` бросил) — откат,
+    предписание остаётся черновиком. Легло, а коммит не прошёл —
+    `IssuedDraftLostError`: в почте лежит черновик, который надо удалить.
     """
     who = _actor(actor)
     ident = uuid_or_none(prescription_id)
@@ -216,6 +240,7 @@ def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescript
     with _admin("Отправить предписание") as conn:
         try:
             cur = conn.cursor()
+            cur.execute(_IDLE_SQL)
             статус = _locked(cur, ident)[0]
             if статус != STATUS_DRAFT:
                 raise PrescriptionError("Предписание уже отправлено")
@@ -225,11 +250,11 @@ def issue(prescription_id: str, *, actor: str, put_draft: PutDraft) -> Prescript
                 raise PrescriptionError("Нет адресатов — впишите хотя бы один адрес")
             if предписание.due_on < today():
                 raise PrescriptionError("Срок уже прошёл — поправьте его в черновике")
+            cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
         except psycopg.Error as exc:
             raise _translate("Отправить предписание", exc) from exc
         put_draft(предписание)
         try:
-            cur.execute(_ISSUE_SQL, {"id": ident, "actor": who})
             conn.commit()
         except psycopg.Error as exc:
             logger.warning("предписание %s: черновик в почте лёг, отметка нет: %s", ident, exc)
@@ -299,11 +324,14 @@ def reply(
     attachment: Attachment | None,
     max_bytes: int,
     storage: PhotoStorage | None = None,
+    max_replies: int | None = None,
 ) -> str:
     """Ответ партнёра на действующее предписание своей страны. Возвращает id ответа.
 
     Чужое предписание отвечает «нет», как несуществующее. Что отвечает только
     партнёр этой страны и только на действующее — держит ещё и триггер.
+    Ответов на одно предписание не больше `max_replies`
+    (`PRESCRIPTION_MAX_REPLIES`, по умолчанию 50).
     """
     who = _actor(actor)
     текст = (comment or "").strip()
@@ -316,6 +344,7 @@ def reply(
     ident = uuid_or_none(prescription_id)
     if ident is None:
         raise PrescriptionError("Предписания нет")
+    предел = max_replies if max_replies is not None else load_prescription_max_replies()
     reply_id = str(uuid.uuid4())
     row: dict[str, Any] = {
         "id": reply_id,
@@ -329,7 +358,7 @@ def reply(
         "replied_tenant": canonical_tenant(tenant),
     }
     if attachment is None:
-        _record_reply(ident, reach=reach, row=row)
+        _record_reply(ident, reach=reach, row=row, limit=предел)
         return reply_id
     if not attachment.data:
         raise PrescriptionError("Файл пустой — класть нечего")
@@ -347,6 +376,7 @@ def reply(
         _record_reply(
             ident,
             reach=reach,
+            limit=предел,
             row={
                 **row,
                 "storage_path": uri,
@@ -361,15 +391,24 @@ def reply(
     return reply_id
 
 
-def _record_reply(ident: str, *, reach: Reach, row: dict[str, Any]) -> None:
+def _record_reply(ident: str, *, reach: Reach, row: dict[str, Any], limit: int) -> None:
     try:
         with connect_read() as conn, conn.cursor() as cur:
+            # Под замком: два ответа разом не проскочат предел, закрытие — статус.
+            cur.execute(_ADVISORY_SQL, (ident,))
             cur.execute(_HEAD_FOR_REPLY_SQL, {"id": ident, **reach_params(reach)})
             head = cur.fetchone()
             if head is None:
                 raise PrescriptionError("Предписания нет")
             if head[0] != STATUS_ISSUED:
                 raise PrescriptionError("Предписание закрыто — ответ к нему не кладут")
+            cur.execute(_COUNT_REPLIES_SQL, (ident,))
+            count = cur.fetchone()
+            if count is not None and int(count[0]) >= limit:
+                raise PrescriptionError(
+                    f"На это предписание уже {limit} ответов — больше не принимается. "
+                    "Напишите УК, чтобы закрыли это предписание и составили новое"
+                )
             cur.execute(_INSERT_REPLY_SQL, row)
             conn.commit()
     except psycopg.Error as exc:

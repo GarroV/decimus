@@ -59,8 +59,10 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
     },
     "rx.form.bases": {"ru": "Проверки-основания", "en": "Inspections it is based on"},
     "rx.form.bases_hint": {
-        "ru": "Последние принятые проверки УК в стране. Можно не отмечать.",
-        "en": "Latest accepted inspections in the country. Optional.",
+        "ru": "Последние {n} принятых проверок УК в стране — более ранних здесь нет. "
+        "Можно не отмечать.",
+        "en": "The latest {n} accepted inspections in the country; older ones are not listed. "
+        "Optional.",
     },
     "rx.form.no_bases": {
         "ru": "Принятых проверок УК в стране нет.",

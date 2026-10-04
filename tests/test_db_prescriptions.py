@@ -394,17 +394,44 @@ def test_без_адресатов_не_отправляют(сеть: dict[str,
     assert журнал == [], "черновик в почту положен без адресатов"
 
 
-def test_отметка_не_легла_после_черновика_говорит_об_этом(
+def test_отказ_базы_на_отправке_в_почту_не_кладёт(
     сеть: dict[str, str], admin_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Arrange — перевод в «действует» база отвергает (подменённый переход).
     ident = _черновик()
     monkeypatch.setattr(
         rxw,
         "_ISSUE_SQL",
         "update prescriptions set status = 'closed' where id = %(id)s and %(actor)s is not null",
     )
+    положено: list[str] = []
+
+    # Act
+    with pytest.raises(PrescriptionError) as отказ:
+        rxw.issue(ident, actor="hq-lead", put_draft=_положено(положено))
+
+    # Assert — база проверяет ДО почты: в Gmail ничего, предписание — черновик.
+    assert not isinstance(отказ.value, IssuedDraftLostError)
+    assert положено == [], "письмо легло в почту раньше, чем база приняла отправку"
+    assert _hq(ident).status == "draft"
+
+
+def test_коммит_не_прошёл_после_почты_говорит_удалить_черновик(
+    сеть: dict[str, str], pg_dsn: str
+) -> None:
+    ident = _черновик()
+
+    def оборвать(_п: rx.Prescription) -> None:
+        # Письмо «легло», а соединение отправки обрывается до коммита.
+        with psycopg.connect(pg_dsn, autocommit=True) as conn:
+            conn.execute(
+                "select pg_terminate_backend(pid) from pg_stat_activity "
+                "where pid <> pg_backend_pid() and state = 'idle in transaction' "
+                "and query like 'update prescriptions set status = ''issued''%%'"
+            )
+
     with pytest.raises(IssuedDraftLostError, match="Удалите этот черновик"):
-        rxw.issue(ident, actor="hq-lead", put_draft=_положено([]))
+        rxw.issue(ident, actor="hq-lead", put_draft=оборвать)
     assert _hq(ident).status == "draft"
 
 
