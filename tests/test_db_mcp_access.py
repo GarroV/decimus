@@ -21,6 +21,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -37,6 +38,18 @@ from src.db.mcp_access import (  # noqa: E402
 )
 
 pytestmark = requires_db
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Пространство, на которое выпускаются токены тестов набора.
+
+    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
+    базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        завести_пространства(request.getfixturevalue("pg_dsn"), "belgrade")
+
 
 #: Роли в круге для тестов — не настоящие telegram_id, просто различимые числа.
 ОСНОВАТЕЛЬ = 100

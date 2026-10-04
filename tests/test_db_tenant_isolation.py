@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 # `psycopg` — зависимость блока `db`, а не всего проекта: без этой строки сбор
 # файла падает целиком там, где её ещё не поставили.
@@ -27,6 +28,17 @@ pytestmark = requires_db
 
 СВОЙ = "HQ"  # тенант УК (D234)
 ЧУЖОЙ = "partner"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Два пространства, между которыми проверяется изоляция.
+
+    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
+    базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        завести_пространства(request.getfixturevalue("pg_dsn"), СВОЙ, ЧУЖОЙ)
 
 
 def test_синоним_не_может_указывать_на_точку_чужого_арендатора(db_env: str) -> None:
