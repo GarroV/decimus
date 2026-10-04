@@ -22,7 +22,12 @@ from src.mcp.checklist_layout import DRAFT, applied
 from src.mcp.checklists import apply_to_production, create
 from src.mcp.rpc import handle
 
-АРЕНДАТОР = "укашка"
+# "HQ", а не прежняя "укашка" (волна 1, #340): вызовы идут через `handle` →
+# `rpc._aimed`, а та наводит правящий инструмент в `space_of(tenant)`, который
+# требует годный слаг пространства. `space_of("HQ")` приводится к "hq"
+# (`DEFAULT_SPACE`), и весь файл продолжает работать слово в слово — прямые
+# вызовы двери (`create(store, tenant=...)`) тенант вообще не читают.
+АРЕНДАТОР = "HQ"
 
 
 @pytest.fixture

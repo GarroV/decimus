@@ -33,7 +33,9 @@ from src.db.errors import DbError, MoveError, RetractionError
 from src.db.migrate import discover_migrations
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.move import MoveRecord
+from src.db.reach import own_reach
 from src.db.retract import Retraction
+from src.domain.tenants import canonical_tenant
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -339,6 +341,29 @@ def test_снятая_проверка_видна_снятой_и_с_причи�
     assert "/retract" not in страница
 
 
+@админ
+@pytest.mark.parametrize(("пространство", "свои_действия"), [(ТЕНАНТ, True), ("GE", False)])
+def test_действия_записи_только_у_проверки_своего_пространства(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, пространство: str, свои_действия: bool
+) -> None:
+    """УК открывает проверку партнёра на чтение (D283), но снять, перенести и
+    писать по ней письмо не предлагается: запись — только в своё пространство."""
+    # Arrange
+    деталь = карточка(шапка(tenant_code=пространство))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
+    monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
+    monkeypatch.setattr(data, "load_units", lambda **_k: (("u-1", "Demo Pizzeria #1"),))
+
+    # Act
+    ответ = стенд.get(f"/inspections/{деталь.inspection.id}")
+    страница = ответ.get_data(as_text=True)
+
+    # Assert — карточка открывается в обоих случаях, действия — только у своей.
+    assert ответ.status_code == 200
+    for действие in ("/retract", "/move", "/letter"):
+        assert (действие in страница) is свои_действия, действие
+
+
 # --- снятие идёт существующей дверью ---------------------------------------
 
 
@@ -368,7 +393,10 @@ def test_снятие_зовёт_дверь_блока_db_с_причиной_и
 
     # Assert — ровно один вызов, тенант стенда, причина как введена.
     assert ответ.status_code == 200
-    assert вызовы == [{"id": строка.id, "tenant": ТЕНАНТ, "reason": "дубль обхода"}]
+    # Запись идёт в пространство ВОШЕДШЕГО, в нынешнем коде (#340): «default» — это HQ.
+    assert вызовы == [
+        {"id": строка.id, "tenant": canonical_tenant(ТЕНАНТ), "reason": "дубль обхода"}
+    ]
     assert "Кадров убрано: 2" in ответ.get_data(as_text=True)
 
 
@@ -654,7 +682,7 @@ def test_реестр_без_снятых_если_администратор_н
     monkeypatch.setattr(data.queries, "list_inspections", _сломанный_админ([строка]))
 
     # Act
-    реестр = data.load_registry(tenant=ТЕНАНТ, limit=10)
+    реестр = data.load_registry(reach=own_reach(ТЕНАНТ), limit=10)
 
     # Assert
     assert реестр.rows == (строка,)
@@ -670,7 +698,7 @@ def test_карточка_открывается_если_администрат
     monkeypatch.setattr(data.queries, "get_inspection", _сломанный_админ(деталь))
 
     # Act / Assert
-    assert data.load_card(деталь.inspection.id, tenant=ТЕНАНТ) is деталь
+    assert data.load_card(деталь.inspection.id, reach=own_reach(ТЕНАНТ)) is деталь
 
 
 def test_лежащая_база_по_прежнему_отказ(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -684,7 +712,7 @@ def test_лежащая_база_по_прежнему_отказ(monkeypatch: p
 
     # Act / Assert
     with pytest.raises(DbError):
-        data.load_registry(tenant=ТЕНАНТ, limit=10)
+        data.load_registry(reach=own_reach(ТЕНАНТ), limit=10)
 
 
 def test_аудитор_не_отклоняет_проверку(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -745,7 +773,7 @@ def test_администратор_переносит_и_автор_берёт�
     assert вызовы == [
         {
             "id": "x",
-            "tenant": ТЕНАНТ,
+            "tenant": canonical_tenant(ТЕНАНТ),
             "new_date": "2026-09-01",
             "new_unit_id": "u-2",
             "reason": "не та точка",

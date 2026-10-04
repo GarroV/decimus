@@ -48,6 +48,7 @@ from src.db.fingerprint import compute_fingerprint, previous_fingerprints  # noq
 from src.db.photos import upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import (  # noqa: E402
     SOURCE_PHOTO,
     Inspection,
@@ -60,7 +61,9 @@ from src.domain import score as domain_score  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "инфочасть"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 ТОЧКА = "Белград-1"
 
 #: Срок плана действий — то самое поле, из-за которого задача заведена. Дата
@@ -130,7 +133,7 @@ def test_срок_плана_действий_читается_обратно_д
     """
     ident = _проверка(2002)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     поля = {поле.code: поле.text for поле in подробно.info}
@@ -146,7 +149,7 @@ def test_порядок_полей_сохраняется_записанным(d
     """
     ident = _проверка(2003)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     прочитано = [поле.code for поле in подробно.info]

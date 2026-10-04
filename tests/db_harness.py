@@ -184,3 +184,104 @@ def _drop_roles(roles: Iterable[str]) -> None:
     with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
         for role in roles:
             conn.execute(sql.SQL("drop role if exists {}").format(sql.Identifier(role)))
+
+
+# ── Пространства партнёров и один справочник (волна 1, #340; D284) ─────────
+#
+# Проверка партнёра ссылается на точку справочника УК своей страны: своих точек
+# партнёр не заводит (D234). Поэтому оснастка, которой нужна проверка
+# партнёра, сначала заводит точку у УК со страной и привязывает пространство к
+# стране — ровно так, как это будет на площадке.
+
+_номер_чата = iter(range(910_000, 1_000_000))
+
+
+def привязать_страну(pg_dsn: str, *, tenant: str, country: str) -> None:
+    """Пространство `tenant` привязано к стране `country` (строка `space_countries`).
+
+    Пишет под ролью, создавшей базу: роли приложения эта таблица только для
+    чтения, и заводит пространства не продукт, а команда (задача 13).
+    """
+    import psycopg
+
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("insert into tenants (code) values (%s) on conflict do nothing", (tenant,))
+        cur.execute(
+            "insert into space_countries (country, tenant_code) values (%s, %s) "
+            "on conflict do nothing",
+            (country, tenant),
+        )
+
+
+def точка_справочника(name: str, *, country: str, city: str = "") -> str:
+    """Точка справочника УК со страной; возвращает её идентификатор."""
+    from src.db.directory import upsert_unit
+
+    return upsert_unit(name, country=country, city=city or None, tenant="HQ")
+
+
+def слить_проверку(
+    *,
+    unit: str,
+    tenant: str,
+    chat_id: int | None = None,
+    text: str = "нагар на печи",
+    date: str | None = None,
+) -> str:
+    """Завершённая проверка через официальный контракт домена и слив; её `id`.
+
+    Нужны `domain_env` (каталог состояния) и `db_env` (база) — фикстуры
+    вызывающего. Имя не `push_inspection`: так называется слив по чату в
+    `src.db.push`, и одноимённый помощник с другой сигнатурой путал бы (Н23).
+    """
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
+
+    чат = next(_номер_чата) if chat_id is None else chat_id
+    start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant, date=date)
+    add_finding(чат, code="CLN03", level="D1", zone="hot_kitchen", text=text)
+    return push_inspection(чат)
+
+
+def привязать_пространства(pg_dsn: str, *tenants: str) -> None:
+    """Каждое пространство привязано к стране своего кода (`GE` → `GE`).
+
+    Для наборов про изоляцию партнёров друг от друга: код пространства и код
+    страны совпадают, и точка «страны партнёра» не требует отдельной таблицы.
+    """
+    for tenant in tenants:
+        привязать_страну(pg_dsn, tenant=tenant, country=tenant)
+
+
+def точка_пространства(unit: str, *, tenant: str) -> None:
+    """Точка, на которую `tenant` может слить проверку.
+
+    У УК слив заводит точку сам. У партнёра — точка справочника УК в стране его
+    кода (пара к `привязать_пространства`). Точку, уже заведённую в другой
+    стране, помощник не переносит: одноимённых точек у двух пространств при
+    одном справочнике не бывает (D284), и тест, которому это нужно, врёт.
+    """
+    from src.db.directory import list_units
+    from src.db.reach import Reach
+    from src.domain.tenants import HQ_TENANT, canonical_tenant
+
+    if canonical_tenant(tenant) == HQ_TENANT:
+        return
+    уже = {u.name: u.country for u in list_units(reach=Reach(HQ_TENANT, None, None))}
+    if unit in уже and уже[unit] != tenant:
+        raise AssertionError(
+            f"Точка «{unit}» уже заведена в стране {уже[unit]}, а сливает её {tenant}: "
+            f"при одном справочнике одноимённых точек у двух пространств нет (D284)"
+        )
+    точка_справочника(unit, country=tenant)
+
+
+def пространства_для_теста(request: pytest.FixtureRequest, *tenants: str) -> None:
+    """Привязать пространства к странам своего кода — если тесту нужна база.
+
+    Для автоматической фикстуры набора, где база нужна не всем тестам: тест без
+    `db_env` базы не получает и здесь, а тест с ней получает ту же базу, что
+    `db_env` (`pg_dsn` один на тест).
+    """
+    if "db_env" in request.fixturenames:
+        привязать_пространства(request.getfixturevalue("pg_dsn"), *tenants)

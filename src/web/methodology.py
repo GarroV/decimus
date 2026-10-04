@@ -37,11 +37,21 @@ from typing import Any
 from src.mcp import checklist_tools as door
 from src.mcp import checklists as lists_door
 from src.mcp.checklist import Store, current_version, tip_version
-from src.mcp.checklist_layout import ACTIVE, DRAFT, RETIRED, for_code
+from src.mcp.checklist_layout import (
+    ACTIVE,
+    DEFAULT_SPACE,
+    DRAFT,
+    RETIRED,
+    locate,
+    may_write,
+    read_spaces,
+    space_of,
+)
 from src.mcp.config import DATA_DIR_VAR, MCP_CHECKLIST_STORE_VAR
 from src.mcp.errors import McpError
 
 from .errors import MethodologyRefused
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -704,28 +714,51 @@ class Difference:
     candidate: lists_door.Summary | None
 
 
-def store_for(store: Store, code: str | None) -> Store:
-    """Хранилище, наведённое на чек-лист с экрана — или на применённый к проду.
+def store_for(
+    store: Store, code: str | None, *, tenant: str, space: str | None, write: bool, lang: str
+) -> Store:
+    """Хранилище чек-листа с экрана — видимого этому пространству, иначе отказ (#340).
 
-    Тот же ход, что у точки входа MCP (`rpc`), и та же функция: экран, знающий
-    про чек-листы своё, однажды показал бы не то, что правит агент.
+    Код не назван — применённый к проду, тот же ход, что у точки входа MCP:
+    экран, знающий про чек-листы своё, однажды показал бы не то, что правит
+    агент. Чужой и несуществующий — одним текстом: иначе ответ подтверждал бы,
+    что чужое есть. Правка чужого — отказ ДО двери: дверь на чтении заводит
+    нетронутое хранилище, а на правке пишет журнал (D283).
     """
     try:
-        return for_code(store, code)
+        найдено = locate(store, tenant=tenant, code=code, space=space)
     except McpError as отказ:
         raise _refusal(отказ) from None
+    if найдено is None:
+        raise MethodologyRefused(t("methodology.not_found", lang, code=code or ""))
+    if write and not may_write(найдено, tenant=tenant):
+        ключ = (
+            "methodology.etalon_readonly"
+            if найдено.space == DEFAULT_SPACE
+            else "methodology.foreign_readonly"
+        )
+        raise MethodologyRefused(t(ключ, lang))
+    return найдено
 
 
-def checklists_overview(store: Store) -> list[lists_door.Overview]:
-    """Все чек-листы хранилища. Пусто — пустой список, а не отказ.
+def own_space(tenant: str) -> str:
+    """Каталог своего пространства в хранилище: `HQ` → `hq` (D183).
 
-    Нетронутое хранилище дверь заводит сама (`checklists.overview`): иначе
-    первый заход на экран показал бы «чек-листов нет» на площадке, где
-    методика есть и по ней считают, — пустой перечень читался бы как факт о
-    продукте.
+    Экрану это нужно, чтобы отличать своё от чужого в колонке; сам он
+    `src.mcp` не импортирует (`tests/test_web_bounds.py`).
+    """
+    return space_of(tenant)
+
+
+def checklists_overview(store: Store, *, tenant: str) -> list[lists_door.Overview]:
+    """Чек-листы, видимые пространству: у УК — все, у партнёра — свои и эталон.
+
+    Пусто — пустой список, а не отказ. Нетронутое хранилище дверь заводит сама
+    (`checklists.overview`): иначе первый заход на экран показал бы «чек-листов
+    нет» на площадке, где методика есть и по ней считают.
     """
     try:
-        return lists_door.overview(store)
+        return lists_door.overview(store, spaces=read_spaces(tenant, store.root))
     except McpError as отказ:
         raise _refusal(отказ) from None
 
@@ -753,6 +786,10 @@ class RailRow:
     #: если после открытия опубликовали пустое издание; такой флаг переключатель
     #: обязан уметь снять.
     wants_bot: bool = False
+    #: Пространство чек-листа в хранилище (волна 1, #340): ссылка на чек-лист
+    #: другого пространства несёт его в адресе (`?space=`), а переключатель
+    #: бота есть только у своего (эталон у партнёра — чтение, D283).
+    space: str = DEFAULT_SPACE
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
@@ -760,7 +797,7 @@ def _rail_key(row: RailRow) -> tuple[int, str]:
 
 
 def checklist_rail(
-    store: Store, перечень: list[lists_door.Overview] | None = None
+    store: Store, перечень: list[lists_door.Overview] | None = None, *, tenant: str
 ) -> tuple[RailRow, ...]:
     """Чек-листы для колонки: в работе → черновики → снятые, внутри — по названию.
 
@@ -773,7 +810,7 @@ def checklist_rail(
     и те же коды живут в разных.
     """
     строки = []
-    for c in перечень if перечень is not None else checklists_overview(store):
+    for c in перечень if перечень is not None else checklists_overview(store, tenant=tenant):
         свой = replace(store, space=c.space, code=c.code)
         try:
             сводка = lists_door.summary(свой)
@@ -797,6 +834,7 @@ def checklist_rail(
                 items=сводка.items if сводка else None,
                 bot_block=нельзя,
                 wants_bot=c.in_bot,
+                space=c.space,
             )
         )
     return tuple(sorted(строки, key=_rail_key))
@@ -814,8 +852,15 @@ def checklist_difference(store: Store) -> Difference:
 def create_checklist(
     store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
 ) -> Any:
-    """Завести чек-лист с нуля. Рождается черновиком и к проду не идёт."""
-    целевое = store_for(store, code)
+    """Завести чек-лист с нуля — в СВОЁМ пространстве. Рождается черновиком.
+
+    Пространство берётся у вошедшего, а не у хранилища или адреса: заведение
+    чужого — не правка, которую можно отклонить, а новый каталог в чужом месте.
+    """
+    try:
+        целевое = replace(store, space=space_of(tenant), code=code)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
     try:
         return lists_door.create(
             целевое, tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
@@ -825,44 +870,69 @@ def create_checklist(
 
 
 def rename_checklist(
-    store: Store, *, tenant: str, author: str, code: str, name_ru: str, name_en: str
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    space: str | None,
+    lang: str,
+    name_ru: str,
+    name_en: str,
 ) -> Any:
     """Поменять названия. Код не меняется ничем и никогда."""
+    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang)
     try:
         return lists_door.rename(
-            store_for(store, code), tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
+            целевое, tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
         )
     except McpError as отказ:
         raise _refusal(отказ) from None
 
 
-def set_checklist_state(store: Store, *, tenant: str, author: str, code: str, state: str) -> Any:
+def set_checklist_state(
+    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str, state: str
+) -> Any:
     """Черновик / в работе / снят."""
+    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang)
     try:
-        return lists_door.set_state(store_for(store, code), tenant=tenant, state=state, by=author)
+        return lists_door.set_state(целевое, tenant=tenant, state=state, by=author)
     except McpError as отказ:
         raise _refusal(отказ) from None
 
 
-def apply_checklist(store: Store, *, tenant: str, author: str, code: str) -> dict[str, object]:
+def apply_checklist(
+    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str
+) -> dict[str, object]:
     """Применить чек-лист к проду: по нему пойдут проверки.
 
     Заслоны — в двери: пустой, снятый и без опубликованного издания к проду не
     идут. Экран их не повторяет, он их показывает.
     """
     try:
-        return lists_door.apply_to_production(store_for(store, code), tenant=tenant, by=author)
+        return lists_door.apply_to_production(
+            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang),
+            tenant=tenant,
+            by=author,
+        )
     except McpError as отказ:
         raise _refusal(отказ) from None
 
 
-def set_bot_access(store: Store, *, tenant: str, author: str, code: str, on: bool) -> object:
+def set_bot_access(
+    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str, on: bool
+) -> object:
     """Открыть чек-лист аудиторам в боте или закрыть (волна 3).
 
     Заслоны — в двери (#339): черновик, снятый, неопубликованный и пустой в бот
     не открываются. Экран их не повторяет, он показывает причину заранее.
     """
     try:
-        return lists_door.set_bot_access(store_for(store, code), tenant=tenant, on=on, by=author)
+        return lists_door.set_bot_access(
+            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang),
+            tenant=tenant,
+            on=on,
+            by=author,
+        )
     except McpError as отказ:
         raise _refusal(отказ) from None

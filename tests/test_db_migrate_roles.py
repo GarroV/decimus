@@ -168,6 +168,9 @@ def test_накат_заводит_роли_без_всесилия(tmp_path: Pa
 APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Справочник правится по делу, но не удаляется: DELETE не выдан (`0004`).
     "tenants": {"SELECT", "INSERT"},
+    # Страны пространства (`0029`, #340) — только чтение: их заводит команда,
+    # а продукт по ним считает охват чтения и сторож точки проверки.
+    "space_countries": {"SELECT"},
     "units": {"SELECT", "INSERT", "UPDATE"},
     "unit_aliases": {"SELECT", "INSERT", "UPDATE"},
     # Документ проверки: полный набор выдан НАМЕРЕННО, держит политика (`0004`).
@@ -209,6 +212,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # имени владельца схемы; появится здесь INSERT — и роль сможет дописать
     # «перенос», которого не было.
     "inspection_moves": {"SELECT"},
+    # Привязка бота (`0031`, D286): ссылки и привязки заводятся и читаются,
+    # но не удаляются; правятся только пометки погашения и отвязки (ниже).
+    "bot_link_tokens": {"SELECT", "INSERT"},
+    "bot_bindings": {"SELECT", "INSERT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -218,6 +225,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
 #: выпуска не правятся ни одним запросом, потому что права на них нет (`0011`).
 APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "mcp_tokens": {"UPDATE": {"revoked_at", "revoked_by"}},
+    # Погашение ссылки и отвязка бота (`0031`): отпечаток, учётка и срок не
+    # правятся ничем, иначе погашенную ссылку можно было бы перевыпустить.
+    "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
+    "bot_bindings": {"UPDATE": {"unbound_at"}},
     "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
@@ -236,6 +247,9 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
 ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "units": {"SELECT"},
+    # Страны пространства (`0029`, #340): администратор пишет проверки в обход
+    # продукта (снятие, перенос), и сторож точки проверки читает их его правами.
+    "space_countries": {"SELECT"},
     "inspections": {"SELECT"},
     "findings": {"SELECT"},
     "photos": {"SELECT"},

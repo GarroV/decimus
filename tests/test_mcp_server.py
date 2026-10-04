@@ -25,6 +25,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import пространства_для_теста, точка_пространства
 
 from src.mcp.catalogue import KIND_CHECKLIST, KIND_CHECKLIST_SOURCE, KIND_RETRACTION, TOOLS
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
@@ -39,8 +40,16 @@ from src.mcp.server import MAX_BODY_BYTES, build_server
 
 ТОКЕН_А = "a" * MIN_TOKEN_LENGTH
 ТОКЕН_Б = "b" * MIN_TOKEN_LENGTH
-АРЕНДАТОР_А = "партнёр-а"
-АРЕНДАТОР_Б = "партнёр-б"
+# Коды пространств совпадают с кодами их стран (волна 1, D284): точки партнёров
+# заводятся в справочнике УК этой страны, пространства привязаны к ней.
+АРЕНДАТОР_А = "GE"
+АРЕНДАТОР_Б = "AM"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    пространства_для_теста(request, АРЕНДАТОР_А, АРЕНДАТОР_Б)
+
 
 ЗОНЫ = ("hot_kitchen", "cold_kitchen", "dough")
 
@@ -115,6 +124,7 @@ def _проверка(chat_id: int, *, арендатор: str, точка: str,
     from src.db.push import push_inspection
     from src.domain import add_finding, start_inspection
 
+    точка_пространства(точка, tenant=арендатор)
     start_inspection(
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор, date="2026-08-15"
     )

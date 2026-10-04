@@ -111,12 +111,17 @@ def _read(
     свежим, а спрашивают про период, которого в ней может не быть вовсе.
     """
     from ..db.queries import DEFAULT_LIMIT, list_inspections
+    from ..db.reach import reach_of
 
     rows_limit = DEFAULT_LIMIT if limit is None else limit
     with _history():
         rows = tuple(
             list_inspections(
-                tenant=tenant, unit=unit, date_from=date_from, date_to=date_to, limit=rows_limit
+                reach=reach_of(tenant),
+                unit=unit,
+                date_from=date_from,
+                date_to=date_to,
+                limit=rows_limit,
             )
         )
     return _Page(rows=rows, limit=rows_limit, truncated=len(rows) >= rows_limit)
@@ -164,6 +169,7 @@ def read_findings_over_period(
     разошлась бы с первой на границах окна.
     """
     from ..db.queries import MAX_LIMIT, findings_by_unit
+    from ..db.reach import reach_of
 
     page = _read_everything(tenant=tenant, date_from=date_from, date_to=date_to)
     названия = tuple(dict.fromkeys(row.unit_name for row in page.rows))
@@ -171,8 +177,10 @@ def read_findings_over_period(
     собранные: list[FindingRow] = []
     обрезано = page.truncated
     with _history():
+        # Охват один на весь обход: страны пространства читаются из базы.
+        охват = reach_of(tenant)
         for имя in названия:
-            найденные = findings_by_unit(tenant=tenant, unit=имя, limit=MAX_LIMIT)
+            найденные = findings_by_unit(reach=охват, unit=имя, limit=MAX_LIMIT)
             обрезано = обрезано or len(найденные) >= MAX_LIMIT
             собранные.extend(row for row in найденные if row.inspection_id in в_периоде)
     return Findings(
@@ -335,9 +343,10 @@ def _detail(ident: str, *, tenant: str) -> InspectionDetail | None:
     непригодного окружения.
     """
     from ..db.queries import get_inspection as db_get_inspection
+    from ..db.reach import reach_of
 
     with _history():
-        return db_get_inspection(ident, tenant=tenant)
+        return db_get_inspection(ident, reach=reach_of(tenant))
 
 
 def _brief(row: InspectionRow) -> dict[str, object]:
@@ -620,10 +629,11 @@ def findings_by_unit(*, tenant: str, unit: str, limit: int | None = None) -> dic
     requested_limit = _require_limit(limit)
     from ..db.queries import DEFAULT_LIMIT
     from ..db.queries import findings_by_unit as db_findings_by_unit
+    from ..db.reach import reach_of
 
     applied_limit = DEFAULT_LIMIT if requested_limit is None else requested_limit
     with _history():
-        rows = db_findings_by_unit(tenant=tenant, unit=name, limit=applied_limit)
+        rows = db_findings_by_unit(reach=reach_of(tenant), unit=name, limit=applied_limit)
     truncated = len(rows) >= applied_limit
     return {
         "tenant": tenant,

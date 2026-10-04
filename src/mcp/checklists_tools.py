@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any
 
 from . import checklists as api
-from .checklist_layout import Store, read_meta
+from .checklist_layout import Store, read_meta, read_spaces
 from .errors import ChecklistError
 
 
@@ -35,14 +35,20 @@ def _row(чеклист: api.Overview) -> dict[str, Any]:
 
 
 def checklists(*, tenant: str, store: Store) -> dict[str, Any]:
-    """Все чек-листы хранилища: код, названия, состояние, применён ли к проду.
+    """Чек-листы, видимые этому тенанту: код, названия, состояние, применён ли к проду.
+
+    Перечень сужен до пространств, которые тенант вправе читать (D283): УК
+    видит всё хранилище, партнёр — своё и эталон, а не соседей по хранилищу.
+    Инструмент не требует кода чек-листа — он и существует затем, чтобы код
+    узнать (preflight Н1): общий заслон «без кода не уходим в пространство
+    партнёра» на него не распространяется.
 
     Состояние и применение к проду — разные вещи, и перечень показывает оба.
     «В работе» говорит, что чек-лист годен к употреблению, и таких может быть
     несколько; «применён к проду» — указатель, и он ровно один, пока выбор
     чек-листа на старте проверки не спрашивают (D178).
     """
-    найденные = api.overview(store)
+    найденные = api.overview(store, spaces=read_spaces(tenant, store.root))
     в_проде = next((c.code for c in найденные if c.in_production), None)
     return {
         "tenant": tenant,
@@ -61,6 +67,18 @@ def checklist_meta(*, tenant: str, store: Store) -> dict[str, Any]:
 
     Пустой ответ на незнакомый код агент однажды перескажет человеку как «такой
     чек-лист есть, но он пуст», и это будет неправдой.
+
+    Кода тоже не требует (preflight Н1) — отсутствующий читается как «тот, на
+    который навело хранилище без кода» (у УК это применённый к проду, у
+    партнёра — попытка по умолчанию в своём пространстве), а не как отказ
+    «назовите чек-лист».
+
+    Код ЭТАЛОНА УК, названный партнёром явно, тоже отвечает — не «не найден»
+    (ревью Task 2, controller ruling): партнёр видит строку эталона в
+    `checklists` (D283, D285), и «не найден» на код, который только что сам
+    же перечень назвал, выглядело бы как порча данных. Наведение на
+    пространство УК для этого случая делает `rpc._aimed`, до вызова этой
+    функции — здесь `store` уже смотрит, куда нужно.
     """
     карточка = read_meta(store)
     if карточка is None:
@@ -69,7 +87,12 @@ def checklist_meta(*, tenant: str, store: Store) -> dict[str, Any]:
             f"checklists, завести новый — create_checklist"
         )
     найденный = next(
-        (c for c in api.overview(store) if (c.space, c.code) == (store.space, store.code)), None
+        (
+            c
+            for c in api.overview(store, spaces=read_spaces(tenant, store.root))
+            if (c.space, c.code) == (store.space, store.code)
+        ),
+        None,
     )
     if найденный is None:
         raise ChecklistError(f"Чек-листа «{store.code}» в хранилище нет")

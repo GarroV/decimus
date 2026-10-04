@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import urllib.parse
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date, datetime
 from typing import Any
 
@@ -24,9 +25,11 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 
 from src.db.letters import SavedLetter
 from src.db.models import InspectionDetail, InspectionRow
+from src.domain.tenants import canonical_tenant
 from src.web import inspections as data
 from src.web import letter_draft
 from src.web.google_mail import DRAFT_SCOPE
+from src.web.texts import t
 
 ТЕНАНТ = "default"
 ПРОВЕРКА = "11111111-1111-1111-1111-111111111111"
@@ -62,9 +65,12 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     следы: dict[str, list[Any]] = {"remember": [], "draft": [], "token": []}
 
-    monkeypatch.setattr(data, "load_card", lambda _id, *, tenant: карточка())
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
 
-    def _remember(inspection_id: str, *, body: str, lang: str, saved_by: str) -> SavedLetter:
+    def _remember(
+        inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
+    ) -> SavedLetter:
+        assert tenant == canonical_tenant(ТЕНАНТ), "письмо фиксируется в пространстве вошедшего"
         следы["remember"].append((inspection_id, body, lang, saved_by))
         return SavedLetter(
             id="l-1", body=body, lang=lang, saved_by=saved_by, created_at=datetime.now()
@@ -217,6 +223,44 @@ def test_кнопка_есть_на_экране_письма(
     )
     страница = client_страница(клиент[0])
     assert f"/inspections/{ПРОВЕРКА}/letter/draft" in страница
+
+
+_КНОПКИ_ЗАПИСИ = ("letter.gmail.submit", "letter.export.submit", "letter.save.submit")
+
+
+@pytest.mark.parametrize(("пространство", "видны"), [(ТЕНАНТ, True), ("GE", False)])
+def test_у_проверки_чужого_пространства_нет_кнопок_записи_письма(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]],
+    monkeypatch: pytest.MonkeyPatch,
+    пространство: str,
+    видны: bool,
+) -> None:
+    """Ревью #340, п.9: УК читает письмо проверки партнёра, но не пишет его."""
+    своя = карточка()
+    monkeypatch.setattr(
+        data,
+        "load_card",
+        lambda _id, *, reach: replace(
+            своя, inspection=replace(своя.inspection, tenant_code=пространство)
+        ),
+    )
+    monkeypatch.setattr(
+        data,
+        "load_letter",
+        lambda detail, *, lang=None: data.Letter(
+            text="Заготовка письма",
+            lang="ru",
+            source="pinned",
+            ready=True,
+            caveats=(),
+            failure=None,
+        ),
+    )
+    страница = client_страница(клиент[0])
+    for ключ in _КНОПКИ_ЗАПИСИ:
+        assert (t(ключ, "ru") in страница) is видны, ключ
+    for адрес in ("/letter/draft", "/letter/save"):
+        assert (f"/inspections/{ПРОВЕРКА}{адрес}" in страница) is видны, адрес
 
 
 def client_страница(client: FlaskClient) -> str:

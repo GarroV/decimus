@@ -10,7 +10,7 @@
   <div class="ov-head">
     <div class="ov-head__main">
       <h1 class="ov-head__title">{{ t('section.users.title') }}</h1>
-      <div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>
+      {% if manage %}<div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>{% endif %}
     </div>
   </div>
 
@@ -26,6 +26,10 @@
         <div class="note__text">{{ t('users.added.text') }}</div>
         <p class="pass"><code>{{ added.password }}</code></p>
       </div>
+    </div>
+  {% elif outcome == 'add_space_unknown' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.add.space_unknown') }}</div>
     </div>
   {% elif outcome == 'add_failed' %}
     <div class="note note--warn mt-gap">
@@ -49,6 +53,80 @@
     </div>
   {% endif %}
 
+  {% if outcome == 'bot_unset' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unset', var=bot_var) }}</div></div>
+  {% elif outcome == 'bot_link_failed' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.link_failed') }}</div></div>
+  {% elif outcome == 'bot_unlinked' %}
+    <div class="note note--ok mt-gap"><div class="note__text">{{ t('users.bot.unlinked') }}</div></div>
+  {% elif outcome == 'bot_unlink_missing' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_missing') }}</div></div>
+  {% elif outcome == 'bot_unlink_failed' %}
+    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_failed') }}</div></div>
+  {% endif %}
+
+  {# Привязка бота (D286): человек сам связывает свой Telegram со своей
+     учёткой — и тем самым со своим пространством. #}
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.bot.title') }}</div></div>
+    <div class="card__body">
+      {% if bot_link %}
+        {# Ссылка показана ЗДЕСЬ и один раз: в адрес она не попадает, а живёт
+           десять минут и срабатывает однажды. #}
+        <p>{{ t('users.bot.link') }}</p>
+        <p class="pass"><a href="{{ bot_link }}" rel="noopener noreferrer"><code>{{ bot_link }}</code></a></p>
+        <p class="field-note">{{ t('users.bot.until', time=bot_link_until.strftime('%H:%M') if bot_link_until else '') }}</p>
+      {% elif not own_binding_known %}
+        <p class="field-note">{{ t('users.bot.unknown') }}</p>
+      {% elif own_binding %}
+        <p>{{ t('users.bot.bound', id=own_binding.telegram_id, date=own_binding.bound_at.strftime('%Y-%m-%d %H:%M')) }}</p>
+        <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}" class="row">
+          <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
+        </form>
+      {% else %}
+        <p>{{ t('users.bot.unbound') }}</p>
+      {% endif %}
+      {% if not bot_link and own_binding_known %}
+        {% if bot_username %}
+          <form method="post" action="{{ url(users_path ~ '/bot-link') }}?lang={{ lang }}" class="row mt-gap">
+            <button class="btn btn--primary" type="submit">{{ t('users.bot.link_submit') }}</button>
+          </form>
+        {% else %}
+          <p class="field-note">{{ t('users.bot.unset', var=bot_var) }}</p>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+
+  {% if not manage %}
+    {# Не админ УК видит себя: вкладка открыта всем ради привязки бота (D286),
+       а управлять людьми может только админ УК (D288). #}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('users.self.title') }}</div></div>
+      <div class="card__body">
+        <div class="table-wrap">
+          <table class="table table--list">
+            <thead>
+              <tr>
+                <th class="is-text">{{ t('users.col.login') }}</th>
+                <th class="is-text">{{ t('users.col.space') }}</th>
+                <th class="is-text">{{ t('users.col.role') }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="is-text">{{ account.login }}</td>
+                <td class="is-text mono">{{ tenant }}</td>
+                <td class="is-text">{{ t('users.role.' ~ account.role) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="field-note">{{ t('users.self.text') }}</p>
+      </div>
+    </section>
+  {% endif %}
+
   {% if not people_known %}
     {# «База недоступна» и «людей нет» — разные вещи, и вторая была бы
        молчаливой ложью на экране, где считают людей с доступом. #}
@@ -60,14 +138,16 @@
 
   {# Список — первым: экран открывают посмотреть, у кого доступ, а заводят
      человека реже. Отключённые остаются в списке приглушёнными. #}
-  {% if people %}
+  {% if manage and people %}
     <div class="table-wrap mt-gap">
       <table class="table table--list">
         <thead>
           <tr>
             <th class="is-text">{{ t('users.col.login') }}</th>
+            <th class="is-text">{{ t('users.col.space') }}</th>
             <th class="is-text">{{ t('users.col.role') }}</th>
             <th class="is-text">{{ t('users.col.state') }}</th>
+            <th class="is-text">{{ t('users.col.bot') }}</th>
             <th>{{ t('users.col.created') }}</th>
             <th></th>
           </tr>
@@ -76,6 +156,7 @@
           {% for человек in people %}
             <tr{% if человек.disabled_at %} class="is-muted"{% endif %}>
               <td class="is-text">{{ человек.login }}</td>
+              <td class="is-text mono">{{ человек.tenant }}</td>
               <td class="is-text">{{ t('users.role.' ~ человек.role) }}</td>
               <td class="is-text">
                 {% if человек.disabled_at %}
@@ -84,11 +165,25 @@
                   {{ t('users.state.active') }}
                 {% endif %}
               </td>
+              <td class="is-text">
+                {% set привязка = bindings.get(человек.id) %}
+                {% if привязка %}
+                  <span class="mono">{{ привязка.telegram_id }}</span>
+                  <span class="mx-muted">{{ привязка.bound_at.strftime('%Y-%m-%d') }}</span>
+                  <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}">
+                    <input type="hidden" name="user_id" value="{{ человек.id }}">
+                    <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
+                  </form>
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
                 {% if not человек.disabled_at and человек.login != account.login %}
                   <form method="post" action="{{ url(users_path ~ '/disable') }}?lang={{ lang }}">
                     <input type="hidden" name="login" value="{{ человек.login }}">
+                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <button class="btn btn--sm" type="submit">{{ t('users.disable.submit') }}</button>
                   </form>
                 {% endif %}
@@ -99,6 +194,7 @@
       </table>
     </div>
   {% endif %}
+  {% if manage %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head"><div class="ov-card__title">{{ t('users.add.title') }}</div></div>
     <div class="card__body">
@@ -107,6 +203,14 @@
         <span class="field-label">{{ t('users.add.login') }}</span>
         <input class="input" name="login" required autocomplete="off"
                pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false">
+      </label>
+      <label>
+        <span class="field-label">{{ t('users.add.space') }}</span>
+        <select class="input" name="tenant">
+          {% for код in spaces %}
+            <option value="{{ код }}"{% if код == tenant %} selected{% endif %}>{{ код }}</option>
+          {% endfor %}
+        </select>
       </label>
       <label>
         <span class="field-label">{{ t('users.add.role') }}</span>
@@ -121,4 +225,5 @@
     <p class="field-note">{{ t('users.add.hint') }}</p>
     </div>
   </section>
+  {% endif %}
 {% endblock %}

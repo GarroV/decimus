@@ -268,7 +268,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     "section.tenants.title": {"ru": "Проект", "en": "Project"},
-    "section.users.title": {"ru": "Люди", "en": "People"},
+    # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
+    "section.users.title": {"ru": "Пользователи", "en": "Users"},
     "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
     # --- вход, выход, отказ (T323) -----------------------------------------
     # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
@@ -743,7 +744,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "мы отправили партнёру."
         ),
         "en": (
-            "An edit survives only if you press \u201cSave the letter\u201d: leaving the "
+            "An edit survives only if you press \u201cSave changes\u201d: leaving the "
             "page without saving loses it. The saved text is the answer to what exactly "
             "we sent the partner."
         ),
@@ -805,6 +806,66 @@ TEXTS: dict[str, dict[str, str]] = {
     "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
     "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
     "users.col.login": {"ru": "Логин", "en": "Login"},
+    # Пространства (волна 1, #340): админ УК видит людей всех пространств и
+    # заводит человека в выбранное (D282, D286).
+    "users.col.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.space_unknown": {
+        "ru": "Такого пространства нет. Выберите из списка.",
+        "en": "There is no such space. Pick one from the list.",
+    },
+    # Привязка бота через веб (D286): одноразовая ссылка своей учётке.
+    "users.col.bot": {"ru": "Бот", "en": "Bot"},
+    "users.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
+    "users.bot.bound": {
+        "ru": "Бот привязан: Telegram ID {id}, с {date}.",
+        "en": "The bot is linked: Telegram ID {id}, since {date}.",
+    },
+    "users.bot.unbound": {
+        "ru": "Бот не привязан. Привяжите его, чтобы проводить проверки в Telegram.",
+        "en": "The bot is not linked. Link it to run inspections in Telegram.",
+    },
+    "users.bot.unknown": {
+        "ru": "Не удалось узнать, привязан ли бот. Это не значит, что не привязан.",
+        "en": "Could not check whether the bot is linked. That does not mean it is not.",
+    },
+    "users.bot.link_submit": {"ru": "Привязать бота", "en": "Link the bot"},
+    "users.bot.link": {
+        "ru": "Откройте эту ссылку в Telegram на своём телефоне — бот привяжется к вашей учётке:",
+        "en": "Open this link in Telegram on your phone — the bot will link to your account:",
+    },
+    "users.bot.until": {
+        "ru": "Ссылка одноразовая и действует 10 минут (до {time}). Новая ссылка отменяет прежнюю.",
+        "en": (
+            "The link works once and for 10 minutes (until {time}). A new link cancels the old one."
+        ),
+    },
+    "users.bot.unset": {
+        "ru": "Привязка бота на этом стенде не настроена: не задана переменная {var}.",
+        "en": "Bot linking is not set up on this server: the {var} variable is not set.",
+    },
+    "users.bot.link_failed": {
+        "ru": "Ссылку выпустить не вышло — база не ответила. Попробуйте ещё раз.",
+        "en": "Could not issue the link — the database did not respond. Try again.",
+    },
+    "users.bot.unlink": {"ru": "Отвязать", "en": "Unlink"},
+    "users.bot.unlinked": {
+        "ru": "Бот отвязан. Этот Telegram больше не проводит проверки от учётки.",
+        "en": "The bot is unlinked. This Telegram no longer runs inspections for the account.",
+    },
+    "users.bot.unlink_missing": {
+        "ru": "Привязки не было — отвязывать нечего.",
+        "en": "There was no link — nothing to unlink.",
+    },
+    "users.bot.unlink_failed": {
+        "ru": "Отвязать не вышло — база не ответила. Попробуйте ещё раз.",
+        "en": "Could not unlink — the database did not respond. Try again.",
+    },
+    "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
+    "users.self.text": {
+        "ru": "Людей заводит и отключает администратор УК.",
+        "en": "People are added and disabled by an HQ administrator.",
+    },
     "users.col.role": {"ru": "Что можно", "en": "Access"},
     "users.col.state": {"ru": "Состояние", "en": "State"},
     "users.col.created": {"ru": "Заведён", "en": "Added"},
@@ -1017,6 +1078,20 @@ TEXTS: dict[str, dict[str, str]] = {
     "methodology.published": {
         "ru": "Опубликована версия {version}. Проверки считаются по ней начиная с этой минуты.",
         "en": "Version {version} is published. Inspections are scored by it from now on.",
+    },
+    # Методика по пространству (волна 1, #340; D283). Чужой и несуществующий
+    # чек-лист — один текст: иначе ответ подтверждал бы, что чужое есть.
+    "methodology.not_found": {
+        "ru": "Чек-листа «{code}» нет.",
+        "en": "There is no checklist “{code}”.",
+    },
+    "methodology.etalon_readonly": {
+        "ru": "Эталон правит только УК. Здесь его можно смотреть, но не менять.",
+        "en": "Only HQ edits the reference checklist. You can view it here but not change it.",
+    },
+    "methodology.foreign_readonly": {
+        "ru": "Чек-лист другого пространства открыт только для чтения.",
+        "en": "A checklist of another space is read-only.",
     },
     "methodology.saved": {
         "ru": (

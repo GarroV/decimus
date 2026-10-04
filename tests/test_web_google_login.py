@@ -10,10 +10,12 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 import pytest
+from flask import Response
 from flask.testing import FlaskClient
 from web_harness import Сессия, Учётка, подменить_двери, собрать
 
 from src.web import auth
+from src.web import inspections as data
 from src.web.google_auth import GoogleAuthError, GoogleIdentity, GoogleSettings
 
 ТЕНАНТ = "rs"
@@ -58,7 +60,7 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     monkeypatch.setattr(
         auth,
         "find_by_email",
-        lambda email, *, tenant: Учётка(tenant=tenant) if email == ПОЧТА_СВОЯ else None,
+        lambda email: Учётка(tenant=ТЕНАНТ) if email == ПОЧТА_СВОЯ else None,
     )
     monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -127,6 +129,46 @@ def test_знакомая_почта_пускает_внутрь(клиент: F
     assert ответ.status_code == 302
     assert обмен.звали == 1
     assert auth.COOKIE_NAME in ответ.headers.get("Set-Cookie", "")
+
+
+def test_стенд_уК_впускает_через_google_учётку_партнёра_в_её_пространство(
+    monkeypatch: pytest.MonkeyPatch, обмен: Обмен
+) -> None:
+    """Аналог формы (D282, ревью Task 4 круг 1, Minor 1б): Google на стенде УК
+    тоже отдаёт пространство УЧЁТКИ, а не стенда.
+
+    `подменить_двери(..., tenant="GE")` держит и опознание, и сессию на
+    пространстве УЧЁТКИ; `find_by_email` подменён тем же пространством —
+    ровно то, что вернула бы настоящая строка `web_users`. Стенд собран на
+    `tenant="HQ"`: это и есть проверяемый сценарий.
+    """
+    подменить_двери(monkeypatch, tenant="GE")
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant="GE"))
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+
+    app = собрать(tenant="HQ")
+    увиденные_пространства: list[str] = []
+
+    @app.after_request
+    def _запомнить_пространство_вошедшего(response: Response) -> Response:
+        учётка = auth.current_account()
+        if учётка is not None:
+            увиденные_пространства.append(учётка.tenant)
+        return response
+
+    with app.test_client() as client:
+        метка = метка_захода(client)
+        вход = client.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+        assert вход.status_code == 302
+        assert auth.COOKIE_NAME in вход.headers.get("Set-Cookie", "")
+        ответ = client.get("/inspections")
+        assert ответ.status_code == 200
+
+    assert обмен.звали == 1
+    assert увиденные_пространства == ["GE"], (
+        "приложение обязано увидеть пространство УЧЁТКИ, а не тенант стенда"
+    )
 
 
 def test_незнакомая_почта_получает_отказ_а_не_учётку(клиент: FlaskClient, обмен: Обмен) -> None:
@@ -204,7 +246,7 @@ def test_через_фронт_google_получает_адрес_фронта_�
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
     с_фронтом = replace(РЕКВИЗИТЫ, front_redirect_uri=ФРОНТ)
     monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: с_фронтом)
-    monkeypatch.setattr(auth, "find_by_email", lambda email, *, tenant: Учётка(tenant=tenant))
+    monkeypatch.setattr(auth, "find_by_email", lambda email: Учётка(tenant=ТЕНАНТ))
     monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
     виденные: list[str] = []
     исходный = обмен.__call__

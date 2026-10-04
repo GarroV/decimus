@@ -125,74 +125,25 @@ def test_auditor_names_with_non_numeric_id_is_config_error() -> None:
         load_bot_settings(env)
 
 
-def test_auditor_name_for_id_outside_allowed_list_is_config_error() -> None:
-    """Две разъезжающиеся копии списка ID — источник тихой ошибки: имя есть, доступа нет."""
-    env = {
-        "TELEGRAM_BOT_TOKEN": "123:abc",
-        "ALLOWED_TELEGRAM_IDS": "111",
-        "AUDITOR_NAMES": "999:Чужой",
-    }
-    with pytest.raises(BotConfigError, match="999"):
-        load_bot_settings(env)
-
-
-# --- приглашения по юзернейму (#230) -----------------------------------------
-
-
-def test_invites_are_parsed_into_settings() -> None:
+def test_name_for_id_outside_allowed_list_is_accepted() -> None:
+    """D286: привязавший бота через веб в списке разрешённых не стоит, а имя ему нужно."""
     settings = load_bot_settings(
         {
             "TELEGRAM_BOT_TOKEN": "123:abc",
             "ALLOWED_TELEGRAM_IDS": "111",
-            "BOT_INVITES": "@Apetrov:Anna Petrova,sidorov",
-        }
-    )
-    assert set(settings.invites) == {"apetrov", "sidorov"}
-    assert settings.invites["apetrov"].name == "Anna Petrova"
-
-
-def test_stand_without_invites_still_starts() -> None:
-    """Переменная необязательна: стенд, куда никого не приглашают."""
-    settings = load_bot_settings({"TELEGRAM_BOT_TOKEN": "123:abc", "ALLOWED_TELEGRAM_IDS": "111"})
-    assert settings.invites == {}
-
-
-def test_broken_invite_stops_the_start() -> None:
-    with pytest.raises(BotConfigError, match="не похоже на юзернейм"):
-        load_bot_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "123:abc",
-                "ALLOWED_TELEGRAM_IDS": "111",
-                "BOT_INVITES": "Anna Petrova",
-            }
-        )
-
-
-def test_name_for_invited_id_is_allowed_while_invites_exist() -> None:
-    """ID приглашённого до его первого сообщения не знает никто.
-
-    Пока приглашения заданы, список разрешённых перестаёт быть полным
-    перечнем тех, чьё имя уместно назвать, — и сверка по нему отказывала бы
-    старту из-за ВЕРНОЙ записи.
-    """
-    settings = load_bot_settings(
-        {
-            "TELEGRAM_BOT_TOKEN": "123:abc",
-            "ALLOWED_TELEGRAM_IDS": "111",
-            "BOT_INVITES": "apetrov:Anna Petrova",
             "AUDITOR_NAMES": "555000111:Пётр Петров",
         }
     )
     assert settings.auditor_names == {555000111: "Пётр Петров"}
 
 
-def test_without_invites_the_old_guarantee_holds() -> None:
-    """Приглашений нет — прежняя сверка на месте целиком."""
-    with pytest.raises(BotConfigError, match="не входит"):
-        load_bot_settings(
-            {
-                "TELEGRAM_BOT_TOKEN": "123:abc",
-                "ALLOWED_TELEGRAM_IDS": "111",
-                "AUDITOR_NAMES": "999:Кто-то",
-            }
-        )
+def test_invites_variable_is_no_longer_read() -> None:
+    """Приглашения по юзернейму сняты: прежняя переменная не открывает доступ."""
+    settings = load_bot_settings(
+        {
+            "TELEGRAM_BOT_TOKEN": "123:abc",
+            "ALLOWED_TELEGRAM_IDS": "111",
+            "BOT_INVITES": "apetrov:Anna Petrova",
+        }
+    )
+    assert not hasattr(settings, "invites")

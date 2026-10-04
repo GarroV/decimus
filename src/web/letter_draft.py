@@ -96,9 +96,13 @@ def install(app: Flask, conf: Settings) -> None:
     @app.post(f"{реестр}/<inspection_id>/letter/draft", endpoint="letter_draft")
     def letter_draft(inspection_id: str) -> Response | tuple[str, int]:
         refuse_foreign_origin()
-        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        if not auth.is_own(detail.inspection.tenant_code):
+            # Черновик письма — запись от имени пространства: по проверке,
+            # которую вошедший только читает (D283), — отказ.
+            return render_template("users/forbidden.html"), 403
 
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
         текст = request.form.get("text") or ""
@@ -109,6 +113,7 @@ def install(app: Flask, conf: Settings) -> None:
         try:
             data.remember_letter(
                 inspection_id,
+                tenant=auth.current_tenant(),
                 body=текст,
                 lang=письмо_на,
                 saved_by="—" if вошедший is None else вошедший.login,
@@ -188,9 +193,13 @@ def install(app: Flask, conf: Settings) -> None:
         if not код or реквизиты is None:
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
 
-        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        if not auth.is_own(detail.inspection.tenant_code):
+            # Черновик письма — запись от имени пространства: по проверке,
+            # которую вошедший только читает (D283), — отказ.
+            return render_template("users/forbidden.html"), 403
 
         # Из ЗАФИКСИРОВАННОГО письма, а не из заготовки: заготовка
         # пересобирается и к этому моменту могла бы дать другой текст, чем

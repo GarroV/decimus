@@ -17,6 +17,7 @@ pytest.importorskip("psycopg")
 
 from src.db.push import push_inspection
 from src.db.queries import item_usage
+from src.db.reach import own_reach
 from src.db.retract import retract_inspection
 from src.domain import add_finding, start_inspection
 
@@ -49,7 +50,7 @@ def test_сводка_пункта_не_считает_отклонённую(do
     retract_inspection(лишняя, tenant="default", reason="дубль")
 
     # Act
-    сводка = item_usage(tenant="default", code=ПУНКТ.lower(), checklist="bizdev")
+    сводка = item_usage(reach=own_reach("default"), code=ПУНКТ.lower(), checklist="bizdev")
 
     # Assert
     assert (сводка.records, сводка.units, сводка.inspections) == (3, 2, 2)
@@ -63,7 +64,7 @@ def test_пункт_чужого_чеклиста_не_смешивается(do
     _проверка(904, "Белград-1", 1)
 
     # Act
-    сводка = item_usage(tenant="default", code=ПУНКТ, checklist="rnd")
+    сводка = item_usage(reach=own_reach("default"), code=ПУНКТ, checklist="rnd")
 
     # Assert — у чек-листа rnd проверок нет, и сводка пуста, а не общая.
     assert (сводка.records, сводка.units, сводка.last_date) == (0, 0, None)

@@ -26,7 +26,9 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import web_throttle
+from src.db import bot_links, web_throttle
+from src.db.reach import Reach
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth
 from src.web.app import create_app
 from src.web.config import Settings
@@ -145,11 +147,18 @@ def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Сч
 def подменить_двери(
     monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str = "auditor"
 ) -> dict[str, list[Any]]:
-    """Двери опознания, подменённые на границе модуля. Пишут, кого звали."""
+    """Двери опознания, подменённые на границе модуля. Пишут, кого звали.
+
+    `tenant` — пространство УЧЁТКИ, которую отдают двери при удаче: именно оно
+    едет в возвращаемой `Учётка`. Тенант стенда задаёт `собрать(tenant=...)` —
+    это вторая, независимая настройка: с D282 учётка любого пространства
+    входит через любой стенд, и опознание своего тенанта стенда больше не
+    знает вовсе.
+    """
     зовы: dict[str, list[Any]] = {"authenticate": [], "open": [], "resolve": [], "close": []}
 
-    def _authenticate(login: str, password: str, *, tenant: str) -> Учётка | None:
-        зовы["authenticate"].append((login, password, tenant))
+    def _authenticate(login: str, password: str) -> Учётка | None:
+        зовы["authenticate"].append((login, password))
         if login == ЛОГИН and password == ПАРОЛЬ:
             return Учётка(tenant=tenant, role=role)
         return None
@@ -158,8 +167,8 @@ def подменить_двери(
         зовы["open"].append(account.login)
         return Сессия()
 
-    def _resolve(token: str, *, tenant: str) -> Учётка | None:
-        зовы["resolve"].append((token, tenant))
+    def _resolve(token: str) -> Учётка | None:
+        зовы["resolve"].append((token,))
         return Учётка(tenant=tenant, role=role) if token == ТОКЕН else None
 
     def _close(token: str) -> bool:
@@ -170,6 +179,14 @@ def подменить_двери(
     monkeypatch.setattr(auth, "open_session", _open)
     monkeypatch.setattr(auth, "resolve_session", _resolve)
     monkeypatch.setattr(auth, "close_session", _close)
+    # Охват вошедшего (волна 1, #340) у партнёра читает его страны из базы.
+    # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
+    # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.
+    monkeypatch.setattr(auth, "reach_of", охват_без_базы)
+    # Привязка бота (D286) на вкладке «Пользователи» тоже читает базу: по
+    # умолчанию бот не привязан ни у кого. Наборы про привязку подменяют сами.
+    monkeypatch.setattr(bot_links, "binding_of", lambda _user_id: None)
+    monkeypatch.setattr(bot_links, "live_bindings", lambda: {})
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.
@@ -177,7 +194,15 @@ def подменить_двери(
     return зовы
 
 
-def собрать(*, tenant: str, ui_lang: str = "ru") -> Flask:
+def охват_без_базы(tenant: str) -> Reach:
+    """Охват пространства без похода в базу: УК — всё, партнёр — страна его кода."""
+    код = canonical_tenant(tenant)
+    if код == HQ_TENANT:
+        return Reach(код, None, None)
+    return Reach(код, None, (код,))
+
+
+def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None = None) -> Flask:
     """Приложение с настройками стенда набора."""
     app = create_app(
         Settings(
@@ -186,6 +211,7 @@ def собрать(*, tenant: str, ui_lang: str = "ru") -> Flask:
             tenant=tenant,
             ui_lang=ui_lang,
             secret_key=СЕКРЕТ,
+            bot_username=bot_username,
         )
     )
     app.config.update(TESTING=True)

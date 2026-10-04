@@ -36,6 +36,7 @@ from flask import Flask, g, make_response, redirect, render_template, request, u
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
+from src.db.reach import Reach, reach_of
 from src.db.web_access import (
     SESSION_TTL,
     Account,
@@ -47,6 +48,7 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.tenants import canonical_tenant
 
 from .config import Settings
 from .google_auth import (
@@ -102,12 +104,45 @@ def current_account() -> Account | None:
     return getattr(g, CURRENT, None)
 
 
+#: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
+REACH = "reach"
+
+
+def current_tenant() -> str:
+    """Пространство вошедшего — для записи (D283).
+
+    Без вошедшего — ошибка кода, а не «покажем УК»: маршрут, дошедший сюда без
+    человека, прошёл мимо заслона, и молчаливый тенант по умолчанию спрятал бы это.
+    """
+    account = current_account()
+    if account is None:
+        raise RuntimeError("current_tenant() вызван без вошедшего: маршрут прошёл мимо заслона")
+    return canonical_tenant(account.tenant)
+
+
+def is_own(tenant_code: str) -> bool:
+    """Запись принадлежит пространству вошедшего — писать можно только такую (D283)."""
+    return canonical_tenant(tenant_code) == current_tenant()
+
+
+def current_reach() -> Reach:
+    """Охват вошедшего — для чтения (D283, D289). Считается один раз на запрос."""
+    охват = getattr(g, REACH, None)
+    if охват is None:
+        охват = reach_of(current_tenant())
+        setattr(g, REACH, охват)
+    return охват
+
+
 def install(app: Flask, conf: Settings) -> None:
     """Повесить заслон и зарегистрировать вход с выходом."""
     signer = URLSafeTimedSerializer(
         conf.secret_key, salt=COOKIE_SALT, signer_kwargs={"digest_method": hashlib.sha256}
     )
     max_age = int(SESSION_TTL.total_seconds())
+    # Счётчик попыток ведётся по тенанту СТЕНДА: до входа пространство
+    # человека неизвестно, а счётчик — защита от перебора, не граница.
+    рубеж = conf.tenant
 
     def token_of_request() -> str | None:
         """Токен из куки, если подпись наша и не просрочена. Иначе — ничего."""
@@ -152,7 +187,7 @@ def install(app: Flask, conf: Settings) -> None:
         if request.endpoint in OPEN_ENDPOINTS:
             return None
         token = token_of_request()
-        account = resolve_session(token, tenant=conf.tenant) if token else None
+        account = resolve_session(token) if token else None
         if account is None:
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
@@ -188,10 +223,10 @@ def install(app: Flask, conf: Settings) -> None:
         # лишних параллельных попыток, сколько у сервера потоков (T328). Сверка
         # пароля идёт ПОСЛЕ: смысл ограничителя в том, что запертый не доходит
         # до дорогой части вовсе — ни до scrypt, ни до базы учёток.
-        попытка = admit_attempt(tenant=conf.tenant, address=адрес, login=имя)
+        попытка = admit_attempt(tenant=рубеж, address=адрес, login=имя)
         if not попытка.admitted:
             return заперто(попытка.verdict)
-        account = authenticate(имя, request.form.get("password") or "", tenant=conf.tenant)
+        account = authenticate(имя, request.form.get("password") or "")
         if account is None:
             if попытка.verdict.locked:
                 return заперто(попытка.verdict)
@@ -201,7 +236,7 @@ def install(app: Flask, conf: Settings) -> None:
             # пароль, и он уехал бы в разметку, а оттуда в кэш и в снимок
             # экрана.
             return render_template("login.html", failed=True, locked_minutes=None), 401
-        note_success(tenant=conf.tenant, address=адрес, login=имя)
+        note_success(tenant=рубеж, address=адрес, login=имя)
         session = open_session(account)
         return remember(redirect(url_for("home")), session)
 
@@ -302,12 +337,12 @@ def install(app: Flask, conf: Settings) -> None:
         # ВОТ ЗДЕСЬ круг допущенных: Google подтвердил владение почтой и не
         # более того. Незнакомая почта получает отказ, а не заводит учётку —
         # иначе круг допущенных задавал бы Google, а не владелец.
-        account = find_by_email(кто.email, tenant=conf.tenant)
+        account = find_by_email(кто.email)
         if account is None:
             return отказано
 
         note_success(
-            tenant=conf.tenant,
+            tenant=рубеж,
             address=client_address(trusted_proxies=conf.trusted_proxies),
             login=account.login,
         )

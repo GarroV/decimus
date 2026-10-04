@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import пространства_для_теста, точка_пространства
 
 pytest.importorskip("psycopg")
 
@@ -37,8 +38,16 @@ from src.mcp.tools import read_findings_over_period
 
 pytestmark = requires_db
 
-АРЕНДАТОР_А = "партнёр-а"
-АРЕНДАТОР_Б = "партнёр-б"
+# Коды пространств совпадают с кодами их стран (волна 1, D284): точки партнёров
+# заводятся в справочнике УК этой страны, пространства привязаны к ней.
+АРЕНДАТОР_А = "GE"
+АРЕНДАТОР_Б = "AM"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    пространства_для_теста(request, АРЕНДАТОР_А, АРЕНДАТОР_Б)
+
 
 #: Строка карты слов в `tests/methodology`: «Печь | CLN05 | TEH05», две колонки —
 #: «Грязь» и «Поломка». Модель предлагает CLN05 (нагар), аудитор записывает
@@ -56,6 +65,7 @@ def _проверка(
     предложение: Suggestion | None = None,
     слова: str = "",
 ) -> str:
+    точка_пространства(точка, tenant=арендатор)
     start_inspection(
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор, date=дата
     )

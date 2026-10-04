@@ -12,16 +12,29 @@
 push_inspection(chat_id: int) -> str          # id проверки в базе; повторный вызов не создаёт дубль
 upload_photos(inspection_id: str, *, fetch: Callable[[str], bytes | None],
               allow_missing: bool = False) -> int   # сколько кадров выгружено в хранилище
-list_inspections(*, tenant: str, unit: str | None = None,
+# охват чтения (волна 1, #340; D283, D284, D289) — src/db/reach.py
+# Reach(tenant, tenants, countries): кто читает; чьи проверки (None — всех);
+#   пиццерии каких стран (None — всех, () — ничего). Reach.params() — массивы
+#   в неизменный текст запроса (S608).
+# reach_of(tenant): УК — Reach("HQ", None, None); партнёр — Reach(t, None,
+#   его страны из space_countries); без стран — ничего (закрыто по умолчанию).
+# own_reach(tenant): только свои проверки — снятие проверки (retraction) и
+#   изоляция партнёров в тестах. Веб и MCP читают по reach_of вошедшего/токена.
+# Чтение принимает reach, запись — tenant (своё пространство). Исключение —
+# previous_inspection(*, tenant, unit): повтор ×2 (D255) по своему пространству.
+list_inspections(*, reach: Reach, unit: str | None = None,
                  date_from: date | None = None, date_to: date | None = None,
-                 limit: int = 100) -> list[InspectionRow]   # арендатор обязателен (T110)
+                 limit: int = 100) -> list[InspectionRow]   # охват обязателен (T110)
 
-# чтение проверки целиком и находок (T114); арендатор так же обязателен
+# чтение проверки целиком и находок (T114); охват так же обязателен
 # InspectionDetail.info — информационная часть проверки в ЗАПИСАННОМ порядке
 # (T200): tuple[InfoRow, ...], у поля код пункта методики и ответ аудитора
-get_inspection(inspection_id: str, *, tenant: str) -> InspectionDetail | None
-findings_by_unit(*, tenant: str, unit: str,
+get_inspection(inspection_id: str, *, reach: Reach) -> InspectionDetail | None
+findings_by_unit(*, reach: Reach, unit: str,
                  limit: int = 100) -> list[FindingRow]
+# на охвате же: zone_losses, systemic_findings, class_counts, worst_zones,
+# units_total, unit_ids, unit_geography, edition_first_used, item_usage,
+# reports.latest_report, previews.finding_previews/preview_bytes, move.list_moves
 
 # снятие сданной проверки из истории (T210, T233; D086, D089)
 # причина обязательна; повторный вызов не переписывает её и доделывает уборку кадров
@@ -36,7 +49,31 @@ get_inspection(..., include_retracted: bool = False)
 upsert_unit(name: str, *, code: str | None = None,
             aliases: tuple[str, ...] = (), tenant: str = "default") -> str   # id точки
 resolve_unit(name: str, *, tenant: str = "default") -> Unit | None           # по любому написанию
-list_units(*, tenant: str = "default") -> list[Unit]
+list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # справочник УК в охвате
+# слив партнёра ищет точку в справочнике УК и точек не заводит (D234, #471);
+# точку чужой страны не пишет сторож схемы inspections_unit_of_space (0030)
+
+# логин единый на систему (0028, D282): уникальные login и email во всей базе;
+#   накат отказывает на двойниках и называет запрос, которым их найти
+
+# пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
+SpaceRow(code, name, countries: tuple[str, ...], people: int)
+check_space_code(code) -> str      # ^[A-Z][A-Z0-9_-]{1,31}$, не legacy-код
+space_exists(code) -> bool         # роль приложения
+create_space(code, *, name) -> SpaceRow        # совпадение без учёта регистра — отказ
+list_spaces() -> tuple[SpaceRow, ...]
+bind_countries(space, countries) -> tuple[str, ...]   # всё или ничего; страна
+#   другого пространства — AccessError с его кодом; HQ стран не имеет
+# команда: make space ARGS="add|countries|list ..." (tools/space.py)
+
+# привязка бота к учётке (0031, D286) — src/db/bot_links.py, роль приложения
+issue_link(user_id) -> IssuedLink(token, expires_at)   # 10 минут, прежние гаснут;
+#   в базе только отпечаток SHA-256
+redeem(token, *, telegram_id) -> Binding | None        # одна транзакция; None —
+#   один ответ на все отказы; погашение и отвязка односторонние (RLS restrictive)
+resolve(telegram_id) / binding_of(user_id) -> Binding | None
+live_bindings() -> dict[user_id, Binding]   unbind(user_id) -> bool
+# Binding(telegram_id, user_id, login, tenant, bound_at): tenant — из web_users
 
 # карта синонимов формулировок: как сказал аудитор → код пункта (T284, D119)
 lookup_phrase(text: str, *, lang: str, tenant: str = "default") -> PhraseAlias | None
@@ -189,6 +226,13 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
   отдельным контейнером. У s3mock корзина создаётся переменной `initialBuckets`,
   лицензия Apache-2.0, образ есть под arm64 (проверено запуском). Тома у стенда
   нет намеренно: это площадка для смоука, а не место, где можно держать кадры.
+- **Волна 1 (#340, D284): справочник один, и проверка ссылается на точку по
+  `unit_id`.** Составная ссылка проверки и переносов снята миграцией `0030`;
+  правило «чья точка годится» держит триггер `inspections_unit_of_space`:
+  точка своего тенанта либо справочника УК из стран пространства
+  (`space_countries`, `0029`, страна — ключ: одна страна, одно пространство).
+  Абзацы ниже описывают устройство до волны; у синонимов составная ссылка
+  осталась.
 - **Разделение арендаторов держится схемой, а не дисциплиной запросов.** И
   синоним, и сама проверка ссылаются на точку составной ссылкой
   `(tenant_code, unit_id) → units (tenant_code, id)`. До этого ссылка шла на

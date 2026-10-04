@@ -22,6 +22,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.directory import list_units, resolve_unit, upsert_unit  # noqa: E402
 from src.db.errors import PushError  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.db.units import normalize_unit_name  # noqa: E402
 
 pytestmark = requires_db
@@ -145,7 +146,7 @@ def test_list_units_отдаёт_справочник_арендатора_по_
     upsert_unit("Белград", aliases=("БГ",), tenant="default")
     upsert_unit("Партнёрская точка", tenant="partner")
 
-    справочник = list_units(tenant="default")
+    справочник = list_units(reach=own_reach("default"))
 
     assert [точка.name for точка in справочник] == ["Белград", "Ниш"]
     белград = справочник[0]
@@ -203,7 +204,7 @@ def test_каноничное_название_сильнее_синонима(d
 def test_география_точки_записывается_и_читается(db_env: str) -> None:
     upsert_unit("Тбилиси-9", country="GE", city="Tbilisi")
 
-    найдена = [т for т in list_units() if т.name == "Тбилиси-9"]
+    найдена = [т for т in list_units(reach=own_reach("HQ")) if т.name == "Тбилиси-9"]
 
     assert len(найдена) == 1
     assert найдена[0].country == "GE"
@@ -223,7 +224,7 @@ def test_повторное_заведение_без_географии_её_н
 
     upsert_unit("Белград-9")
 
-    точка = next(т for т in list_units() if т.name == "Белград-9")
+    точка = next(т for т in list_units(reach=own_reach("HQ")) if т.name == "Белград-9")
     assert точка.country == "RS"
     assert точка.city == "beograd"
 
@@ -234,7 +235,7 @@ def test_страновой_срез_не_отдаёт_чужие_и_безро�
     upsert_unit("Загреб-9", country="HR", city="zagreb")
     upsert_unit("Без страны-9")
 
-    армянские = {т.name for т in list_units(country="AM")}
+    армянские = {т.name for т in list_units(reach=own_reach("HQ"), country="AM")}
 
     assert "Ереван-9" in армянские
     assert "Загреб-9" not in армянские
@@ -249,7 +250,7 @@ def test_код_страны_приводится_к_одному_виду(db_en
     """
     upsert_unit("Батуми-9", country=" ge ", city="batumi")
 
-    срез = {т.name for т in list_units(country="ge")}
+    срез = {т.name for т in list_units(reach=own_reach("HQ"), country="ge")}
 
     assert "Батуми-9" in срез
 
@@ -279,7 +280,7 @@ def test_повторное_заведение_по_коду_географию_
 
     upsert_unit("Лагос-9 (новое имя)", code="NG-LAG-9")
 
-    точка = next(т for т in list_units() if т.code == "NG-LAG-9")
+    точка = next(т for т in list_units(reach=own_reach("HQ")) if т.code == "NG-LAG-9")
     assert точка.name == "Лагос-9 (новое имя)"
     assert точка.country == "NG"
     assert точка.city == "lagos"

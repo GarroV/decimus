@@ -18,13 +18,19 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import RETRACTION_URL_VAR, set_retraction_env
+from db_harness import (
+    RETRACTION_URL_VAR,
+    set_retraction_env,
+    привязать_страну,
+    точка_справочника,
+)
 
 psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import ConfigError, DbError, RetractionError  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import findings_by_unit, get_inspection, list_inspections  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.db.retract import retract_inspection  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
@@ -136,9 +142,12 @@ def test_снятие_повторяемо_и_причину_не_перепис
 # --- чего снять нельзя --------------------------------------------------------
 
 
-def test_чужую_проверку_снять_нельзя(domain_env: Path, retraction_env: str) -> None:
+def test_чужую_проверку_снять_нельзя(domain_env: Path, pg_dsn: str, retraction_env: str) -> None:
     """Арендатор — не украшение вызова: снять можно только своё."""
-    чужая = _проверка(405, точка="Будапешт-1", арендатор="partner-b")
+    # Партнёр сливает на точку справочника УК своей страны (D284).
+    точка_справочника("Будапешт-1", country="HU")
+    привязать_страну(pg_dsn, tenant="HU", country="HU")
+    чужая = _проверка(405, точка="Будапешт-1", арендатор="HU")
 
     with pytest.raises(RetractionError) as отказ:
         retract_inspection(чужая, tenant="default", reason=ПРИЧИНА)
@@ -202,7 +211,7 @@ def test_снятой_проверки_в_истории_не_видно(domain_
     живая = _проверка(409, точка="Белград-2")
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
-    видно = {строка.id for строка in list_inspections(tenant="default")}
+    видно = {строка.id for строка in list_inspections(reach=own_reach("default"))}
 
     assert живая in видно
     assert снятая not in видно
@@ -216,7 +225,8 @@ def test_администратор_видит_снятую_и_видит_что
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
     строки = {
-        строка.id: строка for строка in list_inspections(tenant="default", include_retracted=True)
+        строка.id: строка
+        for строка in list_inspections(reach=own_reach("default"), include_retracted=True)
     }
 
     assert снятая in строки
@@ -233,7 +243,8 @@ def test_живая_проверка_снятой_не_помечена(domain_e
     живая = _проверка(411)
 
     строки = {
-        строка.id: строка for строка in list_inspections(tenant="default", include_retracted=True)
+        строка.id: строка
+        for строка in list_inspections(reach=own_reach("default"), include_retracted=True)
     }
 
     assert строки[живая].retracted is False
@@ -247,9 +258,9 @@ def test_снятая_проверка_по_идентификатору_отв�
     ident = _проверка(412)
     retract_inspection(ident, tenant="default", reason=ПРИЧИНА)
 
-    assert get_inspection(ident, tenant="default") is None
+    assert get_inspection(ident, reach=own_reach("default")) is None
 
-    подробно = get_inspection(ident, tenant="default", include_retracted=True)
+    подробно = get_inspection(ident, reach=own_reach("default"), include_retracted=True)
     assert подробно is not None
     assert подробно.inspection.retracted is True
     assert подробно.inspection.retraction_reason == ПРИЧИНА
@@ -264,7 +275,7 @@ def test_находки_снятой_проверки_из_истории_точ
     _проверка(414)
     retract_inspection(снятая, tenant="default", reason=ПРИЧИНА)
 
-    находки = findings_by_unit(tenant="default", unit=ТОЧКА)
+    находки = findings_by_unit(reach=own_reach("default"), unit=ТОЧКА)
 
     проверки = {находка.inspection_id for находка in находки}
     assert len(находки) == 1, "находки снятой проверки остались в истории точки"
@@ -289,9 +300,11 @@ def test_после_снятия_ту_же_проверку_можно_слит�
     второй = push_inspection(415)
 
     assert второй != первый, "слив вернул снятую проверку вместо новой"
-    видно = {строка.id for строка in list_inspections(tenant="default")}
+    видно = {строка.id for строка in list_inspections(reach=own_reach("default"))}
     assert видно == {второй}
-    всего = {строка.id for строка in list_inspections(tenant="default", include_retracted=True)}
+    всего = {
+        строка.id for строка in list_inspections(reach=own_reach("default"), include_retracted=True)
+    }
     assert всего == {первый, второй}, "снятая проверка пропала из истории администратора"
 
 
@@ -328,6 +341,6 @@ def test_без_подключения_администратора_снятых
     monkeypatch.delenv(RETRACTION_URL_VAR, raising=False)
 
     with pytest.raises(ConfigError):
-        list_inspections(tenant="default", include_retracted=True)
+        list_inspections(reach=own_reach("default"), include_retracted=True)
     with pytest.raises(ConfigError):
-        get_inspection(str(_проверка(419)), tenant="default", include_retracted=True)
+        get_inspection(str(_проверка(419)), reach=own_reach("default"), include_retracted=True)

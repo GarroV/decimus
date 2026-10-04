@@ -20,10 +20,16 @@ import psycopg
 
 from .config import check_environment
 from .errors import PushError
+from .queries import _require_inspection_id, _require_tenant
 
+# Письмо ложится только к проверке пространства, которое его фиксирует: сверка
+# `tenant_code` стоит в самом запросе, а не только в вызывающем (ревью #340,
+# п.7). Чужая проверка и несуществующая дают один ответ — пустой `returning`.
 _INSERT_LETTER_SQL = """
 insert into partner_letters (inspection_id, body, lang, saved_by)
-values (%(inspection_id)s, %(body)s, %(lang)s, %(saved_by)s)
+select i.id, %(body)s, %(lang)s, %(saved_by)s
+  from inspections i
+ where i.id = %(inspection_id)s and i.tenant_code = %(tenant)s
 returning id, created_at
 """
 
@@ -34,8 +40,6 @@ where inspection_id = %s and (%s::text is null or lang = %s)
 order by created_at desc, id desc
 limit 1
 """
-
-_SELECT_INSPECTION_SQL = "select 1 from inspections where id = %s"
 
 
 @dataclass(frozen=True)
@@ -49,7 +53,9 @@ class SavedLetter:
     created_at: datetime
 
 
-def save_letter(inspection_id: str, *, body: str, lang: str, saved_by: str) -> SavedLetter:
+def save_letter(
+    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
+) -> SavedLetter:
     """Зафиксировать письмо партнёру в том виде, в каком его подтвердил человек.
 
     Пустой текст — отказ, а не пустая запись: письмо из пробелов выглядит в
@@ -59,7 +65,12 @@ def save_letter(inspection_id: str, *, body: str, lang: str, saved_by: str) -> S
     Прежние записи не трогаются. Передумал — фиксируется НОВОЕ письмо, и обе
     записи видно: из истории нельзя вынуть отправленное, иначе она перестаёт
     быть историей.
+
+    `tenant` — пространство того, кто фиксирует: письмо к проверке другого
+    пространства не ложится, и отказ тот же, что у несуществующей проверки.
     """
+    tenant_code = _require_tenant(tenant)
+    ident = _require_inspection_id(inspection_id)
     if not body.strip():
         raise PushError("Письмо не сохранено: в нём нет текста")
     if not lang.strip():
@@ -70,22 +81,21 @@ def save_letter(inspection_id: str, *, body: str, lang: str, saved_by: str) -> S
     settings = check_environment()
     with psycopg.connect(settings.dsn) as conn:
         with conn.cursor() as cur:
-            cur.execute(_SELECT_INSPECTION_SQL, (inspection_id,))
-            if cur.fetchone() is None:
-                raise PushError(f"Проверки {inspection_id} нет в истории — письму не к чему лечь")
-
             cur.execute(
                 _INSERT_LETTER_SQL,
                 {
-                    "inspection_id": inspection_id,
+                    "inspection_id": ident,
+                    "tenant": tenant_code,
                     "body": body,
                     "lang": lang,
                     "saved_by": saved_by,
                 },
             )
             row = cur.fetchone()
-            if row is None:  # pragma: no cover — `returning` на удавшемся insert даёт строку
-                raise PushError("Письмо не сохранено: база не вернула запись")
+            if row is None:
+                raise PushError(
+                    f"Проверки {ident} нет в истории пространства — письму не к чему лечь"
+                )
         conn.commit()
 
     return SavedLetter(id=str(row[0]), body=body, lang=lang, saved_by=saved_by, created_at=row[1])

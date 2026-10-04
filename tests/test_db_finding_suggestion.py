@@ -34,13 +34,16 @@ from src.db.errors import PushError  # noqa: E402 — после importorskip н
 from src.db.fingerprint import compute_fingerprint  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import findings_by_unit, get_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, get_state, start_inspection  # noqa: E402
 from src.domain import score as domain_score  # noqa: E402
 from src.domain.models import Inspection  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "предложения"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 ТОЧКА = "Белград-1"
 
 
@@ -132,7 +135,7 @@ def test_чтение_отдаёт_предложение_и_говорит_чт
     )
     ident = push_inspection(902)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     (находка,) = подробно.findings
@@ -165,7 +168,7 @@ def test_совпавшее_предложение_не_считается_пр�
     )
     ident = push_inspection(903)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     (находка,) = подробно.findings
@@ -183,7 +186,7 @@ def test_запись_без_предложения_не_выглядит_исп
 
     ident = push_inspection(904)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
     assert подробно is not None
     (находка,) = подробно.findings
     assert находка.suggested_code is None
@@ -214,7 +217,7 @@ def test_пустая_строка_не_выдаётся_за_ответ_мод�
     )
     assert запись == (None, None), "пустая строка легла в базу как ответ модели"
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
     assert подробно is not None
     assert подробно.findings[0].corrections() == ()
 
@@ -238,7 +241,7 @@ def test_находки_точки_тоже_несут_предложение(
     )
     push_inspection(905)
 
-    (находка,) = findings_by_unit(tenant=АРЕНДАТОР, unit=ТОЧКА)
+    (находка,) = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit=ТОЧКА)
 
     assert находка.suggested_code == "CLN06"
     assert находка.suggested_confidence == pytest.approx(0.31)

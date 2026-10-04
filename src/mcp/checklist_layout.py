@@ -161,6 +161,88 @@ def check_slug(value: str, *, что: str) -> str:
     return значение
 
 
+#: Прежний код тенанта УК, `default` (до переименования в `HQ`, D234, #439).
+#: Он ещё живёт в `MCP_TOKENS` и файлах состояния идущих проверок бота — не
+#: приведённый `canonical_tenant`, потому что тот живёт в `src.domain.tenants`,
+#: а `src.domain` при загрузке тянет `bot_checklists`, который импортирует
+#: этот модуль: получился бы круг. Своя маленькая карта здесь дешевле круга.
+_LEGACY_TENANT_SPACES: dict[str, str] = {"default": DEFAULT_SPACE}
+
+
+def space_of(tenant: str) -> str:
+    """Каталог пространства в хранилище для кода тенанта: `HQ` → `hq` (D183).
+
+    Старый код тенанта УК приводится картой выше, а не проверкой слага: он не
+    должен читаться как код пространства партнёра «default».
+    """
+    очищенный = (tenant or "").strip().lower()
+    if очищенный in _LEGACY_TENANT_SPACES:
+        return _LEGACY_TENANT_SPACES[очищенный]
+    return check_slug(очищенный, что="Код пространства")
+
+
+def bot_spaces(tenant: str) -> tuple[str, ...]:
+    """Где искать чек-лист по коду и что предлагать боту: своё первым, эталон следом.
+
+    Своё первым: при поиске по коду оно выигрывает, и копия партнёра (волна 4) не
+    подменяется эталоном с тем же кодом.
+    """
+    своё = space_of(tenant)
+    return (своё,) if своё == DEFAULT_SPACE else (своё, DEFAULT_SPACE)
+
+
+def read_spaces(tenant: str, root: Path) -> tuple[str, ...]:
+    """Что тенант может читать. УК — всё хранилище (D283), партнёр — своё и эталон."""
+    if space_of(tenant) != DEFAULT_SPACE:
+        return bot_spaces(tenant)
+    прочие = sorted({space for space, _code in known(root)} - {DEFAULT_SPACE})
+    return (DEFAULT_SPACE, *прочие)
+
+
+def exists(store: Store) -> bool:
+    """Есть ли такой чек-лист: издания или карточка — тот же признак, что у `known`."""
+    return (store.home / VERSIONS_DIR).is_dir() or (store.home / META_FILE).is_file()
+
+
+def locate(
+    store: Store, *, tenant: str, code: str | None, space: str | None = None
+) -> Store | None:
+    """Хранилище видимого тенанту чек-листа, или `None` — «не найден».
+
+    Один `None` на «нет такого» и «есть, но чужой»: иначе ответ подтверждал бы, что
+    чужое существует. Нетронутое хранилище УК отдаётся как есть — его заводит первый
+    заход двери (`checklist._ensure`).
+    """
+    if space is not None:
+        if check_slug(space, что="Код пространства") not in read_spaces(tenant, store.root):
+            return None
+        где: tuple[str, ...] = (space,)
+    else:
+        где = bot_spaces(tenant)
+    нетронуто = где[0] == DEFAULT_SPACE and not known(store.root)
+    if code is None:
+        for s in где:
+            # Код сбрасывается на умолчание, а не наследуется от `store`: иначе
+            # хранилище, ранее наведённое на чужой код, подставило бы его сюда,
+            # и «без кода» партнёра увело бы не в эталон, а в код из прошлого
+            # вызова (Review Н17).
+            найдено = for_code(replace(store, space=s, code=DEFAULT_CODE), None)
+            if exists(найдено):
+                return найдено
+        return replace(store, space=DEFAULT_SPACE, code=DEFAULT_CODE) if нетронуто else None
+    код = check_slug(code, что="Код чек-листа")
+    for s in где:
+        кандидат = replace(store, space=s, code=код)
+        if exists(кандидат):
+            return кандидат
+    return replace(store, space=DEFAULT_SPACE, code=код) if нетронуто else None
+
+
+def may_write(store: Store, *, tenant: str) -> bool:
+    """Правка — только в своём пространстве: эталон у партнёра и партнёр у УК — чтение."""
+    return store.space == space_of(tenant)
+
+
 def check_state(value: str) -> str:
     """Состояние чек-листа — или отказ, перечисляющий годные."""
     значение = (value or "").strip()
@@ -332,6 +414,10 @@ def for_code(store: Store, code: str | None) -> Store:
     if в_проде is None:
         return store
     space, чей = в_проде
+    # Указатель прода один на хранилище и смотрит в пространство УК. Кто не назвал
+    # чек-лист, остаётся в своём пространстве (Review Focus 4).
+    if space != store.space:
+        return store
     return replace(store, space=space, code=чей)
 
 

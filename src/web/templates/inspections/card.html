@@ -25,7 +25,11 @@
       {% if report %}
         <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/report') }}?lang={{ lang }}">{{ t('card.report.download') }}</a>
       {% endif %}
+      {# Письмо партнёру — запись от имени пространства: у проверки, которую
+         вошедший только читает (УК у партнёра, D283), кнопки нет. #}
+      {% if own %}
       <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
+      {% endif %}
     </div>
   </div>
   {% if not report and not failure %}

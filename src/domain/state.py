@@ -594,7 +594,7 @@ def start_inspection(
     # с диском дороже. Отметка при этом честная — издание действующей методики.
     from .bot_checklists import pick
 
-    выбран = pick(settings, checklist_code)
+    выбран = pick(settings, checklist_code, tenant=tenant)
     # Каталог издания разворачивается ОДИН раз: публикация переставляет
     # указатель, и снимок со стартом движка иначе могли бы взять разные издания.
     # Без хранилища это `AUDIT_DATA_DIR` — поведение до волны 3 не меняется.
@@ -720,10 +720,18 @@ def sync_checklist_version(chat_id: int) -> Inspection:
         raise InspectionNotStarted(
             f"В этом чате проверка не начата — нет {path}. Переводить нечего"
         )
-    from .bot_checklists import source_for
+    from .bot_checklists import source_for, space_for
 
     code = edition.recorded_code(chat_id, settings)
-    current = edition.keep(settings, code, source_for(settings, code))
+    # Пространство ищем по тенанту ЭТОЙ проверки, не по умолчанию: код партнёра
+    # лежит в его собственном пространстве, а не в `hq`, и `source_for` без
+    # пространства искал бы там, где чек-листа партнёра нет (Review Н4). Само
+    # правило «где искать» — в `bot_checklists.space_for`, тем же порядком, что
+    # у `available`, а не повторено здесь второй раз (Review Minor №1).
+    состояние = read_state(chat_id, settings)
+    тенант = состояние.tenant if состояние is not None else HQ_TENANT
+    пространство = space_for(settings, тенант, code)
+    current = edition.keep(settings, code, source_for(settings, code, space=пространство))
     with state_lock(path):
         raw = _read_raw(path)
         block = dict(raw.get(DOMAIN_KEY) or {})

@@ -22,6 +22,8 @@ from dataclasses import dataclass
 
 from src.db import directory
 from src.db.errors import DbError
+from src.db.reach import reach_of
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +102,12 @@ class UnitMatch:
     checked: bool
 
 
-def match_unit(typed: str, *, tenant: str = directory.DEFAULT_TENANT) -> UnitMatch:
-    """Сверить написанное со справочником. Отказа не бывает — см. шапку модуля."""
+def match_unit(typed: str, *, tenant: str) -> UnitMatch:
+    """Сверить написанное со справочником стран пространства. Отказа не бывает — см. шапку."""
     try:
-        units = directory.list_units(tenant=tenant)
+        # Справочник один (D284): у партнёра — точки его стран, у УК — все.
+        # Страны читаются из базы, и её отказ — тот же `DbError`, что ниже.
+        units = directory.list_units(reach=reach_of(tenant))
     except DbError as exc:
         logger.warning("справочник точек недоступен, название принято как написано: %s", exc)
         return UnitMatch(name=None, suggestions=(), checked=False)
@@ -140,21 +144,10 @@ def match_in(typed: str, units: list[tuple[str, tuple[str, ...], bool]]) -> Unit
     return UnitMatch(name=None, suggestions=tuple(варианты[:SUGGESTIONS_LIMIT]), checked=True)
 
 
-#: Тенант управляющей компании: только он заводит новые пиццерии (D233).
-#: Партнёры из своих тенантов выбирают из справочника, но не пополняют его.
-UK_TENANT = directory.DEFAULT_TENANT
-
-
-def bot_tenant(_message: object) -> str:
-    """Тенант, от имени которого пишет бот.
-
-    Сегодня каждая проверка из бота ложится в тенант УК — выбора тенанта у
-    бота нет. Появятся в боте партнёры — тенант будет браться здесь, а запрет
-    заводить пиццерии (`may_add_units`) уже стоит.
-    """
-    return UK_TENANT
-
-
 def may_add_units(tenant: str) -> bool:
-    """Заводить новые пиццерии может только управляющая компания (D233)."""
-    return tenant == UK_TENANT
+    """Заводить новые пиццерии может только управляющая компания (D233, D234).
+
+    Партнёры выбирают из справочника своих стран, но не пополняют его: справочник
+    один и принадлежит УК (D284).
+    """
+    return canonical_tenant(tenant) == HQ_TENANT
