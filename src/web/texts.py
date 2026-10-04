@@ -23,6 +23,7 @@ from collections.abc import Mapping
 
 from .errors import WebTextError
 from .texts_plans import PLAN_TEXTS
+from .texts_prescriptions import PRESCRIPTION_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -264,7 +265,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.overview.title": {"ru": "Обзор", "en": "Overview"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
-    "section.orders.title": {"ru": "Предписания", "en": "Orders"},
+    "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
     "section.country.title": {"ru": "Страна", "en": "Country"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
@@ -1732,10 +1733,15 @@ TEXTS: dict[str, dict[str, str]] = {
 
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
-_ПЕРЕСЕЧЕНИЕ = TEXTS.keys() & PLAN_TEXTS.keys()
+# Предписания (волна 3) — так же.
+_ПЕРЕСЕЧЕНИЕ = (
+    (TEXTS.keys() & PLAN_TEXTS.keys())
+    | (TEXTS.keys() & PRESCRIPTION_TEXTS.keys())
+    | (PLAN_TEXTS.keys() & PRESCRIPTION_TEXTS.keys())
+)
 if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
-TEXTS = {**TEXTS, **PLAN_TEXTS}
+TEXTS = {**TEXTS, **PLAN_TEXTS, **PRESCRIPTION_TEXTS}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:

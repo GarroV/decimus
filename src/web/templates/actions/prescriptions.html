@@ -1,0 +1,66 @@
+{#
+  Предписания в разделе действий УК (волна 3, D266) — отвечает на вопрос «что по
+  предписаниям ждёт моей реакции». Сверху очередь (просрочены, ответил
+  партнёр, черновики), под ней предписания. Только пространству УК.
+#}{% extends "base.html" %}
+{% from "_prescription.html" import rx_tag, rx_units with context %}
+{% block title %}{{ t('section.actions.title') }} · {{ t('actions.tab.prescriptions') }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ country_title(country) if country else t('actions.all_countries') }}</div>
+      <h1 class="ov-head__title">{{ t('rx.list.title') }}</h1>
+    </div>
+    <a class="btn btn--primary" href="{{ url(rx_hq_path ~ '/new') }}?lang={{ lang }}{% if country %}&amp;country={{ country }}{% endif %}">{{ t('rx.new') }}</a>
+  </div>
+  {% set tab = 'prescriptions' %}{% include "actions/_tabs.html" %}
+
+  <div class="ov-filters">
+    <a class="ov-chip{% if not closed %} is-on{% endif %}" href="{{ select_url(closed='', queue='') }}">{{ t('rx.show_open') }}</a>
+    <a class="ov-chip{% if closed %} is-on{% endif %}" href="{{ select_url(closed='1', queue='') }}">{{ t('rx.show_closed') }}</a>
+    {% if not closed %}
+      <span class="ov-filters__gap"></span>
+      {% for q in ('overdue', 'replied', 'drafts') %}
+        <a class="ov-chip{% if queue == q %} is-on{% endif %}" href="{{ select_url(queue='' if queue == q else q) }}">{{ t('rx.queue.' ~ q, n=counts[q]) }}</a>
+      {% endfor %}
+    {% endif %}
+    <span class="ov-filters__gap"></span>
+    <span class="ov-filters__label">{{ t('actions.country') }}</span>
+    <a class="ov-chip{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
+    {% for code in countries %}
+      <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
+    {% endfor %}
+  </div>
+
+  {% if truncated %}<div class="note note--warn mt-gap"><div><div class="note__text">{{ t('rx.truncated', n=limit) }}</div></div></div>{% endif %}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('rx.list.title') }}</div>
+      <div class="ov-card__hint">{{ t('rx.list.hint') }}</div>
+      <div class="ov-card__count">{{ rows|length }}</div>
+    </div>
+    {% if rows %}
+      <div class="ov-table ov-table--rx">
+        <div class="ov-table__head">
+          <span>{{ t('rx.col.subject') }}</span>
+          <span>{{ t('rx.col.country') }}</span>
+          <span>{{ t('rx.col.units') }}</span>
+          <span class="ov-num">{{ t('rx.col.due') }}</span>
+          <span>{{ t('rx.col.state') }}</span>
+        </div>
+        {% for p in rows %}
+          <a class="ov-table__row" href="{{ url(rx_hq_path ~ '/' ~ p.id) }}?lang={{ lang }}">
+            <span class="ov-cell__name">{{ p.subject }}</span>
+            <span class="ov-cell__muted">{{ country_title(p.country) or p.country }}</span>
+            <span class="ov-cell__muted">{{ rx_units(p) }}</span>
+            <span class="ov-num{% if p.overdue(today) %} ov-num--err{% endif %}">{{ p.due_on }}</span>
+            <span>{{ rx_tag(p, today) }}{% if p.status == 'issued' and p.replies %} <span class="tag tag--micro tag--neutral">{{ t('rx.event.replied') }}</span>{% endif %}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('rx.closed_empty') if closed else t('rx.list.empty') }}</div>
+    {% endif %}
+  </section>
+{% endblock %}
