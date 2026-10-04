@@ -32,6 +32,7 @@ from . import accounts
 OK = "ok"
 MISMATCH = "mismatch"
 SHORT = "short"
+LONG = "long"
 EMPTY = "empty"
 WRONG = "wrong"
 LOCKED = "locked"
@@ -58,6 +59,11 @@ def change_own(
         return Outcome(MISMATCH, 400)
     if len(new) < accounts.MIN_PASSWORD_LENGTH:
         return Outcome(SHORT, 400)
+    if len(new) > accounts.MAX_PASSWORD_LENGTH:
+        return Outcome(LONG, 400)
+    if len(current) > accounts.MAX_PASSWORD_LENGTH:
+        # Такого текущего нет ни у кого: тот же ответ, что на неверный, без scrypt.
+        return Outcome(WRONG, 400)
     попытка = admit_attempt(tenant=stand, address=address, login=login)
     if not попытка.admitted:
         return _заперто(попытка.verdict)

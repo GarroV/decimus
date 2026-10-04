@@ -135,7 +135,7 @@
     <div class="card__body">
       {% if password %}
         <div class="note {{ 'note--ok' if password.key == 'ok' else 'note--warn' }}">
-          <div class="note__text">{{ t('users.password.' ~ password.key, min=min_password, minutes=password.locked_minutes) }}</div>
+          <div class="note__text">{{ t('users.password.' ~ password.key, min=min_password, max=max_password, minutes=password.locked_minutes) }}</div>
         </div>
       {% endif %}
       <form method="post" action="{{ url(users_path ~ '/password') }}?lang={{ lang }}" class="row users-add mt-gap">
@@ -145,11 +145,11 @@
         </label>
         <label class="grow">
           <span class="field-label">{{ t('users.password.new') }}</span>
-          <input class="input" type="password" name="new" required minlength="{{ min_password }}" autocomplete="new-password">
+          <input class="input" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password">
         </label>
         <label class="grow">
           <span class="field-label">{{ t('users.password.repeat') }}</span>
-          <input class="input" type="password" name="repeat" required minlength="{{ min_password }}" autocomplete="new-password">
+          <input class="input" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password">
         </label>
         <button class="btn btn--primary" type="submit">{{ t('users.password.submit') }}</button>
       </form>

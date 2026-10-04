@@ -19,9 +19,10 @@ from flask.testing import FlaskClient
 from web_harness import ПАРОЛЬ, СВОЙ, ТОКЕН, войти, подменить_двери, собрать
 
 from src.db.errors import AccessError
-from src.db.web_access import MIN_PASSWORD_LENGTH
+from src.db.web_access import MAX_PASSWORD_LENGTH, MIN_PASSWORD_LENGTH
 from src.db.web_throttle import FAILURES_BEFORE_LOCK
 from src.web import accounts
+from src.web.app import MAX_BODY_BYTES
 
 ТЕНАНТ = "HQ"
 ПУТЬ = "/users/password"
@@ -116,6 +117,40 @@ def test_короткий_новый_до_базы_не_доходит(
 
     assert ответ.status_code == 400
     assert str(MIN_PASSWORD_LENGTH) in ответ.get_data(as_text=True)
+    assert зовы == []
+
+
+def test_длинный_новый_до_базы_не_доходит(
+    стенд: FlaskClient, зовы: list[tuple[str, str, str]]
+) -> None:
+    ответ = сменить(стенд, new="д" * (MAX_PASSWORD_LENGTH + 1))
+
+    assert ответ.status_code == 400
+    assert str(MAX_PASSWORD_LENGTH) in ответ.get_data(as_text=True)
+    assert зовы == []
+
+
+def test_длинный_текущий_до_базы_не_доходит(
+    стенд: FlaskClient, зовы: list[tuple[str, str, str]]
+) -> None:
+    """Такого текущего нет ни у кого: ответ тот же, что на неверный, но без scrypt."""
+    ответ = сменить(стенд, current="д" * (MAX_PASSWORD_LENGTH + 1))
+
+    assert ответ.status_code == 400
+    assert "проверьте текущий пароль" in ответ.get_data(as_text=True)
+    assert зовы == []
+
+
+def test_тело_больше_предела_отвергается_до_разбора(
+    стенд: FlaskClient, зовы: list[tuple[str, str, str]]
+) -> None:
+    # Тело чуть больше нашего предела, но меньше предела Werkzeug на память
+    # формы (500 КБ): иначе 413 дал бы он, а не `MAX_BODY_BYTES`. Поле `new`
+    # уходит в форму дважды (с повтором), поэтому каждое — половина с запасом.
+    половина = "x" * (MAX_BODY_BYTES // 2 + 1024)
+    ответ = сменить(стенд, new=половина)
+
+    assert ответ.status_code == 413
     assert зовы == []
 
 

@@ -88,6 +88,13 @@ FINGERPRINT_LENGTH = 64
 #: выбирают.
 MIN_PASSWORD_LENGTH = 12
 
+#: Предел длины пароля сверху. Его проверяют до scrypt у каждой двери, которая
+#: хеширует пароль: иначе одна отправка тела в сотни килобайт заказывает
+#: стенду лишнюю работу. 256 знаков с запасом вмещают любую парольную фразу
+#: и любой пароль из менеджера паролей. Пароля длиннее нет ни у кого, поэтому
+#: на сверке такой пароль просто «не тот».
+MAX_PASSWORD_LENGTH = 256
+
 #: Логин — имя, а не свободный текст: он попадает в адрес запроса, в журнал и
 #: в разговор людей. Ограничение формы здесь — обычная проверка ввода на
 #: границе, а не защита от инъекции (её держат параметры запроса).
@@ -425,6 +432,11 @@ def _checked_password(password: str) -> str:
             f"Пароль короче {MIN_PASSWORD_LENGTH} знаков. Короткий подбирается по "
             f"украденной базе за вечер, и никакой хеш этого не меняет"
         )
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise AccessError(
+            f"Пароль длиннее {MAX_PASSWORD_LENGTH} знаков. Предел стоит до scrypt: "
+            f"без него одна отправка заказывает стенду лишнюю работу"
+        )
     return password
 
 
@@ -587,6 +599,9 @@ def change_own_password(token: str, *, current: str, new: str) -> bool:
     (`docs/12-web-admin.md`, «Кто пишет хеш при смене с экрана»).
     """
     _checked_password(new)
+    if len(current) > MAX_PASSWORD_LENGTH:
+        # Такого текущего нет ни у кого: «не тот», без scrypt и без базы.
+        return False
     отпечаток = session_fingerprint(token)
     with _connected("сменить свой пароль") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_OWN_HASH_SQL, (отпечаток,))
@@ -684,7 +699,12 @@ def authenticate(login: str, password: str) -> Account | None:
     систему: опознание ищет его во всей базе, а не в границах тенанта стенда —
     один адрес входа пускает в любое пространство ту учётку, которой оно
     принадлежит.
+
+    Пароль длиннее `MAX_PASSWORD_LENGTH` — `None` сразу, без scrypt: такого
+    пароля нет ни у кого, и быстрый отказ не выдаёт, заведён ли логин.
     """
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return None
     with _connected("сверить учётку") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
         row = cur.fetchone()
