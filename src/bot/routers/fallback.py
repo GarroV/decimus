@@ -35,8 +35,8 @@ import logging
 from aiogram import Router
 from aiogram.types import CallbackQuery, Message
 
-from ..lang import chat_ui_lang
-from ..texts import default_ui_lang, t
+from ..lang import chat_ui_lang, person_ui_lang
+from ..texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ def build_fallback_router() -> Router:
         if not isinstance(message, Message):
             # Чата нет — сообщение отправлять некуда. Ответ на нажатие остаётся
             # единственным каналом, и без окна человек его не увидит.
-            await callback.answer(t("error.button_gone", default_ui_lang()), show_alert=True)
+            await callback.answer(t("error.button_gone", person_ui_lang()), show_alert=True)
             return
         # Часики снимаются ПЕРВЫМ действием: сообщение может и не уйти (чат
         # закрыт, телеграм отказал), а зависший интерфейс — это то, ради чего

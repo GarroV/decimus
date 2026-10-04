@@ -57,9 +57,14 @@ DEFAULT_UI_LANG = "ru"
 
 TEXTS: dict[str, dict[str, str]] = {
     # --- вход и мастер начала проверки (T050, T051, T063) ---
+    # Строка про /lang и пункт меню — на ОБОИХ языках намеренно (D303): выход из
+    # чужого языка должен найти тот, кто этот язык не читает.
     "start.greeting": {
-        "ru": "Бот выездных проверок. Нажмите «Новая проверка», чтобы начать.",
-        "en": "Field audit bot. Tap “New inspection” to begin.",
+        "ru": (
+            "Бот выездных проверок. Нажмите «Новая проверка», чтобы начать.\n"
+            "Язык бота / Bot language: /lang"
+        ),
+        "en": ("Field audit bot. Tap “New inspection” to begin.\nBot language / Язык бота: /lang"),
     },
     "start.ask_unit": {
         "ru": "Название пиццерии? Введите текстом.",
@@ -1800,6 +1805,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— Процент и буква — только в конце.\n"
             "— Сданную проверку править нельзя.\n"
             "— Сбой — /start. /version — версия сборки.\n"
+            "— /lang — язык бота.\n"
         ),
         "en": (
             "How to work with the bot\n"
@@ -1839,9 +1845,33 @@ TEXTS: dict[str, dict[str, str]] = {
             "— The percentage and the grade come at the end, not during the walk.\n"
             "— A handed-over inspection cannot be edited.\n"
             "— Something broke — /start. /version tells the build.\n"
+            "— /lang — the bot language.\n"
         ),
     },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
+    # --- язык бота, выбранный человеком (D303, #411) ---
+    "cmd.lang": {"ru": "Язык бота / Bot language", "en": "Bot language / Язык бота"},
+    # Имя языка на нём самом — подпись кнопки выбора: «Русский» ищет глазами тот,
+    # кому он нужен, а «Russian» — никто.
+    "lang.self_name": {"ru": "Русский", "en": "English"},
+    "lang.ask": {
+        "ru": (
+            "На каком языке говорить боту? Сейчас — {current}.\n"
+            "Язык отчёта партнёру выбирается отдельно, при старте проверки."
+        ),
+        "en": (
+            "Which language should the bot speak? Now — {current}.\n"
+            "The report language is chosen separately, when an inspection starts."
+        ),
+    },
+    "lang.chosen": {
+        "ru": "Готово: бот говорит по-русски. Выбор сохранён и для следующих проверок.",
+        "en": "Done: the bot now speaks English. The choice is kept for future inspections.",
+    },
+    "lang.save_failed": {
+        "ru": "Не удалось сохранить выбор языка. Попробуйте ещё раз чуть позже.",
+        "en": "Could not save the language choice. Please try again a bit later.",
+    },
     # Ответ о сборке — не украшение: по нему аудитор может сказать, что именно
     # он видел, а мы — понять, к какому образу относится его жалоба (T246).
     "version.answer": {"ru": "Сборка: {v}", "en": "Build: {v}"},

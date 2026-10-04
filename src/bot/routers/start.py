@@ -56,7 +56,7 @@ from ..keyboards import (
     sealed_keyboard,
     unit_new_keyboard,
 )
-from ..lang import chat_ui_lang
+from ..lang import chat_ui_lang, person_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
@@ -532,13 +532,12 @@ def build_start_router(
                 # партнёру в документ он уезжает на языке отчёта.
                 kind=kind_code,
                 report_lang=report_lang,
-                # Языка в проверке три, и до T128 из бота не задавался ни один
-                # из двух остальных: аудитор выбирал английский отчёт, а
-                # разговор оставался русским — язык был константой, а не
-                # параметром. Вопрос в мастере один, поэтому его ответ ложится
-                # во все три поля; полями они остаются разными, и разъехаться
-                # им ничто не мешает, когда вопросов станет больше.
-                ui_lang=report_lang,
+                # Языка в проверке три (T025). Интерфейс — язык ЧЕЛОВЕКА
+                # (D303): его выбор `/lang`, иначе язык стенда; отчёт к нему
+                # больше не привязан — до D303 английский отчёт заодно
+                # переключал и разговор. Речь по-прежнему идёт за отчётом:
+                # отдельного вопроса о ней в мастере нет.
+                ui_lang=person_ui_lang(),
                 speech_lang=report_lang,
                 auditor=auditor,
                 # Пространство того, кто начал (волна 1, #340): в нём проверка
