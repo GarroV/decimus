@@ -14,10 +14,24 @@
 --
 -- КТО ПОДТВЕРЖДАЕТ. Только администратор истории — роль, под которой веб
 -- делает действия над проверкой (отклонение, перенос). Приложение, то есть
--- бот, запечатать проверку больше не может: иначе этап приёмки держался бы на
--- том, что бот об этом не вспомнит. Запрет стоит в триггере, а не в
--- привилегиях: колонка `status` приложению выдана целиком с `0004`, и забрать
--- её значило бы сломать слив, который кладёт `status` при вставке.
+-- бот, запечатать проверку не может НИ ОДНИМ путём: ни правкой (`update`
+-- ждущей в `finalized`), ни вставкой сразу запечатанной строки с выдуманной
+-- отметкой о приёмке. Иначе этап приёмки держался бы на том, что бот об этом
+-- не вспомнит. Запрет стоит в двух триггерах, а не в привилегиях: колонка
+-- `status` приложению выдана целиком с `0004`, и забрать её значило бы сломать
+-- слив, который кладёт `status` при вставке.
+--
+-- ВСТАВКА. Не администратор истории и не владелец таблицы кладёт проверку
+-- только на приёмку: `status = 'draft'` явно и без отметки о приёмке.
+-- Умолчание колонки (`finalized` с `0004`) НЕ меняется: исторические загрузки
+-- идут владельцем, и смена умолчания молча спрятала бы их из истории; а
+-- приложению умолчание больше ничего не даёт — вставка без явного `draft`
+-- получает отказ, а не запечатанную строку. Владельца триггер не держит: он
+-- может триггер и выключить, заслон от него был бы видимостью.
+--
+-- ОТКЛОНЁННУЮ НЕ ПОДТВЕРЖДАЮТ. Отклонение по `0012` касается принятых, но
+-- если ждущая окажется отклонённой (ручная правка, будущий путь), её
+-- подтверждение вернуло бы в историю отозванный документ — отказ.
 --
 -- ЧЬЮ ПРОВЕРКУ. Роль администратора истории одна на все пространства, поэтому
 -- «подтверждает только своё пространство» (D283) держит запрос веба условием
@@ -64,6 +78,10 @@ begin
     end if;
 
     if new.status = 'finalized' then
+        if old.retracted_at is not null then
+            raise exception 'проверка % отклонена — подтверждать её нечего', old.id
+                using errcode = 'check_violation';
+        end if;
         if not pg_has_role(current_user, 'dodo_audit_admin', 'member') then
             raise exception 'подтвердить проверку % может только администратор истории', old.id
                 using errcode = 'insufficient_privilege';
@@ -81,4 +99,36 @@ create trigger inspections_acceptance_guarded
     before update of status, accepted_at, accepted_by on inspections
     for each row execute function guard_inspection_acceptance();
 
+create function guard_inspection_insert_on_review() returns trigger
+    language plpgsql
+    set search_path = pg_catalog, public, pg_temp
+as $$
+begin
+    if new.status = 'draft' and new.accepted_at is null and new.accepted_by is null then
+        return new;
+    end if;
+    if pg_has_role(current_user, 'dodo_audit_admin', 'member')
+       or exists (
+           select 1 from pg_catalog.pg_class c
+           where c.oid = tg_relid and pg_has_role(current_user, c.relowner, 'member')
+       ) then
+        return new;
+    end if;
+    raise exception 'проверка ложится в базу только на приёмку: status = draft без отметки о приёмке (D199)'
+        using errcode = 'insufficient_privilege';
+end;
+$$;
+
+create trigger inspections_insert_on_review
+    before insert on inspections
+    for each row execute function guard_inspection_insert_on_review();
+
 grant update (status, accepted_at, accepted_by) on inspections to dodo_audit_admin;
+
+-- Очередь приёмки (`list_inspections(on_review=True)`): ждущих единицы, а
+-- история — тысячи строк. Частичный индекс держит очередь пространства в
+-- порядке выдачи и не растёт вместе с историей. Отклонённых ждущих нет
+-- (отклоняют принятые), поэтому условие — только статус.
+create index inspections_on_review_queue
+    on inspections (tenant_code, inspection_date desc, pushed_at desc)
+    where status = 'draft';
