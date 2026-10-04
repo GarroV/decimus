@@ -53,6 +53,7 @@
   }
 
   function refresh() {
+    if (!box.hidden) return;
     var s = window.getSelection();
     if (!s || !s.rangeCount || !inside(s.anchorNode)) return;
     ["bold", "italic", "strikeThrough"].forEach(function (cmd) {
@@ -73,6 +74,7 @@
 
   function closeBox() {
     box.hidden = true;
+    linkButton.setAttribute("aria-pressed", "false");
     input.value = "";
     saved = null;
   }
@@ -96,6 +98,9 @@
     say("");
     saved = s.getRangeAt(0).cloneRange();
     box.hidden = false;
+    // Пока вводится адрес, выделение в тексте не видно — нажатая кнопка
+    // говорит, что ссылка ляжет на выделенные перед этим слова.
+    linkButton.setAttribute("aria-pressed", "true");
     input.focus();
   }
 
@@ -135,6 +140,8 @@
     if (e.target.closest("[data-link-apply]")) applyLink();
     else if (e.target.closest("[data-link-cancel]")) { closeBox(); editor.focus(); }
   });
+
+  input.addEventListener("input", function () { say(""); });
 
   input.addEventListener("keydown", function (e) {
     // Enter в поле адреса ставит ссылку, а не отправляет форму письма.
