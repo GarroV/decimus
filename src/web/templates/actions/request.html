@@ -14,7 +14,7 @@
       <div class="ov-card__hint">
         <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>
         {% if r.grade %} · <span class="grade tag tag--micro">{{ r.grade }}</span> {{ '%.1f'|format(r.pct) if r.pct is not none else '' }}{% endif %}
-        · {{ t('actions.request.due', due=r.due_on) }} · {{ state_tag(r, today) }}
+        · <span{% if r.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('actions.request.due', due=r.due_on) }}</span> · {{ state_tag(r, today) }}
         · {{ t('plans.origin.' ~ r.origin) }}
       </div>
     </div>

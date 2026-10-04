@@ -16,7 +16,7 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     "plans.state.accepted": {"ru": "Принят", "en": "Accepted"},
     "plans.overdue": {"ru": "Просрочен", "en": "Overdue"},
     "plans.origin.auto": {
-        "ru": "запрошен сам: в проверке D2 или D3",
+        "ru": "запрошен автоматически: в проверке D2 или D3",
         "en": "requested automatically: the inspection has D2 or D3",
     },
     "plans.origin.manual": {"ru": "запрошен вручную", "en": "requested manually"},
@@ -69,6 +69,7 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "The plan was returned. Comment from the management company:",
     },
     "plans.upload": {"ru": "Загрузить план", "en": "Upload plan"},
+    "plans.file_label": {"ru": "Файл плана", "en": "Plan file"},
     "plans.empty": {
         "ru": "Запросов экшн-плана нет.",
         "en": "There are no action plan requests.",
@@ -132,10 +133,10 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "Action plan needed, the unit has no country set",
     },
     "card.plan.no_country_hint": {
-        "ru": "В проверке есть D2 или D3, но запрос некому показать. Задайте точке "
-        "страну в справочнике — после этого запросите план здесь.",
-        "en": "The inspection has D2 or D3, but there is no one to show the request to. "
-        "Set the unit's country in the directory, then request the plan here.",
+        "ru": "В проверке есть D2 или D3, но партнёр не увидит запрос: у точки не задана "
+        "страна. Задайте точке страну в справочнике — после этого запросите план здесь.",
+        "en": "The inspection has D2 or D3, but no partner will see the request: the unit "
+        "has no country. Set the unit's country in the directory, then request the plan here.",
     },
     # --- открытые и принятые -----------------------------------------------
     "plans.show_accepted": {"ru": "Принятые", "en": "Accepted"},
