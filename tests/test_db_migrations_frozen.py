@@ -151,7 +151,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Заведена вместе с файлом (D303, #411) и нигде ещё не применена.
     "0035_bot_ui_langs.sql": (
-        "sql1:46314c2b24a72f1e01a7dfdffd02cb32836205a4abd8196215ea004db41807a2"
+        "sql1:6579bf02abc5635cfc8fa8dff1d1ba287b64d09e4ce4d667aa484f90b90450b7"
     ),
 }
 
