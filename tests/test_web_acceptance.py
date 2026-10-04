@@ -13,10 +13,12 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 from test_web_app import ПУСТАЯ_СЕТЬ, ТЕНАНТ, карточка, шапка
+from test_web_letter import собранное
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
 from src.db.errors import AcceptError, ReviseError
 from src.domain.tenants import canonical_tenant
+from src.report.letters import Papers
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -297,3 +299,21 @@ def test_запись_вне_чек_листа_тоже_исправляется
     # Assert
     assert "Записи вне чек-листа версии: 1" in страница
     assert "/findings/f1/revise?lang=" in страница
+
+
+@админ
+def test_письмо_открывается_и_у_ждущей_приёмки(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Экран письма (#488) читает карточку с ждущими — проверка на приёмке не теряет письма."""
+    # Arrange
+    _приёмка(monkeypatch)
+    monkeypatch.setattr(data, "letter_sources", lambda: Papers(live=None, store=None))
+    monkeypatch.setattr(data, "build_letter", lambda *_a, **_k: собранное())
+
+    # Act
+    ответ = стенд.get("/inspections/x/letter")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert "Your inspection scored 92%." in ответ.get_data(as_text=True)
