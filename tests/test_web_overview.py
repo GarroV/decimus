@@ -38,11 +38,9 @@ from src.web.texts import t as _t
     grades=(),
     average=None,
     comparable=True,
-    comparability_note="",
     zone_losses=(),
     systemic=(),
     attention=(),
-    problem_units=(),
 )
 
 
@@ -76,7 +74,6 @@ def снимок(**поля: object) -> ov.Overview:
         "inspections": (строка("Белград-1", 71.5, "D"), строка("Тбилиси-2", 95.5, "B")),
         "average": 83.5,
         "comparable": True,
-        "comparability_note": "",
         "zone_losses": (
             ov.ZoneLoss(
                 code="kitchen",
@@ -99,7 +96,6 @@ def снимок(**поля: object) -> ov.Overview:
                 tone="err",
             ),
         ),
-        "problem_units": (строка("Белград-1", 71.5, "D"),),
     }
     основа.update(поля)
     основа["grades"] = ov._grades(основа["inspections"])  # type: ignore[arg-type]

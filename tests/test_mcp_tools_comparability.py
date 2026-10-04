@@ -71,7 +71,8 @@ def _признак(ответ: dict[str, Any]) -> dict[str, Any]:
     return значение
 
 
-def test_история_точки_называет_разрыв_ряда(ряд_из_двух_цен: list[InspectionRow]) -> None:
+@pytest.mark.usefixtures("ряд_из_двух_цен")
+def test_история_точки_называет_разрыв_ряда() -> None:
     """Ряд одной точки — то место, где разницу цен и принимают за динамику."""
     ответ = tools.unit_history(tenant="укашка", unit="Белград-1")
 
@@ -81,7 +82,8 @@ def test_история_точки_называет_разрыв_ряда(ряд
     )
 
 
-def test_сводка_по_сети_называет_разрыв_ряда(ряд_из_двух_цен: list[InspectionRow]) -> None:
+@pytest.mark.usefixtures("ряд_из_двух_цен")
+def test_сводка_по_сети_называет_разрыв_ряда() -> None:
     """Распределение букв по сети — ровно тот ряд, из-за которого задача заведена."""
     ответ = tools.network_summary(tenant="укашка")
 
@@ -89,7 +91,8 @@ def test_сводка_по_сети_называет_разрыв_ряда(ря�
     assert _признак(ответ)["note"] in str(ответ["status"])
 
 
-def test_список_проверок_называет_разрыв_ряда(ряд_из_двух_цен: list[InspectionRow]) -> None:
+@pytest.mark.usefixtures("ряд_из_двух_цен")
+def test_список_проверок_называет_разрыв_ряда() -> None:
     ответ = tools.list_inspections(tenant="укашка")
 
     assert _признак(ответ)["comparable"] is False

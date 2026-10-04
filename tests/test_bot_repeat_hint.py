@@ -50,6 +50,8 @@ pytestmark = [pytest.mark.asyncio]
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
 ПРОШЛЫЙ_РАЗ = date(2026, 9, 1)
+
+
 def текст_вопроса() -> str:
     """Вопрос о повторе для записи CLN05: пункт назван словами, а не номером."""
     item = get_item("CLN05", chat_id=CHAT_ID).question("ru")
