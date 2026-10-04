@@ -33,7 +33,7 @@ from __future__ import annotations
 
 import html
 from html.parser import HTMLParser
-from urllib.parse import urlsplit
+from urllib.parse import parse_qsl, urlsplit
 
 #: Разрешённые элементы и их синонимы, которые пишут браузеры: Chrome ставит
 #: зачёркивание тегом `<strike>`, вставка из почты приносит `<strong>`.
@@ -51,6 +51,9 @@ _INLINE = {
 #: Схемы ссылок, которые доезжают. Без схемы ссылка тоже снимается: письмо
 #: читают вне админки, и путь `/inspections/...` у партнёра не ведёт никуда.
 ALLOWED_SCHEMES = frozenset({"http", "https", "mailto"})
+
+#: Параметры `mailto:`, которые добавляют получателей мимо глаз читающего.
+_MAILTO_FORBIDDEN_KEYS = frozenset({"cc", "bcc"})
 
 #: Элементы, чьё СОДЕРЖИМОЕ не текст письма: код, стили, скрытое. Снимаются
 #: целиком — оставить «alert(1)» словами в письме партнёру значит испортить его.
@@ -125,6 +128,10 @@ def safe_href(raw: str | None) -> str | None:
     адрес = raw.strip()
     if not адрес or any(ord(знак) < 0x20 or ord(знак) == 0x7F for знак in адрес):
         return None
+    # Пробел и обратная кавычка в адресе — не адрес: браузер и почта режут
+    # такую ссылку по-разному, и партнёр нажмёт не туда, куда смотрел.
+    if any(знак.isspace() or знак == "`" for знак in адрес):
+        return None
     try:
         части = urlsplit(адрес)
     except ValueError:
@@ -133,7 +140,22 @@ def safe_href(raw: str | None) -> str | None:
         return None
     if части.scheme.lower() in {"http", "https"} and not части.netloc:
         return None
+    if части.scheme.lower() == "mailto" and not _safe_mailto(части.query):
+        return None
     return адрес
+
+
+def _safe_mailto(query: str) -> bool:
+    """Параметры `mailto:` не дописывают письму заголовков и получателей.
+
+    `%0d%0a` в теме превращается почтовым клиентом в новую строку заголовка
+    (`Bcc: чужой`), а `cc`/`bcc` добавляют получателя, которого партнёр по
+    слову ссылки не видит. Тема и текст без переводов строки — допустимы.
+    """
+    if "%0d" in query.lower() or "%0a" in query.lower():
+        return False
+    ключи = {ключ.strip().lower() for ключ, _ in parse_qsl(query, keep_blank_values=True)}
+    return not ключи & _MAILTO_FORBIDDEN_KEYS
 
 
 class _Cleaner(HTMLParser):

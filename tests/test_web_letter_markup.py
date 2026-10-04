@@ -78,11 +78,11 @@ def test_ссылка_без_адреса_снимается() -> None:
 
 
 def test_кавычка_в_адресе_не_выходит_из_атрибута() -> None:
-    вывод = sanitize("<a href='https://dodo.example/\" onclick=\"alert(1)'>x</a>")
+    вывод = sanitize("<a href='https://dodo.example/\"onclick=\"alert(1)'>x</a>")
 
     # Кавычек в выводе ровно две — обе свои, вокруг адреса.
     assert вывод.count('"') == 2
-    assert вывод.startswith('<a href="https://dodo.example/&quot; onclick=&quot;alert(1)">')
+    assert вывод.startswith('<a href="https://dodo.example/&quot;onclick=&quot;alert(1)">')
 
 
 # --- скрипты и обработчики -------------------------------------------------
@@ -332,3 +332,42 @@ def test_закрытое_выбрасываемое_по_прежнему_вы�
 @pytest.mark.parametrize("вход", ["a <b c", "a </b c", "t <5 и <x"])
 def test_недописанный_тег_в_конце_остаётся_текстом(вход: str) -> None:
     assert to_plain(sanitize(вход)) == вход
+
+
+# --- mailto без внедрения заголовков, адрес без пробелов (ревью) -------------
+
+
+@pytest.mark.parametrize(
+    "адрес",
+    [
+        "mailto:a@dodo.example?subject=x%0d%0aBcc:z@evil.example",
+        "mailto:a@dodo.example?subject=x%0D%0ABcc:z@evil.example",
+        "mailto:a@dodo.example?body=x%0Ay",
+        "mailto:a@dodo.example?cc=z@evil.example",
+        "mailto:a@dodo.example?BCC=z@evil.example",
+        "mailto:a@dodo.example?subject=x&bcc=z@evil.example",
+        "mailto:a@dodo.example?%62cc=z@evil.example",
+    ],
+)
+def test_mailto_с_переводом_строки_или_копией_снимается(адрес: str) -> None:
+    assert sanitize(f'<a href="{адрес}">почта</a>') == "почта"
+
+
+def test_mailto_с_темой_остаётся() -> None:
+    вход = '<a href="mailto:a@dodo.example?subject=Audit">почта</a>'
+
+    assert sanitize(вход) == вход
+
+
+@pytest.mark.parametrize(
+    "адрес",
+    [
+        "http://exa mple.com",
+        "https://dodo.example/a b",
+        "https://dodo.example/`x`",
+        "mailto:a b@dodo.example",
+        "https://dodo.example/ x",
+    ],
+)
+def test_адрес_с_пробелом_или_обратной_кавычкой_снимается(адрес: str) -> None:
+    assert sanitize(f'<a href="{адрес}">тут</a>') == "тут"
