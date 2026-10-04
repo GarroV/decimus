@@ -33,6 +33,7 @@ from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
 from .lang import chat_ui_lang
+from .lang_choice import PersonMiddleware
 from .material import MaterialStore
 from .pending import PendingStore
 from .roster import Roster
@@ -43,6 +44,7 @@ from .routers import (
     build_finish_router,
     build_help_router,
     build_info_router,
+    build_lang_router,
     build_material_router,
     build_mcp_router,
     build_record_router,
@@ -52,6 +54,7 @@ from .routers import (
     build_version_router,
 )
 from .routers.help import HELP_COMMAND
+from .routers.lang import LANG_COMMAND
 from .routers.material import MaterialHandler
 from .routers.mcp import (
     MCP_ADD_COMMAND,
@@ -169,6 +172,12 @@ def build_dispatcher(
     if roster is not None:
         settings = replace(settings, auditor_names={**roster.names(), **settings.auditor_names})
 
+    # Первой из внешних: человек апдейта нужен выбору языка (D303) везде, в
+    # том числе в ответе на ссылку привязки, который даёт мидлварь доступа.
+    person = PersonMiddleware()
+    dispatcher.message.outer_middleware(person)
+    dispatcher.callback_query.outer_middleware(person)
+
     access = AccessMiddleware(
         settings.allowed_ids, bindings if bindings is not None else BindingCache(), roster
     )
@@ -198,6 +207,7 @@ def build_dispatcher(
     # текста они не ждут, и на порядок разбора материала не влияют.
     dispatcher.include_router(build_mcp_router(settings))
     dispatcher.include_router(build_help_router())
+    dispatcher.include_router(build_lang_router())
     dispatcher.include_router(build_resend_router())
     dispatcher.include_router(build_version_router())
     dispatcher.include_router(build_finish_router(store))
@@ -253,6 +263,9 @@ MENU_COMMANDS = (
     # Справка и версия — не шаги обхода, поэтому стоят за работой, а не
     # посреди неё. Справка выше версии: её читает аудитор, и читает чаще.
     (HELP_COMMAND, "cmd.help"),
+    # Язык бота (D303) — рядом со справкой: тоже не шаг обхода, а настройка,
+    # и подписан на обоих языках, чтобы его нашёл и тот, кто язык стенда не читает.
+    (LANG_COMMAND, "cmd.lang"),
     (RESEND_COMMAND, "cmd.resend"),
     (VERSION_COMMAND, "cmd.version"),
 )

@@ -216,6 +216,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # но не удаляются; правятся только пометки погашения и отвязки (ниже).
     "bot_link_tokens": {"SELECT", "INSERT"},
     "bot_bindings": {"SELECT", "INSERT"},
+    # Язык бота, выбранный человеком (D303, `0035`): удалять выбор не может никто.
+    "bot_ui_langs": {"SELECT", "INSERT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -229,6 +231,7 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # правятся ничем, иначе погашенную ссылку можно было бы перевыпустить.
     "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
     "bot_bindings": {"UPDATE": {"unbound_at"}},
+    "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
     "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
