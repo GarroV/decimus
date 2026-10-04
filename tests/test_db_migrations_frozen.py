@@ -153,6 +153,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0034_inspection_acceptance.sql": (
         "sql1:dddc35114711d27b8665c679b99393924bdede70e20c9fb42913d328c8d0357a"
     ),
+    "0036_action_plans.sql": (
+        "sql1:7b8dd97fafa9742c5b305b8e98b7af227af468a3930df28646b4941a849786c8"
+    ),
 }
 
 

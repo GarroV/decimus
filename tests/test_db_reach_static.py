@@ -19,7 +19,7 @@ import re
 from pathlib import Path
 from types import ModuleType
 
-from src.db import directory, move, previews, push, queries, reports, revise
+from src.db import action_plans, directory, move, previews, push, queries, reports, revise
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
 
 #: Запросы по проверкам без условия охвата — только по имени и с причиной.
@@ -27,6 +27,11 @@ from src.db.reach import REACH_SQL, UNIT_REACH_SQL
     "queries._PREVIOUS_INSPECTION_SQL": (
         "повтор ×2 (D255) считается по проверкам своего пространства, "
         "и зовёт его бот пишущего тенанта, а не читающий охват"
+    ),
+    "action_plans._INSPECTION_FOR_REQUEST_SQL": (
+        "запись, а не чтение: запрос экшн-плана заводит УК по проверке своего "
+        "пространства (условие на `tenant_code` — в коде), в транзакции "
+        "подтверждения или кнопкой; наружу из этой строки ничего не уходит"
     ),
     "queries._FINDINGS_OF_INSPECTION_SQL": (
         "читается тем же соединением сразу после карточки, которую "
@@ -58,7 +63,7 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
-    запросы = _запросы(queries, reports, previews, move)
+    запросы = _запросы(queries, reports, previews, move, action_plans)
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
     дыры = [имя for имя in сверено if имя not in ВНЕ_ОХВАТА and REACH_SQL not in запросы[имя]]
@@ -79,7 +84,7 @@ def test_каждое_чтение_справочника_стоит_на_охв
 
 def test_исключения_называют_настоящие_запросы() -> None:
     """Исключение на запрос, которого больше нет, молча расширило бы будущий."""
-    запросы = _запросы(queries, reports, previews, move, directory)
+    запросы = _запросы(queries, reports, previews, move, directory, action_plans)
     мёртвые = [имя for имя in (*ВНЕ_ОХВАТА, *СПРАВОЧНИК_ВНЕ_ОХВАТА) if имя not in запросы]
     assert мёртвые == []
 
