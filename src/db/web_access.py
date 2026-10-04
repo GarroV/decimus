@@ -51,6 +51,7 @@ from .config import check_environment, load_retraction_settings
 from .errors import AccessError, ConfigError, EmailTakenError
 from .migrate import admin_dsn
 from .reading import reading
+from .space_guard import require_space
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
 #: посреди работы, длиннее — забытая на чужом экране вкладка переживает ночь.
@@ -87,13 +88,18 @@ FINGERPRINT_LENGTH = 64
 #: выбирают.
 MIN_PASSWORD_LENGTH = 12
 
+#: Предел длины пароля сверху. Его проверяют до scrypt у каждой двери, которая
+#: хеширует пароль: иначе одна отправка тела в сотни килобайт заказывает
+#: стенду лишнюю работу. 256 знаков с запасом вмещают любую парольную фразу
+#: и любой пароль из менеджера паролей. Пароля длиннее нет ни у кого, поэтому
+#: на сверке такой пароль просто «не тот».
+MAX_PASSWORD_LENGTH = 256
+
 #: Логин — имя, а не свободный текст: он попадает в адрес запроса, в журнал и
 #: в разговор людей. Ограничение формы здесь — обычная проверка ввода на
 #: границе, а не защита от инъекции (её держат параметры запроса).
 LOGIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
-_SELECT_TENANT_SQL = "select 1 from tenants where code = %s"
 
 _INSERT_USER_SQL = """
     insert into web_users (tenant_code, login, password_hash, role)
@@ -110,7 +116,7 @@ _SELECT_USER_SQL = """
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
-    select login, created_at, disabled_at, role, tenant_code, id
+    select login, created_at, disabled_at, role, tenant_code, id, email
       from web_users
      where (%(tenant)s::text is null or tenant_code = %(tenant)s)
      order by tenant_code, login
@@ -124,10 +130,20 @@ _DISABLE_USER_SQL = """
      where tenant_code = %s and login = %s and disabled_at is null
 """
 
+#: Прежняя роль читается той же командой, что пишет новую: строка запирается
+#: (`for update`), и между «было» и «стало» вторая правка не вклинится.
 _SET_ROLE_SQL = """
-    update web_users
+    with прежняя as (
+        select id, role
+          from web_users
+         where tenant_code = %s and login = %s and disabled_at is null
+           for update
+    )
+    update web_users u
        set role = %s
-     where tenant_code = %s and login = %s and disabled_at is null
+      from прежняя
+     where u.id = прежняя.id
+ returning прежняя.role
 """
 
 _CHANGE_PASSWORD_SQL = """
@@ -137,16 +153,43 @@ _CHANGE_PASSWORD_SQL = """
  returning id
 """  # noqa: S105 — это текст ЗАПРОСА, а не пароль
 
+#: Свой хеш — по живой сессии, тем же условием, что у опознания: закрытая,
+#: просроченная сессия или отключённая учётка пароля не меняют.
+_SELECT_OWN_HASH_SQL = """
+    select u.password_hash
+      from web_sessions s
+      join web_users u on u.id = s.user_id
+     where s.fingerprint = %s
+       and s.closed_at is null
+       and s.expires_at > now()
+       and u.disabled_at is null
+"""
+
+#: Запись — функцией базы (`0032`): роль приложения хеш не пишет, а функция
+#: трогает только строку той сессии, чей токен ей предъявлен. От пробитого
+#: приложения это не защищает — см. `change_own_password` ниже.
+_CHANGE_OWN_PASSWORD_SQL = "select change_own_password(%s, %s, %s)"  # noqa: S105 — текст запроса
+
 _CLOSE_USER_SESSIONS_SQL = """
     update web_sessions
        set closed_at = now()
      where user_id = %s and closed_at is null
 """
 
+#: Прежняя почта читается той же командой, что пишет новую (строка заперта):
+#: сессии закрываются, только если почта на деле сменилась.
 _SET_EMAIL_SQL = """
-    update web_users
+    with прежняя as (
+        select id, email
+          from web_users
+         where tenant_code = %s and login = %s and disabled_at is null
+           for update
+    )
+    update web_users u
        set email = %s
-     where tenant_code = %s and login = %s and disabled_at is null
+      from прежняя
+     where u.id = прежняя.id
+ returning u.id, прежняя.email is distinct from u.email
 """
 
 _SELECT_USER_BY_EMAIL_SQL = """
@@ -225,6 +268,9 @@ class AccountRow:
     #: Ключ учётки — для привязки бота на экране людей (D286): привязка
     #: ссылается на учётку, а не на логин.
     id: str = ""
+    #: Почта входа через Google (#399): экран людей правит её и обязан видеть,
+    #: какая стоит сейчас. `None` — вход через Google закрыт.
+    email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -396,6 +442,11 @@ def _checked_password(password: str) -> str:
             f"Пароль короче {MIN_PASSWORD_LENGTH} знаков. Короткий подбирается по "
             f"украденной базе за вечер, и никакой хеш этого не меняет"
         )
+    if len(password) > MAX_PASSWORD_LENGTH:
+        raise AccessError(
+            f"Пароль длиннее {MAX_PASSWORD_LENGTH} знаков. Предел стоит до scrypt: "
+            f"без него одна отправка заказывает стенду лишнюю работу"
+        )
     return password
 
 
@@ -409,26 +460,19 @@ def _checked_login(login: str) -> str:
     return имя
 
 
-def _ensure_tenant(tenant: str) -> None:
-    """Убедиться, что арендатор заведён; завести — только если его нет.
+def _require_tenant(tenant: str) -> None:
+    """Пространство учётки обязано быть заведено — иначе отказ (#481).
 
-    Разделено намеренно. Заводить ЧЕЛОВЕКА — обычная работа админки, и она
-    идёт под узкой ролью. Заводить АРЕНДАТОРА — работа уровня схемы, и права
-    на неё есть только у владельца схемы: новый арендатор это новый заказчик,
-    а не новый сотрудник.
+    Раньше незаведённое пространство здесь же и заводилось ролью владельца
+    схемы, и опечатка в коде (`HQQ` вместо `HQ`) давала человеку новое пустое
+    пространство вместо отказа. Пространства заводит команда (`make space`),
+    строку `HQ` — схема (`0029`).
 
-    Проверка идёт под ролью приложения, потому что читать список арендаторов
-    ей можно. Без этой проверки заведение человека в СУЩЕСТВУЮЩЕМ арендаторе
-    требовало бы прав владельца схемы — то есть веб-процесс пришлось бы пускать
-    в базу с правом снести её целиком ради обычной кнопки «добавить».
+    Проверка идёт под ролью приложения: читать список пространств ей можно, а
+    заводящей человека роли это право незачем.
     """
-    with _connected("проверить арендатора") as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_TENANT_SQL, (tenant,))
-        if cur.fetchone() is not None:
-            return
-    with _owned(f"завести арендатора «{tenant}»") as conn, conn.cursor() as cur:
-        cur.execute(_INSERT_TENANT_SQL, (tenant,))
-        conn.commit()
+    with _connected("проверить пространство") as conn, conn.cursor() as cur:
+        require_space(cur, tenant, error=AccessError)
 
 
 def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
@@ -444,7 +488,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # бы админов молча.
     роль = _checked_role(role)
     хеш = password_hash(_checked_password(password))
-    _ensure_tenant(tenant)
+    _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
         try:
             cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
@@ -470,6 +514,7 @@ def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
             role=str(r[3]),
             tenant=str(r[4]),
             id=str(r[5]),
+            email=None if r[6] is None else str(r[6]),
         )
         for r in строки
     )
@@ -505,10 +550,20 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     бою, миграция не знает, и раздача «всем» или «по имени» выдала бы права
     людям, которых на это никто не смотрел.
     """
+    return reassign_role(login, tenant=tenant, role=role) is not None
+
+
+def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
+    """Назначить роль живой учётке и вернуть ПРЕЖНЮЮ. `None` — такой живой учётки нет.
+
+    Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
+    экран правит роли, а таблицы истории ролей нет и не заводится.
+    """
     роль = _checked_role(role)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
-        cur.execute(_SET_ROLE_SQL, (роль, tenant, login.strip().lower()))
-        return cur.rowcount > 0
+        cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
+        строка = cur.fetchone()
+    return None if строка is None else str(строка[0])
 
 
 def change_password(login: str, *, tenant: str, password: str) -> bool:
@@ -520,9 +575,9 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
     транзакции — иначе между записью хеша и закрытием остаётся окно, в котором
     старая сессия ещё жива, а новый пароль уже роздан.
 
-    Роль владельца схемы: пароли меняет команда с машины, у роли приложения на
-    `web_users` по-прежнему только чтение. Смена с экрана — отдельная задача
-    (#324), и право там выдаётся не этим движением.
+    Роль повышенных полномочий: пароль любой учётки меняет команда с машины
+    («пароль забыт совсем»). Свой пароль с экрана меняет `change_own_password`
+    — другой дверью и без этого права (#324).
     """
     хеш = password_hash(_checked_password(password))
     with _managing("сменить пароль учётки") as conn, conn.cursor() as cur:
@@ -532,6 +587,46 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
             return False
         cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
         return True
+
+
+def change_own_password(token: str, *, current: str, new: str) -> bool:
+    """Сменить СВОЙ пароль по живой сессии (#324). `False` — текущий не тот или сессии нет.
+
+    Оба отказа — один `False`, и это намеренно: экран не должен подсказывать,
+    что именно не так с текущим паролем, а «сессия закрыта» по эту сторону
+    формы выглядит так же — пароль не сменён.
+
+    Новый пароль проверяется тем же правилом, что при заведении и смене
+    командой (`_checked_password`), — и до похода в базу.
+
+    Роль приложения: прямой записи хеша у неё нет (`0014`). Пишет функция
+    базы `change_own_password` (`0032`, путь поиска — `0033`) — только строку
+    той сессии, чей токен предъявлен, только если прежний хеш всё ещё на месте,
+    и тем же движением закрывает остальные сессии человека, оставляя эту.
+
+    Это сужение поверхности, а НЕ защита от пробитого приложения: оно читает
+    хеши и открывает сессии само, значит может пройти эту дверь за любого
+    (`docs/12-web-admin.md`, «Кто пишет хеш при смене с экрана»).
+    """
+    _checked_password(new)
+    if len(current) > MAX_PASSWORD_LENGTH:
+        # Такого текущего нет ни у кого: «не тот», без scrypt и без базы.
+        return False
+    отпечаток = session_fingerprint(token)
+    with _connected("сменить свой пароль") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_OWN_HASH_SQL, (отпечаток,))
+        строка = cur.fetchone()
+        if строка is None:
+            # Сверка всё равно стоит одного scrypt: иначе по времени ответа
+            # видно, жива ли сессия, — то же правило, что у `authenticate`.
+            password_hash(current)
+            return False
+        прежний = str(строка[0])
+        if not password_matches(current, прежний):
+            return False
+        cur.execute(_CHANGE_OWN_PASSWORD_SQL, (token, прежний, password_hash(new)))
+        итог = cur.fetchone()
+    return bool(итог and итог[0])
 
 
 def normalize_email(email: str) -> str:
@@ -559,17 +654,28 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
 
     Роль владельца схемы, как заведение и роли: право менять круг допущенных
     не выдаётся приложению, иначе кнопка на экране и дыра в нём — одно и то же.
+
+    **Сменилась почта — открытые сессии человека закрываются тем же движением**,
+    как при смене пароля командой (`change_password`), и теми же правами
+    роли (`0022`). Почту меняют в ответ на «к ней получили доступ чужие», и
+    вошедший через Google по прежней почте не должен пережить смену. Та же
+    почта, сохранённая повторно, — не смена, сессии остаются.
     """
     значение = None if email is None else normalize_email(email)
     with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
         try:
-            cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+            cur.execute(_SET_EMAIL_SQL, (tenant, login.strip().lower(), значение))
         except psycopg.errors.UniqueViolation as занято:
             # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
             # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
             # там, где была опечатка в логине.
             raise EmailTakenError(f"почта {значение} уже привязана к другой учётке") from занято
-        return cur.rowcount > 0
+        строка = cur.fetchone()
+        if строка is None:
+            return False
+        if строка[1]:
+            cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+        return True
 
 
 def find_by_email(email: str) -> Account | None:
@@ -614,7 +720,12 @@ def authenticate(login: str, password: str) -> Account | None:
     систему: опознание ищет его во всей базе, а не в границах тенанта стенда —
     один адрес входа пускает в любое пространство ту учётку, которой оно
     принадлежит.
+
+    Пароль длиннее `MAX_PASSWORD_LENGTH` — `None` сразу, без scrypt: такого
+    пароля нет ни у кого, и быстрый отказ не выдаёт, заведён ли логин.
     """
+    if len(password) > MAX_PASSWORD_LENGTH:
+        return None
     with _connected("сверить учётку") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_USER_SQL, (login.strip().lower(),))
         row = cur.fetchone()

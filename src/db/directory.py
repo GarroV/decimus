@@ -28,6 +28,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from .config import check_environment
 from .errors import PushError
 from .reach import Reach, require_reach
+from .space_guard import require_space
 from .units import normalize_unit_name
 
 #: Арендатор по умолчанию — то же значение, что у `push.DEFAULT_TENANT` и у
@@ -85,7 +86,6 @@ order by priority
 limit 1
 """
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
 
 # География проставляется через `coalesce(excluded…, units…)` и в обеих
 # ветвях: повторная загрузка НЕ обязана знать всё, что знает база. Загрузчик
@@ -240,7 +240,9 @@ def upsert_unit(
     try:
         with psycopg.connect(settings.dsn) as conn:
             with conn.cursor() as cur:
-                cur.execute(_INSERT_TENANT_SQL, (tenant,))
+                # Пространство не заводится точкой справочника: незаведённое —
+                # отказ (#481).
+                require_space(cur, tenant, error=PushError)
                 sql = _UPSERT_UNIT_BY_CODE_SQL if normalized_code else _UPSERT_UNIT_BY_NAME_SQL
                 cur.execute(
                     sql,
