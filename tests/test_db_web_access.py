@@ -407,6 +407,17 @@ def test_список_без_пространства_это_люди_всех_�
     assert {ТЕНАНТ, ЧУЖОЙ} <= set(list_spaces())
 
 
+def test_список_показывает_почту_входа_через_google(обе_роли: str) -> None:
+    """Экран людей правит почту (#399) — значит, должен видеть, какая стоит сейчас."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email="Director@Dodobrands.io")
+
+    почты = {строка.login: строка.email for строка in list_accounts(tenant=ТЕНАНТ)}
+
+    assert почты == {"director": "director@dodobrands.io", "petr": None}
+
+
 def test_заведённая_учётка_по_умолчанию_не_админ(обе_роли: str) -> None:
     """Умолчание — самая узкая роль.
 

@@ -28,6 +28,7 @@ from src.db.web_access import (
     disable_account,
     list_accounts,
     list_spaces,
+    set_email,
     set_role,
 )
 
@@ -42,6 +43,7 @@ __all__ = [
     "change_own_password",
     "disable",
     "everyone",
+    "set_email",
     "set_role",
     "spaces",
 ]

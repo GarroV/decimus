@@ -862,6 +862,54 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not unlink — the database did not respond. Try again.",
     },
     "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
+    "users.col.email": {"ru": "Почта для входа через Google", "en": "Google sign-in email"},
+    "users.email.placeholder": {"ru": "нет — вход только паролем", "en": "none — password only"},
+    "users.edit.save": {"ru": "Сохранить", "en": "Save"},
+    "users.edit.missing": {
+        "ru": "Учётка не найдена или отключена — ничего не изменено.",
+        "en": "Account not found or disabled — nothing changed.",
+    },
+    "users.edit.space": {
+        "ru": "Такого пространства нет — ничего не изменено.",
+        "en": "No such space — nothing changed.",
+    },
+    "users.edit.failed": {
+        "ru": "База не ответила — ничего не изменено. Попробуйте ещё раз.",
+        "en": "The database did not respond — nothing changed. Please try again.",
+    },
+    "users.role.ok": {"ru": "Роль изменена.", "en": "Role changed."},
+    "users.role.unknown": {
+        "ru": "Такой роли нет — ничего не изменено.",
+        "en": "No such role — nothing changed.",
+    },
+    "users.role.self": {
+        "ru": "Свою роль сменить нельзя: так можно закрыть себе экран людей.",
+        "en": "You cannot change your own role: it could lock you out of this screen.",
+    },
+    "users.role.failed": {
+        "ru": "Роль не изменена: база не ответила. Попробуйте ещё раз.",
+        "en": "Role not changed: the database did not respond. Please try again.",
+    },
+    "users.email.ok": {
+        "ru": "Почта сохранена: человек может входить через Google.",
+        "en": "Email saved: the person can sign in with Google.",
+    },
+    "users.email.removed": {
+        "ru": "Почта снята: вход через Google закрыт, пароль остался.",
+        "en": "Email removed: Google sign-in is closed, the password still works.",
+    },
+    "users.email.shape": {
+        "ru": "Это не похоже на почту — ничего не изменено.",
+        "en": "This does not look like an email address — nothing changed.",
+    },
+    "users.email.taken": {
+        "ru": "Эта почта уже привязана к другой учётке — ничего не изменено.",
+        "en": "This email is already linked to another account — nothing changed.",
+    },
+    "users.email.failed": {
+        "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
+        "en": "Email not saved: the database did not respond. Please try again.",
+    },
     "users.password.title": {"ru": "Сменить пароль", "en": "Change password"},
     "users.password.current": {"ru": "Текущий пароль", "en": "Current password"},
     "users.password.new": {"ru": "Новый пароль", "en": "New password"},

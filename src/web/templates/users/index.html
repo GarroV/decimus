@@ -157,6 +157,12 @@
     </div>
   </section>
 
+  {% if edit %}
+    <div class="note {{ 'note--ok' if edit.status == 200 and edit.key != 'edit.missing' else 'note--warn' }} mt-gap">
+      <div class="note__text">{{ t('users.' ~ edit.key) }}</div>
+    </div>
+  {% endif %}
+
   {% if not people_known %}
     {# «База недоступна» и «людей нет» — разные вещи, и вторая была бы
        молчаливой ложью на экране, где считают людей с доступом. #}
@@ -177,6 +183,7 @@
             <th class="is-text">{{ t('users.col.space') }}</th>
             <th class="is-text">{{ t('users.col.role') }}</th>
             <th class="is-text">{{ t('users.col.state') }}</th>
+            <th class="is-text">{{ t('users.col.email') }}</th>
             <th class="is-text">{{ t('users.col.bot') }}</th>
             <th>{{ t('users.col.created') }}</th>
             <th></th>
@@ -187,12 +194,41 @@
             <tr{% if человек.disabled_at %} class="is-muted"{% endif %}>
               <td class="is-text">{{ человек.login }}</td>
               <td class="is-text mono">{{ человек.tenant }}</td>
-              <td class="is-text">{{ t('users.role.' ~ человек.role) }}</td>
+              <td class="is-text">
+                {% if not человек.disabled_at and человек.login != account.login %}
+                  <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row">
+                    <input type="hidden" name="login" value="{{ человек.login }}">
+                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
+                    <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
+                      {% for код in roles %}
+                        <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
+                      {% endfor %}
+                    </select>
+                    <button class="btn btn--sm" type="submit">{{ t('users.edit.save') }}</button>
+                  </form>
+                {% else %}
+                  {{ t('users.role.' ~ человек.role) }}
+                {% endif %}
+              </td>
               <td class="is-text">
                 {% if человек.disabled_at %}
                   {{ t('users.state.disabled', date=человек.disabled_at.strftime('%Y-%m-%d')) }}
                 {% else %}
                   {{ t('users.state.active') }}
+                {% endif %}
+              </td>
+              <td class="is-text">
+                {% if not человек.disabled_at %}
+                  <form method="post" action="{{ url(users_path ~ '/email') }}?lang={{ lang }}" class="row">
+                    <input type="hidden" name="login" value="{{ человек.login }}">
+                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
+                    <input class="input input--sm" type="email" name="email" value="{{ человек.email or '' }}"
+                           placeholder="{{ t('users.email.placeholder') }}" aria-label="{{ t('users.col.email') }}"
+                           autocomplete="off" spellcheck="false">
+                    <button class="btn btn--sm" type="submit">{{ t('users.edit.save') }}</button>
+                  </form>
+                {% else %}
+                  {{ человек.email or '—' }}
                 {% endif %}
               </td>
               <td class="is-text">
