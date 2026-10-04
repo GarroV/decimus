@@ -668,47 +668,54 @@ def upload_version(
     if ident is None:
         raise ActionPlanError("Запроса нет")
     store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
+    file_id = str(uuid.uuid4())
+    key = object_key(ident, file_id)
+    # Файл кладётся ДО транзакции: заливка до 25 МБ не держит ни соединение, ни
+    # замок строки запроса. Строка не легла (чужой запрос, не та стадия,
+    # отказ базы) — объект убирается. Обратный порядок оставил бы в истории
+    # версию, которой нет в хранилище.
+    uri = store.put(key, data, content_type=_clean_content_type(content_type))
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
-            cur.execute(_LOCK_FOR_UPLOAD_SQL, {"id": ident, **require_reach(reach).params()})
-            row = cur.fetchone()
-            if row is None:
-                raise ActionPlanError("Запроса нет")
-            if row[0] != STATUS_REQUESTED:
-                raise ActionPlanError(
-                    "План уже на приёмке или принят — новую версию кладут после возврата"
-                )
-            cur.execute(_NEXT_VERSION_SQL, (ident,))
-            version_row = cur.fetchone()
-            version = int(version_row[0]) if version_row else 1
-            file_id = str(uuid.uuid4())
-            key = object_key(ident, file_id)
-            # Сначала файл, потом строка: обратный порядок оставил бы в истории
-            # версию, которой нет в хранилище.
-            uri = store.put(key, data, content_type=_clean_content_type(content_type))
-            try:
-                cur.execute(
-                    _INSERT_FILE_SQL,
-                    {
-                        "id": file_id,
-                        "request_id": ident,
-                        "version": version,
-                        "storage_path": uri,
-                        "file_name": clean_file_name(file_name),
-                        "size_bytes": len(data),
-                        "content_type": _clean_content_type(content_type),
-                        "uploaded_by": who,
-                        "uploaded_tenant": tenant,
-                    },
-                )
-                cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
-                conn.commit()
-            except psycopg.Error:
-                _drop_orphan(store, key)
-                raise
-            return version
-    except psycopg.Error as exc:
-        raise _translate("Загрузить план", exc) from exc
+        version = _record_version(
+            ident,
+            reach=reach,
+            row={
+                "id": file_id,
+                "request_id": ident,
+                "storage_path": uri,
+                "file_name": clean_file_name(file_name),
+                "size_bytes": len(data),
+                "content_type": _clean_content_type(content_type),
+                "uploaded_by": who,
+                "uploaded_tenant": tenant,
+            },
+        )
+    except (ActionPlanError, psycopg.Error) as exc:
+        _drop_orphan(store, key)
+        if isinstance(exc, psycopg.Error):
+            raise _translate("Загрузить план", exc) from exc
+        raise
+    return version
+
+
+def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
+    """Строка версии и перевод на приёмку — под замком строки запроса."""
+    with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+        cur.execute(_LOCK_FOR_UPLOAD_SQL, {"id": ident, **require_reach(reach).params()})
+        head = cur.fetchone()
+        if head is None:
+            raise ActionPlanError("Запроса нет")
+        if head[0] != STATUS_REQUESTED:
+            raise ActionPlanError(
+                "План уже на приёмке или принят — новую версию кладут после возврата"
+            )
+        cur.execute(_NEXT_VERSION_SQL, (ident,))
+        version_row = cur.fetchone()
+        version = int(version_row[0]) if version_row else 1
+        cur.execute(_INSERT_FILE_SQL, {**row, "version": version})
+        cur.execute(_SET_STATUS_SQL, {"id": ident, "status": STATUS_ON_REVIEW})
+        conn.commit()
+        return version
 
 
 def _drop_orphan(store: PhotoStorage, key: str) -> None:

@@ -49,6 +49,10 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "The file is larger than {mb} MB and cannot be accepted.",
     },
     "plans.no_file": {"ru": "Файл не выбран.", "en": "No file chosen."},
+    "plans.storage_down": {
+        "ru": "Хранилище файлов сейчас не принимает файл. Попробуйте позже.",
+        "en": "File storage is not accepting files right now. Please try again later.",
+    },
     "plans.uploaded": {
         "ru": "Версия {version} загружена и ушла на приёмку.",
         "en": "Version {version} uploaded and sent for review.",
