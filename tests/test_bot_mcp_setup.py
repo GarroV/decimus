@@ -722,6 +722,8 @@ async def test_спрятанных_команд_у_бота_нет(domain_env: 
         # Временная: обкатка формата отчёта (#261, D122) — уйдёт вместе с ней.
         "resend",
         "version",
+        # Язык бота (D303) — у всех: выбрать его вправе каждый.
+        "lang",
         MCP_COMMAND,
         MCP_ADD_COMMAND,
         MCP_REVOKE_COMMAND,

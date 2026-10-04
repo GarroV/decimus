@@ -1,7 +1,8 @@
 """Языки этого чата — так, чтобы на них нельзя было упасть (T126).
 
-Язык интерфейса живёт в самой проверке (`Inspection.ui_lang`), а проверка лежит
-файлом. Значит, чтобы поздороваться, боту надо этот файл прочитать — и если он
+Язык интерфейса — прежде всего выбор человека (`/lang`, D303, `lang_choice.py`),
+затем язык начатой проверки (`Inspection.ui_lang`), затем язык стенда. Проверка
+лежит файлом. Значит, чтобы поздороваться, боту надо этот файл прочитать — и если он
 испорчен, чтение бросает отказ ещё до того, как собрана первая строка ответа.
 Именно так бот и немел целиком: сказать «состояние испорчено» он не мог, потому
 что падал на выборе языка, которым это сказать.
@@ -26,8 +27,9 @@ import logging
 
 from src import domain
 
+from . import lang_choice
 from .inspection import read_inspection
-from .texts import DEFAULT_UI_LANG, ui_lang_or_default
+from .texts import DEFAULT_UI_LANG, UI_LANGS, ui_lang_or_default
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +59,60 @@ def _lang(value: str | None) -> str:
         return DEFAULT_UI_LANG
 
 
-def chat_ui_lang(chat_id: int) -> str:
-    """Язык интерфейса этого чата: из начатой проверки, иначе умолчание.
+def pick_ui_lang(*, chosen: str | None, started: str | None) -> str:
+    """Порядок выбора языка интерфейса (D303) — ядро, без похода куда-либо.
 
-    До старта проверки состояния нет — спрашивать язык интерфейса отдельным
-    шагом мастера спека не просит, а падать на приветствии нельзя.
+    1. Явный выбор человека (`/lang`) — сильнее всего: он и есть решение D303.
+    2. Язык начатой проверки (`Inspection.ui_lang`): проверка, начатая до
+       выбора, не меняет язык посреди обхода сама по себе. Язык ОТЧЁТА от
+       этого не зависит вовсе — он отдельным полем (T025).
+    3. Язык стенда `BOT_UI_LANG` — умолчание из настройки, а не из кода, и
+       через `_lang` без отказа наружу.
+
+    Языка клиента Telegram (`language_code`) в цепочке нет намеренно: владелец
+    04.10.2026 — «Пока дефолт на русском, потом переключим на инглиш», то есть
+    умолчание одно на стенд и меняется его настройкой.
+
+    Значение не из словаря на любом шаге пропускается, а не принимается: язык,
+    сохранённый до того, как его убрали из словаря, не должен ронять `t()`.
+    """
+    for кандидат in (chosen, started):
+        if кандидат in UI_LANGS:
+            return кандидат
+    return _lang(None)
+
+
+def _chosen(telegram_id: int) -> str | None:
+    try:
+        return lang_choice.CHOICES.chosen(telegram_id)
+    except Exception:
+        logger.exception("выбор языка человека %s не прочитался — как без выбора", telegram_id)
+        return None
+
+
+def person_ui_lang() -> str:
+    """Язык человека этого апдейта, без учёта проверки чата.
+
+    Им начинается новая проверка (её `ui_lang`) и отвечают места, где чата
+    нет или проверка не при чём. Вне апдейта — язык стенда.
+    """
+    return _ui_lang(None)
+
+
+def _ui_lang(started: str | None) -> str:
+    person = lang_choice.current_person()
+    chosen = None if person is None else _chosen(person.telegram_id)
+    return pick_ui_lang(chosen=chosen, started=started)
+
+
+def chat_ui_lang(chat_id: int) -> str:
+    """Язык интерфейса для человека этого апдейта в этом чате (D303).
+
+    Порядок — `pick_ui_lang`: выбор человека, язык начатой в чате проверки,
+    язык стенда. Ни один шаг не бросает отказа наружу.
     """
     inspection = _state(chat_id)
-    return _lang(None if inspection is None else inspection.ui_lang)
+    return _ui_lang(None if inspection is None else inspection.ui_lang)
 
 
 def chat_speech_lang(chat_id: int) -> str:
@@ -93,5 +141,5 @@ def chat_langs(chat_id: int) -> tuple[str, str]:
     """
     inspection = _state(chat_id)
     if inspection is None:
-        return _lang(None), _lang(None)
-    return _lang(inspection.ui_lang), inspection.report_lang
+        return _ui_lang(None), _lang(None)
+    return _ui_lang(inspection.ui_lang), inspection.report_lang
