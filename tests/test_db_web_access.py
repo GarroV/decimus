@@ -41,10 +41,10 @@ from src.db.web_access import (  # noqa: E402
     normalize_email,
     open_session,
     password_hash,
+    reassign_role,
     resolve_session,
     session_fingerprint,
     set_email,
-    reassign_role,
     set_role,
 )
 
