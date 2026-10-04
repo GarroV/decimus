@@ -26,7 +26,8 @@ from dataclasses import replace
 
 from src.db import queries, revise
 from src.db.errors import ReviseError
-from src.db.reach import own_reach
+from src.db.reach import reach_of
+from src.domain.tenants import canonical_tenant
 from src.report.letters import LetterError
 from src.report.letters import sources as letter_sources
 from src.report.rescore import rescore
@@ -59,9 +60,12 @@ def revise_card(
     text: str,
 ) -> None:
     """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`."""
-    detail = queries.get_inspection(inspection_id, reach=own_reach(tenant), include_on_review=True)
+    detail = queries.get_inspection(inspection_id, reach=reach_of(tenant), include_on_review=True)
     if detail is None:
         raise ReviseError("Такой проверки нет")
+    if canonical_tenant(detail.inspection.tenant_code) != canonical_tenant(tenant):
+        # Охват отдаёт и чужие проверки на чтение (D289); исправлять — только своё.
+        raise ReviseError("Исправлять можно только проверки своего пространства")
     if not detail.inspection.on_review:
         raise ReviseError(
             "Проверка уже принята — записи принятой не исправляются (D200). "

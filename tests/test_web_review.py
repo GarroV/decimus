@@ -13,7 +13,7 @@ from src.web.review import build_sheet
 
 ЗОНЫ = (
     {"code": "hall", "name_ru": "Зал", "name_en": "Hall"},
-    {"code": "hot_kitchen", "name_ru": "Горячий цех", "name_en": "Hot kitchen"},
+    {"code": "hot_kitchen", "name_ru": "Зона Б", "name_en": "Zone B"},
 )
 
 
