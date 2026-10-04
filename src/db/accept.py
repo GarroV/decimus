@@ -25,8 +25,9 @@ from typing import Any
 
 import psycopg
 
-from .config import load_retraction_settings
-from .errors import AcceptError
+from .action_plans import open_auto_request, today
+from .config import load_action_plan_settings, load_retraction_settings
+from .errors import AcceptError, ActionPlanError
 from .queries import _require_inspection_id, _require_tenant
 
 _SELECT_HEAD_SQL = """
@@ -60,12 +61,22 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
             "принятая проверка неотличима от принятой никем"
         )
     settings = load_retraction_settings()
+    due_days = load_action_plan_settings().due_days
     try:
         with psycopg.connect(settings.dsn) as conn:
             _apply(conn, ident, tenant_code, автор)
+            # Запрос экшн-плана при D2/D3 (D272) — в ТОЙ ЖЕ транзакции: проверка
+            # не может оказаться принятой без запроса, которого ждёт партнёр.
+            with conn.cursor() as cur:
+                open_auto_request(cur, ident, actor=автор, due_days=due_days, on=today())
             conn.commit()
     except AcceptError:
         raise
+    except ActionPlanError as exc:
+        raise AcceptError(
+            f"Проверка {ident} не подтверждена: запрос экшн-плана не завёлся ({exc}). "
+            f"Проверка осталась на приёмке"
+        ) from exc
     except psycopg.Error as exc:
         # Тип, а не текст драйвера: в тексте бывает адрес базы, а отказ
         # печатается на карточке.
