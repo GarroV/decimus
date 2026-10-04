@@ -843,7 +843,27 @@ TEXTS: dict[str, dict[str, str]] = {
             "we sent the partner."
         ),
     },
-    "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
+    # Форматирование письма (D169, #332): ровно четыре вида, больше ничего.
+    # Буква на кнопке — та, что принята в редакторах этого языка.
+    "letter.format.toolbar": {"ru": "Форматирование письма", "en": "Letter formatting"},
+    "letter.format.bold": {"ru": "Жирный (Ctrl+B)", "en": "Bold (Ctrl+B)"},
+    "letter.format.bold.glyph": {"ru": "Ж", "en": "B"},
+    "letter.format.italic": {"ru": "Курсив (Ctrl+I)", "en": "Italic (Ctrl+I)"},
+    "letter.format.italic.glyph": {"ru": "К", "en": "I"},
+    "letter.format.strike": {"ru": "Зачёркнутый", "en": "Strikethrough"},
+    "letter.format.strike.glyph": {"ru": "З", "en": "S"},
+    "letter.format.link": {"ru": "Ссылка", "en": "Link"},
+    "letter.format.link.address": {"ru": "Адрес ссылки", "en": "Link address"},
+    "letter.format.link.apply": {"ru": "Поставить", "en": "Apply"},
+    "letter.format.link.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "letter.format.link.select": {
+        "ru": "Выделите слова, на которые поставить ссылку.",
+        "en": "Select the words to put the link on.",
+    },
+    "letter.format.link.bad": {
+        "ru": "Ссылка не поставлена: адрес должен начинаться с https://, http:// или mailto:.",
+        "en": "Link not added: the address must start with https://, http:// or mailto:.",
+    },
     # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
     # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
     # делает, — иначе человек закроет экран, считая письмо ушедшим.
@@ -956,6 +976,98 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not unlink — the database did not respond. Try again.",
     },
     "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
+    "users.col.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
+    "users.email.placeholder": {"ru": "не задана", "en": "not set"},
+    "users.email.submit": {"ru": "Сохранить", "en": "Save"},
+    "users.role.submit": {"ru": "Назначить", "en": "Assign"},
+    "users.edit.missing": {
+        "ru": "Учётка не найдена или отключена — ничего не изменено.",
+        "en": "Account not found or disabled — nothing changed.",
+    },
+    "users.edit.space": {
+        "ru": "Такого пространства нет — ничего не изменено.",
+        "en": "No such space — nothing changed.",
+    },
+    "users.edit.failed": {
+        "ru": "База не ответила — ничего не изменено. Попробуйте ещё раз.",
+        "en": "The database did not respond — nothing changed. Please try again.",
+    },
+    "users.role.ok": {"ru": "Роль изменена.", "en": "Role changed."},
+    "users.role.unknown": {
+        "ru": "Такой роли нет — ничего не изменено.",
+        "en": "No such role — nothing changed.",
+    },
+    "users.role.self": {
+        "ru": "Свою роль сменить нельзя: так можно закрыть себе экран людей.",
+        "en": "You cannot change your own role: it could lock you out of this screen.",
+    },
+    "users.role.failed": {
+        "ru": "Роль не изменена: база не ответила. Попробуйте ещё раз.",
+        "en": "Role not changed: the database did not respond. Please try again.",
+    },
+    "users.email.ok": {
+        "ru": "Почта сохранена: человек может входить через Google.",
+        "en": "Email saved: the person can sign in with Google.",
+    },
+    "users.email.removed": {
+        "ru": "Почта снята: вход через Google закрыт, пароль остался.",
+        "en": "Email removed: Google sign-in is closed, the password still works.",
+    },
+    "users.email.shape": {
+        "ru": "Это не похоже на почту — ничего не изменено.",
+        "en": "This does not look like an email address — nothing changed.",
+    },
+    "users.email.taken": {
+        "ru": "Эта почта уже привязана к другой учётке — ничего не изменено.",
+        "en": "This email is already linked to another account — nothing changed.",
+    },
+    "users.email.failed": {
+        "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
+        "en": "Email not saved: the database did not respond. Please try again.",
+    },
+    "users.password.title": {"ru": "Сменить пароль", "en": "Change password"},
+    "users.password.current": {"ru": "Текущий пароль", "en": "Current password"},
+    "users.password.new": {"ru": "Новый пароль", "en": "New password"},
+    "users.password.repeat": {"ru": "Повтор нового", "en": "Repeat new password"},
+    "users.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
+    "users.password.hint": {
+        "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
+        "этот остаётся.",
+        "en": "At least {min} characters. After the change all your other sessions are "
+        "signed out; this one stays.",
+    },
+    "users.password.ok": {
+        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
+        "en": "Password changed. Your other sessions have been signed out.",
+    },
+    "users.password.wrong": {
+        "ru": "Пароль не сменён: проверьте текущий пароль.",
+        "en": "Password not changed: check your current password.",
+    },
+    "users.password.mismatch": {
+        "ru": "Пароль не сменён: повтор не совпадает с новым.",
+        "en": "Password not changed: the repeat does not match the new password.",
+    },
+    "users.password.short": {
+        "ru": "Пароль не сменён: новый короче {min} знаков.",
+        "en": "Password not changed: the new password is shorter than {min} characters.",
+    },
+    "users.password.long": {
+        "ru": "Пароль не сменён: новый длиннее {max} знаков.",
+        "en": "Password not changed: the new password is longer than {max} characters.",
+    },
+    "users.password.empty": {
+        "ru": "Пароль не сменён: заполните текущий и новый пароль.",
+        "en": "Password not changed: fill in the current and the new password.",
+    },
+    "users.password.locked": {
+        "ru": "Слишком много неудачных попыток. Попробуйте через {minutes} мин.",
+        "en": "Too many failed attempts. Try again in {minutes} min.",
+    },
+    "users.password.failed": {
+        "ru": "Пароль не сменён: база не ответила. Попробуйте ещё раз.",
+        "en": "Password not changed: the database did not respond. Please try again.",
+    },
     "users.self.text": {
         "ru": "Людей заводит и отключает администратор УК.",
         "en": "People are added and disabled by an HQ administrator.",

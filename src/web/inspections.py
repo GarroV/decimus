@@ -35,6 +35,8 @@ from src.report.letters import LetterError
 from src.report.letters import build as build_letter
 from src.report.letters import sources as letter_sources
 
+from . import letter_markup
+
 logger = logging.getLogger(__name__)
 
 
@@ -335,9 +337,17 @@ def remember_letter(
 
     Своей проверки текста здесь нет ни строки — она в `src/db/letters.py`, там
     же, где запись. Вторая копия правил разошлась бы с первой молча.
+
+    Разметка письма чистится здесь, при сохранении (`letter_markup`): через эту
+    функцию идут и «Сохранить», и «В черновики Google». Письмо из одной
+    разметки без слов уходит в запись пустым — и запись отказывает своим
+    правилом «в нём нет текста», а не лежит в истории «отправленным».
     """
+    чистое = letter_markup.sanitize(body)
+    if not letter_markup.to_plain(чистое).strip():
+        чистое = ""
     return letters_store.save_letter(
-        inspection_id, tenant=tenant, body=body, lang=lang, saved_by=saved_by
+        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by
     )
 
 

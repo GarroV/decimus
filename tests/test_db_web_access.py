@@ -20,6 +20,7 @@ from datetime import timedelta
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -40,6 +41,7 @@ from src.db.web_access import (  # noqa: E402
     normalize_email,
     open_session,
     password_hash,
+    reassign_role,
     resolve_session,
     session_fingerprint,
     set_email,
@@ -62,6 +64,7 @@ def обе_роли(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -
     смотрят в таблицу в обход продукта.
     """
     monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    завести_пространства(pg_dsn, ТЕНАНТ, ЧУЖОЙ)
     return pg_dsn
 
 
@@ -407,6 +410,17 @@ def test_список_без_пространства_это_люди_всех_�
     assert {ТЕНАНТ, ЧУЖОЙ} <= set(list_spaces())
 
 
+def test_список_показывает_почту_входа_через_google(обе_роли: str) -> None:
+    """Экран людей правит почту (#399) — значит, должен видеть, какая стоит сейчас."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email="Director@Dodobrands.io")
+
+    почты = {строка.login: строка.email for строка in list_accounts(tenant=ТЕНАНТ)}
+
+    assert почты == {"director": "director@dodobrands.io", "petr": None}
+
+
 def test_заведённая_учётка_по_умолчанию_не_админ(обе_роли: str) -> None:
     """Умолчание — самая узкая роль.
 
@@ -435,6 +449,17 @@ def test_роль_назначается_и_видна_вошедшему(обе
     сессия = open_session(опознанная)
     из_сессии = resolve_session(сессия.token)
     assert из_сессии is not None and из_сессии.role == ROLE_ADMIN
+
+
+def test_смена_роли_называет_прежнюю(обе_роли: str) -> None:
+    """Прежняя роль — для следа в журнале приложения: кто, кого, было → стало."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert reassign_role("Director", tenant=ТЕНАНТ, role=ROLE_ADMIN) == ROLE_AUDITOR
+    assert reassign_role("director", tenant=ТЕНАНТ, role=ROLE_AUDITOR) == ROLE_ADMIN
+    assert reassign_role("nobody", tenant=ТЕНАНТ, role=ROLE_ADMIN) is None
+    опознанная = authenticate("director", ПАРОЛЬ)
+    assert опознанная is not None and опознанная.role == ROLE_AUDITOR
 
 
 def test_роль_чужого_тенанта_не_назначается(обе_роли: str) -> None:
@@ -530,6 +555,46 @@ def test_снятая_почта_закрывает_вход_через_google_�
 
     assert find_by_email(ПОЧТА) is None
     assert authenticate("director", ПАРОЛЬ) is not None
+
+
+def test_смена_почты_закрывает_сессии_человека(обе_роли: str) -> None:
+    """Сменили почту входа — вошедший по прежней вылетает (ревью access2, L7).
+
+    Почту меняют в ответ на «к ней получили доступ чужие»: если открытая
+    через Google сессия переживает смену, смена не выгнала того, ради кого
+    её делали. Та же дисциплина, что у смены пароля командой.
+    """
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    сосед = create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    до_смены = open_session(учётка)
+    соседская = open_session(сосед)
+
+    assert set_email("director", tenant=ТЕНАНТ, email="new." + ПОЧТА) is True
+
+    assert resolve_session(до_смены.token) is None
+    assert resolve_session(соседская.token) is not None
+
+
+def test_снятие_почты_закрывает_сессии_человека(обе_роли: str) -> None:
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    сессия = open_session(учётка)
+
+    assert set_email("director", tenant=ТЕНАНТ, email=None) is True
+
+    assert resolve_session(сессия.token) is None
+
+
+def test_та_же_почта_сессий_не_закрывает(обе_роли: str) -> None:
+    """Повторное сохранение без правки — не смена: выбивать человека не за что."""
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    сессия = open_session(учётка)
+
+    assert set_email("director", tenant=ТЕНАНТ, email=ПОЧТА.upper()) is True
+
+    assert resolve_session(сессия.token) is not None
 
 
 def test_пустая_почта_не_опознаёт_никого(обе_роли: str) -> None:

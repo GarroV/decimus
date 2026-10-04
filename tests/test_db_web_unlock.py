@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import set_retraction_env, завести_пространства
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -46,6 +46,7 @@ def обе_роли(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -
     администратора. Проверять снятие под одной ролью значило бы проверять код в
     отрыве от того, чем он на площадке ограничен.
     """
+    завести_пространства(pg_dsn, ТЕНАНТ, ЧУЖОЙ)
     return set_retraction_env(db_env, monkeypatch)
 
 
