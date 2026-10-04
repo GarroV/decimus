@@ -149,6 +149,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0033_definer_search_path.sql": (
         "sql1:1c82c43ad0df14ac507789d39802e980ed4fa89d50aaa2d3eab950a06c37d376"
     ),
+    # Этап приёмки (D199). Номера 0032–0033 заняты веткой доступа (#484).
+    "0034_inspection_acceptance.sql": (
+        "sql1:dddc35114711d27b8665c679b99393924bdede70e20c9fb42913d328c8d0357a"
+    ),
 }
 
 

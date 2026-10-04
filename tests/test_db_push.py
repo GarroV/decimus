@@ -13,6 +13,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 # `psycopg` — зависимость блока `db`, а не всего проекта: без этой строки сбор
 # этого файла падает целиком в окружении, где её ещё не поставили (см.
@@ -140,6 +141,7 @@ def test_list_inspections_фильтрует_по_точке_и_отдаёт_с�
     _начать(8, unit="Ниш-1")
     id7 = push_inspection(7)
     push_inspection(8)
+    accept_pushed()  # D199: история отдаёт только принятые
 
     # Арендатор обязателен с T110: чьи проверки читаем — обязана сказать
     # выборка, а не подразумевать.

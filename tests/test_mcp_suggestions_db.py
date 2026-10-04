@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import пространства_для_теста, точка_пространства
+from db_harness import accept_pushed, пространства_для_теста, точка_пространства
 
 pytest.importorskip("psycopg")
 
@@ -79,7 +79,9 @@ def _проверка(
         words=слова,
         suggested=предложение,
     )
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def _предложение(confidence: float | None = 0.87) -> Suggestion:
