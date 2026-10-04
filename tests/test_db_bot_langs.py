@@ -48,3 +48,10 @@ def test_удалить_выбор_роль_приложения_не_может
     choose_lang(501, "en")
     with psycopg.connect(db_env) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
         conn.execute("delete from bot_ui_langs where telegram_id = 501")
+
+
+@pytest.mark.parametrize("код", ["pt-BR", "zh-Hans"])
+def test_база_принимает_код_с_регионом_и_письмом(db_env: str, код: str) -> None:
+    """Третий язык добавляется словарём — миграция под него не нужна (ревью #492, п.3)."""
+    choose_lang(501, код)
+    assert chosen_lang(501) == код
