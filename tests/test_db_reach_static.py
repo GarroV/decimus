@@ -19,7 +19,19 @@ import re
 from pathlib import Path
 from types import ModuleType
 
-from src.db import action_plans, directory, move, previews, push, queries, reports, revise
+from src.db import (
+    action_plans,
+    directory,
+    move,
+    prescriptions,
+    prescriptions_write,
+    previews,
+    push,
+    queries,
+    reports,
+    revise,
+)
+from src.db.prescriptions import PRESCRIPTION_REACH_SQL
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
 
 #: Запросы по проверкам без условия охвата — только по имени и с причиной.
@@ -63,7 +75,7 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
-    запросы = _запросы(queries, reports, previews, move, action_plans)
+    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions)
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
     дыры = [имя for имя in сверено if имя not in ВНЕ_ОХВАТА and REACH_SQL not in запросы[имя]]
@@ -71,15 +83,27 @@ def test_каждое_чтение_проверок_стоит_на_охвате
 
 
 def test_каждое_чтение_справочника_стоит_на_охвате() -> None:
-    запросы = _запросы(queries, directory)
+    запросы = _запросы(queries, directory, prescriptions)
     сверено = [имя for имя, текст in запросы.items() if _СПРАВОЧНИК.search(текст)]
-    assert len(сверено) >= 4, f"сверка не нашла запросов справочника: {сверено}"
+    assert len(сверено) >= 5, f"сверка не нашла запросов справочника: {сверено}"
     дыры = [
         имя
         for имя in сверено
         if имя not in СПРАВОЧНИК_ВНЕ_ОХВАТА and UNIT_REACH_SQL not in запросы[имя]
     ]
     assert дыры == [], "читают справочник без охвата: " + ", ".join(дыры)
+
+
+_ПРЕДПИСАНИЯ = re.compile(r"\b(from|join)\s+prescriptions\s+p\b")
+
+
+def test_каждое_чтение_предписаний_стоит_на_охвате() -> None:
+    """Предписание чужой страны или черновик партнёру — дыра, видимая только чтением (0037)."""
+    запросы = _запросы(prescriptions, prescriptions_write)
+    сверено = [имя for имя, текст in запросы.items() if _ПРЕДПИСАНИЯ.search(текст)]
+    assert len(сверено) >= 6, f"сверка не нашла запросов предписаний: {сверено}"
+    дыры = [имя for имя in сверено if PRESCRIPTION_REACH_SQL not in запросы[имя]]
+    assert дыры == [], "читают предписания без охвата: " + ", ".join(дыры)
 
 
 def test_исключения_называют_настоящие_запросы() -> None:
@@ -91,7 +115,7 @@ def test_исключения_называют_настоящие_запросы
 
 def test_условие_охвата_записано_одной_строкой() -> None:
     """Сверка идёт по тексту с нормализованными пробелами — и сам литерал обязан быть таким."""
-    for литерал in (REACH_SQL, UNIT_REACH_SQL):
+    for литерал in (REACH_SQL, UNIT_REACH_SQL, PRESCRIPTION_REACH_SQL):
         assert литерал == " ".join(литерал.split())
 
 

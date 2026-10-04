@@ -160,6 +160,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0036_action_plans.sql": (
         "sql1:3101613414c0dd0562ce5314a5205f58c32d938bb4b99af2fe7e6ed261d6f8da"
     ),
+    # Предписания (волна 3, T361). Заведена вместе с файлом, нигде не применена.
+    "0037_prescriptions.sql": (
+        "sql1:933a2a507c5c0ea5a2251751ac6901661c82a9f6b333a0775caca71e7cd40c59"
+    ),
 }
 
 
