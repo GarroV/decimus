@@ -225,3 +225,17 @@ def test_ответ_без_номера_черновика_не_выдаётся
 
     with pytest.raises(GoogleMailError):
         create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)
+
+
+@pytest.mark.parametrize(
+    ("кому", "тема"),
+    [
+        ("partner@example.com\r\nBcc: z@evil.example", "Тема"),
+        ("partner@example.com", "Тема\r\nBcc: z@evil.example"),
+        ("partner@example.com\nBcc: z@evil.example", "Тема"),
+    ],
+)
+def test_перевод_строки_в_заголовке_отказ_словами(кому: str, тема: str) -> None:
+    """CR/LF в теме или адресате — не 500 из почтовой сборки, а внятный отказ."""
+    with pytest.raises(GoogleMailError):
+        mime_message(to=кому, subject=тема, body="Текст")
