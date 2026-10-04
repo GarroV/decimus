@@ -18,7 +18,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 boto3 = pytest.importorskip("boto3")
@@ -105,7 +105,9 @@ def _проверка_с_кадрами(chat_id: int, *, кадры: tuple[str, 
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     for file_id in кадры:
         attach_photo(chat_id, 1, file_id)
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def _строки(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> list[tuple[Any, ...]]:

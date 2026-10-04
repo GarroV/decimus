@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -41,7 +41,9 @@ def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
 def _проверка(chat_id: int, *, точка: str = ТОЧКА) -> str:
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant="default")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def _id_точки(название: str) -> str:

@@ -36,6 +36,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -97,7 +98,9 @@ def _проверка(chat_id: int, *, words: str = СЛОВА) -> str:
         source="comment",
         words=words,
     )
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def test_сырые_слова_ложатся_рядом_с_записью(domain_env: Path, db_env: str) -> None:

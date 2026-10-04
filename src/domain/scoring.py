@@ -67,6 +67,16 @@ def score(chat_id: int) -> Score:
             code=0,
             command="score",
         ) from exc
+    return parse_score(raw)
+
+
+def parse_score(raw: Mapping[str, Any]) -> Score:
+    """Ответ `audit.py score --json` → `Score`. Ни одной своей операции над числами.
+
+    Отдельно от `score`, потому что тот же ответ движка читают и те, кто
+    считает не проверку чата, а записанную (пересчёт на приёмке, D200): разбор
+    в двух местах разошёлся бы молча.
+    """
     counts: Mapping[str, Any] = raw.get("counts") or {}
     zones: Mapping[str, Any] = raw.get("zones") or {}
     # Счётчики берутся как есть: у движка в них попадает и `D0` —

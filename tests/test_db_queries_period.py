@@ -22,7 +22,7 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from db_harness import привязать_страну, точка_справочника  # noqa: E402
+from db_harness import accept_pushed, привязать_страну, точка_справочника  # noqa: E402
 
 from src.db.errors import DbError  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
@@ -59,7 +59,9 @@ def _проверка(chat_id: int, *, арендатор: str, дата: str, �
         chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор, date=дата
     )
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 # --- залитая история (D035) --------------------------------------------------

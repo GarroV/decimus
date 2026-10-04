@@ -22,7 +22,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import пространства_для_теста, точка_пространства
+from db_harness import accept_pushed, пространства_для_теста, точка_пространства
 
 pytest.importorskip("psycopg")
 
@@ -74,7 +74,9 @@ def _проверка(
     )
     for номер in range(находок):
         add_finding(chat_id, code="CLN03", level="D1", zone=ЗОНЫ[номер], text="грязь на полу")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 # --- изоляция арендаторов ----------------------------------------------------

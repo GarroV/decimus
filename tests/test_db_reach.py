@@ -163,8 +163,8 @@ def test_база_не_пишет_проверку_партнёра_на_точ�
             cur.execute(
                 "insert into inspections (tenant_code, unit_id, chat_id, kind, inspection_date, "
                 "report_lang, ui_lang, speech_lang, checklist_version, pct, grade, "
-                "source_fingerprint) values ('GE', %s, 1, 'planned', '2026-09-03', 'ru', 'ru', "
-                "'ru', 'v1', 100, 'A', 'отпечаток-сторожа')",
+                "source_fingerprint, status) values ('GE', %s, 1, 'planned', '2026-09-03', "
+                "'ru', 'ru', 'ru', 'v1', 100, 'A', 'отпечаток-сторожа', 'draft')",
                 (ереван,),
             )
 

@@ -34,6 +34,7 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 from conftest import requires_db
+from db_harness import accept_pushed
 
 from src import db
 from src.bot.app import build_dispatcher
@@ -128,6 +129,7 @@ async def test_проведённая_ботом_проверка_лежит_в_
     """
     session = await проверка_через_бота(monkeypatch)
     assert отправленные_документы(session), "аудитору не отдали отчёт — слив проверять не на чем"
+    accept_pushed()  # D199: слив оставил проверку на приёмке
 
     эталон = score(CHAT_ID)
     строки = db.list_inspections(reach=own_reach("default"))
@@ -150,6 +152,7 @@ async def test_повторная_сборка_отчёта_не_плодит_в
     await build_report(build_dispatcher(SETTINGS), bot)
 
     assert отправленные_документы(session), "второй отчёт не собрался — сравнивать нечего"
+    accept_pushed()  # D199
     assert len(db.list_inspections(reach=own_reach("default"))) == 1
 
 

@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -74,7 +75,9 @@ def _проверка_с_находками(
     )
     for zone, text in находки:
         add_finding(chat_id, code="CLN03", level="D1", zone=zone, text=text)
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def test_шапка_проверки_совпадает_с_записанным(domain_env: Path, db_env: str) -> None:
@@ -192,6 +195,7 @@ def test_source_пусто_без_записи_и_comment_со_слов_ауди
         source=SOURCE_COMMENT,
     )
     insp_id = push_inspection(chat_id)
+    accept_pushed(insp_id)  # D199
 
     прочитанная = get_inspection(insp_id, reach=own_reach(АРЕНДАТОР))
 
