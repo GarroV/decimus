@@ -145,6 +145,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0032_web_own_password.sql": (
         "sql1:f64b46589d9cda89d261da23ed8bc353e50d96e41683b295a14109be328c598f"
     ),
+    # Заведена вместе с файлом (ревью безопасности access2) и нигде ещё не применена.
+    "0033_definer_search_path.sql": (
+        "sql1:1c82c43ad0df14ac507789d39802e980ed4fa89d50aaa2d3eab950a06c37d376"
+    ),
 }
 
 
