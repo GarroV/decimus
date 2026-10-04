@@ -19,6 +19,7 @@ from .record import build_record_router
 from .records import build_records_router
 from .resend import build_resend_router
 from .start import build_start_router
+from .stops import build_stops_router
 from .version import build_version_router
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "build_records_router",
     "build_resend_router",
     "build_start_router",
+    "build_stops_router",
     "build_version_router",
 ]

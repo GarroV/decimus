@@ -50,7 +50,7 @@ from src.domain.errors import DomainError
 from src.recognize.errors import RecognizeError
 from src.recognize.transcribe import transcribe
 
-from .. import frame_copies, sidecar, view
+from .. import frame_copies, sidecar, stops, view
 from ..info import KIND_DATE, KIND_TEXT, KIND_YES_NO, fields_to_ask, parse_date
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -101,7 +101,7 @@ async def start_info(message: Message, state: FSMContext, chat_id: int, lang: st
     последний рубеж (T126), как и на всех остальных входах.
     """
     if read_inspection(chat_id) is None:
-        await message.answer(t("material.no_inspection", lang))
+        await stops.refuse(message, lang, step="finish.info", key="material.no_inspection")
         return
     asked = await asyncio.to_thread(partial(fields_to_ask, lang, chat_id=chat_id))
     if not asked:
@@ -213,7 +213,7 @@ async def _save(message: Message, state: FSMContext, lang: str, value: str) -> N
         await asyncio.to_thread(domain.set_info, message.chat.id, code, value, photos=shots)
     except DomainError:
         logger.exception("информационное поле %s чата %s не записалось", code, message.chat.id)
-        await message.answer(t("info.not_saved", lang))
+        await stops.refuse(message, lang, step="finish.info", key="info.not_saved")
         return
     # Кадры сняты только после удачной записи: отказ движка оставляет их при
     # вопросе, и повторный ответ уносит их с собой, а не теряет по дороге.
@@ -242,7 +242,9 @@ async def _save_free_text(message: Message, state: FSMContext, lang: str, text: 
     if kind == KIND_DATE:
         stamp = parse_date(value)
         if stamp is None:
-            await message.answer(t("info.bad_date", lang, text=view.shorten(value)))
+            await stops.refuse(
+                message, lang, step="finish.info", key="info.bad_date", text=view.shorten(value)
+            )
             return
         value = stamp
     await _save(message, state, lang, value)
@@ -316,14 +318,16 @@ def build_info_router() -> Router:
         voice = message.voice
         raw = None if bot is None or voice is None else await fetch_bytes(bot, voice.file_id)
         if raw is None:
-            await message.answer(t("record.voice_not_downloaded", lang))
+            await stops.refuse(message, lang, step="finish.info", key="record.voice_not_downloaded")
             return
         try:
             # Язык речи в `transcribe` не передаётся: у него его нет в
             # сигнатуре, и разбор кадра зовёт его так же (`routers/record.py`).
             heard = await asyncio.to_thread(transcribe, raw)
         except RecognizeError as exc:
-            await message.answer(t("record.voice_failed", lang, reason=f"{exc}."))
+            await stops.refuse(
+                message, lang, step="finish.info", key="record.voice_failed", reason=f"{exc}."
+            )
             return
         # Показать ДО записи и дать поправить (D069): дальше либо кнопка
         # «Записать так», либо присланный текст, который её заменит.
