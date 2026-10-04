@@ -20,6 +20,7 @@ import pytest
 from conftest import requires_db
 from db_harness import (
     RETRACTION_URL_VAR,
+    accept_pushed,
     set_retraction_env,
     привязать_страну,
     точка_справочника,
@@ -54,7 +55,9 @@ def _проверка(chat_id: int, *, точка: str = ТОЧКА, аренд�
     """Настоящая проверка через контракт `domain`, затем слив в базу."""
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def _строка(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> tuple[Any, ...] | None:
@@ -298,6 +301,7 @@ def test_после_снятия_ту_же_проверку_можно_слит�
     retract_inspection(первый, tenant="default", reason=ПРИЧИНА)
 
     второй = push_inspection(415)
+    accept_pushed(второй)  # D199: история читает только принятые
 
     assert второй != первый, "слив вернул снятую проверку вместо новой"
     видно = {строка.id for строка in list_inspections(reach=own_reach("default"))}
