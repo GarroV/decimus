@@ -39,6 +39,7 @@ from bot_harness import (
 )
 from bot_harness import callback_query as callback
 from conftest import requires_data, requires_db
+from db_harness import accept_pushed
 
 from src import db
 from src.bot.app import build_dispatcher
@@ -295,6 +296,7 @@ async def test_поправленное_предложение_лежит_в_б�
     await build_report(dp, bot)
 
     assert session.documents, "отчёт не отдан — слива могло и не быть"
+    accept_pushed()  # D199
     (строка,) = db.findings_by_unit(reach=own_reach("default"), unit="Белград 2")
 
     assert (строка.code, строка.zone) == ("CLN03", "cold_kitchen"), (

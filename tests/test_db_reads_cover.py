@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -61,7 +62,9 @@ def _проверка(
         contact=поля["contact"],
     )
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def test_чтение_по_идентификатору_отдаёт_шапку_письма(domain_env: Path, db_env: str) -> None:
