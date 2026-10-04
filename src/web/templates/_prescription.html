@@ -8,6 +8,10 @@
   <span class="tag tag--micro {{ rx_tones[state] }}">{{ t('rx.state.' ~ state) }}</span>
 {%- endmacro %}
 
+{% macro rx_replied(p) -%}
+  {%- if p.status == 'issued' and p.replies %} <span class="tag tag--micro tag--warn">{{ t('rx.event.replied') }}</span>{% endif -%}
+{%- endmacro %}
+
 {% macro rx_units(p) -%}
   {%- if p.whole_country -%}{{ t('rx.whole_country') }}{%- else -%}{{ p.units|map(attribute='name')|join(', ') }}{%- endif -%}
 {%- endmacro %}

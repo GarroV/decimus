@@ -3,7 +3,7 @@
   партнёра, история — и действия по шагу: черновик кладут в Gmail или правят,
   действующее закрывают с комментарием. Отправленное не правится.
 #}{% extends "base.html" %}
-{% from "_prescription.html" import rx_tag, rx_units, letter, bases, replies, history, meta with context %}
+{% from "_prescription.html" import rx_tag, rx_replied, rx_units, letter, bases, replies, history, meta with context %}
 {% block title %}{{ t('section.actions.title') }} · {{ p.subject }}{% endblock %}
 
 {% block body %}
@@ -14,7 +14,7 @@
       <h1 class="ov-head__title">{{ p.subject }}</h1>
       <div class="ov-card__hint">
         {{ rx_units(p) }} · <span{% if p.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('rx.due', due=p.due_on) }}</span>
-        · {{ rx_tag(p, today) }}{% if p.issued_at %} · {{ meta(p) }}{% endif %}
+        · {{ rx_tag(p, today) }}{{ rx_replied(p) }}{% if p.issued_at %} · {{ meta(p) }}{% endif %}
       </div>
     </div>
   </div>
@@ -30,7 +30,7 @@
       <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.send_title') }}</div></div>
       <div class="card__body stack">
         <div class="ov-cell__muted">{{ t('rx.card.send_hint') }}</div>
-        <div class="row">
+        <div class="row rx-send">
           <form method="post" action="{{ url(rx_hq_path ~ '/' ~ p.id ~ '/send') }}?lang={{ lang }}">
             <button class="btn btn--primary" type="submit">{{ t('rx.card.send') }}</button>
           </form>

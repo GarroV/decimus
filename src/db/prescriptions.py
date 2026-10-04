@@ -329,7 +329,7 @@ from prescriptions p
 where (%(countries)s::text[] is null or (p.country = any(%(countries)s) and p.status <> 'draft'))
   and p.status <> 'draft'
   and p.country = %(country)s
-order by p.issued_at desc
+order by (p.status = 'closed'), p.due_on, p.issued_at desc
 limit %(limit)s
 """  # noqa: S608
 
@@ -532,7 +532,7 @@ def list_prescriptions(
 
 
 def country_prescriptions(country: str, *, reach: Reach) -> PrescriptionList:
-    """Отправленные и закрытые предписания страны для её экрана, свежие сверху."""
+    """Отправленные и закрытые предписания страны: действующие по сроку, закрытые ниже."""
     params = {**reach_params(reach), "country": country, "limit": LIST_LIMIT + 1}
     rows = _read_conn(_COUNTRY_SQL, params)
     return PrescriptionList(rows=rows[:LIST_LIMIT], truncated=len(rows) > LIST_LIMIT)

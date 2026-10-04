@@ -84,6 +84,12 @@ def _require_hq() -> None:
         abort(404)
 
 
+def _not_found() -> tuple[str, int]:
+    """Чужое, черновое для партнёра и несуществующее — один ответ, но про предписание."""
+    назад = section("actions").path + "/prescriptions" if is_hq() else section("orders").path
+    return render_template("prescriptions/not_found.html", back=назад), 404
+
+
 def _parse_date(raw: str) -> date | None:
     try:
         return date.fromisoformat((raw or "").strip()[:10])
@@ -204,7 +210,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         lang = _lang(conf)
         текущее = rx.get_prescription(prescription_id, reach=auth.current_reach())
         if текущее is None:
-            return render_template("inspections/not_found.html"), 404
+            return _not_found()
         if текущее.status != rx.STATUS_DRAFT:
             return redirect(url_for("rx_view", prescription_id=текущее.id, lang=lang), code=303)
         return _render_form(
@@ -222,7 +228,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         lang = _lang(conf)
         текущее = rx.get_prescription(prescription_id, reach=auth.current_reach())
         if текущее is None:
-            return render_template("inspections/not_found.html"), 404
+            return _not_found()
         try:
             rxw.update_draft(текущее.id, _draft_from_form(текущее.country), actor=_actor())
         except PrescriptionError as exc:
@@ -241,7 +247,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         refuse_foreign_origin()
         текущее = rx.get_prescription(prescription_id, reach=auth.current_reach())
         if текущее is None:
-            return render_template("inspections/not_found.html"), 404
+            return _not_found()
         return _go_to_gmail(текущее.id, _lang(conf))
 
     @app.post(f"{путь}/<prescription_id>/close", endpoint="rx_close")
@@ -435,7 +441,7 @@ def _render_card(
     lang = _lang(conf)
     предписание = rx.get_prescription(prescription_id, reach=auth.current_reach())
     if предписание is None:
-        return render_template("inspections/not_found.html"), 404
+        return _not_found()
     исход = request.args.get("gmail") or ""
     if notice is None and request.args.get("saved") == "1":
         notice = t("rx.saved", lang)
@@ -567,7 +573,7 @@ def _render_partner_card(
 ) -> str | tuple[str, int]:
     предписание = rx.get_prescription(prescription_id, reach=auth.current_reach())
     if предписание is None:
-        return render_template("inspections/not_found.html"), 404
+        return _not_found()
     return render_template(
         "prescriptions/card.html",
         p=предписание,

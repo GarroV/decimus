@@ -2,7 +2,7 @@
   Предписание глазами партнёра (волна 3): письмо, срок, статус, основания и
   ответ — комментарий и, по желанию, файл. Закрывает предписание УК.
 #}{% extends "base.html" %}
-{% from "_prescription.html" import rx_tag, rx_units, letter, bases, replies, meta with context %}
+{% from "_prescription.html" import rx_tag, rx_replied, rx_units, letter, bases, replies, meta with context %}
 {% block title %}{{ t('section.orders.title') }} · {{ p.subject }}{% endblock %}
 
 {% block body %}
@@ -13,7 +13,7 @@
       <h1 class="ov-head__title">{{ p.subject }}</h1>
       <div class="ov-card__hint">
         {{ rx_units(p) }} · <span{% if p.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('rx.due', due=p.due_on) }}</span>
-        · {{ rx_tag(p, today) }} · {{ meta(p) }}
+        · {{ rx_tag(p, today) }}{{ rx_replied(p) }} · {{ meta(p) }}
       </div>
     </div>
   </div>
