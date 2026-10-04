@@ -21,8 +21,10 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db import action_plans as plans  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
-from src.db.errors import ActionPlanError  # noqa: E402
+from src.db.errors import AcceptError, ActionPlanError  # noqa: E402
+from src.db.move import move_inspection  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
+from src.db.retract import retract_inspection  # noqa: E402
 
 pytestmark = requires_db
 
@@ -162,8 +164,8 @@ def test_роль_приложения_не_заводит_запрос(сеть
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         _sql(
             db_env,
-            "insert into action_plan_requests (inspection_id, country, due_on, origin,"
-            " requested_by, due_set_by) values (%s, 'GE', current_date, 'manual', 'bot', 'bot')",
+            "insert into action_plan_requests (inspection_id, due_on, origin,"
+            " requested_by, due_set_by) values (%s, current_date, 'manual', 'bot', 'bot')",
             (ident,),
         )
 
@@ -173,8 +175,8 @@ def test_принятым_запрос_не_вставляет_никто(сет
     with pytest.raises(psycopg.errors.InsufficientPrivilege, match="только запрошенным"):
         _sql(
             admin_env,
-            "insert into action_plan_requests (inspection_id, country, due_on, status, origin,"
-            " requested_by, due_set_by) values (%s, 'GE', current_date, 'accepted', 'manual',"
+            "insert into action_plan_requests (inspection_id, due_on, status, origin,"
+            " requested_by, due_set_by) values (%s, current_date, 'accepted', 'manual',"
             " 'hq', 'hq')",
             (ident,),
         )
@@ -432,11 +434,13 @@ def test_уК_правит_срок_и_это_в_истории(сеть: None) 
 
 def test_просрочка_считается_на_чтении(сеть: None, admin_env: str) -> None:
     запрос = _запрос(_принятая("D2"))
-    _sql(
-        admin_env,
-        "update action_plan_requests set due_on = %s where id = %s",
-        (СЕГОДНЯ - timedelta(days=1), запрос.id),
-    )
+    with psycopg.connect(admin_env) as conn:
+        conn.execute("select set_config('decimus.plan_actor', 'hq', true)")
+        conn.execute(
+            "update action_plan_requests set due_on = %s where id = %s",
+            (СЕГОДНЯ - timedelta(days=1), запрос.id),
+        )
+        conn.commit()
     итог = _запрос(запрос.inspection_id)
     assert итог.overdue(СЕГОДНЯ) is True
     assert итог.overdue(date(2000, 1, 1)) is False
@@ -445,3 +449,180 @@ def test_просрочка_считается_на_чтении(сеть: None,
 def test_админская_связь_не_та_что_у_приложения(db_env: str) -> None:
     """Санитарная: тесты выше действительно ходят двумя разными ролями."""
     assert admin_role_dsn(db_env) != db_env
+
+
+# --- страна — у точки, а не копией в запросе (ревью #495, п.2) -----------------
+
+
+def test_перенос_в_точку_другой_страны_уводит_запрос(сеть: None, склад: Хранилище) -> None:
+    """Проверку перенесли в Армению — план кладёт Армения, Грузия запроса не видит."""
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+    ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
+
+    # Act
+    move_inspection(
+        запрос.inspection_id,
+        tenant="HQ",
+        new_date=СЕГОДНЯ,
+        new_unit_id=ереван,
+        reason="не та точка",
+        actor="hq",
+    )
+
+    # Assert
+    assert _запрос(запрос.inspection_id).country == "AM"
+    assert plans.get_request(запрос.id, reach=reach_of("GE")) is None
+    with pytest.raises(ActionPlanError, match="Запроса нет"):
+        _загрузить(склад, запрос.id, tenant="GE")
+    assert _загрузить(склад, запрос.id, tenant="AM") == 1
+
+
+def _вставить_запрос(dsn: str, ident: str) -> None:
+    _sql(
+        dsn,
+        "insert into action_plan_requests (inspection_id, due_on, origin, requested_by,"
+        " due_set_by) values (%s, current_date + 3, 'manual', 'hq', 'hq')",
+        (ident,),
+    )
+
+
+def test_база_не_заводит_запрос_по_проверке_партнёра(сеть: None, admin_env: str) -> None:
+    ident = _принятая("D2", tenant="GE")
+    with pytest.raises(psycopg.errors.CheckViolation, match="проверке УК"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_по_ждущей_проверке(сеть: None, admin_env: str) -> None:
+    ident = _проверка("D2")
+    with pytest.raises(psycopg.errors.CheckViolation, match="принятой и не отклонённой"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_по_отклонённой_проверке(
+    сеть: None, admin_env: str, склад: Хранилище
+) -> None:
+    ident = _принятая("D1")
+    retract_inspection(ident, tenant="HQ", reason="дубль", storage=склад)
+    with pytest.raises(psycopg.errors.CheckViolation, match="принятой и не отклонённой"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_без_страны_у_точки(сеть: None, admin_env: str) -> None:
+    """Страну точке с проверками не стереть (0030), поэтому — точка, у которой её не было."""
+    from src.db.directory import upsert_unit
+
+    upsert_unit("Nowhere-1", tenant="HQ")
+    ident = _принятая("D1", unit="Nowhere-1")
+    with pytest.raises(psycopg.errors.CheckViolation, match="нет страны"):
+        _вставить_запрос(admin_env, ident)
+
+
+# --- отклонённая проверка снимает запрос с очереди (ревью #495, п.3) -----------
+
+
+def test_отклонённая_проверка_уходит_из_очереди_и_версий_не_принимает(
+    сеть: None, склад: Хранилище
+) -> None:
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+
+    # Act
+    retract_inspection(запрос.inspection_id, tenant="HQ", reason="дубль", storage=склад)
+
+    # Assert
+    assert запрос.id not in {r.id for r in plans.list_requests(reach=reach_of("HQ"))}
+    with pytest.raises(ActionPlanError, match="Запроса нет"):
+        _загрузить(склад, запрос.id)
+
+
+def test_триггер_не_кладёт_версию_к_отклонённой_даже_мимо_охвата(
+    сеть: None, склад: Хранилище, pg_dsn: str
+) -> None:
+    """Владелец базы видит отклонённую проверку — и всё равно получает отказ триггера."""
+    запрос = _запрос(_принятая("D2"))
+    retract_inspection(запрос.inspection_id, tenant="HQ", reason="дубль", storage=склад)
+    with pytest.raises(psycopg.errors.CheckViolation, match="отклонена"):
+        _sql(
+            pg_dsn,
+            "insert into action_plan_files (id, request_id, version, storage_path, file_name,"
+            " size_bytes, content_type, uploaded_by, uploaded_tenant) values"
+            " (gen_random_uuid(), %s, 1, 's3://x/y', 'p.pdf', 3, 'application/pdf', 'ge', 'GE')",
+            (запрос.id,),
+        )
+
+
+# --- срок и подпись меняются вместе (ревью #495, п.6) --------------------------
+
+
+def test_срок_без_подписи_не_правится(сеть: None, admin_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.CheckViolation, match="с подписью"):
+        _sql(
+            admin_env,
+            "update action_plan_requests set due_on = due_on + 1 where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_подпись_без_срока_не_меняется(сеть: None, admin_env: str, pg_dsn: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _sql(
+            admin_env,
+            "update action_plan_requests set due_set_by = 'подлог' where id = %s",
+            (запрос.id,),
+        )
+    with pytest.raises(psycopg.errors.CheckViolation, match="без правки срока"):
+        _sql(
+            pg_dsn,
+            "update action_plan_requests set due_set_by = 'подлог' where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_подпись_срока_берётся_из_транзакции(сеть: None, admin_env: str) -> None:
+    """Колонку подписи не подставить вручную: её пишет триггер из `decimus.plan_actor`."""
+    запрос = _запрос(_принятая("D2"))
+    with psycopg.connect(admin_env) as conn:
+        conn.execute("select set_config('decimus.plan_actor', 'hq-lead', true)")
+        conn.execute(
+            "update action_plan_requests set due_on = due_on + 1 where id = %s", (запрос.id,)
+        )
+        conn.commit()
+    assert [(e.action, e.actor) for e in _запрос(запрос.inspection_id).events][-1] == (
+        "due_changed",
+        "hq-lead",
+    )
+
+
+# --- настройка срока читается, только когда запрос нужен (ревью #495, п.5) -----
+
+
+def test_кривая_настройка_срока_не_мешает_принять_проверку_без_d2(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+) -> None:
+    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    ident = _принятая("D1")
+    assert _статус(admin_env, ident) == "finalized"
+
+
+def test_кривая_настройка_при_d2_это_понятный_отказ_и_проверка_ждёт(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+) -> None:
+    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    ident = _проверка("D2")
+
+    with pytest.raises(AcceptError, match="запрос экшн-плана, а он не завёлся") as отказ:
+        accept_inspection(ident, tenant="HQ", actor="garva")
+
+    assert "семь" not in str(отказ.value), "текст настройки на карточке не печатается"
+    assert _статус(admin_env, ident) == "draft"
+    assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
+
+
+def _статус(dsn: str, ident: str) -> str:
+    with psycopg.connect(dsn) as conn:
+        строка = conn.execute("select status from inspections where id = %s", (ident,)).fetchone()
+    assert строка is not None
+    return str(строка[0])

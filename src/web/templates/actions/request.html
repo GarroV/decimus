@@ -6,10 +6,10 @@
 {% block title %}{{ t('section.actions.title') }} · {{ r.unit_name }}{% endblock %}
 
 {% block body %}
-  <a class="cn-back" href="{{ url(actions_path) }}?lang={{ lang }}&amp;country={{ r.country }}">‹ {{ t('section.actions.title') }}</a>
+  <a class="cn-back" href="{{ url(actions_path) }}?lang={{ lang }}{% if r.country %}&amp;country={{ r.country }}{% endif %}">‹ {{ t('section.actions.title') }}</a>
   <div class="ov-head">
     <div class="ov-head__main">
-      <div class="ov-head__kicker">{{ country_title(r.country) or r.country }} · {{ t('actions.request.kicker') }}</div>
+      <div class="ov-head__kicker">{{ (country_title(r.country) or r.country) if r.country else '—' }} · {{ t('actions.request.kicker') }}</div>
       <h1 class="ov-head__title">{{ r.unit_name }}</h1>
       <div class="ov-card__hint">
         <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>

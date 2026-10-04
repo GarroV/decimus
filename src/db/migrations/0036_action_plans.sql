@@ -26,10 +26,21 @@
 -- search_path как в 0033); прямой записи не выдано никому. Действие нельзя
 -- совершить, не оставив следа, и след нельзя дописать задним числом.
 --
--- ЧЬЯ СТРАНА. Запрос несёт код страны точки (D284: одна страна — один
--- партнёр); кто её видит, решает охват чтения (`reach.py`). Загрузить версию
--- может только пространство, за которым страна закреплена (`space_countries`)
--- — это держит триггер, а не только запрос веба.
+-- ЧЬЯ СТРАНА. Копии страны в запросе нет: страна — у точки проверки
+-- (`inspections.unit_id → units.country`, D284: одна страна — один партнёр).
+-- Перенесли проверку в точку другой страны (D195) — запрос уехал вместе с ней,
+-- и охват чтения (`reach.py`) и триггер загрузки читают одно и то же. Загрузить
+-- версию может только пространство, за которым страна точки закреплена
+-- (`space_countries`), — это держит триггер, а не только запрос веба.
+--
+-- ПО КАКОЙ ПРОВЕРКЕ. Запрос заводится только по принятой и не отклонённой
+-- проверке УК, у точки которой есть страна, — держит триггер вставки (урок
+-- #490: не только Python). Отклонённая проверка запрос не снимает, но
+-- загрузить версию к ней нельзя, и из очереди он уходит (`action_plans.py`).
+--
+-- СРОК С ПОДПИСЬЮ. Кто назначил срок, пишет триггер из `decimus.plan_actor`
+-- (настройка транзакции, как `decimus.move_actor` у переноса, 0025): правка
+-- срока без подписи — отказ, а подпись без правки срока не переписывается.
 --
 -- Раннер оборачивает файл в одну транзакцию сам — begin/commit здесь не нужны.
 
@@ -38,7 +49,6 @@ create table action_plan_requests (
     -- Один запрос на проверку: автозапрос при подтверждении и кнопка УК не
     -- заводят двух.
     inspection_id uuid not null unique references inspections (id),
-    country text not null check (country ~ '^[A-Z]{2}$'),
     due_on date not null,
     status text not null default 'requested'
         check (status in ('requested', 'on_review', 'accepted')),
@@ -47,11 +57,16 @@ create table action_plan_requests (
     origin text not null check (origin in ('auto', 'manual')),
     requested_by text not null check (length(btrim(requested_by)) > 0),
     requested_at timestamptz not null default now(),
-    -- Кто последним назначил срок: при заведении — тот, кто запросил.
+    -- Кто последним назначил срок: при заведении — тот, кто запросил; дальше
+    -- пишет триггер из подписи транзакции.
     due_set_by text not null check (length(btrim(due_set_by)) > 0)
 );
 
-create index action_plan_requests_queue_idx on action_plan_requests (country, status, due_on);
+-- Очередь УК (`action_plans._OPEN_SQL`): открытых — единицы, принятые копятся
+-- годами. Частичный индекс держит открытые в порядке выдачи и не растёт вместе
+-- с историей.
+create index action_plan_requests_open_idx on action_plan_requests (due_on, requested_at)
+    where status <> 'accepted';
 
 create table action_plan_files (
     id uuid primary key,
@@ -109,22 +124,54 @@ as $$
 declare
     последняя uuid;
     вердикт text;
+    автор text;
+    чья text;
+    стадия text;
+    отклонена timestamptz;
+    страна text;
 begin
     if tg_op = 'INSERT' then
         if new.status <> 'requested' then
             raise exception 'запрос экшн-плана заводится только запрошенным, а не %', new.status
                 using errcode = 'insufficient_privilege';
         end if;
-        if new.due_set_by is distinct from new.requested_by then
-            raise exception 'срок нового запроса назначает тот, кто запросил'
+        select i.tenant_code, i.status, i.retracted_at, u.country
+          into чья, стадия, отклонена, страна
+        from public.inspections i
+        join public.units u on u.id = i.unit_id
+        where i.id = new.inspection_id;
+        if чья is distinct from 'HQ' then
+            raise exception 'экшн-план запрашивают по проверке УК, а проверка % не её', new.inspection_id
                 using errcode = 'check_violation';
         end if;
+        if стадия is distinct from 'finalized' or отклонена is not null then
+            raise exception 'экшн-план запрашивают по принятой и не отклонённой проверке'
+                using errcode = 'check_violation';
+        end if;
+        if страна is null then
+            raise exception 'у точки проверки % нет страны — запрос некому показать', new.inspection_id
+                using errcode = 'check_violation';
+        end if;
+        new.due_set_by := new.requested_by;
         return new;
     end if;
 
     if old.status = 'accepted' then
         raise exception 'принятый экшн-план % не меняется', old.id
             using errcode = 'check_violation';
+    end if;
+    if new.due_on is not distinct from old.due_on then
+        if new.due_set_by is distinct from old.due_set_by then
+            raise exception 'кто назначил срок, не меняется без правки срока'
+                using errcode = 'check_violation';
+        end if;
+    else
+        автор := btrim(coalesce(current_setting('decimus.plan_actor', true), ''));
+        if автор = '' then
+            raise exception 'срок запроса % правят с подписью (decimus.plan_actor)', old.id
+                using errcode = 'check_violation';
+        end if;
+        new.due_set_by := автор;
     end if;
     if new.status = old.status then
         return new;
@@ -175,13 +222,22 @@ as $$
 declare
     статус text;
     страна text;
+    отклонена timestamptz;
     следующая integer;
 begin
-    select r.status, r.country into статус, страна
+    -- Страна — у точки проверки, а не копией в запросе. Отклонённую проверку
+    -- роль приложения не видит вовсе (0010): строки нет — отказ.
+    select r.status, u.country, i.retracted_at into статус, страна, отклонена
     from public.action_plan_requests r
+    join public.inspections i on i.id = r.inspection_id
+    join public.units u on u.id = i.unit_id
     where r.id = new.request_id;
     if статус is distinct from 'requested' then
         raise exception 'версию плана кладут только в запрошенный запрос (сейчас %)', coalesce(статус, 'нет запроса')
+            using errcode = 'check_violation';
+    end if;
+    if отклонена is not null then
+        raise exception 'проверка отклонена — план к ней не кладут'
             using errcode = 'check_violation';
     end if;
     if not exists (
@@ -310,7 +366,7 @@ grant update (status) on action_plan_requests to dodo_audit_app;
 
 -- УК (администратор истории): запрос, срок, вердикт.
 grant insert on action_plan_requests to dodo_audit_admin;
-grant update (status, due_on, due_set_by) on action_plan_requests to dodo_audit_admin;
+grant update (status, due_on) on action_plan_requests to dodo_audit_admin;
 grant insert on action_plan_reviews to dodo_audit_admin;
 
 alter table action_plan_requests enable row level security;

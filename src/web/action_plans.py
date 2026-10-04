@@ -144,7 +144,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         очередь = очередь if очередь in QUEUES else ""
         все = plans.list_requests(reach=auth.current_reach())
         сегодня = plans.today()
-        страны = tuple(sorted({r.country for r in все}))
+        страны = tuple(sorted({r.country for r in все if r.country}))
         в_стране = tuple(r for r in все if not страна or r.country == страна)
         на_приёмке = tuple(r for r in в_стране if r.status == plans.STATUS_ON_REVIEW)
         просрочены = tuple(r for r in в_стране if r.overdue(сегодня))
