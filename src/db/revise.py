@@ -43,7 +43,7 @@ from .config import check_environment
 from .errors import ReviseError
 from .models import InspectionDetail
 from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
-from .queries import _require_inspection_id, _require_tenant, read_detail
+from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
 
 
@@ -178,7 +178,7 @@ def _apply(
         (язык_речи,) = замок
         # Всё ниже — после замка: соседняя правка этой проверки уже записана
         # целиком или ещё не началась.
-        detail = read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)
+        detail = _read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)
         if detail is None:
             raise ReviseError(f"Проверки {ident} у арендатора {tenant} нет")
         score = score_of(_revised(detail, запись, revision))
