@@ -1255,6 +1255,26 @@ TEXTS: dict[str, dict[str, str]] = {
             "inspection is still here it can be saved, and a new one erases it."
         ),
     },
+    # Слив отклонён сторожем справочника (#482): точки нет среди точек
+    # пространства. Это не сбой базы, повтор не поможет — нужна другая точка или
+    # правка справочника в УК. Две причины (точки нет вовсе / она чужой страны)
+    # звучат одним текстом: различие подсказало бы, что пиццерия в сети есть.
+    "finish.unit_refused": {
+        "ru": (
+            "Отчёт и письмо на месте, но в историю проверок эта проверка не записалась: "
+            "пиццерии «{unit}» нет среди точек вашего пространства. Повтор не поможет. "
+            "Если название верное — сообщите управляющей компании, точки в справочник "
+            "заносит она. Если ошиблись точкой — начните проверку заново с правильным "
+            "названием (/start)."
+        ),
+        "en": (
+            "The report and the letter are yours, but this inspection did not reach the "
+            "history: the pizzeria «{unit}» is not among the units of your space. Retrying "
+            "will not help. If the name is right, tell the management company — it is the "
+            "one that adds units to the directory. If the unit is wrong, start the "
+            "inspection again with the right name (/start)."
+        ),
+    },
     "finish.photos_not_archived": {
         "ru": (
             "Проверка в историю записана, а кадры в хранилище не уехали. Отчёта это не "
