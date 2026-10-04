@@ -86,6 +86,10 @@ dependencies = [
     # туннеля (D100) соединение бывает и HTTPS. Своей подписи на hmac вместо
     # этого не пишется: она уже есть, проверена и приезжает с Flask.
     "itsdangerous==2.2.0",
+    # То же правило: иконки веб-админки (src/web/icons.py) помечают SVG
+    # безопасной разметкой `markupsafe.Markup` напрямую. Версия та же, что
+    # тянет Jinja этого выпуска.
+    "markupsafe==3.0.3",
 ]
 
 [project.optional-dependencies]
