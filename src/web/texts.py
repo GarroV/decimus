@@ -862,9 +862,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not unlink — the database did not respond. Try again.",
     },
     "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
-    "users.col.email": {"ru": "Почта для входа через Google", "en": "Google sign-in email"},
-    "users.email.placeholder": {"ru": "нет — вход только паролем", "en": "none — password only"},
-    "users.edit.save": {"ru": "Сохранить", "en": "Save"},
+    "users.col.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
+    "users.email.placeholder": {"ru": "не задана", "en": "not set"},
+    "users.email.submit": {"ru": "Сохранить", "en": "Save"},
+    "users.role.submit": {"ru": "Назначить", "en": "Assign"},
     "users.edit.missing": {
         "ru": "Учётка не найдена или отключена — ничего не изменено.",
         "en": "Account not found or disabled — nothing changed.",
