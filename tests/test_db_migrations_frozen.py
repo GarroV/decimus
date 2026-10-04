@@ -141,6 +141,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0031_bot_bindings.sql": (
         "sql1:78af39fa30505d3950be07b9eaed310efc3098994efe0d2221542da7ddfda5c8"
     ),
+    # Заведена вместе с файлом (#324) и нигде ещё не применена.
+    "0032_web_own_password.sql": (
+        "sql1:f64b46589d9cda89d261da23ed8bc353e50d96e41683b295a14109be328c598f"
+    ),
 }
 
 

@@ -137,6 +137,22 @@ _CHANGE_PASSWORD_SQL = """
  returning id
 """  # noqa: S105 — это текст ЗАПРОСА, а не пароль
 
+#: Свой хеш — по живой сессии, тем же условием, что у опознания: закрытая,
+#: просроченная сессия или отключённая учётка пароля не меняют.
+_SELECT_OWN_HASH_SQL = """
+    select u.password_hash
+      from web_sessions s
+      join web_users u on u.id = s.user_id
+     where s.fingerprint = %s
+       and s.closed_at is null
+       and s.expires_at > now()
+       and u.disabled_at is null
+"""
+
+#: Запись — функцией базы (`0032`): роль приложения хеш не пишет, а функция
+#: трогает только строку той сессии, чей токен ей предъявлен.
+_CHANGE_OWN_PASSWORD_SQL = "select change_own_password(%s, %s, %s)"  # noqa: S105 — текст запроса
+
 _CLOSE_USER_SESSIONS_SQL = """
     update web_sessions
        set closed_at = now()
@@ -520,9 +536,9 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
     транзакции — иначе между записью хеша и закрытием остаётся окно, в котором
     старая сессия ещё жива, а новый пароль уже роздан.
 
-    Роль владельца схемы: пароли меняет команда с машины, у роли приложения на
-    `web_users` по-прежнему только чтение. Смена с экрана — отдельная задача
-    (#324), и право там выдаётся не этим движением.
+    Роль повышенных полномочий: пароль любой учётки меняет команда с машины
+    («пароль забыт совсем»). Свой пароль с экрана меняет `change_own_password`
+    — другой дверью и без этого права (#324).
     """
     хеш = password_hash(_checked_password(password))
     with _managing("сменить пароль учётки") as conn, conn.cursor() as cur:
@@ -532,6 +548,39 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
             return False
         cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
         return True
+
+
+def change_own_password(token: str, *, current: str, new: str) -> bool:
+    """Сменить СВОЙ пароль по живой сессии (#324). `False` — текущий не тот или сессии нет.
+
+    Оба отказа — один `False`, и это намеренно: экран не должен подсказывать,
+    что именно не так с текущим паролем, а «сессия закрыта» по эту сторону
+    формы выглядит так же — пароль не сменён.
+
+    Новый пароль проверяется тем же правилом, что при заведении и смене
+    командой (`_checked_password`), — и до похода в базу.
+
+    Роль приложения: прямой записи хеша у неё нет (`0014`). Пишет функция
+    базы `change_own_password` (`0032`) — только строку той сессии, чей токен
+    предъявлен, только если прежний хеш всё ещё на месте, и тем же движением
+    закрывает остальные сессии человека, оставляя эту.
+    """
+    _checked_password(new)
+    отпечаток = session_fingerprint(token)
+    with _connected("сменить свой пароль") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_OWN_HASH_SQL, (отпечаток,))
+        строка = cur.fetchone()
+        if строка is None:
+            # Сверка всё равно стоит одного scrypt: иначе по времени ответа
+            # видно, жива ли сессия, — то же правило, что у `authenticate`.
+            password_hash(current)
+            return False
+        прежний = str(строка[0])
+        if not password_matches(current, прежний):
+            return False
+        cur.execute(_CHANGE_OWN_PASSWORD_SQL, (token, прежний, password_hash(new)))
+        итог = cur.fetchone()
+    return bool(итог and итог[0])
 
 
 def normalize_email(email: str) -> str:

@@ -127,6 +127,36 @@
     </section>
   {% endif %}
 
+  {# Свой пароль (#324): меняет каждый вошедший, и только себе — чью строку
+     трогать, решает сессия, а не поле формы. Введённое обратно в разметку не
+     возвращается: среди него пароли. #}
+  <section class="ov-card ov-card--wide mt-gap" id="password">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.password.title') }}</div></div>
+    <div class="card__body">
+      {% if password %}
+        <div class="note {{ 'note--ok' if password.key == 'ok' else 'note--warn' }}">
+          <div class="note__text">{{ t('users.password.' ~ password.key, min=min_password, minutes=password.locked_minutes) }}</div>
+        </div>
+      {% endif %}
+      <form method="post" action="{{ url(users_path ~ '/password') }}?lang={{ lang }}" class="row users-add mt-gap">
+        <label class="grow">
+          <span class="field-label">{{ t('users.password.current') }}</span>
+          <input class="input" type="password" name="current" required autocomplete="current-password">
+        </label>
+        <label class="grow">
+          <span class="field-label">{{ t('users.password.new') }}</span>
+          <input class="input" type="password" name="new" required minlength="{{ min_password }}" autocomplete="new-password">
+        </label>
+        <label class="grow">
+          <span class="field-label">{{ t('users.password.repeat') }}</span>
+          <input class="input" type="password" name="repeat" required minlength="{{ min_password }}" autocomplete="new-password">
+        </label>
+        <button class="btn btn--primary" type="submit">{{ t('users.password.submit') }}</button>
+      </form>
+      <p class="field-note">{{ t('users.password.hint', min=min_password) }}</p>
+    </div>
+  </section>
+
   {% if not people_known %}
     {# «База недоступна» и «людей нет» — разные вещи, и вторая была бы
        молчаливой ложью на экране, где считают людей с доступом. #}
