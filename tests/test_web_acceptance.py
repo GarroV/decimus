@@ -269,3 +269,31 @@ def test_отказ_правки_показан_текстом(стенд: Flask
     assert "Запись не исправлена: Класс D3 для пункта CLN05 не предусмотрен" in ответ.get_data(
         as_text=True
     )
+
+
+@админ
+def test_запись_вне_чек_листа_тоже_исправляется(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Запись, перенесённую в необычную зону, лист показывает отдельно — с формой правки."""
+    # Arrange — пункт записи в чек-листе только в зале, а запись — на кухне.
+    _приёмка(monkeypatch)
+    пункты = ({"id": "CLN02", "kind": "violation", "question_ru": "Пол", "zones": "HALL"},)
+    зоны = (
+        {"code": "KITCHEN", "name_ru": "Кухня", "name_en": "Kitchen"},
+        {"code": "HALL", "name_ru": "Зал", "name_en": "Hall"},
+    )
+    monkeypatch.setattr(
+        review,
+        "load_sheet",
+        lambda _h, findings, **kw: review.build_sheet(
+            items=пункты, zones=зоны, findings=findings, lang=kw["lang"]
+        ),
+    )
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert
+    assert "Записи вне чек-листа версии: 1" in страница
+    assert "/findings/f1/revise?lang=" in страница
