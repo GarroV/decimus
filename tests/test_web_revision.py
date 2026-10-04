@@ -10,7 +10,7 @@ import pytest
 
 from src.db.errors import ReviseError
 from src.db.models import FindingRow, InspectionDetail, InspectionRow
-from src.db.reach import own_reach
+from src.db.reach import reach_of
 from src.domain.models import Score
 from src.web import revision
 from src.web.methodology import Composition
@@ -117,10 +117,19 @@ def test_движок_считает_исправленную_запись_и_о
     assert стенд["записано"]["tenant"] == "HQ"
 
 
-def test_проверка_читается_только_своим_пространством(стенд: dict[str, Any]) -> None:
-    """УК читает партнёра шире, чем пишет (D283): правка видит только свои проверки."""
-    _исправить()
-    assert стенд["охват"] == own_reach("HQ")
+def test_чужая_проверка_из_охвата_не_исправляется(стенд: dict[str, Any]) -> None:
+    """УК читает партнёра шире, чем пишет (D283): чужую ждущую — только на чтение."""
+    # Arrange — охват УК отдаёт проверку партнёра
+    стенд["проверка"] = replace(
+        стенд["проверка"], inspection=replace(стенд["проверка"].inspection, tenant_code="demo")
+    )
+
+    # Act / Assert — отказ до движка и до записи
+    with pytest.raises(ReviseError, match="своего пространства"):
+        _исправить()
+    assert "посчитано" not in стенд
+    assert "записано" not in стенд
+    assert стенд["охват"] == reach_of("HQ")
 
 
 def test_зона_вне_списка_пункта_помечается_необычной(стенд: dict[str, Any]) -> None:
