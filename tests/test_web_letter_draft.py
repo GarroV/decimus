@@ -288,3 +288,43 @@ def test_кука_похода_помечена_secure_за_туннелем(
     )
     кука = next(к for к in ответ.headers.getlist("Set-Cookie") if "dodo_audit_mail_state" in к)
     assert "Secure" in кука
+
+
+def test_перевод_строки_в_контакте_даёт_отказ_а_не_500(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Контакт из шапки со вписанным переводом строки — ревью санитайзера, п.4."""
+    from src.web import google_mail
+
+    включить_почту(monkeypatch)
+    client, _ = клиент
+    своя = карточка()
+    monkeypatch.setattr(
+        data,
+        "load_card",
+        lambda _id, *, reach: replace(
+            своя,
+            inspection=replace(
+                своя.inspection, contact="partner@example.com\r\nBcc: z@evil.example"
+            ),
+        ),
+    )
+
+    def _не_звать(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("до Gmail письмо с битым заголовком доходить не должно")
+
+    # Настоящая сборка письма, подменён только сетевой вызов.
+    monkeypatch.setattr(
+        letter_draft,
+        "create_draft",
+        lambda token, **поля: google_mail.create_draft(token, opener=_не_звать, **поля),
+    )
+    уход = увести(client)
+    метка = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(уход.headers["Location"]).query))[
+        "state"
+    ]
+
+    ответ = client.get(f"/auth/google/mail?state={метка}&code=код")
+
+    assert ответ.status_code == 303
+    assert "gmail=failed" in ответ.headers["Location"]
