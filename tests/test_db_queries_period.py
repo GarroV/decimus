@@ -266,7 +266,6 @@ def test_период_идёт_по_индексу_а_не_полным_прох
                 "limit": 100,
                 "date_from": НАЧАЛО + timedelta(days=5000),
                 "date_to": НАЧАЛО + timedelta(days=5030),
-                "on_review": False,  # D199: очередь истории, не приёмки
             },
         )
         план = "\n".join(строка[0] for строка in cur.fetchall())

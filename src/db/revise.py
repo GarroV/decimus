@@ -1,8 +1,19 @@
 """Правка записи проверки на приёмке — вместе с пересчитанной оценкой (D200).
 
 До подтверждения запись правится целиком: пункт, класс, зона, формулировка.
-Оценку сюда приносит вызывающий, посчитанной движком (`src/report/rescore.py`)
-по уже исправленным записям: этот модуль чисел не считает, он их кладёт.
+Оценку считает движок вызывающего (`score_of`, обычно `src/report/rescore.py`):
+этот модуль чисел не считает, он отдаёт движку проверку с уже применённой
+правкой и кладёт то, что движок вернул.
+
+ПРАВКИ ОДНОЙ ПРОВЕРКИ ИДУТ ПО ОЧЕРЕДИ. Первым действием транзакция берёт замок
+строки проверки (`for update`), и только ПОСЛЕ него читает записи, считает
+оценку и пишет. Без замка два вычитывающих, правящих разные записи, считали
+бы каждый от своего снимка — и последней легла бы оценка без одной правки
+(ядро: число в отчёте). Замок выбран, а не оптимистичная версия: правки
+редкие и короткие, ждать соседа лучше, чем отказывать ему и заставлять
+повторять; и тот же замок закрывает гонку проверки «пара пункт + зона
+свободна». Подтверждение (`accept.py`) берёт тот же замок, поэтому правка и
+подтверждение одной проверки тоже не перекрываются.
 
 Запись и оценка пишутся ОДНОЙ транзакцией. Порознь они разошлись бы при первом
 же обрыве — и в истории оказалась бы исправленная запись под буквой,
@@ -20,7 +31,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Callable
+from dataclasses import dataclass, replace
 from typing import Any
 
 import psycopg
@@ -29,8 +41,10 @@ from psycopg.types.json import Json
 from ..domain.models import Score
 from .config import check_environment
 from .errors import ReviseError
+from .models import InspectionDetail
 from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
-from .queries import _require_inspection_id, _require_tenant
+from .queries import _require_inspection_id, _require_tenant, read_detail
+from .reach import own_reach
 
 
 @dataclass(frozen=True)
@@ -44,16 +58,23 @@ class Revision:
     text: str
 
 
-_SELECT_HEAD_SQL = """
-select i.status, i.retracted_at, i.speech_lang, f.id
+# Замок строки ждущей проверки — первое действие транзакции. Под ролью
+# приложения `for update` требует права править строку, а принятую проверку
+# политика заморозки от правки прячет: поэтому замок берётся только у ждущей,
+# а почему его не дали, объясняет второй, обычный запрос ниже.
+_LOCK_SQL = """
+select i.speech_lang
 from inspections i
-left join findings f on f.inspection_id = i.id and f.id = %(finding)s
+where i.id = %(id)s and i.tenant_code = %(tenant)s
+  and i.status = 'draft' and i.retracted_at is null
+for update
+"""
+
+_SELECT_HEAD_SQL = """
+select i.status, i.retracted_at
+from inspections i
 where i.id = %(id)s and i.tenant_code = %(tenant)s
 """
-# Без `for update`: под ролью приложения блокировка строки требует права её
-# править, а принятую проверку политика заморозки прячет от правки — и отказ
-# «уже принята» превратился бы в «проверки нет». Гонку с подтверждением
-# закрывает условие `status = 'draft'` в записи оценки и проверка числа строк.
 
 _PAIR_TAKEN_SQL = """
 select n from findings
@@ -75,9 +96,17 @@ where id = %(id)s and tenant_code = %(tenant)s and status = 'draft'
 
 
 def revise_finding(
-    inspection_id: str, finding_id: str, *, tenant: str, revision: Revision, score: Score
+    inspection_id: str,
+    finding_id: str,
+    *,
+    tenant: str,
+    revision: Revision,
+    score_of: Callable[[InspectionDetail], Score],
 ) -> None:
-    """Исправить запись ждущей проверки и положить пересчитанную оценку.
+    """Исправить запись ждущей проверки и положить оценку, посчитанную после замка.
+
+    `score_of` получает проверку, прочитанную ПОСЛЕ замка и с уже применённой
+    правкой, и возвращает оценку движка. Его исключение откатывает всё.
 
     Отказ — `ReviseError`: проверки или записи нет, проверка уже принята или
     отклонена, пара «пункт + зона» уже занята другой записью.
@@ -89,7 +118,7 @@ def revise_finding(
         raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
     try:
         with psycopg.connect(check_environment().dsn) as conn:
-            _apply(conn, ident, запись, tenant_code, revision, score)
+            _apply(conn, ident, запись, tenant_code, revision, score_of)
             conn.commit()
     except ReviseError:
         raise
@@ -100,29 +129,59 @@ def revise_finding(
         ) from exc
 
 
+def _refuse_lock(cur: Any, ident: str, tenant: str) -> ReviseError:
+    """Почему замок не дали: проверки нет, она отклонена или уже принята."""
+    cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
+    шапка = cur.fetchone()
+    if шапка is None:
+        return ReviseError(f"Проверки {ident} у арендатора {tenant} нет")
+    if шапка[1] is not None:
+        return ReviseError("Проверка отклонена — её записи не исправляют")
+    return ReviseError(
+        "Проверка уже принята — записи принятой не исправляются (D200). "
+        "Поправить можно только шапку, под журналом"
+    )
+
+
+def _revised(detail: InspectionDetail, запись: str, revision: Revision) -> InspectionDetail:
+    """Проверка, какой она станет после правки, — её и считает движок."""
+    прежняя = next((f for f in detail.findings if f.id == запись), None)
+    if прежняя is None:
+        raise ReviseError("Такой записи в этой проверке нет")
+    исправленная = replace(
+        прежняя,
+        code=revision.code,
+        level=revision.level,
+        zone=revision.zone,
+        zone_unusual=revision.zone_unusual,
+        text=revision.text.strip(),
+    )
+    return replace(
+        detail,
+        findings=tuple(исправленная if f.id == запись else f for f in detail.findings),
+    )
+
+
 def _apply(
     conn: psycopg.Connection[Any],
     ident: str,
     запись: str,
     tenant: str,
     revision: Revision,
-    score: Score,
+    score_of: Callable[[InspectionDetail], Score],
 ) -> None:
     with conn.cursor() as cur:
-        cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant, "finding": запись})
-        шапка = cur.fetchone()
-        if шапка is None:
+        cur.execute(_LOCK_SQL, {"id": ident, "tenant": tenant})
+        замок = cur.fetchone()
+        if замок is None:
+            raise _refuse_lock(cur, ident, tenant)
+        (язык_речи,) = замок
+        # Всё ниже — после замка: соседняя правка этой проверки уже записана
+        # целиком или ещё не началась.
+        detail = read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)
+        if detail is None:
             raise ReviseError(f"Проверки {ident} у арендатора {tenant} нет")
-        статус, отклонена, язык_речи, есть_запись = шапка
-        if отклонена is not None:
-            raise ReviseError("Проверка отклонена — её записи не исправляют")
-        if статус != "draft":
-            raise ReviseError(
-                "Проверка уже принята — записи принятой не исправляются (D200). "
-                "Поправить можно только шапку, под журналом"
-            )
-        if есть_запись is None:
-            raise ReviseError("Такой записи в этой проверке нет")
+        score = score_of(_revised(detail, запись, revision))
         cur.execute(
             _PAIR_TAKEN_SQL,
             {"id": ident, "code": revision.code, "zone": revision.zone, "finding": запись},
@@ -144,28 +203,35 @@ def _apply(
                 "zone_unusual": revision.zone_unusual,
             },
         )
+        if cur.rowcount != 1:
+            raise ReviseError(
+                "Запись не исправлена: проверка уже подтверждена или записи больше нет. "
+                "Ни запись, ни оценка не изменились"
+            )
         cur.execute(
             _INSERT_TRANSLATION_SQL,
             ("finding", запись, "text", язык_речи, revision.text.strip()),
         )
-        cur.execute(
-            _UPDATE_SCORE_SQL,
-            {
-                "id": ident,
-                "tenant": tenant,
-                "pct": score.pct,
-                "grade": score.grade,
-                "deductions": score.deductions,
-                "counts": Json(dict(score.counts)),
-                "by_zone": Json(_by_zone_payload(score)),
-            },
+        _write_score(cur, ident, tenant, score)
+
+
+def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:
+    cur.execute(
+        _UPDATE_SCORE_SQL,
+        {
+            "id": ident,
+            "tenant": tenant,
+            "pct": score.pct,
+            "grade": score.grade,
+            "deductions": score.deductions,
+            "counts": Json(dict(score.counts)),
+            "by_zone": Json(_by_zone_payload(score)),
+        },
+    )
+    if cur.rowcount != 1:
+        raise ReviseError(
+            "Оценку не удалось записать: проверка перестала ждать приёмки, пока её правили"
         )
-        if cur.rowcount != 1:
-            raise ReviseError(
-                "Оценку не удалось записать: проверка перестала ждать приёмки, пока её правили"
-            )
-        for lang, label in (("ru", score.label_ru), ("en", score.label_en)):
-            if label:
-                cur.execute(
-                    _INSERT_TRANSLATION_SQL, ("inspection", ident, "grade_label", lang, label)
-                )
+    for lang, label in (("ru", score.label_ru), ("en", score.label_en)):
+        if label:
+            cur.execute(_INSERT_TRANSLATION_SQL, ("inspection", ident, "grade_label", lang, label))

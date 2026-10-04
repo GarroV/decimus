@@ -26,6 +26,7 @@ from src.db.errors import DbError  # noqa: E402 — после importorskip на
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import (  # noqa: E402
     _LIST_ALL_SQL,
+    _QUEUE_ALL_SQL,
     DEFAULT_LIMIT,
     MAX_LIMIT,
     list_inspections,
@@ -212,7 +213,6 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
                     "limit": DEFAULT_LIMIT,
                     "date_from": None,
                     "date_to": None,
-                    "on_review": False,  # D199: очередь истории, не приёмки
                 },
             )
             план = "\n".join(строка[0] for строка in cur.fetchall())
@@ -223,3 +223,50 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
         assert "inspections_date_idx" in план, (
             f"выборка {охват} не пользуется индексом по дате обхода:\n{план}"
         )
+
+
+_ЖДУЩИЕ_SQL = """
+insert into inspections (
+    tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
+    ui_lang, speech_lang, checklist_version, pct, grade, source_fingerprint, status
+)
+select
+    %(tenant)s, %(unit_id)s, 1, 'planned', current_date, 'ru',
+    'ru', 'ru', 'v1', 97.5, 'A', 'ждущая-' || g, 'draft'
+from generate_series(1, 5) g
+"""
+
+
+def test_очередь_приёмки_идёт_по_частичному_индексу(pg_dsn: str) -> None:
+    """D199: ждущих единицы на тысячи принятых — очередь не читает историю.
+
+    Текст запроса тот же, что выполняет код (`_QUEUE_ALL_SQL`). Этап задан в
+    нём литералом, а не параметром: с параметром планировщик частичный индекс
+    не сопоставил бы.
+    """
+    # Arrange — 8000 принятых и пять ждущих одного пространства.
+    _насыпать(pg_dsn, арендатор=АРЕНДАТОР_А, сколько=8000)
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select unit_id from inspections where tenant_code = %s limit 1", (АРЕНДАТОР_А,)
+        )
+        (точка,) = cur.fetchone() or (None,)
+        cur.execute(_ЖДУЩИЕ_SQL, {"tenant": АРЕНДАТОР_А, "unit_id": точка})
+        cur.execute("analyze inspections")
+        conn.commit()
+
+    # Act
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "explain " + _QUEUE_ALL_SQL,
+            {
+                **own_reach(АРЕНДАТОР_А).params(),
+                "limit": DEFAULT_LIMIT,
+                "date_from": None,
+                "date_to": None,
+            },
+        )
+        план = "\n".join(строка[0] for строка in cur.fetchall())
+
+    # Assert
+    assert "inspections_on_review_queue" in план, f"очередь не берёт свой индекс:\n{план}"
