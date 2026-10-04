@@ -22,7 +22,16 @@ from datetime import datetime
 from typing import Any
 
 import psycopg
-from flask import Flask, abort, redirect, render_template, request, send_file, url_for
+from flask import (
+    Flask,
+    abort,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -35,7 +44,7 @@ from src.domain.kinds import kind_title
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
-from . import accounts, assets, auth, letter_draft, pricing, view
+from . import accounts, assets, auth, letter_draft, pricing, profile, view
 from . import country as country_data
 from . import inspections as data
 from . import methodology as method
@@ -47,6 +56,7 @@ from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
+from .remote import client_address
 from .sections import (
     SECTIONS,
     check_registry,
@@ -979,6 +989,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         code: int = 200,
         bot_link: str | None = None,
         bot_link_until: datetime | None = None,
+        password: profile.Outcome | None = None,
     ) -> tuple[str, int]:
         # Перечень людей и форма заведения — только админу УК (D288). Остальные
         # видят свою строку: вкладка открыта всем ради привязки бота (D286).
@@ -1024,6 +1035,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 bot_link=bot_link,
                 bot_link_until=bot_link_until,
                 bot_var=WEB_BOT_USERNAME_VAR,
+                password=password,
+                min_password=accounts.MIN_PASSWORD_LENGTH,
             ),
             code,
         )
@@ -1078,6 +1091,33 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         except DbError:
             return _страница_учёток(outcome="bot_unlink_failed", code=503)
         return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
+
+    @app.post(f"{users_path}/password")
+    def own_password() -> FlaskResponse | tuple[str, int]:
+        """Сменить СВОЙ пароль (#324). Чей — решает сессия этого запроса, не форма.
+
+        Страница, а не перенаправление: исход показывается на месте, а
+        введённое обратно в разметку не возвращается — среди него пароли.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("смена пароля без вошедшего: маршрут прошёл мимо заслона")
+        исход = profile.change_own(
+            current=request.form.get("current") or "",
+            new=request.form.get("new") or "",
+            repeat=request.form.get("repeat") or "",
+            token=auth.current_session_token(),
+            login=вошедший.login,
+            stand=auth.throttle_tenant(),
+            address=client_address(trusted_proxies=conf.trusted_proxies),
+        )
+        страница, код = _страница_учёток(password=исход, code=исход.status)
+        if исход.retry_after_seconds is None:
+            return страница, код
+        ответ = make_response(страница, код)
+        ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
+        return ответ
 
     @app.post(f"{users_path}/add")
     def add_user() -> FlaskResponse | tuple[str, int]:

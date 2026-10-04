@@ -862,6 +862,45 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not unlink — the database did not respond. Try again.",
     },
     "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
+    "users.password.title": {"ru": "Сменить пароль", "en": "Change password"},
+    "users.password.current": {"ru": "Текущий пароль", "en": "Current password"},
+    "users.password.new": {"ru": "Новый пароль", "en": "New password"},
+    "users.password.repeat": {"ru": "Повтор нового", "en": "Repeat new password"},
+    "users.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
+    "users.password.hint": {
+        "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
+        "этот остаётся.",
+        "en": "At least {min} characters. After the change all your other sessions are "
+        "signed out; this one stays.",
+    },
+    "users.password.ok": {
+        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
+        "en": "Password changed. Your other sessions have been signed out.",
+    },
+    "users.password.wrong": {
+        "ru": "Пароль не сменён: проверьте текущий пароль.",
+        "en": "Password not changed: check your current password.",
+    },
+    "users.password.mismatch": {
+        "ru": "Пароль не сменён: повтор не совпадает с новым.",
+        "en": "Password not changed: the repeat does not match the new password.",
+    },
+    "users.password.short": {
+        "ru": "Пароль не сменён: новый короче {min} знаков.",
+        "en": "Password not changed: the new password is shorter than {min} characters.",
+    },
+    "users.password.empty": {
+        "ru": "Пароль не сменён: заполните текущий и новый пароль.",
+        "en": "Password not changed: fill in the current and the new password.",
+    },
+    "users.password.locked": {
+        "ru": "Слишком много неудачных попыток. Попробуйте через {minutes} мин.",
+        "en": "Too many failed attempts. Try again in {minutes} min.",
+    },
+    "users.password.failed": {
+        "ru": "Пароль не сменён: база не ответила. Попробуйте ещё раз.",
+        "en": "Password not changed: the database did not respond. Please try again.",
+    },
     "users.self.text": {
         "ru": "Людей заводит и отключает администратор УК.",
         "en": "People are added and disabled by an HQ administrator.",
