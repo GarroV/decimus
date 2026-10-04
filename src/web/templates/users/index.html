@@ -196,7 +196,7 @@
               <td class="is-text mono">{{ человек.tenant }}</td>
               <td class="is-text">
                 {% if not человек.disabled_at and человек.login != account.login %}
-                  <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row">
+                  <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row users-inline">
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
@@ -204,7 +204,7 @@
                         <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
                       {% endfor %}
                     </select>
-                    <button class="btn btn--sm" type="submit">{{ t('users.edit.save') }}</button>
+                    <button class="btn btn--sm" type="submit">{{ t('users.role.submit') }}</button>
                   </form>
                 {% else %}
                   {{ t('users.role.' ~ человек.role) }}
@@ -219,13 +219,13 @@
               </td>
               <td class="is-text">
                 {% if not человек.disabled_at %}
-                  <form method="post" action="{{ url(users_path ~ '/email') }}?lang={{ lang }}" class="row">
+                  <form method="post" action="{{ url(users_path ~ '/email') }}?lang={{ lang }}" class="row users-inline">
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
-                    <input class="input input--sm" type="email" name="email" value="{{ человек.email or '' }}"
+                    <input class="input input--sm users-email" type="email" name="email" value="{{ человек.email or '' }}"
                            placeholder="{{ t('users.email.placeholder') }}" aria-label="{{ t('users.col.email') }}"
                            autocomplete="off" spellcheck="false">
-                    <button class="btn btn--sm" type="submit">{{ t('users.edit.save') }}</button>
+                    <button class="btn btn--sm" type="submit">{{ t('users.email.submit') }}</button>
                   </form>
                 {% else %}
                   {{ человек.email or '—' }}
