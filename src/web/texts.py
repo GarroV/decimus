@@ -938,6 +938,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Пароль не сменён: новый короче {min} знаков.",
         "en": "Password not changed: the new password is shorter than {min} characters.",
     },
+    "users.password.long": {
+        "ru": "Пароль не сменён: новый длиннее {max} знаков.",
+        "en": "Password not changed: the new password is longer than {max} characters.",
+    },
     "users.password.empty": {
         "ru": "Пароль не сменён: заполните текущий и новый пароль.",
         "en": "Password not changed: fill in the current and the new password.",

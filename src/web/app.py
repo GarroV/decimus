@@ -1038,6 +1038,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 bot_var=WEB_BOT_USERNAME_VAR,
                 password=password,
                 min_password=accounts.MIN_PASSWORD_LENGTH,
+                max_password=accounts.MAX_PASSWORD_LENGTH,
                 edit=edit,
             ),
             code,
