@@ -136,7 +136,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
-    monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: ())
+    monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:

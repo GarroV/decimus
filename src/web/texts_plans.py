@@ -137,6 +137,17 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "en": "The inspection has D2 or D3, but there is no one to show the request to. "
         "Set the unit's country in the directory, then request the plan here.",
     },
+    # --- открытые и принятые -----------------------------------------------
+    "plans.show_accepted": {"ru": "Принятые", "en": "Accepted"},
+    "plans.show_open": {"ru": "Открытые", "en": "Open"},
+    "plans.accepted_empty": {
+        "ru": "Принятых планов нет.",
+        "en": "There are no accepted plans.",
+    },
+    "plans.truncated": {
+        "ru": "Показаны первые {n} — остальные в список не уместились.",
+        "en": "Showing the first {n}; the rest did not fit into the list.",
+    },
     "country.plans.act": {"ru": "Действовать", "en": "Act"},
     "country.plans.mine": {"ru": "Мои запросы", "en": "My requests"},
 }
