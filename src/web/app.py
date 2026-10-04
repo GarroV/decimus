@@ -27,7 +27,7 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import bot_links, directory
-from src.db.errors import DbError, MoveError, RetractionError
+from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
@@ -35,7 +35,7 @@ from src.domain.kinds import kind_title
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
-from . import accounts, assets, auth, letter_draft, pricing, view
+from . import accounts, assets, auth, letter_draft, pricing, review, revision, view
 from . import country as country_data
 from . import inspections as data
 from . import methodology as method
@@ -63,6 +63,11 @@ logger = logging.getLogger(__name__)
 #: (`queries.DEFAULT_LIMIT`), и здесь он назван явно, чтобы менять его правкой
 #: одной строки, а не поиском по коду.
 REGISTRY_LIMIT = 100
+
+#: Классы нарушения в форме правки записи на приёмке (D200). Только варианты
+#: выбора: допустим ли класс для пункта, решает чек-лист версии
+#: (`revision.revise_card`), а вычет за класс — движок.
+REVISE_LEVELS = ("D1", "D2", "D3")
 
 #: Предел размера тела запроса. Формы админки маленькие — самая крупная это
 #: правленое письмо партнёру, — и неограниченное тело на странице, открытой
@@ -1146,6 +1151,60 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
+    @app.post(f"{section('registry').path}/<inspection_id>/accept")
+    def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Подтвердить проверку на приёмке (D199). Админ своего пространства (D283)."""
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        чужая = _refuse_unless_own(inspection_id)
+        if чужая is not None:
+            return чужая
+        вошедший = auth.current_account()
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            data.accept_card(
+                inspection_id,
+                tenant=auth.current_tenant(),
+                actor=вошедший.login if вошедший else "",
+            )
+        except AcceptError as exc:
+            failure = t("accept.failed", _lang(conf), reason=str(exc))
+        else:
+            notice = t("accept.done", _lang(conf))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
+    def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Исправить запись ждущей проверки с пересчётом (D200). Админ своего пространства."""
+        отказ = _admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        чужая = _refuse_unless_own(inspection_id)
+        if чужая is not None:
+            return чужая
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            revision.revise_card(
+                inspection_id,
+                finding_id,
+                tenant=auth.current_tenant(),
+                lang=_lang(conf),
+                code=request.form.get("code") or "",
+                level=request.form.get("level") or "",
+                zone=request.form.get("zone") or "",
+                text=request.form.get("text") or "",
+            )
+        except ReviseError as exc:
+            failure = t("revise.failed", _lang(conf), reason=str(exc))
+        else:
+            notice = t("revise.done", _lang(conf))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Перенести проверку по дате и пиццерии (D195). Только администратор."""
@@ -1275,6 +1334,24 @@ def _render_card(
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
+        and not detail.inspection.on_review
+    )
+    # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
+    # админ своего пространства (D283), и ровно до подтверждения (D199, D200).
+    # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
+    можно_подтвердить = (
+        админ
+        and своя
+        and data.retraction_available()
+        and detail.inspection.on_review
+        and not detail.inspection.retracted
+    )
+    # Лист вычитки — только на приёмке (D199): у принятой проверки вычитывать
+    # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
+    лист = (
+        review.load_sheet(detail.inspection, detail.findings, lang=lang)
+        if detail.inspection.on_review
+        else None
     )
     # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
     # хуже отсутствующей. Отказ базы здесь карточку не роняет, а честно
@@ -1296,6 +1373,10 @@ def _render_card(
         кадры_известны = False
     return render_template(
         "inspections/card.html",
+        sheet=лист,
+        may_accept=можно_подтвердить,
+        may_revise=можно_подтвердить,
+        levels=REVISE_LEVELS,
         report=отчёт,
         report_known=отчёт_известен,
         photos=кадры,
@@ -1320,7 +1401,12 @@ def _render_card(
         or data.load_edition_since(
             reach=auth.current_reach(), version=detail.inspection.checklist_version
         ),
-        may_retract=data.retraction_available() and админ and своя,
+        # Ждущую приёмки не снимают: снятие — для принятой (retract.py), а
+        # ошибку на приёмке чинят правкой записи (D200).
+        may_retract=data.retraction_available()
+        and админ
+        and своя
+        and not detail.inspection.on_review,
         own=своя,
         notice=notice,
         failure=failure,

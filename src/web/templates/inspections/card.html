@@ -56,6 +56,15 @@
     </div>
   {% endif %}
 
+  {% if head.on_review and not head.retracted %}
+    <div class="note note--warn mt-gap">
+      <div>
+        <div class="note__title">{{ t('accept.banner.title') }}</div>
+        <div class="note__text">{{ t('accept.banner.text') if own else t('accept.foreign') }}</div>
+      </div>
+    </div>
+  {% endif %}
+
   <div class="card mt-gap">
     <div class="card__head head-line">
       <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade }}</span>
@@ -75,9 +84,16 @@
           {% endfor %}
         </div>
       </div>
-      <span class="tag {% if head.retracted %}tag--err{% else %}tag--neutral{% endif %} tag--micro">
-        {{ t('state.retracted') if head.retracted else t('state.sealed') }}
-      </span>
+      {% if head.retracted %}
+        <span class="tag tag--err tag--micro">{{ t('state.retracted') }}</span>
+      {% elif head.on_review %}
+        <span class="tag tag--warn tag--micro">{{ t('state.review') }}</span>
+      {% else %}
+        <span class="tag tag--neutral tag--micro"
+              {% if head.accepted_at %}title="{{ t('accept.meta', at=head.accepted_at[:16].replace('T', ' '), by=head.accepted_by) }}"{% endif %}>
+          {{ t('state.sealed') }}
+        </span>
+      {% endif %}
     </div>
 
     <div class="card__facts">
@@ -192,6 +208,84 @@
     {% endif %}
   </section>
 
+  {# Лист вычитки (D199): весь чек-лист версии по зонам, а не только записи.
+     Зона с нарушениями раскрыта, чистая свёрнута — но есть: вычитывающий
+     обязан видеть и то, что аудитор счёл чистым. #}
+  {% if sheet %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('review.sheet.title') }}</div>
+      </div>
+      <p class="field-note">{{ t('review.sheet.hint') }}</p>
+      {% if sheet.unplaced %}
+        <div class="note note--warn mt-gap"><div>
+          <div class="note__title">{{ t('review.sheet.unplaced', count=sheet.unplaced|length) }}</div>
+          {% for finding in sheet.unplaced %}
+            <div class="note__text">{{ finding.n }} · {{ finding.code }} · {{ finding.zone }} — <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></div>
+          {% endfor %}
+        </div></div>
+      {% endif %}
+      {% for zone in sheet.zones %}
+        <details class="review-zone"{% if zone.violations %} open{% endif %}>
+          <summary class="find-row">
+            <span class="find-row__main">
+              <span class="find-row__text">{{ zone.name }}</span>
+              <span class="find-row__meta">{{ t('review.zone.meta', items=zone.items|length, violations=zone.violations) }}</span>
+            </span>
+          </summary>
+          {% for item in zone.items %}
+            <div class="find-row">
+              {% if item.clean %}
+                <span class="tag tag--ok find-row__level">{{ t('review.item.clean') }}</span>
+              {% else %}
+                <span class="tag {{ level_tone(item.findings[0].level) }} find-row__level">{{ item.findings[0].level }}</span>
+              {% endif %}
+              <span class="find-row__main">
+                <span class="find-row__text">{{ item.question }}</span>
+                <span class="find-row__meta">{{ item.code }}</span>
+                {% for finding in item.findings %}
+                  <span class="find-row__meta">{{ finding.n }} · <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></span>
+                  {% if may_revise %}
+                    <details class="review-revise">
+                      <summary class="field-note">{{ t('revise.open', n=finding.n) }}</summary>
+                      <form method="post" class="stack mt-gap"
+                            action="{{ url('/inspections/' ~ head.id ~ '/findings/' ~ finding.id ~ '/revise') }}?lang={{ lang }}">
+                        <label><span class="field-label">{{ t('revise.item') }}</span>
+                          <select class="input" name="code">
+                            {% for code, question in sheet.catalogue %}
+                              <option value="{{ code }}"{% if code == finding.code %} selected{% endif %}>{{ code }} — {{ question }}</option>
+                            {% endfor %}
+                          </select></label>
+                        <label><span class="field-label">{{ t('revise.level') }}</span>
+                          <select class="input" name="level">
+                            {% for lvl in levels %}<option{% if lvl == finding.level %} selected{% endif %}>{{ lvl }}</option>{% endfor %}
+                          </select></label>
+                        <label><span class="field-label">{{ t('revise.zone') }}</span>
+                          <select class="input" name="zone">
+                            {% for z in sheet.zones %}<option value="{{ z.code }}"{% if z.code == finding.zone %} selected{% endif %}>{{ z.name }}</option>{% endfor %}
+                          </select></label>
+                        <label><span class="field-label">{{ t('revise.text') }}</span>
+                          <textarea class="input" name="text" required maxlength="1000" rows="2" lang="{{ finding.lang }}">{{ finding.text or '' }}</textarea></label>
+                        <p class="field-note">{{ t('revise.hint') }}</p>
+                        <button class="btn" type="submit">{{ t('revise.submit') }}</button>
+                      </form>
+                    </details>
+                  {% endif %}
+                  {% for photo_id in photos.get(finding.id, ()) %}
+                    <a href="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
+                      <img class="review-photo" src="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}"
+                           alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
+                    </a>
+                  {% endfor %}
+                {% endfor %}
+              </span>
+            </div>
+          {% endfor %}
+        </details>
+      {% endfor %}
+    </section>
+  {% endif %}
+
   {# ── Информационная часть ──────────────────────────────────────────────
      Вопрос и ответ рядом: код без вопроса человеку ничего не говорит, а «Да»
      без вопроса не значит ничего (замечание владельца 28.09). Вопрос — из
@@ -278,6 +372,18 @@
       <div><dt class="muted">{{ t('card.build.since') }}</dt><dd title="{{ head.checklist_version }}">{{ build_since or t('card.build.since_unknown') }}</dd></div>
     </dl>
   </details>
+
+  {% if may_accept %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('accept.title') }}</h2></div>
+      <div class="card"><div class="card__body">
+        <p class="field-note">{{ t('accept.hint') }}</p>
+        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/accept') }}?lang={{ lang }}" class="row mt-gap">
+          <button class="btn btn--primary" type="submit">{{ t('accept.submit') }}</button>
+        </form>
+      </div></div>
+    </div>
+  {% endif %}
 
   {% if may_retract and not head.retracted %}
     <div class="section">
