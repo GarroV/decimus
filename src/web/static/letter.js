@@ -25,7 +25,7 @@
   var input = tools.querySelector("[data-link-input]");
   var note = tools.querySelector("[data-link-note]");
   var linkButton = tools.querySelector('[data-cmd="link"]');
-  var SCHEME = /^(https?:\/\/\S+|mailto:\S+)$/i;
+  var SCHEME = /^(https?:\/\/[^\s`]+|mailto:[^\s`]+)$/i;
   var saved = null;
 
   plain.hidden = true;
