@@ -520,10 +520,10 @@ def get_inspection(
         _reading("проверку по идентификатору", as_admin=include_retracted) as conn,
         conn.cursor() as cur,
     ):
-        return read_detail(cur, reach=охват, ident=ident, include_on_review=include_on_review)
+        return _read_detail(cur, reach=охват, ident=ident, include_on_review=include_on_review)
 
 
-def read_detail(
+def _read_detail(
     cur: Any, *, reach: Reach, ident: str, include_on_review: bool
 ) -> InspectionDetail | None:
     """Проверка целиком на ЧУЖОМ курсоре — внутри транзакции вызывающего.
@@ -531,6 +531,11 @@ def read_detail(
     Нужна правке на приёмке (D200): она читает записи и пересчитывает оценку
     после того, как взяла замок проверки, в той же транзакции. Иначе две
     правки одной проверки считали бы каждая от своего снимка (`src/db/revise.py`).
+
+    Внутренняя намеренно: записи и сведения читаются по идентификатору БЕЗ
+    охвата — только после того, как карточка отобрана по охвату. Вызывающих
+    ровно два, `get_inspection` и `revise._apply` (после замка своего
+    пространства); список держит `tests/test_db_reach_static.py`.
     """
     cur.execute(
         _GET_INSPECTION_SQL,
