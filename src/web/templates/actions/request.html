@@ -1,0 +1,68 @@
+{#
+  Запрос экшн-плана глазами УК: проверка, версии, вердикты, история — и
+  действия: принять, вернуть с комментарием, поправить срок (D274).
+#}{% extends "base.html" %}
+{% from "_plan.html" import state_tag, versions, history with context %}
+{% block title %}{{ t('section.actions.title') }} · {{ r.unit_name }}{% endblock %}
+
+{% block body %}
+  <a class="cn-back" href="{{ url(actions_path) }}?lang={{ lang }}{% if r.country %}&amp;country={{ r.country }}{% endif %}">‹ {{ t('section.actions.title') }}</a>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ (country_title(r.country) or r.country) if r.country else '—' }} · {{ t('actions.request.kicker') }}</div>
+      <h1 class="ov-head__title">{{ r.unit_name }}</h1>
+      <div class="ov-card__hint">
+        <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>
+        {% if r.grade %} · <span class="grade tag tag--micro">{{ r.grade }}</span> {{ '%.1f'|format(r.pct) if r.pct is not none else '' }}{% endif %}
+        · <span{% if r.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('actions.request.due', due=r.due_on) }}</span> · {{ state_tag(r, today) }}
+        · {{ t('plans.origin.' ~ r.origin) }}
+      </div>
+    </div>
+  </div>
+
+  {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('plans.versions.title') }}</div></div>
+    <div class="card__body">{{ versions(r, plans_path) }}</div>
+  </section>
+
+  {% if r.status == 'on_review' %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('actions.review.title') }}</div>
+        <div class="ov-card__hint">{{ t('actions.review.hint') }}</div>
+      </div>
+      <div class="card__body stack">
+        <form method="post" action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/review') }}?lang={{ lang }}" class="row">
+          <input type="hidden" name="verdict" value="accepted">
+          <button class="btn btn--primary" type="submit">{{ t('actions.review.accept') }}</button>
+        </form>
+        <form method="post" action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/review') }}?lang={{ lang }}" class="stack mt-gap">
+          <input type="hidden" name="verdict" value="returned">
+          <label class="field">{{ t('actions.review.comment') }}
+            <textarea class="input" name="comment" required maxlength="2000" rows="3"></textarea></label>
+          <button class="btn" type="submit">{{ t('actions.review.return') }}</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  {% if r.status != 'accepted' %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('actions.due.title') }}</div></div>
+      <div class="card__body">
+        <form method="post" action="{{ url(actions_path ~ '/requests/' ~ r.id ~ '/due') }}?lang={{ lang }}" class="row">
+          <input class="input" type="date" name="due" value="{{ r.due_on }}" min="{{ today }}" required>
+          <button class="btn btn--sm" type="submit">{{ t('actions.due.submit') }}</button>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('plans.history.title') }}</div></div>
+    <div class="card__body">{{ history(r) }}</div>
+  </section>
+{% endblock %}

@@ -46,6 +46,7 @@ from src.report.info_titles import FOUND
 
 from . import (
     accounts,
+    action_plans,
     assets,
     auth,
     letter_draft,
@@ -99,7 +100,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "country", "admin", "users")
+SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -122,6 +123,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
+    action_plans.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     _register_errors(app)
@@ -640,7 +642,25 @@ def _register_country(app: Flask, conf: Settings) -> None:
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
+            **_country_plans(код),
         )
+
+
+def _country_plans(код: str) -> dict[str, Any]:
+    """Блок экшн-планов экрана страны: запросы, их состояние и куда действовать."""
+    открытые, принятые, известны = action_plans.country_plans(код)
+    уК = action_plans.is_hq()
+    return {
+        "plans": открытые.rows + принятые.rows,
+        "plans_truncated": открытые.truncated or принятые.truncated,
+        "plans_limit": action_plans.LIST_LIMIT,
+        "plans_known": известны,
+        "plans_today": action_plans.today(),
+        "plans_path": section("plans").path,
+        "plans_act_path": section("actions" if уК else "plans").path,
+        "plans_act_country": уК,
+        "state_tones": action_plans.STATE_TONES,
+    }
 
 
 def _register_units(app: Flask, conf: Settings) -> None:
@@ -1486,8 +1506,40 @@ def _render_card(
     except DbError:
         кадры = {}
         кадры_известны = False
+    план, план_известен = action_plans.card_plan(inspection_id)
+    # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
+    # запросить, либо у точки нет страны — тогда только видимая отметка.
+    план_нужен = (
+        action_plans.is_hq()
+        and своя
+        and план is None
+        and план_известен
+        and not detail.inspection.on_review
+        and not detail.inspection.retracted
+        and action_plans.needs_plan(detail.counts)
+    )
+    без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return render_template(
         "inspections/card.html",
+        plan=план,
+        plan_known=план_известен,
+        plan_link=(
+            f"{section('actions').path}/requests/{план.id}"
+            if план is not None and action_plans.is_hq()
+            else section("plans").path
+        ),
+        plan_today=action_plans.today(),
+        plan_state_tones=action_plans.STATE_TONES,
+        plan_due_default=action_plans.default_due(),
+        plan_needed=план_нужен,
+        plan_no_country=без_страны,
+        # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
+        may_request_plan=(
+            action_plans.is_hq()
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
+        ),
         sheet=лист,
         may_accept=можно_подтвердить,
         may_revise=можно_подтвердить,

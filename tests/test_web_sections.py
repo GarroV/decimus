@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from web_harness import войти, подменить_двери, собрать
 
+from src.web import action_plans
 from src.web.errors import SectionRegistryError
 from src.web.sections import (
     SECTIONS,
@@ -34,13 +35,16 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
         "calendar",
         "admin",
         "tenants",
+        "actions",
         "users",
         "mini",
     ]
 
 
 def test_built_keys_are_the_built_screens() -> None:
-    assert built_keys() == frozenset({"overview", "registry", "country", "admin", "users"})
+    assert built_keys() == frozenset(
+        {"overview", "registry", "plans", "country", "admin", "users", "actions"}
+    )
 
 
 def test_keys_and_paths_are_unique_and_paths_are_absolute() -> None:
@@ -61,7 +65,7 @@ def test_section_refuses_an_unknown_key() -> None:
 
 
 def test_check_registry_accepts_exactly_the_built_sections() -> None:
-    check_registry(("overview", "registry", "country", "admin", "users"))
+    check_registry(("overview", "registry", "plans", "country", "admin", "users", "actions"))
 
 
 def test_check_registry_refuses_a_built_section_left_without_a_screen() -> None:
@@ -70,8 +74,10 @@ def test_check_registry_refuses_a_built_section_left_without_a_screen() -> None:
 
 
 def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
-    with pytest.raises(SectionRegistryError, match="plans"):
-        check_registry(("overview", "registry", "country", "admin", "users", "plans"))
+    with pytest.raises(SectionRegistryError, match="orders"):
+        check_registry(
+            ("overview", "registry", "plans", "country", "admin", "users", "actions", "orders")
+        )
 
 
 def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
@@ -126,5 +132,6 @@ def test_раздел_только_уК_открыт_уК(monkeypatch: pytest.Mo
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
+        monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
         for s in (s for s in SECTIONS if s.hq_only):
             assert client.get(s.path).status_code == 200, s.key
