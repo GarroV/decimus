@@ -22,6 +22,7 @@ import os
 from collections.abc import Mapping
 
 from .errors import WebTextError
+from .texts_plans import PLAN_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -262,7 +263,7 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "section.overview.title": {"ru": "Обзор", "en": "Overview"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
-    "section.plans.title": {"ru": "Планы", "en": "Action plans"},
+    "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
     "section.orders.title": {"ru": "Предписания", "en": "Orders"},
     "section.country.title": {"ru": "Страна", "en": "Country"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
@@ -1728,6 +1729,13 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "There is no such address in the admin. The sections are in the navigation.",
     },
 }
+
+# Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
+# сверяется здесь же, а не доверяется глазу.
+_ПЕРЕСЕЧЕНИЕ = TEXTS.keys() & PLAN_TEXTS.keys()
+if _ПЕРЕСЕЧЕНИЕ:
+    raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
+TEXTS = {**TEXTS, **PLAN_TEXTS}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:

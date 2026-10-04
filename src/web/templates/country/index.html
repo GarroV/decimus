@@ -3,11 +3,12 @@
   всё приходит из `src/web/country.py`, который берёт цифры «Обзора» с отбором
   по стране, — движок посчитал, база записала, экран показал.
 
-  Блоков предписаний, экшн-планов и плана проверок здесь нет, пока их нет в
+  Экшн-планы — блоком страны (волна 2). Блоков предписаний и плана проверок здесь нет, пока их нет в
   продукте (D217): ни заглушкой, ни пустой рамкой. Они придут своими волнами
   спеки. Действий УК на экране тоже нет (D264).
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
+{% from "_plan.html" import state_tag, versions with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
 
 {% block body %}
@@ -127,6 +128,36 @@
       </div>
     {% else %}
       <div class="ov-card__empty">{{ t('country.units.empty') }}</div>
+    {% endif %}
+  </section>
+
+  {# ── Экшн-планы страны (волна 2) ──────────────────────────────────────
+     Запрос, версии, комментарии УК, итог. Действий здесь нет (D264): УК
+     переходит в «Действия», партнёр — в свой раздел. #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.plans.title') }}</div>
+      <div class="ov-card__hint">{{ t('country.plans.hint') }}</div>
+      <a class="btn btn--sm" href="{{ url(plans_act_path) }}{% if plans_act_country %}?country={{ view.code }}&amp;lang={{ lang }}{% else %}?lang={{ lang }}{% endif %}">
+        {{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}</a>
+    </div>
+    {% if not plans_known %}
+      <div class="ov-card__empty">{{ t('country.plans.unknown') }}</div>
+    {% elif plans %}
+      {% for r in plans %}
+        <div class="ov-history">
+          <div class="ov-row">
+            <span class="ov-row__name">
+              <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ r.unit_name }} · {{ r.inspection_date }}</a>
+              <span class="ov-row__meta">{{ t('actions.request.due', due=r.due_on) }}</span>
+            </span>
+            {{ state_tag(r, plans_today) }}
+          </div>
+          {{ versions(r, plans_path) }}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.plans.empty') }}</div>
     {% endif %}
   </section>
 

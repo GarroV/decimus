@@ -378,6 +378,37 @@
     </dl>
   </details>
 
+  {# ── Экшн-план (волна 2) ─────────────────────────────────────────────
+     Запрос по проверке УК: открыт — ссылка в раздел (УК — в «Действия»,
+     партнёр — к себе); нет — кнопка УК «запросить» (D272: с D2/D3 запрос
+     появляется сам). Без запроса и без права запросить блока нет (D217). #}
+  {% if plan %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
+      <div class="card"><div class="card__body row">
+        <span class="tag tag--micro {{ plan_state_tones[plan.state] }}">{{ t('plans.state.' ~ plan.state) }}</span>
+        {% if plan.overdue(plan_today) %}<span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
+        <span class="ov-cell__muted">{{ t('actions.request.due', due=plan.due_on) }}</span>
+        <a class="btn btn--sm" href="{{ url(plan_link) }}?lang={{ lang }}">{{ t('card.plan.open') }}</a>
+      </div></div>
+    </div>
+  {% elif not plan_known %}
+    <div class="note mt-gap"><div><div class="note__text">{{ t('card.plan.unknown') }}</div></div></div>
+  {% elif may_request_plan %}
+    <div class="section">
+      <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
+      <div class="card"><div class="card__body">
+        <p class="field-note">{{ t('card.plan.request_hint') }}</p>
+        <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="row mt-gap">
+          <input type="hidden" name="inspection_id" value="{{ head.id }}">
+          <label><span class="field-label">{{ t('card.plan.due') }}</span>
+            <input class="input" type="date" name="due" value="{{ plan_due_default }}" min="{{ plan_today }}" required></label>
+          <button class="btn btn--primary" type="submit">{{ t('card.plan.request_submit') }}</button>
+        </form>
+      </div></div>
+    </div>
+  {% endif %}
+
   {% if may_accept %}
     <div class="section">
       <div class="section__head"><h2 class="section__title">{{ t('accept.title') }}</h2></div>
