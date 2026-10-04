@@ -43,24 +43,68 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import secrets
-from dataclasses import dataclass, replace
+from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
-from ..report.engine_call import VERSIONS_DIR
+# Чтение раскладки — то, что нужно и боту, — живёт ярусом ниже, в `src.domain`
+# (#455): бот выбирает чек-лист там, а `src.domain` не имеет права звать
+# `src.mcp`. Здесь эти имена переиздаются как были, а отказы `domain`
+# переводятся в словарь блока MCP — точка входа ловит `ChecklistError`.
+from ..domain import checklist_store as _store
+from ..domain.checklist_store import (  # переиздание: прежние импортёры не меняются
+    ACTIVE as ACTIVE,
+)
+from ..domain.checklist_store import (
+    CURRENT_LINK as CURRENT_LINK,
+)
+from ..domain.checklist_store import (
+    DEFAULT_CODE as DEFAULT_CODE,
+)
+from ..domain.checklist_store import (
+    DEFAULT_SPACE as DEFAULT_SPACE,
+)
+from ..domain.checklist_store import (
+    DRAFT as DRAFT,
+)
+from ..domain.checklist_store import (
+    META_FILE as META_FILE,
+)
+from ..domain.checklist_store import (
+    RETIRED as RETIRED,
+)
+from ..domain.checklist_store import (
+    SLUG_PATTERN as SLUG_PATTERN,
+)
+from ..domain.checklist_store import (
+    STATES as STATES,
+)
+from ..domain.checklist_store import (
+    VERSIONS_DIR as VERSIONS_DIR,
+)
+from ..domain.checklist_store import (
+    Meta as Meta,
+)
+from ..domain.checklist_store import (
+    Store as Store,
+)
+from ..domain.checklist_store import (
+    applied as applied,
+)
+from ..domain.checklist_store import (
+    in_bot_of as in_bot_of,
+)
+from ..domain.checklist_store import (
+    known as known,
+)
+from ..domain.checklist_store import (
+    prod_link as prod_link,
+)
+from ..domain.checklist_store import (
+    read_meta as read_meta,
+)
 from .errors import ChecklistError
-
-#: Пространство управляющей компании — то единственное, что существует сегодня.
-#:
-#: `hq`, а не `uk`: пространства получат и партнёры (D182), а продукт работает
-#: по Европе, Кавказу, Монголии, Бали и Нигерии — `uk` в таком соседстве
-#: читается страной, а не управляющей компанией.
-DEFAULT_SPACE = "hq"
-
-#: Код чек-листа, которым является существующая методика (D181). Он уезжает в
-#: базу к каждой уже проведённой проверке и не меняется никогда.
-DEFAULT_CODE = "bizdev"
 
 #: Названия того же чек-листа для человека (D181). Связь — кодом, показ —
 #: названием: формулировки переводятся и правятся, коды нет.
@@ -76,13 +120,6 @@ DEFAULT_NAMES = ("Проверка бизнес-девелопера", "Business
 #: машине.
 IN_LOG = "Какие именно каталоги — в логе сервера: он остаётся на машине"
 
-#: Карточка чек-листа рядом с его изданиями.
-META_FILE = "meta.json"
-
-#: Указатель: и на верхнем ярусе (применён к проду), и внутри чек-листа
-#: (опубликованное издание). Имя одно, потому что смысл один — «вот это».
-CURRENT_LINK = "current"
-
 #: Журнал правок. Строка на событие, дописывается и не переписывается.
 JOURNAL_FILE = "journal.jsonl"
 
@@ -90,105 +127,32 @@ JOURNAL_FILE = "journal.jsonl"
 #: на место переименованием, а не копированием через границу файловой системы.
 TMP_DIR = ".tmp"
 
-#: Состояния чек-листа. `draft` — черновик, годен к правке и не годен к проду;
-#: `active` — в работе, таких может быть несколько (задел под выбор чек-листа на
-#: старте проверки, D178); `retired` — снят, к проду не применяется.
-#:
-#: Состояние и применение к проду — разные вещи: «в работе» говорит, что
-#: чек-лист годен к употреблению, а «применён к проду» — указатель, и он ровно
-#: один, пока выбора на старте не спрашивают.
-DRAFT, ACTIVE, RETIRED = "draft", "active", "retired"
-STATES = (DRAFT, ACTIVE, RETIRED)
 
-#: Код пространства и код чек-листа: строчные латинские буквы, цифры, дефис и
-#: подчёркивание. Тот же шаблон, что у имени набора методики, и это не
-#: совпадение — код чек-листа становится куском пути и именем в базе.
-SLUG_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_-]{0,31}$")
+def _translated[T](call: Callable[[], T]) -> T:
+    """Позвать правило яруса `domain` и перевести его отказ в словарь блока MCP.
 
-
-@dataclass(frozen=True)
-class Store:
-    """Куда пишем издания и что сегодня читает движок.
-
-    `root` — хранилище целиком (`MCP_CHECKLIST_STORE`), `live` — каталог
-    методики продукта (`AUDIT_DATA_DIR`). Пара «пространство + код» называет,
-    С КАКИМ чек-листом работает вызывающий; не названа — работаем с тем, что
-    был единственным до множественности.
-
-    Умолчания здесь не для краткости. Ими держится обещание, ради которого
-    двухуровневая раскладка и делалась так: вызов, ничего не знающий про
-    чек-листы, продолжает работать слово в слово.
+    Слова отказа те же: правило одно (`src/domain/checklist_store.py`), меняется
+    только тип — точка входа MCP и админка ловят `ChecklistError`.
     """
-
-    root: Path
-    live: Path
-    space: str = DEFAULT_SPACE
-    code: str = DEFAULT_CODE
-
-    @property
-    def home(self) -> Path:
-        """Каталог этого чек-листа: издания, журнал и карточка внутри него."""
-        return self.root / self.space / self.code
-
-
-@dataclass(frozen=True)
-class Meta:
-    """Карточка чек-листа: чем он связан, как называется и годен ли к делу."""
-
-    code: str
-    name_ru: str
-    name_en: str
-    state: str
-    #: Доступен ли аудиторам в боте (волна 3, D221). `None` — ключа в карточке
-    #: нет: так выглядит каждая карточка до волны 3, и тогда «в боте» тот, на
-    #: кого смотрит верхний указатель `current` (`checklists.in_bot_of`).
-    in_bot: bool | None = None
+    try:
+        return call()
+    except _store.ChecklistStoreError as отказ:
+        raise ChecklistError(str(отказ)) from None
 
 
 def check_slug(value: str, *, что: str) -> str:
-    """Код пространства или чек-листа — или отказ с примером годного.
-
-    Проверяется здесь, а не у вызывающего: код становится куском пути внутри
-    хранилища, и `..` в нём открыл бы дорогу к чужому каталогу.
-    """
-    значение = (value or "").strip()
-    if not SLUG_PATTERN.match(значение):
-        raise ChecklistError(
-            f"{что} «{value}» не годится: ожидаются строчные латинские буквы, цифры, дефис и "
-            f"подчёркивание, до 32 знаков (например «bizdev»). Код уезжает в базу к каждой "
-            f"проверке и в путь хранилища, поэтому он строже названия"
-        )
-    return значение
-
-
-#: Прежний код тенанта УК, `default` (до переименования в `HQ`, D234, #439).
-#: Он ещё живёт в `MCP_TOKENS` и файлах состояния идущих проверок бота — не
-#: приведённый `canonical_tenant`, потому что тот живёт в `src.domain.tenants`,
-#: а `src.domain` при загрузке тянет `bot_checklists`, который импортирует
-#: этот модуль: получился бы круг. Своя маленькая карта здесь дешевле круга.
-_LEGACY_TENANT_SPACES: dict[str, str] = {"default": DEFAULT_SPACE}
+    """Код пространства или чек-листа — или отказ с примером годного (`ChecklistError`)."""
+    return _translated(lambda: _store.check_slug(value, что=что))
 
 
 def space_of(tenant: str) -> str:
-    """Каталог пространства в хранилище для кода тенанта: `HQ` → `hq` (D183).
-
-    Старый код тенанта УК приводится картой выше, а не проверкой слага: он не
-    должен читаться как код пространства партнёра «default».
-    """
-    очищенный = (tenant or "").strip().lower()
-    if очищенный in _LEGACY_TENANT_SPACES:
-        return _LEGACY_TENANT_SPACES[очищенный]
-    return check_slug(очищенный, что="Код пространства")
+    """Каталог пространства в хранилище для кода тенанта: `HQ` → `hq` (D183)."""
+    return _translated(lambda: _store.space_of(tenant))
 
 
 def bot_spaces(tenant: str) -> tuple[str, ...]:
-    """Где искать чек-лист по коду и что предлагать боту: своё первым, эталон следом.
-
-    Своё первым: при поиске по коду оно выигрывает, и копия партнёра (волна 4) не
-    подменяется эталоном с тем же кодом.
-    """
-    своё = space_of(tenant)
-    return (своё,) if своё == DEFAULT_SPACE else (своё, DEFAULT_SPACE)
+    """Где искать чек-лист по коду: своё первым, эталон следом (`ChecklistError`)."""
+    return _translated(lambda: _store.bot_spaces(tenant))
 
 
 def read_spaces(tenant: str, root: Path) -> tuple[str, ...]:
@@ -284,26 +248,6 @@ def guard_link(link: Path, *, что: str, подсказка: str) -> None:
 # --- карточка чек-листа -------------------------------------------------------
 
 
-def read_meta(store: Store) -> Meta | None:
-    """Карточка чек-листа. Нет карточки — `None`, а не отказ.
-
-    `None` законен: так выглядит хранилище, которое ещё не заводили, и
-    однослойное хранилище до миграции. Отказывать на это значило бы требовать
-    карточку раньше, чем её есть кому написать.
-    """
-    путь = store.home / META_FILE
-    if not путь.is_file():
-        return None
-    тело = json.loads(путь.read_text(encoding="utf-8"))
-    return Meta(
-        code=str(тело.get("code") or store.code),
-        name_ru=str(тело.get("name_ru") or ""),
-        name_en=str(тело.get("name_en") or ""),
-        state=str(тело.get("state") or ACTIVE),
-        in_bot=тело["in_bot"] if isinstance(тело.get("in_bot"), bool) else None,
-    )
-
-
 def write_meta(store: Store, meta: Meta) -> None:
     """Записать карточку целиком. Запись атомарна: полкарточки не бывает."""
     store.home.mkdir(parents=True, exist_ok=True)
@@ -327,45 +271,7 @@ def write_meta(store: Store, meta: Meta) -> None:
     os.replace(временный, store.home / META_FILE)
 
 
-def in_bot_of(карточка: Meta, space: str, code: str, в_проде: tuple[str, str] | None) -> bool:
-    """Доступен ли чек-лист в боте — с учётом карточек до волны 3.
-
-    Флаг карточки решает, когда он записан. Нет ключа — наследуем прежний смысл:
-    в боте тот, на кого смотрит верхний указатель `current`. Так хранилище
-    прода после выката показывает ровно то, по чему проверки шли вчера, и
-    мигрировать его не нужно. Снятый и черновик в боте не бывают, что бы ни
-    стояло во флаге: флаг — намерение, «в работе» — годность.
-    """
-    if карточка.state != ACTIVE:
-        return False
-    if карточка.in_bot is not None:
-        return карточка.in_bot
-    return в_проде == (space, code)
-
-
 # --- применение к проду -------------------------------------------------------
-
-
-def prod_link(root: Path) -> Path:
-    """Указатель «по этому чек-листу идут проверки». Ровно один на хранилище."""
-    return root / CURRENT_LINK
-
-
-def applied(root: Path) -> tuple[str, str] | None:
-    """Какой чек-лист применён к проду — или `None`, если указателя нет.
-
-    Читается по ссылке, а не по отдельной записи: указатель и есть ответ, а
-    вторая копия этого факта разошлась бы с ним молча.
-    """
-    link = prod_link(root)
-    if not link.is_symlink():
-        return None
-    куски = Path(os.readlink(link)).parts
-    # Ждём «<пространство>/<код>/current». Другая форма — однослойное хранилище
-    # до миграции («versions/<издание>»): чек-листа она не называет.
-    if len(куски) != 3 or куски[2] != CURRENT_LINK:
-        return None
-    return куски[0], куски[1]
 
 
 def guard_prod_link(root: Path) -> None:
@@ -419,27 +325,6 @@ def for_code(store: Store, code: str | None) -> Store:
     if space != store.space:
         return store
     return replace(store, space=space, code=чей)
-
-
-# --- перечень чек-листов ------------------------------------------------------
-
-
-def known(root: Path) -> list[tuple[str, str]]:
-    """Все чек-листы хранилища парами «пространство, код», по порядку.
-
-    Чек-листом считается каталог с изданиями или с карточкой: каталог, куда
-    ничего не положили, чек-листом не является и в перечне только мешал бы.
-    """
-    if not root.is_dir():
-        return []
-    найденные: list[tuple[str, str]] = []
-    for пространство in sorted(p for p in root.iterdir() if p.is_dir()):
-        if пространство.name.startswith(".") or пространство.name == VERSIONS_DIR:
-            continue
-        for чеклист in sorted(c for c in пространство.iterdir() if c.is_dir()):
-            if (чеклист / VERSIONS_DIR).is_dir() or (чеклист / META_FILE).is_file():
-                найденные.append((пространство.name, чеклист.name))
-    return найденные
 
 
 # --- миграция однослойного хранилища ------------------------------------------

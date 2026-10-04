@@ -18,6 +18,7 @@ import os
 import sys
 from pathlib import Path
 
+from ..domain.checklist_store import VERSIONS_DIR as _VERSIONS_DIR
 from ..domain.version import SEGMENT_BYTES, is_one_segment
 from .errors import ReportError
 
@@ -32,8 +33,9 @@ class EngineCallError(ReportError):
 
 
 #: Каталог версий методики внутри хранилища. Имя общее для всех, кто в это
-#: хранилище смотрит: разойдясь, они читали бы разные каталоги.
-VERSIONS_DIR = "versions"
+#: хранилище смотрит, и объявлено одно — ярусом ниже, рядом с раскладкой,
+#: которую читает бот (#455).
+VERSIONS_DIR = _VERSIONS_DIR
 
 
 def edition_dirs(store_root: Path, edition: str) -> list[Path]:
