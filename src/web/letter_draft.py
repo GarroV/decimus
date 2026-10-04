@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from flask import Flask, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 from src.db.errors import DbError
@@ -200,7 +201,19 @@ def install(app: Flask, conf: Settings) -> None:
         return уйти_за_согласием(KIND_LETTER, inspection_id, письмо_на, реквизиты)
 
     def _вернуть_другое(вид: str, ident: str, lang: str, метка: str) -> Response:
-        """Возврат похода не за письмом по проверке: та же сверка, исход — у вида."""
+        """Возврат похода не за письмом по проверке: та же сверка, исход — у вида.
+
+        Метка одноразовая на ЛЮБОМ исходе — отказ, несовпадение, сбой, отказ в
+        доступе (404) или успех: кука похода снимается всегда.
+        """
+        try:
+            ответ = _исход_другого(вид, ident, lang, метка)
+        except HTTPException as exc:
+            ответ = exc.get_response()
+        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
+        return ответ
+
+    def _исход_другого(вид: str, ident: str, lang: str, метка: str) -> Response:
         возвраты: dict[str, MailReturn] = app.extensions.get(MAIL_RETURNS_KEY, {})
         возврат = возвраты.get(вид)
         if возврат is None:
@@ -214,10 +227,7 @@ def install(app: Flask, conf: Settings) -> None:
         реквизиты = почтовые_реквизиты()
         if not код or реквизиты is None:
             return возврат.back(ident, lang, "failed")
-        ответ = возврат.finish(ident, lang, lambda: exchange_code_for_token(реквизиты, code=код))
-        # Метка одноразовая — как у письма по проверке.
-        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
-        return ответ
+        return возврат.finish(ident, lang, lambda: exchange_code_for_token(реквизиты, code=код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
     def google_mail_callback() -> Response | tuple[str, int]:

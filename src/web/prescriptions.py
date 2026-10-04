@@ -387,6 +387,7 @@ def _render_form(
         values=values,
         unit_choices=точки,
         base_choices=основания,
+        bases_limit=rx.BASES_LIMIT,
         failure=failure,
         **_common(),
     )

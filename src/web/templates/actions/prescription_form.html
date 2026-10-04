@@ -52,7 +52,7 @@
                   <span>{{ c.title }}</span>{% if c.detail %}<span class="ov-cell__muted">{{ c.detail }}</span>{% endif %}</label>
               {% endfor %}
             </div>
-            <div class="field-note">{{ t('rx.form.bases_hint') }}</div>
+            <div class="field-note">{{ t('rx.form.bases_hint', n=bases_limit) }}</div>
           {% else %}
             <div class="field-note">{{ t('rx.form.no_bases') }}</div>
           {% endif %}
