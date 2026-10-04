@@ -282,7 +282,9 @@ def test_смена_роли_оставляет_след_в_журнале(
     """След без новой таблицы: кто правил, кого, было → стало (ревью безопасности, M3)."""
     with caplog.at_level(logging.INFO, logger="src.web.people"):
         админ_ук.post(
-            "/users/role", data={"login": "nino", "tenant": "GE", "role": "admin"}, headers=ЗАГОЛОВКИ
+            "/users/role",
+            data={"login": "nino", "tenant": "GE", "role": "admin"},
+            headers=ЗАГОЛОВКИ,
         )
 
     след = [з.getMessage() for з in caplog.records if з.name == "src.web.people"]
@@ -316,10 +318,14 @@ def test_отказ_правки_следа_не_оставляет(
     """След — о сделанном: отказ формы или «нет такой учётки» правкой не был."""
     with caplog.at_level(logging.INFO, logger="src.web.people"):
         админ_ук.post(
-            "/users/role", data={"login": "nobody", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+            "/users/role",
+            data={"login": "nobody", "tenant": "HQ", "role": "admin"},
+            headers=ЗАГОЛОВКИ,
         )
         админ_ук.post(
-            "/users/email", data={"login": "petr", "tenant": "HQ", "email": "petr"}, headers=ЗАГОЛОВКИ
+            "/users/email",
+            data={"login": "petr", "tenant": "HQ", "email": "petr"},
+            headers=ЗАГОЛОВКИ,
         )
         админ_ук.post(
             "/users/email",
