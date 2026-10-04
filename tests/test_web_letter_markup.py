@@ -297,3 +297,38 @@ def test_html_часть_очищает_даже_неочищенный_вход
     assert "javascript" not in html
     assert "onclick" not in html
     assert "<img" not in html
+
+
+# --- незакрытое выбрасываемое не съедает письмо (ревью) ---------------------
+
+
+@pytest.mark.parametrize(
+    "вход",
+    [
+        "до<style>x после",
+        "до<title>заг после",
+        "до<select><option>1</option> после",
+        "до<script>a</script после",
+        "до<iframe>x после",
+    ],
+)
+def test_незакрытое_выбрасываемое_не_съедает_остаток(вход: str) -> None:
+    """Без закрывающего тега это не код, а текст человека — он остаётся."""
+    вывод = sanitize(вход)
+
+    assert вывод.startswith("до")
+    assert "после" in вывод
+    assert "<style" not in вывод and "<script" not in вывод and "<title" not in вывод
+
+
+def test_незакрытое_выбрасываемое_оставляет_разметку_после_себя() -> None:
+    assert sanitize("<b>а</b><style>x <i>курсив</i>") == "<b>а</b>x <i>курсив</i>"
+
+
+def test_закрытое_выбрасываемое_по_прежнему_выбрасывается_целиком() -> None:
+    assert sanitize("до<style>x</style>после<script>y</script>") == "допосле"
+
+
+@pytest.mark.parametrize("вход", ["a <b c", "a </b c", "t <5 и <x"])
+def test_недописанный_тег_в_конце_остаётся_текстом(вход: str) -> None:
+    assert to_plain(sanitize(вход)) == вход

@@ -139,8 +139,12 @@ def safe_href(raw: str | None) -> str | None:
 class _Cleaner(HTMLParser):
     """Пересборка входа по белому списку. Выход — `result()`."""
 
-    def __init__(self) -> None:
+    def __init__(self, raw: str) -> None:
         super().__init__(convert_charrefs=True)
+        self._raw = raw
+        #: Где во входе кончается открывающий тег самого внешнего выбрасываемого
+        #: элемента. Не закрылся до конца входа — это не код, а текст человека.
+        self._drop_rest_at: int | None = None
         self._out: list[str] = []
         #: Открытые разрешённые элементы, по каноническому имени.
         self._stack: list[str] = []
@@ -172,6 +176,8 @@ class _Cleaner(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag in _DROP_WITH_CONTENT:
+            if not self._dropping:
+                self._drop_rest_at = self._offset() + len(self.get_starttag_text() or "")
             self._dropping += 1
             return
         if self._dropping:
@@ -244,8 +250,29 @@ class _Cleaner(HTMLParser):
     # намеренно: у `HTMLParser` их обработчики ничего не делают, то есть в
     # вывод они не попадают — это и нужно (проверено тестом).
 
+    def _offset(self) -> int:
+        """Позиция разбора во входе знаками: `getpos()` отдаёт строку и столбец."""
+        строка, столбец = self.getpos()
+        return sum(len(часть) + 1 for часть in self._raw.split("\n")[: строка - 1]) + столбец
+
     def result(self) -> str:
+        # Недописанную конструкцию в самом конце (`a <b c`, `t <x`) разборщик
+        # при `close()` молча выбрасывает. Это текст человека: забираем
+        # неразобранный хвост сами и отдаём текстом. Внутри `<script>` хвост —
+        # часть выбрасываемого, и его судьбу решает ветка ниже.
+        хвост, self.rawdata = self.rawdata, ""
+        if хвост and self.cdata_elem is None:
+            self.handle_data(html.unescape(хвост))
         self.close()
+        if self._dropping and self._drop_rest_at is not None:
+            # Выбрасываемый элемент так и не закрылся (`<style>` без пары,
+            # недописанный `</script`): выбросить «до конца» значило бы молча
+            # съесть остаток письма. Сам тег снимается, всё после него
+            # чистится заново как обычный вход — текстом и разметкой.
+            остаток = sanitize(self._raw[self._drop_rest_at :])
+            if остаток:
+                self._flush_break()
+                self._out.append(остаток)
         while self._stack:
             self._out.append(f"</{self._stack.pop()}>")
         return "".join(self._out)
@@ -253,7 +280,7 @@ class _Cleaner(HTMLParser):
 
 def sanitize(raw: str) -> str:
     """Любая строка → каноническая разметка письма (см. модуль)."""
-    чистильщик = _Cleaner()
+    чистильщик = _Cleaner(raw)
     чистильщик.feed(raw)
     return чистильщик.result()
 
