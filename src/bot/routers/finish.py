@@ -196,6 +196,14 @@ async def archive(
             reply_markup=version_mismatch_keyboard(lang),
         )
         return
+    except db.UnitRefusedError as exc:
+        # Сторож справочника пространства (#482): база ответила, и ответила
+        # «нет». Текст «база не ответила» звал бы подождать и не начинать новую,
+        # а повтор здесь не поможет никогда — нужна другая точка или правка
+        # справочника в УК. Отличается это типом, как и расхождение версии.
+        logger.warning("слив проверки чата %s отклонён сторожем точки: %s", chat_id, exc)
+        await message.answer(t("finish.unit_refused", lang, unit=exc.unit))
+        return
     except db.DbError:
         logger.exception("слив проверки чата %s не удался", chat_id)
         await message.answer(t("finish.not_archived", lang))
