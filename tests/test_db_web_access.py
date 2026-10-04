@@ -20,6 +20,7 @@ from datetime import timedelta
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -62,6 +63,7 @@ def обе_роли(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -
     смотрят в таблицу в обход продукта.
     """
     monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    завести_пространства(pg_dsn, ТЕНАНТ, ЧУЖОЙ)
     return pg_dsn
 
 

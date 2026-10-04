@@ -306,3 +306,9 @@ bars
 weak
 rates
 penalty
+# Вкладка «Пользователи», волна доступа (#324, #399): маршруты Flask —
+# регистрирует декоратор; `locked_minutes` исхода смены пароля читает шаблон.
+own_password
+user_role
+user_email
+locked_minutes
