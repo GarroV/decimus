@@ -30,6 +30,24 @@ from dataclasses import dataclass, replace
 from datetime import date
 from pathlib import Path
 
+# Чтение карточки, издания и годности к боту — ярусом ниже (#455): по тем же
+# правилам выбирает чек-лист бот, а звать `src.mcp` ему нельзя.
+from ..domain.checklist_store import (
+    BOT_BLOCK_DRAFT as BOT_BLOCK_DRAFT,
+)
+from ..domain.checklist_store import (
+    BOT_BLOCK_EMPTY as BOT_BLOCK_EMPTY,
+)
+from ..domain.checklist_store import (
+    BOT_BLOCK_RETIRED as BOT_BLOCK_RETIRED,
+)
+from ..domain.checklist_store import (
+    BOT_BLOCK_UNPUBLISHED as BOT_BLOCK_UNPUBLISHED,
+)
+from ..domain.checklist_store import bot_block as _store_bot_block
+from ..domain.checklist_store import count_violations as _violations
+from ..domain.checklist_store import meta_or_default as _meta_or_default
+from ..domain.checklist_store import published_edition as _published_edition
 from ..domain.config import DATA_FILES, REQUIRED_DATA_FILES
 from ..domain.version import VERSION_FILE, compose
 from ..report.engine_call import REPO_ROOT, VERSIONS_DIR
@@ -44,7 +62,6 @@ from .checklist import (
 )
 from .checklist_layout import (
     ACTIVE,
-    CURRENT_LINK,
     DEFAULT_CODE,
     DEFAULT_SPACE,
     DRAFT,
@@ -67,11 +84,6 @@ from .errors import ChecklistError
 #: обязан приезжать с кодом — иначе завести чек-лист можно было бы не на всякой
 #: машине.
 BLANK_DIR = REPO_ROOT / "checklist-blank"
-
-#: Строка вида пункта, которая делает чек-лист способным что-то найти. Пункты
-#: других видов (замеры, информационные) в оценке не участвуют, и чек-лист из
-#: них одних даёт те же 100%, что пустой.
-VIOLATION_KIND = "violation"
 
 
 @dataclass(frozen=True)
@@ -98,27 +110,6 @@ def _signed(note: str, by: str | None) -> str:
     на этой строке.
     """
     return note if not by else f"{note}; {by}"
-
-
-def _meta_or_default(store: Store) -> Meta:
-    """Карточка чек-листа или та, которой он был бы заведён.
-
-    Карточки может не быть у хранилища, перенесённого руками. Отказывать на это
-    нельзя: перечень чек-листов обязан показывать и такой, иначе человек не
-    увидит, что у него на диске.
-    """
-    карточка = read_meta(store)
-    if карточка is not None:
-        return карточка
-    return Meta(code=store.code, name_ru=store.code, name_en=store.code, state=ACTIVE)
-
-
-def _published_edition(store: Store) -> str | None:
-    """Опубликованное издание чек-листа — или `None`, если публиковать нечего."""
-    указатель = store.home / CURRENT_LINK
-    if not указатель.is_symlink():
-        return None
-    return Path(os.readlink(указатель)).name
 
 
 def _alive(store: Store) -> None:
@@ -163,25 +154,6 @@ def overview(store: Store, *, spaces: tuple[str, ...] | None = None) -> list[Ove
             )
         )
     return ответ
-
-
-def _violations(каталог: Path) -> int:
-    """Сколько в методике пунктов, по которым бывает нарушение.
-
-    Считается разбором файла, а не движком: движок таких вопросов не отвечает, а
-    заводить ради счёта четвёртый подпроцесс — дороже и медленнее. Формат
-    колонок общий с движком (`id,kind,...`), и разойтись они не могут: колонку
-    `kind` читает и он.
-    """
-    путь = каталог / "checklist.csv"
-    if not путь.is_file():
-        return 0
-    with путь.open(encoding="utf-8-sig", newline="") as f:
-        return sum(
-            1
-            for строка in csv.DictReader(f)
-            if (строка.get("kind") or "").strip() == VIOLATION_KIND
-        )
 
 
 @dataclass(frozen=True)
@@ -568,39 +540,27 @@ __all__ = [
 
 # --- доступ в боте (волна 3) -------------------------------------------------
 
-#: Почему чек-лист нельзя открыть в боте — кодом, чтобы экран сказал это на
-#: своём языке одним словом. `None` — можно.
-BOT_BLOCK_DRAFT, BOT_BLOCK_RETIRED, BOT_BLOCK_UNPUBLISHED, BOT_BLOCK_EMPTY = (
-    "draft",
-    "retired",
-    "unpublished",
-    "empty",
-)
-
 
 def bot_block(store: Store) -> str | None:
     """Код причины, по которой чек-лист нельзя открыть в боте, или `None`.
 
     Те же заслоны, что у `set_bot_access`, но без отказа: экран панели «Бот»
     показывает причину вместо переключателя, а не даёт нажать и отказывает.
+    Само правило — ярусом ниже (`src/domain/checklist_store.py: bot_block`), им
+    же выбирает чек-лист бот; здесь к нему добавлено одно уточнение, для
+    которого нужен журнал правок.
     """
-    карточка = _meta_or_default(store)
-    if карточка.state == RETIRED:
-        return BOT_BLOCK_RETIRED
-    if карточка.state == DRAFT:
-        return BOT_BLOCK_DRAFT
+    причина = _store_bot_block(store, version_dir=_version_dir)
+    if причина != BOT_BLOCK_EMPTY:
+        return причина
+    # Новый чек-лист рождается с опубликованным пустым бланком. Пункты,
+    # записанные после, живут в неопубликованной версии — и сказать «нет
+    # пунктов» человеку, который их только что завёл, значило бы соврать.
     издание = _published_edition(store)
-    if издание is None:
+    последняя = tip_version(store)
+    if последняя != издание and _violations(_version_dir(store, последняя)) > 0:
         return BOT_BLOCK_UNPUBLISHED
-    if _violations(_version_dir(store, издание)) == 0:
-        # Новый чек-лист рождается с опубликованным пустым бланком. Пункты,
-        # записанные после, живут в неопубликованной версии — и сказать «нет
-        # пунктов» человеку, который их только что завёл, значило бы соврать.
-        последняя = tip_version(store)
-        if последняя != издание and _violations(_version_dir(store, последняя)) > 0:
-            return BOT_BLOCK_UNPUBLISHED
-        return BOT_BLOCK_EMPTY
-    return None
+    return BOT_BLOCK_EMPTY
 
 
 def _settle_inherited(store: Store) -> None:

@@ -223,6 +223,23 @@ def _drop_roles(roles: Iterable[str]) -> None:
 _номер_чата = iter(range(910_000, 1_000_000))
 
 
+def завести_пространства(pg_dsn: str, *codes: str) -> None:
+    """Завести пространства `codes` (строки `tenants`), если их ещё нет.
+
+    Пространства заводит команда `make space`, а двери базы (`create_account`,
+    `issue_token`, `remember_phrase`, `upsert_unit`) сами их больше не заводят и
+    на незаведённое отказывают (#481). Тесту, которому нужно пространство,
+    приходится завести его явно. Пишет под ролью-владельцем (`pg_dsn`).
+    """
+    import psycopg
+
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        for code in codes:
+            cur.execute(
+                "insert into tenants (code) values (%s) on conflict (code) do nothing", (code,)
+            )
+
+
 def привязать_страну(pg_dsn: str, *, tenant: str, country: str) -> None:
     """Пространство `tenant` привязано к стране `country` (строка `space_countries`).
 

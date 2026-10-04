@@ -36,7 +36,9 @@
     </div>
   {% else %}
     {% set правится = saved and not show_draft %}
-    <form class="lt" method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">
+    {# Адрес записи — только у своей проверки: чужую вошедший читает (D283), и
+       формы, которая куда-то пишет, у неё нет. #}
+    <form class="lt" method="post"{% if own %} action="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}"{% endif %}>
       <div class="lt__head">
         <div class="lt__title">
           <h1 class="lt__name">{{ t('letter.title') }}</h1>
@@ -66,10 +68,10 @@
         </div>
         <div class="lt__actions">
           {#
-            Сохранение и выгрузка — РАЗНЫЕ действия, и каждое названо своей
-            кнопкой. Одна кнопка со скрытым переключателем отличала бы их
-            только полем, которого не видно, а промах человек замечал бы уже
-            после того, как письмо ушло не туда.
+            Сохранение и черновик Google — РАЗНЫЕ действия, и каждое названо
+            своей кнопкой. Выгрузки файлом нет (D169): копирование из поля
+            решает ту же задачу без файла. Форма по умолчанию сохраняет —
+            отправка Enter'ом не уводит письмо к Google.
 
             Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
             записывает и не отменяет, а только показывает свежесобранный
@@ -83,13 +85,12 @@
           {% if правится %}
             <a class="btn btn--ghost" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
           {% endif %}
-          {# Черновик, выгрузка и фиксация — запись от имени пространства: у
+          {# Черновик и фиксация — запись от имени пространства: у
              проверки, которую вошедший только читает (УК у партнёра, D283),
              кнопок нет — сервер такую запись всё равно отклонит (#340). #}
           {% if own %}
           <button class="btn" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
-          <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
           <button class="btn btn--primary" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
           {% endif %}
@@ -127,21 +128,59 @@
         </div>
       {% endif %}
 
-      <label class="lt__body">
-        <span class="sr-only">{{ t('letter.edit.label') }}</span>
-        {#
-          Письмо уезжает партнёру как есть, поэтому и правится как есть: поле
-          показывает ровно тот текст, который собрал движок, без разметки
-          вокруг и без переносов от себя.
+      {#
+        Письмо правится С ФОРМАТИРОВАНИЕМ (D169): жирный, курсив, зачёркнутый,
+        ссылка — и ничего больше. Разметку собирает белый список на сервере
+        (`src/web/letter_markup.py`) и при сохранении, и здесь, при выводе:
+        `|safe` стоит строго на результате `letter_html`, то есть очистки.
 
-          Показывается ЗАФИКСИРОВАННОЕ письмо, если оно есть, и заготовка
-          движка — если его нет. Заготовка пересобирается каждый раз и от
-          пересборки меняется; у партнёра же на руках один текст, и подменять
-          его сегодняшней пересборкой значит отвечать на «что мы отправили»
-          правдоподобной неправдой.
-        #}
-        <textarea class="lt__text" name="text" rows="24" spellcheck="true" lang="{{ saved.lang if правится else letter.lang }}">{{ saved.body if правится else letter.text }}</textarea>
-      </label>
+        Без скрипта работает прежнее поле: разметка в нём видна текстом и
+        сохраняется так же. Скрипт (`static/letter.js`) прячет поле, открывает
+        редактор и перед отправкой кладёт его разметку обратно в поле.
+
+        Показывается ЗАФИКСИРОВАННОЕ письмо, если оно есть, и заготовка
+        движка — если его нет: у партнёра на руках один текст, и подменять его
+        сегодняшней пересборкой значит отвечать на «что мы отправили»
+        правдоподобной неправдой.
+      #}
+      {% set язык_письма = saved.lang if правится else letter.lang %}
+      <div class="lt__body">
+        {% if own %}
+          <div class="lt__tools" role="toolbar" aria-label="{{ t('letter.format.toolbar') }}" data-letter-tools hidden>
+            <button class="lt__tool" type="button" data-cmd="bold" aria-pressed="false"
+                    title="{{ t('letter.format.bold') }}" aria-label="{{ t('letter.format.bold') }}"><b>{{ t('letter.format.bold.glyph') }}</b></button>
+            <button class="lt__tool" type="button" data-cmd="italic" aria-pressed="false"
+                    title="{{ t('letter.format.italic') }}" aria-label="{{ t('letter.format.italic') }}"><i>{{ t('letter.format.italic.glyph') }}</i></button>
+            <button class="lt__tool" type="button" data-cmd="strikeThrough" aria-pressed="false"
+                    title="{{ t('letter.format.strike') }}" aria-label="{{ t('letter.format.strike') }}"><s>{{ t('letter.format.strike.glyph') }}</s></button>
+            <button class="lt__tool lt__tool--wide" type="button" data-cmd="link" aria-pressed="false"
+                    title="{{ t('letter.format.link') }}">{{ t('letter.format.link') }}</button>
+            {# Адрес ссылки — своим полем в панели, а не окном браузера: окно
+               уводит выделение, и ссылка легла бы не на те слова. #}
+            <span class="lt__linkbox" data-link-box hidden>
+              <input class="input lt__linkinput" type="text" inputmode="url" autocomplete="off"
+                     spellcheck="false" placeholder="https://…"
+                     aria-label="{{ t('letter.format.link.address') }}" data-link-input>
+              <button class="btn btn--sm" type="button" data-link-apply>{{ t('letter.format.link.apply') }}</button>
+              <button class="btn btn--sm btn--ghost" type="button" data-link-cancel>{{ t('letter.format.link.cancel') }}</button>
+            </span>
+            <span class="lt__toolnote" data-link-note
+                  data-select="{{ t('letter.format.link.select') }}"
+                  data-bad="{{ t('letter.format.link.bad') }}" role="status"></span>
+          </div>
+          <label class="lt__plain" data-letter-plain>
+            <span class="sr-only">{{ t('letter.edit.label') }}</span>
+            <textarea class="lt__text" id="letter-text" name="text" rows="24" spellcheck="true" lang="{{ язык_письма }}">{{ letter_markup }}</textarea>
+          </label>
+          <div class="lt__text lt__rich" contenteditable="true" role="textbox" aria-multiline="true"
+               aria-label="{{ t('letter.edit.label') }}" spellcheck="true" lang="{{ язык_письма }}"
+               data-letter-editor data-field="letter-text" hidden>{{ letter_html(letter_markup)|safe }}</div>
+        {% else %}
+          {# Чужая проверка только читается (D283): письмо видно как есть,
+             без поля, которое нечем сохранить. #}
+          <div class="lt__text lt__rich" aria-label="{{ t('letter.edit.label') }}" lang="{{ язык_письма }}">{{ letter_html(letter_markup)|safe }}</div>
+        {% endif %}
+      </div>
       <input type="hidden" name="letter_lang" value="{{ letter_lang }}">
 
       <div class="lt__foot">
@@ -160,5 +199,6 @@
         <span>{{ t('letter.lead') }} {{ t('letter.lang.note') }}</span>
       </div>
     </form>
+    {% if own %}<script src="{{ url_for('static', filename='letter.js') }}" defer></script>{% endif %}
   {% endif %}
 {% endblock %}

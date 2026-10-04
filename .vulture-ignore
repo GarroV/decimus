@@ -315,3 +315,20 @@ bars
 weak
 rates
 penalty
+
+# Обработчики `html.parser.HTMLParser`: их зовёт сам разборщик из `feed()`, по
+# имени в коде не читается ни одно (`src/web/letter_markup.py`).
+handle_starttag
+handle_startendtag
+handle_endtag
+handle_data
+
+# Вкладка «Пользователи», волна доступа (#324, #399): маршруты Flask —
+# регистрирует декоратор; `locked_minutes` исхода смены пароля читает шаблон.
+own_password
+user_role
+user_email
+locked_minutes
+# Фикстура pytest с `autouse=True` (ревью access2, L5, `tests/test_db_password_bounds.py`):
+# подключает сам pytest каждому тесту файла — отказ раньше scrypt и базы.
+_без_scrypt_и_базы

@@ -34,6 +34,7 @@ from src.web.google_auth import (
     TOKEN_ENDPOINT,
     GoogleSettings,
 )
+from src.web.letter_markup import to_email_html, to_plain
 
 #: Право завести черновик и ничего больше: ни чтения ящика, ни отправки.
 #: `gmail.modify` и `https://mail.google.com/` тоже подошли бы — и оба дают
@@ -119,23 +120,45 @@ def draft_subject(*, city: str, date: str, lang: str) -> str:
     return " · ".join(часть for часть in части if часть)
 
 
-def mime_message(*, to: str, subject: str, body: str) -> str:
-    """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
-    if not body.strip():
+def letter_message(*, to: str, subject: str, body: str) -> EmailMessage:
+    """Письмо партнёру как MIME: текстовая часть и HTML-часть одного содержания.
+
+    `body` — разметка письма (`src/web/letter_markup.py`), и чистится она
+    ЗДЕСЬ, а не только при сохранении: запись могла лечь в базу в обход
+    экрана, и в почту партнёра не уезжает ничего, что не прошло белый список.
+    """
+    текст = to_plain(body)
+    if not текст.strip():
         raise GoogleMailError("письмо пустое — черновик не заводится")
 
     письмо = EmailMessage()
     # Заголовки кириллицей кодирует сам `EmailMessage` (RFC 2047); собранный
     # руками заголовок с сырым UTF-8 Gmail примет, а почтовые клиенты
     # покажут кракозябрами.
-    письмо["Subject"] = subject
-    # Пустой адресат — обычное дело: контакт партнёра заполняет мастер бота, и
-    # он не обязателен. Заголовок `To:` с пустым значением делает черновик
-    # неотправляемым, поэтому его просто нет.
-    if to.strip():
-        письмо["To"] = to.strip()
-    письмо.set_content(body)
+    # Перевод строки в теме или адресате — это дописанный заголовок
+    # (`Bcc: чужой`), а не текст. Почтовая сборка отказывает на нём
+    # `ValueError`; здесь он становится отказом черновика словами, а не 500.
+    try:
+        письмо["Subject"] = subject
+        # Пустой адресат — обычное дело: контакт партнёра заполняет мастер
+        # бота, и он не обязателен. Заголовок `To:` с пустым значением делает
+        # черновик неотправляемым, поэтому его просто нет.
+        if to.strip():
+            письмо["To"] = to.strip()
+    except ValueError as сбой:
+        raise GoogleMailError(
+            "в теме или адресате письма перевод строки — черновик не заводится"
+        ) from сбой
+    # Текстовая часть первой: по RFC 2046 части `alternative` идут от простой
+    # к богатой, и клиент показывает последнюю, которую умеет.
+    письмо.set_content(текст)
+    письмо.add_alternative(to_email_html(body), subtype="html")
+    return письмо
 
+
+def mime_message(*, to: str, subject: str, body: str) -> str:
+    """Письмо как `raw` для Gmail: MIME в base64url без выравнивания."""
+    письмо = letter_message(to=to, subject=subject, body=body)
     return base64.urlsafe_b64encode(письмо.as_bytes()).decode().rstrip("=")
 
 

@@ -141,6 +141,14 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0031_bot_bindings.sql": (
         "sql1:78af39fa30505d3950be07b9eaed310efc3098994efe0d2221542da7ddfda5c8"
     ),
+    # Заведена вместе с файлом (#324) и нигде ещё не применена.
+    "0032_web_own_password.sql": (
+        "sql1:f64b46589d9cda89d261da23ed8bc353e50d96e41683b295a14109be328c598f"
+    ),
+    # Заведена вместе с файлом (ревью безопасности access2) и нигде ещё не применена.
+    "0033_definer_search_path.sql": (
+        "sql1:1c82c43ad0df14ac507789d39802e980ed4fa89d50aaa2d3eab950a06c37d376"
+    ),
     # Этап приёмки (D199). Номера 0032–0033 заняты веткой доступа (#484).
     "0034_inspection_acceptance.sql": (
         "sql1:64abfd79af27b23321992e6933437dc11aa126a6ea3df819406213437ddfee48"
