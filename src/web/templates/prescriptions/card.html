@@ -1,0 +1,55 @@
+{#
+  Предписание глазами партнёра (волна 3): письмо, срок, статус, основания и
+  ответ — комментарий и, по желанию, файл. Закрывает предписание УК.
+#}{% extends "base.html" %}
+{% from "_prescription.html" import rx_tag, rx_units, letter, bases, replies, meta with context %}
+{% block title %}{{ t('section.orders.title') }} · {{ p.subject }}{% endblock %}
+
+{% block body %}
+  <a class="cn-back" href="{{ url(rx_partner_path) }}?lang={{ lang }}">‹ {{ t('section.orders.title') }}</a>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ country_title(p.country) or p.country }} · {{ t('rx.card.kicker') }}</div>
+      <h1 class="ov-head__title">{{ p.subject }}</h1>
+      <div class="ov-card__hint">
+        {{ rx_units(p) }} · <span{% if p.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('rx.due', due=p.due_on) }}</span>
+        · {{ rx_tag(p, today) }} · {{ meta(p) }}
+      </div>
+    </div>
+  </div>
+
+  {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+  {% if p.status == 'closed' %}
+    <div class="note note--ok mt-gap"><div><div class="note__title">{{ t('rx.card.closed_note', comment=p.close_comment) }}</div></div></div>
+  {% endif %}
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.letter') }}</div></div>
+    <div class="card__body">{{ letter(p) }}</div>
+  </section>
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.bases') }}</div></div>
+    <div class="card__body">{{ bases(p, registry_path) }}</div>
+  </section>
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.replies') }}</div></div>
+    <div class="card__body stack">
+      {{ replies(p, rx_partner_path) }}
+      {% if p.status == 'issued' %}
+        <form method="post" enctype="multipart/form-data" class="stack mt-gap"
+              action="{{ url(rx_partner_path ~ '/' ~ p.id ~ '/reply') }}?lang={{ lang }}">
+          <label class="field"><span class="field-label">{{ t('rx.reply.comment') }}</span>
+            <textarea class="input" name="comment" required maxlength="4000" rows="4"></textarea></label>
+          <label class="field"><span class="field-label">{{ t('rx.reply.file', mb=max_mb) }}</span>
+            <input class="input" type="file" name="file"></label>
+          <div><button class="btn btn--primary" type="submit">{{ t('rx.reply.submit') }}</button></div>
+        </form>
+      {% else %}
+        <div class="ov-cell__muted">{{ t('rx.reply.closed') }}</div>
+      {% endif %}
+    </div>
+  </section>
+{% endblock %}

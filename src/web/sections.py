@@ -65,7 +65,9 @@ SECTIONS: tuple[Section, ...] = (
     Section(key="registry", path="/inspections", built=True, icon="task"),
     # Экшн-планы партнёра (волна 2, D263, D265): свои запросы и загрузка файла.
     Section(key="plans", path="/plans", built=True, partner_only=True, icon="timeline"),
-    Section(key="orders", path="/orders", built=False, icon="flag"),
+    # Предписания партнёра (волна 3, D266): пришедшие предписания, срок,
+    # статус и ответ. У УК для них вкладка в «Действиях» (D264).
+    Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     Section(key="country", path="/country", built=True, icon="globe"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),

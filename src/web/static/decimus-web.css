@@ -1788,3 +1788,57 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   font: inherit;
   cursor: pointer;
 }
+
+/* ── Предписания (волна 3) ─────────────────────────────────────────────
+   Вкладки «Действий», таблица предписаний (та же сетка, что очередь планов),
+   письмо как написано и выбор пиццерий и оснований. */
+.rx-tabs { margin: var(--space-4) 0 var(--space-2); }
+.rx-tabs a { text-decoration: none; }
+.ov-table--rx .ov-table__head,
+.ov-table--rx .ov-table__row {
+  grid-template-columns: minmax(12rem, 2fr) minmax(6rem, 1fr) minmax(8rem, 1.2fr) 6rem minmax(8rem, 1fr);
+  min-width: 44rem;
+}
+.rx-letter { display: grid; gap: var(--space-3); }
+.rx-letter__subject { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.rx-letter__body,
+.rx-reply__text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--lh-meta); }
+.rx-letter__to { overflow-wrap: anywhere; }
+.rx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.rx-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.rx-reply { display: grid; gap: var(--space-1); }
+.rx-pick { border: 0; margin: 0; padding: 0; min-width: 0; }
+.rx-pick__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+.rx-pick__item { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; cursor: pointer; }
+.rx-pick__item input { accent-color: var(--accent); flex: 0 0 auto; }
+.rx-pick__item span { overflow-wrap: anywhere; }
+.rx-form__body { min-height: 14rem; font: inherit; }
+.rx-form__actions { grid-column: 1 / -1; gap: var(--space-3); flex-wrap: wrap; }
+.rx-form__actions .btn { margin-top: 0; }
+
+/* Таблица предписаний на телефоне — строка складывается в карточку, как
+   очередь планов: тема сверху, страна и пиццерии под ней, срок и состояние. */
+@media (max-width: 52rem) {
+  .ov-table--rx .ov-table__head { display: none; }
+  .ov-table--rx .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name"
+      "country units"
+      "due state";
+    min-width: 0;
+    row-gap: var(--space-1);
+  }
+  .ov-table--rx .ov-table__row > :nth-child(1) { grid-area: name; }
+  .ov-table--rx .ov-table__row > :nth-child(2) { grid-area: country; }
+  .ov-table--rx .ov-table__row > :nth-child(3) { grid-area: units; justify-self: end; }
+  .ov-table--rx .ov-table__row > :nth-child(4) { grid-area: due; justify-self: start; }
+  .ov-table--rx .ov-table__row > :nth-child(5) { grid-area: state; justify-self: end; }
+}

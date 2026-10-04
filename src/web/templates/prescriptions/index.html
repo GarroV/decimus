@@ -1,0 +1,48 @@
+{#
+  Раздел партнёра «Предписания» (волна 3, D266) — отвечает на вопрос «что от
+  меня требует УК и до какого числа». Только свои страны (охват, D284) и
+  только отправленные предписания. Действий УК здесь нет.
+#}{% extends "base.html" %}
+{% from "_prescription.html" import rx_tag, rx_units with context %}
+{% block title %}{{ t('section.orders.title') }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('rx.partner.kicker') }}</div>
+      <h1 class="ov-head__title">{{ t('rx.partner.title') }}</h1>
+      <div class="ov-card__hint">{{ t('rx.partner.hint') }}</div>
+    </div>
+  </div>
+
+  <div class="ov-filters">
+    <a class="ov-chip{% if not closed %} is-on{% endif %}" href="{{ url(rx_partner_path) }}?lang={{ lang }}">{{ t('rx.show_open') }}</a>
+    <a class="ov-chip{% if closed %} is-on{% endif %}" href="{{ url(rx_partner_path) }}?closed=1&amp;lang={{ lang }}">{{ t('rx.show_closed') }}</a>
+  </div>
+  {% if truncated %}<div class="note note--warn mt-gap"><div><div class="note__text">{{ t('rx.truncated', n=limit) }}</div></div></div>{% endif %}
+
+  <section class="ov-card ov-card--wide">
+    {% if rows %}
+      <div class="ov-table ov-table--rx">
+        <div class="ov-table__head">
+          <span>{{ t('rx.col.subject') }}</span>
+          <span>{{ t('rx.col.country') }}</span>
+          <span>{{ t('rx.col.units') }}</span>
+          <span class="ov-num">{{ t('rx.col.due') }}</span>
+          <span>{{ t('rx.col.state') }}</span>
+        </div>
+        {% for p in rows %}
+          <a class="ov-table__row" href="{{ url(rx_partner_path ~ '/' ~ p.id) }}?lang={{ lang }}">
+            <span class="ov-cell__name">{{ p.subject }}</span>
+            <span class="ov-cell__muted">{{ country_title(p.country) or p.country }}</span>
+            <span class="ov-cell__muted">{{ rx_units(p) }}</span>
+            <span class="ov-num{% if p.overdue(today) %} ov-num--err{% endif %}">{{ p.due_on }}</span>
+            <span>{{ rx_tag(p, today) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('rx.closed_empty') if closed else t('rx.partner.empty') }}</div>
+    {% endif %}
+  </section>
+{% endblock %}

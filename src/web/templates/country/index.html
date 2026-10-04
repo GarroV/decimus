@@ -9,6 +9,7 @@
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
 {% from "_plan.html" import state_tag, versions with context %}
+{% from "_prescription.html" import rx_tag, rx_units with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
 
 {% block body %}
@@ -159,6 +160,34 @@
       {% endfor %}
     {% else %}
       <div class="ov-card__empty">{{ t('country.plans.empty') }}</div>
+    {% endif %}
+  </section>
+
+  {# ── Предписания страны (волна 3) ─────────────────────────────────────
+     Что отправлено партнёру этой страны: дата, суть, срок, статус; письмо
+     открывается. Действий здесь нет (D264). #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.rx.title') }}</div>
+      <div class="ov-card__hint">{{ t('country.rx.hint') }}</div>
+      <a class="btn btn--sm" href="{{ url(rx_hq_path if rx_act_hq else rx_partner_path) }}?lang={{ lang }}{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}">
+        {{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}</a>
+    </div>
+    {% if rx_truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('rx.truncated', n=rx_limit) }}</div></div></div>{% endif %}
+    {% if not rx_known %}
+      <div class="ov-card__empty">{{ t('country.rx.unknown') }}</div>
+    {% elif rx_rows %}
+      {% for p in rx_rows %}
+        <div class="ov-row">
+          <span class="ov-row__name">
+            <a href="{{ url((rx_hq_path if rx_act_hq else rx_partner_path) ~ '/' ~ p.id) }}?lang={{ lang }}">{{ p.subject }}</a>
+            <span class="ov-row__meta">{{ p.issued_at.strftime('%Y-%m-%d') if p.issued_at else '' }} · {{ rx_units(p) }} · {{ t('rx.due', due=p.due_on) }}</span>
+          </span>
+          {{ rx_tag(p, today_rx) }}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.rx.empty') }}</div>
     {% endif %}
   </section>
 
