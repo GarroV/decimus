@@ -29,6 +29,8 @@ from typing import Any, Protocol
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT
+
 from .config import check_environment, load_retraction_settings, load_storage_settings
 from .errors import ActionPlanError, DbError, StorageError
 from .reach import Reach, require_reach
@@ -57,9 +59,6 @@ STATE_ACCEPTED = "accepted"
 
 ORIGIN_AUTO = "auto"
 ORIGIN_MANUAL = "manual"
-
-#: Пространство УК: запросы — только по его проверкам (D289).
-HQ_TENANT = "HQ"
 
 #: Префикс файлов в хранилище кадров (D268): удаление кадров после вычитки
 #: (D202) ходит по `inspections/`, сюда не заглядывает.
