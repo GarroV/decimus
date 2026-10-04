@@ -51,6 +51,7 @@ from .routers import (
     build_records_router,
     build_resend_router,
     build_start_router,
+    build_stops_router,
     build_version_router,
 )
 from .routers.help import HELP_COMMAND
@@ -65,6 +66,7 @@ from .routers.mcp import (
 from .routers.record import make_frame_handler, make_material_handler, make_waiting_handler
 from .routers.records import RECORDS_COMMAND
 from .routers.resend import RESEND_COMMAND
+from .routers.stops import STOPS_COMMAND
 from .routers.version import VERSION_COMMAND
 from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
@@ -206,6 +208,7 @@ def build_dispatcher(
     # рядом с остальными командами: своих состояний диалога у них нет, обычного
     # текста они не ждут, и на порядок разбора материала не влияют.
     dispatcher.include_router(build_mcp_router(settings))
+    dispatcher.include_router(build_stops_router(settings))
     dispatcher.include_router(build_help_router())
     dispatcher.include_router(build_lang_router())
     dispatcher.include_router(build_resend_router())
@@ -285,6 +288,9 @@ MCP_MENU_COMMANDS = (
     (MCP_ADD_COMMAND, "cmd.mcp_add"),
     (MCP_REVOKE_COMMAND, "cmd.mcp_revoke"),
     (MCP_WHO_COMMAND, "cmd.mcp_who"),
+    # Счётчик отказов мастера (#436): владелец открывает его сам, бот о
+    # повторяющихся отказах никому не пишет. Тот же круг, тот же заслон.
+    (STOPS_COMMAND, "cmd.stops"),
 )
 
 
