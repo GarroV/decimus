@@ -176,10 +176,20 @@ _CLOSE_USER_SESSIONS_SQL = """
      where user_id = %s and closed_at is null
 """
 
+#: Прежняя почта читается той же командой, что пишет новую (строка заперта):
+#: сессии закрываются, только если почта на деле сменилась.
 _SET_EMAIL_SQL = """
-    update web_users
+    with прежняя as (
+        select id, email
+          from web_users
+         where tenant_code = %s and login = %s and disabled_at is null
+           for update
+    )
+    update web_users u
        set email = %s
-     where tenant_code = %s and login = %s and disabled_at is null
+      from прежняя
+     where u.id = прежняя.id
+ returning u.id, прежняя.email is distinct from u.email
 """
 
 _SELECT_USER_BY_EMAIL_SQL = """
@@ -644,17 +654,28 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
 
     Роль владельца схемы, как заведение и роли: право менять круг допущенных
     не выдаётся приложению, иначе кнопка на экране и дыра в нём — одно и то же.
+
+    **Сменилась почта — открытые сессии человека закрываются тем же движением**,
+    как при смене пароля командой (`change_password`), и теми же правами
+    роли (`0022`). Почту меняют в ответ на «к ней получили доступ чужие», и
+    вошедший через Google по прежней почте не должен пережить смену. Та же
+    почта, сохранённая повторно, — не смена, сессии остаются.
     """
     значение = None if email is None else normalize_email(email)
     with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
         try:
-            cur.execute(_SET_EMAIL_SQL, (значение, tenant, login.strip().lower()))
+            cur.execute(_SET_EMAIL_SQL, (tenant, login.strip().lower(), значение))
         except psycopg.errors.UniqueViolation as занято:
             # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
             # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
             # там, где была опечатка в логине.
             raise EmailTakenError(f"почта {значение} уже привязана к другой учётке") from занято
-        return cur.rowcount > 0
+        строка = cur.fetchone()
+        if строка is None:
+            return False
+        if строка[1]:
+            cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+        return True
 
 
 def find_by_email(email: str) -> Account | None:
