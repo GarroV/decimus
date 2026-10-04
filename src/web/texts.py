@@ -427,8 +427,102 @@ TEXTS: dict[str, dict[str, str]] = {
     # техническим статусом: владелец назвал его непонятным и для себя, и для
     # пользователя (D172). Свойство объясняется
     # там, где человек правит методику, а не рядом с оценкой.
-    "state.sealed": {"ru": "Завершена", "en": "Completed"},
+    # «Принята», а не «Завершена» (D199): с этапом приёмки завершённый обход
+    # и принятая проверка — разные состояния.
+    "state.sealed": {"ru": "Принята", "en": "Accepted"},
     "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
+    "state.review": {"ru": "На приёмке", "en": "Awaiting review"},
+    # --- этап приёмки (D199) -------------------------------------------------
+    "registry.review.title": {"ru": "Ждут приёмки", "en": "Awaiting review"},
+    "registry.review.hint": {
+        "ru": (
+            "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
+            "карточки точек она попадёт после подтверждения."
+        ),
+        "en": (
+            "The visit is over, but nobody has reviewed the inspection yet. It joins the "
+            "network history, the overview and unit cards once it is accepted."
+        ),
+    },
+    "accept.banner.title": {"ru": "Проверка на приёмке", "en": "Inspection awaiting review"},
+    "accept.banner.text": {
+        "ru": (
+            "Вычитайте записи и подтвердите проверку. До подтверждения она не входит в "
+            "историю сети, а её записи можно исправить."
+        ),
+        "en": (
+            "Review the records and accept the inspection. Until then it is not part of "
+            "the network history, and its records can still be corrected."
+        ),
+    },
+    "accept.foreign": {
+        "ru": (
+            "Проверка другого пространства: вычитывает и подтверждает её то пространство, "
+            "чья она. Здесь она только для чтения."
+        ),
+        "en": (
+            "This inspection belongs to another space: that space reviews and accepts it. "
+            "Here it is read-only."
+        ),
+    },
+    "accept.title": {"ru": "Подтвердить проверку", "en": "Accept inspection"},
+    "accept.hint": {
+        "ru": (
+            "После подтверждения проверка входит в историю сети, а её записи больше не "
+            "правятся. Вернуть на приёмку нельзя."
+        ),
+        "en": (
+            "Once accepted, the inspection joins the network history and its records can no "
+            "longer be edited. It cannot be sent back for review."
+        ),
+    },
+    "accept.submit": {"ru": "Подтвердить", "en": "Accept"},
+    "accept.done": {"ru": "Проверка принята.", "en": "The inspection is accepted."},
+    "accept.failed": {
+        "ru": "Проверку не подтвердили: {reason}",
+        "en": "The inspection was not accepted: {reason}",
+    },
+    "accept.meta": {"ru": "Принята {at} · {by}", "en": "Accepted {at} · {by}"},
+    "review.sheet.title": {"ru": "Весь чек-лист", "en": "Full checklist"},
+    "review.sheet.hint": {
+        "ru": (
+            "Все пункты версии, по которой считали проверку, зона за зоной. «Чисто» — по пункту "
+            "в этой зоне записи нет."
+        ),
+        "en": (
+            "Every item of the checklist version this inspection was scored against, zone by "
+            "zone. “Clean” means there is no record for the item in that zone."
+        ),
+    },
+    "review.sheet.unplaced": {
+        "ru": "Записи вне чек-листа версии: {count}",
+        "en": "Records outside the checklist version: {count}",
+    },
+    "review.zone.meta": {
+        "ru": "пунктов {items} · нарушений {violations}",
+        "en": "{items} items · {violations} violations",
+    },
+    "review.item.clean": {"ru": "Чисто", "en": "Clean"},
+    "review.photo.alt": {"ru": "Кадр к записи {n}", "en": "Photo for record {n}"},
+    # --- правка записи на приёмке (D200) ---------------------------------------
+    "revise.open": {"ru": "Исправить запись {n}", "en": "Correct record {n}"},
+    "revise.item": {"ru": "Пункт", "en": "Item"},
+    "revise.level": {"ru": "Класс", "en": "Class"},
+    "revise.zone": {"ru": "Зона", "en": "Zone"},
+    "revise.text": {"ru": "Формулировка", "en": "Wording"},
+    "revise.hint": {
+        "ru": "После сохранения оценка пересчитывается движком по методике этой проверки.",
+        "en": "Saving recalculates the score with the engine, using this inspection's checklist.",
+    },
+    "revise.submit": {"ru": "Сохранить и пересчитать", "en": "Save and recalculate"},
+    "revise.done": {
+        "ru": "Запись исправлена, оценка пересчитана.",
+        "en": "The record is corrected and the score recalculated.",
+    },
+    "revise.failed": {
+        "ru": "Запись не исправлена: {reason}",
+        "en": "The record was not corrected: {reason}",
+    },
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
     "card.build.title": {"ru": "Сборка чек-листа", "en": "Checklist build"},

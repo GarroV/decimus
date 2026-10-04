@@ -23,8 +23,8 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 
+from src.db import accept, move, previews, queries, reports, retract
 from src.db import letters as letters_store
-from src.db import move, previews, queries, reports, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
@@ -46,6 +46,9 @@ class Registry:
     #: Видны ли снятые проверки. `False` — не «их нет», а «подключение
     #: администратора истории не задано»; страница обязана сказать это словами.
     retracted_visible: bool
+    #: Проверки на приёмке (D199) — обойдены, ждут вычитки и подтверждения.
+    #: Отдельным списком, а не в `rows`: в историю сети они ещё не входят.
+    review: tuple[InspectionRow, ...] = ()
 
     @property
     def retracted_count(self) -> int:
@@ -69,15 +72,20 @@ def retraction_available() -> bool:
 
 
 def load_registry(*, reach: Reach, limit: int) -> Registry:
-    """Проверки тенанта, свежие по дате обхода — первыми."""
+    """Проверки в охвате, свежие по дате обхода — первыми, и отдельно — ждущие приёмки.
+
+    Очередь приёмки идёт по тому же охвату, что история (D283, D289): УК видит
+    ждущие партнёра, но подтверждать их не может — это решает карточка.
+    """
+    review = tuple(queries.list_inspections(reach=reach, limit=limit, on_review=True))
     if retraction_available():
         try:
             rows = queries.list_inspections(reach=reach, limit=limit, include_retracted=True)
-            return Registry(rows=tuple(rows), retracted_visible=True)
+            return Registry(rows=tuple(rows), retracted_visible=True, review=review)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
     rows = queries.list_inspections(reach=reach, limit=limit)
-    return Registry(rows=tuple(rows), retracted_visible=False)
+    return Registry(rows=tuple(rows), retracted_visible=False, review=review)
 
 
 def _log_admin_read_failed(where: str, exc: DbError) -> None:
@@ -102,13 +110,18 @@ def load_card(inspection_id: str, *, reach: Reach) -> InspectionDetail | None:
     `None` — проверки у тенанта нет. Тем же `None` отвечает снятая проверка,
     когда снятые не видны: «такой проверки нет» и «вам её не видно» снаружи
     неразличимы намеренно (`queries.get_inspection`).
+
+    Проверку на приёмке (D199) карточка показывает: это и есть экран, на
+    котором её вычитывают и подтверждают.
     """
     if retraction_available():
         try:
-            return queries.get_inspection(inspection_id, reach=reach, include_retracted=True)
+            return queries.get_inspection(
+                inspection_id, reach=reach, include_retracted=True, include_on_review=True
+            )
         except DbError as exc:
             _log_admin_read_failed("карточка проверки", exc)
-    return queries.get_inspection(inspection_id, reach=reach)
+    return queries.get_inspection(inspection_id, reach=reach, include_on_review=True)
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
@@ -201,6 +214,15 @@ def load_letter(detail: InspectionDetail, *, lang: str | None = None) -> Letter:
         caveats=не_восстановлено,
         failure=None,
     )
+
+
+def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
+    """Подтвердить проверку своего пространства на приёмке (D199).
+
+    Отказ — `AcceptError` блока `db`; проверка чужого пространства отвечает
+    им же, тем же «нет», что несуществующая.
+    """
+    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor)
 
 
 def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Retraction:
