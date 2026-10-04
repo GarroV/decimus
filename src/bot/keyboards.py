@@ -26,7 +26,7 @@ from src.domain.errors import ValidationError
 
 from .errors import BotTextError
 from .info import KIND_YES_NO
-from .texts import t
+from .texts import UI_LANGS, t
 
 #: Код вида проверки → слово на каждом языке. Живёт в предметной области
 #: (`src/domain/kinds.py`), здесь только имя для чтения: своей копии у бота нет
@@ -139,6 +139,23 @@ def lang_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for code, label in LANG_LABELS.items():
         builder.button(text=label, callback_data=f"{LANG_PREFIX}{code}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+#: Выбор языка БОТА (D303, `/lang`) — не путать с `LANG_PREFIX`, языком отчёта.
+UI_LANG_PREFIX = "lang:ui:"
+
+
+def ui_lang_keyboard() -> InlineKeyboardMarkup:
+    """Языки интерфейса из словаря бота, каждый подписан на нём самом (D303).
+
+    Надпись берётся каталогом (`lang.self_name` на языке кнопки): третий язык
+    добавляется словарём, а кнопка появляется сама.
+    """
+    builder = InlineKeyboardBuilder()
+    for code in UI_LANGS:
+        builder.button(text=t("lang.self_name", code), callback_data=f"{UI_LANG_PREFIX}{code}")
     builder.adjust(1)
     return builder.as_markup()
 
