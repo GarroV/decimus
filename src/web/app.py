@@ -22,7 +22,16 @@ from datetime import datetime
 from typing import Any
 
 import psycopg
-from flask import Flask, abort, redirect, render_template, request, send_file, url_for
+from flask import (
+    Flask,
+    abort,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -35,7 +44,7 @@ from src.domain.kinds import kind_title
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
-from . import accounts, assets, auth, letter_draft, letter_markup, pricing, view
+from . import accounts, assets, auth, letter_draft, letter_markup, people, pricing, profile, view
 from . import country as country_data
 from . import inspections as data
 from . import methodology as method
@@ -48,6 +57,7 @@ from .geo_names import city_title, country_title
 from .google_mail import GoogleMailError, draft_subject, letter_message
 from .icons import icon
 from .origin import refuse_foreign_origin
+from .remote import client_address
 from .sections import (
     SECTIONS,
     check_registry,
@@ -1018,6 +1028,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         code: int = 200,
         bot_link: str | None = None,
         bot_link_until: datetime | None = None,
+        password: profile.Outcome | None = None,
+        edit: people.Outcome | None = None,
     ) -> tuple[str, int]:
         # Перечень людей и форма заведения — только админу УК (D288). Остальные
         # видят свою строку: вкладка открыта всем ради привязки бота (D286).
@@ -1063,6 +1075,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 bot_link=bot_link,
                 bot_link_until=bot_link_until,
                 bot_var=WEB_BOT_USERNAME_VAR,
+                password=password,
+                min_password=accounts.MIN_PASSWORD_LENGTH,
+                max_password=accounts.MAX_PASSWORD_LENGTH,
+                edit=edit,
             ),
             code,
         )
@@ -1117,6 +1133,85 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         except DbError:
             return _страница_учёток(outcome="bot_unlink_failed", code=503)
         return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
+
+    @app.post(f"{users_path}/password")
+    def own_password() -> FlaskResponse | tuple[str, int]:
+        """Сменить СВОЙ пароль (#324). Чей — решает сессия этого запроса, не форма.
+
+        Страница, а не перенаправление: исход показывается на месте, а
+        введённое обратно в разметку не возвращается — среди него пароли.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("смена пароля без вошедшего: маршрут прошёл мимо заслона")
+        исход = profile.change_own(
+            current=request.form.get("current") or "",
+            new=request.form.get("new") or "",
+            repeat=request.form.get("repeat") or "",
+            token=auth.current_session_token(),
+            login=вошедший.login,
+            stand=auth.throttle_tenant(),
+            address=client_address(trusted_proxies=conf.trusted_proxies),
+        )
+        страница, код = _страница_учёток(password=исход, code=исход.status)
+        if исход.retry_after_seconds is None:
+            return страница, код
+        ответ = make_response(страница, код)
+        ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
+        return ответ
+
+    def _правка_человека(
+        действие: Callable[[str, str], people.Outcome],
+    ) -> FlaskResponse | tuple[str, int]:
+        """Общее у правки роли и почты: заслон, происхождение, пространство из формы.
+
+        Пространство — из строки учётки в перечне, сверенное с заведёнными:
+        человека правят там, где он живёт, а не в пространстве админа.
+        """
+        отказ = _hq_admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        логин = (request.form.get("login") or "").strip()
+        try:
+            пространство = _пространство_из_формы()
+        except DbError:
+            return _страница_учёток(edit=people.Outcome("edit.failed", 503), code=503)
+        if пространство is None or not логин:
+            return _страница_учёток(edit=people.Outcome("edit.space", 400), code=400)
+        исход = действие(логин, пространство)
+        return _страница_учёток(edit=исход, code=исход.status)
+
+    @app.post(f"{users_path}/role")
+    def user_role() -> FlaskResponse | tuple[str, int]:
+        """Назначить роль человеку (#399). Только админ УК; свою — нельзя."""
+        вошедший = auth.current_account()
+        роль = (request.form.get("role") or "").strip()
+        return _правка_человека(
+            lambda логин, пространство: people.change_role(
+                login=логин,
+                tenant=пространство,
+                role=роль,
+                actor_login=вошедший.login if вошедший else "",
+                actor_tenant=вошедший.tenant if вошедший else "",
+            )
+        )
+
+    @app.post(f"{users_path}/email")
+    def user_email() -> FlaskResponse | tuple[str, int]:
+        """Почта входа через Google (#399): задать или снять (пустое поле). Только админ УК."""
+        вошедший = auth.current_account()
+        почта = request.form.get("email") or ""
+        return _правка_человека(
+            lambda логин, пространство: people.change_email(
+                login=логин,
+                tenant=пространство,
+                email=почта,
+                actor_login=вошедший.login if вошедший else "",
+                actor_tenant=вошедший.tenant if вошедший else "",
+            )
+        )
 
     @app.post(f"{users_path}/add")
     def add_user() -> FlaskResponse | tuple[str, int]:
