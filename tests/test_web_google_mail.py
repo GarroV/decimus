@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import email
+import email.message
 import email.policy
 import json
 import urllib.parse
@@ -96,7 +97,60 @@ def test_тема_и_тело_на_кириллице_доезжают_целы�
     )
     assert письмо["Subject"] == "Проверка · Белград"
     assert письмо["To"] == "partner@example.com"
-    assert письмо.get_content().strip() == "Здравствуйте!"
+    assert письмо.get_body(preferencelist=("plain",)).get_content().strip() == "Здравствуйте!"
+
+
+def _разобрать(сырое: str) -> email.message.EmailMessage:
+    письмо = email.message_from_bytes(
+        base64.urlsafe_b64decode(сырое + "=" * (-len(сырое) % 4)), policy=email.policy.default
+    )
+    assert isinstance(письмо, email.message.EmailMessage)
+    return письмо
+
+
+def test_письмо_несёт_html_и_честный_текст() -> None:
+    """Форматирование доезжает HTML-частью, а текстовая часть — без разметки.
+
+    Почта без HTML показывает текстовую часть: тег в ней читается партнёром
+    буквально, а ссылка без адреса превращается в слово, которое некуда нажать.
+    """
+    сырое = mime_message(
+        to="",
+        subject="Тема",
+        body='<b>Срок</b> — <s>5</s> 3 дня\nПлан: <a href="https://dodo.example/p">ссылка</a>',
+    )
+    письмо = _разобрать(сырое)
+
+    assert письмо.get_content_type() == "multipart/alternative"
+    текст = письмо.get_body(preferencelist=("plain",)).get_content()
+    разметка = письмо.get_body(preferencelist=("html",)).get_content()
+    assert текст.strip() == "Срок — 5 3 дня\nПлан: ссылка (https://dodo.example/p)"
+    assert "<b>Срок</b>" in разметка
+    assert "<s>5</s>" in разметка
+    assert '<a href="https://dodo.example/p">ссылка</a>' in разметка
+
+
+def test_в_письмо_не_уезжает_неочищенное() -> None:
+    """Сборка письма чистит сама: запись могла лечь в базу в обход сохранения."""
+    сырое = mime_message(
+        to="",
+        subject="Тема",
+        body='<a href="javascript:alert(1)" onclick="x">a</a><script>alert(2)</script>'
+        "<img src=x onerror=alert(3)>",
+    )
+    письмо = _разобрать(сырое)
+
+    разметка = письмо.get_body(preferencelist=("html",)).get_content()
+    текст = письмо.get_body(preferencelist=("plain",)).get_content()
+    for часть in (разметка, текст):
+        assert "javascript" not in часть
+        assert "alert" not in часть
+        assert "onclick" not in часть and "onerror" not in часть
+
+
+def test_письмо_из_одной_разметки_без_слов_отвергается() -> None:
+    with pytest.raises(GoogleMailError):
+        mime_message(to="", subject="Тема", body="<b> </b><script>x</script>")
 
 
 def test_сырое_письмо_закодировано_безопасно_для_адреса() -> None:
@@ -171,3 +225,17 @@ def test_ответ_без_номера_черновика_не_выдаётся
 
     with pytest.raises(GoogleMailError):
         create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)
+
+
+@pytest.mark.parametrize(
+    ("кому", "тема"),
+    [
+        ("partner@example.com\r\nBcc: z@evil.example", "Тема"),
+        ("partner@example.com", "Тема\r\nBcc: z@evil.example"),
+        ("partner@example.com\nBcc: z@evil.example", "Тема"),
+    ],
+)
+def test_перевод_строки_в_заголовке_отказ_словами(кому: str, тема: str) -> None:
+    """CR/LF в теме или адресате — не 500 из почтовой сборки, а внятный отказ."""
+    with pytest.raises(GoogleMailError):
+        mime_message(to=кому, subject=тема, body="Текст")
