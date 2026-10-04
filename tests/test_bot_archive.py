@@ -40,6 +40,7 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import VERSION_KEEP_CALLBACK, VERSION_SYNC_CALLBACK
 from src.bot.texts import t
+from src.db.reach import own_reach
 from src.domain import score, start_inspection
 
 pytestmark = pytest.mark.asyncio
@@ -129,7 +130,7 @@ async def test_проведённая_ботом_проверка_лежит_в_
     assert отправленные_документы(session), "аудитору не отдали отчёт — слив проверять не на чем"
 
     эталон = score(CHAT_ID)
-    строки = db.list_inspections(tenant="default")
+    строки = db.list_inspections(reach=own_reach("default"))
 
     assert len(строки) == 1, "завершённая проверка не доехала до базы"
     (проверка,) = строки
@@ -149,7 +150,7 @@ async def test_повторная_сборка_отчёта_не_плодит_в
     await build_report(build_dispatcher(SETTINGS), bot)
 
     assert отправленные_документы(session), "второй отчёт не собрался — сравнивать нечего"
-    assert len(db.list_inspections(tenant="default")) == 1
+    assert len(db.list_inspections(reach=own_reach("default"))) == 1
 
 
 # --- слив зовётся после отчёта и тянет за собой кадры ------------------------

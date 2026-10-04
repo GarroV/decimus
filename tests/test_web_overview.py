@@ -27,6 +27,7 @@ from test_web_app import ТЕНАНТ
 from web_harness import войти, подменить_двери, собрать
 
 from src.db.models import InspectionRow
+from src.db.reach import own_reach
 from src.web import app as app_mod
 from src.web import overview as ov
 from src.web.texts import t as _t
@@ -524,7 +525,7 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
 
     # Act
     ov.load(
-        tenant=ТЕНАНТ,
+        reach=own_reach(ТЕНАНТ),
         limit=50,
         selection=ov.Selection(city="Белград", country="RS", grade="D"),
         today=date(2026, 9, 24),
@@ -555,7 +556,7 @@ def test_пустой_отбор_не_сужает_агрегаты(monkeypatch:
     monkeypatch.setattr(ov, "queries", база)
 
     # Act
-    ov.load(tenant=ТЕНАНТ, limit=50, today=date(2026, 9, 24))
+    ov.load(reach=own_reach(ТЕНАНТ), limit=50, today=date(2026, 9, 24))
 
     # Assert
     for имя, kwargs in база.звонки.items():
@@ -698,7 +699,7 @@ def test_пункт_на_одной_точке_системным_не_счит�
     monkeypatch.setattr(ov, "queries", База())
 
     # Act
-    данные = ov.load(tenant=ТЕНАНТ, limit=50, today=date(2026, 9, 24))
+    данные = ov.load(reach=own_reach(ТЕНАНТ), limit=50, today=date(2026, 9, 24))
 
     # Assert
     assert [item.code for item in данные.systemic] == ["K-1"]

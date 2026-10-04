@@ -23,6 +23,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.errors import PushError  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.db.reports import REPORT_CONTENT_TYPE, report_object_key, upload_report  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
@@ -194,7 +195,7 @@ def test_последний_отчёт_выдаётся_своему_аренд�
     последний = upload_report(inspection_id, data=ДРУГОЙ_ОТЧЁТ, storage=склад)
     (свой,) = _строки(db_env, "select tenant_code from inspections where id = %s", (inspection_id,))
 
-    найденный = latest_report(inspection_id, tenant=str(свой[0]))
+    найденный = latest_report(inspection_id, reach=own_reach(str(свой[0])))
     assert найденный is not None
     # Последний по времени — пересобранный, а не первый.
     assert найденный.storage_path == последний.storage_path
@@ -204,4 +205,4 @@ def test_последний_отчёт_выдаётся_своему_аренд�
             return склад.положено[key]
 
     assert fetch_report(найденный, storage=Читатель()) == ДРУГОЙ_ОТЧЁТ
-    assert latest_report(inspection_id, tenant="someone-else") is None
+    assert latest_report(inspection_id, reach=own_reach("someone-else")) is None

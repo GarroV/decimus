@@ -31,13 +31,16 @@ psycopg = pytest.importorskip("psycopg")
 from src.db.fingerprint import compute_fingerprint  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import get_inspection, list_inspections  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, get_state, start_inspection  # noqa: E402
 from src.domain import score as domain_score  # noqa: E402
 from src.domain.kinds import kind_title  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "вид-проверки"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 
 #: Код вида и слово, которым он показывается по-русски. Слово написано здесь
 #: буквально, а не получено тем же `kind_title`: сверка функции с самой собой
@@ -131,8 +134,8 @@ def test_чтение_отдаёт_код_и_по_нему_есть_слово_�
     _проверка(804)
     ident = push_inspection(804)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
-    (строка,) = list_inspections(tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
+    (строка,) = list_inspections(reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     assert подробно.inspection.kind == КОД, "чтение по идентификатору отдало не код вида"

@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import set_retraction_env, привязать_страну, точка_справочника
 
 pytest.importorskip("psycopg")
 
@@ -62,8 +62,9 @@ def _подтверждение(ident: str, *, арендатор: str = АРЕ�
     литерал разошёлся бы с ней в первый же день, когда тест погонят не сегодня.
     """
     from src.db.queries import get_inspection
+    from src.db.reach import own_reach
 
-    подробно = get_inspection(ident, tenant=арендатор, include_retracted=True)
+    подробно = get_inspection(ident, reach=own_reach(арендатор), include_retracted=True)
     assert подробно is not None
     строка = подробно.inspection
     return {"confirm_unit": строка.unit_name, "confirm_date": строка.inspection_date.isoformat()}
@@ -232,10 +233,13 @@ def test_подтверждение_без_внятного_ответа_это_
 
 
 def test_чужая_проверка_отвечает_тем_же_что_несуществующая(
-    domain_env: Path, retraction_env: str
+    domain_env: Path, pg_dsn: str, retraction_env: str
 ) -> None:
     """Разные ответы дали бы перебору идентификаторов состав чужой истории."""
-    чужая = _проверка(508, арендатор="сосед")
+    # Партнёр сливает на точку справочника УК своей страны (D284).
+    привязать_страну(pg_dsn, tenant="HU", country="HU")
+    точка_справочника("Будапешт-1", country="HU")
+    чужая = _проверка(508, точка="Будапешт-1", арендатор="HU")
 
     with pytest.raises(ToolError) as отказ:
         retraction.retract_inspection(
@@ -271,6 +275,7 @@ def test_уже_снятая_называет_записанную_причин�
     приходит отказом, а не полем в обычном ответе.
     """
     from src.db.queries import get_inspection
+    from src.db.reach import own_reach
 
     ident = _проверка(509)
     _снять(ident)
@@ -279,7 +284,7 @@ def test_уже_снятая_называет_записанную_причин�
         _снять(ident, причина="другая причина, записанная позже")
 
     assert ПРИЧИНА in str(отказ.value), "отказ обязан назвать записанную причину"
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР, include_retracted=True)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР), include_retracted=True)
     assert подробно is not None
     assert подробно.inspection.retraction_reason == ПРИЧИНА, "причина снятия переписана"
 

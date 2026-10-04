@@ -21,6 +21,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import findings_by_unit, get_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, start_inspection  # noqa: E402
 
 pytestmark = requires_db
@@ -57,7 +58,7 @@ def test_чтение_проверки_отдаёт_пометку(domain_env: P
     _проверка_с_повтором(1)
     inspection_id = push_inspection(1)
 
-    detail = get_inspection(inspection_id, tenant=ТЕНАНТ)
+    detail = get_inspection(inspection_id, reach=own_reach(ТЕНАНТ))
 
     assert detail is not None
     assert {f.code: f.repeat for f in detail.findings} == {"CLN05": True, "CLN06": False}
@@ -69,7 +70,7 @@ def test_находки_точки_отдают_пометку(domain_env: Path,
     _проверка_с_повтором(1)
     push_inspection(1)
 
-    записи = findings_by_unit(tenant=ТЕНАНТ, unit="Белград-1")
+    записи = findings_by_unit(reach=own_reach(ТЕНАНТ), unit="Белград-1")
 
     assert {f.code: f.repeat for f in записи} == {"CLN05": True, "CLN06": False}
 

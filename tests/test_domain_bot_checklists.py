@@ -21,6 +21,7 @@ from src.domain.bot_checklists import DEFAULT_CODE, available, pick
 from src.domain.config import check_environment
 from src.domain.engine import DOMAIN_KEY, state_file
 from src.domain.errors import ChecklistVersionMismatch, DomainError
+from src.domain.tenants import HQ_TENANT
 from src.mcp.checklist import Store, apply_change, current_version, publish
 from src.mcp.checklists import create, set_bot_access, set_state
 
@@ -74,7 +75,7 @@ def _начать(code: str | None = None) -> None:
 
 
 def test_без_хранилища_чек_лист_один_и_проверка_как_раньше(методика: Path) -> None:
-    открыты = available(check_environment())
+    открыты = available(check_environment(), tenant=HQ_TENANT)
     assert [(c.code, c.source) for c in открыты] == [(DEFAULT_CODE, методика)]
 
     _начать()
@@ -84,7 +85,7 @@ def test_без_хранилища_чек_лист_один_и_проверка_
 
 
 def test_несколько_открытых_без_кода_это_отказ(хранилище: Store) -> None:
-    assert [c.code for c in available(check_environment())] == ["rnd", "bizdev"]
+    assert [c.code for c in available(check_environment(), tenant=HQ_TENANT)] == ["rnd", "bizdev"]
 
     with pytest.raises(DomainError, match="несколько"):
         _начать()
@@ -106,7 +107,7 @@ def test_закрытый_в_боте_не_начинается(хранилищ
     set_bot_access(replace(хранилище, code="rnd"), tenant=АРЕНДАТОР, on=False)
 
     with pytest.raises(DomainError, match="больше не открыт"):
-        pick(check_environment(), "rnd")
+        pick(check_environment(), "rnd", tenant=HQ_TENANT)
 
 
 def test_закрыли_посреди_проверки_она_идёт_по_снимку(хранилище: Store) -> None:
@@ -165,6 +166,6 @@ def test_опубликовали_пустое_издание_открытого
     assert правка.accepted and правка.version is not None, правка
     publish(rnd, tenant=АРЕНДАТОР, version=правка.version)
 
-    assert [c.code for c in available(check_environment())] == ["bizdev"]
+    assert [c.code for c in available(check_environment(), tenant=HQ_TENANT)] == ["bizdev"]
     with pytest.raises(DomainError, match="больше не открыт"):
         _начать("rnd")

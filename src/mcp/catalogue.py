@@ -82,6 +82,38 @@ class ToolSpec:
     #: у продукта есть, и на нём такой инструмент ответил бы «промахов не
     #: найдено» вместо «читать неоткуда».
     history: bool = False
+    #: Инструмент методики (`kind=KIND_CHECKLIST`), которому обязателен код
+    #: чек-листа, когда его наводят в пространство партнёра (волна 1, #340).
+    #:
+    #: По умолчанию `True`: правящий инструмент без кода в чужом для эталона
+    #: пространстве не должен молча уйти неизвестно куда — отказ обязан
+    #: назвать причину (`rpc.NAME_THE_CHECKLIST`). Но `checklists` и
+    #: `checklist_meta` — читатели уровня хранилища, а не уровня чек-листа: им
+    #: код не нужен, чтобы ответить (`checklists` — перечень, `checklist_meta`
+    #: без кода читает применённый к проду). Тот же общий заслон отказал бы
+    #: партнёру даже в перечне его собственных чек-листов, которого он
+    #: спросил, чтобы код УЗНАТЬ, — испортив дверь, которой этот код и
+    #: называют (preflight Н1).
+    needs_checklist: bool = True
+    #: Инструмент методики (`kind=KIND_CHECKLIST`) МЕНЯЕТ хранилище, а не
+    #: только читает его (волна 1, ревью Task 2, круг 2: `needs_checklist`
+    #: для этого не годится — он решает другой вопрос, обязателен ли код, а
+    #: не пишет ли инструмент).
+    #:
+    #: По умолчанию `True` — намеренно, в ту же сторону, что у
+    #: `needs_checklist`: если новый инструмент методики забудут
+    #: классифицировать, он получит отказ `rpc.ETALON_READONLY_FOR_PARTNER`
+    #: на код эталона, а не тихий доступ к чужому хранилищу. Цена ошибки в
+    #: эту сторону — лишний, но честный отказ на чтение; цена в обратную —
+    #: партнёрский токен правит эталон под видом чтения, потому что кто-то
+    #: забыл явно сказать, что инструмент пишет. `False` стоит только у
+    #: инструментов, которые ничего не меняют: `checklists`, `checklist_meta`
+    #: и содержимое методики (`checklist_versions`, `checklist_items`,
+    #: `checklist_item`, `scoring`, `route`, `photo_cues`,
+    #: `photo_cue_suggestions`, `uncovered_phrases`, `learned_phrases`) —
+    #: именно этот список и держит `tests/test_mcp_catalogue.py` в
+    #: `ИМЕНА_ЧИТАЮЩИХ_МЕТОДИКУ`, а не угадывает его отсюда.
+    writes: bool = True
 
 
 def _date_property(*, meaning: str) -> dict[str, object]:
@@ -535,6 +567,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.checklist_versions,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="checklist_items",
@@ -566,6 +599,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.checklist_items,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="checklist_item",
@@ -592,6 +626,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.checklist_item,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     # --- методика: правка пунктов -------------------------------------------
     ToolSpec(
@@ -971,6 +1006,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.scoring,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="set_scoring",
@@ -1079,6 +1115,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.route,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="set_route",
@@ -1153,6 +1190,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.photo_cues,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="add_photo_cue",
@@ -1357,6 +1395,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.photo_cue_suggestions,
         kind=KIND_CHECKLIST,
+        writes=False,
         history=True,
     ),
     ToolSpec(
@@ -1402,6 +1441,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklist_tools.uncovered_phrases,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="learned_phrases",
@@ -1458,6 +1498,7 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=phrases.learned_phrases,
         kind=KIND_CHECKLIST,
+        writes=False,
     ),
     ToolSpec(
         name="retract_learned_phrase",
@@ -1658,13 +1699,16 @@ TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="checklists",
         description=(
-            "List every checklist the store holds: code, names, state (draft "
-            "/ active / retired) and which one is applied to production. "
-            "State and production are different things: 'active' means a "
-            "checklist is fit for use and several may be, while 'applied to "
-            "production' is a pointer and there is exactly one. Checklists "
-            "are never deleted — a retired one stays listed, because "
-            "inspections were scored by it."
+            "List the checklists visible to this tenant: code, names, state "
+            "(draft / active / retired) and which one is applied to "
+            "production. HQ sees every checklist in the store; a partner "
+            "sees its own plus HQ's. State and production are different "
+            "things: 'active' means a checklist is fit for use and several "
+            "may be, while 'applied to production' is a pointer and there is "
+            "exactly one. Checklists are never deleted — a retired one stays "
+            "listed, because inspections were scored by it. No 'checklist' "
+            "argument is needed to call this — it lists checklists, it does "
+            "not name one."
         ),
         input_schema={
             "type": "object",
@@ -1674,14 +1718,22 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.checklists,
         kind=KIND_CHECKLIST,
+        needs_checklist=False,
+        writes=False,
     ),
     ToolSpec(
         name="checklist_meta",
         description=(
             "Read one checklist's card: code, both names, state, whether it "
             "is applied to production and which edition it publishes. Name "
-            "the checklist with 'checklist'; omit it to read the one applied "
-            "to production."
+            "the checklist with 'checklist' — any code a call to checklists "
+            "just listed for this tenant works here, including HQ's own "
+            "(a partner may read HQ's card, only not edit it). For the HQ "
+            "tenant, omitting it reads the one applied to production; a "
+            "partner has no production pointer of its own, so omitting it "
+            "there looks for the default code in the partner's own space "
+            "and answers 'not found' if there is none — name the checklist "
+            "explicitly."
         ),
         input_schema={
             "type": "object",
@@ -1691,6 +1743,8 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.checklist_meta,
         kind=KIND_CHECKLIST,
+        needs_checklist=False,
+        writes=False,
     ),
     ToolSpec(
         name="create_checklist",

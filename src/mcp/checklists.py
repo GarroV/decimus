@@ -136,12 +136,18 @@ def _alive(store: Store) -> None:
         current_version(replace(store, space=DEFAULT_SPACE, code=DEFAULT_CODE))
 
 
-def overview(store: Store) -> list[Overview]:
-    """Все чек-листы хранилища. Нетронутое хранилище заводится здесь же."""
+def overview(store: Store, *, spaces: tuple[str, ...] | None = None) -> list[Overview]:
+    """Все чек-листы хранилища. Нетронутое хранилище заводится здесь же.
+
+    `spaces` не назван — виден весь перечень (старое поведение); назван — перечень
+    сужается до этих пространств: так бот партнёра не покажет чужие чек-листы.
+    """
     _alive(store)
     в_проде = applied(store.root)
     ответ: list[Overview] = []
     for space, code in known(store.root):
+        if spaces is not None and space not in spaces:
+            continue
         свой = replace(store, space=space, code=code)
         карточка = _meta_or_default(свой)
         ответ.append(
@@ -297,6 +303,20 @@ def create(
         raise ChecklistError(
             f"Чек-лист «{code}» в пространстве «{space}» уже есть. Код не меняется никогда — им "
             f"чек-лист связан с проверками и со снимками изданий; заведите другой код"
+        )
+    # Коды эталона и чек-листов партнёров не повторяются: партнёр видит эталон
+    # рядом со своими (`bot_spaces`), и совпавший код сделал бы поиск по коду
+    # неоднозначным.
+    занят = [s for s, c in known(store.root) if c == code and s != space]
+    if space != DEFAULT_SPACE and DEFAULT_SPACE in занят:
+        raise ChecklistError(
+            f"Код «{code}» — код чек-листа эталона УК. Эталон виден в вашем пространстве "
+            f"под этим кодом; заведите свой чек-лист под другим кодом"
+        )
+    if space == DEFAULT_SPACE and занят:
+        raise ChecklistError(
+            f"Код «{code}» занят чек-листом пространства партнёра. Коды эталона и "
+            f"чек-листов партнёров не повторяются: партнёр видит эталон рядом со своими"
         )
     имя_ру, имя_ен = (name_ru or "").strip(), (name_en or "").strip()
     if not имя_ру or not имя_ен:
@@ -481,6 +501,11 @@ def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> 
     есть, и они не про формат, а про смысл (#339).
     """
     _alive(store)
+    if store.space != DEFAULT_SPACE:
+        raise ChecklistError(
+            "К проду применяет только УК: указатель прода один на всю сеть. "
+            "В пространстве партнёра доступ в боте задаётся галочкой «в боте»"
+        )
     карточка, издание, вопросов = _fit_for_inspections(store)
     прежний = applied(store.root)
     point_prod_at(store)
@@ -586,10 +611,16 @@ def _settle_inherited(store: Store) -> None:
     старый смысл, а он читается от указателя — и включение второго чек-листа
     молча сняло бы с бота первый. Поэтому до первой записи прежнее положение
     фиксируется у всех явным значением.
+
+    Только в своём пространстве (Review Н18): иначе решение партнёра по своему
+    чек-листу дописывало бы карточки эталона УК и соседних партнёров — правка
+    не должна уходить дальше пространства, из которого пришла.
     """
     в_проде = applied(store.root)
     карточки = []
     for space, code in known(store.root):
+        if space != store.space:
+            continue
         свой = replace(store, space=space, code=code)
         карточка = read_meta(свой)
         if карточка is None:

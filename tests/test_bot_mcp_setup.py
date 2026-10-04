@@ -97,7 +97,6 @@ SETTINGS = BotSettings(
     mode="polling",
     auditor_names={},
     mcp_owner_id=AUDITOR_ID,
-    mcp_tenant="default",
 )
 
 #: Тот же стенд, но круг на нём не назначен: настройка не доступна никому.

@@ -12,10 +12,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
-from src.domain.tenants import HQ_TENANT, canonical_tenant
-
 from .errors import BotConfigError, BotTextError
-from .invites import INVITES_VAR, Invite, parse_invites
 from .texts import DEFAULT_UI_LANG, UI_LANG_VAR, default_ui_lang
 
 # Подавление ниже: S105 видит «TOKEN» в имени и считает строку зашитым секретом.
@@ -38,19 +35,6 @@ AUDITOR_NAMES_VAR = "AUDITOR_NAMES"
 #: оставляет выяснять по молчащему пункту меню.
 MCP_OWNER_ID_VAR = "BOT_MCP_OWNER_ID"
 
-#: Чью историю проверок открывают токены, выпущенные ЭТИМ ботом. Тот же
-#: вопрос, на который у токенов из `.env` отвечает запись «арендатор=токен»
-#: (`src/mcp/config.py`), — и отвечает на него по-прежнему развёртывание, а не
-#: человек в чате: арендатор, названный тем, кто просит доступ, это не граница
-#: арендаторов, а её отсутствие.
-MCP_TENANT_VAR = "BOT_MCP_TENANT"
-
-#: Арендатор по умолчанию — ровно тот, под которым этот же бот сливает
-#: проверки (`src.domain.state.DEFAULT_TENANT`, `src.db.push.DEFAULT_TENANT`).
-#: Это не догадка, а то же самое значение: функций мультиарендности в MVP нет
-#: (решение D005), и токен, открывающий что-то другое, не открывал бы ничего.
-#: Стенд, сменивший арендатора проверок, обязан сменить и этот.
-DEFAULT_MCP_TENANT = HQ_TENANT
 #: Язык интерфейса до начала проверки (T131). Имя и разбор живут в `texts.py`,
 #: рядом с самим каталогом языков, — здесь только проверка на старте.
 
@@ -80,11 +64,6 @@ class BotSettings:
     #: открыт. Умолчание «пускать всех» здесь было бы худшим из возможных —
     #: забытая переменная раздавала бы историю проверок партнёров.
     mcp_owner_id: int | None = None
-    #: Чью историю открывают выпущенные этим ботом токены.
-    mcp_tenant: str = DEFAULT_MCP_TENANT
-    #: Кого ждём по юзернейму, пока его числовой ID неизвестен (#230). Пустая
-    #: карта — законное состояние: стенд, куда никого не приглашают.
-    invites: Mapping[str, Invite] = field(default_factory=dict)
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -116,23 +95,17 @@ def _parse_allowed_ids(raw: str) -> frozenset[int]:
     return frozenset(ids)
 
 
-def _parse_auditor_names(
-    raw: str, allowed_ids: frozenset[int], *, invited: bool = False
-) -> dict[int, str]:
+def _parse_auditor_names(raw: str) -> dict[int, str]:
     """Разобрать карту «ID:имя» через запятую.
 
     Кривая запись — отказ на старте, а не пропуск: пропущенная строка означала
     бы, что в отчёт партнёру молча уедет имя из профиля Telegram, и заметить
-    это можно только по готовому отчёту. По той же причине отвергается ID,
-    которого нет в списке разрешённых: две разъезжающиеся копии списка — то,
-    из-за чего имя перестаёт подставляться без единого сообщения об ошибке.
+    это можно только по готовому отчёту.
 
-    **Приглашения снимают эту сверку, пока они заданы (#230).** ID
-    приглашённого до его первого сообщения не знает никто — ни стенд, ни бот, —
-    поэтому список разрешённых перестаёт быть полным перечнем тех, чьё имя
-    уместно назвать. Проверять по неполному списку означало бы отказывать
-    старту из-за верной записи. Как только приглашений нет, прежняя гарантия
-    возвращается целиком.
+    Сверки со списком разрешённых ID больше нет (D286): человек, привязавший
+    бота к учётке через веб, в `ALLOWED_TELEGRAM_IDS` не входит, а назвать его
+    в шапке отчёта уместно. Список разрешённых перестал быть перечнем всех,
+    кто работает ботом.
     """
     names: dict[int, str] = {}
     for chunk in raw.split(","):
@@ -152,11 +125,6 @@ def _parse_auditor_names(
             )
         if not value:
             raise BotConfigError(f"{AUDITOR_NAMES_VAR}: у ID {key} пустое имя")
-        if not invited and int(key) not in allowed_ids:
-            raise BotConfigError(
-                f"{AUDITOR_NAMES_VAR}: ID {key} не входит в {ALLOWED_IDS_VAR}. "
-                f"Имя без доступа никогда не подставится"
-            )
         names[int(key)] = value
     return names
 
@@ -190,16 +158,6 @@ def _parse_mcp_owner_id(raw: str, allowed_ids: frozenset[int]) -> int | None:
     return owner
 
 
-def _parse_mcp_tenant(raw: str) -> str:
-    """Арендатор, чью историю открывают выпущенные ботом токены.
-
-    Пусто — тот же арендатор, под которым этот бот сливает проверки. Это не
-    подстановка догадки: другого арендатора у проверок MVP не бывает (D005), и
-    токен, открывающий что-то ещё, открывал бы пустоту.
-    """
-    return canonical_tenant(raw) or DEFAULT_MCP_TENANT
-
-
 def _parse_ui_lang(env: Mapping[str, str]) -> str:
     """Язык интерфейса стенда — или отказ на старте (T131).
 
@@ -224,10 +182,7 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         raise BotConfigError(
             f"Режим «{mode}» ({MODE_VAR}) не поддержан. Доступно: {', '.join(KNOWN_MODES)}"
         )
-    invites = parse_invites(src.get(INVITES_VAR) or "")
-    names = _parse_auditor_names(
-        src.get(AUDITOR_NAMES_VAR) or "", allowed_ids, invited=bool(invites)
-    )
+    names = _parse_auditor_names(src.get(AUDITOR_NAMES_VAR) or "")
     return BotSettings(
         token=token,
         allowed_ids=allowed_ids,
@@ -235,6 +190,4 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         ui_lang=_parse_ui_lang(src),
         auditor_names=names,
         mcp_owner_id=_parse_mcp_owner_id(src.get(MCP_OWNER_ID_VAR) or "", allowed_ids),
-        invites=invites,
-        mcp_tenant=_parse_mcp_tenant(src.get(MCP_TENANT_VAR) or ""),
     )

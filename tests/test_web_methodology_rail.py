@@ -27,17 +27,23 @@ def хранилище(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> metho
 
 def test_колонка_в_работе_раньше_черновиков_снятые_в_конце(хранилище: method.Store) -> None:
     # Arrange — в проде bizdev; черновик «rnd» и снятый «old».
-    method.checklists_overview(хранилище)
+    method.checklists_overview(хранилище, tenant="HQ")
     for код, имя in (("rnd", "Аудит РНД"), ("old", "Старый")):
         method.create_checklist(
             хранилище, tenant="default", author="t", code=код, name_ru=имя, name_en=имя
         )
     method.set_checklist_state(
-        хранилище, tenant="default", author="t", code="old", state=method.RETIRED
+        хранилище,
+        tenant="default",
+        author="t",
+        code="old",
+        space=None,
+        lang="ru",
+        state=method.RETIRED,
     )
 
     # Act
-    строки = method.checklist_rail(хранилище)
+    строки = method.checklist_rail(хранилище, tenant="HQ")
 
     # Assert
     assert [r.code for r in строки] == ["bizdev", "rnd", "old"]
@@ -49,14 +55,14 @@ def test_колонка_в_работе_раньше_черновиков_сня
 
 def test_битый_чек_лист_не_роняет_колонку(хранилище: method.Store) -> None:
     """Испорченные ставки одного чек-листа — «—» в его строке, а не 500 всего экрана."""
-    method.checklists_overview(хранилище)
+    method.checklists_overview(хранилище, tenant="HQ")
     method.create_checklist(
         хранилище, tenant="default", author="t", code="rnd", name_ru="РНД", name_en="RnD"
     )
     for ставки in (хранилище.root / "hq" / "rnd").rglob("scoring.json"):
         ставки.write_text("{ не json", encoding="utf-8")
 
-    строки = {r.code: r for r in method.checklist_rail(хранилище)}
+    строки = {r.code: r for r in method.checklist_rail(хранилище, tenant="HQ")}
 
     assert строки["rnd"].items is None
     assert строки["bizdev"].items and строки["bizdev"].items > 0

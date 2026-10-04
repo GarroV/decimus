@@ -28,6 +28,7 @@ from src.db import move, previews, queries, reports, retract
 from src.db.config import load_retraction_settings
 from src.db.errors import DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
+from src.db.reach import Reach
 from src.domain.models import TEXT_LANGS
 from src.report import info_titles
 from src.report.letters import LetterError
@@ -67,15 +68,15 @@ def retraction_available() -> bool:
     return True
 
 
-def load_registry(*, tenant: str, limit: int) -> Registry:
+def load_registry(*, reach: Reach, limit: int) -> Registry:
     """Проверки тенанта, свежие по дате обхода — первыми."""
     if retraction_available():
         try:
-            rows = queries.list_inspections(tenant=tenant, limit=limit, include_retracted=True)
+            rows = queries.list_inspections(reach=reach, limit=limit, include_retracted=True)
             return Registry(rows=tuple(rows), retracted_visible=True)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
-    rows = queries.list_inspections(tenant=tenant, limit=limit)
+    rows = queries.list_inspections(reach=reach, limit=limit)
     return Registry(rows=tuple(rows), retracted_visible=False)
 
 
@@ -95,7 +96,7 @@ def _log_admin_read_failed(where: str, exc: DbError) -> None:
     )
 
 
-def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
+def load_card(inspection_id: str, *, reach: Reach) -> InspectionDetail | None:
     """Проверка целиком: шапка, разбивка оценки, находки, информационная часть.
 
     `None` — проверки у тенанта нет. Тем же `None` отвечает снятая проверка,
@@ -104,10 +105,10 @@ def load_card(inspection_id: str, *, tenant: str) -> InspectionDetail | None:
     """
     if retraction_available():
         try:
-            return queries.get_inspection(inspection_id, tenant=tenant, include_retracted=True)
+            return queries.get_inspection(inspection_id, reach=reach, include_retracted=True)
         except DbError as exc:
             _log_admin_read_failed("карточка проверки", exc)
-    return queries.get_inspection(inspection_id, tenant=tenant)
+    return queries.get_inspection(inspection_id, reach=reach)
 
 
 #: Языки, на которых письмо вообще может быть собрано. Берутся у МЕТОДИКИ
@@ -212,39 +213,39 @@ def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Ret
     return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
 
 
-def load_geography(*, tenant: str) -> dict[str, tuple[str, str]]:
+def load_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
     """География точек `{название: (страна, город)}` — для отбора реестра.
 
     Отказ базы здесь — не повод не показать реестр: без географии отбор по
     стране и городу просто не предлагается, а список проверок остаётся.
     """
     try:
-        return queries.unit_geography(tenant=tenant)
+        return queries.unit_geography(reach=reach)
     except DbError as exc:
         logger.warning("география точек недоступна, отбор по месту не показан: %s", exc)
         return {}
 
 
-def load_item_usage(*, tenant: str, code: str, checklist: str) -> ItemUsage | None:
+def load_item_usage(*, reach: Reach, code: str, checklist: str) -> ItemUsage | None:
     """Как часто пункт нарушают — для панели «Методики» (D197). `None` — база молчит.
 
     Сводка — подсказка к правке, а не часть методики: без неё пункт правится
     так же, поэтому отказ базы не роняет экран, а называется на нём строкой.
     """
     try:
-        return queries.item_usage(tenant=tenant, code=code, checklist=checklist)
+        return queries.item_usage(reach=reach, code=code, checklist=checklist)
     except DbError as exc:
         logger.warning("сводка пункта %s недоступна: %s", code, exc)
         return None
 
 
-def load_edition_since(*, tenant: str, version: str) -> date | None:
+def load_edition_since(*, reach: Reach, version: str) -> date | None:
     """С какого дня сборка в работе — для справки карточки (D218). `None` — база молчит.
 
     Справка — подсказка, а не документ: отказ базы карточку не роняет.
     """
     try:
-        return queries.edition_first_used(tenant=tenant, version=version)
+        return queries.edition_first_used(reach=reach, version=version)
     except DbError as exc:
         logger.warning("первая проверка по сборке %s недоступна: %s", version, exc)
         return None
@@ -273,16 +274,17 @@ def move_card(
     )
 
 
-def load_moves(inspection_id: str, *, tenant: str) -> tuple[move.MoveRecord, ...]:
+def load_moves(inspection_id: str, *, reach: Reach) -> tuple[move.MoveRecord, ...]:
     """История переносов карточки, свежие первыми."""
-    return move.list_moves(inspection_id, tenant=tenant)
+    return move.list_moves(inspection_id, reach=reach)
 
 
-def load_units(*, tenant: str) -> tuple[tuple[str, str], ...]:
+def load_units(*, reach: Reach) -> tuple[tuple[str, str], ...]:
     """Пиццерии справочника для выбора при переносе: `(id, название)` по алфавиту."""
     return tuple(
         sorted(
-            ((ид, имя) for имя, ид in queries.unit_ids(tenant=tenant).items()), key=lambda x: x[1]
+            ((ид, имя) for имя, ид in queries.unit_ids(reach=reach).items()),
+            key=lambda x: x[1],
         )
     )
 
@@ -305,14 +307,16 @@ def saved_letter(
 
 
 def remember_letter(
-    inspection_id: str, *, body: str, lang: str, saved_by: str
+    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
 ) -> letters_store.SavedLetter:
     """Зафиксировать письмо так, как его подтвердил человек.
 
     Своей проверки текста здесь нет ни строки — она в `src/db/letters.py`, там
     же, где запись. Вторая копия правил разошлась бы с первой молча.
     """
-    return letters_store.save_letter(inspection_id, body=body, lang=lang, saved_by=saved_by)
+    return letters_store.save_letter(
+        inspection_id, tenant=tenant, body=body, lang=lang, saved_by=saved_by
+    )
 
 
 @dataclass(frozen=True)
@@ -349,9 +353,9 @@ def load_info(detail: InspectionDetail, *, lang: str) -> tuple[tuple[InfoLine, .
     return строки, исход
 
 
-def load_report(inspection_id: str, *, tenant: str) -> reports.ReportRef | None:
+def load_report(inspection_id: str, *, reach: Reach) -> reports.ReportRef | None:
     """Последний сохранённый PDF проверки (D204) — ссылка, без самого файла."""
-    return reports.latest_report(inspection_id, tenant=tenant)
+    return reports.latest_report(inspection_id, reach=reach)
 
 
 def report_bytes(ref: reports.ReportRef) -> bytes:
@@ -359,11 +363,11 @@ def report_bytes(ref: reports.ReportRef) -> bytes:
     return reports.fetch_report(ref)
 
 
-def load_previews(inspection_id: str, *, tenant: str) -> dict[str, tuple[str, ...]]:
+def load_previews(inspection_id: str, *, reach: Reach) -> dict[str, tuple[str, ...]]:
     """Кадры со сжатой копией по записям проверки (D219)."""
-    return previews.finding_previews(inspection_id, tenant=tenant)
+    return previews.finding_previews(inspection_id, reach=reach)
 
 
-def preview_bytes(inspection_id: str, photo_id: str, *, tenant: str) -> bytes | None:
+def preview_bytes(inspection_id: str, photo_id: str, *, reach: Reach) -> bytes | None:
     """Сжатая копия одного кадра — или `None`, если её у этой проверки нет."""
-    return previews.preview_bytes(inspection_id, photo_id, tenant=tenant)
+    return previews.preview_bytes(inspection_id, photo_id, reach=reach)

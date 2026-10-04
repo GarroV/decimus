@@ -163,7 +163,7 @@
    `data-mx-open`: подмена слоя панели не обновила бы ни колонку, ни шапку,
    ни список пунктов (`methodology.js`). #}
 {% macro rail_row(r) %}
-  <a class="mx-rail__row{% if r.code == checklist_code %} is-on{% endif %}" href="{{ url_for('methodology', checklist=r.code, lang=lang) }}"{% if r.code == checklist_code %} aria-current="page"{% endif %}>
+  <a class="mx-rail__row{% if r.code == checklist_code %} is-on{% endif %}" href="{{ url_for('methodology', checklist=r.code, space=(r.space if r.space != own_space else None), lang=lang) }}"{% if r.code == checklist_code %} aria-current="page"{% endif %}>
     <span class="mx-rail__name">{{ r.name_ru if lang == 'ru' else (r.name_en or r.name_ru) }}</span>
     <span class="mx-rail__meta">{{ r.items if r.items is not none else '—' }} · {{ t('checklists.state.' ~ r.state) }}{% if r.in_bot %}<span class="mx-rail__bot-mark" title="{{ t('methodology.rail.bot_mark') }}">{{ icon('tg') }}<span class="mx-sr">{{ t('methodology.rail.bot_mark') }}</span></span>{% endif %}</span>
   </a>
@@ -225,7 +225,7 @@
         <div class="pick__menu" role="menu">
           {% for c in checklists %}
             <a class="pick__item{% if c.code == checklist_code %} is-on{% endif %}" role="menuitem"
-               href="{{ url_for('methodology', checklist=c.code, lang=lang) }}">
+               href="{{ url_for('methodology', checklist=c.code, space=(c.space if c.space != own_space else None), lang=lang) }}">
               <span class="pick__label">{{ c.name_ru if lang == 'ru' else (c.name_en or c.name_ru) }}
                 <span class="mx-muted mono">{{ c.code }} · {{ t('checklists.state.' ~ c.state) }}</span></span>
               {% if c.code == checklist_code %}<span class="pick__mark" aria-hidden="true">✓</span>{% endif %}
@@ -663,7 +663,9 @@
                     <span class="mx-botlist__stuck">{{ t('methodology.bot.stuck', why=t('methodology.bot.why.' ~ r.bot_block)) }}</span>
                   {% endif %}
                 </div>
-                {% if r.wants_bot or not r.bot_block %}
+                {# Переключатель — только у чек-листа своего пространства: эталон у
+                   партнёра и чек-лист партнёра у УК — только чтение (D283). #}
+                {% if r.space == own_space and (r.wants_bot or not r.bot_block) %}
                   <form method="post" action="{{ action('methodology_bot', code=r.code) }}">
                     <input type="hidden" name="on" value="{{ '0' if r.wants_bot else '1' }}">
                     <button type="submit" class="mx-toggle{% if r.wants_bot %} is-on{% endif %}" role="switch" aria-checked="{{ 'true' if r.wants_bot else 'false' }}"
@@ -672,6 +674,9 @@
                       <span class="mx-toggle__text">{{ t('methodology.bot.on') if r.wants_bot else t('methodology.bot.off') }}</span>
                     </button>
                   </form>
+                {% elif r.space != own_space %}
+                  {# Чужое — без переключателя, но с состоянием: читать его можно. #}
+                  <span class="mx-botlist__why">{{ t('methodology.bot.on') if r.in_bot else t('methodology.bot.off') }}</span>
                 {% else %}
                   <span class="mx-botlist__why" title="{{ t('methodology.bot.why.' ~ r.bot_block ~ '.hint') }}">{{ t('methodology.bot.why.' ~ r.bot_block) }}</span>
                 {% endif %}

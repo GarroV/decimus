@@ -1,196 +1,241 @@
-"""Доступ по списку разрешённых Telegram ID.
+"""Доступ бота по привязке к учётке (D286), совместимость для действующих (вопрос 2).
 
-`docs/furca/blocks/bot.md`: «Отвечает только Telegram ID из списка разрешённых;
-чужому не отвечает ничего осмысленного» (T050).
+Пространство человека — из привязки его Telegram ID к учётке; ID из окружения
+и связки `roster.json` — сотрудник УК, но только пока привязки нет.
 """
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
-from aiogram.types import Chat, Message, TelegramObject, Update, User
+from aiogram.methods import SendMessage
+from aiogram.types import Chat, Message, TelegramObject, User
+from bot_harness import RecordingSession, make_bot
 
-from src.bot.access import AccessMiddleware, is_allowed
-from src.bot.invites import StaticInvites, parse_invites
+from src.bot.access import (
+    BINDING_STALE_MAX,
+    SPACE_KEY,
+    AccessMiddleware,
+    BindingCache,
+    is_allowed,
+)
 from src.bot.roster import Roster
+from src.db.bot_links import NEVER_BOUND, Binding, Standing
+from src.db.errors import AccessError
+from src.domain.tenants import HQ_TENANT
+
+pytestmark = pytest.mark.asyncio
 
 
-def _user(user_id: int) -> User:
-    return User(id=user_id, is_bot=False, first_name="Т")
+def _msg(user_id: int, text: str = "привет") -> tuple[Message, RecordingSession]:
+    bot, session = make_bot()
+    message = Message(
+        message_id=1,
+        date=datetime.now(UTC),
+        chat=Chat(id=user_id, type="private"),
+        from_user=User(id=user_id, is_bot=False, first_name="Т"),
+        text=text,
+    ).as_(bot)
+    return message, session
 
 
-def test_allowed_id_passes() -> None:
-    assert is_allowed(111, frozenset({111, 222})) is True
+def _привязка(tg: int, tenant: str) -> Binding:
+    return Binding(
+        telegram_id=tg, user_id="u", login="anna", tenant=tenant, bound_at=datetime.now(UTC)
+    )
 
 
-def test_unknown_id_is_rejected() -> None:
-    assert is_allowed(999, frozenset({111, 222})) is False
+async def _пустить(mw: AccessMiddleware, event: TelegramObject) -> str | None:
+    """Пространство, с которым апдейт дошёл до обработчика, — или `None`, если не дошёл."""
+    увидено: list[dict[str, Any]] = []
+
+    async def handler(_e: TelegramObject, data: dict[str, Any]) -> None:
+        увидено.append(dict(data))
+
+    await mw(handler, event, {})
+    return увидено[0][SPACE_KEY] if увидено else None
 
 
-def test_no_user_is_rejected() -> None:
+def _положение(привязка: Binding | None) -> Standing:
+    return NEVER_BOUND if привязка is None else Standing.live(привязка)
+
+
+def _кэш(ответы: dict[int, Binding | None], **настройки: Any) -> BindingCache:
+    return BindingCache(standing=lambda tg: _положение(ответы.get(tg)), **настройки)
+
+
+def _пространство(кэш: BindingCache, tg: int) -> str | None:
+    положение = кэш.standing_of(tg)
+    return None if положение is None or положение.binding is None else положение.binding.tenant
+
+
+def _ответы(session: RecordingSession) -> list[str]:
+    return [c.text for c in session.calls if isinstance(c, SendMessage)]
+
+
+async def test_no_user_is_rejected() -> None:
     """Обновление без отправителя (например, служебное) — не пропускаем."""
     assert is_allowed(None, frozenset({111})) is False
 
 
-@pytest.mark.asyncio
-async def test_middleware_calls_handler_for_allowed_user() -> None:
-    middleware = AccessMiddleware(allowed_ids=frozenset({111}))
-    called_with: list[TelegramObject] = []
+async def test_привязанный_работает_в_пространстве_учётки() -> None:
+    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "GE")}), None)
+    assert await _пустить(mw, _msg(501)[0]) == "GE"
 
-    async def handler(event: TelegramObject, data: dict[str, Any]) -> str:
-        called_with.append(event)
-        return "handled"
 
-    message = Message(
-        message_id=1,
-        date=0,  # type: ignore[arg-type]
-        chat=Chat(id=111, type="private"),
-        from_user=_user(111),
-        text="привет",
+async def test_незнакомому_бот_молчит() -> None:
+    mw = AccessMiddleware(frozenset(), _кэш({}), None)
+    message, session = _msg(999)
+    assert await _пустить(mw, message) is None
+    assert session.calls == [], "постороннему бот ничего не отвечает"
+
+
+async def test_ссылка_привязывает_незнакомого_и_отвечает_в_тот_же_чат() -> None:
+    погашено: list[tuple[str, int]] = []
+
+    def погасить(token: str, *, telegram_id: int) -> Binding | None:
+        погашено.append((token, telegram_id))
+        return _привязка(telegram_id, "GE")
+
+    mw = AccessMiddleware(frozenset(), _кэш({}), None, redeem=погасить)
+    message, session = _msg(501, "/start link-abc")
+    assert await _пустить(mw, message) is None, "ссылка обработчику не передаётся"
+    assert погашено == [("abc", 501)]
+    assert len(_ответы(session)) == 1 and "anna" in _ответы(session)[0]
+
+
+async def test_негодная_ссылка_не_пускает_и_не_объясняет_причину() -> None:
+    mw = AccessMiddleware(frozenset(), _кэш({}), None, redeem=lambda *_a, **_k: None)
+    message, session = _msg(501, "/start link-abc")
+    assert await _пустить(mw, message) is None
+    assert len(_ответы(session)) == 1
+
+
+async def test_обычный_старт_не_гасит_ссылок() -> None:
+    def погасить(*_a: object, **_k: object) -> Binding | None:
+        raise AssertionError("обычный /start не ссылка привязки")
+
+    mw = AccessMiddleware(frozenset({111}), _кэш({}), None, redeem=погасить)
+    assert await _пустить(mw, _msg(111, "/start")[0]) == HQ_TENANT
+
+
+async def test_совместимость_пускает_действующих_аудиторов_уК(tmp_path: Path) -> None:
+    mw = AccessMiddleware(frozenset({111}), _кэш({}), Roster.load(tmp_path))
+    assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+
+
+async def test_связки_по_приглашениям_пускают_как_уК(tmp_path: Path) -> None:
+    path = tmp_path / "access" / "roster.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '{"version": 1, "entries": [{"telegram_id": 222, "username": "apetrov"}]}',
+        encoding="utf-8",
     )
-    result = await middleware(handler, message, {})
-    assert result == "handled"
-    assert called_with == [message]
+    mw = AccessMiddleware(frozenset({111}), _кэш({}), Roster.load(tmp_path))
+    assert await _пустить(mw, _msg(222)[0]) == HQ_TENANT
 
 
-@pytest.mark.asyncio
-async def test_middleware_drops_update_for_stranger() -> None:
-    """Чужому бот не должен отвечать ничего осмысленного: хендлер не зовётся."""
-    middleware = AccessMiddleware(allowed_ids=frozenset({111}))
-    calls = 0
+async def test_привязка_главнее_совместимости() -> None:
+    """Review Focus 3: ID из окружения, привязанный к учётке партнёра, работает как партнёр."""
+    mw = AccessMiddleware(frozenset({111}), _кэш({111: _привязка(111, "GE")}), None)
+    assert await _пустить(mw, _msg(111)[0]) == "GE"
 
-    async def handler(event: TelegramObject, data: dict[str, Any]) -> str:
-        nonlocal calls
-        calls += 1
-        return "handled"
 
-    message = Message(
-        message_id=1,
-        date=0,  # type: ignore[arg-type]
-        chat=Chat(id=999, type="private"),
-        from_user=_user(999),
-        text="привет",
+async def test_старый_код_тенанта_учётки_читается_как_уК() -> None:
+    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "default")}), None)
+    assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
+
+
+async def test_отвязка_действует_после_истечения_кэша() -> None:
+    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
+    ответы: dict[int, Binding | None] = {501: _привязка(501, "GE")}
+    кэш = _кэш(ответы, ttl=timedelta(seconds=60), now=lambda: сейчас[0])
+    assert _пространство(кэш, 501) == "GE"
+    ответы[501] = None
+    assert _пространство(кэш, 501) == "GE", "в пределах срока кэша — прежний ответ"
+    сейчас[0] += timedelta(seconds=61)
+    assert _пространство(кэш, 501) is None
+
+
+async def test_погашенная_ссылка_сбрасывает_кэш() -> None:
+    """Партнёр, привязавшийся заново, работает в новом пространстве сразу, без минуты ожидания."""
+    ответы: dict[int, Binding | None] = {111: None}
+    кэш = _кэш(ответы)
+
+    def погасить(_token: str, *, telegram_id: int) -> Binding | None:
+        ответы[telegram_id] = _привязка(telegram_id, "GE")
+        return ответы[telegram_id]
+
+    mw = AccessMiddleware(frozenset({111}), кэш, None, redeem=погасить)
+    assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+    await _пустить(mw, _msg(111, "/start link-abc")[0])
+    assert await _пустить(mw, _msg(111)[0]) == "GE"
+
+
+def _кэш_с_отказом(сейчас: list[datetime], живая: list[bool]) -> BindingCache:
+    def standing(tg: int) -> Standing:
+        if not живая[0]:
+            raise AccessError("база недоступна")
+        return _положение(_привязка(tg, "GE") if tg == 501 else None)
+
+    return BindingCache(standing=standing, ttl=timedelta(seconds=60), now=lambda: сейчас[0])
+
+
+async def test_при_коротком_отказе_базы_узнанный_работает_незнакомый_нет() -> None:
+    """Вопрос 3: аудитор на точке не остаётся без бота из-за короткого сбоя базы."""
+    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
+    живая = [True]
+    кэш = _кэш_с_отказом(сейчас, живая)
+    assert _пространство(кэш, 501) == "GE"
+    живая[0] = False
+    сейчас[0] += BINDING_STALE_MAX - timedelta(seconds=1)
+    assert _пространство(кэш, 501) == "GE"
+    assert кэш.standing_of(777) is None
+
+
+async def test_долгий_отказ_базы_прежнего_ответа_не_продлевает() -> None:
+    """Ревью #340, п.6: отключённая за время сбоя учётка не работает ботом дальше."""
+    сейчас = [datetime(2026, 9, 30, tzinfo=UTC)]
+    живая = [True]
+    кэш = _кэш_с_отказом(сейчас, живая)
+    assert _пространство(кэш, 501) == "GE"
+    живая[0] = False
+    сейчас[0] += BINDING_STALE_MAX
+    assert кэш.standing_of(501) is None
+    mw = AccessMiddleware(frozenset({501}), кэш, None)
+    assert await _пустить(mw, _msg(501)[0]) is None, "и совместимость не подхватывает"
+
+
+async def test_при_отказе_базы_совместимость_не_пускает_несверенного() -> None:
+    """Был ли этот ID привязан и отвязан — без базы не узнать, поэтому отказ."""
+    mw = AccessMiddleware(frozenset({111}), _кэш_с_отказом([datetime.now(UTC)], [False]), None)
+    assert await _пустить(mw, _msg(111)[0]) is None
+
+
+@pytest.mark.parametrize("откуда", ["окружение", "связки"])
+async def test_бывшая_привязка_закрывает_путь_совместимости(откуда: str, tmp_path: Path) -> None:
+    """Ревью #340, п.5: отвязанный или с отключённой учёткой не пускается как УК."""
+    path = tmp_path / "access" / "roster.json"
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '{"version": 1, "entries": [{"telegram_id": 111, "username": "apetrov"}]}',
+        encoding="utf-8",
     )
-    result = await middleware(handler, message, {})
-    assert result is None
-    assert calls == 0
+    разрешённые = frozenset({111}) if откуда == "окружение" else frozenset()
+    кэш = BindingCache(standing=lambda _tg: Standing(binding=None, ever_bound=True))
+    mw = AccessMiddleware(разрешённые, кэш, Roster.load(tmp_path))
+    assert await _пустить(mw, _msg(111)[0]) is None
 
 
-@pytest.mark.asyncio
-async def test_middleware_ignores_non_user_events() -> None:
-    """Событие без `from_user` (например, канал) — тоже не зовёт хендлер и не падает."""
-    middleware = AccessMiddleware(allowed_ids=frozenset({111}))
-
-    async def handler(event: TelegramObject, data: dict[str, Any]) -> str:
-        return "handled"
-
-    update = Update(update_id=1)
-    result = await middleware(handler, update, {})
-    assert result is None
-
-
-# --- привод по юзернейму (#230) ---------------------------------------------
-#
-# Числовой ID нового аудитора неоткуда взять заранее, поэтому стенд называет
-# юзернеймы, а ID бот узнаёт при первом контакте и дальше держится за него.
-
-
-def _named(user_id: int, username: str | None) -> User:
-    return User(id=user_id, is_bot=False, first_name="Т", username=username)
-
-
-def _message_from(user: User) -> Message:
-    return Message(
-        message_id=1,
-        date=0,  # type: ignore[arg-type]
-        chat=Chat(id=user.id, type="private"),
-        from_user=user,
-        text="/start",
-    )
-
-
-async def _passes(middleware: AccessMiddleware, user: User) -> bool:
-    async def handler(event: TelegramObject, data: dict[str, Any]) -> str:
-        return "handled"
-
-    return await middleware(handler, _message_from(user), {}) == "handled"
-
-
-def _middleware(
-    tmp_path: Path, invites: str, allowed: frozenset[int] = frozenset()
-) -> tuple[AccessMiddleware, Roster]:
-    roster = Roster.load(tmp_path)
-    return (
-        AccessMiddleware(
-            allowed_ids=allowed,
-            invites=StaticInvites(parse_invites(invites)),
-            roster=roster,
-        ),
-        roster,
-    )
-
-
-@pytest.mark.asyncio
-async def test_invited_user_is_recognised_on_first_contact(tmp_path: Path) -> None:
-    """Клик по «старту» — и человек внутри: ID взят из этого же апдейта."""
-    middleware, roster = _middleware(tmp_path, "apetrov:Anna Petrova")
-
-    assert await _passes(middleware, _named(555000111, "apetrov")) is True
-    assert roster.knows(555000111) is True
-    assert roster.names() == {555000111: "Anna Petrova"}
-
-
-@pytest.mark.asyncio
-async def test_recognised_user_passes_by_id_after_changing_username(tmp_path: Path) -> None:
-    """Дальше ключ — число: смена юзернейма доступа не отнимает."""
-    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
-    await _passes(middleware, _named(555000111, "apetrov"))
-
-    assert await _passes(middleware, _named(555000111, "anna_new")) is True
-
-
-@pytest.mark.asyncio
-async def test_released_username_does_not_let_a_stranger_in(tmp_path: Path) -> None:
-    """Главный тест задачи: приглашение срабатывает ОДИН раз.
-
-    Юзернейм владелец отпускает, и его занимает кто угодно. Если бы
-    приглашение работало повторно, посторонний с чужим бывшим юзернеймом
-    получил бы отчёты партнёров и историю проверок.
-    """
-    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
-    await _passes(middleware, _named(555000111, "apetrov"))
-
-    assert await _passes(middleware, _named(999999, "apetrov")) is False
-
-
-@pytest.mark.asyncio
-async def test_invitation_is_matched_case_insensitively(tmp_path: Path) -> None:
-    middleware, _ = _middleware(tmp_path, "@Ivanov:Ivan Ivanov")
-
-    assert await _passes(middleware, _named(222, "IVANOV")) is True
-
-
-@pytest.mark.asyncio
-async def test_user_without_username_is_not_let_in(tmp_path: Path) -> None:
-    """Юзернейма нет — сверять нечего, и это не повод пускать."""
-    middleware, _ = _middleware(tmp_path, "apetrov:Anna Petrova")
-
-    assert await _passes(middleware, _named(333, None)) is False
-
-
-@pytest.mark.asyncio
-async def test_stranger_with_unknown_username_stays_silent(tmp_path: Path) -> None:
-    middleware, roster = _middleware(tmp_path, "apetrov:Anna Petrova")
-
-    assert await _passes(middleware, _named(444, "somebody")) is False
-    assert roster.knows(444) is False
-
-
-@pytest.mark.asyncio
-async def test_configured_id_still_passes_without_any_invites(tmp_path: Path) -> None:
-    """Прежняя дверь не тронута: ID из `ALLOWED_TELEGRAM_IDS` работает как раньше."""
-    middleware, _ = _middleware(tmp_path, "", allowed=frozenset({111222333}))
-
-    assert await _passes(middleware, _named(111222333, None)) is True
+async def test_каждый_пуск_по_совместимости_пишется_в_журнал(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    mw = AccessMiddleware(frozenset({111}), _кэш({}), None)
+    with caplog.at_level("WARNING", logger="src.bot.access"):
+        assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+        assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
+    строки = [r.getMessage() for r in caplog.records if "совместимости" in r.getMessage()]
+    assert строки == ["путь совместимости: Telegram ID 111 пущен как УК (ALLOWED_TELEGRAM_IDS)"] * 2

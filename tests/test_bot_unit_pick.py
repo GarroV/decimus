@@ -62,7 +62,7 @@ def test_недоступный_справочник_не_останавлива
     monkeypatch.setattr(unit_pick.directory, "list_units", лежит)
 
     # Act / Assert
-    assert match_unit("Тбилиси-1").checked is False
+    assert match_unit("Тбилиси-1", tenant="HQ").checked is False
 
 
 def test_кириллица_находит_точку_базы_записанную_латиницей() -> None:

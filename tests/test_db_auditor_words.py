@@ -42,12 +42,15 @@ psycopg = pytest.importorskip("psycopg")
 from src.db.fingerprint import compute_fingerprint  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
 from src.db.queries import findings_by_unit, get_inspection  # noqa: E402
+from src.db.reach import own_reach  # noqa: E402
 from src.domain import add_finding, get_state, start_inspection  # noqa: E402
 from src.domain import score as domain_score  # noqa: E402
 
 pytestmark = requires_db
 
-АРЕНДАТОР = "слова"
+# Тенант УК (D234): слив партнёра новую точку не заводит (D284, #471), а
+# наборы заводят точки сливом. Граница пространств — `test_db_reach.py`.
+АРЕНДАТОР = "HQ"
 ТОЧКА = "Белград-1"
 
 #: Речь аудитора не совпадает ни с языком интерфейса, ни с языком отчёта — это
@@ -132,7 +135,7 @@ def test_чтение_по_идентификатору_отдаёт_слова_
     """
     ident = _проверка(1852)
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
 
     assert подробно is not None
     (находка,) = подробно.findings
@@ -149,7 +152,7 @@ def test_находки_точки_тоже_несут_слова(domain_env: Pa
     """
     _проверка(1853)
 
-    (находка,) = findings_by_unit(tenant=АРЕНДАТОР, unit=ТОЧКА)
+    (находка,) = findings_by_unit(reach=own_reach(АРЕНДАТОР), unit=ТОЧКА)
 
     assert находка.words == СЛОВА, "находки точки отданы без слов аудитора"
 
@@ -167,7 +170,7 @@ def test_запись_без_слов_не_выглядит_речью(domain_en
     (запись,) = _строки(db_env, "select words from findings where inspection_id = %s", (ident,))
     assert запись[0] is None, "отсутствие слов записано в базу чем-то, что похоже на речь"
 
-    подробно = get_inspection(ident, tenant=АРЕНДАТОР)
+    подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
     assert подробно is not None
     assert подробно.findings[0].words == "", "пустота отдана не пустой строкой"
 

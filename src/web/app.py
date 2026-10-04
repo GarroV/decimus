@@ -18,19 +18,21 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
-from flask import Flask, redirect, render_template, request, send_file, url_for
+from flask import Flask, abort, redirect, render_template, request, send_file, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import directory
+from src.db import bot_links, directory
 from src.db.errors import DbError, MoveError, RetractionError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
 from . import accounts, assets, auth, letter_draft, pricing, view
@@ -40,12 +42,19 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
-from .config import Settings, load_settings
+from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
-from .sections import SECTIONS, check_registry, current_section, section, visible_sections
+from .sections import (
+    SECTIONS,
+    check_registry,
+    current_section,
+    refused_for,
+    section,
+    visible_sections,
+)
 from .texts import UI_LANGS, lang_or_default, t
 
 logger = logging.getLogger(__name__)
@@ -79,6 +88,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    _install_hq_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -126,7 +136,7 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # панель слева обязана это показывать, как Swarm (D164).
             "current_key": current_section(request.path),
             "icon": icon,
-            "tenant": conf.tenant,
+            "tenant": canonical_tenant(account.tenant) if account else "",
             "current_path": request.path,
             # Внутренние ссылки собираются ЭТИМ, а не склейкой строк в шаблоне.
             # Снаружи админка может жить под путём общего входа площадки
@@ -235,7 +245,7 @@ def _checklist_names(lang: str) -> dict[str, str]:
     if state.store is None:
         return {}
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused:
         return {}
     return {
@@ -260,7 +270,7 @@ def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
     if state.store is None:
         return {}
     try:
-        состав = method.load_composition(state.store, tenant=conf.tenant)
+        состав = method.load_composition(state.store, tenant=auth.current_tenant())
     except MethodologyRefused:
         return {}
     ключ = "question_ru" if lang == "ru" else "question_en"
@@ -294,7 +304,9 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             period=request.args.get("period", "all").strip()[:8],
             sort=request.args.get("sort", "score").strip()[:8],
         )
-        snapshot = overview_data.load(tenant=conf.tenant, limit=REGISTRY_LIMIT, selection=selection)
+        snapshot = overview_data.load(
+            reach=auth.current_reach(), limit=REGISTRY_LIMIT, selection=selection
+        )
         registry_path = section("registry").path
 
         def отбор(**изменения: str) -> str:
@@ -494,7 +506,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
 
     @app.get(section("country").path, endpoint="country_index")
     def country_index() -> Any:
-        страны = country_data.countries(tenant=conf.tenant)
+        страны = country_data.countries(reach=auth.current_reach())
         if len(страны) == 1:
             # Язык переезжает, только если его выбрали в адресе: иначе
             # переход в единственную страну вешал бы `?lang=` умолчания.
@@ -520,7 +532,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
             sort=request.args.get("sort", "score").strip()[:8],
         )
         вид = country_data.load(
-            tenant=conf.tenant,
+            reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
             code=код,
             selection=selection,
@@ -552,7 +564,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
         # Выбор страны — колонкой слева, как чек-листы в «Методике» (владелец
         # 30.09.2026), а не чипом в отборе. Переход в другую страну сбрасывает
         # весь срез: город и раскрытая точка другой страны дали бы пустоту.
-        страны = country_data.countries(tenant=conf.tenant)
+        страны = country_data.countries(reach=auth.current_reach())
         if вид.snapshot.cities:
             чипы.append(
                 _pick(
@@ -618,12 +630,12 @@ def _register_units(app: Flask, conf: Settings) -> None:
         # запрос по идентификатору — это новая функция слоя базы ради одной
         # строки, и заводить её стоит тогда, когда список станет дорогим.
         точка = next(
-            (u for u in directory.list_units(tenant=conf.tenant) if u.id == unit_id),
+            (u for u in directory.list_units(reach=auth.current_reach()) if u.id == unit_id),
             None,
         )
         if точка is None:
             return render_template("inspections/not_found.html"), 404
-        снимок = unit_data.load(tenant=conf.tenant, unit=точка.name, lang=lang)
+        снимок = unit_data.load(reach=auth.current_reach(), unit=точка.name, lang=lang)
         return render_template(
             "units/card.html",
             data=снимок,
@@ -649,7 +661,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.get(section("registry").path)
     def registry() -> str:
-        registry_data = data.load_registry(tenant=conf.tenant, limit=REGISTRY_LIMIT)
+        registry_data = data.load_registry(reach=auth.current_reach(), limit=REGISTRY_LIMIT)
         # Отбор реестра живёт в адресе ровно по той же причине, что и на
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
@@ -662,7 +674,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         город = request.args.get("city", "").strip()[:80]
         # Поиск из левой панели: часть названия пиццерии, без учёта регистра.
         искомое = request.args.get("q", "").strip()[:80]
-        гео = data.load_geography(tenant=conf.tenant)
+        гео = data.load_geography(reach=auth.current_reach())
 
         def место(row: InspectionRow) -> tuple[str, str]:
             страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
@@ -795,11 +807,11 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         спрашивается ДО файла — она же проверяет арендатора.
         """
         lang = _lang(conf)
-        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
         try:
-            ref = data.load_report(inspection_id, tenant=conf.tenant)
+            ref = data.load_report(inspection_id, reach=auth.current_reach())
             if ref is None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
@@ -828,7 +840,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         if not (_is_uuid(inspection_id) and _is_uuid(photo_id)):
             return "", 404
         try:
-            копия = data.preview_bytes(inspection_id, photo_id, tenant=conf.tenant)
+            копия = data.preview_bytes(inspection_id, photo_id, reach=auth.current_reach())
         except DbError as exc:
             logger.warning("кадр %s проверки %s не выдан: %s", photo_id, inspection_id, exc)
             return "", 503
@@ -845,7 +857,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.get(f"{section('registry').path}/<inspection_id>/letter")
     def letter(inspection_id: str) -> str | tuple[str, int]:
         lang = _lang(conf)
-        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
         # Язык ПИСЬМА — третий язык продукта, и он свой: партнёру пишут на его
@@ -885,6 +897,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
+            own=_own(detail),
             save_outcome=request.args.get("saved"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
@@ -901,9 +914,11 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # ДО того, как что-то отдаётся. Иначе страница выгрузки превратилась
         # бы в готовый способ получить от админки файл с любым присланным
         # текстом по её собственному адресу.
-        head = data.load_card(inspection_id, tenant=conf.tenant)
+        head = data.load_card(inspection_id, reach=auth.current_reach())
         if head is None:
             return render_template("inspections/not_found.html"), 404
+        if not _own(head):
+            return render_template("users/forbidden.html"), 403
         текст = request.form.get("text") or ""
         return _letter_file(текст, inspection_id)
 
@@ -917,9 +932,11 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         без ответа навсегда.
         """
         refuse_foreign_origin()
-        detail = data.load_card(inspection_id, tenant=conf.tenant)
+        detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        if not _own(detail):
+            return render_template("users/forbidden.html"), 403
 
         текст = request.form.get("text") or ""
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
@@ -927,6 +944,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             data.remember_letter(
                 inspection_id,
+                tenant=auth.current_tenant(),
                 body=текст,
                 lang=письмо_на,
                 saved_by="—" if вошедший is None else вошедший.login,
@@ -955,35 +973,111 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     users_path = section("users").path
 
     def _страница_учёток(
-        *, added: accounts.Added | None = None, outcome: str | None = None, code: int = 200
+        *,
+        added: accounts.Added | None = None,
+        outcome: str | None = None,
+        code: int = 200,
+        bot_link: str | None = None,
+        bot_link_until: datetime | None = None,
     ) -> tuple[str, int]:
+        # Перечень людей и форма заведения — только админу УК (D288). Остальные
+        # видят свою строку: вкладка открыта всем ради привязки бота (D286).
+        управляет = _hq_admin_only() is None
+        люди: tuple[accounts.AccountRow, ...] = ()
+        пространства: tuple[str, ...] = ()
+        перечень_известен = True
+        привязки: dict[str, bot_links.Binding] = {}
+        if управляет:
+            try:
+                люди = accounts.everyone(tenant=None)
+                пространства = accounts.spaces()
+                привязки = bot_links.live_bindings()
+            except DbError:
+                # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
+                # вторая была бы молчаливой ложью на экране, где считают людей
+                # с доступом.
+                перечень_известен = False
+        вошедший = auth.current_account()
+        своя_привязка: bot_links.Binding | None = None
+        привязка_известна = True
         try:
-            люди = accounts.everyone(tenant=conf.tenant)
-            перечень_известен = True
+            своя_привязка = bot_links.binding_of(вошедший.id) if вошедший else None
         except DbError:
-            # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и вторая
-            # была бы молчаливой ложью на экране, где считают людей с доступом.
-            люди = ()
-            перечень_известен = False
+            # «Не привязан» и «не смогли узнать» — разные ответы: второй не
+            # предлагает привязать заново то, что, может быть, привязано.
+            привязка_известна = False
         return (
             render_template(
                 "users/index.html",
+                manage=управляет,
                 people=люди,
                 people_known=перечень_известен,
+                spaces=пространства,
                 added=added,
                 outcome=outcome,
                 roles=accounts.ROLES,
                 users_path=users_path,
+                bindings=привязки,
+                own_binding=своя_привязка,
+                own_binding_known=привязка_известна,
+                bot_username=conf.bot_username,
+                bot_link=bot_link,
+                bot_link_until=bot_link_until,
+                bot_var=WEB_BOT_USERNAME_VAR,
             ),
             code,
         )
 
+    def _пространство_из_формы() -> str | None:
+        """Пространство из формы — только из заведённых; незнакомое — `None`."""
+        выбрано = canonical_tenant((request.form.get("tenant") or "").strip())
+        return выбрано if выбрано and выбрано in accounts.spaces() else None
+
     @app.get(users_path)
     def users() -> FlaskResponse | tuple[str, int]:
-        отказ = _admin_only()
-        if отказ is not None:
-            return отказ
         return _страница_учёток()
+
+    @app.post(f"{users_path}/bot-link")
+    def bot_link() -> FlaskResponse | tuple[str, int]:
+        """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
+
+        Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
+        Telegram к выбранному человеку. Ссылка показывается на странице ответа,
+        а не в адресе: адрес оседает в истории браузера и журнале прокси — тот
+        же довод, что у пароля новой учётки.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("выпуск ссылки привязки без вошедшего: маршрут прошёл мимо заслона")
+        if not conf.bot_username:
+            return _страница_учёток(outcome="bot_unset", code=503)
+        try:
+            ссылка = bot_links.issue_link(вошедший.id)
+        except DbError:
+            return _страница_учёток(outcome="bot_link_failed", code=503)
+        return _страница_учёток(
+            bot_link=link_url(conf.bot_username, ссылка.token),
+            bot_link_until=ссылка.expires_at,
+        )
+
+    @app.post(f"{users_path}/bot-unlink")
+    def bot_unlink() -> FlaskResponse | tuple[str, int]:
+        """Отвязать бота: свою привязку — каждый, чужую — только админ УК (D288)."""
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("отвязка бота без вошедшего: маршрут прошёл мимо заслона")
+        чей = (request.form.get("user_id") or "").strip() or вошедший.id
+        if чей != вошедший.id:
+            отказ = _hq_admin_only()
+            if отказ is not None:
+                return отказ
+        try:
+            отвязано = bot_links.unbind(чей)
+        except DbError:
+            return _страница_учёток(outcome="bot_unlink_failed", code=503)
+        return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
 
     @app.post(f"{users_path}/add")
     def add_user() -> FlaskResponse | tuple[str, int]:
@@ -993,21 +1087,24 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         браузера и в журнале обратного прокси, то есть перестал бы быть
         паролем ровно в момент показа.
         """
-        отказ = _admin_only()
+        отказ = _hq_admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         роль = request.form.get("role") or accounts.ROLE_AUDITOR
         try:
-            заведённый = accounts.add(логин, tenant=conf.tenant, role=роль)
+            пространство = _пространство_из_формы()
+            if пространство is None:
+                return _страница_учёток(outcome="add_space_unknown", code=400)
+            заведённый = accounts.add(логин, tenant=пространство, role=роль)
         except DbError:
             return _страница_учёток(outcome="add_failed", code=400)
         return _страница_учёток(added=заведённый, outcome="added")
 
     @app.post(f"{users_path}/disable")
     def disable_user() -> FlaskResponse | tuple[str, int]:
-        отказ = _admin_only()
+        отказ = _hq_admin_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1019,7 +1116,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # пометку изнутри продукта нечем.
             return _страница_учёток(outcome="disable_self", code=400)
         try:
-            отключено = accounts.disable(логин, tenant=conf.tenant)
+            # Пространство — из строки учётки в перечне, сверенное с заведёнными:
+            # учётку отключают там, где она живёт, а не в пространстве админа.
+            пространство = _пространство_из_формы()
+            if пространство is None:
+                return _страница_учёток(outcome="disable_missing", code=400)
+            отключено = accounts.disable(логин, tenant=пространство)
         except DbError:
             return _страница_учёток(outcome="disable_failed", code=400)
         return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
@@ -1030,11 +1132,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
+        чужая = _refuse_unless_own(inspection_id)
+        if чужая is not None:
+            return чужая
         reason = (request.form.get("reason") or "").strip()
         notice: str | None = None
         failure: str | None = None
         try:
-            done = data.retract_card(inspection_id, tenant=conf.tenant, reason=reason)
+            done = data.retract_card(inspection_id, tenant=auth.current_tenant(), reason=reason)
         except RetractionError as exc:
             failure = t("retract.failed", _lang(conf), reason=str(exc))
         else:
@@ -1048,13 +1153,16 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
+        чужая = _refuse_unless_own(inspection_id)
+        if чужая is not None:
+            return чужая
         вошедший = auth.current_account()
         notice: str | None = None
         failure: str | None = None
         try:
             перенесено = data.move_card(
                 inspection_id,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 new_date=request.form.get("date") or "",
                 new_unit_id=request.form.get("unit") or "",
                 reason=request.form.get("reason") or "",
@@ -1065,6 +1173,68 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         else:
             notice = t("move.done" if перенесено else "move.same", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+
+def _own(detail: Any) -> bool:
+    """Проверка своего пространства: писать можно только её (D283).
+
+    Читать вошедший может шире, чем писать: УК — всю сеть, партнёр — проверки
+    УК по пиццериям своей страны (D289). Запись по такой проверке — отказ.
+    """
+    return auth.is_own(detail.inspection.tenant_code)
+
+
+def _refuse_unless_own(inspection_id: str) -> FlaskResponse | None:
+    """Отказ записи по проверке: вне охвата — 404, чужого пространства — 403.
+
+    Вне охвата ответ тот же, что у несуществующей: «такой нет» и «вам её не
+    видно» снаружи неразличимы. Проверку, которую вошедший читать вправе, но
+    которая не его, — 403: он её видит, и делать вид, что её нет, — загадка.
+    """
+    detail = data.load_card(inspection_id, reach=auth.current_reach())
+    if detail is None:
+        return render_template("inspections/not_found.html"), 404  # type: ignore[return-value]
+    if not _own(detail):
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    return None
+
+
+def _install_hq_gate(app: Flask) -> None:
+    """Раздел только для УК отвечает партнёру тем же 404, что несуществующий адрес (D264).
+
+    Заслон на раздел целиком, а не на каждую кнопку внутри: так доступы проще
+    держать — это и был довод владельца. Стоит после заслона входа: без
+    вошедшего туда не доходит ни один закрытый адрес.
+    """
+
+    @app.before_request
+    def _только_уК() -> None:
+        if request.endpoint in auth.OPEN_ENDPOINTS or auth.current_account() is None:
+            return
+        if refused_for(request.path, auth.current_tenant()):
+            abort(404)
+
+
+def link_url(bot_username: str, token: str) -> str:
+    """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
+    return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
+
+
+def _hq_admin_only() -> FlaskResponse | None:
+    """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
+
+    Админ партнёра на вкладке «Пользователи» не управляет никем: его права не
+    построены (D288 открыт), и роль `admin` у учётки партнёра здесь ничего не
+    открывает.
+    """
+    вошедший = auth.current_account()
+    if (
+        вошедший is not None
+        and вошедший.role == accounts.ROLE_ADMIN
+        and canonical_tenant(вошедший.tenant) == HQ_TENANT
+    ):
+        return None
+    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
 def _admin_only() -> FlaskResponse | None:
@@ -1085,21 +1255,23 @@ def _admin_only() -> FlaskResponse | None:
 def _render_card(
     inspection_id: str, *, conf: Settings, notice: str | None, failure: str | None
 ) -> str | tuple[str, int]:
-    detail = data.load_card(inspection_id, tenant=conf.tenant)
+    detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
         return render_template("inspections/not_found.html"), 404
     lang = _lang(conf)
     админ = _admin_only() is None
     try:
-        переносы = data.load_moves(inspection_id, tenant=conf.tenant)
+        переносы = data.load_moves(inspection_id, reach=auth.current_reach())
         история_известна = True
     except DbError:
         # История недоступна (например, схема ещё без `0025`) — карточка живёт,
         # а переносить без истории нельзя: форма не показывается.
         переносы = ()
         история_известна = False
+    своя = _own(detail)
     можно_переносить = (
         админ
+        and своя
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
@@ -1108,7 +1280,7 @@ def _render_card(
     # хуже отсутствующей. Отказ базы здесь карточку не роняет, а честно
     # говорит, что наличие отчёта сейчас неизвестно (как у истории переносов).
     try:
-        отчёт = data.load_report(inspection_id, tenant=conf.tenant)
+        отчёт = data.load_report(inspection_id, reach=auth.current_reach())
         отчёт_известен = True
     except DbError:
         отчёт = None
@@ -1117,7 +1289,7 @@ def _render_card(
     # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
     # роняет, записи показываются без кадров, и это сказано словами.
     try:
-        кадры = data.load_previews(inspection_id, tenant=conf.tenant)
+        кадры = data.load_previews(inspection_id, reach=auth.current_reach())
         кадры_известны = True
     except DbError:
         кадры = {}
@@ -1133,7 +1305,7 @@ def _render_card(
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
-        units=data.load_units(tenant=conf.tenant) if можно_переносить else (),
+        units=data.load_units(reach=auth.current_reach()) if можно_переносить else (),
         detail=detail,
         head=detail.inspection,
         zones=view.zone_lines(detail.by_zone, lang),
@@ -1145,8 +1317,11 @@ def _render_card(
             detail.inspection.checklist_code, detail.inspection.checklist_code
         ),
         build_since=pricing.edition_day(detail.inspection.checklist_version)
-        or data.load_edition_since(tenant=conf.tenant, version=detail.inspection.checklist_version),
-        may_retract=data.retraction_available() and админ,
+        or data.load_edition_since(
+            reach=auth.current_reach(), version=detail.inspection.checklist_version
+        ),
+        may_retract=data.retraction_available() and админ and своя,
+        own=своя,
         notice=notice,
         failure=failure,
     )
@@ -1200,7 +1375,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.add_item(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 process=(form.get("process") or "").strip(),
                 question_ru=(form.get("question_ru") or "").strip(),
@@ -1226,7 +1401,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.edit_item(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=code,
                 process=form.get("process"),
@@ -1250,7 +1425,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.disable_item(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=code,
                 note=request.form.get("note"),
@@ -1266,7 +1441,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.restore_item(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=code,
                 note=request.form.get("note"),
@@ -1283,7 +1458,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.add_zone(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=(form.get("code") or "").strip(),
                 name_ru=(form.get("name_ru") or "").strip(),
@@ -1311,7 +1486,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.set_zone_shares(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 shares=доли,
                 note=request.form.get("note"),
@@ -1328,7 +1503,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.rename_zone(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=code,
                 name_ru=form.get("name_ru"),
@@ -1347,7 +1522,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.remove_zone(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 code=code,
                 equal_shares=bool(form.get("equal_shares")),
@@ -1367,7 +1542,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.set_route_zones(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 zones=mview.route_order(номера, сейчас),
                 note=form.get("note"),
@@ -1384,7 +1559,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             conf,
             lambda store, автор: method.set_scoring(
                 store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=автор,
                 start_pct=form.get("start_pct"),
                 d1=form.get("d1"),
@@ -1405,8 +1580,17 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
             return _render_methodology(conf, notice=None, failure=None)
         try:
             # Публикуется версия ПОКАЗАННОГО чек-листа, а не корня хранилища (#382).
-            склад = method.store_for(state.store, _который(request))
-            опубликована = method.publish_version(склад, tenant=conf.tenant, version=version)
+            склад = method.store_for(
+                state.store,
+                _который(request),
+                tenant=auth.current_tenant(),
+                space=_которое_пространство(request),
+                write=True,
+                lang=_lang(conf),
+            )
+            опубликована = method.publish_version(
+                склад, tenant=auth.current_tenant(), version=version
+            )
         except MethodologyRefused as отказ:
             return _render_methodology(conf, notice=None, failure=str(отказ))
         return _render_methodology(
@@ -1445,10 +1629,17 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
+        if auth.current_tenant() != HQ_TENANT:
+            # Чек-листы заводит УК (D283): у партнёра заведения нет — он
+            # работает по эталону и читает его.
+            отказ_заведения = t("methodology.etalon_readonly", _lang(conf))
+            if с_методики:
+                return _render_methodology(conf, notice=None, failure=отказ_заведения, panel="new")
+            return _render_checklists(conf, notice=None, failure=отказ_заведения)
         try:
             заведён = method.create_checklist(
                 state.store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=_author(conf),
                 code=(form.get("code") or "").strip(),
                 name_ru=(form.get("name_ru") or "").strip(),
@@ -1476,9 +1667,11 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         try:
             стало = method.set_checklist_state(
                 state.store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=_author(conf),
                 code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
                 state=(request.form.get("state") or "").strip(),
             )
         except MethodologyRefused as отказ:
@@ -1499,9 +1692,11 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         try:
             method.set_bot_access(
                 state.store,
-                tenant=conf.tenant,
+                tenant=auth.current_tenant(),
                 author=_author(conf),
                 code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
                 on=request.form.get("on") == "1",
             )
         except MethodologyRefused as отказ:
@@ -1523,7 +1718,17 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return render_template("methodology/unset.html", missing=state.missing)
-        целевое = method.store_for(state.store, code)
+        try:
+            целевое = method.store_for(
+                state.store,
+                code,
+                tenant=auth.current_tenant(),
+                space=_которое_пространство(request),
+                write=False,
+                lang=_lang(conf),
+            )
+        except MethodologyRefused as отказ:
+            return _render_checklists(conf, notice=None, failure=str(отказ))
         return render_template(
             "methodology/apply.html",
             code=code,
@@ -1539,7 +1744,12 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             return _render_checklists(conf, notice=None, failure=None)
         try:
             итог = method.apply_checklist(
-                state.store, tenant=conf.tenant, author=_author(conf), code=code
+                state.store,
+                tenant=auth.current_tenant(),
+                author=_author(conf),
+                code=code,
+                space=_которое_пространство(request),
+                lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(conf, notice=None, failure=str(отказ))
@@ -1561,7 +1771,7 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
     if state.store is None:
         return render_template("methodology/unset.html", missing=state.missing)
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
         return render_template(
             "methodology/checklists.html",
@@ -1597,16 +1807,26 @@ def _который(запрос: Any) -> str | None:
     return (запрос.args.get("checklist") or "").strip() or None
 
 
+def _которое_пространство(запрос: Any) -> str | None:
+    """Пространство чек-листа из адреса (`?space=`) — УК открывает чек-лист партнёра.
+
+    Не названо — `None`: чек-лист ищется в своём пространстве, а у партнёра
+    следом в эталоне (`checklist_layout.locate`). Чужое пространство в адресе
+    не открывает ничего: `locate` сверяет его с тем, что вошедшему видно.
+    """
+    return (запрос.args.get("space") or "").strip() or None
+
+
 def _author(conf: Settings) -> str:
     """Кто правит — для журнала хранилища.
 
     Заслон без учётки на эти маршруты не пускает вовсе, так что ветка с
     тенантом — не подстраховка «на всякий случай», а честный ответ на случай,
     когда правку однажды позовёт не человек: подписать её именем арендатора
-    правдивее, чем пустым местом.
+    правдивее, чем пустым местом: подпись «web» говорит, откуда пришла правка.
     """
     account = auth.current_account()
-    return account.login if account else conf.tenant
+    return account.login if account else "web"
 
 
 def _apply(conf: Settings, действие: Any) -> _Итог:
@@ -1615,7 +1835,15 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
     if state.store is None:
         return _Итог()
     try:
-        правка = действие(method.store_for(state.store, _который(request)), _author(conf))
+        склад = method.store_for(
+            state.store,
+            _который(request),
+            tenant=auth.current_tenant(),
+            space=_которое_пространство(request),
+            write=True,
+            lang=_lang(conf),
+        )
+        правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
         return _Итог(failure=str(отказ))
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
@@ -1658,22 +1886,31 @@ def _render_methodology(
     lang = _lang(conf)
     попросили = (request.args.get("version") or "").strip() or None
     try:
-        перечень = method.checklists_overview(state.store)
+        перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
         перечень, failure = [], failure or str(отказ)
     код = _который_показан(перечень, _который(request))
     try:
-        колонка = method.checklist_rail(state.store, перечень)
+        колонка = method.checklist_rail(state.store, перечень, tenant=auth.current_tenant())
     except MethodologyRefused:
         колонка = ()
     try:
-        склад = method.store_for(state.store, код)
+        склад = method.store_for(
+            state.store,
+            код,
+            tenant=auth.current_tenant(),
+            space=_которое_пространство(request),
+            write=False,
+            lang=lang,
+        )
     except MethodologyRefused as отказ:
+        # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
+        # который виден всем (D283): пустой экран читался бы как поломка.
         склад, failure = state.store, failure or str(отказ)
     try:
-        состав = method.load_composition(склад, tenant=conf.tenant, version=попросили)
+        состав = method.load_composition(склад, tenant=auth.current_tenant(), version=попросили)
     except MethodologyRefused as отказ:
-        состав = method.load_composition(склад, tenant=conf.tenant)
+        состав = method.load_composition(склад, tenant=auth.current_tenant())
         failure = failure or str(отказ)
     отбор = mview.parse_filter(request.args)
     выбран = item or (request.args.get("item") or "").strip() or None
@@ -1700,6 +1937,7 @@ def _render_methodology(
         """
         параметры = {
             "checklist": (код or "") if _который(request) else "",
+            "space": _которое_пространство(request) or "",
             "version": попросили or "",
             "q": отбор.q,
             "level": отбор.level,
@@ -1716,6 +1954,7 @@ def _render_methodology(
         """Адрес формы: несёт тот же чек-лист и отбор, чтобы итог лёг на тот же экран."""
         параметры = {
             "checklist": код or "",
+            "space": _которое_пространство(request) or "",
             "q": отбор.q,
             "level": отбор.level,
             "zone": отбор.zone,
@@ -1734,9 +1973,9 @@ def _render_methodology(
     карточка = None
     if выбран and not новый:
         try:
-            карточка = method.load_item(склад, tenant=conf.tenant, code=выбран, version=попросили)[
-                "item"
-            ]
+            карточка = method.load_item(
+                склад, tenant=auth.current_tenant(), code=выбран, version=попросили
+            )["item"]
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
     # Разница действующей и свежей записанной — по запросу: чтение каждого
@@ -1745,11 +1984,13 @@ def _render_methodology(
     if request.args.get("diff") == "1" and состав.unpublished:
         try:
             разница = mview.diff_items(
-                method.full_items(склад, tenant=conf.tenant, version=состав.current),
-                method.full_items(склад, tenant=conf.tenant, version=состав.latest),
+                method.full_items(склад, tenant=auth.current_tenant(), version=состав.current),
+                method.full_items(склад, tenant=auth.current_tenant(), version=состав.latest),
             ) + mview.diff_zones(
-                method.zones_of_version(склад, tenant=conf.tenant, version=состав.current),
-                method.zones_of_version(склад, tenant=conf.tenant, version=состав.latest),
+                method.zones_of_version(
+                    склад, tenant=auth.current_tenant(), version=состав.current
+                ),
+                method.zones_of_version(склад, tenant=auth.current_tenant(), version=состав.latest),
             )
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
@@ -1758,11 +1999,13 @@ def _render_methodology(
     обход: list[dict[str, Any]] = []
     if панель == "scoring":
         try:
-            обход = list(method.load_route(склад, tenant=conf.tenant, version=попросили)["zones"])
+            обход = list(
+                method.load_route(склад, tenant=auth.current_tenant(), version=попросили)["zones"]
+            )
         except MethodologyRefused as отказ:
             failure = failure or str(отказ)
     сводка = (
-        data.load_item_usage(tenant=conf.tenant, code=выбран, checklist=код or "")
+        data.load_item_usage(reach=auth.current_reach(), code=выбран, checklist=код or "")
         if карточка is not None and выбран
         else None
     )
@@ -1774,6 +2017,9 @@ def _render_methodology(
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.
         rail=колонка,
+        # Своё пространство вошедшего: ссылки на чек-листы другого пространства
+        # несут его в адресе, а переключатели бота — только у своих (D283).
+        own_space=method.own_space(auth.current_tenant()),
         picking=not _который(request),
         checklist_code=код,
         needs_name=method.needs_set_name(состав),
