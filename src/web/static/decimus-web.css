@@ -396,7 +396,7 @@
 }
 .lt__tool:hover { border-color: var(--line-control-2); color: var(--ink); }
 .lt__tool:focus-visible { outline: none; box-shadow: var(--focus-ring); }
-.lt__tool[aria-pressed="true"] { background: var(--surface-3); border-color: var(--line-control-2); color: var(--ink); }
+.lt__tool[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent-line); color: var(--accent); }
 .lt__linkbox { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .lt__linkinput { width: min(22rem, 70vw); height: var(--control-h-sm); }
 .lt__toolnote { font-size: var(--fs-meta); color: var(--warn); }
