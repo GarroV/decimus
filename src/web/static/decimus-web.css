@@ -1733,3 +1733,18 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
      вроде «ЯЗЫК ОТЧЁТА» ломались по слову на строку. */
   .card__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ── Экшн-планы (волна 2) ──────────────────────────────────────────────
+   Таблица запросов раздела УК — та же сетка, что у точек страны; версии и
+   история — списки без маркеров, строка за строкой. */
+.ov-table--plans .ov-table__head,
+.ov-table--plans .ov-table__row {
+  grid-template-columns: minmax(9rem, 1.4fr) minmax(6rem, 1fr) 4rem 6rem 6rem minmax(9rem, 1fr);
+  min-width: 44rem;
+}
+.plan-versions,
+.plan-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.plan-versions__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.plan-versions__file { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
+.plan-history { font-size: var(--fs-meta); }

@@ -332,3 +332,23 @@ locked_minutes
 # Фикстура pytest с `autouse=True` (ревью access2, L5, `tests/test_db_password_bounds.py`):
 # подключает сам pytest каждому тесту файла — отказ раньше scrypt и базы.
 _без_scrypt_и_базы
+
+# Экшн-планы (волна 2, `src/web/action_plans.py`): маршруты Flask зовёт
+# диспетчер по адресу, регистрирует декоратор — по имени их не читает никто.
+actions
+actions_request
+actions_review
+actions_due
+actions_new
+plans_index
+plans_upload
+plan_file
+# Предел тела на маршруте загрузки (D269): атрибут запроса читает сам Flask.
+max_content_length
+# Поля и свойство запроса экшн-плана читают шаблоны (`_plan.html`,
+# `plans/index.html`), а Jinja статически не видна.
+uploaded_by
+reviewed_by
+reviewed_at
+requested_at
+last_comment
