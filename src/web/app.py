@@ -1161,10 +1161,15 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.post(f"{users_path}/email")
     def user_email() -> FlaskResponse | tuple[str, int]:
         """Почта входа через Google (#399): задать или снять (пустое поле). Только админ УК."""
+        вошедший = auth.current_account()
         почта = request.form.get("email") or ""
         return _правка_человека(
             lambda логин, пространство: people.change_email(
-                login=логин, tenant=пространство, email=почта
+                login=логин,
+                tenant=пространство,
+                email=почта,
+                actor_login=вошедший.login if вошедший else "",
+                actor_tenant=вошедший.tenant if вошедший else "",
             )
         )
 

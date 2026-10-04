@@ -123,10 +123,20 @@ _DISABLE_USER_SQL = """
      where tenant_code = %s and login = %s and disabled_at is null
 """
 
+#: Прежняя роль читается той же командой, что пишет новую: строка запирается
+#: (`for update`), и между «было» и «стало» вторая правка не вклинится.
 _SET_ROLE_SQL = """
-    update web_users
+    with прежняя as (
+        select id, role
+          from web_users
+         where tenant_code = %s and login = %s and disabled_at is null
+           for update
+    )
+    update web_users u
        set role = %s
-     where tenant_code = %s and login = %s and disabled_at is null
+      from прежняя
+     where u.id = прежняя.id
+ returning прежняя.role
 """
 
 _CHANGE_PASSWORD_SQL = """
@@ -518,10 +528,20 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     бою, миграция не знает, и раздача «всем» или «по имени» выдала бы права
     людям, которых на это никто не смотрел.
     """
+    return reassign_role(login, tenant=tenant, role=role) is not None
+
+
+def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
+    """Назначить роль живой учётке и вернуть ПРЕЖНЮЮ. `None` — такой живой учётки нет.
+
+    Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
+    экран правит роли, а таблицы истории ролей нет и не заводится.
+    """
     роль = _checked_role(role)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
-        cur.execute(_SET_ROLE_SQL, (роль, tenant, login.strip().lower()))
-        return cur.rowcount > 0
+        cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
+        строка = cur.fetchone()
+    return None if строка is None else str(строка[0])
 
 
 def change_password(login: str, *, tenant: str, password: str) -> bool:

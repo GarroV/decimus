@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -43,9 +44,9 @@ def строка(login: str, *, tenant: str = "HQ", role: str = "auditor", email
 def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     позвали: dict[str, list[Any]] = {"role": [], "email": []}
 
-    def _роль(login: str, *, tenant: str, role: str) -> bool:
+    def _роль(login: str, *, tenant: str, role: str) -> str | None:
         позвали["role"].append((login, tenant, role))
-        return login != "nobody"
+        return None if login == "nobody" else "auditor"
 
     def _почта(login: str, *, tenant: str, email: str | None) -> bool:
         позвали["email"].append((login, tenant, email))
@@ -53,7 +54,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
             raise EmailTakenError("занята")
         return login != "nobody"
 
-    monkeypatch.setattr(accounts, "set_role", _роль)
+    monkeypatch.setattr(accounts, "reassign_role", _роль)
     monkeypatch.setattr(accounts, "set_email", _почта)
     monkeypatch.setattr(
         accounts,
@@ -273,3 +274,57 @@ def test_тексты_правки_есть_по_английски(
 
     assert "Email saved" in ответ.get_data(as_text=True)
     assert "Google sign-in email" in ответ.get_data(as_text=True)
+
+
+def test_смена_роли_оставляет_след_в_журнале(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]], caplog: pytest.LogCaptureFixture
+) -> None:
+    """След без новой таблицы: кто правил, кого, было → стало (ревью безопасности, M3)."""
+    with caplog.at_level(logging.INFO, logger="src.web.people"):
+        админ_ук.post(
+            "/users/role", data={"login": "nino", "tenant": "GE", "role": "admin"}, headers=ЗАГОЛОВКИ
+        )
+
+    след = [з.getMessage() for з in caplog.records if з.name == "src.web.people"]
+    assert len(след) == 1, след
+    assert all(часть in след[0] for часть in (f"HQ/{ЛОГИН}", "GE/nino", "auditor", "admin"))
+
+
+def test_смена_почты_оставляет_след_без_адреса(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]], caplog: pytest.LogCaptureFixture
+) -> None:
+    """Факт смены почты — да, сам адрес — нет: журнал приложения не место для почт."""
+    with caplog.at_level(logging.INFO, logger="src.web.people"):
+        админ_ук.post(
+            "/users/email",
+            data={"login": "petr", "tenant": "HQ", "email": "new.petr@dodobrands.io"},
+            headers=ЗАГОЛОВКИ,
+        )
+        админ_ук.post(
+            "/users/email", data={"login": "petr", "tenant": "HQ", "email": ""}, headers=ЗАГОЛОВКИ
+        )
+
+    след = [з.getMessage() for з in caplog.records if з.name == "src.web.people"]
+    assert len(след) == 2, след
+    assert all(f"HQ/{ЛОГИН}" in з and "HQ/petr" in з for з in след)
+    assert not any("@" in з for з in след)
+
+
+def test_отказ_правки_следа_не_оставляет(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]], caplog: pytest.LogCaptureFixture
+) -> None:
+    """След — о сделанном: отказ формы или «нет такой учётки» правкой не был."""
+    with caplog.at_level(logging.INFO, logger="src.web.people"):
+        админ_ук.post(
+            "/users/role", data={"login": "nobody", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+        )
+        админ_ук.post(
+            "/users/email", data={"login": "petr", "tenant": "HQ", "email": "petr"}, headers=ЗАГОЛОВКИ
+        )
+        админ_ук.post(
+            "/users/email",
+            data={"login": "nobody", "tenant": "HQ", "email": "nobody@dodobrands.io"},
+            headers=ЗАГОЛОВКИ,
+        )
+
+    assert not [з for з in caplog.records if з.name == "src.web.people"]

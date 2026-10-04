@@ -44,6 +44,7 @@ from src.db.web_access import (  # noqa: E402
     resolve_session,
     session_fingerprint,
     set_email,
+    reassign_role,
     set_role,
 )
 
@@ -448,6 +449,17 @@ def test_роль_назначается_и_видна_вошедшему(обе
     сессия = open_session(опознанная)
     из_сессии = resolve_session(сессия.token)
     assert из_сессии is not None and из_сессии.role == ROLE_ADMIN
+
+
+def test_смена_роли_называет_прежнюю(обе_роли: str) -> None:
+    """Прежняя роль — для следа в журнале приложения: кто, кого, было → стало."""
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+
+    assert reassign_role("Director", tenant=ТЕНАНТ, role=ROLE_ADMIN) == ROLE_AUDITOR
+    assert reassign_role("director", tenant=ТЕНАНТ, role=ROLE_AUDITOR) == ROLE_ADMIN
+    assert reassign_role("nobody", tenant=ТЕНАНТ, role=ROLE_ADMIN) is None
+    опознанная = authenticate("director", ПАРОЛЬ)
+    assert опознанная is not None and опознанная.role == ROLE_AUDITOR
 
 
 def test_роль_чужого_тенанта_не_назначается(обе_роли: str) -> None:
