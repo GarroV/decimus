@@ -81,7 +81,11 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
 
         return дверь
 
-    monkeypatch.setattr(plans, "list_requests", записать("list", (запрос(files=(ВЕРСИЯ,)),)))
+    monkeypatch.setattr(
+        plans,
+        "list_requests",
+        записать("list", plans.PlanList(rows=(запрос(files=(ВЕРСИЯ,)),), truncated=False)),
+    )
     monkeypatch.setattr(plans, "get_request", записать("get", запрос(files=(ВЕРСИЯ,))))
     monkeypatch.setattr(plans, "review", записать("review"))
     monkeypatch.setattr(plans, "set_due", записать("due"))
@@ -162,6 +166,41 @@ def test_уК_видит_очередь_и_запрос(уК: FlaskClient) -> No
     страница = уК.get("/actions?lang=ru").get_data(as_text=True)
     assert "Batumi-1" in страница
     assert "Ждут приёмки · 1" in страница
+
+
+def test_уК_переключается_на_принятые_и_очереди_там_нет(
+    уК: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    страница = уК.get("/actions?accepted=1&lang=ru").get_data(as_text=True)
+    assert зовы["list"][-1]["accepted"] is True
+    assert "Ждут приёмки" not in страница
+
+
+def test_очередь_по_умолчанию_только_открытые(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
+    уК.get("/actions?lang=ru")
+    assert зовы["list"][-1]["accepted"] is False
+
+
+def test_партнёр_переключается_на_принятые(
+    партнёр: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    партнёр.get("/plans?accepted=1&lang=ru")
+    assert зовы["list"][-1]["accepted"] is True
+
+
+@pytest.mark.parametrize("адрес", ["/actions?lang=ru", "/plans?lang=ru"])
+def test_обрезанный_список_сказан_на_экране(
+    адрес: str, monkeypatch: pytest.MonkeyPatch, зовы: Any
+) -> None:
+    tenant = "HQ" if адрес.startswith("/actions") else "GE"
+    monkeypatch.setattr(
+        plans,
+        "list_requests",
+        lambda **_: plans.PlanList(rows=(запрос(files=(ВЕРСИЯ,)),), truncated=True),
+    )
+    for client in _стенд(monkeypatch, tenant):
+        страница = client.get(адрес).get_data(as_text=True)
+        assert f"Показаны первые {plans.LIST_LIMIT}" in страница
 
 
 def test_уК_возвращает_план_подпись_из_сессии(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:

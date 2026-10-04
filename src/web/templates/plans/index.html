@@ -15,6 +15,12 @@
     </div>
   </div>
 
+  <div class="ov-filters">
+    <a class="ov-chip{% if not accepted %} is-on{% endif %}" href="{{ url(plans_path) }}?lang={{ lang }}">{{ t('plans.show_open') }}</a>
+    <a class="ov-chip{% if accepted %} is-on{% endif %}" href="{{ url(plans_path) }}?accepted=1&amp;lang={{ lang }}">{{ t('plans.show_accepted') }}</a>
+  </div>
+  {% if truncated %}<div class="note note--warn mt-gap"><div><div class="note__text">{{ t('plans.truncated', n=limit) }}</div></div></div>{% endif %}
+
   {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
 
@@ -46,6 +52,6 @@
       </div>
     </section>
   {% else %}
-    <section class="ov-card ov-card--wide mt-gap"><div class="ov-card__empty">{{ t('plans.empty') }}</div></section>
+    <section class="ov-card ov-card--wide mt-gap"><div class="ov-card__empty">{{ t('plans.accepted_empty') if accepted else t('plans.empty') }}</div></section>
   {% endfor %}
 {% endblock %}

@@ -648,10 +648,12 @@ def _register_country(app: Flask, conf: Settings) -> None:
 
 def _country_plans(код: str) -> dict[str, Any]:
     """Блок экшн-планов экрана страны: запросы, их состояние и куда действовать."""
-    запросы, известны = action_plans.country_plans(код)
+    открытые, принятые, известны = action_plans.country_plans(код)
     уК = action_plans.is_hq()
     return {
-        "plans": запросы,
+        "plans": открытые.rows + принятые.rows,
+        "plans_truncated": открытые.truncated or принятые.truncated,
+        "plans_limit": action_plans.LIST_LIMIT,
         "plans_known": известны,
         "plans_today": action_plans.today(),
         "plans_path": section("plans").path,

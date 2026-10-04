@@ -195,6 +195,14 @@ class PlanRequest:
 
 
 @dataclass(frozen=True)
+class PlanList:
+    """Страница списка: строки и упёрся ли он в предел (тогда это сказано на экране)."""
+
+    rows: tuple[PlanRequest, ...]
+    truncated: bool
+
+
+@dataclass(frozen=True)
 class PlanFileRef:
     """Файл к выдаче: где лежит и как назывался."""
 
@@ -207,7 +215,43 @@ class PlanFileRef:
 # ── Запросы ─────────────────────────────────────────────────────────────────
 
 # Охват — литералом `REACH_SQL` (сверка `tests/test_db_reach_static.py`).
-_LIST_SQL = """
+# Отклонённая проверка запрос не снимает, но из списков он уходит.
+#
+# Очередь — только открытые: принятые копятся годами и, попав в общий список с
+# пределом, вытеснили бы открытые молча. Условие статуса — литерал, а не
+# параметр: так его узнаёт частичный индекс `action_plan_requests_open_idx`
+# (0036), и очередь по всем странам не читает историю.
+_OPEN_SQL = """
+select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
+       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
+from action_plan_requests r
+join inspections i on i.id = r.inspection_id
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and r.status <> 'accepted'
+  and i.retracted_at is null
+  and (%(country)s::text is null or u.country = %(country)s)
+order by r.due_on, r.requested_at
+limit %(limit)s
+"""  # noqa: E501 — условие охвата вписано литералом целиком
+
+# Принятые — отдельно, по кнопке «Принятые»: свежие первыми.
+_ACCEPTED_SQL = """
+select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
+       r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
+from action_plan_requests r
+join inspections i on i.id = r.inspection_id
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and r.status = 'accepted'
+  and i.retracted_at is null
+  and (%(country)s::text is null or u.country = %(country)s)
+order by r.due_on desc, r.requested_at desc
+limit %(limit)s
+"""  # noqa: E501
+
+# Один запрос — по id или по проверке, в любом статусе.
+_ONE_SQL = """
 select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
        r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
 from action_plan_requests r
@@ -215,12 +259,10 @@ join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.retracted_at is null
-  and (%(country)s::text is null or u.country = %(country)s)
   and (%(request_id)s::uuid is null or r.id = %(request_id)s)
   and (%(inspection_id)s::uuid is null or r.inspection_id = %(inspection_id)s)
-order by r.due_on, r.requested_at
-limit %(limit)s
-"""  # noqa: E501 — условие охвата вписано литералом целиком
+limit 1
+"""  # noqa: E501
 
 _FILES_SQL = """
 select f.request_id, f.id, f.version, f.file_name, f.size_bytes, f.content_type,
@@ -339,23 +381,10 @@ def _uuid_or_none(value: str | None) -> str | None:
         return None
 
 
-def _read(
-    reach: Reach,
-    *,
-    country: str | None = None,
-    request_id: str | None = None,
-    inspection_id: str | None = None,
-) -> tuple[PlanRequest, ...]:
-    params = {
-        **require_reach(reach).params(),
-        "country": country or None,
-        "request_id": request_id,
-        "inspection_id": inspection_id,
-        "limit": LIST_LIMIT,
-    }
+def _read(sql: str, params: dict[str, Any]) -> tuple[PlanRequest, ...]:
     try:
         with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
-            cur.execute(_LIST_SQL, params)
+            cur.execute(sql, params)
             heads = cur.fetchall()
             ids = [str(row[0]) for row in heads]
             cur.execute(_FILES_SQL, {"ids": ids})
@@ -410,9 +439,31 @@ def _assemble(
     )
 
 
-def list_requests(*, reach: Reach, country: str | None = None) -> tuple[PlanRequest, ...]:
-    """Запросы в охвате читающего (и стране, если названа) — по сроку."""
-    return _read(reach, country=country)
+def list_requests(*, reach: Reach, country: str | None = None, accepted: bool = False) -> PlanList:
+    """Открытые запросы в охвате (и стране, если названа) по сроку; `accepted` — принятые.
+
+    Читается на одну строку больше предела: так видно, что список обрезан, и
+    экран говорит об этом, а не молчит.
+    """
+    params = {
+        **require_reach(reach).params(),
+        "country": country or None,
+        "limit": LIST_LIMIT + 1,
+    }
+    rows = _read(_ACCEPTED_SQL if accepted else _OPEN_SQL, params)
+    return PlanList(rows=rows[:LIST_LIMIT], truncated=len(rows) > LIST_LIMIT)
+
+
+def _read_one(
+    reach: Reach, *, request_id: str | None = None, inspection_id: str | None = None
+) -> PlanRequest | None:
+    params = {
+        **require_reach(reach).params(),
+        "request_id": request_id,
+        "inspection_id": inspection_id,
+    }
+    found = _read(_ONE_SQL, params)
+    return found[0] if found else None
 
 
 def get_request(request_id: str, *, reach: Reach) -> PlanRequest | None:
@@ -420,8 +471,7 @@ def get_request(request_id: str, *, reach: Reach) -> PlanRequest | None:
     ident = _uuid_or_none(request_id)
     if ident is None:
         return None
-    found = _read(reach, request_id=ident)
-    return found[0] if found else None
+    return _read_one(reach, request_id=ident)
 
 
 def request_of_inspection(inspection_id: str, *, reach: Reach) -> PlanRequest | None:
@@ -429,8 +479,7 @@ def request_of_inspection(inspection_id: str, *, reach: Reach) -> PlanRequest | 
     ident = _uuid_or_none(inspection_id)
     if ident is None:
         return None
-    found = _read(reach, inspection_id=ident)
-    return found[0] if found else None
+    return _read_one(reach, inspection_id=ident)
 
 
 def unit_country_missing(inspection_id: str, *, reach: Reach) -> bool:

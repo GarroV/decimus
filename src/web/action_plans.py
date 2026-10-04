@@ -89,15 +89,27 @@ def unit_without_country(inspection_id: str) -> bool:
         return False
 
 
-def country_plans(code: str) -> tuple[tuple[plans.PlanRequest, ...], bool]:
-    """Запросы страны для её экрана и известно ли это."""
+EMPTY = plans.PlanList(rows=(), truncated=False)
+#: Предел списка — для подписи «показаны первые N».
+LIST_LIMIT = plans.LIST_LIMIT
+
+
+def country_plans(code: str) -> tuple[plans.PlanList, plans.PlanList, bool]:
+    """Открытые и принятые запросы страны для её экрана и известно ли это.
+
+    Принятые читаются отдельно: итог плана экран страны показывает (критерий
+    спеки), а в очередь они не попадают.
+    """
     if not code:
-        return (), True
+        return EMPTY, EMPTY, True
+    охват = auth.current_reach()
     try:
-        return plans.list_requests(reach=auth.current_reach(), country=code), True
+        открытые = plans.list_requests(reach=охват, country=code)
+        принятые = plans.list_requests(reach=охват, country=code, accepted=True)
     except DbError as exc:
         logger.warning("экшн-планы страны %s не прочитаны: %s", code, exc)
-        return (), False
+        return EMPTY, EMPTY, False
+    return открытые, принятые, True
 
 
 def default_due() -> date:
@@ -117,6 +129,11 @@ def install(app: Flask, conf: Settings) -> None:
     max_bytes = load_action_plan_settings().max_bytes
     _install_hq(app, conf)
     _install_partner(app, conf, max_bytes=max_bytes)
+
+
+def _accepted() -> bool:
+    """Показать принятые вместо открытых — `?accepted=1`."""
+    return request.args.get("accepted") == "1"
 
 
 def _lang(conf: Settings) -> str:
@@ -157,7 +174,9 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         страна = (request.args.get("country") or "").strip().upper()[:2]
         очередь = (request.args.get("queue") or "").strip()
         очередь = очередь if очередь in QUEUES else ""
-        все = plans.list_requests(reach=auth.current_reach())
+        принятые = _accepted()
+        список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
+        все = список.rows
         сегодня = plans.today()
         страны = tuple(sorted({r.country for r in все if r.country}))
         в_стране = tuple(r for r in все if not страна or r.country == страна)
@@ -166,7 +185,13 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         строки = {QUEUE_REVIEW: на_приёмке, QUEUE_OVERDUE: просрочены}.get(очередь, в_стране)
 
         def отбор(**изменения: str) -> str:
-            параметры = {"country": страна, "queue": очередь, "lang": lang, **изменения}
+            параметры = {
+                "country": страна,
+                "queue": очередь,
+                "accepted": "1" if принятые else "",
+                "lang": lang,
+                **изменения,
+            }
             живые = {к: з for к, з in параметры.items() if з}
             return url_for("actions") + (f"?{urlencode(живые)}" if живые else "")
 
@@ -179,6 +204,9 @@ def _install_hq(app: Flask, conf: Settings) -> None:
             on_review=len(на_приёмке),
             overdue=len(просрочены),
             total=len(в_стране),
+            accepted=принятые,
+            truncated=список.truncated,
+            limit=plans.LIST_LIMIT,
             select_url=отбор,
             **_common(lang),
         )
@@ -352,10 +380,14 @@ def _render_partner(
     conf: Settings, *, max_bytes: int, notice: str | None, failure: str | None
 ) -> str:
     lang = _lang(conf)
-    запросы = plans.list_requests(reach=auth.current_reach())
+    принятые = _accepted()
+    список = plans.list_requests(reach=auth.current_reach(), accepted=принятые)
     return render_template(
         "plans/index.html",
-        rows=запросы,
+        rows=список.rows,
+        accepted=принятые,
+        truncated=список.truncated,
+        limit=plans.LIST_LIMIT,
         max_mb=max_bytes // (1024 * 1024),
         notice=notice,
         failure=failure,

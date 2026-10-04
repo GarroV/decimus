@@ -141,6 +141,7 @@
       <a class="btn btn--sm" href="{{ url(plans_act_path) }}{% if plans_act_country %}?country={{ view.code }}&amp;lang={{ lang }}{% else %}?lang={{ lang }}{% endif %}">
         {{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}</a>
     </div>
+    {% if plans_truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('plans.truncated', n=plans_limit) }}</div></div></div>{% endif %}
     {% if not plans_known %}
       <div class="ov-card__empty">{{ t('country.plans.unknown') }}</div>
     {% elif plans %}

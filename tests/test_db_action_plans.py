@@ -21,6 +21,7 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db import action_plans as plans  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
+from src.db.action_plans import _OPEN_SQL  # noqa: E402
 from src.db.errors import AcceptError, ActionPlanError  # noqa: E402
 from src.db.move import move_inspection  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
@@ -338,9 +339,9 @@ def test_партнёр_видит_только_запросы_своих_стр
     армения = _запрос(_принятая("D2", unit=ЧУЖАЯ_ТОЧКА))
 
     # Act
-    у_ge = {r.id for r in plans.list_requests(reach=reach_of("GE"))}
-    у_am = {r.id for r in plans.list_requests(reach=reach_of("AM"))}
-    у_уК = {r.id for r in plans.list_requests(reach=reach_of("HQ"))}
+    у_ge = {r.id for r in plans.list_requests(reach=reach_of("GE")).rows}
+    у_am = {r.id for r in plans.list_requests(reach=reach_of("AM")).rows}
+    у_уК = {r.id for r in plans.list_requests(reach=reach_of("HQ")).rows}
 
     # Assert
     assert (у_ge, у_am, у_уК) == ({грузия.id}, {армения.id}, {грузия.id, армения.id})
@@ -531,7 +532,7 @@ def test_отклонённая_проверка_уходит_из_очеред�
     retract_inspection(запрос.inspection_id, tenant="HQ", reason="дубль", storage=склад)
 
     # Assert
-    assert запрос.id not in {r.id for r in plans.list_requests(reach=reach_of("HQ"))}
+    assert запрос.id not in {r.id for r in plans.list_requests(reach=reach_of("HQ")).rows}
     with pytest.raises(ActionPlanError, match="Запроса нет"):
         _загрузить(склад, запрос.id)
 
@@ -626,3 +627,100 @@ def _статус(dsn: str, ident: str) -> str:
         строка = conn.execute("select status from inspections where id = %s", (ident,)).fetchone()
     assert строка is not None
     return str(строка[0])
+
+
+# --- очередь — только открытые, принятые отдельно (ревью #495, п.1) ------------
+
+
+def test_принятый_уходит_из_очереди_в_принятые(сеть: None, склад: Хранилище) -> None:
+    # Arrange — один план принят, второй ждёт.
+    принятый = _запрос(_принятая("D2"))
+    _загрузить(склад, принятый.id)
+    plans.review(принятый.id, actor="hq-lead", verdict="accepted", comment="")
+    открытый = _запрос(_принятая("D3"))
+
+    # Act
+    очередь = plans.list_requests(reach=reach_of("HQ"))
+    принятые = plans.list_requests(reach=reach_of("HQ"), accepted=True)
+
+    # Assert
+    assert [r.id for r in очередь.rows] == [открытый.id]
+    assert [r.id for r in принятые.rows] == [принятый.id]
+    assert очередь.truncated is False
+
+
+def test_упёршийся_в_предел_список_говорит_об_этом(
+    сеть: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    первый = _запрос(_принятая("D2"))
+    _принятая("D3")
+    monkeypatch.setattr(plans, "LIST_LIMIT", 1)
+
+    очередь = plans.list_requests(reach=reach_of("HQ"))
+
+    assert [r.id for r in очередь.rows] == [первый.id]
+    assert очередь.truncated is True
+
+
+_ТОЧКА_НАГРУЗКИ_SQL = """
+insert into units (tenant_code, name, name_normalized, country)
+values ('HQ', 'Нагрузочная', 'нагрузочная', 'GE')
+returning id
+"""
+
+# Под владельцем и с выключенными триггерами пользователя: наполнение — не путь
+# продукта, а объём для планировщика (как в `test_db_queries_tenant`, #490).
+_МНОГО_ПРИНЯТЫХ_SQL = """
+with i as (
+    insert into inspections (
+        tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
+        ui_lang, speech_lang, checklist_version, pct, grade, source_fingerprint,
+        status, accepted_at, accepted_by
+    )
+    select 'HQ', %(unit_id)s, 1, 'planned', current_date - g, 'ru', 'ru', 'ru', 'v1',
+           90, 'B', 'план-' || g, 'finalized', now(), 'hq'
+    from generate_series(1, %(сколько)s) g
+    returning id, inspection_date
+)
+insert into action_plan_requests (inspection_id, due_on, status, origin, requested_by, due_set_by)
+select id, inspection_date + 7, 'accepted', 'auto', 'hq', 'hq' from i
+"""
+
+_ПЯТЬ_ОТКРЫТЫХ_SQL = """
+update action_plan_requests set status = 'requested'
+where id in (select id from action_plan_requests order by due_on desc limit 5)
+"""
+
+
+def test_очередь_всех_стран_идёт_по_частичному_индексу(pg_dsn: str, сеть: None) -> None:
+    """Принятые копятся годами — очередь УК по всем странам их не читает.
+
+    Разбирается тот же текст запроса, что выполняет код (`_OPEN_SQL`), с
+    охватом УК (вся сеть) и без страны: самый широкий случай.
+    """
+    # Arrange — 8000 принятых и пять открытых.
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("alter table inspections disable trigger user")
+        cur.execute("alter table action_plan_requests disable trigger user")
+        cur.execute(_ТОЧКА_НАГРУЗКИ_SQL)
+        (точка,) = cur.fetchone() or (None,)
+        cur.execute(_МНОГО_ПРИНЯТЫХ_SQL, {"unit_id": точка, "сколько": 8000})
+        cur.execute(_ПЯТЬ_ОТКРЫТЫХ_SQL)
+        cur.execute("alter table inspections enable trigger user")
+        cur.execute("alter table action_plan_requests enable trigger user")
+        conn.commit()
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute("analyze inspections")
+        conn.execute("analyze units")
+        conn.execute("analyze action_plan_requests")
+
+    # Act
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "explain " + _OPEN_SQL,
+            {**reach_of("HQ").params(), "country": None, "limit": plans.LIST_LIMIT + 1},
+        )
+        план = "\n".join(строка[0] for строка in cur.fetchall())
+
+    # Assert
+    assert "action_plan_requests_open_idx" in план, f"очередь не берёт свой индекс:\n{план}"
