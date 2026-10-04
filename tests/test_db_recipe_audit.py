@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -50,7 +50,9 @@ def _слить() -> str:
     """Слить одну проверку на синтетической методике (`domain_env`)."""
     start_inspection(ЧАТ, unit=ТОЧКА, kind="planned", report_lang="ru")
     add_finding(ЧАТ, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(ЧАТ)
+    ident = push_inspection(ЧАТ)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 @requires_db

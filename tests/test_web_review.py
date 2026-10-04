@@ -16,6 +16,7 @@ from src.web.review import build_sheet
     {"code": "hot_kitchen", "name_ru": "Горячий цех", "name_en": "Hot kitchen"},
 )
 
+
 def _пункт(code: str, kind: str, ru: str, en: str, zones: str) -> dict[str, str]:
     return {"id": code, "kind": kind, "question_ru": ru, "question_en": en, "zones": zones}
 
