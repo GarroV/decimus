@@ -44,7 +44,7 @@ from src.domain.kinds import kind_title
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
-from . import accounts, assets, auth, letter_draft, pricing, profile, view
+from . import accounts, assets, auth, letter_draft, people, pricing, profile, view
 from . import country as country_data
 from . import inspections as data
 from . import methodology as method
@@ -990,6 +990,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         bot_link: str | None = None,
         bot_link_until: datetime | None = None,
         password: profile.Outcome | None = None,
+        edit: people.Outcome | None = None,
     ) -> tuple[str, int]:
         # Перечень людей и форма заведения — только админу УК (D288). Остальные
         # видят свою строку: вкладка открыта всем ради привязки бота (D286).
@@ -1037,6 +1038,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 bot_var=WEB_BOT_USERNAME_VAR,
                 password=password,
                 min_password=accounts.MIN_PASSWORD_LENGTH,
+                edit=edit,
             ),
             code,
         )
@@ -1118,6 +1120,50 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         ответ = make_response(страница, код)
         ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
         return ответ
+
+    def _правка_человека(
+        действие: Callable[[str, str], people.Outcome],
+    ) -> FlaskResponse | tuple[str, int]:
+        """Общее у правки роли и почты: заслон, происхождение, пространство из формы.
+
+        Пространство — из строки учётки в перечне, сверенное с заведёнными:
+        человека правят там, где он живёт, а не в пространстве админа.
+        """
+        отказ = _hq_admin_only()
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        логин = (request.form.get("login") or "").strip()
+        try:
+            пространство = _пространство_из_формы()
+        except DbError:
+            return _страница_учёток(edit=people.Outcome("edit.failed", 503), code=503)
+        if пространство is None or not логин:
+            return _страница_учёток(edit=people.Outcome("edit.space", 400), code=400)
+        исход = действие(логин, пространство)
+        return _страница_учёток(edit=исход, code=исход.status)
+
+    @app.post(f"{users_path}/role")
+    def user_role() -> FlaskResponse | tuple[str, int]:
+        """Назначить роль человеку (#399). Только админ УК; свою — нельзя."""
+        вошедший = auth.current_account()
+        свой = вошедший.login if вошедший else ""
+        роль = (request.form.get("role") or "").strip()
+        return _правка_человека(
+            lambda логин, пространство: people.change_role(
+                login=логин, tenant=пространство, role=роль, own_login=свой
+            )
+        )
+
+    @app.post(f"{users_path}/email")
+    def user_email() -> FlaskResponse | tuple[str, int]:
+        """Почта входа через Google (#399): задать или снять (пустое поле). Только админ УК."""
+        почта = request.form.get("email") or ""
+        return _правка_человека(
+            lambda логин, пространство: people.change_email(
+                login=логин, tenant=пространство, email=почта
+            )
+        )
 
     @app.post(f"{users_path}/add")
     def add_user() -> FlaskResponse | tuple[str, int]:
