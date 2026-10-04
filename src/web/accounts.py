@@ -18,27 +18,35 @@ import secrets
 from dataclasses import dataclass
 
 from src.db.web_access import (
+    MAX_PASSWORD_LENGTH,
+    MIN_PASSWORD_LENGTH,
     ROLE_ADMIN,
     ROLE_AUDITOR,
     ROLES,
     AccountRow,
+    change_own_password,
     create_account,
     disable_account,
     list_accounts,
     list_spaces,
-    set_role,
+    reassign_role,
+    set_email,
 )
 
 __all__ = [
+    "MAX_PASSWORD_LENGTH",
+    "MIN_PASSWORD_LENGTH",
     "ROLES",
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
     "AccountRow",
     "Added",
     "add",
+    "change_own_password",
     "disable",
     "everyone",
-    "set_role",
+    "reassign_role",
+    "set_email",
     "spaces",
 ]
 
