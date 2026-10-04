@@ -11,7 +11,7 @@
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
 | `icons.json` | `dodo/core/icons.json` | `f70045d` |
-| `mark-small.svg`, `icon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `dodo/brand/decimus/` | `50352f6` (знак «Глитч-мрамор», 04.10.2026) |
+| `mark-small.svg`, `icon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `dodo/brand/decimus/` | `bdf2787` (знак «Глитч-мрамор» 04.10.2026, ободок плитки 05.10.2026 — D186) |
 
 Знак продукта приехал 04.10.2026 (D185 в MERIDIUS, раздел от 04.10.2026 в
 `dodo/docs/decisions.md` forma) и заменил прежний `favicon.svg`. Геометрия —
