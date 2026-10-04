@@ -225,7 +225,7 @@ def test_кнопка_есть_на_экране_письма(
     assert f"/inspections/{ПРОВЕРКА}/letter/draft" in страница
 
 
-_КНОПКИ_ЗАПИСИ = ("letter.gmail.submit", "letter.export.submit", "letter.save.submit")
+_КНОПКИ_ЗАПИСИ = ("letter.gmail.submit", "letter.save.submit")
 
 
 @pytest.mark.parametrize(("пространство", "видны"), [(ТЕНАНТ, True), ("GE", False)])

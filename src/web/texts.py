@@ -749,13 +749,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "we sent the partner."
         ),
     },
-    # Выгрузка — файл письма `.eml` с той же разметкой, что у черновика
-    # Google: почта открывает его как неотправленное письмо.
-    "letter.export.submit": {"ru": "Скачать письмом .eml", "en": "Download as .eml"},
-    "letter.export.empty": {
-        "ru": "В письме нет текста — скачивать нечего.",
-        "en": "The letter has no text — there is nothing to download.",
-    },
     # Форматирование письма (D169, #332): ровно четыре вида, больше ничего.
     # Буква на кнопке — та, что принята в редакторах этого языка.
     "letter.format.toolbar": {"ru": "Форматирование письма", "en": "Letter formatting"},

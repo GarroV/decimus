@@ -25,7 +25,6 @@ from src.web.app import MoveError, RetractionError
 ЗАПИСЬ = [
     f"/inspections/{ЧУЖАЯ}/retract",
     f"/inspections/{ЧУЖАЯ}/move",
-    f"/inspections/{ЧУЖАЯ}/letter",
     f"/inspections/{ЧУЖАЯ}/letter/save",
     f"/inspections/{ЧУЖАЯ}/letter/draft",
 ]
