@@ -201,3 +201,91 @@ def test_подтверждение_без_отметки_не_проходит(
         pytest.raises(psycopg.errors.CheckViolation),
     ):
         conn.execute("update inspections set status = 'finalized' where id = %s", (ident,))
+
+
+_ВСТАВКА_SQL = (
+    "insert into inspections (tenant_code, unit_id, chat_id, kind, inspection_date, "
+    "report_lang, ui_lang, speech_lang, checklist_version, pct, grade, source_fingerprint{поля}) "
+    "select tenant_code, unit_id, 1, 'planned', current_date, 'ru', 'ru', 'ru', 'v1', 100, 'A', "
+    "%(отпечаток)s{значения} from inspections where id = %(образец)s"
+)
+
+
+@pytest.mark.parametrize(
+    ("поля", "значения"),
+    [
+        # Явно запечатанная с выдуманной отметкой — самый прямой обход приёмки.
+        (", status, accepted_at, accepted_by", ", 'finalized', now(), 'garva'"),
+        # Без статуса: умолчание колонки — `finalized` (0004).
+        ("", ""),
+    ],
+    ids=["запечатанная-с-отметкой", "по-умолчанию"],
+)
+def test_роль_приложения_не_вставляет_проверку_мимо_приёмки(
+    сеть: None, db_env: str, поля: str, значения: str
+) -> None:
+    """Скомпрометированный бот не кладёт в историю проверку, минуя приёмку."""
+    # Arrange
+    образец = _ждущая()
+    отпечаток = f"обход-{поля.count(',')}"
+
+    # Act / Assert
+    with (
+        psycopg.connect(db_env) as conn,
+        pytest.raises(psycopg.errors.InsufficientPrivilege, match="только на приёмку"),
+    ):
+        conn.execute(
+            _ВСТАВКА_SQL.format(поля=поля, значения=значения),
+            {"отпечаток": отпечаток, "образец": образец},
+        )
+    with psycopg.connect(db_env) as conn:
+        row = conn.execute(
+            "select count(*) from inspections where source_fingerprint = %s", (отпечаток,)
+        ).fetchone()
+    assert row == (0,)
+
+
+def test_роль_приложения_вставляет_ждущую(сеть: None, db_env: str) -> None:
+    """Сторож вставки различает статус, а не запрещает вставку вообще."""
+    # Arrange
+    образец = _ждущая()
+
+    # Act
+    with psycopg.connect(db_env) as conn:
+        conn.execute(
+            _ВСТАВКА_SQL.format(поля=", status", значения=", 'draft'"),
+            {"отпечаток": "ждущая-вручную", "образец": образец},
+        )
+        conn.commit()
+        row = conn.execute(
+            "select status, accepted_at from inspections where source_fingerprint = %s",
+            ("ждущая-вручную",),
+        ).fetchone()
+
+    # Assert
+    assert row == ("draft", None)
+
+
+def test_отклонённую_ждущую_не_подтверждают(сеть: None, pg_dsn: str, db_env: str) -> None:
+    """Подтверждение вернуло бы в историю отозванный документ — база отказывает."""
+    # Arrange — отклонённая ждущая (путём продукта её не получить; ставит владелец).
+    ident = _ждущая()
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute(
+            "update inspections set retracted_at = now(), retraction_reason = 'дубль' "
+            "where id = %s",
+            (ident,),
+        )
+        conn.commit()
+
+    # Act / Assert
+    with (
+        psycopg.connect(admin_role_dsn(db_env)) as conn,
+        pytest.raises(psycopg.errors.CheckViolation, match="отклонена"),
+    ):
+        conn.execute(
+            "update inspections set status = 'finalized', accepted_at = now(), "
+            "accepted_by = 'garva' where id = %s",
+            (ident,),
+        )
+    assert _статус(db_env, ident)[0] == "draft"

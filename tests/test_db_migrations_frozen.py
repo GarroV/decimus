@@ -151,7 +151,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Этап приёмки (D199). Номера 0032–0033 заняты веткой доступа (#484).
     "0034_inspection_acceptance.sql": (
-        "sql1:64abfd79af27b23321992e6933437dc11aa126a6ea3df819406213437ddfee48"
+        "sql1:dddc35114711d27b8665c679b99393924bdede70e20c9fb42913d328c8d0357a"
     ),
 }
 
