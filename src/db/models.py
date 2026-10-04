@@ -68,6 +68,12 @@ class InspectionRow:
     #: кто читает с `include_retracted=True`.
     retracted: bool = False
     retraction_reason: str = ""
+    #: Этап приёмки (D199). `on_review` — проверка обойдена, но ещё не вычитана
+    #: и не подтверждена человеком; в историю сети она не входит. Кто и когда
+    #: подтвердил — пусто у ждущих и у принятых до появления этапа (0034).
+    on_review: bool = False
+    accepted_at: str = ""
+    accepted_by: str = ""
 
 
 @dataclass(frozen=True)

@@ -104,6 +104,33 @@ def set_retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return dsn
 
 
+def accept_pushed(*ids: str, dsn: str | None = None) -> None:
+    """Подтвердить слитые проверки так, как это делает человек на приёмке (D199).
+
+    Слив кладёт проверку на приёмку, и в историю — в списки, обзор, находки
+    точки — она попадает только после подтверждения. Тесту, которому нужна
+    именно история, приходится подтвердить проверку тем же путём, что и
+    админке: под ролью администратора истории. Без `ids` — все ждущие.
+
+    `dsn` — подключение приложения (`db_env`); не задано — то, что выставила
+    фикстура `db_env` в окружение. Ни того, ни другого — отказ, а не тихий
+    пропуск: тест, которому не подтвердили проверку, читал бы пустую историю.
+    """
+    import psycopg
+
+    основа = dsn or os.environ.get("DATABASE_URL", "")
+    if not основа:
+        raise AssertionError("accept_pushed: нет подключения — тесту нужна фикстура db_env")
+    with psycopg.connect(admin_role_dsn(основа)) as conn:
+        conn.execute(
+            "update inspections set status = 'finalized', accepted_at = now(), "
+            "accepted_by = 'test' where status = 'draft' and retracted_at is null "
+            "and (%(all)s or id = any(%(ids)s::uuid[]))",
+            {"all": not ids, "ids": list(ids)},
+        )
+        conn.commit()
+
+
 #: Роли, которые заводит накат: приложение (`0004`) и администратор истории
 #: (`0010`). Список нужен переименованию ниже, и он же сторожит сам себя —
 #: роль, которой не нашлось ни в одном файле миграций, считается опечаткой и
@@ -227,12 +254,17 @@ def слить_проверку(
     chat_id: int | None = None,
     text: str = "нагар на печи",
     date: str | None = None,
+    accept: bool = True,
 ) -> str:
     """Завершённая проверка через официальный контракт домена и слив; её `id`.
 
     Нужны `domain_env` (каталог состояния) и `db_env` (база) — фикстуры
     вызывающего. Имя не `push_inspection`: так называется слив по чату в
     `src.db.push`, и одноимённый помощник с другой сигнатурой путал бы (Н23).
+
+    По умолчанию проверка ещё и подтверждается (D199): наборам этого помощника
+    нужна история сети, а ждущая приёмки в историю не входит. `accept=False` —
+    оставить её на приёмке.
     """
     from src.db.push import push_inspection
     from src.domain import add_finding, start_inspection
@@ -240,7 +272,10 @@ def слить_проверку(
     чат = next(_номер_чата) if chat_id is None else chat_id
     start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant, date=date)
     add_finding(чат, code="CLN03", level="D1", zone="hot_kitchen", text=text)
-    return push_inspection(чат)
+    ident = push_inspection(чат)
+    if accept:
+        accept_pushed(ident)
+    return ident
 
 
 def привязать_пространства(pg_dsn: str, *tenants: str) -> None:
