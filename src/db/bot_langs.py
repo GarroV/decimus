@@ -4,13 +4,29 @@
 бота, здесь не решается — это знает бот (`src/bot/texts.py: UI_LANGS`); база
 держит только форму кода.
 
-Отказ базы — `AccessError` (через `_connected`), а не `None`: «выбора нет» и
-«не смогли посмотреть» — разные ответы, и бот обязан их различать.
+Отказ базы — `AccessError`, а не `None`: «выбора нет» и «не смогли
+посмотреть» — разные ответы, и бот обязан их различать.
+
+**Подключение своё, с коротким сроком** (ревью #492, п.1). Выбор языка нужен
+на каждом сообщении человека, и у него есть честное умолчание, поэтому ждать
+базу дольше `CONNECT_TIMEOUT_S` секунд незачем. Общее `web_access._connected`
+срока не задаёт, и менять его ради этого модуля значило бы менять поведение
+всем остальным его вызовам.
 """
 
 from __future__ import annotations
 
-from .web_access import _connected
+from collections.abc import Iterator
+from contextlib import contextmanager
+from typing import Any
+
+import psycopg
+
+from .config import check_environment
+from .errors import AccessError
+
+#: Сколько ждать установления связи с базой, секунд (минимум libpq — 2).
+CONNECT_TIMEOUT_S = 3
 
 _CHOSEN_SQL = "select ui_lang from bot_ui_langs where telegram_id = %s"
 _CHOOSE_SQL = """
@@ -18,6 +34,21 @@ _CHOOSE_SQL = """
     on conflict (telegram_id) do update
        set ui_lang = excluded.ui_lang, chosen_at = now()
 """
+
+
+@contextmanager
+def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
+    """Подключение роли приложения с коротким сроком. Наружу — ТИП ошибки, не текст.
+
+    В тексте psycopg может оказаться строка подключения целиком — тот же приём,
+    что у `web_access._connected`.
+    """
+    settings = check_environment()
+    try:
+        with psycopg.connect(settings.dsn, connect_timeout=CONNECT_TIMEOUT_S) as conn:
+            yield conn
+    except psycopg.Error as exc:
+        raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
 def chosen_lang(telegram_id: int) -> str | None:

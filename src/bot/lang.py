@@ -84,7 +84,8 @@ def pick_ui_lang(*, chosen: str | None, started: str | None) -> str:
 
 def _chosen(telegram_id: int) -> str | None:
     try:
-        return lang_choice.CHOICES.chosen(telegram_id)
+        # Только память: в базу ходит мидлварь, в потоке (ревью #492, п.1).
+        return lang_choice.CHOICES.cached(telegram_id)
     except Exception:
         logger.exception("выбор языка человека %s не прочитался — как без выбора", telegram_id)
         return None

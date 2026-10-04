@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 
 from aiogram import F, Router
@@ -50,7 +51,8 @@ def build_lang_router() -> Router:
             await callback.answer()
             return
         try:
-            lang_choice.CHOICES.choose(callback.from_user.id, code)
+            # В потоке: запись в базу не должна держать цикл событий (ревью #492).
+            await asyncio.to_thread(lang_choice.CHOICES.choose, callback.from_user.id, code)
         except Exception:
             # Широко, как и всё вокруг выбора языка: человеку нужен ответ, а
             # разбор — в журнал целиком.
