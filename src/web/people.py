@@ -1,7 +1,7 @@
 """Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399).
 
 Раньше почта привязывалась только командой (`tools/web_user.py email`), роль —
-тоже. Экран зовёт те же двери базы (`set_role`, `set_email`) под той же ролью
+тоже. Экран зовёт те же двери базы (`reassign_role`, `set_email`) под той же ролью
 повышенных полномочий, что заведение и отключение.
 
 Здесь — только проверка ввода и перевод исхода в код ответа. Кому можно
@@ -16,12 +16,18 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 
 from src.db.errors import DbError, EmailTakenError
 
 from . import accounts
+
+#: След правки людей — строкой журнала приложения, без отдельной таблицы:
+#: кто правил, кого, было → стало. Сам адрес почты в журнал не пишется —
+#: только факт, что почту задали или сняли. Людям ничего не отправляется.
+logger = logging.getLogger(__name__)
 
 #: Почта — грубой формой: «что-то@что-то.что-то» без пробелов. Подтверждает её
 #: не эта проверка, а Google при входе; здесь ловится опечатка вроде логина в
@@ -56,13 +62,26 @@ def change_role(
     if is_self(login=login, tenant=tenant, actor_login=actor_login, actor_tenant=actor_tenant):
         return Outcome("role.self", 400)
     try:
-        назначена = accounts.set_role(login, tenant=tenant, role=role)
+        прежняя = accounts.reassign_role(login, tenant=tenant, role=role)
     except DbError:
         return Outcome("role.failed", 503)
-    return Outcome("role.ok", 200) if назначена else Outcome("edit.missing", 200)
+    if прежняя is None:
+        return Outcome("edit.missing", 200)
+    logger.info(
+        "люди: роль сменена; правил %s/%s, кому %s/%s, было %s, стало %s",
+        actor_tenant,
+        actor_login,
+        tenant,
+        login.strip().lower(),
+        прежняя,
+        role,
+    )
+    return Outcome("role.ok", 200)
 
 
-def change_email(*, login: str, tenant: str, email: str) -> Outcome:
+def change_email(
+    *, login: str, tenant: str, email: str, actor_login: str, actor_tenant: str
+) -> Outcome:
     """Привязать почту входа через Google; пустая — снять (пароль и учётка остаются)."""
     почта = email.strip()
     if почта and not EMAIL_SHAPE.match(почта):
@@ -75,4 +94,12 @@ def change_email(*, login: str, tenant: str, email: str) -> Outcome:
         return Outcome("email.failed", 503)
     if not сделано:
         return Outcome("edit.missing", 200)
+    logger.info(
+        "люди: почта входа через Google %s; правил %s/%s, кому %s/%s",
+        "задана" if почта else "снята",
+        actor_tenant,
+        actor_login,
+        tenant,
+        login.strip().lower(),
+    )
     return Outcome("email.ok" if почта else "email.removed", 200)
