@@ -21,8 +21,8 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping
-from dataclasses import replace
 
 from src.db import queries, revise
 from src.db.errors import ReviseError
@@ -34,6 +34,8 @@ from src.report.rescore import rescore
 
 from .errors import MethodologyRefused
 from .review import VIOLATION, checklist_of
+
+logger = logging.getLogger(__name__)
 
 #: Порог слов в формулировке: запись печатается в отчёте партнёру строкой.
 MAX_TEXT = 1000
@@ -82,7 +84,10 @@ def revise_card(
     try:
         состав = checklist_of(detail.inspection, lang=lang)
     except MethodologyRefused as exc:
-        raise ReviseError(f"Чек-лист этой проверки не прочитан, сверять не с чем: {exc}") from exc
+        # Подробность (имена переменных окружения, пути хранилища) — в журнал
+        # сервера, не на экран: человеку она ничего не даёт, а устройство стенда выдаёт.
+        logger.warning("правка записи: чек-лист проверки %s не прочитан: %s", inspection_id, exc)
+        raise ReviseError("Чек-лист этой проверки не прочитан, сверять не с чем") from exc
     пункт = next((i for i in состав.items if str(i.get("id", "")) == код), None)
     if пункт is None or (пункт.get("kind") or VIOLATION).strip() != VIOLATION:
         raise ReviseError(f"Пункта нарушения {код} в чек-листе версии этой проверки нет")
@@ -97,23 +102,18 @@ def revise_card(
     свои = _zones(пункт)
     необычная = bool(свои) and свои != ("*",) and зона not in свои
 
-    исправленная = replace(
-        прежняя, code=код, level=класс, zone=зона, zone_unusual=необычная, text=слова
-    )
-    новая = replace(
-        detail,
-        findings=tuple(исправленная if f.id == finding_id else f for f in detail.findings),
-    )
+    бумаги = letter_sources()
     try:
-        оценка = rescore(новая, papers=letter_sources())
+        revise.revise_finding(
+            inspection_id,
+            finding_id,
+            tenant=tenant,
+            revision=revise.Revision(
+                code=код, level=класс, zone=зона, zone_unusual=необычная, text=слова
+            ),
+            # Движок считает ВНУТРИ транзакции правки, после замка проверки:
+            # соседняя правка той же проверки уже учтена (`src/db/revise.py`).
+            score_of=lambda current: rescore(current, papers=бумаги),
+        )
     except LetterError as exc:
         raise ReviseError(f"Пересчитать проверку не удалось, запись не тронута: {exc}") from exc
-    revise.revise_finding(
-        inspection_id,
-        finding_id,
-        tenant=tenant,
-        revision=revise.Revision(
-            code=код, level=класс, zone=зона, zone_unusual=необычная, text=слова
-        ),
-        score=оценка,
-    )

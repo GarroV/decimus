@@ -129,7 +129,9 @@ def checklist_of(head: InspectionRow, *, lang: str) -> method.Composition:
 
     Отказ — `MethodologyRefused`, в том числе когда хранилище методики не
     задано: «чек-листа нет» и «не прочитали» снаружи различать незачем, а
-    чинить — да, и поимённо названная переменная уходит в текст отказа.
+    чинить — да, и поимённо названная переменная уходит в текст отказа. Этот
+    текст — для журнала сервера: на экран его не выводят (`load_sheet`,
+    `revision.revise_card`).
     """
     state = method.load_store()
     if state.store is None:

@@ -13,6 +13,7 @@ from src.db.models import FindingRow, InspectionDetail, InspectionRow
 from src.db.reach import reach_of
 from src.domain.models import Score
 from src.web import revision
+from src.web.errors import MethodologyRefused
 from src.web.methodology import Composition
 
 ЗАПИСЬ = "22222222-2222-2222-2222-222222222222"
@@ -87,8 +88,10 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         журнал["посчитано"] = detail
         return ОЦЕНКА
 
-    def записать(*_a: Any, **kw: Any) -> None:
-        журнал["записано"] = kw
+    def записать(_inspection: str, finding: str, **kw: Any) -> None:
+        # Как настоящая правка: движку — проверка с уже применённой правкой.
+        текущая = revision.revise._revised(журнал["проверка"], finding, kw["revision"])
+        журнал["записано"] = {**kw, "score": kw["score_of"](текущая)}
 
     monkeypatch.setattr(revision, "rescore", пересчитать)
     monkeypatch.setattr(revision.revise, "revise_finding", записать)
@@ -167,3 +170,24 @@ def test_чужая_запись_не_правится(стенд: dict[str, Any
     стенд["проверка"] = replace(проверка, findings=(replace(проверка.findings[0], id="другая"),))
     with pytest.raises(ReviseError, match="Такой записи"):
         _исправить()
+
+
+def test_непрочитанный_чек_лист_не_выдаёт_устройство_стенда(
+    стенд: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Имя переменной окружения — в журнал сервера, на экран — только «не прочитан»."""
+
+    # Arrange
+    def отказать(*_a: Any, **_k: Any) -> None:
+        raise MethodologyRefused("хранилище методики не задано: MCP_CHECKLIST_STORE")
+
+    monkeypatch.setattr(revision, "checklist_of", отказать)
+
+    # Act
+    with pytest.raises(ReviseError) as отказ:
+        _исправить()
+
+    # Assert
+    assert "не прочитан" in str(отказ.value)
+    assert "MCP_CHECKLIST_STORE" not in str(отказ.value)
+    assert "записано" not in стенд
