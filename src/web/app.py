@@ -966,6 +966,15 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         текст = request.form.get("text") or ""
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
+        if detail.inspection.on_review:
+            # Письмо фиксируется как ушедшее партнёру; по непринятой проверке
+            # (D199) такой записи быть не должно. Смотреть письмо можно.
+            return redirect(
+                url_for(
+                    "letter", inspection_id=inspection_id, letter_lang=письмо_на, saved="on_review"
+                ),
+                code=303,
+            )
         вошедший = auth.current_account()
         try:
             data.remember_letter(
