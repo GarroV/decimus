@@ -43,6 +43,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import AccessError
+from .space_guard import require_space
 
 #: Сколько случайных байт в токене. 32 байта → 43 знака `token_urlsafe`, то
 #: есть заведомо длиннее нижней границы, которую сервер требует от токенов из
@@ -91,7 +92,6 @@ update mcp_tokens set revoked_at = now(), revoked_by = %(by)s
 where telegram_id = %(who)s and revoked_at is null
 """
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
 
 #: Выпуск. Имя запроса намеренно без слова «token»: линтер видит его в имени
 #: константы и считает строку зашитым секретом (S105). Спорить с ним
@@ -330,7 +330,8 @@ def issue_token(telegram_id: int, *, tenant: str) -> IssuedToken:
             )
         cur.execute(_REVOKE_TOKENS_SQL, {"who": telegram_id, "by": telegram_id})
         replaced = cur.rowcount > 0
-        cur.execute(_INSERT_TENANT_SQL, (tenant,))
+        # Пространство не заводится выпуском токена: незаведённое — отказ (#481).
+        require_space(cur, tenant, error=AccessError)
         cur.execute(
             _INSERT_ISSUED_SQL,
             {"who": telegram_id, "tenant": tenant, "fingerprint": token_fingerprint(token)},

@@ -12,6 +12,7 @@ import time
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -34,6 +35,7 @@ pytestmark = requires_db
 @pytest.fixture
 def учётки(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    завести_пространства(pg_dsn, "GE", "HQ")
     return {
         "ge": create_account("ge-auditor", tenant="GE", password=ПАРОЛЬ).id,
         "hq": create_account("hq-auditor", tenant="HQ", password=ПАРОЛЬ).id,

@@ -32,6 +32,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment, load_retraction_settings
 from .errors import SynonymError
+from .space_guard import require_space
 
 #: Арендатор по умолчанию — то же значение, что у `directory.DEFAULT_TENANT`.
 DEFAULT_TENANT = HQ_TENANT
@@ -199,7 +200,6 @@ returning item_code, lang, phrase, phrase_normalized, origin, created_at,
           retracted_at, retraction_reason, corrected_at, correction_reason, previous_item_code
 """
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
 
 # Карта берётся целиком намеренно, без предела выдачи: синонимов у арендатора
 # столько, сколько пунктов методики, помноженных на способы их назвать, —
@@ -331,7 +331,8 @@ def remember_phrase(
     try:
         with psycopg.connect(settings.dsn) as conn:
             with conn.cursor() as cur:
-                cur.execute(_INSERT_TENANT_SQL, (tenant,))
+                # Пространство не заводится синонимом: незаведённое — отказ (#481).
+                require_space(cur, tenant, error=SynonymError)
                 cur.execute(_REMEMBER_SQL, params)
                 row = cur.fetchone()
                 if row is not None:

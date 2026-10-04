@@ -51,6 +51,7 @@ from .config import check_environment, load_retraction_settings
 from .errors import AccessError, ConfigError, EmailTakenError
 from .migrate import admin_dsn
 from .reading import reading
+from .space_guard import require_space
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
 #: посреди работы, длиннее — забытая на чужом экране вкладка переживает ночь.
@@ -92,8 +93,6 @@ MIN_PASSWORD_LENGTH = 12
 #: границе, а не защита от инъекции (её держат параметры запроса).
 LOGIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9._-]{1,63}$")
 
-_INSERT_TENANT_SQL = "insert into tenants (code) values (%s) on conflict (code) do nothing"
-_SELECT_TENANT_SQL = "select 1 from tenants where code = %s"
 
 _INSERT_USER_SQL = """
     insert into web_users (tenant_code, login, password_hash, role)
@@ -428,26 +427,19 @@ def _checked_login(login: str) -> str:
     return имя
 
 
-def _ensure_tenant(tenant: str) -> None:
-    """Убедиться, что арендатор заведён; завести — только если его нет.
+def _require_tenant(tenant: str) -> None:
+    """Пространство учётки обязано быть заведено — иначе отказ (#481).
 
-    Разделено намеренно. Заводить ЧЕЛОВЕКА — обычная работа админки, и она
-    идёт под узкой ролью. Заводить АРЕНДАТОРА — работа уровня схемы, и права
-    на неё есть только у владельца схемы: новый арендатор это новый заказчик,
-    а не новый сотрудник.
+    Раньше незаведённое пространство здесь же и заводилось ролью владельца
+    схемы, и опечатка в коде (`HQQ` вместо `HQ`) давала человеку новое пустое
+    пространство вместо отказа. Пространства заводит команда (`make space`),
+    строку `HQ` — схема (`0029`).
 
-    Проверка идёт под ролью приложения, потому что читать список арендаторов
-    ей можно. Без этой проверки заведение человека в СУЩЕСТВУЮЩЕМ арендаторе
-    требовало бы прав владельца схемы — то есть веб-процесс пришлось бы пускать
-    в базу с правом снести её целиком ради обычной кнопки «добавить».
+    Проверка идёт под ролью приложения: читать список пространств ей можно, а
+    заводящей человека роли это право незачем.
     """
-    with _connected("проверить арендатора") as conn, conn.cursor() as cur:
-        cur.execute(_SELECT_TENANT_SQL, (tenant,))
-        if cur.fetchone() is not None:
-            return
-    with _owned(f"завести арендатора «{tenant}»") as conn, conn.cursor() as cur:
-        cur.execute(_INSERT_TENANT_SQL, (tenant,))
-        conn.commit()
+    with _connected("проверить пространство") as conn, conn.cursor() as cur:
+        require_space(cur, tenant, error=AccessError)
 
 
 def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
@@ -463,7 +455,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # бы админов молча.
     роль = _checked_role(role)
     хеш = password_hash(_checked_password(password))
-    _ensure_tenant(tenant)
+    _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
         try:
             cur.execute(_INSERT_USER_SQL, (tenant, имя, хеш, роль))
