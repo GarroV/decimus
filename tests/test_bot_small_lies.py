@@ -68,23 +68,35 @@ async def test_устаревшее_предложение_не_винит_пе�
     assert "перезапус" not in session.last_text.lower(), "названа причина, которой не было"
 
 
-# --- язык интерфейса следует за выбором аудитора -----------------------------
+# --- язык интерфейса — язык человека, а не отчёта (D303) ----------------------
 
 
-async def test_выбранный_язык_ложится_во_все_три_поля(domain_env: Path) -> None:
-    """Поля разные и остаются разными, но из бота их наконец задают."""
-    await пройти_мастер("en")
+async def test_язык_отчёта_не_переключает_язык_бота(domain_env: Path) -> None:
+    """До D303 английский отчёт заодно переключал разговор; теперь поля живут порознь.
+
+    Речь по-прежнему идёт за отчётом (отдельного вопроса о ней нет), интерфейс —
+    за человеком: без выбора это язык стенда.
+    """
+    session = await пройти_мастер("en")
 
     проверка = get_state(CHAT_ID)
     assert проверка is not None
-    assert (проверка.report_lang, проверка.ui_lang, проверка.speech_lang) == ("en", "en", "en")
+    assert (проверка.report_lang, проверка.ui_lang, проверка.speech_lang) == ("en", "ru", "en")
+    assert session.last_text.startswith("Проверка начата"), "отчёт перекрасил язык бота"
 
 
-async def test_после_выбора_английского_разговор_идёт_по_английски(domain_env: Path) -> None:
-    """То самое расхождение: отчёт английский, а диалог оставался русским."""
-    session = await пройти_мастер("en")
+async def test_выбранный_язык_бота_ведёт_разговор_и_ложится_в_проверку(
+    domain_env: Path, выборы_языка: dict[int, str]
+) -> None:
+    """Выбор человека (`/lang`) — язык интерфейса новой проверки; отчёт свой."""
+    выборы_языка[AUDITOR_ID] = "en"
 
-    assert session.last_text.startswith("Inspection started"), "диалог остался на прежнем языке"
+    session = await пройти_мастер("ru")
+
+    проверка = get_state(CHAT_ID)
+    assert проверка is not None
+    assert (проверка.report_lang, проверка.ui_lang) == ("ru", "en")
+    assert session.last_text.startswith("Inspection started"), "выбор человека не услышан"
 
 
 async def test_русский_выбор_разговор_не_меняет(domain_env: Path) -> None:

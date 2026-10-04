@@ -183,8 +183,12 @@ async def test_resume_buttons_speak_the_language_of_the_inspection(
 async def test_started_inspection_outranks_the_deployment_language(
     domain_env: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Английский стенд с русской проверкой говорит по-русски — иначе поле мертво."""
-    monkeypatch.setenv(UI_LANG_VAR, "en")
+    """Проверка, начатая по-русски, остаётся русской, когда стенд переключили на английский.
+
+    Иначе поле мертво — и язык менялся бы посреди обхода сам по себе. С D303
+    язык новой проверки берётся у человека (без выбора — у стенда), поэтому
+    стенд переключается уже после старта.
+    """
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await walk_wizard_to_language(dp, bot)
@@ -194,6 +198,7 @@ async def test_started_inspection_outranks_the_deployment_language(
     inspection = get_state(CHAT_ID)
     assert inspection is not None
     assert inspection.ui_lang == "ru"
+    monkeypatch.setenv(UI_LANG_VAR, "en")
     session.clear()
     await feed(dp, bot, text_message("/start"))
     assert session.keyboard_texts() == [
