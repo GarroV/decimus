@@ -43,6 +43,42 @@
     проверку не мог никто и снятых нет. Предупреждение о невозможном — шум.
   #}
 
+  {# Ждущие приёмки (D199) — отдельным блоком над историей и мимо отбора:
+     их мало, и ни одна не должна потеряться за выбранной буквой. Блок идёт
+     по охвату вошедшего: УК видит здесь и ждущие партнёра — на чтение. #}
+  {% if registry.review %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('registry.review.title') }}</div>
+        <div class="ov-card__count">{{ registry.review|length }}</div>
+      </div>
+      <p class="field-note">{{ t('registry.review.hint') }}</p>
+      {% for row in registry.review %}
+        <a class="ins-row" href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
+          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+          <span class="ins-row__main">
+            <span class="ins-row__title">
+              <span class="ins-row__unit">{{ row.unit_name }}</span>
+              <span class="ins-row__score">{{ row.pct }}</span>
+            </span>
+            <span class="ins-row__meta">
+              {{ row.inspection_date }} ·
+              {{ kind_title(row.kind, lang) }} ·
+              {% if row.city %}{{ city_title(row.city) }} · {% endif %}
+              {{ row.auditor or '—' }} ·
+              {{ t('registry.col.findings') }}: {{ row.findings_count }}
+            </span>
+          </span>
+          <span class="ins-row__state">
+            <span class="ov-dot ov-dot--warn"></span>
+            <span class="ins-row__state-text">{{ t('state.review') }}</span>
+          </span>
+          <span class="ins-row__go">›</span>
+        </a>
+      {% endfor %}
+    </section>
+  {% endif %}
+
   {% if rows %}
     <section class="ov-card ov-card--wide">
       {% for row in rows %}

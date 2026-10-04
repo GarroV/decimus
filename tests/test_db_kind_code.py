@@ -25,6 +25,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -133,6 +134,7 @@ def test_чтение_отдаёт_код_и_по_нему_есть_слово_�
     """
     _проверка(804)
     ident = push_inspection(804)
+    accept_pushed(ident)  # D199: тесту нужна принятая
 
     подробно = get_inspection(ident, reach=own_reach(АРЕНДАТОР))
     (строка,) = list_inspections(reach=own_reach(АРЕНДАТОР))

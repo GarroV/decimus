@@ -23,6 +23,7 @@ from typing import Any
 
 import pytest
 from conftest import APP_ROLE, requires_db
+from db_harness import accept_pushed, admin_role_dsn
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -36,7 +37,9 @@ def _завершённая(chat_id: int = 301) -> str:
     """Проверка, слитая продуктовым путём: она и есть «документ, ушедший партнёру»."""
     start_inspection(chat_id, unit="Белград-1", kind="planned", report_lang="ru")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int:
@@ -189,6 +192,7 @@ def test_кадр_завершённой_проверки_нельзя_удал�
     add_finding(302, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     attach_photo(302, 1, "file-302")
     inspection_id = push_inspection(302)
+    accept_pushed(inspection_id)
 
     удаление = _выполнить(db_env, "delete from photos where inspection_id = %s", (inspection_id,))
 
@@ -208,6 +212,7 @@ def test_кадр_выгружается_один_раз_и_дальше_зам�
     add_finding(303, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     attach_photo(303, 1, "file-303")
     inspection_id = push_inspection(303)
+    accept_pushed(inspection_id)
 
     выгрузка = _выполнить(
         db_env,
@@ -268,8 +273,12 @@ def test_незапечатанную_проверку_править_можно
     правка_черновика = _выполнить(
         db_env, "update inspections set pct = 91 where id = %s", (черновик_id,)
     )
+    # Печатает теперь только администратор истории, с подписью (D199, 0034).
     печать = _выполнить(
-        db_env, "update inspections set status = 'finalized' where id = %s", (черновик_id,)
+        admin_role_dsn(db_env),
+        "update inspections set status = 'finalized', accepted_at = now(), "
+        "accepted_by = 'test' where id = %s",
+        (черновик_id,),
     )
     правка_после = _выполнить(
         db_env, "update inspections set pct = 100 where id = %s", (черновик_id,)

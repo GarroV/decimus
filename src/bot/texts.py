@@ -295,14 +295,15 @@ TEXTS: dict[str, dict[str, str]] = {
     # слова об одном и том же читались бы как разные запреты.
     "sealed.blocked": {
         "ru": (
-            "Эта проверка сдана — отчёт по ней собран, отправлен и уехал в историю точки. "
+            "Эта проверка сдана — отчёт по ней собран, отправлен и ушёл на приёмку в админку. "
             "Дописывать и править её нельзя: у получателя на руках другой документ, "
             "и та же проверка встала бы в историю второй строкой.\n\n"
             "Начните новую проверку — или уберите сданную из чата."
         ),
         "en": (
-            "This inspection is handed over — its report was built, sent and archived in "
-            "the unit’s history. It can be neither extended nor edited: the recipient "
+            "This inspection is handed over — its report was built, sent and passed on "
+            "for review in the admin panel. It can be neither extended nor edited here: "
+            "the recipient "
             "holds a different document, and the same inspection would land in the "
             "history a second time.\n\n"
             "Start a new inspection — or remove the handed-over one from the chat."
