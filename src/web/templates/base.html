@@ -29,7 +29,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{{ t('app.name') }} · {% block title %}{{ t('app.mark') }}{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  {#
+    Знак продукта — «Глитч-мрамор» (D185 MERIDIUS; канон и геометрия — forma,
+    `dodo/brand/`). Файлы — копии раскатки, здесь не правятся. Малый SVG — во
+    вкладку и в марку панели; PNG 32 — вкладке браузера, не знающего SVG;
+    apple-touch — плитке на домашнем экране iPhone; манифест — иконкам Android.
+  #}
+  <link rel="icon" href="{{ url_for('static', filename='mark-small.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='icon-32.png') }}" type="image/png" sizes="32x32">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='site.webmanifest') }}">
   {#
     Тема ставится ДО первой отрисовки, иначе тёмная мигает светлой на каждом
     переходе. Выбор человека — в localStorage, «как в системе» — отсутствие
@@ -52,7 +61,7 @@
     <header class="topbar">
       <div class="topbar__inner">
         <div class="topbar__brand">
-          <img class="topbar__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+          <img class="topbar__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
           <span class="topbar__name">{{ t('app.name') }}</span>
           <span class="topbar__mark">Dodo</span>
         </div>
@@ -70,7 +79,7 @@
     #}
     <header class="mbar">
       <a class="mbar__brand" href="{{ url('/overview') }}?lang={{ lang }}">
-        <img class="topbar__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+        <img class="topbar__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
         <span class="topbar__name">{{ t('app.name') }}</span>
       </a>
       <span class="topbar__spacer"></span>
@@ -83,7 +92,7 @@
     {% if account %}
       <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
         <a class="sidenav__brand" href="{{ url('/overview') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
-          <img class="sidenav__logo" src="{{ url_for('static', filename='favicon.svg') }}" alt="">
+          <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
           <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
         </a>
 
