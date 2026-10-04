@@ -149,6 +149,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0033_definer_search_path.sql": (
         "sql1:1c82c43ad0df14ac507789d39802e980ed4fa89d50aaa2d3eab950a06c37d376"
     ),
+    # Заведена вместе с файлом (D303, #411) и нигде ещё не применена.
+    "0035_bot_ui_langs.sql": (
+        "sql1:46314c2b24a72f1e01a7dfdffd02cb32836205a4abd8196215ea004db41807a2"
+    ),
 }
 
 
