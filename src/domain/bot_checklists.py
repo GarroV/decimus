@@ -2,7 +2,9 @@
 
 Что открыто в боте, решает методист в админке — флагом в карточке чек-листа
 (`src/mcp/checklists.py: set_bot_access`). Здесь это только читается: бот
-ничего в хранилище не пишет, том ему смонтирован на чтение.
+ничего в хранилище не пишет, том ему смонтирован на чтение. Раскладку
+хранилища и годность чек-листа к боту бот берёт ярусом ниже, у себя в
+`src.domain` (`checklist_store`), — звать `src.mcp` ему нельзя (#455).
 
 Без хранилища (`MCP_CHECKLIST_STORE` не задан, как в разработке и на демо) бот
 ведёт себя слово в слово как до волны 3: чек-лист один, `bizdev`, методика —
@@ -20,24 +22,28 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.mcp.checklist_layout import (
+from .checklist_store import (
     ACTIVE,
     CURRENT_LINK,
     DEFAULT_SPACE,
     Store,
     applied,
+    bot_block,
     bot_spaces,
     in_bot_of,
     known,
     read_meta,
 )
-
+from .checklist_store import (
+    DEFAULT_CODE as _DEFAULT_CODE,
+)
 from .config import Settings
 from .errors import DomainError
 from .tenants import canonical_tenant
 
 #: Код чек-листа по умолчанию — тот, что был единственным до множественности.
-DEFAULT_CODE = "bizdev"
+#: Объявлен один раз (`src/domain/edition.py`), здесь только переиздан.
+DEFAULT_CODE = _DEFAULT_CODE
 
 
 @dataclass(frozen=True)
@@ -72,10 +78,6 @@ def available(settings: Settings, *, tenant: str) -> list[BotChecklist]:
     (D285, D227): в работе, с опубликованным изданием и пунктами (`bot_block`),
     независимо от того, открыла ли их УК своему боту.
     """
-    # Отложенный импорт: `src.mcp.checklists` тянет `src.domain.config`, а пакет
-    # `src.domain` при загрузке тянет этот модуль — на верхнем уровне вышел бы круг.
-    from src.mcp.checklists import bot_block
-
     root = settings.checklist_store
     if root is None or not root.is_dir() or not known(root):
         return _legacy(settings)
