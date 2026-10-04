@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 pytest.importorskip("psycopg")
 
@@ -30,7 +30,9 @@ def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
 
 def _сданная(chat_id: int) -> str:
     start_inspection(chat_id, unit="Белград-1", kind="planned", report_lang="ru", tenant="default")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def test_дата_сборки_без_снятой_и_без_чужой(domain_env: Path, admin_env: str) -> None:

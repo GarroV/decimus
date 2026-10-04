@@ -20,7 +20,7 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from db_harness import привязать_пространства, точка_пространства  # noqa: E402
+from db_harness import accept_pushed, привязать_пространства, точка_пространства  # noqa: E402
 
 from src.db.errors import DbError  # noqa: E402 — после importorskip намеренно
 from src.db.push import push_inspection  # noqa: E402
@@ -51,7 +51,9 @@ def _проверка(chat_id: int, *, арендатор: str, точка: str 
     точка_пространства(точка, tenant=арендатор)
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def test_выборка_не_отдаёт_проверки_чужого_арендатора(domain_env: Path, db_env: str) -> None:
@@ -210,6 +212,7 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
                     "limit": DEFAULT_LIMIT,
                     "date_from": None,
                     "date_to": None,
+                    "on_review": False,  # D199: очередь истории, не приёмки
                 },
             )
             план = "\n".join(строка[0] for строка in cur.fetchall())

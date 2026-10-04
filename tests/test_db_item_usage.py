@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env
+from db_harness import accept_pushed, set_retraction_env
 
 pytest.importorskip("psycopg")
 
@@ -39,7 +39,9 @@ def _проверка(chat_id: int, точка: str, записей: int) -> str
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant="default")
     for зона in ЗОНЫ[:записей]:
         add_finding(chat_id, code=ПУНКТ, level="D1", zone=зона, text="подтёки на стене")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def test_сводка_пункта_не_считает_отклонённую(domain_env: Path, admin_env: str) -> None:
