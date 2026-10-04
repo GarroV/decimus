@@ -872,22 +872,27 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   /* Недостроенного в нижней полосе нет (D217): карта продукта целиком — в
      боковом меню компьютера (D138). */
   .tabbar__item.is-wip { display: none; }
+  /* Пункты делят ширину поровну и сжимаются: с шестым пунктом («Экшн-планы»)
+     последний уезжал за край экрана телефона (сверка экшн-планов, 04.10.2026).
+     Длинная подпись обрезается многоточием, полное имя — в `title`. */
   .tabbar__item {
-    flex: 1 0 auto;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
     min-height: var(--tap-min);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-1);
     border-radius: var(--r-control);
     font-size: var(--fs-micro);
     font-weight: var(--w-medium);
     color: var(--ink-3);
     white-space: nowrap;
   }
-  .tabbar__item svg { width: 18px; height: 18px; }
+  .tabbar__item svg { width: 18px; height: 18px; flex: none; }
+  .tabbar__item > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .tabbar__item:hover { text-decoration: none; color: var(--ink); }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
 }
@@ -1748,3 +1753,38 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .plan-versions__file { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
 .plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
 .plan-history { font-size: var(--fs-meta); }
+
+/* Очередь УК на телефоне — строка складывается в карточку, как реестр: точка
+   и буква сверху, срок и состояние под ними. Шесть колонок уезжали вбок, и
+   состояние — смысл очереди — читалось только прокруткой (сверка norma). */
+@media (max-width: 52rem) {
+  .ov-table--plans .ov-table__head { display: none; }
+  .ov-table--plans .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name grade"
+      "country date"
+      "due state";
+    min-width: 0;
+    row-gap: var(--space-1);
+  }
+  .ov-table--plans .ov-table__row > :nth-child(1) { grid-area: name; }
+  .ov-table--plans .ov-table__row > :nth-child(2) { grid-area: country; }
+  .ov-table--plans .ov-table__row > :nth-child(3) { grid-area: grade; justify-self: end; }
+  .ov-table--plans .ov-table__row > :nth-child(4) { grid-area: date; justify-self: end; }
+  .ov-table--plans .ov-table__row > :nth-child(5) { grid-area: due; justify-self: start; }
+  .ov-table--plans .ov-table__row > :nth-child(6) { grid-area: state; justify-self: end; }
+}
+
+/* Поле файла плана — в тон кнопкам forma, а не серой кнопкой браузера. */
+.input[type="file"] { padding: var(--space-2); }
+.input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}

@@ -8,7 +8,7 @@
   {%- if r.overdue(today) %} <span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
 {%- endmacro %}
 
-{% macro versions(r, plans_path) -%}
+{% macro versions(r, plans_path, hide_last_comment=false) -%}
   {% if r.files %}
     <ol class="plan-versions">
       {% for f in r.files|reverse %}
@@ -21,13 +21,13 @@
           </span>
           {% if f.verdict %}
             <span class="tag tag--micro {{ 'tag--ok' if f.verdict == 'accepted' else 'tag--warn' }}">{{ t('plans.verdict.' ~ f.verdict) }}</span>
-            {% if f.comment %}<span class="plan-versions__comment">«{{ f.comment }}» — {{ f.reviewed_by }}</span>{% endif %}
+            {% if f.comment and not (hide_last_comment and loop.first) %}<span class="plan-versions__comment">«{{ f.comment }}» — {{ f.reviewed_by }}</span>{% endif %}
           {% endif %}
         </li>
       {% endfor %}
     </ol>
   {% else %}
-    <p class="ov-cell__muted">{{ t('plans.no_versions') }}</p>
+    <div class="ov-cell__muted">{{ t('plans.no_versions') }}</div>
   {% endif %}
 {%- endmacro %}
 

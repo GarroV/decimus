@@ -41,11 +41,13 @@
             <div class="note__text">«{{ r.last_comment }}»</div>
           </div></div>
         {% endif %}
-        {{ versions(r, plans_path) }}
+        {# Комментарий возврата уже стоит плашкой выше — у версии его не повторяем. #}
+        {{ versions(r, plans_path, hide_last_comment=(r.state == 'returned' and r.last_comment)) }}
         {% if r.status == 'requested' %}
           <form method="post" enctype="multipart/form-data"
                 action="{{ url(plans_path ~ '/' ~ r.id ~ '/upload') }}?lang={{ lang }}" class="row mt-gap">
-            <input class="input" type="file" name="file" required>
+            <label><span class="field-label">{{ t('plans.file_label') }}</span>
+              <input class="input" type="file" name="file" required></label>
             <button class="btn btn--primary" type="submit">{{ t('plans.upload') }}</button>
           </form>
         {% endif %}
