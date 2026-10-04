@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import io
 import logging
+from collections.abc import Mapping
 from datetime import date
 from typing import Any
 from urllib.parse import urlencode
@@ -72,6 +73,20 @@ def card_plan(inspection_id: str) -> tuple[plans.PlanRequest | None, bool]:
     except DbError as exc:
         logger.warning("экшн-план проверки %s не прочитан: %s", inspection_id, exc)
         return None, False
+
+
+def needs_plan(counts: Mapping[str, Any]) -> bool:
+    """D2 или D3 в счётчиках движка — то же правило, что у автозапроса (D272)."""
+    return plans.needs_action_plan(counts or {})
+
+
+def unit_without_country(inspection_id: str) -> bool:
+    """У точки проверки нет страны? Не прочитали — отметки нет, причина в журнале."""
+    try:
+        return plans.unit_country_missing(inspection_id, reach=auth.current_reach())
+    except DbError as exc:
+        logger.warning("страна точки проверки %s не прочитана: %s", inspection_id, exc)
+        return False
 
 
 def country_plans(code: str) -> tuple[tuple[plans.PlanRequest, ...], bool]:

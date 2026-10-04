@@ -156,3 +156,36 @@ def test_путь_из_критерия_приёмки(как: Вход) -> None
         "uploaded",
         "accepted",
     ]
+
+
+def test_карточка_отмечает_нужный_план_у_точки_без_страны(как: Вход) -> None:
+    """D2 у точки без страны: запроса нет, а на карточке — видимая отметка (ревью #495, п.4)."""
+    from src.db.directory import upsert_unit
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
+
+    # Arrange — точка без страны, проверка УК с D2 подтверждена: запрос не завёлся.
+    upsert_unit("Nowhere-1", tenant="HQ")
+    start_inspection(9_300_002, unit="Nowhere-1", kind="planned", report_lang="ru", tenant="HQ")
+    add_finding(9_300_002, code="PRD02", level="D2", zone="cold_kitchen", text="партии вместе")
+    без_страны = push_inspection(9_300_002)
+    accept_inspection(без_страны, tenant="HQ", actor="hq-lead")
+    assert plans.request_of_inspection(без_страны, reach=reach_of("HQ")) is None
+    со_страной = _проверка_уК_с_d2()
+    start_inspection(9_300_003, unit="Nowhere-1", kind="planned", report_lang="ru", tenant="HQ")
+    add_finding(9_300_003, code="PRD01", level="D1", zone="fridge", text="мелочь")
+    только_d1 = push_inspection(9_300_003)
+    accept_inspection(только_d1, tenant="HQ", actor="hq-lead")
+
+    # Act
+    уК = как("HQ")
+    карточка = уК.get(f"/inspections/{без_страны}?lang=ru").get_data(as_text=True)
+    обычная = уК.get(f"/inspections/{со_страной}?lang=ru").get_data(as_text=True)
+    без_d2 = уК.get(f"/inspections/{только_d1}?lang=ru").get_data(as_text=True)
+
+    # Assert
+    assert "Нужен экшн-план, у точки не задана страна" in карточка
+    assert "Открыть запрос" in обычная, "карточка не та: блока плана на ней нет"
+    assert "Нужен экшн-план, у точки не задана страна" not in обычная
+    assert "Запросить экшн-план" in без_d2, "карточка не та: формы запроса на ней нет"
+    assert "Нужен экшн-план, у точки не задана страна" not in без_d2

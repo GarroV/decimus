@@ -123,6 +123,20 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Экшн-планы сейчас не прочитать.",
         "en": "Action plans cannot be read right now.",
     },
+    "card.plan.request_hint_needed": {
+        "ru": "В проверке есть D2 или D3, а запроса нет — запросите план.",
+        "en": "The inspection has D2 or D3 but no request — request a plan.",
+    },
+    "card.plan.no_country": {
+        "ru": "Нужен экшн-план, у точки не задана страна",
+        "en": "Action plan needed, the unit has no country set",
+    },
+    "card.plan.no_country_hint": {
+        "ru": "В проверке есть D2 или D3, но запрос некому показать. Задайте точке "
+        "страну в справочнике — после этого запросите план здесь.",
+        "en": "The inspection has D2 or D3, but there is no one to show the request to. "
+        "Set the unit's country in the directory, then request the plan here.",
+    },
     "country.plans.act": {"ru": "Действовать", "en": "Act"},
     "country.plans.mine": {"ru": "Мои запросы", "en": "My requests"},
 }

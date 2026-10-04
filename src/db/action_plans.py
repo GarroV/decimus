@@ -249,6 +249,15 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(c
   and f.id = %(id)s
 """  # noqa: E501
 
+# Карточка: у точки проверки нет страны — запрос с D2/D3 не завёлся (ревью #495).
+_UNIT_COUNTRY_MISSING_SQL = """
+select u.country is null
+from inspections i
+join units u on u.id = i.unit_id
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.id = %(id)s
+"""  # noqa: E501
+
 # Загрузка: замок строки запроса, охват — тем же литералом.
 _LOCK_FOR_UPLOAD_SQL = """
 select r.status
@@ -422,6 +431,20 @@ def request_of_inspection(inspection_id: str, *, reach: Reach) -> PlanRequest | 
         return None
     found = _read(reach, inspection_id=ident)
     return found[0] if found else None
+
+
+def unit_country_missing(inspection_id: str, *, reach: Reach) -> bool:
+    """У точки проверки нет страны? Проверки вне охвата — `False`, как и нет её."""
+    ident = _uuid_or_none(inspection_id)
+    if ident is None:
+        return False
+    try:
+        with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+            cur.execute(_UNIT_COUNTRY_MISSING_SQL, {"id": ident, **require_reach(reach).params()})
+            row = cur.fetchone()
+    except psycopg.Error as exc:
+        raise DbError(f"Не удалось прочитать страну точки ({type(exc).__name__})") from exc
+    return bool(row and row[0])
 
 
 def file_for_download(file_id: str, *, reach: Reach) -> PlanFileRef | None:

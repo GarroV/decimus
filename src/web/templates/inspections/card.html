@@ -394,11 +394,18 @@
     </div>
   {% elif not plan_known %}
     <div class="note mt-gap"><div><div class="note__text">{{ t('card.plan.unknown') }}</div></div></div>
+  {% elif plan_no_country %}
+    {# D2/D3 есть, а запрос не завёлся: у точки нет страны (ревью #495, п.4).
+       Только отметка на экране — никаких уведомлений. #}
+    <div class="note note--warn mt-gap"><div>
+      <div class="note__title">{{ t('card.plan.no_country') }}</div>
+      <div class="note__text">{{ t('card.plan.no_country_hint') }}</div>
+    </div></div>
   {% elif may_request_plan %}
     <div class="section">
       <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
       <div class="card"><div class="card__body">
-        <p class="field-note">{{ t('card.plan.request_hint') }}</p>
+        <p class="field-note">{{ t('card.plan.request_hint_needed') if plan_needed else t('card.plan.request_hint') }}</p>
         <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="row mt-gap">
           <input type="hidden" name="inspection_id" value="{{ head.id }}">
           <label><span class="field-label">{{ t('card.plan.due') }}</span>
