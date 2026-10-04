@@ -1505,6 +1505,18 @@ def _render_card(
         кадры = {}
         кадры_известны = False
     план, план_известен = action_plans.card_plan(inspection_id)
+    # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
+    # запросить, либо у точки нет страны — тогда только видимая отметка.
+    план_нужен = (
+        action_plans.is_hq()
+        and своя
+        and план is None
+        and план_известен
+        and not detail.inspection.on_review
+        and not detail.inspection.retracted
+        and action_plans.needs_plan(detail.counts)
+    )
+    без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return render_template(
         "inspections/card.html",
         plan=план,
@@ -1517,6 +1529,8 @@ def _render_card(
         plan_today=action_plans.today(),
         plan_state_tones=action_plans.STATE_TONES,
         plan_due_default=action_plans.default_due(),
+        plan_needed=план_нужен,
+        plan_no_country=без_страны,
         # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
         may_request_plan=(
             action_plans.is_hq()
