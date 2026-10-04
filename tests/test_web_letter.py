@@ -24,6 +24,9 @@
 
 from __future__ import annotations
 
+import email
+import email.message
+import email.policy
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -185,15 +188,15 @@ def test_выгружается_правленое_а_не_собранное(с
     # Act
     ответ = стенд.post(f"/inspections/{ПРОВЕРКА}/letter", data={"text": правленое}, headers=СВОЙ)
 
-    # Assert
+    # Assert — файл письма `.eml`; текстовая часть несёт ровно правленое.
     assert ответ.status_code == 200
-    assert ответ.get_data(as_text=True) == правленое
+    письмо = email.message_from_bytes(ответ.get_data(), policy=email.policy.default)
+    assert isinstance(письмо, email.message.EmailMessage)
+    assert письмо.get_body(preferencelist=("plain",)).get_content().rstrip("\n") == правленое
     assert "attachment" in ответ.headers["Content-Disposition"]
     assert ответ.headers["X-Content-Type-Options"] == "nosniff"
-    # Кодировка названа ровно один раз. Дважды — не косметика: заголовок с
-    # повтором часть получателей разбирает как имя кодировки «utf-8; charset=utf-8»
-    # и откатывается на латиницу, то есть письмо приезжает нечитаемым.
-    assert ответ.headers["Content-Type"] == "text/plain; charset=utf-8"
+    # Тип назван ровно один раз и без кодировки: письмо несёт её в своих частях.
+    assert ответ.headers["Content-Type"] == "message/rfc822"
 
 
 def test_выгрузка_чужой_проверки_отказывает(
@@ -226,7 +229,7 @@ def test_имя_файла_не_дописывает_заголовок(стен
 
     # Assert
     расположение = ответ.headers["Content-Disposition"]
-    assert расположение == 'attachment; filename="letter-ab.txt"'
+    assert расположение == 'attachment; filename="letter-ab.eml"'
 
 
 def test_карточка_ведёт_к_письму(стенд: FlaskClient) -> None:

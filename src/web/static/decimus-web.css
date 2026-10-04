@@ -322,9 +322,9 @@
    действия; шапка липнет к верху окна браузера; поле занимает остаток
    экрана; пояснения — мелким подвалом.
 
-   Шрифт поля моноширинный и намеренно: письмо уезжает партнёру простым
-   текстом, и перенос строки, лишний пробел или съехавший отступ должны быть
-   видны здесь ровно такими, какими их увидит получатель. */
+   Поле без скрипта моноширинное: в нём разметка письма видна текстом, и
+   перенос строки или лишний пробел должны быть видны ровно такими, какие
+   они есть. Редактор с форматированием (`.lt__rich`) — шрифтом интерфейса. */
 
 .lt {
   display: flex; flex-direction: column;
@@ -371,6 +371,36 @@
 }
 .lt__text:hover { border-color: var(--line-control-2); }
 .lt__text:focus { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: var(--focus-ring); }
+/* Редактор с форматированием (D169): тот же короб, что у поля, но шрифт
+   интерфейса — письмо теперь уходит с видом, и моноширинный шрифт врал бы о
+   том, как его увидит партнёр. Строки письма — значимые переводы строки. */
+.lt__rich {
+  overflow: auto; overflow-wrap: anywhere;
+  font: var(--w-regular) var(--fs-body) / 1.6 var(--font-ui);
+}
+.lt__rich:focus-visible { outline: none; border-color: var(--accent); background: var(--surface); box-shadow: var(--focus-ring); }
+.lt__rich a { color: var(--accent); text-decoration: underline; }
+.lt__plain { display: block; }
+/* `hidden` у элементов с собственным `display` не срабатывает сам. */
+.lt__text[hidden], .lt__plain[hidden], .lt__tools[hidden], .lt__linkbox[hidden] { display: none; }
+.lt__tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.lt__tool {
+  min-width: var(--control-h-sm); height: var(--control-h-sm); padding: 0 var(--space-4);
+  border: 1px solid var(--line-control); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink-2);
+  font: var(--w-regular) var(--fs-dense) / 1 var(--font-ui); cursor: pointer;
+  transition: border-color var(--t-state) var(--ease), background var(--t-state) var(--ease);
+}
+.lt__tool:hover { border-color: var(--line-control-2); color: var(--ink); }
+.lt__tool:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.lt__tool[aria-pressed="true"] { background: var(--surface-3); border-color: var(--line-control-2); color: var(--ink); }
+.lt__linkbox { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.lt__linkinput { width: min(22rem, 70vw); height: var(--control-h-sm); }
+.lt__toolnote { font-size: var(--fs-meta); color: var(--warn); }
+.lt__toolnote:empty { display: none; }
 .lt__foot {
   display: grid; gap: var(--space-2);
   padding: 0 var(--space-7) var(--space-6);

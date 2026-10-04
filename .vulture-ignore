@@ -306,3 +306,10 @@ bars
 weak
 rates
 penalty
+
+# Обработчики `html.parser.HTMLParser`: их зовёт сам разборщик из `feed()`, по
+# имени в коде не читается ни одно (`src/web/letter_markup.py`).
+handle_starttag
+handle_startendtag
+handle_endtag
+handle_data

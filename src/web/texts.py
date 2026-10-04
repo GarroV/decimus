@@ -749,7 +749,34 @@ TEXTS: dict[str, dict[str, str]] = {
             "we sent the partner."
         ),
     },
-    "letter.export.submit": {"ru": "Выгрузить файлом", "en": "Download as a file"},
+    # Выгрузка — файл письма `.eml` с той же разметкой, что у черновика
+    # Google: почта открывает его как неотправленное письмо.
+    "letter.export.submit": {"ru": "Скачать письмом .eml", "en": "Download as .eml"},
+    "letter.export.empty": {
+        "ru": "В письме нет текста — скачивать нечего.",
+        "en": "The letter has no text — there is nothing to download.",
+    },
+    # Форматирование письма (D169, #332): ровно четыре вида, больше ничего.
+    # Буква на кнопке — та, что принята в редакторах этого языка.
+    "letter.format.toolbar": {"ru": "Форматирование письма", "en": "Letter formatting"},
+    "letter.format.bold": {"ru": "Жирный (Ctrl+B)", "en": "Bold (Ctrl+B)"},
+    "letter.format.bold.glyph": {"ru": "Ж", "en": "B"},
+    "letter.format.italic": {"ru": "Курсив (Ctrl+I)", "en": "Italic (Ctrl+I)"},
+    "letter.format.italic.glyph": {"ru": "К", "en": "I"},
+    "letter.format.strike": {"ru": "Зачёркнутый", "en": "Strikethrough"},
+    "letter.format.strike.glyph": {"ru": "З", "en": "S"},
+    "letter.format.link": {"ru": "Ссылка", "en": "Link"},
+    "letter.format.link.address": {"ru": "Адрес ссылки", "en": "Link address"},
+    "letter.format.link.apply": {"ru": "Поставить", "en": "Apply"},
+    "letter.format.link.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "letter.format.link.select": {
+        "ru": "Выделите слова, на которые поставить ссылку.",
+        "en": "Select the words to put the link on.",
+    },
+    "letter.format.link.bad": {
+        "ru": "Ссылка не поставлена: адрес должен начинаться с https://, http:// или mailto:.",
+        "en": "Link not added: the address must start with https://, http:// or mailto:.",
+    },
     # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
     # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
     # делает, — иначе человек закроет экран, считая письмо ушедшим.
