@@ -156,7 +156,11 @@ def test_уК_в_разделе_партнёра_уходит_в_свой(уК: 
 
 def test_чужое_предписание_это_404(партнёр: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: None)
-    assert партнёр.get(f"/prescriptions/{ИД}").status_code == 404
+    нет = партнёр.get(f"/prescriptions/{ИД}?lang=ru")
+    assert нет.status_code == 404
+    # Отказ говорит о предписании и ведёт к предписаниям, а не к проверкам.
+    assert "Предписание не найдено" in нет.get_data(as_text=True)
+    assert 'href="/prescriptions?lang=ru"' in нет.get_data(as_text=True)
     ответ = партнёр.post(f"/prescriptions/{ИД}/reply", data={"comment": "x"}, headers=ORIGIN)
     assert ответ.status_code in (400, 404)
 

@@ -143,6 +143,12 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "The draft reached your mailbox but the notice was not marked as sent. Delete "
         "that draft without sending it and try again.",
     },
+    "rx.not_found.title": {"ru": "Предписание не найдено", "en": "Notice not found"},
+    "rx.not_found.text": {
+        "ru": "Такого предписания нет или оно вам недоступно.",
+        "en": "There is no such notice, or it is not available to you.",
+    },
+    "rx.not_found.back": {"ru": "К предписаниям", "en": "To notices"},
     # --- раздел партнёра ----------------------------------------------------
     "rx.partner.kicker": {"ru": "От управляющей компании", "en": "From the management company"},
     "rx.partner.title": {"ru": "Предписания", "en": "Compliance notices"},
