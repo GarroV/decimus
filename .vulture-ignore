@@ -312,3 +312,6 @@ own_password
 user_role
 user_email
 locked_minutes
+# Фикстура pytest с `autouse=True` (ревью access2, L5, `tests/test_db_password_bounds.py`):
+# подключает сам pytest каждому тесту файла — отказ раньше scrypt и базы.
+_без_scrypt_и_базы
