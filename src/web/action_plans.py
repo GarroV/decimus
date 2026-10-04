@@ -289,13 +289,19 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
                 data=файл.read(max_bytes + 1),
                 max_bytes=max_bytes,
             )
-        except (ActionPlanError, StorageError) as exc:
+        except ActionPlanError as exc:
             return _render_partner(
                 conf,
                 max_bytes=max_bytes,
                 notice=None,
                 failure=t("plans.failed", lang, reason=exc),
             ), 400
+        except StorageError as exc:
+            # Текст хранилища называет корзину и ключ — партнёру он ни к чему.
+            logger.warning("файл плана к запросу %s не лёг в хранилище: %s", request_id, exc)
+            return _render_partner(
+                conf, max_bytes=max_bytes, notice=None, failure=t("plans.storage_down", lang)
+            ), 503
         return _render_partner(
             conf,
             max_bytes=max_bytes,
