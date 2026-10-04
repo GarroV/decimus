@@ -53,11 +53,9 @@ from src.web.sections import SECTIONS
     grades=(),
     average=None,
     comparable=True,
-    comparability_note="",
     zone_losses=(),
     systemic=(),
     attention=(),
-    problem_units=(),
 )
 
 

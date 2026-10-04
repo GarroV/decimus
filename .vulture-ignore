@@ -102,11 +102,17 @@ close_connection
 _база_не_видна_сама_собой
 _язык_интерфейса_не_протекает_из_оболочки
 _методика_не_протекает_из_оболочки
+_сведение_комментария_не_уходит_в_сеть
+_правка_ответом_не_уходит_в_сеть
+_бот_без_базы_не_знает_привязок
 
 # Фикстура pytest, подключённая по имени строкой (T151): `usefixtures` берёт её
 # из строки, и статический разбор такой связи не видит. В теле теста фикстура
 # не нужна ни одним значением — она поднимает окружение без рендерера PDF.
 стенд_без_рендерера
+# Две проверки по разным ставкам (#428): тестам признака несопоставимости
+# нужна только подмена чтения, значение фикстуры им ни к чему.
+ряд_из_двух_цен
 
 # Фикстура pytest с `autouse=True` (T171): её подключает сам pytest каждому
 # тесту файла, по имени её никто не зовёт. Убирает DATABASE_URL из окружения,
@@ -209,6 +215,12 @@ retracted_count
 is_latest
 unpublished
 ready
+# Длина заливки полосы потерь зоны в карточке проверки — оформление, его
+# читает только `inspections/card.html`.
+fill
+# Последние записи точки и имена их зон — карточка пиццерии `units/card.html`.
+last_findings
+zone_names
 
 # Хук Flask: функция регистрируется декоратором `@app.after_request` и зовётся
 # фреймворком, а не кодом. Для vulture это неотличимо от мёртвой функции.
@@ -248,3 +260,49 @@ _только_уК
 # декоратор; `bound_at` привязки читает шаблон вкладки «Пользователи».
 bot_unlink
 bound_at
+# Набралось, пока `make dead` стоял красным с 28.09 (#428): красный гейт
+# перестал отличать старый долг от нового, и имена ниже прошли в main мимо
+# проверки. Все живые — разобраны поимённо 01.10.2026.
+#
+# Маршруты Flask (`@app.get`/`@app.post`) — зовёт фреймворк по адресу запроса.
+country_index
+users
+add_user
+disable_user
+do_move
+methodology_zone_add
+methodology_zone_shares
+methodology_zone_rename
+methodology_zone_remove
+methodology_route
+methodology_scoring
+checklists_create
+checklists_state
+methodology_bot
+checklists_apply_preview
+checklists_apply
+google_start
+google_callback
+google_mail_callback
+# Хуки Flask: `@app.context_processor`, `@app.url_defaults` и подмена метода
+# приложения `get_send_file_max_age` — их вызывает фреймворк, не код.
+_вход_через_google_доступен
+_add_fingerprint
+_.get_send_file_max_age
+# Хендлер aiogram выбора чек-листа на старте (D221) — зовёт диспетчер по фильтру.
+on_checklist
+# Параметр нужен как ключ `lru_cache`: правка файла меняет mtime и сбрасывает
+# запомненный отпечаток. В теле он не читается намеренно.
+mtime_ns
+# Поля, которые читают только шаблоны Jinja: подпись выбора (`_pick.html`),
+# «Обзор» и «Страна», карточка пиццерии, ставки методики.
+current_title
+narrowed
+worst_zone_ru
+worst_zone_en
+breakdown
+audits_count
+bars
+weak
+rates
+penalty

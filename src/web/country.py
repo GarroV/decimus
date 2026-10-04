@@ -31,11 +31,9 @@ _EMPTY = Overview(
     grades=(),
     average=None,
     comparable=True,
-    comparability_note="",
     zone_losses=(),
     systemic=(),
     attention=(),
-    problem_units=(),
 )
 
 
