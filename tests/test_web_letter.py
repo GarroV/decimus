@@ -10,9 +10,6 @@
   который аудитор назвал партнёру, не по чему;
 * **незнакомая оговорка не пропадает** — каждая из них причина, по которой
   отправлять нельзя, и молчание о ней возвращает экран к виду «всё хорошо»;
-* **выгружается правленое, а не собранное** — иначе человек правит опечатку,
-  скачивает файл и отправляет ровно то, что правил;
-* **чужую проверку выгрузка не отдаёт** — ни своим текстом, ни чужим;
 * **отказ сборщика не роняет экран** — методики нужной версии может не
   оказаться на диске, и это обычный исход.
 
@@ -24,9 +21,6 @@
 
 from __future__ import annotations
 
-import email
-import email.message
-import email.policy
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -175,61 +169,6 @@ def test_отказ_сборщика_не_роняет_экран(
     # Assert — страница, а не 500-я, и причина словами.
     assert ответ.status_code == 200
     assert "Снимок методики версии 2026.09 не найден" in ответ.get_data(as_text=True)
-
-
-def test_выгружается_правленое_а_не_собранное(стенд: FlaskClient) -> None:
-    """Человек поправил — уехало поправленное.
-
-    Обратное молчит: файл скачался, выглядит письмом, и правка в нём пропала.
-    """
-    # Arrange
-    правленое = ТЕКСТ.replace("92%", "92,0 %")
-
-    # Act
-    ответ = стенд.post(f"/inspections/{ПРОВЕРКА}/letter", data={"text": правленое}, headers=СВОЙ)
-
-    # Assert — файл письма `.eml`; текстовая часть несёт ровно правленое.
-    assert ответ.status_code == 200
-    письмо = email.message_from_bytes(ответ.get_data(), policy=email.policy.default)
-    assert isinstance(письмо, email.message.EmailMessage)
-    assert письмо.get_body(preferencelist=("plain",)).get_content().rstrip("\n") == правленое
-    assert "attachment" in ответ.headers["Content-Disposition"]
-    assert ответ.headers["X-Content-Type-Options"] == "nosniff"
-    # Тип назван ровно один раз и без кодировки: письмо несёт её в своих частях.
-    assert ответ.headers["Content-Type"] == "message/rfc822"
-
-
-def test_выгрузка_чужой_проверки_отказывает(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Проверки этого арендатора нет — отдавать нечего и не из чего.
-
-    Без этой двери страница выгрузки принимала бы любой присланный текст и
-    отдавала его файлом с адреса самой админки.
-    """
-    # Arrange
-    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
-
-    # Act
-    ответ = стенд.post("/inspections/чужая/letter", data={"text": "что угодно"}, headers=СВОЙ)
-
-    # Assert
-    assert ответ.status_code == 404
-    assert "что угодно" not in ответ.get_data(as_text=True)
-
-
-def test_имя_файла_не_дописывает_заголовок(стенд: FlaskClient) -> None:
-    """Идентификатор приходит из адреса, то есть снаружи.
-
-    Кавычка или перевод строки в нём — это уже не имя файла, а дописанный
-    заголовок ответа.
-    """
-    # Act
-    ответ = стенд.post('/inspections/a"b/letter', data={"text": ТЕКСТ}, headers=СВОЙ)
-
-    # Assert
-    расположение = ответ.headers["Content-Disposition"]
-    assert расположение == 'attachment; filename="letter-ab.eml"'
 
 
 def test_карточка_ведёт_к_письму(стенд: FlaskClient) -> None:

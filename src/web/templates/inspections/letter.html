@@ -36,7 +36,9 @@
     </div>
   {% else %}
     {% set правится = saved and not show_draft %}
-    <form class="lt" method="post" action="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">
+    {# Адрес записи — только у своей проверки: чужую вошедший читает (D283), и
+       формы, которая куда-то пишет, у неё нет. #}
+    <form class="lt" method="post"{% if own %} action="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}"{% endif %}>
       <div class="lt__head">
         <div class="lt__title">
           <h1 class="lt__name">{{ t('letter.title') }}</h1>
@@ -66,10 +68,10 @@
         </div>
         <div class="lt__actions">
           {#
-            Сохранение и выгрузка — РАЗНЫЕ действия, и каждое названо своей
-            кнопкой. Одна кнопка со скрытым переключателем отличала бы их
-            только полем, которого не видно, а промах человек замечал бы уже
-            после того, как письмо ушло не туда.
+            Сохранение и черновик Google — РАЗНЫЕ действия, и каждое названо
+            своей кнопкой. Выгрузки файлом нет (D169): копирование из поля
+            решает ту же задачу без файла. Форма по умолчанию сохраняет —
+            отправка Enter'ом не уводит письмо к Google.
 
             Возврат к заготовке — ссылка, а не кнопка формы: он ничего не
             записывает и не отменяет, а только показывает свежесобранный
@@ -83,13 +85,12 @@
           {% if правится %}
             <a class="btn btn--ghost" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}&amp;letter_lang={{ letter_lang }}&amp;draft=1">{{ t('letter.draft.restore') }}</a>
           {% endif %}
-          {# Черновик, выгрузка и фиксация — запись от имени пространства: у
+          {# Черновик и фиксация — запись от имени пространства: у
              проверки, которую вошедший только читает (УК у партнёра, D283),
              кнопок нет — сервер такую запись всё равно отклонит (#340). #}
           {% if own %}
           <button class="btn" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/draft') }}?lang={{ lang }}">{{ t('letter.gmail.submit') }}</button>
-          <button class="btn" type="submit">{{ t('letter.export.submit') }}</button>
           <button class="btn btn--primary" type="submit"
                   formaction="{{ url('/inspections/' ~ head.id ~ '/letter/save') }}?lang={{ lang }}">{{ t('letter.save.submit') }}</button>
           {% endif %}
@@ -102,12 +103,9 @@
         'ok': ('ok', t('letter.gmail.ok')), 'denied': ('warn', t('letter.gmail.denied')),
         'unavailable': ('warn', t('letter.gmail.unavailable')), 'failed': ('warn', t('letter.gmail.failed')),
       }.get(gmail_outcome) %}
-      {% if outcome or save_outcome or export_outcome or not letter.ready or show_draft %}
+      {% if outcome or save_outcome or not letter.ready or show_draft %}
         <div class="lt__notes">
           {% if outcome %}<p class="note note--{{ outcome[0] }}">{{ outcome[1] }}</p>{% endif %}
-          {% if export_outcome == 'empty' %}
-            <p class="note note--warn">{{ t('letter.export.empty') }}</p>
-          {% endif %}
           {% if save_outcome == 'ok' %}
             <p class="note note--ok">{{ t('letter.save.ok') }}</p>
           {% elif save_outcome == 'failed' %}

@@ -1,17 +1,14 @@
-"""Письмо с форматированием на экране, при сохранении и в выгрузке (T353, #332).
+"""Письмо с форматированием на экране и при сохранении (T353, #332).
 
 Сам белый список проверяется в `test_web_letter_markup.py`. Здесь — что он
 стоит на каждой двери: письмо, сохранённое через экран, ложится в запись
 очищенным; запись выводится очищенной, даже если легла в базу в обход экрана;
-заготовка движка — простой текст и разметкой не становится; файл выгрузки
-несёт то же форматирование, что и черновик Google, и честный текстовый вариант.
+заготовка движка — простой текст и разметкой не становится. Что несёт
+черновик Google — `test_web_google_mail.py`.
 """
 
 from __future__ import annotations
 
-import email
-import email.message
-import email.policy
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -127,39 +124,3 @@ def test_заготовка_движка_не_становится_размет�
     assert "<b>3</b>" not in страница
     assert "<script>alert" not in страница
     assert "Срок &lt;b&gt;3&lt;/b&gt; дня" in страница
-
-
-def _письмо_из(ответ: Any) -> email.message.EmailMessage:
-    письмо = email.message_from_bytes(ответ.get_data(), policy=email.policy.default)
-    assert isinstance(письмо, email.message.EmailMessage)
-    return письмо
-
-
-def test_выгрузка_несёт_форматирование_и_честный_текст(стенд: FlaskClient) -> None:  # noqa: F811
-    ответ = стенд.post(
-        f"/inspections/{ПРОВЕРКА}/letter",
-        data={"text": ВРЕДНОЕ + "\nВторая строка", "letter_lang": "en"},
-        headers=СВОЙ,
-    )
-
-    assert ответ.status_code == 200
-    assert ответ.mimetype == "message/rfc822"
-    письмо = _письмо_из(ответ)
-    assert письмо["X-Unsent"] == "1"
-    разметка = письмо.get_body(preferencelist=("html",)).get_content()
-    текст = письмо.get_body(preferencelist=("plain",)).get_content()
-    assert ОЧИЩЕННОЕ in разметка
-    assert текст.strip() == "Жирно кликплан (https://dodo.example/plan)\nВторая строка"
-    _без_опасного(разметка)
-    _без_опасного(текст)
-
-
-def test_пустое_письмо_файлом_не_отдаётся(стенд: FlaskClient) -> None:  # noqa: F811
-    ответ = стенд.post(
-        f"/inspections/{ПРОВЕРКА}/letter",
-        data={"text": "<script>alert(1)</script>", "letter_lang": "en"},
-        headers=СВОЙ,
-    )
-
-    assert ответ.status_code == 303
-    assert "export=empty" in ответ.headers["Location"]
