@@ -288,4 +288,5 @@ def test_отклонённую_ждущую_не_подтверждают(се�
             "accepted_by = 'garva' where id = %s",
             (ident,),
         )
-    assert _статус(db_env, ident)[0] == "draft"
+    # Отклонённую роль приложения не видит (политики снятия) — читает владелец.
+    assert _статус(pg_dsn, ident)[0] == "draft"

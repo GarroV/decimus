@@ -157,14 +157,21 @@ def test_две_правки_одной_проверки_не_теряют_др�
     detail = get_inspection(ident, reach=УК, include_on_review=True)
     assert detail is not None
     пол, стены = sorted(detail.findings, key=lambda f: f.code)
-    первая_внутри, вторая_пошла = threading.Event(), threading.Event()
+    первая_внутри, вторая_посчитала = threading.Event(), threading.Event()
     ошибки: list[BaseException] = []
 
     def медленный_движок(current: InspectionDetail) -> Score:
+        # Первая держит транзакцию, пока вторая не дойдёт до движка. С замком
+        # вторая до движка не дойдёт (ждёт замка) — ожидание истечёт; без
+        # замка она посчитает от снимка без первой правки — и это поймается.
         первая_внутри.set()
-        вторая_пошла.wait(timeout=10)
-        вторая_пошла.wait(timeout=0.8)  # дать второй дойти до чтения
+        вторая_посчитала.wait(timeout=5)
         return _считать_d2(current)
+
+    def второй_движок(current: InspectionDetail) -> Score:
+        оценка = _считать_d2(current)
+        вторая_посчитала.set()
+        return оценка
 
     def правка(запись: str, код: str, движок: Callable[[InspectionDetail], Score]) -> None:
         try:
@@ -185,9 +192,8 @@ def test_две_правки_одной_проверки_не_теряют_др�
     # Act
     первый.start()
     assert первая_внутри.wait(timeout=10), "первая правка не дошла до пересчёта"
-    второй = threading.Thread(target=правка, args=(стены.id, "CLN06", _считать_d2))
+    второй = threading.Thread(target=правка, args=(стены.id, "CLN06", второй_движок))
     второй.start()
-    вторая_пошла.set()
     первый.join(timeout=30)
     второй.join(timeout=30)
 
@@ -216,7 +222,7 @@ def test_правка_без_задетой_записи_не_пишет_оце�
     )
 
     # Act / Assert
-    with pytest.raises(ReviseError, match="запись не исправлена"):
+    with pytest.raises(ReviseError, match="Запись не исправлена"):
         revise_finding(ident, запись, tenant="HQ", revision=ИСПРАВЛЕНИЕ, score_of=_по(ПЕРЕСЧЁТ))
     после = get_inspection(ident, reach=УК, include_on_review=True)
     assert после is not None and после.inspection.pct == до.inspection.pct
