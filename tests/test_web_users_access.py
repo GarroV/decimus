@@ -187,6 +187,32 @@ def test_свою_роль_не_снять(админ_ук: FlaskClient, зов�
     assert зовы["role"] == []
 
 
+def test_свою_роль_не_снять_и_другим_регистром_логина(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """Логин хранится в нижнем регистре: «Director» — та же учётка, что «director»."""
+    ответ = админ_ук.post(
+        "/users/role",
+        data={"login": ЛОГИН.upper(), "tenant": "HQ", "role": "auditor"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 400
+    assert зовы["role"] == []
+
+
+def test_тот_же_логин_в_другом_пространстве_не_свой(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """«Свой» — пара (пространство, логин), а не логин: тёзка в GE — другой человек."""
+    ответ = админ_ук.post(
+        "/users/role", data={"login": ЛОГИН, "tenant": "GE", "role": "auditor"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 200
+    assert зовы["role"] == [(ЛОГИН, "GE", "auditor")]
+
+
 def test_нет_такой_учётки_сказано(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = админ_ук.post(
         "/users/role", data={"login": "nobody", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
