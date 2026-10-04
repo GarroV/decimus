@@ -557,6 +557,46 @@ def test_снятая_почта_закрывает_вход_через_google_�
     assert authenticate("director", ПАРОЛЬ) is not None
 
 
+def test_смена_почты_закрывает_сессии_человека(обе_роли: str) -> None:
+    """Сменили почту входа — вошедший по прежней вылетает (ревью access2, L7).
+
+    Почту меняют в ответ на «к ней получили доступ чужие»: если открытая
+    через Google сессия переживает смену, смена не выгнала того, ради кого
+    её делали. Та же дисциплина, что у смены пароля командой.
+    """
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    сосед = create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    до_смены = open_session(учётка)
+    соседская = open_session(сосед)
+
+    assert set_email("director", tenant=ТЕНАНТ, email="new." + ПОЧТА) is True
+
+    assert resolve_session(до_смены.token) is None
+    assert resolve_session(соседская.token) is not None
+
+
+def test_снятие_почты_закрывает_сессии_человека(обе_роли: str) -> None:
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    сессия = open_session(учётка)
+
+    assert set_email("director", tenant=ТЕНАНТ, email=None) is True
+
+    assert resolve_session(сессия.token) is None
+
+
+def test_та_же_почта_сессий_не_закрывает(обе_роли: str) -> None:
+    """Повторное сохранение без правки — не смена: выбивать человека не за что."""
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+    сессия = open_session(учётка)
+
+    assert set_email("director", tenant=ТЕНАНТ, email=ПОЧТА.upper()) is True
+
+    assert resolve_session(сессия.token) is not None
+
+
 def test_пустая_почта_не_опознаёт_никого(обе_роли: str) -> None:
     """Пустая строка — не «любой», а никто: иначе вход открывается молчанием."""
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
