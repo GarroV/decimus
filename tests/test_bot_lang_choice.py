@@ -10,6 +10,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import threading
+import time
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -20,7 +23,7 @@ from src.bot.app import build_dispatcher
 from src.bot.config import UI_LANG_VAR, BotSettings
 from src.bot.keyboards import UI_LANG_PREFIX
 from src.bot.lang import chat_ui_lang, pick_ui_lang
-from src.bot.lang_choice import RETRY_AFTER, LangChoices
+from src.bot.lang_choice import CACHE_TTL, RETRY_AFTER, LangChoices
 from src.bot.texts import t
 from src.domain import get_state
 
@@ -131,6 +134,23 @@ def test_отказ_базы_при_чтении_не_роняет_и_не_до�
     store.rows[AUDITOR_ID] = "en"
     сейчас[0] += RETRY_AFTER + timedelta(seconds=1)
     assert выборы.chosen(AUDITOR_ID) == "en", "после паузы база не спрошена снова"
+
+
+@pytest.mark.parametrize("выбор", [None, "en"])
+def test_запомненное_живёт_не_дольше_срока(store: _Store, выбор: str | None) -> None:
+    """И «не выбирал», и выбор перечитываются через `CACHE_TTL` (ревью #492, п.2)."""
+    сейчас = [datetime(2026, 10, 4, tzinfo=UTC)]
+    выборы = LangChoices(now=lambda: сейчас[0])
+    if выбор is not None:
+        store.rows[AUDITOR_ID] = выбор
+    assert выборы.chosen(AUDITOR_ID) == выбор
+
+    store.rows[AUDITOR_ID] = "ru"  # выбор сделан мимо этого процесса
+    сейчас[0] += CACHE_TTL - timedelta(seconds=1)
+    assert выборы.chosen(AUDITOR_ID) == выбор, "память перечитана раньше срока"
+    сейчас[0] += timedelta(seconds=2)
+    assert выборы.chosen(AUDITOR_ID) == "ru", "запомненное живёт дольше срока"
+    assert store.reads == 2
 
 
 def test_несохранённый_выбор_не_запоминается(store: _Store) -> None:
@@ -275,3 +295,61 @@ async def test_кнопка_языка_не_из_словаря_ничего_н�
 @pytest.mark.parametrize("lang", ["ru", "en"])
 def test_тексты_выбора_заведены_на_обоих_языках(key: str, lang: str) -> None:
     assert t(key, lang, current="x").strip()
+
+
+@pytest.mark.asyncio
+async def test_зависшая_база_одного_не_держит_остальных(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Чтение выбора идёт в потоке, а не в цикле событий (ревью #492, п.1).
+
+    База, зависшая на одном человеке, держит только его апдейт: второй
+    человек получает ответ сразу. Чтение в цикле событий заморозило бы обоих.
+    """
+    другой = AUDITOR_ID + 1
+    отпустить = threading.Event()
+
+    def читать(telegram_id: int) -> str | None:
+        if telegram_id == AUDITOR_ID:
+            отпустить.wait(5)
+        return None
+
+    monkeypatch.setattr(lang_choice, "_load_from_db", читать)
+    settings = BotSettings(
+        token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID, другой}), mode="polling"
+    )
+    bot, session = make_bot()
+    dp = build_dispatcher(settings)
+    начало = time.monotonic()
+
+    завис = asyncio.create_task(feed(dp, bot, text_message("/start")))
+    await asyncio.sleep(0.05)
+    await asyncio.wait_for(
+        feed(dp, bot, text_message("/start", user_id=другой, chat_id=другой)), timeout=2
+    )
+    прошло = time.monotonic() - начало
+    отпустить.set()
+    await завис
+
+    assert прошло < 2, f"второй человек ждал зависшую базу первого: {прошло:.1f} с"
+    assert session.texts.count(t("start.greeting", "ru")) == 2
+
+
+def test_чтение_выбора_ждёт_базу_недолго(monkeypatch: pytest.MonkeyPatch) -> None:
+    """У подключения выбора языка свой короткий срок связи (ревью #492, п.1)."""
+    psycopg = pytest.importorskip("psycopg")
+    from src.db import bot_langs
+    from src.db.errors import AccessError
+
+    переданное: dict[str, object] = {}
+
+    def связь(dsn: str, **kw: object) -> object:
+        переданное.update(kw)
+        raise psycopg.OperationalError("нет связи")
+
+    monkeypatch.setenv("DATABASE_URL", "postgresql://nobody@127.0.0.1:1/none")
+    monkeypatch.setattr(bot_langs.psycopg, "connect", связь)
+
+    with pytest.raises(AccessError):
+        bot_langs.chosen_lang(AUDITOR_ID)
+    assert переданное.get("connect_timeout") == bot_langs.CONNECT_TIMEOUT_S
