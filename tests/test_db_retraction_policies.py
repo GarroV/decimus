@@ -19,7 +19,7 @@ from typing import Any
 
 import pytest
 from conftest import APP_ROLE, requires_db
-from db_harness import ADMIN_ROLE, admin_role_dsn
+from db_harness import ADMIN_ROLE, accept_pushed, admin_role_dsn
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -57,7 +57,9 @@ def _проверка(chat_id: int, *, точка: str) -> str:
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru")
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     attach_photo(chat_id, 1, "tg-file-901")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def _выгрузить_кадры(pg_dsn: str, inspection_id: str) -> None:

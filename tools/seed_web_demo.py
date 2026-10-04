@@ -295,6 +295,36 @@ def _build(spec: DemoInspection) -> None:
         domain.add_finding(spec.chat_id, code, level, zone, evidence, repeat=code in spec.repeats)
 
 
+#: Подключение администратора истории — им демо-проверки принимаются (D199).
+RETRACTION_URL_VAR = "DATABASE_RETRACTION_URL"
+
+
+def _accept(app_dsn: str, ids: list[str]) -> None:
+    """Принять демо-проверки, как их принял бы человек на приёмке (D199).
+
+    Слив кладёт проверку на приёмку, и без этого шага демо-сеть была бы пустой:
+    обзор, страна, карточки точек и реестр показывают только принятые.
+
+    Принимать вправе только член роли администратора истории (триггер `0034`):
+    берётся подключение владельца схемы — то же, что у сноса и привязки стран,
+    чтобы посев целиком шёл в одну базу; без него — администратора истории.
+    Порядок не случаен: подключение администратора истории из `.env` стенда
+    может указывать на другую базу, чем та, куда посев сливает.
+    """
+    dsn = (
+        (os.environ.get(ADMIN_URL_VAR) or "").strip()
+        or (os.environ.get(RETRACTION_URL_VAR) or "").strip()
+        or app_dsn
+    )
+    _require_local_dsn(dsn)
+    with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "update inspections set status = 'finalized', accepted_at = now(), "
+            "accepted_by = 'demo' where tenant_code = %s and id = any(%s::uuid[])",
+            (DEMO_TENANT, ids),
+        )
+
+
 def seed() -> list[str]:
     """Собрать демо-сеть и слить её в базу. Возвращает идентификаторы строк."""
     # Порядок тот же, что у `seed_demo`: окружение ставится до первого
@@ -313,6 +343,7 @@ def seed() -> list[str]:
     _directory()
 
     ids: list[str] = []
+    даты: list[str] = []
     for spec in DEMO_INSPECTIONS:
         if spec.country not in страны:
             print(f"{spec.unit} — skipped: country {spec.country} is not the demo space's")
@@ -323,8 +354,15 @@ def seed() -> list[str]:
         inspection_id = push_inspection(spec.chat_id, allow_unknown_version=True)
         score = domain.score(spec.chat_id)
         ids.append(inspection_id)
+        даты.append(str(spec.date))
         print(f"{spec.unit} — {spec.date}: {score.pct:g}% grade {score.grade}, id={inspection_id}")
-    print(f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}")
+    # Самая свежая остаётся ждать приёмки — так демо показывает и сам этап.
+    свежая = max(range(len(ids)), key=lambda i: даты[i]) if ids else -1
+    _accept(app_dsn, [ident for i, ident in enumerate(ids) if i != свежая])
+    print(
+        f"Demo history in the database: {len(ids)} inspections, tenant {DEMO_TENANT}; "
+        f"{'one' if ids else 'none'} awaiting review"
+    )
     return ids
 
 

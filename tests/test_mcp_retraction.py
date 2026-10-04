@@ -24,7 +24,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import set_retraction_env, привязать_страну, точка_справочника
+from db_harness import accept_pushed, set_retraction_env, привязать_страну, точка_справочника
 
 pytest.importorskip("psycopg")
 
@@ -45,14 +45,22 @@ def retraction_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     return set_retraction_env(db_env, monkeypatch)
 
 
-def _проверка(chat_id: int, *, точка: str = ТОЧКА, арендатор: str = АРЕНДАТОР) -> str:
-    """Настоящая проверка через контракт `domain`, затем слив в базу."""
+def _проверка(
+    chat_id: int, *, точка: str = ТОЧКА, арендатор: str = АРЕНДАТОР, принять: bool = True
+) -> str:
+    """Настоящая проверка через контракт `domain`, затем слив в базу.
+
+    `принять=False` оставляет проверку на приёмке, как её и кладёт слив (D199).
+    """
     from src.db.push import push_inspection
     from src.domain import add_finding, start_inspection
 
     start_inspection(chat_id, unit=точка, kind="planned", report_lang="ru", tenant=арендатор)
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    if принять:
+        accept_pushed(ident)  # D199: слив оставляет на приёмке
+    return ident
 
 
 def _подтверждение(ident: str, *, арендатор: str = АРЕНДАТОР) -> dict[str, str]:
@@ -316,19 +324,29 @@ def test_незапечатанная_проверка_снятию_не_под�
     import psycopg
 
     set_retraction_env(db_env, monkeypatch)
-    ident = _проверка(511)
-    подтверждение = _подтверждение(ident)
+    ident = _проверка(511, принять=False)
     with psycopg.connect(pg_dsn) as conn:
-        # Печать снимается сырым SQL намеренно: продуктового пути «распечатать
-        # обратно» нет и не будет, а состояние, в которое слив попадает при
-        # обрыве, воспроизвести чем-то надо.
-        conn.execute("update inspections set status = 'draft' where id = %s", (ident,))
-        conn.commit()
+        # Слив оставляет проверку на приёмке (D199) — это и есть «черновик»;
+        # распечатать принятую обратно нельзя (триггер), и воспроизводить этот
+        # путь сырым SQL больше не нужно. Дату читаем сырым SQL: чтение истории
+        # непринятую не отдаёт.
+        (дата,) = conn.execute(
+            "select inspection_date from inspections where id = %s", (ident,)
+        ).fetchone()
+        статус = conn.execute("select status from inspections where id = %s", (ident,)).fetchone()
+    assert статус == ("draft",), "слив не оставил проверку на приёмке"
+    подтверждение = {"confirm_unit": ТОЧКА, "confirm_date": дата.isoformat()}
 
     with pytest.raises(ToolError) as отказ:
         retraction.retract_inspection(tenant=АРЕНДАТОР, id=ident, reason=ПРИЧИНА, **подтверждение)
 
-    assert "запечат" in str(отказ.value).lower()
+    # С D199 черновик для снятия невидим: отказ тот же, что у чужой и
+    # несуществующей проверки (причину намеренно не называют), а не «не запечатана».
+    assert "у этого доступа нет" in str(отказ.value)
+    with psycopg.connect(pg_dsn) as conn:
+        assert conn.execute(
+            "select retracted_at from inspections where id = %s", (ident,)
+        ).fetchone() == (None,), "черновик оказался снят"
 
 
 def test_снятие_без_подключения_администратора_называет_переменную(

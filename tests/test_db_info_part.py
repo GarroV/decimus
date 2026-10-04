@@ -41,6 +41,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -102,7 +103,9 @@ def _проверка(
     add_finding(chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     for индекс, (код, текст) in enumerate(поля):
         set_info(chat_id, код, текст, photos=кадры if индекс == 0 else ())
-    return push_inspection(chat_id)
+    ident = push_inspection(chat_id)
+    accept_pushed(ident)  # D199: тесту нужна принятая
+    return ident
 
 
 def test_информационная_часть_доезжает_до_базы(domain_env: Path, db_env: str) -> None:

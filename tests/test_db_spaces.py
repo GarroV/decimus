@@ -139,3 +139,14 @@ def test_посев_демо_это_пространство_партнёра_с
             " where i.tenant_code = 'demo'"
         ).fetchall()
     assert чьи == [("HQ",)], "точки демо — в едином справочнике УК"
+
+    # D199: демо-история принята, кроме самой свежей — она показывает приёмку.
+    # Повторный посев сносит и принятые: иначе второй запуск не начался бы.
+    повтор = _команда("seed_web_demo.py", env=env)
+    assert повтор.returncode == 0, повтор.stderr[-2000:]
+    with psycopg.connect(владелец) as conn:
+        статусы = conn.execute(
+            "select status, count(*) from inspections where tenant_code = 'demo' "
+            "group by status order by status"
+        ).fetchall()
+    assert dict(статусы).get("draft") == 1 and dict(статусы).get("finalized", 0) >= 1, статусы

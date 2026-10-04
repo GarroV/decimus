@@ -283,7 +283,19 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
 ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # Плюс перенос (`0025`, D195): дата и пиццерия, и только они. Содержимое —
     # оценка, буква, разбивка — по-прежнему не правится никем.
-    "inspections": {"UPDATE": {"retracted_at", "retraction_reason", "unit_id", "inspection_date"}},
+    # Плюс подтверждение на приёмке (`0034`, D199): статус и отметка «кто и
+    # когда»; что запечатывает только эта роль и обратного хода нет — триггер.
+    "inspections": {
+        "UPDATE": {
+            "retracted_at",
+            "retraction_reason",
+            "unit_id",
+            "inspection_date",
+            "status",
+            "accepted_at",
+            "accepted_by",
+        }
+    },
     # Учётки администратор истории читает ТРЕМЯ КОЛОНКАМИ (`0016`, T328), и
     # `password_hash` в их число не входит. Зачем вообще: в счётчике попыток
     # лежат отпечатки, и без списка логинов команда «показать, кто заперт»

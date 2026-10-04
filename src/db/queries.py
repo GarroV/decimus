@@ -69,7 +69,7 @@ MAX_LIMIT = 1000
 # необходимости: незаданная граница — это `-infinity`/`infinity`, то есть
 # отсутствие ограничения, записанное данными. Так текст запроса остаётся одним
 # и тем же независимо от аргументов, а его план — проверяемым.
-_LIST_ALL_SQL = """
+_LIST_ALL_TEMPLATE = """
 select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
@@ -80,13 +80,16 @@ select
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
-    i.checklist_code
+    i.checklist_code,
+    -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
+    i.status, i.accepted_at, i.accepted_by
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
 """
@@ -95,7 +98,7 @@ limit %(limit)s
 # один (D284), поэтому одноимённых точек у двух пространств больше не заводится;
 # прежние собственные точки партнёров, если такие есть, охват УК видит рядом с
 # точками справочника — и одноимённые склеились бы в одну историю.
-_LIST_BY_UNIT_SQL = """
+_LIST_BY_UNIT_TEMPLATE = """
 select
     i.id, i.tenant_code, u.name, i.chat_id, i.kind, i.inspection_date,
     i.report_lang, i.checklist_version, i.pct, i.grade,
@@ -106,7 +109,9 @@ select
     i.retracted_at, i.retraction_reason,
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
-    i.checklist_code
+    i.checklist_code,
+    -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
+    i.status, i.accepted_at, i.accepted_by
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -114,9 +119,21 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
 """
+
+# Этап — ОТДЕЛЬНЫМ текстом запроса, а не параметром (`(status = 'draft') =
+# %(on_review)s`): условие с параметром планировщик не сопоставит с частичным
+# индексом очереди `inspections_on_review_queue` (0034), и очередь из единиц
+# строк читалась бы через всю историю. История — принятые, очередь — ждущие.
+_HISTORY_STAGE = "i.status = 'finalized'"
+_QUEUE_STAGE = "i.status = 'draft'"
+_LIST_ALL_SQL = _LIST_ALL_TEMPLATE.replace("__STAGE__", _HISTORY_STAGE)
+_QUEUE_ALL_SQL = _LIST_ALL_TEMPLATE.replace("__STAGE__", _QUEUE_STAGE)
+_LIST_BY_UNIT_SQL = _LIST_BY_UNIT_TEMPLATE.replace("__STAGE__", _HISTORY_STAGE)
+_QUEUE_BY_UNIT_SQL = _LIST_BY_UNIT_TEMPLATE.replace("__STAGE__", _QUEUE_STAGE)
 
 # Проверка целиком: та же шапка плюс разбивка оценки, которой в списке нет.
 # Числа отдаются как лежат — ни одного действия над ними.
@@ -132,12 +149,14 @@ select
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
+    i.status, i.accepted_at, i.accepted_by,
     i.deductions, i.counts, i.by_zone
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.id = %(id)s
+  and (%(include_on_review)s or i.status = 'finalized')
 """
 
 # Формулировки лежат строками `(entity_type, entity_id, field, lang)` (D025) и
@@ -188,6 +207,7 @@ join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and u.name_normalized = %(unit)s
+  and i.status = 'finalized'
 order by i.inspection_date desc, i.pushed_at desc, f.n
 limit %(limit)s
 """
@@ -273,6 +293,12 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         # пустой код у записанной проверки означал бы «не знаем, по чему
         # проверяли», а такого состояния у неё не бывает.
         checklist_code=str(row[18] or "bizdev"),
+        # Этап приёмки (D199): `draft` теперь не миг внутри транзакции слива, а
+        # проверка, ждущая вычитки. Принятые до появления этапа отметки о
+        # приёмке не имеют — пустая строка, а не выдуманное время.
+        on_review=row[19] == "draft",
+        accepted_at=row[20].isoformat() if row[20] is not None else "",
+        accepted_by=str(row[21] or ""),
     )
 
 
@@ -403,6 +429,7 @@ def list_inspections(
     date_to: date | None = None,
     limit: int = DEFAULT_LIMIT,
     include_retracted: bool = False,
+    on_review: bool = False,
 ) -> list[InspectionRow]:
     """Проверки в охвате читающего, свежие по дате обхода — первыми.
 
@@ -430,6 +457,11 @@ def list_inspections(
     (`DATABASE_RETRACTION_URL`), и тогда в выдаче появляются снятые — помеченные
     как снятые, с причиной. Не задано подключение — отказ, а не тихая выдача
     без них: «снятых нет» и «вам их не видно» разные ответы.
+
+    `on_review` выбирает ОДНУ из двух очередей, а не расширяет выдачу (D199):
+    по умолчанию — только принятые, то есть история сети; `True` — только
+    ждущие вычитки. Смешанной выдачи нет намеренно: проверка до подтверждения
+    не часть истории, и реестр показывает её отдельным списком.
     """
     охват = _require_reach(reach)
     rows_limit = _require_limit(limit)
@@ -445,15 +477,22 @@ def list_inspections(
         conn.cursor() as cur,
     ):
         if unit is None:
-            cur.execute(_LIST_ALL_SQL, params)
+            cur.execute(_QUEUE_ALL_SQL if on_review else _LIST_ALL_SQL, params)
         else:
-            cur.execute(_LIST_BY_UNIT_SQL, {**params, "unit": normalize_unit_name(unit)})
+            cur.execute(
+                _QUEUE_BY_UNIT_SQL if on_review else _LIST_BY_UNIT_SQL,
+                {**params, "unit": normalize_unit_name(unit)},
+            )
         rows = cur.fetchall()
     return [_row_to_inspection(row) for row in rows]
 
 
 def get_inspection(
-    inspection_id: str, *, reach: Reach, include_retracted: bool = False
+    inspection_id: str,
+    *,
+    reach: Reach,
+    include_retracted: bool = False,
+    include_on_review: bool = False,
 ) -> InspectionDetail | None:
     """Одна проверка из охвата читающего целиком: шапка, разбивка оценки и находки.
 
@@ -470,6 +509,10 @@ def get_inspection(
     подключение администратора истории. Без него снятая проверка отвечает
     `None` — тем же ответом, что несуществующая, и это не небрежность: тому,
     кто снятых не видит, они и не существуют.
+
+    Проверка на приёмке (D199) по умолчанию отвечает `None` тем же ответом:
+    до подтверждения она не документ сети, и агент или аналитика не должны
+    выдать её за таковой. Экран приёмки просит её явно — `include_on_review`.
     """
     охват = _require_reach(reach)
     ident = _require_inspection_id(inspection_id)
@@ -477,21 +520,41 @@ def get_inspection(
         _reading("проверку по идентификатору", as_admin=include_retracted) as conn,
         conn.cursor() as cur,
     ):
-        cur.execute(_GET_INSPECTION_SQL, {**охват.params(), "id": ident})
-        row = cur.fetchone()
-        колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
-        if row is None:
-            return None
-        # Находки читаются тем же соединением и в той же транзакции: между
-        # двумя подключениями проверка могла бы измениться, и шапка разъехалась
-        # бы с телом документа.
-        cur.execute(_FINDINGS_OF_INSPECTION_SQL, {"id": ident})
-        findings = cur.fetchall()
-        # Информационная часть — тем же соединением и той же транзакцией, по
-        # той же причине: собранный заново документ обязан быть одним
-        # документом, а не шапкой одной проверки и сроком другой.
-        cur.execute(_INFO_OF_INSPECTION_SQL, {"id": ident})
-        info = cur.fetchall()
+        return _read_detail(cur, reach=охват, ident=ident, include_on_review=include_on_review)
+
+
+def _read_detail(
+    cur: Any, *, reach: Reach, ident: str, include_on_review: bool
+) -> InspectionDetail | None:
+    """Проверка целиком на ЧУЖОМ курсоре — внутри транзакции вызывающего.
+
+    Нужна правке на приёмке (D200): она читает записи и пересчитывает оценку
+    после того, как взяла замок проверки, в той же транзакции. Иначе две
+    правки одной проверки считали бы каждая от своего снимка (`src/db/revise.py`).
+
+    Внутренняя намеренно: записи и сведения читаются по идентификатору БЕЗ
+    охвата — только после того, как карточка отобрана по охвату. Вызывающих
+    ровно два, `get_inspection` и `revise._apply` (после замка своего
+    пространства); список держит `tests/test_db_reach_static.py`.
+    """
+    cur.execute(
+        _GET_INSPECTION_SQL,
+        {**reach.params(), "id": ident, "include_on_review": include_on_review},
+    )
+    row = cur.fetchone()
+    колонки = {опис.name: место for место, опис in enumerate(cur.description or ())}
+    if row is None:
+        return None
+    # Находки читаются тем же соединением и в той же транзакции: между
+    # двумя подключениями проверка могла бы измениться, и шапка разъехалась
+    # бы с телом документа.
+    cur.execute(_FINDINGS_OF_INSPECTION_SQL, {"id": ident})
+    findings = cur.fetchall()
+    # Информационная часть — тем же соединением и той же транзакцией, по
+    # той же причине: собранный заново документ обязан быть одним
+    # документом, а не шапкой одной проверки и сроком другой.
+    cur.execute(_INFO_OF_INSPECTION_SQL, {"id": ident})
+    info = cur.fetchall()
     # Разбивка берётся ПО ИМЕНИ колонки, а не по её номеру. Номер здесь уже
     # ломался молча: приписка `checklist_code` в конец списка колонок (T345)
     # сдвинула разбивку на единицу, и чтение карточки стало падать разбором
@@ -578,6 +641,7 @@ from inspections i
      cross join lateral jsonb_each(i.by_zone) as zone
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -611,6 +675,7 @@ with записи as (
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and i.status = 'finalized'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -751,6 +816,7 @@ from findings f
      join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -903,6 +969,7 @@ from inspections i
      cross join lateral jsonb_each(i.by_zone) as zone
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.status = 'finalized'
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -993,6 +1060,7 @@ from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.status = 'finalized'
   and i.checklist_version = %(version)s
   and i.retracted_at is null
 """

@@ -19,7 +19,7 @@ import re
 from pathlib import Path
 from types import ModuleType
 
-from src.db import directory, move, previews, push, queries, reports
+from src.db import directory, move, previews, push, queries, reports, revise
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
 
 #: Запросы по проверкам без условия охвата — только по имени и с причиной.
@@ -124,9 +124,10 @@ def test_находки_по_идентификатору_читаются_то�
     """Исключение из охвата держится на одном вызывающем — второй его бы прорвал.
 
     Находки и сведения проверки читаются по её идентификатору без `REACH_SQL`,
-    потому что единственный вызывающий, `get_inspection`, тем же курсором уже
+    потому что единственный вызывающий, `_read_detail`, тем же курсором уже
     отобрал карточку по охвату и вышел, если её нет. Новый вызов этих запросов
-    где-либо ещё — чтение чужой проверки по перебору идентификаторов.
+    где-либо ещё — чтение чужой проверки по перебору идентификаторов. Кто
+    зовёт сам `_read_detail`, держит следующий тест.
     """
     корень = Path(queries.__file__).resolve().parents[2] / "src"
     чужие = [
@@ -144,14 +145,14 @@ def test_находки_по_идентификатору_читаются_то�
         for имя, функция in функции.items()
         if any(запрос in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ for _, запрос in _вызовы_execute(функция))
     )
-    assert зовущие == ["get_inspection"], f"запросы без охвата зовут: {зовущие}"
+    assert зовущие == ["_read_detail"], f"запросы без охвата зовут: {зовущие}"
 
-    вызовы = _вызовы_execute(функции["get_inspection"])
+    вызовы = _вызовы_execute(функции["_read_detail"])
     карточка = [строка for строка, запрос in вызовы if запрос == "_GET_INSPECTION_SQL"]
-    assert len(карточка) == 1, "get_inspection больше не читает карточку по охвату"
+    assert len(карточка) == 1, "_read_detail больше не читает карточку по охвату"
     выход = [
         у.lineno
-        for у in ast.walk(функции["get_inspection"])
+        for у in ast.walk(функции["_read_detail"])
         if isinstance(у, ast.If)
         and isinstance(у.body[0], ast.Return)
         and isinstance(у.test, ast.Compare)
@@ -164,6 +165,63 @@ def test_находки_по_идентификатору_читаются_то�
         if запрос in _БЕЗ_ОХВАТА_ПОСЛЕ_КАРТОЧКИ and строка < min(выход)
     ]
     assert раньше == [], "читают до проверки карточки по охвату: " + ", ".join(раньше)
+
+
+#: Кто вправе звать `_read_detail` — и чем он перед этим ограничил проверку.
+#: `get_inspection` передаёт охват читающего; `revise._apply` — после замка
+#: строки своего пространства (`_LOCK_SQL` с `tenant_code`).
+_ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {("db/queries.py", "get_inspection"), ("db/revise.py", "_apply")}
+
+
+def _зовущие_функции(дерево: ast.AST, имя: str) -> list[tuple[ast.FunctionDef, int]]:
+    """Функции дерева, внутри которых вызывается `имя(...)`, и строка вызова."""
+    найдено = []
+    for функция in ast.walk(дерево):
+        if not isinstance(функция, ast.FunctionDef):
+            continue
+        for узел in ast.walk(функция):
+            if (
+                isinstance(узел, ast.Call)
+                and isinstance(узел.func, ast.Name)
+                and узел.func.id == имя
+            ):
+                найдено.append((функция, узел.lineno))
+    return найдено
+
+
+def test_проверку_целиком_читают_только_после_охвата_или_замка_своего() -> None:
+    """`_read_detail` читает записи без охвата — вызывающих ровно два, каждый с заслоном.
+
+    Новый вызов где-то ещё прорвал бы ту же границу, что держит тест выше:
+    записи чужой проверки по перебору идентификаторов.
+    """
+    корень = Path(queries.__file__).resolve().parents[1]  # src/
+    вызовы: dict[tuple[str, str], int] = {}
+    for путь in корень.rglob("*.py"):
+        if "_read_detail" not in путь.read_text(encoding="utf-8"):
+            continue
+        дерево = ast.parse(путь.read_text(encoding="utf-8"))
+        for функция, строка in _зовущие_функции(дерево, "_read_detail"):
+            вызовы[(str(путь.relative_to(корень)), функция.name)] = строка
+    assert set(вызовы) == _ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ, f"_read_detail зовут: {sorted(вызовы)}"
+
+    # Правка: сначала замок своего пространства, выход без него — потом чтение.
+    assert "tenant_code = %(tenant)s" in revise._LOCK_SQL
+    assert "for update" in revise._LOCK_SQL
+    правка = next(
+        у
+        for у in ast.walk(ast.parse(inspect.getsource(revise)))
+        if isinstance(у, ast.FunctionDef) and у.name == "_apply"
+    )
+    замок = [строка for строка, запрос in _вызовы_execute(правка) if запрос == "_LOCK_SQL"]
+    отказ = [
+        у.lineno
+        for у in ast.walk(правка)
+        if isinstance(у, ast.If) and isinstance(у.body[0], ast.Raise)
+    ]
+    чтение = вызовы[("db/revise.py", "_apply")]
+    assert замок and min(замок) < чтение, "правка читает проверку до замка своего пространства"
+    assert отказ and min(отказ) < чтение, "нет выхода без замка до чтения проверки"
 
 
 def test_слив_не_заводит_пространство() -> None:

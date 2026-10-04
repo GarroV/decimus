@@ -328,3 +328,67 @@ def test_перевод_строки_в_контакте_даёт_отказ_а_
 
     assert ответ.status_code == 303
     assert "gmail=failed" in ответ.headers["Location"]
+
+
+def _на_приёмке(monkeypatch: pytest.MonkeyPatch) -> None:
+    ждущая = карточка()
+    ждущая = replace(ждущая, inspection=replace(ждущая.inspection, on_review=True))
+    monkeypatch.setattr(data, "load_card", lambda _id, *, reach: ждущая)
+
+
+def test_у_ждущей_приёмки_черновик_в_почту_не_уходит(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D199: письмо непринятой проверки смотрят, но не фиксируют и в Gmail не кладут."""
+    # Arrange
+    включить_почту(monkeypatch)
+    _на_приёмке(monkeypatch)
+    client, следы = клиент
+
+    # Act
+    ответ = увести(client)
+
+    # Assert
+    assert "gmail=on_review" in ответ.headers["Location"]
+    assert not следы["remember"]
+    assert not следы["draft"]
+
+
+def test_возврат_от_google_по_ждущей_приёмки_черновика_не_создаёт(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — уход начат по принятой, к возврату проверка на приёмке.
+    включить_почту(monkeypatch)
+    client, следы = клиент
+    уход = увести(client)
+    метка = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(уход.headers["Location"]).query))[
+        "state"
+    ]
+    _на_приёмке(monkeypatch)
+
+    # Act
+    ответ = client.get(f"/auth/google/mail?state={метка}&code=код")
+
+    # Assert
+    assert "gmail=on_review" in ответ.headers["Location"]
+    assert not следы["draft"]
+
+
+def test_у_ждущей_приёмки_письмо_не_сохраняется(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _на_приёмке(monkeypatch)
+    client, следы = клиент
+
+    # Act
+    ответ = client.post(
+        f"/inspections/{ПРОВЕРКА}/letter/save",
+        data={"text": "Текст", "letter_lang": "ru"},
+        headers={"Origin": СВОЙ},
+    )
+
+    # Assert
+    assert ответ.status_code == 303
+    assert "saved=on_review" in ответ.headers["Location"]
+    assert not следы["remember"]

@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import accept_pushed
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -57,6 +58,7 @@ def test_слив_переносит_пометку_повтора(domain_env: P
 def test_чтение_проверки_отдаёт_пометку(domain_env: Path, db_env: str) -> None:
     _проверка_с_повтором(1)
     inspection_id = push_inspection(1)
+    accept_pushed(inspection_id)  # D199: история читает только принятые
 
     detail = get_inspection(inspection_id, reach=own_reach(ТЕНАНТ))
 
@@ -68,7 +70,7 @@ def test_находки_точки_отдают_пометку(domain_env: Path,
     # Карточка точки читает историю именно этой выборкой: без пометки здесь
     # экран не сможет отличить «встречалось» от «засчитано вдвое».
     _проверка_с_повтором(1)
-    push_inspection(1)
+    accept_pushed(push_inspection(1))
 
     записи = findings_by_unit(reach=own_reach(ТЕНАНТ), unit="Белград-1")
 
