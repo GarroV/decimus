@@ -37,11 +37,23 @@ class Outcome:
     status: int
 
 
-def change_role(*, login: str, tenant: str, role: str, own_login: str) -> Outcome:
+def is_self(*, login: str, tenant: str, actor_login: str, actor_tenant: str) -> bool:
+    """Та же ли это учётка, что у правящего: пара (пространство, логин).
+
+    Логин сверяется в том виде, в каком его хранит база (без краёв, нижний
+    регистр): дверь базы приводит его сама, и «Director» из формы иначе
+    прошёл бы мимо сверки и сменил роль самому правящему.
+    """
+    return tenant == actor_tenant and login.strip().lower() == actor_login.strip().lower()
+
+
+def change_role(
+    *, login: str, tenant: str, role: str, actor_login: str, actor_tenant: str
+) -> Outcome:
     """Назначить роль. Свою — нельзя: снять с себя админа значит закрыть экран людей."""
     if role not in accounts.ROLES:
         return Outcome("role.unknown", 400)
-    if login == own_login:
+    if is_self(login=login, tenant=tenant, actor_login=actor_login, actor_tenant=actor_tenant):
         return Outcome("role.self", 400)
     try:
         назначена = accounts.set_role(login, tenant=tenant, role=role)

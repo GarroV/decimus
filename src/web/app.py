@@ -1147,11 +1147,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     def user_role() -> FlaskResponse | tuple[str, int]:
         """Назначить роль человеку (#399). Только админ УК; свою — нельзя."""
         вошедший = auth.current_account()
-        свой = вошедший.login if вошедший else ""
         роль = (request.form.get("role") or "").strip()
         return _правка_человека(
             lambda логин, пространство: people.change_role(
-                login=логин, tenant=пространство, role=роль, own_login=свой
+                login=логин,
+                tenant=пространство,
+                role=роль,
+                actor_login=вошедший.login if вошедший else "",
+                actor_tenant=вошедший.tenant if вошедший else "",
             )
         )
 
