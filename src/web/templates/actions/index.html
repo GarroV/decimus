@@ -1,0 +1,70 @@
+{#
+  Раздел действий УК (D264) — отвечает на вопрос «что по экшн-планам ждёт
+  моей реакции». Сверху очередь (ждут приёмки, просрочены), под ней запросы.
+  Только пространству УК: заслон на раздел целиком (`hq_only`) и на маршруте.
+  Имя раздела рабочее (#462).
+#}{% extends "base.html" %}
+{% from "_plan.html" import state_tag with context %}
+{% block title %}{{ t('section.actions.title') }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ country_title(country) if country else t('actions.all_countries') }}</div>
+      <h1 class="ov-head__title">{{ t('actions.kicker') }}</h1>
+    </div>
+  </div>
+
+  {# Очередь — итог над строками: клик сужает список под ней. Принятые —
+     отдельно (кнопка «Принятые»): в очередь они не попадают. #}
+  <div class="ov-filters">
+    <a class="ov-chip{% if not accepted %} is-on{% endif %}" href="{{ select_url(accepted='', queue='') }}">{{ t('plans.show_open') }}</a>
+    <a class="ov-chip{% if accepted %} is-on{% endif %}" href="{{ select_url(accepted='1', queue='') }}">{{ t('plans.show_accepted') }}</a>
+    {% if not accepted %}
+      <span class="ov-filters__gap"></span>
+      <a class="ov-chip{% if queue == 'review' %} is-on{% endif %}" href="{{ select_url(queue='' if queue == 'review' else 'review') }}">
+        {{ t('actions.queue.review', n=on_review) }}</a>
+      <a class="ov-chip{% if queue == 'overdue' %} is-on{% endif %}" href="{{ select_url(queue='' if queue == 'overdue' else 'overdue') }}">
+        {{ t('actions.queue.overdue', n=overdue) }}</a>
+    {% endif %}
+    <span class="ov-filters__gap"></span>
+    <span class="ov-filters__label">{{ t('actions.country') }}</span>
+    <a class="ov-chip{% if not country %} is-on{% endif %}" href="{{ select_url(country='') }}">{{ t('actions.all_countries') }}</a>
+    {% for code in countries %}
+      <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ select_url(country=code) }}">{{ country_title(code) or code }}</a>
+    {% endfor %}
+  </div>
+
+  {% if truncated %}<div class="note note--warn mt-gap"><div><div class="note__text">{{ t('plans.truncated', n=limit) }}</div></div></div>{% endif %}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('actions.list.title') }}</div>
+      <div class="ov-card__hint">{{ t('actions.list.hint') }}</div>
+      <div class="ov-card__count">{{ rows|length }}</div>
+    </div>
+    {% if rows %}
+      <div class="ov-table ov-table--plans">
+        <div class="ov-table__head">
+          <span>{{ t('overview.points.unit') }}</span>
+          <span>{{ t('actions.col.country') }}</span>
+          <span class="ov-num">{{ t('overview.points.grade') }}</span>
+          <span class="ov-num">{{ t('actions.col.inspection') }}</span>
+          <span class="ov-num">{{ t('actions.col.due') }}</span>
+          <span>{{ t('actions.col.state') }}</span>
+        </div>
+        {% for r in rows %}
+          <a class="ov-table__row" href="{{ url(actions_path ~ '/requests/' ~ r.id) }}?lang={{ lang }}">
+            <span class="ov-cell__name">{{ r.unit_name }}</span>
+            <span class="ov-cell__muted">{{ (country_title(r.country) or r.country) if r.country else '—' }}</span>
+            <span class="ov-num">{% if r.grade %}<span class="grade tag tag--micro">{{ r.grade }}</span>{% endif %}</span>
+            <span class="ov-num ov-cell__muted">{{ r.inspection_date }}</span>
+            <span class="ov-num{% if r.overdue(today) %} ov-num--err{% endif %}">{{ r.due_on }}</span>
+            <span>{{ state_tag(r, today) }}</span>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="ov-card__empty">{{ t('plans.accepted_empty') if accepted else t('actions.list.empty') }}</div>
+    {% endif %}
+  </section>
+{% endblock %}

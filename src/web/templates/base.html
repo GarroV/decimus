@@ -161,7 +161,7 @@
         <a class="tabbar__item{% if item.key == current_key %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
            href="{{ url(item.path) }}?lang={{ lang }}"
            {% if item.key == current_key %}aria-current="page"{% endif %}
-           {% if not item.built %}title="{{ t('nav.wip') }}"{% endif %}>{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
+           title="{{ t('nav.wip') if not item.built else t('section.' ~ item.key ~ '.title') }}">{{ icon(item.icon) }}<span>{{ t('section.' ~ item.key ~ '.title') }}</span></a>
       {% endfor %}
     </nav>
   {% endif %}

@@ -36,6 +36,7 @@ from src.db.move import MoveRecord
 from src.db.reach import own_reach
 from src.db.retract import Retraction
 from src.domain.tenants import canonical_tenant
+from src.web import action_plans
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
@@ -134,6 +135,8 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
+    # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
+    monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -154,8 +157,10 @@ def test_все_девять_разделов_открываются(стенд:
     # Раздел с ограничением по роли (T338) из этого правила выведен: он и
     # должен отказывать, и отказывает вслух — 403 с объяснением, а не пустой
     # страницей.
+    # Раздел партнёра (экшн-планы, волна 2) УК не закрыт, а отправляет в свой
+    # раздел действий (D264) — 303, не отказ.
     for раздел in SECTIONS:
-        ожидаемый = 403 if раздел.admin_only else 200
+        ожидаемый = 403 if раздел.admin_only else 303 if раздел.partner_only else 200
         assert стенд.get(раздел.path).status_code == ожидаемый, раздел.key
 
 
@@ -164,7 +169,7 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 5
+    assert len(непостроенные) == 4
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key
@@ -198,7 +203,7 @@ def test_навигация_показывает_карту_продукта_ц�
     # готовым, и человек идёт в него за работой, которой там нет.
     assert "sidenav__item is-wip" in страница
     for раздел in SECTIONS:
-        if раздел.admin_only:
+        if раздел.admin_only or раздел.partner_only:
             # Ссылка, ведущая в отказ, выглядит как поломка продукта: раздел
             # с ограничением по роли не зовёт того, кого не пустят.
             assert раздел.path not in страница, раздел.key

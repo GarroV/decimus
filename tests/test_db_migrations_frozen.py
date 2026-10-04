@@ -157,6 +157,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0035_bot_ui_langs.sql": (
         "sql1:6579bf02abc5635cfc8fa8dff1d1ba287b64d09e4ce4d667aa484f90b90450b7"
     ),
+    "0036_action_plans.sql": (
+        "sql1:3101613414c0dd0562ce5314a5205f58c32d938bb4b99af2fe7e6ed261d6f8da"
+    ),
 }
 
 

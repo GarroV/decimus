@@ -337,3 +337,22 @@ _без_scrypt_и_базы
 # aiogram, статически их имена не читает никто.
 on_lang_command
 on_lang_chosen
+# Экшн-планы (волна 2, `src/web/action_plans.py`): маршруты Flask зовёт
+# диспетчер по адресу, регистрирует декоратор — по имени их не читает никто.
+actions
+actions_request
+actions_review
+actions_due
+actions_new
+plans_index
+plans_upload
+plan_file
+# Предел тела на маршруте загрузки (D269): атрибут запроса читает сам Flask.
+max_content_length
+# Поля и свойство запроса экшн-плана читают шаблоны (`_plan.html`,
+# `plans/index.html`), а Jinja статически не видна.
+uploaded_by
+reviewed_by
+reviewed_at
+requested_at
+last_comment
