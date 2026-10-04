@@ -18,15 +18,31 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 # `psycopg` — зависимость блока `db`, а не всего проекта: без этой строки сбор
 # этого файла падает целиком в окружении, где её ещё не поставили (см. тот же
 # приём и объяснение в `tests/test_db_synonyms.py` и `tests/conftest.py`).
 psycopg = pytest.importorskip("psycopg")
 
+from src.db.errors import SynonymError  # noqa: E402
 from src.db.synonyms import list_phrases, lookup_phrase, remember_phrase  # noqa: E402
 
 pytestmark = requires_db
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Пространства, на которые тесты набора записывают синонимы.
+
+    «нет-такого» не заводится: его отсутствие проверяет тест.
+
+    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
+    базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        завести_пространства(request.getfixturevalue("pg_dsn"), "HQ", "альфа")
+
 
 #: Выдуманный код пункта. Настоящие коды методики сюда не попадают намеренно:
 #: связывание проверяется кодом как таковым, а не тем, какой он (см. образец).
@@ -199,9 +215,9 @@ def test_карта_одного_арендатора_не_отвечает_на
 def test_синоним_несуществующего_арендатора_не_ложится_в_никуда(db_env: str) -> None:
     """Ссылка на `tenants (code)` не даёт синониму привязаться к партнёру, которого нет.
 
-    Встречное утверждение — тем же тестом: `remember_phrase` заводит строку
-    арендатора сама (`_INSERT_TENANT_SQL` в `src.db.synonyms`), а не полагается
-    на то, что кто-то завёл её заранее.
+    Встречное утверждение — тем же тестом: `remember_phrase` незаведённое
+    пространство не заводит, а отказывает (#481) — пространства заводит
+    команда `make space`.
     """
     with pytest.raises(psycopg.errors.ForeignKeyViolation):
         _выполнить(
@@ -217,9 +233,10 @@ def test_синоним_несуществующего_арендатора_не
             },
         )
 
-    remember_phrase("жёлтый зонт под потолком", item_code=ПУНКТ, lang="ru", tenant="альфа")
+    with pytest.raises(SynonymError, match="make space"):
+        remember_phrase("жёлтый зонт под потолком", item_code=ПУНКТ, lang="ru", tenant="нет-такого")
 
-    assert _счёт(db_env, "select count(*) from tenants where code = %s", ("альфа",)) == 1
+    assert _счёт(db_env, "select count(*) from tenants where code = %s", ("нет-такого",)) == 0
 
 
 # --- T292: правка карты держится правами и ограничениями, а не слоем ---------

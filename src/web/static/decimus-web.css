@@ -1663,6 +1663,11 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .ap-table th[scope=row] { font-weight: var(--w-regular); color: var(--ink-2); width: 30%; }
 .ap-table tr.ap-diff td { font-weight: var(--w-semibold); background: var(--warn-soft); }
 .users-add { align-items: flex-end; }
+/* Правка роли и почты в строке перечня (#399): кнопка стоит при своём поле и
+   переносится под него, когда колонке тесно, — так перечень помещается в
+   карточку на 1280–1440 и «Отключить» не уезжает за край. */
+.users-inline { flex-wrap: wrap; gap: var(--space-2) var(--space-3); padding: var(--space-3) 0; }
+.users-email { width: 11rem; }
 
 /* Таблица-перечень (люди): у `.table` ядра ячейки текста без полей — она
    построена под денежные таблицы, где поля даёт закреплённая колонка имени.

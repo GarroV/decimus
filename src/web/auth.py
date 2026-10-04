@@ -32,7 +32,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 
-from flask import Flask, g, make_response, redirect, render_template, request, url_for
+from flask import Flask, current_app, g, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
@@ -98,10 +98,42 @@ OPEN_ENDPOINTS = frozenset({"login", "static", "google_start", "google_callback"
 #: Ключ в `g`, под которым живёт вошедший на время запроса.
 CURRENT = "account"
 
+#: Ключ в `g` для токена сессии этого запроса: смена своего пароля (#324)
+#: предъявляет базе ИМЕННО его — строку учётки выбирает живая сессия, а не
+#: поле формы.
+SESSION_TOKEN = "session_token"  # noqa: S105 — имя ключа в `g`, а не токен
+
 
 def current_account() -> Account | None:
     """Кто сейчас на странице. `None` — никого, и до страницы дело не дошло."""
     return getattr(g, CURRENT, None)
+
+
+#: Где в `app.extensions` лежит тенант, по которому ведётся счётчик попыток.
+THROTTLE_KEY = "decimus_throttle_tenant"
+
+
+def throttle_tenant() -> str:
+    """Тенант счётчика попыток — тот же, что у формы входа (T325, #324).
+
+    Форма смены своего пароля сверяет текущий пароль и обязана считать
+    попытки в ТОМ ЖЕ счётчике, что и вход: иначе она стала бы вторым входом
+    для подбора. Источник один — `install`, второго здесь не заводится.
+    """
+    return str(current_app.extensions[THROTTLE_KEY])
+
+
+def current_session_token() -> str:
+    """Токен сессии вошедшего — из куки этого запроса, сверенный заслоном.
+
+    Без вошедшего — ошибка кода: маршрут прошёл мимо заслона.
+    """
+    токен = getattr(g, SESSION_TOKEN, None)
+    if not токен:
+        raise RuntimeError(
+            "current_session_token() вызван без вошедшего: маршрут прошёл мимо заслона"
+        )
+    return str(токен)
 
 
 #: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
@@ -143,6 +175,7 @@ def install(app: Flask, conf: Settings) -> None:
     # Счётчик попыток ведётся по тенанту СТЕНДА: до входа пространство
     # человека неизвестно, а счётчик — защита от перебора, не граница.
     рубеж = conf.tenant
+    app.extensions[THROTTLE_KEY] = рубеж
 
     def token_of_request() -> str | None:
         """Токен из куки, если подпись наша и не просрочена. Иначе — ничего."""
@@ -191,6 +224,7 @@ def install(app: Flask, conf: Settings) -> None:
         if account is None:
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
+        setattr(g, SESSION_TOKEN, token)
         return None
 
     def заперто(приговор: Verdict) -> Response:

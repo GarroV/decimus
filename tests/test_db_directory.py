@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 # `psycopg` — зависимость блока `db`, а не всего проекта: без этой строки сбор
 # этого файла падает целиком в окружении, где её ещё не поставили (см.
@@ -26,6 +27,17 @@ from src.db.reach import own_reach  # noqa: E402
 from src.db.units import normalize_unit_name  # noqa: E402
 
 pytestmark = requires_db
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Пространства, в которых заводятся точки тестов набора.
+
+    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
+    базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        завести_пространства(request.getfixturevalue("pg_dsn"), "HQ", "partner")
 
 
 def _строки(dsn: str, sql: str, params: tuple[object, ...] = ()) -> list[tuple[object, ...]]:

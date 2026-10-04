@@ -27,6 +27,7 @@ import logging
 
 import pytest
 from conftest import requires_db
+from db_harness import завести_пространства
 
 from src.mcp.config import (
     MCP_RETRACTION_TOKENS_VAR,
@@ -47,6 +48,17 @@ from src.mcp.errors import AuthError
 #: разница была бы не видна, и подмена прошла бы незамеченной.
 ЧЕЛОВЕК = 777001
 АРЕНДАТОР_ЧЕЛОВЕКА = "управляющая-компания"
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Пространство, на которое бот выпускает личные токены тестов набора.
+
+    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
+    базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        завести_пространства(request.getfixturevalue("pg_dsn"), АРЕНДАТОР_ЧЕЛОВЕКА)
 
 
 def _настройки(**env: str) -> Settings:
