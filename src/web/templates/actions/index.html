@@ -48,7 +48,7 @@
         {% for r in rows %}
           <a class="ov-table__row" href="{{ url(actions_path ~ '/requests/' ~ r.id) }}?lang={{ lang }}">
             <span class="ov-cell__name">{{ r.unit_name }}</span>
-            <span class="ov-cell__muted">{{ country_title(r.country) or r.country }}</span>
+            <span class="ov-cell__muted">{{ (country_title(r.country) or r.country) if r.country else '—' }}</span>
             <span class="ov-num">{% if r.grade %}<span class="grade tag tag--micro">{{ r.grade }}</span>{% endif %}</span>
             <span class="ov-num ov-cell__muted">{{ r.inspection_date }}</span>
             <span class="ov-num{% if r.overdue(today) %} ov-num--err{% endif %}">{{ r.due_on }}</span>

@@ -31,7 +31,12 @@ import psycopg
 
 from src.domain.tenants import HQ_TENANT
 
-from .config import check_environment, load_retraction_settings, load_storage_settings
+from .config import (
+    check_environment,
+    load_action_plan_settings,
+    load_retraction_settings,
+    load_storage_settings,
+)
 from .errors import ActionPlanError, DbError, StorageError
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
@@ -157,7 +162,9 @@ class PlanRequest:
 
     id: str
     inspection_id: str
-    country: str
+    #: Страна точки проверки сейчас (не копия на момент запроса): проверку
+    #: переносят в точку другой страны (D195) — запрос уезжает с ней.
+    country: str | None
     due_on: date
     status: str
     origin: str
@@ -201,13 +208,14 @@ class PlanFileRef:
 
 # Охват — литералом `REACH_SQL` (сверка `tests/test_db_reach_static.py`).
 _LIST_SQL = """
-select r.id, r.inspection_id, r.country, r.due_on, r.status, r.origin, r.requested_by,
+select r.id, r.inspection_id, u.country, r.due_on, r.status, r.origin, r.requested_by,
        r.requested_at, u.id, u.name, i.inspection_date, i.pct, i.grade
 from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and (%(country)s::text is null or r.country = %(country)s)
+  and i.retracted_at is null
+  and (%(country)s::text is null or u.country = %(country)s)
   and (%(request_id)s::uuid is null or r.id = %(request_id)s)
   and (%(inspection_id)s::uuid is null or r.inspection_id = %(inspection_id)s)
 order by r.due_on, r.requested_at
@@ -237,6 +245,7 @@ join action_plan_requests r on r.id = f.request_id
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.retracted_at is null
   and f.id = %(id)s
 """  # noqa: E501
 
@@ -247,6 +256,7 @@ from action_plan_requests r
 join inspections i on i.id = r.inspection_id
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.retracted_at is null
   and r.id = %(id)s
 for update of r
 """  # noqa: E501
@@ -279,8 +289,8 @@ _EXISTING_SQL = "select 1 from action_plan_requests where inspection_id = %s"
 
 _INSERT_REQUEST_SQL = """
 insert into action_plan_requests
-    (inspection_id, country, due_on, origin, requested_by, due_set_by)
-values (%(inspection_id)s, %(country)s, %(due_on)s, %(origin)s, %(actor)s, %(actor)s)
+    (inspection_id, due_on, origin, requested_by, due_set_by)
+values (%(inspection_id)s, %(due_on)s, %(origin)s, %(actor)s, %(actor)s)
 on conflict (inspection_id) do nothing
 returning id
 """
@@ -296,9 +306,10 @@ order by f.version desc
 limit 1
 """
 
-_SET_DUE_SQL = """
-update action_plan_requests set due_on = %(due_on)s, due_set_by = %(actor)s where id = %(id)s
-"""
+# Подпись срока — настройкой транзакции: `due_set_by` пишет триггер (0036).
+_SIGN_DUE_SQL = "select set_config('decimus.plan_actor', %s, true)"
+
+_SET_DUE_SQL = "update action_plan_requests set due_on = %(due_on)s where id = %(id)s"
 
 _INSERT_REVIEW_SQL = """
 insert into action_plan_reviews (file_id, verdict, comment, reviewed_by)
@@ -354,7 +365,7 @@ def _assemble(
     return PlanRequest(
         id=ident,
         inspection_id=str(head[1]),
-        country=str(head[2]),
+        country=None if head[2] is None else str(head[2]),
         due_on=head[3],
         status=str(head[4]),
         origin=str(head[5]),
@@ -453,13 +464,17 @@ def fetch_file(ref: PlanFileRef, *, storage: FileReader | None = None) -> bytes:
 
 
 def open_auto_request(
-    cur: psycopg.Cursor[Any], inspection_id: str, *, actor: str, due_days: int, on: date
+    cur: psycopg.Cursor[Any], inspection_id: str, *, actor: str, on: date
 ) -> str | None:
     """Завести запрос сам — тем же курсором, что подтверждает проверку (D272).
 
     Зовётся из `accept.py` внутри транзакции подтверждения: подтверждение без
     запроса невозможно, оба ложатся вместе или не ложатся вовсе. Возвращает id
     запроса или `None`, если он не нужен (нет D2/D3, проверка не УК) или уже был.
+
+    Срок (`ACTION_PLAN_DUE_DAYS`) читается здесь и только когда запрос нужен:
+    кривая настройка роняет подтверждение проверки с D2/D3 (`ConfigError`), а не
+    любой проверки.
     """
     cur.execute(_INSPECTION_FOR_REQUEST_SQL, (inspection_id,))
     row = cur.fetchone()
@@ -480,8 +495,7 @@ def open_auto_request(
         _INSERT_REQUEST_SQL,
         {
             "inspection_id": inspection_id,
-            "country": country,
-            "due_on": due_date(on, due_days),
+            "due_on": due_date(on, load_action_plan_settings().due_days),
             "origin": ORIGIN_AUTO,
             "actor": actor,
         },
@@ -532,7 +546,6 @@ def request_plan(inspection_id: str, *, actor: str, due_on: date) -> str:
                 _INSERT_REQUEST_SQL,
                 {
                     "inspection_id": ident,
-                    "country": row[4] if row else None,
                     "due_on": due_on,
                     "origin": ORIGIN_MANUAL,
                     "actor": who,
@@ -574,7 +587,8 @@ def set_due(request_id: str, *, actor: str, due_on: date) -> None:
             status = _locked_status(cur, ident)
             if status == STATUS_ACCEPTED:
                 raise ActionPlanError("План уже принят — срок не правится")
-            cur.execute(_SET_DUE_SQL, {"id": ident, "due_on": due_on, "actor": who})
+            cur.execute(_SIGN_DUE_SQL, (who,))
+            cur.execute(_SET_DUE_SQL, {"id": ident, "due_on": due_on})
             conn.commit()
     except psycopg.Error as exc:
         raise _translate("Поправить срок", exc) from exc

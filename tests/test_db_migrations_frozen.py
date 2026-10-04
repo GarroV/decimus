@@ -154,7 +154,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:dddc35114711d27b8665c679b99393924bdede70e20c9fb42913d328c8d0357a"
     ),
     "0036_action_plans.sql": (
-        "sql1:7b8dd97fafa9742c5b305b8e98b7af227af468a3930df28646b4941a849786c8"
+        "sql1:3101613414c0dd0562ce5314a5205f58c32d938bb4b99af2fe7e6ed261d6f8da"
     ),
 }
 
