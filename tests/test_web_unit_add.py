@@ -16,6 +16,7 @@ from flask.testing import FlaskClient
 from test_web_country import данные, открыть
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
+from src.db.directory import CreatedUnit
 from src.db.errors import PushError, UnitExistsError
 from src.db.reach import Reach
 from src.web import app as app_mod
@@ -29,13 +30,15 @@ from src.web import auth, unit_add
 def заведено(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     позвали: list[dict[str, Any]] = []
 
-    def _create(name: str, **поля: Any) -> str:
+    def _create(name: str, **поля: Any) -> CreatedUnit:
         позвали.append({"name": name, **поля})
         if name == "Belgrade-1":
             raise UnitExistsError("есть", unit_id="u-old", name="Belgrade-1")
         if name == "Novi Sad-9":
             raise PushError("база не ответила")
-        return "u-new"
+        if name == "Novi Sad-12":
+            return CreatedUnit(id="u-new", taken_aliases=("Нови Сад 12",))
+        return CreatedUnit(id="u-new")
 
     monkeypatch.setattr(unit_add.directory, "create_unit", _create)
     monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("RS", 1),))
@@ -207,3 +210,10 @@ def test_маршрут_вне_охвата_как_несуществующий(
     assert заведено == []
     # Своя (суженная) страна открыта — отказ выше не из-за поломки стенда.
     assert уК_узкий.get("/country/GE/units/new").status_code == 200
+
+
+def test_занятый_синоним_не_теряется_молча(уК: FlaskClient, заведено: list[dict[str, Any]]) -> None:
+    ответ = отправить(уК, name="Нови Сад 12")
+    assert ответ.status_code == 302
+    assert "alias_taken=1" in ответ.headers["Location"]
+    assert "alias_taken" not in отправить(уК, name="Белград 6").headers["Location"]
