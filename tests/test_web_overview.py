@@ -102,6 +102,10 @@ def снимок(**поля: object) -> ov.Overview:
     ряд = основа["inspections"]
     основа.setdefault("inspections_total", len(ряд))  # type: ignore[arg-type]
     основа.setdefault("units_checked", len({r.unit_name for r in ряд}))  # type: ignore[attr-defined]
+    основа.setdefault(
+        "critical_total",
+        sum(1 for a in основа["attention"] if a.why == "critical"),  # type: ignore[attr-defined]
+    )
     return ov.Overview(**основа)  # type: ignore[arg-type]
 
 

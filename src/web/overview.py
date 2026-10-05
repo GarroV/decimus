@@ -209,6 +209,9 @@ class Overview:
     #: `inspections` ограничен пределом, а плитки — нет.
     inspections_total: int = 0
     units_checked: int = 0
+    #: Проверок среза с критическим нарушением — по ВСЕМУ срезу, из
+    #: `class_counts` (#503). Список поводов `attention` — по ряду и до `TOP`.
+    critical_total: int = 0
 
 
 def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
@@ -702,4 +705,5 @@ def load(
         truncated=обрезан or было_обрезано,
         inspections_total=сводка.inspections,
         units_checked=сводка.units,
+        critical_total=sum(1 for классы in counts.values() if классы.get(CRITICAL)),
     )

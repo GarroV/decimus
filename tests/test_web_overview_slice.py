@@ -175,3 +175,21 @@ def test_плитки_и_буквы_считаются_по_всему_срез�
     # Таблица — по-прежнему последние сто, и об этом сказано.
     assert len(снимок.inspections) == ПРЕДЕЛ
     assert снимок.truncated
+
+
+def test_плитка_критических_считает_весь_срез(сеть: dict[str, str], pg_dsn: str) -> None:
+    # Критическое нарушение — у сто первой, самой старой проверки сети. В ряд
+    # с пределом сто она не попадает, но плитка говорит обо всём срезе, как
+    # и остальные плитки (тот же отбор, что у `class_counts`).
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute(
+            "insert into findings (inspection_id, n, code, level, zone) "
+            "select id, 1, 'CLN05', 'D3', 'hot_kitchen' from inspections where unit_id = %s",
+            (сеть["Тбилиси-1"],),
+        )
+        conn.commit()
+
+    снимок = ov.load(reach=own_reach("HQ"), limit=ПРЕДЕЛ, selection=ov.Selection())
+
+    assert снимок.critical_total == 1
+    assert "Тбилиси-1" not in {r.unit_name for r in снимок.inspections}
