@@ -12,6 +12,17 @@
 push_inspection(chat_id: int) -> str          # id проверки в базе; повторный вызов не создаёт дубль
 upload_photos(inspection_id: str, *, fetch: Callable[[str], bytes | None],
               allow_missing: bool = False) -> int   # сколько кадров выгружено в хранилище
+# хранилище не приняло кадр — PhotosDeferredError (наследник PushError): строки
+# остаются с пустым storage_path и ждут дозагрузки (#459); кадр, записанный
+# другим выгрузчиком, не переписывается и в счёт не идёт
+pending_photo_uploads(*, min_age_sec: int, max_age_sec: int | None = None,
+                      limit: int = 1000)
+    -> list[PendingUpload]   # невыгруженные кадры по проверкам:
+                             # (inspection_id, file_ids, waiting_since); max_age_sec
+                             # отрезает застарелые — у них редкий проход
+# S3PhotoStorage(settings, *, fail_fast=False): fail_fast=True — 5 с на
+# соединение и одна попытка, только для upload_photos и upload_report (сдача и
+# дозагрузка); остальные — умолчания botocore с повторами. ping() — head_bucket
 # охват чтения (волна 1, #340; D283, D284, D289) — src/db/reach.py
 # Reach(tenant, tenants, countries): кто читает; чьи проверки (None — всех);
 #   пиццерии каких стран (None — всех, () — ничего). Reach.params() — массивы
@@ -567,7 +578,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 |---|---|
 | `src/db/push.py` | `push_inspection` — сборка отпечатка, транзакция, идемпотентная запись |
 | `src/db/queries.py` | `list_inspections`, `get_inspection`, `findings_by_unit` — только чтение |
-| `src/db/photos.py` | `upload_photos` — выгрузка кадров, отметка ссылки в базе |
+| `src/db/photos.py` | `upload_photos` — выгрузка кадров, отметка ссылки в базе; `pending_photo_uploads` — что ждёт дозагрузки (#459) |
 | `src/db/retract.py` | `retract_inspection` — снятие проверки пометкой и уборка её кадров из хранилища (T210, T233) |
 | `src/db/storage.py` | `PhotoStorage` (узкий интерфейс) и драйвер S3 |
 | `src/db/fingerprint.py` | `compute_fingerprint` — чистая функция, без базы; `previous_fingerprints` — те же данные по прежним рецептам, чтобы смена рецепта не задваивала слитое (T193) |
