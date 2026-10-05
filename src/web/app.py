@@ -68,6 +68,7 @@ from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
 from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
+from .db_refusal import note_target_mismatch, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
@@ -1063,7 +1064,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 люди = accounts.everyone(tenant=None)
                 пространства = accounts.spaces()
                 привязки = bot_links.live_bindings()
-            except DbError:
+            except DbError as exc:
+                note_target_mismatch(exc)
                 # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
                 # вторая была бы молчаливой ложью на экране, где считают людей
                 # с доступом.
@@ -1252,7 +1254,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             if пространство is None:
                 return _страница_учёток(outcome="add_space_unknown", code=400)
             заведённый = accounts.add(логин, tenant=пространство, role=роль)
-        except DbError:
+        except DbError as exc:
+            note_target_mismatch(exc)
             return _страница_учёток(outcome="add_failed", code=400)
         return _страница_учёток(added=заведённый, outcome="added")
 
@@ -1276,7 +1279,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             if пространство is None:
                 return _страница_учёток(outcome="disable_missing", code=400)
             отключено = accounts.disable(логин, tenant=пространство)
-        except DbError:
+        except DbError as exc:
+            note_target_mismatch(exc)
             return _страница_учёток(outcome="disable_failed", code=400)
         return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
 
@@ -2452,7 +2456,9 @@ def _register_errors(app: Flask, conf: Settings) -> None:
     def _db_down(exc: DbError) -> tuple[str, int]:
         if _schema_lags(exc):
             return render_template("error_schema.html", total=len(discover_migrations())), 503
-        return render_template("error_db.html", reason=str(exc)), 503
+        # Расхождение подключений — общими словами, подробности в журнал (#515):
+        # карта стенда вошедшему, в том числе партнёру, ни к чему.
+        return render_template("error_db.html", reason=public_reason(exc, _lang(conf))), 503
 
     @app.errorhandler(MethodologyRefused)
     def _methodology_broken(exc: MethodologyRefused) -> tuple[str, int]:

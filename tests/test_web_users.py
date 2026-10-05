@@ -22,6 +22,7 @@ from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
 from src.web import accounts
+from src.web.accounts import everyone as настоящий_перечень
 
 #: Админ УК: управлять людьми может только он (D288).
 ТЕНАНТ = "HQ"
@@ -233,3 +234,27 @@ def test_не_админ_видит_только_себя(monkeypatch: pytest.Mo
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
     assert ЛОГИН in страница and "/users/add" not in страница
+
+
+def test_расхождение_баз_на_вкладке_не_раскрывает_стенд(
+    стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """#515: вошедший не видит базы, хосты и роли; оператор находит их в журнале."""
+    # Arrange — настоящий перечень людей, подключение истории ведёт в другую базу
+    monkeypatch.setattr(accounts, "everyone", настоящий_перечень)
+    monkeypatch.setenv("DATABASE_URL", "postgresql://dodo_audit_app:x@db.example/stand")
+    monkeypatch.setenv(
+        "DATABASE_RETRACTION_URL", "postgresql://dodo_audit_admin:x@db.example/shared"
+    )
+    monkeypatch.delenv("DATABASE_ADMIN_URL", raising=False)
+
+    # Act
+    with caplog.at_level("ERROR"):
+        страница = стенд_админа.get("/users").get_data(as_text=True)
+
+    # Assert
+    for деталь in ("db.example", "shared", "dodo_audit_admin", "DATABASE_RETRACTION_URL"):
+        assert деталь not in страница, деталь
+    журнал = " ".join(r.getMessage() for r in caplog.records if r.levelname == "ERROR")
+    assert "shared" in журнал
+    assert "db.example" in журнал

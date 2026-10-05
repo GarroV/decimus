@@ -353,4 +353,12 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Множитель повтора — «{value}», а это не число.",
         "en": "Repeat multiplier is “{value}”, which is not a number.",
     },
+    # --- стенд: подключения к базе разошлись (#515) ---------------------------
+    "refusal.web.db_target": {
+        "ru": "Подключения этой установки ведут в разные базы, поэтому действие остановлено — "
+        "иначе данные ушли бы не туда. Обратитесь к администратору.",
+        "en": "This installation's database connections point to different databases, so the "
+        "action was stopped to keep data from going to the wrong place. Please contact the "
+        "administrator.",
+    },
 }
