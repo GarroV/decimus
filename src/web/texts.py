@@ -135,13 +135,14 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.tile.unchecked": {"ru": "Не проверено", "en": "Not inspected"},
     # Срез длиннее предела ряда (#470): молча обрезанный ряд читается как весь.
     "overview.truncated": {
-        "ru": "В срезе больше {n} проверок. Средняя, буквы и таблица точек считаются "
-        "по последним {n}, потери по зонам и системные нарушения — по всему срезу. "
-        "Сузьте период или место, чтобы все блоки говорили об одних проверках.",
-        "en": "The slice has more than {n} inspections. The average, grades and the "
-        "unit table cover the latest {n}; zone losses and systemic findings cover the "
-        "whole slice. Narrow the period or place so every block speaks of the same "
-        "inspections.",
+        "ru": "В срезе больше {n} проверок. Таблицы пиццерий и городов и поводы "
+        "посмотреть построены по последним {n}; плитки, буквы, потери по зонам и "
+        "системные нарушения — по всему срезу. Сузьте период или место, чтобы "
+        "увидеть в таблицах всё.",
+        "en": "The slice has more than {n} inspections. The unit and city tables and "
+        "the reasons to look cover the latest {n}; the tiles, grades, zone losses and "
+        "systemic findings cover the whole slice. Narrow the period or place to see "
+        "everything in the tables.",
     },
     "overview.tile.note.unchecked": {
         "ru": "точек без проверки за период",
