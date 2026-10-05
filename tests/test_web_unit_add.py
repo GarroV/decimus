@@ -19,7 +19,7 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 from src.db.errors import PushError, UnitExistsError
 from src.db.reach import Reach
 from src.web import app as app_mod
-from src.web import unit_add
+from src.web import auth, unit_add
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 АДРЕС = "/country/RS/units/new"
@@ -178,3 +178,32 @@ def test_незнакомый_город_сначала_переспрашива
 def test_отказ_базы_не_выдаётся_за_успех(уК: FlaskClient, заведено: list[dict[str, Any]]) -> None:
     ответ = отправить(уК, name="Нови Сад 9")
     assert ответ.status_code == 503
+
+
+def test_без_Origin_и_Referer_отказ_и_в_базе_ничего(
+    уК: FlaskClient, заведено: list[dict[str, Any]]
+) -> None:
+    # Заслон разрешает совпадение, а не отсутствие данных (`src/web/origin.py`).
+    ответ = уК.post(АДРЕС, data={"name": "Belgrade-6"})
+    assert ответ.status_code == 403
+    assert заведено == []
+
+
+@pytest.fixture
+def уК_узкий(monkeypatch: pytest.MonkeyPatch, заведено: Any) -> Iterator[FlaskClient]:
+    """УК, чей охват сужен до Грузии: правило «пишешь только туда, что видишь»."""
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    monkeypatch.setattr(auth, "reach_of", lambda tenant: Reach(tenant, None, ("GE",)))
+    with собрать(tenant="HQ").test_client() as client:
+        assert войти(client).status_code == 302
+        yield client
+
+
+def test_маршрут_вне_охвата_как_несуществующий(
+    уК_узкий: FlaskClient, заведено: list[dict[str, Any]]
+) -> None:
+    assert уК_узкий.get(АДРЕС).status_code == 404
+    assert отправить(уК_узкий, name="Belgrade-6").status_code == 404
+    assert заведено == []
+    # Своя (суженная) страна открыта — отказ выше не из-за поломки стенда.
+    assert уК_узкий.get("/country/GE/units/new").status_code == 200
