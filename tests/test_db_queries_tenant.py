@@ -213,6 +213,10 @@ def test_выборка_идёт_по_индексу_а_не_полным_про
                     "limit": DEFAULT_LIMIT,
                     "date_from": None,
                     "date_to": None,
+                    # Отбор по месту и букве не задан — «все» (#470).
+                    "city": None,
+                    "country": None,
+                    "grade": None,
                 },
             )
             план = "\n".join(строка[0] for строка in cur.fetchall())
@@ -264,6 +268,10 @@ def test_очередь_приёмки_идёт_по_частичному_инд
                 "limit": DEFAULT_LIMIT,
                 "date_from": None,
                 "date_to": None,
+                # Отбор по месту и букве не задан — «все» (#470).
+                "city": None,
+                "country": None,
+                "grade": None,
             },
         )
         план = "\n".join(строка[0] for строка in cur.fetchall())

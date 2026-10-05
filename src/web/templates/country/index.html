@@ -57,6 +57,9 @@
     </div>
   </div>
 
+  {# Срез длиннее предела ряда (#470): сказать вслух, а не обрезать молча. #}
+  {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
+
   {# Отбор — ссылками, как на «Обзоре»: срез живёт в адресе. Страна здесь не
      фильтр, а сам экран, поэтому она в адресе пути, а не в `?country=`. #}
   <div class="ov-filters">

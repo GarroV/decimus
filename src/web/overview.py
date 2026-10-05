@@ -200,6 +200,10 @@ class Overview:
     #: обработчика прошёл бы мимо подменяемого слоя и сломал бы проверки
     #: экрана, которые до базы не доходят.
     unit_ids: dict[str, str] = field(default_factory=dict)
+    #: Срез за период больше предела ряда: проверки, средняя, буквы и таблица
+    #: точек взяты по последним `limit` проверкам среза, а потери по зонам и
+    #: системные нарушения — по всему. Экран обязан сказать это вслух (#470).
+    truncated: bool = False
 
 
 def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
@@ -324,18 +328,6 @@ def _movement(сейчас: tuple[InspectionRow, ...], раньше: tuple[Inspe
     if not _comparable(сейчас) or not _comparable(раньше) or not _comparable(сейчас + раньше):
         return None
     return round(если_сейчас - если_раньше, 1)
-
-
-def _fits(row: InspectionRow, *, selection: Selection, geo: dict[str, tuple[str, str]]) -> bool:
-    """Попадает ли проверка в выборку. Сравнение по кодам, не по подписям."""
-    country, city = geo.get(row.unit_name, ("", ""))
-    if selection.country and country != selection.country:
-        return False
-    if selection.city and city != selection.city:
-        return False
-    if selection.grade and row.grade != selection.grade:
-        return False
-    return True
 
 
 def _by_city(
@@ -526,6 +518,33 @@ def _geo_choices(
     return по_весу(страны), по_весу(города)
 
 
+def _slice(
+    *,
+    reach: Reach,
+    limit: int,
+    selection: Selection,
+    date_from: date | None,
+    date_to: date | None,
+) -> tuple[tuple[InspectionRow, ...], bool]:
+    """Ряд проверок среза и признак, что он длиннее предела.
+
+    Отбор по месту и букве едет В ЗАПРОС, до предела (#470): поверх сотни
+    свежих по всей сети страна, чьи проверки старше сотой, получала бы неполный
+    ряд. Читается на одну строку больше предела — так обрезка видна, а не
+    угадывается по ровному числу.
+    """
+    ряд = queries.list_inspections(
+        reach=reach,
+        limit=limit + 1,
+        date_from=date_from,
+        date_to=date_to,
+        city=selection.city,
+        country=selection.country,
+        grade=selection.grade,
+    )
+    return tuple(ряд[:limit]), len(ряд) > limit
+
+
 def load(
     *,
     reach: Reach,
@@ -551,24 +570,17 @@ def load(
     ид_точек = queries.unit_ids(reach=охват)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
     worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
-    весь_ряд = tuple(
-        queries.list_inspections(reach=охват, limit=limit, date_from=date_from, date_to=date_to)
+    rows, обрезан = _slice(
+        reach=охват, limit=limit, selection=selection, date_from=date_from, date_to=date_to
     )
-    rows = tuple(row for row in весь_ряд if _fits(row, selection=selection, geo=geo))
     # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
     # у «всего времени» предыдущего окна не существует, и лишний поход в базу
     # на каждом открытии экрана был бы платой ни за что.
     было_от, было_до = window_before(selection.period, today=today or date.today())
-    было = (
-        tuple(
-            row
-            for row in queries.list_inspections(
-                reach=охват, limit=limit, date_from=было_от, date_to=было_до
-            )
-            if _fits(row, selection=selection, geo=geo)
-        )
+    было, было_обрезано = (
+        _slice(reach=охват, limit=limit, selection=selection, date_from=было_от, date_to=было_до)
         if было_от is not None
-        else ()
+        else ((), False)
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
     losses = queries.zone_losses(
@@ -618,4 +630,5 @@ def load(
         cities=города,
         breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
+        truncated=обрезан or было_обрезано,
     )
