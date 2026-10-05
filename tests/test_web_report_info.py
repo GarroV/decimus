@@ -179,8 +179,8 @@ def test_часть_кадров_без_копии_показана_рядом_�
     html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=ru").get_data(as_text=True)
     assert "find-row--photos" in html
     assert f"/inspections/{ПРОВЕРКА}/photos/{КАДР}" in html
-    assert "Фото: 1" in html
-    assert "Фото недоступно: 1" in html
+    # Видно уже в свёрнутой строке, а не только под раскрытием.
+    assert "Фото: 1 · недоступно: 1" in html
 
 
 def test_копия_кадра_отдаётся_картинкой_и_не_в_общий_кэш(
