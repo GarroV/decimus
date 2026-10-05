@@ -99,6 +99,9 @@ def снимок(**поля: object) -> ov.Overview:
     }
     основа.update(поля)
     основа["grades"] = ov._grades(основа["inspections"])  # type: ignore[arg-type]
+    ряд = основа["inspections"]
+    основа.setdefault("inspections_total", len(ряд))  # type: ignore[arg-type]
+    основа.setdefault("units_checked", len({r.unit_name for r in ряд}))  # type: ignore[attr-defined]
     return ov.Overview(**основа)  # type: ignore[arg-type]
 
 
@@ -477,6 +480,10 @@ class ЗаписнаяБаза:
         self._записать("list_inspections", kw)
         return ()
 
+    def slice_summary(self, **kw: object) -> tuple[int, list[tuple[str, str, str, int, float]]]:
+        self._записать("slice_summary", kw)
+        return 0, []
+
     def class_counts(self, **kw: object) -> dict[str, dict[str, int]]:
         self._записать("class_counts", kw)
         return {}
@@ -519,6 +526,7 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
     # а не по сети (#470: ряд, отобранный поверх сотни по сети, терял срез).
     assert set(база.звонки) == {
         "list_inspections",
+        "slice_summary",
         "class_counts",
         "worst_zones",
         "zone_losses",

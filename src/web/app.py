@@ -414,7 +414,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 note=t(
                     "overview.tile.note.units",
                     _lang(conf),
-                    checked=len({row.unit_name for row in snapshot.inspections}),
+                    checked=snapshot.units_checked,
                 ),
                 href=registry_path,
             ),
@@ -427,7 +427,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="inspections",
-                value=str(len(snapshot.inspections)),
+                value=str(snapshot.inspections_total),
                 note=t("overview.tile.note.inspections", _lang(conf)),
                 href=registry_path,
             ),
