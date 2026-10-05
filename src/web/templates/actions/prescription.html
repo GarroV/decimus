@@ -1,0 +1,82 @@
+{#
+  Предписание глазами УК (волна 3): письмо, пиццерии, основания, ответы
+  партнёра, история — и действия по шагу: черновик кладут в Gmail или правят,
+  действующее закрывают с комментарием. Отправленное не правится.
+#}{% extends "base.html" %}
+{% from "_prescription.html" import rx_tag, rx_replied, rx_units, letter, bases, replies, history, meta with context %}
+{% block title %}{{ t('section.actions.title') }} · {{ p.subject }}{% endblock %}
+
+{% block body %}
+  <a class="cn-back" href="{{ url(rx_hq_path) }}?lang={{ lang }}&amp;country={{ p.country }}">‹ {{ t('actions.tab.prescriptions') }}</a>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ country_title(p.country) or p.country }} · {{ t('rx.card.kicker') }}</div>
+      <h1 class="ov-head__title">{{ p.subject }}</h1>
+      <div class="ov-card__hint">
+        {{ rx_units(p) }} · <span{% if p.overdue(today) %} class="ov-num--err"{% endif %}>{{ t('rx.due', due=p.due_on) }}</span>
+        · {{ rx_tag(p, today) }}{{ rx_replied(p) }}{% if p.issued_at %} · {{ meta(p) }}{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if gmail %}
+    <div class="note {{ 'note--ok' if gmail == 'ok' else ('note--warn' if gmail in ('denied', 'unavailable') else 'note--error') }} mt-gap"><div><div class="note__title">{{ t('rx.gmail.' ~ gmail) }}</div></div></div>
+  {% endif %}
+  {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+
+  {% if p.status == 'draft' %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.send_title') }}</div></div>
+      <div class="card__body stack">
+        <div class="ov-cell__muted">{{ t('rx.card.send_hint') }}</div>
+        <div class="row rx-send">
+          <form method="post" action="{{ url(rx_hq_path ~ '/' ~ p.id ~ '/send') }}?lang={{ lang }}">
+            <button class="btn btn--primary" type="submit">{{ t('rx.card.send') }}</button>
+          </form>
+          <a class="btn" href="{{ url(rx_hq_path ~ '/' ~ p.id ~ '/edit') }}?lang={{ lang }}">{{ t('rx.card.edit') }}</a>
+        </div>
+      </div>
+    </section>
+  {% elif p.status == 'closed' %}
+    <div class="note note--ok mt-gap"><div><div class="note__title">{{ t('rx.card.closed_note', comment=p.close_comment) }}</div></div></div>
+  {% endif %}
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.letter') }}</div></div>
+    <div class="card__body">{{ letter(p) }}</div>
+  </section>
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.bases') }}</div></div>
+    <div class="card__body">{{ bases(p, registry_path) }}</div>
+  </section>
+
+  {% if p.status != 'draft' %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.replies') }}</div></div>
+      <div class="card__body">{{ replies(p, rx_partner_path) }}</div>
+    </section>
+  {% endif %}
+
+  {% if p.status == 'issued' %}
+    <section class="ov-card ov-card--wide mt-gap">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ t('rx.card.close_title') }}</div>
+      </div>
+      <div class="card__body stack">
+        <div class="ov-cell__muted">{{ t('rx.card.close_hint') }}</div>
+        <form method="post" action="{{ url(rx_hq_path ~ '/' ~ p.id ~ '/close') }}?lang={{ lang }}" class="stack">
+          <label class="field"><span class="field-label">{{ t('rx.card.close_comment') }}</span>
+            <textarea class="input" name="comment" required maxlength="2000" rows="3"></textarea></label>
+          <div><button class="btn" type="submit">{{ t('rx.card.close') }}</button></div>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <section class="ov-card ov-card--wide mt-gap">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('rx.card.history') }}</div></div>
+    <div class="card__body">{{ history(p) }}</div>
+  </section>
+{% endblock %}

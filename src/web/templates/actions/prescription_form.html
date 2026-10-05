@@ -1,0 +1,78 @@
+{#
+  Составить или поправить черновик предписания (волна 3, D270, D275). Страна
+  выбирается первой: от неё зависят пиццерии, проверки-основания и
+  подставленные адресаты. Текст письма сотрудник вставляет сам.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.actions.title') }} · {{ t('rx.form.title_edit') if current else t('rx.form.title_new') }}{% endblock %}
+
+{% block body %}
+  <a class="cn-back" href="{{ url(rx_hq_path ~ ('/' ~ current.id if current else '')) }}?lang={{ lang }}">‹ {{ t('actions.tab.prescriptions') }}</a>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ (country_title(country) or country) if country else t('rx.form.kicker') }}</div>
+      <h1 class="ov-head__title">{{ t('rx.form.title_edit') if current else t('rx.form.title_new') }}</h1>
+    </div>
+  </div>
+
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+
+  {% if not current %}
+    <div class="ov-filters">
+      <span class="ov-filters__label">{{ t('rx.form.country') }}</span>
+      {% for code, _n in countries %}
+        <a class="ov-chip{% if code == country %} is-on{% endif %}" href="{{ url(rx_hq_path ~ '/new') }}?country={{ code }}&amp;lang={{ lang }}">{{ country_title(code) or code }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% if not country %}
+    <section class="ov-card ov-card--wide"><div class="ov-card__empty">{{ t('rx.form.pick_country') }}</div></section>
+  {% else %}
+    <form method="post" class="ov-card ov-card--wide rx-form"
+          action="{{ url(rx_hq_path ~ ('/' ~ current.id ~ '/edit' if current else '')) }}?lang={{ lang }}">
+      <input type="hidden" name="country" value="{{ country }}">
+      <div class="card__body form-grid">
+        <fieldset class="field field--wide rx-pick">
+          <legend class="field-label">{{ t('rx.form.units') }}</legend>
+          <div class="rx-pick__list">
+            {% for c in unit_choices %}
+              <label class="rx-pick__item"><input type="checkbox" name="unit" value="{{ c.id }}"{% if c.id in values.units %} checked{% endif %}>
+                <span>{{ c.title }}</span>{% if c.detail %}<span class="ov-cell__muted">{{ city_title(c.detail) or c.detail }}</span>{% endif %}</label>
+            {% endfor %}
+          </div>
+          <div class="field-note">{{ t('rx.form.units_hint') }}</div>
+        </fieldset>
+
+        <fieldset class="field field--wide rx-pick">
+          <legend class="field-label">{{ t('rx.form.bases') }}</legend>
+          {% if base_choices %}
+            <div class="rx-pick__list">
+              {% for c in base_choices %}
+                <label class="rx-pick__item"><input type="checkbox" name="inspection" value="{{ c.id }}"{% if c.id in values.inspections %} checked{% endif %}>
+                  <span>{{ c.title }}</span>{% if c.detail %}<span class="ov-cell__muted">{{ c.detail }}</span>{% endif %}</label>
+              {% endfor %}
+            </div>
+            <div class="field-note">{{ t('rx.form.bases_hint', n=bases_limit) }}</div>
+          {% else %}
+            <div class="field-note">{{ t('rx.form.no_bases') }}</div>
+          {% endif %}
+        </fieldset>
+
+        <label class="field field--narrow"><span class="field-label">{{ t('rx.form.due') }}</span>
+          <input class="input" type="date" name="due" value="{{ values.due }}" min="{{ today }}" required></label>
+        <label class="field"><span class="field-label">{{ t('rx.form.recipients') }}</span>
+          <input class="input" type="text" name="recipients" value="{{ values.recipients }}" maxlength="2000" autocomplete="off" inputmode="email">
+          <span class="field-note">{{ t('rx.form.recipients_hint') }}</span></label>
+        <label class="field field--wide"><span class="field-label">{{ t('rx.form.subject') }}</span>
+          <input class="input" type="text" name="subject" value="{{ values.subject }}" maxlength="300" required></label>
+        <label class="field field--wide"><span class="field-label">{{ t('rx.form.body') }}</span>
+          <textarea class="input rx-form__body" name="body" rows="14" maxlength="20000" required>{{ values.body }}</textarea>
+          <span class="field-note">{{ t('rx.form.body_hint') }}</span></label>
+        <div class="row rx-form__actions">
+          <button class="btn" type="submit" name="then" value="save">{{ t('rx.form.save') }}</button>
+          <button class="btn btn--primary" type="submit" name="then" value="send">{{ t('rx.form.save_send') }}</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}
