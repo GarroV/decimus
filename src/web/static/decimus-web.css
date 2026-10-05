@@ -1017,6 +1017,12 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .find-row__shots { flex: none; font-size: var(--fs-micro); color: var(--ink-2); white-space: nowrap; }
 .find-row__shots::after { content: " ▾"; }
 .find-row--photos[open] .find-row__shots::after { content: " ▴"; }
+/* Кадры были, но показать их нечем (#422): не раскрытие, а честная пометка. */
+.find-row__shots.find-row__lost::after { content: none; }
+/* Счётчик с недоступными длиннее: на телефоне переносится, а не уезжает за край карточки. */
+@media (max-width: 719px) {
+  .find-row__shots--partial { flex: 0 1 auto; max-width: 9.5rem; white-space: normal; text-align: right; }
+}
 .find-row__gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));

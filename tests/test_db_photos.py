@@ -286,7 +286,7 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
 
     from PIL import Image
 
-    from src.db.previews import finding_previews, preview_bytes
+    from src.db.previews import FindingShots, finding_previews, preview_bytes
 
     снимок = io.BytesIO()
     Image.new("RGB", (3000, 2000), (200, 40, 40)).save(снимок, format="JPEG", quality=95)
@@ -318,7 +318,7 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
             return склад.положено[key]
 
     assert finding_previews(inspection_id, reach=own_reach(str(tenant))) == {
-        str(finding_id): (str(photo_id),)
+        str(finding_id): FindingShots(shown=(str(photo_id),), missing=0)
     }
     assert (
         preview_bytes(
@@ -348,3 +348,108 @@ def test_кадр_не_картинка_ложится_как_есть_а_коп
     assert склад.положено == {ключ: КАДРЫ["tg-file-001"]}
     assert storage_path == f"s3://{КОРЗИНА}/{ключ}"
     assert preview_path is None
+
+    # #422: кадр есть, а показать его нечем — карточка называет его
+    # недоступным, а не теряет запись из числа записей с фото. Чужому охвату
+    # не видно и этого.
+    from src.db.previews import FindingShots, finding_previews
+
+    ((finding_id, tenant),) = _строки(
+        db_env,
+        "select p.finding_id, i.tenant_code from photos p "
+        "join inspections i on i.id = p.inspection_id where p.id = %s",
+        (photo_id,),
+    )
+    assert finding_previews(inspection_id, reach=own_reach(str(tenant))) == {
+        str(finding_id): FindingShots(shown=(), missing=1)
+    }
+    assert finding_previews(inspection_id, reach=own_reach("someone-else")) == {}
+
+
+def _два_кадра_один_убран(
+    db_env: str, pg_dsn: str, chat_id: int
+) -> tuple[str, str, str, str, ЗаписнойСклад]:
+    """Проверка с двумя настоящими кадрами одной записи; второй убран (`purged_at`).
+
+    Возвращает `(проверка, запись, видимый, убранный, склад)`. У убранного
+    `preview_path` остаётся — убран он отметкой, а не пустой ссылкой.
+    """
+    import io
+
+    from PIL import Image
+
+    снимки: dict[str, bytes] = {}
+    for номер, цвет in (("tg-a", (200, 40, 40)), ("tg-b", (40, 40, 200))):
+        буфер = io.BytesIO()
+        Image.new("RGB", (800, 600), цвет).save(буфер, format="JPEG")
+        снимки[номер] = буфер.getvalue()
+    inspection_id = _проверка_с_кадрами(chat_id, кадры=tuple(снимки))
+    склад = ЗаписнойСклад()
+    upload_photos(inspection_id, fetch=снимки.get, storage=склад)
+    строки = _строки(
+        db_env,
+        "select id, finding_id, telegram_file_id from photos where inspection_id = %s",
+        (inspection_id,),
+    )
+    по_файлу = {str(файл): (str(кадр), str(запись)) for кадр, запись, файл in строки}
+    видимый, запись = по_файлу["tg-a"]
+    убранный, _ = по_файлу["tg-b"]
+    # Отметка ставится под учёткой, создавшей базу (как у доливщика копий): у
+    # роли приложения и у администратора истории выгруженный кадр заморожен
+    # (`photos_uploaded_only_once`), и правка молча не легла бы — её проверяет
+    # утверждение ниже.
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute("update photos set purged_at = now() where id = %s", (убранный,))
+    ((preview_path, purged_at),) = _строки(
+        db_env, "select preview_path, purged_at from photos where id = %s", (убранный,)
+    )
+    assert purged_at is not None, "засев не удался: кадр не отмечен убранным"
+    assert preview_path is not None, "засев не удался: у убранного кадра нет копии"
+    return inspection_id, запись, видимый, убранный, склад
+
+
+def test_чужое_пространство_не_видит_ни_видимого_ни_убранного_кадра(
+    domain_env: Path, db_env: str, pg_dsn: str
+) -> None:
+    """#422: охват пространства держит и счётчик карточки, и прямое чтение кадра."""
+    from src.db.previews import finding_previews, preview_bytes
+
+    inspection_id, _, видимый, убранный, склад = _два_кадра_один_убран(db_env, pg_dsn, 41)
+    ((tenant,),) = _строки(
+        db_env, "select tenant_code from inspections where id = %s", (inspection_id,)
+    )
+
+    class Читатель:
+        def get(self, key: str) -> bytes:
+            return next(iter(склад.положено.values()))
+
+    свой, чужой = own_reach(str(tenant)), own_reach("someone-else")
+    # Сверка: своему видимый кадр отдаётся — пустота у чужого не от отсутствия данных.
+    assert finding_previews(inspection_id, reach=свой) != {}
+    assert preview_bytes(inspection_id, видимый, reach=свой, storage=Читатель()) is not None
+
+    assert finding_previews(inspection_id, reach=чужой) == {}
+    for кадр in (видимый, убранный):
+        assert preview_bytes(inspection_id, кадр, reach=чужой, storage=Читатель()) is None
+
+
+def test_убранный_кадр_с_копией_считается_недоступным_а_не_показанным(
+    domain_env: Path, db_env: str, pg_dsn: str
+) -> None:
+    """#422: у убранного кадра `preview_path` остаётся, но показать его нечем."""
+    from src.db.previews import FindingShots, finding_previews, preview_bytes
+
+    inspection_id, запись, видимый, убранный, склад = _два_кадра_один_убран(db_env, pg_dsn, 42)
+    ((tenant,),) = _строки(
+        db_env, "select tenant_code from inspections where id = %s", (inspection_id,)
+    )
+
+    class Читатель:
+        def get(self, key: str) -> bytes:
+            return next(iter(склад.положено.values()))
+
+    свой = own_reach(str(tenant))
+    assert finding_previews(inspection_id, reach=свой) == {
+        запись: FindingShots(shown=(видимый,), missing=1)
+    }
+    assert preview_bytes(inspection_id, убранный, reach=свой, storage=Читатель()) is None

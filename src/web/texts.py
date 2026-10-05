@@ -579,6 +579,11 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "card.info.title": {"ru": "Информационная часть", "en": "Information part"},
     "card.findings.photos": {"ru": "Фото: {n}", "en": "Photos: {n}"},
+    "card.findings.photos_lost": {"ru": "Фото недоступно: {n}", "en": "Photos unavailable: {n}"},
+    "card.findings.photos_partial": {
+        "ru": "Фото: {n} · недоступно: {lost}",
+        "en": "Photos: {n} · unavailable: {lost}",
+    },
     "card.findings.photos_unknown": {
         "ru": "Фото к записям сейчас не показать: база не ответила.",
         "en": "Photos for the findings cannot be shown right now: the database did not answer.",
