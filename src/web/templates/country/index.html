@@ -50,12 +50,15 @@
       <h1 class="ov-head__title">{{ country_title(view.code) or '—' }}</h1>
       <div class="ov-card__hint">
         {{ t('country.summary',
-             inspections=data.inspections|length,
+             inspections=data.inspections_total,
              average=('—' if data.average is none or not data.comparable else '%.1f'|format(data.average)),
              unchecked=data.unchecked) }}
       </div>
     </div>
   </div>
+
+  {# Срез длиннее предела ряда (#470): сказать вслух, а не обрезать молча. #}
+  {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
   {# Отбор — ссылками, как на «Обзоре»: срез живёт в адресе. Страна здесь не
      фильтр, а сам экран, поэтому она в адресе пути, а не в `?country=`. #}
