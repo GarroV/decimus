@@ -22,6 +22,7 @@ S3-совместимый интерфейс есть у всех перечис
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import TYPE_CHECKING, Protocol
 
 from .errors import StorageError
@@ -73,6 +74,15 @@ class StorageSettings:
     #: задаётся явно, и именно он делает переезд правкой конфига.
     endpoint_url: str | None = None
     region: str = "us-east-1"
+
+
+@dataclass(frozen=True)
+class StoredObject:
+    """Объект в хранилище, как его видит список: ключ, размер, когда лёг."""
+
+    key: str
+    size: int
+    modified: datetime
 
 
 class PhotoStorage(Protocol):
@@ -225,6 +235,32 @@ class S3PhotoStorage:
                 f"Хранилище не убрало объект {key} из корзины {self._bucket} "
                 f"({type(exc).__name__}): {exc}"
             ) from exc
+
+    def list_prefix(self, prefix: str) -> tuple[StoredObject, ...]:
+        """Все объекты под префиксом, постранично до конца — для сверки (#496).
+
+        Только чтение. Отказ на любой странице — `StorageError`: половина
+        списка, выданная за весь, превратила бы непрочитанное в «строку без
+        объекта».
+        """
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        найдено: list[StoredObject] = []
+        try:
+            страницы = self._client.get_paginator("list_objects_v2")
+            for страница in страницы.paginate(Bucket=self._bucket, Prefix=prefix):
+                for item in страница.get("Contents", []):
+                    найдено.append(
+                        StoredObject(
+                            key=item["Key"], size=int(item["Size"]), modified=item["LastModified"]
+                        )
+                    )
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не отдало список {prefix} из корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
+        return tuple(найдено)
 
     def get(self, key: str) -> bytes:
         """Прочитать объект целиком — для выдачи отчёта из админки (D204).
