@@ -17,6 +17,7 @@ from .errors import (
     RetractionError,
     StorageError,
     SynonymError,
+    UnitRefusedError,
     VersionMismatchError,
 )
 from .models import FindingRow, InfoRow, InspectionDetail, InspectionRow
@@ -101,6 +102,7 @@ __all__ = [
     "StoredReport",
     "SynonymError",
     "Unit",
+    "UnitRefusedError",
     "VersionMismatchError",
     "findings_by_unit",
     "get_inspection",
