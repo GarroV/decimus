@@ -135,6 +135,17 @@ def test_карточные_чтения_чужой_страны_пусты(се
     assert previews.finding_previews(чужая, reach=ge) == {}
     assert move.list_moves(чужая, reach=ge) == ()
 
+    # Сам кадр по прямой ссылке — тот же охват, что у карточки (#422).
+    (запись,) = previews.finding_previews(чужая, reach=уК).values()
+    (кадр,) = запись.shown
+
+    class Склад:
+        def get(self, key: str) -> bytes:
+            return b"preview"
+
+    assert previews.preview_bytes(чужая, кадр, reach=уК, storage=Склад()) == b"preview"
+    assert previews.preview_bytes(чужая, кадр, reach=ge, storage=Склад()) is None
+
 
 def test_проверка_партнёра_ссылается_на_точку_справочника_уК(
     сеть: dict[str, str], pg_dsn: str

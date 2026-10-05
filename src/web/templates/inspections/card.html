@@ -244,7 +244,9 @@
         <div class="ov-card__empty">{{ t('card.findings.photos_unknown') }}</div>
       {% endif %}
       {% for finding in detail.findings %}
-        {% set shots = photos.get(finding.id, ()) %}
+        {% set entry = photos.get(finding.id) %}
+        {% set shots = entry.shown if entry else () %}
+        {% set lost = entry.missing if entry else 0 %}
         {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
           <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
@@ -257,7 +259,8 @@
             </span>
           </span>
         {% if shots %}
-            <span class="find-row__shots">{{ t('card.findings.photos', n=shots|length) }}</span>
+            {#- Часть кадров показать нечем — сказано уже в свёрнутой строке, а не только под раскрытием. #}
+            <span class="find-row__shots{% if lost %} find-row__shots--partial{% endif %}">{% if lost %}{{ t('card.findings.photos_partial', n=shots|length, lost=lost) }}{% else %}{{ t('card.findings.photos', n=shots|length) }}{% endif %}</span>
           </summary>
           <div class="find-row__gallery">
             {% for shot in shots %}
@@ -267,6 +270,7 @@
           </div>
         </details>
         {% else %}
+          {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
         </div>
         {% endif %}
       {% endfor %}
@@ -314,12 +318,16 @@
                 {% for finding in item.findings %}
                   <span class="find-row__meta">{{ finding.n }} · <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></span>
                   {% if may_revise %}{{ revise_form(finding) }}{% endif %}
-                  {% for photo_id in photos.get(finding.id, ()) %}
+                  {% set review_shots = photos.get(finding.id) %}
+                  {% for photo_id in (review_shots.shown if review_shots else ()) %}
                     <a href="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
                       <img class="review-photo" src="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}"
                            alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
                     </a>
                   {% endfor %}
+                  {% if review_shots and review_shots.missing %}
+                    <span class="find-row__meta find-row__lost">{{ t('card.findings.photos_lost', n=review_shots.missing) }}</span>
+                  {% endif %}
                 {% endfor %}
               </span>
             </div>
