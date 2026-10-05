@@ -317,9 +317,13 @@ def test_без_администратора_истории_плашки_о_сн
 
 
 def test_подключение_истории_в_другую_базу_видно_на_экране(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """#515: заданное, но ведущее не туда подключение — не «функции нет», а отказ словами."""
+    """#515: заданное, но ведущее не туда подключение — не «функции нет», а отказ.
+
+    Вошедшему (в том числе партнёру) — общими словами, без баз, хостов и ролей;
+    подробности — в журнал сервера на уровне ERROR.
+    """
     # Arrange — настоящая `retraction_available`, разные базы у приложения и истории
     monkeypatch.setattr(data, "retraction_available", настоящая_проверка_истории)
     monkeypatch.setattr(data, "load_registry", настоящий_реестр)
@@ -332,14 +336,19 @@ def test_подключение_истории_в_другую_базу_видн
     )
 
     # Act
-    ответ = стенд.get("/inspections")
+    with caplog.at_level("ERROR"):
+        ответ = стенд.get("/inspections")
     страница = ответ.get_data(as_text=True)
 
-    # Assert — реестр не делает вид, что снятия нет: страница называет обе базы
+    # Assert — реестр не делает вид, что снятия нет, но и стенд не раскрывает
     assert ответ.status_code == 503
-    assert "разные базы" in страница
-    assert "shared" in страница
-    assert пароль not in страница
+    assert "Обратитесь к администратору" in страница
+    for деталь in ("db.example", "shared", "stand", "dodo_audit_admin", "DATABASE_URL", пароль):
+        assert деталь not in страница, деталь
+    журнал = " ".join(r.getMessage() for r in caplog.records if r.levelname == "ERROR")
+    assert "shared" in журнал
+    assert "db.example" in журнал
+    assert пароль not in журнал
 
 
 def test_без_администратора_истории_снятие_не_предлагается(
