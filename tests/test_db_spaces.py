@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from conftest import requires_db
+from db_harness import admin_role_dsn
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -96,7 +97,19 @@ def _команда(скрипт: str, *args: str, env: dict[str, str]) -> subpr
 
 
 def _окружение(pg_dsn: str, db_env: str, **ещё: str) -> dict[str, str]:
-    return {**os.environ, "DATABASE_ADMIN_URL": pg_dsn, "DATABASE_URL": db_env, **ещё}
+    """Все три подключения — на одноразовую базу теста.
+
+    Команда читает `.env` (`load_dotenv`, без перезаписи заданного), и
+    незаданное здесь подключение приходит оттуда — из базы стенда. С #487 это
+    отказ «Подключения ведут в разные базы», а до него было записью в чужую базу.
+    """
+    return {
+        **os.environ,
+        "DATABASE_ADMIN_URL": pg_dsn,
+        "DATABASE_URL": db_env,
+        "DATABASE_RETRACTION_URL": admin_role_dsn(db_env),
+        **ещё,
+    }
 
 
 def test_команда_заводит_привязывает_и_перечисляет(владелец: str, db_env: str) -> None:
