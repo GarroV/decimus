@@ -18,18 +18,26 @@
 Пропавший кадр не проходит молча. Выгрузка, вернувшая «успех» с половиной
 кадров, оставила бы в базе часть ссылок мёртвыми навсегда и никому об этом не
 сказала — а именно от этого задача и заводилась.
+
+Хранилище может лежать в момент сдачи (D259: оно на MUSPELHEIM, а тот
+засыпает). Тогда кадр не теряется: строка остаётся с пустым `storage_path`,
+вызывающий получает `PhotosDeferredError`, а потом кадр доливает дозагрузка —
+`pending_photo_uploads` называет, что ждёт, бот качает байты у телеграма и
+зовёт ту же `upload_photos` (#459).
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
 
 from .config import check_environment, load_storage_settings
-from .errors import PushError, StorageError
+from .errors import PhotosDeferredError, PushError, StorageError
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
@@ -47,11 +55,77 @@ where inspection_id = %s and storage_path is null
 order by created_at, id
 """
 
+#: `storage_path is null` в условии — не перестраховка. Сдача и дозагрузка могут
+#: взять один кадр одновременно; объект ляжет дважды по тому же ключу (ключ из
+#: идентификаторов, байты те же), а ссылку запишет тот, кто успел первым.
+#: Второй получит ноль строк и не посчитает кадр своим (#459).
 _MARK_UPLOADED_SQL = """
-update photos set storage_path = %s, preview_path = %s, uploaded_at = now() where id = %s
+update photos set storage_path = %s, preview_path = %s, uploaded_at = now()
+where id = %s and storage_path is null
+"""
+
+#: Невыгруженные кадры всех видимых проверок. Убранные (`purged_at`) не берутся:
+#: их объект снят намеренно. Снятые проверки роль приложения не видит вовсе
+#: (`photos_follow_visible_inspection`), значит и их кадры сюда не попадут.
+#: Свежие — не раньше `min_age_sec`: их, скорее всего, прямо сейчас выгружает
+#: сама сдача с байтами на руках, и качать их у телеграма второй раз незачем.
+#: Застарелые — старше `max_age_sec`, если он задан, — в обычный проход не
+#: идут: кадр, который телеграм не отдаёт неделями, иначе вечно занимал бы
+#: место в выборке (ревью #514).
+_SELECT_ALL_PENDING_SQL = """
+select inspection_id, telegram_file_id, created_at
+from photos
+where storage_path is null and purged_at is null
+  and created_at < now() - make_interval(secs => %(min_age)s)
+  and (%(max_age)s::float8 is null or created_at >= now() - make_interval(secs => %(max_age)s))
+order by created_at, id
+limit %(limit)s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
+
+
+@dataclass(frozen=True)
+class PendingUpload:
+    """Проверка, у которой есть кадры без ссылки в хранилище (#459)."""
+
+    inspection_id: str
+    #: Идентификаторы телеграма без повторов, в порядке поступления.
+    file_ids: tuple[str, ...]
+    #: С какого момента ждёт самый старый из этих кадров.
+    waiting_since: datetime
+
+
+#: Сколько кадров брать за один проход дозагрузки. Остаток возьмёт следующий.
+PENDING_BATCH = 1000
+
+
+def pending_photo_uploads(
+    *, min_age_sec: int, max_age_sec: int | None = None, limit: int = PENDING_BATCH
+) -> list[PendingUpload]:
+    """Какие кадры ещё не легли в хранилище — по проверкам (#459).
+
+    Читает только базу: хранилище здесь не трогается, поэтому ответ есть и
+    тогда, когда оно лежит, — и это ровно тот момент, когда он нужен.
+    `max_age_sec` отрезает застарелые кадры (у них свой, редкий проход).
+    """
+    settings = check_environment()
+    params = {"min_age": min_age_sec, "max_age": max_age_sec, "limit": limit}
+    try:
+        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+            cur.execute(_SELECT_ALL_PENDING_SQL, params)
+            rows = cur.fetchall()
+    except psycopg.Error as exc:
+        raise PushError(
+            f"Список невыгруженных кадров не прочитан ({type(exc).__name__}): {exc}"
+        ) from exc
+    by_inspection: dict[str, dict[str, None]] = {}
+    since: dict[str, datetime] = {}
+    for inspection_id, file_id, created_at in rows:
+        key = str(inspection_id)
+        by_inspection.setdefault(key, {})[str(file_id)] = None
+        since.setdefault(key, created_at)  # строки идут по возрастанию времени
+    return [PendingUpload(key, tuple(ids), since[key]) for key, ids in by_inspection.items()]
 
 
 def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> None:
@@ -127,7 +201,9 @@ def upload_photos(
     в переменных, а не в коде.
     """
     settings = check_environment()
-    store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
+    store = (
+        storage if storage is not None else S3PhotoStorage(load_storage_settings(), fail_fast=True)
+    )
 
     uploaded = 0
     missing: list[str] = []
@@ -146,8 +222,11 @@ def upload_photos(
                 uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
                 with conn.cursor() as cur:
                     cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))
+                    marked = cur.rowcount
                 conn.commit()
-                uploaded += 1
+                # Ноль строк — кадр уже записал другой выгрузчик (сдача или
+                # дозагрузка): объект тот же, ссылка его, считать его своим нельзя.
+                uploaded += marked
     except PushError:
         raise
     except psycopg.Error as exc:
@@ -162,10 +241,10 @@ def upload_photos(
         # именно `StorageError`, а не `Exception`: широкий перехват подменял бы
         # собой и ошибку в коде вызывающего — настоящая поломка выглядела бы
         # отказом хранилища и молча уходила в «повторим позже».
-        raise PushError(
+        raise PhotosDeferredError(
             f"Хранилище не приняло кадр проверки {inspection_id} "
             f"({type(exc).__name__}): {exc} Выгруженные до отказа кадры остались "
-            f"выгруженными — повторный вызов доделает остаток"
+            f"выгруженными, остальные ждут дозагрузки"
         ) from exc
 
     if missing and not allow_missing:
