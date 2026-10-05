@@ -23,7 +23,7 @@ from src.db import queries
 from src.db.models import InspectionRow
 from src.db.reach import Reach
 
-from .pricing import price_key
+from .pricing import price_key, price_key_of
 
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
@@ -200,6 +200,18 @@ class Overview:
     #: обработчика прошёл бы мимо подменяемого слоя и сломал бы проверки
     #: экрана, которые до базы не доходят.
     unit_ids: dict[str, str] = field(default_factory=dict)
+    #: Срез за период больше предела ряда: ряд `inspections` и всё, что из него
+    #: строится (таблицы точек и городов, поводы), взяты по последним `limit`
+    #: проверкам среза. Плитки, буквы, потери и системные — по всему срезу
+    #: (#503). Экран обязан сказать это вслух (#470).
+    truncated: bool = False
+    #: Проверок и проверенных точек во ВСЁМ срезе (#503) — для плиток. Ряд
+    #: `inspections` ограничен пределом, а плитки — нет.
+    inspections_total: int = 0
+    units_checked: int = 0
+    #: Проверок среза с критическим нарушением — по ВСЕМУ срезу, из
+    #: `class_counts` (#503). Список поводов `attention` — по ряду и до `TOP`.
+    critical_total: int = 0
 
 
 def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
@@ -213,6 +225,64 @@ def _grades(rows: tuple[InspectionRow, ...]) -> tuple[tuple[str, int], ...]:
         if row.grade in счёт:
             счёт[row.grade] += 1
     return tuple((буква, число) for буква, число in счёт.items())
+
+
+@dataclass(frozen=True)
+class _Summary:
+    """Сводка всего среза из базы: то, о чём говорят плитки (#503)."""
+
+    inspections: int
+    units: int
+    average: float | None
+    grades: tuple[tuple[str, int], ...]
+    #: Ключи цены (`price_key_of`) всех проверок среза — для сравнимости.
+    prices: frozenset[tuple[str, str]]
+
+    @property
+    def comparable(self) -> bool:
+        return len(self.prices) <= 1
+
+
+_НИЧЕГО = _Summary(inspections=0, units=0, average=None, grades=(), prices=frozenset())
+
+
+def _summary(
+    *, reach: Reach, selection: Selection, date_from: date | None, date_to: date | None
+) -> _Summary:
+    """Средняя, буквы и счёт по всему срезу — агрегатом в базе, без предела ряда.
+
+    Процент и буква — записанные движком; здесь они только складываются, как и
+    раньше складывались по прочитанному ряду (`_average`, `_grades`).
+    """
+    точек, группы = queries.slice_summary(
+        reach=reach,
+        date_from=date_from,
+        date_to=date_to,
+        city=selection.city,
+        country=selection.country,
+        grade=selection.grade,
+    )
+    проверок = sum(группа[3] for группа in группы)
+    счёт = {буква: 0 for буква in ("A", "B", "C", "D")}
+    for группа in группы:
+        if группа[2] in счёт:
+            счёт[группа[2]] += группа[3]
+    return _Summary(
+        inspections=проверок,
+        units=точек,
+        average=round(sum(группа[4] for группа in группы) / проверок, 1) if проверок else None,
+        grades=tuple(счёт.items()),
+        prices=frozenset(price_key_of(группа[0], группа[1]) for группа in группы),
+    )
+
+
+def _summary_movement(сейчас: _Summary, раньше: _Summary) -> float | None:
+    """Движение средней всего среза против прошлого окна — по правилам `_movement`."""
+    if сейчас.average is None or раньше.average is None:
+        return None
+    if len(сейчас.prices | раньше.prices) > 1:
+        return None
+    return round(сейчас.average - раньше.average, 1)
 
 
 def _comparable(rows: tuple[InspectionRow, ...]) -> bool:
@@ -324,18 +394,6 @@ def _movement(сейчас: tuple[InspectionRow, ...], раньше: tuple[Inspe
     if not _comparable(сейчас) or not _comparable(раньше) or not _comparable(сейчас + раньше):
         return None
     return round(если_сейчас - если_раньше, 1)
-
-
-def _fits(row: InspectionRow, *, selection: Selection, geo: dict[str, tuple[str, str]]) -> bool:
-    """Попадает ли проверка в выборку. Сравнение по кодам, не по подписям."""
-    country, city = geo.get(row.unit_name, ("", ""))
-    if selection.country and country != selection.country:
-        return False
-    if selection.city and city != selection.city:
-        return False
-    if selection.grade and row.grade != selection.grade:
-        return False
-    return True
 
 
 def _by_city(
@@ -526,6 +584,33 @@ def _geo_choices(
     return по_весу(страны), по_весу(города)
 
 
+def _slice(
+    *,
+    reach: Reach,
+    limit: int,
+    selection: Selection,
+    date_from: date | None,
+    date_to: date | None,
+) -> tuple[tuple[InspectionRow, ...], bool]:
+    """Ряд проверок среза и признак, что он длиннее предела.
+
+    Отбор по месту и букве едет В ЗАПРОС, до предела (#470): поверх сотни
+    свежих по всей сети страна, чьи проверки старше сотой, получала бы неполный
+    ряд. Читается на одну строку больше предела — так обрезка видна, а не
+    угадывается по ровному числу.
+    """
+    ряд = queries.list_inspections(
+        reach=reach,
+        limit=limit + 1,
+        date_from=date_from,
+        date_to=date_to,
+        city=selection.city,
+        country=selection.country,
+        grade=selection.grade,
+    )
+    return tuple(ряд[:limit]), len(ряд) > limit
+
+
 def load(
     *,
     reach: Reach,
@@ -551,24 +636,23 @@ def load(
     ид_точек = queries.unit_ids(reach=охват)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
     worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
-    весь_ряд = tuple(
-        queries.list_inspections(reach=охват, limit=limit, date_from=date_from, date_to=date_to)
+    rows, обрезан = _slice(
+        reach=охват, limit=limit, selection=selection, date_from=date_from, date_to=date_to
     )
-    rows = tuple(row for row in весь_ряд if _fits(row, selection=selection, geo=geo))
     # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
     # у «всего времени» предыдущего окна не существует, и лишний поход в базу
     # на каждом открытии экрана был бы платой ни за что.
     было_от, было_до = window_before(selection.period, today=today or date.today())
-    было = (
-        tuple(
-            row
-            for row in queries.list_inspections(
-                reach=охват, limit=limit, date_from=было_от, date_to=было_до
-            )
-            if _fits(row, selection=selection, geo=geo)
-        )
+    было, было_обрезано = (
+        _slice(reach=охват, limit=limit, selection=selection, date_from=было_от, date_to=было_до)
         if было_от is not None
-        else ()
+        else ((), False)
+    )
+    сводка = _summary(reach=охват, selection=selection, date_from=date_from, date_to=date_to)
+    сводка_было = (
+        _summary(reach=охват, selection=selection, date_from=было_от, date_to=было_до)
+        if было_от is not None
+        else _НИЧЕГО
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
     losses = queries.zone_losses(
@@ -582,9 +666,9 @@ def load(
         units_total=всего_точек,
         unit_ids=ид_точек,
         inspections=rows,
-        grades=_grades(rows),
-        average=_average(rows),
-        comparable=_comparable(rows),
+        grades=сводка.grades,
+        average=сводка.average,
+        comparable=сводка.comparable,
         zone_losses=tuple(
             ZoneLoss(
                 code=code,
@@ -608,14 +692,18 @@ def load(
         ),
         attention=_attention(rows, counts=counts),
         problems=_problems(точки),
-        average_delta=_movement(rows, было),
+        average_delta=_summary_movement(сводка, сводка_было),
         # Точки справочника, по которым за период нет ни одной проверки.
         # Считается от того же справочника, что и знаменатель плитки: иначе
         # «не проверено» и «всего» пришли бы из разных мест и разошлись.
-        unchecked=max(всего_точек - len({row.unit_name for row in rows}), 0),
+        unchecked=max(всего_точек - сводка.units, 0),
         selection=selection,
         countries=страны,
         cities=города,
         breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
+        truncated=обрезан or было_обрезано,
+        inspections_total=сводка.inspections,
+        units_checked=сводка.units,
+        critical_total=sum(1 for классы in counts.values() if классы.get(CRITICAL)),
     )

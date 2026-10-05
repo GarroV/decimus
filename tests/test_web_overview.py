@@ -99,6 +99,13 @@ def снимок(**поля: object) -> ov.Overview:
     }
     основа.update(поля)
     основа["grades"] = ov._grades(основа["inspections"])  # type: ignore[arg-type]
+    ряд = основа["inspections"]
+    основа.setdefault("inspections_total", len(ряд))  # type: ignore[arg-type]
+    основа.setdefault("units_checked", len({r.unit_name for r in ряд}))  # type: ignore[attr-defined]
+    основа.setdefault(
+        "critical_total",
+        sum(1 for a in основа["attention"] if a.why == "critical"),  # type: ignore[attr-defined]
+    )
     return ov.Overview(**основа)  # type: ignore[arg-type]
 
 
@@ -258,23 +265,6 @@ def test_окно_периода_считается_от_сегодня_а_не_
 
     # Assert — ровно 30 дней назад, а не «начало месяца».
     assert (начало, конец) == (date(2026, 8, 25), date(2026, 9, 24))
-
-
-def test_отбор_по_городу_оставляет_только_его_точки() -> None:
-    # Arrange
-    ряд = (
-        проверка("Белград-1", 71.5, "D", версия="2026.09", когда=date(2026, 9, 20)),
-        проверка("Тбилиси-2", 95.5, "B", версия="2026.09", когда=date(2026, 9, 18)),
-    )
-    гео = {"Белград-1": ("RS", "Белград"), "Тбилиси-2": ("GE", "Тбилиси")}
-
-    # Act
-    оставшиеся = tuple(
-        row for row in ряд if ov._fits(row, selection=ov.Selection(city="Белград"), geo=гео)
-    )
-
-    # Assert
-    assert [row.unit_name for row in оставшиеся] == ["Белград-1"]
 
 
 def test_разбивка_не_усредняет_несравнимый_ряд() -> None:
@@ -491,7 +481,12 @@ class ЗаписнаяБаза:
         return 1
 
     def list_inspections(self, **kw: object) -> tuple[InspectionRow, ...]:
+        self._записать("list_inspections", kw)
         return ()
+
+    def slice_summary(self, **kw: object) -> tuple[int, list[tuple[str, str, str, int, float]]]:
+        self._записать("slice_summary", kw)
+        return 0, []
 
     def class_counts(self, **kw: object) -> dict[str, dict[str, int]]:
         self._записать("class_counts", kw)
@@ -531,8 +526,11 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
         today=date(2026, 9, 24),
     )
 
-    # Assert — все четыре агрегата спрошены с тем же отбором, а не по сети.
+    # Assert — ряд проверок и все четыре агрегата спрошены с тем же отбором,
+    # а не по сети (#470: ряд, отобранный поверх сотни по сети, терял срез).
     assert set(база.звонки) == {
+        "list_inspections",
+        "slice_summary",
         "class_counts",
         "worst_zones",
         "zone_losses",
@@ -768,3 +766,15 @@ def test_назначить_проверку_на_обзоре_нет(
 ) -> None:
     страница = показать(стенд, monkeypatch, снимок())
     assert t_ru("overview.assign") not in страница
+
+
+def test_обрезанный_срез_экран_называет_вслух(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # #470: ряд длиннее предела показан не целиком — молча это читалось бы
+    # как весь срез, а соседние блоки считаются по всему.
+    обрезан = показать(стенд, monkeypatch, снимок(truncated=True))
+    целый = показать(стенд, monkeypatch, снимок())
+
+    assert "В срезе больше 2 проверок" in обрезан
+    assert "В срезе больше" not in целый
