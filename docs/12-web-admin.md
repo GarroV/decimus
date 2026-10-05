@@ -1036,7 +1036,7 @@ Gmail (`google_mail.letter_message`). Черновик несёт две час�
 
 | Заголовок | Значение |
 |---|---|
-| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'` |
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com https://*.google.com; frame-ancestors 'none'` |
 | `X-Content-Type-Options` | `nosniff` |
 | `X-Frame-Options` | `DENY` — для просмотрщиков, не знающих `frame-ancestors` |
 | `Referrer-Policy` | `strict-origin-when-cross-origin` — свой адрес уходит целиком, заслон происхождения по `Referer` работает как раньше |
@@ -1051,9 +1051,10 @@ Gmail (`google_mail.letter_message`). Черновик несёт две час�
 
 **Два исключения, оба осознанные.** `style-src 'unsafe-inline'` — столбики
 «Обзора», «Страны», карточек проверки и пиццерии рисуются атрибутом `style` с
-числом из данных. `form-action https://accounts.google.com` — «Черновик в
-Gmail» отправляет форму, и сервер отвечает переходом к согласию Google, а
-браузер проверяет `form-action` и на таком переходе. Вход через Google идёт
+числом из данных. `form-action https://accounts.google.com https://*.google.com`
+— «Черновик в Gmail» отправляет форму, и сервер отвечает переходом к согласию
+Google, а браузер проверяет `form-action` и на таком переходе; цепочка
+согласия может уйти на другой поддомен Google. Вход через Google идёт
 ссылкой, а не формой, и исключения не требует.
 
 ## Стек и почему такой

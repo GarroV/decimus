@@ -50,6 +50,9 @@ from src.web.sections import SECTIONS
     "object-src 'none'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
+    # «Черновик в Gmail»: форма → 303 на согласие Google, дальше цепочка может
+    # уйти на другой поддомен; браузер проверяет form-action на каждом шаге.
+    "form-action 'self' https://accounts.google.com https://*.google.com",
 )
 
 
