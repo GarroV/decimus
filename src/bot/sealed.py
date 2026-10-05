@@ -29,9 +29,8 @@ from __future__ import annotations
 
 from aiogram.types import Message
 
-from . import sidecar
+from . import sidecar, stops
 from .keyboards import sealed_keyboard
-from .texts import t
 
 
 def is_sealed(chat_id: int) -> bool:
@@ -45,4 +44,6 @@ async def refuse(message: Message, lang: str) -> None:
     Текст один на все входы намеренно: аудитор упирается в запрет то кадром, то
     кнопкой, и разные слова об одном и том же читались бы как разные запреты.
     """
-    await message.answer(t("sealed.blocked", lang), reply_markup=sealed_keyboard(lang))
+    await stops.refuse(
+        message, lang, step="sealed", key="sealed.blocked", reply_markup=sealed_keyboard(lang)
+    )
