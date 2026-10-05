@@ -67,8 +67,13 @@ def edition_day(version: str) -> str | None:
 
 def price_key(row: InspectionRow) -> tuple[str, str]:
     """Ключ ряда проверки: код чек-листа и цена его издания."""
-    форма = _reader(row.checklist_version)
+    return price_key_of(row.checklist_code, row.checklist_version)
+
+
+def price_key_of(checklist_code: str, checklist_version: str) -> tuple[str, str]:
+    """Тот же ключ по коду чек-листа и изданию — для агрегата среза из базы (#503)."""
+    форма = _reader(checklist_version)
     return (
-        row.checklist_code,
-        f"shape:{форма}" if форма else f"edition:{row.checklist_version}",
+        checklist_code,
+        f"shape:{форма}" if форма else f"edition:{checklist_version}",
     )
