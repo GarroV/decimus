@@ -187,7 +187,9 @@ def upload_photos(
     в переменных, а не в коде.
     """
     settings = check_environment()
-    store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
+    store = (
+        storage if storage is not None else S3PhotoStorage(load_storage_settings(), fail_fast=True)
+    )
 
     uploaded = 0
     missing: list[str] = []

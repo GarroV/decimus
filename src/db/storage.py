@@ -35,7 +35,12 @@ if TYPE_CHECKING:  # pragma: no cover — только для проверки �
 #: одно значение, — работа без потребителя.
 PHOTO_CONTENT_TYPE = "image/jpeg"  # кадр, не читаемый Pillow, кладётся как пришёл
 
-#: Сколько ждать соединения с хранилищем и сколько раз пробовать (#459).
+#: Сколько ждать соединения с хранилищем и сколько раз пробовать — ТОЛЬКО на
+#: пути сдачи и дозагрузки (`S3PhotoStorage(..., fail_fast=True)`, #459).
+#: Остальные читатели и писатели (админка, снятие, предписания, экшн-планы,
+#: MCP, доливщик копий) идут с умолчаниями botocore и их повторами: там человек
+#: сам нажал кнопку, отказ ему виден, а потерять запись из-за одной неудачной
+#: попытки хуже, чем подождать.
 #:
 #: Умолчания `botocore` — 60 секунд на соединение и пять попыток — рассчитаны на
 #: облако, а не на хранилище, которое спит (D259: MUSPELHEIM засыпает и сам не
@@ -48,11 +53,12 @@ CONNECT_TIMEOUT_SEC = 5
 #: Ожидание ответа уже соединившегося хранилища. Кадр — сотни килобайт, отчёт —
 #: единицы мегабайт; полминуты тишины от живого сервера — уже отказ.
 READ_TIMEOUT_SEC = 30
-#: Всего попыток, включая первую (режим `standard`). Одна, без повтора: на
-#: адрес, который не отвечает, попытка стоит не 5 секунд, а 10 (замерено
-#: 05.10.2026: одна — 10,2 с, две — 16,8 с; умолчания botocore — 309 с), а
-#: мгновенный сбой повторный прогон и так покроет — кадр не потеряется, его
-#: дольёт дозагрузка.
+#: Всего попыток, включая первую (`total_max_attempts`, режим `standard`).
+#: Одна, без повтора: мгновенный сбой покроет дозагрузка — кадр не потеряется.
+#: Ключ именно `total_max_attempts`: `max_attempts` у botocore считает ПОВТОРЫ,
+#: и `max_attempts=1` давал две попытки (поймано тестом на `meta.config`).
+#: Замер 05.10.2026 на адресе, который не отвечает: одна попытка — 5,0 с,
+#: две — 10,4 с; умолчания botocore — 309 с.
 MAX_ATTEMPTS = 1
 
 
@@ -133,22 +139,28 @@ class S3PhotoStorage:
     сервиса из JSON и на каждый кадр это платить незачем.
     """
 
-    def __init__(self, settings: StorageSettings) -> None:
+    def __init__(self, settings: StorageSettings, *, fail_fast: bool = False) -> None:
+        """`fail_fast=True` — короткий срок и одна попытка (путь сдачи и дозагрузки, #459)."""
         import boto3
         from botocore.config import Config
 
         self._bucket = settings.bucket
+        config = (
+            Config(
+                connect_timeout=CONNECT_TIMEOUT_SEC,
+                read_timeout=READ_TIMEOUT_SEC,
+                retries={"total_max_attempts": MAX_ATTEMPTS, "mode": "standard"},
+            )
+            if fail_fast
+            else None
+        )
         self._client: S3Client = boto3.client(
             "s3",
             endpoint_url=settings.endpoint_url or None,
             aws_access_key_id=settings.access_key_id,
             aws_secret_access_key=settings.secret_access_key,
             region_name=settings.region,
-            config=Config(
-                connect_timeout=CONNECT_TIMEOUT_SEC,
-                read_timeout=READ_TIMEOUT_SEC,
-                retries={"max_attempts": MAX_ATTEMPTS, "mode": "standard"},
-            ),
+            config=config,
         )
 
     @property
