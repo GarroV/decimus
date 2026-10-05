@@ -77,7 +77,11 @@ def check_environment(env: Mapping[str, str] | None = None) -> Settings:
 
 
 def load_retraction_settings(env: Mapping[str, str] | None = None) -> Settings:
-    """Прочитать подключение администратора истории. Отказ — `ConfigError`.
+    """Прочитать подключение администратора истории — сверенное с остальными.
+
+    Не задано — `ConfigError`. Задано, но ведёт не в ту базу, что другие
+    заданные `DATABASE_*_URL`, или не разбирается — `DatabaseTargetError`
+    (наследник `ConfigError`, #515): его нельзя читать как «не задано».
 
     Отдельная переменная, а не роль, выбранная по ходу: право видеть снятые
     проверки живёт в базе (миграция `0010`), а не в коде, и получить его можно
@@ -94,6 +98,14 @@ def load_retraction_settings(env: Mapping[str, str] | None = None) -> Settings:
             f"истории (роль dodo_audit_admin), и приходит он отдельным "
             f"подключением — пример значения в .env.example"
         )
+    # Сверка здесь, а не у каждого потребителя (#515): снятие, приёмка,
+    # перенос, синонимы, экшн-планы и предписания берут подключение только
+    # отсюда, и стенд, где `DATABASE_URL` переопределён, а это подключение
+    # пришло из `.env`, иначе молча писал бы в другую базу. Импорт внутри —
+    # потому что `database_target` сам читает это подключение отсюда.
+    from .database_target import same_database_or_refuse
+
+    same_database_or_refuse(DATABASE_RETRACTION_URL_VAR, dsn, src)
     return Settings(dsn=dsn)
 
 

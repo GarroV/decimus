@@ -30,7 +30,7 @@ from psycopg import ProgrammingError
 from psycopg.conninfo import conninfo_to_dict
 
 from .config import DATABASE_RETRACTION_URL_VAR, DATABASE_URL_VAR, load_retraction_settings
-from .errors import AccessError, ConfigError
+from .errors import AccessError, ConfigError, DatabaseTargetError
 from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
 
 #: Порт Postgres, когда в строке он не назван, — так же его подставляет libpq.
@@ -69,7 +69,7 @@ def target_of(dsn: str, *, var: str) -> DatabaseTarget:
     try:
         params = conninfo_to_dict(dsn)
     except ProgrammingError:
-        raise ConfigError(f"Строка подключения {var} не разбирается") from None
+        raise DatabaseTargetError(f"Строка подключения {var} не разбирается") from None
     user = str(params.get("user") or "")
     return DatabaseTarget(
         host=str(params.get("host") or "").lower(),
@@ -99,7 +99,7 @@ def same_database_or_refuse(
     listed = "; ".join(
         f"{var} → {targets[var].label()}" for var in CONNECTION_VARS if var in targets
     )
-    raise ConfigError(
+    raise DatabaseTargetError(
         f"Подключения ведут в разные базы: {listed}. Роли у них разные, а база "
         f"обязана быть одна — иначе запись уйдёт не туда, где её потом ищут. "
         f"Поправьте переменную, которая указывает не на ту базу"
@@ -115,18 +115,26 @@ def same_database_or_deny(var: str, dsn: str, зачем: str) -> DatabaseTarget
 
 
 def managing_dsn(зачем: str) -> tuple[str, str]:
-    """Подключение, которым трогают учётки: имя переменной и строка.
+    """Подключение, которым трогают учётки: имя переменной и строка — уже сверенные.
 
     Первая — узкая роль администратора истории, без неё — владелец схемы;
     почему именно так, сказано у `web_access._managing`. Ни той ни другой —
     отказ с названием обеих.
+
+    Откат на владельца схемы — только когда подключение истории НЕ ЗАДАНО.
+    Заданное, но ведущее в другую базу или неразборное (`DatabaseTargetError`,
+    #515) — отказ: иначе расхождение баз выглядело бы как «не задано», и учётку
+    молча завела бы другая роль.
     """
     try:
         return DATABASE_RETRACTION_URL_VAR, load_retraction_settings().dsn
+    except DatabaseTargetError as exc:
+        raise AccessError(f"Не удалось {зачем}: {exc}") from None
     except ConfigError:
         pass
     dsn = admin_dsn()
     if dsn:
+        same_database_or_deny(DATABASE_ADMIN_URL_VAR, dsn, зачем)
         return DATABASE_ADMIN_URL_VAR, dsn
     raise AccessError(
         f"Не удалось {зачем}: не задано ни DATABASE_RETRACTION_URL, ни "
@@ -142,6 +150,5 @@ def managing_target() -> str:
     и запись в чужую базу выглядела как успех. Сверка баз та же, что у записи,
     поэтому расхождение команда узнаёт до первого изменения, а не после.
     """
-    зачем = "назвать базу учёток"
-    var, dsn = managing_dsn(зачем)
-    return f"{same_database_or_deny(var, dsn, зачем).label()} ({var})"
+    var, dsn = managing_dsn("назвать базу учёток")
+    return f"{target_of(dsn, var=var).label()} ({var})"
