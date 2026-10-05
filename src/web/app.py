@@ -397,7 +397,9 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             }
             return _url("country", code=country, **{к: з for к, з in живые.items() if з})
 
-        критических = sum(1 for item in snapshot.attention if item.why == "critical")
+        # По всему срезу, как остальные плитки (#503), а не по списку поводов:
+        # тот обрезан рядом с пределом и `TOP`.
+        критических = snapshot.critical_total
         if snapshot.average is None:
             среднее = t("overview.tile.note.average_none", _lang(conf))
         elif not snapshot.comparable:
@@ -414,7 +416,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 note=t(
                     "overview.tile.note.units",
                     _lang(conf),
-                    checked=len({row.unit_name for row in snapshot.inspections}),
+                    checked=snapshot.units_checked,
                 ),
                 href=registry_path,
             ),
@@ -427,7 +429,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="inspections",
-                value=str(len(snapshot.inspections)),
+                value=str(snapshot.inspections_total),
                 note=t("overview.tile.note.inspections", _lang(conf)),
                 href=registry_path,
             ),

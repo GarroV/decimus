@@ -89,6 +89,9 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -119,6 +122,9 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -430,6 +436,9 @@ def list_inspections(
     limit: int = DEFAULT_LIMIT,
     include_retracted: bool = False,
     on_review: bool = False,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
 ) -> list[InspectionRow]:
     """Проверки в охвате читающего, свежие по дате обхода — первыми.
 
@@ -462,6 +471,11 @@ def list_inspections(
     по умолчанию — только принятые, то есть история сети; `True` — только
     ждущие вычитки. Смешанной выдачи нет намеренно: проверка до подтверждения
     не часть истории, и реестр показывает её отдельным списком.
+
+    `city`/`country`/`grade` — отбор по месту и букве В БАЗЕ, до предела (#470),
+    по тем же правилам, что у агрегатов (`_narrowing`): пусто — «все». Отбор
+    поверх прочитанной страницы терял бы проверки среза старше `limit`-й по
+    всей сети, и экран показывал бы другое множество, чем соседние блоки.
     """
     охват = _require_reach(reach)
     rows_limit = _require_limit(limit)
@@ -471,6 +485,7 @@ def list_inspections(
         "limit": rows_limit,
         "date_from": date_from,
         "date_to": date_to,
+        **_narrowing(city, country, grade),
     }
     with (
         _reading("список проверок", as_admin=include_retracted) as conn,
@@ -702,6 +717,33 @@ order by units desc, records desc, записи.code
 limit %(limit)s
 """
 
+# Сводка среза для плиток (#503): сколько проверок, сколько точек, буквы и
+# сумма процентов — по ВСЕМУ срезу, а не по прочитанному ряду с пределом. Числа
+# движка складываются, но не выводятся: процент и буква взяты такими, какими он
+# их записал. Разбивка по изданию нужна, чтобы потребитель решил, законно ли
+# усреднять срез (T349): разные цены не усредняются.
+_SLICE_SUMMARY_SQL = """
+with срез as (
+    select i.unit_id, i.checklist_code, i.checklist_version, i.grade, i.pct
+    from inspections i
+         join units u on u.id = i.unit_id
+    where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and i.status = 'finalized'
+      and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+      and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+)
+select
+    coalesce(checklist_code, ''), checklist_version, grade, count(*), sum(pct),
+    (select count(distinct unit_id) from срез)
+from срез
+group by 1, 2, 3
+order by 1, 2, 3
+"""
+
 _UNITS_TOTAL_SQL = """
 select count(*) from units u
 where u.tenant_code = 'HQ'
@@ -790,6 +832,42 @@ def systemic_findings(
             (str(code), str(level), int(records), int(units), str(text or ""), str(lang or ""))
             for code, level, records, units, text, lang in cur.fetchall()
         ]
+
+
+def slice_summary(
+    *,
+    reach: Reach,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+) -> tuple[int, list[tuple[str, str, str, int, float]]]:
+    """Сводка среза без предела: `(точек, [(код чек-листа, издание, буква, проверок, сумма %)])`.
+
+    Ряд проверок экрана ограничен пределом, а плитки (средняя, буквы, число
+    проверок и точек) обязаны говорить о том же множестве, что потери по зонам
+    и системные нарушения, — то есть обо всём срезе (#503). Отбор — тот же
+    `_narrowing`, охват — тот же.
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("сводка среза") as conn, conn.cursor() as cur:
+        cur.execute(
+            _SLICE_SUMMARY_SQL,
+            {
+                **охват.params(),
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
+        строки = cur.fetchall()
+    точек = int(строки[0][5]) if строки else 0
+    return точек, [
+        (str(code), str(version), str(буква), int(n), float(сумма))
+        for code, version, буква, n, сумма, _ in строки
+    ]
 
 
 def units_total(*, reach: Reach) -> int:
