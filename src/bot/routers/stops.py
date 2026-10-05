@@ -31,13 +31,14 @@ from .mcp import _guard
 logger = logging.getLogger(__name__)
 
 STOPS_COMMAND = "stops"
-#: Период по умолчанию и предел: дольше года счётчик не спрашивают.
+#: Период по умолчанию и предел. Предел — срок хранения счётчика (#501):
+#: дальше него строк нет, и период длиннее молча считал бы меньше спрошенного.
 DEFAULT_DAYS = 7
-MAX_DAYS = 366
+MAX_DAYS = stops.STOPS_RETENTION_DAYS
 
 
 def _days(command: CommandObject) -> int | None:
-    """Период в днях из аргумента. Пусто — неделя; не число или вне 1…366 — `None`."""
+    """Период в днях из аргумента. Пусто — неделя; не число или вне 1…MAX_DAYS — `None`."""
     raw = (command.args or "").strip()
     if not raw:
         return DEFAULT_DAYS
