@@ -11,6 +11,12 @@
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
 | `icons.json` | `dodo/core/icons.json` | `f70045d` |
+| `mark-small.svg`, `icon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `dodo/brand/decimus/` | `bdf2787` (знак «Глитч-мрамор» 04.10.2026, ободок плитки 05.10.2026 — D186) |
+
+Знак продукта приехал 04.10.2026 (D185 в MERIDIUS, раздел от 04.10.2026 в
+`dodo/docs/decisions.md` forma) и заменил прежний `favicon.svg`. Геометрия —
+`dodo/brand/build.py` в forma; сами файлы не правятся, пересборка там одной
+командой. `site.webmanifest` рядом — файл самого продукта, не копия.
 
 Ядро обновлено 30.09.2026 той же раскаткой из ветки forma `feat/lang-pill`
 (#461): переключатель языка пилюлей `.langpill` и строка `.sidenav__lang`,
@@ -51,6 +57,7 @@ eb0a543c0105e06f99e7c7f439c542039737c8dc940a62e266d306b38ae41be3  icons.json
 ```bash
 diff -u src/web/static/dodo-ds.css        ~/Documents/projects/forma/dodo/core/dodo-ds.css
 diff -u src/web/static/decimus-domain.css ~/Documents/projects/forma/dodo/decimus/domain.css
+cmp src/web/static/mark-small.svg        ~/Documents/projects/forma/dodo/brand/decimus/mark-small.svg
 ```
 
 Разошлось — обновляется копия, а не оригинал, и в этой таблице меняется коммит.
