@@ -371,7 +371,7 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
             as_attachment=True,
             download_name=ссылка.file_name,
         )
-        ответ.headers["X-Content-Type-Options"] = "nosniff"
+        # `nosniff` ставит общий крючок (`src/web/security_headers.py`).
         ответ.headers["Cache-Control"] = "private, no-store"
         return ответ
 
