@@ -395,8 +395,8 @@ def report_bytes(ref: reports.ReportRef) -> bytes:
     return reports.fetch_report(ref)
 
 
-def load_previews(inspection_id: str, *, reach: Reach) -> dict[str, tuple[str, ...]]:
-    """Кадры со сжатой копией по записям проверки (D219)."""
+def load_previews(inspection_id: str, *, reach: Reach) -> dict[str, previews.FindingShots]:
+    """Кадры записей проверки (D219): показываемые и сколько показать нечем."""
     return previews.finding_previews(inspection_id, reach=reach)
 
 

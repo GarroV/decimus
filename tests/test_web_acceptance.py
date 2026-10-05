@@ -17,6 +17,7 @@ from test_web_letter import собранное
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
 from src.db.errors import AcceptError, ReviseError
+from src.db.previews import FindingShots
 from src.domain.tenants import canonical_tenant
 from src.report.letters import Papers
 from src.web import country as country_data
@@ -125,6 +126,30 @@ def test_ждущая_своя_показана_с_плашкой_листом_�
     assert "Сохранить и пересчитать" in страница
     assert "/move?lang=" not in страница
     assert "/retract?lang=" not in страница
+
+
+@админ
+def test_лист_вычитки_показывает_кадры_и_называет_недоступные(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#422: вычитывающий видит кадр записи и то, что ещё один показать нечем."""
+    # Arrange
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+    кадр = "22222222-2222-2222-2222-222222222222"
+    находка = карточка(шапка()).findings[0].id
+    monkeypatch.setattr(
+        data, "load_previews", lambda *_a, **_k: {находка: FindingShots(shown=(кадр,), missing=1)}
+    )
+
+    # Act
+    страница = стенд.get("/inspections/x").get_data(as_text=True)
+
+    # Assert — в листе миниатюра и пометка; в записях пометка в строке счётчика.
+    assert 'class="review-photo"' in страница
+    assert f"/photos/{кадр}" in страница
+    assert страница.count("Фото недоступно: 1") == 1
+    assert "Фото: 1 · недоступно: 1" in страница
 
 
 @админ

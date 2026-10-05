@@ -17,7 +17,7 @@ import io
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -46,15 +46,19 @@ from src.report.info_titles import FOUND
 
 from . import (
     accounts,
+    action_plans,
     assets,
     auth,
     letter_draft,
     letter_markup,
     people,
+    prescriptions,
     pricing,
     profile,
     review,
     revision,
+    security_headers,
+    unit_add,
     view,
 )
 from . import country as country_data
@@ -99,7 +103,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "country", "admin", "users")
+SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans", "orders")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -120,12 +124,15 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_overview(app, conf)
     _register_country(app, conf)
     _register_units(app, conf)
+    unit_add.install(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
+    action_plans.install(app, conf)
+    prescriptions.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
-    _register_errors(app)
-    _register_frame_ban(app)
+    _register_errors(app, conf)
+    security_headers.install(app, hsts=conf.hsts)
     return app
 
 
@@ -395,7 +402,9 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             }
             return _url("country", code=country, **{к: з for к, з in живые.items() if з})
 
-        критических = sum(1 for item in snapshot.attention if item.why == "critical")
+        # По всему срезу, как остальные плитки (#503), а не по списку поводов:
+        # тот обрезан рядом с пределом и `TOP`.
+        критических = snapshot.critical_total
         if snapshot.average is None:
             среднее = t("overview.tile.note.average_none", _lang(conf))
         elif not snapshot.comparable:
@@ -412,7 +421,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
                 note=t(
                     "overview.tile.note.units",
                     _lang(conf),
-                    checked=len({row.unit_name for row in snapshot.inspections}),
+                    checked=snapshot.units_checked,
                 ),
                 href=registry_path,
             ),
@@ -425,7 +434,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="inspections",
-                value=str(len(snapshot.inspections)),
+                value=str(snapshot.inspections_total),
                 note=t("overview.tile.note.inspections", _lang(conf)),
                 href=registry_path,
             ),
@@ -640,7 +649,27 @@ def _register_country(app: Flask, conf: Settings) -> None:
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
+            can_add_units=unit_add.can_add_here(код),
+            **_country_plans(код),
+            **prescriptions.country_block(код),
         )
+
+
+def _country_plans(код: str) -> dict[str, Any]:
+    """Блок экшн-планов экрана страны: запросы, их состояние и куда действовать."""
+    открытые, принятые, известны = action_plans.country_plans(код)
+    уК = action_plans.is_hq()
+    return {
+        "plans": открытые.rows + принятые.rows,
+        "plans_truncated": открытые.truncated or принятые.truncated,
+        "plans_limit": action_plans.LIST_LIMIT,
+        "plans_known": известны,
+        "plans_today": action_plans.today(),
+        "plans_path": section("plans").path,
+        "plans_act_path": section("actions" if уК else "plans").path,
+        "plans_act_country": уК,
+        "state_tones": action_plans.STATE_TONES,
+    }
 
 
 def _register_units(app: Flask, conf: Settings) -> None:
@@ -667,9 +696,15 @@ def _register_units(app: Flask, conf: Settings) -> None:
         if точка is None:
             return render_template("inspections/not_found.html"), 404
         снимок = unit_data.load(reach=auth.current_reach(), unit=точка.name, lang=lang)
+        if снимок.last is None:
+            # Проверок нет — география только в справочнике. Так выглядит
+            # пиццерия, только что заведённая из админки (#437).
+            снимок = replace(снимок, city=точка.city or "", country=точка.country or "")
         return render_template(
             "units/card.html",
             data=снимок,
+            added=request.args.get("added") == "1",
+            alias_taken=request.args.get("alias_taken") == "1",
             lang=lang,
             window=unit_data.ОКНО,
             grade_tone=view.grade_tone,
@@ -882,7 +917,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # может держать её долго — но только у себя: кадр кухни партнёра не
         # должен оседать в общих кэшах по дороге.
         ответ.headers["Cache-Control"] = "private, max-age=86400"
-        ответ.headers["X-Content-Type-Options"] = "nosniff"
         return ответ
 
     @app.get(f"{section('registry').path}/<inspection_id>/letter")
@@ -1486,8 +1520,40 @@ def _render_card(
     except DbError:
         кадры = {}
         кадры_известны = False
+    план, план_известен = action_plans.card_plan(inspection_id)
+    # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
+    # запросить, либо у точки нет страны — тогда только видимая отметка.
+    план_нужен = (
+        action_plans.is_hq()
+        and своя
+        and план is None
+        and план_известен
+        and not detail.inspection.on_review
+        and not detail.inspection.retracted
+        and action_plans.needs_plan(detail.counts)
+    )
+    без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
     return render_template(
         "inspections/card.html",
+        plan=план,
+        plan_known=план_известен,
+        plan_link=(
+            f"{section('actions').path}/requests/{план.id}"
+            if план is not None and action_plans.is_hq()
+            else section("plans").path
+        ),
+        plan_today=action_plans.today(),
+        plan_state_tones=action_plans.STATE_TONES,
+        plan_due_default=action_plans.default_due(),
+        plan_needed=план_нужен,
+        plan_no_country=без_страны,
+        # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
+        may_request_plan=(
+            action_plans.is_hq()
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
+        ),
         sheet=лист,
         may_accept=можно_подтвердить,
         may_revise=можно_подтвердить,
@@ -1793,7 +1859,9 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 склад, tenant=auth.current_tenant(), version=version
             )
         except MethodologyRefused as отказ:
-            return _render_methodology(conf, notice=None, failure=str(отказ))
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_methodology(
             conf,
             notice=t("methodology.published", _lang(conf), version=опубликована),
@@ -1848,8 +1916,12 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             )
         except MethodologyRefused as отказ:
             if с_методики:
-                return _render_methodology(conf, notice=None, failure=str(отказ), panel="new")
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+                return _render_methodology(
+                    conf, notice=None, failure=method.refusal_text(отказ, _lang(conf)), panel="new"
+                )
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         if с_методики:
             # Заведённый с «Методики» открывается сразу: его и собирались наполнять.
             return redirect(_url("methodology", checklist=заведён.code, lang=_lang(conf)))
@@ -1876,7 +1948,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 state=(request.form.get("state") or "").strip(),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_checklists(
             conf,
             notice=t("checklists.state.set", _lang(conf), checklist=стало.code, state=стало.state),
@@ -1901,7 +1975,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 on=request.form.get("on") == "1",
             )
         except MethodologyRefused as отказ:
-            return _render_methodology(conf, notice=None, failure=str(отказ), panel="bot")
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf)), panel="bot"
+            )
         остаться = (request.args.get("checklist") or "").strip()
         return redirect(
             _url(
@@ -1929,7 +2005,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return render_template(
             "methodology/apply.html",
             code=code,
@@ -1953,7 +2031,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_checklists(
             conf,
             notice=t("checklists.applied", _lang(conf), checklist=str(итог["applied"])),
@@ -1979,7 +2059,7 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
             checklists=[],
             states=method.CHECKLIST_STATES,
             notice=None,
-            failure=failure or str(отказ),
+            failure=failure or method.refusal_text(отказ, _lang(conf)),
         )
     return render_template(
         "methodology/checklists.html",
@@ -2046,7 +2126,7 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
         )
         правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
-        return _Итог(failure=str(отказ))
+        return _Итог(failure=method.refusal_text(отказ, _lang(conf)))
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
 
 
@@ -2089,7 +2169,7 @@ def _render_methodology(
     try:
         перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
-        перечень, failure = [], failure or str(отказ)
+        перечень, failure = [], failure or method.refusal_text(отказ, _lang(conf))
     код = _который_показан(перечень, _который(request))
     try:
         колонка = method.checklist_rail(state.store, перечень, tenant=auth.current_tenant())
@@ -2107,12 +2187,12 @@ def _render_methodology(
     except MethodologyRefused as отказ:
         # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
         # который виден всем (D283): пустой экран читался бы как поломка.
-        склад, failure = state.store, failure or str(отказ)
+        склад, failure = state.store, failure or method.refusal_text(отказ, _lang(conf))
     try:
         состав = method.load_composition(склад, tenant=auth.current_tenant(), version=попросили)
     except MethodologyRefused as отказ:
         состав = method.load_composition(склад, tenant=auth.current_tenant())
-        failure = failure or str(отказ)
+        failure = failure or method.refusal_text(отказ, _lang(conf))
     отбор = mview.parse_filter(request.args)
     выбран = item or (request.args.get("item") or "").strip() or None
     # Пункт из адреса, которого в этой версии нет (старая ссылка, другой
@@ -2178,7 +2258,7 @@ def _render_methodology(
                 склад, tenant=auth.current_tenant(), code=выбран, version=попросили
             )["item"]
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     # Разница действующей и свежей записанной — по запросу: чтение каждого
     # пункта целиком дорого, а полоса версии и так говорит, что она есть.
     разница: tuple[mview.Change, ...] | None = None
@@ -2194,7 +2274,7 @@ def _render_methodology(
                 method.zones_of_version(склад, tenant=auth.current_tenant(), version=состав.latest),
             )
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     открыта_зона = (request.args.get("zone_card") or "").strip()
     зона = next((z for z in состав.zones if z.get("code") == открыта_зона), None)
     обход: list[dict[str, Any]] = []
@@ -2204,7 +2284,7 @@ def _render_methodology(
                 method.load_route(склад, tenant=auth.current_tenant(), version=попросили)["zones"]
             )
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     сводка = (
         data.load_item_usage(reach=auth.current_reach(), code=выбран, checklist=код or "")
         if карточка is not None and выбран
@@ -2339,27 +2419,6 @@ def _kind_title(code: str, lang: str) -> str:
         return code
 
 
-def _register_frame_ban(app: Flask) -> None:
-    """Запретить встраивание страниц админки в чужой документ.
-
-    Заслон происхождения (`origin.refuse_foreign_origin`) закрывает запрос С чужой
-    страницы, но не закрывает случай, когда чужая страница показывает НАШУ в
-    рамке: документ тогда честно наш, происхождение совпадает, и заслон
-    пропустит отправку формы — сняв проверку руками человека, который думал,
-    что нажимает что-то другое. Обязательное поле причины делает подмену
-    многоходовой, но не невозможной.
-
-    Два заголовка, а не один: `frame-ancestors` — действующее правило, а
-    `X-Frame-Options` остаётся ради просмотрщиков, которые его не знают.
-    """
-
-    @app.after_request
-    def _no_frames(response: Response) -> Response:
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
-        return response
-
-
 #: Ответы драйвера, которые означают «код новее схемы», а не отказ базы: код
 #: обратился к столбцу или таблице, которых в базе нет. Лечится накатом
 #: миграций, и сообщение обязано сказать именно это (#351).
@@ -2381,7 +2440,7 @@ def _schema_lags(exc: BaseException) -> bool:
     return False
 
 
-def _register_errors(app: Flask) -> None:
+def _register_errors(app: Flask, conf: Settings) -> None:
     """Отказы показываются страницей, а не трассировкой.
 
     База недоступна — это нормальный исход, а не поломка кода: админка читает
@@ -2405,7 +2464,9 @@ def _register_errors(app: Flask) -> None:
         события, что недоступная база, и ответ на него такой же — сказать
         причину словами.
         """
-        return render_template("methodology/broken.html", reason=str(exc)), 503
+        return render_template(
+            "methodology/broken.html", reason=method.refusal_text(exc, _lang(conf))
+        ), 503
 
     @app.errorhandler(404)
     def _not_found(_: object) -> tuple[str, int]:

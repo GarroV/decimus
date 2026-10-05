@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ t('section.actions.title') }}{% endblock %}
+{% block body %}
+  <div class="note note--error"><div><div class="note__title">{{ failure }}</div></div></div>
+  {% if inspection_id %}
+    <p class="mt-gap"><a href="{{ url(registry_path ~ '/' ~ inspection_id) }}?lang={{ lang }}">‹ {{ t('actions.back_to_inspection') }}</a></p>
+  {% endif %}
+{% endblock %}

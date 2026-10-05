@@ -13,9 +13,32 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from types import MappingProxyType
+
 
 class McpError(Exception):
-    """Базовый отказ блока `mcp`."""
+    """Базовый отказ блока `mcp`.
+
+    **Текст отказа — русский, и это язык MCP, а не забывчивость.** Его читает
+    агент партнёра, и менять ему язык ответа никто не просил. Но тот же отказ
+    показывает и веб-админка человеку с английским интерфейсом (#475), а
+    переводить готовую фразу нельзя — параметры в ней уже подставлены. Поэтому
+    отказ несёт ещё и КОД (`refusal`) с параметрами (`params`): веб берёт по
+    коду свой текст на языке интерфейса, а `str(отказ)` остаётся прежним
+    словом в слово. Отказ без кода веб показывает как есть — по-русски.
+    """
+
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        refusal: str | None = None,
+        params: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.refusal = refusal
+        self.params: Mapping[str, object] = MappingProxyType(dict(params or {}))
 
 
 class McpConfigError(McpError):

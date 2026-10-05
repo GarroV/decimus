@@ -7,6 +7,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from types import MappingProxyType
+
 
 class WebError(Exception):
     """Базовый отказ блока `web`."""
@@ -27,7 +30,19 @@ class MethodologyRefused(WebError):
     обычный и частый исход (движок не принял методику, правка ничего не
     изменила, такой версии в хранилище нет). Показывается она словами двери на
     той же странице, а не пятисоткой.
+
+    `key` и `params` — ключ текста в каталоге (`texts.py`) и его параметры: на
+    экран отказ идёт на языке интерфейса (`methodology.refusal_text`, #475), а
+    `str(отказ)` — русской строкой для журнала сервера. Отказ без ключа
+    показывается как есть.
     """
+
+    def __init__(
+        self, message: str, *, key: str | None = None, params: Mapping[str, object] | None = None
+    ) -> None:
+        super().__init__(message)
+        self.key = key
+        self.params: Mapping[str, object] = MappingProxyType(dict(params or {}))
 
 
 class SectionRegistryError(WebError):

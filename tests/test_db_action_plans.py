@@ -1,0 +1,726 @@
+"""Экшн-планы в базе: автозапрос, заслоны ролей и стран, история (D272, D274, урок #490).
+
+Проверяется то, что держит БАЗА и двери блока `db`, а не экран: роль
+приложения (бот, партнёр в вебе) не заводит запрос, не выносит вердикт и не
+переводит план в «принят» ни вставкой, ни правкой; партнёр чужой страны не
+видит, не загружает и не скачивает; угаданный id запроса или файла отвечает
+тем же «нет», что несуществующий.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, date, datetime, timedelta
+from pathlib import Path
+from typing import Any
+
+import pytest
+from conftest import requires_db
+from db_harness import admin_role_dsn, set_retraction_env, привязать_страну, точка_справочника
+
+psycopg = pytest.importorskip("psycopg")
+
+from src.db import action_plans as plans  # noqa: E402
+from src.db.accept import accept_inspection  # noqa: E402
+from src.db.action_plans import _OPEN_SQL  # noqa: E402
+from src.db.errors import AcceptError, ActionPlanError  # noqa: E402
+from src.db.move import move_inspection  # noqa: E402
+from src.db.reach import reach_of  # noqa: E402
+from src.db.retract import retract_inspection  # noqa: E402
+
+pytestmark = requires_db
+
+ТОЧКА = "Batumi-1"
+ЧУЖАЯ_ТОЧКА = "Yerevan-1"
+СЕГОДНЯ = datetime.now(UTC).date()
+МБ = 1024 * 1024
+_чаты = iter(range(9_100_000, 9_200_000))
+
+
+class Хранилище:
+    """Хранилище в памяти: ключ → байты."""
+
+    def __init__(self) -> None:
+        self.объекты: dict[str, bytes] = {}
+
+    def put(self, key: str, data: bytes, *, content_type: str) -> str:
+        self.объекты[key] = data
+        return f"s3://test/{key}"
+
+    def get(self, key: str) -> bytes:
+        return self.объекты[key]
+
+    def delete(self, key: str) -> None:
+        self.объекты.pop(key, None)
+
+
+@pytest.fixture
+def admin_env(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
+    return set_retraction_env(db_env, monkeypatch)
+
+
+@pytest.fixture
+def сеть(pg_dsn: str, db_env: str, domain_env: Path, admin_env: str) -> None:
+    """Batumi-1 в Грузии (партнёр GE), Yerevan-1 в Армении (партнёр AM)."""
+    точка_справочника(ТОЧКА, country="GE", city="Batumi")
+    точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
+    привязать_страну(pg_dsn, tenant="GE", country="GE")
+    привязать_страну(pg_dsn, tenant="AM", country="AM")
+
+
+@pytest.fixture
+def склад() -> Хранилище:
+    return Хранилище()
+
+
+def _проверка(*уровни: str, unit: str = ТОЧКА, tenant: str = "HQ") -> str:
+    """Слитая и ждущая приёмки проверка с записями названных классов."""
+    from src.db.push import push_inspection
+    from src.domain import add_finding, start_inspection
+
+    чат = next(_чаты)
+    start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant)
+    коды = {"D1": "PRD01", "D2": "PRD02", "D3": "PRD04"}
+    зоны = {"D1": "fridge", "D2": "cold_kitchen", "D3": "dry_storage"}
+    for уровень in уровни:
+        add_finding(чат, code=коды[уровень], level=уровень, zone=зоны[уровень], text="запись")
+    return push_inspection(чат)
+
+
+def _принятая(*уровни: str, unit: str = ТОЧКА, tenant: str = "HQ") -> str:
+    ident = _проверка(*уровни, unit=unit, tenant=tenant)
+    accept_inspection(ident, tenant=tenant, actor="garva")
+    return ident
+
+
+def _запрос(ident: str) -> plans.PlanRequest:
+    найден = plans.request_of_inspection(ident, reach=reach_of("HQ"))
+    assert найден is not None, "запроса по проверке нет"
+    return найден
+
+
+def _загрузить(
+    склад: Хранилище, request_id: str, *, tenant: str = "GE", data: bytes = b"%PDF plan"
+) -> int:
+    return plans.upload_version(
+        request_id,
+        reach=reach_of(tenant),
+        tenant=tenant,
+        actor=f"partner-{tenant.lower()}",
+        file_name="план.pdf",
+        content_type="application/pdf",
+        data=data,
+        max_bytes=25 * МБ,
+        storage=склад,
+    )
+
+
+def _sql(dsn: str, текст: str, параметры: tuple[Any, ...] = ()) -> None:
+    with psycopg.connect(dsn) as conn:
+        conn.execute(текст, параметры)
+        conn.commit()
+
+
+# --- автозапрос при подтверждении (D272, D274) -------------------------------
+
+
+def test_подтверждение_с_d2_само_заводит_запрос_на_семь_дней(сеть: None) -> None:
+    # Act
+    ident = _принятая("D1", "D2")
+
+    # Assert
+    запрос = _запрос(ident)
+    assert (запрос.country, запрос.status, запрос.origin) == ("GE", "requested", "auto")
+    assert запрос.due_on == СЕГОДНЯ + timedelta(days=7)
+    assert запрос.requested_by == "garva"
+    assert [(e.action, e.actor) for e in запрос.events] == [("requested", "garva")]
+
+
+def test_подтверждение_с_d3_заводит_запрос(сеть: None) -> None:
+    assert _запрос(_принятая("D3")).status == "requested"
+
+
+def test_срок_по_умолчанию_берётся_из_настройки(
+    сеть: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "10")
+    assert _запрос(_принятая("D2")).due_on == СЕГОДНЯ + timedelta(days=10)
+
+
+def test_подтверждение_без_d2_d3_запроса_не_заводит(сеть: None) -> None:
+    ident = _принятая("D1")
+    assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
+
+
+def test_своя_проверка_партнёра_запроса_не_заводит(сеть: None) -> None:
+    """Экшн-план — ответ партнёра на проверку УК (D289)."""
+    ident = _принятая("D2", tenant="GE")
+    assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
+
+
+# --- заслоны базы: роль приложения не выносит вердикт (урок #490) -------------
+
+
+def test_роль_приложения_не_заводит_запрос(сеть: None, db_env: str) -> None:
+    ident = _принятая("D1")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _sql(
+            db_env,
+            "insert into action_plan_requests (inspection_id, due_on, origin,"
+            " requested_by, due_set_by) values (%s, current_date, 'manual', 'bot', 'bot')",
+            (ident,),
+        )
+
+
+def test_принятым_запрос_не_вставляет_никто(сеть: None, admin_env: str) -> None:
+    ident = _принятая("D1")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match="только запрошенным"):
+        _sql(
+            admin_env,
+            "insert into action_plan_requests (inspection_id, due_on, status, origin,"
+            " requested_by, due_set_by) values (%s, current_date, 'accepted', 'manual',"
+            " 'hq', 'hq')",
+            (ident,),
+        )
+
+
+def test_роль_приложения_не_выносит_вердикт(сеть: None, склад: Хранилище, db_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    файл = _запрос(запрос.inspection_id).files[-1].id
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _sql(
+            db_env,
+            "insert into action_plan_reviews (file_id, verdict, reviewed_by)"
+            " values (%s, 'accepted', 'bot')",
+            (файл,),
+        )
+
+
+def test_роль_приложения_не_переводит_в_принят(сеть: None, склад: Хранилище, db_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match="только УК"):
+        _sql(
+            db_env,
+            "update action_plan_requests set status = 'accepted' where id = %s",
+            (запрос.id,),
+        )
+    assert _запрос(запрос.inspection_id).status == "on_review"
+
+
+def test_роль_приложения_не_правит_срок(сеть: None, db_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _sql(
+            db_env,
+            "update action_plan_requests set due_on = due_on + 30 where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_принятым_без_вердикта_не_делает_и_уК(сеть: None, склад: Хранилище, admin_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    with pytest.raises(psycopg.errors.CheckViolation, match="нет вердикта"):
+        _sql(
+            admin_env,
+            "update action_plan_requests set status = 'accepted' where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_историю_не_пишет_напрямую_никто(сеть: None, db_env: str, admin_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    for dsn in (db_env, admin_env):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            _sql(
+                dsn,
+                "insert into action_plan_events (request_id, action, actor)"
+                " values (%s, 'accepted', 'подлог')",
+                (запрос.id,),
+            )
+
+
+def test_чужое_пространство_версию_не_кладёт_даже_мимо_двери(сеть: None, db_env: str) -> None:
+    """Триггер держит страну и без кода веба: AM не кладёт файл в запрос Грузии."""
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege, match="не отвечает за страну"):
+        _sql(
+            db_env,
+            "insert into action_plan_files (id, request_id, version, storage_path, file_name,"
+            " size_bytes, content_type, uploaded_by, uploaded_tenant) values"
+            " (gen_random_uuid(), %s, 1, 's3://x/y', 'p.pdf', 3, 'application/pdf', 'am', 'AM')",
+            (запрос.id,),
+        )
+
+
+# --- путь из критерия приёмки --------------------------------------------------
+
+
+def test_запрос_загрузка_возврат_вторая_версия_приём(сеть: None, склад: Хранилище) -> None:
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+
+    # Act
+    assert _загрузить(склад, запрос.id, data=b"v1") == 1
+    plans.review(запрос.id, actor="hq-lead", verdict="returned", comment="нет сроков")
+    после_возврата = _запрос(запрос.inspection_id)
+    assert _загрузить(склад, запрос.id, data=b"v2") == 2
+    plans.review(запрос.id, actor="hq-lead", verdict="accepted", comment="")
+
+    # Assert
+    итог = _запрос(запрос.inspection_id)
+    assert после_возврата.state == plans.STATE_RETURNED
+    assert итог.state == plans.STATE_ACCEPTED
+    assert [(f.version, f.verdict, f.comment) for f in итог.files] == [
+        (1, "returned", "нет сроков"),
+        (2, "accepted", None),
+    ]
+    assert [(e.action, e.actor) for e in итог.events] == [
+        ("requested", "garva"),
+        ("uploaded", "partner-ge"),
+        ("returned", "hq-lead"),
+        ("uploaded", "partner-ge"),
+        ("accepted", "hq-lead"),
+    ]
+    assert sorted(склад.объекты.values()) == [b"v1", b"v2"]
+    assert all(ключ.startswith("action-plans/") for ключ in склад.объекты)
+
+
+def test_возврат_без_комментария_это_отказ(сеть: None, склад: Хранилище) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    with pytest.raises(ActionPlanError, match="комментар"):
+        plans.review(запрос.id, actor="hq", verdict="returned", comment="  ")
+    assert _запрос(запрос.inspection_id).status == "on_review"
+
+
+def test_пока_план_на_приёмке_новую_версию_не_кладут(сеть: None, склад: Хранилище) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    with pytest.raises(ActionPlanError):
+        _загрузить(склад, запрос.id)
+
+
+def test_принятый_план_не_меняется(сеть: None, склад: Хранилище) -> None:
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id)
+    plans.review(запрос.id, actor="hq", verdict="accepted", comment="")
+    with pytest.raises(ActionPlanError):
+        _загрузить(склад, запрос.id)
+    with pytest.raises(ActionPlanError):
+        plans.set_due(запрос.id, actor="hq", due_on=СЕГОДНЯ + timedelta(days=30))
+    with pytest.raises(ActionPlanError):
+        plans.review(запрос.id, actor="hq", verdict="returned", comment="ещё")
+
+
+def test_вердикт_без_версии_это_отказ(сеть: None) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(ActionPlanError):
+        plans.review(запрос.id, actor="hq", verdict="accepted", comment="")
+
+
+@pytest.mark.parametrize("размер", [0, 25 * МБ + 1])
+def test_пустой_и_больше_предела_файл_не_принимается(
+    сеть: None, склад: Хранилище, размер: int
+) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(ActionPlanError):
+        _загрузить(склад, запрос.id, data=b"x" * размер)
+    assert склад.объекты == {}
+
+
+# --- охват: чужая страна и IDOR ----------------------------------------------
+
+
+def test_партнёр_видит_только_запросы_своих_стран(сеть: None) -> None:
+    # Arrange
+    грузия = _запрос(_принятая("D2"))
+    армения = _запрос(_принятая("D2", unit=ЧУЖАЯ_ТОЧКА))
+
+    # Act
+    у_ge = {r.id for r in plans.list_requests(reach=reach_of("GE")).rows}
+    у_am = {r.id for r in plans.list_requests(reach=reach_of("AM")).rows}
+    у_уК = {r.id for r in plans.list_requests(reach=reach_of("HQ")).rows}
+
+    # Assert
+    assert (у_ge, у_am, у_уК) == ({грузия.id}, {армения.id}, {грузия.id, армения.id})
+
+
+def test_чужой_запрос_по_id_неотличим_от_несуществующего(сеть: None) -> None:
+    запрос = _запрос(_принятая("D2"))
+    assert plans.get_request(запрос.id, reach=reach_of("AM")) is None
+    assert plans.get_request(запрос.id, reach=reach_of("GE")) is not None
+    assert plans.get_request("00000000-0000-0000-0000-000000000000", reach=reach_of("GE")) is None
+
+
+def test_партнёр_чужой_страны_не_загружает(сеть: None, склад: Хранилище) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(ActionPlanError, match="нет"):
+        _загрузить(склад, запрос.id, tenant="AM")
+    assert склад.объекты == {}
+    assert _запрос(запрос.inspection_id).status == "requested"
+
+
+def test_уК_версию_за_партнёра_не_кладёт(сеть: None, склад: Хранилище) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(ActionPlanError):
+        _загрузить(склад, запрос.id, tenant="HQ")
+    assert _запрос(запрос.inspection_id).files == ()
+
+
+def test_файл_скачивают_своя_страна_и_уК_а_чужая_нет(сеть: None, склад: Хранилище) -> None:
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+    _загрузить(склад, запрос.id, data=b"plan-bytes")
+    файл = _запрос(запрос.inspection_id).files[0].id
+
+    # Act
+    у_ge = plans.file_for_download(файл, reach=reach_of("GE"))
+    у_уК = plans.file_for_download(файл, reach=reach_of("HQ"))
+    у_am = plans.file_for_download(файл, reach=reach_of("AM"))
+
+    # Assert
+    assert у_am is None
+    assert у_ge is not None and у_уК is not None
+    assert у_ge.file_name == "план.pdf"
+    assert plans.fetch_file(у_ge, storage=склад) == b"plan-bytes"
+
+
+# --- ручной запрос и срок ---------------------------------------------------------
+
+
+def test_уК_запрашивает_план_по_проверке_без_d2_со_сроком(сеть: None) -> None:
+    # Arrange
+    ident = _принятая("D1")
+    срок = СЕГОДНЯ + timedelta(days=14)
+
+    # Act
+    plans.request_plan(ident, actor="hq-lead", due_on=срок)
+
+    # Assert
+    запрос = _запрос(ident)
+    assert (запрос.origin, запрос.due_on, запрос.requested_by) == ("manual", срок, "hq-lead")
+
+
+def test_второй_запрос_по_той_же_проверке_это_отказ(сеть: None) -> None:
+    ident = _принятая("D2")
+    with pytest.raises(ActionPlanError, match="уже"):
+        plans.request_plan(ident, actor="hq", due_on=СЕГОДНЯ + timedelta(days=3))
+
+
+@pytest.mark.parametrize("какая", ["ждущая", "партнёра"])
+def test_запросить_можно_только_по_принятой_проверке_уК(сеть: None, какая: str) -> None:
+    ident = _проверка("D1") if какая == "ждущая" else _принятая("D1", tenant="GE")
+    with pytest.raises(ActionPlanError):
+        plans.request_plan(ident, actor="hq", due_on=СЕГОДНЯ + timedelta(days=3))
+
+
+def test_срок_в_прошлом_это_отказ(сеть: None) -> None:
+    ident = _принятая("D1")
+    with pytest.raises(ActionPlanError, match="прошёл"):
+        plans.request_plan(ident, actor="hq", due_on=СЕГОДНЯ - timedelta(days=1))
+
+
+def test_уК_правит_срок_и_это_в_истории(сеть: None) -> None:
+    запрос = _запрос(_принятая("D2"))
+    новый = СЕГОДНЯ + timedelta(days=20)
+
+    plans.set_due(запрос.id, actor="hq-lead", due_on=новый)
+
+    итог = _запрос(запрос.inspection_id)
+    assert итог.due_on == новый
+    assert [(e.action, e.actor) for e in итог.events][-1] == ("due_changed", "hq-lead")
+
+
+def test_просрочка_считается_на_чтении(сеть: None, admin_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with psycopg.connect(admin_env) as conn:
+        conn.execute("select set_config('decimus.plan_actor', 'hq', true)")
+        conn.execute(
+            "update action_plan_requests set due_on = %s where id = %s",
+            (СЕГОДНЯ - timedelta(days=1), запрос.id),
+        )
+        conn.commit()
+    итог = _запрос(запрос.inspection_id)
+    assert итог.overdue(СЕГОДНЯ) is True
+    assert итог.overdue(date(2000, 1, 1)) is False
+
+
+def test_админская_связь_не_та_что_у_приложения(db_env: str) -> None:
+    """Санитарная: тесты выше действительно ходят двумя разными ролями."""
+    assert admin_role_dsn(db_env) != db_env
+
+
+# --- страна — у точки, а не копией в запросе (ревью #495, п.2) -----------------
+
+
+def test_перенос_в_точку_другой_страны_уводит_запрос(сеть: None, склад: Хранилище) -> None:
+    """Проверку перенесли в Армению — план кладёт Армения, Грузия запроса не видит."""
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+    ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
+
+    # Act
+    move_inspection(
+        запрос.inspection_id,
+        tenant="HQ",
+        new_date=СЕГОДНЯ,
+        new_unit_id=ереван,
+        reason="не та точка",
+        actor="hq",
+    )
+
+    # Assert
+    assert _запрос(запрос.inspection_id).country == "AM"
+    assert plans.get_request(запрос.id, reach=reach_of("GE")) is None
+    with pytest.raises(ActionPlanError, match="Запроса нет"):
+        _загрузить(склад, запрос.id, tenant="GE")
+    assert _загрузить(склад, запрос.id, tenant="AM") == 1
+
+
+def _вставить_запрос(dsn: str, ident: str) -> None:
+    _sql(
+        dsn,
+        "insert into action_plan_requests (inspection_id, due_on, origin, requested_by,"
+        " due_set_by) values (%s, current_date + 3, 'manual', 'hq', 'hq')",
+        (ident,),
+    )
+
+
+def test_база_не_заводит_запрос_по_проверке_партнёра(сеть: None, admin_env: str) -> None:
+    ident = _принятая("D2", tenant="GE")
+    with pytest.raises(psycopg.errors.CheckViolation, match="проверке УК"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_по_ждущей_проверке(сеть: None, admin_env: str) -> None:
+    ident = _проверка("D2")
+    with pytest.raises(psycopg.errors.CheckViolation, match="принятой и не отклонённой"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_по_отклонённой_проверке(
+    сеть: None, admin_env: str, склад: Хранилище
+) -> None:
+    ident = _принятая("D1")
+    retract_inspection(ident, tenant="HQ", reason="дубль", storage=склад)
+    with pytest.raises(psycopg.errors.CheckViolation, match="принятой и не отклонённой"):
+        _вставить_запрос(admin_env, ident)
+
+
+def test_база_не_заводит_запрос_без_страны_у_точки(сеть: None, admin_env: str) -> None:
+    """Страну точке с проверками не стереть (0030), поэтому — точка, у которой её не было."""
+    from src.db.directory import upsert_unit
+
+    upsert_unit("Nowhere-1", tenant="HQ")
+    ident = _принятая("D1", unit="Nowhere-1")
+    with pytest.raises(psycopg.errors.CheckViolation, match="нет страны"):
+        _вставить_запрос(admin_env, ident)
+
+
+# --- отклонённая проверка снимает запрос с очереди (ревью #495, п.3) -----------
+
+
+def test_отклонённая_проверка_уходит_из_очереди_и_версий_не_принимает(
+    сеть: None, склад: Хранилище
+) -> None:
+    # Arrange
+    запрос = _запрос(_принятая("D2"))
+
+    # Act
+    retract_inspection(запрос.inspection_id, tenant="HQ", reason="дубль", storage=склад)
+
+    # Assert
+    assert запрос.id not in {r.id for r in plans.list_requests(reach=reach_of("HQ")).rows}
+    with pytest.raises(ActionPlanError, match="Запроса нет"):
+        _загрузить(склад, запрос.id)
+
+
+def test_триггер_не_кладёт_версию_к_отклонённой_даже_мимо_охвата(
+    сеть: None, склад: Хранилище, pg_dsn: str
+) -> None:
+    """Владелец базы видит отклонённую проверку — и всё равно получает отказ триггера."""
+    запрос = _запрос(_принятая("D2"))
+    retract_inspection(запрос.inspection_id, tenant="HQ", reason="дубль", storage=склад)
+    with pytest.raises(psycopg.errors.CheckViolation, match="отклонена"):
+        _sql(
+            pg_dsn,
+            "insert into action_plan_files (id, request_id, version, storage_path, file_name,"
+            " size_bytes, content_type, uploaded_by, uploaded_tenant) values"
+            " (gen_random_uuid(), %s, 1, 's3://x/y', 'p.pdf', 3, 'application/pdf', 'ge', 'GE')",
+            (запрос.id,),
+        )
+
+
+# --- срок и подпись меняются вместе (ревью #495, п.6) --------------------------
+
+
+def test_срок_без_подписи_не_правится(сеть: None, admin_env: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.CheckViolation, match="с подписью"):
+        _sql(
+            admin_env,
+            "update action_plan_requests set due_on = due_on + 1 where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_подпись_без_срока_не_меняется(сеть: None, admin_env: str, pg_dsn: str) -> None:
+    запрос = _запрос(_принятая("D2"))
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        _sql(
+            admin_env,
+            "update action_plan_requests set due_set_by = 'подлог' where id = %s",
+            (запрос.id,),
+        )
+    with pytest.raises(psycopg.errors.CheckViolation, match="без правки срока"):
+        _sql(
+            pg_dsn,
+            "update action_plan_requests set due_set_by = 'подлог' where id = %s",
+            (запрос.id,),
+        )
+
+
+def test_подпись_срока_берётся_из_транзакции(сеть: None, admin_env: str) -> None:
+    """Колонку подписи не подставить вручную: её пишет триггер из `decimus.plan_actor`."""
+    запрос = _запрос(_принятая("D2"))
+    with psycopg.connect(admin_env) as conn:
+        conn.execute("select set_config('decimus.plan_actor', 'hq-lead', true)")
+        conn.execute(
+            "update action_plan_requests set due_on = due_on + 1 where id = %s", (запрос.id,)
+        )
+        conn.commit()
+    assert [(e.action, e.actor) for e in _запрос(запрос.inspection_id).events][-1] == (
+        "due_changed",
+        "hq-lead",
+    )
+
+
+# --- настройка срока читается, только когда запрос нужен (ревью #495, п.5) -----
+
+
+def test_кривая_настройка_срока_не_мешает_принять_проверку_без_d2(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+) -> None:
+    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    ident = _принятая("D1")
+    assert _статус(admin_env, ident) == "finalized"
+
+
+def test_кривая_настройка_при_d2_это_понятный_отказ_и_проверка_ждёт(
+    сеть: None, monkeypatch: pytest.MonkeyPatch, admin_env: str
+) -> None:
+    monkeypatch.setenv("ACTION_PLAN_DUE_DAYS", "семь")
+    ident = _проверка("D2")
+
+    with pytest.raises(AcceptError, match="запрос экшн-плана, а он не завёлся") as отказ:
+        accept_inspection(ident, tenant="HQ", actor="garva")
+
+    assert "семь" not in str(отказ.value), "текст настройки на карточке не печатается"
+    assert _статус(admin_env, ident) == "draft"
+    assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
+
+
+def _статус(dsn: str, ident: str) -> str:
+    with psycopg.connect(dsn) as conn:
+        строка = conn.execute("select status from inspections where id = %s", (ident,)).fetchone()
+    assert строка is not None
+    return str(строка[0])
+
+
+# --- очередь — только открытые, принятые отдельно (ревью #495, п.1) ------------
+
+
+def test_принятый_уходит_из_очереди_в_принятые(сеть: None, склад: Хранилище) -> None:
+    # Arrange — один план принят, второй ждёт.
+    принятый = _запрос(_принятая("D2"))
+    _загрузить(склад, принятый.id)
+    plans.review(принятый.id, actor="hq-lead", verdict="accepted", comment="")
+    открытый = _запрос(_принятая("D3"))
+
+    # Act
+    очередь = plans.list_requests(reach=reach_of("HQ"))
+    принятые = plans.list_requests(reach=reach_of("HQ"), accepted=True)
+
+    # Assert
+    assert [r.id for r in очередь.rows] == [открытый.id]
+    assert [r.id for r in принятые.rows] == [принятый.id]
+    assert очередь.truncated is False
+
+
+def test_упёршийся_в_предел_список_говорит_об_этом(
+    сеть: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    первый = _запрос(_принятая("D2"))
+    _принятая("D3")
+    monkeypatch.setattr(plans, "LIST_LIMIT", 1)
+
+    очередь = plans.list_requests(reach=reach_of("HQ"))
+
+    assert [r.id for r in очередь.rows] == [первый.id]
+    assert очередь.truncated is True
+
+
+_ТОЧКА_НАГРУЗКИ_SQL = """
+insert into units (tenant_code, name, name_normalized, country)
+values ('HQ', 'Нагрузочная', 'нагрузочная', 'GE')
+returning id
+"""
+
+# Под владельцем и с выключенными триггерами пользователя: наполнение — не путь
+# продукта, а объём для планировщика (как в `test_db_queries_tenant`, #490).
+_МНОГО_ПРИНЯТЫХ_SQL = """
+with i as (
+    insert into inspections (
+        tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
+        ui_lang, speech_lang, checklist_version, pct, grade, source_fingerprint,
+        status, accepted_at, accepted_by
+    )
+    select 'HQ', %(unit_id)s, 1, 'planned', current_date - g, 'ru', 'ru', 'ru', 'v1',
+           90, 'B', 'план-' || g, 'finalized', now(), 'hq'
+    from generate_series(1, %(сколько)s) g
+    returning id, inspection_date
+)
+insert into action_plan_requests (inspection_id, due_on, status, origin, requested_by, due_set_by)
+select id, inspection_date + 7, 'accepted', 'auto', 'hq', 'hq' from i
+"""
+
+_ПЯТЬ_ОТКРЫТЫХ_SQL = """
+update action_plan_requests set status = 'requested'
+where id in (select id from action_plan_requests order by due_on desc limit 5)
+"""
+
+
+def test_очередь_всех_стран_идёт_по_частичному_индексу(pg_dsn: str, сеть: None) -> None:
+    """Принятые копятся годами — очередь УК по всем странам их не читает.
+
+    Разбирается тот же текст запроса, что выполняет код (`_OPEN_SQL`), с
+    охватом УК (вся сеть) и без страны: самый широкий случай.
+    """
+    # Arrange — 8000 принятых и пять открытых.
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("alter table inspections disable trigger user")
+        cur.execute("alter table action_plan_requests disable trigger user")
+        cur.execute(_ТОЧКА_НАГРУЗКИ_SQL)
+        (точка,) = cur.fetchone() or (None,)
+        cur.execute(_МНОГО_ПРИНЯТЫХ_SQL, {"unit_id": точка, "сколько": 8000})
+        cur.execute(_ПЯТЬ_ОТКРЫТЫХ_SQL)
+        cur.execute("alter table inspections enable trigger user")
+        cur.execute("alter table action_plan_requests enable trigger user")
+        conn.commit()
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute("analyze inspections")
+        conn.execute("analyze units")
+        conn.execute("analyze action_plan_requests")
+
+    # Act
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "explain " + _OPEN_SQL,
+            {**reach_of("HQ").params(), "country": None, "limit": plans.LIST_LIMIT + 1},
+        )
+        план = "\n".join(строка[0] for строка in cur.fetchall())
+
+    # Assert
+    assert "action_plan_requests_open_idx" in план, f"очередь не берёт свой индекс:\n{план}"

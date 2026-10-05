@@ -140,14 +140,32 @@ def load_store(env: Mapping[str, str] | None = None) -> StoreState:
     return StoreState(store=Store(root=_abs(root), live=_abs(live)))
 
 
+#: Ключи текстов отказов двери: `refusal.<код отказа>` (`src/mcp/errors.py`).
+REFUSAL_PREFIX = "refusal."
+
+
 def _refusal(exc: McpError) -> MethodologyRefused:
-    """Отказ двери — отказом блока, слово в слово.
+    """Отказ двери — отказом блока, с кодом и параметрами двери.
 
     Пересказ потерял бы то единственное, ради чего отказ и печатается: движок
     называет, ЧТО именно он не принял, и человеку с экрана нужно это, а не
-    «правка отклонена».
+    «правка отклонена». Поэтому параметры отказа (код пункта, слова движка)
+    едут на экран как есть, а фраза вокруг них берётся по коду на языке
+    интерфейса (#475). Отказ без кода остаётся русской строкой двери.
     """
-    return MethodologyRefused(str(exc))
+    key = None if exc.refusal is None else REFUSAL_PREFIX + exc.refusal
+    return MethodologyRefused(str(exc), key=key, params=exc.params)
+
+
+def refusal_text(exc: MethodologyRefused, lang: str) -> str:
+    """Отказ словами на языке интерфейса — то, что видит человек на экране.
+
+    Отказ с ключом берёт текст из каталога; без ключа — как есть (отказ,
+    которому код ещё не заведён, по-русски, но не потерян).
+    """
+    if exc.key is None:
+        return str(exc)
+    return t(exc.key, lang, **exc.params)
 
 
 def load_composition(store: Store, *, tenant: str, version: str | None = None) -> Composition:
@@ -291,7 +309,9 @@ def _days(value: str | None) -> int | None:
     except ValueError:
         raise MethodologyRefused(
             f"Срок устранения «{text}» не число. Пустой срок и срок 0 — разные вещи: "
-            f"нулевой печатается партнёру как «устранить немедленно»"
+            f"нулевой печатается партнёру как «устранить немедленно»",
+            key="refusal.web.term_not_number",
+            params={"value": text},
         ) from None
 
 
@@ -465,14 +485,19 @@ def _share(value: str | None, *, zone: str) -> float:
     text = _maybe(value)
     if text is None:
         raise MethodologyRefused(
-            f"Доля зоны «{zone}» не заполнена. Доли задаются набором сразу и обязаны сойтись к 100%"
+            f"Доля зоны «{zone}» не заполнена. Доли задаются набором сразу "
+            f"и обязаны сойтись к 100%",
+            key="refusal.web.share_empty",
+            params={"zone": zone},
         )
     try:
         return float(text.replace(",", "."))
     except ValueError:
         raise MethodologyRefused(
             f"Доля зоны «{zone}» — «{text}», а это не число. Доля задаёт вес зоны "
-            f"в оценке, поэтому подставить вместо непонятного ввода ноль нельзя"
+            f"в оценке, поэтому подставить вместо непонятного ввода ноль нельзя",
+            key="refusal.web.share_not_number",
+            params={"zone": zone, "value": text},
         ) from None
 
 
@@ -621,16 +646,21 @@ def set_scoring(
     и спутать их значило бы обнулить цену класса молча.
     """
 
-    def цифра(значение: str | None, *, что: str) -> float | None:
+    def цифра(значение: str | None, *, что: str, поле: str) -> float | None:
         текст = _maybe(значение)
         if текст is None:
             return None
         try:
             return float(текст.replace(",", "."))
         except ValueError:
+            # Поле — частью ключа, а не подставленным словом: подпись поля
+            # переводится, и русская подпись внутри английской фразы — тот же
+            # дефект, ради которого ключ и заведён (#475).
             raise MethodologyRefused(
                 f"{что} — «{текст}», а это не число. Ставка задаёт цену нарушения, "
-                f"поэтому подставить вместо непонятного ввода ноль нельзя"
+                f"поэтому подставить вместо непонятного ввода ноль нельзя",
+                key=f"refusal.web.rate_not_number.{поле}",
+                params={"value": текст},
             ) from None
 
     try:
@@ -638,10 +668,12 @@ def set_scoring(
             door.set_scoring(
                 tenant=tenant,
                 store=store,
-                start_pct=цифра(start_pct, что="Начальный процент"),
-                d1=цифра(d1, что="Ставка D1"),
-                d2=цифра(d2, что="Ставка D2"),
-                repeat_multiplier=цифра(repeat_multiplier, что="Множитель повтора"),
+                start_pct=цифра(start_pct, что="Начальный процент", поле="start_pct"),
+                d1=цифра(d1, что="Ставка D1", поле="d1"),
+                d2=цифра(d2, что="Ставка D2", поле="d2"),
+                repeat_multiplier=цифра(
+                    repeat_multiplier, что="Множитель повтора", поле="repeat_multiplier"
+                ),
                 note=_signed(author, note),
                 version_name=_maybe(version_name),
             )

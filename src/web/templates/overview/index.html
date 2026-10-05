@@ -50,6 +50,9 @@
        href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
   </div>
 
+  {# Срез длиннее предела ряда (#470): сказать вслух, а не обрезать молча. #}
+  {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
+
   {# Плитки кликабельны все до одной: цифра без перехода на вопрос экрана не
      отвечает, а бриф прямо запрещает полосу мёртвых плиток. #}
   <div class="ov-tiles">

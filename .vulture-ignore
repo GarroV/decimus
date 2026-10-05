@@ -48,6 +48,8 @@ on_mcp
 on_client
 on_send
 on_version
+# `/stops` (#436) — счётчик отказов мастера, его зовёт диспетчер по команде.
+on_stops
 # Хендлеры информационной части в конце проверки (T158): те же правила,
 # что и у остальных — их зовёт диспетчер по фильтрам состояния.
 on_done
@@ -233,9 +235,10 @@ zone_names
 
 # Хук Flask: функция регистрируется декоратором `@app.after_request` и зовётся
 # фреймворком, а не кодом. Для vulture это неотличимо от мёртвой функции.
-# Снимать нельзя: она ставит заголовки против встраивания админки в чужой
-# документ (`X-Frame-Options`, `frame-ancestors`), и проверка на них живая.
-_no_frames
+# Снимать нельзя: она ставит заголовки безопасности на каждый ответ (#489:
+# CSP, рамки, nosniff, Referrer-, Permissions-Policy, HSTS по настройке), и
+# проверка на них живая (`tests/test_web_security_headers.py`).
+_security_headers
 
 # Обработчики входа и выхода (T323). Регистрируются декораторами `@app.route`
 # и `@app.post` внутри `auth.install`, зовёт их сам Flask по маршруту. Тот же
@@ -315,6 +318,9 @@ bars
 weak
 rates
 penalty
+# Список поводов «Обзора»: число плитки «Критических» с #503 берётся по всему
+# срезу (`critical_total`), а сам список читает только шаблон.
+attention
 
 # Обработчики `html.parser.HTMLParser`: их зовёт сам разборщик из `feed()`, по
 # имени в коде не читается ни одно (`src/web/letter_markup.py`).
@@ -332,3 +338,54 @@ locked_minutes
 # Фикстура pytest с `autouse=True` (ревью access2, L5, `tests/test_db_password_bounds.py`):
 # подключает сам pytest каждому тесту файла — отказ раньше scrypt и базы.
 _без_scrypt_и_базы
+
+# Выбор языка бота (D303): команда `/lang` и нажатие кнопки языка — хендлеры
+# aiogram, статически их имена не читает никто.
+on_lang_command
+on_lang_chosen
+# Экшн-планы (волна 2, `src/web/action_plans.py`): маршруты Flask зовёт
+# диспетчер по адресу, регистрирует декоратор — по имени их не читает никто.
+actions
+actions_request
+actions_review
+actions_due
+actions_new
+plans_index
+plans_upload
+plan_file
+# Предел тела на маршруте загрузки (D269): атрибут запроса читает сам Flask.
+max_content_length
+# Поля и свойство запроса экшн-плана читают шаблоны (`_plan.html`,
+# `plans/index.html`), а Jinja статически не видна.
+uploaded_by
+reviewed_by
+reviewed_at
+requested_at
+last_comment
+# Предписания (волна 3, `src/web/prescriptions.py`): маршруты Flask зовёт
+# диспетчер по адресу, регистрирует декоратор — по имени их не читает никто.
+rx_list
+rx_new
+rx_create
+rx_view
+rx_edit
+rx_update
+rx_send
+rx_close
+orders
+order_reply
+order_file
+# Поля предписания и ответа читают шаблоны (`_prescription.html`), а Jinja
+# статически не видна; `replied_tenant` — чьё пространство ответило, для разбора.
+replied_by
+replied_tenant
+replied_at
+created_by
+issued_by
+issued_at
+closed_by
+closed_at
+
+# Заведение пиццерии из веб-админки (#437): маршрут Flask — вызывает
+# диспетчер по адресу, регистрирует декоратор, по имени его не зовёт никто.
+unit_create

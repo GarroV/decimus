@@ -19,7 +19,7 @@ from db_harness import привязать_страну, слить_провер�
 
 from src.db import move, previews, queries, reports  # noqa: E402
 from src.db.directory import list_units  # noqa: E402
-from src.db.errors import DbError, PushError  # noqa: E402
+from src.db.errors import DbError, PushError, UnitRefusedError  # noqa: E402
 from src.db.reach import Reach, countries_of, reach_of  # noqa: E402
 
 pytestmark = requires_db
@@ -135,6 +135,17 @@ def test_карточные_чтения_чужой_страны_пусты(се
     assert previews.finding_previews(чужая, reach=ge) == {}
     assert move.list_moves(чужая, reach=ge) == ()
 
+    # Сам кадр по прямой ссылке — тот же охват, что у карточки (#422).
+    (запись,) = previews.finding_previews(чужая, reach=уК).values()
+    (кадр,) = запись.shown
+
+    class Склад:
+        def get(self, key: str) -> bytes:
+            return b"preview"
+
+    assert previews.preview_bytes(чужая, кадр, reach=уК, storage=Склад()) == b"preview"
+    assert previews.preview_bytes(чужая, кадр, reach=ge, storage=Склад()) is None
+
 
 def test_проверка_партнёра_ссылается_на_точку_справочника_уК(
     сеть: dict[str, str], pg_dsn: str
@@ -179,8 +190,9 @@ def test_чужая_страна_и_вне_справочника_отказыв
     """Ревью #340, п.10: отказ не подтверждает, что пиццерия в сети есть."""
     отказы = []
     for точка in ("Yerevan-1", "Yerevan-99"):
-        with pytest.raises(PushError) as отказ:
+        with pytest.raises(UnitRefusedError) as отказ:
             слить_проверку(unit=точка, tenant="GE")
+        assert отказ.value.unit == точка
         отказы.append(str(отказ.value).replace(точка, "…"))
     assert отказы[0] == отказы[1]
 

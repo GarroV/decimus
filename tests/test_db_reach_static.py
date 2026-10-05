@@ -19,7 +19,19 @@ import re
 from pathlib import Path
 from types import ModuleType
 
-from src.db import directory, move, previews, push, queries, reports, revise
+from src.db import (
+    action_plans,
+    directory,
+    move,
+    prescriptions,
+    prescriptions_write,
+    previews,
+    push,
+    queries,
+    reports,
+    revise,
+)
+from src.db.prescriptions import PRESCRIPTION_REACH_SQL
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
 
 #: Запросы по проверкам без условия охвата — только по имени и с причиной.
@@ -27,6 +39,11 @@ from src.db.reach import REACH_SQL, UNIT_REACH_SQL
     "queries._PREVIOUS_INSPECTION_SQL": (
         "повтор ×2 (D255) считается по проверкам своего пространства, "
         "и зовёт его бот пишущего тенанта, а не читающий охват"
+    ),
+    "action_plans._INSPECTION_FOR_REQUEST_SQL": (
+        "запись, а не чтение: запрос экшн-плана заводит УК по проверке своего "
+        "пространства (условие на `tenant_code` — в коде), в транзакции "
+        "подтверждения или кнопкой; наружу из этой строки ничего не уходит"
     ),
     "queries._FINDINGS_OF_INSPECTION_SQL": (
         "читается тем же соединением сразу после карточки, которую "
@@ -58,7 +75,7 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
-    запросы = _запросы(queries, reports, previews, move)
+    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions)
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
     дыры = [имя for имя in сверено if имя not in ВНЕ_ОХВАТА and REACH_SQL not in запросы[имя]]
@@ -66,9 +83,9 @@ def test_каждое_чтение_проверок_стоит_на_охвате
 
 
 def test_каждое_чтение_справочника_стоит_на_охвате() -> None:
-    запросы = _запросы(queries, directory)
+    запросы = _запросы(queries, directory, prescriptions)
     сверено = [имя for имя, текст in запросы.items() if _СПРАВОЧНИК.search(текст)]
-    assert len(сверено) >= 4, f"сверка не нашла запросов справочника: {сверено}"
+    assert len(сверено) >= 5, f"сверка не нашла запросов справочника: {сверено}"
     дыры = [
         имя
         for имя in сверено
@@ -77,16 +94,28 @@ def test_каждое_чтение_справочника_стоит_на_охв
     assert дыры == [], "читают справочник без охвата: " + ", ".join(дыры)
 
 
+_ПРЕДПИСАНИЯ = re.compile(r"\b(from|join)\s+prescriptions\s+p\b")
+
+
+def test_каждое_чтение_предписаний_стоит_на_охвате() -> None:
+    """Предписание чужой страны или черновик партнёру — дыра, видимая только чтением (0037)."""
+    запросы = _запросы(prescriptions, prescriptions_write)
+    сверено = [имя for имя, текст in запросы.items() if _ПРЕДПИСАНИЯ.search(текст)]
+    assert len(сверено) >= 6, f"сверка не нашла запросов предписаний: {сверено}"
+    дыры = [имя for имя in сверено if PRESCRIPTION_REACH_SQL not in запросы[имя]]
+    assert дыры == [], "читают предписания без охвата: " + ", ".join(дыры)
+
+
 def test_исключения_называют_настоящие_запросы() -> None:
     """Исключение на запрос, которого больше нет, молча расширило бы будущий."""
-    запросы = _запросы(queries, reports, previews, move, directory)
+    запросы = _запросы(queries, reports, previews, move, directory, action_plans)
     мёртвые = [имя for имя in (*ВНЕ_ОХВАТА, *СПРАВОЧНИК_ВНЕ_ОХВАТА) if имя not in запросы]
     assert мёртвые == []
 
 
 def test_условие_охвата_записано_одной_строкой() -> None:
     """Сверка идёт по тексту с нормализованными пробелами — и сам литерал обязан быть таким."""
-    for литерал in (REACH_SQL, UNIT_REACH_SQL):
+    for литерал in (REACH_SQL, UNIT_REACH_SQL, PRESCRIPTION_REACH_SQL):
         assert литерал == " ".join(литерал.split())
 
 
