@@ -40,6 +40,10 @@ WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 #: (D286). Необязательна: без неё кнопки «Привязать бота» нет, а вкладка
 #: называет переменную.
 WEB_BOT_USERNAME_VAR = "WEB_BOT_USERNAME"
+#: Слать ли `Strict-Transport-Security` (#489). Только для стенда, который
+#: снаружи открывается ИСКЛЮЧИТЕЛЬНО по HTTPS: заголовок браузер помнит год, и
+#: включённый на стенде без сертификата он закрыл бы стенд на этот год.
+WEB_HSTS_VAR = "WEB_HSTS"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -99,6 +103,8 @@ class Settings:
     url_prefix: str = ""
     #: Имя бота для ссылки привязки (D286); `None` — привязка не настроена.
     bot_username: str | None = None
+    #: Слать `Strict-Transport-Security` (`WEB_HSTS=1`). По умолчанию нет.
+    hsts: bool = False
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -153,6 +159,23 @@ def _parse_listen_network(raw: str) -> bool:
     raise WebConfigError(
         f"Значение {WEB_LISTEN_NETWORK_VAR}={value} не понято: ожидается 1 (слушать сеть "
         f"контейнера за общим прокси) или пусто/0 (только петля)"
+    )
+
+
+def _parse_hsts(raw: str) -> bool:
+    """Включён ли HSTS. Пусто и `0` — нет, `1` — да, остальное — отказ запуска.
+
+    Опечатка не должна тихо значить ни «да» (стенд без сертификата закрыт на
+    год), ни «нет» (защита, которую считают включённой, не работает).
+    """
+    value = raw.strip()
+    if value in ("", "0"):
+        return False
+    if value == "1":
+        return True
+    raise WebConfigError(
+        f"Значение {WEB_HSTS_VAR}={value} не понято: ожидается 1 (стенд снаружи только "
+        f"по HTTPS, слать Strict-Transport-Security) или пусто/0 (не слать)"
     )
 
 
@@ -269,4 +292,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
+        hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
     )
