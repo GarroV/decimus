@@ -31,11 +31,10 @@
   <title>{{ t('app.name') }} · {% block title %}{{ t('app.mark') }}{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
   {#
-    Тема ставится ДО первой отрисовки, иначе тёмная мигает светлой на каждом
-    переходе. Выбор человека — в localStorage, «как в системе» — отсутствие
-    записи (как в Swarm).
+    Тема ставится ДО первой отрисовки, поэтому файл без defer. Встроенным
+    скриптом его не держим: политика источников (#489) такие не исполняет.
   #}
-  <script>!function(){try{var m=matchMedia("(prefers-color-scheme: dark)"),k="decimus-theme",a=function(){var t=null;try{t=localStorage.getItem(k)}catch(e){}document.documentElement.dataset.theme=t==="dark"||(t!=="light"&&m.matches)?"dark":"light"};a();m.addEventListener("change",a)}catch(e){}}()</script>
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
