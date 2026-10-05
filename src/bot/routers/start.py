@@ -29,7 +29,7 @@ from src.domain.bot_checklists import BotChecklist, available
 from src.domain.config import check_environment
 from src.domain.errors import DomainError
 from src.domain.geo import COUNTRIES
-from src.domain.unit_name import UnitName, canonical_unit
+from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, UnitName, canonical_unit
 
 from .. import sealed, sidecar, stops
 from ..auditor import auditor_name, auditor_name_was_shortened
@@ -65,26 +65,8 @@ from ..unit_pick import match_unit, may_add_units
 
 logger = logging.getLogger(__name__)
 
-#: Сколько знаков в названии точки бот принимает.
-#:
-#: Число замерено, а не выбрано на вкус. Имя файла отчёта движок собирает как
-#: «Аудит <точка> - <аудитор> - <дата>.pdf»; кириллица в UTF-8 — два байта на
-#: знак, а предел имени файла на ext4 (площадка продукта, D053) — 255 байт.
-#: С аудитором в 40 знаков на название остаётся около шестидесяти. Проверено
-#: фактическим прогоном: на 300 знаках сборка отчёта падает с «File name too
-#: long», и узнаёт об этом аудитор в конце проверки, когда переснимать поздно.
-UNIT_NAME_LIMIT = 60
-
-#: Тот же предел, но БАЙТАМИ (T128, переоткрытая часть, issue #103): в знаках
-#: он не ловит тяжёлые символы — 60 эмодзи это те же 60 знаков (в предел выше
-#: укладываются), но уже 240 байт, то есть одно название съедает больше, чем
-#: весь бюджет имени файла. Число — часть общего бюджета: постоянная часть
-#: формулы имени файла (слово, два разделителя, дата, «.pdf») занимает 31 байт
-#: (замерено, см. комментарий у `AUDITOR_NAME_BYTE_LIMIT` в `../auditor.py`),
-#: остаётся 224 байта на название точки и имя аудитора вместе. Точке — 120
-#: байт (ровно 60 кириллических знаков — старым живым названиям запрет не
-#: мешает, старое поведение не меняется), аудитору — 100.
-UNIT_NAME_BYTE_LIMIT = 120
+# Пределы названия точки (`UNIT_NAME_LIMIT`, `UNIT_NAME_BYTE_LIMIT`) живут в
+# `src/domain/unit_name.py`: их же держит веб-админка, заводя пиццерию (#437).
 
 
 async def _offer_resume(message: Message, inspection: domain.Inspection, lang: str) -> None:
@@ -366,6 +348,11 @@ def build_start_router(
             await stops.refuse(
                 message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
             )
+            return
+        if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+            # «щ» → «shch» добавляет байты, а нелатинский незнакомый город
+            # остаётся многобайтным: ввод прошёл предел, сведённое имя — нет.
+            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
             return
         сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
         if сверка.name is not None or not сверка.checked:

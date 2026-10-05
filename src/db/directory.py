@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -26,15 +27,27 @@ import psycopg
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
-from .errors import PushError
+from .errors import PushError, UnitExistsError
 from .reach import Reach, require_reach
 from .space_guard import require_space
 from .units import normalize_unit_name
+
+logger = logging.getLogger(__name__)
 
 #: Арендатор по умолчанию — то же значение, что у `push.DEFAULT_TENANT` и у
 #: `domain.state.DEFAULT_TENANT`. Импортировать чужую внутреннюю константу ради
 #: одной строки дороже, чем закрепить значение тестом (так же сделано в push).
 DEFAULT_TENANT = HQ_TENANT
+
+
+@dataclass(frozen=True)
+class CreatedUnit:
+    """Заведённая точка и написания, которые синонимом не легли (#437)."""
+
+    id: str
+    #: Синонимы, чей ключ к моменту записи уже занят ДРУГОЙ точкой: точка
+    #: заведена, а это написание по-прежнему ведёт к той, другой.
+    taken_aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -110,6 +123,22 @@ on conflict (tenant_code, name_normalized) do update set name = excluded.name,
     country = coalesce(excluded.country, units.country),
     city = coalesce(excluded.city, units.city)
 returning id
+"""
+
+# Заведение новой точки, а не «завести или обновить»: совпадение имени — дубль,
+# и решает его человек, а не молчаливое обновление чужой строки (#437).
+_INSERT_NEW_UNIT_SQL = """
+insert into units (tenant_code, name, name_normalized, country, city)
+values (%(tenant)s, %(name)s, %(key)s, %(country)s, %(city)s)
+on conflict (tenant_code, name_normalized) do nothing
+returning id
+"""
+
+_INSERT_NEW_ALIAS_SQL = """
+insert into unit_aliases (tenant_code, alias_normalized, unit_id, alias)
+values (%s, %s, %s, %s)
+on conflict (tenant_code, alias_normalized) do nothing
+returning unit_id
 """
 
 _UPSERT_ALIAS_SQL = """
@@ -277,3 +306,100 @@ def upsert_unit(
             f"Не удалось записать точку «{name}» в справочник ({type(exc).__name__}): {exc}"
         ) from exc
     return unit_id
+
+
+def _existing(
+    cur: psycopg.Cursor[Any], tenant: str, keys: tuple[str, ...]
+) -> tuple[str, str, str | None] | None:
+    """Точка, которую любое из написаний уже называет: `(id, имя, страна)` или `None`."""
+    for key in keys:
+        cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
+        row = cur.fetchone()
+        if row is not None:
+            cur.execute("select country from units where id = %s", (row[0],))
+            страна = cur.fetchone()
+            return str(row[0]), str(row[1]), (None if страна is None else страна[0])
+    return None
+
+
+def _insert_new(cur: psycopg.Cursor[Any], поля: dict[str, Any], alias_keys: tuple[str, ...]) -> str:
+    """Вставить точку, если ни имя, ни синонимы ничего не называют; иначе — отказ."""
+    tenant = str(поля["tenant"])
+    занята = _existing(cur, tenant, (str(поля["key"]), *alias_keys))
+    if занята is None:
+        cur.execute(_INSERT_NEW_UNIT_SQL, поля)
+        row = cur.fetchone()
+        if row is not None:
+            return str(row[0])
+        # Ключ имени занял кто-то между сверкой и вставкой: тот же дубль.
+        занята = _existing(cur, tenant, (str(поля["key"]),))
+    if занята is None:
+        raise PushError("Postgres не вставил точку и не нашёл занявшую её имя")
+    raise UnitExistsError(
+        f"Пиццерия «{занята[1]}» в справочнике уже есть",
+        unit_id=занята[0],
+        name=занята[1],
+        country=занята[2],
+    )
+
+
+def create_unit(
+    name: str,
+    *,
+    country: str,
+    city: str | None = None,
+    aliases: tuple[str, ...] = (),
+    tenant: str = DEFAULT_TENANT,
+) -> CreatedUnit:
+    """Завести НОВУЮ точку справочника; уже есть — `UnitExistsError` (#437).
+
+    В отличие от `upsert_unit`, ничего существующего не трогает: имя или
+    синоним, совпавшие с точкой справочника (название или синоним, тем же
+    ключом, что сверка бота), — отказ с этой точкой. Сверка и запись идут в
+    одной транзакции, а гонку двух одинаковых заведений закрывает уникальный
+    ключ имени: вторая вставка ничего не вставляет и становится тем же отказом.
+
+    Кто вправе заводить, здесь не решается — это `domain.tenants.may_add_units`
+    у вызывающего; пространство обязано быть заведено (`require_space`).
+    """
+    tenant = canonical_tenant(tenant)
+    key = normalize_unit_name(name)
+    if not key:
+        raise PushError("У точки пустое название — в справочник её завести нечем")
+    синонимы: dict[str, str] = {}
+    for alias in aliases:
+        alias_key = normalize_unit_name(alias)
+        if alias_key and alias_key != key:
+            синонимы.setdefault(alias_key, alias.strip())
+    поля = {
+        "tenant": tenant,
+        "name": name.strip(),
+        "key": key,
+        "country": (country or "").strip().upper() or None,
+        "city": (city or "").strip() or None,
+    }
+    settings = check_environment()
+    try:
+        with psycopg.connect(settings.dsn) as conn:
+            with conn.cursor() as cur:
+                require_space(cur, tenant, error=PushError)
+                unit_id = _insert_new(cur, поля, tuple(синонимы))
+                занятые: list[str] = []
+                for alias_key, alias in синонимы.items():
+                    cur.execute(_INSERT_NEW_ALIAS_SQL, (tenant, alias_key, UUID(unit_id), alias))
+                    if cur.fetchone() is None:
+                        # Ключ занял другой между сверкой и записью. Точку не
+                        # откатываем — она заведена верно, — но и не молчим.
+                        занятые.append(alias)
+            conn.commit()
+    except (PushError, UnitExistsError):
+        raise
+    except psycopg.Error as exc:
+        raise PushError(
+            f"Не удалось завести точку «{name}» в справочник ({type(exc).__name__}): {exc}"
+        ) from exc
+    if занятые:
+        logger.warning(
+            "точка %s заведена, но синонимы заняты другой точкой: %s", name, ", ".join(занятые)
+        )
+    return CreatedUnit(id=unit_id, taken_aliases=tuple(занятые))
