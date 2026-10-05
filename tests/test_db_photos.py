@@ -286,7 +286,7 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
 
     from PIL import Image
 
-    from src.db.previews import finding_previews, preview_bytes
+    from src.db.previews import FindingShots, finding_previews, preview_bytes
 
     снимок = io.BytesIO()
     Image.new("RGB", (3000, 2000), (200, 40, 40)).save(снимок, format="JPEG", quality=95)
@@ -318,7 +318,7 @@ def test_у_кадра_ложится_сжатая_копия_и_читаетс�
             return склад.положено[key]
 
     assert finding_previews(inspection_id, reach=own_reach(str(tenant))) == {
-        str(finding_id): (str(photo_id),)
+        str(finding_id): FindingShots(shown=(str(photo_id),), missing=0)
     }
     assert (
         preview_bytes(
@@ -348,3 +348,19 @@ def test_кадр_не_картинка_ложится_как_есть_а_коп
     assert склад.положено == {ключ: КАДРЫ["tg-file-001"]}
     assert storage_path == f"s3://{КОРЗИНА}/{ключ}"
     assert preview_path is None
+
+    # #422: кадр есть, а показать его нечем — карточка называет его
+    # недоступным, а не теряет запись из числа записей с фото. Чужому охвату
+    # не видно и этого.
+    from src.db.previews import FindingShots, finding_previews
+
+    ((finding_id, tenant),) = _строки(
+        db_env,
+        "select p.finding_id, i.tenant_code from photos p "
+        "join inspections i on i.id = p.inspection_id where p.id = %s",
+        (photo_id,),
+    )
+    assert finding_previews(inspection_id, reach=own_reach(str(tenant))) == {
+        str(finding_id): FindingShots(shown=(), missing=1)
+    }
+    assert finding_previews(inspection_id, reach=own_reach("someone-else")) == {}

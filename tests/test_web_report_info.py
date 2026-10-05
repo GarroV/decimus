@@ -18,6 +18,7 @@ from web_harness import войти, подменить_двери, собрат�
 
 from src.db.errors import StorageError
 from src.db.models import InfoRow
+from src.db.previews import FindingShots
 from src.db.reports import ReportRef
 from src.report.info_titles import FOUND, NOT_AT_HAND
 from src.web import inspections as data
@@ -132,7 +133,9 @@ def test_чужой_проверки_нет_и_файла_нет(
 
 
 def _с_кадрами(monkeypatch: pytest.MonkeyPatch, клиент: FlaskClient, находка: str) -> None:
-    monkeypatch.setattr(data, "load_previews", lambda *_a, **_k: {находка: (КАДР,)})
+    monkeypatch.setattr(
+        data, "load_previews", lambda *_a, **_k: {находка: FindingShots(shown=(КАДР,), missing=0)}
+    )
 
 
 def test_запись_с_кадрами_раскрывается_и_показывает_копию(
@@ -149,6 +152,35 @@ def test_запись_с_кадрами_раскрывается_и_показы
 def test_без_кадров_раскрытия_нет(с_отчётом: FlaskClient) -> None:
     html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
     assert "find-row--photos" not in html
+    assert "Photos unavailable" not in html
+
+
+def test_кадры_без_копии_названы_а_не_пропали(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#422: кадры были, показать нечем — запись говорит об этом, а не выглядит пустой."""
+    находка = карточка(шапка()).findings[0].id
+    monkeypatch.setattr(
+        data, "load_previews", lambda *_a, **_k: {находка: FindingShots(shown=(), missing=2)}
+    )
+    html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=en").get_data(as_text=True)
+    assert "Photos unavailable: 2" in html
+    # Раскрывать нечего — раскрытия нет.
+    assert "find-row--photos" not in html
+
+
+def test_часть_кадров_без_копии_показана_рядом_с_остальными(
+    с_отчётом: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    находка = карточка(шапка()).findings[0].id
+    monkeypatch.setattr(
+        data, "load_previews", lambda *_a, **_k: {находка: FindingShots(shown=(КАДР,), missing=1)}
+    )
+    html = с_отчётом.get(f"/inspections/{ПРОВЕРКА}?lang=ru").get_data(as_text=True)
+    assert "find-row--photos" in html
+    assert f"/inspections/{ПРОВЕРКА}/photos/{КАДР}" in html
+    assert "Фото: 1" in html
+    assert "Фото недоступно: 1" in html
 
 
 def test_копия_кадра_отдаётся_картинкой_и_не_в_общий_кэш(
