@@ -19,7 +19,8 @@
 * **`form-action`** — свои формы плюс `accounts.google.com`: «Черновик в
   Gmail» отправляет форму письма, а сервер отвечает переходом к согласию
   Google. Браузер проверяет `form-action` и на таком переходе, без этого
-  источника кнопка молча не сработала бы.
+  источника кнопка молча не сработала бы. `*.google.com` — потому что цепочка
+  согласия может продолжиться переходом на другой поддомен Google.
 * **`frame-ancestors 'none'` и `X-Frame-Options: DENY`** — чужая страница не
   покажет нашу в рамке (подмена нажатий); второй — для просмотрщиков, которые
   не знают первого.
@@ -42,7 +43,7 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "connect-src 'self'",
         "object-src 'none'",
         "base-uri 'self'",
-        "form-action 'self' https://accounts.google.com",
+        "form-action 'self' https://accounts.google.com https://*.google.com",
         "frame-ancestors 'none'",
     )
 )
