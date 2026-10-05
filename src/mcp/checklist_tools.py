@@ -59,7 +59,9 @@ def _note(note: str | None) -> str | None:
     if len(text) > MAX_NOTE:
         raise ChecklistError(
             f"Пояснение к правке длиннее {MAX_NOTE} знаков. Журнал читает человек: в нём нужна "
-            f"причина правки одной фразой, а не выгрузка"
+            f"причина правки одной фразой, а не выгрузка",
+            refusal="note_too_long",
+            params={"max": MAX_NOTE},
         )
     return text
 
@@ -72,7 +74,9 @@ def _kind(kind: str | None) -> str | None:
         raise ChecklistError(
             f"Вид пункта «{kind}» неизвестен, ожидается один из: {', '.join(ITEM_KINDS)}. "
             f"Выключить пункт — это remove_checklist_item, а не вид «off»: так выключение "
-            f"видно в журнале одной записью, а не двумя разными способами"
+            f"видно в журнале одной записью, а не двумя разными способами",
+            refusal="unknown_item_kind",
+            params={"kind": kind, "kinds": ", ".join(ITEM_KINDS)},
         )
     return value
 
@@ -85,7 +89,9 @@ def _accepted(outcome: Outcome) -> dict[str, Any]:
     """
     if not outcome.accepted:
         raise ChecklistError(
-            f"Правка отклонена, новой версии не появилось. Движок сказал: {outcome.refusal}"
+            f"Правка отклонена, новой версии не появилось. Движок сказал: {outcome.refusal}",
+            refusal="edit_refused",
+            params={"engine": outcome.refusal},
         )
     return {
         "base_version": outcome.base_version,
@@ -440,7 +446,8 @@ def _shares(shares: object) -> str:
             "Не названо ни одной доли: ожидается набор «код зоны → доля в процентах», "
             'например {"hot_kitchen": 20, "facade": 5}. Доли задаются набором, а не по '
             "одной: они складываются в 100%, и одна доля в отрыве от остальных даёт "
-            "методику, которую движок считать откажется"
+            "методику, которую движок считать откажется",
+            refusal="no_shares",
         )
     пары = []
     for код, значение in shares.items():
@@ -449,7 +456,9 @@ def _shares(shares: object) -> str:
             доля = float(значение)
         except (TypeError, ValueError):
             raise ChecklistError(
-                f"Доля зоны {проверенный} должна быть числом процентов, а пришло «{значение}»"
+                f"Доля зоны {проверенный} должна быть числом процентов, а пришло «{значение}»",
+                refusal="share_not_number",
+                params={"zone": проверенный, "value": значение},
             ) from None
         пары.append(f"{проверенный}={доля:g}")
     return ",".join(пары)
@@ -545,7 +554,8 @@ def set_scoring(
         raise ChecklistError(
             "Не названо ни одной ставки: скажите начальный процент, D1, D2 или "
             "множитель повтора. Пустая правка завела бы версию, ничем не "
-            "отличающуюся от предыдущей"
+            "отличающуюся от предыдущей",
+            refusal="no_rates",
         )
     return _change(
         store,

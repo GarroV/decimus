@@ -86,7 +86,9 @@ def _названо(codes: Sequence[str] | None, *, entity: str) -> list[str] | 
     if isinstance(codes, str):
         raise ChecklistError(
             f"Порядок обхода ({ВИДЫ[entity]}) ожидается списком кодов, а пришла одна строка "
-            f"«{codes}». Список — это последовательность: «сначала эта, потом та»"
+            f"«{codes}». Список — это последовательность: «сначала эта, потом та»",
+            refusal="route_not_list",
+            params={"value": codes},
         )
     получилось: list[str] = []
     видели: set[str] = set()
@@ -96,7 +98,9 @@ def _названо(codes: Sequence[str] | None, *, entity: str) -> list[str] | 
             raise ChecklistError(
                 f"Код «{проверенный}» назван в порядке обхода дважды. Порядок — это "
                 f"последовательность, и дубль означает, что одно из двух мест ошибочно; "
-                f"такой маршрут продукт читать откажется"
+                f"такой маршрут продукт читать откажется",
+                refusal="route_code_twice",
+                params={"code": проверенный},
             )
         видели.add(проверенный.casefold())
         получилось.append(проверенный)
@@ -112,16 +116,24 @@ def _сверить(codes: list[str], *, entity: str, data_dir: Path) -> list[st
     известные = _известные(data_dir, entity)
     неизвестные = [код for код in codes if код.casefold() not in известные]
     if неизвестные:
-        raise ChecklistError(
-            f"В порядке обхода названы коды, которых в методике нет: "
-            f"{', '.join(неизвестные)}. "
-            + (
-                f"Зоны этой версии: {', '.join(известные.values())}"
-                if entity == ZONE
-                else f"Пунктов в этой версии {len(известные)}, перечень отдаёт checklist_items"
-            )
-            + ". Маршрут связывается кодами, а не формулировками, и код, которого в методике "
+        названы = (
+            f"В порядке обхода названы коды, которых в методике нет: {', '.join(неизвестные)}. "
+        )
+        хвост = (
+            ". Маршрут связывается кодами, а не формулировками, и код, которого в методике "
             "нет, продукт читать откажется — увидит это уже аудитор на точке"
+        )
+        if entity == ZONE:
+            raise ChecklistError(
+                f"{названы}Зоны этой версии: {', '.join(известные.values())}{хвост}",
+                refusal="route_unknown_zones",
+                params={"unknown": ", ".join(неизвестные), "known": ", ".join(известные.values())},
+            )
+        raise ChecklistError(
+            f"{названы}Пунктов в этой версии {len(известные)}, перечень отдаёт "
+            f"checklist_items{хвост}",
+            refusal="route_unknown_items",
+            params={"unknown": ", ".join(неизвестные), "count": len(известные)},
         )
     return [известные[код.casefold()] for код in codes]
 
@@ -182,7 +194,9 @@ def _разобрать(data_dir: Path) -> продукт.Route:
     except ConfigError as беда:
         raise ChecklistError(
             f"Маршрут обхода ({ROUTE_FILE}) в этой версии методики не читается разбором "
-            f"продукта: {_clean(str(беда), data_dir)}"
+            f"продукта: {_clean(str(беда), data_dir)}",
+            refusal="route_unreadable",
+            params={"file": ROUTE_FILE, "detail": _clean(str(беда), data_dir)},
         ) from None
 
 
@@ -193,7 +207,9 @@ def _выстроить(
     try:
         return продукт.arrange(значения, порядок, lambda строка: строка[колонка], what=что)
     except ConfigError as беда:
-        raise ChecklistError(str(беда)) from None
+        raise ChecklistError(
+            str(беда), refusal="route_arrange_refused", params={"detail": str(беда)}
+        ) from None
 
 
 def _проверено(кандидат: Path, новые: dict[str, list[str] | None]) -> None:
@@ -212,7 +228,9 @@ def _проверено(кандидат: Path, новые: dict[str, list[str] 
         if видно[entity] != ожидаемое:
             raise ChecklistError(
                 f"После правки разбор продукта видит порядок {видно[entity]}, а не "
-                f"{ожидаемое}. Правка записана не так, как задумана"
+                f"{ожидаемое}. Правка записана не так, как задумана",
+                refusal="route_parsed_otherwise",
+                params={"seen": видно[entity], "expected": ожидаемое},
             )
         файл, колонка = СПРАВОЧНИКИ[entity]
         выстроено = _выстроить(
@@ -225,7 +243,9 @@ def _проверено(кандидат: Path, новые: dict[str, list[str] 
         if получилось != коды:
             raise ChecklistError(
                 f"После правки продукт пойдёт по порядку {', '.join(получилось)}, а не "
-                f"{', '.join(коды)}. Правка записана не так, как задумана"
+                f"{', '.join(коды)}. Правка записана не так, как задумана",
+                refusal="route_arranged_otherwise",
+                params={"got": ", ".join(получилось), "wanted": ", ".join(коды)},
             )
 
 
@@ -296,7 +316,8 @@ def set_route(
         raise ChecklistError(
             "Не названо ни одного порядка: ожидается zones — коды зон в том порядке, в "
             "котором аудитор идёт по пиццерии, и/или items — коды пунктов чек-листа. "
-            "Вызов, который ничего не задаёт, агент перескажет человеку как сделанную работу"
+            "Вызов, который ничего не задаёт, агент перескажет человеку как сделанную работу",
+            refusal="route_nothing_given",
         )
 
     def _mutate(кандидат: Path, _holder: Path) -> tuple[str | None, str]:
