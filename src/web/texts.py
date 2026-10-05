@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
+from .texts_refusals import REFUSAL_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -1746,15 +1747,17 @@ TEXTS: dict[str, dict[str, str]] = {
 
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
-# Предписания (волна 3) — так же.
-_ПЕРЕСЕЧЕНИЕ = (
-    (TEXTS.keys() & PLAN_TEXTS.keys())
-    | (TEXTS.keys() & PRESCRIPTION_TEXTS.keys())
-    | (PLAN_TEXTS.keys() & PRESCRIPTION_TEXTS.keys())
-)
+# Предписания (волна 3) и отказы «Методики» (#475) — так же.
+_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS)
+_ПЕРЕСЕЧЕНИЕ = {
+    ключ
+    for номер, часть in enumerate(_ЧАСТИ)
+    for другая in _ЧАСТИ[номер + 1 :]
+    for ключ in часть.keys() & другая.keys()
+}
 if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
-TEXTS = {**TEXTS, **PLAN_TEXTS, **PRESCRIPTION_TEXTS}
+TEXTS = {**TEXTS, **PLAN_TEXTS, **PRESCRIPTION_TEXTS, **REFUSAL_TEXTS}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:
