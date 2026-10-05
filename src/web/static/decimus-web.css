@@ -1019,7 +1019,6 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .find-row--photos[open] .find-row__shots::after { content: " ▴"; }
 /* Кадры были, но показать их нечем (#422): не раскрытие, а честная пометка. */
 .find-row__shots.find-row__lost::after { content: none; }
-.find-row__gallery + .find-row__lost { margin: 0; padding: 0 var(--space-7) var(--space-4); }
 .find-row__gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));

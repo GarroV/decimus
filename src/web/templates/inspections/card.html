@@ -258,7 +258,8 @@
             </span>
           </span>
         {% if shots %}
-            <span class="find-row__shots">{{ t('card.findings.photos', n=shots|length) }}</span>
+            {#- Часть кадров показать нечем — сказано уже в свёрнутой строке, а не только под раскрытием. #}
+            <span class="find-row__shots">{% if lost %}{{ t('card.findings.photos_partial', n=shots|length, lost=lost) }}{% else %}{{ t('card.findings.photos', n=shots|length) }}{% endif %}</span>
           </summary>
           <div class="find-row__gallery">
             {% for shot in shots %}
@@ -266,7 +267,6 @@
               <a href="{{ src }}" target="_blank" rel="noopener"><img src="{{ src }}" loading="lazy" alt="{{ finding.code }} · {{ loop.index }}"></a>
             {% endfor %}
           </div>
-          {% if lost %}<p class="field-note find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</p>{% endif %}
         </details>
         {% else %}
           {% if lost %}<span class="find-row__shots find-row__lost">{{ t('card.findings.photos_lost', n=lost) }}</span>{% endif %}
