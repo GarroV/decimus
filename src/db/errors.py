@@ -78,10 +78,15 @@ class UnitExistsError(DbError):
     отвечает загадкой «не получилось».
     """
 
-    def __init__(self, message: str, *, unit_id: str, name: str) -> None:
+    def __init__(
+        self, message: str, *, unit_id: str, name: str, country: str | None = None
+    ) -> None:
         super().__init__(message)
         self.unit_id = unit_id
         self.name = name
+        #: Страна найденной точки: ссылку на её карточку экран даёт, только
+        #: если точка в охвате вошедшего.
+        self.country = country
 
 
 class StorageError(DbError):

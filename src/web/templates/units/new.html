@@ -21,7 +21,7 @@
   {% if exists_name %}
     <div class="note note--warn mt-gap" role="alert"><div>
       <div class="note__title">{{ t('unitnew.exists', name=exists_name) }}</div>
-      <div class="note__text"><a href="{{ exists_url }}">{{ t('unitnew.exists.open') }}</a></div>
+      {% if exists_url %}<div class="note__text"><a href="{{ exists_url }}">{{ t('unitnew.exists.open') }}</a></div>{% endif %}
     </div></div>
   {% endif %}
   {% if confirm %}

@@ -310,13 +310,15 @@ def upsert_unit(
 
 def _existing(
     cur: psycopg.Cursor[Any], tenant: str, keys: tuple[str, ...]
-) -> tuple[str, str] | None:
-    """Точка, которую любое из написаний уже называет: `(id, имя)` или `None`."""
+) -> tuple[str, str, str | None] | None:
+    """Точка, которую любое из написаний уже называет: `(id, имя, страна)` или `None`."""
     for key in keys:
         cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
         row = cur.fetchone()
         if row is not None:
-            return str(row[0]), str(row[1])
+            cur.execute("select country from units where id = %s", (row[0],))
+            страна = cur.fetchone()
+            return str(row[0]), str(row[1]), (None if страна is None else страна[0])
     return None
 
 
@@ -334,7 +336,10 @@ def _insert_new(cur: psycopg.Cursor[Any], поля: dict[str, Any], alias_keys: 
     if занята is None:
         raise PushError("Postgres не вставил точку и не нашёл занявшую её имя")
     raise UnitExistsError(
-        f"Пиццерия «{занята[1]}» в справочнике уже есть", unit_id=занята[0], name=занята[1]
+        f"Пиццерия «{занята[1]}» в справочнике уже есть",
+        unit_id=занята[0],
+        name=занята[1],
+        country=занята[2],
     )
 
 

@@ -97,6 +97,18 @@ def _confirm_context(plan: NewUnit, lang: str) -> dict[str, Any]:
     }
 
 
+def _card_url_in_reach(exc: UnitExistsError, lang: str) -> str | None:
+    """Ссылка на найденную точку — только если вошедший её видит; иначе просто «уже есть».
+
+    Ссылка вне охвата вела бы в 404 и вдобавок называла бы идентификатор точки,
+    которую вошедшему знать не положено.
+    """
+    охват = auth.current_reach()
+    if охват.countries is not None and exc.country not in охват.countries:
+        return None
+    return url_for("unit", unit_id=exc.unit_id, lang=lang)
+
+
 def install(app: Flask, conf: Settings) -> None:
     """Маршруты заведения пиццерии: форма и её отправка."""
     путь = section("country").path + "/<code>/units/new"
@@ -133,7 +145,7 @@ def install(app: Flask, conf: Settings) -> None:
                 lang,
                 typed=написано,
                 exists_name=exc.name,
-                exists_url=url_for("unit", unit_id=exc.unit_id, lang=lang),
+                exists_url=_card_url_in_reach(exc, lang),
             ), 409
         except DbError:
             logger.exception("пиццерия %s не заведена в справочник", plan.name)
