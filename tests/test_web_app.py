@@ -41,6 +41,8 @@ from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
+from src.web.inspections import load_registry as настоящий_реестр
+from src.web.inspections import retraction_available as настоящая_проверка_истории
 from src.web.sections import SECTIONS
 
 ТЕНАНТ = "default"
@@ -312,6 +314,32 @@ def test_без_администратора_истории_плашки_о_сн
     # человеку на экране тем более не нужно.
     assert "Снятые проверки не видны" not in страница
     assert "DATABASE_RETRACTION_URL" not in страница
+
+
+def test_подключение_истории_в_другую_базу_видно_на_экране(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#515: заданное, но ведущее не туда подключение — не «функции нет», а отказ словами."""
+    # Arrange — настоящая `retraction_available`, разные базы у приложения и истории
+    monkeypatch.setattr(data, "retraction_available", настоящая_проверка_истории)
+    monkeypatch.setattr(data, "load_registry", настоящий_реестр)
+    # Очередь приёмки читается обычной ролью до вопроса об истории — база жива.
+    monkeypatch.setattr(data.queries, "list_inspections", lambda **_: [])
+    пароль = "s3cret-не-печатать"
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://dodo_audit_app:{пароль}@db.example/stand")
+    monkeypatch.setenv(
+        "DATABASE_RETRACTION_URL", f"postgresql://dodo_audit_admin:{пароль}@db.example/shared"
+    )
+
+    # Act
+    ответ = стенд.get("/inspections")
+    страница = ответ.get_data(as_text=True)
+
+    # Assert — реестр не делает вид, что снятия нет: страница называет обе базы
+    assert ответ.status_code == 503
+    assert "разные базы" in страница
+    assert "shared" in страница
+    assert пароль not in страница
 
 
 def test_без_администратора_истории_снятие_не_предлагается(
