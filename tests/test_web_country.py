@@ -185,3 +185,13 @@ def test_без_страны_в_адресе_справа_первая_стра�
     assert "Выберите страну" not in страница and "Choose a country" not in страница
     assert "mx-shell--pick" in страница
     assert "mx-shell--pick" not in стенд.get("/country/GE").get_data(as_text=True)
+
+
+def test_обрезанный_срез_страны_экран_называет_вслух(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    вид = данные()
+    обрезан = replace(вид, snapshot=replace(вид.snapshot, truncated=True))
+
+    assert "В срезе больше 1 проверок" in открыть(стенд, monkeypatch, обрезан, "/country/GE")
+    assert "В срезе больше" not in открыть(стенд, monkeypatch, вид, "/country/GE")

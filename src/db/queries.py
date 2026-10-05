@@ -89,6 +89,9 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -119,6 +122,9 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and u.name_normalized = %(unit)s
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
   and __STAGE__
 order by i.inspection_date desc, i.pushed_at desc
 limit %(limit)s
@@ -430,6 +436,9 @@ def list_inspections(
     limit: int = DEFAULT_LIMIT,
     include_retracted: bool = False,
     on_review: bool = False,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
 ) -> list[InspectionRow]:
     """Проверки в охвате читающего, свежие по дате обхода — первыми.
 
@@ -462,6 +471,11 @@ def list_inspections(
     по умолчанию — только принятые, то есть история сети; `True` — только
     ждущие вычитки. Смешанной выдачи нет намеренно: проверка до подтверждения
     не часть истории, и реестр показывает её отдельным списком.
+
+    `city`/`country`/`grade` — отбор по месту и букве В БАЗЕ, до предела (#470),
+    по тем же правилам, что у агрегатов (`_narrowing`): пусто — «все». Отбор
+    поверх прочитанной страницы терял бы проверки среза старше `limit`-й по
+    всей сети, и экран показывал бы другое множество, чем соседние блоки.
     """
     охват = _require_reach(reach)
     rows_limit = _require_limit(limit)
@@ -471,6 +485,7 @@ def list_inspections(
         "limit": rows_limit,
         "date_from": date_from,
         "date_to": date_to,
+        **_narrowing(city, country, grade),
     }
     with (
         _reading("список проверок", as_admin=include_retracted) as conn,
