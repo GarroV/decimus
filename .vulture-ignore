@@ -362,3 +362,26 @@ reviewed_by
 reviewed_at
 requested_at
 last_comment
+# Предписания (волна 3, `src/web/prescriptions.py`): маршруты Flask зовёт
+# диспетчер по адресу, регистрирует декоратор — по имени их не читает никто.
+rx_list
+rx_new
+rx_create
+rx_view
+rx_edit
+rx_update
+rx_send
+rx_close
+orders
+order_reply
+order_file
+# Поля предписания и ответа читают шаблоны (`_prescription.html`), а Jinja
+# статически не видна; `replied_tenant` — чьё пространство ответило, для разбора.
+replied_by
+replied_tenant
+replied_at
+created_by
+issued_by
+issued_at
+closed_by
+closed_at

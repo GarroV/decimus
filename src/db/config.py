@@ -139,6 +139,11 @@ DEFAULT_ATTACHMENT_MAX_MB = 25
 #: гигабайта — это лишний ноль, а не решение.
 MAX_ACTION_PLAN_DUE_DAYS = 365
 MAX_ATTACHMENT_MB = 1024
+#: Предел ответов партнёра на одно предписание: ловушка на зацикленную форму и
+#: замусоривание, а не норма переписки.
+PRESCRIPTION_MAX_REPLIES_VAR = "PRESCRIPTION_MAX_REPLIES"
+DEFAULT_PRESCRIPTION_MAX_REPLIES = 50
+MAX_PRESCRIPTION_REPLIES = 1000
 _MB = 1024 * 1024
 
 
@@ -177,4 +182,15 @@ def load_action_plan_settings(env: Mapping[str, str] | None = None) -> ActionPla
             src, ATTACHMENT_MAX_MB_VAR, DEFAULT_ATTACHMENT_MAX_MB, MAX_ATTACHMENT_MB
         )
         * _MB,
+    )
+
+
+def load_prescription_max_replies(env: Mapping[str, str] | None = None) -> int:
+    """Предел ответов на одно предписание из окружения. Мусор — `ConfigError`."""
+    src = os.environ if env is None else env
+    return _bounded_int(
+        src,
+        PRESCRIPTION_MAX_REPLIES_VAR,
+        DEFAULT_PRESCRIPTION_MAX_REPLIES,
+        MAX_PRESCRIPTION_REPLIES,
     )
