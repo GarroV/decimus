@@ -21,9 +21,12 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from collections.abc import Callable
+from dataclasses import dataclass
 
 from flask import Flask, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
+from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
 
 from src.db.errors import DbError
@@ -50,6 +53,25 @@ MAIL_STATE_SALT = "google-mail-state"
 #: Десять минут на согласие. Больше — окно, в котором чужая страница может
 #: подсунуть свой возврат; меньше — человек не успевает прочитать экран Google.
 MAIL_STATE_TTL_SECONDS = 600
+
+#: Вид похода за согласием. Адрес возврата у Google один (сверяется точно), и
+#: возврат узнаёт, что класть в черновики, по виду из подписанной куки.
+KIND_LETTER = "letter"
+#: Ключи в `app.extensions`: начать поход другого вида и вернуться из него.
+MAIL_CONSENT_KEY = "decimus.mail_consent"
+MAIL_RETURNS_KEY = "decimus.mail_returns"
+
+
+@dataclass(frozen=True)
+class MailReturn:
+    """Как вернуться из похода за согласием для вида письма, кроме письма по проверке.
+
+    `back(id, lang, исход)` — на экран с исходом; `finish(id, lang, токен)` —
+    положить черновик (`токен()` меняет код на доступ к почте) и вернуть ответ.
+    """
+
+    back: Callable[[str, str, str], Response]
+    finish: Callable[[str, str, Callable[[], str]], Response]
 
 
 def _почта_вошедшего(вошедший: object | None) -> str:
@@ -93,6 +115,49 @@ def install(app: Flask, conf: Settings) -> None:
             client_id=вход.client_id, client_secret=вход.client_secret, redirect_uri=адрес
         )
 
+    def уйти_за_согласием(вид: str, ident: str, lang: str, реквизиты: GoogleSettings) -> Response:
+        """Уход к Google за почтовым правом; в подписанной куке — за чем ходили."""
+        метка = new_state()
+        ответ = redirect(
+            consent_url(
+                реквизиты,
+                state=метка,
+                # Подсказка, в какой аккаунт вести: своей почты у учётки
+                # админки пока нет (D173, #334 — человек ещё не одна
+                # сущность), поэтому годится логин, если он и есть почта.
+                # Пустая подсказка — не поломка: Google просто спросит, каким
+                # аккаунтом входить.
+                login_hint=_почта_вошедшего(auth.current_account()),
+            )
+        )
+        # В куке едет и метка, и то, за чем ходили: возврат придёт голым GET, и
+        # без этого маршрут не знал бы, какое письмо класть в черновики. Кука
+        # подписана — подменить в ней вид или номер значит подделать подпись.
+        ответ.set_cookie(
+            MAIL_STATE_COOKIE,
+            подписант.dumps({"state": метка, "kind": вид, "id": ident, "lang": lang}),
+            max_age=MAIL_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            # `over_https()`, а НЕ `request.is_secure`: наружу админка выходит
+            # туннелем (D100), TLS заканчивается на нём, и до сервера доезжает
+            # обычный HTTP. По `is_secure` кука похода ушла бы без `Secure`
+            # ровно там, где это и важно.
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    def начать_поход(вид: str, ident: str, lang: str) -> Response | None:
+        """Уход за согласием для другого вида письма (предписание); нет реквизитов — `None`."""
+        реквизиты = почтовые_реквизиты()
+        if реквизиты is None:
+            return None
+        return уйти_за_согласием(вид, ident, lang, реквизиты)
+
+    app.extensions[MAIL_CONSENT_KEY] = начать_поход
+    app.extensions.setdefault(MAIL_RETURNS_KEY, {})
+
     @app.post(f"{реестр}/<inspection_id>/letter/draft", endpoint="letter_draft")
     def letter_draft(inspection_id: str) -> Response | tuple[str, int]:
         refuse_foreign_origin()
@@ -133,36 +198,36 @@ def install(app: Flask, conf: Settings) -> None:
             # работает как работала, просто без черновиков.
             return к_письму(inspection_id, lang=письмо_на, исход="unavailable")
 
-        метка = new_state()
-        ответ = redirect(
-            consent_url(
-                реквизиты,
-                state=метка,
-                # Подсказка, в какой аккаунт вести: своей почты у учётки
-                # админки пока нет (D173, #334 — человек ещё не одна
-                # сущность), поэтому годится логин, если он и есть почта.
-                # Пустая подсказка — не поломка: Google просто спросит, каким
-                # аккаунтом входить.
-                login_hint=_почта_вошедшего(вошедший),
-            )
-        )
-        # В куке едет и метка, и то, за чем ходили: возврат придёт голым GET, и
-        # без этого маршрут не знал бы, какое письмо класть в черновики. Кука
-        # подписана — подменить в ней номер проверки значит подделать подпись.
-        ответ.set_cookie(
-            MAIL_STATE_COOKIE,
-            подписант.dumps({"state": метка, "id": inspection_id, "lang": письмо_на}),
-            max_age=MAIL_STATE_TTL_SECONDS,
-            httponly=True,
-            samesite="Lax",
-            # `over_https()`, а НЕ `request.is_secure`: наружу админка выходит
-            # туннелем (D100), TLS заканчивается на нём, и до сервера доезжает
-            # обычный HTTP. По `is_secure` кука похода ушла бы без `Secure`
-            # ровно там, где это и важно.
-            secure=over_https(),
-            path="/",
-        )
+        return уйти_за_согласием(KIND_LETTER, inspection_id, письмо_на, реквизиты)
+
+    def _вернуть_другое(вид: str, ident: str, lang: str, метка: str) -> Response:
+        """Возврат похода не за письмом по проверке: та же сверка, исход — у вида.
+
+        Метка одноразовая на ЛЮБОМ исходе — отказ, несовпадение, сбой, отказ в
+        доступе (404) или успех: кука похода снимается всегда.
+        """
+        try:
+            ответ = _исход_другого(вид, ident, lang, метка)
+        except HTTPException as exc:
+            ответ = exc.get_response()
+        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
         return ответ
+
+    def _исход_другого(вид: str, ident: str, lang: str, метка: str) -> Response:
+        возвраты: dict[str, MailReturn] = app.extensions.get(MAIL_RETURNS_KEY, {})
+        возврат = возвраты.get(вид)
+        if возврат is None:
+            return redirect(url_for("registry"), code=303)
+        пришедшая = request.args.get("state") or ""
+        if not hmac.compare_digest(метка.encode(), пришедшая.encode()):
+            return возврат.back(ident, lang, "failed")
+        if request.args.get("error"):
+            return возврат.back(ident, lang, "denied")
+        код = request.args.get("code") or ""
+        реквизиты = почтовые_реквизиты()
+        if not код or реквизиты is None:
+            return возврат.back(ident, lang, "failed")
+        return возврат.finish(ident, lang, lambda: exchange_code_for_token(реквизиты, code=код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
     def google_mail_callback() -> Response | tuple[str, int]:
@@ -179,6 +244,9 @@ def install(app: Flask, conf: Settings) -> None:
         письмо_на = str(поход.get("lang") or "")
         if not inspection_id:
             return redirect(url_for("registry"), code=303)
+        вид = str(поход.get("kind") or KIND_LETTER)
+        if вид != KIND_LETTER:
+            return _вернуть_другое(вид, inspection_id, письмо_на, str(поход.get("state") or ""))
 
         пришедшая = request.args.get("state") or ""
         # В БАЙТАХ, а не в строках: `compare_digest` на не-ASCII падает

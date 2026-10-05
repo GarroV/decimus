@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Iterator
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 import pytest
@@ -19,6 +20,7 @@ from flask import Flask
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, СЕКРЕТ, войти, подменить_двери, собрать
 
+from src.db import prescriptions as rx
 from src.web import action_plans
 from src.web import country as country_data
 from src.web import inspections as data
@@ -268,3 +270,65 @@ def test_проверка_шаблонов_пропускает_разрешён
         '<a href="/x" data-online="1">'
     )
     assert нарушения_шаблона(чистое) == []
+
+
+# --- предписания (волна 3, #499): свои маршруты вне карты разделов -----------
+
+РАСПОРЯЖЕНИЕ = "11111111-1111-1111-1111-111111111111"
+
+
+def _предписание(status: str) -> rx.Prescription:
+    return rx.Prescription(
+        id=РАСПОРЯЖЕНИЕ,
+        country="GE",
+        due_on=date(2030, 1, 1),
+        recipients="ops@ge.example.com",
+        subject="Предписание · Грузия",
+        body="Строка один",
+        status=status,
+        created_by="hq-lead",
+        created_at=datetime(2026, 10, 5, tzinfo=UTC),
+        issued_by=None if status == "draft" else "hq-lead",
+        issued_at=None if status == "draft" else datetime(2026, 10, 5, tzinfo=UTC),
+        closed_by=None,
+        closed_at=None,
+        close_comment=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("tenant", "статус", "адрес"),
+    [
+        ("HQ", "issued", "/actions/prescriptions"),
+        ("HQ", "issued", "/actions/prescriptions/new?country=GE"),
+        ("HQ", "issued", f"/actions/prescriptions/{РАСПОРЯЖЕНИЕ}"),
+        ("HQ", "draft", f"/actions/prescriptions/{РАСПОРЯЖЕНИЕ}/edit"),
+        ("GE", "issued", "/prescriptions"),
+        ("GE", "issued", f"/prescriptions/{РАСПОРЯЖЕНИЕ}"),
+    ],
+)
+def test_предписания_несут_набор_и_без_встроенного_кода(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, статус: str, адрес: str
+) -> None:
+    # Arrange — раздел УК «Действия → Предписания» и раздел партнёра; оба
+    # пришли после #489 и обязаны стоять под той же политикой.
+    _заглушить_данные(monkeypatch)
+    предписание = _предписание(статус)
+    monkeypatch.setattr(
+        rx, "list_prescriptions", lambda *_a, **_k: rx.PrescriptionList((предписание,), False)
+    )
+    monkeypatch.setattr(rx, "get_prescription", lambda *_a, **_k: предписание)
+    monkeypatch.setattr(rx, "choices", lambda *_a, **_k: ((), ()))
+    monkeypatch.setattr(rx, "remembered_recipients", lambda _c: "ops@ge.example.com")
+    monkeypatch.setattr(country_data, "countries", lambda **_: (("GE", 2),))
+    подменить_двери(monkeypatch, tenant=tenant, role="admin")
+
+    with собрать(tenant=tenant).test_client() as client:
+        assert войти(client).status_code == 302
+        # Act
+        ответ = client.get(адрес)
+
+    # Assert
+    assert ответ.status_code == 200, (адрес, ответ.status_code)
+    _проверить_набор(ответ, адрес)
+    assert нарушения_шаблона(ответ.get_data(as_text=True)) == [], адрес
