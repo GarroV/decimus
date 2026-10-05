@@ -62,6 +62,12 @@ UNIT_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Такой страны в словаре сети нет.",
         "en": "This country is not in the network's dictionary.",
     },
+    "unitnew.alias_taken": {
+        "ru": "Написание, которым её завели, синонимом не сохранено: его уже занимает другая "
+        "пиццерия справочника.",
+        "en": "The spelling used to add it was not saved as a synonym: another pizzeria in "
+        "the directory already holds it.",
+    },
     "unitnew.added": {
         "ru": "Пиццерия {name} добавлена в справочник. Проверок у неё пока нет.",
         "en": "The pizzeria {name} was added to the directory. It has no inspections yet.",

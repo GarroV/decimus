@@ -704,6 +704,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
             "units/card.html",
             data=снимок,
             added=request.args.get("added") == "1",
+            alias_taken=request.args.get("alias_taken") == "1",
             lang=lang,
             window=unit_data.ОКНО,
             grade_tone=view.grade_tone,

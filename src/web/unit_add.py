@@ -120,7 +120,7 @@ def install(app: Flask, conf: Settings) -> None:
             # с цифрой («Zemun 2») иначе стал бы «городом» сети (#440).
             return _render(страна, lang, typed=написано, **_confirm_context(plan, lang))
         try:
-            unit_id = directory.create_unit(
+            заведена = directory.create_unit(
                 plan.name,
                 country=plan.country,
                 city=plan.city,
@@ -145,4 +145,7 @@ def install(app: Flask, conf: Settings) -> None:
             plan.country,
             вошедший.login if вошедший else "?",
         )
-        return redirect(url_for("unit", unit_id=unit_id, lang=lang, added=1))
+        if заведена.taken_aliases:
+            # Точка заведена, а написание ведёт к другой: сказать на экране.
+            return redirect(url_for("unit", unit_id=заведена.id, lang=lang, added=1, alias_taken=1))
+        return redirect(url_for("unit", unit_id=заведена.id, lang=lang, added=1))

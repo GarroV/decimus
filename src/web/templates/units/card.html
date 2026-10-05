@@ -21,6 +21,9 @@
 {% block body %}
   {% if added %}
     <div class="note note--ok mt-gap" role="status"><div><div class="note__title">{{ t('unitnew.added', name=data.name) }}</div></div></div>
+    {% if alias_taken %}
+      <div class="note note--warn mt-gap" role="status"><div><div class="note__title">{{ t('unitnew.alias_taken') }}</div></div></div>
+    {% endif %}
   {% endif %}
   <div class="ov-head">
     <div class="ov-head__main">

@@ -36,9 +36,11 @@ def _строка(dsn: str, unit_id: str) -> tuple[object, ...] | None:
 
 
 def test_новая_точка_заводится_с_географией_и_синонимом(db_env: str) -> None:
-    unit_id = create_unit(
+    заведена = create_unit(
         "Belgrade-6", country="rs", city="beograd", aliases=("Белград 6",), tenant=УК
     )
+    unit_id = заведена.id
+    assert заведена.taken_aliases == ()
 
     assert _строка(db_env, unit_id) == ("Belgrade-6", "RS", "beograd")
     по_синониму = resolve_unit("белград  6", tenant=УК)
@@ -104,3 +106,24 @@ def test_гонка_двух_заведений_даёт_отказ_а_не_вт
 
     assert отказ.value.unit_id == прежняя
     assert _строка(db_env, прежняя) == ("Belgrade-2", "RS", None)
+
+
+def test_синоним_занятый_в_гонке_возвращается_а_точка_остаётся(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Сверка синонима не увидела чужой; запись синонима упёрлась в ключ.
+
+    Точка заведена верно и не откатывается, но потеря написания не молчит:
+    оно приходит в `taken_aliases`, а синоним по-прежнему ведёт к прежней точке.
+    """
+    import src.db.directory as directory
+
+    чужая = upsert_unit("Novi Sad-1", country="RS", aliases=("Нови Сад 12",), tenant=УК)
+    monkeypatch.setattr(directory, "_existing", lambda *_args: None)
+
+    заведена = create_unit("Novi Sad-12", country="RS", aliases=("Нови Сад 12",), tenant=УК)
+
+    assert заведена.taken_aliases == ("Нови Сад 12",)
+    assert _строка(db_env, заведена.id) == ("Novi Sad-12", "RS", None)
+    по_синониму = resolve_unit("Нови Сад 12", tenant=УК)
+    assert по_синониму is not None and по_синониму.id == чужая

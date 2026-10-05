@@ -17,6 +17,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -31,10 +32,22 @@ from .reach import Reach, require_reach
 from .space_guard import require_space
 from .units import normalize_unit_name
 
+logger = logging.getLogger(__name__)
+
 #: Арендатор по умолчанию — то же значение, что у `push.DEFAULT_TENANT` и у
 #: `domain.state.DEFAULT_TENANT`. Импортировать чужую внутреннюю константу ради
 #: одной строки дороже, чем закрепить значение тестом (так же сделано в push).
 DEFAULT_TENANT = HQ_TENANT
+
+
+@dataclass(frozen=True)
+class CreatedUnit:
+    """Заведённая точка и написания, которые синонимом не легли (#437)."""
+
+    id: str
+    #: Синонимы, чей ключ к моменту записи уже занят ДРУГОЙ точкой: точка
+    #: заведена, а это написание по-прежнему ведёт к той, другой.
+    taken_aliases: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -125,6 +138,7 @@ _INSERT_NEW_ALIAS_SQL = """
 insert into unit_aliases (tenant_code, alias_normalized, unit_id, alias)
 values (%s, %s, %s, %s)
 on conflict (tenant_code, alias_normalized) do nothing
+returning unit_id
 """
 
 _UPSERT_ALIAS_SQL = """
@@ -331,7 +345,7 @@ def create_unit(
     city: str | None = None,
     aliases: tuple[str, ...] = (),
     tenant: str = DEFAULT_TENANT,
-) -> str:
+) -> CreatedUnit:
     """Завести НОВУЮ точку справочника; уже есть — `UnitExistsError` (#437).
 
     В отличие от `upsert_unit`, ничего существующего не трогает: имя или
@@ -365,8 +379,13 @@ def create_unit(
             with conn.cursor() as cur:
                 require_space(cur, tenant, error=PushError)
                 unit_id = _insert_new(cur, поля, tuple(синонимы))
+                занятые: list[str] = []
                 for alias_key, alias in синонимы.items():
                     cur.execute(_INSERT_NEW_ALIAS_SQL, (tenant, alias_key, UUID(unit_id), alias))
+                    if cur.fetchone() is None:
+                        # Ключ занял другой между сверкой и записью. Точку не
+                        # откатываем — она заведена верно, — но и не молчим.
+                        занятые.append(alias)
             conn.commit()
     except (PushError, UnitExistsError):
         raise
@@ -374,4 +393,8 @@ def create_unit(
         raise PushError(
             f"Не удалось завести точку «{name}» в справочник ({type(exc).__name__}): {exc}"
         ) from exc
-    return unit_id
+    if занятые:
+        logger.warning(
+            "точка %s заведена, но синонимы заняты другой точкой: %s", name, ", ".join(занятые)
+        )
+    return CreatedUnit(id=unit_id, taken_aliases=tuple(занятые))
