@@ -93,7 +93,9 @@ def upload_report(
         raise PushError("Отчёт не сохранён: пришли пустые байты, а не документ")
 
     settings = check_environment()
-    store = storage if storage is not None else S3PhotoStorage(load_storage_settings())
+    store = (
+        storage if storage is not None else S3PhotoStorage(load_storage_settings(), fail_fast=True)
+    )
 
     digest = hashlib.sha256(data).hexdigest()[:32]
     key = report_object_key(inspection_id, digest)

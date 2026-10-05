@@ -28,7 +28,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
 
 from src import domain
 
-from . import frame_copies
+from . import frame_copies, photo_backfill
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
@@ -418,10 +418,15 @@ async def start_polling() -> None:
     # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца
     # опроса: задачу без ссылки сборщик мусора снимает на середине.
     sweeper = asyncio.create_task(frame_copies.sweep_forever())
+    # Дозагрузка кадров, не легших в хранилище на сдаче (#459, D259): хранилище
+    # на MUSPELHEIM засыпает, и вернуть кадры потом может только бот — байты
+    # есть у телеграма, а токен у него одного.
+    backfill = asyncio.create_task(photo_backfill.backfill_forever(bot))
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
         sweeper.cancel()
+        backfill.cancel()
         await bot.session.close()
 
 
