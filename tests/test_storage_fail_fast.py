@@ -11,8 +11,8 @@ import pytest
 
 pytest.importorskip("boto3")
 
-from src.db import photos, reports, retract  # noqa: E402
-from src.db.storage import (  # noqa: E402
+from src.db import photos, reports, retract
+from src.db.storage import (
     CONNECT_TIMEOUT_SEC,
     MAX_ATTEMPTS,
     S3PhotoStorage,
