@@ -1,0 +1,52 @@
+{#
+  Новая пиццерия страны (#437, D233, D240). Один вопрос: «как называется
+  новая пиццерия этой страны». Вход — кнопка «Добавить пиццерию» на экране
+  страны, только у УК. Правила имени и прав — в `src/web/unit_add.py`, здесь
+  только поле, отказ словами и подтверждение незнакомого города.
+#}{% extends "base.html" %}
+{% block title %}{{ t('unitnew.title') }}{% endblock %}
+
+{% block body %}
+  <a class="cn-back" href="{{ back }}">‹ {{ t('unitnew.back') }}</a>
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ country_title(country) or country }}</div>
+      <h1 class="ov-head__title">{{ t('unitnew.title') }}</h1>
+    </div>
+  </div>
+
+  {% if failure %}
+    <div class="note note--error mt-gap" role="alert"><div><div class="note__title">{{ failure }}</div></div></div>
+  {% endif %}
+  {% if exists_name %}
+    <div class="note note--warn mt-gap" role="alert"><div>
+      <div class="note__title">{{ t('unitnew.exists', name=exists_name) }}</div>
+      {% if exists_url %}<div class="note__text"><a href="{{ exists_url }}">{{ t('unitnew.exists.open') }}</a></div>{% endif %}
+    </div></div>
+  {% endif %}
+  {% if confirm %}
+    <div class="note note--warn mt-gap" role="alert"><div>
+      <div class="note__title">{{ t('unitnew.confirm.title', city=confirm_city) }}</div>
+      <div class="note__text">{{ t('unitnew.confirm.text', name=confirm, country=confirm_country) }}</div>
+    </div></div>
+  {% endif %}
+
+  <section class="ov-card ov-card--wide">
+    <div class="card__body">
+      <form method="post" action="{{ action }}" class="row users-add">
+        <label class="grow">
+          <span class="field-label">{{ t('unitnew.name') }}</span>
+          <input class="input" name="name" value="{{ typed }}" required maxlength="60"
+                 autocomplete="off" spellcheck="false" placeholder="Belgrade-6"{% if not confirm %} autofocus{% endif %}>
+        </label>
+        {% if confirm %}
+          <input type="hidden" name="confirm" value="{{ confirm }}">
+          <button class="btn btn--primary" type="submit">{{ t('unitnew.confirm.submit', name=confirm) }}</button>
+        {% else %}
+          <button class="btn btn--primary" type="submit">{{ t('unitnew.submit') }}</button>
+        {% endif %}
+      </form>
+      <p class="field-note">{{ t('unitnew.name_hint') }}</p>
+    </div>
+  </section>
+{% endblock %}

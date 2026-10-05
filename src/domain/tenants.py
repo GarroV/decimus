@@ -20,3 +20,12 @@ def canonical_tenant(code: str) -> str:
     """Нынешний код тенанта: старый переводится, остальные — как есть."""
     cleaned = code.strip()
     return LEGACY_TENANTS.get(cleaned, cleaned)
+
+
+def may_add_units(tenant: str) -> bool:
+    """Заводить новые пиццерии может только управляющая компания (D233, D234).
+
+    Партнёры выбирают из справочника своих стран, но не пополняют его: справочник
+    один и принадлежит УК (D284). Одно правило на бота и на веб-админку (#437).
+    """
+    return canonical_tenant(tenant) == HQ_TENANT

@@ -135,6 +135,25 @@ async def test_название_из_60_эмодзи_не_принимается
     assert session.last_text == t("start.unit_too_long_bytes", "ru")
 
 
+async def test_байтовый_предел_и_на_сведённом_имени(domain_env: Path) -> None:
+    """Ввод проходит оба предела, а «Город-N» после сведения — нет (#437, ревью #510).
+
+    «щ» становится «shch», грузинские буквы остаются трёхбайтными: в шапку и в
+    имя файла ляжет имя длиннее байтового предела, если сверять только ввод.
+    """
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+    написано = "щ" * 6 + "ქ" * 32 + "-1"
+    assert len(написано.encode("utf-8")) <= UNIT_NAME_BYTE_LIMIT
+
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback("start:new"))
+    await feed(dp, bot, text_message(написано))
+
+    assert get_state(CHAT_ID) is None
+    assert session.last_text == t("start.unit_too_long_bytes", "ru")
+
+
 async def test_название_в_60_кириллических_знаков_принимается_по_прежнему(
     domain_env: Path,
 ) -> None:
