@@ -31,6 +31,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import psycopg
@@ -68,13 +69,17 @@ where id = %s and storage_path is null
 #: (`photos_follow_visible_inspection`), значит и их кадры сюда не попадут.
 #: Свежие — не раньше `min_age_sec`: их, скорее всего, прямо сейчас выгружает
 #: сама сдача с байтами на руках, и качать их у телеграма второй раз незачем.
+#: Застарелые — старше `max_age_sec`, если он задан, — в обычный проход не
+#: идут: кадр, который телеграм не отдаёт неделями, иначе вечно занимал бы
+#: место в выборке (ревью #514).
 _SELECT_ALL_PENDING_SQL = """
-select inspection_id, telegram_file_id
+select inspection_id, telegram_file_id, created_at
 from photos
 where storage_path is null and purged_at is null
-  and created_at < now() - make_interval(secs => %s)
+  and created_at < now() - make_interval(secs => %(min_age)s)
+  and (%(max_age)s::float8 is null or created_at >= now() - make_interval(secs => %(max_age)s))
 order by created_at, id
-limit %s
+limit %(limit)s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
@@ -87,31 +92,40 @@ class PendingUpload:
     inspection_id: str
     #: Идентификаторы телеграма без повторов, в порядке поступления.
     file_ids: tuple[str, ...]
+    #: С какого момента ждёт самый старый из этих кадров.
+    waiting_since: datetime
 
 
 #: Сколько кадров брать за один проход дозагрузки. Остаток возьмёт следующий.
 PENDING_BATCH = 1000
 
 
-def pending_photo_uploads(*, min_age_sec: int, limit: int = PENDING_BATCH) -> list[PendingUpload]:
+def pending_photo_uploads(
+    *, min_age_sec: int, max_age_sec: int | None = None, limit: int = PENDING_BATCH
+) -> list[PendingUpload]:
     """Какие кадры ещё не легли в хранилище — по проверкам (#459).
 
     Читает только базу: хранилище здесь не трогается, поэтому ответ есть и
     тогда, когда оно лежит, — и это ровно тот момент, когда он нужен.
+    `max_age_sec` отрезает застарелые кадры (у них свой, редкий проход).
     """
     settings = check_environment()
+    params = {"min_age": min_age_sec, "max_age": max_age_sec, "limit": limit}
     try:
         with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
-            cur.execute(_SELECT_ALL_PENDING_SQL, (min_age_sec, limit))
+            cur.execute(_SELECT_ALL_PENDING_SQL, params)
             rows = cur.fetchall()
     except psycopg.Error as exc:
         raise PushError(
             f"Список невыгруженных кадров не прочитан ({type(exc).__name__}): {exc}"
         ) from exc
     by_inspection: dict[str, dict[str, None]] = {}
-    for inspection_id, file_id in rows:
-        by_inspection.setdefault(str(inspection_id), {})[str(file_id)] = None
-    return [PendingUpload(key, tuple(ids)) for key, ids in by_inspection.items()]
+    since: dict[str, datetime] = {}
+    for inspection_id, file_id, created_at in rows:
+        key = str(inspection_id)
+        by_inspection.setdefault(key, {})[str(file_id)] = None
+        since.setdefault(key, created_at)  # строки идут по возрастанию времени
+    return [PendingUpload(key, tuple(ids), since[key]) for key, ids in by_inspection.items()]
 
 
 def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> None:

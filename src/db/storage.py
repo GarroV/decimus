@@ -191,6 +191,22 @@ class S3PhotoStorage:
         # хранилища в момент показа, а не хранится.
         return f"s3://{self._bucket}/{key}"
 
+    def ping(self) -> None:
+        """Дешёво спросить, живо ли хранилище: `head_bucket`, без объектов (#459).
+
+        Дозагрузка зовёт это до того, как качать кадры у телеграма: при лежащем
+        хранилище качать незачем. Отказ — `StorageError`.
+        """
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        try:
+            self._client.head_bucket(Bucket=self._bucket)
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не ответило на проверку корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
+
     def delete(self, key: str) -> None:
         """Убрать объект. Отсутствующего объекта достаточно, чтобы считать дело сделанным.
 

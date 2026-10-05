@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
 import pytest
@@ -22,8 +23,9 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.bot.photo_backfill import backfill_once  # noqa: E402
-from src.db.errors import PhotosDeferredError, StorageError  # noqa: E402
+from src.bot import photo_backfill  # noqa: E402
+from src.bot.photo_backfill import STALE_AFTER_SEC, backfill_once  # noqa: E402
+from src.db.errors import ConfigError, PhotosDeferredError, PushError, StorageError  # noqa: E402
 from src.db.photos import pending_photo_uploads, upload_photos  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
 from src.domain import add_finding, attach_photo, start_inspection  # noqa: E402
@@ -76,6 +78,13 @@ class Склад:
         self.вызовов += 1
         self.положено[key] = data
         return f"s3://{КОРЗИНА}/{key}"
+
+    def delete(self, key: str) -> None:
+        self.положено.pop(key, None)
+
+    def ping(self) -> None:
+        if self.лежит:
+            raise StorageError("хранилище не ответило")
 
 
 # --- сдача при лежащем хранилище -------------------------------------------
@@ -180,3 +189,92 @@ def test_кадр_записанный_другим_выгрузчиком_не_
     assert all(str(p).startswith(f"s3://{КОРЗИНА}/") for p in ссылки.values()), (
         f"ссылку первого выгрузчика переписал второй: {ссылки}"
     )
+
+
+# --- ревью #514 ---------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_лежащее_хранилище_проверяется_до_телеграма(domain_env: Path, db_env: str) -> None:
+    """Хранилище лежит — у телеграма не качаем ничего: всё равно класть некуда."""
+    _проверка(47)
+    запрошено: list[str] = []
+
+    async def телеграм(file_id: str) -> bytes | None:
+        запрошено.append(file_id)
+        return КАДРЫ.get(file_id)
+
+    итог = await backfill_once(телеграм, min_age_sec=0, storage=Склад(лежит=True))
+
+    assert итог.storage_down
+    assert запрошено == [], "кадры качались у телеграма при лежащем хранилище"
+
+
+def _состарить(pg_dsn: str, inspection_id: str, дней: int) -> None:
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute(
+            "update photos set created_at = now() - make_interval(days => %s) "
+            "where inspection_id = %s",
+            (дней, inspection_id),
+        )
+
+
+@pytest.mark.asyncio
+async def test_застарелый_кадр_не_занимает_частый_проход_а_берётся_редким(
+    domain_env: Path, db_env: str, pg_dsn: str
+) -> None:
+    старая = _проверка(48)
+    _состарить(pg_dsn, старая, 5)
+    свежая = _проверка(49)
+    склад = Склад()
+
+    частый = await backfill_once(_телеграм, min_age_sec=0, storage=склад)
+
+    assert частый.pending == len(КАДРЫ), "застарелые кадры попали в частый проход"
+    assert all(_ссылки(db_env, свежая).values())
+    assert not any(_ссылки(db_env, старая).values())
+
+    редкий = await backfill_once(
+        _телеграм, min_age_sec=STALE_AFTER_SEC, max_age_sec=None, storage=склад
+    )
+
+    assert (редкий.pending, редкий.uploaded) == (len(КАДРЫ), len(КАДРЫ))
+    assert редкий.oldest is not None
+    assert all(_ссылки(db_env, старая).values()), "редкий проход не долил застарелые кадры"
+
+
+@pytest.mark.asyncio
+async def test_отказ_одной_проверки_не_обрывает_проход(
+    domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    первая = _проверка(50)
+    вторая = _проверка(51)
+    настоящая = photo_backfill.db.upload_photos
+
+    def выгрузка(inspection_id: str, **kw: object) -> int:
+        if inspection_id == первая:
+            raise PushError("база не приняла отметку")
+        return настоящая(inspection_id, **kw)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(photo_backfill.db, "upload_photos", выгрузка)
+
+    итог = await backfill_once(_телеграм, min_age_sec=0, storage=Склад())
+
+    assert итог.failed == 1
+    assert all(_ссылки(db_env, вторая).values()), "вторая проверка не долита после отказа первой"
+
+
+@pytest.mark.asyncio
+async def test_ненастроенное_хранилище_при_непустой_очереди_это_ошибка_вслух(
+    domain_env: Path, db_env: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    _проверка(52)
+    for имя in ("S3_BUCKET", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_ENDPOINT_URL"):
+        monkeypatch.delenv(имя, raising=False)
+
+    with caplog.at_level(logging.ERROR), pytest.raises(ConfigError):
+        await backfill_once(_телеграм, min_age_sec=0)
+
+    assert any(
+        r.levelno >= logging.ERROR and "кадров ждёт 2" in r.getMessage() for r in caplog.records
+    ), "очередь стоит, а журнал молчит"
