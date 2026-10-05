@@ -29,6 +29,7 @@ from mcp_checklist_harness import build_edition
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.mcp.checklist import check_code
+from src.mcp.checklist_layout import check_slug
 from src.mcp.errors import ChecklistError
 from src.web import methodology as method
 from src.web.errors import MethodologyRefused
@@ -36,11 +37,21 @@ from src.web.texts import TEXTS, UI_LANGS
 
 ROOT = Path(__file__).resolve().parents[1]
 MCP_DIR = ROOT / "src" / "mcp"
+DOMAIN_STORE = ROOT / "src" / "domain" / "checklist_store.py"
 WEB_DIR = ROOT / "src" / "web"
 
-#: Модули, чьи отказы доходят до панели «Методики» и обязаны нести код (#475).
-CODED_MODULES = ("checklist.py", "checklists.py", "checklist_tools.py")
-REFUSAL_TYPES = {"ChecklistError", "EngineNoVerdictError"}
+#: Модули, чьи отказы доходят до панели «Методики» и обязаны нести код (#475, #504).
+#: Модули двери, до которых веб не доходит (фото-эталоны, подсказки, непокрытые
+#: фразы, чтение проверок), здесь не названы: их отказы читает только агент.
+CODED_MODULES = (
+    MCP_DIR / "checklist.py",
+    MCP_DIR / "checklists.py",
+    MCP_DIR / "checklist_tools.py",
+    MCP_DIR / "route.py",
+    MCP_DIR / "checklist_layout.py",
+    DOMAIN_STORE,
+)
+REFUSAL_TYPES = {"ChecklistError", "EngineNoVerdictError", "ChecklistStoreError"}
 
 ТЕНАНТ = "default"
 
@@ -72,7 +83,7 @@ def _param_names(call: ast.Call, where: str) -> frozenset[str]:
 def _raised() -> dict[str, set[frozenset[str]]]:
     """Ключ текста → наборы параметров, с которыми его кладут в отказ."""
     found: dict[str, set[frozenset[str]]] = {}
-    for path in sorted(MCP_DIR.glob("*.py")):
+    for path in [*sorted(MCP_DIR.glob("*.py")), DOMAIN_STORE]:
         for call in _calls(path):
             code = _keyword(call, "refusal")
             if isinstance(code, ast.Constant) and isinstance(code.value, str):
@@ -139,9 +150,9 @@ def test_rate_field_refusals_have_texts() -> None:
 def test_every_store_refusal_carries_a_code() -> None:
     """Отказ без кода приходит английскому интерфейсу по-русски — тихо."""
     uncoded = [
-        f"{name}:{call.lineno}"
-        for name in CODED_MODULES
-        for call in _calls(MCP_DIR / name)
+        f"{path.name}:{call.lineno}"
+        for path in CODED_MODULES
+        for call in _calls(path)
         if getattr(call.func, "id", None) in REFUSAL_TYPES and _keyword(call, "refusal") is None
     ]
     assert not uncoded, f"отказ без кода: {', '.join(uncoded)}"
@@ -207,3 +218,14 @@ def test_form_refusal_comes_in_english_on_english_screen(клиент: FlaskClie
 
     assert "Rate D1 is “abc”, which is not a number." in страница
     assert "а это не число" not in страница
+
+
+def test_domain_refusal_keeps_its_code_through_mcp() -> None:
+    """Отказ яруса `domain` переводится в отказ MCP — код и параметры не теряются (#504)."""
+    with pytest.raises(ChecklistError) as caught:
+        check_slug("BAD!", что="Код чек-листа")
+    отказ = caught.value
+
+    assert "не годится" in str(отказ), "текст MCP изменился — агенты читают его"
+    assert отказ.refusal == "bad_slug"
+    assert "“BAD!” is not valid" in method.refusal_text(method._refusal(отказ), "en")

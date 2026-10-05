@@ -22,9 +22,10 @@ import csv
 import json
 import os
 import re
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 from .edition import DEFAULT_CODE as DEFAULT_CODE
 from .errors import DomainError
@@ -79,7 +80,23 @@ BOT_BLOCK_DRAFT, BOT_BLOCK_RETIRED, BOT_BLOCK_UNPUBLISHED, BOT_BLOCK_EMPTY = (
 
 
 class ChecklistStoreError(DomainError):
-    """Хранилище методик или код в нём не годятся — отказ яруса `domain`."""
+    """Хранилище методик или код в нём не годятся — отказ яруса `domain`.
+
+    Код отказа и параметры — как у отказов MCP (`src/mcp/errors.py`): MCP
+    переводит этот отказ в свой, не теряя их, и веб берёт по коду фразу на
+    языке интерфейса (#504). Текст остаётся русским — его читает агент.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        refusal: str | None = None,
+        params: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.refusal = refusal
+        self.params: Mapping[str, object] = MappingProxyType(dict(params or {}))
 
 
 @dataclass(frozen=True)
@@ -132,7 +149,9 @@ def check_slug(value: str, *, что: str) -> str:
         raise ChecklistStoreError(
             f"{что} «{value}» не годится: ожидаются строчные латинские буквы, цифры, дефис и "
             f"подчёркивание, до 32 знаков (например «bizdev»). Код уезжает в базу к каждой "
-            f"проверке и в путь хранилища, поэтому он строже названия"
+            f"проверке и в путь хранилища, поэтому он строже названия",
+            refusal="bad_slug",
+            params={"value": value},
         )
     return значение
 
@@ -291,13 +310,17 @@ def published_dir(store: Store, edition: str) -> Path:
     if not is_one_segment((edition or "").strip()):
         raise ChecklistStoreError(
             f"«{edition}» не может быть именем каталога издания. Перечень версий отдаёт "
-            f"checklist_versions"
+            f"checklist_versions",
+            refusal="bad_version",
+            params={"version": edition},
         )
     каталог = store.home / VERSIONS_DIR / edition
     if not каталог.is_dir():
         raise ChecklistStoreError(
             f"Версии методики «{edition}» в хранилище нет. Перечень версий отдаёт "
-            f"checklist_versions"
+            f"checklist_versions",
+            refusal="version_missing",
+            params={"version": edition},
         )
     return каталог
 

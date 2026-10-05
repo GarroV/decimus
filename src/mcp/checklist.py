@@ -562,6 +562,7 @@ def _point_at(store: Store, version: str) -> None:
                 "Хранилище версий методики собрано не этим механизмом: уберите этот файл или "
                 f"укажите под хранилище другой каталог. {IN_LOG}"
             ),
+            refusal="version_link_not_link",
         )
     except ChecklistError:
         _to_log("на месте указателя не ссылка", MCP_CHECKLIST_STORE=store.root)
