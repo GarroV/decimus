@@ -33,7 +33,10 @@ def заведено(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     def _create(name: str, **поля: Any) -> CreatedUnit:
         позвали.append({"name": name, **поля})
         if name == "Belgrade-1":
-            raise UnitExistsError("есть", unit_id="u-old", name="Belgrade-1")
+            raise UnitExistsError("есть", unit_id="u-old", name="Belgrade-1", country="RS")
+        if name == "Batumi-1":
+            # Синоним грузинского ввода ведёт к точке другой страны.
+            raise UnitExistsError("есть", unit_id="u-far", name="Batumi-1", country="AM")
         if name == "Novi Sad-9":
             raise PushError("база не ответила")
         if name == "Novi Sad-12":
@@ -217,3 +220,10 @@ def test_занятый_синоним_не_теряется_молча(уК: Fl
     assert ответ.status_code == 302
     assert "alias_taken=1" in ответ.headers["Location"]
     assert "alias_taken" not in отправить(уК, name="Белград 6").headers["Location"]
+
+
+def test_дубль_вне_охвата_без_ссылки(уК_узкий: FlaskClient, заведено: list[dict[str, Any]]) -> None:
+    ответ = уК_узкий.post("/country/GE/units/new", data={"name": "Батуми 1"}, headers=ЗАГОЛОВКИ)
+    страница = ответ.get_data(as_text=True)
+    assert ответ.status_code == 409
+    assert "Batumi-1" in страница and "/units/u-far" not in страница

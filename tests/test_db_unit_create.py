@@ -53,7 +53,11 @@ def test_дубль_по_имени_отказ_и_прежняя_строка_н
     with pytest.raises(UnitExistsError) as отказ:
         create_unit("belgrade-1", country="ME", city="podgorica", tenant=УК)
 
-    assert (отказ.value.unit_id, отказ.value.name) == (прежняя, "Belgrade-1")
+    assert (отказ.value.unit_id, отказ.value.name, отказ.value.country) == (
+        прежняя,
+        "Belgrade-1",
+        "RS",
+    )
     assert _строка(db_env, прежняя) == ("Belgrade-1", "RS", "beograd")
 
 
