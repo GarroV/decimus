@@ -29,7 +29,7 @@ from src.domain.tenants import HQ_TENANT
 
 from .config import check_environment
 from .directory import resolve_unit_id
-from .errors import PushError, VersionMismatchError
+from .errors import PushError, UnitRefusedError, VersionMismatchError
 from .fingerprint import compute_fingerprint, previous_fingerprints
 from .units import normalize_unit_name
 
@@ -287,15 +287,16 @@ def _push_info(cur: psycopg.Cursor[Any], inspection: Inspection, *, inspection_i
         место += 1
 
 
-def _unit_refused(unit: str, tenant_code: str) -> PushError:
+def _unit_refused(unit: str, tenant_code: str) -> UnitRefusedError:
     """Один отказ на «точки нет в справочнике» и «точка чужой страны» (ревью #340, п.10).
 
     Различие подсказало бы партнёру, что пиццерия с таким названием в сети
     есть, только не в его странах.
     """
-    return PushError(
+    return UnitRefusedError(
         f"Пиццерии «{unit}» нет в справочнике стран пространства {tenant_code}. "
-        f"Новую пиццерию заводит только УК (D234)"
+        f"Новую пиццерию заводит только УК (D234)",
+        unit=unit,
     )
 
 
