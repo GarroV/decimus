@@ -15,8 +15,14 @@ upload_photos(inspection_id: str, *, fetch: Callable[[str], bytes | None],
 # хранилище не приняло кадр — PhotosDeferredError (наследник PushError): строки
 # остаются с пустым storage_path и ждут дозагрузки (#459); кадр, записанный
 # другим выгрузчиком, не переписывается и в счёт не идёт
-pending_photo_uploads(*, min_age_sec: int, limit: int = 1000)
-    -> list[PendingUpload]   # невыгруженные кадры по проверкам: (inspection_id, file_ids)
+pending_photo_uploads(*, min_age_sec: int, max_age_sec: int | None = None,
+                      limit: int = 1000)
+    -> list[PendingUpload]   # невыгруженные кадры по проверкам:
+                             # (inspection_id, file_ids, waiting_since); max_age_sec
+                             # отрезает застарелые — у них редкий проход
+# S3PhotoStorage(settings, *, fail_fast=False): fail_fast=True — 5 с на
+# соединение и одна попытка, только для upload_photos и upload_report (сдача и
+# дозагрузка); остальные — умолчания botocore с повторами. ping() — head_bucket
 # охват чтения (волна 1, #340; D283, D284, D289) — src/db/reach.py
 # Reach(tenant, tenants, countries): кто читает; чьи проверки (None — всех);
 #   пиццерии каких стран (None — всех, () — ничего). Reach.params() — массивы

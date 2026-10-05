@@ -1292,6 +1292,22 @@ TEXTS: dict[str, dict[str, str]] = {
             "storage is back: nothing for you to do."
         ),
     },
+    # То же, но часть кадров телеграм не отдал уже на сдаче (их нет и в отчёте):
+    # за них дозагрузка ничего не обещает (ревью #514).
+    "finish.photos_deferred_partial": {
+        "ru": (
+            "Проверка в историю записана. Хранилище фото сейчас недоступно, поэтому "
+            "кадры в него пока не легли. Бот догрузит их сам, когда хранилище вернётся, — "
+            "кроме кадров, которых не отдал телеграм ({lost}): их нет и в отчёте, и вернуть "
+            "их бот не обещает."
+        ),
+        "en": (
+            "The inspection reached the history. The photo storage is unavailable right now, "
+            "so the photos are not in it yet. The bot will upload them by itself once the "
+            "storage is back — except the photos Telegram did not return ({lost}): they are "
+            "missing from the report too, and the bot cannot promise to bring them back."
+        ),
+    },
     "finish.photos_not_archived": {
         "ru": (
             "Проверка в историю записана, а кадры в хранилище не уехали. Отчёта это не "

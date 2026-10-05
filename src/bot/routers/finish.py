@@ -158,6 +158,7 @@ async def archive(
     *,
     allow_missing: bool,
     report: Path | None = None,
+    lost: int = 0,
 ) -> None:
     """Отправить завершённую проверку в историю: сама проверка, затем кадры (T123).
 
@@ -235,7 +236,12 @@ async def archive(
         # Проверка в истории, кадры в базе строками без ссылки — их дольёт
         # дозагрузка (`photo_backfill`). Аудитору — что делать ничего не надо.
         logger.warning("кадры проверки чата %s отложены до дозагрузки: %s", chat_id, exc)
-        await message.answer(t("finish.photos_deferred", lang))
+        # Кадры, которых телеграм не отдал уже на сдаче (`lost`), дозагрузка
+        # вернуть не обещает: за них «догрузим сам» было бы неправдой (ревью #514).
+        if lost:
+            await message.answer(t("finish.photos_deferred_partial", lang, lost=lost))
+        else:
+            await message.answer(t("finish.photos_deferred", lang))
         # Отчёт уехал бы в то же лежащее хранилище и ждал бы отказа ещё раз,
         # пока бот, обрабатывающий сообщения по одному, стоит для всех.
         if report is not None:
@@ -419,7 +425,15 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
 
         # После отчёта, а не вместо: не собравшееся письмо проверку в истории
         # не отменяет — она завершена ровно тем, что документ уже у аудитора.
-        await archive(message, chat_id, found, lang, allow_missing=allow_missing, report=pdf)
+        await archive(
+            message,
+            chat_id,
+            found,
+            lang,
+            allow_missing=allow_missing,
+            report=pdf,
+            lost=len(set(refs) - set(found)),
+        )
 
 
 def build_finish_router(store: MaterialStore) -> Router:

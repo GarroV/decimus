@@ -377,3 +377,28 @@ async def test_расхождение_версии_на_сливе_даёт_те
     ]
     assert VERSION_SYNC_CALLBACK in кнопки, "выхода «перевести на действующую методику» нет"
     assert VERSION_KEEP_CALLBACK in кнопки, "выхода «оставить как есть» нет"
+
+
+class _Чат:
+    """Сообщение-двойник: помнит, что бот ответил."""
+
+    def __init__(self) -> None:
+        self.ответы: list[str] = []
+
+    async def answer(self, text: str, **_: Any) -> None:
+        self.ответы.append(text)
+
+
+async def test_за_кадры_не_отданные_телеграмом_дозагрузку_не_обещаем(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ревью #514: часть кадров телеграм не отдал на сдаче — «догрузим сам» не про них."""
+    from src.bot.routers.finish import archive
+
+    подменить_слив(monkeypatch, "insp-1")
+    подменить_выгрузку(monkeypatch, db.PhotosDeferredError("хранилище недоступно"))
+    чат = _Чат()
+
+    await archive(чат, CHAT_ID, {}, "ru", allow_missing=True, lost=2)  # type: ignore[arg-type]
+
+    assert чат.ответы == [t("finish.photos_deferred_partial", "ru", lost=2)]
