@@ -1,0 +1,77 @@
+{#
+  Общие куски предписания (волна 3): метка состояния, письмо, пиццерии и
+  основания, ответы партнёра, история. Одна разметка на раздел УК, раздел
+  партнёра и экран страны — иначе копии разойдутся молча.
+#}
+{% macro rx_tag(p, today) -%}
+  {%- set state = p.state(today) -%}
+  <span class="tag tag--micro {{ rx_tones[state] }}">{{ t('rx.state.' ~ state) }}</span>
+{%- endmacro %}
+
+{% macro rx_replied(p) -%}
+  {%- if p.status == 'issued' and p.replies %} <span class="tag tag--micro tag--warn">{{ t('rx.event.replied') }}</span>{% endif -%}
+{%- endmacro %}
+
+{% macro rx_units(p) -%}
+  {%- if p.whole_country -%}{{ t('rx.whole_country') }}{%- else -%}{{ p.units|map(attribute='name')|join(', ') }}{%- endif -%}
+{%- endmacro %}
+
+{% macro letter(p) -%}
+  <div class="rx-letter">
+    <div class="rx-letter__to ov-cell__muted">{{ t('rx.card.to', to=(p.recipients or t('rx.card.no_recipients'))) }}</div>
+    <div class="rx-letter__subject">{{ p.subject }}</div>
+    <div class="rx-letter__body">{{ p.body }}</div>
+  </div>
+{%- endmacro %}
+
+{% macro bases(p, registry_path) -%}
+  {% if p.bases %}
+    <ul class="rx-list">
+      {% for b in p.bases %}
+        <li>
+          {% if b.known %}
+            <a href="{{ url(registry_path ~ '/' ~ b.inspection_id) }}?lang={{ lang }}">{{ b.unit_name }} · {{ b.inspection_date }}</a>
+            {% if b.grade %}<span class="grade tag tag--micro">{{ b.grade }}</span>{% endif %}
+            {% if b.pct is not none %}<span class="ov-cell__muted">{{ '%.1f'|format(b.pct) }}%</span>{% endif %}
+          {% else %}
+            <span class="ov-cell__muted">{{ t('rx.base_unknown') }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="ov-cell__muted">{{ t('rx.card.no_bases') }}</div>
+  {% endif %}
+{%- endmacro %}
+
+{% macro replies(p, files_path) -%}
+  {% if p.replies %}
+    <ol class="plan-versions">
+      {% for r in p.replies|reverse %}
+        <li class="rx-reply">
+          <div class="rx-reply__text">{{ r.comment }}</div>
+          <div class="plan-versions__row">
+            {% if r.file_name %}<a class="plan-versions__file" href="{{ url(files_path ~ '/files/' ~ r.id) }}">{{ r.file_name }}</a>{% endif %}
+            <span class="ov-cell__muted">{{ t('rx.reply.meta', by=r.replied_by, at=r.replied_at.strftime('%Y-%m-%d %H:%M')) }}</span>
+          </div>
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <div class="ov-cell__muted">{{ t('rx.card.no_replies') }}</div>
+  {% endif %}
+{%- endmacro %}
+
+{% macro history(p) -%}
+  <ol class="plan-history">
+    {% for e in p.events %}
+      <li><span class="ov-cell__muted">{{ e.at.strftime('%Y-%m-%d %H:%M') }}</span>
+        {{ t('rx.event.' ~ e.action) }} · {{ e.actor }}{% if e.action == 'closed' and e.detail %} · «{{ e.detail }}»{% endif %}</li>
+    {% endfor %}
+  </ol>
+{%- endmacro %}
+
+{% macro meta(p) -%}
+  {%- if p.issued_at %}{{ t('rx.issued_meta', at=p.issued_at.strftime('%Y-%m-%d'), by=p.issued_by) }}{% endif -%}
+  {%- if p.closed_at %} · {{ t('rx.closed_meta', at=p.closed_at.strftime('%Y-%m-%d'), by=p.closed_by) }}{% endif -%}
+{%- endmacro %}

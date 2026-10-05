@@ -1,0 +1,13 @@
+{# Предписания нет в охвате. Тем же ответом отвечает чужое, черновое для
+   партнёра и несуществующее — различать их снаружи нельзя намеренно. #}
+{% extends "base.html" %}
+{% block title %}{{ t('rx.not_found.title') }}{% endblock %}
+{% block body %}
+  <div class="row row--tight">
+    <a class="back" href="{{ url(back) }}?lang={{ lang }}">‹ {{ t('rx.not_found.back') }}</a>
+  </div>
+  <div class="empty mt-gap">
+    <div class="empty__title">{{ t('rx.not_found.title') }}</div>
+    <p class="empty__text">{{ t('rx.not_found.text') }}</p>
+  </div>
+{% endblock %}
