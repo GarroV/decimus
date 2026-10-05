@@ -431,3 +431,25 @@ def test_чужое_пространство_не_видит_ни_видимог
     assert finding_previews(inspection_id, reach=чужой) == {}
     for кадр in (видимый, убранный):
         assert preview_bytes(inspection_id, кадр, reach=чужой, storage=Читатель()) is None
+
+
+def test_убранный_кадр_с_копией_считается_недоступным_а_не_показанным(
+    domain_env: Path, db_env: str, pg_dsn: str
+) -> None:
+    """#422: у убранного кадра `preview_path` остаётся, но показать его нечем."""
+    from src.db.previews import FindingShots, finding_previews, preview_bytes
+
+    inspection_id, запись, видимый, убранный, склад = _два_кадра_один_убран(db_env, pg_dsn, 42)
+    ((tenant,),) = _строки(
+        db_env, "select tenant_code from inspections where id = %s", (inspection_id,)
+    )
+
+    class Читатель:
+        def get(self, key: str) -> bytes:
+            return next(iter(склад.положено.values()))
+
+    свой = own_reach(str(tenant))
+    assert finding_previews(inspection_id, reach=свой) == {
+        запись: FindingShots(shown=(видимый,), missing=1)
+    }
+    assert preview_bytes(inspection_id, убранный, reach=свой, storage=Читатель()) is None
