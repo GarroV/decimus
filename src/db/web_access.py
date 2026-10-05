@@ -47,9 +47,10 @@ from typing import Any
 
 import psycopg
 
-from .config import check_environment, load_retraction_settings
-from .errors import AccessError, ConfigError, EmailTakenError
-from .migrate import admin_dsn
+from .config import check_environment
+from .database_target import managing_dsn, same_database_or_deny
+from .errors import AccessError, EmailTakenError
+from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
 from .reading import reading
 from .space_guard import require_space
 
@@ -384,6 +385,7 @@ def _owned(зачем: str) -> Iterator[psycopg.Connection[Any]]:
             f"владельца схемы — та же, что накатывает миграции; роль приложения "
             f"этого права не имеет намеренно"
         )
+    same_database_or_deny(DATABASE_ADMIN_URL_VAR, dsn, зачем)
     try:
         with psycopg.connect(dsn) as conn:
             yield conn
@@ -406,17 +408,13 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     объявлен здесь и повторяется всегда одинаково. Молчаливым откат был бы,
     если бы вторая роль права НЕ имела и отказывала уже на записи — тогда
     настоящая причина («не задано подключение») пряталась бы за чужой.
+
+    Выбранное подключение сверяется с остальными заданными (#487): ведут в
+    разные базы — отказ с названием каждой, а не запись туда, куда пришла
+    первая по порядку переменная.
     """
-    try:
-        dsn = load_retraction_settings().dsn
-    except ConfigError:
-        dsn = admin_dsn() or ""
-    if not dsn:
-        raise AccessError(
-            f"Не удалось {зачем}: не задано ни DATABASE_RETRACTION_URL, ни "
-            f"DATABASE_ADMIN_URL. Учётки трогает роль повышенных полномочий; "
-            f"роль приложения этого права не имеет намеренно (D155)"
-        )
+    var, dsn = managing_dsn(зачем)
+    same_database_or_deny(var, dsn, зачем)
     try:
         with psycopg.connect(dsn) as conn:
             yield conn

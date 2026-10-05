@@ -395,6 +395,9 @@ refuse(message, lang, *, step, key, reply_markup=None, **fmt)  # ответит�
                                                  # и строка в `STATE_DIR/bot-stops.jsonl`
 note_stop(telegram_id, *, step, reason) -> None  # то же без ответа; отказ записи хендлер не роняет
 count_stops(since, *, path=None) -> list[StopCount]  # по шагу и причине: сколько раз, скольким людям
+prune_stops(*, path=None, now=None) -> int        # обрезать до STOPS_RETENTION_DAYS (90, #501):
+                                                 # атомарная подмена под flock `<файл>.lock`;
+                                                 # note_stop зовёт её сам, когда старейшая строка вышла за срок
 
 # src/bot/routers/stops.py                       # `/stops [дней]` — счётчик за период (#436)
 STOPS_COMMAND: str                               # «stops»; пускает тот же `_guard`, что `/mcp`

@@ -22,6 +22,15 @@
 **Отказ записи не роняет ответ человеку.** Не записалась строка — это потеря
 сведений для подсчёта, а не повод оставить аудитора без сообщения.
 
+**Счётчик хранит `STOPS_RETENTION_DAYS` дней, не больше** (#501). Строки
+старше обрезаются при записи, как только самая старая строка файла вышла за
+срок: файл перестаёт расти по строке на отказ навсегда, а `/stops` спрашивает
+период не длиннее того же срока — иначе он молча считал бы меньше, чем
+спросили. Обрезка переписывает файл целиком во временный рядом и подменяет его
+атомарно (`os.replace`), а запись и обрезка идут под одной блокировкой файла
+(`flock` на `<файл>.lock`): иначе строка, дописанная между чтением и подменой,
+ушла бы в старый файл и пропала вместе с ним.
+
 Сообщений никому, кроме самого аудитора, отсюда не уходит: «повторяющийся отказ
 доходит до владельца» — это сообщение человеку, а такие отправки — только по
 явному «да» владельца на текст и адресатов. Пока его нет, владелец сам
@@ -30,11 +39,16 @@
 
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
+import os
+import tempfile
 from collections import Counter, defaultdict
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -49,6 +63,14 @@ logger = logging.getLogger(__name__)
 
 #: Файл счётчика в каталоге состояния: строка JSON на отказ.
 STOPS_FILE_NAME = "bot-stops.jsonl"
+
+#: Сколько дней счётчик помнит отказ (#501). Он же — предел периода `/stops`.
+STOPS_RETENTION_DAYS = 90
+STOPS_RETENTION = timedelta(days=STOPS_RETENTION_DAYS)
+
+#: Суффикс файла блокировки. Отдельный файл, а не сам счётчик: счётчик при
+#: обрезке подменяется другим, и блокировка на нём осталась бы на старом.
+LOCK_SUFFIX = ".lock"
 
 
 @dataclass(frozen=True)
@@ -82,10 +104,81 @@ def note_stop(telegram_id: int, *, step: str, reason: str) -> None:
     try:
         path = stops_path()
         path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(line, ensure_ascii=False) + "\n")
+        with _locked(path):
+            with path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(line, ensure_ascii=False) + "\n")
+            if _prune_due(path, _now()):
+                _prune_locked(path, _now())
     except (OSError, DomainError):
         logger.exception("отказ мастера (шаг %s) не записался в счётчик", step)
+
+
+@contextmanager
+def _locked(path: Path) -> Iterator[None]:
+    """Исключительная блокировка счётчика на время записи или обрезки."""
+    lock = path.with_name(path.name + LOCK_SUFFIX)
+    with lock.open("a") as handle:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+def _first_line(path: Path) -> str:
+    with path.open(encoding="utf-8") as f:
+        return f.readline()
+
+
+def _prune_due(path: Path, now: datetime) -> bool:
+    """Пора ли обрезать: самая старая (первая) строка вышла за срок или не читается.
+
+    Строки дописываются по времени, поэтому смотреть дальше первой не нужно, и
+    обычная запись не перечитывает файл целиком.
+    """
+    parsed = _parse(_first_line(path))
+    return parsed is None or parsed[0] < now - STOPS_RETENTION
+
+
+def prune_stops(*, path: Path | None = None, now: datetime | None = None) -> int:
+    """Обрезать счётчик до срока хранения. Возвращает, сколько строк убрано."""
+    source = path or stops_path()
+    if not source.exists():
+        return 0
+    with _locked(source):
+        return _prune_locked(source, now or _now())
+
+
+def _prune_locked(path: Path, now: datetime) -> int:
+    """Оставить строки не старше срока и подменить файл атомарно. Блокировка — на вызывающем.
+
+    Испорченные строки уходят вместе со старыми: посчитать их нельзя, а
+    оставленные, они делали бы обрезку «пора» на каждой записи.
+    """
+    cutoff = now - STOPS_RETENTION
+    kept: list[str] = []
+    dropped = 0
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        parsed = _parse(raw)
+        if parsed is not None and parsed[0] >= cutoff:
+            kept.append(raw)
+        elif raw.strip():
+            dropped += 1
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("".join(row + "\n" for row in kept))
+            f.flush()
+            os.fsync(f.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    if dropped:
+        logger.info(
+            "счётчик отказов обрезан до %d дней: убрано строк %d", STOPS_RETENTION_DAYS, dropped
+        )
+    return dropped
 
 
 async def refuse(
