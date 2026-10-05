@@ -26,7 +26,7 @@ from datetime import date
 from src.db import accept, move, previews, queries, reports, retract
 from src.db import letters as letters_store
 from src.db.config import load_retraction_settings
-from src.db.errors import DbError, MoveError
+from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.db.reach import Reach
 from src.domain.models import TEXT_LANGS
@@ -65,9 +65,16 @@ def retraction_available() -> bool:
     здесь не проверяется — только наличие настройки; поломка подключения
     вылезет отказом на самом вызове, и переспрашивать её заранее значило бы
     ходить в сеть дважды.
+
+    Задано, но ведёт не в ту базу (`DatabaseTargetError`, #515), — не «функции
+    нет», а поломка стенда: отказ уходит наверх и показывается страницей с
+    названными базами. Спрятать кнопки снятия здесь значило бы сделать
+    расхождение невидимым, а записи через это подключение ушли бы в чужую базу.
     """
     try:
         load_retraction_settings()
+    except DatabaseTargetError:
+        raise
     except DbError:
         return False
     return True

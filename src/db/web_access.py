@@ -411,10 +411,10 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 
     Выбранное подключение сверяется с остальными заданными (#487): ведут в
     разные базы — отказ с названием каждой, а не запись туда, куда пришла
-    первая по порядку переменная.
+    первая по порядку переменная. Сверяет `managing_dsn` (#515), здесь второй
+    раз не нужно.
     """
-    var, dsn = managing_dsn(зачем)
-    same_database_or_deny(var, dsn, зачем)
+    _, dsn = managing_dsn(зачем)
     try:
         with psycopg.connect(dsn) as conn:
             yield conn

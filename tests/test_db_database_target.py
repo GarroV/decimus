@@ -180,3 +180,151 @@ def test_web_user_при_расхождении_баз_отказывает_до
     assert "shared_test" in итог.stderr
     assert "заведена" not in итог.stdout
     assert ПАРОЛЬ not in итог.stdout + итог.stderr
+
+
+# --- #515: сверка у каждого, кто берёт подключение администратора истории ---
+
+
+def test_подключение_истории_сверяется_при_чтении() -> None:
+    """Сверка живёт в `load_retraction_settings`, а не у каждого потребителя (#515)."""
+    from src.db.config import load_retraction_settings
+    from src.db.errors import DatabaseTargetError
+
+    assert load_retraction_settings(окружение(ИСТОРИЯ_ТА_ЖЕ)).dsn == ИСТОРИЯ_ТА_ЖЕ
+    with pytest.raises(DatabaseTargetError) as отказ:
+        load_retraction_settings(окружение(ИСТОРИЯ_ЧУЖАЯ))
+
+    assert "shared_test" in str(отказ.value)
+    assert ПАРОЛЬ not in str(отказ.value)
+
+
+def test_незаданное_подключение_истории_не_расхождение() -> None:
+    """«Не задано» остаётся простым `ConfigError`: им живут необязательные функции."""
+    from src.db.config import load_retraction_settings
+    from src.db.errors import DatabaseTargetError
+
+    with pytest.raises(ConfigError) as отказ:
+        load_retraction_settings({"DATABASE_URL": ПРИЛОЖЕНИЕ})
+
+    assert not isinstance(отказ.value, DatabaseTargetError)
+
+
+def _потребители() -> list[Any]:
+    """Каждый, кто пишет или читает под администратором истории, — до подключения."""
+    import uuid
+    from datetime import date
+
+    from src.db import (
+        accept,
+        action_plans,
+        move,
+        prescriptions_write,
+        reading,
+        retract,
+        synonyms,
+        web_unlock,
+    )
+
+    проверка = str(uuid.uuid4())
+
+    def читать() -> None:
+        with reading.reading("проверки", as_admin=True):
+            pass
+
+    def разблокировать() -> None:
+        with web_unlock._connected("снять блокировку"):
+            pass
+
+    return [
+        lambda: retract.retract_inspection(проверка, tenant="demo", reason="дубль проверки"),
+        lambda: accept.accept_inspection(проверка, tenant="demo", actor="Аудитор"),
+        lambda: move.move_inspection(
+            проверка,
+            tenant="demo",
+            new_date=date(2026, 9, 1),
+            new_unit_id=str(uuid.uuid4()),
+            reason="не та дата",
+            actor="Аудитор",
+        ),
+        lambda: synonyms.retract_phrase(
+            "грязный пол", lang="ru", reason="неверный пункт", tenant="demo"
+        ),
+        lambda: synonyms.repoint_phrase(
+            "грязный пол", lang="ru", item_code="1.1", reason="неверный пункт", tenant="demo"
+        ),
+        читать,
+        разблокировать,
+        lambda: action_plans._admin_write("запросить план"),
+        lambda: prescriptions_write._admin("создать черновик"),
+    ]
+
+
+@pytest.mark.parametrize(
+    "номер",
+    range(9),
+    ids=[
+        "снятие",
+        "приёмка",
+        "перенос",
+        "снятие синонима",
+        "правка синонима",
+        "чтение снятых",
+        "разблокировка входа",
+        "экшн-план",
+        "предписание",
+    ],
+)
+def test_потребитель_истории_при_расхождении_не_подключается(
+    monkeypatch: pytest.MonkeyPatch, номер: int
+) -> None:
+    """Сценарий #515: запись не уходит в другую базу, а отказывает с названием баз."""
+    import psycopg
+
+    from src.db.errors import DatabaseTargetError
+
+    _выставить(monkeypatch, окружение(ИСТОРИЯ_ЧУЖАЯ))
+
+    def connect(dsn: str, *a: Any, **kw: Any) -> Any:
+        raise _Подключился(dsn)
+
+    monkeypatch.setattr(psycopg, "connect", connect)
+
+    with pytest.raises(DatabaseTargetError) as отказ:
+        _потребители()[номер]()
+
+    assert "разные базы" in str(отказ.value)
+    assert ПАРОЛЬ not in str(отказ.value)
+
+
+def test_экран_не_прячет_расхождение_за_незаданным(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Веб: не задано — функции нет; задано не туда — отказ наверх, а не «функции нет»."""
+    from src.db.errors import DatabaseTargetError
+    from src.web import inspections
+
+    monkeypatch.setenv("DATABASE_URL", ПРИЛОЖЕНИЕ)
+    monkeypatch.delenv("DATABASE_ADMIN_URL", raising=False)
+    monkeypatch.delenv("DATABASE_RETRACTION_URL", raising=False)
+    assert inspections.retraction_available() is False
+
+    _выставить(monkeypatch, окружение(ИСТОРИЯ_ТА_ЖЕ))
+    assert inspections.retraction_available() is True
+
+    _выставить(monkeypatch, окружение(ИСТОРИЯ_ЧУЖАЯ))
+    with pytest.raises(DatabaseTargetError):
+        inspections.retraction_available()
+
+
+def test_учётки_при_расхождении_истории_не_уходят_к_владельцу_схемы(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Расхождение — не «не задано»: отката на `DATABASE_ADMIN_URL` нет (#515)."""
+    from src.db.database_target import managing_dsn
+
+    _выставить(monkeypatch, окружение(ИСТОРИЯ_ЧУЖАЯ))
+    monkeypatch.delenv("DATABASE_ADMIN_URL")
+
+    with pytest.raises(AccessError) as отказ:
+        managing_dsn("завести учётку")
+
+    assert "разные базы" in str(отказ.value)
+    assert "не задано" not in str(отказ.value)
