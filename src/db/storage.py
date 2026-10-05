@@ -35,6 +35,32 @@ if TYPE_CHECKING:  # pragma: no cover — только для проверки �
 #: одно значение, — работа без потребителя.
 PHOTO_CONTENT_TYPE = "image/jpeg"  # кадр, не читаемый Pillow, кладётся как пришёл
 
+#: Сколько ждать соединения с хранилищем и сколько раз пробовать — ТОЛЬКО на
+#: пути сдачи и дозагрузки (`S3PhotoStorage(..., fail_fast=True)`, #459).
+#: Остальные читатели и писатели (админка, снятие, предписания, экшн-планы,
+#: MCP, доливщик копий) идут с умолчаниями botocore и их повторами: там человек
+#: сам нажал кнопку, отказ ему виден, а потерять запись из-за одной неудачной
+#: попытки хуже, чем подождать.
+#:
+#: Умолчания `botocore` — 60 секунд на соединение и пять попыток — рассчитаны на
+#: облако, а не на хранилище, которое спит (D259: MUSPELHEIM засыпает и сам не
+#: просыпается). Спящий узел tailnet на соединение не отвечает вовсе, и каждая
+#: попытка дожидается полного срока: на сдаче это минуты, а бот обрабатывает
+#: сообщения по одному (`handle_as_tasks=False`) — стояли бы все аудиторы.
+#: Короткий срок ничего не теряет: невыгруженный кадр остаётся в базе с пустой
+#: ссылкой, и его доливает дозагрузка (`src/bot/photo_backfill.py`).
+CONNECT_TIMEOUT_SEC = 5
+#: Ожидание ответа уже соединившегося хранилища. Кадр — сотни килобайт, отчёт —
+#: единицы мегабайт; полминуты тишины от живого сервера — уже отказ.
+READ_TIMEOUT_SEC = 30
+#: Всего попыток, включая первую (`total_max_attempts`, режим `standard`).
+#: Одна, без повтора: мгновенный сбой покроет дозагрузка — кадр не потеряется.
+#: Ключ именно `total_max_attempts`: `max_attempts` у botocore считает ПОВТОРЫ,
+#: и `max_attempts=1` давал две попытки (поймано тестом на `meta.config`).
+#: Замер 05.10.2026 на адресе, который не отвечает: одна попытка — 5,0 с,
+#: две — 10,4 с; умолчания botocore — 309 с.
+MAX_ATTEMPTS = 1
+
 
 @dataclass(frozen=True)
 class StorageSettings:
@@ -113,16 +139,28 @@ class S3PhotoStorage:
     сервиса из JSON и на каждый кадр это платить незачем.
     """
 
-    def __init__(self, settings: StorageSettings) -> None:
+    def __init__(self, settings: StorageSettings, *, fail_fast: bool = False) -> None:
+        """`fail_fast=True` — короткий срок и одна попытка (путь сдачи и дозагрузки, #459)."""
         import boto3
+        from botocore.config import Config
 
         self._bucket = settings.bucket
+        config = (
+            Config(
+                connect_timeout=CONNECT_TIMEOUT_SEC,
+                read_timeout=READ_TIMEOUT_SEC,
+                retries={"total_max_attempts": MAX_ATTEMPTS, "mode": "standard"},
+            )
+            if fail_fast
+            else None
+        )
         self._client: S3Client = boto3.client(
             "s3",
             endpoint_url=settings.endpoint_url or None,
             aws_access_key_id=settings.access_key_id,
             aws_secret_access_key=settings.secret_access_key,
             region_name=settings.region,
+            config=config,
         )
 
     @property
@@ -152,6 +190,22 @@ class S3PhotoStorage:
         # Открытая ссылка для человека собирается по этой из конфигурации
         # хранилища в момент показа, а не хранится.
         return f"s3://{self._bucket}/{key}"
+
+    def ping(self) -> None:
+        """Дешёво спросить, живо ли хранилище: `head_bucket`, без объектов (#459).
+
+        Дозагрузка зовёт это до того, как качать кадры у телеграма: при лежащем
+        хранилище качать незачем. Отказ — `StorageError`.
+        """
+        from botocore.exceptions import BotoCoreError, ClientError
+
+        try:
+            self._client.head_bucket(Bucket=self._bucket)
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError(
+                f"Хранилище не ответило на проверку корзины {self._bucket} "
+                f"({type(exc).__name__}): {exc}"
+            ) from exc
 
     def delete(self, key: str) -> None:
         """Убрать объект. Отсутствующего объекта достаточно, чтобы считать дело сделанным.
