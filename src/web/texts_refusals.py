@@ -241,6 +241,83 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "en": "The engine gave no answer: {script} was stopped by signal {signal}. This is "
         "a server failure, not a methodology one — repeat the edit.",
     },
+    # --- порядок обхода (#504) -----------------------------------------------------
+    "refusal.route_not_list": {
+        "ru": "Порядок обхода ожидается списком кодов, а пришла одна строка «{value}».",
+        "en": "The route order must be a list of codes, but a single string came: “{value}”.",
+    },
+    "refusal.route_code_twice": {
+        "ru": "Код «{code}» назван в порядке обхода дважды — одно из двух мест ошибочно.",
+        "en": "Code “{code}” appears twice in the route order — one of the two places is wrong.",
+    },
+    "refusal.route_unknown_zones": {
+        "ru": "В порядке обхода названы зоны, которых в методике нет: {unknown}. Зоны этой "
+        "версии: {known}.",
+        "en": "The route order names zones that are not in the methodology: {unknown}. Zones of "
+        "this version: {known}.",
+    },
+    "refusal.route_unknown_items": {
+        "ru": "В порядке обхода названы пункты, которых в методике нет: {unknown}. Пунктов в "
+        "этой версии: {count}.",
+        "en": "The route order names items that are not in the methodology: {unknown}. Items in "
+        "this version: {count}.",
+    },
+    "refusal.route_unreadable": {
+        "ru": "Маршрут обхода ({file}) в этой версии методики не читается. Разбор сказал: {detail}",
+        "en": "The route ({file}) in this methodology version cannot be read. The parser said: "
+        "{detail}",
+    },
+    "refusal.route_arrange_refused": {
+        "ru": "Порядок обхода не выстраивается. Разбор сказал: {detail}",
+        "en": "The route order cannot be arranged. The parser said: {detail}",
+    },
+    "refusal.route_parsed_otherwise": {
+        "ru": "После правки разбор видит порядок {seen}, а не {expected}. Правка записана не "
+        "так, как задумана.",
+        "en": "After the edit the parser sees the order {seen}, not {expected}. The edit was "
+        "not recorded as intended.",
+    },
+    "refusal.route_arranged_otherwise": {
+        "ru": "После правки аудитор пойдёт по порядку {got}, а не {wanted}. Правка записана не "
+        "так, как задумана.",
+        "en": "After the edit the auditor would follow the order {got}, not {wanted}. The edit "
+        "was not recorded as intended.",
+    },
+    "refusal.route_nothing_given": {
+        "ru": "Не задан ни порядок зон, ни порядок пунктов — менять нечего.",
+        "en": "Neither a zone order nor an item order was given — there is nothing to change.",
+    },
+    # --- раскладка хранилища (#504) --------------------------------------------
+    "refusal.bad_slug": {
+        "ru": "Код «{value}» не годится: ожидаются строчные латинские буквы, цифры, дефис и "
+        "подчёркивание, до 32 знаков (например «bizdev»).",
+        "en": "Code “{value}” is not valid: use lowercase Latin letters, digits, hyphens and "
+        "underscores, up to 32 characters (for example “bizdev”).",
+    },
+    "refusal.bad_state": {
+        "ru": "Состояние «{value}» неизвестно. Годятся: {states}.",
+        "en": "State “{value}” is unknown. Valid states: {states}.",
+    },
+    "refusal.prod_link_not_link": {
+        "ru": "На месте указателя чек-листа, применённого к проду, лежит не ссылка: хранилище "
+        "версий собрано не этим механизмом. Это настройка сервера — подробности в логе сервера.",
+        "en": "The production checklist pointer in the store is not a link: the version store "
+        "was not built by this mechanism. This is a server setting — details are in the "
+        "server log.",
+    },
+    "refusal.version_link_not_link": {
+        "ru": "На месте указателя действующей версии чек-листа лежит не ссылка: хранилище "
+        "версий собрано не этим механизмом. Это настройка сервера — подробности в логе сервера.",
+        "en": "The current-version pointer of the checklist is not a link: the version store "
+        "was not built by this mechanism. This is a server setting — details are in the "
+        "server log.",
+    },
+    "refusal.store_half_moved": {
+        "ru": "Хранилище версий методики выглядит наполовину перенесённым: версии лежат и в "
+        "старом месте, и в «{space}/{code}». Уберите одно из двух и повторите.",
+        "en": "The methodology version store looks half moved: versions are both in the old "
+        "place and in “{space}/{code}”. Remove one of the two and try again.",
+    },
     # --- отказы самого экрана: разбор ввода формы ---------------------------------
     "refusal.web.term_not_number": {
         "ru": "Срок устранения «{value}» не число. Пустой срок и срок 0 — разные вещи: "

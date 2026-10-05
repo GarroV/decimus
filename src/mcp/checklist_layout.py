@@ -132,12 +132,14 @@ def _translated[T](call: Callable[[], T]) -> T:
     """Позвать правило яруса `domain` и перевести его отказ в словарь блока MCP.
 
     Слова отказа те же: правило одно (`src/domain/checklist_store.py`), меняется
-    только тип — точка входа MCP и админка ловят `ChecklistError`.
+    только тип — точка входа MCP и админка ловят `ChecklistError`. Код и
+    параметры отказа едут дальше как есть: по ним веб берёт фразу на языке
+    интерфейса (#504).
     """
     try:
         return call()
     except _store.ChecklistStoreError as отказ:
-        raise ChecklistError(str(отказ)) from None
+        raise ChecklistError(str(отказ), refusal=отказ.refusal, params=отказ.params) from None
 
 
 def check_slug(value: str, *, что: str) -> str:
@@ -213,7 +215,9 @@ def check_state(value: str) -> str:
     if значение not in STATES:
         raise ChecklistError(
             f"Состояние «{value}» неизвестно. Годятся: {', '.join(STATES)} — черновик, в работе, "
-            f"снят"
+            f"снят",
+            refusal="bad_state",
+            params={"value": value, "states": ", ".join(STATES)},
         )
     return значение
 
@@ -234,15 +238,20 @@ def swap_link(link: Path, target: str) -> None:
     os.replace(временный, link)
 
 
-def guard_link(link: Path, *, что: str, подсказка: str) -> None:
+def guard_link(link: Path, *, что: str, подсказка: str, refusal: str) -> None:
     """Отказать, если на месте указателя лежит не ссылка.
 
     Хранилище держится на указателях-ссылках. Обычный файл или каталог на их
     месте означает, что каталог собран не этим механизмом, и дописывать в него
     издания нельзя — иначе однажды окажется, что публикация никуда не ведёт.
+
+    `refusal` — код отказа у вызывающего: какой указатель сбит, знает он, а
+    `что` и `подсказка` — русские слова для MCP, перевести которые нельзя (#504).
     """
     if link.exists(follow_symlinks=False) and not link.is_symlink():
-        raise ChecklistError(f"На месте указателя {что} лежит не ссылка. {подсказка}")
+        raise ChecklistError(
+            f"На месте указателя {что} лежит не ссылка. {подсказка}", refusal=refusal
+        )
 
 
 # --- карточка чек-листа -------------------------------------------------------
@@ -289,6 +298,7 @@ def guard_prod_link(root: Path) -> None:
             f"Хранилище версий методики, названное в MCP_CHECKLIST_STORE, собрано не этим "
             f"механизмом: уберите этот файл или укажите под хранилище другой каталог. {IN_LOG}"
         ),
+        refusal="prod_link_not_link",
     )
 
 
@@ -356,7 +366,9 @@ def migrate(store: Store) -> bool:
         raise ChecklistError(
             f"Хранилище версий методики выглядит наполовину перенесённым: издания лежат и в "
             f"старом месте, и в «{store.space}/{store.code}». Слить их молча нельзя — уберите "
-            f"одно из двух и повторите"
+            f"одно из двух и повторите",
+            refusal="store_half_moved",
+            params={"space": store.space, "code": store.code},
         )
     store.home.mkdir(parents=True, exist_ok=True)
     os.replace(старые, новые)
