@@ -230,6 +230,19 @@ async def archive(
         )
     except db.ConfigError as exc:
         logger.info("кадры проверки чата %s не выгружаются: %s", chat_id, exc)
+    except db.PhotosDeferredError as exc:
+        # Хранилище лежит (#459, D259: оно на MUSPELHEIM, а тот засыпает).
+        # Проверка в истории, кадры в базе строками без ссылки — их дольёт
+        # дозагрузка (`photo_backfill`). Аудитору — что делать ничего не надо.
+        logger.warning("кадры проверки чата %s отложены до дозагрузки: %s", chat_id, exc)
+        await message.answer(t("finish.photos_deferred", lang))
+        # Отчёт уехал бы в то же лежащее хранилище и ждал бы отказа ещё раз,
+        # пока бот, обрабатывающий сообщения по одному, стоит для всех.
+        if report is not None:
+            logger.warning(
+                "отчёт проверки %s в хранилище не выгружен: хранилище недоступно", inspection_id
+            )
+        return
     except db.DbError:
         logger.exception("выгрузка кадров проверки чата %s не удалась", chat_id)
         await message.answer(t("finish.photos_not_archived", lang))

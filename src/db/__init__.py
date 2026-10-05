@@ -13,6 +13,7 @@ from .errors import (
     AccessError,
     ConfigError,
     DbError,
+    PhotosDeferredError,
     PushError,
     RetractionError,
     StorageError,
@@ -44,6 +45,8 @@ if TYPE_CHECKING:
     from .letters import SavedLetter as SavedLetter
     from .letters import latest_letter as latest_letter
     from .letters import save_letter as save_letter
+    from .photos import PendingUpload as PendingUpload
+    from .photos import pending_photo_uploads as pending_photo_uploads
     from .photos import upload_photos as upload_photos
     from .push import push_inspection as push_inspection
     from .queries import findings_by_unit as findings_by_unit
@@ -91,6 +94,8 @@ __all__ = [
     "InfoRow",
     "InspectionDetail",
     "InspectionRow",
+    "PendingUpload",
+    "PhotosDeferredError",
     "PhraseAlias",
     "PhraseEdit",
     "PhraseMemory",
@@ -112,6 +117,7 @@ __all__ = [
     "list_units",
     "lookup_phrase",
     "normalize_phrase",
+    "pending_photo_uploads",
     "push_inspection",
     "remember_phrase",
     "repoint_phrase",
@@ -133,6 +139,9 @@ _LAZY = {
     "latest_letter": (".letters", "latest_letter"),
     "SavedLetter": (".letters", "SavedLetter"),
     "upload_photos": (".photos", "upload_photos"),
+    # Дозагрузка кадров, не легших в хранилище на сдаче (#459).
+    "pending_photo_uploads": (".photos", "pending_photo_uploads"),
+    "PendingUpload": (".photos", "PendingUpload"),
     "upload_report": (".reports", "upload_report"),
     "StoredReport": (".reports", "StoredReport"),
     "push_inspection": (".push", "push_inspection"),

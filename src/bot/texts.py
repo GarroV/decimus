@@ -1275,6 +1275,23 @@ TEXTS: dict[str, dict[str, str]] = {
             "inspection again with the right name (/start)."
         ),
     },
+    # Хранилище кадров лежит на сдаче (#459, D259). Обещание «догрузит сам»
+    # честное только здесь: строки кадров в базе есть, байты у телеграма, и
+    # дозагрузка (`photo_backfill`) их вернёт. Кадр, которого нет у телеграма,
+    # идёт другим текстом — ниже.
+    "finish.photos_deferred": {
+        "ru": (
+            "Проверка в историю записана. Хранилище фото сейчас недоступно, поэтому "
+            "кадры в него пока не легли. Отчёта и письма это не задевает — кадры в них "
+            "уже есть. Бот догрузит фото сам, когда хранилище вернётся: делать ничего не нужно."
+        ),
+        "en": (
+            "The inspection reached the history. The photo storage is unavailable right now, "
+            "so the photos are not in it yet. The report and the letter are unaffected — the "
+            "photos are already in them. The bot will upload the photos by itself once the "
+            "storage is back: nothing for you to do."
+        ),
+    },
     "finish.photos_not_archived": {
         "ru": (
             "Проверка в историю записана, а кадры в хранилище не уехали. Отчёта это не "
