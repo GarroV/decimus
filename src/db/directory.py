@@ -26,7 +26,7 @@ import psycopg
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
-from .errors import PushError
+from .errors import PushError, UnitExistsError
 from .reach import Reach, require_reach
 from .space_guard import require_space
 from .units import normalize_unit_name
@@ -110,6 +110,21 @@ on conflict (tenant_code, name_normalized) do update set name = excluded.name,
     country = coalesce(excluded.country, units.country),
     city = coalesce(excluded.city, units.city)
 returning id
+"""
+
+# Заведение новой точки, а не «завести или обновить»: совпадение имени — дубль,
+# и решает его человек, а не молчаливое обновление чужой строки (#437).
+_INSERT_NEW_UNIT_SQL = """
+insert into units (tenant_code, name, name_normalized, country, city)
+values (%(tenant)s, %(name)s, %(key)s, %(country)s, %(city)s)
+on conflict (tenant_code, name_normalized) do nothing
+returning id
+"""
+
+_INSERT_NEW_ALIAS_SQL = """
+insert into unit_aliases (tenant_code, alias_normalized, unit_id, alias)
+values (%s, %s, %s, %s)
+on conflict (tenant_code, alias_normalized) do nothing
 """
 
 _UPSERT_ALIAS_SQL = """
@@ -275,5 +290,88 @@ def upsert_unit(
     except psycopg.Error as exc:
         raise PushError(
             f"Не удалось записать точку «{name}» в справочник ({type(exc).__name__}): {exc}"
+        ) from exc
+    return unit_id
+
+
+def _existing(
+    cur: psycopg.Cursor[Any], tenant: str, keys: tuple[str, ...]
+) -> tuple[str, str] | None:
+    """Точка, которую любое из написаний уже называет: `(id, имя)` или `None`."""
+    for key in keys:
+        cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
+        row = cur.fetchone()
+        if row is not None:
+            return str(row[0]), str(row[1])
+    return None
+
+
+def _insert_new(cur: psycopg.Cursor[Any], поля: dict[str, Any], alias_keys: tuple[str, ...]) -> str:
+    """Вставить точку, если ни имя, ни синонимы ничего не называют; иначе — отказ."""
+    tenant = str(поля["tenant"])
+    занята = _existing(cur, tenant, (str(поля["key"]), *alias_keys))
+    if занята is None:
+        cur.execute(_INSERT_NEW_UNIT_SQL, поля)
+        row = cur.fetchone()
+        if row is not None:
+            return str(row[0])
+        # Ключ имени занял кто-то между сверкой и вставкой: тот же дубль.
+        занята = _existing(cur, tenant, (str(поля["key"]),))
+    if занята is None:
+        raise PushError("Postgres не вставил точку и не нашёл занявшую её имя")
+    raise UnitExistsError(
+        f"Пиццерия «{занята[1]}» в справочнике уже есть", unit_id=занята[0], name=занята[1]
+    )
+
+
+def create_unit(
+    name: str,
+    *,
+    country: str,
+    city: str | None = None,
+    aliases: tuple[str, ...] = (),
+    tenant: str = DEFAULT_TENANT,
+) -> str:
+    """Завести НОВУЮ точку справочника; уже есть — `UnitExistsError` (#437).
+
+    В отличие от `upsert_unit`, ничего существующего не трогает: имя или
+    синоним, совпавшие с точкой справочника (название или синоним, тем же
+    ключом, что сверка бота), — отказ с этой точкой. Сверка и запись идут в
+    одной транзакции, а гонку двух одинаковых заведений закрывает уникальный
+    ключ имени: вторая вставка ничего не вставляет и становится тем же отказом.
+
+    Кто вправе заводить, здесь не решается — это `domain.tenants.may_add_units`
+    у вызывающего; пространство обязано быть заведено (`require_space`).
+    """
+    tenant = canonical_tenant(tenant)
+    key = normalize_unit_name(name)
+    if not key:
+        raise PushError("У точки пустое название — в справочник её завести нечем")
+    синонимы: dict[str, str] = {}
+    for alias in aliases:
+        alias_key = normalize_unit_name(alias)
+        if alias_key and alias_key != key:
+            синонимы.setdefault(alias_key, alias.strip())
+    поля = {
+        "tenant": tenant,
+        "name": name.strip(),
+        "key": key,
+        "country": (country or "").strip().upper() or None,
+        "city": (city or "").strip() or None,
+    }
+    settings = check_environment()
+    try:
+        with psycopg.connect(settings.dsn) as conn:
+            with conn.cursor() as cur:
+                require_space(cur, tenant, error=PushError)
+                unit_id = _insert_new(cur, поля, tuple(синонимы))
+                for alias_key, alias in синонимы.items():
+                    cur.execute(_INSERT_NEW_ALIAS_SQL, (tenant, alias_key, UUID(unit_id), alias))
+            conn.commit()
+    except (PushError, UnitExistsError):
+        raise
+    except psycopg.Error as exc:
+        raise PushError(
+            f"Не удалось завести точку «{name}» в справочник ({type(exc).__name__}): {exc}"
         ) from exc
     return unit_id

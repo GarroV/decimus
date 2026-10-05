@@ -71,6 +71,19 @@ class UnitRefusedError(PushError):
         self.unit = unit
 
 
+class UnitExistsError(DbError):
+    """Пиццерия с таким именем или синонимом в справочнике уже есть (#437).
+
+    Несёт найденную точку: экран показывает её и ведёт в её карточку, а не
+    отвечает загадкой «не получилось».
+    """
+
+    def __init__(self, message: str, *, unit_id: str, name: str) -> None:
+        super().__init__(message)
+        self.unit_id = unit_id
+        self.name = name
+
+
 class StorageError(DbError):
     """Хранилище кадров не приняло или не отдало объект.
 

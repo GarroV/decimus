@@ -80,6 +80,9 @@
       <div class="ov-card__title">{{ t('country.units.title') }}</div>
       <div class="ov-card__hint">{{ t('country.units.hint') }}</div>
       <div class="ov-card__count">{{ data.points|length }}</div>
+      {% if can_add_units %}
+        <a class="btn btn--sm" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">{{ t('unitnew.open') }}</a>
+      {% endif %}
     </div>
     {% if data.points %}
       <div class="ov-table ov-table--points">
