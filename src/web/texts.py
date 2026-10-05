@@ -23,6 +23,7 @@ from collections.abc import Mapping
 
 from .errors import WebTextError
 from .texts_plans import PLAN_TEXTS
+from .texts_refusals import REFUSAL_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -1735,7 +1736,7 @@ TEXTS: dict[str, dict[str, str]] = {
 _ПЕРЕСЕЧЕНИЕ = TEXTS.keys() & PLAN_TEXTS.keys()
 if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
-TEXTS = {**TEXTS, **PLAN_TEXTS}
+TEXTS = {**TEXTS, **PLAN_TEXTS, **REFUSAL_TEXTS}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:

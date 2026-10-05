@@ -126,7 +126,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     action_plans.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
-    _register_errors(app)
+    _register_errors(app, conf)
     _register_frame_ban(app)
     return app
 
@@ -1845,7 +1845,9 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 склад, tenant=auth.current_tenant(), version=version
             )
         except MethodologyRefused as отказ:
-            return _render_methodology(conf, notice=None, failure=str(отказ))
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_methodology(
             conf,
             notice=t("methodology.published", _lang(conf), version=опубликована),
@@ -1900,8 +1902,12 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             )
         except MethodologyRefused as отказ:
             if с_методики:
-                return _render_methodology(conf, notice=None, failure=str(отказ), panel="new")
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+                return _render_methodology(
+                    conf, notice=None, failure=method.refusal_text(отказ, _lang(conf)), panel="new"
+                )
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         if с_методики:
             # Заведённый с «Методики» открывается сразу: его и собирались наполнять.
             return redirect(_url("methodology", checklist=заведён.code, lang=_lang(conf)))
@@ -1928,7 +1934,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 state=(request.form.get("state") or "").strip(),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_checklists(
             conf,
             notice=t("checklists.state.set", _lang(conf), checklist=стало.code, state=стало.state),
@@ -1953,7 +1961,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 on=request.form.get("on") == "1",
             )
         except MethodologyRefused as отказ:
-            return _render_methodology(conf, notice=None, failure=str(отказ), panel="bot")
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf)), panel="bot"
+            )
         остаться = (request.args.get("checklist") or "").strip()
         return redirect(
             _url(
@@ -1981,7 +1991,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return render_template(
             "methodology/apply.html",
             code=code,
@@ -2005,7 +2017,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 lang=_lang(conf),
             )
         except MethodologyRefused as отказ:
-            return _render_checklists(conf, notice=None, failure=str(отказ))
+            return _render_checklists(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
         return _render_checklists(
             conf,
             notice=t("checklists.applied", _lang(conf), checklist=str(итог["applied"])),
@@ -2031,7 +2045,7 @@ def _render_checklists(conf: Settings, *, notice: str | None, failure: str | Non
             checklists=[],
             states=method.CHECKLIST_STATES,
             notice=None,
-            failure=failure or str(отказ),
+            failure=failure or method.refusal_text(отказ, _lang(conf)),
         )
     return render_template(
         "methodology/checklists.html",
@@ -2098,7 +2112,7 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
         )
         правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
-        return _Итог(failure=str(отказ))
+        return _Итог(failure=method.refusal_text(отказ, _lang(conf)))
     return _Итог(notice=t("methodology.saved", _lang(conf), version=правка.version))
 
 
@@ -2141,7 +2155,7 @@ def _render_methodology(
     try:
         перечень = method.checklists_overview(state.store, tenant=auth.current_tenant())
     except MethodologyRefused as отказ:
-        перечень, failure = [], failure or str(отказ)
+        перечень, failure = [], failure or method.refusal_text(отказ, _lang(conf))
     код = _который_показан(перечень, _который(request))
     try:
         колонка = method.checklist_rail(state.store, перечень, tenant=auth.current_tenant())
@@ -2159,12 +2173,12 @@ def _render_methodology(
     except MethodologyRefused as отказ:
         # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
         # который виден всем (D283): пустой экран читался бы как поломка.
-        склад, failure = state.store, failure or str(отказ)
+        склад, failure = state.store, failure or method.refusal_text(отказ, _lang(conf))
     try:
         состав = method.load_composition(склад, tenant=auth.current_tenant(), version=попросили)
     except MethodologyRefused as отказ:
         состав = method.load_composition(склад, tenant=auth.current_tenant())
-        failure = failure or str(отказ)
+        failure = failure or method.refusal_text(отказ, _lang(conf))
     отбор = mview.parse_filter(request.args)
     выбран = item or (request.args.get("item") or "").strip() or None
     # Пункт из адреса, которого в этой версии нет (старая ссылка, другой
@@ -2230,7 +2244,7 @@ def _render_methodology(
                 склад, tenant=auth.current_tenant(), code=выбран, version=попросили
             )["item"]
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     # Разница действующей и свежей записанной — по запросу: чтение каждого
     # пункта целиком дорого, а полоса версии и так говорит, что она есть.
     разница: tuple[mview.Change, ...] | None = None
@@ -2246,7 +2260,7 @@ def _render_methodology(
                 method.zones_of_version(склад, tenant=auth.current_tenant(), version=состав.latest),
             )
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     открыта_зона = (request.args.get("zone_card") or "").strip()
     зона = next((z for z in состав.zones if z.get("code") == открыта_зона), None)
     обход: list[dict[str, Any]] = []
@@ -2256,7 +2270,7 @@ def _render_methodology(
                 method.load_route(склад, tenant=auth.current_tenant(), version=попросили)["zones"]
             )
         except MethodologyRefused as отказ:
-            failure = failure or str(отказ)
+            failure = failure or method.refusal_text(отказ, _lang(conf))
     сводка = (
         data.load_item_usage(reach=auth.current_reach(), code=выбран, checklist=код or "")
         if карточка is not None and выбран
@@ -2433,7 +2447,7 @@ def _schema_lags(exc: BaseException) -> bool:
     return False
 
 
-def _register_errors(app: Flask) -> None:
+def _register_errors(app: Flask, conf: Settings) -> None:
     """Отказы показываются страницей, а не трассировкой.
 
     База недоступна — это нормальный исход, а не поломка кода: админка читает
@@ -2457,7 +2471,9 @@ def _register_errors(app: Flask) -> None:
         события, что недоступная база, и ответ на него такой же — сказать
         причину словами.
         """
-        return render_template("methodology/broken.html", reason=str(exc)), 503
+        return render_template(
+            "methodology/broken.html", reason=method.refusal_text(exc, _lang(conf))
+        ), 503
 
     @app.errorhandler(404)
     def _not_found(_: object) -> tuple[str, int]:

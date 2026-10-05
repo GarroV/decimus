@@ -206,13 +206,17 @@ def _check_name(name: str) -> str:
         raise ChecklistError(
             f"Имя набора «{value}» кончается датой. Дату издания ставит хранилище само, "
             f"и вторая рядом с ней сделала бы идентификатор версии нечитаемым: "
-            f"назовите набор без даты, например «imf»"
+            f"назовите набор без даты, например «imf»",
+            refusal="set_name_has_date",
+            params={"name": value},
         )
     if not NAME_PATTERN.match(value):
         raise ChecklistError(
             f"Имя набора «{value}» не годится: ожидаются строчные латинские буквы, цифры, "
             f"дефис и подчёркивание, до 32 знаков (например «imf»). Имя попадает в "
-            f"идентификатор версии, а он уезжает в базу к каждой посчитанной проверке"
+            f"идентификатор версии, а он уезжает в базу к каждой посчитанной проверке",
+            refusal="set_name_invalid",
+            params={"name": value},
         )
     return value
 
@@ -227,7 +231,9 @@ def _check_version(version: str) -> str:
     try:
         return _check_version_common(version)
     except EngineCallError as отказ:
-        raise ChecklistError(str(отказ)) from None
+        raise ChecklistError(
+            str(отказ), refusal="bad_version", params={"version": version}
+        ) from None
 
 
 def check_code(code: str) -> str:
@@ -242,7 +248,9 @@ def check_code(code: str) -> str:
         raise ChecklistError(
             f"«{code}» не похоже на код: ожидаются латинские буквы, цифры и подчёркивание "
             f"(например «CLN05» или «fridge»). Сущности связываются кодами, а не "
-            f"формулировками"
+            f"формулировками",
+            refusal="bad_code",
+            params={"code": code},
         )
     return value
 
@@ -281,11 +289,17 @@ def _run(
                 pause_before_retry(попытка)
                 continue
             раз = "" if попытка == 1 else f" {попытка} раза подряд"
-            raise EngineNoVerdictError(_нет_ответа(script, f"умер до ответа{раз}"))
+            raise EngineNoVerdictError(
+                _нет_ответа(script, f"умер до ответа{раз}"),
+                refusal="engine_died",
+                params={"script": script.name, "attempts": попытка},
+            )
         if not вывод.strip():
             _to_log("движок вышел молча", скрипт=script, каталог=data_dir)
             raise EngineNoVerdictError(
-                _нет_ответа(script, f"вышел с кодом {код} и не сказал ни слова")
+                _нет_ответа(script, f"вышел с кодом {код} и не сказал ни слова"),
+                refusal="engine_silent",
+                params={"script": script.name, "exit_code": код},
             )
         return код, вывод
     raise AssertionError("недостижимо: цикл попыток всегда выходит возвратом или отказом")
@@ -323,7 +337,9 @@ def _launch(
         # (T120). В лог процесса он уходит целиком — лог остаётся на машине.
         _to_log("движок не уложился в срок", скрипт=script, каталог=data_dir)
         raise EngineNoVerdictError(
-            _нет_ответа(script, f"не уложился в {срок.timeout:g} с")
+            _нет_ответа(script, f"не уложился в {срок.timeout:g} с"),
+            refusal="engine_timeout",
+            params={"script": script.name, "seconds": f"{срок.timeout:g}"},
         ) from None
     if завершение.returncode < 0:
         # Снятый сигналом проверяется здесь и ПЕРВЫМ. Убитый на полуслове
@@ -331,7 +347,11 @@ def _launch(
         # он неотличим от разбора, кончившегося отказом: обрывок уехал бы
         # вызывающему как «движок сказал вот что».
         _to_log("движок снят сигналом", скрипт=script, каталог=data_dir)
-        raise EngineNoVerdictError(_нет_ответа(script, f"снят сигналом {-завершение.returncode}"))
+        raise EngineNoVerdictError(
+            _нет_ответа(script, f"снят сигналом {-завершение.returncode}"),
+            refusal="engine_killed",
+            params={"script": script.name, "signal": -завершение.returncode},
+        )
     return завершение.returncode, завершение.stdout + завершение.stderr
 
 
@@ -475,7 +495,8 @@ def _bootstrap(store: Store) -> str:
         raise ChecklistError(
             f"Каталог методики, названный в AUDIT_DATA_DIR, на сервере не найден. Хранилище "
             f"версий начинается с той методики, по которой продукт считает сегодня, — без неё "
-            f"начинать не с чего. {IN_LOG}"
+            f"начинать не с чего. {IN_LOG}",
+            refusal="live_missing",
         )
     нет = [name for name in REQUIRED_DATA_FILES if not (live / name).is_file()]
     if нет:
@@ -483,7 +504,9 @@ def _bootstrap(store: Store) -> str:
         raise ChecklistError(
             f"Каталог методики, названный в AUDIT_DATA_DIR, неполный: не хватает "
             f"{', '.join(нет)}. Снимать версию с половины методики нельзя — движок добрал бы "
-            f"остальное из своей копии данных. {IN_LOG}"
+            f"остальное из своей копии данных. {IN_LOG}",
+            refusal="live_incomplete",
+            params={"missing": ", ".join(нет)},
         )
     version = compose(live, DATA_FILES)
     _versions_root(store).mkdir(parents=True, exist_ok=True)
@@ -585,7 +608,9 @@ def _ensure(store: Store) -> str:
     if known(store.root):
         raise ChecklistError(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-            f"checklists, завести новый — create_checklist"
+            f"checklists, завести новый — create_checklist",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
         )
     # Снимком боевой методики заводится только пространство УК (D226: копии без
     # правки нет): нетронутое пространство партнёра не получает молчаливую
@@ -593,7 +618,9 @@ def _ensure(store: Store) -> str:
     if store.space != DEFAULT_SPACE:
         raise ChecklistError(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-            f"checklists, завести новый — create_checklist"
+            f"checklists, завести новый — create_checklist",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
         )
     return _bootstrap(store)
 
@@ -622,7 +649,9 @@ def _version_dir(store: Store, version: str) -> Path:
     if not каталог.is_dir():
         raise ChecklistError(
             f"Версии методики «{version}» в хранилище нет. Перечень версий отдаёт "
-            f"checklist_versions"
+            f"checklist_versions",
+            refusal="version_missing",
+            params={"version": version},
         )
     return каталог
 
@@ -692,7 +721,9 @@ def read_item(store: Store, *, code: str, version: str | None = None) -> dict[st
             return {**строка, "criteria": _criteria(каталог, wanted)}
     raise ChecklistError(
         f"Пункта «{code}» нет в методике версии {каталог.name}. Пункты связываются кодами, "
-        f"а не формулировками: перечень отдаёт checklist_items"
+        f"а не формулировками: перечень отдаёт checklist_items",
+        refusal="item_missing",
+        params={"code": code, "version": каталог.name},
     )
 
 
@@ -726,7 +757,8 @@ def _resolve_name(version_name: str | None, base_dir: Path) -> str:
         "У методики нет имени набора: она никем не издана и живёт под одним отпечатком "
         "данных. Правка обязана дать версию с датой (решение D050), а дата без имени "
         "набора не идентификатор — назовите набор аргументом version_name, например «imf». "
-        "Дальше имя подхватится само"
+        "Дальше имя подхватится само",
+        refusal="set_name_missing",
     )
 
 
@@ -848,10 +880,12 @@ def apply_edit(
                 tool=tool,
                 base_version=base_version,
                 note=note,
-                why=(
+                refusal=ChecklistError(
                     f"Правка ничего не изменила в методике: отпечаток данных остался прежним "
                     f"({прежний_отпечаток}). Новая версия с тем же содержимым записала бы в "
-                    f"журнал правку, которой не было"
+                    f"журнал правку, которой не было",
+                    refusal="edit_changed_nothing",
+                    params={"fingerprint": прежний_отпечаток},
                 ),
             )
         version = compose(кандидат, DATA_FILES)
@@ -863,7 +897,7 @@ def apply_edit(
                 tool=tool,
                 base_version=base_version,
                 note=note,
-                why=_occupied(store, base_version=base_version, version=version),
+                refusal=_occupied(store, base_version=base_version, version=version),
             )
         цель.parent.mkdir(parents=True, exist_ok=True)
         os.replace(кандидат, цель)
@@ -910,7 +944,7 @@ def _made_from(store: Store, *, base_version: str, version: str) -> bool:
     )
 
 
-def _occupied(store: Store, *, base_version: str, version: str) -> str:
+def _occupied(store: Store, *, base_version: str, version: str) -> ChecklistError:
     """Отказ на занятое имя версии — свой для повтора и свой для возврата (T218).
 
     Совпадает здесь не запрос, а ПОЛУЧИВШЕЕСЯ состояние: идентификатор версии
@@ -932,19 +966,23 @@ def _occupied(store: Store, *, base_version: str, version: str) -> str:
     именем набора.
     """
     if _made_from(store, base_version=base_version, version=version):
-        return (
+        return ChecklistError(
             f"Версия {version} в хранилище уже есть, и получилась она ровно этой правкой от "
             f"версии {base_version}: то же самое уже сделано, повторять нечего. Отпечаток "
-            f"считается по данным, поэтому две одинаковые правки — это одна версия, а не две"
+            f"считается по данным, поэтому две одинаковые правки — это одна версия, а не две",
+            refusal="version_repeated",
+            params={"version": version, "base_version": base_version},
         )
-    return (
+    return ChecklistError(
         f"Новой версии не будет, и правка не записана: методика после неё совпадает с версией "
         f"{version}, которая в хранилище уже есть. Это ВОЗВРАТ к её состоянию, а не повтор "
         f"правки — от основы {base_version} правка отличается, но имя версии считается по "
         f"содержимому (D050), и второго каталога с тем же содержимым, набором и датой быть не "
         f"может. Что дальше: чтобы движок считал по этому состоянию, опубликуйте {version} "
         f"инструментом publish_checklist_version — откат делается так; чтобы записать это "
-        f"состояние отдельной версией, назовите другой набор аргументом version_name"
+        f"состояние отдельной версией, назовите другой набор аргументом version_name",
+        refusal="version_reverted",
+        params={"version": version, "base_version": base_version},
     )
 
 
@@ -1028,7 +1066,13 @@ def _write_refusal(
 
 
 def _store_refuses(
-    store: Store, *, tenant: str, tool: str, base_version: str, note: str | None, why: str
+    store: Store,
+    *,
+    tenant: str,
+    tool: str,
+    base_version: str,
+    note: str | None,
+    refusal: ChecklistError,
 ) -> ChecklistError:
     """Отказ САМОГО ХРАНИЛИЩА: записать в журнал и вернуть отказ для `raise` (T238).
 
@@ -1056,8 +1100,10 @@ def _store_refuses(
     Возвращается отказ, а не поднимается здесь: `raise _store_refuses(...)` на
     месте вызова оставляет ход управления видимым глазом.
     """
-    _write_refusal(store, tenant=tenant, tool=tool, base_version=base_version, note=note, why=why)
-    return ChecklistError(why)
+    _write_refusal(
+        store, tenant=tenant, tool=tool, base_version=base_version, note=note, why=str(refusal)
+    )
+    return refusal
 
 
 def publish(store: Store, *, tenant: str, version: str) -> dict[str, object]:
@@ -1087,7 +1133,9 @@ def publish(store: Store, *, tenant: str, version: str) -> dict[str, object]:
             f"MCP_CHECKLIST_STORE. Публикация переставляет этот указатель — движок её не "
             f"увидит, и проверки продолжат считаться по прежней методике. Чтобы публикация "
             f"работала, AUDIT_DATA_DIR должен указывать на сам указатель «{CURRENT_LINK}» "
-            f"внутри хранилища. {IN_LOG}"
+            f"внутри хранилища. {IN_LOG}",
+            refusal="engine_reads_outside_store",
+            params={"link": CURRENT_LINK},
         )
     _point_at(store, цель.name)
     _journal(
