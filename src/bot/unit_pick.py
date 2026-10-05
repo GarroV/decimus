@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from src.db import directory
 from src.db.errors import DbError
 from src.db.reach import reach_of
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import may_add_units as may_add_units
 
 logger = logging.getLogger(__name__)
 
@@ -142,12 +142,3 @@ def match_in(typed: str, units: list[tuple[str, tuple[str, ...], bool]]) -> Unit
         if имя not in варианты:
             варианты.append(имя)
     return UnitMatch(name=None, suggestions=tuple(варианты[:SUGGESTIONS_LIMIT]), checked=True)
-
-
-def may_add_units(tenant: str) -> bool:
-    """Заводить новые пиццерии может только управляющая компания (D233, D234).
-
-    Партнёры выбирают из справочника своих стран, но не пополняют его: справочник
-    один и принадлежит УК (D284).
-    """
-    return canonical_tenant(tenant) == HQ_TENANT

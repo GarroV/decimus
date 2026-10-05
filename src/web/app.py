@@ -17,7 +17,7 @@ import io
 import logging
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 from typing import Any
 
@@ -58,6 +58,7 @@ from . import (
     review,
     revision,
     security_headers,
+    unit_add,
     view,
 )
 from . import country as country_data
@@ -123,6 +124,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_overview(app, conf)
     _register_country(app, conf)
     _register_units(app, conf)
+    unit_add.install(app, conf)
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
@@ -647,6 +649,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
             grade_tone=view.grade_tone,
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
+            can_add_units=unit_add.can_add_here(код),
             **_country_plans(код),
             **prescriptions.country_block(код),
         )
@@ -693,9 +696,14 @@ def _register_units(app: Flask, conf: Settings) -> None:
         if точка is None:
             return render_template("inspections/not_found.html"), 404
         снимок = unit_data.load(reach=auth.current_reach(), unit=точка.name, lang=lang)
+        if снимок.last is None:
+            # Проверок нет — география только в справочнике. Так выглядит
+            # пиццерия, только что заведённая из админки (#437).
+            снимок = replace(снимок, city=точка.city or "", country=точка.country or "")
         return render_template(
             "units/card.html",
             data=снимок,
+            added=request.args.get("added") == "1",
             lang=lang,
             window=unit_data.ОКНО,
             grade_tone=view.grade_tone,
