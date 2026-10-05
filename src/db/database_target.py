@@ -111,7 +111,7 @@ def same_database_or_deny(var: str, dsn: str, зачем: str) -> DatabaseTarget
     try:
         return same_database_or_refuse(var, dsn)
     except ConfigError as exc:
-        raise AccessError(f"Не удалось {зачем}: {exc}") from None
+        raise AccessError(f"Не удалось {зачем}: {exc}") from exc
 
 
 def managing_dsn(зачем: str) -> tuple[str, str]:
@@ -129,7 +129,7 @@ def managing_dsn(зачем: str) -> tuple[str, str]:
     try:
         return DATABASE_RETRACTION_URL_VAR, load_retraction_settings().dsn
     except DatabaseTargetError as exc:
-        raise AccessError(f"Не удалось {зачем}: {exc}") from None
+        raise AccessError(f"Не удалось {зачем}: {exc}") from exc
     except ConfigError:
         pass
     dsn = admin_dsn()
