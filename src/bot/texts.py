@@ -1255,6 +1255,26 @@ TEXTS: dict[str, dict[str, str]] = {
             "inspection is still here it can be saved, and a new one erases it."
         ),
     },
+    # Слив отклонён сторожем справочника (#482): точки нет среди точек
+    # пространства. Это не сбой базы, повтор не поможет — нужна другая точка или
+    # правка справочника в УК. Две причины (точки нет вовсе / она чужой страны)
+    # звучат одним текстом: различие подсказало бы, что пиццерия в сети есть.
+    "finish.unit_refused": {
+        "ru": (
+            "Отчёт и письмо на месте, но в историю проверок эта проверка не записалась: "
+            "пиццерии «{unit}» нет среди точек вашего пространства. Повтор не поможет. "
+            "Если название верное — сообщите управляющей компании, точки в справочник "
+            "заносит она. Если ошиблись точкой — начните проверку заново с правильным "
+            "названием (/start)."
+        ),
+        "en": (
+            "The report and the letter are yours, but this inspection did not reach the "
+            "history: the pizzeria «{unit}» is not among the units of your space. Retrying "
+            "will not help. If the name is right, tell the management company — it is the "
+            "one that adds units to the directory. If the unit is wrong, start the "
+            "inspection again with the right name (/start)."
+        ),
+    },
     "finish.photos_not_archived": {
         "ru": (
             "Проверка в историю записана, а кадры в хранилище не уехали. Отчёта это не "
@@ -1622,6 +1642,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "cmd.mcp_add": {"ru": "Дать доступ к MCP", "en": "Grant MCP access"},
     "cmd.mcp_revoke": {"ru": "Отозвать доступ к MCP", "en": "Revoke MCP access"},
     "cmd.mcp_who": {"ru": "У кого доступ к MCP", "en": "Who has MCP access"},
+    "cmd.stops": {"ru": "Отказы мастера за период", "en": "Wizard refusals over a period"},
     # Отказ тому, кто в круг не входит. Короткий и без подробностей: человек
     # здесь свой (мидлварь доступа его пустила), поэтому молчать невежливо, но
     # и рассказывать ему, кто в круге и как туда попасть, незачем — за этим он
@@ -1633,6 +1654,30 @@ TEXTS: dict[str, dict[str, str]] = {
     # Круг не назначен вовсе: стенд поднялся без основателя. Отдельный текст, а
     # не тот же отказ, — потому что чинится это в другом месте и другим
     # человеком: не «попроси доступ», а «на стенде не задана переменная».
+    # --- счётчик отказов мастера, `/stops` (#436) ---
+    #
+    # Шаг и причина печатаются кодами: коды не переводятся и не правятся, и
+    # по ним же ищется строка в журнале контейнера.
+    "stops.header": {
+        "ru": "Отказы мастера за {days} дн. — шаг · причина: сколько раз, скольким людям",
+        "en": "Wizard refusals over {days} days — step · reason: times, people",
+    },
+    "stops.line": {
+        "ru": "• {step} · {reason}: {times} раз, людей {people}",
+        "en": "• {step} · {reason}: {times} times, people {people}",
+    },
+    "stops.empty": {
+        "ru": "За {days} дн. мастер никому не отказывал.",
+        "en": "No wizard refusals over {days} days.",
+    },
+    "stops.bad_days": {
+        "ru": "Период — число дней от 1 до {limit}, например: /stops 30",
+        "en": "The period is a number of days from 1 to {limit}, for example: /stops 30",
+    },
+    "stops.unreadable": {
+        "ru": "Счётчик отказов не прочитался. Подробности — в журнале стенда.",
+        "en": "The refusal counter could not be read. Details are in the server log.",
+    },
     "mcp.circle_unset": {
         "ru": (
             "Круг доступа к MCP на этом стенде не назначен, поэтому подключение не "
