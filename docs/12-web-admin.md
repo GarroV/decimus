@@ -1026,6 +1026,36 @@ Gmail (`google_mail.letter_message`). Черновик несёт две час�
 (замер 24.09.2026) каждый клик переспрашивал стили и шрифты по 0,3 с на запрос
 через Funnel, и экран моргал белым.
 
+## Заголовки безопасности (#489)
+
+Каждый ответ админки — страница, редирект, отказ, 404 и 500, статика, кадр —
+несёт один и тот же набор. Ставит его один крючок `after_request` в
+`src/web/security_headers.py`; там же объяснено каждое исключение. Сторожит
+`tests/test_web_security_headers.py`: обходит разделы, вход, отказ заслона
+происхождения, ошибки и статику.
+
+| Заголовок | Значение |
+|---|---|
+| `Content-Security-Policy` | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self' https://accounts.google.com; frame-ancestors 'none'` |
+| `X-Content-Type-Options` | `nosniff` |
+| `X-Frame-Options` | `DENY` — для просмотрщиков, не знающих `frame-ancestors` |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` — свой адрес уходит целиком, заслон происхождения по `Referer` работает как раньше |
+| `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
+| `Strict-Transport-Security` | `max-age=31536000`, только при `WEB_HSTS=1` ([08-deploy §8.1](08-deploy.md#81-подключение-к-прокси--надстройка-площадки)) |
+
+**Скрипты — только файлами из `static/`.** Встроенного `<script>` с кодом,
+обработчиков `on*=` и ссылок `javascript:` в шаблонах нет, и тест это
+проверяет: под такой политикой вернувшийся встроенный скрипт не упадёт с
+ошибкой, а просто не исполнится. Тема до первой отрисовки ставится файлом
+`static/theme.js`, подключённым в `<head>` без `defer`.
+
+**Два исключения, оба осознанные.** `style-src 'unsafe-inline'` — столбики
+«Обзора», «Страны», карточек проверки и пиццерии рисуются атрибутом `style` с
+числом из данных. `form-action https://accounts.google.com` — «Черновик в
+Gmail» отправляет форму, и сервер отвечает переходом к согласию Google, а
+браузер проверяет `form-action` и на таком переходе. Вход через Google идёт
+ссылкой, а не формой, и исключения не требует.
+
 ## Стек и почему такой
 
 Рамка задана решением D148: Python, тот же образ и `docker-compose.yml`, что у

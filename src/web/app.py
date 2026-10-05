@@ -56,6 +56,7 @@ from . import (
     profile,
     review,
     revision,
+    security_headers,
     view,
 )
 from . import country as country_data
@@ -127,7 +128,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     _register_errors(app)
-    _register_frame_ban(app)
+    security_headers.install(app, hsts=conf.hsts)
     return app
 
 
@@ -904,7 +905,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # может держать её долго — но только у себя: кадр кухни партнёра не
         # должен оседать в общих кэшах по дороге.
         ответ.headers["Cache-Control"] = "private, max-age=86400"
-        ответ.headers["X-Content-Type-Options"] = "nosniff"
         return ответ
 
     @app.get(f"{section('registry').path}/<inspection_id>/letter")
@@ -2391,27 +2391,6 @@ def _kind_title(code: str, lang: str) -> str:
         return kind_title(code, lang)
     except ValidationError:
         return code
-
-
-def _register_frame_ban(app: Flask) -> None:
-    """Запретить встраивание страниц админки в чужой документ.
-
-    Заслон происхождения (`origin.refuse_foreign_origin`) закрывает запрос С чужой
-    страницы, но не закрывает случай, когда чужая страница показывает НАШУ в
-    рамке: документ тогда честно наш, происхождение совпадает, и заслон
-    пропустит отправку формы — сняв проверку руками человека, который думал,
-    что нажимает что-то другое. Обязательное поле причины делает подмену
-    многоходовой, но не невозможной.
-
-    Два заголовка, а не один: `frame-ancestors` — действующее правило, а
-    `X-Frame-Options` остаётся ради просмотрщиков, которые его не знают.
-    """
-
-    @app.after_request
-    def _no_frames(response: Response) -> Response:
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
-        return response
 
 
 #: Ответы драйвера, которые означают «код новее схемы», а не отказ базы: код
