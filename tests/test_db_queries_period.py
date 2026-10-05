@@ -266,6 +266,10 @@ def test_период_идёт_по_индексу_а_не_полным_прох
                 "limit": 100,
                 "date_from": НАЧАЛО + timedelta(days=5000),
                 "date_to": НАЧАЛО + timedelta(days=5030),
+                # Отбор по месту и букве не задан — «все» (#470).
+                "city": None,
+                "country": None,
+                "grade": None,
             },
         )
         план = "\n".join(строка[0] for строка in cur.fetchall())

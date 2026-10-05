@@ -49,6 +49,10 @@ class Section:
     #: целиком (`refused_for` в `before_request`), а не на каждую кнопку:
     #: так доступы проще держать, это и был довод владельца.
     hq_only: bool = False
+    #: Виден только партнёру: у УК для того же дела свой раздел (D264), и пункт,
+    #: ведущий его в чужую половину, — лишний шаг. Это НЕ заслон: открыть
+    #: адрес УК может, экран сам отправит его в свой раздел.
+    partner_only: bool = False
     #: Иконка пункта в левой панели — имя из набора линейки (`icons.py`).
     icon: str = "doc"
 
@@ -59,12 +63,18 @@ class Section:
 SECTIONS: tuple[Section, ...] = (
     Section(key="overview", path="/overview", built=True, icon="home"),
     Section(key="registry", path="/inspections", built=True, icon="task"),
-    Section(key="plans", path="/plans", built=False, icon="timeline"),
-    Section(key="orders", path="/orders", built=False, icon="flag"),
+    # Экшн-планы партнёра (волна 2, D263, D265): свои запросы и загрузка файла.
+    Section(key="plans", path="/plans", built=True, partner_only=True, icon="timeline"),
+    # Предписания партнёра (волна 3, D266): пришедшие предписания, срок,
+    # статус и ответ. У УК для них вкладка в «Действиях» (D264).
+    Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     Section(key="country", path="/country", built=True, icon="globe"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
     Section(key="tenants", path="/tenants", built=False, hq_only=True, icon="board"),
+    # Действия УК (D264): очередь экшн-планов, приём и возврат. Имя рабочее —
+    # названия разделов прорабатываются в #462.
+    Section(key="actions", path="/actions", built=True, hq_only=True, icon="check"),
     # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток
     # жило в командной строке, и владелец попросил перенести его на экран.
     # Открыт каждому вошедшему (D286): человек видит здесь себя и привязывает
@@ -148,7 +158,11 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     админ = getattr(account, "role", None) == "admin"
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(
-        item for item in SECTIONS if (админ or not item.admin_only) and (уК or not item.hq_only)
+        item
+        for item in SECTIONS
+        if (админ or not item.admin_only)
+        and (уК or not item.hq_only)
+        and not (уК and item.partner_only)
     )
 
 

@@ -274,7 +274,9 @@ def create(
     if свой.home.exists():
         raise ChecklistError(
             f"Чек-лист «{code}» в пространстве «{space}» уже есть. Код не меняется никогда — им "
-            f"чек-лист связан с проверками и со снимками изданий; заведите другой код"
+            f"чек-лист связан с проверками и со снимками изданий; заведите другой код",
+            refusal="checklist_exists",
+            params={"code": code, "space": space},
         )
     # Коды эталона и чек-листов партнёров не повторяются: партнёр видит эталон
     # рядом со своими (`bot_spaces`), и совпавший код сделал бы поиск по коду
@@ -283,24 +285,31 @@ def create(
     if space != DEFAULT_SPACE and DEFAULT_SPACE in занят:
         raise ChecklistError(
             f"Код «{code}» — код чек-листа эталона УК. Эталон виден в вашем пространстве "
-            f"под этим кодом; заведите свой чек-лист под другим кодом"
+            f"под этим кодом; заведите свой чек-лист под другим кодом",
+            refusal="code_is_reference",
+            params={"code": code},
         )
     if space == DEFAULT_SPACE and занят:
         raise ChecklistError(
             f"Код «{code}» занят чек-листом пространства партнёра. Коды эталона и "
-            f"чек-листов партнёров не повторяются: партнёр видит эталон рядом со своими"
+            f"чек-листов партнёров не повторяются: партнёр видит эталон рядом со своими",
+            refusal="code_taken_by_partner",
+            params={"code": code},
         )
     имя_ру, имя_ен = (name_ru or "").strip(), (name_en or "").strip()
     if not имя_ру or not имя_ен:
         raise ChecklistError(
             "У чек-листа должны быть оба названия — русское и английское: язык продукта это "
-            "параметр, а не константа, и показывается чек-лист названием, а не кодом"
+            "параметр, а не константа, и показывается чек-лист названием, а не кодом",
+            refusal="names_required",
         )
     нет = [name for name in REQUIRED_DATA_FILES if not (BLANK_DIR / name).is_file()]
     if нет:
         raise ChecklistError(
             f"Бланк методики в репозитории неполный: не хватает {', '.join(нет)}. Новый чек-лист "
-            f"рождается из него, и завести его не с чего"
+            f"рождается из него, и завести его не с чего",
+            refusal="blank_incomplete",
+            params={"missing": ", ".join(нет)},
         )
 
     day = today or date.today()
@@ -318,7 +327,9 @@ def create(
         if отказ is not None:
             raise ChecklistError(
                 f"Движок не принимает бланк методики — завести чек-лист с нуля нечем. Он сказал "
-                f"так: {отказ}"
+                f"так: {отказ}",
+                refusal="blank_rejected",
+                params={"engine": отказ},
             )
         издание = compose(кандидат, DATA_FILES)
         (свой.home / VERSIONS_DIR).mkdir(parents=True, exist_ok=True)
@@ -371,7 +382,9 @@ def rename(
     if карточка is None:
         raise ChecklistError(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-            f"checklists"
+            f"checklists",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
         )
     новая = replace(
         карточка,
@@ -406,13 +419,17 @@ def set_state(store: Store, *, tenant: str, state: str, by: str | None = None) -
     if карточка is None:
         raise ChecklistError(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-            f"checklists"
+            f"checklists",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
         )
     в_проде = applied(store.root) == (store.space, store.code)
     if в_проде and хотим == RETIRED:
         raise ChecklistError(
             f"Чек-лист «{store.code}» применён к проду — по нему идут проверки, и снять его "
-            f"значит считать по снятой методике. Сначала примените к проду другой"
+            f"значит считать по снятой методике. Сначала примените к проду другой",
+            refusal="applied_cannot_retire",
+            params={"code": store.code},
         )
     новая = replace(карточка, state=хотим)
     write_meta(store, новая)
@@ -442,17 +459,23 @@ def _fit_for_inspections(store: Store) -> tuple[Meta, str, int]:
     if карточка is None:
         raise ChecklistError(
             f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-            f"checklists"
+            f"checklists",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
         )
     if карточка.state == RETIRED:
         raise ChecklistError(
             f"Чек-лист «{store.code}» снят. Снятый к проду не применяется: его сняли потому, что "
-            f"считать по нему больше не следует. Верните его в работу, если это ошибка"
+            f"считать по нему больше не следует. Верните его в работу, если это ошибка",
+            refusal="retired_not_applicable",
+            params={"code": store.code},
         )
     издание = _published_edition(store)
     if издание is None:
         raise ChecklistError(
-            f"У чек-листа «{store.code}» нет опубликованного издания — применять к проду нечего"
+            f"У чек-листа «{store.code}» нет опубликованного издания — применять к проду нечего",
+            refusal="no_published_edition",
+            params={"code": store.code},
         )
     вопросов = _violations(_version_dir(store, издание))
     if вопросов == 0:
@@ -460,7 +483,9 @@ def _fit_for_inspections(store: Store) -> tuple[Meta, str, int]:
             f"В чек-листе «{store.code}» нет ни одного пункта, по которому бывает нарушение. "
             f"Такой чек-лист считается без единого вопроса и даёт партнёру 100% и высшую "
             f"оценку — то есть сбой вышел бы наружу не ошибкой, а хорошей новостью. Заведите "
-            f"пункты и примените снова"
+            f"пункты и примените снова",
+            refusal="no_violation_items",
+            params={"code": store.code},
         )
     return карточка, издание, вопросов
 
@@ -476,7 +501,8 @@ def apply_to_production(store: Store, *, tenant: str, by: str | None = None) -> 
     if store.space != DEFAULT_SPACE:
         raise ChecklistError(
             "К проду применяет только УК: указатель прода один на всю сеть. "
-            "В пространстве партнёра доступ в боте задаётся галочкой «в боте»"
+            "В пространстве партнёра доступ в боте задаётся галочкой «в боте»",
+            refusal="apply_only_reference",
         )
     карточка, издание, вопросов = _fit_for_inspections(store)
     прежний = applied(store.root)
@@ -607,14 +633,18 @@ def set_bot_access(store: Store, *, tenant: str, on: bool, by: str | None = None
         if карточка.state != ACTIVE:
             raise ChecklistError(
                 f"Чек-лист «{store.code}» — черновик. В бот открывается только чек-лист в работе: "
-                f"черновик ещё правят, и аудитор получил бы вопросы, которых завтра не будет"
+                f"черновик ещё правят, и аудитор получил бы вопросы, которых завтра не будет",
+                refusal="draft_not_for_bot",
+                params={"code": store.code},
             )
     else:
         есть = read_meta(store)
         if есть is None:
             raise ChecklistError(
                 f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
-                f"checklists"
+                f"checklists",
+                refusal="checklist_missing",
+                params={"code": store.code, "space": store.space},
             )
         карточка = есть
     _settle_inherited(store)

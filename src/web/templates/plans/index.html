@@ -1,0 +1,59 @@
+{#
+  Раздел партнёра «Экшн-планы» (D263, D265) — отвечает на вопрос «что от меня
+  ждут и до какого числа». Только свои страны (охват, D284). Загрузка файла
+  любого формата (D267); после возврата — новая версия. Действий УК здесь нет.
+#}{% extends "base.html" %}
+{% from "_plan.html" import state_tag, versions with context %}
+{% block title %}{{ t('section.plans.title') }}{% endblock %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <div class="ov-head__kicker">{{ t('plans.kicker') }}</div>
+      <h1 class="ov-head__title">{{ t('plans.title') }}</h1>
+      <div class="ov-card__hint">{{ t('plans.hint', mb=max_mb) }}</div>
+    </div>
+  </div>
+
+  <div class="ov-filters">
+    <a class="ov-chip{% if not accepted %} is-on{% endif %}" href="{{ url(plans_path) }}?lang={{ lang }}">{{ t('plans.show_open') }}</a>
+    <a class="ov-chip{% if accepted %} is-on{% endif %}" href="{{ url(plans_path) }}?accepted=1&amp;lang={{ lang }}">{{ t('plans.show_accepted') }}</a>
+  </div>
+  {% if truncated %}<div class="note note--warn mt-gap"><div><div class="note__text">{{ t('plans.truncated', n=limit) }}</div></div></div>{% endif %}
+
+  {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+
+  {% for r in rows %}
+    <section class="ov-card ov-card--wide mt-gap" id="request-{{ r.id }}">
+      <div class="ov-card__head">
+        <div class="ov-card__title">{{ r.unit_name }}</div>
+        <div class="ov-card__hint">
+          <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ t('actions.request.inspection', date=r.inspection_date) }}</a>
+          · {{ t('actions.request.due', due=r.due_on) }}
+        </div>
+        <div>{{ state_tag(r, today) }}</div>
+      </div>
+      <div class="card__body stack">
+        {% if r.state == 'returned' and r.last_comment %}
+          <div class="note note--warn"><div>
+            <div class="note__title">{{ t('plans.returned_note') }}</div>
+            <div class="note__text">«{{ r.last_comment }}»</div>
+          </div></div>
+        {% endif %}
+        {# Комментарий возврата уже стоит плашкой выше — у версии его не повторяем. #}
+        {{ versions(r, plans_path, hide_last_comment=(r.state == 'returned' and r.last_comment)) }}
+        {% if r.status == 'requested' %}
+          <form method="post" enctype="multipart/form-data"
+                action="{{ url(plans_path ~ '/' ~ r.id ~ '/upload') }}?lang={{ lang }}" class="row mt-gap">
+            <label><span class="field-label">{{ t('plans.file_label') }}</span>
+              <input class="input" type="file" name="file" required></label>
+            <button class="btn btn--primary" type="submit">{{ t('plans.upload') }}</button>
+          </form>
+        {% endif %}
+      </div>
+    </section>
+  {% else %}
+    <section class="ov-card ov-card--wide mt-gap"><div class="ov-card__empty">{{ t('plans.accepted_empty') if accepted else t('plans.empty') }}</div></section>
+  {% endfor %}
+{% endblock %}

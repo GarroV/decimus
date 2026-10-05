@@ -1,0 +1,41 @@
+{#
+  Общие куски экшн-плана (волна 2): метка состояния, версии с вердиктами и
+  история. Одна разметка на раздел УК, раздел партнёра, экран страны и
+  карточку проверки — иначе четыре копии разойдутся молча.
+#}
+{% macro state_tag(r, today) -%}
+  <span class="tag tag--micro {{ state_tones[r.state] }}">{{ t('plans.state.' ~ r.state) }}</span>
+  {%- if r.overdue(today) %} <span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro versions(r, plans_path, hide_last_comment=false) -%}
+  {% if r.files %}
+    <ol class="plan-versions">
+      {% for f in r.files|reverse %}
+        <li class="plan-versions__row">
+          <a class="plan-versions__file" href="{{ url(plans_path ~ '/files/' ~ f.id) }}">
+            {{ t('plans.version', n=f.version) }} · {{ f.file_name }}
+          </a>
+          <span class="ov-cell__muted">
+            {{ t('plans.uploaded_meta', by=f.uploaded_by, at=f.uploaded_at.strftime('%Y-%m-%d %H:%M'), kb=((f.size_bytes + 1023) // 1024)) }}
+          </span>
+          {% if f.verdict %}
+            <span class="tag tag--micro {{ 'tag--ok' if f.verdict == 'accepted' else 'tag--warn' }}">{{ t('plans.verdict.' ~ f.verdict) }}</span>
+            {% if f.comment and not (hide_last_comment and loop.first) %}<span class="plan-versions__comment">«{{ f.comment }}» — {{ f.reviewed_by }}</span>{% endif %}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ol>
+  {% else %}
+    <div class="ov-cell__muted">{{ t('plans.no_versions') }}</div>
+  {% endif %}
+{%- endmacro %}
+
+{% macro history(r) -%}
+  <ol class="plan-history">
+    {% for e in r.events %}
+      <li><span class="ov-cell__muted">{{ e.at.strftime('%Y-%m-%d %H:%M') }}</span>
+        {{ t('plans.event.' ~ e.action) }} · {{ e.actor }}{% if e.action in ('returned',) and e.detail %} · «{{ e.detail }}»{% endif %}</li>
+    {% endfor %}
+  </ol>
+{%- endmacro %}

@@ -216,6 +216,27 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # но не удаляются; правятся только пометки погашения и отвязки (ниже).
     "bot_link_tokens": {"SELECT", "INSERT"},
     "bot_bindings": {"SELECT", "INSERT"},
+    # Язык бота, выбранный человеком (D303, `0035`): удалять выбор не может никто.
+    "bot_ui_langs": {"SELECT", "INSERT"},
+    # Экшн-планы (`0036`): партнёр ролью приложения только кладёт версию файла
+    # (и переводит запрос на приёмку — колонка ниже). Ни запроса, ни вердикта
+    # она не заводит: INSERT на них появится — и бот положит «принятый» план
+    # мимо УК (урок #490). Историю пишут только триггеры.
+    "action_plan_requests": {"SELECT"},
+    "action_plan_files": {"SELECT", "INSERT"},
+    "action_plan_reviews": {"SELECT"},
+    "action_plan_events": {"SELECT"},
+    # Предписания (`0037`): партнёр ролью приложения только отвечает на
+    # действующее предписание своей страны. Ни предписания, ни его связей, ни
+    # закрытия она не пишет: INSERT или UPDATE появится — и бот заведёт
+    # «отправленное» предписание мимо УК. Историю и адресатов страны пишут
+    # только триггеры.
+    "prescriptions": {"SELECT"},
+    "prescription_units": {"SELECT"},
+    "prescription_inspections": {"SELECT"},
+    "prescription_replies": {"SELECT", "INSERT"},
+    "prescription_events": {"SELECT"},
+    "country_recipients": {"SELECT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -229,6 +250,7 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # правятся ничем, иначе погашенную ссылку можно было бы перевыпустить.
     "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
     "bot_bindings": {"UPDATE": {"unbound_at"}},
+    "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
     "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
@@ -242,6 +264,10 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # правкой `key_fingerprint`, то есть и снять с себя запрет, и повесить его
     # на чужой логин.
     "web_login_attempts": {"UPDATE": {"failures", "updated_at"}},
+    # Загрузка версии переводит запрос на приёмку (`0036`) — и только статус:
+    # срок, страна и проверка запроса партнёру не правятся. В какой статус
+    # можно перевести, держит триггер `action_plan_requests_guarded`.
+    "action_plan_requests": {"UPDATE": {"status"}},
 }
 
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
@@ -272,6 +298,21 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     # История переносов (`0025`, D195): читать — да, писать — нет, даже тому,
     # кто переносит. След пишет только триггер.
     "inspection_moves": {"SELECT"},
+    # Экшн-планы (`0036`): УК заводит запрос и выносит вердикт; файлы читает,
+    # но не кладёт — план присылает партнёр. История — только чтение.
+    "action_plan_requests": {"SELECT", "INSERT"},
+    "action_plan_files": {"SELECT"},
+    "action_plan_reviews": {"SELECT", "INSERT"},
+    "action_plan_events": {"SELECT"},
+    # Предписания (`0037`): УК заводит черновик и правит его связи (пока он
+    # черновик — держит триггер); ответы партнёра читает, но не пишет. История
+    # и адресаты страны — только чтение: их пишут триггеры.
+    "prescriptions": {"SELECT", "INSERT"},
+    "prescription_units": {"SELECT", "INSERT", "DELETE"},
+    "prescription_inspections": {"SELECT", "INSERT", "DELETE"},
+    "prescription_replies": {"SELECT"},
+    "prescription_events": {"SELECT"},
+    "country_recipients": {"SELECT"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия
@@ -321,6 +362,24 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
         "UPDATE": {"closed_at"},
     },
     "photos": {"UPDATE": {"purged_at"}},
+    # Экшн-планы (`0036`): статус (приём и возврат), срок и кто его назначил.
+    # Проверка, страна и происхождение запроса не правятся никем.
+    "action_plan_requests": {"UPDATE": {"status", "due_on"}},
+    # Предписания (`0037`): содержимое черновика, отправка и закрытие. Страна,
+    # авторство и отметки времени не правятся никем; что правится на каком
+    # шаге (отправленное — никак), держит триггер `prescriptions_guarded`.
+    "prescriptions": {
+        "UPDATE": {
+            "subject",
+            "body",
+            "recipients",
+            "due_on",
+            "status",
+            "issued_by",
+            "closed_by",
+            "close_comment",
+        }
+    },
     # Правка карты синонимов (`0013`, T292) — тот же заслон, что у снятия
     # проверки: пишутся ровно названные колонки. Неприкосновенны при этом
     # арендатор, язык и ключ поиска (ключ карты не переезжает), сказанное

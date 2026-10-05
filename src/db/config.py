@@ -127,3 +127,70 @@ def load_storage_settings(env: Mapping[str, str] | None = None) -> StorageSettin
         endpoint_url=(src.get(S3_ENDPOINT_URL_VAR) or "").strip() or None,
         region=(src.get(S3_REGION_VAR) or "").strip() or DEFAULT_S3_REGION,
     )
+
+
+#: Срок ответа на запрос экшн-плана по умолчанию, дней от подтверждения (D274).
+ACTION_PLAN_DUE_DAYS_VAR = "ACTION_PLAN_DUE_DAYS"
+DEFAULT_ACTION_PLAN_DUE_DAYS = 7
+#: Предел файла экшн-плана, МБ (D269): настройкой, чтобы увеличить без правки кода.
+ATTACHMENT_MAX_MB_VAR = "ATTACHMENT_MAX_MB"
+DEFAULT_ATTACHMENT_MAX_MB = 25
+#: Ловушки на опечатку, а не пределы устройства: срок больше года и файл больше
+#: гигабайта — это лишний ноль, а не решение.
+MAX_ACTION_PLAN_DUE_DAYS = 365
+MAX_ATTACHMENT_MB = 1024
+#: Предел ответов партнёра на одно предписание: ловушка на зацикленную форму и
+#: замусоривание, а не норма переписки.
+PRESCRIPTION_MAX_REPLIES_VAR = "PRESCRIPTION_MAX_REPLIES"
+DEFAULT_PRESCRIPTION_MAX_REPLIES = 50
+MAX_PRESCRIPTION_REPLIES = 1000
+_MB = 1024 * 1024
+
+
+@dataclass(frozen=True)
+class ActionPlanSettings:
+    """Настройки экшн-планов: срок по умолчанию и предел файла в байтах."""
+
+    due_days: int
+    max_bytes: int
+
+
+def _bounded_int(src: Mapping[str, str], name: str, default: int, upper: int) -> int:
+    raw = (src.get(name) or "").strip()
+    if not raw:
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        value = 0
+    if not 1 <= value <= upper:
+        raise ConfigError(
+            f"Переменная {name}={raw!r} непригодна: нужно целое от 1 до {upper}. "
+            f"Без неё берётся {default}"
+        )
+    return value
+
+
+def load_action_plan_settings(env: Mapping[str, str] | None = None) -> ActionPlanSettings:
+    """Срок ответа (D274) и предел файла (D269) из окружения. Мусор — `ConfigError`."""
+    src = os.environ if env is None else env
+    return ActionPlanSettings(
+        due_days=_bounded_int(
+            src, ACTION_PLAN_DUE_DAYS_VAR, DEFAULT_ACTION_PLAN_DUE_DAYS, MAX_ACTION_PLAN_DUE_DAYS
+        ),
+        max_bytes=_bounded_int(
+            src, ATTACHMENT_MAX_MB_VAR, DEFAULT_ATTACHMENT_MAX_MB, MAX_ATTACHMENT_MB
+        )
+        * _MB,
+    )
+
+
+def load_prescription_max_replies(env: Mapping[str, str] | None = None) -> int:
+    """Предел ответов на одно предписание из окружения. Мусор — `ConfigError`."""
+    src = os.environ if env is None else env
+    return _bounded_int(
+        src,
+        PRESCRIPTION_MAX_REPLIES_VAR,
+        DEFAULT_PRESCRIPTION_MAX_REPLIES,
+        MAX_PRESCRIPTION_REPLIES,
+    )

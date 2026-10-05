@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import io
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 import psycopg
@@ -59,15 +60,18 @@ def make_preview(data: bytes) -> bytes:
 # колонки пространства нет, и запрос без этого отдал бы кадр чужого
 # пространства по угаданному идентификатору (#340). Убранные кадры (`purged_at`, D089) не
 # показываются — их в хранилище уже нет.
+#
+# Кадры записи берутся ВСЕ, а не только с копией: запись, у которой кадры
+# были, но показать их нечем (убраны при снятии, не прочитались как
+# изображение, ещё не выгружены), иначе выглядела бы записью без фото.
 _PREVIEWS_OF_INSPECTION_SQL = """
-select p.finding_id, p.id
+select p.finding_id, p.id, (p.preview_path is not null and p.purged_at is null) as shown
 from photos p
 join inspections i on i.id = p.inspection_id
 join units u on u.id = i.unit_id
-where p.inspection_id = %(id)s
+where p.inspection_id = %(id)s and p.finding_id is not null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and p.preview_path is not null and p.purged_at is null
 order by p.created_at, p.id
 """
 
@@ -93,14 +97,32 @@ def _read(sql: str, params: dict[str, object]) -> list[tuple[Any, ...]]:
         raise DbError(f"Не удалось прочитать кадры проверки ({type(exc).__name__})") from exc
 
 
-def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, tuple[str, ...]]:
-    """Кадры со сжатой копией по записям: идентификатор записи → кадры по порядку."""
-    по_записям: dict[str, list[str]] = {}
-    for finding_id, photo_id in _read(
+@dataclass(frozen=True)
+class FindingShots:
+    """Кадры одной записи: какие можно показать и сколько показать нечем."""
+
+    shown: tuple[str, ...]
+    missing: int
+
+
+def finding_previews(inspection_id: str, *, reach: Reach) -> dict[str, FindingShots]:
+    """Кадры по записям: идентификатор записи → показываемые кадры по порядку и
+    число кадров без копии. Запись без единого кадра в словарь не попадает."""
+    показать: dict[str, list[str]] = {}
+    нечем: dict[str, int] = {}
+    for finding_id, photo_id, shown in _read(
         _PREVIEWS_OF_INSPECTION_SQL, {"id": inspection_id, **require_reach(reach).params()}
     ):
-        по_записям.setdefault(str(finding_id), []).append(str(photo_id))
-    return {запись: tuple(кадры) for запись, кадры in по_записям.items()}
+        запись = str(finding_id)
+        показать.setdefault(запись, [])
+        if shown:
+            показать[запись].append(str(photo_id))
+        else:
+            нечем[запись] = нечем.get(запись, 0) + 1
+    return {
+        запись: FindingShots(shown=tuple(кадры), missing=нечем.get(запись, 0))
+        for запись, кадры in показать.items()
+    }
 
 
 def preview_bytes(

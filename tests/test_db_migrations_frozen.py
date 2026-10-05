@@ -153,6 +153,17 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0034_inspection_acceptance.sql": (
         "sql1:dddc35114711d27b8665c679b99393924bdede70e20c9fb42913d328c8d0357a"
     ),
+    # Заведена вместе с файлом (D303, #411) и нигде ещё не применена.
+    "0035_bot_ui_langs.sql": (
+        "sql1:6579bf02abc5635cfc8fa8dff1d1ba287b64d09e4ce4d667aa484f90b90450b7"
+    ),
+    "0036_action_plans.sql": (
+        "sql1:3101613414c0dd0562ce5314a5205f58c32d938bb4b99af2fe7e6ed261d6f8da"
+    ),
+    # Предписания (волна 3, T361). Заведена вместе с файлом, нигде не применена.
+    "0037_prescriptions.sql": (
+        "sql1:43d57b3c91055a750ab725a703950240dd1bfec580248da175a760d73b6fdd09"
+    ),
 }
 
 

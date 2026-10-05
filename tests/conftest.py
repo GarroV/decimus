@@ -357,6 +357,27 @@ def _бот_без_базы_не_знает_привязок(monkeypatch: pytest
 
 
 @pytest.fixture(autouse=True)
+def выборы_языка(monkeypatch: pytest.MonkeyPatch) -> dict[int, str]:
+    """Выбор языка бота (D303) в тестах без базы — словарь в памяти, свой на тест.
+
+    Без подмены бот спрашивал бы базу о выборе на каждом сообщении, а кэш
+    процесса (`lang_choice.CHOICES`) переносил бы выбор одного теста в
+    следующий. Тест, которому нужен выбор, берёт этот словарь по имени фикстуры.
+    """
+    from src.bot import lang_choice
+
+    выборы: dict[int, str] = {}
+
+    def записать(telegram_id: int, lang: str) -> None:
+        выборы[telegram_id] = lang
+
+    monkeypatch.setattr(lang_choice, "_load_from_db", выборы.get)
+    monkeypatch.setattr(lang_choice, "_save_to_db", записать)
+    monkeypatch.setattr(lang_choice, "CHOICES", lang_choice.LangChoices())
+    return выборы
+
+
+@pytest.fixture(autouse=True)
 def _правка_ответом_не_уходит_в_сеть(monkeypatch: pytest.MonkeyPatch) -> None:
     """Дешёвая модель правки ответом (#454) в тестах не зовётся никогда.
 

@@ -29,9 +29,9 @@ from src.domain.bot_checklists import BotChecklist, available
 from src.domain.config import check_environment
 from src.domain.errors import DomainError
 from src.domain.geo import COUNTRIES
-from src.domain.unit_name import UnitName, canonical_unit
+from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, UnitName, canonical_unit
 
-from .. import sealed, sidecar
+from .. import sealed, sidecar, stops
 from ..auditor import auditor_name, auditor_name_was_shortened
 from ..config import BotSettings
 from ..inspection import read_inspection
@@ -56,7 +56,7 @@ from ..keyboards import (
     sealed_keyboard,
     unit_new_keyboard,
 )
-from ..lang import chat_ui_lang
+from ..lang import chat_ui_lang, person_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
 from ..states import StartFlow
@@ -65,26 +65,8 @@ from ..unit_pick import match_unit, may_add_units
 
 logger = logging.getLogger(__name__)
 
-#: Сколько знаков в названии точки бот принимает.
-#:
-#: Число замерено, а не выбрано на вкус. Имя файла отчёта движок собирает как
-#: «Аудит <точка> - <аудитор> - <дата>.pdf»; кириллица в UTF-8 — два байта на
-#: знак, а предел имени файла на ext4 (площадка продукта, D053) — 255 байт.
-#: С аудитором в 40 знаков на название остаётся около шестидесяти. Проверено
-#: фактическим прогоном: на 300 знаках сборка отчёта падает с «File name too
-#: long», и узнаёт об этом аудитор в конце проверки, когда переснимать поздно.
-UNIT_NAME_LIMIT = 60
-
-#: Тот же предел, но БАЙТАМИ (T128, переоткрытая часть, issue #103): в знаках
-#: он не ловит тяжёлые символы — 60 эмодзи это те же 60 знаков (в предел выше
-#: укладываются), но уже 240 байт, то есть одно название съедает больше, чем
-#: весь бюджет имени файла. Число — часть общего бюджета: постоянная часть
-#: формулы имени файла (слово, два разделителя, дата, «.pdf») занимает 31 байт
-#: (замерено, см. комментарий у `AUDITOR_NAME_BYTE_LIMIT` в `../auditor.py`),
-#: остаётся 224 байта на название точки и имя аудитора вместе. Точке — 120
-#: байт (ровно 60 кириллических знаков — старым живым названиям запрет не
-#: мешает, старое поведение не меняется), аудитору — 100.
-UNIT_NAME_BYTE_LIMIT = 120
+# Пределы названия точки (`UNIT_NAME_LIMIT`, `UNIT_NAME_BYTE_LIMIT`) живут в
+# `src/domain/unit_name.py`: их же держит веб-админка, заводя пиццерию (#437).
 
 
 async def _offer_resume(message: Message, inspection: domain.Inspection, lang: str) -> None:
@@ -157,11 +139,11 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
     открыты = _open_checklists(space)
     if открыты is None:
         await state.clear()
-        await message.answer(t("start.failed", lang))
+        await stops.refuse(message, lang, step="start.checklist", key="start.failed")
         return
     if not открыты:
         await state.clear()
-        await message.answer(t("start.no_checklists", lang))
+        await stops.refuse(message, lang, step="start.checklist", key="start.no_checklists")
         return
     if len(открыты) == 1:
         await state.update_data(checklist=открыты[0].code)
@@ -209,8 +191,12 @@ def build_start_router(
             inspection = read_inspection(message.chat.id)
         except DomainError:
             logger.exception("состояние чата %s не читается", message.chat.id)
-            await message.answer(
-                t("start.state_broken", lang), reply_markup=new_inspection_keyboard(lang)
+            await stops.refuse(
+                message,
+                lang,
+                step="start",
+                key="start.state_broken",
+                reply_markup=new_inspection_keyboard(lang),
             )
             return
         if inspection is not None:
@@ -249,7 +235,7 @@ def build_start_router(
         lang = chat_ui_lang(message.chat.id)
         inspection = read_inspection(message.chat.id)
         if inspection is None:
-            await message.answer(t("start.resume_gone", lang))
+            await stops.refuse(message, lang, step="start.resume", key="start.resume_gone")
             return
         if sealed.is_sealed(message.chat.id):
             # Кнопка из вчерашней переписки живёт вечно, а сдать проверку
@@ -308,16 +294,16 @@ def build_start_router(
         lang = chat_ui_lang(chat_id)
         await state.clear()
         if not sealed.is_sealed(chat_id):
-            await message.answer(t("sealed.drop_gone", lang))
+            await stops.refuse(message, lang, step="start.drop", key="sealed.drop_gone")
             return
         try:
             убрана = await asyncio.to_thread(domain.drop_inspection, chat_id)
         except DomainError:
             logger.exception("проверка чата %s не убралась", chat_id)
-            await message.answer(t("start.failed", lang))
+            await stops.refuse(message, lang, step="start.drop", key="start.failed")
             return
         if not убрана:
-            await message.answer(t("sealed.drop_gone", lang))
+            await stops.refuse(message, lang, step="start.drop", key="sealed.drop_gone")
             return
         # Заметки уходят вместе с проверкой: список кадров, последняя зона и
         # карта сообщений относятся к ней, а не к чату.
@@ -335,27 +321,38 @@ def build_start_router(
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
         if not unit:
-            await message.answer(t("start.unit_empty", lang))
+            await stops.refuse(message, lang, step="start.unit", key="start.unit_empty")
             return
         if len(unit) > UNIT_NAME_LIMIT:
             # Отказ здесь, а не отказом сборки отчёта в конце проверки: там
             # аудитор уже уехал с точки, и переименовать пиццерию ему нечем.
-            await message.answer(t("start.unit_too_long", lang, limit=UNIT_NAME_LIMIT))
+            await stops.refuse(
+                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
+            )
             return
         if len(unit.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
             # Предел в знаках это не ловит: 60 эмодзи проходят его же знаками,
             # а по байтам уже почти весь бюджет имени файла разом (T128).
-            await message.answer(t("start.unit_too_long_bytes", lang))
+            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
             return
         # Имя точки — город по-английски и номер, как бы его ни написали (D233).
         имя = canonical_unit(unit)
         if имя is None:
-            await message.answer(t("start.unit_need_number", lang, typed=unit))
+            await stops.refuse(
+                message, lang, step="start.unit", key="start.unit_need_number", typed=unit
+            )
             return
         if len(имя.name) > UNIT_NAME_LIMIT:
             # Латиница бывает длиннее написанного («Щ» → «shch»): предел имени
             # файла отчёта сверяется с тем, что ляжет в шапку, а не с вводом.
-            await message.answer(t("start.unit_too_long", lang, limit=UNIT_NAME_LIMIT))
+            await stops.refuse(
+                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
+            )
+            return
+        if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+            # «щ» → «shch» добавляет байты, а нелатинский незнакомый город
+            # остаётся многобайтным: ввод прошёл предел, сведённое имя — нет.
+            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
             return
         сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
         if сверка.name is not None or not сверка.checked:
@@ -364,7 +361,9 @@ def build_start_router(
             await _unit_chosen(message, state, lang, сверка.name or имя.name)
             return
         if not may_add_units(space):
-            await message.answer(t("start.unit_new_partner", lang, name=имя.name))
+            await stops.refuse(
+                message, lang, step="start.unit", key="start.unit_new_partner", name=имя.name
+            )
             return
         await state.update_data(unit_new=asdict(имя), unit_typed=unit)
         await message.answer(
@@ -384,14 +383,20 @@ def build_start_router(
         сырое = данные.get("unit_new")
         if not isinstance(сырое, dict):
             # Кнопка из старого сообщения: к какой точке она относилась, уже не узнать.
-            await message.answer(t("start.unit_pick_gone", lang))
+            await stops.refuse(message, lang, step="start.unit_new", key="start.unit_pick_gone")
             return
         if (callback.data or "").removeprefix(UNIT_NEW_PREFIX) != UNIT_NEW_YES:
             await state.update_data(unit_new=None, unit_typed=None)
             await _ask_unit(message, state, lang)
             return
         if not may_add_units(space):
-            await message.answer(t("start.unit_new_partner", lang, name=сырое["name"]))
+            await stops.refuse(
+                message,
+                lang,
+                step="start.unit_new",
+                key="start.unit_new_partner",
+                name=сырое["name"],
+            )
             return
         имя = UnitName(**сырое)
         написано = str(данные.get("unit_typed") or "")
@@ -438,7 +443,9 @@ def build_start_router(
         вовсе, а у знакомой он придёт следом и вытеснит вопрос мастера с
         экрана: аудитор прочитает ответ команды и решит, что название принято.
         """
-        await message.answer(t("start.unit_command", chat_ui_lang(message.chat.id)))
+        await stops.refuse(
+            message, chat_ui_lang(message.chat.id), step="start.unit", key="start.unit_command"
+        )
         raise SkipHandler
 
     @router.message(StateFilter(StartFlow.waiting_unit), ~F.text)
@@ -451,7 +458,9 @@ def build_start_router(
         поймал бы пропущенную команду здесь же — и она никуда бы не уехала, а
         аудитор получил бы «жду название» вместо ответа команды.
         """
-        await message.answer(t("start.unit_expected", chat_ui_lang(message.chat.id)))
+        await stops.refuse(
+            message, chat_ui_lang(message.chat.id), step="start.unit", key="start.unit_expected"
+        )
 
     @router.callback_query(
         StateFilter(StartFlow.waiting_checklist), F.data.startswith(CHECKLIST_PREFIX)
@@ -467,7 +476,7 @@ def build_start_router(
         if code not in {c.code for c in открыты}:
             # Методист закрыл чек-лист, пока аудитор смотрел на кнопки: не
             # подменяем соседним молча, а показываем свежий список.
-            await message.answer(t("start.checklist_gone", lang))
+            await stops.refuse(message, lang, step="start.checklist", key="start.checklist_gone")
             await _ask_checklist(message, state, lang, space)
             return
         await state.update_data(checklist=code)
@@ -502,9 +511,15 @@ def build_start_router(
         unit = str(data.get("unit", "")).strip()
         kind_code = str(data.get("kind", ""))
         if not unit or kind_code not in KIND_TITLES:
+            # Мастер потерял ответы прошлых шагов (перезапуск, старая кнопка) и
+            # начинается заново — для человека это тот же отказ, и он посчитан.
             await state.clear()
-            await message.answer(
-                t("start.greeting", lang), reply_markup=new_inspection_keyboard(lang)
+            await stops.refuse(
+                message,
+                lang,
+                step="start.lang",
+                key="start.greeting",
+                reply_markup=new_inspection_keyboard(lang),
             )
             return
 
@@ -532,13 +547,12 @@ def build_start_router(
                 # партнёру в документ он уезжает на языке отчёта.
                 kind=kind_code,
                 report_lang=report_lang,
-                # Языка в проверке три, и до T128 из бота не задавался ни один
-                # из двух остальных: аудитор выбирал английский отчёт, а
-                # разговор оставался русским — язык был константой, а не
-                # параметром. Вопрос в мастере один, поэтому его ответ ложится
-                # во все три поля; полями они остаются разными, и разъехаться
-                # им ничто не мешает, когда вопросов станет больше.
-                ui_lang=report_lang,
+                # Языка в проверке три (T025). Интерфейс — язык ЧЕЛОВЕКА
+                # (D303): его выбор `/lang`, иначе язык стенда; отчёт к нему
+                # больше не привязан — до D303 английский отчёт заодно
+                # переключал и разговор. Речь по-прежнему идёт за отчётом:
+                # отдельного вопроса о ней в мастере нет.
+                ui_lang=person_ui_lang(),
                 speech_lang=report_lang,
                 auditor=auditor,
                 # Пространство того, кто начал (волна 1, #340): в нём проверка
@@ -553,7 +567,7 @@ def build_start_router(
             # тому, кто зовёт движок из командной строки. В журнал целиком, в
             # чат — что делать (T151, тот же принцип, что у T127).
             logger.exception("не удалось начать проверку в чате %s", message.chat.id)
-            await message.answer(t("start.failed", lang))
+            await stops.refuse(message, lang, step="start.lang", key="start.failed")
             return
         finally:
             await state.clear()

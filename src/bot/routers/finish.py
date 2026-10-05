@@ -44,7 +44,7 @@ from src.domain.errors import ChecklistVersionMismatch, DomainError
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter, build_pdf
 
-from .. import sidecar, view
+from .. import sidecar, stops, view
 from ..errors import BotNotesError
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -86,7 +86,7 @@ async def show_summary(message: Message, chat_id: int, lang: str, *, store: Mate
     """
     inspection = read_inspection(chat_id)
     if inspection is None:
-        await message.answer(t("material.no_inspection", lang))
+        await stops.refuse(message, lang, step="finish.summary", key="material.no_inspection")
         return
     # Подпроцесс (26 мс) — в поток, чтобы бот не вставал на время расчёта (T101).
     try:
@@ -97,9 +97,14 @@ async def show_summary(message: Message, chat_id: int, lang: str, *, store: Mate
         # текстом последнего рубежа, из которого не видно ни версий, ни выхода
         # (T167). Обе версии — человеку, оба выхода — кнопками, выбор — за ним.
         logger.warning("расхождение версии методики в чате %s: %s", chat_id, exc)
-        await message.answer(
-            t("finish.version_mismatch", lang, recorded=exc.recorded, current=exc.current),
+        await stops.refuse(
+            message,
+            lang,
+            step="finish.summary",
+            key="finish.version_mismatch",
             reply_markup=version_mismatch_keyboard(lang),
+            recorded=exc.recorded,
+            current=exc.current,
         )
         return
     await message.answer(
@@ -191,14 +196,29 @@ async def archive(
         # называет два выхода, и один из них — кнопка. Без неё сообщение врало
         # бы, а довести проверку до истории аудитору было бы нечем.
         logger.warning("расхождение версии методики на сливе чата %s: %s", chat_id, exc)
-        await message.answer(
-            t("finish.version_mismatch", lang, recorded=exc.recorded, current=exc.current),
+        await stops.refuse(
+            message,
+            lang,
+            step="finish.archive",
+            key="finish.version_mismatch",
             reply_markup=version_mismatch_keyboard(lang),
+            recorded=exc.recorded,
+            current=exc.current,
+        )
+        return
+    except db.UnitRefusedError as exc:
+        # Сторож справочника пространства (#482): база ответила, и ответила
+        # «нет». Текст «база не ответила» звал бы подождать и не начинать новую,
+        # а повтор здесь не поможет никогда — нужна другая точка или правка
+        # справочника в УК. Отличается это типом, как и расхождение версии.
+        logger.warning("слив проверки чата %s отклонён сторожем точки: %s", chat_id, exc)
+        await stops.refuse(
+            message, lang, step="finish.archive", key="finish.unit_refused", unit=exc.unit
         )
         return
     except db.DbError:
         logger.exception("слив проверки чата %s не удался", chat_id)
-        await message.answer(t("finish.not_archived", lang))
+        await stops.refuse(message, lang, step="finish.archive", key="finish.not_archived")
         return
 
     try:
@@ -305,7 +325,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
     bot = message.bot
     inspection = read_inspection(chat_id)
     if bot is None or inspection is None:
-        await message.answer(t("material.no_inspection", lang))
+        await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
         return
     await message.answer(t("finish.building", lang))
     # Кадры записей и кадры информационной части (T179) — одним списком: карту
@@ -328,9 +348,13 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
         except PhotoMissing as exc:
             # Решение «собрать без кадра» принимает аудитор, а не код: отчёт без
             # доказательства партнёр справедливо оспорит.
-            await message.answer(
-                t("finish.photos_missing", lang, reason=exc),
+            await stops.refuse(
+                message,
+                lang,
+                step="finish.build",
+                key="finish.photos_missing",
                 reply_markup=without_photos_keyboard(lang),
+                reason=exc,
             )
             return
         except ReportError:
@@ -338,7 +362,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             # рендерера, пути во временный каталог и совет поставить системные
             # библиотеки (T151). Аудитору на точке нужен не он.
             logger.exception("отчёт чата %s не собрался", chat_id)
-            await message.answer(t("finish.pdf_failed", lang))
+            await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
             return
 
         await message.answer_document(FSInputFile(pdf))
@@ -426,7 +450,9 @@ def build_finish_router(store: MaterialStore) -> Router:
             inspection = await asyncio.to_thread(domain.sync_checklist_version, chat_id)
         except DomainError:
             logger.exception("перевод проверки чата %s на действующую методику не удался", chat_id)
-            await message.answer(t("finish.version_sync_failed", lang))
+            await stops.refuse(
+                message, lang, step="finish.version", key="finish.version_sync_failed"
+            )
             return
         await message.answer(t("finish.version_synced", lang, current=inspection.checklist_version))
         # Тупик кончается там же, где начался: аудитор снова видит итог и кнопки
@@ -448,7 +474,7 @@ def build_finish_router(store: MaterialStore) -> Router:
         message, chat_id, lang = here
         inspection = read_inspection(chat_id)
         if inspection is None:
-            await message.answer(t("material.no_inspection", lang))
+            await stops.refuse(message, lang, step="finish.version", key="material.no_inspection")
             return
         await message.answer(t("finish.version_kept", lang, recorded=inspection.checklist_version))
 

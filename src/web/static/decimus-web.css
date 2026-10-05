@@ -872,22 +872,27 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   /* Недостроенного в нижней полосе нет (D217): карта продукта целиком — в
      боковом меню компьютера (D138). */
   .tabbar__item.is-wip { display: none; }
+  /* Пункты делят ширину поровну и сжимаются: с шестым пунктом («Экшн-планы»)
+     последний уезжал за край экрана телефона (сверка экшн-планов, 04.10.2026).
+     Длинная подпись обрезается многоточием, полное имя — в `title`. */
   .tabbar__item {
-    flex: 1 0 auto;
+    flex: 1 1 0;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 2px;
     min-height: var(--tap-min);
-    padding: var(--space-2) var(--space-3);
+    padding: var(--space-2) var(--space-1);
     border-radius: var(--r-control);
     font-size: var(--fs-micro);
     font-weight: var(--w-medium);
     color: var(--ink-3);
     white-space: nowrap;
   }
-  .tabbar__item svg { width: 18px; height: 18px; }
+  .tabbar__item svg { width: 18px; height: 18px; flex: none; }
+  .tabbar__item > span { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
   .tabbar__item:hover { text-decoration: none; color: var(--ink); }
   .tabbar__item.is-current { background: var(--accent-soft); color: var(--accent); }
 }
@@ -1012,6 +1017,12 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .find-row__shots { flex: none; font-size: var(--fs-micro); color: var(--ink-2); white-space: nowrap; }
 .find-row__shots::after { content: " ▾"; }
 .find-row--photos[open] .find-row__shots::after { content: " ▴"; }
+/* Кадры были, но показать их нечем (#422): не раскрытие, а честная пометка. */
+.find-row__shots.find-row__lost::after { content: none; }
+/* Счётчик с недоступными длиннее: на телефоне переносится, а не уезжает за край карточки. */
+@media (max-width: 719px) {
+  .find-row__shots--partial { flex: 0 1 auto; max-width: 9.5rem; white-space: normal; text-align: right; }
+}
 .find-row__gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
@@ -1733,3 +1744,111 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
      вроде «ЯЗЫК ОТЧЁТА» ломались по слову на строку. */
   .card__facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ── Экшн-планы (волна 2) ──────────────────────────────────────────────
+   Таблица запросов раздела УК — та же сетка, что у точек страны; версии и
+   история — списки без маркеров, строка за строкой. */
+.ov-table--plans .ov-table__head,
+.ov-table--plans .ov-table__row {
+  grid-template-columns: minmax(9rem, 1.4fr) minmax(6rem, 1fr) 4rem 6rem 6rem minmax(9rem, 1fr);
+  min-width: 44rem;
+}
+.plan-versions,
+.plan-history { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.plan-versions__row { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.plan-versions__file { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.plan-versions__comment { font-size: var(--fs-meta); color: var(--ink-2); overflow-wrap: anywhere; }
+.plan-history { font-size: var(--fs-meta); }
+
+/* Очередь УК на телефоне — строка складывается в карточку, как реестр: точка
+   и буква сверху, срок и состояние под ними. Шесть колонок уезжали вбок, и
+   состояние — смысл очереди — читалось только прокруткой (сверка norma). */
+@media (max-width: 52rem) {
+  .ov-table--plans .ov-table__head { display: none; }
+  .ov-table--plans .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name grade"
+      "country date"
+      "due state";
+    min-width: 0;
+    row-gap: var(--space-1);
+  }
+  .ov-table--plans .ov-table__row > :nth-child(1) { grid-area: name; }
+  .ov-table--plans .ov-table__row > :nth-child(2) { grid-area: country; }
+  .ov-table--plans .ov-table__row > :nth-child(3) { grid-area: grade; justify-self: end; }
+  .ov-table--plans .ov-table__row > :nth-child(4) { grid-area: date; justify-self: end; }
+  .ov-table--plans .ov-table__row > :nth-child(5) { grid-area: due; justify-self: start; }
+  .ov-table--plans .ov-table__row > :nth-child(6) { grid-area: state; justify-self: end; }
+}
+
+/* Поле файла плана — в тон кнопкам forma, а не серой кнопкой браузера. */
+.input[type="file"] { padding: var(--space-2); }
+.input[type="file"]::file-selector-button {
+  margin-right: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* ── Предписания (волна 3) ─────────────────────────────────────────────
+   Вкладки «Действий», таблица предписаний (та же сетка, что очередь планов),
+   письмо как написано и выбор пиццерий и оснований. */
+.rx-tabs { margin: var(--space-4) 0 var(--space-2); }
+.rx-tabs a { text-decoration: none; }
+.ov-table--rx .ov-table__head,
+.ov-table--rx .ov-table__row {
+  grid-template-columns: minmax(12rem, 2fr) minmax(6rem, 1fr) minmax(8rem, 1.2fr) 6rem minmax(8rem, 1fr);
+  min-width: 44rem;
+}
+.rx-letter { display: grid; gap: var(--space-3); }
+.rx-letter__subject { font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.rx-letter__body,
+.rx-reply__text { white-space: pre-wrap; overflow-wrap: anywhere; line-height: var(--lh-meta); }
+.rx-letter__to { overflow-wrap: anywhere; }
+.rx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-2); }
+.rx-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2) var(--space-3); }
+.rx-reply { display: grid; gap: var(--space-1); }
+.rx-pick { border: 0; margin: 0; padding: 0; min-width: 0; }
+.rx-pick__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
+  gap: var(--space-2) var(--space-4);
+  max-height: 18rem;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+.rx-pick__item { display: flex; align-items: baseline; gap: var(--space-2); min-width: 0; cursor: pointer; }
+.rx-pick__item input { accent-color: var(--accent); flex: 0 0 auto; }
+.rx-pick__item span { overflow-wrap: anywhere; }
+.rx-form__body { min-height: 14rem; font: inherit; }
+.rx-form__actions { grid-column: 1 / -1; gap: var(--space-3); flex-wrap: wrap; }
+.rx-form__actions .btn { margin-top: 0; }
+
+/* Таблица предписаний на телефоне — строка складывается в карточку, как
+   очередь планов: тема сверху, страна и пиццерии под ней, срок и состояние. */
+@media (max-width: 52rem) {
+  .ov-table--rx .ov-table__head { display: none; }
+  .ov-table--rx .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "name name"
+      "country units"
+      "due state";
+    min-width: 0;
+    row-gap: var(--space-1);
+  }
+  .ov-table--rx .ov-table__row > :nth-child(1) { grid-area: name; }
+  .ov-table--rx .ov-table__row > :nth-child(2) { grid-area: country; }
+  .ov-table--rx .ov-table__row > :nth-child(3) { grid-area: units; justify-self: end; }
+  .ov-table--rx .ov-table__row > :nth-child(4) { grid-area: due; justify-self: start; }
+  .ov-table--rx .ov-table__row > :nth-child(5) { grid-area: state; justify-self: end; }
+}
+/* Группа чипов держится вместе при переносе: ярлык «Страна» не отрывается от своих чипов. */
+.rx-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+/* Кнопки отправки черновика — одной ширины: форма не заводит свою коробку. */
+.rx-send form { display: contents; }
