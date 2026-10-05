@@ -237,6 +237,26 @@ async def test_отказ_хранилища_называется_отдельн
     assert session.last_text == t("finish.photos_not_archived", "ru")
 
 
+async def test_лежащее_хранилище_не_роняет_сдачу_и_обещает_дозагрузку(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#459: хранилище спит — отчёт у аудитора, сказано, что фото догрузятся сами.
+
+    Отчёт в то же лежащее хранилище не отправляется: бот обрабатывает
+    сообщения по одному, и второе ожидание отказа стояло бы для всех.
+    """
+    подменить_слив(monkeypatch, "insp-1")
+    подменить_выгрузку(monkeypatch, db.PhotosDeferredError("хранилище недоступно"))
+    отчёты = Calls()
+    monkeypatch.setattr(db, "upload_report", lambda *a, **kw: отчёты.append((a, kw)), raising=False)
+
+    session = await проверка_через_бота(monkeypatch)
+
+    assert отправленные_документы(session), "лежащее хранилище оставило аудитора без отчёта"
+    assert session.last_text == t("finish.photos_deferred", "ru")
+    assert not отчёты, "отчёт поехал в хранилище, про которое уже известно, что оно лежит"
+
+
 async def test_ненастроенная_база_не_выглядит_сбоем(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

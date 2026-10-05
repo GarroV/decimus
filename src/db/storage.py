@@ -35,6 +35,26 @@ if TYPE_CHECKING:  # pragma: no cover — только для проверки �
 #: одно значение, — работа без потребителя.
 PHOTO_CONTENT_TYPE = "image/jpeg"  # кадр, не читаемый Pillow, кладётся как пришёл
 
+#: Сколько ждать соединения с хранилищем и сколько раз пробовать (#459).
+#:
+#: Умолчания `botocore` — 60 секунд на соединение и пять попыток — рассчитаны на
+#: облако, а не на хранилище, которое спит (D259: MUSPELHEIM засыпает и сам не
+#: просыпается). Спящий узел tailnet на соединение не отвечает вовсе, и каждая
+#: попытка дожидается полного срока: на сдаче это минуты, а бот обрабатывает
+#: сообщения по одному (`handle_as_tasks=False`) — стояли бы все аудиторы.
+#: Короткий срок ничего не теряет: невыгруженный кадр остаётся в базе с пустой
+#: ссылкой, и его доливает дозагрузка (`src/bot/photo_backfill.py`).
+CONNECT_TIMEOUT_SEC = 5
+#: Ожидание ответа уже соединившегося хранилища. Кадр — сотни килобайт, отчёт —
+#: единицы мегабайт; полминуты тишины от живого сервера — уже отказ.
+READ_TIMEOUT_SEC = 30
+#: Всего попыток, включая первую (режим `standard`). Одна, без повтора: на
+#: адрес, который не отвечает, попытка стоит не 5 секунд, а 10 (замерено
+#: 05.10.2026: одна — 10,2 с, две — 16,8 с; умолчания botocore — см. #459), а
+#: мгновенный сбой повторный прогон и так покроет — кадр не потеряется, его
+#: дольёт дозагрузка.
+MAX_ATTEMPTS = 1
+
 
 @dataclass(frozen=True)
 class StorageSettings:
@@ -115,6 +135,7 @@ class S3PhotoStorage:
 
     def __init__(self, settings: StorageSettings) -> None:
         import boto3
+        from botocore.config import Config
 
         self._bucket = settings.bucket
         self._client: S3Client = boto3.client(
@@ -123,6 +144,11 @@ class S3PhotoStorage:
             aws_access_key_id=settings.access_key_id,
             aws_secret_access_key=settings.secret_access_key,
             region_name=settings.region,
+            config=Config(
+                connect_timeout=CONNECT_TIMEOUT_SEC,
+                read_timeout=READ_TIMEOUT_SEC,
+                retries={"max_attempts": MAX_ATTEMPTS, "mode": "standard"},
+            ),
         )
 
     @property

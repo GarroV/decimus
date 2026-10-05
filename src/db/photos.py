@@ -18,18 +18,25 @@
 Пропавший кадр не проходит молча. Выгрузка, вернувшая «успех» с половиной
 кадров, оставила бы в базе часть ссылок мёртвыми навсегда и никому об этом не
 сказала — а именно от этого задача и заводилась.
+
+Хранилище может лежать в момент сдачи (D259: оно на MUSPELHEIM, а тот
+засыпает). Тогда кадр не теряется: строка остаётся с пустым `storage_path`,
+вызывающий получает `PhotosDeferredError`, а потом кадр доливает дозагрузка —
+`pending_photo_uploads` называет, что ждёт, бот качает байты у телеграма и
+зовёт ту же `upload_photos` (#459).
 """
 
 from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 
 from .config import check_environment, load_storage_settings
-from .errors import PushError, StorageError
+from .errors import PhotosDeferredError, PushError, StorageError
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
@@ -47,11 +54,64 @@ where inspection_id = %s and storage_path is null
 order by created_at, id
 """
 
+#: `storage_path is null` в условии — не перестраховка. Сдача и дозагрузка могут
+#: взять один кадр одновременно; объект ляжет дважды по тому же ключу (ключ из
+#: идентификаторов, байты те же), а ссылку запишет тот, кто успел первым.
+#: Второй получит ноль строк и не посчитает кадр своим (#459).
 _MARK_UPLOADED_SQL = """
-update photos set storage_path = %s, preview_path = %s, uploaded_at = now() where id = %s
+update photos set storage_path = %s, preview_path = %s, uploaded_at = now()
+where id = %s and storage_path is null
+"""
+
+#: Невыгруженные кадры всех видимых проверок. Убранные (`purged_at`) не берутся:
+#: их объект снят намеренно. Снятые проверки роль приложения не видит вовсе
+#: (`photos_follow_visible_inspection`), значит и их кадры сюда не попадут.
+#: Свежие — не раньше `min_age_sec`: их, скорее всего, прямо сейчас выгружает
+#: сама сдача с байтами на руках, и качать их у телеграма второй раз незачем.
+_SELECT_ALL_PENDING_SQL = """
+select inspection_id, telegram_file_id
+from photos
+where storage_path is null and purged_at is null
+  and created_at < now() - make_interval(secs => %s)
+order by created_at, id
+limit %s
 """
 
 _INSPECTION_EXISTS_SQL = "select 1 from inspections where id = %s"
+
+
+@dataclass(frozen=True)
+class PendingUpload:
+    """Проверка, у которой есть кадры без ссылки в хранилище (#459)."""
+
+    inspection_id: str
+    #: Идентификаторы телеграма без повторов, в порядке поступления.
+    file_ids: tuple[str, ...]
+
+
+#: Сколько кадров брать за один проход дозагрузки. Остаток возьмёт следующий.
+PENDING_BATCH = 1000
+
+
+def pending_photo_uploads(*, min_age_sec: int, limit: int = PENDING_BATCH) -> list[PendingUpload]:
+    """Какие кадры ещё не легли в хранилище — по проверкам (#459).
+
+    Читает только базу: хранилище здесь не трогается, поэтому ответ есть и
+    тогда, когда оно лежит, — и это ровно тот момент, когда он нужен.
+    """
+    settings = check_environment()
+    try:
+        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+            cur.execute(_SELECT_ALL_PENDING_SQL, (min_age_sec, limit))
+            rows = cur.fetchall()
+    except psycopg.Error as exc:
+        raise PushError(
+            f"Список невыгруженных кадров не прочитан ({type(exc).__name__}): {exc}"
+        ) from exc
+    by_inspection: dict[str, dict[str, None]] = {}
+    for inspection_id, file_id in rows:
+        by_inspection.setdefault(str(inspection_id), {})[str(file_id)] = None
+    return [PendingUpload(key, tuple(ids)) for key, ids in by_inspection.items()]
 
 
 def _require_inspection(conn: psycopg.Connection[Any], inspection_id: str) -> None:
@@ -146,8 +206,11 @@ def upload_photos(
                 uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
                 with conn.cursor() as cur:
                     cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))
+                    marked = cur.rowcount
                 conn.commit()
-                uploaded += 1
+                # Ноль строк — кадр уже записал другой выгрузчик (сдача или
+                # дозагрузка): объект тот же, ссылка его, считать его своим нельзя.
+                uploaded += marked
     except PushError:
         raise
     except psycopg.Error as exc:
@@ -162,10 +225,10 @@ def upload_photos(
         # именно `StorageError`, а не `Exception`: широкий перехват подменял бы
         # собой и ошибку в коде вызывающего — настоящая поломка выглядела бы
         # отказом хранилища и молча уходила в «повторим позже».
-        raise PushError(
+        raise PhotosDeferredError(
             f"Хранилище не приняло кадр проверки {inspection_id} "
             f"({type(exc).__name__}): {exc} Выгруженные до отказа кадры остались "
-            f"выгруженными — повторный вызов доделает остаток"
+            f"выгруженными, остальные ждут дозагрузки"
         ) from exc
 
     if missing and not allow_missing:
