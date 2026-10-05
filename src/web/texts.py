@@ -177,7 +177,9 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.tile.note.average_mixed": {"ru": "разные чек-листы", "en": "different checklists"},
     "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
-    "overview.attention.count": {"ru": "поводов: {count}", "en": "{count} pending"},
+    # Число ПОКАЗАННЫХ поводов: список ограничен, и «поводов: 6» читалось бы как
+    # «всего шесть» рядом с плиткой критических по всему срезу (#503).
+    "overview.attention.count": {"ru": "показано: {count}", "en": "{count} shown"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
     "overview.attention.hint": {
         "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
