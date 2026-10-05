@@ -226,6 +226,17 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "action_plan_files": {"SELECT", "INSERT"},
     "action_plan_reviews": {"SELECT"},
     "action_plan_events": {"SELECT"},
+    # Предписания (`0037`): партнёр ролью приложения только отвечает на
+    # действующее предписание своей страны. Ни предписания, ни его связей, ни
+    # закрытия она не пишет: INSERT или UPDATE появится — и бот заведёт
+    # «отправленное» предписание мимо УК. Историю и адресатов страны пишут
+    # только триггеры.
+    "prescriptions": {"SELECT"},
+    "prescription_units": {"SELECT"},
+    "prescription_inspections": {"SELECT"},
+    "prescription_replies": {"SELECT", "INSERT"},
+    "prescription_events": {"SELECT"},
+    "country_recipients": {"SELECT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -293,6 +304,15 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "action_plan_files": {"SELECT"},
     "action_plan_reviews": {"SELECT", "INSERT"},
     "action_plan_events": {"SELECT"},
+    # Предписания (`0037`): УК заводит черновик и правит его связи (пока он
+    # черновик — держит триггер); ответы партнёра читает, но не пишет. История
+    # и адресаты страны — только чтение: их пишут триггеры.
+    "prescriptions": {"SELECT", "INSERT"},
+    "prescription_units": {"SELECT", "INSERT", "DELETE"},
+    "prescription_inspections": {"SELECT", "INSERT", "DELETE"},
+    "prescription_replies": {"SELECT"},
+    "prescription_events": {"SELECT"},
+    "country_recipients": {"SELECT"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия
@@ -345,6 +365,21 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # Экшн-планы (`0036`): статус (приём и возврат), срок и кто его назначил.
     # Проверка, страна и происхождение запроса не правятся никем.
     "action_plan_requests": {"UPDATE": {"status", "due_on"}},
+    # Предписания (`0037`): содержимое черновика, отправка и закрытие. Страна,
+    # авторство и отметки времени не правятся никем; что правится на каком
+    # шаге (отправленное — никак), держит триггер `prescriptions_guarded`.
+    "prescriptions": {
+        "UPDATE": {
+            "subject",
+            "body",
+            "recipients",
+            "due_on",
+            "status",
+            "issued_by",
+            "closed_by",
+            "close_comment",
+        }
+    },
     # Правка карты синонимов (`0013`, T292) — тот же заслон, что у снятия
     # проверки: пишутся ровно названные колонки. Неприкосновенны при этом
     # арендатор, язык и ключ поиска (ключ карты не переезжает), сказанное

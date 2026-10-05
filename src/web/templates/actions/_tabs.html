@@ -1,0 +1,7 @@
+{# Вкладки раздела «Действия»: два вопроса УК — экшн-планы и предписания. #}
+<nav class="seg rx-tabs" aria-label="{{ t('section.actions.title') }}">
+  <a class="{{ 'seg__current' if tab == 'plans' else 'seg__item' }}" {% if tab == 'plans' %}aria-current="page"{% endif %}
+     href="{{ url(actions_path) }}?lang={{ lang }}{% if country %}&amp;country={{ country }}{% endif %}">{{ t('actions.tab.plans') }}</a>
+  <a class="{{ 'seg__current' if tab == 'prescriptions' else 'seg__item' }}" {% if tab == 'prescriptions' %}aria-current="page"{% endif %}
+     href="{{ url(actions_path ~ '/prescriptions') }}?lang={{ lang }}{% if country %}&amp;country={{ country }}{% endif %}">{{ t('actions.tab.prescriptions') }}</a>
+</nav>

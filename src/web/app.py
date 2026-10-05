@@ -52,6 +52,7 @@ from . import (
     letter_draft,
     letter_markup,
     people,
+    prescriptions,
     pricing,
     profile,
     review,
@@ -100,7 +101,7 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans")
+SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans", "orders")
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -124,6 +125,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
+    prescriptions.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     _register_errors(app, conf)
@@ -645,6 +647,7 @@ def _register_country(app: Flask, conf: Settings) -> None:
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
             **_country_plans(код),
+            **prescriptions.country_block(код),
         )
 
 
