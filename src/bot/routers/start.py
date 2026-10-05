@@ -349,6 +349,11 @@ def build_start_router(
                 message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
             )
             return
+        if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+            # «щ» → «shch» добавляет байты, а нелатинский незнакомый город
+            # остаётся многобайтным: ввод прошёл предел, сведённое имя — нет.
+            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
+            return
         сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
         if сверка.name is not None or not сверка.checked:
             # Совпало со справочником — или справочник недоступен, и тогда не

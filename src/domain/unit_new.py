@@ -26,6 +26,7 @@ from .unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, canonical_unit
 #: Коды отказов. Это коды, а не тексты: экран переводит их своим словарём.
 EMPTY = "empty"
 TOO_LONG = "too_long"
+TOO_LONG_BYTES = "too_long_bytes"
 NEED_NUMBER = "need_number"
 OTHER_COUNTRY = "other_country"
 UNKNOWN_COUNTRY = "unknown_country"
@@ -60,6 +61,14 @@ class NewUnit:
         return (self.typed,) if self.typed and self.typed != self.name else ()
 
 
+def _check_length(name: str) -> None:
+    """Предел названия знаками и байтами — два разных отказа: чинятся по-разному."""
+    if len(name) > UNIT_NAME_LIMIT:
+        raise NewUnitRefused(TOO_LONG, limit=UNIT_NAME_LIMIT)
+    if len(name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+        raise NewUnitRefused(TOO_LONG_BYTES, limit=UNIT_NAME_BYTE_LIMIT)
+
+
 def plan_new_unit(typed: str, *, country: str) -> NewUnit:
     """Каноническая новая пиццерия страны `country` из написанного — или `NewUnitRefused`."""
     код_страны = (country or "").strip().upper()
@@ -68,15 +77,14 @@ def plan_new_unit(typed: str, *, country: str) -> NewUnit:
     написано = " ".join((typed or "").split())
     if not написано:
         raise NewUnitRefused(EMPTY)
-    if len(написано) > UNIT_NAME_LIMIT or len(написано.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
-        raise NewUnitRefused(TOO_LONG, limit=UNIT_NAME_LIMIT)
+    _check_length(написано)
     имя = canonical_unit(написано)
     if имя is None:
         raise NewUnitRefused(NEED_NUMBER, typed=написано)
-    if len(имя.name) > UNIT_NAME_LIMIT:
-        # Латиница бывает длиннее написанного («Щ» → «shch»): предел имени
-        # файла отчёта сверяется с тем, что ляжет в шапку (как в боте).
-        raise NewUnitRefused(TOO_LONG, limit=UNIT_NAME_LIMIT)
+    # Латиница бывает длиннее написанного («Щ» → «shch»), а незнакомый город
+    # не латинского письма остаётся многобайтным: предел имени файла отчёта
+    # сверяется и с тем, что ляжет в шапку (как в боте).
+    _check_length(имя.name)
     if имя.country is not None and имя.country != код_страны:
         raise NewUnitRefused(OTHER_COUNTRY, name=имя.name, country=имя.country)
     return NewUnit(name=имя.name, country=код_страны, city=имя.city, typed=написано)

@@ -50,6 +50,12 @@ UNIT_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Название длиннее {limit} знаков.",
         "en": "The name is longer than {limit} characters.",
     },
+    "unitnew.refused.too_long_bytes": {
+        "ru": "Название не влезет в имя файла отчёта: больше {limit} байт. В нём много "
+        "непростых знаков (эмодзи, нелатинские буквы) — сократите его.",
+        "en": "The name does not fit the report file name: over {limit} bytes. It has many "
+        "complex characters (emoji, non-Latin letters) — shorten it.",
+    },
     "unitnew.refused.need_number": {
         "ru": "В «{typed}» нет номера. Пиццерия называется городом и номером: Belgrade-6.",
         "en": "«{typed}» has no number. A pizzeria is named by city and number: Belgrade-6.",
