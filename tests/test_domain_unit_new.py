@@ -55,7 +55,7 @@ def test_незнакомый_город_не_отказ_но_помечен() -
         ("Belgrade-6", "ZZ", unit_new.UNKNOWN_COUNTRY),
         ("Belgrade-6", "", unit_new.UNKNOWN_COUNTRY),
         ("П" * UNIT_NAME_LIMIT + "-1", "RS", unit_new.TOO_LONG),
-        ("🍕" * 40 + "-1", "RS", unit_new.TOO_LONG),
+        ("🍕" * 40 + "-1", "RS", unit_new.TOO_LONG_BYTES),
         # Латиница длиннее написанного: «Щ» → «shch».
         ("Щ" * (UNIT_NAME_LIMIT - 3) + "-1", "RS", unit_new.TOO_LONG),
     ],
@@ -67,3 +67,12 @@ def test_отказы(написано: str, страна: str, код: str) -> 
 def test_заводит_только_уК() -> None:
     assert may_add_units("HQ") and may_add_units("default")
     assert not may_add_units("GE") and not may_add_units("")
+
+
+def test_байтовый_предел_и_на_каноническом_имени() -> None:
+    # Ввод проходит оба предела, а сведённое имя — нет: «щ» становится «shch»
+    # (байтов больше), грузинские буквы остаются трёхбайтными.
+    написано = "щ" * 6 + "ქ" * 32 + "-1"
+    assert len(написано) <= UNIT_NAME_LIMIT and len(написано.encode()) <= 120
+    пойман = отказ(написано, "GE")
+    assert (пойман.code, пойман.params) == (unit_new.TOO_LONG_BYTES, {"limit": 120})
