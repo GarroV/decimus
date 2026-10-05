@@ -31,7 +31,8 @@ def _пространства(request: pytest.FixtureRequest) -> None:
 def _строка(dsn: str, unit_id: str) -> tuple[object, ...] | None:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute("select name, country, city from units where id = %s", (unit_id,))
-        return cur.fetchone()
+        row = cur.fetchone()
+        return None if row is None else tuple(row)
 
 
 def test_новая_точка_заводится_с_географией_и_синонимом(db_env: str) -> None:
@@ -76,3 +77,30 @@ def test_синоним_новой_точки_называющий_сущест�
 def test_незаведённое_пространство_отказ(db_env: str) -> None:
     with pytest.raises(PushError):
         create_unit("Belgrade-7", country="RS", tenant="nowhere")
+
+
+def test_гонка_двух_заведений_даёт_отказ_а_не_вторую_строку(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Сверка не увидела точку — её завели между сверкой и вставкой.
+
+    Уникальный ключ имени не даёт второй строки, и вторая вставка обязана
+    стать тем же отказом «уже есть», а не «база не вставила».
+    """
+    import src.db.directory as directory
+
+    прежняя = upsert_unit("Belgrade-2", country="RS", tenant=УК)
+    настоящая = directory._existing
+    вызовов: list[tuple[object, ...]] = []
+
+    def _слепая_первая_сверка(*args: object) -> object:
+        вызовов.append(args)
+        return None if len(вызовов) == 1 else настоящая(*args)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(directory, "_existing", _слепая_первая_сверка)
+
+    with pytest.raises(UnitExistsError) as отказ:
+        create_unit("Belgrade-2", country="RS", tenant=УК)
+
+    assert отказ.value.unit_id == прежняя
+    assert _строка(db_env, прежняя) == ("Belgrade-2", "RS", None)
