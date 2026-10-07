@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Iterator
 from datetime import UTC, datetime
 from types import SimpleNamespace
@@ -21,6 +22,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
+from src.domain.permissions import ROLE_SCOPES, canonical_role
 from src.web import accounts
 from src.web.accounts import everyone as настоящий_перечень
 
@@ -258,3 +260,81 @@ def test_расхождение_баз_на_вкладке_не_раскрыва
     журнал = " ".join(r.getMessage() for r in caplog.records if r.levelname == "ERROR")
     assert "shared" in журнал
     assert "db.example" in журнал
+
+
+# --- Мост ролей (до Task 10–11): выбор роли на экране людей ---
+
+_СЕЛЕКТ = re.compile(r'<select[^>]*name="role"[^>]*>(.*?)</select>', re.S)
+_ПУНКТ = re.compile(r'<option value="([^"]+)"[^>]*>([^<]+)</option>')
+
+
+def _выборы_роли(страница: str) -> list[list[tuple[str, str]]]:
+    return [
+        [(код, подпись.strip()) for код, подпись in _ПУНКТ.findall(блок)]
+        for блок in _СЕЛЕКТ.findall(страница)
+    ]
+
+
+def _стенд_с_людьми(monkeypatch: pytest.MonkeyPatch, заведено: list[Any]) -> FlaskClient:
+    def завести(login: str, **k: Any) -> accounts.Added:
+        заведено.append((login, k["tenant"], k["role"]))
+        return accounts.Added(login=login, role=k["role"], password="p")
+
+    ge = строка("ge-petr", role="country_staff")
+    ge.tenant = "GE"
+    monkeypatch.setattr(accounts, "add", завести)
+    monkeypatch.setattr(accounts, "spaces", lambda: (ТЕНАНТ, "GE"))
+    monkeypatch.setattr(
+        accounts,
+        "everyone",
+        lambda **_: (строка(ЛОГИН, role="hq_admin"), строка("hq-petr", role="hq_staff"), ge),
+    )
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="hq_admin")
+    клиент = собрать(tenant=ТЕНАНТ).test_client()
+    войти(клиент)
+    return клиент
+
+
+def test_заведение_без_выбора_роли_заводит_сотрудника(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Первый пункт формы заведения — тот, что браузер отправит, не тронув список."""
+    заведено: list[Any] = []
+    клиент = _стенд_с_людьми(monkeypatch, заведено)
+    страница = клиент.get("/users").get_data(as_text=True)
+    по_умолчанию = _выборы_роли(страница)[-1][0][0]
+
+    for пространство in ("HQ", "GE"):
+        клиент.post(
+            "/users/add",
+            headers=СВОЙ,
+            data={"login": f"new-{пространство}", "tenant": пространство, "role": по_умолчанию},
+        )
+    клиент.post("/users/add", headers=СВОЙ, data={"login": "no-field", "tenant": "GE"})
+
+    коды = [canonical_role(роль, тенант) for _, тенант, роль in заведено]
+    assert коды == ["hq_staff", "country_staff", "country_staff"]
+
+
+def test_в_выборе_роли_нет_ролей_чужого_охвата(monkeypatch: pytest.MonkeyPatch) -> None:
+    клиент = _стенд_с_людьми(monkeypatch, [])
+    выборы = _выборы_роли(клиент.get("/users").get_data(as_text=True))
+
+    # Первые три выбора — строки перечня: себя править нельзя (без формы),
+    # поэтому остаются hq-petr и ge-petr; последний — форма заведения.
+    строки = выборы[:-1]
+    assert [{код for код, _ in выбор} for выбор in строки] == [
+        {"hq_staff", "hq_admin"},
+        {"country_staff", "country_admin"},
+    ]
+    assert all(
+        ROLE_SCOPES[код] == ("hq" if i == 0 else "country")
+        for i, выбор in enumerate(строки)
+        for код, _ in выбор
+    )
+    assert all(выбор[0][0].endswith("_staff") for выбор in строки)
+
+
+def test_подписи_ролей_в_выборе_не_повторяются(monkeypatch: pytest.MonkeyPatch) -> None:
+    клиент = _стенд_с_людьми(monkeypatch, [])
+    for выбор in _выборы_роли(клиент.get("/users").get_data(as_text=True)):
+        подписи = [подпись for _, подпись in выбор]
+        assert len(подписи) == len(set(подписи)) >= 2
