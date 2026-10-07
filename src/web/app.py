@@ -60,6 +60,7 @@ from . import (
     security_headers,
     unit_add,
     view,
+    walk,
 )
 from . import country as country_data
 from . import inspections as data
@@ -132,6 +133,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     prescriptions.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
+    walk.install(app, ui_lang=conf.ui_lang)
     _register_errors(app, conf)
     security_headers.install(app, hsts=conf.hsts)
     return app

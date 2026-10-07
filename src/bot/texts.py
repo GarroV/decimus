@@ -1957,6 +1957,8 @@ TEXTS: dict[str, dict[str, str]] = {
     # в `keyboards.py` — единственные строки интерфейса мимо каталога, и потому
     # единственные, которые язык стенда не мог перекрасить.
     "btn.new_inspection": {"ru": "Новая проверка", "en": "New inspection"},
+    # Мини-апп обхода (#418): что не осмотрено и что было здесь в прошлый раз.
+    "btn.walk": {"ru": "Обход точки", "en": "Walk-through"},
     "btn.resume_continue": {"ru": "Продолжить", "en": "Continue"},
     "btn.sealed_drop": {"ru": "Убрать из чата", "en": "Remove from chat"},
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},

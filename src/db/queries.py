@@ -37,6 +37,8 @@ from .models import (
     InspectionDetail,
     InspectionRow,
     ItemUsage,
+    PreviousFinding,
+    PreviousFindings,
     PreviousInspection,
 )
 from .reach import Reach
@@ -999,6 +1001,56 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
         return None
     return PreviousInspection(
         date=rows[0][0], codes=frozenset(str(код) for _, код in rows if код is not None)
+    )
+
+
+# Прошлая проверка с формулировками (#418) — тот же выбор «прошлой», что у
+# `_PREVIOUS_INSPECTION_SQL`: одна последняя неснятая проверка точки. Выбор
+# повторён намеренно, а не склеен из общего куска строки: каждый запрос
+# читается целиком, и расхождение между ними видно глазом.
+_PREVIOUS_FINDINGS_SQL = """
+with прошлая as (
+    select i.id, i.inspection_date, i.speech_lang
+    from inspections i
+    join units u on u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and u.name = %(unit)s
+      and i.retracted_at is null
+    order by i.inspection_date desc, i.pushed_at desc
+    limit 1
+)
+select прошлая.inspection_date, f.code, f.level, f.zone,
+    (select t.text from translations t
+      where t.entity_type = 'finding' and t.entity_id = f.id
+        and t.field = 'text' and t.lang = прошлая.speech_lang)
+from прошлая
+left join findings f on f.inspection_id = прошлая.id and f.level <> 'D0'
+order by f.n
+"""
+
+
+def previous_findings(*, tenant: str, unit: str) -> PreviousFindings | None:
+    """Прошлая проверка точки с её нарушениями — подсказка «здесь было» (#418).
+
+    Отдаёт факт, как и `previous_inspection`: что записали в прошлый раз, где и
+    каким классом. Исправлено ли это сегодня, решает аудитор на месте.
+    Информационные записи (`D0`) нарушениями не являются и не отдаются.
+
+    `None` — прошлых проверок у точки нет (или точка чужая).
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("прошлые нарушения точки") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_FINDINGS_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        rows = cur.fetchall()
+    if not rows:
+        return None
+    return PreviousFindings(
+        date=rows[0][0],
+        findings=tuple(
+            PreviousFinding(code=str(код), level=str(класс), zone=str(зона), text=текст)
+            for _, код, класс, зона, текст in rows
+            if код is not None
+        ),
     )
 
 

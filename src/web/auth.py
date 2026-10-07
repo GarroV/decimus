@@ -50,6 +50,7 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import canonical_tenant
 
+from . import walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -93,7 +94,12 @@ COOKIE_SALT = "web-session"
 #: файлы не рассказывают ничего. Как только в статику попадёт хоть что-то про
 #: данные, её место здесь придётся пересмотреть — поэтому список короткий и
 #: лежит на виду.
-OPEN_ENDPOINTS = frozenset({"login", "static", "google_start", "google_callback"})
+#:
+#: `walk_page` и `walk_data` — мини-апп обхода в Telegram (#418, `walk.py`):
+#: у аудитора нет учётки админки, его опознаёт подпись Telegram, а не кука.
+OPEN_ENDPOINTS = (
+    frozenset({"login", "static", "google_start", "google_callback"}) | walk_auth.ENDPOINTS
+)
 
 #: Ключ в `g`, под которым живёт вошедший на время запроса.
 CURRENT = "account"

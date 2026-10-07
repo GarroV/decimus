@@ -55,6 +55,7 @@ from ..keyboards import (
     resume_keyboard,
     sealed_keyboard,
     unit_new_keyboard,
+    walk_keyboard,
 )
 from ..lang import chat_ui_lang, person_ui_lang
 from ..material import MaterialStore
@@ -255,7 +256,8 @@ def build_start_router(
                     findings=len(inspection.findings),
                 ),
                 lang,
-            )
+            ),
+            reply_markup=walk_keyboard(lang, settings.walk_url),
         )
 
     @router.callback_query(F.data == RESUME_NEW_CALLBACK)
@@ -612,7 +614,10 @@ def build_start_router(
                     date=inspection.date,
                 ),
                 started_lang,
-            )
+            ),
+            # Обход (#418) — тут же, под стартом: первое, что аудитор видит
+            # после начала, и самое естественное место найти, что осматривать.
+            reply_markup=walk_keyboard(started_lang, settings.walk_url),
         )
 
     return router

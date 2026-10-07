@@ -31,7 +31,9 @@
 
 from __future__ import annotations
 
-from flask import Flask, Response
+from flask import Flask, Response, request
+
+from . import walk_auth
 
 #: Политика источников. Всё своё; исключения названы и объяснены выше.
 CONTENT_SECURITY_POLICY = "; ".join(
@@ -56,6 +58,30 @@ PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
 #: Год — срок, который браузеры и списки предзагрузки считают рабочим.
 #: Без `includeSubDomains`: стенд живёт на имени площадки, чьи соседние имена
 #: не наши.
+#: Мини-апп обхода (#418) — единственная страница, которую показывают в рамке:
+#: Telegram открывает её во встроенном окне, а веб-клиент Telegram — во
+#: `<iframe>` со своего домена. Поэтому у неё своя политика, а не дыра в общей:
+#: рамка разрешена только доменам Telegram, скрипт — только свой и
+#: `telegram-web-app.js` с telegram.org. `X-Frame-Options` у неё нет вовсе:
+#: значения «разрешить этим доменам» у заголовка не бывает, а `DENY` закрыл
+#: бы веб-клиент Telegram.
+WALK_ENDPOINTS = walk_auth.ENDPOINTS
+
+WALK_CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self' https://telegram.org",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self'",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors https://web.telegram.org https://*.telegram.org",
+    )
+)
+
 HSTS_MAX_AGE = 31_536_000
 
 #: Заголовки, одинаковые для каждого ответа.
@@ -67,14 +93,25 @@ BASE_HEADERS: dict[str, str] = {
     "Permissions-Policy": PERMISSIONS_POLICY,
 }
 
+WALK_HEADERS: dict[str, str] = {
+    **{ключ: значение for ключ, значение in BASE_HEADERS.items() if ключ != "X-Frame-Options"},
+    "Content-Security-Policy": WALK_CONTENT_SECURITY_POLICY,
+}
+
 
 def install(app: Flask, *, hsts: bool) -> None:
     """Повесить заголовки на каждый ответ приложения."""
     заголовки = dict(BASE_HEADERS)
+    обход = dict(WALK_HEADERS)
     if hsts:
         заголовки["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
+        обход["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
 
     @app.after_request
     def _security_headers(response: Response) -> Response:
-        response.headers.update(заголовки)
+        if request.endpoint in WALK_ENDPOINTS:
+            response.headers.pop("X-Frame-Options", None)
+            response.headers.update(обход)
+        else:
+            response.headers.update(заголовки)
         return response
