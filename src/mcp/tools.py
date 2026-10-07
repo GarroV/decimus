@@ -34,6 +34,7 @@ from datetime import date
 from ..db.errors import ConfigError as DbConfigError
 from ..db.models import FindingRow, InspectionDetail, InspectionRow
 from . import comparability
+from .db_target import config_refusal
 from .errors import ToolError
 
 #: Формат даты в аргументах инструментов. ISO и только он: «15.08.2026» и
@@ -65,7 +66,9 @@ def _history() -> Iterator[None]:
     Ловится именно `db.ConfigError` — «окружения для базы нет», а не «база не
     ответила». Упавшая или недоступная база приходит другим типом и остаётся
     общим отказом чтения: это разные события, и сводить их в один текст значит
-    отправлять человека чинить то, что не сломано.
+    отправлять человека чинить то, что не сломано. Его наследник — подключения
+    заданы, но ведут в разные базы — отвечает своим кодом `db_target`
+    (`db_target.py`, #521), а не «не задано».
 
     Текст пишется здесь, а не пересказывается из отказа блока `db`: наружу
     уходит ответ агенту, и правило «в ответ не попадает текст чужого отказа»
@@ -74,8 +77,8 @@ def _history() -> Iterator[None]:
     """
     try:
         yield
-    except DbConfigError:
-        raise ToolError(HISTORY_NOT_CONNECTED) from None
+    except DbConfigError as отказ:
+        raise config_refusal(отказ, HISTORY_NOT_CONNECTED) from None
 
 
 @dataclass(frozen=True)
