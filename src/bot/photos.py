@@ -22,11 +22,26 @@ from pathlib import Path
 
 from aiogram import Bot
 
+from src.domain import check_environment, is_upload_ref, upload_file
+from src.domain.errors import DomainError
+
 logger = logging.getLogger(__name__)
 
 #: Сколько ждать файл. Кадр с телефона на плохой связи доезжает не мгновенно, а
 #: аудитор стоит на точке и ждёт ответа — держать его дольше бессмысленно.
 DOWNLOAD_TIMEOUT_SEC = 30
+
+
+def _read_upload(ref: str) -> bytes | None:
+    try:
+        path = upload_file(ref, check_environment())
+        if path is None:
+            logger.error("кадр мини-аппа %s пропал из папки состояния", ref)
+            return None
+        return path.read_bytes()
+    except (DomainError, OSError):
+        logger.exception("не удалось прочитать кадр мини-аппа %s", ref)
+        return None
 
 
 def _save(path: Path, raw: bytes) -> None:
@@ -35,7 +50,15 @@ def _save(path: Path, raw: bytes) -> None:
 
 
 async def fetch_bytes(bot: Bot, file_id: str) -> bytes | None:
-    """Скачать файл телеграма в память. Не получилось — `None` и запись в журнал."""
+    """Скачать файл телеграма в память. Не получилось — `None` и запись в журнал.
+
+    Кадр, снятый в мини-аппе обхода (D312), идентификатора телеграма не имеет:
+    он лежит файлом в папке состояния, и ссылка на него читается здесь же. Одна
+    дверь на оба вида кадров — сборка отчёта, выгрузка в хранилище, копии и
+    пересылка получают кадр мини-аппа, не зная о его существовании.
+    """
+    if is_upload_ref(file_id):
+        return await asyncio.to_thread(_read_upload, file_id)
     try:
         buffer = await bot.download(file_id, destination=BytesIO(), timeout=DOWNLOAD_TIMEOUT_SEC)
     except Exception:

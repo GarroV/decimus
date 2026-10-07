@@ -37,12 +37,36 @@ MAX_AGE_SECONDS = 6 * 60 * 60
 TOKEN_VAR = "TELEGRAM_BOT_TOKEN"  # noqa: S105 — имя переменной, а не токен
 PREVIEW_VAR = "WEB_WALK_PREVIEW_CHAT"
 
+#: Чаты, на которые открывается просмотр без подписи: вымышленный диапазон
+#: демо-сидов (`tools/seed_*`), с номером человека в Telegram не совпадёт. Второй
+#: замок после «не вместе с токеном»: с D312 просмотр пишет, и пропавший на
+#: проде токен при забытой переменной не должен открыть настоящую проверку.
+PREVIEW_CHATS = (999_000_000_000, 999_999_999_999)
+
 #: Адреса обхода, открытые без учётки админки: здесь опознаёт подпись Telegram.
 #: Одна константа на два потребителя — заслон входа (`auth.OPEN_ENDPOINTS`) и
 #: политику заголовков (`security_headers`), — чтобы они не разошлись.
 PAGE_ENDPOINT = "walk_page"
 DATA_ENDPOINT = "walk_data"
-ENDPOINTS = frozenset({PAGE_ENDPOINT, DATA_ENDPOINT})
+#: Запись из мини-аппа (D312): кадр, его показ, запись проверки, сведение о визите.
+PHOTO_ENDPOINT = "walk_photo"
+PHOTO_VIEW_ENDPOINT = "walk_photo_view"
+FINDING_ENDPOINT = "walk_finding"
+INFO_ENDPOINT = "walk_info"
+ENDPOINTS = frozenset(
+    {
+        PAGE_ENDPOINT,
+        DATA_ENDPOINT,
+        PHOTO_ENDPOINT,
+        PHOTO_VIEW_ENDPOINT,
+        FINDING_ENDPOINT,
+        INFO_ENDPOINT,
+    }
+)
+
+#: Заголовок, которым клиент отдаёт подписанную строку в запросах записи: тело
+#: там занято кадром или JSON, а в адресе строка осела бы в журналах прокси.
+INIT_DATA_HEADER = "X-Telegram-Init-Data"
 
 
 class WalkAccessError(Exception):
@@ -76,6 +100,12 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
                 "для стенда без бота, на проде он открыл бы обход любому"
             )
         preview = int(preview_raw)
+        if not PREVIEW_CHATS[0] <= preview <= PREVIEW_CHATS[1]:
+            raise ValueError(
+                f"{PREVIEW_VAR}: чат {preview} не из вымышленного диапазона сидов "
+                f"{PREVIEW_CHATS[0]}–{PREVIEW_CHATS[1]}. Просмотр без подписи пишет в "
+                "проверку (D312) и на настоящий чат не открывается"
+            )
     return WalkSettings(
         bot_token=token,
         preview_chat=preview,

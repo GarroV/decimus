@@ -93,6 +93,13 @@ def test_просмотр_вместе_с_токеном_бота_не_стар�
         load_walk_settings({"TELEGRAM_BOT_TOKEN": ТОКЕН, "WEB_WALK_PREVIEW_CHAT": "7"})
 
 
+def test_просмотр_не_открывается_на_настоящий_чат() -> None:
+    """С D312 просмотр пишет: забытая переменная не должна открыть живую проверку."""
+    with pytest.raises(ValueError, match="вымышленного диапазона"):
+        load_walk_settings({"WEB_WALK_PREVIEW_CHAT": str(АУДИТОР)})
+    assert load_walk_settings({"WEB_WALK_PREVIEW_CHAT": "999000000501"}).preview_chat
+
+
 def test_без_настроек_обход_выключен() -> None:
     assert not load_walk_settings({}).enabled
 
@@ -194,7 +201,7 @@ def test_данные_по_подписи_и_без_истории(domain_env: P
 def test_без_проверки_экран_говорит_что_её_нет(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    client = _приложение(monkeypatch, WEB_WALK_PREVIEW_CHAT="5").test_client()
+    client = _приложение(monkeypatch, WEB_WALK_PREVIEW_CHAT="999000000005").test_client()
 
     тело = client.post(walk.DATA_PATH, data="", content_type="text/plain").get_json()
 

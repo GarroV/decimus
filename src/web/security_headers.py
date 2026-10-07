@@ -72,7 +72,8 @@ WALK_CONTENT_SECURITY_POLICY = "; ".join(
         "default-src 'self'",
         "script-src 'self' https://telegram.org",
         "style-src 'self' 'unsafe-inline'",
-        "img-src 'self'",
+        # blob: — превью кадра, снятого на телефоне, до и после отправки (D312).
+        "img-src 'self' blob:",
         "font-src 'self'",
         "connect-src 'self'",
         "object-src 'none'",

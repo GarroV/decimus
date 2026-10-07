@@ -298,6 +298,10 @@ google_callback
 google_mail_callback
 walk_page
 walk_data
+walk_photo
+walk_photo_view
+walk_finding
+walk_info
 # Хуки Flask: `@app.context_processor`, `@app.url_defaults` и подмена метода
 # приложения `get_send_file_max_age` — их вызывает фреймворк, не код.
 _вход_через_google_доступен

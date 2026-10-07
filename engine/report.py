@@ -36,7 +36,7 @@ T = {
         "zones": "Разбивка по зонам", "zone": "Зона", "share": "Доля", "lost": "Потеряно",
         "left": "Осталось", "findings": "Зафиксированные нарушения", "no_findings":
         "Нарушений не зафиксировано.", "deadline": "Устранить до", "immediately": "немедленно",
-        "comment": "Комментарий", "process": "Процесс", "info": "Дополнительно",
+        "comment": "Рекомендация", "process": "Процесс", "info": "Дополнительно",
         "appendix": "Приложение. Информационные записи",
         "appendix_note": "Раздел носит справочный характер: перечисленные ниже записи "
                          "не являются нарушениями и не влияют на оценку.",
@@ -64,7 +64,7 @@ T = {
         "zones": "Breakdown by zone", "zone": "Zone", "share": "Share", "lost": "Lost",
         "left": "Remaining", "findings": "Recorded violations", "no_findings":
         "No violations recorded.", "deadline": "Fix by", "immediately": "immediately",
-        "comment": "Comment", "process": "Process", "info": "Additional information",
+        "comment": "Recommendation", "process": "Process", "info": "Additional information",
         "appendix": "Appendix. Informational records",
         "appendix_note": "This section is for reference only: the records below are not "
                          "violations and do not affect the score.",

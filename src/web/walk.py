@@ -10,13 +10,11 @@
 * **прошлая проверка точки** — что и где тогда записали. Повтор стоит вдвое
   (D191), поэтому прошлое нарушение — первое, на что смотреть.
 
-Фиксация остаётся в чате (D047, `docs/07-roadmap.md`): мини-апп ничего не
-пишет в проверку и не предлагает записей — «модель предлагает, фиксирует
-человек» здесь соблюдается тем, что записи здесь не рождаются вовсе. Отметки
-«зона осмотрена» и «исправлено» — личные пометки аудитора, на оценку не
-влияют и хранятся в облачном хранилище Telegram у самого аудитора
-(`walk.js`). Поэтому сервер только читает: состояние бота — тем же томом
-`:ro`, что и у админки, историю — запросом `previous_findings`.
+С D312 экран ещё и пишет: кадры, нарушение, замер, рекомендацию партнёру и
+сведения о визите — через те же функции домена, что и бот, в ту же проверку.
+Запись живёт в `walk_write.py`; здесь — чтение и опознание, общее для обоих.
+Отметки «зона осмотрена» и «исправлено» по-прежнему личные пометки аудитора в
+облачном хранилище Telegram (`walk.js`): на оценку они не влияют.
 
 Два адреса: страница (`/tg/walk`, одинаковая для всех, данных в ней нет) и
 данные (`/tg/walk/data`, POST с подписанной строкой Telegram в теле, — в
@@ -29,7 +27,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import re
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
@@ -38,15 +36,18 @@ from flask import Flask, Response, jsonify, render_template, request
 from src.db import bot_links, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
-from src.domain import get_state, list_items, list_zones
+from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
 from src.domain.errors import DomainError
-from src.domain.models import Inspection, Zone
+from src.domain.info_fields import FIELDS
+from src.domain.models import ChecklistItem, Inspection, Zone
 
+from . import walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     DATA_ENDPOINT,
+    INIT_DATA_HEADER,
     PAGE_ENDPOINT,
     WalkAccessError,
     WalkSettings,
@@ -98,6 +99,31 @@ def _question_text(raw: str) -> str:
     return _LEVEL_PREFIX.sub("", raw).strip()
 
 
+def _photo(ref: str) -> dict[str, Any]:
+    """Кадр записи для экрана. Кадр из чата мини-апп показать не может — токена у
+    веба на скачивание нет, — поэтому он помечается, а не прячется."""
+    return {"ref": ref, "own": is_upload_ref(ref)}
+
+
+def _catalogue(items: Iterable[ChecklistItem], lang: str) -> list[dict[str, Any]]:
+    """Пункты, которые аудитор может записать: нарушения и замеры (D0).
+
+    Служебные (`aggregate`, `info`) не предлагаются — правило фиксации 8.
+    """
+    return [
+        {
+            "code": item.code,
+            "q": _question_text(item.question(lang)),
+            "process": item.process(lang),
+            "levels": list(item.levels),
+            "zones": [] if not item.zones or item.zones == ["*"] else list(item.zones),
+            "measure": item.levels == [INFO_LEVEL],
+        }
+        for item in items
+        if item.kind == "violation"
+    ]
+
+
 def build_walk(
     inspection: Inspection,
     zones: Iterable[Zone],
@@ -105,6 +131,9 @@ def build_walk(
     *,
     lang: str,
     question: Callable[[str], str | None],
+    items: Iterable[ChecklistItem] = (),
+    info: list[dict[str, Any]] | None = None,
+    sealed: bool = False,
 ) -> dict[str, Any]:
     """Данные экрана обхода. Чистая функция: всё нужное приходит аргументами.
 
@@ -131,7 +160,16 @@ def build_walk(
 
     for finding in inspection.findings:
         slot(finding.zone)["recorded"].append(
-            {"n": finding.n, "code": finding.code, "level": finding.level, "text": finding.text}
+            {
+                "n": finding.n,
+                "code": finding.code,
+                "level": finding.level,
+                "text": finding.text,
+                "comment": finding.comment,
+                "repeat": finding.repeat,
+                "unusual": finding.zone_unusual,
+                "photos": [_photo(ref) for ref in finding.photos],
+            }
         )
     for old in found.findings if found else ():
         slot(old.zone)["previous"].append(
@@ -148,11 +186,14 @@ def build_walk(
         "unit": inspection.unit,
         "date": str(inspection.date),
         "key": mark_key(inspection),
+        "sealed": sealed,
         "previous": (
             {"date": found.date.isoformat(), "count": len(found.findings)} if found else None
         ),
         "previous_unavailable": previous.unavailable,
         "zones": list(by_zone.values()),
+        "items": _catalogue(items, lang),
+        "info": info or [],
     }
 
 
@@ -179,10 +220,6 @@ def _previous(inspection: Inspection) -> PreviousOutcome:
         return PreviousOutcome(None, unavailable=True)
 
 
-def _questions(chat_id: int, lang: str) -> Mapping[str, str]:
-    return {item.code: item.question(lang) for item in list_items(chat_id=chat_id)}
-
-
 def revoked(chat_id: int) -> bool:
     """Сняли ли у человека доступ — привязку бота или учётку (`src/bot/access.py`, п.5).
 
@@ -196,6 +233,30 @@ def revoked(chat_id: int) -> bool:
     return положение.binding is None and положение.ever_bound
 
 
+def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
+    """Сведения о визите: поля методики этой проверки с уже данными ответами.
+
+    Поле, которого в методике нет, не показывается — состав задаёт управляющая
+    компания (`src/bot/info.py`).
+    """
+    out = []
+    for field in FIELDS:
+        try:
+            asked = get_item(field.code, chat_id=inspection.chat_id).question(lang)
+        except DomainError:
+            continue
+        answer = inspection.info.get(field.code)
+        out.append(
+            {
+                "code": field.code,
+                "kind": field.kind,
+                "q": _question_text(asked),
+                "value": answer.text if answer else "",
+            }
+        )
+    return out
+
+
 def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
     """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`."""
     inspection = get_state(chat_id)
@@ -203,19 +264,74 @@ def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
         lang = fallback_lang
         return {"state": "none", "lang": lang, "texts": texts_for(lang)}
     lang = inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang
-    questions = _questions(chat_id, lang)
+    items = list_items(chat_id=chat_id)
+    questions = {item.code: item.question(lang) for item in items}
     payload = build_walk(
         inspection,
         list_zones(chat_id=chat_id),
         _previous(inspection),
         lang=lang,
         question=questions.get,
+        items=items,
+        info=info_fields(inspection, lang),
+        sealed=handed_over(chat_id),
     )
     return {**payload, "texts": texts_for(lang)}
 
 
+def init_data_of() -> str:
+    """Подписанная строка Telegram: заголовок у запросов записи, тело у чтения."""
+    header = request.headers.get(INIT_DATA_HEADER)
+    if header is not None:
+        return header[:MAX_INIT_DATA]
+    return request.get_data(as_text=True)[:MAX_INIT_DATA]
+
+
+def identify(
+    conf: WalkSettings, ui_lang: str, *, header_only: bool = False
+) -> int | tuple[Response, int]:
+    """Чей это запрос — номер чата или готовый отказ.
+
+    Одна дверь на чтение и запись: подпись, затем снятый доступ. Запись
+    (`header_only`) берёт подпись только из заголовка. Снятие
+    сверяется только при живом токене — на стенде без бота его не с чем
+    сверить. База молчит — 503, а не «пускаю вслепую».
+    """
+    if not conf.enabled:
+        return jsonify({"error": "disabled"}), 404
+    if header_only and INIT_DATA_HEADER not in request.headers:
+        # Запись принимает подпись только заголовком: тело (кадр до 10 МБ) не
+        # читается, пока не известно, чьё оно (ревью 07.10.2026).
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        chat_id = chat_of(init_data_of(), conf)
+    except WalkAccessError as exc:
+        logger.info("Обход: отказ в опознании — %s", exc)
+        return jsonify({"error": "unauthorized"}), 401
+    try:
+        if conf.bot_token is not None and revoked(chat_id):
+            logger.info("Обход: доступ чата %s снят — отказ", chat_id)
+            return jsonify({"error": "unauthorized"}), 401
+    except DbError:
+        logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
+        return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
+    return chat_id
+
+
+def payload_response(chat_id: int, ui_lang: str) -> tuple[Response, int]:
+    """Свежие данные экрана — ответ на чтение и на каждую запись."""
+    try:
+        ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang))
+    except STATE_FAILURES:
+        logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
+        return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
+    # Данные одного человека: ни прокси, ни WebView не должны их помнить.
+    ответ.headers["Cache-Control"] = "no-store"
+    return ответ, 200
+
+
 def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -> None:
-    """Повесить страницу и данные обхода. Без настроек — адреса отвечают 404."""
+    """Повесить страницу, данные и запись обхода. Без настроек — адреса отвечают 404."""
     conf = settings or load_walk_settings()
 
     @app.get(PAGE_PATH, endpoint=PAGE_ENDPOINT)
@@ -226,26 +342,9 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
 
     @app.post(DATA_PATH, endpoint=DATA_ENDPOINT)
     def walk_data() -> tuple[Response, int]:
-        if not conf.enabled:
-            return jsonify({"error": "disabled"}), 404
-        init_data = request.get_data(as_text=True)[:MAX_INIT_DATA]
-        try:
-            chat_id = chat_of(init_data, conf)
-        except WalkAccessError as exc:
-            logger.info("Обход: отказ в опознании — %s", exc)
-            return jsonify({"error": "unauthorized"}), 401
-        try:
-            if conf.bot_token is not None and revoked(chat_id):
-                logger.info("Обход: доступ чата %s снят — отказ", chat_id)
-                return jsonify({"error": "unauthorized"}), 401
-        except DbError:
-            logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
-            return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
-        try:
-            ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang))
-            # Данные одного человека: ни прокси, ни WebView не должны их помнить.
-            ответ.headers["Cache-Control"] = "no-store"
-            return ответ, 200
-        except STATE_FAILURES:
-            logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
-            return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
+        who = identify(conf, ui_lang)
+        if not isinstance(who, int):
+            return who
+        return payload_response(who, ui_lang)
+
+    walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=payload_response)
