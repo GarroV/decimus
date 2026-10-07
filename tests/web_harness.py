@@ -28,6 +28,7 @@ from flask.testing import FlaskClient
 
 from src.db import bot_links, web_throttle
 from src.db.reach import Reach
+from src.domain.permissions import DEFAULT_MATRIX, canonical_role
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth
 from src.web.app import create_app
@@ -42,17 +43,23 @@ from src.web.config import Settings
 ТОКЕН = "сессионный-токен"
 СВОЙ = "http://localhost"
 
+#: Учётка двойника — её же тесты ставят автором проверки (D311).
+УЧЁТКА = "22222222-2222-2222-2222-222222222222"
+
 
 class Учётка:
     """То немногое, что страницам нужно знать о вошедшем."""
 
     def __init__(self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor") -> None:
-        self.id = "22222222-2222-2222-2222-222222222222"
+        self.id = УЧЁТКА
         self.login = login
         self.tenant = tenant
-        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
-        # прятал бы отказ раздела людей во всех тестах разом.
-        self.role = role
+        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Старое имя роли
+        # переводится по пространству так же, как его переводит миграция `0038`.
+        self.role = canonical_role(role, tenant)
+        self.grants = dict(DEFAULT_MATRIX.get(self.role, {}))
+        self.role_name_ru = self.role
+        self.role_name_en = self.role
 
 
 class Сессия:

@@ -56,6 +56,7 @@ from . import (
     action_plans,
     assets,
     auth,
+    guard,
     letter_draft,
     letter_markup,
     people,
@@ -128,6 +129,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
     _install_hq_gate(app)
+    guard.install(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
