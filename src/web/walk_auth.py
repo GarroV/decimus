@@ -30,8 +30,9 @@ from dataclasses import dataclass
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
 #: Сколько живёт подпись. Telegram выдаёт свежую при каждом открытии, а
-#: обход длится час-два; сутки — с запасом на открытый весь день экран.
-MAX_AGE_SECONDS = 24 * 60 * 60
+#: обход длится час-два; шесть часов — с запасом на свёрнутое окно, и при
+#: этом утёкшая строка не живёт до завтра.
+MAX_AGE_SECONDS = 6 * 60 * 60
 
 TOKEN_VAR = "TELEGRAM_BOT_TOKEN"  # noqa: S105 — имя переменной, а не токен
 PREVIEW_VAR = "WEB_WALK_PREVIEW_CHAT"

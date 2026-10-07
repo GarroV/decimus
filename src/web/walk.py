@@ -242,7 +242,10 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
             logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
             return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
         try:
-            return jsonify(walk_payload(chat_id, fallback_lang=ui_lang)), 200
+            ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang))
+            # Данные одного человека: ни прокси, ни WebView не должны их помнить.
+            ответ.headers["Cache-Control"] = "no-store"
+            return ответ, 200
         except STATE_FAILURES:
             logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
             return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
