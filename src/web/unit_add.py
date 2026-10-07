@@ -121,12 +121,12 @@ def install(app: Flask, conf: Settings) -> None:
     @app.post(путь, endpoint="unit_create")
     @guard.action("unit.create", object_in_route=True)
     def unit_create(code: str) -> Response | str | tuple[str, int]:
+        refuse_foreign_origin()
         страна = _gate(code)
         # Объект — справочник УК: пиццерия ложится с `tenant=HQ_TENANT` (ниже).
         отказ = guard.permit("unit.create", HQ_TENANT)
         if отказ is not None:
             return отказ
-        refuse_foreign_origin()
         lang = _lang(conf)
         написано = (request.form.get("name") or "")[:200]
         try:
