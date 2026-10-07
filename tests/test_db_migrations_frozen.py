@@ -164,6 +164,8 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0037_prescriptions.sql": (
         "sql1:43d57b3c91055a750ab725a703950240dd1bfec580248da175a760d73b6fdd09"
     ),
+    # Роли и права ролей (спека «Администрирование», блок 1). Заведена вместе с файлом.
+    "0038_roles.sql": ("sql1:ec578525eb2c472a7e4275fe8283ee38f077a70c35d9d81e76ab8715515cd455"),
 }
 
 

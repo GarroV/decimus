@@ -67,6 +67,16 @@ list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # спр
 # логин единый на систему (0028, D282): уникальные login и email во всей базе;
 #   накат отказывает на двойниках и называет запрос, которым их найти
 
+# роли и права ролей (0038, спека «Администрирование», D310, D311) — roles, role_permissions
+#   roles(code, scope ∈ {hq, country}, name_ru, name_en): роль относится к УК или к стране
+#   role_permissions(role_code, action_code, reach ∈ {own, all}): право роли на действие;
+#   own — только проверки, занесённые учёткой человека, и только у пяти действий над
+#   проверкой (role_permissions_own_on_inspection); нет строки — нет права
+#   коды — каталог src/domain/permissions.py (ACTIONS); граница пространств — в can
+#   web_users.role → roles.code; роль УК только у людей HQ, роль страны только у людей
+#   страны (триггер web_users_role_scope, check_violation)
+#   засев — DEFAULT_MATRIX, перенос admin/auditor × HQ/страна → 4 роли
+
 # пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
 SpaceRow(code, name, countries: tuple[str, ...], people: int)
 check_space_code(code) -> str      # ^[A-Z][A-Z0-9_-]{1,31}$, не legacy-код

@@ -237,6 +237,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT", "INSERT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # Роли и права ролей (`0038`): приложение их только читает — права роли
+    # приезжают вместе с опознанием. Пишет их экран админа УК (блок 2).
+    "roles": {"SELECT"},
+    "role_permissions": {"SELECT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -313,6 +317,10 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
+    # Роли (`0038`): триггер охвата роли читает `roles` под ролью того, кто
+    # заводит учётку, — без чтения заведение отказало бы нехваткой прав.
+    "roles": {"SELECT"},
+    "role_permissions": {"SELECT"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия

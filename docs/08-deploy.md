@@ -1254,3 +1254,23 @@ Console (за владельцем). Метку фронта (`X-Decimus-Front`)
    его на `/prescriptions` и отвечает комментарием с файлом → УК закрывает с
    комментарием → на `/country/GE` видно «Закрыто»; партнёр другой страны
    предписания не видит, `/actions/prescriptions` отвечает ему 404.
+
+### 8.14. Раскатка ядра прав, блок 1 «Администрирование»
+
+1. **Миграция `0038_roles.sql`** — таблицы `roles`, `role_permissions`, четыре роли по
+   умолчанию, перенос `web_users.role`: `HQ × admin → hq_admin`, `HQ × auditor → hq_staff`,
+   `страна × admin → country_admin`, `страна × auditor → country_staff`. Перед накатом
+   посмотреть, кто что получит: `make web-user ARGS="list --tenant <код>"` на целевой базе по
+   каждому пространству (коды — `select code from tenants`; без `--tenant` и `WEB_TENANT`
+   команда отказывает).
+2. **Миграция `0039_cross_space_actions.sql`** — пустой журнал действий УК у партнёра.
+3. **Миграция `0040_inspection_author.sql`** — колонка `inspections.created_by`. У проверок,
+   залитых до неё, автора нет: их снимают, переносят, подтверждают и правят только админы
+   (D311). Автор появляется у проверок, начатых в боте человеком с привязкой к учётке.
+4. Команда `make web-user ARGS="role <логин> <роль> --tenant <код>"` принимает коды
+   `hq_admin`, `hq_staff`, `country_admin`, `country_staff`; старые `admin`/`auditor`
+   переводятся по пространству учётки.
+5. Переменные окружения не меняются: MCP в блоке 1 работает по прежним
+   `MCP_TOKENS`, `MCP_CHECKLIST_TENANTS`, `MCP_RETRACTION_TOKENS`.
+6. После наката: `make web-user ARGS="list --tenant <код>"` по каждому пространству — у каждой
+   учётки код роли по таблице переноса.
