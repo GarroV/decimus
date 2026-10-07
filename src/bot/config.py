@@ -35,6 +35,11 @@ AUDITOR_NAMES_VAR = "AUDITOR_NAMES"
 #: оставляет выяснять по молчащему пункту меню.
 MCP_OWNER_ID_VAR = "BOT_MCP_OWNER_ID"
 
+#: Адрес мини-аппа обхода (#418) — страница `/tg/walk` веб-сервиса. Пусто —
+#: кнопки «Обход точки» нет, и бот ведёт себя как до мини-аппа. Telegram
+#: открывает мини-апп только по https, поэтому иной адрес — отказ на старте.
+WALK_URL_VAR = "BOT_WALK_URL"
+
 #: Язык интерфейса до начала проверки (T131). Имя и разбор живут в `texts.py`,
 #: рядом с самим каталогом языков, — здесь только проверка на старте.
 
@@ -64,6 +69,7 @@ class BotSettings:
     #: открыт. Умолчание «пускать всех» здесь было бы худшим из возможных —
     #: забытая переменная раздавала бы историю проверок партнёров.
     mcp_owner_id: int | None = None
+    walk_url: str | None = None
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -172,6 +178,17 @@ def _parse_ui_lang(env: Mapping[str, str]) -> str:
         raise BotConfigError(f"{UI_LANG_VAR}: {exc}") from exc
 
 
+def _parse_walk_url(raw: str) -> str | None:
+    url = raw.strip()
+    if not url:
+        return None
+    if not url.startswith("https://"):
+        raise BotConfigError(
+            f"{WALK_URL_VAR} — «{url}»: Telegram открывает мини-апп только по https://"
+        )
+    return url
+
+
 def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
     """Прочитать и проверить окружение бота. Отказ — `BotConfigError`."""
     src = os.environ if env is None else env
@@ -190,4 +207,5 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         ui_lang=_parse_ui_lang(src),
         auditor_names=names,
         mcp_owner_id=_parse_mcp_owner_id(src.get(MCP_OWNER_ID_VAR) or "", allowed_ids),
+        walk_url=_parse_walk_url(src.get(WALK_URL_VAR) or ""),
     )
