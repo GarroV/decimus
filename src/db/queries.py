@@ -82,7 +82,7 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by, i.created_by
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -114,7 +114,7 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by, i.created_by
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -155,7 +155,7 @@ select
     -- В КОНЕЦ, а не в середину (T345): разбор строки позиционный, и вставка
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
-    i.status, i.accepted_at, i.accepted_by,
+    i.status, i.accepted_at, i.accepted_by, i.created_by,
     i.deductions, i.counts, i.by_zone
 from inspections i
 join units u on u.id = i.unit_id
@@ -305,6 +305,8 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         on_review=row[19] == "draft",
         accepted_at=row[20].isoformat() if row[20] is not None else "",
         accepted_by=str(row[21] or ""),
+        # Автор (D311, `0040`) — последним, по той же причине, что код чек-листа.
+        created_by=str(row[22] or ""),
     )
 
 

@@ -272,6 +272,7 @@ def слить_проверку(
     text: str = "нагар на печи",
     date: str | None = None,
     accept: bool = True,
+    author_user_id: str = "",
 ) -> str:
     """Завершённая проверка через официальный контракт домена и слив; её `id`.
 
@@ -287,7 +288,15 @@ def слить_проверку(
     from src.domain import add_finding, start_inspection
 
     чат = next(_номер_чата) if chat_id is None else chat_id
-    start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant, date=date)
+    start_inspection(
+        чат,
+        unit=unit,
+        kind="planned",
+        report_lang="ru",
+        tenant=tenant,
+        date=date,
+        author_user_id=author_user_id,
+    )
     add_finding(чат, code="CLN03", level="D1", zone="hot_kitchen", text=text)
     ident = push_inspection(чат)
     if accept:
