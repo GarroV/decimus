@@ -30,7 +30,7 @@ def test_отдаёт_последнюю_проверку_с_зонами_кла
     add_finding(1, code="CLN05", level="D1", zone="hot_kitchen", text="старое")
     push_inspection(1)
     start_inspection(2, unit="Белград-1", kind="planned", report_lang="ru", date="2026-09-15")
-    add_finding(2, code="CLN06", level="D2", zone="dining", text="пятно на столе у окна")
+    add_finding(2, code="PRD09", level="D2", zone="fridge", text="контейнеры без даты")
     add_finding(2, code="INF10", level="D0", zone="fridge", text="замер")
     push_inspection(2)
 
@@ -39,7 +39,7 @@ def test_отдаёт_последнюю_проверку_с_зонами_кла
     assert прошлая is not None
     assert прошлая.date.isoformat() == "2026-09-15"
     assert [(f.code, f.level, f.zone, f.text) for f in прошлая.findings] == [
-        ("CLN06", "D2", "dining", "пятно на столе у окна")
+        ("PRD09", "D2", "fridge", "контейнеры без даты")
     ], "замер (D0) не нарушение, а позапрошлая проверка — не прошлая"
     повтор = previous_inspection(tenant=ТЕНАНТ, unit="Белград-1")
     assert повтор is not None and повтор.date == прошлая.date, "подсказки смотрят в разные обходы"
