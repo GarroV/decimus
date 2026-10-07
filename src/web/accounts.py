@@ -18,6 +18,7 @@ import secrets
 from dataclasses import dataclass
 
 from src.db.web_access import (
+    LEGACY_ROLES,
     MAX_PASSWORD_LENGTH,
     MIN_PASSWORD_LENGTH,
     ROLE_ADMIN,
@@ -34,6 +35,7 @@ from src.db.web_access import (
 )
 
 __all__ = [
+    "LEGACY_ROLES",
     "MAX_PASSWORD_LENGTH",
     "MIN_PASSWORD_LENGTH",
     "ROLES",

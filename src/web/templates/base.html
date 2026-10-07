@@ -138,7 +138,7 @@
 
         <div class="sidenav__user">
           <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
-          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.admin') if account.role == 'admin' else t('nav.role.auditor') }}</small></span>
+          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.' ~ account.role) }}</small></span>
           {#
             Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
             чужой странице, выбив человека из админки без единого его движения.

@@ -47,6 +47,13 @@ from typing import Any
 
 import psycopg
 
+from src.domain.permissions import (
+    LEGACY_ROLE_ADMIN,
+    LEGACY_ROLE_AUDITOR,
+    ROLE_SCOPES,
+    canonical_role,
+)
+
 from .config import check_environment
 from .database_target import managing_dsn, same_database_or_deny
 from .errors import AccessError, EmailTakenError
@@ -225,12 +232,14 @@ _CLOSE_SESSION_SQL = """
 """
 
 
-#: Роли внутри админки. Перечислены здесь И ограничением схемы (`0020`):
-#: код без схемы пропустил бы опечатку в базу, схема без кода молчала бы о
-#: ней до первой записи.
-ROLE_AUDITOR = "auditor"
-ROLE_ADMIN = "admin"
-ROLES = (ROLE_AUDITOR, ROLE_ADMIN)
+#: Старые имена ролей (`0020`) — псевдонимы: команды стендов, формы и тесты
+#: зовут `admin`/`auditor`, перевод по пространству — `canonical_role`.
+ROLE_AUDITOR = LEGACY_ROLE_AUDITOR
+ROLE_ADMIN = LEGACY_ROLE_ADMIN
+LEGACY_ROLES: tuple[str, ...] = (ROLE_AUDITOR, ROLE_ADMIN)
+#: Коды ролей по умолчанию (`0038`). Мост до Task 11: там выбор роли берётся
+#: из таблицы `roles`, а этот перечень уходит.
+ROLES: tuple[str, ...] = tuple(ROLE_SCOPES)
 
 
 @dataclass(frozen=True)
@@ -422,10 +431,15 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
-def _checked_role(role: str) -> str:
-    if role not in ROLES:
+def _checked_role(role: str, tenant: str) -> str:
+    """Код роли: старое имя переводится по пространству, незнакомое — отказ."""
+    try:
+        код = canonical_role(role, tenant)
+    except ValueError as exc:
+        raise AccessError("Роль не задана") from exc
+    if код not in ROLES:
         raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
-    return role
+    return код
 
 
 def _checked_password(password: str) -> str:
@@ -484,7 +498,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
     # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
     # бы админов молча.
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant)
     хеш = password_hash(_checked_password(password))
     _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
@@ -557,7 +571,7 @@ def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
     Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
     экран правит роли, а таблицы истории ролей нет и не заводится.
     """
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
         cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
         строка = cur.fetchone()

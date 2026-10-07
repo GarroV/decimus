@@ -49,6 +49,7 @@ from src.db.database_target import managing_target  # noqa: E402
 from src.db.errors import DbError  # noqa: E402
 from src.db.spaces import space_exists  # noqa: E402
 from src.db.web_access import (  # noqa: E402
+    LEGACY_ROLES,
     MIN_PASSWORD_LENGTH,
     ROLES,
     change_password,
@@ -180,7 +181,11 @@ def main(argv: list[str] | None = None) -> int:
     # она — на живом стенде это единственный способ открыть экран учёток.
     роль = с_арендатором("role", "назначить роль учётке")
     роль.add_argument("login")
-    роль.add_argument("role", choices=ROLES, help="что человеку можно в админке")
+    роль.add_argument(
+        "role",
+        choices=(*ROLES, *LEGACY_ROLES),
+        help="код роли (hq_admin, hq_staff, country_admin, country_staff) или старое admin/auditor",
+    )
 
     args = parser.parse_args(argv)
     tenant = _tenant(args.tenant)
@@ -241,7 +246,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"отключена {строка.disabled_at:%Y-%m-%d}" if строка.disabled_at else "работает"
                 )
                 print(
-                    f"{строка.login:<24} {строка.role:<8} {метка:<10} "
+                    f"{строка.login:<24} {строка.role:<13} {метка:<10} "
                     f"заведена {строка.created_at:%Y-%m-%d}"
                 )
             return 0

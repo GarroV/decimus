@@ -327,12 +327,14 @@ Swarm Brain. Шапки над содержимым после входа нет
 ```bash
 make web-user ARGS="add director --tenant demo"   # пароль спросят вводом без эха
 make web-user ARGS="list --tenant demo"
-make web-user ARGS="role director admin --tenant demo"   # первый админ стенда
+make web-user ARGS="role director hq_admin --tenant HQ"   # первый админ стенда (старое «admin» тоже понимается)
 make web-user ARGS="password director --tenant demo"   # сменить пароль (T340)
 make web-user ARGS="email director director@dodobrands.io --tenant demo"   # почта для входа через Google
 make web-user ARGS="email director --tenant demo"   # снять почту: вход через Google закрыт, пароль остался
 make web-user ARGS="disable director --tenant demo"
 ```
+
+Роли — коды `hq_admin`, `hq_staff`, `country_admin`, `country_staff` (`src/domain/permissions.py`); роль УК — только людям `HQ`, роль страны — только людям страны.
 
 **Смена пароля закрывает открытые сессии** этого человека, свою в том числе.
 Иначе смена не выгоняет того, ради кого её делают: пароль меняют в ответ на

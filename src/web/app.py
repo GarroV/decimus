@@ -41,6 +41,7 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
+from src.domain.permissions import ROLE_COUNTRY_ADMIN, ROLE_HQ_ADMIN, canonical_role
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
@@ -1432,6 +1433,16 @@ def link_url(bot_username: str, token: str) -> str:
     return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
 
 
+def _is_admin(account: Any) -> bool:
+    """Мост ролей (до Task 10): админ УК или админ страны — по коду или старому имени."""
+    return canonical_role(account.role, account.tenant) in (ROLE_HQ_ADMIN, ROLE_COUNTRY_ADMIN)
+
+
+def _is_hq_admin(account: Any) -> bool:
+    """Мост ролей (до Task 11): админ УК — по коду или старому имени."""
+    return canonical_role(account.role, account.tenant) == ROLE_HQ_ADMIN
+
+
 def _hq_admin_only() -> FlaskResponse | None:
     """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
 
@@ -1440,11 +1451,7 @@ def _hq_admin_only() -> FlaskResponse | None:
     открывает.
     """
     вошедший = auth.current_account()
-    if (
-        вошедший is not None
-        and вошедший.role == accounts.ROLE_ADMIN
-        and canonical_tenant(вошедший.tenant) == HQ_TENANT
-    ):
+    if вошедший is not None and _is_hq_admin(вошедший):
         return None
     return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
@@ -1457,7 +1464,7 @@ def _admin_only() -> FlaskResponse | None:
     её с выносом кадров мог любой аудитор.
     """
     вошедший = auth.current_account()
-    if вошедший is not None and вошедший.role == accounts.ROLE_ADMIN:
+    if вошедший is not None and _is_admin(вошедший):
         return None
     # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
     # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.

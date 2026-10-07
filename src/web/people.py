@@ -57,7 +57,7 @@ def change_role(
     *, login: str, tenant: str, role: str, actor_login: str, actor_tenant: str
 ) -> Outcome:
     """Назначить роль. Свою — нельзя: снять с себя админа значит закрыть экран людей."""
-    if role not in accounts.ROLES:
+    if role not in accounts.ROLES and role not in accounts.LEGACY_ROLES:
         return Outcome("role.unknown", 400)
     if is_self(login=login, tenant=tenant, actor_login=actor_login, actor_tenant=actor_tenant):
         return Outcome("role.self", 400)
