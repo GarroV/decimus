@@ -13,13 +13,15 @@ import json
 import time
 from datetime import date
 from pathlib import Path
+from typing import Any
 from urllib.parse import urlencode
 
 import pytest
 from flask import Flask
 from web_harness import СЕКРЕТ
 
-from src.db.errors import DbError
+from src.db.bot_links import NEVER_BOUND, Standing
+from src.db.errors import AccessError, DbError
 from src.db.models import PreviousFinding, PreviousFindings
 from src.domain import add_finding, get_state, list_zones, start_inspection
 from src.web import walk
@@ -177,6 +179,7 @@ def test_данные_по_подписи_и_без_истории(domain_env: P
         raise DbError("нет базы")
 
     monkeypatch.setattr(walk.queries, "previous_findings", база_молчит)
+    monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
     client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
 
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
@@ -217,3 +220,42 @@ def test_страница_пускает_в_рамку_только_telegram(mon
     вход = client.get("/login")
     assert вход.headers["X-Frame-Options"] == "DENY", "ослабление ушло дальше обхода"
     assert "frame-ancestors 'none'" in вход.headers["Content-Security-Policy"]
+
+
+def _подписанный_клиент(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch, положение: object
+) -> Any:
+    start_inspection(АУДИТОР, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
+    monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
+
+    def standing(_: int) -> object:
+        if isinstance(положение, Exception):
+            raise положение
+        return положение
+
+    monkeypatch.setattr(walk.bot_links, "standing", standing)
+    return _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
+
+
+def test_снятый_доступ_не_открывает_даже_свою_проверку(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _подписанный_клиент(domain_env, monkeypatch, Standing(binding=None, ever_bound=True))
+    ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
+    assert ответ.status_code == 401, "отключённый человек видел бы обход и историю точки"
+
+
+def test_без_привязки_пускает_тот_кого_пустил_бот(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
+    ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
+    assert ответ.status_code == 200
+
+
+def test_база_молчит_отказ_а_не_пропуск_вслепую(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = _подписанный_клиент(domain_env, monkeypatch, AccessError("нет базы"))
+    ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
+    assert ответ.status_code == 503

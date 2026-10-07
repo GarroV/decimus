@@ -35,7 +35,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from src.db import queries
+from src.db import bot_links, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.domain import get_state, list_items, list_zones
@@ -183,6 +183,19 @@ def _questions(chat_id: int, lang: str) -> Mapping[str, str]:
     return {item.code: item.question(lang) for item in list_items(chat_id=chat_id)}
 
 
+def revoked(chat_id: int) -> bool:
+    """Сняли ли у человека доступ — привязку бота или учётку (`src/bot/access.py`, п.5).
+
+    Проверка ЕГО проверки ещё лежит на диске, но бот его уже не пускает — и
+    экран обхода не должен становиться обходным путём. Привязки не было
+    никогда — не отказ: такой человек мог завести проверку только по старому
+    списку бота, и раз она есть, бот его пустил. База молчит — `DbError`
+    наверх: сверить снятие нечем, а отвечать «пускаю» вслепую нельзя.
+    """
+    положение = bot_links.standing(chat_id)
+    return положение.binding is None and положение.ever_bound
+
+
 def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
     """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`."""
     inspection = get_state(chat_id)
@@ -221,6 +234,13 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         except WalkAccessError as exc:
             logger.info("Обход: отказ в опознании — %s", exc)
             return jsonify({"error": "unauthorized"}), 401
+        try:
+            if conf.bot_token is not None and revoked(chat_id):
+                logger.info("Обход: доступ чата %s снят — отказ", chat_id)
+                return jsonify({"error": "unauthorized"}), 401
+        except DbError:
+            logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
+            return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
         try:
             return jsonify(walk_payload(chat_id, fallback_lang=ui_lang)), 200
         except STATE_FAILURES:
