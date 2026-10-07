@@ -48,6 +48,7 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.permissions import Actor
 from src.domain.tenants import canonical_tenant
 
 from .config import Settings
@@ -164,6 +165,19 @@ def current_reach() -> Reach:
         охват = reach_of(current_tenant())
         setattr(g, REACH, охват)
     return охват
+
+
+def current_actor() -> Actor:
+    """Вошедший как субъект прав: пространство, роль и права роли этого запроса."""
+    account = current_account()
+    if account is None:
+        raise RuntimeError("current_actor() вызван без вошедшего: маршрут прошёл мимо заслона")
+    return Actor(
+        tenant=current_tenant(),
+        role=account.role,
+        grants=account.grants,
+        user_id=account.id,
+    )
 
 
 def install(app: Flask, conf: Settings) -> None:
