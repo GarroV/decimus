@@ -602,7 +602,9 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0026_photo_previews.sql` | `photos.preview_path` — сжатая копия кадра для показа в админке (D219): пишется той же выгрузкой (`upload_photos`, `src/db/previews.py`), хранится навсегда, убирается только снятием проверки. С D250/D253 оригинал не хранится: выгрузка кладёт один сжатый объект (1600 px, JPEG q75), `storage_path` и `preview_path` указывают на него; нечитаемый Pillow кадр ложится как пришёл, `preview_path` у него пуст. Кадры до D253 — два объекта, оригиналы старой выгрузки остаются в хранилище, пока владелец не решит иначе |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError` |
+| `src/db/database_target.py` | куда ведёт строка подключения (хост, порт, база, роль — без пароля) и сверка, что все заданные `DATABASE_*_URL` ведут в одну базу; расхождение — `DatabaseTargetError` (#487, #515) |
+| `src/db/target_refusal.py` | узнать расхождение баз в цепочке причин отказа и записать подробности в журнал на уровне ERROR — одно правило для веба (`src/web/db_refusal.py`) и MCP (`src/mcp/db_target.py`), #521 |
 | `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
