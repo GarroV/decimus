@@ -43,6 +43,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from types import MappingProxyType
 from typing import Any
 
 import psycopg
@@ -51,6 +52,7 @@ from src.domain.permissions import (
     LEGACY_ROLE_ADMIN,
     LEGACY_ROLE_AUDITOR,
     ROLE_SCOPES,
+    Grants,
     canonical_role,
 )
 
@@ -59,6 +61,7 @@ from .database_target import managing_dsn, same_database_or_deny
 from .errors import AccessError, EmailTakenError
 from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
 from .reading import reading
+from .roles import grants_column, grants_from_row
 from .space_guard import require_space
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
@@ -115,11 +118,14 @@ _INSERT_USER_SQL = """
     returning id
 """
 
-_SELECT_USER_SQL = """
-    select id, login, tenant_code, password_hash, role
-      from web_users
-     where login = %s and disabled_at is null
-"""
+_GRANTS_OF_USER = grants_column("u.role")
+
+_SELECT_USER_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER},
+           u.password_hash
+      from web_users u join roles r on r.code = u.role
+     where u.login = %s and u.disabled_at is null
+"""  # noqa: S608 — подзапрос собран из константы модуля
 
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
@@ -200,11 +206,11 @@ _SET_EMAIL_SQL = """
  returning u.id, прежняя.email is distinct from u.email
 """
 
-_SELECT_USER_BY_EMAIL_SQL = """
-    select id, login, tenant_code, role
-      from web_users
-     where email = %s and disabled_at is null
-"""
+_SELECT_USER_BY_EMAIL_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER}
+      from web_users u join roles r on r.code = u.role
+     where u.email = %s and u.disabled_at is null
+"""  # noqa: S608 — подзапрос собран из константы модуля
 
 _OPEN_SESSION_SQL = """
     insert into web_sessions (user_id, fingerprint, expires_at)
@@ -215,15 +221,16 @@ _OPEN_SESSION_SQL = """
 #: Учётка сверяется ВМЕСТЕ с сессией, одним запросом. Отдельной проверкой
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
-_RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code, u.role
+_RESOLVE_SESSION_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER}
       from web_sessions s
       join web_users u on u.id = s.user_id
+      join roles r on r.code = u.role
      where s.fingerprint = %s
        and s.closed_at is null
        and s.expires_at > now()
        and u.disabled_at is null
-"""
+"""  # noqa: S608 — подзапрос собран из константы модуля
 
 _CLOSE_SESSION_SQL = """
     update web_sessions
@@ -242,18 +249,25 @@ LEGACY_ROLES: tuple[str, ...] = (ROLE_AUDITOR, ROLE_ADMIN)
 ROLES: tuple[str, ...] = tuple(ROLE_SCOPES)
 
 
+#: Ограничение охвата роли в схеме (`0038`): его имя различает «роль чужого
+#: охвата» и прочие отказы проверки.
+_ROLE_SCOPE_CONSTRAINT = "web_users_role_scope"
+_NO_GRANTS: Grants = MappingProxyType({})
+
+
 @dataclass(frozen=True)
 class Account:
-    """Учётка так, как её видят страницы: кто вошёл и чью историю показывать."""
+    """Учётка так, как её видят страницы: кто вошёл, его роль и права роли."""
 
     id: str
     login: str
     tenant: str
-    #: Что человеку можно В АДМИНКЕ (`auditor` | `admin`), а не чью историю
-    #: ему видно: за историю отвечает арендатор, и роль его не расширяет.
-    #: Приезжает вместе с опознанием, одним запросом с ним: спрошенная
-    #: отдельно, она успела бы устареть между двумя запросами.
-    role: str = ROLE_AUDITOR
+    #: Код роли (`roles.code`). Приезжает вместе с опознанием одним запросом.
+    role: str = ""
+    #: Права роли на момент запроса: код действия → охват (`own`/`all`).
+    grants: Grants = _NO_GRANTS
+    role_name_ru: str = ""
+    role_name_en: str = ""
 
 
 @dataclass(frozen=True)
@@ -432,14 +446,35 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 
 
 def _checked_role(role: str, tenant: str) -> str:
-    """Код роли: старое имя переводится по пространству, незнакомое — отказ."""
+    """Код роли: старое имя переводится по пространству. Заведена ли — решает схема (FK)."""
     try:
-        код = canonical_role(role, tenant)
+        return canonical_role(role, tenant)
     except ValueError as exc:
         raise AccessError("Роль не задана") from exc
-    if код not in ROLES:
-        raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
-    return код
+
+
+def _role_refusal(exc: psycopg.Error, *, role: str, tenant: str) -> AccessError | None:
+    """Отказ схемы про роль — словами; прочие отказы — `None` (решает вызывающий)."""
+    if isinstance(exc, psycopg.errors.ForeignKeyViolation):
+        return AccessError(f"Роль «{role}» не заведена")
+    if isinstance(exc, psycopg.errors.CheckViolation) and (
+        exc.diag.constraint_name == _ROLE_SCOPE_CONSTRAINT
+    ):
+        return AccessError(f"Роль «{role}» не для пространства «{tenant}»")
+    return None
+
+
+def _account(row: tuple[Any, ...]) -> Account:
+    """Строка опознания → учётка. Первые семь колонок одинаковы у трёх запросов."""
+    return Account(
+        id=str(row[0]),
+        login=str(row[1]),
+        tenant=str(row[2]),
+        role=str(row[3]),
+        role_name_ru=str(row[4]),
+        role_name_en=str(row[5]),
+        grants=grants_from_row(row[6]),
+    )
 
 
 def _checked_password(password: str) -> str:
@@ -508,6 +543,11 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
             raise AccessError(
                 f"Логин «{имя}» уже занят — логины единые на всю систему. Возьмите другой"
             ) from exc
+        except (psycopg.errors.ForeignKeyViolation, psycopg.errors.CheckViolation) as exc:
+            отказ = _role_refusal(exc, role=role, tenant=tenant)
+            if отказ is None:
+                raise
+            raise отказ from exc
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
     return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль)
@@ -573,7 +613,13 @@ def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
     """
     роль = _checked_role(role, tenant)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
-        cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
+        try:
+            cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
+        except (psycopg.errors.ForeignKeyViolation, psycopg.errors.CheckViolation) as exc:
+            отказ = _role_refusal(exc, role=role, tenant=tenant)
+            if отказ is None:
+                raise
+            raise отказ from exc
         строка = cur.fetchone()
     return None if строка is None else str(строка[0])
 
@@ -714,7 +760,7 @@ def find_by_email(email: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
+    return _account(row)
 
 
 def authenticate(login: str, password: str) -> Account | None:
@@ -744,9 +790,9 @@ def authenticate(login: str, password: str) -> Account | None:
     if row is None:
         password_hash(password)
         return None
-    if not password_matches(password, str(row[3])):
+    if not password_matches(password, str(row[7])):
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
+    return _account(row)
 
 
 def open_session(account: Account) -> OpenedSession:
@@ -780,7 +826,7 @@ def resolve_session(token: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
+    return _account(row)
 
 
 def close_session(token: str) -> bool:

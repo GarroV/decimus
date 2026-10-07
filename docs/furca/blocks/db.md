@@ -77,6 +77,14 @@ list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # спр
 #   страны (триггер web_users_role_scope, check_violation)
 #   засев — DEFAULT_MATRIX, перенос admin/auditor × HQ/страна → 4 роли
 
+# двери ролей — src/db/roles.py (роль приложения): list_roles() -> tuple[Role, ...],
+#   grants_of(role_code) -> Grants (незаведённая — пусто); grants_column(role_expr) —
+#   единственный подзапрос «права роли колонкой jsonb», grants_from_row — его разбор
+# опознание (authenticate, find_by_email, resolve_session) отдаёт Account с role,
+#   role_name_ru/en и grants — одним запросом на каждый запрос страницы;
+#   create_account/reassign_role: роль чужого охвата → AccessError «не для пространства»,
+#   незаведённая → «не заведена» (отказ схемы, не перечень в коде)
+
 # журнал действий УК у партнёра (0039) — src/db/cross_space.py
 #   entry_for(actor, *, object_tenant, action, object_ref) -> Entry | None (своё — None)
 #   record(conn, entry): пишет на подключении ДВЕРИ ДЕЙСТВИЯ до её коммита и только

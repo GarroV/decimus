@@ -49,9 +49,7 @@ from src.db.database_target import managing_target  # noqa: E402
 from src.db.errors import DbError  # noqa: E402
 from src.db.spaces import space_exists  # noqa: E402
 from src.db.web_access import (  # noqa: E402
-    LEGACY_ROLES,
     MIN_PASSWORD_LENGTH,
-    ROLES,
     change_password,
     create_account,
     disable_account,
@@ -183,7 +181,6 @@ def main(argv: list[str] | None = None) -> int:
     роль.add_argument("login")
     роль.add_argument(
         "role",
-        choices=(*ROLES, *LEGACY_ROLES),
         help="код роли (hq_admin, hq_staff, country_admin, country_staff) или старое admin/auditor",
     )
 
