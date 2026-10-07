@@ -164,3 +164,98 @@ def can(
         свой = bool(actor.user_id) and object_author == actor.user_id
         return Decision(True, RULE_OK) if свой else Decision(False, RULE_NOT_AUTHOR)
     return Decision(False, RULE_MATRIX)
+
+
+SCOPE_HQ = "hq"
+SCOPE_COUNTRY = "country"
+
+ROLE_HQ_ADMIN = "hq_admin"
+ROLE_HQ_STAFF = "hq_staff"
+ROLE_COUNTRY_ADMIN = "country_admin"
+ROLE_COUNTRY_STAFF = "country_staff"
+
+#: Охват ролей по умолчанию. Заведённые админом УК роли (блок 2) несут охват в
+#: строке `roles.scope`, а не здесь.
+ROLE_SCOPES: Mapping[str, str] = {
+    ROLE_HQ_ADMIN: SCOPE_HQ,
+    ROLE_HQ_STAFF: SCOPE_HQ,
+    ROLE_COUNTRY_ADMIN: SCOPE_COUNTRY,
+    ROLE_COUNTRY_STAFF: SCOPE_COUNTRY,
+}
+
+
+def _all(codes: frozenset[str]) -> dict[str, str]:
+    return {код: REACH_ALL for код in codes}
+
+
+#: Сотрудник правит только проверки, которые занёс сам (D311).
+_OWN_INSPECTIONS: Mapping[str, str] = {код: REACH_OWN for код in INSPECTION_OBJECT_ACTIONS}
+
+#: Права по умолчанию — таблица спеки с поправками D310 (`unit.create` у
+#: `hq_staff`) и D311 (охват «свои» у сотрудников). Засев `0038` сверяется с
+#: ней тестом (`tests/test_db_roles_migration.py`), а не копируется руками.
+DEFAULT_MATRIX: Mapping[str, Grants] = {
+    ROLE_HQ_ADMIN: _all(ACTION_CODES),
+    ROLE_HQ_STAFF: {
+        **_all(ACTION_CODES - {"people.manage", "space.manage", "roles.manage"}),
+        **_OWN_INSPECTIONS,
+    },
+    ROLE_COUNTRY_ADMIN: _all(ACTION_CODES - HQ_ONLY_ACTIONS),
+    ROLE_COUNTRY_STAFF: {
+        **_all(
+            frozenset({"inspection.conduct", "prescription.reply", "plan.submit", "mcp.connect"})
+        ),
+        **_OWN_INSPECTIONS,
+    },
+}
+
+#: Роли учёток до спеки «Администрирование» (`0020`). Живут в командах стендов
+#: (`make web-user ... role <логин> admin`) и в тестах; переводятся на входе.
+LEGACY_ROLE_ADMIN = "admin"
+LEGACY_ROLE_AUDITOR = "auditor"
+_LEGACY: Mapping[tuple[str, str], str] = {
+    (LEGACY_ROLE_ADMIN, SCOPE_HQ): ROLE_HQ_ADMIN,
+    (LEGACY_ROLE_AUDITOR, SCOPE_HQ): ROLE_HQ_STAFF,
+    (LEGACY_ROLE_ADMIN, SCOPE_COUNTRY): ROLE_COUNTRY_ADMIN,
+    (LEGACY_ROLE_AUDITOR, SCOPE_COUNTRY): ROLE_COUNTRY_STAFF,
+}
+
+
+def scope_of_tenant(tenant: str) -> str:
+    """Охват ролей пространства: у УК — роли УК, у страны — роли страны."""
+    return SCOPE_HQ if _required_tenant(tenant, what="пространство") == HQ_TENANT else SCOPE_COUNTRY
+
+
+def canonical_role(role: str, tenant: str) -> str:
+    """Код роли: старое `admin`/`auditor` переводится по пространству, прочее — как есть."""
+    код = (role or "").strip()
+    if not код:
+        raise ValueError("Не задана роль учётки")
+    return _LEGACY.get((код, scope_of_tenant(tenant)), код)
+
+
+def _grant_problem(роль: str, охват_роли: str, код: str, охват: str) -> str | None:
+    if код not in ACTION_CODES:
+        return f"{роль}: {код} — нет в каталоге действий"
+    if охват not in (REACH_OWN, REACH_ALL):
+        return f"{роль}: {код} — охват «{охват}» не из own/all"
+    if охват == REACH_OWN and код not in INSPECTION_OBJECT_ACTIONS:
+        return f"{роль}: {код} — охват «own» только у действий над проверкой"
+    if охват_роли == SCOPE_COUNTRY and код in HQ_ONLY_ACTIONS:
+        return f"{роль}: {код} — действие только УК ({RULE_HQ_ONLY})"
+    return None
+
+
+def validate_matrix(matrix: Mapping[str, Grants], scopes: Mapping[str, str]) -> list[str]:
+    """Нарушения матрицы словами: код или охват не из каталога, «только УК» у страны."""
+    нарушения: list[str] = []
+    for роль in sorted(matrix):
+        охват_роли = scopes.get(роль)
+        if охват_роли is None:
+            нарушения.append(f"{роль}: у роли нет охвата")
+            continue
+        for код in sorted(matrix[роль]):
+            беда = _grant_problem(роль, охват_роли, код, matrix[роль][код])
+            if беда is not None:
+                нарушения.append(беда)
+    return нарушения
