@@ -48,7 +48,7 @@ from src.domain.permissions import (
     canonical_role,
     scope_of_tenant,
 )
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import canonical_tenant
 from src.report.info_titles import FOUND
 
 from . import (
@@ -1667,6 +1667,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return redirect(_url("methodology", **request.args.to_dict(), item=code))
 
     @app.post(f"{путь}/items")
+    @guard.action("checklist.edit")
     def methodology_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1693,6 +1694,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
     @app.post(f"{путь}/items/<code>")
+    @guard.action("checklist.edit")
     def methodology_edit(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1718,6 +1720,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/disable")
+    @guard.action("checklist.edit")
     def methodology_disable(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1734,6 +1737,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/restore")
+    @guard.action("checklist.edit")
     def methodology_restore(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1750,6 +1754,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/zones")
+    @guard.action("checklist.edit")
     def methodology_zone_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1771,6 +1776,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/shares")
+    @guard.action("checklist.edit")
     def methodology_zone_shares() -> str:
         refuse_foreign_origin()
         # Доли приезжают полями `share_<код>` и отправляются ВСЕ разом: сумма
@@ -1795,6 +1801,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/rename")
+    @guard.action("checklist.edit")
     def methodology_zone_rename(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1814,6 +1821,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/remove")
+    @guard.action("checklist.edit")
     def methodology_zone_remove(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1832,6 +1840,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/route")
+    @guard.action("checklist.edit")
     def methodology_route() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1851,6 +1860,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/scoring")
+    @guard.action("checklist.edit")
     def methodology_scoring() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1871,6 +1881,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/publish")
+    @guard.action("checklist.publish")
     def methodology_publish() -> str:
         refuse_foreign_origin()
         version = (request.form.get("version") or "").strip()
@@ -1922,6 +1933,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         return _render_checklists(conf, notice=None, failure=None)
 
     @app.post(путь)
+    @guard.action("checklist.manage")
     def checklists_create() -> str | Response:
         refuse_foreign_origin()
         form = request.form
@@ -1930,13 +1942,9 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
-        if auth.current_tenant() != HQ_TENANT:
-            # Чек-листы заводит УК (D283): у партнёра заведения нет — он
-            # работает по эталону и читает его.
-            отказ_заведения = t("methodology.etalon_readonly", _lang(conf))
-            if с_методики:
-                return _render_methodology(conf, notice=None, failure=отказ_заведения, panel="new")
-            return _render_checklists(conf, notice=None, failure=отказ_заведения)
+        # Пространство — вошедшего (D311): админ страны заводит свои чек-листы у себя;
+        # чужое пространство дверь не принимает (`space_of(tenant)`), право —
+        # `checklist.manage` в заслоне.
         try:
             заведён = method.create_checklist(
                 state.store,
@@ -1964,6 +1972,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/state")
+    @guard.action("checklist.manage")
     def checklists_state(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()
@@ -1990,6 +1999,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{section('admin').path}/bot/<code>")
+    @guard.action("checklist.manage")
     def methodology_bot(code: str) -> str | Response:
         """Переключатель панели «Бот»: открыть чек-лист в боте или закрыть (волна 3)."""
         refuse_foreign_origin()
@@ -2048,6 +2058,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/apply")
+    @guard.action("checklist.manage")
     def checklists_apply(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()

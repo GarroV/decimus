@@ -3,9 +3,9 @@
 Раньше точку заводили бот («Новая пиццерия?», D233) и `tools/units.py add` по
 ssh. Правила те же, что у бота, и живут они не здесь:
 
-- кто вправе — `domain.tenants.may_add_units`: только пространство УК (D234),
-  партнёр справочник не пополняет (D284), и для него адреса нет вовсе (404, как
-  у разделов УК, D264);
+- кто вправе — `can(unit.create)` (D310): право роли, и только в пространстве УК
+  (D234); партнёр справочник не пополняет (D284), и для него адреса нет вовсе
+  (404, как у разделов УК, D264);
 - какое имя — `domain.unit_new.plan_new_unit`: «Город-N» по-английски
   (D232, D233), город другой страны — отказ, незнакомый город — подтверждение;
 - дубль — `db.directory.create_unit`: имя или синоним уже называют точку —
@@ -28,10 +28,11 @@ from src.db import directory
 from src.db.errors import DbError, UnitExistsError
 from src.db.reach import Reach
 from src.domain.geo import COUNTRIES
-from src.domain.tenants import HQ_TENANT, may_add_units
+from src.domain.permissions import Actor, can
+from src.domain.tenants import HQ_TENANT
 from src.domain.unit_new import OTHER_COUNTRY, NewUnit, NewUnitRefused, plan_new_unit
 
-from . import auth
+from . import auth, guard
 from . import country as country_data
 from .config import Settings
 from .geo_names import country_title
@@ -42,20 +43,20 @@ from .texts import lang_or_default, t
 logger = logging.getLogger(__name__)
 
 
-def may_add_in(tenant: str, reach: Reach, code: str) -> bool:
-    """Может ли вошедший завести пиццерию в стране `code`.
+def may_add_in(actor: Actor, reach: Reach, code: str) -> bool:
+    """Может ли вошедший завести пиццерию в стране `code`: право, словарь сети, охват.
 
-    Три условия, и все обязательны: пространство УК, страна из словаря сети и
-    страна в охвате вошедшего.
+    Объект — справочник пиццерий; он один и принадлежит УК (D284), поэтому
+    пространство объекта для `can` — `HQ_TENANT`.
     """
-    if not may_add_units(tenant) or code not in COUNTRIES:
+    if not can(actor, "unit.create", HQ_TENANT) or code not in COUNTRIES:
         return False
     return reach.countries is None or code in reach.countries
 
 
 def can_add_here(code: str) -> bool:
     """Показывать ли вход «Добавить пиццерию» на экране страны `code`."""
-    return bool(code) and may_add_in(auth.current_tenant(), auth.current_reach(), code)
+    return bool(code) and may_add_in(auth.current_actor(), auth.current_reach(), code)
 
 
 def _gate(raw_code: str) -> str:
@@ -118,8 +119,13 @@ def install(app: Flask, conf: Settings) -> None:
         return _render(_gate(code), _lang(conf))
 
     @app.post(путь, endpoint="unit_create")
+    @guard.action("unit.create", object_in_route=True)
     def unit_create(code: str) -> Response | str | tuple[str, int]:
         страна = _gate(code)
+        # Объект — справочник УК: пиццерия ложится с `tenant=HQ_TENANT` (ниже).
+        отказ = guard.permit("unit.create", HQ_TENANT)
+        if отказ is not None:
+            return отказ
         refuse_foreign_origin()
         lang = _lang(conf)
         написано = (request.form.get("name") or "")[:200]
