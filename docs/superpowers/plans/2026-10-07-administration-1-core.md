@@ -2,58 +2,58 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** одна проверка прав `can(человек, действие, пространство_объекта)` — граница пространств в коде и матрица «роль × действие» в базе — стоит на каждом пишущем маршруте веба, каждой команде бота и каждом пишущем инструменте MCP. Роли по умолчанию заведены миграцией, учётки перенесены, действия УК в пространстве партнёра пишутся в журнал той же транзакцией. Поведение для людей не меняется, кроме отличий, которые даёт таблица ролей спеки.
+**Goal:** одна проверка прав `can(человек, действие, пространство_объекта, автор_объекта)` — граница пространств в коде и матрица «роль × действие» в базе — стоит на каждом пишущем маршруте веба, каждой команде бота и каждом пишущем инструменте MCP. У действий над проверкой ячейка матрицы — «нет / свои / все» (D311), и проверка помнит учётку, которая её занесла. Роли по умолчанию заведены миграцией, учётки перенесены, действия УК в пространстве партнёра пишутся в журнал той же транзакцией. Поведение для людей не меняется, кроме отличий таблицы ролей спеки, D310 и D311.
 
-**Architecture:** каталог действий и `can` — чистый модуль `src/domain/permissions.py` (без базы, тестируется таблицей). Роли и галочки — таблицы `roles`, `role_permissions` (миграция `0038`); права роли приезжают вместе с опознанием (сессия веба, привязка бота) одним запросом, поэтому снятая галочка действует со следующего запроса. Веб: декоратор `guard.action(...)` объявляет код на маршруте, `before_request` спрашивает `can` для маршрутов своего пространства, маршрут с объектом чужого пространства зовёт `guard.permit(код, пространство_объекта)` сам, а `after_request` роняет пишущий маршрут, который объявил объект и не спросил. Журнал `cross_space_actions` (миграция `0039`) пишется функцией `cross_space.record(conn, запись)` на том же подключении, которым дверь делает действие, до коммита. Бот: внутренняя мидлварь роутера `ActionMiddleware(код)`. MCP: у `ToolSpec` поле `action`, права токена в блоке 1 — мост из того, что уже открывает окружение (`MCP_CHECKLIST_TENANTS`, `MCP_RETRACTION_TOKENS`); роли токенам — блок 3.
+**Architecture:** каталог действий и `can` — чистый модуль `src/domain/permissions.py` (без базы, тестируется таблицей). Права роли — словарь «код действия → охват» (`all` или `own`; нет строки — нет права); `own` допустим только у действий над проверкой. Роли и права — таблицы `roles`, `role_permissions` (миграция `0038`); права роли приезжают вместе с опознанием (сессия веба, привязка бота) одним запросом, поэтому снятое право действует со следующего запроса. Автор проверки — колонка `inspections.created_by` (миграция `0040`): бот кладёт учётку привязки в состояние проверки при старте, слив пишет её в базу. Веб: декоратор `guard.action(...)` объявляет код на маршруте, `before_request` спрашивает `can` для маршрутов своего пространства, маршрут с объектом (проверка, человек) зовёт `guard.permit(код, пространство_объекта, object_author=...)` сам, а `after_request` роняет пишущий маршрут, который объявил объект и не спросил. Журнал `cross_space_actions` (миграция `0039`) пишется функцией `cross_space.record(conn, запись)` на том же подключении, которым дверь делает действие, до коммита. Бот: внутренняя мидлварь роутера `ActionMiddleware(код)`. MCP: у `ToolSpec` поле `action`, права токена в блоке 1 — мост из того, что уже открывает окружение (`MCP_CHECKLIST_TENANTS`, `MCP_RETRACTION_TOKENS`); роли токенам — блок 3.
 
 **Tech Stack:** Python 3.12, Flask, aiogram 3, psycopg 3, PostgreSQL (миграции SQL раннером `src/db/migrate.py`), pytest.
 
-**Spec:** docs/superpowers/specs/2026-10-07-administration-design.md
+**Spec:** docs/superpowers/specs/2026-10-07-administration-design.md (с решениями D310, D311 из `docs/furca/decisions.md`)
 
 ## Global Constraints
 
-- Сущности связываются **кодами, никогда формулировками**: код действия (`inspection.retract`) и код роли (`hq_admin`) — ключи; подписи ролей — колонки `name_ru`/`name_en`, подписи действий — тексты по ключу. Ни одна проверка не сравнивает подпись.
-- **Язык — параметр, никогда не константа.** Каждый новый текст для человека заводится на ru и en тем же коммитом (`src/web/texts.py`, `src/bot/texts.py`); тест текстов (`tests/test_web_texts.py`, `tests/test_bot_texts*.py`) обязан оставаться зелёным.
-- **Оценку не считать заново.** Блок движок не трогает. Регрессия: `make regress` → `belgrade-1` 97.5%, A, 5×D1; `belgrade-2` 97.0%, A, 6×D1. Разошлось — регрессия, а не «другая версия».
+- Сущности связываются **кодами, никогда формулировками**: код действия (`inspection.retract`), код роли (`hq_admin`), охват права (`own`/`all`) — ключи; подписи ролей — колонки `name_ru`/`name_en`. Ни одна проверка не сравнивает подпись.
+- **Язык — параметр, никогда не константа.** Каждый новый текст для человека заводится на ru и en тем же коммитом (`src/web/texts.py`, `src/bot/texts.py`); тесты текстов (`tests/test_web_texts.py`, `tests/test_bot_texts*.py`) остаются зелёными.
+- **Оценку не считать заново.** Блок движок не трогает; автор проверки в отпечаток слива не входит. Регрессия: `make regress` → `belgrade-1` 97.5%, A, 5×D1; `belgrade-2` 97.0%, A, 6×D1. Разошлось — регрессия, а не «другая версия».
 - **Модель предлагает, фиксирует человек** — блок этого не касается; ни одна запись не попадает в отчёт без аудитора, как и раньше.
-- **Роли по умолчанию и перенос — ровно по таблице спеки** (`admin`/`auditor` × `HQ`/страна → `hq_admin`/`hq_staff`/`country_admin`/`country_staff`). Отличия от сегодняшнего поведения, которые даёт таблица, перечислены ниже в «Расхождения со спекой»; других отличий быть не должно.
-- **Граница пространств — только в `can`**, не в галочках: страна не трогает объект УК и чужую страну никогда; `unit.create`, `space.manage`, `roles.manage` у роли страны не действуют ни при какой галочке.
-- **Новая пишущая операция без кода в каталоге — дефект**, его ловят тесты полноты (Task 11 — веб, Task 12 — бот, Task 13 — MCP).
-- **Блок 1 не трогает**: экран «Администрирование» (блок 2), токен ↔ учётку, фильтр `tools/list`, отказ `forbidden`, уход `MCP_TOKENS`/`MCP_CHECKLIST_TENANTS`/`MCP_RETRACTION_TOKENS`/`BOT_MCP_OWNER_ID`, `mcp_admins`, `/mcp_add`/`/mcp_revoke`/`/mcp_who` (блок 3).
+- **Роли по умолчанию и перенос — по таблице спеки с поправками D310 и D311** (`admin`/`auditor` × `HQ`/страна → `hq_admin`/`hq_staff`/`country_admin`/`country_staff`). Других отличий от сегодняшнего поведения быть не должно.
+- **Граница пространств — только в `can`**, не в матрице: страна не трогает объект УК и чужую страну никогда; `unit.create`, `space.manage`, `roles.manage` у роли страны не действуют ни при каком праве. Охват `own` границу не расширяет: «свои» страны — только в её пространстве.
+- **«Свои» = проверку занесла учётка этого человека** (`inspections.created_by = учётка`). Проверка без автора (старая, или занесённая без привязки бота) под «свои» не попадает никогда.
+- **Новая пишущая операция без кода в каталоге — дефект**, его ловят тесты полноты (Task 12 — веб, Task 13 — бот, Task 14 — MCP).
+- **Блок 1 не трогает**: экран «Администрирование» (блок 2), токен ↔ учётку, фильтр `tools/list`, отказ `forbidden`, уход `MCP_TOKENS`/`MCP_CHECKLIST_TENANTS`/`MCP_RETRACTION_TOKENS`/`BOT_MCP_OWNER_ID`, `mcp_admins`, `/mcp_add`/`/mcp_revoke`/`/mcp_who` (блок 3); снятие заведения пиццерии из бота (#527).
 - **Тесты базы — на тестовой базе MUSPELHEIM, не на Postgres Mac** (D212). `.env` рабочей копии ведёт `DATABASE_ADMIN_URL` на `127.0.0.1:55432` — это туннель `localhost:55432 → muspelheim:15432`. Перед прогоном: `nc -z 127.0.0.1 55432 && echo туннель-жив`; молчит — `launchctl kickstart -k gui/$(id -u)/io.garva.mac-stands-tunnel` и повтор. Переключаться молча на `localhost:5432` нельзя; без туннеля никак — спросить владельца.
 - **Точечный прогон** файла: `make test-honest ARGS="tests/<файл>.py -q -rs"` (цель экспортирует `DATABASE_URL`, `DATABASE_APP_PASSWORD`, `DATABASE_RETRACTION_PASSWORD` из `.env`). В выводе не должно быть строк `SKIPPED` у тестов с базой: пропуск = туннель или окружение, это не зелёный прогон.
 - **Полный прогон** перед сдачей: `make check` (ставит `AUDIT_REQUIRE_DATA=1`: пропуск тестов базы роняет прогон, #207) и `make regress`.
 - **Значения секретов не читать и не печатать**: строки `.env` берёт `Makefile`; в командах плана нет ни одного `cat .env`.
 - **Коммит и пуш после каждой задачи**, `git add` только поимённо (никаких `-a` и `.`), сообщение в формате `type: описание`, последней строкой `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`. Ветка — текущая рабочая ветка блока, не `main`.
 - **Раскатка** блока на живой продукт — только по явному «да» владельца в разговоре и в ночное окно 23:00–06:59 (скилл `deploy-window`); пуш в ветку, с которой собирается прод, тоже раскатка.
-- **Миграции:** следующие номера `0038`, `0039`; раннер сам оборачивает файл в транзакцию (`begin/commit` не писать); отпечаток каждой новой миграции записывается в `tests/test_db_migrations_frozen.py` тем же коммитом; права ролей — в `tests/test_db_migrate_roles.py` (`APP_TABLE_GRANTS`, `ADMIN_TABLE_GRANTS`); функции-триггеры — `set search_path = pg_catalog, public, pg_temp` (как `0033`).
+- **Миграции:** следующие номера `0038`, `0039`, `0040`; раннер сам оборачивает файл в транзакцию (`begin/commit` не писать); отпечаток каждой новой миграции записывается в `tests/test_db_migrations_frozen.py` тем же коммитом; права ролей — в `tests/test_db_migrate_roles.py` (`APP_TABLE_GRANTS`, `ADMIN_TABLE_GRANTS`); функции-триггеры — `set search_path = pg_catalog, public, pg_temp` (как `0033`).
 
 ## Review Focus
 
-- **Галочку сняли, а сессия старая:** права роли читаются в `resolve_session` на каждом запросе, не на входе. Тест — Task 5, `test_снятая_галочка_действует_со_следующей_сверки_сессии`.
-- **Действие откатилось, а строка журнала осталась (или наоборот):** журнал пишется тем же подключением до коммита двери. Тест — Task 8, `test_отказ_двери_не_оставляет_журнала` (снятие проверки партнёра, которой нет у этого пространства).
-- **Маршрут объявил объект чужого пространства и не спросил `can`:** запись прошла бы без границы. Тест — Task 6, `test_маршрут_с_объектом_без_permit_падает_500`.
-- **Старый код тенанта `default`** (файлы состояния бота, `MCP_TOKENS` стендов) попадает в `can` и должен значить `HQ`, а не «чужое пространство». Тесты — Task 1, `test_старый_код_уК_приводится`; Task 13, `test_мост_с_тенантом_default_правит_как_уК`.
-- **Человеку бота без привязки** (путь совместимости `ALLOWED_TELEGRAM_IDS`/`roster.json`) роли в базе нет, а проверку он вести обязан. Тест — Task 12, `test_путь_совместимости_получает_права_hq_staff`.
+- **Право сняли, а сессия старая:** права роли читаются в `resolve_session` на каждом запросе, не на входе. Тест — Task 6, `test_снятое_право_действует_со_следующей_сверки_сессии`.
+- **Действие откатилось, а строка журнала осталась (или наоборот):** журнал пишется тем же подключением до коммита двери. Тест — Task 9, `test_отказ_двери_не_оставляет_журнала`.
+- **Маршрут объявил объект и не спросил `can`** (или спросил о действии над проверкой, не передав автора): запись прошла бы без границы или без «свои». Тесты — Task 7, `test_маршрут_с_объектом_без_permit_падает_500` и `test_действие_над_проверкой_без_автора_падает_500`.
+- **Проверка без автора** (залита до `0040` или занесена без привязки бота): сотрудник с правом «свои» получает отказ, админ — нет; пустой автор не совпадает с учёткой без `id`. Тесты — Task 2, строки «неизвестен» таблицы; Task 5, `test_проверка_без_учётки_ложится_без_автора`; Task 10, `test_сотрудник_уК_не_снимает_проверку_без_автора`.
+- **Человек бота без привязки и старый код `default`** (путь совместимости `ALLOWED_TELEGRAM_IDS`/`roster.json`, `MCP_TOKENS` стендов): роли в базе нет, а проверку он вести обязан; `default` значит `HQ`, а не «чужое пространство». Тесты — Task 13, `test_путь_совместимости_получает_права_hq_staff`; Task 1, `test_старый_код_уК_приводится`; Task 14, `test_мост_с_тенантом_default_правит_как_уК`.
 
 ## Расхождения со спекой
 
-Каждое — отдельной строкой, с тем, как план поступает, пока владелец не скажет иначе.
+Каждое — отдельной строкой, с тем, как план поступает.
 
-1. **Расхождение со спекой: в каталоге нет кода для подтверждения проверки на приёмке** (`POST /inspections/<id>/accept`, D199, сегодня — только `admin`). План заводит код `inspection.accept`; по умолчанию он у `hq_admin`, `hq_staff`, `country_admin` (по правилу таблицы «все, кроме…»), не у `country_staff`.
-2. **Расхождение со спекой: в каталоге нет кода для правки записи проверки на приёмке** (`POST /inspections/<id>/findings/<fid>/revise`, сегодня — только `admin`). Спека в «За рамками» называет правку завершённого отчёта несуществующей, но правка черновика на приёмке есть. План заводит код `inspection.revise` с теми же умолчаниями, что у `inspection.accept`.
-3. **Расхождение со спекой: `hq_staff` получает снятие, перенос, подтверждение и правку на приёмке.** Сегодня это только `admin`; таблица спеки даёт `hq_staff` «всё, кроме четырёх», а текст спеки называет только три отличия. План следует таблице.
-4. **Расхождение со спекой: `hq_staff` теряет заведение пиццерий** — и в вебе, и **в боте на старте проверки** (`src/bot/routers/start.py`, «новая пиццерия?»). Сегодня может любой человек УК (`may_add_units`). План следует таблице (`unit.create` у `hq_staff` нет).
-5. **Расхождение со спекой: заведение чек-листа партнёром.** Каталог кладёт «создать» в `checklist.manage`, а его по умолчанию получает `country_admin`; сегодня маршрут отказывает любому партнёру (D283, `checklists_create`). План оставляет этот отказ двери как есть (строже матрицы) — поведение не меняется.
+1. **Расхождение со спекой: в каталоге нет кода для подтверждения проверки на приёмке** (`POST /inspections/<id>/accept`, D199). План заводит код `inspection.accept` — действие над проверкой (`own`/`all`).
+2. **Расхождение со спекой: в каталоге нет кода для правки записи проверки на приёмке** (`POST /inspections/<id>/findings/<fid>/revise`). Спека в «За рамками» называет правку завершённого отчёта несуществующей, но правка черновика на приёмке есть. План заводит код `inspection.revise` — действие над проверкой.
+3. **Решено D311 (было расхождение: `hq_staff` получал снятие, перенос, подтверждение и правку всех проверок).** Действия над проверкой — `inspection.retract`, `inspection.move`, `inspection.accept`, `inspection.revise`, `inspection.letter` — в матрице несут охват: `hq_staff` и `country_staff` — `own`, `hq_admin` и `country_admin` — `all`. Расхождение с таблицей спеки, принятое владельцем: `country_staff` получает снятие, перенос, подтверждение и правку **своих** проверок (в таблице спеки их не было), а письмо — только по своим (в таблице было по всем своего пространства).
+4. **Решено D310 (было расхождение: `hq_staff` терял заведение пиццерий).** `unit.create` по умолчанию у `hq_admin` и `hq_staff`; бот на старте проверки заводит пиццерию как сейчас, снятие этого пути — #527, не блок 1.
+5. **Решено D311 (было расхождение: заведение чек-листа партнёром).** Админ страны заводит и правит свои чек-листы в своём пространстве: отказ D283 в `checklists_create` снимается, дверь заводит чек-лист только в пространстве вошедшего (`space_of(tenant)`), граница — слой 1.
 6. **Расхождение со спекой: правка методики партнёра человеком УК.** Методика лежит файлами, журнал «в одной транзакции» с правкой файла невозможен. План оставляет дверь методики своей (`may_write`: правка только в своём пространстве) — УК в методику партнёра в блоке 1 не пишет.
 7. **Расхождение со спекой: команды бота без пишущей операции.** `/help`, `/lang` (личная настройка языка), `/version`, `/stops` (чтение, круг админов) и запасной обработчик кода в каталоге не получают; тест полноты держит их явным списком исключений с причиной. `/mcp_add`, `/mcp_revoke`, `/mcp_who` до блока 3 закрываются тем же `mcp.connect`, что `/mcp`, поверх круга `mcp_admins`.
 8. **Расхождение со спекой (порядок блоков): админ страны заводит людей (D307) — не в блоке 1.** Экран людей до блока 2 остаётся открыт только УК (мост в маршрутах «Пользователей»), иначе админ страны получил бы перечень людей всех пространств. Правило «назначить или снять админа страны — только `space.manage`» блок 2 обязан добавить вместе со снятием моста.
+9. **Расхождение со спекой (уточнение D311): что считается «действием над проверкой».** Сверено по каталогу: объект — конкретная проверка только у пяти кодов из п. 3. `inspection.conduct` создаёт новую проверку (объекта ещё нет); `prescription.manage`, `prescription.reply`, `plan.manage`, `plan.submit` действуют над предписанием и планом действий (разделы УК и партнёра, D264); остальные — над методикой, людьми, пространствами. У них охват всегда `all`.
 
-## Открытые вопросы владельцу (до раскатки блока)
+## Открытые вопросы владельцу
 
-- **В1** (расхождение 4): сотрудник УК в боте на старте проверки перестаёт заводить новую пиццерию. Так и задумано, или `unit.create` по умолчанию у `hq_staff` оставить? Ответ меняет одну строку засева в `0038` — до того, как миграция применена где-либо.
-- **В2** (расхождение 3): сотрудник УК начинает снимать, переносить, подтверждать и править проверки на приёмке. Так и задумано?
-- **В3** (расхождение 5): админу страны открыть заведение своих чек-листов (D304: «правят то, что завели сами»), или пока оставить отказ?
+- **В4.** Человек бота **без привязки** к учётке веба (путь совместимости `ALLOWED_TELEGRAM_IDS`/`roster.json`) заносит проверки **без автора**: по D311 они не попадают ни под чьи «свои», их снимает, переносит, подтверждает и правит только админ. Так и оставить до перевода всех на привязку, или до этого считать автором кого-то ещё? План делает «без автора» (закрыто по умолчанию).
 
 ## Задачи
 
@@ -66,22 +66,24 @@
 **Interfaces:**
 - Consumes: `src.domain.tenants.HQ_TENANT: str`, `src.domain.tenants.canonical_tenant(code: str) -> str`.
 - Produces:
-  - `Action(code: str, group: str, hq_only: bool = False)` — frozen dataclass.
-  - `ACTIONS: tuple[Action, ...]`, `ACTION_CODES: frozenset[str]`, `HQ_ONLY_ACTIONS: frozenset[str]`.
-  - `RULE_OK = "ok"`, `RULE_MATRIX = "matrix"`, `RULE_HQ_ONLY = "hq_only"`, `RULE_HQ_OBJECT = "hq_object"`, `RULE_FOREIGN_SPACE = "foreign_space"`.
-  - `Actor(tenant: str, role: str | None, grants: frozenset[str], user_id: str | None = None)` — frozen dataclass.
+  - `Action(code: str, group: str, hq_only: bool = False, on_inspection: bool = False)` — frozen dataclass.
+  - `ACTIONS: tuple[Action, ...]`, `ACTION_CODES: frozenset[str]`, `HQ_ONLY_ACTIONS: frozenset[str]`, `INSPECTION_OBJECT_ACTIONS: frozenset[str]`.
+  - `REACH_OWN = "own"`, `REACH_ALL = "all"`; `Grants = Mapping[str, str]` — код действия → охват.
+  - `RULE_OK = "ok"`, `RULE_MATRIX = "matrix"`, `RULE_HQ_ONLY = "hq_only"`, `RULE_HQ_OBJECT = "hq_object"`, `RULE_FOREIGN_SPACE = "foreign_space"`, `RULE_NOT_AUTHOR = "not_author"`.
+  - `Actor(tenant: str, role: str | None, grants: Grants, user_id: str | None = None)` — frozen dataclass.
   - `Decision(allowed: bool, rule: str)` — frozen dataclass, `__bool__` → `allowed`.
-  - `class UnknownAction(ValueError)`.
-  - `can(actor: Actor, action: str, object_tenant: str) -> Decision`.
+  - `class UnknownAction(ValueError)`; `class AuthorNotGiven` и его единственный экземпляр `AUTHOR_NOT_GIVEN`.
+  - `can(actor: Actor, action: str, object_tenant: str, *, object_author: str | None | AuthorNotGiven = AUTHOR_NOT_GIVEN) -> Decision` — у действия над проверкой автор обязателен (`None` — неизвестен), иначе `ValueError`.
 
 - [ ] **Step 1: Написать падающий тест**
 
 ```python
 # tests/test_permissions_can.py
-"""Ядро прав, слой 1 — граница пространств (спека «Администрирование», D304, D306).
+"""Ядро прав: граница пространств и охват «свои/все» (спека «Администрирование», D304, D306, D311).
 
-Ядро (права доступа) — тестами вперёд. Граница не настраивается: никакая
-галочка не даёт стране тронуть объект УК, чужую страну или действие «только УК».
+Ядро (права доступа) — тестами вперёд. Граница не настраивается: никакое
+право не даёт стране тронуть объект УК, чужую страну или действие «только УК».
+«Свои» — только проверка, которую занесла учётка этого человека.
 """
 
 from __future__ import annotations
@@ -91,48 +93,38 @@ import pytest
 from src.domain.permissions import (
     ACTION_CODES,
     HQ_ONLY_ACTIONS,
+    INSPECTION_OBJECT_ACTIONS,
+    REACH_ALL,
+    REACH_OWN,
     RULE_FOREIGN_SPACE,
     RULE_HQ_OBJECT,
     RULE_HQ_ONLY,
     RULE_MATRIX,
+    RULE_NOT_AUTHOR,
     RULE_OK,
     Actor,
     UnknownAction,
     can,
 )
 
-ВСЁ = frozenset(ACTION_CODES)
+ВСЁ = {код: REACH_ALL for код in ACTION_CODES}
 
 
-def уК(grants: frozenset[str] = ВСЁ, tenant: str = "HQ") -> Actor:
+def уК(grants: dict[str, str] = ВСЁ, tenant: str = "HQ") -> Actor:
     return Actor(tenant=tenant, role="hq_admin", grants=grants, user_id="u-hq")
 
 
-def страна(tenant: str = "GE", grants: frozenset[str] = ВСЁ) -> Actor:
+def страна(tenant: str = "GE", grants: dict[str, str] = ВСЁ) -> Actor:
     return Actor(tenant=tenant, role="country_admin", grants=grants, user_id="u-ge")
 
 
 def test_каталог_ровно_по_спеке_и_два_кода_расхождений() -> None:
     assert ACTION_CODES == {
-        "inspection.conduct",
-        "inspection.retract",
-        "inspection.move",
-        "inspection.accept",
-        "inspection.revise",
-        "inspection.letter",
-        "prescription.manage",
-        "prescription.reply",
-        "plan.manage",
-        "plan.submit",
-        "checklist.edit",
-        "checklist.publish",
-        "checklist.manage",
-        "phrases.manage",
-        "people.manage",
-        "mcp.connect",
-        "unit.create",
-        "space.manage",
-        "roles.manage",
+        "inspection.conduct", "inspection.retract", "inspection.move", "inspection.accept",
+        "inspection.revise", "inspection.letter", "prescription.manage", "prescription.reply",
+        "plan.manage", "plan.submit", "checklist.edit", "checklist.publish",
+        "checklist.manage", "phrases.manage", "people.manage", "mcp.connect",
+        "unit.create", "space.manage", "roles.manage",
     }
 
 
@@ -140,35 +132,66 @@ def test_только_уК_ровно_три_действия() -> None:
     assert HQ_ONLY_ACTIONS == {"unit.create", "space.manage", "roles.manage"}
 
 
+def test_действия_над_проверкой_ровно_пять() -> None:
+    assert INSPECTION_OBJECT_ACTIONS == {
+        "inspection.retract", "inspection.move", "inspection.accept",
+        "inspection.revise", "inspection.letter",
+    }
+
+
 def test_уК_действует_в_пространстве_партнёра() -> None:
-    решение = can(уК(), "inspection.retract", "GE")
+    решение = can(уК(), "inspection.retract", "GE", object_author=None)
     assert решение.allowed and решение.rule == RULE_OK
 
 
-def test_страна_не_трогает_объект_уК_даже_с_галочкой() -> None:
+def test_страна_не_трогает_объект_уК_даже_с_правом() -> None:
     решение = can(страна(), "checklist.edit", "HQ")
     assert not решение.allowed and решение.rule == RULE_HQ_OBJECT
 
 
 def test_страна_не_трогает_чужую_страну() -> None:
-    решение = can(страна("GE"), "inspection.retract", "AM")
+    решение = can(страна("GE"), "inspection.retract", "AM", object_author="u-ge")
     assert not решение.allowed and решение.rule == RULE_FOREIGN_SPACE
 
 
 @pytest.mark.parametrize("код", sorted(HQ_ONLY_ACTIONS))
-def test_действие_только_уК_стране_не_даёт_никакая_галочка(код: str) -> None:
+def test_действие_только_уК_стране_не_даёт_никакое_право(код: str) -> None:
     решение = can(страна(), код, "GE")
     assert not решение.allowed and решение.rule == RULE_HQ_ONLY
 
 
-def test_без_галочки_отказ_матрицы_и_у_уК() -> None:
-    решение = can(уК(grants=frozenset()), "inspection.retract", "HQ")
+def test_без_права_отказ_матрицы_и_у_уК() -> None:
+    решение = can(уК(grants={}), "inspection.retract", "HQ", object_author="u-hq")
+    assert not решение.allowed and решение.rule == RULE_MATRIX
+
+
+@pytest.mark.parametrize(
+    ("автор", "можно", "правило"),
+    [("u-hq", True, RULE_OK), ("u-other", False, RULE_NOT_AUTHOR), (None, False, RULE_NOT_AUTHOR)],
+)
+def test_охват_свои_только_для_своей_проверки(автор: str | None, можно: bool, правило: str) -> None:
+    человек = уК(grants={"inspection.retract": REACH_OWN})
+    решение = can(человек, "inspection.retract", "HQ", object_author=автор)
+    assert (решение.allowed, решение.rule) == (можно, правило)
+
+
+def test_свои_без_учётки_не_совпадают_с_пустым_автором() -> None:
+    человек = Actor(tenant="HQ", role="hq_staff", grants={"inspection.move": REACH_OWN})
+    assert not can(человек, "inspection.move", "HQ", object_author="")
+
+
+def test_действие_над_проверкой_без_автора_это_ошибка_кода() -> None:
+    with pytest.raises(ValueError, match="автор"):
+        can(уК(), "inspection.retract", "HQ")
+
+
+def test_неизвестный_охват_это_отказ_матрицы() -> None:
+    решение = can(уК(grants={"checklist.edit": "some"}), "checklist.edit", "HQ")
     assert not решение.allowed and решение.rule == RULE_MATRIX
 
 
 def test_старый_код_уК_приводится() -> None:
-    решение = can(уК(tenant="default"), "unit.create", "HQ")
-    assert решение.allowed
+    assert can(уК(tenant="default"), "unit.create", "HQ").allowed
 
 
 def test_неизвестное_действие_это_ошибка_кода() -> None:
@@ -178,7 +201,7 @@ def test_неизвестное_действие_это_ошибка_кода() 
 
 def test_пустое_пространство_объекта_это_ошибка_кода() -> None:
     with pytest.raises(ValueError, match="пространство"):
-        can(уК(), "inspection.retract", "  ")
+        can(уК(), "checklist.edit", "  ")
 
 
 def test_отказ_ложен_в_условии() -> None:
@@ -194,14 +217,16 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'src.domain.permissions
 
 ```python
 # src/domain/permissions.py
-"""Каталог действий и проверка прав `can` (спека «Администрирование», D304, D306, D307).
+"""Каталог действий и проверка прав `can` (спека «Администрирование», D304, D306, D307, D311).
 
 Решение принимается двумя слоями, и отказ первого второй не переопределяет:
 
 1. **Граница** (код, не настраивается): человек УК действует в любом
    пространстве; человек страны — только в своём; объект УК страна не меняет
-   никогда; действия «только УК» роли страны не выдаются ни одной галочкой.
-2. **Матрица** (настраивает админ УК): есть ли у роли человека право.
+   никогда; действия «только УК» роли страны не выдаются никаким правом.
+2. **Матрица** (настраивает админ УК): есть ли у роли право и с каким охватом.
+   У действий над проверкой охват — «свои» (`own`: проверку занесла учётка
+   этого человека) или «все» (`all`); у остальных — только `all`.
 
 Код действия — ключ, подписи переводятся отдельно. Новая пишущая операция
 получает код здесь в момент появления: это часть её готовности.
@@ -209,6 +234,7 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'src.domain.permissions
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 
 from .tenants import HQ_TENANT, canonical_tenant
@@ -220,17 +246,19 @@ class Action:
 
     code: str
     group: str
-    #: Действие только УК: роли страны не выдаётся ни одной галочкой (слой 1).
+    #: Действие только УК: роли страны не выдаётся никаким правом (слой 1).
     hq_only: bool = False
+    #: Объект — конкретная проверка: право несёт охват «свои/все» (D311).
+    on_inspection: bool = False
 
 
 ACTIONS: tuple[Action, ...] = (
     Action("inspection.conduct", "inspection"),
-    Action("inspection.retract", "inspection"),
-    Action("inspection.move", "inspection"),
-    Action("inspection.accept", "inspection"),
-    Action("inspection.revise", "inspection"),
-    Action("inspection.letter", "inspection"),
+    Action("inspection.retract", "inspection", on_inspection=True),
+    Action("inspection.move", "inspection", on_inspection=True),
+    Action("inspection.accept", "inspection", on_inspection=True),
+    Action("inspection.revise", "inspection", on_inspection=True),
+    Action("inspection.letter", "inspection", on_inspection=True),
     Action("prescription.manage", "prescription"),
     Action("prescription.reply", "prescription"),
     Action("plan.manage", "plan"),
@@ -248,16 +276,31 @@ ACTIONS: tuple[Action, ...] = (
 
 ACTION_CODES: frozenset[str] = frozenset(a.code for a in ACTIONS)
 HQ_ONLY_ACTIONS: frozenset[str] = frozenset(a.code for a in ACTIONS if a.hq_only)
+INSPECTION_OBJECT_ACTIONS: frozenset[str] = frozenset(a.code for a in ACTIONS if a.on_inspection)
+
+REACH_OWN = "own"
+REACH_ALL = "all"
+
+#: Права роли: код действия → охват. Нет ключа — нет права.
+Grants = Mapping[str, str]
 
 RULE_OK = "ok"
 RULE_MATRIX = "matrix"
 RULE_HQ_ONLY = "hq_only"
 RULE_HQ_OBJECT = "hq_object"
 RULE_FOREIGN_SPACE = "foreign_space"
+RULE_NOT_AUTHOR = "not_author"
 
 
 class UnknownAction(ValueError):
     """Код действия не из каталога — ошибка кода, а не отказ человеку."""
+
+
+class AuthorNotGiven:
+    """Метка «автора объекта не передали» — отличается от `None` («автор неизвестен»)."""
+
+
+AUTHOR_NOT_GIVEN = AuthorNotGiven()
 
 
 @dataclass(frozen=True)
@@ -267,8 +310,8 @@ class Actor:
     tenant: str
     #: Код роли; `None` — права не из роли (мост MCP до блока 3).
     role: str | None
-    grants: frozenset[str]
-    #: Учётка веба — для журнала действий УК у партнёра.
+    grants: Grants
+    #: Учётка веба: по ней опознаются «свои» проверки и пишется журнал.
     user_id: str | None = None
 
 
@@ -290,22 +333,48 @@ def _required_tenant(code: str, *, what: str) -> str:
     return приведённый
 
 
-def can(actor: Actor, action: str, object_tenant: str) -> Decision:
-    """Может ли `actor` сделать `action` над объектом пространства `object_tenant`."""
+def _boundary(кто: str, action: str, чьё: str) -> str | None:
+    """Слой 1: правило отказа границы или `None`, если граница пропускает."""
+    if кто == HQ_TENANT:
+        return None
+    if action in HQ_ONLY_ACTIONS:
+        return RULE_HQ_ONLY
+    if чьё == HQ_TENANT:
+        return RULE_HQ_OBJECT
+    if чьё != кто:
+        return RULE_FOREIGN_SPACE
+    return None
+
+
+def can(
+    actor: Actor,
+    action: str,
+    object_tenant: str,
+    *,
+    object_author: str | None | AuthorNotGiven = AUTHOR_NOT_GIVEN,
+) -> Decision:
+    """Может ли `actor` сделать `action` над объектом пространства `object_tenant`.
+
+    У действия над проверкой `object_author` обязателен: учётка, занёсшая
+    проверку, или `None`, если она неизвестна. Забытый автор — ошибка кода:
+    молча считать его «чужим» значило бы прятать пропуск в отказах людям.
+    """
     if action not in ACTION_CODES:
         raise UnknownAction(f"Действия «{action}» нет в каталоге src/domain/permissions.py")
+    if action in INSPECTION_OBJECT_ACTIONS and isinstance(object_author, AuthorNotGiven):
+        raise ValueError(f"«{action}» — действие над проверкой: передайте автора объекта")
     кто = _required_tenant(actor.tenant, what="пространство человека")
     чьё = _required_tenant(object_tenant, what="пространство объекта")
-    if кто != HQ_TENANT:
-        if action in HQ_ONLY_ACTIONS:
-            return Decision(False, RULE_HQ_ONLY)
-        if чьё == HQ_TENANT:
-            return Decision(False, RULE_HQ_OBJECT)
-        if чьё != кто:
-            return Decision(False, RULE_FOREIGN_SPACE)
-    if action not in actor.grants:
-        return Decision(False, RULE_MATRIX)
-    return Decision(True, RULE_OK)
+    отказ_границы = _boundary(кто, action, чьё)
+    if отказ_границы is not None:
+        return Decision(False, отказ_границы)
+    охват = actor.grants.get(action)
+    if охват == REACH_ALL:
+        return Decision(True, RULE_OK)
+    if охват == REACH_OWN and action in INSPECTION_OBJECT_ACTIONS:
+        свой = bool(actor.user_id) and object_author == actor.user_id
+        return Decision(True, RULE_OK) if свой else Decision(False, RULE_NOT_AUTHOR)
+    return Decision(False, RULE_MATRIX)
 ```
 
 - [ ] **Step 4: Прогнать — ожидается PASS**
@@ -317,7 +386,7 @@ Expected: все тесты PASS, ruff и mypy без ошибок.
 
 ```bash
 git add src/domain/permissions.py tests/test_permissions_can.py
-git commit -m "feat: каталог действий и can — граница пространств
+git commit -m "feat: каталог действий и can — граница пространств и охват свои/все
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
@@ -334,23 +403,23 @@ git push
 - Produces:
   - `SCOPE_HQ = "hq"`, `SCOPE_COUNTRY = "country"`.
   - `ROLE_HQ_ADMIN = "hq_admin"`, `ROLE_HQ_STAFF = "hq_staff"`, `ROLE_COUNTRY_ADMIN = "country_admin"`, `ROLE_COUNTRY_STAFF = "country_staff"`.
-  - `ROLE_SCOPES: Mapping[str, str]` — код роли → охват.
-  - `DEFAULT_MATRIX: Mapping[str, frozenset[str]]` — код роли → права по умолчанию.
+  - `ROLE_SCOPES: Mapping[str, str]` — код роли → охват роли.
+  - `DEFAULT_MATRIX: Mapping[str, Grants]` — код роли → права по умолчанию.
   - `LEGACY_ROLE_ADMIN = "admin"`, `LEGACY_ROLE_AUDITOR = "auditor"`.
   - `scope_of_tenant(tenant: str) -> str`.
   - `canonical_role(role: str, tenant: str) -> str` — старое `admin`/`auditor` → новый код по пространству; прочее — как есть.
-  - `validate_matrix(matrix: Mapping[str, frozenset[str]], scopes: Mapping[str, str]) -> list[str]` — нарушения словами, пусто — годна.
+  - `validate_matrix(matrix: Mapping[str, Grants], scopes: Mapping[str, str]) -> list[str]` — нарушения словами, пусто — годна.
 
 - [ ] **Step 1: Написать падающий тест**
 
 ```python
 # tests/test_permissions_table.py
-"""Таблица «роль × действие × пространство человека × пространство объекта → да/нет».
+"""Таблица «роль × действие × пространство человека × пространство объекта × автор → да/нет».
 
-Таблица ролей переписана здесь из спеки руками, а не взята из кода: иначе тест
-сверял бы `DEFAULT_MATRIX` с самим собой. Проверка таблицы прогоняется и на
-заведомо сломанной матрице, и на заведомо сломанном `can` — она обязана
-покраснеть и назвать нарушенное правило (`testing.md`).
+Таблица ролей переписана здесь руками из спеки с поправками D310 и D311, а не
+взята из кода: иначе тест сверял бы `DEFAULT_MATRIX` с самим собой. Проверка
+таблицы прогоняется и на заведомо сломанной матрице, и на заведомо сломанном
+`can` — она обязана покраснеть и назвать нарушенное правило (`testing.md`).
 """
 
 from __future__ import annotations
@@ -371,7 +440,7 @@ from src.domain.permissions import (
     validate_matrix,
 )
 
-ВСЕ_ПО_СПЕКЕ = frozenset(
+ВСЕ = frozenset(
     {
         "inspection.conduct", "inspection.retract", "inspection.move", "inspection.accept",
         "inspection.revise", "inspection.letter", "prescription.manage", "prescription.reply",
@@ -381,22 +450,44 @@ from src.domain.permissions import (
     }
 )
 ТОЛЬКО_УК = frozenset({"unit.create", "space.manage", "roles.manage"})
-СПЕКА: dict[str, frozenset[str]] = {
-    "hq_admin": ВСЕ_ПО_СПЕКЕ,
-    "hq_staff": ВСЕ_ПО_СПЕКЕ - {"people.manage", "space.manage", "roles.manage", "unit.create"},
-    "country_admin": ВСЕ_ПО_СПЕКЕ - ТОЛЬКО_УК,
-    "country_staff": frozenset(
-        {"inspection.conduct", "inspection.letter", "prescription.reply", "plan.submit",
-         "mcp.connect"}
-    ),
+НАД_ПРОВЕРКОЙ = frozenset(
+    {"inspection.retract", "inspection.move", "inspection.accept", "inspection.revise",
+     "inspection.letter"}
+)
+
+
+def _все(коды: frozenset[str]) -> dict[str, str]:
+    return {код: "all" for код in коды}
+
+
+СВОИ = {код: "own" for код in НАД_ПРОВЕРКОЙ}
+СПЕКА: dict[str, dict[str, str]] = {
+    "hq_admin": _все(ВСЕ),
+    # D310: unit.create у сотрудника УК остаётся; D311: над проверкой — свои.
+    "hq_staff": {**_все(ВСЕ - {"people.manage", "space.manage", "roles.manage"}), **СВОИ},
+    "country_admin": _все(ВСЕ - ТОЛЬКО_УК),
+    "country_staff": {
+        **_все(frozenset({"inspection.conduct", "prescription.reply", "plan.submit",
+                          "mcp.connect"})),
+        **СВОИ,
+    },
 }
 ПРОСТРАНСТВО = {"hq_admin": "HQ", "hq_staff": "HQ", "country_admin": "GE", "country_staff": "GE"}
 ОБЪЕКТЫ = ("HQ", "GE", "AM")
+АВТОРЫ = ("я", "другой", "неизвестен")
 
-Решатель = Callable[[Actor, str, str], Decision]
+Решатель = Callable[..., Decision]
 
 
-def ожидание(роль: str, действие: str, объект: str) -> tuple[bool, str]:
+def _учётка(роль: str) -> str:
+    return f"u-{роль}"
+
+
+def _автор(роль: str, кто: str) -> str | None:
+    return {"я": _учётка(роль), "другой": "u-other", "неизвестен": None}[кто]
+
+
+def ожидание(роль: str, действие: str, объект: str, автор: str) -> tuple[bool, str]:
     кто = ПРОСТРАНСТВО[роль]
     if кто != "HQ":
         if действие in ТОЛЬКО_УК:
@@ -405,28 +496,45 @@ def ожидание(роль: str, действие: str, объект: str) ->
             return False, "hq_object"
         if объект != кто:
             return False, "foreign_space"
-    return (True, "ok") if действие in СПЕКА[роль] else (False, "matrix")
+    охват = СПЕКА[роль].get(действие)
+    if охват is None:
+        return False, "matrix"
+    if охват == "own" and автор != "я":
+        return False, "not_author"
+    return True, "ok"
 
 
-def сверить(решать: Решатель, матрица: Mapping[str, frozenset[str]]) -> list[str]:
+def _строки(действие: str) -> tuple[str, ...]:
+    return АВТОРЫ if действие in НАД_ПРОВЕРКОЙ else ("—",)
+
+
+def сверить(решать: Решатель, матрица: Mapping[str, Mapping[str, str]]) -> list[str]:
     нарушения: list[str] = []
     for роль, кто in ПРОСТРАНСТВО.items():
-        человек = Actor(tenant=кто, role=роль, grants=матрица[роль])
-        for действие in sorted(ВСЕ_ПО_СПЕКЕ):
+        человек = Actor(tenant=кто, role=роль, grants=матрица[роль], user_id=_учётка(роль))
+        for действие in sorted(ВСЕ):
             for объект in ОБЪЕКТЫ:
-                можно, правило = ожидание(роль, действие, объект)
-                вышло = решать(человек, действие, объект)
-                if вышло.allowed != можно:
-                    нарушения.append(
-                        f"{роль} × {действие} × {объект}: ожидалось "
-                        f"{'да' if можно else 'нет'} ({правило}), вышло "
-                        f"{'да' if вышло.allowed else 'нет'} ({вышло.rule})"
-                    )
+                for автор in _строки(действие):
+                    можно, правило = ожидание(роль, действие, объект, автор)
+                    if действие in НАД_ПРОВЕРКОЙ:
+                        вышло = решать(человек, действие, объект, object_author=_автор(роль, автор))
+                    else:
+                        вышло = решать(человек, действие, объект)
+                    if вышло.allowed != можно:
+                        нарушения.append(
+                            f"{роль} × {действие} × {объект} × {автор}: ожидалось "
+                            f"{'да' if можно else 'нет'} ({правило}), вышло "
+                            f"{'да' if вышло.allowed else 'нет'} ({вышло.rule})"
+                        )
     return нарушения
 
 
+def _сломать(роль: str, **права: str) -> dict[str, Mapping[str, str]]:
+    return {**DEFAULT_MATRIX, роль: {**DEFAULT_MATRIX[роль], **права}}
+
+
 def test_матрица_по_умолчанию_равна_таблице_спеки() -> None:
-    assert dict(DEFAULT_MATRIX) == СПЕКА
+    assert {р: dict(п) for р, п in DEFAULT_MATRIX.items()} == СПЕКА
     assert dict(ROLE_SCOPES) == {
         "hq_admin": "hq", "hq_staff": "hq", "country_admin": "country", "country_staff": "country",
     }
@@ -437,21 +545,38 @@ def test_таблица_прав_ролей_по_умолчанию() -> None:
 
 
 def test_сломанная_матрица_не_пробивает_границу() -> None:
-    сломанная = {**DEFAULT_MATRIX, "country_staff": DEFAULT_MATRIX["country_staff"] | {"checklist.edit"}}
+    сломанная = _сломать("country_staff", **{"checklist.edit": "all"})
     assert сверить(can, сломанная) == [
-        "country_staff × checklist.edit × GE: ожидалось нет (matrix), вышло да (ok)"
+        "country_staff × checklist.edit × GE × —: ожидалось нет (matrix), вышло да (ok)"
     ]
 
 
+def test_сломанный_охват_свои_называет_каждую_чужую_проверку() -> None:
+    сломанная = _сломать("hq_staff", **{"inspection.retract": "all"})
+    assert сверить(can, сломанная) == [
+        f"hq_staff × inspection.retract × {объект} × {автор}: ожидалось нет (not_author), "
+        f"вышло да (ok)"
+        for объект in ОБЪЕКТЫ
+        for автор in ("другой", "неизвестен")
+    ]
+
+
+def test_проверка_таблицы_ловит_can_без_автора() -> None:
+    def автор_всегда_свой(человек: Actor, действие: str, объект: str, **_: object) -> Decision:
+        return can(человек, действие, объект, object_author=человек.user_id)
+
+    нарушения = сверить(автор_всегда_свой, DEFAULT_MATRIX)
+    assert "country_staff × inspection.move × GE × неизвестен: ожидалось нет (not_author), вышло да (ok)" in нарушения
+
+
 def test_проверка_таблицы_ловит_снятую_границу() -> None:
-    def без_границы(человек: Actor, действие: str, _объект: str) -> Decision:
+    def без_границы(человек: Actor, действие: str, _объект: str, **_: object) -> Decision:
         if действие in человек.grants:
             return Decision(True, RULE_OK)
         return Decision(False, RULE_MATRIX)
 
-    сломанная = {**DEFAULT_MATRIX, "country_staff": DEFAULT_MATRIX["country_staff"] | {"checklist.edit"}}
-    нарушения = сверить(без_границы, сломанная)
-    assert "country_staff × checklist.edit × HQ: ожидалось нет (hq_object), вышло да (ok)" in нарушения
+    нарушения = сверить(без_границы, _сломать("country_staff", **{"checklist.edit": "all"}))
+    assert "country_staff × checklist.edit × HQ × —: ожидалось нет (hq_object), вышло да (ok)" in нарушения
     assert any("(foreign_space)" in н for н in нарушения)
 
 
@@ -460,21 +585,31 @@ def test_матрица_по_умолчанию_годна() -> None:
 
 
 def test_проверка_матрицы_называет_только_уК_у_роли_страны() -> None:
-    сломанная = {**DEFAULT_MATRIX, "country_admin": DEFAULT_MATRIX["country_admin"] | {"unit.create"}}
-    assert validate_matrix(сломанная, ROLE_SCOPES) == [
+    assert validate_matrix(_сломать("country_admin", **{"unit.create": "all"}), ROLE_SCOPES) == [
         "country_admin: unit.create — действие только УК (hq_only)"
     ]
 
 
+def test_проверка_матрицы_называет_свои_не_над_проверкой() -> None:
+    assert validate_matrix(_сломать("hq_staff", **{"checklist.edit": "own"}), ROLE_SCOPES) == [
+        "hq_staff: checklist.edit — охват «own» только у действий над проверкой"
+    ]
+
+
+def test_проверка_матрицы_называет_незнакомый_охват() -> None:
+    assert validate_matrix(_сломать("hq_staff", **{"mcp.connect": "some"}), ROLE_SCOPES) == [
+        "hq_staff: mcp.connect — охват «some» не из own/all"
+    ]
+
+
 def test_проверка_матрицы_называет_код_не_из_каталога() -> None:
-    сломанная = {**DEFAULT_MATRIX, "hq_staff": DEFAULT_MATRIX["hq_staff"] | {"inspection.delete"}}
-    assert validate_matrix(сломанная, ROLE_SCOPES) == [
+    assert validate_matrix(_сломать("hq_staff", **{"inspection.delete": "all"}), ROLE_SCOPES) == [
         "hq_staff: inspection.delete — нет в каталоге действий"
     ]
 
 
 def test_проверка_матрицы_называет_роль_без_охвата() -> None:
-    assert validate_matrix({"ghost": frozenset()}, ROLE_SCOPES) == ["ghost: у роли нет охвата"]
+    assert validate_matrix({"ghost": {}}, ROLE_SCOPES) == ["ghost: у роли нет охвата"]
 
 
 @pytest.mark.parametrize(
@@ -503,7 +638,7 @@ def test_пустая_роль_это_ошибка_кода() -> None:
 Run: `.venv/bin/pytest tests/test_permissions_table.py -q`
 Expected: FAIL — `ImportError: cannot import name 'DEFAULT_MATRIX' from 'src.domain.permissions'`.
 
-- [ ] **Step 3: Минимальная реализация** — дописать в конец `src/domain/permissions.py` (и добавить `from collections.abc import Mapping` к импортам):
+- [ ] **Step 3: Минимальная реализация** — дописать в конец `src/domain/permissions.py`:
 
 ```python
 SCOPE_HQ = "hq"
@@ -523,17 +658,29 @@ ROLE_SCOPES: Mapping[str, str] = {
     ROLE_COUNTRY_STAFF: SCOPE_COUNTRY,
 }
 
-#: Права по умолчанию — таблица спеки. Засев `0038` сверяется с ней тестом
-#: (`tests/test_db_roles_migration.py`), а не копируется руками второй раз.
-DEFAULT_MATRIX: Mapping[str, frozenset[str]] = {
-    ROLE_HQ_ADMIN: ACTION_CODES,
-    ROLE_HQ_STAFF: ACTION_CODES
-    - {"people.manage", "space.manage", "roles.manage", "unit.create"},
-    ROLE_COUNTRY_ADMIN: ACTION_CODES - HQ_ONLY_ACTIONS,
-    ROLE_COUNTRY_STAFF: frozenset(
-        {"inspection.conduct", "inspection.letter", "prescription.reply", "plan.submit",
-         "mcp.connect"}
-    ),
+
+def _all(codes: frozenset[str]) -> dict[str, str]:
+    return {код: REACH_ALL for код in codes}
+
+
+#: Сотрудник правит только проверки, которые занёс сам (D311).
+_OWN_INSPECTIONS: Mapping[str, str] = {код: REACH_OWN for код in INSPECTION_OBJECT_ACTIONS}
+
+#: Права по умолчанию — таблица спеки с поправками D310 (`unit.create` у
+#: `hq_staff`) и D311 (охват «свои» у сотрудников). Засев `0038` сверяется с
+#: ней тестом (`tests/test_db_roles_migration.py`), а не копируется руками.
+DEFAULT_MATRIX: Mapping[str, Grants] = {
+    ROLE_HQ_ADMIN: _all(ACTION_CODES),
+    ROLE_HQ_STAFF: {
+        **_all(ACTION_CODES - {"people.manage", "space.manage", "roles.manage"}),
+        **_OWN_INSPECTIONS,
+    },
+    ROLE_COUNTRY_ADMIN: _all(ACTION_CODES - HQ_ONLY_ACTIONS),
+    ROLE_COUNTRY_STAFF: {
+        **_all(frozenset({"inspection.conduct", "prescription.reply", "plan.submit",
+                          "mcp.connect"})),
+        **_OWN_INSPECTIONS,
+    },
 }
 
 #: Роли учёток до спеки «Администрирование» (`0020`). Живут в командах стендов
@@ -561,21 +708,30 @@ def canonical_role(role: str, tenant: str) -> str:
     return _LEGACY.get((код, scope_of_tenant(tenant)), код)
 
 
-def validate_matrix(
-    matrix: Mapping[str, frozenset[str]], scopes: Mapping[str, str]
-) -> list[str]:
-    """Нарушения матрицы словами: код не из каталога, «только УК» у роли страны."""
+def _grant_problem(роль: str, охват_роли: str, код: str, охват: str) -> str | None:
+    if код not in ACTION_CODES:
+        return f"{роль}: {код} — нет в каталоге действий"
+    if охват not in (REACH_OWN, REACH_ALL):
+        return f"{роль}: {код} — охват «{охват}» не из own/all"
+    if охват == REACH_OWN and код not in INSPECTION_OBJECT_ACTIONS:
+        return f"{роль}: {код} — охват «own» только у действий над проверкой"
+    if охват_роли == SCOPE_COUNTRY and код in HQ_ONLY_ACTIONS:
+        return f"{роль}: {код} — действие только УК ({RULE_HQ_ONLY})"
+    return None
+
+
+def validate_matrix(matrix: Mapping[str, Grants], scopes: Mapping[str, str]) -> list[str]:
+    """Нарушения матрицы словами: код или охват не из каталога, «только УК» у страны."""
     нарушения: list[str] = []
     for роль in sorted(matrix):
-        охват = scopes.get(роль)
-        if охват is None:
+        охват_роли = scopes.get(роль)
+        if охват_роли is None:
             нарушения.append(f"{роль}: у роли нет охвата")
             continue
         for код in sorted(matrix[роль]):
-            if код not in ACTION_CODES:
-                нарушения.append(f"{роль}: {код} — нет в каталоге действий")
-            elif охват == SCOPE_COUNTRY and код in HQ_ONLY_ACTIONS:
-                нарушения.append(f"{роль}: {код} — действие только УК ({RULE_HQ_ONLY})")
+            беда = _grant_problem(роль, охват_роли, код, matrix[роль][код])
+            if беда is not None:
+                нарушения.append(беда)
     return нарушения
 ```
 
@@ -588,13 +744,13 @@ Expected: PASS; ruff, mypy чистые.
 
 ```bash
 git add src/domain/permissions.py tests/test_permissions_table.py
-git commit -m "feat: роли по умолчанию и таблица прав с проверкой на сломанной матрице
+git commit -m "feat: роли по умолчанию (D310, D311) и таблица прав с прогоном на сломанной матрице
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 3: Миграция `0038`: роли, права ролей, перенос учёток
+### Task 3: Миграция `0038`: роли, права ролей с охватом, перенос учёток
 
 **Files:**
 - Create: `src/db/migrations/0038_roles.sql`
@@ -604,17 +760,17 @@ git push
 - Modify: `docs/furca/blocks/db.md` (раздел «API-контракт», после блока про учётки ~строка 67), `docs/08-deploy.md` (новый раздел `### 8.14` после `### 8.13`)
 
 **Interfaces:**
-- Consumes: `DEFAULT_MATRIX`, `ROLE_SCOPES` (Task 2) — только в тесте; `db_harness.empty_database`, `db_harness.завести_пространства`, `src.db.migrate.apply_migrations(dsn, *, directory)`, `src.db.web_access.password_hash(password) -> str`.
-- Produces (схема): `roles(code PK, scope, name_ru, name_en, created_at)`, `role_permissions(role_code FK, action_code, PK)`, `web_users.role` → FK `web_users_role_fkey` на `roles.code`, триггер `web_users_role_scope` (ошибка `check_violation` с `constraint = 'web_users_role_scope'`), права: `select` на `roles`, `role_permissions` ролям `dodo_audit_app` и `dodo_audit_admin`.
+- Consumes: `DEFAULT_MATRIX`, `ROLE_SCOPES` (Task 2) — только в тесте; `db_harness.empty_database`, `src.db.migrate.apply_migrations(dsn, *, directory)`, `src.db.migrate.MIGRATIONS_DIR`, `src.db.web_access.password_hash(password) -> str`.
+- Produces (схема): `roles(code PK, scope, name_ru, name_en, created_at)`; `role_permissions(role_code FK, action_code, reach ∈ {own, all}, PK(role_code, action_code))`, `own` только у пяти действий над проверкой (ограничение `role_permissions_own_on_inspection`); `web_users.role` → FK `web_users_role_fkey`; триггер `web_users_role_scope` (`check_violation`, `constraint = 'web_users_role_scope'`); `select` на `roles`, `role_permissions` ролям `dodo_audit_app` и `dodo_audit_admin`.
 
 - [ ] **Step 1: Написать падающий тест**
 
 ```python
 # tests/test_db_roles_migration.py
-"""Миграция `0038`: роли по умолчанию и перенос учёток (спека «Администрирование»).
+"""Миграция `0038`: роли по умолчанию и перенос учёток (спека «Администрирование», D310, D311).
 
-Ядро (права): каждая текущая учётка получает роль с теми же возможностями,
-засев совпадает с таблицей спеки, роль чужого охвата не ложится никому.
+Ядро (права): каждая текущая учётка получает роль по таблице переноса, засев
+совпадает с `DEFAULT_MATRIX`, роль чужого охвата не ложится никому.
 """
 
 from __future__ import annotations
@@ -674,15 +830,25 @@ def test_каждая_учётка_получает_роль_по_таблице
             ]
 
 
-def test_засев_ролей_равен_таблице_спеки(pg_dsn: str) -> None:
+def test_засев_ролей_равен_матрице_по_умолчанию(pg_dsn: str) -> None:
     with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
         cur.execute("select code, scope from roles")
         assert dict(cur.fetchall()) == dict(ROLE_SCOPES)
-        cur.execute("select role_code, action_code from role_permissions")
-        засев: dict[str, set[str]] = {}
-        for роль, код in cur.fetchall():
-            засев.setdefault(роль, set()).add(код)
-        assert {р: frozenset(к) for р, к in засев.items()} == dict(DEFAULT_MATRIX)
+        cur.execute("select role_code, action_code, reach from role_permissions")
+        засев: dict[str, dict[str, str]] = {}
+        for роль, код, охват in cur.fetchall():
+            засев.setdefault(роль, {})[код] = охват
+        assert засев == {р: dict(п) for р, п in DEFAULT_MATRIX.items()}
+
+
+def test_свои_не_ложатся_на_действие_не_над_проверкой(pg_dsn: str) -> None:
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        with pytest.raises(psycopg.errors.CheckViolation) as отказ:
+            cur.execute(
+                "update role_permissions set reach = 'own' "
+                "where role_code = 'hq_staff' and action_code = 'checklist.edit'"
+            )
+        assert отказ.value.diag.constraint_name == "role_permissions_own_on_inspection"
 
 
 def test_роль_чужого_охвата_не_ложится(pg_dsn: str) -> None:
@@ -719,18 +885,18 @@ def test_смена_пространства_проверяет_охват_ро�
             cur.execute("update web_users set tenant_code = 'GE' where login = 'hq-mover'")
 ```
 
-Дописать в `tests/test_db_migrations_frozen.py`, словарь `ОТПЕЧАТКИ`, после `"0037_prescriptions.sql"` — строку с отпечатком (значение берётся в Step 4):
+Дописать в `tests/test_db_migrations_frozen.py`, словарь `ОТПЕЧАТКИ`, после `"0037_prescriptions.sql"` — строку с отпечатком, который печатает команда Step 4:
 
 ```python
     # Роли и права ролей (спека «Администрирование», блок 1). Заведена вместе с файлом.
-    "0038_roles.sql": ("sql1:<отпечаток из Step 4>"),
+    "0038_roles.sql": ("sql1:<значение из Step 4>"),
 ```
 
 Дописать в `tests/test_db_migrate_roles.py`:
 
 ```python
 # в APP_TABLE_GRANTS, после строки "country_recipients": {"SELECT"},
-    # Роли и галочки (`0038`): приложение их только читает — права роли
+    # Роли и права ролей (`0038`): приложение их только читает — права роли
     # приезжают вместе с опознанием. Пишет их экран админа УК (блок 2).
     "roles": {"SELECT"},
     "role_permissions": {"SELECT"},
@@ -743,28 +909,33 @@ def test_смена_пространства_проверяет_охват_ро�
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
 
-Run: `nc -z 127.0.0.1 55432 && make test-honest ARGS="tests/test_db_roles_migration.py tests/test_db_migrate_roles.py tests/test_db_migrations_frozen.py -q -rs"`
-Expected: FAIL — в `test_db_roles_migration.py` `assert [] == ['0038_roles.sql']` и `relation "roles" does not exist`; в `test_db_migrate_roles.py` лишние таблицы в ожидании. Строк `SKIPPED` нет.
+Run: `nc -z 127.0.0.1 55432 && make test-honest ARGS="tests/test_db_roles_migration.py tests/test_db_migrate_roles.py -q -rs"`
+Expected: FAIL — `assert [] == ['0038_roles.sql']`, `relation "roles" does not exist`; в `test_db_migrate_roles.py` лишние таблицы в ожидании. Строк `SKIPPED` нет.
 
 - [ ] **Step 3: Минимальная реализация**
 
 ```sql
 -- 0038_roles.sql
 --
--- Роли с матрицей «роль × действие» (спека «Администрирование», D306, D309).
+-- Роли с матрицей «роль × действие» (спека «Администрирование», D306, D309-D311).
 --
--- Человеку назначается роль, галочки роли определяют, что она может. Граница
--- пространств галочками не задаётся: её держит `can` в коде
+-- Человеку назначается роль, права роли определяют, что она может. Граница
+-- пространств правами не задаётся: её держит `can` в коде
 -- (`src/domain/permissions.py`), здесь — только охват роли (УК или страна).
+--
+-- ОХВАТ ПРАВА (D311). У действий над проверкой право несёт охват: `own` —
+-- только проверки, которые занесла учётка человека, `all` — все проверки, до
+-- которых пускает граница. У прочих действий — только `all`. Нет строки — нет
+-- права.
 --
 -- ПЕРЕНОС. Роли учёток до этой миграции — `admin`/`auditor` (`0020`). Они
 -- переводятся по пространству учётки ровно по таблице спеки:
 --   HQ × admin → hq_admin, HQ × auditor → hq_staff,
 --   страна × admin → country_admin, страна × auditor → country_staff.
 --
--- ЗАСЕВ ПРАВ — таблица спеки; с кодом (`DEFAULT_MATRIX`) его сверяет
--- `tests/test_db_roles_migration.py`. Код действия проверяется по каталогу
--- приложения при записи (экран блока 2), в схеме — только форма кода.
+-- ЗАСЕВ — таблица спеки с D310 (`unit.create` у `hq_staff`) и D311 (сотрудникам
+-- над проверкой — `own`); с кодом (`DEFAULT_MATRIX`) его сверяет
+-- `tests/test_db_roles_migration.py`.
 --
 -- Раннер оборачивает файл в одну транзакцию сам — begin/commit здесь не нужны.
 
@@ -779,7 +950,14 @@ create table roles (
 create table role_permissions (
     role_code text not null references roles (code) on delete cascade,
     action_code text not null check (action_code ~ '^[a-z]+\.[a-z_]+$'),
-    primary key (role_code, action_code)
+    reach text not null default 'all' check (reach in ('own', 'all')),
+    primary key (role_code, action_code),
+    constraint role_permissions_own_on_inspection check (
+        reach = 'all' or action_code in (
+            'inspection.retract', 'inspection.move', 'inspection.accept',
+            'inspection.revise', 'inspection.letter'
+        )
+    )
 );
 
 insert into roles (code, scope, name_ru, name_en) values
@@ -788,8 +966,8 @@ insert into roles (code, scope, name_ru, name_en) values
     ('country_admin', 'country', 'Админ страны', 'Country admin'),
     ('country_staff', 'country', 'Сотрудник страны', 'Country staff');
 
-insert into role_permissions (role_code, action_code)
-select 'hq_admin', код from unnest(array[
+insert into role_permissions (role_code, action_code, reach)
+select 'hq_admin', код, 'all' from unnest(array[
     'inspection.conduct', 'inspection.retract', 'inspection.move', 'inspection.accept',
     'inspection.revise', 'inspection.letter', 'prescription.manage', 'prescription.reply',
     'plan.manage', 'plan.submit', 'checklist.edit', 'checklist.publish', 'checklist.manage',
@@ -797,23 +975,28 @@ select 'hq_admin', код from unnest(array[
     'roles.manage'
 ]) as код
 union all
-select 'hq_staff', код from unnest(array[
-    'inspection.conduct', 'inspection.retract', 'inspection.move', 'inspection.accept',
-    'inspection.revise', 'inspection.letter', 'prescription.manage', 'prescription.reply',
-    'plan.manage', 'plan.submit', 'checklist.edit', 'checklist.publish', 'checklist.manage',
-    'phrases.manage', 'mcp.connect'
+select 'hq_staff', код, 'all' from unnest(array[
+    'inspection.conduct', 'prescription.manage', 'prescription.reply', 'plan.manage',
+    'plan.submit', 'checklist.edit', 'checklist.publish', 'checklist.manage',
+    'phrases.manage', 'mcp.connect', 'unit.create'
 ]) as код
 union all
-select 'country_admin', код from unnest(array[
+select 'country_admin', код, 'all' from unnest(array[
     'inspection.conduct', 'inspection.retract', 'inspection.move', 'inspection.accept',
     'inspection.revise', 'inspection.letter', 'prescription.manage', 'prescription.reply',
     'plan.manage', 'plan.submit', 'checklist.edit', 'checklist.publish', 'checklist.manage',
     'phrases.manage', 'people.manage', 'mcp.connect'
 ]) as код
 union all
-select 'country_staff', код from unnest(array[
-    'inspection.conduct', 'inspection.letter', 'prescription.reply', 'plan.submit',
-    'mcp.connect'
+select 'country_staff', код, 'all' from unnest(array[
+    'inspection.conduct', 'prescription.reply', 'plan.submit', 'mcp.connect'
+]) as код
+union all
+select роль, код, 'own'
+  from unnest(array['hq_staff', 'country_staff']) as роль
+ cross join unnest(array[
+    'inspection.retract', 'inspection.move', 'inspection.accept', 'inspection.revise',
+    'inspection.letter'
 ]) as код;
 
 -- Прежнее ограничение `0020` знает только admin/auditor — снимается до переноса.
@@ -832,7 +1015,7 @@ alter table web_users
     add constraint web_users_role_fkey foreign key (role) references roles (code);
 
 comment on column web_users.role is
-    'Код роли (roles.code): что человеку можно — галочками role_permissions. '
+    'Код роли (roles.code): что человеку можно — правами role_permissions. '
     'Роль УК — только у людей HQ, роль страны — только у людей страны '
     '(триггер web_users_role_scope). Чью историю видно, решает tenant_code.';
 
@@ -865,20 +1048,22 @@ grant select on roles, role_permissions to dodo_audit_app, dodo_audit_admin;
 
 Run: `.venv/bin/python -c "from src.db.migrate import discover_migrations as d; print([m.checksum for m in d() if m.filename == '0038_roles.sql'][0])"` — вписать выведенное значение в строку `"0038_roles.sql"` в `tests/test_db_migrations_frozen.py`.
 Run: `make test-honest ARGS="tests/test_db_roles_migration.py tests/test_db_migrate_roles.py tests/test_db_migrations_frozen.py -q -rs"`
-Expected: PASS, `SKIPPED` нет. Красные `tests/test_db_web_access.py` и соседей, заводящих учётки с ролью `admin`/`auditor`, на этом шаге ожидаемы и чинятся в Task 5 — не трогать их здесь.
+Expected: PASS, `SKIPPED` нет. Красные `tests/test_db_web_access.py` и соседей, заводящих учётки с ролью `admin`/`auditor`, на этом шаге ожидаемы и чинятся в Task 6 — не трогать их здесь.
 
 - [ ] **Step 5: Документация тем же коммитом**
 
-`docs/furca/blocks/db.md`, раздел «API-контракт», после строк про учётки (~строка 67) — блок:
+`docs/furca/blocks/db.md`, раздел «API-контракт», после строк про учётки (~строка 67):
 
 ```
-# роли и права ролей (0038, спека «Администрирование») — таблицы roles, role_permissions
+# роли и права ролей (0038, спека «Администрирование», D310, D311) — roles, role_permissions
 #   roles(code, scope ∈ {hq, country}, name_ru, name_en): роль относится к УК или к стране
-#   role_permissions(role_code, action_code): галочка «роль может действие»; коды —
-#   каталог src/domain/permissions.py (ACTIONS), граница пространств — не здесь, а в can
+#   role_permissions(role_code, action_code, reach ∈ {own, all}): право роли на действие;
+#   own — только проверки, занесённые учёткой человека, и только у пяти действий над
+#   проверкой (role_permissions_own_on_inspection); нет строки — нет права
+#   коды — каталог src/domain/permissions.py (ACTIONS); граница пространств — в can
 #   web_users.role → roles.code; роль УК только у людей HQ, роль страны только у людей
 #   страны (триггер web_users_role_scope, check_violation)
-#   засев — таблица спеки (DEFAULT_MATRIX), перенос admin/auditor × HQ/страна → 4 роли
+#   засев — DEFAULT_MATRIX, перенос admin/auditor × HQ/страна → 4 роли
 ```
 
 `docs/08-deploy.md` — новый раздел после `### 8.13`:
@@ -891,10 +1076,13 @@ Expected: PASS, `SKIPPED` нет. Красные `tests/test_db_web_access.py` �
    `страна × admin → country_admin`, `страна × auditor → country_staff`. Перед накатом
    посмотреть, кто что получит: `make web-user ARGS="list"` на целевой базе.
 2. **Миграция `0039_cross_space_actions.sql`** — пустой журнал действий УК у партнёра.
-3. Команда `make web-user ARGS="role <логин> <роль> --tenant <код>"` принимает коды
+3. **Миграция `0040_inspection_author.sql`** — колонка `inspections.created_by`. У проверок,
+   залитых до неё, автора нет: их снимают, переносят, подтверждают и правят только админы
+   (D311). Автор появляется у проверок, начатых в боте человеком с привязкой к учётке.
+4. Команда `make web-user ARGS="role <логин> <роль> --tenant <код>"` принимает коды
    `hq_admin`, `hq_staff`, `country_admin`, `country_staff`; старые `admin`/`auditor`
    переводятся по пространству учётки.
-4. Переменные окружения не меняются: MCP в блоке 1 работает по прежним
+5. Переменные окружения не меняются: MCP в блоке 1 работает по прежним
    `MCP_TOKENS`, `MCP_CHECKLIST_TENANTS`, `MCP_RETRACTION_TOKENS`.
 ```
 
@@ -902,7 +1090,7 @@ Expected: PASS, `SKIPPED` нет. Красные `tests/test_db_web_access.py` �
 
 ```bash
 git add src/db/migrations/0038_roles.sql tests/test_db_roles_migration.py tests/test_db_migrations_frozen.py tests/test_db_migrate_roles.py docs/furca/blocks/db.md docs/08-deploy.md
-git commit -m "feat: миграция 0038 — роли, права ролей, перенос учёток
+git commit -m "feat: миграция 0038 — роли, права ролей с охватом, перенос учёток
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
@@ -918,7 +1106,7 @@ git push
 - Modify: `docs/furca/blocks/db.md` (после блока ролей из Task 3)
 
 **Interfaces:**
-- Consumes: `Actor`, `ACTION_CODES`, `UnknownAction` (Task 1); `canonical_tenant`.
+- Consumes: `Actor`, `ACTION_CODES`, `UnknownAction` (Task 1); `canonical_tenant`; `db_harness.завести_пространства`.
 - Produces:
   - `Entry(actor_web_user_id: str, actor_tenant: str, object_tenant: str, action_code: str, object_ref: str)` — frozen dataclass.
   - `entry_for(actor: Actor, *, object_tenant: str, action: str, object_ref: str) -> Entry | None` — `None`, когда пространство одно.
@@ -962,7 +1150,7 @@ def _учётка_уК(pg_dsn: str) -> str:
 
 
 def _уК(user_id: str | None = "u-1") -> Actor:
-    return Actor(tenant="HQ", role="hq_admin", grants=frozenset(), user_id=user_id)
+    return Actor(tenant="HQ", role="hq_admin", grants={}, user_id=user_id)
 
 
 def test_своё_пространство_журнала_не_требует() -> None:
@@ -987,9 +1175,8 @@ def test_код_не_из_каталога_это_ошибка_кода() -> Non
 def test_запись_ложится_только_с_коммитом(pg_dsn: str, db_env: str) -> None:
     завести_пространства(pg_dsn, "GE")
     кто = _учётка_уК(pg_dsn)
-    запись = Entry(кто, "HQ", "GE", "inspection.retract", "inspection:откат")
     with psycopg.connect(db_env) as conn:
-        record(conn, запись)
+        record(conn, Entry(кто, "HQ", "GE", "inspection.retract", "inspection:откат"))
         conn.rollback()
     with psycopg.connect(db_env) as conn:
         record(conn, Entry(кто, "HQ", "GE", "inspection.retract", "inspection:коммит"))
@@ -1166,7 +1353,181 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 5: Двери учёток знают роль и права
+### Task 5: Проверка помнит учётку, которая её занесла (D311)
+
+Проверка создаётся в боте (`src/bot/routers/start.py` → `domain.start_inspection`, состояние чата), а в базу ложится сливом (`src/db/push.py: push_inspection`, `_INSERT_INSPECTION_SQL`). Автор едет тем же путём: поле состояния → колонка `inspections.created_by`. Здесь — домен и база; бот передаёт учётку в Task 13.
+
+**Files:**
+- Create: `src/db/migrations/0040_inspection_author.sql`
+- Modify: `src/domain/models.py` — `Inspection` (~строки 174–194): поле `author_user_id` после `auditor`
+- Modify: `src/domain/state.py` — `start_inspection` (~524–540, параметр; блок ~605–615, ключ `author_user_id`), чтение состояния (~486–508)
+- Modify: `src/db/push.py` — `_INSERT_INSPECTION_SQL` (~57–70), параметры вставки (~368–392)
+- Modify: `src/db/models.py` — `InspectionRow` (~после `accepted_by`): поле `created_by`
+- Modify: `src/db/queries.py` — три шаблона (строки 85, 117, 158: `i.created_by` сразу после `i.accepted_by`), `_row_to_inspection` (~307)
+- Modify: `tests/db_harness.py` — `слить_проверку` (~267): параметр `author_user_id`
+- Modify: `tests/test_db_migrations_frozen.py` (строка `"0040_inspection_author.sql"`)
+- Create: `tests/test_db_inspection_author.py`
+- Modify: `docs/furca/blocks/db.md` (после блока журнала)
+
+**Interfaces:**
+- Consumes: `db_harness.слить_проверку`, `db_harness.точка_пространства`, `src.db.queries.get_inspection(inspection_id, *, reach, include_retracted=False, include_on_review=False)`, `src.db.reach.reach_of(tenant)`, `src.db.fingerprint.compute_fingerprint`.
+- Produces:
+  - Схема: `inspections.created_by uuid null references web_users(id)`.
+  - `Inspection.author_user_id: str = ""` (пусто — автора нет).
+  - `start_inspection(..., author_user_id: str = "") -> Inspection`.
+  - `InspectionRow.created_by: str = ""` (пусто — автора нет).
+  - `слить_проверку(*, unit, tenant, chat_id=None, text=..., date=None, accept=True, author_user_id="") -> str`.
+
+- [ ] **Step 1: Написать падающий тест**
+
+```python
+# tests/test_db_inspection_author.py
+"""Проверка помнит учётку, которая её занесла (D311): «свои» решаются по ней."""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+from conftest import requires_db
+from db_harness import слить_проверку
+
+psycopg = pytest.importorskip("psycopg")
+
+from src.db.queries import get_inspection  # noqa: E402
+from src.db.reach import reach_of  # noqa: E402
+from src.db.web_access import password_hash  # noqa: E402
+from src.domain import get_state, start_inspection  # noqa: E402
+
+pytestmark = requires_db
+ТОЧКА = "Белград-автор"
+
+
+def _учётка(pg_dsn: str) -> str:
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "insert into web_users (tenant_code, login, password_hash, role) "
+            "values ('HQ', 'hq-author', %s, 'hq_staff') returning id",
+            (password_hash("пароль-автора-1"),),
+        )
+        строка = cur.fetchone()
+    assert строка is not None
+    return str(строка[0])
+
+
+def test_автор_едет_из_состояния_в_базу(domain_env: Path, db_env: str, pg_dsn: str) -> None:
+    кто = _учётка(pg_dsn)
+    ident = слить_проверку(unit=ТОЧКА, tenant="HQ", author_user_id=кто, accept=False)
+    карточка = get_inspection(ident, reach=reach_of("HQ"), include_on_review=True)
+    assert карточка is not None and карточка.inspection.created_by == кто
+
+
+def test_проверка_без_учётки_ложится_без_автора(domain_env: Path, db_env: str, pg_dsn: str) -> None:
+    ident = слить_проверку(unit=ТОЧКА, tenant="HQ", accept=False)
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("select created_by from inspections where id = %s", (ident,))
+        assert cur.fetchone() == (None,)
+    карточка = get_inspection(ident, reach=reach_of("HQ"), include_on_review=True)
+    assert карточка is not None and карточка.inspection.created_by == ""
+
+
+def test_автор_сохраняется_в_состоянии_чата(domain_env: Path) -> None:
+    start_inspection(
+        9100, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ", author_user_id="u-77"
+    )
+    состояние = get_state(9100)
+    assert состояние is not None and состояние.author_user_id == "u-77"
+
+
+def test_автор_не_входит_в_отпечаток(domain_env: Path, db_env: str, pg_dsn: str) -> None:
+    кто = _учётка(pg_dsn)
+    первая = слить_проверку(unit=ТОЧКА, tenant="HQ", chat_id=9101, accept=False)
+    вторая = слить_проверку(unit=ТОЧКА, tenant="HQ", chat_id=9101, author_user_id=кто, accept=False)
+    assert первая == вторая
+```
+
+- [ ] **Step 2: Прогнать — ожидается FAIL**
+
+Run: `make test-honest ARGS="tests/test_db_inspection_author.py -q -rs"`
+Expected: FAIL — `TypeError: слить_проверку() got an unexpected keyword argument 'author_user_id'`.
+
+- [ ] **Step 3: Минимальная реализация**
+
+```sql
+-- 0040_inspection_author.sql
+--
+-- Учётка, которая занесла проверку (D311): сотрудник правит только «свои»
+-- проверки — те, что занесла его учётка. Пишется сливом из состояния проверки,
+-- куда бот кладёт учётку привязки при старте.
+--
+-- Колонка допускает пустоту: у проверок, залитых до неё, и у начатых без
+-- привязки бота к учётке автора нет, и под «свои» они не попадают никогда —
+-- их правит админ. В отпечаток слива автор не входит: повторный слив той же
+-- проверки остаётся той же строкой.
+--
+-- Раннер оборачивает файл в одну транзакцию сам — begin/commit здесь не нужны.
+
+alter table inspections add column created_by uuid references web_users (id);
+
+comment on column inspections.created_by is
+    'Учётка веба, занёсшая проверку (D311): по ней решается охват «свои». '
+    'null — автор неизвестен (до 0040 или без привязки бота): только для «все».';
+```
+
+Права не меняются: у `dodo_audit_app` уже есть `insert` на `inspections` целиком (`APP_TABLE_GRANTS`), а чтение администратора — табличное `select`. Отпечаток `0040` вписать в `ОТПЕЧАТКИ` командой Task 3 Step 4 (имя `0040_inspection_author.sql`, комментарий «Автор проверки (D311). Заведена вместе с файлом.»).
+
+`src/domain/models.py`, `Inspection`, после `auditor: str = ""`:
+
+```python
+    #: Учётка веба, которая занесла проверку (D311). Пусто — автора нет
+    #: (бот без привязки): под «свои» такая проверка не попадает.
+    author_user_id: str = ""
+```
+
+`src/domain/state.py`: в `start_inspection` параметр `author_user_id: str = ""` после `checklist_code`; в словарь `block` — `"author_user_id": author_user_id.strip(),`; в чтении состояния — `author_user_id=str(block.get("author_user_id") or ""),` после `auditor=...`.
+
+`src/db/push.py`: в `_INSERT_INSPECTION_SQL` колонка `created_by` перед `status` и значение `%(created_by)s` перед `'draft'`; в параметры вставки — `"created_by": inspection.author_user_id or None,` (пустая строка — `null`, а не ошибка формата `uuid`). `src/db/fingerprint.py` не трогается.
+
+`src/db/models.py`, `InspectionRow`, после `accepted_by`:
+
+```python
+    #: Учётка, занёсшая проверку (D311, `0040`). Пусто — автор неизвестен.
+    created_by: str = ""
+```
+
+`src/db/queries.py`: в трёх шаблонах `i.status, i.accepted_at, i.accepted_by` → `i.status, i.accepted_at, i.accepted_by, i.created_by` (в шаблоне карточки запятая перед `i.deductions` остаётся; разбор карточки берёт `deductions` по имени колонки, `_detail_parts`, и сдвиг его не задевает). В `_row_to_inspection` после `accepted_by=...`:
+
+```python
+        # Автор (D311, `0040`) — последним, по той же причине, что код чек-листа.
+        created_by=str(row[22] or ""),
+```
+
+`tests/db_harness.py`, `слить_проверку`: параметр `author_user_id: str = ""`, вызов `start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant, date=date, author_user_id=author_user_id)`.
+
+- [ ] **Step 4: Прогнать — ожидается PASS; соседи слива и чтения**
+
+Run: `make test-honest ARGS="tests/test_db_inspection_author.py tests/test_db_push.py tests/test_db_reads_tenant.py tests/test_db_migrations_frozen.py tests/test_domain_state.py -q -rs"`
+Expected: PASS, `SKIPPED` нет. Красный в разборе строк (`row[...]`) — регрессия сдвига, разбирать.
+
+- [ ] **Step 5: Документация** — `docs/furca/blocks/db.md`, после блока журнала:
+
+```
+# автор проверки (0040, D311): inspections.created_by → web_users(id), null — неизвестен
+#   пишется сливом из состояния (Inspection.author_user_id, ставит бот при старте по
+#   привязке); в отпечаток не входит; InspectionRow.created_by ("" — неизвестен)
+```
+
+- [ ] **Step 6: Коммит и пуш**
+
+```bash
+git add src/db/migrations/0040_inspection_author.sql src/domain/models.py src/domain/state.py src/db/push.py src/db/models.py src/db/queries.py tests/db_harness.py tests/test_db_migrations_frozen.py tests/test_db_inspection_author.py docs/furca/blocks/db.md
+git commit -m "feat: проверка помнит учётку, которая её занесла (D311)
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git push
+```
+
+### Task 6: Двери учёток знают роль и права
 
 **Files:**
 - Create: `src/db/roles.py`
@@ -1178,12 +1539,12 @@ git push
 - Modify: `docs/12-web-admin.md` (команды `make web-user`, ~строки 328–333)
 
 **Interfaces:**
-- Consumes: `canonical_role`, `scope_of_tenant` (Task 2); таблицы `0038`; `src.db.reading.reading(зачем)`.
+- Consumes: `canonical_role`, `Grants` (Tasks 1–2); таблицы `0038`; `src.db.reading.reading(зачем)`.
 - Produces:
-  - `src/db/roles.py`: `Role(code: str, scope: str, name_ru: str, name_en: str, grants: frozenset[str])`; `list_roles() -> tuple[Role, ...]`; `grants_of(role_code: str) -> frozenset[str]`.
-  - `Account(id: str, login: str, tenant: str, role: str = "", grants: frozenset[str] = frozenset(), role_name_ru: str = "", role_name_en: str = "")`.
-  - `web_access.ROLE_ADMIN = LEGACY_ROLE_ADMIN`, `web_access.ROLE_AUDITOR = LEGACY_ROLE_AUDITOR` (старые имена — псевдонимы для команд стендов); `ROLES` удаляется.
-  - `create_account(login, *, tenant, password, role=ROLE_AUDITOR) -> Account` и `reassign_role(login, *, tenant, role) -> str | None` принимают новый код или старый псевдоним; роль чужого охвата → `AccessError("Роль «…» не для пространства «…»")`, незаведённая → `AccessError("Роль «…» не заведена")`.
+  - `src/db/roles.py`: `Role(code: str, scope: str, name_ru: str, name_en: str, grants: Grants)`; `list_roles() -> tuple[Role, ...]`; `grants_of(role_code: str) -> Grants`.
+  - `Account(id: str, login: str, tenant: str, role: str = "", grants: Grants = <пусто>, role_name_ru: str = "", role_name_en: str = "")`.
+  - `web_access.ROLE_ADMIN = LEGACY_ROLE_ADMIN`, `web_access.ROLE_AUDITOR = LEGACY_ROLE_AUDITOR`; `ROLES` удаляется.
+  - `create_account(...)`, `reassign_role(...)` принимают новый код или старый псевдоним; роль чужого охвата → `AccessError("Роль «…» не для пространства «…»")`, незаведённая → `AccessError("Роль «…» не заведена")`.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -1226,15 +1587,16 @@ def test_старая_роль_переводится_на_заведении(о
     assert учётка.role == "country_admin"
 
 
-def test_вход_приносит_права_и_имя_роли(обе_роли: str) -> None:
+def test_вход_приносит_права_с_охватом_и_имя_роли(обе_роли: str) -> None:
     create_account("hq-staff", tenant="HQ", password=ПАРОЛЬ, role="hq_staff")
     вошёл = authenticate("hq-staff", ПАРОЛЬ)
     assert вошёл is not None
-    assert вошёл.grants == DEFAULT_MATRIX["hq_staff"]
+    assert dict(вошёл.grants) == dict(DEFAULT_MATRIX["hq_staff"])
+    assert вошёл.grants["inspection.retract"] == "own"
     assert (вошёл.role_name_ru, вошёл.role_name_en) == ("Сотрудник УК", "HQ staff")
 
 
-def test_снятая_галочка_действует_со_следующей_сверки_сессии(обе_роли: str) -> None:
+def test_снятое_право_действует_со_следующей_сверки_сессии(обе_роли: str) -> None:
     учётка = create_account("hq-boss", tenant="HQ", password=ПАРОЛЬ, role="hq_admin")
     сессия = open_session(учётка)
     with psycopg.connect(обе_роли) as conn:
@@ -1261,8 +1623,8 @@ def test_перечень_ролей_и_права_роли(обе_роли: str
     assert {р.code: р.scope for р in list_roles()} == {
         "hq_admin": "hq", "hq_staff": "hq", "country_admin": "country", "country_staff": "country",
     }
-    assert grants_of("country_staff") == DEFAULT_MATRIX["country_staff"]
-    assert grants_of("ghost") == frozenset()
+    assert dict(grants_of("country_staff")) == dict(DEFAULT_MATRIX["country_staff"])
+    assert dict(grants_of("ghost")) == {}
 ```
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
@@ -1279,18 +1641,21 @@ Expected: FAIL — `ModuleNotFoundError: No module named 'src.db.roles'`.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
+
+from src.domain.permissions import Grants
 
 from .reading import reading
 
 _LIST_SQL = """
     select r.code, r.scope, r.name_ru, r.name_en,
-           array(select p.action_code from role_permissions p
-                  where p.role_code = r.code order by 1)
+           (select coalesce(jsonb_object_agg(p.action_code, p.reach), '{}'::jsonb)
+              from role_permissions p where p.role_code = r.code)
       from roles r
      order by r.scope, r.code
 """
 
-_GRANTS_SQL = "select action_code from role_permissions where role_code = %s"
+_GRANTS_SQL = "select action_code, reach from role_permissions where role_code = %s"
 
 
 @dataclass(frozen=True)
@@ -1301,7 +1666,7 @@ class Role:
     scope: str
     name_ru: str
     name_en: str
-    grants: frozenset[str]
+    grants: Grants
 
 
 def list_roles() -> tuple[Role, ...]:
@@ -1309,22 +1674,24 @@ def list_roles() -> tuple[Role, ...]:
     with reading("роли") as conn, conn.cursor() as cur:
         cur.execute(_LIST_SQL)
         return tuple(
-            Role(str(r[0]), str(r[1]), str(r[2]), str(r[3]), frozenset(r[4]))
+            Role(str(r[0]), str(r[1]), str(r[2]), str(r[3]), MappingProxyType(dict(r[4])))
             for r in cur.fetchall()
         )
 
 
-def grants_of(role_code: str) -> frozenset[str]:
+def grants_of(role_code: str) -> Grants:
     """Права роли. Незаведённая роль — пусто: закрыто по умолчанию."""
     with reading("права роли") as conn, conn.cursor() as cur:
         cur.execute(_GRANTS_SQL, (role_code,))
-        return frozenset(str(r[0]) for r in cur.fetchall())
+        return MappingProxyType({str(код): str(охват) for код, охват in cur.fetchall()})
 ```
 
 `src/db/web_access.py` — заменить блок ролей и `Account`:
 
 ```python
-from src.domain.permissions import LEGACY_ROLE_ADMIN, LEGACY_ROLE_AUDITOR, canonical_role
+from types import MappingProxyType
+
+from src.domain.permissions import LEGACY_ROLE_ADMIN, LEGACY_ROLE_AUDITOR, Grants, canonical_role
 
 #: Старые имена ролей (`0020`) — псевдонимы: команды стендов и тесты зовут
 #: `role ... admin`, перевод по пространству — `canonical_role`.
@@ -1334,6 +1701,7 @@ ROLE_ADMIN = LEGACY_ROLE_ADMIN
 #: Ограничение охвата роли в схеме (`0038`): его имя различает «роль чужого
 #: охвата» и прочие отказы проверки.
 _ROLE_SCOPE_CONSTRAINT = "web_users_role_scope"
+_NO_GRANTS: Grants = MappingProxyType({})
 
 
 @dataclass(frozen=True)
@@ -1345,36 +1713,34 @@ class Account:
     tenant: str
     #: Код роли (`roles.code`). Приезжает вместе с опознанием одним запросом.
     role: str = ""
-    #: Права роли на момент запроса — галочки `role_permissions`.
-    grants: frozenset[str] = frozenset()
+    #: Права роли на момент запроса: код действия → охват (`own`/`all`).
+    grants: Grants = _NO_GRANTS
     role_name_ru: str = ""
     role_name_en: str = ""
 ```
 
-SQL опознания — три запроса получают одинаковый хвост колонок (`role`, подписи, права), пароль — последним у `_SELECT_USER_SQL`:
+SQL опознания — у трёх запросов одинаковые первые семь колонок, пароль — последним у `_SELECT_USER_SQL`:
 
 ```python
-_SELECT_USER_SQL = """
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,
-           array(select p.action_code from role_permissions p
-                  where p.role_code = u.role order by 1),
+_GRANTS_OF_USER = """
+           (select coalesce(jsonb_object_agg(p.action_code, p.reach), '{}'::jsonb)
+              from role_permissions p where p.role_code = u.role)"""
+
+_SELECT_USER_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,{_GRANTS_OF_USER},
            u.password_hash
       from web_users u join roles r on r.code = u.role
      where u.login = %s and u.disabled_at is null
 """
 
-_SELECT_USER_BY_EMAIL_SQL = """
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,
-           array(select p.action_code from role_permissions p
-                  where p.role_code = u.role order by 1)
+_SELECT_USER_BY_EMAIL_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,{_GRANTS_OF_USER}
       from web_users u join roles r on r.code = u.role
      where u.email = %s and u.disabled_at is null
 """
 
-_RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,
-           array(select p.action_code from role_permissions p
-                  where p.role_code = u.role order by 1)
+_RESOLVE_SESSION_SQL = f"""
+    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en,{_GRANTS_OF_USER}
       from web_sessions s
       join web_users u on u.id = s.user_id
       join roles r on r.code = u.role
@@ -1394,7 +1760,7 @@ def _account(row: tuple[Any, ...]) -> Account:
         role=str(row[3]),
         role_name_ru=str(row[4]),
         role_name_en=str(row[5]),
-        grants=frozenset(row[6]),
+        grants=MappingProxyType({str(к): str(о) for к, о in dict(row[6]).items()}),
     )
 
 
@@ -1426,7 +1792,7 @@ def _role_refusal(exc: psycopg.Error, *, role: str, tenant: str) -> AccessError 
             raise отказ from exc
 ```
 
-`reassign_role`: `роль = _checked_role(role, tenant)`; вызов `cur.execute(_SET_ROLE_SQL, ...)` обернуть тем же `try/except`. `authenticate`, `find_by_email`, `resolve_session`: возвращать `_account(row)` (у `authenticate` хеш берётся как `row[7]`: `password_matches(password, str(row[7]))`). `ROLES` удалить.
+`reassign_role`: `роль = _checked_role(role, tenant)`; вызов `cur.execute(_SET_ROLE_SQL, ...)` обернуть тем же `try/except`. `authenticate`, `find_by_email`, `resolve_session`: возвращать `_account(row)` (у `authenticate` хеш — `row[7]`: `password_matches(password, str(row[7]))`). `ROLES` удалить.
 
 `src/web/accounts.py`: убрать `ROLES` из импорта и из `__all__`; `ROLE_ADMIN`, `ROLE_AUDITOR` оставить. `tools/web_user.py`: `роль.add_argument("role", help="код роли (hq_admin, hq_staff, country_admin, country_staff) или старое admin/auditor")` — без `choices`; импорт `ROLES` убрать.
 
@@ -1456,7 +1822,7 @@ git push
 
 (Если в Step 4 правились и другие файлы тестов — добавить их в `git add` поимённо.)
 
-### Task 6: Заслон прав веба
+### Task 7: Заслон прав веба
 
 **Files:**
 - Create: `src/web/guard.py`
@@ -1466,15 +1832,15 @@ git push
 - Create: `tests/test_web_guard.py`
 
 **Interfaces:**
-- Consumes: `can`, `Actor`, `ACTION_CODES`, `UnknownAction`, `canonical_role`, `DEFAULT_MATRIX` (Tasks 1–2); `Account.grants` (Task 5); `auth.current_account`, `auth.current_tenant`, `auth.OPEN_ENDPOINTS`.
+- Consumes: `can`, `Actor`, `ACTION_CODES`, `INSPECTION_OBJECT_ACTIONS`, `AUTHOR_NOT_GIVEN`, `AuthorNotGiven`, `UnknownAction`, `canonical_role`, `DEFAULT_MATRIX` (Tasks 1–2); `Account.grants` (Task 6); `auth.current_account`, `auth.current_tenant`, `auth.OPEN_ENDPOINTS`.
 - Produces:
-  - `auth.current_actor() -> Actor` — пространство, роль, права и `user_id` вошедшего.
-  - `guard.action(*codes: str, object_in_route: bool = False) -> Callable[[F], F]` — метка на функции маршрута.
-  - `guard.permit(code: str, object_tenant: str) -> tuple[str, int] | None` — `None` можно, иначе страница 403.
-  - `guard.mark_own() -> None` — маршрут с объектом действует над своим (своя привязка бота): граница не нужна.
+  - `auth.current_actor() -> Actor`.
+  - `guard.action(*codes: str, object_in_route: bool = False) -> Callable[[F], F]` — действие над проверкой требует `object_in_route=True`.
+  - `guard.permit(code: str, object_tenant: str, *, object_author: str | None | AuthorNotGiven = AUTHOR_NOT_GIVEN) -> tuple[str, int] | None` — `None` можно, иначе страница 403.
+  - `guard.mark_own() -> None`.
   - `guard.install(app: Flask) -> None`.
-  - `guard.uncovered(app: Flask) -> list[str]` — пишущие маршруты без кода и без исключения.
-  - `guard.EXEMPT_ENDPOINTS: Mapping[str, str]` — эндпоинт → причина; `guard.WRITING_GETS: frozenset[str]`.
+  - `guard.uncovered(app: Flask) -> list[str]`.
+  - `guard.ACTIONS_ATTR`, `guard.EXEMPT_ENDPOINTS: Mapping[str, str]`, `guard.WRITING_GETS: frozenset[str]`.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -1503,10 +1869,17 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> F
     def _own() -> str:
         return "ok"
 
-    @app.post("/_t/object/<tenant>")
+    @app.post("/_t/object/<tenant>/<author>")
     @guard.action("inspection.retract", object_in_route=True)
-    def _object(tenant: str) -> str | tuple[str, int]:
-        отказ = guard.permit("inspection.retract", tenant)
+    def _object(tenant: str, author: str) -> str | tuple[str, int]:
+        автор = None if author == "none" else author
+        отказ = guard.permit("inspection.retract", tenant, object_author=автор)
+        return отказ if отказ is not None else "ok"
+
+    @app.post("/_t/no-author")
+    @guard.action("inspection.retract", object_in_route=True)
+    def _no_author() -> str | tuple[str, int]:
+        отказ = guard.permit("inspection.retract", "HQ")
         return отказ if отказ is not None else "ok"
 
     @app.post("/_t/forgot")
@@ -1529,34 +1902,58 @@ def вошедший(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureReq
         yield client
 
 
+def _post(client: FlaskClient, путь: str) -> int:
+    return client.post(путь, headers={"Origin": СВОЙ}).status_code
+
+
+МОЙ = "22222222-2222-2222-2222-222222222222"
+
+
 @pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
 def test_сотрудник_страны_не_правит_методику(вошедший: FlaskClient) -> None:
-    assert вошедший.post("/_t/own", headers={"Origin": СВОЙ}).status_code == 403
+    assert _post(вошедший, "/_t/own") == 403
 
 
 @pytest.mark.parametrize("вошедший", [("GE", "admin")], indirect=True)
 def test_админ_страны_правит_свою_методику(вошедший: FlaskClient) -> None:
-    assert вошедший.post("/_t/own", headers={"Origin": СВОЙ}).status_code == 200
+    assert _post(вошедший, "/_t/own") == 200
 
 
 @pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
 def test_уК_действует_над_объектом_партнёра(вошедший: FlaskClient) -> None:
-    assert вошедший.post("/_t/object/GE", headers={"Origin": СВОЙ}).status_code == 200
+    assert _post(вошедший, "/_t/object/GE/none") == 200
 
 
 @pytest.mark.parametrize("вошедший", [("GE", "admin")], indirect=True)
 def test_страна_не_действует_над_объектом_уК(вошедший: FlaskClient) -> None:
-    assert вошедший.post("/_t/object/HQ", headers={"Origin": СВОЙ}).status_code == 403
+    assert _post(вошедший, f"/_t/object/HQ/{МОЙ}") == 403
+
+
+@pytest.mark.parametrize("вошедший", [("HQ", "auditor")], indirect=True)
+def test_сотрудник_уК_действует_только_над_своим(вошедший: FlaskClient) -> None:
+    assert _post(вошедший, f"/_t/object/HQ/{МОЙ}") == 200
+    assert _post(вошедший, "/_t/object/HQ/u-other") == 403
+    assert _post(вошедший, "/_t/object/HQ/none") == 403
 
 
 @pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
 def test_маршрут_с_объектом_без_permit_падает_500(вошедший: FlaskClient) -> None:
-    assert вошедший.post("/_t/forgot", headers={"Origin": СВОЙ}).status_code == 500
+    assert _post(вошедший, "/_t/forgot") == 500
+
+
+@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
+def test_действие_над_проверкой_без_автора_падает_500(вошедший: FlaskClient) -> None:
+    assert _post(вошедший, "/_t/no-author") == 500
 
 
 def test_незнакомый_код_падает_на_объявлении() -> None:
     with pytest.raises(ValueError, match="inspection.delete"):
         guard.action("inspection.delete")
+
+
+def test_действие_над_проверкой_требует_объекта_в_маршруте() -> None:
+    with pytest.raises(ValueError, match="object_in_route"):
+        guard.action("inspection.move")
 
 
 def test_полнота_называет_маршрут_без_кода(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1584,7 +1981,7 @@ from src.domain.permissions import DEFAULT_MATRIX, canonical_role
         # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Старое имя роли
         # переводится по пространству так же, как его переводит миграция `0038`.
         self.role = canonical_role(role, tenant)
-        self.grants = DEFAULT_MATRIX.get(self.role, frozenset())
+        self.grants = dict(DEFAULT_MATRIX.get(self.role, {}))
         self.role_name_ru = self.role
         self.role_name_en = self.role
 ```
@@ -1600,7 +1997,7 @@ def current_actor() -> Actor:
     return Actor(
         tenant=current_tenant(),
         role=account.role,
-        grants=frozenset(account.grants),
+        grants=account.grants,
         user_id=account.id,
     )
 ```
@@ -1611,10 +2008,11 @@ def current_actor() -> Actor:
 
 Маршрут объявляет код действия декоратором `action`. Маршрут своего
 пространства проверяется целиком до входа (`before_request`). Маршрут, чей
-объект может лежать в чужом пространстве (`object_in_route=True`), сам зовёт
-`permit(код, пространство_объекта)` — пространство берётся из объекта, а не из
-формы. Забыл позвать — пишущий запрос падает 500 после ответа (`after_request`):
-запись без границы громче, чем тихая.
+объект может лежать в чужом пространстве или принадлежать другому автору
+(`object_in_route=True`), сам зовёт `permit(код, пространство_объекта,
+object_author=...)` — пространство и автор берутся из объекта, а не из формы.
+Забыл позвать — пишущий запрос падает 500 (`after_request`): запись без границы
+громче, чем тихая.
 """
 
 from __future__ import annotations
@@ -1626,7 +2024,14 @@ from typing import Any, TypeVar
 from flask import Flask, current_app, g, render_template, request
 from werkzeug.wrappers import Response
 
-from src.domain.permissions import ACTION_CODES, UnknownAction, can
+from src.domain.permissions import (
+    ACTION_CODES,
+    AUTHOR_NOT_GIVEN,
+    INSPECTION_OBJECT_ACTIONS,
+    AuthorNotGiven,
+    UnknownAction,
+    can,
+)
 
 from . import auth
 
@@ -1652,14 +2057,17 @@ _PERMITTED = "action_permitted"
 
 
 def action(*codes: str, object_in_route: bool = False) -> Callable[[F], F]:
-    """Объявить код действия маршрута. Незнакомый код — ошибка при сборке приложения."""
+    """Объявить код действия маршрута. Ошибка объявления — при сборке приложения."""
     if not codes:
         raise ValueError("Маршрут без кода действия: заслону нечего спрашивать")
     чужие = [код for код in codes if код not in ACTION_CODES]
     if чужие:
         raise UnknownAction(f"Нет в каталоге src/domain/permissions.py: {', '.join(чужие)}")
-    if len(codes) > 1 and not object_in_route:
-        raise ValueError("Несколько кодов — код выбирает маршрут: object_in_route=True")
+    if not object_in_route and (len(codes) > 1 or codes[0] in INSPECTION_OBJECT_ACTIONS):
+        raise ValueError(
+            "Несколько кодов или действие над проверкой — объект решает маршрут: "
+            "object_in_route=True"
+        )
 
     def mark(view: F) -> F:
         setattr(view, ACTIONS_ATTR, codes)
@@ -1677,14 +2085,19 @@ def _forbidden() -> tuple[str, int]:
     return render_template("users/forbidden.html"), 403
 
 
-def permit(code: str, object_tenant: str) -> tuple[str, int] | None:
+def permit(
+    code: str,
+    object_tenant: str,
+    *,
+    object_author: str | None | AuthorNotGiven = AUTHOR_NOT_GIVEN,
+) -> tuple[str, int] | None:
     """Спросить `can` о вошедшем. `None` — можно; иначе страница отказа 403."""
     объявлено = getattr(_view(), ACTIONS_ATTR, ())
     if code not in объявлено:
         raise RuntimeError(
             f"Маршрут {request.endpoint} спрашивает «{code}», а объявил {объявлено}"
         )
-    решение = can(auth.current_actor(), code, object_tenant)
+    решение = can(auth.current_actor(), code, object_tenant, object_author=object_author)
     setattr(g, _PERMITTED, True)
     if решение.allowed:
         return None
@@ -1722,8 +2135,8 @@ def install(app: Flask) -> None:
         if response.status_code >= 400 or getattr(g, _PERMITTED, False):
             return response
         raise RuntimeError(
-            f"Маршрут {request.endpoint} объявил объект чужого пространства и не спросил "
-            f"can: запись прошла без границы"
+            f"Маршрут {request.endpoint} объявил объект и не спросил can: "
+            f"запись прошла без границы"
         )
 
 
@@ -1759,9 +2172,9 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 7: Веб — маршруты своего пространства через `can`
+### Task 8: Веб — маршруты своего пространства через `can`; чек-листы страны (D311)
 
-Маршруты, которые пишут только в пространство вошедшего (двери берут `tenant=auth.current_tenant()` или держат страну триггером базы). Объект здесь всегда своего пространства, поэтому код проверяется целиком в `before_request`.
+Маршруты, которые пишут только в пространство вошедшего (двери берут `tenant=auth.current_tenant()` или держат страну триггером базы). Объект всегда своего пространства, поэтому код проверяется целиком в `before_request`.
 
 | Эндпоинт | Код |
 |---|---|
@@ -1775,40 +2188,38 @@ git push
 | `unit_create` | `unit.create` (`object_in_route=True`: прежний 404 партнёру сохраняется) |
 
 **Files:**
-- Modify: `src/web/app.py` — декоратор `@guard.action(...)` под каждым `@app.post` методики (~строки 1642–1846) и чек-листов (~1897–2023)
+- Modify: `src/web/app.py` — декоратор `@guard.action(...)` под каждым `@app.post` методики (~строки 1642–1846) и чек-листов (~1897–2023); в `checklists_create` (~1904–1910) снять отказ «Чек-листы заводит УК (D283)»
 - Modify: `src/web/prescriptions.py` (~строки 184, 224, 244, 253, 491), `src/web/action_plans.py` (~219, 239, 255, 305)
 - Modify: `src/web/unit_add.py` — `may_add_in` (~строка 45), `can_add_here` (~57), маршрут `unit_create` (~120)
 - Create: `tests/test_web_permissions_routes.py`
-- Modify: `tests/test_web_unit_add.py` (ожидания для `hq_staff`)
+- Modify: `tests/test_web_checklists_screen.py` (ожидание отказа партнёру при заведении → заведение в своём пространстве)
 - Modify: `docs/12-web-admin.md` — новый подраздел «Права на действия» после «Вход: кто вообще видит эти страницы» (~строка 315)
 
 **Interfaces:**
-- Consumes: `guard.action`, `guard.permit` (Task 6); `auth.current_actor`, `can`.
+- Consumes: `guard.action`, `guard.permit` (Task 7); `auth.current_actor`, `can`; `src.web.methodology.create_checklist(store, *, tenant, author, code, name_ru, name_en)` — уже заводит в `space_of(tenant)`.
 - Produces: `unit_add.may_add_in(actor: Actor, reach: Reach, code: str) -> bool` (вместо `tenant: str` первым параметром).
 
 - [ ] **Step 1: Написать падающий тест**
 
 ```python
 # tests/test_web_permissions_routes.py
-"""Маршруты своего пространства спрашивают can — по таблице ролей спеки."""
+"""Маршруты своего пространства спрашивают can — по таблице ролей (D310, D311)."""
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
+from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.web import guard
+from src.web import methodology as method
 
-МЕТОДИКА = (
-    "/admin/items",
-    "/admin/zones",
-    "/admin/route",
-    "/admin/scoring",
-    "/admin/publish",
-)
+МЕТОДИКА = ("/admin/items", "/admin/zones", "/admin/route", "/admin/scoring", "/admin/publish")
 
 
-def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str):  # type: ignore[no-untyped-def]
+def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> FlaskClient:
     подменить_двери(monkeypatch, tenant=tenant, role=role)
     client = собрать(tenant="HQ").test_client()
     assert войти(client).status_code == 302
@@ -1825,6 +2236,31 @@ def test_сотрудник_страны_не_правит_методику(monk
 def test_сотрудник_уК_правит_методику(monkeypatch: pytest.MonkeyPatch, путь: str) -> None:
     клиент = _клиент(monkeypatch, tenant="HQ", role="auditor")
     assert клиент.post(путь, headers={"Origin": СВОЙ}).status_code != 403
+
+
+def test_админ_страны_заводит_чек_лист_в_своём_пространстве(monkeypatch: pytest.MonkeyPatch) -> None:
+    заведено: list[dict[str, Any]] = []
+
+    def завести(_store: Any, **kw: Any) -> Any:
+        заведено.append(kw)
+        return type("Заведён", (), {"code": kw["code"]})()
+
+    monkeypatch.setattr(method, "load_store", lambda: type("С", (), {"store": object()})())
+    monkeypatch.setattr(method, "create_checklist", завести)
+    клиент = _клиент(monkeypatch, tenant="GE", role="admin")
+    ответ = клиент.post(
+        "/admin/checklists",
+        data={"code": "ge_audit", "name_ru": "Аудит GE", "name_en": "GE audit"},
+        headers={"Origin": СВОЙ},
+    )
+    assert ответ.status_code == 200
+    assert [з["tenant"] for з in заведено] == ["GE"]
+
+
+def test_сотрудник_страны_чек_лист_не_заводит(monkeypatch: pytest.MonkeyPatch) -> None:
+    клиент = _клиент(monkeypatch, tenant="GE", role="auditor")
+    ответ = клиент.post("/admin/checklists", data={"code": "x"}, headers={"Origin": СВОЙ})
+    assert ответ.status_code == 403
 
 
 def test_маршруты_своего_пространства_объявили_код() -> None:
@@ -1847,7 +2283,7 @@ def test_маршруты_своего_пространства_объявили
 - [ ] **Step 2: Прогнать — ожидается FAIL**
 
 Run: `.venv/bin/pytest tests/test_web_permissions_routes.py -q`
-Expected: FAIL — сотрудник страны получает не 403; у эндпоинтов нет `required_actions`.
+Expected: FAIL — сотрудник страны получает не 403; админ страны получает отказ «Чек-листы заводит УК»; у эндпоинтов нет `required_actions`.
 
 - [ ] **Step 3: Минимальная реализация**
 
@@ -1858,6 +2294,8 @@ Expected: FAIL — сотрудник страны получает не 403; у
     @guard.action("checklist.edit")
     def methodology_add() -> str:
 ```
+
+`checklists_create`: удалить блок `if auth.current_tenant() != HQ_TENANT: ... отказ_заведения ...` целиком; комментарий над вызовом `method.create_checklist` заменить на: «Пространство — вошедшего (D311): админ страны заводит свои чек-листы у себя; чужое пространство дверь не принимает (`space_of(tenant)`), право — `checklist.manage` в заслоне.» Ключ текста `methodology.etalon_readonly` остаётся, если на него есть другие ссылки (`grep -n "etalon_readonly" src`); иначе удалить его из `src/web/texts.py` на обоих языках.
 
 В `src/web/prescriptions.py` и `src/web/action_plans.py` — импорт `from . import guard`, декоратор под `@app.post(..., endpoint=...)`. Существующие `_require_hq()` и `is_hq()` остаются: это заслон раздела (D264), он отвечает раньше и тем же кодом, что сегодня.
 
@@ -1887,7 +2325,8 @@ def can_add_here(code: str) -> bool:
 
 Run: `.venv/bin/pytest tests/test_web_permissions_routes.py -q` → PASS.
 Run: `.venv/bin/pytest tests/test_web_*.py -q`
-Expected: красными могут стать только ожидания, что сотрудник УК (`auditor` у `HQ`) заводит пиццерию (`tests/test_web_unit_add.py`): по таблице спеки у `hq_staff` нет `unit.create` (расхождение 4, вопрос В1) — переписать ожидание на 404 со ссылкой на расхождение; и ожидания, что сотрудник страны правит методику (`tests/test_web_methodology_spaces.py`) — переписать на 403 (зафиксированное отличие спеки). Любой другой красный — регрессия, разбирать.
+Expected: красными могут стать только ожидания, что сотрудник страны правит методику (`tests/test_web_methodology_spaces.py`) — переписать на 403 (зафиксированное отличие спеки), и что партнёру отказано в заведении чек-листа (`tests/test_web_checklists_screen.py`) — переписать на заведение в своём пространстве (D311). Заведение пиццерий сотрудником УК не меняется (D310). Любой другой красный — регрессия.
+Run: `make test-honest ARGS="tests/test_mcp_checklists.py -q -rs"` — дверь `lists_door.create` заводит чек-лист партнёра в его пространстве (тот же путь, что у MCP); красное — дверь не принимает партнёра, разбирать до коммита.
 
 - [ ] **Step 5: Документация** — `docs/12-web-admin.md`, новый подраздел:
 
@@ -1896,26 +2335,28 @@ Expected: красными могут стать только ожидания, 
 
 Каждый пишущий адрес объявляет код действия (`src/web/guard.py: action`), и до
 выполнения его спрашивает `can` (`src/domain/permissions.py`): граница пространств
-в коде, галочка — в матрице роли (`role_permissions`). Каталог кодов — `ACTIONS`
+в коде, право — в матрице роли (`role_permissions`). Каталог кодов — `ACTIONS`
 в том же модуле; соответствие адресов кодам держит тест полноты
 `tests/test_web_action_coverage.py`. Отказ — страница 403; адреса раздела «только УК»
-по-прежнему отвечают партнёру 404 (D264). Роли по умолчанию — таблица спеки:
-сотрудник страны методику не правит, сотрудник УК пиццерий не заводит.
+по-прежнему отвечают партнёру 404 (D264). Роли по умолчанию: сотрудник страны методику
+не правит; админ страны заводит и правит свои чек-листы у себя (D311); пиццерии заводят
+люди УК (D310). Действия над проверкой — снять, перенести, подтвердить, поправить,
+письмо — у сотрудников только над своими проверками, у админов — над всеми (D311).
 ```
 
 - [ ] **Step 6: Коммит и пуш**
 
 ```bash
-git add src/web/app.py src/web/prescriptions.py src/web/action_plans.py src/web/unit_add.py tests/test_web_permissions_routes.py tests/test_web_unit_add.py docs/12-web-admin.md
-git commit -m "feat: маршруты своего пространства спрашивают can
+git add src/web/app.py src/web/prescriptions.py src/web/action_plans.py src/web/unit_add.py tests/test_web_permissions_routes.py tests/test_web_checklists_screen.py docs/12-web-admin.md
+git commit -m "feat: маршруты своего пространства спрашивают can; чек-листы страны (D311)
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-(Файлы тестов, ожидания которых переписаны в Step 4, — добавить поимённо.)
+(Файлы тестов, ожидания которых переписаны в Step 4, и `src/web/texts.py`, если ключ удалён, — добавить поимённо.)
 
-### Task 8: Журнал в дверях проверок
+### Task 9: Журнал в дверях проверок
 
 Двери снятия, приёмки, переноса, правки на приёмке и письма принимают необязательную запись журнала и пишут её своим подключением до коммита.
 
@@ -1929,12 +2370,12 @@ git push
 - Create: `tests/test_db_cross_space_doors.py`
 
 **Interfaces:**
-- Consumes: `cross_space.Entry`, `cross_space.record` (Task 4).
+- Consumes: `cross_space.Entry`, `cross_space.record` (Task 4); `db_harness.слить_проверку`, `привязать_пространства`, `точка_пространства`, `set_retraction_env`.
 - Produces (новый keyword-only параметр `journal: Entry | None = None` у каждой):
   - `retract_inspection(inspection_id, *, tenant, reason, storage=None, journal=None) -> Retraction`
   - `accept_inspection(inspection_id, *, tenant, actor, journal=None) -> None`
   - `move_inspection(inspection_id, *, tenant, new_date, new_unit_id, reason, actor, journal=None) -> bool`
-  - `revise_finding(inspection_id, *, ..., tenant, ..., journal=None)` (прочие параметры — как сейчас)
+  - `revise_finding(inspection_id, *, ..., journal=None)` (прочие параметры — как сейчас)
   - `save_letter(inspection_id, *, tenant, body, lang, saved_by, journal=None)`
   - `inspections.retract_card(..., journal=None)`, `accept_card(..., journal=None)`, `move_card(..., journal=None)`, обёртка правки — то же.
 
@@ -2074,11 +2515,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 9: Веб — проверки: пространство из объекта, УК у партнёра с журналом
+### Task 10: Веб — действия над проверкой: пространство и автор из проверки, УК у партнёра с журналом
 
-| Эндпоинт | Код | Пространство объекта |
+| Эндпоинт | Код | Пространство / автор объекта |
 |---|---|---|
-| `do_retract` | `inspection.retract` | `detail.inspection.tenant_code` |
+| `do_retract` | `inspection.retract` | `detail.inspection.tenant_code` / `detail.inspection.created_by` |
 | `do_accept` | `inspection.accept` | то же |
 | `do_revise` | `inspection.revise` | то же |
 | `do_move` | `inspection.move` | то же |
@@ -2087,20 +2528,21 @@ git push
 | `google_mail_callback` | `inspection.letter` (письмо) / `prescription.manage` (предписание, объект `HQ`) | проверка письма / `HQ` |
 
 **Files:**
-- Modify: `src/web/app.py` — `_refuse_unless_own` (~1399) заменить на `_permit_on_inspection`; маршруты `save_letter` (~987), `do_retract` (~1288), `do_accept` (~1308), `do_revise` (~1333), `do_move` (~1362); `_admin_only` (~1452) и его вызовы из `_render_card` (~1474) — на `can`
+- Modify: `src/web/app.py` — `_refuse_unless_own` (~1399) заменить на `_permit_on_inspection`; маршруты `save_letter` (~987), `do_retract` (~1288), `do_accept` (~1308), `do_revise` (~1333), `do_move` (~1362); `_admin_only` (~1452) и его вызовы из `_render_card` (~1474) — на `_may`
+- Modify: `src/web/templates/inspections/card.html` (кнопки снятия, переноса, подтверждения, правки — по флагам `can_*`)
 - Modify: `src/web/letter_draft.py` — `letter_draft` (~161), `google_mail_callback` (~232)
 - Create: `tests/test_web_inspection_rights.py`
-- Modify: `tests/test_web_acceptance.py`, `tests/test_web_review.py`, `tests/test_web_spaces_boundary.py` (ожидания по таблице спеки — см. Step 4)
+- Modify: `tests/test_web_acceptance.py`, `tests/test_web_review.py`, `tests/test_web_spaces_boundary.py` (ожидания по таблице — см. Step 4)
 
 **Interfaces:**
-- Consumes: `guard.action`, `guard.permit`, `auth.current_actor`, `cross_space.entry_for` (Task 4), `journal` у обёрток `inspections` (Task 8).
-- Produces: `_permit_on_inspection(inspection_id: str, code: str) -> tuple[Any | None, tuple[str, int] | None]` — `(detail, None)` можно; `(None, ответ)` — 404 вне охвата или 403 по `can`. `_may(code: str, object_tenant: str) -> bool` — для показа кнопок карточки (вместо `_admin_only() is None`).
+- Consumes: `guard.action`, `guard.permit` (Task 7); `auth.current_actor`; `cross_space.entry_for` (Task 4); `InspectionRow.created_by` (Task 5); `journal` у обёрток `inspections` (Task 9).
+- Produces: `_permit_on_inspection(inspection_id: str, code: str) -> tuple[Any | None, FlaskResponse | None]`; `_author_of(detail: Any) -> str | None`; `_may(code: str, detail: Any) -> bool`.
 
 - [ ] **Step 1: Написать падающий тест**
 
 ```python
 # tests/test_web_inspection_rights.py
-"""Действия над проверкой: пространство — из самой проверки, УК у партнёра — в журнал."""
+"""Действия над проверкой: пространство и автор — из самой проверки (D304, D311)."""
 
 from __future__ import annotations
 
@@ -2108,15 +2550,19 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.web import inspections as data
 
 ПРОВЕРКА = "11111111-1111-1111-1111-111111111111"
+МОЙ = "22222222-2222-2222-2222-222222222222"
 
 
-def _карточка(tenant: str) -> Any:
-    return SimpleNamespace(inspection=SimpleNamespace(tenant_code=tenant, id=ПРОВЕРКА))
+def _карточка(tenant: str, автор: str) -> Any:
+    return SimpleNamespace(
+        inspection=SimpleNamespace(tenant_code=tenant, id=ПРОВЕРКА, created_by=автор)
+    )
 
 
 @pytest.fixture
@@ -2132,15 +2578,17 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return записано
 
 
-def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str, чья: str):  # type: ignore[no-untyped-def]
+def _клиент(
+    monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str, чья: str, автор: str = ""
+) -> FlaskClient:
     подменить_двери(monkeypatch, tenant=tenant, role=role)
-    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: _карточка(чья))
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: _карточка(чья, автор))
     client = собрать(tenant="HQ").test_client()
     assert войти(client).status_code == 302
     return client
 
 
-def _снять(client) -> int:  # type: ignore[no-untyped-def]
+def _снять(client: FlaskClient) -> int:
     return client.post(
         f"/inspections/{ПРОВЕРКА}/retract", data={"reason": "ошибка"}, headers={"Origin": СВОЙ}
     ).status_code
@@ -2168,38 +2616,75 @@ def test_своя_проверка_журнала_не_пишет(
 def test_админ_страны_не_снимает_проверку_уК(
     monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
 ) -> None:
-    клиент = _клиент(monkeypatch, tenant="GE", role="admin", чья="HQ")
+    клиент = _клиент(monkeypatch, tenant="GE", role="admin", чья="HQ", автор=МОЙ)
     assert _снять(клиент) == 403
     assert зовы == []
 
 
-def test_сотрудник_страны_не_снимает_свою(
+def test_сотрудник_страны_снимает_свою(
     monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
 ) -> None:
-    клиент = _клиент(monkeypatch, tenant="GE", role="auditor", чья="GE")
+    клиент = _клиент(monkeypatch, tenant="GE", role="auditor", чья="GE", автор=МОЙ)
+    assert _снять(клиент) < 400
+
+
+def test_сотрудник_страны_не_снимает_чужую(
+    monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
+) -> None:
+    клиент = _клиент(monkeypatch, tenant="GE", role="auditor", чья="GE", автор="u-other")
     assert _снять(клиент) == 403
     assert зовы == []
+
+
+def test_сотрудник_уК_снимает_свою_у_партнёра_с_журналом(
+    monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
+) -> None:
+    клиент = _клиент(monkeypatch, tenant="HQ", role="auditor", чья="GE", автор=МОЙ)
+    assert _снять(клиент) < 400
+    assert зовы[0]["journal"].object_tenant == "GE"
+
+
+def test_сотрудник_уК_не_снимает_проверку_без_автора(
+    monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
+) -> None:
+    клиент = _клиент(monkeypatch, tenant="HQ", role="auditor", чья="HQ", автор="")
+    assert _снять(клиент) == 403
+    assert зовы == []
+
+
+def test_админ_уК_снимает_проверку_без_автора(
+    monkeypatch: pytest.MonkeyPatch, зовы: list[dict[str, Any]]
+) -> None:
+    клиент = _клиент(monkeypatch, tenant="HQ", role="admin", чья="HQ", автор="")
+    assert _снять(клиент) < 400
 ```
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
 
 Run: `.venv/bin/pytest tests/test_web_inspection_rights.py -q`
-Expected: FAIL — админ УК над проверкой `GE` получает 403 (сегодняшний `_refuse_unless_own`), у вызова нет `journal`.
+Expected: FAIL — админ УК над проверкой `GE` получает 403 (сегодняшний `_refuse_unless_own`), сотрудник получает 403 и на своей (`_admin_only`), у вызова нет `journal`.
 
 - [ ] **Step 3: Минимальная реализация** (`src/web/app.py`, импорты `from src.db.cross_space import entry_for`, `from src.domain.permissions import can`, `from . import guard`):
 
 ```python
+def _author_of(detail: Any) -> str | None:
+    """Учётка, занёсшая проверку; `None` — автор неизвестен (D311)."""
+    return detail.inspection.created_by or None
+
+
 def _permit_on_inspection(
     inspection_id: str, code: str
 ) -> tuple[Any | None, FlaskResponse | None]:
-    """Проверка в охвате и право на действие над ней — пространство из самой проверки.
+    """Проверка в охвате и право на действие над ней — пространство и автор из неё.
 
     Вне охвата — 404, как у несуществующей: «нет» и «не видно» неразличимы.
     """
     detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
         return None, (render_template("inspections/not_found.html"), 404)  # type: ignore[return-value]
-    отказ = guard.permit(code, detail.inspection.tenant_code)
+    отказ = guard.permit(
+        code, detail.inspection.tenant_code, object_author=_author_of(detail)
+    )
     if отказ is not None:
         return None, отказ  # type: ignore[return-value]
     return detail, None
@@ -2215,9 +2700,11 @@ def _journal(detail: Any, code: str) -> Any:
     )
 
 
-def _may(code: str, object_tenant: str) -> bool:
+def _may(code: str, detail: Any) -> bool:
     """Показывать ли кнопку действия — тот же ответ, что даст маршрут."""
-    return can(auth.current_actor(), code, object_tenant).allowed
+    return can(
+        auth.current_actor(), code, detail.inspection.tenant_code, object_author=_author_of(detail)
+    ).allowed
 ```
 
 `do_retract`:
@@ -2239,28 +2726,28 @@ def _may(code: str, object_tenant: str) -> bool:
             )
 ```
 
-То же строение — у `do_accept` (`inspection.accept`, `data.accept_card(..., tenant=detail.inspection.tenant_code, journal=_journal(detail, "inspection.accept"))`), `do_revise` (`inspection.revise`), `do_move` (`inspection.move`), `save_letter` (`inspection.letter`; вместо `if not _own(detail)`). Вызовы `_admin_only()` в этих маршрутах удаляются (право теперь в `can`). В `_render_card`: `админ = _admin_only() is None` → флаги кнопок по действию: `can_retract=_may("inspection.retract", detail.inspection.tenant_code)`, `can_move=...`, `can_accept=...`, `can_revise=...` и передать их в шаблон вместо одного `админ` (в шаблоне карточки заменить проверки `admin` на соответствующий флаг). `_admin_only`, `_own`, `_refuse_unless_own` удалить, если у них не осталось вызовов (`make dead` подтвердит).
+То же строение — у `do_accept` (`inspection.accept`, `data.accept_card(..., tenant=detail.inspection.tenant_code, journal=_journal(detail, "inspection.accept"))`), `do_revise` (`inspection.revise`), `do_move` (`inspection.move`), `save_letter` (`inspection.letter`; вместо `if not _own(detail)`). Вызовы `_admin_only()` в этих маршрутах удаляются (право теперь в `can`). В `_render_card`: `админ = _admin_only() is None` → флаги кнопок по действию: `can_retract=_may("inspection.retract", detail)`, `can_move=_may("inspection.move", detail)`, `can_accept=_may("inspection.accept", detail)`, `can_revise=_may("inspection.revise", detail)`, `can_letter=_may("inspection.letter", detail)`; в шаблоне `inspections/card.html` каждое условие показа кнопки (`{% if admin %}` у соответствующего блока) заменить на его флаг. `_admin_only`, `_own`, `_refuse_unless_own` удалить, если у них не осталось вызовов (`make dead` подтвердит).
 
-`src/web/letter_draft.py`: `letter_draft` — `@guard.action("inspection.letter", object_in_route=True)`, `if not auth.is_own(detail.inspection.tenant_code)` → `отказ = guard.permit("inspection.letter", detail.inspection.tenant_code)`; при сохранении письма передать `tenant=detail.inspection.tenant_code` и `journal=entry_for(auth.current_actor(), object_tenant=detail.inspection.tenant_code, action="inspection.letter", object_ref=f"inspection:{inspection_id}")`. `google_mail_callback` — `@guard.action("inspection.letter", "prescription.manage", object_in_route=True)`; ветка письма — то же, что выше; ветка другого вида (`_вернуть_другое`) — первой строкой `отказ = guard.permit("prescription.manage", HQ_TENANT)` и `if отказ is not None: return отказ`.
+`src/web/letter_draft.py`: `letter_draft` — `@guard.action("inspection.letter", object_in_route=True)`, `if not auth.is_own(detail.inspection.tenant_code)` → `отказ = guard.permit("inspection.letter", detail.inspection.tenant_code, object_author=detail.inspection.created_by or None)`; при сохранении письма — `tenant=detail.inspection.tenant_code` и `journal=entry_for(auth.current_actor(), object_tenant=detail.inspection.tenant_code, action="inspection.letter", object_ref=f"inspection:{inspection_id}")`. `google_mail_callback` — `@guard.action("inspection.letter", "prescription.manage", object_in_route=True)`; ветка письма — то же, что выше; ветка другого вида (`_вернуть_другое`) — первой строкой `отказ = guard.permit("prescription.manage", HQ_TENANT)` и `if отказ is not None: return отказ`.
 
 - [ ] **Step 4: Прогнать — ожидается PASS; веб целиком**
 
 Run: `.venv/bin/pytest tests/test_web_inspection_rights.py tests/test_web_*.py -q`
-Expected: новый набор PASS. В прежних наборах ожидаемо краснеют только утверждения таблицы спеки: «аудитор УК не снимает/не переносит/не подтверждает/не правит на приёмке» (у `hq_staff` эти права есть — расхождение 3, В2) и «УК получает 403 на проверке партнёра» (D304: теперь проходит с журналом). Переписать каждое на новое ожидание со ссылкой на расхождение/D304. Любой другой красный — регрессия, разбирать.
+Expected: новый набор PASS. В прежних наборах ожидаемо краснеют только утверждения, которые меняет D311 и D304: «аудитор не снимает/не переносит/не подтверждает/не правит» — у сотрудника это теперь можно над своей проверкой (двойник карточки без `created_by` даёт «чужую», и отказ остаётся — переписать только те, где проверка его); «УК получает 403 на проверке партнёра» — теперь проходит с журналом. Переписать каждое со ссылкой на D311/D304. Любой другой красный — регрессия.
 
 - [ ] **Step 5: Коммит и пуш**
 
 ```bash
-git add src/web/app.py src/web/letter_draft.py tests/test_web_inspection_rights.py
-git commit -m "feat: действия над проверкой — пространство из проверки, УК у партнёра с журналом
+git add src/web/app.py src/web/letter_draft.py src/web/templates/inspections/card.html tests/test_web_inspection_rights.py
+git commit -m "feat: действия над проверкой — пространство и автор из проверки, УК у партнёра с журналом
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-(Шаблон карточки и переписанные наборы — добавить в `git add` поимённо.)
+(Переписанные наборы Step 4 — добавить в `git add` поимённо.)
 
-### Task 10: Веб — люди через `can`, журнал, роли из базы
+### Task 11: Веб — люди через `can`, журнал, роли из базы
 
 | Эндпоинт | Код | Пространство объекта |
 |---|---|---|
@@ -2271,7 +2758,7 @@ git push
 
 **Files:**
 - Modify: `src/web/app.py` — `_hq_admin_only` (~1435) → `_people_permit(target_tenant)`; маршруты ~1117–1285; `_страница_учёток` (`roles=accounts.ROLES` → `role_options`, `role_names`)
-- Modify: `src/web/people.py` — `change_role` (~56), `change_email`; `src/web/accounts.py` — `add`, `disable` (параметр `journal`)
+- Modify: `src/web/people.py` — `change_role` (~56), `change_email`; `src/web/accounts.py` — `add`, `disable`, `reassign_role` (параметр `journal`)
 - Modify: `src/db/web_access.py` — `create_account`, `reassign_role`, `set_email`, `disable_account` (параметр `journal: Entry | None = None`, `record(conn, journal)` в том же `with _managing(...)`); `src/db/bot_links.py` — `unbind(user_id, *, journal=None)`
 - Modify: `src/web/templates/users/index.html` (~строки 113–120, 199–210, 282–286), `src/web/templates/base.html` (~141)
 - Modify: `src/web/texts.py` — убрать `users.role.auditor`, `users.role.admin`, `nav.role.admin`, `nav.role.auditor`; добавить `users.role.scope` (ru/en)
@@ -2282,9 +2769,9 @@ git push
 **Interfaces:**
 - Consumes: `guard.permit`, `guard.mark_own`, `entry_for`, `record`, `roles.list_roles() -> tuple[Role, ...]`, `scope_of_tenant`.
 - Produces:
-  - `people.change_role(*, login, tenant, role, actor_login, actor_tenant, known: Mapping[str, str], journal: Entry | None = None) -> Outcome` — `known`: код роли → охват; неизвестная → `Outcome("role.unknown", 400)`, чужой охват → `Outcome("role.scope", 400)`.
+  - `people.change_role(*, login, tenant, role, actor_login, actor_tenant, known: Mapping[str, str], journal: Entry | None = None) -> Outcome` — `known`: код роли → охват роли; неизвестная → `Outcome("role.unknown", 400)`, чужой охват → `Outcome("role.scope", 400)`.
   - `people.change_email(..., journal: Entry | None = None) -> Outcome`.
-  - `accounts.add(login, *, tenant, role=ROLE_AUDITOR, journal=None) -> Added`, `accounts.disable(login, *, tenant, journal=None) -> bool`.
+  - `accounts.add(login, *, tenant, role=ROLE_AUDITOR, journal=None) -> Added`, `accounts.disable(login, *, tenant, journal=None) -> bool`, `accounts.reassign_role(login, *, tenant, role, journal=None) -> str | None`.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -2297,17 +2784,19 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
 from src.db import roles as roles_door
 from src.db.roles import Role
 from src.web import accounts, people
+from src.web.texts import TEXTS
 
 РОЛИ = (
-    Role("hq_admin", "hq", "Админ УК", "HQ admin", frozenset()),
-    Role("hq_staff", "hq", "Сотрудник УК", "HQ staff", frozenset()),
-    Role("country_admin", "country", "Админ страны", "Country admin", frozenset()),
-    Role("country_staff", "country", "Сотрудник страны", "Country staff", frozenset()),
+    Role("hq_admin", "hq", "Админ УК", "HQ admin", {}),
+    Role("hq_staff", "hq", "Сотрудник УК", "HQ staff", {}),
+    Role("country_admin", "country", "Админ страны", "Country admin", {}),
+    Role("country_staff", "country", "Сотрудник страны", "Country staff", {}),
 )
 
 
@@ -2326,14 +2815,14 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     return записано
 
 
-def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str):  # type: ignore[no-untyped-def]
+def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> FlaskClient:
     подменить_двери(monkeypatch, tenant=tenant, role=role)
     client = собрать(tenant="HQ").test_client()
     assert войти(client).status_code == 302
     return client
 
 
-def _назначить(client, роль: str, где: str = "GE") -> int:  # type: ignore[no-untyped-def]
+def _назначить(client: FlaskClient, роль: str, где: str = "GE") -> int:
     return client.post(
         "/users/role", data={"login": "anna", "tenant": где, "role": роль}, headers={"Origin": СВОЙ}
     ).status_code
@@ -2375,8 +2864,6 @@ def test_админ_страны_до_блока_2_людьми_не_управ�
 
 
 def test_текст_чужого_охвата_есть_на_двух_языках() -> None:
-    from src.web.texts import TEXTS
-
     assert set(TEXTS["users.role.scope"]) == {"ru", "en"}
     assert people.Outcome("role.scope", 400).status == 400
 ```
@@ -2407,7 +2894,7 @@ def _people_journal(target_tenant: str, login: str) -> Any:
     )
 ```
 
-Маршруты `user_role`, `user_email`, `add_user`, `disable_user` — декоратор `@guard.action("people.manage", object_in_route=True)`; первым шагом сегодняшняя проверка `_hq_admin_only()` заменяется на: прочитать пространство из формы (`_пространство_из_формы()`; `None` — тот же 400, что сейчас), затем `отказ = _people_permit(пространство)`. В `_правка_человека` порядок тот же. Вызовы дверей получают `journal=_people_journal(пространство, логин)`. `user_role` передаёт `known={р.code: р.scope for р in roles_door.list_roles()}` в `people.change_role`. `bot_unlink` — `@guard.action("people.manage", object_in_route=True)`; своя привязка → `guard.mark_own()`; чужая — пространство учётки из `accounts.everyone(tenant=None)` по `id`, затем `_people_permit(...)`, `bot_links.unbind(чей, journal=_people_journal(пространство, логин))`.
+Маршруты `user_role`, `user_email`, `add_user`, `disable_user` — декоратор `@guard.action("people.manage", object_in_route=True)`; первым шагом сегодняшняя проверка `_hq_admin_only()` заменяется на: прочитать пространство из формы (`_пространство_из_формы()`; `None` — тот же 400, что сейчас), затем `отказ = _people_permit(пространство)`, `if отказ is not None: return отказ`. В `_правка_человека` порядок тот же. Вызовы дверей получают `journal=_people_journal(пространство, логин)`. `user_role` передаёт `known={р.code: р.scope for р in roles_door.list_roles()}` в `people.change_role`. `bot_unlink` — `@guard.action("people.manage", object_in_route=True)`; своя привязка → `guard.mark_own()`; чужая — пространство учётки из `accounts.everyone(tenant=None)` по `id`, затем `_people_permit(...)`, `bot_links.unbind(чей, journal=_people_journal(пространство, логин))`.
 
 `_страница_учёток`: `управляет = auth.current_tenant() == HQ_TENANT and can(auth.current_actor(), "people.manage", HQ_TENANT).allowed`; вместо `roles=accounts.ROLES`:
 
@@ -2446,8 +2933,9 @@ def change_role(
         прежняя = accounts.reassign_role(login, tenant=tenant, role=role, journal=journal)
     except DbError:
         return Outcome("role.failed", 503)
-    ...  # остаток — как сейчас
 ```
+
+Хвост функции после `прежняя = ...` (запись в журнал приложения и `Outcome("role.ok", 200)`) остаётся как сейчас.
 
 `src/web/texts.py`:
 
@@ -2458,7 +2946,7 @@ def change_role(
     },
 ```
 
-Шаблон `users/index.html`: `t('users.role.' ~ account.role)` → `account.role_name_en if lang == 'en' else account.role_name_ru`; `{% for код in roles %}` в строке человека → `{% for код in role_options[scope_of(человек.tenant)] %}` с подписью `role_names[код]`; в форме заведения — две группы `<optgroup label="{{ t('users.col.space') }}: HQ">` (`role_options['hq']`) и страна (`role_options['country']`). `base.html` ~141: `<small>{{ account.role_name_en if lang == 'en' else account.role_name_ru }}</small>`.
+Шаблон `users/index.html`: `t('users.role.' ~ account.role)` → `account.role_name_en if lang == 'en' else account.role_name_ru`; `{% for код in roles %}` в строке человека → `{% for код in role_options[scope_of(человек.tenant)] %}` с подписью `role_names[код]`; в форме заведения — две группы `<optgroup label="HQ">` (`role_options['hq']`) и `<optgroup label="{{ t('users.col.space') }}">` (`role_options['country']`). `base.html` ~141: `<small>{{ account.role_name_en if lang == 'en' else account.role_name_ru }}</small>`.
 
 Двери `web_access`: `create_account(..., journal=None)`, `reassign_role(..., journal=None)`, `set_email(..., journal=None)`, `disable_account(..., journal=None)` — `record(conn, journal)` сразу после основного `cur.execute` внутри `with _managing(...) as conn`; `bot_links.unbind(user_id, *, journal=None)` — то же внутри его `with _connected(...)`. Обёртки `accounts.add`, `accounts.disable`, `accounts.reassign_role` пробрасывают `journal`.
 
@@ -2484,16 +2972,16 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 11: Веб — тест полноты на настоящем приложении
+### Task 12: Веб — тест полноты на настоящем приложении
 
 **Files:**
 - Create: `tests/test_web_action_coverage.py`
 
 **Interfaces:**
-- Consumes: `guard.uncovered`, `guard.ACTIONS_ATTR`, `guard.EXEMPT_ENDPOINTS`, `guard.WRITING_GETS` (Task 6); `web_harness.собрать`.
+- Consumes: `guard.uncovered`, `guard.ACTIONS_ATTR`, `guard.EXEMPT_ENDPOINTS`, `guard.WRITING_GETS` (Task 7); `web_harness.собрать`.
 - Produces: тест полноты веба (закрывает #271 со стороны прав).
 
-- [ ] **Step 1: Написать тест** (падает до Tasks 7, 9, 10; если они уже сделаны — FAIL даёт отрицательный прогон ниже)
+- [ ] **Step 1: Написать тест**
 
 ```python
 # tests/test_web_action_coverage.py
@@ -2541,7 +3029,7 @@ def test_проверка_полноты_ловит_новый_маршрут_б
 - [ ] **Step 2: Прогнать**
 
 Run: `.venv/bin/pytest tests/test_web_action_coverage.py -q`
-Expected: PASS. Если `test_нет_пишущих_маршрутов_без_кода` FAIL — он перечисляет эндпоинты без кода: каждому — код по таблицам Tasks 7, 9, 10, либо строка в `guard.EXEMPT_ENDPOINTS` с причиной, если операция личная.
+Expected: PASS (Tasks 8, 10, 11 сделаны). FAIL `test_нет_пишущих_маршрутов_без_кода` перечисляет эндпоинты без кода: каждому — код по таблицам Tasks 8, 10, 11, либо строка в `guard.EXEMPT_ENDPOINTS` с причиной, если операция личная.
 
 - [ ] **Step 3: Отрицательный прогон**
 
@@ -2558,7 +3046,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 12: Бот — роль в привязке, заслон роутеров, тест полноты
+### Task 13: Бот — роль в привязке, автор проверки, заслон роутеров, тест полноты
 
 | Роутер | Код |
 |---|---|
@@ -2566,11 +3054,13 @@ git push
 | `mcp` | `mcp.connect` (поверх круга `mcp_admins`, который остаётся до блока 3) |
 | `help`, `lang`, `version`, `stops`, `fallback` | исключения: чтение или личная настройка (расхождение 7) |
 
+Заведение пиццерии на старте проверки работает как сейчас (D310): `can(actor, "unit.create", space)` даёт «да» людям УК и путь совместимости (`hq_staff`), «нет» — людям страны, ровно как `may_add_units`. Снятие этого пути — #527.
+
 **Files:**
 - Modify: `src/db/bot_links.py` — `Binding` (~99), `_RESOLVE_BY_USER_SQL`, `_STANDING_SQL`, `_LIVE_BINDINGS_SQL` (~66–87), `_binding(row)`
-- Modify: `src/bot/access.py` — `ACTOR_KEY`, `_grants_from_db`, `AccessMiddleware._space_of` → `_actor_of`, `__call__` (~144–206); новая `ActionMiddleware`, `guard_router`, `EXEMPT_ROUTERS`
+- Modify: `src/bot/access.py` — `ACTOR_KEY`, `_grants_from_db`, `AccessMiddleware._space_of` → `_actor_of`, `__call__` (~144–206); новые `ActionMiddleware`, `guard_router`, `uncovered_routers`, `EXEMPT_ROUTERS`
 - Modify: `src/bot/app.py` — `build_dispatcher` (~201–243): роутеры через `guard_router`
-- Modify: `src/bot/routers/start.py` (~363, ~392): `may_add_units(space)` → `can(actor, "unit.create", space)`
+- Modify: `src/bot/routers/start.py` — `may_add_units(space)` (~363, ~392) → `can(actor, "unit.create", space)`; вызов `domain.start_inspection` (~539–565): `author_user_id`
 - Modify: `src/bot/unit_pick.py` (~26), `src/domain/tenants.py` — `may_add_units` удалить, когда вызовов не останется
 - Modify: `src/bot/texts.py` — `access.forbidden` (ru/en)
 - Modify: `tests/conftest.py` — фикстура `_бот_без_базы_не_знает_привязок` (~345)
@@ -2579,11 +3069,11 @@ git push
 - Modify: `docs/furca/blocks/bot.md` (раздел «Что блок предоставляет», после `Binding`)
 
 **Interfaces:**
-- Consumes: `Actor`, `can`, `DEFAULT_MATRIX`, `ROLE_HQ_STAFF` (Tasks 1–2); `roles.grants_of` (Task 5).
+- Consumes: `Actor`, `can`, `DEFAULT_MATRIX`, `ROLE_HQ_STAFF`, `Grants` (Tasks 1–2); `roles.grants_of` (Task 6); `start_inspection(..., author_user_id=...)` (Task 5).
 - Produces:
-  - `Binding(telegram_id, user_id, login, tenant, bound_at, role: str = "", grants: frozenset[str] = frozenset())`.
-  - `access.ACTOR_KEY = "actor"`; обработчики могут принять `actor: Actor`.
-  - `access.ActionMiddleware(action: str)`; `access.guard_router(router: Router, action: str) -> Router`; `access.EXEMPT_ROUTERS: Mapping[str, str]` — имя роутера → причина; `access.uncovered_routers(dispatcher: Dispatcher) -> list[str]`.
+  - `Binding(telegram_id, user_id, login, tenant, bound_at, role: str = "", grants: Grants = <пусто>)`.
+  - `access.ACTOR_KEY = "actor"`; обработчики принимают `actor: Actor`.
+  - `access.ActionMiddleware(action: str)`; `access.guard_router(router: Router, action: str) -> Router`; `access.EXEMPT_ROUTERS: Mapping[str, str]`; `access.uncovered_routers(dispatcher: Dispatcher) -> list[str]`.
 
 - [ ] **Step 1: Написать падающий тест**
 
@@ -2611,12 +3101,10 @@ from src.bot.access import (
 )
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
-
-НАСТРОЙКИ = BotSettings(token="123456:TEST", allowed_ids=frozenset({501}), mode="polling")
 from src.db.bot_links import Binding, Standing
 from src.domain.permissions import DEFAULT_MATRIX, Actor
 
-pytestmark = pytest.mark.asyncio
+НАСТРОЙКИ = BotSettings(token="123456:TEST", allowed_ids=frozenset({501}), mode="polling")
 
 
 def _msg(user_id: int) -> Message:
@@ -2640,32 +3128,36 @@ async def _данные(mw: AccessMiddleware, user_id: int) -> dict[str, Any] | 
     return увидено[0] if увидено else None
 
 
+@pytest.mark.asyncio
 async def test_путь_совместимости_получает_права_hq_staff() -> None:
     mw = AccessMiddleware(frozenset({501}), bindings=None, roster=None)
     данные = await _данные(mw, 501)
     assert данные is not None
     человек: Actor = данные[ACTOR_KEY]
-    assert (человек.tenant, человек.role) == ("HQ", "hq_staff")
-    assert человек.grants == DEFAULT_MATRIX["hq_staff"]
+    assert (человек.tenant, человек.role, человек.user_id) == ("HQ", "hq_staff", None)
+    assert dict(человек.grants) == dict(DEFAULT_MATRIX["hq_staff"])
 
 
-async def test_привязка_приносит_роль_и_права() -> None:
+@pytest.mark.asyncio
+async def test_привязка_приносит_роль_права_и_учётку() -> None:
     привязка = Binding(
-        telegram_id=502, user_id="u", login="anna", tenant="GE", bound_at=datetime.now(UTC),
+        telegram_id=502, user_id="u-502", login="anna", tenant="GE", bound_at=datetime.now(UTC),
         role="country_staff", grants=DEFAULT_MATRIX["country_staff"],
     )
     кэш = BindingCache(standing=lambda _tg: Standing.live(привязка))
     данные = await _данные(AccessMiddleware(frozenset(), bindings=кэш, roster=None), 502)
-    assert данные is not None and данные[ACTOR_KEY].role == "country_staff"
+    assert данные is not None
+    assert (данные[ACTOR_KEY].role, данные[ACTOR_KEY].user_id) == ("country_staff", "u-502")
 
 
+@pytest.mark.asyncio
 async def test_без_права_обработчик_не_зовётся() -> None:
     вызван: list[bool] = []
 
     async def handler(_e: Any, _d: dict[str, Any]) -> None:
         вызван.append(True)
 
-    человек = Actor(tenant="GE", role="ghost", grants=frozenset())
+    человек = Actor(tenant="GE", role="ghost", grants={})
     await ActionMiddleware("inspection.conduct")(handler, _msg(503), {ACTOR_KEY: человек, "space": "GE"})
     assert вызван == []
 
@@ -2686,23 +3178,23 @@ def test_guard_router_ставит_заслон_на_сообщения_и_кн�
     assert any(isinstance(m, ActionMiddleware) for m in роутер.callback_query.middleware)
 ```
 
-Настройки собираются так же, как в `tests/test_bot_app.py:32` (`BotSettings(token=..., allowed_ids=..., mode="polling")`).
+Дописать в `tests/test_bot_start_space.py` (набор старта проверки; хелперы `feed`, `make_bot` из `bot_harness` уже используются там) тест автора: привязанный человек проходит мастер, и `domain.start_inspection` получает `author_user_id` его учётки; человек пути совместимости — пустую строку. Подменить `src.bot.routers.start.domain.start_inspection` записывающей функцией и проверить `записано[0]["author_user_id"] == "u-502"` и `== ""` соответственно (`test_старт_проверки_пишет_автора_привязки`, `test_старт_без_привязки_без_автора`).
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
 
-Run: `.venv/bin/pytest tests/test_bot_action_coverage.py -q`
+Run: `.venv/bin/pytest tests/test_bot_action_coverage.py tests/test_bot_start_space.py -q`
 Expected: FAIL — `ImportError: cannot import name 'ACTOR_KEY' from 'src.bot.access'`.
 
 - [ ] **Step 3: Минимальная реализация**
 
-`src/db/bot_links.py`: `Binding` дописать поля `role: str = ""` и `grants: frozenset[str] = frozenset()`; во все три SQL после `b.bound_at` добавить `, u.role, array(select p.action_code from role_permissions p where p.role_code = u.role order by 1)` (у `_STANDING_SQL` признак `live` остаётся последней колонкой — индекс в `standing` поменять с `row[5]` на `row[7]`); `_binding(row)` заполняет `role=str(row[5])`, `grants=frozenset(row[6])`.
+`src/db/bot_links.py`: `Binding` дописать поля `role: str = ""` и `grants: Grants = MappingProxyType({})`; во все три SQL после `b.bound_at` добавить `, u.role, (select coalesce(jsonb_object_agg(p.action_code, p.reach), '{}'::jsonb) from role_permissions p where p.role_code = u.role)` (у `_STANDING_SQL` признак `live` остаётся последней колонкой — индекс в `standing` поменять с `row[5]` на `row[7]`); `_binding(row)` заполняет `role=str(row[5])`, `grants=MappingProxyType({str(к): str(о) for к, о in dict(row[6]).items()})`.
 
 `src/bot/access.py`:
 
 ```python
 from aiogram import Dispatcher, Router
 
-from src.domain.permissions import ROLE_HQ_STAFF, Actor, can
+from src.domain.permissions import ROLE_HQ_STAFF, Actor, Grants, can
 
 #: Ключ субъекта прав в `data` апдейта.
 ACTOR_KEY = "actor"
@@ -2719,14 +3211,14 @@ EXEMPT_ROUTERS: Mapping[str, str] = {
 _GUARD_ATTR = "required_action"
 
 
-def _grants_from_db(role: str) -> frozenset[str]:
+def _grants_from_db(role: str) -> Grants:
     """Права роли из базы. Отдельной функцией модуля — её подменяют тесты бота без базы."""
     from src.db.roles import grants_of
 
     return grants_of(role)
 ```
 
-`AccessMiddleware._space_of` переименовать в `_actor_of(user_id) -> Actor | None`: живая привязка → `Actor(tenant=canonical_tenant(b.tenant), role=b.role, grants=b.grants, user_id=b.user_id)`; путь совместимости → `Actor(tenant=HQ_TENANT, role=ROLE_HQ_STAFF, grants=_grants_from_db(ROLE_HQ_STAFF))`; прочие ветки — `None`, как сейчас. В `__call__`: `actor = await asyncio.to_thread(self._actor_of, user_id)`; `data[SPACE_KEY] = actor.tenant`; `data[ACTOR_KEY] = actor`.
+`AccessMiddleware._space_of` переименовать в `_actor_of(user_id) -> Actor | None`: живая привязка → `Actor(tenant=canonical_tenant(b.tenant), role=b.role, grants=b.grants, user_id=b.user_id)`; путь совместимости → `Actor(tenant=HQ_TENANT, role=ROLE_HQ_STAFF, grants=_grants_from_db(ROLE_HQ_STAFF))` (учётки нет: `user_id=None`, проверки такого человека ложатся без автора); прочие ветки — `None`, как сейчас. В `__call__`: `actor = await asyncio.to_thread(self._actor_of, user_id)`; `data[SPACE_KEY] = actor.tenant`; `data[ACTOR_KEY] = actor`.
 
 ```python
 class ActionMiddleware(BaseMiddleware):
@@ -2764,9 +3256,19 @@ def uncovered_routers(dispatcher: Dispatcher) -> list[str]:
     )
 ```
 
-`src/bot/app.py`, `build_dispatcher`: каждый `dispatcher.include_router(build_X_router(...))` для роутеров из таблицы — `dispatcher.include_router(guard_router(build_X_router(...), "inspection.conduct"))`; `mcp` — `guard_router(build_mcp_router(settings), "mcp.connect")`. Имена роутеров (`Router(name=...)`) сверить с ключами `EXEMPT_ROUTERS` — имя берётся из `build_*_router`; несовпадение покажет `test_каждый_роутер_с_кодом_или_в_исключениях`.
+`_answer(event, key)` — ответ по ключу текста на языке человека тем же способом, которым `AccessMiddleware` отвечает отказом сегодня (`chat_ui_lang` + `t(key, lang)`; если в модуле есть готовый помощник ответа отказом — использовать его, а не заводить второй).
 
-`src/bot/routers/start.py`: обработчики, где стоит `may_add_units(space)`, принимают `actor: Actor`; условие → `if not can(actor, "unit.create", space):` (текст отказа `start.unit_new_partner` тот же). `src/bot/unit_pick.py`: убрать реэкспорт `may_add_units`. `src/domain/tenants.py`: удалить `may_add_units`, если `grep -rn "may_add_units" src tests` пуст после правок (тест функции, если есть, удалить вместе с ней — поведение теперь держит таблица прав).
+`src/bot/app.py`, `build_dispatcher`: каждый `dispatcher.include_router(build_X_router(...))` для роутеров из таблицы — `dispatcher.include_router(guard_router(build_X_router(...), "inspection.conduct"))`; `mcp` — `guard_router(build_mcp_router(settings), "mcp.connect")`. Имена роутеров (`Router(name=...)`) сверить с ключами `EXEMPT_ROUTERS` — несовпадение покажет `test_каждый_роутер_с_кодом_или_в_исключениях`.
+
+`src/bot/routers/start.py`: обработчики, где стоит `may_add_units(space)`, принимают `actor: Actor`; условие → `if not can(actor, "unit.create", space):` (текст отказа `start.unit_new_partner` тот же). Обработчик выбора языка, который зовёт `domain.start_inspection`, принимает `actor: Actor` и передаёт после `checklist_code=...`:
+
+```python
+                # Учётка, которая заносит проверку (D311): по ней «свои». Без
+                # привязки (путь совместимости) автора нет — проверку правит админ.
+                author_user_id=actor.user_id or "",
+```
+
+`src/bot/unit_pick.py`: убрать реэкспорт `may_add_units`. `src/domain/tenants.py`: удалить `may_add_units`, если `grep -rn "may_add_units" src tests` пуст после правок (тест функции, если есть, удалить вместе с ней — поведение держит таблица прав).
 
 `src/bot/texts.py`:
 
@@ -2783,7 +3285,7 @@ def uncovered_routers(dispatcher: Dispatcher) -> list[str]:
     from src.domain.permissions import DEFAULT_MATRIX
 
     monkeypatch.setattr(
-        "src.bot.access._grants_from_db", lambda role: DEFAULT_MATRIX.get(role, frozenset())
+        "src.bot.access._grants_from_db", lambda role: DEFAULT_MATRIX.get(role, {})
     )
 ```
 
@@ -2792,7 +3294,7 @@ def uncovered_routers(dispatcher: Dispatcher) -> list[str]:
 - [ ] **Step 4: Прогнать — ожидается PASS; бот целиком**
 
 Run: `.venv/bin/pytest tests/test_bot_action_coverage.py tests/test_bot_*.py -q`
-Expected: PASS. Красным может стать только ожидание «сотрудник УК заводит пиццерию в боте» (расхождение 4, В1) — переписать на отказ `start.unit_new_partner` со ссылкой на расхождение. Прочие красные — регрессия.
+Expected: PASS без переписывания прежних ожиданий: заведение пиццерии в боте не меняется (D310). Любой красный — регрессия.
 Run: `make test-honest ARGS="tests/test_db_bot_links.py -q -rs"` → PASS, `SKIPPED` нет.
 
 - [ ] **Step 5: Отрицательный прогон** — убрать `guard_router(...)` вокруг `build_finish_router(store)` в `src/bot/app.py`, `PYTHONDONTWRITEBYTECODE=1 .venv/bin/pytest tests/test_bot_action_coverage.py -q` → FAIL с именем роутера `finish`; вернуть, `git diff src/bot/app.py` без этой правки, PASS.
@@ -2800,21 +3302,26 @@ Run: `make test-honest ARGS="tests/test_db_bot_links.py -q -rs"` → PASS, `SKIP
 - [ ] **Step 6: Документация** — `docs/furca/blocks/bot.md`, после описания `Binding`:
 
 ```
-# Binding(..., role, grants): роль учётки и её права — тем же запросом, что привязка
+# Binding(..., role, grants): роль учётки и её права (код → own/all) — тем же запросом
 # access.ACTOR_KEY → Actor(tenant, role, grants, user_id) в data апдейта; путь
-#   совместимости (ALLOWED_TELEGRAM_IDS, roster.json) — Actor(HQ, hq_staff, права hq_staff)
+#   совместимости (ALLOWED_TELEGRAM_IDS, roster.json) — Actor(HQ, hq_staff, права hq_staff,
+#   без учётки)
+# старт проверки: author_user_id = учётка привязки (D311); без привязки — пусто, проверка
+#   ложится без автора и под «свои» не попадает
 # guard_router(router, action): внутренняя мидлварь ActionMiddleware — обработчик
 #   зовётся, только если can(actor, action, actor.tenant); отказ — access.forbidden
 # Коды роутеров: inspection.conduct — start, edit, records, resend, finish, info, record,
 #   correct, material; mcp.connect — mcp (поверх круга mcp_admins до блока 3);
 #   исключения — access.EXEMPT_ROUTERS. Полноту держит tests/test_bot_action_coverage.py
+# заведение пиццерии на старте — can(actor, "unit.create", space): люди УК (D310),
+#   временный путь до #527
 ```
 
 - [ ] **Step 7: Коммит и пуш**
 
 ```bash
-git add src/db/bot_links.py src/bot/access.py src/bot/app.py src/bot/routers/start.py src/bot/unit_pick.py src/domain/tenants.py src/bot/texts.py tests/conftest.py tests/test_bot_action_coverage.py docs/furca/blocks/bot.md
-git commit -m "feat: бот — роль в привязке и can на каждом роутере
+git add src/db/bot_links.py src/bot/access.py src/bot/app.py src/bot/routers/start.py src/bot/unit_pick.py src/domain/tenants.py src/bot/texts.py tests/conftest.py tests/test_bot_action_coverage.py tests/test_bot_start_space.py docs/furca/blocks/bot.md
+git commit -m "feat: бот — роль в привязке, автор проверки и can на каждом роутере
 
 Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
@@ -2822,7 +3329,7 @@ git push
 
 (Тесты с исправленными `Binding(...)` — добавить поимённо.)
 
-### Task 13: MCP — код действия у инструмента и мост прав из окружения
+### Task 14: MCP — код действия у инструмента и мост прав из окружения
 
 | Инструменты | Код |
 |---|---|
@@ -2833,7 +3340,7 @@ git push
 | `retract_inspection` | `inspection.retract` |
 | остальные (чтение, в том числе `inspection_letter`) | нет кода |
 
-Мост блока 1: права токена = то, что уже открывает окружение. Хранилище правки методики передано (`MCP_CHECKLIST_TENANTS`) → `checklist.edit`, `checklist.publish`, `checklist.manage`, `phrases.manage`; `may_retract` (`MCP_RETRACTION_TOKENS`) → `inspection.retract`. Пространство объекта — пространство токена: двери MCP пишут только в него (`_aimed`, фильтр снятия по `tenant`). Тексты отказа прежние (`CHECKLIST_CLOSED`, `RETRACTION_CLOSED`) — поведение не меняется.
+Мост блока 1: права токена = то, что уже открывает окружение, с охватом `all`. Хранилище правки методики передано (`MCP_CHECKLIST_TENANTS`) → `checklist.edit`, `checklist.publish`, `checklist.manage`, `phrases.manage`; `may_retract` (`MCP_RETRACTION_TOKENS`) → `inspection.retract`. Пространство объекта — пространство токена: двери MCP пишут только в него. У токена нет учётки, поэтому охват «свои» мосту недоступен; автор объекта передаётся как `None` (неизвестен) — при охвате `all` он не нужен. Тексты отказа прежние (`CHECKLIST_CLOSED`, `RETRACTION_CLOSED`).
 
 **Files:**
 - Modify: `src/mcp/catalogue.py` — `ToolSpec` (~66–116: поле `action` и `__post_init__`), записи инструментов из таблицы (поле `action=...`)
@@ -2842,7 +3349,7 @@ git push
 - Modify: `docs/furca/blocks/mcp.md` — раздел «Откуда берётся арендатор» (~55)
 
 **Interfaces:**
-- Consumes: `can`, `Actor`, `ACTION_CODES`, `UnknownAction`, `canonical_tenant`.
+- Consumes: `can`, `Actor`, `ACTION_CODES`, `UnknownAction`, `REACH_ALL`, `canonical_tenant`.
 - Produces: `ToolSpec.action: str | None = None` (незнакомый код → `UnknownAction` при сборке каталога); `rpc._bridge_actor(*, tenant: str, checklist: Store | None, may_retract: bool) -> Actor`; сигнатура `rpc.handle(...)` не меняется.
 
 - [ ] **Step 1: Написать падающий тест**
@@ -2852,8 +3359,6 @@ git push
 """MCP: каждый пишущий инструмент объявляет код каталога и проходит через can."""
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 
@@ -2915,10 +3420,10 @@ def test_мост_без_права_снятия_отказывает_прежн
     assert rpc.RETRACTION_CLOSED in str(ответ["result"])
 
 
-def test_мост_с_тенантом_default_правит_как_уК(tmp_path: Path) -> None:
+def test_мост_с_тенантом_default_правит_как_уК() -> None:
     человек = rpc._bridge_actor(tenant="default", checklist=None, may_retract=True)
     assert человек.tenant == "HQ"
-    assert человек.grants == frozenset({"inspection.retract"})
+    assert dict(человек.grants) == {"inspection.retract": "all"}
 ```
 
 - [ ] **Step 2: Прогнать — ожидается FAIL**
@@ -2946,21 +3451,19 @@ Expected: FAIL — `AttributeError: 'ToolSpec' object has no attribute 'action'`
 `src/mcp/rpc.py`:
 
 ```python
-from src.domain.permissions import Actor, can
+from src.domain.permissions import REACH_ALL, Actor, can
 from src.domain.tenants import canonical_tenant
 
 #: Права методики, которые мост блока 1 выдаёт вместе с хранилищем правки.
-_CHECKLIST_GRANTS = frozenset(
-    {"checklist.edit", "checklist.publish", "checklist.manage", "phrases.manage"}
-)
+_CHECKLIST_GRANTS = ("checklist.edit", "checklist.publish", "checklist.manage", "phrases.manage")
 
 
 def _bridge_actor(*, tenant: str, checklist: Store | None, may_retract: bool) -> Actor:
     """Права токена в блоке 1 — ровно то, что уже открывает окружение (до ролей блока 3)."""
-    права = set(_CHECKLIST_GRANTS) if checklist is not None else set()
+    права = {код: REACH_ALL for код in _CHECKLIST_GRANTS} if checklist is not None else {}
     if may_retract:
-        права.add("inspection.retract")
-    return Actor(tenant=canonical_tenant(tenant), role=None, grants=frozenset(права))
+        права = {**права, "inspection.retract": REACH_ALL}
+    return Actor(tenant=canonical_tenant(tenant), role=None, grants=права)
 ```
 
 В `_call_tool` строки
@@ -2975,8 +3478,9 @@ def _bridge_actor(*, tenant: str, checklist: Store | None, may_retract: bool) ->
 ```python
     if spec.action is not None:
         человек = _bridge_actor(tenant=tenant, checklist=checklist, may_retract=may_retract)
-        # Пространство объекта — пространство токена: двери MCP пишут только в него.
-        if not can(человек, spec.action, человек.tenant):
+        # Пространство объекта — пространство токена: двери MCP пишут только в
+        # него. Автор неизвестен: у токена нет учётки, «свои» мосту недоступны.
+        if not can(человек, spec.action, человек.tenant, object_author=None):
             закрыто = RETRACTION_CLOSED if spec.kind == KIND_RETRACTION else CHECKLIST_CLOSED
             return _tool_text(закрыто, failed=True)
 ```
@@ -2995,11 +3499,11 @@ Run: `make test-honest ARGS="tests/test_mcp_retraction.py tests/test_mcp_retract
 ```markdown
 **Права инструментов (спека «Администрирование», блок 1).** У каждого пишущего
 инструмента — код действия (`ToolSpec.action`), и вызов идёт через `can`
-(`src/domain/permissions.py`). До блока 3 права токена — мост из окружения:
-хранилище правки методики (`MCP_CHECKLIST_TENANTS`) даёт `checklist.edit`,
+(`src/domain/permissions.py`). До блока 3 права токена — мост из окружения с охватом
+«все»: хранилище правки методики (`MCP_CHECKLIST_TENANTS`) даёт `checklist.edit`,
 `checklist.publish`, `checklist.manage`, `phrases.manage`; `MCP_RETRACTION_TOKENS` —
-`inspection.retract`. Тексты отказа прежние. Полноту держит
-`tests/test_mcp_action_coverage.py`.
+`inspection.retract`. У токена нет учётки, поэтому охват «свои» (D311) ему недоступен.
+Тексты отказа прежние. Полноту держит `tests/test_mcp_action_coverage.py`.
 ```
 
 - [ ] **Step 7: Коммит и пуш**
@@ -3012,7 +3516,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-### Task 14: Сдача блока — CHANGELOG, полный прогон, регрессия, смоук на стенде
+### Task 15: Сдача блока — CHANGELOG, полный прогон, регрессия, смоук на стенде
 
 **Files:**
 - Modify: `CHANGELOG.md` (новая запись сверху)
@@ -3024,20 +3528,22 @@ git push
 - [ ] **Step 1: Запись CHANGELOG** — сверху, под шапкой:
 
 ```markdown
-## 2026-10-07 — ядро прав: роли, can и журнал действий УК у партнёра (блок 1 «Администрирование»)
+## 2026-10-07 — ядро прав: роли, can, «свои» проверки и журнал действий УК у партнёра (блок 1 «Администрирование»)
 
 Права теперь решает одна проверка `can` (`src/domain/permissions.py`): граница
-пространств зашита в коде, а что может роль — галочки в базе (`roles`,
+пространств зашита в коде, а что может роль — права в базе (`roles`,
 `role_permissions`, миграция `0038`). Каждый пишущий адрес веба, каждый роутер бота
 и каждый пишущий инструмент MCP объявляет код действия и проходит через `can`;
 полноту держат тесты. Учётки перенесены: админ и аудитор УК стали `hq_admin` и
-`hq_staff`, админ и аудитор страны — `country_admin` и `country_staff`. Что
-изменилось для людей — по таблице ролей спеки: человек УК действует над
-проверками партнёра (снять, перенести, подтвердить, поправить, письмо) и каждое
-такое действие пишется в журнал `cross_space_actions` (миграция `0039`) той же
-транзакцией; сотрудник страны больше не правит методику; сотрудник УК снимает,
-переносит, подтверждает и правит на приёмке, но не заводит пиццерии — ни в вебе,
-ни в боте. MCP работает по прежним переменным окружения; роли токенам — блок 3.
+`hq_staff`, админ и аудитор страны — `country_admin` и `country_staff`. Проверка
+теперь помнит учётку, которая её занесла (миграция `0040`): сотрудники снимают,
+переносят, подтверждают, правят и пишут письмо только по своим проверкам, админы —
+по всем проверкам своего пространства, админ УК — по всем (D311); проверки без
+автора (до этой версии и без привязки бота) правят админы. Человек УК действует над
+проверками партнёра, и каждое такое действие пишется в журнал `cross_space_actions`
+(миграция `0039`) той же транзакцией. Сотрудник страны больше не правит методику;
+админ страны заводит свои чек-листы у себя (D311); пиццерии по-прежнему заводят люди
+УК (D310). MCP работает по прежним переменным окружения; роли токенам — блок 3.
 Экран «Администрирование» — блок 2. Раскатка — `docs/08-deploy.md`, §8.14.
 ```
 
@@ -3054,9 +3560,9 @@ Expected: `belgrade-1` 97.5%, A, D1 = 5; `belgrade-2` 97%, A, D1 = 6.
 - [ ] **Step 4: Смоук на тестовом стенде MUSPELHEIM** (скилл `muspelheim`; стенд поднимается там, не на Mac)
 
 Проверить запуском и записать в отчёт фактические ответы:
-1. Накат `0038`, `0039` на базе стенда; `make web-user ARGS="list"` — у каждой учётки код роли по таблице переноса.
-2. Вход в веб четырьмя ролями: админ УК снимает проверку партнёра → строка в `cross_space_actions` (`select action_code, object_tenant, object_ref from cross_space_actions order by id desc limit 1`); сотрудник страны на «Методике» получает 403 на сохранение пункта; сотрудник УК — 404 на «Добавить пиццерию»; админ страны — 403 на `/users/role`.
-3. Бот стенда: аудитор без привязки (путь совместимости) начинает и сдаёт проверку как раньше.
+1. Накат `0038`, `0039`, `0040` на базе стенда; `make web-user ARGS="list"` — у каждой учётки код роли по таблице переноса.
+2. Бот стенда: привязанный сотрудник УК начинает и сдаёт проверку → у строки `inspections` заполнен `created_by` (`select created_by is not null from inspections order by pushed_at desc limit 1`); аудитор без привязки (путь совместимости) начинает и сдаёт проверку как раньше, `created_by` пуст; заведение новой пиццерии на старте работает у человека УК (D310).
+3. Вход в веб четырьмя ролями: сотрудник УК снимает свою проверку из п. 2 и получает 403 на проверке без автора; админ УК снимает проверку партнёра → строка в `cross_space_actions` (`select action_code, object_tenant, object_ref from cross_space_actions order by id desc limit 1`); сотрудник страны на «Методике» получает 403 на сохранение пункта; админ страны заводит чек-лист в своём пространстве и получает 403 на `/users/role`.
 4. MCP стенда: токен из `MCP_TOKENS` с `MCP_CHECKLIST_TENANTS` правит методику, без `MCP_RETRACTION_TOKENS` снятие отвечает прежним отказом.
 
 Что проверить не удалось — назвать в отчёте прямо, не выдавать за проверенное.
@@ -3071,10 +3577,11 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 git push
 ```
 
-Раскатка на прод — отдельно, только по «да» владельца и в окно 23:00–06:59, с ответами на В1–В3.
+Раскатка на прод — отдельно, только по «да» владельца и в окно 23:00–06:59.
 
 ## Самопроверка плана
 
-- **Покрытие спеки (только блок 1):** таблицы `roles`, `role_permissions`, FK `web_users.role` — Task 3; `cross_space_actions` — Task 4; миграция ролей и перенос — Task 3; каталог и `can` двумя слоями — Tasks 1–2; таблица прав и прогон на сломанной матрице — Task 2; журнал в той же транзакции — Tasks 4, 8, 9, 10; веб на `can` — Tasks 6, 7, 9, 10; бот — Task 12; MCP — Task 13; тест полноты веб/бот/MCP — Tasks 11, 12, 13; тест миграции «каждая учётка получает роль» — Task 3; доки `12-web-admin`, `blocks/db`, `blocks/bot`, `blocks/mcp`, `08-deploy`, CHANGELOG — Tasks 3, 4, 5, 7, 10, 12, 13, 14. Вне блока 1 и не тронуто: экран «Администрирование», токен ↔ учётка, `tools/list`, `forbidden`, уход env-прав и `mcp_admins`. Пункт спеки «миграция: каждый живой токен сопоставлен или отозван» — блок 3.
-- **Имена между задачами:** `Actor`, `Decision`, `can`, `DEFAULT_MATRIX`, `ROLE_SCOPES`, `canonical_role`, `scope_of_tenant`, `validate_matrix` (Tasks 1–2) → `Entry`, `entry_for`, `record` (Task 4) → `Role`, `list_roles`, `grants_of`, `Account.grants` (Task 5) → `guard.action`, `guard.permit`, `guard.mark_own`, `guard.uncovered`, `auth.current_actor` (Task 6) → `ACTOR_KEY`, `ActionMiddleware`, `guard_router`, `uncovered_routers` (Task 12) → `ToolSpec.action`, `_bridge_actor` (Task 13).
-- **Плейсхолдеры:** единственная подставляемая величина — отпечатки миграций в `ОТПЕЧАТКИ`, и команда, которая её печатает, дана в Task 3 Step 4.
+- **Покрытие спеки (только блок 1) с D310, D311:** таблицы `roles`, `role_permissions` (с охватом `own`/`all`), FK `web_users.role` — Task 3; `cross_space_actions` — Task 4; автор проверки (`inspections.created_by`, запись ботом через привязку, слив) — Tasks 5, 13; миграция ролей и перенос — Task 3; каталог и `can` двумя слоями с автором объекта — Tasks 1–2; таблица прав с измерением «автор = я / другой / неизвестен» и прогоны на сломанной матрице и сломанном `can` — Task 2; журнал в той же транзакции — Tasks 4, 9, 10, 11; веб на `can` — Tasks 7, 8, 10, 11; чек-листы страны (D311) — Task 8; бот — Task 13 (заведение пиццерии как сейчас, D310); MCP — Task 14; тест полноты веб/бот/MCP — Tasks 12, 13, 14; тест миграции «каждая учётка получает роль» — Task 3; доки `12-web-admin`, `blocks/db`, `blocks/bot`, `blocks/mcp`, `08-deploy`, CHANGELOG — Tasks 3, 4, 5, 6, 8, 11, 13, 14, 15. Вне блока 1 и не тронуто: экран «Администрирование», токен ↔ учётка, `tools/list`, `forbidden`, уход env-прав и `mcp_admins`, снятие заведения пиццерии из бота (#527). Пункт спеки «миграция: каждый живой токен сопоставлен или отозван» — блок 3.
+- **Имена между задачами:** `Actor`, `Decision`, `Grants`, `can(..., object_author=)`, `AUTHOR_NOT_GIVEN`, `AuthorNotGiven`, `REACH_OWN`, `REACH_ALL`, `INSPECTION_OBJECT_ACTIONS`, `RULE_NOT_AUTHOR`, `DEFAULT_MATRIX`, `ROLE_SCOPES`, `canonical_role`, `scope_of_tenant`, `validate_matrix` (Tasks 1–2) → `Entry`, `entry_for`, `record` (Task 4) → `Inspection.author_user_id`, `start_inspection(..., author_user_id=)`, `InspectionRow.created_by`, `слить_проверку(..., author_user_id=)` (Task 5) → `Role`, `list_roles`, `grants_of`, `Account.grants` (Task 6) → `guard.action`, `guard.permit(..., object_author=)`, `guard.mark_own`, `guard.uncovered`, `auth.current_actor` (Task 7) → `_permit_on_inspection`, `_author_of`, `_may` (Task 10) → `ACTOR_KEY`, `ActionMiddleware`, `guard_router`, `uncovered_routers` (Task 13) → `ToolSpec.action`, `_bridge_actor` (Task 14).
+- **Плейсхолдеры:** единственные подставляемые величины — отпечатки миграций в `ОТПЕЧАТКИ`; команда, которая их печатает, дана в Task 3 Step 4.
+- **Review Focus:** каждой из пяти строк соответствует названный тест в задаче-владельце (Tasks 6, 9, 7, 2/5/10, 13/1/14).
