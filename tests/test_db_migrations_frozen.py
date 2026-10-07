@@ -166,6 +166,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Роли и права ролей (спека «Администрирование», блок 1). Заведена вместе с файлом.
     "0038_roles.sql": ("sql1:ec578525eb2c472a7e4275fe8283ee38f077a70c35d9d81e76ab8715515cd455"),
+    # Журнал действий УК у партнёра (блок 1). Заведена вместе с файлом.
+    "0039_cross_space_actions.sql": (
+        "sql1:1b2b7baab0944bb968a12f40ba872ac8ed0e7a1a7744441782a74a6c7d940d17"
+    ),
 }
 
 

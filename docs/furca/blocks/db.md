@@ -77,6 +77,13 @@ list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # спр
 #   страны (триггер web_users_role_scope, check_violation)
 #   засев — DEFAULT_MATRIX, перенос admin/auditor × HQ/страна → 4 роли
 
+# журнал действий УК у партнёра (0039) — src/db/cross_space.py
+#   entry_for(actor, *, object_tenant, action, object_ref) -> Entry | None (своё — None)
+#   record(conn, entry): пишет на подключении ДВЕРИ ДЕЙСТВИЯ до её коммита и только
+#   если действие состоялось (холостое — без строки); своего
+#   подключения нет — иначе журнал коммитился бы отдельно от действия
+#   cross_space_actions: actor_tenant = 'HQ', object_tenant <> 'HQ'; только select+insert
+
 # пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
 SpaceRow(code, name, countries: tuple[str, ...], people: int)
 check_space_code(code) -> str      # ^[A-Z][A-Z0-9_-]{1,31}$, не legacy-код
