@@ -65,18 +65,52 @@ def test_сотрудник_страны_чек_лист_не_заводит(mon
     assert ответ.status_code == 403
 
 
-def test_маршруты_своего_пространства_объявили_код() -> None:
+#: Единственная таблица «эндпоинт → код»: 25 маршрутов блока (Task 8).
+КОДЫ: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "methodology_add",
+            "methodology_edit",
+            "methodology_disable",
+            "methodology_restore",
+            "methodology_zone_add",
+            "methodology_zone_shares",
+            "methodology_zone_rename",
+            "methodology_zone_remove",
+            "methodology_route",
+            "methodology_scoring",
+        ),
+        "checklist.edit",
+    ),
+    "methodology_publish": "checklist.publish",
+    **dict.fromkeys(
+        ("checklists_create", "checklists_state", "methodology_bot", "checklists_apply"),
+        "checklist.manage",
+    ),
+    **dict.fromkeys(("rx_create", "rx_update", "rx_send", "rx_close"), "prescription.manage"),
+    "order_reply": "prescription.reply",
+    **dict.fromkeys(("actions_review", "actions_due", "actions_new"), "plan.manage"),
+    "plans_upload": "plan.submit",
+    "unit_create": "unit.create",
+}
+
+
+def test_таблица_кодов_полна() -> None:
+    assert len(КОДЫ) == 25
+
+
+@pytest.mark.parametrize("эндпоинт", sorted(КОДЫ))
+def test_маршрут_объявил_свой_код(эндпоинт: str) -> None:
     app = собрать(tenant="HQ")
-    ожидание = {
-        "methodology_add": ("checklist.edit",),
-        "methodology_publish": ("checklist.publish",),
-        "checklists_create": ("checklist.manage",),
-        "methodology_bot": ("checklist.manage",),
-        "rx_send": ("prescription.manage",),
-        "order_reply": ("prescription.reply",),
-        "actions_new": ("plan.manage",),
-        "plans_upload": ("plan.submit",),
-        "unit_create": ("unit.create",),
-    }
-    for эндпоинт, коды in ожидание.items():
-        assert getattr(app.view_functions[эндпоинт], guard.ACTIONS_ATTR, ()) == коды, эндпоинт
+    объявлено = getattr(app.view_functions[эндпоинт], guard.ACTIONS_ATTR, ())
+    assert объявлено == (КОДЫ[эндпоинт],), эндпоинт
+
+
+@pytest.mark.parametrize(
+    "путь", ("/admin/checklists/x/state", "/admin/checklists/x/apply", "/admin/bot/x")
+)
+def test_сотрудник_страны_не_управляет_чек_листами(
+    monkeypatch: pytest.MonkeyPatch, путь: str
+) -> None:
+    клиент = _клиент(monkeypatch, tenant="GE", role="auditor")
+    assert клиент.post(путь, headers={"Origin": СВОЙ}).status_code == 403
