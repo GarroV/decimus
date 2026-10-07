@@ -74,6 +74,8 @@ class InspectionRow:
     on_review: bool = False
     accepted_at: str = ""
     accepted_by: str = ""
+    #: Учётка, занёсшая проверку (D311, `0040`). Пусто — автор неизвестен.
+    created_by: str = ""
 
 
 @dataclass(frozen=True)

@@ -170,6 +170,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0039_cross_space_actions.sql": (
         "sql1:1b2b7baab0944bb968a12f40ba872ac8ed0e7a1a7744441782a74a6c7d940d17"
     ),
+    # Автор проверки (D311). Заведена вместе с файлом.
+    "0040_inspection_author.sql": (
+        "sql1:03b9ecc9bbb21a566ea77cdd67e62474d1e4e2203e98a1ba3e7d1c9bbdde0a48"
+    ),
 }
 
 

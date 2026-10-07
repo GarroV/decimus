@@ -84,6 +84,10 @@ list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # спр
 #   подключения нет — иначе журнал коммитился бы отдельно от действия
 #   cross_space_actions: actor_tenant = 'HQ', object_tenant <> 'HQ'; только select+insert
 
+# автор проверки (0040, D311): inspections.created_by → web_users(id), null — неизвестен
+#   пишется сливом из состояния (Inspection.author_user_id, ставит бот при старте по
+#   привязке); в отпечаток не входит; InspectionRow.created_by ("" — неизвестен)
+
 # пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
 SpaceRow(code, name, countries: tuple[str, ...], people: int)
 check_space_code(code) -> str      # ^[A-Z][A-Z0-9_-]{1,31}$, не legacy-код

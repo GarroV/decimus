@@ -504,6 +504,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         partner=str(meta.get("partner") or ""),
         contact=str(meta.get("contact") or ""),
         auditor=str(meta.get("auditor") or ""),
+        author_user_id=str(block.get("author_user_id") or ""),
         findings=[_finding(f, sources, suggestions, words) for f in (raw.get("findings") or [])],
         info=read_info(raw),
     )
@@ -536,6 +537,7 @@ def start_inspection(
     auditor: str = "",
     tenant: str = DEFAULT_TENANT,
     checklist_code: str | None = None,
+    author_user_id: str = "",
 ) -> Inspection:
     """Начать проверку в чате.
 
@@ -610,6 +612,7 @@ def start_inspection(
         "kind": kind,
         "checklist_version": version,
         "checklist_code": выбран.code,
+        "author_user_id": author_user_id.strip(),
         "ui_lang": _clean_lang(ui_lang, "язык интерфейса"),
         "speech_lang": _clean_lang(speech_lang, "язык речи аудитора"),
     }
