@@ -44,6 +44,29 @@ def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> F
     def _forgot() -> str:
         return "записал без границы"
 
+    @app.post("/_t/ignores")
+    @guard.action("inspection.retract", object_in_route=True)
+    def _ignores() -> str:
+        guard.permit("inspection.retract", "HQ", object_author="u-other")
+        return "записал вопреки отказу"
+
+    @app.post("/_t/undeclared")
+    @guard.action("checklist.edit")
+    def _undeclared() -> str | tuple[str, int]:
+        отказ = guard.permit("inspection.retract", "HQ", object_author=None)
+        return отказ if отказ is not None else "ok"
+
+    @app.post("/_t/mine")
+    @guard.action("inspection.retract", object_in_route=True)
+    def _mine() -> str:
+        guard.mark_own()
+        return "ok"
+
+    @app.get("/_t/read")
+    @guard.action("checklist.edit")
+    def _read() -> str:
+        return "ok"
+
     @app.post("/_t/bare")
     def _bare() -> str:
         return "без кода"
@@ -134,3 +157,29 @@ def test_учётка_без_id_получает_отказ_а_не_500(monkeypa
         monkeypatch.setattr(auth, "current_actor", без_id)
         assert _post(client, "/_t/own") == 403
         assert _post(client, "/_t/object/GE/none") == 403
+
+
+@pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
+def test_отказ_без_разбора_результата_не_пропускает_запись(вошедший: FlaskClient) -> None:
+    assert _post(вошедший, "/_t/ignores") == 500
+
+
+@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
+def test_код_не_из_объявленных_падает_500(вошедший: FlaskClient) -> None:
+    assert _post(вошедший, "/_t/undeclared") == 500
+
+
+@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
+def test_mark_own_снимает_требование_спросить(вошедший: FlaskClient) -> None:
+    assert _post(вошедший, "/_t/mine") == 200
+
+
+@pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
+def test_чтение_маршрута_с_кодом_без_права_отказано(вошедший: FlaskClient) -> None:
+    assert вошедший.get("/_t/read").status_code == 403
+
+
+def test_без_сессии_маршрут_с_объектом_ведёт_на_вход(monkeypatch: pytest.MonkeyPatch) -> None:
+    with _стенд(monkeypatch, tenant="HQ", role="admin").test_client() as client:
+        ответ = client.post(f"/_t/object/HQ/{МОЙ}", headers={"Origin": СВОЙ})
+        assert ответ.status_code == 302
