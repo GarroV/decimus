@@ -41,7 +41,13 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.permissions import ROLE_COUNTRY_ADMIN, ROLE_HQ_ADMIN, canonical_role
+from src.domain.permissions import (
+    ROLE_COUNTRY_ADMIN,
+    ROLE_HQ_ADMIN,
+    ROLE_SCOPES,
+    canonical_role,
+    scope_of_tenant,
+)
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
@@ -1089,7 +1095,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 spaces=пространства,
                 added=added,
                 outcome=outcome,
-                roles=accounts.ROLES,
+                # Мост ролей (до Task 10–11): форма заведения предлагает старые имена
+                # (сотрудник первым, перевод по пространству делает дверь базы), а
+                # перечень людей — роли охвата самого человека, сотрудник первым.
+                roles=accounts.LEGACY_ROLES,
+                roles_by_tenant={
+                    человек.tenant: _roles_of_space(человек.tenant) for человек in люди
+                },
                 users_path=users_path,
                 bindings=привязки,
                 own_binding=своя_привязка,
@@ -1431,6 +1443,13 @@ def _install_hq_gate(app: Flask) -> None:
 def link_url(bot_username: str, token: str) -> str:
     """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
     return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
+
+
+def _roles_of_space(tenant: str) -> tuple[str, ...]:
+    """Роли охвата пространства, сотрудник первым (мост до Task 11)."""
+    охват = scope_of_tenant(tenant)
+    коды = [код for код, роль_охват in ROLE_SCOPES.items() if роль_охват == охват]
+    return tuple(sorted(коды, key=lambda код: код.endswith("_admin")))
 
 
 def _is_admin(account: Any) -> bool:

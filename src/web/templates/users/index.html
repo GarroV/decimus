@@ -200,7 +200,7 @@
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
-                      {% for код in roles %}
+                      {% for код in roles_by_tenant[человек.tenant] %}
                         <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
                       {% endfor %}
                     </select>
