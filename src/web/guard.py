@@ -50,6 +50,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
 }
 
 _PERMITTED = "action_permitted"
+_REACHED = "guard_reached_view"
 
 
 def action(*codes: str, object_in_route: bool = False) -> Callable[[F], F]:
@@ -92,12 +93,12 @@ def permit(
     if code not in объявлено:
         raise RuntimeError(f"Маршрут {request.endpoint} спрашивает «{code}», а объявил {объявлено}")
     субъект = auth.current_actor()
-    setattr(g, _PERMITTED, True)
     if not субъект.user_id:
         logger.warning("права: отказ %s %s — у учётки нет id", request.endpoint, code)
         return forbidden()
     решение = can(субъект, code, object_tenant, object_author=object_author)
     if решение.allowed:
+        setattr(g, _PERMITTED, True)
         return None
     logger.info(
         "права: отказ %s %s над %s (%s)", request.endpoint, code, object_tenant, решение.rule
@@ -117,6 +118,7 @@ def install(app: Flask) -> None:
     def _права() -> tuple[str, int] | None:
         if request.endpoint in auth.OPEN_ENDPOINTS or auth.current_account() is None:
             return None
+        setattr(g, _REACHED, True)
         view = app.view_functions.get(request.endpoint or "")
         коды = getattr(view, ACTIONS_ATTR, ())
         if not коды or getattr(view, OBJECT_IN_ROUTE_ATTR, False):
@@ -126,9 +128,14 @@ def install(app: Flask) -> None:
     @app.after_request
     def _спросил_ли(response: Response) -> Response:
         view = app.view_functions.get(request.endpoint or "")
-        if request.method not in WRITING_METHODS:
+        пишет = request.method in WRITING_METHODS or request.endpoint in WRITING_GETS
+        if not пишет or not getattr(view, OBJECT_IN_ROUTE_ATTR, False):
             return response
-        if not getattr(view, OBJECT_IN_ROUTE_ATTR, False):
+        # Ответ заслона входа или другого заслона до маршрута — не запись: без
+        # вошедшего или мимо нашего `before_request` маршрут не исполнялся.
+        if not getattr(g, _REACHED, False) or auth.current_account() is None:
+            return response
+        if request.endpoint in auth.OPEN_ENDPOINTS or request.endpoint in EXEMPT_ENDPOINTS:
             return response
         if response.status_code >= 400 or getattr(g, _PERMITTED, False):
             return response
