@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 
 from .config import Settings
 from .engine import option, run_audit, state_file
@@ -65,6 +66,22 @@ def _finding_after(chat_id: int, settings: Settings, n: int, what: str) -> Findi
     return found
 
 
+def _clean_photo(ref: str, whose: str) -> str:
+    """Ссылка на кадр, пригодная движку. Пусто или запятая — отказ.
+
+    Запятая запрещена не из вредности: движок режет по ней список, и один кадр
+    молча превратился бы в два несуществующих.
+    """
+    photo = ref.strip()
+    if not photo:
+        raise ValidationError(f"Пустой идентификатор кадра для {whose}")
+    if "," in photo:
+        raise ValidationError(
+            f"В идентификаторе кадра запятая: «{photo}». Движок разрежет его по ней на два кадра"
+        )
+    return photo
+
+
 def add_finding(
     chat_id: int,
     code: str,
@@ -78,8 +95,13 @@ def add_finding(
     suggested: Suggestion | None = None,
     zone_by_person: bool = False,
     repeat: bool = False,
+    photos: Sequence[str] = (),
 ) -> Finding:
     """Зафиксировать запись.
+
+    `photos` — кадры, с которыми запись рождается (мини-апп обхода, D312). Одним
+    вызовом движка, а не записью и следом `attach_photo`: оборванный второй шаг
+    оставил бы в проверке запись без фотофиксации, которой по D078 быть не может.
 
     `zone_by_person` — зону назвал человек (словами или кнопкой). Тогда зона вне
     списка пункта принимается с пометкой `zone_unusual` (D206): зона — там, где
@@ -128,6 +150,7 @@ def add_finding(
                 "сравнивать с записью не с чем, а в базе оно неотличимо от «не предлагала»"
             )
         check_confidence(suggested.confidence, "в предложении к новой записи")
+    frames = [_clean_photo(photo, "новой записи") for photo in photos]
     out = run_audit(
         [
             "add",
@@ -140,6 +163,7 @@ def add_finding(
             # Повтор — решение аудитора о цене записи, а не наблюдение системы
             # (D191). Флаг передаётся движку, потому что удваивает он.
             *(["--repeat"] if repeat else []),
+            *([option("photo", ",".join(frames))] if frames else []),
         ],
         chat_id=chat_id,
         settings=settings,
@@ -149,7 +173,12 @@ def add_finding(
     remember_source(path, n, source)
     remember_words(path, n, words)
     remember_suggestion(path, n, suggested)
-    return _finding_after(chat_id, settings, n, "add")
+    after = _finding_after(chat_id, settings, n, "add")
+    if any(frame not in after.photos for frame in frames):
+        raise EngineError(
+            f"Движок завёл запись #{n}, но кадры в неё не легли", code=0, command="add"
+        )
+    return after
 
 
 def edit_finding(
@@ -221,16 +250,34 @@ def attach_photo(chat_id: int, n: int, file_id: str) -> None:
     режет по ней список, и один кадр молча превратился бы в два несуществующих.
     """
     settings = settings_for(chat_id)
-    photo = file_id.strip()
-    if not photo:
-        raise ValidationError(f"Пустой идентификатор кадра для записи #{n}")
-    if "," in photo:
-        raise ValidationError(
-            f"В идентификаторе кадра запятая: «{photo}». Движок разрежет его по ней на два кадра"
-        )
+    photo = _clean_photo(file_id, f"записи #{n}")
     run_audit(["photo", str(n), option("add", photo)], chat_id=chat_id, settings=settings)
     after = _finding_after(chat_id, settings, n, "photo")
     if photo not in after.photos:
         raise EngineError(
             f"Движок отчитался об успехе, но кадра нет в записи #{n}", code=0, command="photo"
         )
+
+
+def detach_photo(chat_id: int, n: int, ref: str) -> Finding:
+    """Снять один кадр с записи (мини-апп обхода, D312): лишний или не тот ракурс.
+
+    Последний кадр не снимается: запись без фотофиксации не заводится (D078), и
+    снять последний кадр значило бы завести её задним числом. Сначала новый
+    кадр, потом удаление старого — так запись ни на миг не остаётся без
+    доказательства.
+
+    Снимает движок одной командой под своим замком (`photo N --remove=…`), а не
+    здесь «прочитать список — собрать остаток — записать»: два одновременных
+    снятия вернули бы уже снятый кадр, а снятие рядом с доснятым ботом кадром
+    стёрло бы его (ревью 07.10.2026).
+    """
+    settings = settings_for(chat_id)
+    photo = _clean_photo(ref, f"записи #{n}")
+    run_audit(["photo", str(n), option("remove", photo)], chat_id=chat_id, settings=settings)
+    after = _finding_after(chat_id, settings, n, "photo")
+    if photo in after.photos:
+        raise EngineError(
+            f"Движок отчитался об успехе, но кадр остался в записи #{n}", code=0, command="photo"
+        )
+    return after

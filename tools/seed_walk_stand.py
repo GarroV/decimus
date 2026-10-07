@@ -7,7 +7,10 @@
 * прошлая проверка точки с замечаниями в четырёх зонах — подсказка «здесь
   было»;
 * идущая проверка, где одно прошлое замечание записано снова, а ещё две
-  записи сделаны в других зонах — часть зон засчитана сама, часть нет.
+  записи сделаны в других зонах — часть зон засчитана сама, часть нет. У
+  записей идущей проверки есть кадры — нарисованные здесь же плашки, лежащие
+  так же, как кадры мини-аппа (`walk:…`, D312), чтобы карточки показывали
+  превью, а правка — снятие кадра.
 
 Методика — синтетическая из `tests/methodology`: коды зон в ней настоящие,
 формулировки выдуманы, боевых данных стенд не касается. Состояние и база —
@@ -24,6 +27,7 @@
 
 from __future__ import annotations
 
+import io
 import os
 import shutil
 import sys
@@ -35,6 +39,7 @@ sys.path.insert(0, str(REPO_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "tools"))
 
 import psycopg  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 from seed_web_demo import ADMIN_URL_VAR, _require_local_dsn  # noqa: E402
 
 from src import domain  # noqa: E402
@@ -69,13 +74,34 @@ TODAY = (
 )
 
 
+#: Цвета плашек-кадров: по одной на запись, чтобы превью различались глазом.
+SHADES = ((214, 196, 170), (176, 196, 210), (196, 214, 180), (220, 190, 190))
+
+
+def _frame(label: str, shade: tuple[int, int, int]) -> str:
+    """Нарисовать кадр-плашку и положить его, как кладёт мини-апп. Ответ — ссылка."""
+    image = Image.new("RGB", (960, 720), shade)
+    draw = ImageDraw.Draw(image)
+    draw.rectangle((40, 40, 920, 680), outline=(90, 90, 90), width=6)
+    draw.text((80, 330), label, fill=(40, 40, 40))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=80)
+    return domain.save_upload(buffer.getvalue(), domain.check_environment())
+
+
 def _fresh(chat_id: int) -> None:
     work_dir = chat_dir(chat_id, domain.check_environment())
     if work_dir.exists():
         shutil.rmtree(work_dir)
 
 
-def _start(chat_id: int, day: str, findings: tuple[tuple[str, str, str, str], ...]) -> None:
+def _start(
+    chat_id: int,
+    day: str,
+    findings: tuple[tuple[str, str, str, str], ...],
+    *,
+    with_frames: bool = False,
+) -> None:
     _fresh(chat_id)
     domain.start_inspection(
         chat_id,
@@ -89,8 +115,9 @@ def _start(chat_id: int, day: str, findings: tuple[tuple[str, str, str, str], ..
         auditor="Стенд",
         tenant=TENANT,
     )
-    for code, level, zone, text in findings:
-        domain.add_finding(chat_id, code, level, zone, text)
+    for i, (code, level, zone, text) in enumerate(findings):
+        frames = [_frame(f"{code} / {zone}", SHADES[i % len(SHADES)])] if with_frames else []
+        domain.add_finding(chat_id, code, level, zone, text, photos=frames)
 
 
 def _forget_past(dsn: str) -> int:
@@ -115,7 +142,7 @@ def seed() -> None:
     _start(PAST_CHAT, PAST_DATE, PAST)
     past_id = push_inspection(PAST_CHAT, allow_unknown_version=True)
     _fresh(PAST_CHAT)
-    _start(WALK_CHAT, date.today().isoformat(), TODAY)
+    _start(WALK_CHAT, date.today().isoformat(), TODAY, with_frames=True)
     print(f"Прошлая проверка {UNIT} от {PAST_DATE} в базе: {past_id}")
     print(f"Идущая проверка: чат {WALK_CHAT} — его и задать в WEB_WALK_PREVIEW_CHAT")
 

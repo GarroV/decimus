@@ -24,8 +24,9 @@
   audit.py edit --n N [--qid PRD01] [--level D2] [--zone fridge] [--evidence "..."] [--comment "..."] [--repeat|--no-repeat]
         поправить уже зафиксированное нарушение #N. Синонимы из контракта блока:
         --code = --qid, --text = --evidence. Меняются только переданные поля
-  audit.py photo N --add путь1,путь2 [--clear]
-        доснять фото к уже зафиксированному нарушению #N
+  audit.py photo N --add путь1,путь2 [--clear] [--remove путь]
+        доснять фото к уже зафиксированному нарушению #N; --remove снимает один
+        кадр (последний не снимается)
   audit.py drop N            удалить нарушение по номеру
   audit.py info --qid INF01 --text "..." [--photo путь] [--clear-photos]
         заполнить информационный пункт (сильные стороны, зоны роста и т.п.).
@@ -680,6 +681,19 @@ def cmd_photo(a):
     cur = photos_of(f)
     if a.clear:
         cur = []
+    # Снять один кадр — под замком этой же команды, а не «прочитать список,
+    # собрать остаток, записать»: так два одновременных снятия или снятие
+    # рядом с доснятым ботом кадром не возвращают и не теряют чужое (D312).
+    # Последний кадр не снимается: записи без фотофиксации нет (D078).
+    gone = [x for x in split_photos(a.remove)]
+    if gone:
+        missing = [x for x in gone if x not in cur]
+        if missing:
+            sys.exit(f"У нарушения #{a.n} нет кадра {missing[0]}")
+        rest = [x for x in cur if x not in gone]
+        if not rest and not a.add:
+            sys.exit(f"У нарушения #{a.n} это последний кадр: без фотофиксации запись не ведётся")
+        cur = rest
     # Существование файла здесь НЕ проверяется намеренно: в боте фотография
     # хранится идентификатором телеграма и скачивается только на сборке отчёта.
     # Пропавший кадр ловится там, где путь резолвится, — задача T043 блока report.
@@ -970,6 +984,7 @@ def main():
     ed.set_defaults(fn=cmd_edit)
     ph = s.add_parser("photo"); ph.add_argument("n", type=int)
     ph.add_argument("--add", action="append"); ph.add_argument("--clear", action="store_true")
+    ph.add_argument("--remove", action="append", help="снять этот кадр (последний не снимается)")
     ph.set_defaults(fn=cmd_photo)
     dr = s.add_parser("drop"); dr.add_argument("n", type=int); dr.set_defaults(fn=cmd_drop)
     inf = s.add_parser("info"); inf.add_argument("--qid", required=True); inf.add_argument("--text", required=True)

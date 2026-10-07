@@ -1,0 +1,596 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DECIMUS · мини-апп обхода — запись (D312): форма, кадры, карточки записей,
+   сведения о визите. Подключается ПОСЛЕ walk.css, правила слоя те же: ни
+   одного своего цвета, цели нажатия от 48px, сильный цвет — только у класса.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.walk-banner {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.walk-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.walk-row--add { margin: 4px 0 14px; }
+
+.walk-fix--again::before { content: "+  "; color: var(--warn-ink); }
+
+.walk-add {
+  flex: 1 1 140px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.walk-add--quiet {
+  border-color: var(--line-control);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.walk-mark--zone { margin-top: 4px; }
+
+.walk-mark:disabled {
+  background: var(--line-strong);
+  color: var(--ink-3);
+  cursor: default;
+}
+
+/* записи зоны: карточка-кнопка, превью слева */
+
+.walk-list--records { margin-bottom: 8px; }
+
+.walk-rec + .walk-rec { margin-top: 8px; }
+
+.walk-rec__open {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  min-height: 64px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.walk-rec__open:active { background: var(--surface-2); }
+
+.walk-rec__shot {
+  position: relative;
+  flex: none;
+}
+
+.walk-rec__more {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: var(--overlay);
+  color: var(--ink-inverse);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.walk-rec__words {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.walk-rec__comment {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+
+.walk-rec__chev {
+  align-self: center;
+  color: var(--ink-3);
+  font-size: 22px;
+}
+
+.walk-thumb {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-3);
+}
+
+.walk-thumb__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.walk-thumb.is-chat,
+.walk-thumb.is-missing { background: var(--surface-2); }
+
+.walk-thumb__note {
+  padding: 2px;
+  color: var(--ink-3);
+  font-size: 10px;
+  line-height: 12px;
+  text-align: center;
+}
+
+/* сведения о визите */
+
+.walk-info {
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.walk-info__title {
+  margin: 0 0 4px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.walk-info__hint {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+.walk-info__field { margin-bottom: 16px; }
+
+.walk-info__field .walk-btn { margin-top: 8px; }
+
+/* нижняя кнопка «Записать нарушение» */
+
+.walk-dock {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.walk-dock .walk-mark { max-width: 528px; margin: 0 auto; }
+
+.has-sheet .walk-dock { display: none; }
+
+/* ── форма записи ─────────────────────────────────────────────────────── */
+
+.has-sheet,
+.has-sheet body { overflow: hidden; }
+
+.walk-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  animation: walk-sheet-in .2s ease;
+}
+
+@keyframes walk-sheet-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.walk-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.walk-sheet__title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.walk-sheet__close {
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--surface-2);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.walk-sheet__body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 16px 24px;
+}
+
+.walk-sheet__body > *,
+.walk-sheet__foot { max-width: 528px; margin-left: auto; margin-right: auto; }
+
+.walk-sheet__foot {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.walk-sheet__why {
+  margin: 6px 0 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--ink-3);
+}
+
+.walk-form__part { padding-top: 16px; }
+
+.walk-form__label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.walk-form__hint {
+  margin: -2px 0 8px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--ink-2);
+}
+
+.walk-form__note {
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.walk-form__note--info {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+.walk-form__error {
+  margin: 0 0 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--err-soft);
+  color: var(--err);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+/* кадры в форме */
+
+.walk-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.walk-strip__cell { position: relative; }
+
+.walk-strip__cell .walk-thumb { width: 88px; height: 88px; }
+
+.walk-strip__cell.is-uploading .walk-thumb__img,
+.walk-strip__cell.is-failed .walk-thumb__img { opacity: .45; }
+
+.walk-strip__state,
+.walk-strip__retry {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  padding: 2px 4px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--overlay);
+  color: var(--ink-inverse);
+  font: inherit;
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+}
+
+.walk-strip__retry { background: var(--err); cursor: pointer; }
+
+.walk-strip__remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 32px;
+  height: 32px;
+  border: 2px solid var(--surface);
+  border-radius: 16px;
+  background: var(--ink-2);
+  color: var(--ink-inverse);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.walk-pickrow {
+  display: flex;
+  gap: 8px;
+}
+
+.walk-pick {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.walk-pick--camera {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.walk-pick__input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.walk-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* выбор пункта */
+
+.walk-chip.is-on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--ink-inverse);
+}
+
+.walk-search,
+.walk-input,
+.walk-area {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 12px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 16px; /* меньше 16 — iOS приближает экран при вводе */
+}
+
+.walk-area { resize: vertical; line-height: 22px; }
+
+.walk-search:focus,
+.walk-input:focus,
+.walk-area:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.walk-options {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 46vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.walk-options li + li { border-top: 1px solid var(--line); }
+
+.walk-options__empty {
+  padding: 14px 12px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+.walk-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  min-height: 52px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.walk-option:active { background: var(--surface-2); }
+
+.walk-option__top { display: flex; gap: 8px; align-items: center; }
+
+.walk-option__code,
+.walk-choice__code {
+  color: var(--ink-3);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+
+.walk-option__was {
+  padding: 0 6px;
+  border-radius: 6px;
+  background: var(--warn-soft);
+  color: var(--warn-ink);
+  font-size: 12px;
+}
+
+.walk-option__text { font-size: 15px; line-height: 21px; }
+
+.walk-options .walk-link { margin: 6px 12px 10px; }
+
+.walk-choice {
+  padding: 12px;
+  border: 1px solid var(--accent-line);
+  border-radius: 12px;
+  background: var(--accent-soft);
+}
+
+.walk-choice__line { display: flex; flex-direction: column; gap: 2px; }
+
+.walk-choice__text { font-size: 15px; line-height: 21px; }
+
+.walk-link {
+  min-height: 40px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.walk-link--add { min-height: 44px; }
+
+.walk-link--danger { color: var(--err); }
+
+/* класс: только допустимые, цвет класса на выбранном */
+
+.walk-seg {
+  display: flex;
+  gap: 8px;
+}
+
+.walk-seg__opt {
+  flex: 1;
+  min-height: 48px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.walk-seg__opt.is-on { border-color: var(--accent); background: var(--accent); color: var(--ink-inverse); }
+.walk-seg__opt--d1.is-on { border-color: var(--cls-d1-line); background: var(--cls-d1-soft); color: var(--cls-d1); }
+.walk-seg__opt--d2.is-on { border-color: var(--cls-d2-line); background: var(--cls-d2-soft); color: var(--cls-d2); }
+.walk-seg__opt--d3.is-on { border-color: var(--cls-d3-line); background: var(--cls-d3-soft); color: var(--cls-d3); }
+
+/* повтор */
+
+.walk-check {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  border: 1px solid var(--warn-line);
+  border-radius: 12px;
+  background: var(--warn-soft);
+  cursor: pointer;
+}
+
+.walk-check input { width: 22px; height: 22px; margin: 0; flex: none; accent-color: var(--warn-ink); }
+
+.walk-check__words { display: flex; flex-direction: column; gap: 4px; }
+
+.walk-check__title { font-weight: 600; color: var(--warn-ink); }
+
+.walk-check__hint { font-size: 14px; line-height: 20px; color: var(--ink-2); }
+
+/* обычные кнопки */
+
+.walk-btn {
+  flex: 1;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+}
+
+.walk-btn--small { flex: none; min-height: 40px; }
+
+.walk-btn--danger { border-color: var(--err); background: var(--err); color: var(--ink-inverse); font-weight: 600; }
+
+.walk-add:focus-visible,
+.walk-btn:focus-visible,
+.walk-link:focus-visible,
+.walk-option:focus-visible,
+.walk-seg__opt:focus-visible,
+.walk-rec__open:focus-visible,
+.walk-sheet__close:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* всплывающая строка */
+
+.walk-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  z-index: 20;
+  max-width: calc(100% - 32px);
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--ink-inverse);
+  font-size: 15px;
+  box-shadow: var(--sh-pop);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition: opacity .2s ease, transform .2s ease;
+}
+
+.walk-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
+.walk-toast--err { background: var(--err); }

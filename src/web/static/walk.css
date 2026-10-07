@@ -23,7 +23,7 @@
 .walk__root {
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  padding: 16px 16px calc(104px + env(safe-area-inset-bottom));
 }
 
 .walk__loading { color: var(--ink-3); }
@@ -379,6 +379,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .walk-zone__body { animation: none; }
-  .walk-bar__seg { transition: none; }
+  .walk-zone__body,
+  .walk-sheet { animation: none; }
+  .walk-bar__seg,
+  .walk-toast { transition: none; }
 }
