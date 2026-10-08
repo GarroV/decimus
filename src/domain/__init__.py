@@ -22,7 +22,7 @@ from .checklist import (
 )
 from .config import check_environment
 from .findings import add_finding, attach_photo, detach_photo, drop_finding, edit_finding
-from .handover import handed_over
+from .handover import HandedOverError, handed_over, while_open
 from .info import set_info
 from .kinds import INSPECTION_KINDS, kind_title
 from .models import (
@@ -82,6 +82,7 @@ __all__ = [
     "ZONE_SOURCE_WORDS",
     "ChecklistItem",
     "Finding",
+    "HandedOverError",
     "Inspection",
     "Score",
     "Suggestion",
@@ -115,4 +116,5 @@ __all__ = [
     "start_inspection",
     "sync_checklist_version",
     "upload_file",
+    "while_open",
 ]
