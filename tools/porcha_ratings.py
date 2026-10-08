@@ -31,8 +31,8 @@ cases = [
     ),
     (
         "src/web/app.py",
-        "        if not _control_may_write(request.path,",
-        "        if False and not _control_may_write(request.path,",
+        "        if not _control_may_write(\n",
+        "        if False and not _control_may_write(\n",
         "tests/test_web_users_access.py::test_контроль_вне_рейтингов_не_пишет",
     ),
     (
