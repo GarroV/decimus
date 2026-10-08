@@ -29,7 +29,7 @@ from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RATING, ReportPeriod
 
-from . import auth, ratings_calendar
+from . import auth, ratings_board, ratings_calendar
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
 from .errors import WebTextError
@@ -98,8 +98,21 @@ def render_summary(conf: Settings) -> str:
     selection, found = report.select(request.args, today=date.today())
     summary = report.build(selection)
     names = _country_names(found.countries, lang)
+
+    def country_name(code: str) -> str:
+        return names.get(code) or country_title(code, lang)
+
+    board = ratings_board.build(
+        summary.lines,
+        summary.total,
+        threshold=summary.thresholds["top_threshold"],
+        sort=request.args.get("sort", ""),
+        name=country_name,
+        total_name=t("ratings.total", lang),
+    )
     return render_template(
         "ratings/index.html",
+        board=board,
         summary=summary,
         choices=found,
         selection=selection,
@@ -110,7 +123,7 @@ def render_summary(conf: Settings) -> str:
         risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
         may_manage=may_manage(),
         unit_url=unit_rating_url,
-        country_name=lambda code: names.get(code) or country_title(code, lang),
+        country_name=country_name,
         ratings_path=section("ratings").path,
         at_format=_AT,
     )

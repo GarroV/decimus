@@ -38,8 +38,8 @@
   </li>{% endfor %}</ol>
   {% endif %}
 {% endmacro %}
-{% macro href(group, value=none, period=selection.period.key) -%}
-  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}
+{% macro href(group, value=none, period=selection.period.key, sort=board.sort) -%}
+  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}{% if sort != 'name' %}&amp;sort={{ sort }}{% endif %}&amp;lang={{ lang }}
 {%- endmacro %}
 {% macro ranked(units, kind, side) %}
   <ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}<li>
@@ -64,6 +64,7 @@
   <form class="rt-bar" data-rt-auto method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
     <input type="hidden" name="group" value="{{ selection.group }}">
     <input type="hidden" name="lang" value="{{ lang }}">
+    {% if board.sort != 'name' %}<input type="hidden" name="sort" value="{{ board.sort }}">{% endif %}
     <div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.group') }}</span>
       <nav class="rt-seg" aria-label="{{ t('ratings.group') }}">
@@ -125,48 +126,46 @@
   {% else %}
   {% set prev = previous_title or '—' %}
   <section class="rt-sec" aria-labelledby="rt-scores">
-    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2><span class="rt-sec__meta">{{ t('ratings.col.delta', prev=prev) }}</span></div>
-    <div class="rt-scores">
-      <div class="rt-kpis">
-        {% for kind, value, delta in (('rs', summary.total.rs, summary.total.rs_delta), ('rko', summary.total.rko, summary.total.rko_delta)) %}
-        <div class="rt-card rt-kpi rt-kpi--{{ kind }}">
-          <div class="rt-kpi__label">{{ t('ratings.' ~ kind) }} · {{ t('ratings.total') }}</div>
-          {% if value is none %}<div class="rt-kpi__why">{{ t('ratings.empty.' ~ kind) }}</div>
-          {% else %}<div class="rt-kpi__row"><span class="rt-kpi__value">{{ '%.1f'|format(value) }}<small>/100</small></span>
-            <span class="rt-kpi__delta">{{ dlt(delta) }} <span>{{ t('ratings.col.delta', prev=prev) }}</span></span></div>{% endif %}
-        </div>
+    <div class="rt-sec__head">
+      <h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2>
+      <span class="rt-sec__meta">{{ t('ratings.col.delta', prev=prev) }}</span>
+      {% if board.rows|length > 2 %}<nav class="rt-sort" aria-label="{{ t('ratings.sort') }}">
+        <span class="rt-sort__label">{{ t('ratings.sort') }}</span>
+        {% for s in ('name', 'rs', 'rko') %}<a href="{{ href(selection.group, selection.value, selection.period.key, s) }}"{% if board.sort == s %} aria-current="true"{% endif %}>{{ t('ratings.sort.' ~ s) }}</a>{% endfor %}
+      </nav>{% endif %}
+    </div>
+    <div class="rt-board" role="table" aria-labelledby="rt-scores">
+      <div class="rt-board__head" role="row">
+        <span role="columnheader" class="rt-board__name">{{ t('ratings.col.country') }}</span>
+        {% for kind in ('rs', 'rko') %}
+        <span role="columnheader" class="rt-board__kind">{{ t('ratings.' ~ kind) }}</span>
+        <span class="rt-scale" aria-hidden="true" style="--thr: {{ board.threshold }}%">
+          {% for v, at in board.ticks %}<i style="left: {{ at }}%">{{ v }}</i>{% endfor %}
+        </span>
         {% endfor %}
       </div>
-      <div class="rt-card rt-scroll">
-        <table class="rt-tbl">
-          <thead><tr>
-            <th scope="col" class="is-text">{{ t('ratings.col.country') }}</th>
-            <th scope="col">{{ t('ratings.rs') }}</th><th scope="col">{{ t('ratings.col.delta', prev=prev) }}</th>
-            <th scope="col">{{ t('ratings.rko') }}</th><th scope="col">{{ t('ratings.col.delta', prev=prev) }}</th>
-          </tr></thead>
-          <tbody>
-            {% for line in summary.lines %}<tr>
-              <th scope="row" class="is-text">{{ country_name(line.country) }}</th>
-              <td class="num">{{ num(line.rs) }}</td><td class="num">{{ dlt(line.rs_delta) }}</td>
-              <td class="num">{{ num(line.rko) }}</td><td class="num">{{ dlt(line.rko_delta) }}</td>
-            </tr>{% endfor %}
-            <tr class="rt-tbl__total">
-              <th scope="row" class="is-text"><span class="rt-tbl__sum" aria-hidden="true">Σ</span>{{ t('ratings.total') }}</th>
-              <td class="num">{{ num(summary.total.rs) }}</td><td class="num">{{ dlt(summary.total.rs_delta) }}</td>
-              <td class="num">{{ num(summary.total.rko) }}</td><td class="num">{{ dlt(summary.total.rko_delta) }}</td>
-            </tr>
-          </tbody>
-        </table>
+      {% for row in board.rows %}
+      <div class="rt-board__row{% if row.is_total %} is-total{% endif %}" role="row" style="--i: {{ loop.index0 }}">
+        <span role="rowheader" class="rt-board__name">{% if row.is_total %}<span class="rt-board__sum" aria-hidden="true">Σ</span>{% endif %}{{ row.name }}</span>
+        {% for kind, tr in (('rs', row.rs), ('rko', row.rko)) %}
+        <span role="cell" class="rt-board__val" data-k="{{ t('ratings.' ~ kind) }}">{% if tr.value is none %}<span class="is-empty">—</span>{% else %}<b class="num">{{ '%.1f'|format(tr.value) }}</b>{{ dlt(tr.delta) }}{% endif %}</span>
+        <span class="rt-track rt-track--{{ tr.trend }}" aria-hidden="true" style="--thr: {{ board.threshold }}%; --cur: {{ tr.cur }}%{% if tr.prev is not none %}; --prev: {{ tr.prev }}%{% endif %}">
+          {% if tr.value is not none %}{% if tr.prev is not none %}<i class="rt-track__trail"></i><i class="rt-track__ghost"></i>{% endif %}<i class="rt-track__dot"></i>{% endif %}
+        </span>
+        {% endfor %}
       </div>
+      {% endfor %}
     </div>
   </section>
 
+  <div class="rt-pair">
   {% for kind, cluster, by in (('rko', summary.rko_cluster, summary.rko_by_country), ('rs', summary.rs_cluster, summary.rs_by_country)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-viol">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-viol">{{ t('ratings.block.' ~ kind ~ '_violations') }}</h2></div>
+    {% if cluster.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>{% else %}
     <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
       {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
-    </div></div>
+    </div></div>{% endif %}
     {#- Нет проверок во всей группе — у каждой страны то же «нет данных»: не повторяем его карточкой на страну. -#}
     {% if summary.countries|length > 1 and cluster.checkups != 0 %}
     <h3 class="rt-sub">{{ t('ratings.by_country') }}</h3>
@@ -181,6 +180,9 @@
   </section>
   {% endfor %}
 
+  </div>
+
+  <div class="rt-pair">
   {% for kind, top, bottom, hard, cluster in (('rs', summary.rs_top, summary.rs_bottom, summary.rs_hard, summary.rs_cluster), ('rko', summary.rko_top, summary.rko_bottom, summary.rko_hard, summary.rko_cluster)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-top">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-top">{{ t('ratings.block.' ~ kind ~ '_top') }}</h2></div>
@@ -196,6 +198,10 @@
       </div></div>
     </div>{% endif %}
   </section>
+  {% endfor %}
+  </div>
+  <div class="rt-pair">
+  {% for kind, top, bottom, hard, cluster in (('rs', summary.rs_top, summary.rs_bottom, summary.rs_hard, summary.rs_cluster), ('rko', summary.rko_top, summary.rko_bottom, summary.rko_hard, summary.rko_cluster)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-hard">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-hard">{{ t('ratings.block.' ~ kind ~ '_hard') }}</h2>{% if hard %}<span class="rt-sec__meta num">{{ hard|length }}</span>{% endif %}</div>
     {#- Без проверок за период — «нет данных», а не «чисто» (P16, P37). -#}
@@ -209,6 +215,7 @@
     {% else %}<div class="rt-empty">{{ t('ratings.empty.violations') }}</div>{% endif %}
   </section>
   {% endfor %}
+  </div>
 
   <section class="rt-sec" aria-labelledby="rt-risk">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-risk">{{ t('ratings.block.risk') }}</h2>

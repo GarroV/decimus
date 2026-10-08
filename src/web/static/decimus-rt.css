@@ -83,20 +83,95 @@
 .rt-delta--down { color: var(--err); }
 .rt-delta__arrow { font-size: .75em; margin-right: 2px; }
 
-/* ── Средние: две плитки итога и таблица стран ──────────────── */
-.rt-scores { display: grid; grid-template-columns: 12rem minmax(0, 46rem); gap: var(--rt-gap); align-items: start; }
-.rt-kpis { display: grid; gap: var(--rt-gap); }
-.rt-kpi { padding: var(--space-3) var(--space-5); display: flex; flex-direction: column; gap: var(--space-1); }
-.rt-kpi__label { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); }
-.rt-kpi__row { display: flex; align-items: baseline; gap: var(--space-3) var(--space-5); flex-wrap: wrap; }
-.rt-kpi__value {
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 18px; line-height: 22px;
-  font-weight: var(--w-semibold); color: var(--ink);
+/* ── Табло стран: шкала вместо стены цифр ───────────────────────
+   Строка — страна; у РС и РКО своя шкала. Бледное кольцо — прошлый период,
+   цветной след — куда сдвинулась, точка — где сейчас. Пунктир — порог
+   Top/Bottom: левее него зона бледно-красная. Итог группы — первой строкой.
+   Одно движение на экране: при загрузке точки переезжают с прошлого места. */
+.rt-board {
+  --rt-name: minmax(8rem, 12rem);
+  --rt-val: 6.75rem;
+  display: grid;
+  grid-template-columns: var(--rt-name) var(--rt-val) minmax(0, 1fr) var(--rt-val) minmax(0, 1fr);
+  column-gap: var(--space-5);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  overflow: hidden;
 }
-.rt-kpi__value small { font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-regular); margin-left: 2px; }
-.rt-kpi__delta { display: inline-flex; gap: var(--space-3); align-items: baseline; font-size: var(--fs-dense); }
-.rt-kpi__delta > span:last-child { color: var(--ink-3); font-size: var(--fs-meta); }
-.rt-kpi__why { font-size: var(--fs-dense); line-height: 28px; color: var(--ink-2); }
+.rt-board__head, .rt-board__row { display: contents; }
+.rt-board__head > * {
+  padding: var(--space-3) 0; border-bottom: 1px solid var(--line);
+  font-size: var(--fs-micro); line-height: var(--lh-micro); font-weight: var(--w-semibold); color: var(--ink-3);
+  background: var(--surface-2);
+}
+.rt-board__head > :first-child, .rt-board__row > :first-child { padding-left: var(--space-5); }
+.rt-board__head > :last-child, .rt-board__row > :last-child { margin-right: var(--space-5); }
+.rt-board__kind { text-align: right; font-size: var(--fs-dense); color: var(--ink-2); }
+.rt-board__row > * {
+  display: flex; align-items: center; min-height: 30px; padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--line); transition: background-color .12s;
+}
+.rt-board__row:last-child > * { border-bottom: 0; }
+.rt-board__row:hover > * { background: var(--surface-2); }
+.rt-board__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rt-board__val { justify-content: flex-end; gap: var(--space-3); font-size: var(--fs-dense); white-space: nowrap; }
+.rt-board__val b { font-weight: var(--w-semibold); color: var(--ink); }
+.rt-board__val .rt-delta { min-width: 3.4em; text-align: right; font-size: var(--fs-meta); }
+.rt-board__row.is-total > * { background: var(--accent-soft); border-bottom: 1px solid var(--accent-line); min-height: 40px; }
+.rt-board__row.is-total .rt-board__val b { font-size: 17px; }
+.rt-board__sum { margin-right: var(--space-3); color: var(--accent); font-family: var(--font-mono); }
+
+/* Подписи шкалы в шапке */
+.rt-scale { position: relative; display: block; height: 1.1em; }
+.rt-scale i {
+  position: absolute; top: var(--space-3); transform: translateX(-50%);
+  font-style: normal; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+.rt-scale i:first-child { transform: none; }
+.rt-scale i:last-child { transform: translateX(-100%); }
+
+/* Шкала строки */
+.rt-track { position: relative; align-self: stretch; }
+.rt-track::before {  /* ось: левее порога — зона ниже Top */
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--err-soft) 0 var(--thr), var(--surface-3) var(--thr) 100%);
+}
+.rt-track::after {  /* порог */
+  content: ""; position: absolute; left: var(--thr); top: 22%; bottom: 22%; border-left: 1px dashed var(--line-strong);
+}
+.rt-track i { position: absolute; top: 50%; display: block; }
+.rt-track__dot {
+  z-index: 2; left: var(--cur); width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%;
+  background: var(--ink-2); box-shadow: 0 0 0 2px var(--surface);
+  animation: rt-slide .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 30ms);
+}
+.rt-track__ghost {
+  z-index: 1; left: var(--prev); width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
+  border: 1.5px solid var(--ink-3); background: var(--surface);
+}
+.rt-track__trail {
+  left: min(var(--prev), var(--cur)); width: calc(max(var(--prev), var(--cur)) - min(var(--prev), var(--cur)));
+  height: 4px; margin-top: -2px; border-radius: 2px; background: var(--ink-3); opacity: .55;
+  animation: rt-fade .7s ease-out both; animation-delay: calc(var(--i, 0) * 30ms + .25s);
+}
+.rt-track--up .rt-track__dot, .rt-track--up .rt-track__trail { background: var(--ok); }
+.rt-track--down .rt-track__dot, .rt-track--down .rt-track__trail { background: var(--err); }
+.rt-board__row:hover .rt-track__dot { transform: scale(1.35); }
+.rt-board__row.is-total .rt-track__dot { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; }
+@keyframes rt-slide { from { left: var(--prev, var(--cur)); } }
+@keyframes rt-fade { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .rt-track__dot, .rt-track__trail { animation: none; } }
+
+/* Сортировка табло */
+.rt-sort { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); }
+.rt-sort__label { color: var(--ink-3); margin-right: var(--space-1); }
+.rt-sort a { padding: 1px var(--space-3); border-radius: var(--r-pill); color: var(--ink-2); }
+.rt-sort a:hover { color: var(--accent); text-decoration: none; }
+.rt-sort a[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+
+/* Пары РС | РКО: блоки нижней части встают рядом, а не лентой */
+.rt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); align-items: start; }
+.rt-pair .rt-two { grid-template-columns: 1fr; }
+.rt-pair .rt-viol { grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr)); }
 
 /* Таблица: строки ~32px, шапка капителью, числа моноширинные справа. */
 .rt-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* relative: скрытая подпись .sr-only не выпадает из прокрутки */
@@ -114,8 +189,6 @@
 .rt-tbl tbody tr:hover > * { background: var(--surface-2); }
 .rt-tbl tbody tr:last-child > * { border-bottom: 0; }
 .rt-tbl .is-empty { color: var(--ink-empty); }
-.rt-tbl__total > * { background: var(--surface-2); font-weight: var(--w-bold); border-top: 1px solid var(--line-strong); }
-.rt-tbl__sum { margin-right: var(--space-3); color: var(--ink-3); }
 .rt-tbl small { color: var(--ink-3); font-size: var(--fs-meta); }
 .rt-tbl .rt-wrap { white-space: normal; overflow-wrap: anywhere; min-width: 12rem; }
 .rt-tbl thead th.rt-th-wrap { white-space: normal; min-width: 9rem; max-width: 14rem; }
@@ -202,13 +275,20 @@
 .rt-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
 .rt-split > .rt-sec { min-width: 0; }
 
+@media (max-width: 899px) { .rt-pair { grid-template-columns: 1fr; } }
+
 /* ── Узкие экраны ───────────────────────────────────────────── */
 @media (max-width: 1100px) {
-  .rt-scores { grid-template-columns: 1fr; }
-  .rt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .rt-split { grid-template-columns: 1fr; }
 }
 @media (max-width: 719px) {
+  .rt-board { grid-template-columns: 8.5rem minmax(0, 1fr); column-gap: var(--space-4); }
+  .rt-board__head { display: none; }
+  .rt-board__row > .rt-board__name { grid-column: 1 / -1; padding: var(--space-3) var(--space-5) 0; border-bottom: 0; }
+  .rt-board__row > .rt-board__val { padding-left: var(--space-5); justify-content: flex-start; border-bottom: 0; }
+  .rt-board__row > .rt-board__val::before { content: attr(data-k); color: var(--ink-3); font-size: var(--fs-meta); margin-right: auto; }
+  .rt-board__row > .rt-board__val { flex-wrap: wrap; }
+  .rt-board__row > .rt-track { margin-right: var(--space-5); border-bottom: 0; }
   .rt { --rt-bar-w: 64px; --rt-cell: var(--space-3) var(--space-3); gap: var(--space-7); }
   .rt-head__title { font-size: var(--fs-display); line-height: var(--lh-display); }
   .rt-sec__title { font-size: var(--fs-title); line-height: var(--lh-title); }
