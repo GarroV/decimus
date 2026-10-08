@@ -87,6 +87,18 @@ def previous_period(
     return _rating(max(earlier, key=lambda p: p.begin_on)) if earlier else None
 
 
+def next_period(period: ReportPeriod, *, rs_periods: Sequence[RatingPeriod]) -> ReportPeriod | None:
+    """Следующий такой же период — для стрелки → календаря (D337)."""
+    if period.kind == KIND_MONTH:
+        year, month = period.begin.year, period.begin.month
+        return month_period(year + 1, 1) if month == 12 else month_period(year, month + 1)
+    if period.kind == KIND_QUARTER:
+        year, quarter = period.begin.year, (period.begin.month - 1) // 3 + 1
+        return quarter_period(year + 1, 1) if quarter == 4 else quarter_period(year, quarter + 1)
+    later = [p for p in rs_periods if p.begin_on > period.begin]
+    return _rating(min(later, key=lambda p: p.begin_on)) if later else None
+
+
 def default_period(latest: date | None, *, today: date) -> ReportPeriod:
     anchor = latest or today
     return quarter_period(anchor.year, (anchor.month - 1) // 3 + 1)

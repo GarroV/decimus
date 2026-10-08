@@ -419,3 +419,5 @@ ratings_settings
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
 CHANNEL_SEED
+# Календарь рейтингов (D337): отметку текущей ячейки читает шаблон, vulture его не видит.
+is_current

@@ -8,6 +8,7 @@ from src.ratings.periods import (
     RatingPeriod,
     default_period,
     month_period,
+    next_period,
     parse_period,
     previous_period,
     quarter_period,
@@ -75,3 +76,13 @@ def test_прошлый_период_рейтинга_ближайший_а_не
 def test_по_умолчанию_квартал_последних_данных() -> None:
     assert default_period(date(2026, 9, 16), today=date(2026, 10, 8)).key == "2026-Q3"
     assert default_period(None, today=date(2026, 10, 8)).key == "2026-Q4"
+
+
+def test_следующий_такой_же_период() -> None:
+    assert next_period(quarter_period(2025, 4), rs_periods=РС) == quarter_period(2026, 1)
+    assert next_period(quarter_period(2026, 2), rs_periods=РС) == quarter_period(2026, 3)
+    assert next_period(month_period(2025, 12), rs_periods=РС) == month_period(2026, 1)
+    assert next_period(month_period(2026, 3), rs_periods=РС) == month_period(2026, 4)
+    nxt = next_period(parse_period("rs:11", rs_periods=РС), rs_periods=РС)  # type: ignore[arg-type]
+    assert nxt is not None and nxt.key == "rs:12"
+    assert next_period(parse_period("rs:12", rs_periods=РС), rs_periods=РС) is None  # type: ignore[arg-type]

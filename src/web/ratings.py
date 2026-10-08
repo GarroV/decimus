@@ -14,7 +14,6 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from datetime import date
 
 from flask import Flask, render_template, request
@@ -28,9 +27,9 @@ from src.ratings import report
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
-from src.ratings.periods import KIND_RATING, ReportPeriod, month_period, quarter_period
+from src.ratings.periods import KIND_RATING, ReportPeriod
 
-from . import auth
+from . import auth, ratings_calendar
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
 from .errors import WebTextError
@@ -78,32 +77,6 @@ def _coded(prefix: str, code: str, params: Mapping[str, str], lang: str, fallbac
         return t(fallback, lang)
 
 
-@dataclass(frozen=True)
-class PeriodGroup:
-    """Группа выпадающего списка периода: месяцы, кварталы, периоды рейтинга РС."""
-
-    kind: str
-    options: tuple[tuple[str, str], ...]
-
-
-def period_groups(
-    months: tuple[date, ...], found: report.Choices, selected: str, lang: str
-) -> tuple[PeriodGroup, ...]:
-    """Периоды с данными (P14): ключ строит форма, руками его не набирают."""
-    month_keys = [month_period(m.year, m.month).key for m in months]
-    quarters = dict.fromkeys(quarter_period(m.year, (m.month - 1) // 3 + 1).key for m in months)
-    rating = [(f"rs:{p.id}", p.title_ru if lang == "ru" else p.title_en) for p in found.rs_periods]
-    groups = [
-        PeriodGroup("month", tuple((k, k) for k in month_keys)),
-        PeriodGroup("quarter", tuple((k, k.replace("-", " ")) for k in quarters)),
-        PeriodGroup("rating", tuple(rating)),
-    ]
-    known = {key for g in groups for key, _ in g.options}
-    if selected not in known:  # период по умолчанию без данных — всё равно виден выбранным
-        groups.insert(0, PeriodGroup("current", ((selected, selected.replace("-Q", " Q")),)))
-    return tuple(g for g in groups if g.options)
-
-
 def _country_names(rows: tuple[read.CountryRow, ...], lang: str) -> dict[str, str]:
     """Имя страны из справочника рейтингов: он знает все страны снимка, `geo_names` — нет."""
     return {row.code: row.name_ru if lang == "ru" else row.name_en for row in rows}
@@ -130,7 +103,9 @@ def render_summary(conf: Settings) -> str:
         summary=summary,
         choices=found,
         selection=selection,
-        periods=period_groups(read.period_months(), found, selection.period.key, lang),
+        calendar=ratings_calendar.build(
+            selection.period, read.period_months(), found.rs_periods, lang
+        ),
         previous_title=_period_title(summary.previous, found, lang),
         risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
         may_manage=may_manage(),
