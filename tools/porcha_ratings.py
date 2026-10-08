@@ -413,14 +413,14 @@ cases = [
     ),
     (
         "src/ratings/summary.py",
-        "        (u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name, u.unit)\n",  # noqa: E501
-        "        (u for u in scored if u.score >= threshold), key=lambda u: (-u.score, u.unit_name, u.unit)\n",  # noqa: E501
+        "(u for u in scored if shown(u.score) > threshold)",
+        "(u for u in scored if shown(u.score) >= threshold)",
         "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
     ),
     (
         "src/ratings/summary.py",
-        "        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name, u.unit)\n",  # noqa: E501
-        "        (u for u in scored if u.score < threshold), key=lambda u: (u.score, u.unit_name, u.unit)\n",  # noqa: E501
+        "(u for u in scored if shown(u.score) <= threshold)",
+        "(u for u in scored if shown(u.score) < threshold)",
         "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
     ),
     (
@@ -467,14 +467,14 @@ cases = [
     ),
     (
         "src/ratings/summary.py",
-        "        if all(score < threshold for score in scores):\n",
-        "        if any(score < threshold for score in scores):\n",
+        "        if all(shown(score) < threshold for score in scores):\n",
+        "        if any(shown(score) < threshold for score in scores):\n",
         "tests/test_ratings_summary.py::test_зона_риска_три_подряд_строго_ниже",
     ),
     (
         "src/ratings/summary.py",
-        "        if all(score < threshold for score in scores):\n",
-        "        if all(score <= threshold for score in scores):\n",
+        "        if all(shown(score) < threshold for score in scores):\n",
+        "        if all(shown(score) <= threshold for score in scores):\n",
         "tests/test_ratings_summary.py::test_зона_риска_три_подряд_строго_ниже",
     ),
     (
@@ -693,6 +693,44 @@ cases = [
         "src/web/templates/ratings/index.html",
         "{% if block.checkups == 0 %}",
         "{% if false %}",
+        "tests/test_web_ratings_flow.py",
+    ),
+    # Раунд 1 T11: граница по показанному значению (P38), «нет данных» в
+    # хард-блоке и неполное окно зоны риска (P37), название периода РС (P39).
+    (
+        "src/ratings/summary.py",
+        "(u for u in scored if shown(u.score) > threshold)",
+        "(u for u in scored if u.score > threshold)",
+        "tests/test_ratings_summary.py::test_граница_top_bottom_по_показанному_значению",
+    ),
+    (
+        "src/ratings/summary.py",
+        "(u for u in scored if shown(u.score) <= threshold)",
+        "(u for u in scored if u.score <= threshold)",
+        "tests/test_ratings_summary.py::test_граница_top_bottom_по_показанному_значению",
+    ),
+    (
+        "src/ratings/summary.py",
+        "if all(shown(score) < threshold for score in scores):",
+        "if all(score < threshold for score in scores):",
+        "tests/test_ratings_summary.py::test_зона_риска_по_показанному_значению",
+    ),
+    (
+        "src/web/templates/ratings/index.html",
+        "{% if cluster.checkups == 0 %}",
+        "{% if false %}",
+        "tests/test_web_ratings_flow.py",
+    ),
+    (
+        "src/ratings/report.py",
+        "            short.append(rating_type)\n",
+        "",
+        "tests/test_web_ratings_flow.py",
+    ),
+    (
+        "src/web/ratings.py",
+        "    if period.kind == KIND_RATING:\n",
+        "    if False:\n",
         "tests/test_web_ratings_flow.py",
     ),
     (

@@ -81,6 +81,10 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "No pizzerias at or below the threshold.",
     },
     "ratings.empty.risk": {"ru": "В зоне риска никого.", "en": "Nobody is at risk."},
+    "ratings.risk.short": {
+        "ru": "Недостаточно периодов для оценки: {types}.",
+        "en": "Not enough periods to assess: {types}.",
+    },
     "ratings.empty.countries": {
         "ru": "В группе нет стран: задайте девелопера стране в «Загрузках».",
         "en": "No countries in this group: assign a developer in Uploads.",

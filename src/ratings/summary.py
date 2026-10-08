@@ -1,6 +1,8 @@
 """Расчёты сводки рейтингов (D324): чистые функции над уже прочитанными фактами.
 
-Округления здесь нет — только на экране. Решения плана: страна — среднее
+Средние не округляются; граница Top/Bottom и зоны риска судится по значению
+с точностью показа (`SCORE_DIGITS`, P38) — экран и раскладка не расходятся.
+Решения плана: страна — среднее
 пиццерий (каждая — среднее своих периодов), итог группы — среднее всех
 пиццерий группы; ровно порог — в Bottom; зона риска — строго ниже порога во
 всех последних N периодах.
@@ -21,6 +23,12 @@ TOP_LIMIT = 10
 VIOLATIONS_LIMIT = 5
 _COUNTED = (CATEGORY_VIOLATION, CATEGORY_REMARK)
 DELTA_DIGITS = 1  # точность показа на экране; знак дельты судится по ней
+SCORE_DIGITS = 1  # точность показа оценки; с порогом сравнивается показанное (P38)
+
+
+def shown(score: float) -> float:
+    """Оценка так, как её видит человек: с порогом сравнивается она, а не хвост."""
+    return round(score, SCORE_DIGITS)
 
 
 def _strip_mark(text: str) -> str:
@@ -145,10 +153,12 @@ def top_bottom(
         for unit, avg in unit_averages(facts, rating_type).items()
     ]
     top = sorted(
-        (u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name, u.unit)
+        (u for u in scored if shown(u.score) > threshold),
+        key=lambda u: (-u.score, u.unit_name, u.unit),
     )
     bottom = sorted(
-        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name, u.unit)
+        (u for u in scored if shown(u.score) <= threshold),
+        key=lambda u: (u.score, u.unit_name, u.unit),
     )
     return tuple(top[:limit]), tuple(bottom[:limit])
 
@@ -252,7 +262,7 @@ def risk_zone(
         if len(by_period) != len(period_ids):
             continue
         scores = tuple(by_period[pid].score for pid in period_ids)
-        if all(score < threshold for score in scores):
+        if all(shown(score) < threshold for score in scores):
             sample = by_period[period_ids[-1]]
             zone.append(RiskUnit(unit, sample.unit_name, sample.country, rating_type, scores))
     return tuple(sorted(zone, key=lambda u: (u.country, u.unit_name)))
