@@ -71,7 +71,9 @@ def test_однозначные_слова_находят_пункт_без_мо
     итог = _найти("нагар на поду", [b"x"])
 
     assert итог.via == "fast" and модель.звали == [], "быстрый путь платил бы модели зря"
-    assert итог.candidates[0].wording == "нагар на поду", "как у бота: сказанное и есть формулировка"
+    assert итог.candidates[0].wording == "нагар на поду", (
+        "как у бота: сказанное и есть формулировка"
+    )
 
 
 def test_выученная_фраза_находит_пункт_без_модели(
@@ -181,7 +183,9 @@ def test_запись_по_предложению_хранит_слова_и_п�
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     выучено: list[tuple[str, str]] = []
-    monkeypatch.setattr(walk_write, "learn", lambda w, *, item_code, **k: выучено.append((w, item_code)) or "")
+    monkeypatch.setattr(
+        walk_write, "learn", lambda w, *, item_code, **k: выучено.append((w, item_code)) or ""
+    )
     ответ = клиент.запись(
         op="add",
         zone="hot_kitchen",
@@ -190,7 +194,13 @@ def test_запись_по_предложению_хранит_слова_и_п�
         text="Нагар на поду.",
         words="нагар",
         photos=[клиент.ссылка()],
-        suggested={"code": "CLN05", "level": "D2", "zone": "hot_kitchen", "confidence": 0.8, "via": "model"},
+        suggested={
+            "code": "CLN05",
+            "level": "D2",
+            "zone": "hot_kitchen",
+            "confidence": 0.8,
+            "via": "model",
+        },
     )
 
     assert ответ.status_code == 200, ответ.get_json()
@@ -219,4 +229,12 @@ def test_выученная_фраза_второй_раз_не_учится(
     )
 
     запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
-    assert выучено == [] and запись.suggested_code == "", "как у бота: выученное не пишется предложением"
+    assert выучено == [] and запись.suggested_code == "", (
+        "как у бота: выученное не пишется предложением"
+    )
+
+
+def test_в_модель_идёт_не_больше_десяти_кадров(модель: Модель) -> None:
+    _найти("нагар", [bytes([i]) for i in range(25)])
+
+    assert len(модель.звали[0]["photos"]) == ядро.MODEL_FRAMES_MAX, "каждый кадр — платный"

@@ -350,6 +350,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Повтор ставится только нарушению класса D1 или D2.",
         "en": "Only a D1 or D2 issue can be marked as a repeat.",
     },
+    "walk.err.suggest_busy": {
+        "ru": "Система ещё ищет пункт по прошлому нажатию — подождите пару секунд.",
+        "en": "Still looking for the item from your last tap — give it a few seconds.",
+    },
     "walk.err.recognize": {
         "ru": "Система сейчас не может найти пункт. Выберите его вручную — запись не потеряется.",
         "en": "The system can't find the item right now. Pick it yourself — nothing is lost.",
