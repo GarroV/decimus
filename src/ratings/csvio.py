@@ -9,7 +9,7 @@ from __future__ import annotations
 import csv
 import io
 
-from .model import ERR_EMPTY, ERR_NOT_UTF8, RatingsFormatError
+from .model import ERR_BAD_CSV, ERR_EMPTY, ERR_NOT_UTF8, RatingsFormatError
 
 
 def decode(data: bytes) -> str:
@@ -30,10 +30,16 @@ def read_table(data: bytes) -> tuple[tuple[str, ...], list[tuple[int, list[str]]
     first = text.split("\n", 1)[0]
     delimiter = ";" if first.count(";") > first.count(",") else ","
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
-    header = tuple(cell.strip() for cell in next(reader))
-    rows = [
-        (reader.line_num, [cell.strip() for cell in row])
-        for row in reader
-        if any(cell.strip() for cell in row)
-    ]
+    try:
+        header = tuple(cell.strip() for cell in next(reader))
+        rows = [
+            (reader.line_num, [cell.strip() for cell in row])
+            for row in reader
+            if any(cell.strip() for cell in row)
+        ]
+    except csv.Error as exc:  # ячейка длиннее лимита, NUL и т. п.
+        raise RatingsFormatError(
+            f"Файл CSV повреждён и не читается ({exc}). Выгрузите его заново из Dodo IS",
+            ERR_BAD_CSV,
+        ) from exc
     return header, rows

@@ -23,6 +23,7 @@ from .model import (
     FORMAT_SHEET_SCORES,
     ISSUE_BAD_ROW,
     ISSUE_COUNTRY_UNKNOWN,
+    ISSUE_DEVELOPER_CONFLICT,
     RKO,
     RS,
     Issue,
@@ -207,7 +208,15 @@ def parse_sheet_scores(data: bytes, *, today: date) -> Parsed:
             )
             continue
         if developer:
-            developers.setdefault(country, developer)
+            known = developers.setdefault(country, developer)
+            if known != developer:
+                issues.append(
+                    Issue(
+                        row_no,
+                        ISSUE_DEVELOPER_CONFLICT,
+                        {"country": country, "kept": known, "ignored": developer, "unit": name},
+                    )
+                )
         link = parse_rating_link(link_raw) if link_raw else None
         unit = UnitRef(link.unit_id if link else None, name, country)
         bad: list[str] = []

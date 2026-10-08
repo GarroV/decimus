@@ -13,7 +13,7 @@ import pytest
 from ratings_samples import SHEET_RS_HEADER, U1, sheet_rko, sheet_rs, to_csv
 
 from src.ratings.formats import detect_format
-from src.ratings.model import ISSUE_BAD_ROW, RKO, RS, RatingsFormatError
+from src.ratings.model import ISSUE_BAD_ROW, ISSUE_DEVELOPER_CONFLICT, RKO, RS, RatingsFormatError
 from src.ratings.sheet import assign_years, is_sheet_header, parse_label, parse_sheet_scores
 
 СЕГОДНЯ = date(2026, 10, 8)
@@ -104,3 +104,12 @@ def test_ссылка_листа_чужой_хост_id_не_берётся() ->
     )
     parsed = parse_sheet_scores(data, today=СЕГОДНЯ)
     assert {s.unit.dodo_id for s in parsed.scores if s.unit.name == "Testville-1"} == {None}
+
+
+def test_два_девелопера_у_страны_не_теряются_молча() -> None:
+    data = sheet_rs().replace("Dev One,Slovenia".encode(), "Dev Two,Serbia".encode())
+    parsed = parse_sheet_scores(data, today=СЕГОДНЯ)
+    assert parsed.developers == {"RS": "Dev One"}
+    assert [(i.reason, i.detail["ignored"]) for i in parsed.issues] == [
+        (ISSUE_DEVELOPER_CONFLICT, "Dev Two")
+    ]

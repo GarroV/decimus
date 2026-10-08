@@ -34,6 +34,7 @@ from src.ratings.links import backoffice_checkup_id, hex_id, parse_rating_link, 
 from src.ratings.model import (
     CATEGORY_OTHER,
     CATEGORY_VIOLATION,
+    ERR_BAD_CSV,
     ERR_EMPTY,
     ERR_MISSING_COLUMNS,
     ERR_NOT_UTF8,
@@ -217,7 +218,7 @@ def test_сохранённый_в_excel_с_точкой_с_запятой_чи�
                 "Testville-1",
                 "https://control.dodois.io/backoffice/checkups/" + C1,
                 kb(U1, 2, C1, P_RS),
-                "2026-10-06 15:15:00",
+                "06.10.2026 15:15",
                 "",
                 "",
                 "IMF",
@@ -230,7 +231,41 @@ def test_сохранённый_в_excel_с_точкой_с_запятой_чи�
         delimiter=";",
     )
     assert detect_format(data) == "rs-checkups"
-    assert len(parse_rs_checkups(data).checkups) == 1
+    parsed = parse_rs_checkups(data)
+    assert parsed.issues == ()
+    assert parsed.checkups[0].occurred_at == datetime(2026, 10, 6, 15, 15, tzinfo=UTC)
+
+
+def test_дата_excel_с_секундами() -> None:
+    data = rs_checkups().replace(b"2026-10-06 15:15:00", b"06.10.2026 15:15:07")
+    parsed = parse_rs_checkups(data)
+    assert parsed.issues == ()
+    assert parsed.checkups[0].occurred_at == datetime(2026, 10, 6, 15, 15, 7, tzinfo=UTC)
+
+
+def test_дата_не_по_образцу_строкой_журнала() -> None:
+    parsed = parse_rs_checkups(rs_checkups().replace(b"2026-10-06 15:15:00", b"06/10/2026"))
+    assert [i.reason for i in parsed.issues] == [ISSUE_BAD_ROW]
+
+
+def test_продолжительность_надстрочная_цифра_строкой_журнала() -> None:
+    data = rs_checkups().replace(b",42\r\n", ",".encode() + "²".encode() + b"\r\n")
+    parsed = parse_rs_checkups(data)
+    assert [i.reason for i in parsed.issues] == [ISSUE_BAD_ROW]
+    assert len(parsed.checkups) == 1  # вторая строка принята, РФ отброшена
+
+
+def test_файл_без_bom_и_с_lf_читается() -> None:
+    data = rs_checkups().removeprefix(b"\xef\xbb\xbf").replace(b"\r\n", b"\n")
+    parsed = parse_rs_checkups(data)
+    assert len(parsed.checkups) == 2 and parsed.issues == ()
+
+
+def test_ячейка_длиннее_лимита_csv_отказ_а_не_падение() -> None:
+    data = rs_checkups().replace("Тест Тестов".encode(), b"x" * 200_000, 1)
+    with pytest.raises(RatingsFormatError, match="повреждён") as exc:
+        parse_rs_checkups(data)
+    assert exc.value.code == ERR_BAD_CSV
 
 
 def test_не_utf8_отказ_с_подсказкой() -> None:
