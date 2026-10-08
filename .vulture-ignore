@@ -419,3 +419,11 @@ ratings_settings
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
 CHANNEL_SEED
+
+# API чтения /api/v1 (#567, `src/web/api.py`): маршруты и крючок after_request
+# регистрирует декоратор Flask, по имени их не зовёт никто.
+_after
+_scores
+_checkups
+_inspections_route
+_other

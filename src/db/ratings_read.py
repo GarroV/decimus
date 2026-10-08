@@ -336,3 +336,99 @@ def set_setting(key: str, value: float, *, actor: str) -> None:
     )
     if changed == 0:
         raise RatingsEditError(f"Настройки «{key}» нет", REFUSED_SETTING_UNKNOWN, key=key)
+
+
+# --- чтение для API `/api/v1/ratings/*` (#567) --------------------------------
+#
+# Те же правила среза, что у сводки: период выбирается по дню начала, проверки
+# РКО и РС кладутся в период по дате в UTC, отклонённые на приёмке вне счёта.
+
+
+@dataclass(frozen=True)
+class PeriodRow:
+    id: int
+    begin_on: date
+    end_on: date
+    title_ru: str
+    title_en: str
+
+
+def periods_between(
+    rating_type: str, *, begin: date | None, end: date | None, limit: int
+) -> tuple[PeriodRow, ...]:
+    """Периоды типа, начавшиеся в `[begin, end]` (граница `None` — без неё), старые первыми.
+
+    Не больше `limit` строк: вызывающий просит на одну больше своего предела,
+    чтобы отличить «ровно предел» от «больше».
+    """
+    return tuple(
+        PeriodRow(int(r[0]), r[1], r[2], r[3], r[4])
+        for r in _rows(
+            "select id, begin_on, end_on, title_ru, title_en from ratings.periods "
+            "where rating_type = %s "
+            "and begin_on >= coalesce(%s::date, '-infinity'::date) "
+            "and begin_on <= coalesce(%s::date, 'infinity'::date) "
+            "order by begin_on, id limit %s",
+            (rating_type, begin, end, limit),
+        )
+    )
+
+
+#: Проверки пиццерии в периоде по каналу: дата проверки внутри дат периода (UTC).
+_CHECKUP_COUNTS = (
+    "select c.unit_dodo_id, u.country_code, p.id, c.channel, count(*) "
+    "from ratings.checkups c join ratings.units u on u.dodo_id = c.unit_dodo_id "
+    "join ratings.periods p on p.rating_type = c.rating_type "
+    "and c.occurred_at >= (p.begin_on)::timestamp at time zone 'UTC' "
+    "and c.occurred_at < (p.end_on + 1)::timestamp at time zone 'UTC' "
+    "where c.rating_type = %s and u.country_code = any(%s) and p.id = any(%s) "
+    "and c.channel is not null "
+    "and c.acceptance is distinct from 'rejected' "
+    "group by 1, 2, 3, 4 order by 1, 3, 4"
+)
+
+
+def checkup_counts(
+    rating_type: str, *, countries: Sequence[str], period_ids: Sequence[int]
+) -> list[tuple[str, str, int, str, int]]:
+    """`(unit, country, period_id, channel, count)` — проверки, принятые в счёт."""
+    return [
+        (str(r[0]), str(r[1]), int(r[2]), str(r[3]), int(r[4]))
+        for r in _rows(_CHECKUP_COUNTS, (rating_type, list(countries), list(period_ids)))
+    ]
+
+
+#: Нарушения РКО — из проверок периода (как `_RKO_FACTS`), но по каждому периоду.
+_RKO_PERIOD_VIOLATIONS = (
+    "select p.id, u.country_code, v.text, v.category, v.amount, v.criterion_id "
+    "from ratings.checkups c join ratings.units u on u.dodo_id = c.unit_dodo_id "
+    "join ratings.violations v on v.rating_type = c.rating_type and v.checkup_dodo_id = c.dodo_id "
+    "join ratings.periods p on p.rating_type = 'rko' "
+    "and c.occurred_at >= (p.begin_on)::timestamp at time zone 'UTC' "
+    "and c.occurred_at < (p.end_on + 1)::timestamp at time zone 'UTC' "
+    "where c.rating_type = 'rko' and u.country_code = any(%s) and p.id = any(%s) "
+    "and c.acceptance is distinct from 'rejected' "
+    "order by v.id"
+)
+#: Нарушения РС — замечания периода (как `_RS_REMARKS`).
+_RS_PERIOD_VIOLATIONS = (
+    "select p.id, u.country_code, v.text, v.category, v.amount, v.criterion_id "
+    "from ratings.violations v join ratings.units u on u.dodo_id = v.unit_dodo_id "
+    "join ratings.periods p on p.id = v.period_id "
+    "where v.category = 'remark' and p.rating_type = 'rs' "
+    "and u.country_code = any(%s) and p.id = any(%s) "
+    "order by v.id"
+)
+
+
+def period_violations(
+    rating_type: str, *, countries: Sequence[str], period_ids: Sequence[int]
+) -> list[tuple[int, str, str, str, int, str | None]]:
+    """`(period_id, country, text, category, amount, criterion_id)` по периодам."""
+    if rating_type not in _RULE_TYPES:
+        raise RatingsError(f"Тип рейтинга — rs или rko, а не {rating_type!r}")
+    sql = _RKO_PERIOD_VIOLATIONS if rating_type == "rko" else _RS_PERIOD_VIOLATIONS
+    return [
+        (int(r[0]), str(r[1]), str(r[2]), str(r[3]), int(r[4]), r[5])
+        for r in _rows(sql, (list(countries), list(period_ids)))
+    ]

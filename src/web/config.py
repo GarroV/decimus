@@ -50,6 +50,9 @@ WEB_HSTS_VAR = "WEB_HSTS"
 #: читает; пишет в него этот сервис, отдельным контейнером со своим томом на
 #: запись. Пусто — адресов обхода у админки нет.
 WEB_WALK_UPSTREAM_VAR = "WEB_WALK_UPSTREAM"
+#: Открыть ли API чтения `/api/v1` для сервисов по токену (#567, D336). По
+#: умолчанию закрыто: без переменной маршрутов API у стенда нет вовсе.
+API_ENABLED_VAR = "API_ENABLED"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -114,6 +117,8 @@ class Settings:
     #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
     #: `None` — адреса обхода админкой не отдаются.
     walk_upstream: str | None = None
+    #: Маршруты API `/api/v1` зарегистрированы (`API_ENABLED=1`). По умолчанию нет.
+    api_enabled: bool = False
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -200,6 +205,22 @@ def _parse_listen_network(raw: str) -> bool:
     raise WebConfigError(
         f"Значение {WEB_LISTEN_NETWORK_VAR}={value} не понято: ожидается 1 (слушать сеть "
         f"контейнера за общим прокси) или пусто/0 (только петля)"
+    )
+
+
+def _parse_api_enabled(raw: str) -> bool:
+    """Открыт ли API. Пусто и `0` — нет, `1` — да, остальное — отказ запуска.
+
+    Опечатка не должна тихо открыть наружу поверхность, которую считают закрытой.
+    """
+    value = raw.strip()
+    if value in ("", "0"):
+        return False
+    if value == "1":
+        return True
+    raise WebConfigError(
+        f"Значение {API_ENABLED_VAR}={value} не понято: ожидается 1 (открыть API /api/v1 "
+        f"по токенам) или пусто/0 (API нет)"
     )
 
 
@@ -335,4 +356,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
         walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
+        api_enabled=_parse_api_enabled(src.get(API_ENABLED_VAR) or ""),
     )

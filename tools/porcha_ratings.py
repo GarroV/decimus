@@ -811,6 +811,49 @@ cases = [
         "        kind=KIND_INSPECTIONS,\n",
         "tests/test_mcp_ratings.py::test_инструмент_своего_вида",
     ),
+    # API чтения /api/v1 (#567, D336): заслоны доступа.
+    (
+        "src/web/api.py",
+        "        if scope is not None and scope not in consumer.scopes:\n",
+        "        if False:\n",
+        "tests/test_web_api.py::test_право_рейтингов_не_открывает_проверки",
+    ),
+    (
+        "src/web/api.py",
+        "        if consumer is None:\n",
+        "        if False:\n",
+        "tests/test_web_api.py::test_без_заголовка_401",
+    ),
+    (
+        "src/db/api_tokens.py",
+        "where fingerprint = %s and revoked_at is null\n",
+        "where fingerprint = %s\n",
+        "tests/test_web_api.py::test_незнакомый_и_отозванный_неразличимы",
+    ),
+    (
+        "src/web/api.py",
+        "        wait = per_token.hit(consumer.token_id)\n        if wait:\n",
+        "        wait = per_token.hit(consumer.token_id)\n        if False:\n",
+        "tests/test_web_api.py::test_лимит_на_токен_429",
+    ),
+    (
+        "src/web/api.py",
+        "        if not _COUNTRY.fullmatch(code) or code not in IMF_COUNTRIES:\n",
+        "        if False:\n",
+        "tests/test_web_api.py::test_параметры_400",
+    ),
+    (
+        "src/web/api.py",
+        '        "address": address,\n',
+        '        "address": address,\n        "auth": request.headers.get("Authorization"),\n',
+        "tests/test_web_api.py::test_журнал_без_токена",
+    ),
+    (
+        "src/db/migrations/0041_api_tokens.sql",
+        "grant update (last_used_at) on api_tokens to dodo_audit_app;\n",
+        "grant update (last_used_at, scopes) on api_tokens to dodo_audit_app;\n",
+        "tests/test_db_api_tokens.py::test_роль_приложения_не_расширяет_права",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
