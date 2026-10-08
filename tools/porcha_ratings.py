@@ -26,6 +26,10 @@ _RKO_HI_LOCAL = '    "and c.occurred_at < ((%s::date) + 1)::timestamp "\n'
 _RKO_HI_SAME_DAY = "    \"and c.occurred_at < (%s::date)::timestamp at time zone 'UTC' \"\n"
 _RKO_FACTS_TAIL = "    \"and c.acceptance is distinct from 'rejected' \"\n"
 _RKO_COUNTS_TAIL = "    \"and c.acceptance is distinct from 'rejected' group by 1\"\n"
+# Заслон веб-маршрута рейтингов (T11): адресуется вместе со строкой `def`, у
+# каждого маршрута своей, — сам заслон у всех одинаковый.
+_WEB_GATE = "    def {name}:\n        if not may_manage():\n"
+_WEB_OPEN = "    def {name}:\n        if False:\n"
 
 cases = [
     (
@@ -628,6 +632,68 @@ cases = [
         "    if rating_type not in _RULE_TYPES or match not in _RULE_MATCHES:\n",
         "    if False:\n",
         "tests/test_db_ratings_read.py::test_правило_неверного_типа_отказ_своим_кодом",
+    ),
+    # Веб-раздел (T11): партнёр и аудитор получают 403 на загрузку и справочники,
+    # контроль — 200; пустой блок нарушений без проверок пишет «нет данных» (P16).
+    (
+        "src/web/ratings.py",
+        "    return вошедший is not None and may_manage_ratings(вошедший.role, вошедший.tenant)\n",
+        "    return вошедший is not None\n",
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        "    return вошедший is not None and may_manage_ratings(вошедший.role, вошедший.tenant)\n",
+        "    return False\n",
+        "tests/test_web_ratings.py::test_контроль_и_админ_уК_загружают",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_imports() -> str | tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_imports() -> str | tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_upload() -> tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_upload() -> tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_developer() -> tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_developer() -> tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_rule_add() -> tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_rule_add() -> tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_rule_remove(rule_id: int) -> tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_rule_remove(rule_id: int) -> tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        _WEB_GATE.format(name="ratings_settings() -> tuple[str, int]"),
+        _WEB_OPEN.format(name="ratings_settings() -> tuple[str, int]"),
+        "tests/test_web_ratings.py::test_загрузка_и_справочники_закрыты",
+    ),
+    (
+        "src/web/ratings.py",
+        "        refuse_foreign_origin()\n        return _upload(conf)\n",
+        "        return _upload(conf)\n",
+        "tests/test_web_ratings.py::test_чужой_origin_отказ",
+    ),
+    (
+        "src/web/templates/ratings/index.html",
+        "{% if block.checkups == 0 %}",
+        "{% if false %}",
+        "tests/test_web_ratings_flow.py",
     ),
 ]
 

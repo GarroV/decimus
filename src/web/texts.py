@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
+from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_walk import WALK_TEXTS
@@ -1768,8 +1769,17 @@ TEXTS: dict[str, dict[str, str]] = {
 
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
-# Предписания (волна 3), отказы «Методики» (#475) и заведение пиццерии (#437) — так же.
-_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS, UNIT_TEXTS, WALK_TEXTS)
+# Предписания (волна 3), отказы «Методики» (#475), заведение пиццерии (#437) и
+# рейтинги (спека 2026-10-08) — так же.
+_ЧАСТИ = (
+    TEXTS,
+    PLAN_TEXTS,
+    PRESCRIPTION_TEXTS,
+    RATINGS_TEXTS,
+    REFUSAL_TEXTS,
+    UNIT_TEXTS,
+    WALK_TEXTS,
+)
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
     for номер, часть in enumerate(_ЧАСТИ)
@@ -1782,6 +1792,7 @@ TEXTS = {
     **TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
+    **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
     **UNIT_TEXTS,
     **WALK_TEXTS,

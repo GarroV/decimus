@@ -79,6 +79,10 @@ class ImportReport:
     label: str | None = None
     #: У дубля — когда файл лёг впервые.
     loaded_at: datetime | None = None
+    #: Номер части снимка и их число (P26): подпись на языке интерфейса строит
+    #: веб, `label` — русская строка для журнала и MCP.
+    chunk_index: int | None = None
+    chunk_of: int | None = None
 
 
 def parse_file(data: bytes, *, kind: str | None, today: date) -> Parsed:
@@ -353,7 +357,13 @@ def _write(
                 note=parsed.label,
             )
             return ImportReport(
-                dup, parsed.format, OUTCOME_DUPLICATE, label=parsed.label, loaded_at=prior[1]
+                dup,
+                parsed.format,
+                OUTCOME_DUPLICATE,
+                label=parsed.label,
+                loaded_at=prior[1],
+                chunk_index=parsed.chunk_index,
+                chunk_of=parsed.chunk_of,
             )
         import_id = store.open_import(
             conn,
@@ -389,6 +399,8 @@ def _write(
         unmatched=unmatched,
         issues=len(issues),
         label=parsed.label,
+        chunk_index=parsed.chunk_index,
+        chunk_of=parsed.chunk_of,
     )
 
 

@@ -55,6 +55,7 @@ from . import (
     prescriptions,
     pricing,
     profile,
+    ratings,
     review,
     revision,
     security_headers,
@@ -105,7 +106,17 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans", "orders")
+SCREENS = (
+    "overview",
+    "registry",
+    "country",
+    "ratings",
+    "admin",
+    "users",
+    "actions",
+    "plans",
+    "orders",
+)
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -132,6 +143,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     prescriptions.install(app, conf)
+    ratings.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1435,16 +1447,17 @@ def _install_hq_gate(app: Flask) -> None:
             abort(404)
 
 
-#: Адрес раздела рейтингов: единственное место, где «контроль» (D319) что-то правит.
-RATINGS_PATH = "/ratings"
-
 #: Безопасные методы: читать «контроль» может везде (спека: остальные разделы — на чтение).
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
-def _control_may_write(path: str, *, users_path: str, logout_path: str) -> bool:
-    """Куда «контроль» может писать: рейтинги и дела самого человека (выход, пароль, бот)."""
-    if path == RATINGS_PATH or path.startswith(f"{RATINGS_PATH}/"):
+def _control_may_write(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
+    """Куда «контроль» может писать: рейтинги и дела самого человека (выход, пароль, бот).
+
+    Рейтинги — единственный раздел, где «контроль» (D319) что-то правит; адрес
+    берётся из реестра разделов, а не повторяется здесь строкой.
+    """
+    if path == ratings_path or path.startswith(f"{ratings_path}/"):
         return True
     own = (
         logout_path,
@@ -1464,6 +1477,7 @@ def _install_control_gate(app: Flask) -> None:
     бота) открыты: это не правка разделов.
     """
     users_path = section("users").path
+    ratings_path = section("ratings").path
 
     @app.before_request
     def _контроль_читает() -> None:
@@ -1473,7 +1487,10 @@ def _install_control_gate(app: Flask) -> None:
         if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
             return
         if not _control_may_write(
-            request.path, users_path=users_path, logout_path=auth.LOGOUT_PATH
+            request.path,
+            ratings_path=ratings_path,
+            users_path=users_path,
+            logout_path=auth.LOGOUT_PATH,
         ):
             abort(403)
 
