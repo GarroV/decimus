@@ -4,10 +4,10 @@
   на маршрутах `src/web/ratings.py`. Примечания журнала и причины строк пишет
   импортёр по-русски (для журнала и MCP), поэтому в другой язык они не идут:
   причина строки показывается по коду (P15). Вид — как у сводки (D334),
-  стили — `static/ratings.css`.
+  стили — `static/decimus-rt.css`.
 #}{% extends "base.html" %}
 {% block title %}{{ t('ratings.imports.title') }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='ratings.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">{% endblock %}
 
 {% macro action(path) %}{{ url(ratings_path ~ path) }}?lang={{ lang }}{% endmacro %}
 {% macro sec_head(id, key, meta=none) %}<div class="rt-sec__head"><h2 class="rt-sec__title" id="{{ id }}">{{ t(key) }}</h2>{% if meta %}<span class="rt-sec__meta">{{ meta }}</span>{% endif %}</div>{% endmacro %}
