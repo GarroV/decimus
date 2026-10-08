@@ -168,6 +168,7 @@ def _history(
 ) -> tuple[dict[str, PeriodRef], list[tuple[PeriodRef, float, str | None]]]:
     periods: dict[str, PeriodRef] = {}
     history: list[tuple[PeriodRef, float, str | None]] = []
+    slots: set[tuple[str, date]] = set()
     for item in _list(raw.get("history"), "history"):
         if not isinstance(item, dict):
             raise _BadUnit("элемент истории без описания")
@@ -175,6 +176,10 @@ def _history(
         key = period.dodo_id or ""
         if key in periods:
             raise _BadUnit("период повторён в истории")
+        # unique (rating_type, begin_on) в базе склеил бы два периода в один молча.
+        if (period.rating_type, period.begin_on) in slots:
+            raise _BadUnit("два периода с одним типом и началом")
+        slots.add((period.rating_type, period.begin_on))
         periods[key] = period
         score = _number(item.get("score"), "балл")
         if score is None:

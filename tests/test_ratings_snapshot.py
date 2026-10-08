@@ -147,7 +147,11 @@ _BAD_UNITS: list[tuple[str, dict[str, Any]]] = [
     ("статус словарём", {"history": _history(status={"a": 1})}),
     ("alias списком", {"history": _history(alias=["x"])}),
     ("alias огромный", {"history": _history(alias=HUGE)}),
-    ("период повторён", {"history": _history() + _history()}),
+    # Тот же id с другими датами: повтор ловит именно проверка id, а не проверка слота.
+    (
+        "период повторён",
+        {"history": _history() + _history(begin="2026-09-01", end="2026-09-15")},
+    ),
     ("замечания блок не словарь", {"remarks": [1]}),
     ("period_id замечаний списком", {"remarks": [{"period_id": [P_RS], "items": []}]}),
     ("items не список", {"remarks": [{"period_id": P_RS, "checkups": 1, "items": 3}]}),
@@ -400,6 +404,14 @@ def test_два_id_с_одним_типом_и_началом_вторая_пи�
     assert [(i.row_no, i.reason) for i in parsed.issues] == [(2, ISSUE_BAD_ROW)]
     assert "одним типом и началом" in parsed.issues[0].detail["reason"]
     assert {s.unit.dodo_id for s in parsed.scores} == {U1}
+
+
+def test_два_id_с_одним_типом_и_началом_у_одной_пиццерии_в_журнал() -> None:
+    """Иначе база склеит два периода в один, и второй балл молча перезапишет первый."""
+    parsed = parse_snapshot(_two_units(_history() + _history(id="ee" * 16), _history()))
+    assert [(i.row_no, i.reason) for i in parsed.issues] == [(1, ISSUE_BAD_ROW)]
+    assert "одним типом и началом" in parsed.issues[0].detail["reason"]
+    assert {s.unit.dodo_id for s in parsed.scores} == {U2}
 
 
 def test_одинаковые_периоды_у_разных_пиццерий_принимаются() -> None:
