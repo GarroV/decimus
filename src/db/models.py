@@ -15,6 +15,13 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+#: Происхождение проверки (`inspections.origin`, миграция 0038). `field` —
+#: обход из бота; `import` — историческая, загруженная через MCP поштучно
+#: (D305). Читается загруженная как обычная своей версии методики (D306), а
+#: её подтверждение не открывает запрос экшн-плана (D310, `accept.py`).
+ORIGIN_FIELD = "field"
+ORIGIN_IMPORT = "import"
+
 
 @dataclass(frozen=True)
 class InspectionRow:
