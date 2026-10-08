@@ -17,7 +17,7 @@
 | Миграция: `accepted_at/accepted_by`, триггер `inspections_acceptance_guarded`, грант админу истории | `src/db/migrations/0034_inspection_acceptance.sql` |
 | Слив не запечатывает (`draft` = на приёмке) | `src/db/push.py` |
 | История — только `finalized`; очередь `list_inspections(on_review=True)`; `get_inspection(include_on_review=)` | `src/db/queries.py` |
-| Подтверждение своего пространства | `src/db/accept.py: accept_inspection` |
+| Подтверждение своего пространства; у загруженной (`origin = 'import'`, D310) — без запроса экшн-плана | `src/db/accept.py: accept_inspection` |
 | Запись + оценка одной транзакцией, своё пространство | `src/db/revise.py: revise_finding` |
 | Пересчёт движком по методике версии | `src/report/rescore.py`, `src/domain/scoring.py: parse_score`, повтор в `letters.state_json` |
 | Лист вычитки | `src/web/review.py` |
