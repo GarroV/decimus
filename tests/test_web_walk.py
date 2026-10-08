@@ -195,7 +195,7 @@ def test_данные_по_подписи_и_без_истории(domain_env: P
     assert ответ.status_code == 200
     тело = ответ.get_json()
     assert тело["unit"] == "Белград-1" and тело["previous_unavailable"] is True
-    assert тело["texts"]["walk.zone.mark"] == "Зона осмотрена"
+    assert тело["texts"]["walk.next.mark"] == "Осмотрено →"
     assert client.post(walk.DATA_PATH, data="hash=0", content_type="text/plain").status_code == 401
 
 
