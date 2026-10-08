@@ -44,6 +44,9 @@ ERR_MISSING_COLUMNS = "missing_columns"
 ERR_NOT_SHEET = "not_sheet"
 ERR_BAD_PERIOD = "bad_period"
 ERR_BAD_CSV = "bad_csv"
+ERR_BAD_JSON = "bad_json"
+ERR_BAD_VERSION = "bad_version"
+ERR_BAD_SNAPSHOT = "bad_snapshot"
 
 
 class RatingsFormatError(ValueError):

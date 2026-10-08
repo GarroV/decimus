@@ -125,6 +125,72 @@ cases = [
         "            if False:",
         "tests/test_ratings_sheet.py::test_два_девелопера_у_страны_не_теряются_молча",
     ),
+    (
+        "src/ratings/snapshot.py",
+        "        if period.rating_type != RS:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_снимок_разобран",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        '    if item.get("wow"):\n        return None\n',
+        "",
+        "tests/test_ratings_snapshot.py::test_снимок_разобран",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if not 0 <= score <= 100:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_испорченная_пиццерия_в_журнал_соседка_цела",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if key in periods:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_испорченная_пиццерия_в_журнал_соседка_цела",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "    if not _is_int(amount) or not 1 <= amount <= MAX_COUNT:",
+        "    if not _is_int(amount) or amount < 1:",
+        "tests/test_ratings_snapshot.py::test_испорченная_пиццерия_в_журнал_соседка_цела",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "    except OverflowError as exc:",
+        "    except KeyError as exc:",
+        "tests/test_ratings_snapshot.py::test_испорченная_пиццерия_в_журнал_соседка_цела",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "_is_int(country_id) else (None, None)",
+        "_is_int(country_id) or True else (None, None)",
+        "tests/test_ratings_snapshot.py::test_страна_пиццерии_не_числом_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "    except (RecursionError, ValueError) as exc:\n",
+        "    except ValueError as exc:\n",
+        "tests/test_ratings_snapshot.py::test_мусор_вместо_json_отказ_с_кодом",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        '        or not _is_int(doc.get("version"))\n',
+        "",
+        "tests/test_ratings_snapshot.py::test_испорченный_документ_отказ_с_кодом_а_не_исключение",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        '    return text if len(text) <= _CLIP else text[: _CLIP - 1] + "…"\n',
+        "    return text\n",
+        "tests/test_ratings_snapshot.py::test_огромная_строка_в_журнале_обрезана",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "    if _is_int(index) and _is_int(total) and 1 <= index <= total <= MAX_CHUNKS:",
+        "    if True:",
+        "tests/test_ratings_snapshot.py::test_подпись_части_из_мусора_не_падает",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
