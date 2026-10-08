@@ -487,6 +487,11 @@
 
 .walk-option__text { font-size: 15px; line-height: 21px; }
 
+/* общая заметка — первым вариантом у рекомендации */
+.walk-option--note { background: var(--accent-soft); }
+.walk-option--note .walk-option__text { font-weight: 600; color: var(--accent); }
+.walk-option__hint { display: block; font-size: 13px; line-height: 18px; color: var(--ink-2); }
+
 .walk-options .walk-link { margin: 6px 12px 10px; }
 
 .walk-choice {

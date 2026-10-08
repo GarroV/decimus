@@ -41,7 +41,15 @@
     return W.state.data.zones.filter(function (z) { return z.code === code; })[0] || null;
   }
 
+  /** Общая заметка: рекомендация не про пункт — уходит в конец отчёта. */
+  var NOTE_CODE = "NOTE";
+
+  function noteItem() {
+    return { code: NOTE_CODE, q: tx("walk.note.item"), process: "", zones: [], levels: [], measure: false, note: true };
+  }
+
   function item(code) {
+    if (code === NOTE_CODE) return noteItem();
     return W.state.data.items.filter(function (i) { return i.code === code; })[0] || null;
   }
 
@@ -192,7 +200,7 @@
     if (mode === f.mode) return;
     f.mode = mode;
     var it = item(f.code);
-    if (it && it.measure !== (mode === "measure")) f.code = null;
+    if (it && (it.measure !== (mode === "measure") || (it.note && mode !== "advice"))) f.code = null;
     f.level = mode === "advice" ? ADVICE_LEVEL : mode === "measure" ? "D0" : null;
     if (mode === "violation" && f.code) {
       var chosen = item(f.code);
@@ -221,13 +229,14 @@
         b.setAttribute("aria-pressed", on ? "true" : "false");
         seg.appendChild(b);
       });
-      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : null);
+      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : isMeasure() ? tx("walk.sheet.measure_hint") : null);
       box.insertBefore(seg, box.firstChild);
       return box;
     },
 
     photos: function () {
-      var hint = f.photos.length ? null : isAdvice() ? tx("walk.sheet.photos_optional") : tx("walk.sheet.photos_hint");
+      var hint = f.photos.length ? null : isAdvice() ? tx("walk.sheet.photos_optional")
+        : isMeasure() ? tx("walk.sheet.photos_measure") : tx("walk.sheet.photos_hint");
       var box = section(tx("walk.sheet.photos"), hint);
       if (f.photos.length) {
         var strip = el("div", "walk-strip");
@@ -279,9 +288,10 @@
       if (chosen && !f.picking) {
         var card = el("div", "walk-choice");
         var line = el("div", "walk-choice__line");
-        line.appendChild(el("span", "walk-choice__code", chosen.code));
+        if (!chosen.note) line.appendChild(el("span", "walk-choice__code", chosen.code));
         line.appendChild(el("span", "walk-choice__text", chosen.q));
         card.appendChild(line);
+        if (chosen.note) card.appendChild(el("p", "walk-form__hint", tx("walk.note.hint")));
         card.appendChild(W.button("walk-link", tx("walk.sheet.change"), function () {
           f.picking = true;
           redraw("item");
@@ -297,7 +307,7 @@
       }
       var input = el("input", "walk-search");
       input.type = "search";
-      input.placeholder = tx("walk.sheet.search");
+      input.placeholder = isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search");
       input.value = f.query || "";
       input.setAttribute("enterkeyhint", "search");
       var list = el("ul", "walk-options");
@@ -451,6 +461,21 @@
     var options = choices();
     if (!options.length) {
       list.appendChild(el("li", "walk-options__empty", tx("walk.sheet.search_empty")));
+    }
+    if (isAdvice() && !f.query) {
+      var noteLi = el("li");
+      var nb = W.button("walk-option walk-option--note", null, function () {
+        f.code = NOTE_CODE;
+        f.level = ADVICE_LEVEL;
+        f.picking = false;
+        W.haptic();
+        changed();
+        redraw("item", "footer");
+      });
+      nb.appendChild(el("span", "walk-option__text", tx("walk.note.item")));
+      nb.appendChild(el("span", "walk-option__hint", tx("walk.note.hint")));
+      noteLi.appendChild(nb);
+      list.appendChild(noteLi);
     }
     options.slice(0, 60).forEach(function (i) {
       var li = el("li");
