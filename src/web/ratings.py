@@ -28,7 +28,7 @@ from src.ratings import report
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
-from src.ratings.periods import month_period, quarter_period
+from src.ratings.periods import KIND_RATING, ReportPeriod, month_period, quarter_period
 
 from . import auth
 from .action_plans import FORM_OVERHEAD_BYTES
@@ -109,6 +109,17 @@ def _country_names(rows: tuple[read.CountryRow, ...], lang: str) -> dict[str, st
     return {row.code: row.name_ru if lang == "ru" else row.name_en for row in rows}
 
 
+def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str) -> str | None:
+    """Период словами: у периода РС — его название на языке экрана, а не ключ `rs:<id>` (P39)."""
+    if period is None:
+        return None
+    if period.kind == KIND_RATING:
+        for p in found.rs_periods:
+            if f"rs:{p.id}" == period.key:
+                return p.title_ru if lang == "ru" else p.title_en
+    return period.key
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
@@ -120,6 +131,8 @@ def render_summary(conf: Settings) -> str:
         choices=found,
         selection=selection,
         periods=period_groups(read.period_months(), found, selection.period.key, lang),
+        previous_title=_period_title(summary.previous, found, lang),
+        risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
         may_manage=may_manage(),
         unit_url=unit_rating_url,
         country_name=lambda code: names.get(code) or country_title(code, lang),

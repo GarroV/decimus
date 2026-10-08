@@ -70,6 +70,9 @@ class Summary:
     rko_bottom: tuple[UnitScore, ...]
     rko_hard: tuple[ViolationFact, ...]
     risk: tuple[RiskUnit, ...]
+    #: Типы рейтинга, у которых периодов меньше окна зоны риска (P37): «никого»
+    #: про них не говорится — их не судили.
+    risk_short: tuple[str, ...]
     thresholds: dict[str, float]
     last_loaded: dict[str, datetime]
 
@@ -138,19 +141,22 @@ def _blocks(
 
 def _risk(
     codes: Sequence[str], period: ReportPeriod, limits: Mapping[str, float]
-) -> tuple[RiskUnit, ...]:
-    """Зона риска — по полному окну из `risk_periods` (P11): меньше периодов — не судим."""
+) -> tuple[tuple[RiskUnit, ...], tuple[str, ...]]:
+    """Зона риска — по полному окну из `risk_periods` (P11): меньше периодов — не судим,
+    и тип уходит вторым значением, чтобы экран не выдал «не судили» за «никого» (P37)."""
     window = int(limits["risk_periods"])
     risk: list[RiskUnit] = []
+    short: list[str] = []
     for rating_type in (RS, RKO):
         ids = read.last_period_ids(rating_type, until=period.end, n=window)
         if len(ids) < window:
+            short.append(rating_type)
             continue
         facts = _facts(
             read.score_facts(countries=codes, begin=period.begin, end=period.end, period_ids=ids)
         )
         risk += risk_zone(facts, ids, rating_type=rating_type, threshold=limits["risk_threshold"])
-    return tuple(risk)
+    return tuple(risk), tuple(short)
 
 
 def build(selection: Selection) -> Summary:
@@ -175,6 +181,7 @@ def build(selection: Selection) -> Summary:
     top = limits["top_threshold"]
     rs_top, rs_bottom = top_bottom(current, RS, threshold=top)
     rko_top, rko_bottom = top_bottom(current, RKO, threshold=top)
+    risk, risk_short = _risk(codes, period, limits)
     return Summary(
         selection=selection,
         countries=codes,
@@ -191,7 +198,8 @@ def build(selection: Selection) -> Summary:
         rko_top=rko_top,
         rko_bottom=rko_bottom,
         rko_hard=hard_lines(rko_facts, rules, RKO),
-        risk=_risk(codes, period, limits),
+        risk=risk,
+        risk_short=risk_short,
         thresholds=limits,
         last_loaded=read.last_loaded(),
     )

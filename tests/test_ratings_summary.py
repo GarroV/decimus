@@ -200,3 +200,19 @@ def test_хард_порядок_не_зависит_от_входа() -> None:
 def test_страны_вне_списка_не_входят_в_группу() -> None:
     facts = [f("a", "SI", 90), f("c", "RS", 10)]
     assert group_average(facts, "rs", ["SI"]) == pytest.approx(90)
+
+
+def test_граница_top_bottom_по_показанному_значению() -> None:
+    """85.04 на экране «85.0» — ровно порог, значит Bottom, а не «Выше 85» (P38)."""
+    top, bottom = top_bottom([f("a", "SI", 85.04), f("b", "SI", 85.06)], "rs", threshold=85)
+    assert [u.unit for u in top] == ["b"]
+    assert [u.unit for u in bottom] == ["a"]
+
+
+def test_зона_риска_по_показанному_значению() -> None:
+    """84.96 на экране «85.0» — не ниже порога 85, в зону риска не идёт (P38)."""
+    facts = [f("a", "SI", 84.96, period=p) for p in (1, 2)] + [
+        f("b", "SI", 84.94, period=p) for p in (1, 2)
+    ]
+    zone = risk_zone(facts, [1, 2], rating_type="rs", threshold=85)
+    assert [u.unit for u in zone] == ["b"]
