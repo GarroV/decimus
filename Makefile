@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: bootstrap check test test-honest cov image regress web walk web-up web-demo web-user api-token space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -386,6 +386,11 @@ space:
 #   make web-unlock ARGS="unlock-address 203.0.113.7 --tenant demo"
 web-unlock:
 	$(VENV)/python tools/web_unlock.py $(ARGS)
+
+# Токены API /api/v1 для сервисов (#567, D336): issue / list / revoke.
+# Значение токена печатается один раз; в базе только отпечаток (docs/16-api.md).
+api-token:
+	$(VENV)/python tools/api_token.py $(ARGS)
 
 # СПРАВОЧНИК ТОЧЕК СЕТИ: загрузка с сайтов стран и заведение руками (T335).
 # География точки (страна кодом ISO, город) появилась миграцией 0017 — до неё

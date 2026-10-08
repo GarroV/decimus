@@ -177,6 +177,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0040_control_role.sql": (
         "sql1:149df9ece74bb0126f1a28a5bf383ffabeb794246d7bb6d2309e69d3f0c811a4"
     ),
+    # Токены сервисов для API чтения /api/v1 (#567, D336). Заведена вместе с файлом,
+    # нигде не применена.
+    "0041_api_tokens.sql": (
+        "sql1:7b7eba57b8999f0de02143c50c95d9224623797d6cb2cf8399dfc56ad76da016"
+    ),
 }
 
 
