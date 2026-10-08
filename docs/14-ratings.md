@@ -70,7 +70,7 @@
 
 ## Ядро и порча
 
-Ядро с тестами до кода: `src/ratings/{links,countries,csvio,formats,sheet,snapshot,matching,periods,summary}.py`. Защиты ядра проверяются порчей: `tools/porcha_ratings.py` подменяет по строке кода и требует, чтобы свой тест упал (запуск — с `DATABASE_URL` тестовой базы).
+Ядро с тестами до кода: `src/ratings/{links,countries,csvio,formats,sheet,snapshot,matching,periods,summary}.py`. Защиты ядра проверяются порчей: `tools/porcha_ratings.py` подменяет по строке кода и требует, чтобы свой тест упал; тесты идут через `make test-honest` (тестовая база подставляется сама), а пропущенный тест — «НЕ ПРОВЕРЕНА» и провал прогона.
 
 ## Процедура снимка для Claude
 
