@@ -90,10 +90,10 @@
    Одно движение на экране: при загрузке точки переезжают с прошлого места. */
 .rt-board {
   --rt-name: minmax(8rem, 12rem);
-  --rt-val: 6.75rem;
+  --rt-val: 8.25rem;
   display: grid;
   grid-template-columns: var(--rt-name) var(--rt-val) minmax(0, 1fr) var(--rt-val) minmax(0, 1fr);
-  column-gap: var(--space-5);
+  column-gap: 0;
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
   overflow: hidden;
 }
@@ -105,7 +105,7 @@
 }
 .rt-board__head > :first-child, .rt-board__row > :first-child { padding-left: var(--space-5); }
 .rt-board__head > :last-child, .rt-board__row > :last-child { margin-right: var(--space-5); }
-.rt-board__kind { text-align: right; font-size: var(--fs-dense); color: var(--ink-2); }
+.rt-board__kind { text-align: right; padding-right: var(--space-5); font-size: var(--fs-dense); color: var(--ink-2); }
 .rt-board__row > * {
   display: flex; align-items: center; min-height: 30px; padding: var(--space-1) 0;
   border-bottom: 1px solid var(--line); transition: background-color .12s;
@@ -113,7 +113,7 @@
 .rt-board__row:last-child > * { border-bottom: 0; }
 .rt-board__row:hover > * { background: var(--surface-2); }
 .rt-board__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rt-board__val { justify-content: flex-end; gap: var(--space-3); font-size: var(--fs-dense); white-space: nowrap; }
+.rt-board__val { justify-content: flex-end; gap: var(--space-3); padding-left: var(--space-5); padding-right: var(--space-5); font-size: var(--fs-dense); white-space: nowrap; }
 .rt-board__val b { font-weight: var(--w-semibold); color: var(--ink); }
 .rt-board__val .rt-delta { min-width: 3.4em; text-align: right; font-size: var(--fs-meta); }
 .rt-board__row.is-total > * { background: var(--accent-soft); border-bottom: 1px solid var(--accent-line); min-height: 40px; }
