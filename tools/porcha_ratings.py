@@ -41,6 +41,60 @@ cases = [
         "    if role not in accounts.ROLES:",
         "tests/test_web_users_access.py::test_контроль_вне_уК_до_базы_не_доходит",
     ),
+    (
+        "src/ratings/countries.py",
+        'EXCLUDED = frozenset({"RU", "KZ", "UZ"})\n',
+        "EXCLUDED = frozenset()\n",
+        "tests/test_ratings_formats.py::test_нарушения_ркО_разобраны",
+    ),
+    (
+        "src/ratings/formats.py",
+        "    if link.rating_type not in (None, rating_type):\n",
+        "    if False:\n",
+        "tests/test_ratings_formats.py::test_нарушения_ркО_тип_рейтинга_в_ссылке_чужой",
+    ),
+    (
+        "src/ratings/links.py",
+        "    if parts.hostname != RATING_HOST or not parts.fragment:\n",
+        "    if not parts.fragment:\n",
+        "tests/test_ratings_formats.py::test_испорченная_ссылка_не_разбирается",
+    ),
+    (
+        "src/ratings/formats.py",
+        "        backoffice_url=checkup_backoffice_url(checkup_id),\n",
+        "        backoffice_url=row[back_col],\n",
+        "tests/test_ratings_formats.py::test_ссылки_в_результате_собраны_заново_а_не_из_ячейки",
+    ),
+    (
+        "src/ratings/formats.py",
+        "        rating_url=checkup_rating_url(",
+        "        rating_url=row[rating_col] or checkup_rating_url(",
+        "tests/test_ratings_formats.py::test_ссылки_в_результате_собраны_заново_а_не_из_ячейки",
+    ),
+    (
+        "src/ratings/links.py",
+        '    if host != BACKOFFICE_DOMAIN and not host.endswith("." + BACKOFFICE_DOMAIN):\n',
+        "    if False:\n",
+        "tests/test_ratings_formats.py::test_чужая_ссылка_бэкофиса_строка_отвергается",
+    ),
+    (
+        "src/ratings/sheet.py",
+        "        elif start > later:\n            year -= 1\n",
+        "        elif start > later:\n            pass\n",
+        "tests/test_ratings_sheet.py::test_год_выводится_справа_налево_через_новый_год",
+    ),
+    (
+        "src/ratings/sheet.py",
+        "    if not 0 <= value <= 100:\n",
+        "    if False:\n",
+        "tests/test_ratings_sheet.py::test_балл_вне_0_100_строкой_журнала",
+    ),
+    (
+        "src/ratings/links.py",
+        "    if parts.hostname != RATING_HOST or not parts.fragment:\n",
+        "    if not parts.fragment:\n",
+        "tests/test_ratings_sheet.py::test_ссылка_листа_чужой_хост_id_не_берётся",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
