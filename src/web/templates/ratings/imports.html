@@ -41,14 +41,14 @@
       <thead><tr>
         <th scope="col" class="is-text">{{ t('ratings.journal.at') }}</th><th scope="col" class="is-text">{{ t('ratings.journal.actor') }}</th>
         <th scope="col" class="is-text">{{ t('ratings.journal.channel') }}</th><th scope="col" class="is-text">{{ t('ratings.journal.format') }}</th>
-        <th scope="col" class="is-text">{{ t('ratings.journal.outcome') }}</th><th scope="col">{{ t('ratings.journal.counts') }}</th>
+        <th scope="col" class="is-text">{{ t('ratings.journal.outcome') }}</th><th scope="col" class="rt-th-wrap">{{ t('ratings.journal.counts') }}</th>
         {% if lang == 'ru' %}<th scope="col" class="is-text">{{ t('ratings.journal.note') }}</th>{% endif %}
       </tr></thead>
       <tbody>{% for row in journal %}<tr>
         <td class="is-text num">{{ row.at.strftime(at_format) }}</td>
         <td class="is-text">{{ row.actor }}</td>
         <td class="is-text">{{ t('ratings.channel.' ~ row.channel) }}</td>
-        <td class="is-text">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
+        <td class="is-text rt-wrap">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
         <td class="is-text"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.outcome.' ~ row.outcome) }}</span></td>
         <td class="num">{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
         {% if lang == 'ru' %}<td class="is-text rt-wrap">{{ row.note or '' }}</td>{% endif %}
