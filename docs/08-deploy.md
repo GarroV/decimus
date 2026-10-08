@@ -1112,8 +1112,7 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 
 ### 8.8. Google Console — адреса возврата (за владельцем)
 
-Адреса временные: с постоянным доменом на Cloudflare меняются оба адреса ниже и
-`BOT_MCP_URL`.
+Свой домен не заводится (D304). Адрес возврата через Worker — в конце §8.9.
 
 Клиент `decimus-web`, **Authorized redirect URIs** — добавить (прежние не
 убирать, пока MUSPELHEIM не выключен):
@@ -1127,18 +1126,38 @@ https://decimus.95-111-249-216.sslip.io/auth/google/mail
 `WEB_URL_PREFIX` пустой (у админки свой адрес). Пути заданы в коде:
 `GOOGLE_CALLBACK_PATH` (`src/web/auth.py`), `MAIL_CALLBACK_PATH`
 (`src/web/letter_draft.py`). `BOT_MCP_URL` —
-`https://mcp.decimus.95-111-249-216.sslip.io/`.
+`https://decimus-mcp.vasiliy-garro.workers.dev/` (D304): этот адрес бот
+вписывает в строку установки MCP, и он должен открываться там, где `sslip.io`
+заблокирован.
 
-### 8.9. Временный фронт Cloudflare (D236, #424)
+### 8.9. Вход через Cloudflare — постоянный (D236, D304, #424)
 
 В части стран `sslip.io` заблокирован по решению властей: провайдер отдаёт свою
-заглушку и свой сертификат. Пока нет своего домена, рядом с основным адресом
-работает фронт на адресе Cloudflare — основной адрес при этом остаётся.
+заглушку и свой сертификат. Поэтому люди, бот и доки ходят на адреса
+Cloudflare Worker'ов. Это постоянный вход, своего домена не будет, пока
+владелец сам не решит (D304).
 
-| Что | Фронт | Куда пересылает |
+| Что | Адрес для людей | Имя сайта в Caddy |
 |---|---|---|
 | Админка | `https://decimus.vasiliy-garro.workers.dev` | `decimus.95-111-249-216.sslip.io` |
 | MCP | `https://decimus-mcp.vasiliy-garro.workers.dev` | `mcp.decimus.95-111-249-216.sslip.io` |
+
+**Путь до сервера — туннель (Workers VPC).** Worker не ищет сервер по имени
+`sslip.io` в интернете: привязка `EDGE` (VPC-сервис `vps-edge-caddy`) ведёт
+запрос туннелем `vps-edge` прямо в Caddy на VPS. Имя `sslip.io` остаётся только
+SNI и Host, по которым Caddy выбирает сайт, — его DNS и доступность в пути не
+участвуют. Туннель — контейнер `cloudflared` в `/srv/edge`
+(`GarroV/vps-infra: edge/compose.yml`), токен — `/srv/edge/tunnel.env` (600,
+вне git); наружу он ничего не публикует и видит только Caddy. Если туннель
+лёг, Worker отправляет тот же запрос прежним путём через интернет и пишет в
+лог `tunnel failed, falling back to public path` (`npx wrangler tail <имя>`).
+Проверено 08.10: пробный Worker при живом туннеле — ни одного отката, при
+погашенном `cloudflared` — откат и ответ 200.
+
+| Что в Cloudflare | Имя | ID |
+|---|---|---|
+| Туннель | `vps-edge` | `6ec223e1-4c1b-46ac-98ed-ce36161a7b41` |
+| VPC-сервис | `vps-edge-caddy` (хост `caddy`, проверка сертификата выключена — участок туннель→Caddy внутри docker-сети) | `01a11a74-ba20-7ea3-a9c1-581681d0c341` |
 
 Код — `front/src/index.js`, настройки — `front/wrangler.admin.jsonc` и
 `front/wrangler.mcp.jsonc`, выкладка `npx wrangler deploy -c <файл>` из `front/`.
