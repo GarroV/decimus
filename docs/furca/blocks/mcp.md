@@ -66,7 +66,7 @@ repoint_learned_phrase(phrase, lang, item_code, reason)
 import_ratings(kind, content, file_name?)   # kind: rko-violations | rko-evaluations | rs-checkups | sheet-scores | snapshot
 ```
 
-`import_ratings` зовёт тот же импортёр, что веб (`src/ratings/importer.py`), обработчик — `src/mcp/ratings_tools.py`; заслон стоит на входе (`rpc._call_tool`) и ещё раз в обработчике; автор в журнале — `mcp:HQ`. Снимок идёт частями до `MCP_CHUNK_BYTES` = 300 000 байт, ответ несёт номер части; повтор того же содержимого — `duplicate`. Продуктовое описание — `docs/14-ratings.md`.
+`import_ratings` зовёт тот же импортёр, что веб (`src/ratings/importer.py`), обработчик — `src/mcp/ratings_tools.py`; заслон стоит на входе (`rpc._call_tool`) и ещё раз в обработчике; автор в журнале — `mcp:HQ`. Снимок идёт частями до `MCP_CHUNK_BYTES` = 300 000 байт, ответ несёт номер части; повтор того же содержимого — `duplicate`. Продуктовое описание — `docs/15-ratings.md`.
 
 **Форма ответа.** JSON внутри текстового блока MCP, ключи английские: это машинная поверхность, агент пересказывает её человеку сам. У каждой выдачи есть `status` словами — «ничего не найдено» отличимо от «не смогли прочитать», а `truncated` говорит, что чтение упёрлось в предел. `chat_id` наружу не отдаётся.
 

@@ -4,7 +4,7 @@
 повтор — `duplicate`. Открыт только токену пространства УК — заслон стоит на
 входе (`rpc._call_tool`, вид `KIND_RATINGS`) и ещё раз здесь. Свой вход в Dodo
 IS сервер не хранит: снимок Claude собирает в браузере сотрудника
-(`docs/14-ratings.md`).
+(`docs/15-ratings.md`).
 """
 
 from __future__ import annotations

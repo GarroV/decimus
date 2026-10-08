@@ -84,7 +84,7 @@ _DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M")
 _UNKNOWN = (
     "Формат файла не узнан по заголовку. Ожидаются выгрузки rko-violations, "
     "rko-evaluations, rs-checkups, лист «Качество по пиццериям» (sheet-scores) "
-    "или снимок рейтинга (JSON) — docs/14-ratings.md"
+    "или снимок рейтинга (JSON) — docs/15-ratings.md"
 )
 
 

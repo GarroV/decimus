@@ -1,6 +1,6 @@
 """Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника.
 
-Формат и процедура сбора — `docs/14-ratings.md`. Часть снимка самостоятельна:
+Формат и процедура сбора — `docs/15-ratings.md`. Часть снимка самостоятельна:
 повтор части или порядок частей ничего не ломают. Пиццерия с битым элементом
 уходит в журнал целиком — половина её истории хуже, чем никакой. Замечания
 периодов РКО отбрасываются: нарушения РКО идут из выгрузки `rko-violations`, и
@@ -247,7 +247,7 @@ def _load(data: bytes) -> dict[str, Any]:
         or doc["version"] != SNAPSHOT_VERSION
     ):
         raise RatingsFormatError(
-            f"Снимок не той версии: ожидается version = {SNAPSHOT_VERSION} (docs/14-ratings.md)",
+            f"Снимок не той версии: ожидается version = {SNAPSHOT_VERSION} (docs/15-ratings.md)",
             ERR_BAD_VERSION,
             expected=str(SNAPSHOT_VERSION),
         )

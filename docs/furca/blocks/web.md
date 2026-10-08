@@ -41,7 +41,7 @@
 
 ### Рейтинги (`ratings`)
 
-Раздел `ratings` (`/ratings`) читают все. Подраздел «Загрузки» (`/ratings/imports`) и формы записи (`POST /ratings/import|countries|hard-rules|settings`, `…/hard-rules/<id>/delete`) закрыты заслоном `may_manage_ratings` (`src/domain/tenants.py`): контроль и админ УК, остальным 403. Маршруты — `src/web/ratings.py`, сводка — `src/ratings/report.py`, тексты — `src/web/texts_ratings.py`. Продуктовое описание — `docs/14-ratings.md`.
+Раздел `ratings` (`/ratings`) читают все. Подраздел «Загрузки» (`/ratings/imports`) и формы записи (`POST /ratings/import|countries|hard-rules|settings`, `…/hard-rules/<id>/delete`) закрыты заслоном `may_manage_ratings` (`src/domain/tenants.py`): контроль и админ УК, остальным 403. Маршруты — `src/web/ratings.py`, сводка — `src/ratings/report.py`, тексты — `src/web/texts_ratings.py`. Продуктовое описание — `docs/15-ratings.md`.
 
 ### Признак «построен / не построен»
 
