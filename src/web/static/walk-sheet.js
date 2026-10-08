@@ -1,32 +1,17 @@
 /* Мини-апп обхода: форма записи (D312) — нарушение, рекомендация, замер, правка.
+ * Как устроена и почему — docs/13-walk-mini-app.md, раздел о форме записи.
  *
- * Коренная механика (D330): аудитор снимает и говорит пару слов — пункт, класс
- * и формулировку ищет система, та же, что у бота (`/tg/walk/suggest` зовёт
- * распознавание бота). Модель предлагает, фиксирует человек: предложения стоят
- * карточками, верхнее выбрано, а запись появляется только по «Сохранить».
- * Ручной поиск по перечню — запасной путь из меню, а не главный экран.
+ * Нарушение (D330): кадр и пара слов → «Найти пункт» → система (та же, что у
+ * бота, `/tg/walk/suggest`) предлагает карточки, верхняя выбрана → человек
+ * проверяет и жмёт «Сохранить». Ручной поиск — запасной путь из меню. Зона и
+ * вид записи — строкой над формой, выбор — меню снизу (`walk-menu.js`).
+ * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
+ * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
- * Зона и вид записи — не облака кнопок, а строка над формой: нажатие
- * открывает меню (`walk-menu.js`). Зона по умолчанию — текущая остановка.
- *
- * Вид записи: «Нарушение · Рекомендация». Рекомендация
- * (D201, класс R) — «что сделать» у пункта без нарушения: без вычета и срока,
- * кадр по желанию, текст обязателен. Общая заметка (D314) — рекомендация с
- * кодом NOTE, без пункта: в отчёте — разделом «Заметки проверяющего». Замер
- * открывается со строки остановки «Печь и холодильники» (D315).
- *
- * Одна форма на все случаи, сверху вниз в том порядке, в каком аудитор
- * действует на точке: снял → сказал → система нашла → насколько → формулировка.
- * Шагов-экранов нет: вернуться к фото после выбора пункта — это прокрутка.
- *
- * Правила методики форма подсказывает, а не решает:
- * - без фото «Сохранить» не нажимается (D078);
- * - классы — только допустимые для пункта; один допустимый ставится сам;
- * - пункт, уже записанный в этой зоне, — не вторая запись, а новые фото к той
- *   (уникальность пары «пункт + зона»);
- * - повтор предлагается, только если в прошлый раз здесь было это же, и
- *   ставится нажатием человека (D191);
- * - окончательно всё проверяет движок, и его отказ показывается его словами.
+ * Правила методики форма подсказывает, а не решает: без фото не сохранить
+ * (D078), классы — только допустимые для пункта, пункт, уже записанный в этой
+ * зоне, — новые фото к той записи, повтор ставит человек (D191); окончательно
+ * проверяет движок, и его отказ показывается его словами.
  *
  * Поля ввода не перерисовываются на каждый знак — иначе на телефоне слетает
  * клавиатура. Перерисовываются только секции, которые от выбора зависят.
@@ -320,6 +305,7 @@
       f.finding = false;
       f.found = (res.body && res.body.candidates) || [];
       f.question = (res.body && res.body.question) || "";
+      f.via = (res.body && res.body.via) || "model";
       f.asked = JSON.stringify(asked);
       if (f.found.length) pick(f.found[0].code, f.found[0]);
       else { redraw("item", "footer"); }
@@ -359,11 +345,11 @@
       var row = el("div", "walk-ctx");
       if (!f.n && !isMeasure()) {
         var kind = KINDS.filter(function (pair) { return pair[0] === f.mode; })[0];
-        row.appendChild(W.button("walk-ctx__pill", tx(kind[1]) + " ▾", kindMenu));
+        row.appendChild(W.button("walk-ctx__pill", tx(kind[1]), kindMenu));
       }
       var z = zoneOf(f.zone);
       var zb = W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
-        (z ? z.title : tx("walk.sheet.pick_zone")) + " ▾", zoneMenu);
+        (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu);
       zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
       row.appendChild(zb);
       var box = el("div", "walk-ctx__box");
@@ -378,39 +364,13 @@
       var hint = f.photos.length ? null : isAdvice() ? tx("walk.sheet.photos_optional")
         : isMeasure() ? tx("walk.sheet.photos_measure") : null;
       var box = section(f.photos.length || !recognizing() ? tx("walk.sheet.photos") : null, hint);
-      if (f.photos.length) {
-        var strip = el("div", "walk-strip");
-        f.photos.forEach(function (p) {
-          var cell = el("div", "walk-strip__cell is-" + (p.state || "done"));
-          cell.appendChild(W.photo.thumb(p));
-          if (p.state === "uploading") cell.appendChild(el("span", "walk-strip__state", tx("walk.photo.uploading")));
-          if (p.state === "failed") {
-            cell.appendChild(W.button("walk-strip__retry", tx("walk.photo.failed"), function () {
-              send(p, p.file);
-              redraw("photos", "item", "footer");
-            }));
-          }
-          var x = W.button("walk-strip__remove", "✕", function () { removePhoto(p); });
-          x.setAttribute("aria-label", tx("walk.photo.remove"));
-          cell.appendChild(x);
-          strip.appendChild(cell);
-        });
-        box.appendChild(strip);
-      }
-      if (!f.photos.length && recognizing()) {
-        var hero = W.photo.picker(tx("walk.photo.hero"), true, addFiles);
-        hero.classList.add("walk-pick--hero");
-        hero.appendChild(el("span", "walk-pick__sub", tx("walk.photo.hero_hint")));
-        box.appendChild(hero);
-        var gal = W.photo.picker(tx("walk.photo.gallery_link"), false, addFiles);
-        gal.classList.add("walk-pick--link");
-        box.appendChild(gal);
-        return box;
-      }
-      var row = el("div", "walk-pickrow");
-      row.appendChild(W.photo.picker(f.photos.length ? tx("walk.photo.more") : tx("walk.photo.camera"), true, addFiles));
-      row.appendChild(W.photo.picker(tx("walk.photo.gallery"), false, addFiles));
-      box.appendChild(row);
+      var hero = !f.photos.length && recognizing();
+      box.appendChild(W.photo.block(f.photos, {
+        hero: hero,
+        onFiles: addFiles,
+        onRetry: function (p) { send(p, p.file); redraw("photos", "item", "footer"); },
+        onRemove: removePhoto,
+      }));
       return box;
     },
 
@@ -654,7 +614,7 @@
   function suggested() {
     if (!f.found || !f.found.length || stale()) return null;
     var top = f.found[0];
-    return { code: top.code, level: top.level, zone: top.zone, confidence: top.confidence };
+    return { code: top.code, level: top.level, zone: top.zone, confidence: top.confidence, via: f.via };
   }
 
   function ops() {

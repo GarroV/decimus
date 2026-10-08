@@ -121,5 +121,46 @@
     return box;
   }
 
-  W.photo = { compress: compress, upload: upload, view: view, remember: remember, picker: picker, thumb: thumb };
+  /**
+   * Кадры записи с их состоянием и кнопки «снять / из галереи».
+   * `hero` — кадров ещё нет и снимок — первое действие формы (D330): крупная
+   * плитка камеры и ссылка на галерею вместо двух равных кнопок.
+   */
+  function block(photos, on) {
+    var tx = W.tx;
+    var box = W.el("div", "walk-photos");
+    if (photos.length) {
+      var strip = W.el("div", "walk-strip");
+      photos.forEach(function (p) {
+        var cell = W.el("div", "walk-strip__cell is-" + (p.state || "done"));
+        cell.appendChild(thumb(p));
+        if (p.state === "uploading") cell.appendChild(W.el("span", "walk-strip__state", tx("walk.photo.uploading")));
+        if (p.state === "failed") {
+          cell.appendChild(W.button("walk-strip__retry", tx("walk.photo.failed"), function () { on.onRetry(p); }));
+        }
+        var x = W.button("walk-strip__remove", "✕", function () { on.onRemove(p); });
+        x.setAttribute("aria-label", tx("walk.photo.remove"));
+        cell.appendChild(x);
+        strip.appendChild(cell);
+      });
+      box.appendChild(strip);
+    }
+    if (on.hero) {
+      var big = picker(tx("walk.photo.hero"), true, on.onFiles);
+      big.classList.add("walk-pick--hero");
+      big.appendChild(W.el("span", "walk-pick__sub", tx("walk.photo.hero_hint")));
+      box.appendChild(big);
+      var gal = picker(tx("walk.photo.gallery_link"), false, on.onFiles);
+      gal.classList.add("walk-pick--link");
+      box.appendChild(gal);
+      return box;
+    }
+    var row = W.el("div", "walk-pickrow");
+    row.appendChild(picker(photos.length ? tx("walk.photo.more") : tx("walk.photo.camera"), true, on.onFiles));
+    row.appendChild(picker(tx("walk.photo.gallery"), false, on.onFiles));
+    box.appendChild(row);
+    return box;
+  }
+
+  W.photo = { compress: compress, upload: upload, view: view, remember: remember, picker: picker, thumb: thumb, block: block };
 })();

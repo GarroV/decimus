@@ -127,6 +127,26 @@ def generate(repo: Path) -> dict:
     return {"payload": payload, "pics": pics}
 
 
+#: Названия зон рабочей методики (`<AUDIT_DATA_DIR>/zones.csv`): в публичном
+#: репозитории её нет, поэтому синтетическая методика зовёт зоны иначе. Есть
+#: файл рядом — макет показывает зоны так, как их видит аудитор на точке.
+ZONES_CSV_VAR = "WALK_MOCKUP_ZONES"
+
+
+def real_zone_names(payload: dict) -> None:
+    path = os.environ.get(ZONES_CSV_VAR)
+    if not path:
+        print(f"Названия зон синтетические: {ZONES_CSV_VAR} не задана")
+        return
+    import csv
+
+    with open(path, encoding="utf-8") as fh:
+        names = {row["code"]: row["name_ru"] for row in csv.DictReader(fh)}
+    for zone in payload["zones"]:
+        zone["title"] = names.get(zone["code"], zone["title"])
+    print(f"Названия зон — из {path}")
+
+
 def main() -> None:
     repo = Path(__file__).resolve().parents[2]
     out = Path(sys.argv[1]).resolve()
@@ -146,6 +166,7 @@ def main() -> None:
     fix_zones = {"INF10": ["fridge", "freezer"], "INF11": ["hot_kitchen"]}
     for it in p["items"]:
         it["zones"] = fix_zones.get(it["code"], it["zones"])
+    real_zone_names(p)
     # Пример рекомендации без нарушения (D201): сервер её пока не пишет (#375),
     # поэтому она кладётся в данные макета напрямую.
     for zone in p["zones"]:
@@ -184,7 +205,14 @@ def main() -> None:
         return re.sub(r"url\('(fonts/[^']+)'\)", inline, text)
 
     styles = "\n".join(
-        css(n) for n in ["dodo-ds.css", "decimus-domain.css", "walk.css", "walk-record.css", "walk-menu.css"]
+        css(n)
+        for n in [
+            "dodo-ds.css",
+            "decimus-domain.css",
+            "walk.css",
+            "walk-record.css",
+            "walk-menu.css",
+        ]
     )
     scripts = "\n".join(
         (static / n).read_text()
