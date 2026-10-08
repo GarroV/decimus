@@ -103,13 +103,13 @@ def csv_format(header: Sequence[str]) -> str | None:
 def detect_format(data: bytes) -> str:
     if data.lstrip(b"\xef\xbb\xbf \t\r\n").startswith(b"{"):
         return FORMAT_SNAPSHOT
-    header, _ = read_table(data)
+    header, rows = read_table(data)
     fmt = csv_format(header)
     if fmt is not None:
         return fmt
-    from .sheet import is_sheet_header  # лист зовёт csvio, не formats: цикла нет
+    from .sheet import is_sheet_table  # лист зовёт csvio, не formats: цикла нет
 
-    if is_sheet_header(header):
+    if is_sheet_table(header, rows):
         return FORMAT_SHEET_SCORES
     raise RatingsFormatError(_UNKNOWN, ERR_UNKNOWN_FORMAT)
 
