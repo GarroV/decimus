@@ -194,7 +194,7 @@ exclude = [".venv"]
 # `seed_demo` — там же по устройству: сид демо-истории для веба берёт у него
 # каталог данных и путь состояния через sys.path, чтобы не заводить вторую
 # копию тех же двух констант (tools/seed_web_demo.py).
-known_first_party = ["src", "audit", "seed_demo", "seed_web_demo"]
+known_first_party = ["src", "audit", "seed_demo", "seed_web_demo", "seed_ratings_demo"]
 # engine/ сканируется: иначе объявленные зависимости движка выглядят
 # неиспользуемыми, и проверку пришлось бы глушить списком исключений.
 extend_exclude = ["^\\.venv/", "^tests/"]
