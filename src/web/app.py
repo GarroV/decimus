@@ -122,6 +122,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
     _install_hq_gate(app)
+    _install_control_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -1093,6 +1094,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 added=added,
                 outcome=outcome,
                 roles=accounts.ROLES,
+                roles_for=accounts.roles_for,
                 users_path=users_path,
                 bindings=привязки,
                 own_binding=своя_привязка,
@@ -1257,6 +1259,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             пространство = _пространство_из_формы()
             if пространство is None:
                 return _страница_учёток(outcome="add_space_unknown", code=400)
+            if роль not in accounts.roles_for(пространство):
+                return _страница_учёток(outcome="add_role_space", code=400)
             заведённый = accounts.add(логин, tenant=пространство, role=роль)
         except DbError as exc:
             note_target_mismatch(exc)
@@ -1429,6 +1433,49 @@ def _install_hq_gate(app: Flask) -> None:
             return
         if refused_for(request.path, auth.current_tenant()):
             abort(404)
+
+
+#: Адрес раздела рейтингов: единственное место, где «контроль» (D319) что-то правит.
+RATINGS_PATH = "/ratings"
+
+#: Безопасные методы: читать «контроль» может везде (спека: остальные разделы — на чтение).
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _control_may_write(path: str, *, users_path: str, logout_path: str) -> bool:
+    """Куда «контроль» может писать: рейтинги и дела самого человека (выход, пароль, бот)."""
+    if path == RATINGS_PATH or path.startswith(f"{RATINGS_PATH}/"):
+        return True
+    own = (
+        logout_path,
+        f"{users_path}/password",
+        f"{users_path}/bot-link",
+        f"{users_path}/bot-unlink",
+    )
+    return path in own
+
+
+def _install_control_gate(app: Flask) -> None:
+    """Роль «контроль» вне рейтингов только читает (D319, спека «Роль «контроль»»).
+
+    Заслон на запись стоит `before_request`, а не на каждом маршруте: новый
+    правящий маршрут закрыт для контроля с момента появления, и закрывать его
+    не придётся помнить. Свои дела человека (выход, свой пароль, привязка
+    бота) открыты: это не правка разделов.
+    """
+    users_path = section("users").path
+
+    @app.before_request
+    def _контроль_читает() -> None:
+        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
+            return
+        вошедший = auth.current_account()
+        if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
+            return
+        if not _control_may_write(
+            request.path, users_path=users_path, logout_path=auth.LOGOUT_PATH
+        ):
+            abort(403)
 
 
 def link_url(bot_username: str, token: str) -> str:

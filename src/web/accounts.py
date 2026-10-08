@@ -22,6 +22,7 @@ from src.db.web_access import (
     MIN_PASSWORD_LENGTH,
     ROLE_ADMIN,
     ROLE_AUDITOR,
+    ROLE_CONTROL,
     ROLES,
     AccountRow,
     change_own_password,
@@ -30,6 +31,7 @@ from src.db.web_access import (
     list_accounts,
     list_spaces,
     reassign_role,
+    roles_for,
     set_email,
 )
 
@@ -39,6 +41,7 @@ __all__ = [
     "ROLES",
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
+    "ROLE_CONTROL",
     "AccountRow",
     "Added",
     "add",
@@ -46,6 +49,7 @@ __all__ = [
     "disable",
     "everyone",
     "reassign_role",
+    "roles_for",
     "set_email",
     "spaces",
 ]

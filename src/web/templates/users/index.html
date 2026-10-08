@@ -31,6 +31,10 @@
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.add.space_unknown') }}</div>
     </div>
+  {% elif outcome == 'add_role_space' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.add.role_space') }}</div>
+    </div>
   {% elif outcome == 'add_failed' %}
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.add.failed') }}</div>
@@ -200,7 +204,7 @@
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
-                      {% for код in roles %}
+                      {% for код in roles_for(человек.tenant) %}
                         <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
                       {% endfor %}
                     </select>

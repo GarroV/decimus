@@ -47,6 +47,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .config import check_environment
 from .database_target import managing_dsn, same_database_or_deny
 from .errors import AccessError, EmailTakenError
@@ -230,7 +232,9 @@ _CLOSE_SESSION_SQL = """
 #: ней до первой записи.
 ROLE_AUDITOR = "auditor"
 ROLE_ADMIN = "admin"
-ROLES = (ROLE_AUDITOR, ROLE_ADMIN)
+#: Контроль УК (D319): рейтинги — загрузка и справочники. Только в HQ (`0039`).
+ROLE_CONTROL = "control"
+ROLES = (ROLE_AUDITOR, ROLE_ADMIN, ROLE_CONTROL)
 
 
 @dataclass(frozen=True)
@@ -422,9 +426,18 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
-def _checked_role(role: str) -> str:
+def roles_for(tenant: str) -> tuple[str, ...]:
+    """Роли, которые бывают в пространстве: «контроль» — только в УК (`0039`)."""
+    if canonical_tenant(tenant) == HQ_TENANT:
+        return ROLES
+    return tuple(role for role in ROLES if role != ROLE_CONTROL)
+
+
+def _checked_role(role: str, *, tenant: str) -> str:
     if role not in ROLES:
         raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
+    if role not in roles_for(tenant):
+        raise AccessError("Роль «контроль» бывает только в пространстве УК (HQ)")
     return role
 
 
@@ -484,7 +497,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
     # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
     # бы админов молча.
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant=tenant)
     хеш = password_hash(_checked_password(password))
     _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
@@ -557,7 +570,7 @@ def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
     Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
     экран правит роли, а таблицы истории ролей нет и не заводится.
     """
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant=tenant)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
         cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
         строка = cur.fetchone()

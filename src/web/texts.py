@@ -56,6 +56,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.theme.dark": {"ru": "Тёмная", "en": "Dark"},
     "nav.role.admin": {"ru": "Админ", "en": "Admin"},
     "nav.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
+    "nav.role.control": {"ru": "Контроль", "en": "Control"},
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
@@ -954,11 +955,22 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
     "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
+    "users.role.control": {
+        "ru": "Рейтинги: загрузка и справочники (только УК)",
+        "en": "Ratings: uploads and settings (HQ only)",
+    },
     "users.col.login": {"ru": "Логин", "en": "Login"},
     # Пространства (волна 1, #340): админ УК видит людей всех пространств и
     # заводит человека в выбранное (D282, D286).
     "users.col.space": {"ru": "Пространство", "en": "Space"},
     "users.add.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.role_space": {
+        "ru": (
+            "Роль «контроль» бывает только в пространстве УК (HQ). "
+            "Выберите другую роль или пространство."
+        ),
+        "en": "The Control role exists only in the HQ space. Pick another role or space.",
+    },
     "users.add.space_unknown": {
         "ru": "Такого пространства нет. Выберите из списка.",
         "en": "There is no such space. Pick one from the list.",
