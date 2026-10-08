@@ -281,6 +281,10 @@ def build_edit_router() -> Router:
                 reply_markup=zones_keyboard(f"{EDIT_ZONE_PREFIX}{n}:", zones),
             )
             return
+        if what == EDIT_LEVEL and finding.level == domain.ADVICE_LEVEL:
+            # Совет и нарушение — разная цена: движок такую правку отвергнет (D201).
+            await message.answer(t("edit.level_advice", lang, n=n))
+            return
         if what == EDIT_LEVEL:
             # Классы приходят из методики по коду пункта: предлагать аудитору
             # то, что движок всё равно отвергнет, — это лишний круг на точке.

@@ -79,6 +79,7 @@ where i.id = %(id)s and i.tenant_code = %(tenant)s
 _PAIR_TAKEN_SQL = """
 select n from findings
 where inspection_id = %(id)s and code = %(code)s and zone = %(zone)s and id <> %(finding)s
+  and level not in ('D0', 'R')
 """
 
 _UPDATE_FINDING_SQL = """

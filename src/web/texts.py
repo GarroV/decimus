@@ -26,6 +26,7 @@ from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_units import UNIT_TEXTS
+from .texts_walk import WALK_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -573,6 +574,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.findings.col.text": {"ru": "Формулировка", "en": "Wording"},
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
+    "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
+    "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
         "ru": "Записей у проверки нет.",
@@ -1754,7 +1757,7 @@ TEXTS: dict[str, dict[str, str]] = {
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
 # Предписания (волна 3), отказы «Методики» (#475) и заведение пиццерии (#437) — так же.
-_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS, UNIT_TEXTS)
+_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS, UNIT_TEXTS, WALK_TEXTS)
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
     for номер, часть in enumerate(_ЧАСТИ)
@@ -1763,7 +1766,14 @@ _ПЕРЕСЕЧЕНИЕ = {
 }
 if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
-TEXTS = {**TEXTS, **PLAN_TEXTS, **PRESCRIPTION_TEXTS, **REFUSAL_TEXTS, **UNIT_TEXTS}
+TEXTS = {
+    **TEXTS,
+    **PLAN_TEXTS,
+    **PRESCRIPTION_TEXTS,
+    **REFUSAL_TEXTS,
+    **UNIT_TEXTS,
+    **WALK_TEXTS,
+}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:

@@ -23,6 +23,7 @@ import re
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
 from src.domain.tenants import canonical_tenant
 
@@ -44,6 +45,11 @@ WEB_BOT_USERNAME_VAR = "WEB_BOT_USERNAME"
 #: снаружи открывается ИСКЛЮЧИТЕЛЬНО по HTTPS: заголовок браузер помнит год, и
 #: включённый на стенде без сертификата он закрыл бы стенд на этот год.
 WEB_HSTS_VAR = "WEB_HSTS"
+#: Где живёт сервис мини-аппа обхода (`python -m src.web.walk_main`), которому
+#: админка передаёт адреса `/tg/walk*`. Админка состояние проверок только
+#: читает; пишет в него этот сервис, отдельным контейнером со своим томом на
+#: запись. Пусто — адресов обхода у админки нет.
+WEB_WALK_UPSTREAM_VAR = "WEB_WALK_UPSTREAM"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -105,6 +111,9 @@ class Settings:
     bot_username: str | None = None
     #: Слать `Strict-Transport-Security` (`WEB_HSTS=1`). По умолчанию нет.
     hsts: bool = False
+    #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
+    #: `None` — адреса обхода админкой не отдаются.
+    walk_upstream: str | None = None
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -140,6 +149,38 @@ def _parse_url_prefix(raw: str) -> str:
     if not путь:
         return ""
     return f"/{путь}"
+
+
+def _parse_walk_upstream(raw: str) -> str | None:
+    """Адрес сервиса обхода: ровно `http://хост:порт`, без пути и учётных данных.
+
+    Сервис живёт во внутренней сети стенда, поэтому только `http`. Путь не
+    принимается: к нему приклеивается путь запроса, и лишний сегмент увёл бы
+    каждый запрос мимо адресов обхода молча.
+    """
+    value = raw.strip()
+    if not value:
+        return None
+    refusal = WebConfigError(
+        f"{WEB_WALK_UPSTREAM_VAR}={value} не понят: ожидается http://хост:порт сервиса "
+        f"обхода, без пути, например http://walk:8269"
+    )
+    try:
+        parts = urlsplit(value)
+        port = parts.port
+    except ValueError:
+        raise refusal from None
+    if (
+        parts.scheme != "http"
+        or not parts.hostname
+        or port is None
+        or parts.username is not None
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+    ):
+        raise refusal
+    return f"http://{parts.hostname}:{port}"
 
 
 def _parse_listen_network(raw: str) -> bool:
@@ -293,4 +334,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
+        walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
     )
