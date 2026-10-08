@@ -11,30 +11,11 @@
 from __future__ import annotations
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
-    "walk.title": {"ru": "Обход точки", "en": "Walk-through"},
-    "walk.left": {"ru": "Осталось осмотреть", "en": "Still to check"},
     "walk.progress": {
         "ru": "Осмотрено зон: {done} из {total}",
         "en": "Zones checked: {done} of {total}",
     },
     "walk.all_done": {"ru": "Все зоны осмотрены", "en": "All zones checked"},
-    "walk.how": {
-        "ru": "Откройте зону и запишите, что нашли: фото, пункт, класс. Зона без нарушений — "
-        "отметьте её осмотренной. В чат тоже можно писать: всё попадёт в одну проверку.",
-        "en": "Open a zone and record what you find: photo, item, class. A zone with no "
-        "issues — mark it as checked. The chat still works: everything goes into one "
-        "inspection.",
-    },
-    "walk.prev.title": {"ru": "В прошлый раз, {date}", "en": "Last time, {date}"},
-    "walk.prev.summary": {
-        "ru": "Замечаний: {count}. Повтор считается вдвое — посмотрите каждое.",
-        "en": "Issues: {count}. A repeat counts double — look at each one.",
-    },
-    "walk.prev.left": {"ru": "Ещё не перепроверено: {count}", "en": "Not rechecked yet: {count}"},
-    "walk.prev.clean": {
-        "ru": "Прошлая проверка прошла без замечаний.",
-        "en": "The previous inspection had no issues.",
-    },
     "walk.prev.none": {
         "ru": "Это первая проверка пиццерии — сравнивать не с чем.",
         "en": "This is the pizzeria's first inspection — nothing to compare with.",
@@ -43,23 +24,52 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "История сейчас недоступна, подсказок о прошлой проверке не будет.",
         "en": "History is unavailable right now, so there are no hints from last time.",
     },
-    "walk.zone.mark": {"ru": "Зона осмотрена", "en": "Zone checked"},
-    "walk.zone.unmark": {"ru": "Вернуть в неосмотренные", "en": "Mark as not checked"},
-    "walk.zone.auto": {
-        "ru": "Здесь уже есть записи — зона засчитана.",
-        "en": "There are records here already — the zone counts as checked.",
+    "walk.prev.line": {
+        "ru": "Прошлый раз, {date}: не перепроверено {count}",
+        "en": "Last time, {date}: {count} not rechecked",
     },
+    "walk.prev.line_done": {
+        "ru": "Прошлый раз, {date}: всё перепроверено",
+        "en": "Last time, {date}: all rechecked",
+    },
+    "walk.prev.line_clean": {
+        "ru": "Прошлый раз, {date}: без замечаний",
+        "en": "Last time, {date}: no findings",
+    },
+    "walk.switch.all": {"ru": "Все зоны", "en": "All zones"},
+    "walk.switch.prev": {"ru": "Предыдущая зона", "en": "Previous zone"},
+    "walk.switch.next": {"ru": "Следующая зона", "en": "Next zone"},
+    "walk.hint.left": {"ru": "Не были:", "en": "Not yet:"},
+    "walk.hint.more": {"ru": "ещё {count}", "en": "{count} more"},
+    "walk.tile.done": {"ru": "осмотрено", "en": "checked"},
+    "walk.tile.todo": {"ru": "не были", "en": "not yet"},
+    "walk.cl.title": {"ru": "Чек-лист зоны", "en": "Zone checklist"},
+    "walk.cl.count": {"ru": "{count} пунктов", "en": "{count} items"},
+    "walk.cl.hint": {
+        "ru": "Нажмите пункт, чтобы записать по нему нарушение.",
+        "en": "Tap an item to record a finding against it.",
+    },
+    "walk.cl.was": {"ru": "было", "en": "last time"},
+    "walk.zone.empty_hint": {
+        "ru": "Нарушений нет — нажмите «Осмотрено».",
+        "en": "Nothing wrong here? Tap “Checked”.",
+    },
+    "walk.zone.clean_done": {
+        "ru": "Зона осмотрена, нарушений нет.",
+        "en": "Zone checked, nothing found.",
+    },
+    "walk.zone.done_toast": {"ru": "{zone}: осмотрено", "en": "{zone}: checked"},
+    "walk.next.mark": {"ru": "Осмотрено →", "en": "Checked →"},
+    "walk.next.go": {"ru": "Следующая →", "en": "Next →"},
+    "walk.next.info": {"ru": "Сведения о визите", "en": "Visit details"},
+    "walk.info.open": {"ru": "Сведения", "en": "Details"},
+    "walk.zone.unmark": {"ru": "Вернуть в неосмотренные", "en": "Mark as not checked"},
     "walk.zone.now": {"ru": "Записано сейчас", "en": "Recorded now"},
     "walk.zone.before": {"ru": "Было в прошлый раз", "en": "Found last time"},
-    "walk.zone.nothing": {"ru": "Пока ничего не записано.", "en": "Nothing recorded yet."},
     "walk.count.now": {"ru": "сейчас: {count}", "en": "now: {count}"},
     "walk.count.before": {"ru": "было: {count}", "en": "last time: {count}"},
     "walk.item.again": {"ru": "Записано снова", "en": "Recorded again"},
     "walk.item.fixed": {"ru": "Исправлено", "en": "Fixed"},
-    "walk.item.hint": {
-        "ru": "Не исправлено — запишите повтор: вычет за него вдвое.",
-        "en": "Not fixed — record it as a repeat: it costs double.",
-    },
     "walk.item.record_repeat": {"ru": "Не исправлено", "en": "Not fixed"},
     "walk.none.title": {"ru": "Проверка не начата", "en": "No inspection in progress"},
     "walk.none.text": {
@@ -79,10 +89,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Обход не загрузился. Закройте окно и откройте снова.",
         "en": "The walk-through did not load. Close the window and open it again.",
     },
-    "walk.loading": {"ru": "Загружаю обход…", "en": "Loading the walk-through…"},
     # ── запись из мини-аппа (D312) ──────────────────────────────────────
-    "walk.add.violation": {"ru": "Записать нарушение", "en": "Record an issue"},
-    "walk.add.measure": {"ru": "Записать замер", "en": "Record a reading"},
     "walk.add.short": {"ru": "Нарушение", "en": "Issue"},
     "walk.add.short_measure": {"ru": "Замер", "en": "Reading"},
     "walk.sheet.new": {"ru": "Новое нарушение", "en": "New issue"},
