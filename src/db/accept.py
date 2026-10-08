@@ -17,6 +17,10 @@
 Подтверждение берёт замок строки (`for update`) — тот же, что берёт правка
 записи (`revise.py`), поэтому правка и подтверждение одной проверки идут по
 очереди.
+
+Подтверждение обойдённой проверки с D2/D3 тем же движением открывает запрос
+экшн-плана (D272). Загруженная историческая (`origin = 'import'`, D305) его не
+открывает (D310) — решает строка базы, а не тот, кто подтверждает.
 """
 
 from __future__ import annotations
@@ -29,12 +33,13 @@ import psycopg
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
 from .errors import AcceptError, ActionPlanError, ConfigError
+from .models import ORIGIN_IMPORT
 from .queries import _require_inspection_id, _require_tenant
 
 logger = logging.getLogger(__name__)
 
 _SELECT_HEAD_SQL = """
-select status, retracted_at
+select status, retracted_at, origin
 from inspections
 where id = %(id)s and tenant_code = %(tenant)s
 for update
@@ -66,8 +71,15 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
     settings = load_retraction_settings()
     try:
         with psycopg.connect(settings.dsn) as conn:
-            _apply(conn, ident, tenant_code, автор)
-            _open_plan_request(conn, ident, автор)
+            происхождение = _apply(conn, ident, tenant_code, автор)
+            # Загруженная историческая проверка (D305) запроса экшн-плана не
+            # открывает и никому ничего не шлёт (D310): проверка трёхлетней
+            # давности не может требовать от партнёра план сегодня. Решает
+            # строка базы, а не вызывающий, поэтому подтверждение из веба
+            # («Ждут приёмки») и из MCP ведут себя одинаково, а переписать
+            # происхождение не даёт триггер `inspections_origin_fixed` (0038).
+            if происхождение != ORIGIN_IMPORT:
+                _open_plan_request(conn, ident, автор)
             conn.commit()
     except AcceptError:
         raise
@@ -80,13 +92,14 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
         ) from exc
 
 
-def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str) -> None:
+def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str) -> str:
+    """Перевести ждущую в принятые; вернуть происхождение проверки (0038)."""
     with conn.cursor() as cur:
         cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
         шапка = cur.fetchone()
         if шапка is None:
             raise AcceptError(f"Проверки {ident} у арендатора {tenant} нет — подтверждать нечего")
-        статус, отклонена = шапка
+        статус, отклонена, происхождение = шапка
         if отклонена is not None:
             raise AcceptError(f"Проверка {ident} отклонена — отклонённую не подтверждают")
         if статус != "draft":
@@ -98,6 +111,7 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
                 f"ожидалась одна. Так выглядит отказ построчной политики: подключение "
                 f"обязано идти под ролью администратора истории"
             )
+    return str(происхождение)
 
 
 def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: str) -> None:
