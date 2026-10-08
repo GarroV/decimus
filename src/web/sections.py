@@ -69,6 +69,10 @@ SECTIONS: tuple[Section, ...] = (
     # статус и ответ. У УК для них вкладка в «Действиях» (D264).
     Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     Section(key="country", path="/country", built=True, icon="globe"),
+    # Рейтинги РС/РКО (спека 2026-10-08): видят все — УК и любой партнёр
+    # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
+    # (`src/web/ratings.py`), не флаг раздела.
+    Section(key="ratings", path="/ratings", built=True, icon="graph"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
     Section(key="tenants", path="/tenants", built=False, hq_only=True, icon="board"),

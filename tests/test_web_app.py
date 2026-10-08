@@ -40,6 +40,7 @@ from src.web import action_plans
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
+from src.web import ratings as ratings_screen
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.inspections import load_registry as настоящий_реестр
 from src.web.inspections import retraction_available as настоящая_проверка_истории
@@ -139,6 +140,8 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
+    # Сводка рейтингов читает базу; её путь на настоящей базе — test_web_ratings_flow.
+    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:

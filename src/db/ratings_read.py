@@ -93,6 +93,20 @@ def rs_periods() -> tuple[tuple[int, date, date, str, str], ...]:
     )
 
 
+def period_months() -> tuple[date, ...]:
+    """Месяцы, в которых начался хоть один период рейтинга (любого типа), новые первыми.
+
+    Из них экран строит выбор месяца и квартала: предлагать период без данных незачем.
+    """
+    return tuple(
+        r[0]
+        for r in _rows(
+            "select distinct date_trunc('month', begin_on)::date from ratings.periods "
+            "order by 1 desc"
+        )
+    )
+
+
 def last_period_ids(rating_type: str, *, until: date, n: int) -> tuple[int, ...]:
     """Последние `n` периодов типа, начавшихся не позже `until`, старые первыми."""
     rows = _rows(

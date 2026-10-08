@@ -1,0 +1,126 @@
+{#
+  Раздел «Рейтинги» (спека 2026-10-08, D324): сводка как в Apps Script контроля.
+  Ни одного вычисления: всё приходит из `src.ratings.report`. Видят все (D327).
+  Раскладка D296: слева выбор среза, справа сводка; период — сверху, один на экран.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.ratings.title') }}{% endblock %}
+
+{% macro num(x) %}{% if x is none %}—{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
+{% macro dlt(x) %}{% if x is none %}<span class="rt-delta">—</span>{% else %}<span class="rt-delta {{ 'rt-delta--up' if x >= 0 else 'rt-delta--down' }}">{{ '%+.1f'|format(x) }}</span>{% endif %}{% endmacro %}
+{% macro unit_link(u, kind) %}<a href="{{ unit_url(u.unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ u.unit_name }}</a>{% endmacro %}
+{#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
+    данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
+{% macro vblock(block, kind) %}
+  {% if block.checkups == 0 %}<div class="ov-card__empty">{{ t('ratings.empty.' ~ kind) }}</div>
+  {% elif block.total == 0 %}<div class="ov-card__empty">{{ t('ratings.empty.violations') }}</div>
+  {% else %}
+  <div class="ov-card__hint">{{ t('ratings.violations.total', n=block.total) }} · {{ t('ratings.violations.per', x=('%.2f'|format(block.per_checkup)) if block.per_checkup is not none else '—') }}</div>
+  <ol class="rt-list">{% for line in block.top %}<li><span>{{ line.text }}</span><b>{{ line.count }}</b></li>{% endfor %}</ol>
+  {% endif %}
+{% endmacro %}
+{% macro href(group, value=none, period=selection.period.key) -%}
+  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}
+{%- endmacro %}
+
+{% block body %}
+<div class="mx-shell rt-shell">
+  <aside class="mx-rail" aria-label="{{ t('ratings.group') }}">
+    <div class="mx-rail__head mx-rail__head--list">
+      <div class="ov-chips">
+      {% for g in ('imf', 'developer', 'country') %}
+        <a class="ov-chip{% if selection.group == g %} is-on{% endif %}" href="{{ href(g) }}">{{ t('ratings.group.' ~ g) }}</a>
+      {% endfor %}
+      </div>
+    </div>
+    {% if selection.group == 'developer' %}
+      {% for d in choices.developers %}
+        <a class="mx-rail__row{% if d == selection.value %} is-on{% endif %}" href="{{ href('developer', d) }}"><span class="mx-rail__name">{{ d }}</span></a>
+      {% else %}<div class="ov-card__empty">{{ t('ratings.empty.countries') }}</div>{% endfor %}
+    {% elif selection.group == 'country' %}
+      {% for c in choices.countries %}
+        <a class="mx-rail__row{% if c.code == selection.value %} is-on{% endif %}" href="{{ href('country', c.code) }}"><span class="mx-rail__name">{{ country_name(c.code) }}</span><span class="mx-rail__meta">{{ c.developer or '' }}</span></a>
+      {% endfor %}
+    {% endif %}
+  </aside>
+  <div class="mx-main">
+    <div class="ov-head">
+      <div class="ov-head__main">
+        <div class="ov-head__kicker">{{ t('ratings.kicker') }}</div>
+        <h1 class="ov-head__title">{{ t('ratings.title') }}</h1>
+        <div class="ov-card__hint">
+          {% if summary.last_loaded %}{{ t('ratings.loaded.title') }}: {% for fmt, at in summary.last_loaded|dictsort %}{{ t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format)) }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ t('ratings.loaded.none') }}{% endif %}
+        </div>
+      </div>
+      {% if may_manage %}<a class="btn" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
+    </div>
+
+    <form class="ov-filters" method="get" action="{{ url(ratings_path) }}">
+      <input type="hidden" name="group" value="{{ selection.group }}">
+      {% if selection.value %}<input type="hidden" name="value" value="{{ selection.value }}">{% endif %}
+      <input type="hidden" name="lang" value="{{ lang }}">
+      <label class="ov-filters__label" for="rt-period">{{ t('ratings.period') }}</label>
+      <select class="input input--sm" id="rt-period" name="period">
+        {% for g in periods %}<optgroup label="{{ t('ratings.period.' ~ g.kind) }}">
+          {% for key, title in g.options %}<option value="{{ key }}"{% if key == selection.period.key %} selected{% endif %}>{{ title }}</option>{% endfor %}
+        </optgroup>{% endfor %}
+      </select>
+      <button class="btn btn--sm" type="submit">{{ t('ratings.show') }}</button>
+    </form>
+
+    {% if not summary.countries %}
+      <div class="ov-card ov-card--wide"><div class="ov-card__empty">{{ t('ratings.empty.countries') }}</div></div>
+    {% else %}
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.block.scores') }}</div></div>
+      {% set prev = summary.previous.key if summary.previous else '—' %}
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th class="is-text">{{ t('ratings.col.country') }}</th><th>{{ t('ratings.rs') }}</th><th>{{ t('ratings.col.delta', prev=prev) }}</th><th>{{ t('ratings.rko') }}</th><th>{{ t('ratings.col.delta', prev=prev) }}</th></tr></thead>
+        <tbody>
+          {% for line in summary.lines %}<tr><td class="is-text">{{ country_name(line.country) }}</td><td>{{ num(line.rs) }}</td><td>{{ dlt(line.rs_delta) }}</td><td>{{ num(line.rko) }}</td><td>{{ dlt(line.rko_delta) }}</td></tr>{% endfor %}
+          <tr class="rt-total"><td class="is-text">{{ t('ratings.total') }}</td><td>{{ num(summary.total.rs) }}</td><td>{{ dlt(summary.total.rs_delta) }}</td><td>{{ num(summary.total.rko) }}</td><td>{{ dlt(summary.total.rko_delta) }}</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    {% for kind, cluster, by in (('rko', summary.rko_cluster, summary.rko_by_country), ('rs', summary.rs_cluster, summary.rs_by_country)) %}
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.block.' ~ kind ~ '_violations') }}</div></div>
+      <div class="card__body stack">
+        <div><h3 class="rt-sub">{{ t('ratings.cluster') }}</h3>{{ vblock(cluster, kind) }}</div>
+        {% if summary.countries|length > 1 %}
+        <div><h3 class="rt-sub">{{ t('ratings.by_country') }}</h3>
+          <div class="rt-two">{% for code in summary.countries %}<div><b>{{ country_name(code) }}</b>{{ vblock(by[code], kind) }}</div>{% endfor %}</div>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+    {% endfor %}
+
+    {% for kind, top, bottom, hard in (('rs', summary.rs_top, summary.rs_bottom, summary.rs_hard), ('rko', summary.rko_top, summary.rko_bottom, summary.rko_hard)) %}
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.block.' ~ kind ~ '_top') }}</div></div>
+      {% if not top and not bottom %}<div class="ov-card__empty">{{ t('ratings.empty.' ~ kind) }}</div>{% else %}
+      <div class="card__body rt-two">
+        <div><h3 class="rt-sub">{{ t('ratings.top', x=summary.thresholds.top_threshold|int) }}</h3>
+          {% if top %}<ol class="rt-list">{% for u in top %}<li><span>{{ unit_link(u, kind) }} <small class="mx-muted">{{ country_name(u.country) }}</small></span><b>{{ num(u.score) }}</b></li>{% endfor %}</ol>{% else %}<div class="ov-card__empty">{{ t('ratings.empty.top') }}</div>{% endif %}</div>
+        <div><h3 class="rt-sub">{{ t('ratings.bottom', x=summary.thresholds.top_threshold|int) }}</h3>
+          {% if bottom %}<ol class="rt-list">{% for u in bottom %}<li><span>{{ unit_link(u, kind) }} <small class="mx-muted">{{ country_name(u.country) }}</small></span><b>{{ num(u.score) }}</b></li>{% endfor %}</ol>{% else %}<div class="ov-card__empty">{{ t('ratings.empty.bottom') }}</div>{% endif %}</div>
+      </div>{% endif %}
+    </section>
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.block.' ~ kind ~ '_hard') }}</div></div>
+      {% if hard %}<div class="table-wrap"><table class="table"><tbody>{% for v in hard %}<tr><td class="is-text">{{ country_name(v.country) }}</td><td class="is-text"><a href="{{ unit_url(v.unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ v.unit_name }}</a></td><td class="is-text">{{ v.text }}</td><td>{{ v.amount }}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}<div class="ov-card__empty">{{ t('ratings.empty.violations') }}</div>{% endif %}
+    </section>
+    {% endfor %}
+
+    <section class="ov-card ov-card--wide">
+      <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.block.risk') }}</div>
+        <div class="ov-card__hint">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=summary.thresholds.risk_threshold|int) }}</div></div>
+      {% if summary.risk %}<div class="table-wrap"><table class="table"><tbody>{% for u in summary.risk %}<tr><td class="is-text">{{ t('ratings.' ~ u.rating_type) }}</td><td class="is-text">{{ country_name(u.country) }}</td><td class="is-text"><a href="{{ unit_url(u.unit, u.rating_type) }}" target="_blank" rel="noopener noreferrer">{{ u.unit_name }}</a></td><td>{% for s in u.scores %}{{ num(s) }}{% if not loop.last %} → {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody></table></div>
+      {% else %}<div class="ov-card__empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
+    </section>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

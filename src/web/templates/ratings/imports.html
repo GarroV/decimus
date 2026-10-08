@@ -1,0 +1,119 @@
+{#
+  «Загрузки» раздела «Рейтинги» (спека 2026-10-08): загрузка файла, журнал,
+  несопоставленное и справочники. Только контроль и админ УК (D319) — заслон
+  на маршрутах `src/web/ratings.py`. Примечания журнала и причины строк пишет
+  импортёр по-русски (для журнала и MCP), поэтому в другой язык они не идут:
+  причина строки показывается по коду (P15).
+#}{% extends "base.html" %}
+{% block title %}{{ t('ratings.imports.title') }}{% endblock %}
+
+{% macro action(path) %}{{ url(ratings_path ~ path) }}?lang={{ lang }}{% endmacro %}
+
+{% block body %}
+  <div class="ov-head">
+    <div class="ov-head__main">
+      <a class="back" href="{{ url(ratings_path) }}?lang={{ lang }}">{{ t('ratings.back') }}</a>
+      <h1 class="ov-head__title">{{ t('ratings.imports.title') }}</h1>
+    </div>
+  </div>
+  {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
+  {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.imports.submit') }}</div>
+      <div class="ov-card__hint">{{ t('ratings.imports.hint', mb=max_mb) }}</div></div>
+    <div class="card__body">
+      <form method="post" enctype="multipart/form-data" action="{{ action('/import') }}" class="row">
+        <label><span class="field-label">{{ t('ratings.imports.file') }}</span>
+          <input class="input" type="file" name="file" accept=".csv,.json,text/csv,application/json" required></label>
+        <button class="btn btn--primary" type="submit">{{ t('ratings.imports.submit') }}</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.journal') }}</div></div>
+    {% if journal %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr>
+        <th class="is-text">{{ t('ratings.journal.at') }}</th><th class="is-text">{{ t('ratings.journal.actor') }}</th>
+        <th class="is-text">{{ t('ratings.journal.channel') }}</th><th class="is-text">{{ t('ratings.journal.format') }}</th>
+        <th class="is-text">{{ t('ratings.journal.outcome') }}</th><th>{{ t('ratings.journal.counts') }}</th>
+        {% if lang == 'ru' %}<th class="is-text">{{ t('ratings.journal.note') }}</th>{% endif %}
+      </tr></thead>
+      <tbody>{% for row in journal %}<tr>
+        <td class="is-text">{{ row.at.strftime(at_format) }}</td>
+        <td class="is-text">{{ row.actor }}</td>
+        <td class="is-text">{{ t('ratings.channel.' ~ row.channel) }}</td>
+        <td class="is-text">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small class="mx-muted">{{ row.file_name }}</small>{% endif %}</td>
+        <td class="is-text"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.outcome.' ~ row.outcome) }}</span></td>
+        <td>{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
+        {% if lang == 'ru' %}<td class="is-text">{{ row.note or '' }}</td>{% endif %}
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="ov-card__empty">{{ t('ratings.journal.empty') }}</div>{% endif %}
+  </section>
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.issues') }}</div></div>
+    {% if issues %}
+    <div class="table-wrap"><table class="table"><tbody>{% for i in issues %}<tr>
+      <td class="is-text">{{ i.at.strftime(at_format) }}{% if i.format %} · {{ t('ratings.format.' ~ i.format) }}{% endif %}<br><small class="mx-muted">{{ t('ratings.issues.row', n=i.row_no) }}</small></td>
+      <td class="is-text">{{ t('ratings.issue.' ~ i.reason) }}</td>
+      <td class="is-text">{{ i.detail.unit or '' }}{% if i.detail.country %} · {{ i.detail.country }}{% endif %}{% if lang == 'ru' and i.detail.reason %}<br><small class="mx-muted">{{ i.detail.reason }}</small>{% endif %}</td>
+    </tr>{% endfor %}</tbody></table></div>
+    {% else %}<div class="ov-card__empty">{{ t('ratings.issues.empty') }}</div>{% endif %}
+  </section>
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.developers') }}</div></div>
+    <div class="card__body stack">
+      {% for c in countries %}
+      <form method="post" action="{{ action('/countries') }}" class="row">
+        <input type="hidden" name="code" value="{{ c.code }}">
+        <label><span class="field-label">{{ country_name(c.code) }}</span>
+          <input class="input" name="developer" value="{{ c.developer or '' }}" maxlength="120"></label>
+        <button class="btn btn--sm" type="submit">{{ t('ratings.developers.save') }}</button>
+      </form>
+      {% else %}<div class="ov-card__empty">{{ t('ratings.empty.countries') }}</div>{% endfor %}
+    </div>
+  </section>
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.rules') }}</div></div>
+    {% if rules %}
+    <div class="table-wrap"><table class="table"><tbody>{% for rule_id, rating_type, match, pattern in rules %}<tr>
+      <td class="is-text">{{ t('ratings.' ~ rating_type) }}</td>
+      <td class="is-text">{{ t('ratings.rules.match.' ~ match) }}</td>
+      <td class="is-text">{{ pattern }}</td>
+      <td><form method="post" action="{{ action('/hard-rules/' ~ rule_id ~ '/delete') }}"><button class="btn btn--sm btn--danger" type="submit">{{ t('ratings.rules.remove') }}</button></form></td>
+    </tr>{% endfor %}</tbody></table></div>
+    {% else %}<div class="ov-card__empty">{{ t('ratings.rules.empty') }}</div>{% endif %}
+    <div class="card__body">
+      <form method="post" action="{{ action('/hard-rules') }}" class="row">
+        <label><span class="field-label">{{ t('ratings.rules.type') }}</span>
+          <select class="input" name="rating_type"><option value="rko">{{ t('ratings.rko') }}</option><option value="rs">{{ t('ratings.rs') }}</option></select></label>
+        <label><span class="field-label">{{ t('ratings.rules.match') }}</span>
+          <select class="input" name="match"><option value="text">{{ t('ratings.rules.match.text') }}</option><option value="contains">{{ t('ratings.rules.match.contains') }}</option></select></label>
+        <label><span class="field-label">{{ t('ratings.rules.pattern') }}</span>
+          <input class="input" name="pattern" required></label>
+        <button class="btn btn--sm" type="submit">{{ t('ratings.rules.add') }}</button>
+      </form>
+    </div>
+  </section>
+
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('ratings.settings') }}</div></div>
+    <div class="card__body">
+      <form method="post" action="{{ action('/settings') }}" class="row">
+        {% for key in ('top_threshold', 'risk_threshold') %}
+        <label><span class="field-label">{{ t('ratings.settings.' ~ key) }}</span>
+          <input class="input input--num" type="number" name="{{ key }}" min="0" max="100" step="0.1" value="{{ settings[key] if key in settings else '' }}"></label>
+        {% endfor %}
+        <label><span class="field-label">{{ t('ratings.settings.risk_periods') }}</span>
+          <input class="input input--num" type="number" name="risk_periods" min="2" max="12" step="1" value="{{ settings.risk_periods|int if 'risk_periods' in settings else '' }}"></label>
+        <button class="btn btn--sm" type="submit">{{ t('ratings.settings.save') }}</button>
+      </form>
+    </div>
+  </section>
+{% endblock %}
