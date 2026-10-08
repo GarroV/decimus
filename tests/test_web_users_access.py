@@ -403,7 +403,12 @@ def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator
 def test_контроль_вне_рейтингов_не_пишет(
     контроль: FlaskClient, зовы: dict[str, list[Any]], путь: str, форма: dict[str, str]
 ) -> None:
-    """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут."""
+    """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут.
+
+    Заслон держат ТОЛЬКО `/admin/publish` и `/admin/items`: `/users/*` и retract
+    дают 403 и без него (`_hq_admin_only`, `_admin_only`). Убрать эти два случая
+    значит опустошить проверку заслона незаметно.
+    """
     ответ = контроль.post(путь, data=форма, headers=ЗАГОЛОВКИ)
 
     assert ответ.status_code == 403
