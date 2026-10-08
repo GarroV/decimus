@@ -3,10 +3,11 @@
  * Экран отвечает на вопрос аудитора на ходу: «что мне ещё посмотреть и
  * записать на этой точке?». Он целиком про ОДНУ зону — ту, где аудитор
  * стоит: сверху точка, прогресс и прошлый раз одной строкой; под ними
- * переключатель зон (текущая, три подсказки «не были», весь список по
- * нажатию); дальше прошлое, записанное и чек-лист этой зоны; внизу —
- * «+ Нарушение» и «Осмотрено →», который засчитывает зону и ведёт в
- * следующую неосмотренную. Сведения о визите — отдельный лист из шапки.
+ * переключатель зон (текущая, три подсказки «осталось», лист «Все зоны»
+ * снизу по нажатию, свайп — соседняя зона); дальше прошлое, записанное,
+ * замеры и чек-лист этой зоны; внизу — «+ Нарушение» и «Осмотрено →».
+ * Зону засчитывает только явное «Осмотрено»: запись делает её «в работе».
+ * Сведения о визите — отдельный лист из шапки.
  * Форма записи — `walk-sheet.js`, кадры — `walk-photo.js`, общее — `walk-core.js`.
  *
  * Личные пометки («зона осмотрена», «исправлено») лежат в CloudStorage
@@ -62,7 +63,15 @@
 
   function fixKey(item, zone) { return item.code + "|" + zone.code; }
 
-  function zoneDone(zone) { return zone.recorded.length > 0 || S.marks.z.indexOf(zone.code) !== -1; }
+  /** Осмотрена — только когда аудитор сам сказал «Осмотрено». Запись в зоне
+   *  ещё не значит, что зону прошли целиком: она «в работе». */
+  function zoneDone(zone) { return S.marks.z.indexOf(zone.code) !== -1; }
+
+  function zoneStarted(zone) { return !zoneDone(zone) && zone.recorded.length > 0; }
+
+  function stateClass(zone) { return zoneDone(zone) ? " is-done" : zoneStarted(zone) ? " is-started" : ""; }
+
+  var ADVICE_LEVEL = "R";
 
   function rechecked(item, zone) { return item.again || S.marks.f.indexOf(fixKey(item, zone)) !== -1; }
 
@@ -152,7 +161,7 @@
     var bar = el("div", "walk-progress__bar");
     bar.setAttribute("aria-hidden", "true");
     zones.forEach(function (z) {
-      bar.appendChild(el("span", "walk-progress__seg" + (zoneDone(z) ? " is-done" : "") + (z.code === S.open ? " is-here" : "")));
+      bar.appendChild(el("span", "walk-progress__seg" + stateClass(z) + (z.code === S.open ? " is-here" : "")));
     });
     progress.appendChild(bar);
     var count = el("span", "walk-progress__count", done + "/" + zones.length);
@@ -183,32 +192,75 @@
   /* ── переключатель зон: текущая, подсказки, весь список ────────────── */
 
   function tileMeta(z) {
+    var parts = [];
+    parts.push(zoneDone(z) ? tx("walk.tile.done") : zoneStarted(z) ? tx("walk.tile.started") : tx("walk.tile.todo"));
+    if (z.recorded.length) parts.push(tx("walk.count.now", { count: z.recorded.length }));
     var attention = openPrevious(z);
-    if (attention) return tx("walk.count.before", { count: attention });
-    if (z.recorded.length) return tx("walk.count.now", { count: z.recorded.length });
-    return zoneDone(z) ? tx("walk.tile.done") : tx("walk.tile.todo");
+    if (attention) parts.push(tx("walk.count.before", { count: attention }));
+    return parts.join(" · ");
   }
 
-  function setPanel(box, open) {
+  /** Весь список зон — лист снизу, под большим пальцем; выбор его закрывает. */
+  function setPanel(open) {
     S.panel = open;
-    box.classList.toggle("is-open", open);
-    box.querySelector(".walk-switch__main").setAttribute("aria-expanded", open ? "true" : "false");
-    box.querySelector(".walk-panel").inert = !open;
+    var sheet = document.getElementById("walk-zones-sheet");
+    if (sheet) {
+      sheet.classList.toggle("is-open", open);
+      sheet.inert = !open;
+    }
+    var main = root.querySelector(".walk-switch__main");
+    if (main) main.setAttribute("aria-expanded", open ? "true" : "false");
     W.haptic();
   }
 
+  function renderZonesSheet(zones, zone) {
+    var old = document.getElementById("walk-zones-sheet");
+    if (old) old.parentNode.removeChild(old);
+    var sheet = el("div", "walk-zsheet" + (S.panel ? " is-open" : ""));
+    sheet.id = "walk-zones-sheet";
+    sheet.inert = !S.panel;
+    var scrim = W.button("walk-zsheet__scrim", null, function () { setPanel(false); });
+    scrim.setAttribute("aria-label", tx("walk.sheet.close"));
+    sheet.appendChild(scrim);
+    var card = el("div", "walk-zsheet__card");
+    card.setAttribute("role", "dialog");
+    var head = el("div", "walk-zsheet__head");
+    head.appendChild(el("h2", "walk-zsheet__title", tx("walk.switch.all")));
+    var done = zones.filter(zoneDone).length;
+    head.appendChild(el("span", "walk-zsheet__count", done + "/" + zones.length));
+    card.appendChild(head);
+    var grid = el("div", "walk-panel__grid");
+    zones.forEach(function (z) {
+      var tile = W.button("walk-tile" + stateClass(z) + (openPrevious(z) ? " has-attention" : "") +
+        (z.code === zone.code ? " is-here" : ""), null, function () { go(z.code); });
+      var name = el("span", "walk-tile__name");
+      name.appendChild(el("span", "walk-tile__check" + stateClass(z), zoneDone(z) ? "✓" : ""));
+      name.appendChild(el("span", null, z.title));
+      tile.appendChild(name);
+      tile.appendChild(el("span", "walk-tile__meta", tileMeta(z)));
+      grid.appendChild(tile);
+    });
+    card.appendChild(grid);
+    sheet.appendChild(card);
+    document.body.appendChild(sheet);
+  }
+
   function renderSwitch(zones, zone) {
-    var box = el("section", "walk-switch" + (S.panel ? " is-open" : ""));
+    var box = el("section", "walk-switch");
     var bar = el("div", "walk-switch__bar");
     var at = zoneIndex(zone.code);
     var n = zones.length;
     var back = W.button("walk-switch__arrow", "‹", function () { go(zones[(at - 1 + n) % n].code, -1); });
     back.setAttribute("aria-label", tx("walk.switch.prev"));
-    var main = W.button("walk-switch__main", null, function () { setPanel(box, !S.panel); });
+    var main = W.button("walk-switch__main", null, function () { setPanel(!S.panel); });
     main.setAttribute("aria-expanded", S.panel ? "true" : "false");
     main.setAttribute("aria-label", zone.title + ". " + tx("walk.switch.all"));
-    main.appendChild(el("span", "walk-switch__check" + (zoneDone(zone) ? " is-done" : ""), zoneDone(zone) ? "✓" : ""));
-    main.appendChild(el("span", "walk-switch__name", zone.title));
+    main.appendChild(el("span", "walk-switch__check" + stateClass(zone), zoneDone(zone) ? "✓" : ""));
+    var label = el("span", "walk-switch__label");
+    label.appendChild(el("span", "walk-switch__name", zone.title));
+    label.appendChild(el("span", "walk-switch__state",
+      zoneDone(zone) ? tx("walk.tile.done") : zoneStarted(zone) ? tx("walk.tile.started") : tx("walk.tile.todo")));
+    main.appendChild(label);
     main.appendChild(el("span", "walk-switch__caret", "▾"));
     var fwd = W.button("walk-switch__arrow", "›", function () { go(zones[(at + 1) % n].code, 1); });
     fwd.setAttribute("aria-label", tx("walk.switch.next"));
@@ -217,24 +269,6 @@
     bar.appendChild(fwd);
     box.appendChild(bar);
 
-    var panel = el("div", "walk-panel");
-    panel.inert = !S.panel;
-    var inner = el("div", "walk-panel__inner");
-    var grid = el("div", "walk-panel__grid");
-    zones.forEach(function (z) {
-      var tile = W.button("walk-tile" + (zoneDone(z) ? " is-done" : "") + (openPrevious(z) ? " has-attention" : "") +
-        (z.code === zone.code ? " is-here" : ""), null, function () { go(z.code); });
-      var name = el("span", "walk-tile__name");
-      name.appendChild(el("span", "walk-tile__check", zoneDone(z) ? "✓" : ""));
-      name.appendChild(el("span", null, z.title));
-      tile.appendChild(name);
-      tile.appendChild(el("span", "walk-tile__meta", tileMeta(z)));
-      grid.appendChild(tile);
-    });
-    inner.appendChild(grid);
-    panel.appendChild(inner);
-    box.appendChild(panel);
-
     var left = zones.filter(function (z) { return !zoneDone(z) && z.code !== zone.code; });
     // Сначала те, где прошлое не перепроверено, дальше — порядок методики.
     left = left.filter(openPrevious).concat(left.filter(function (z) { return !openPrevious(z); }));
@@ -242,11 +276,11 @@
     if (left.length) {
       hints.appendChild(el("span", "walk-hints__label", tx("walk.hint.left")));
       left.slice(0, 3).forEach(function (z) {
-        hints.appendChild(W.button("walk-hint" + (openPrevious(z) ? " has-attention" : ""), z.title, function () { go(z.code); }));
+        hints.appendChild(W.button("walk-hint" + stateClass(z) + (openPrevious(z) ? " has-attention" : ""), z.title, function () { go(z.code); }));
       });
       if (left.length > 3) {
         hints.appendChild(W.button("walk-hint walk-hint--more", tx("walk.hint.more", { count: left.length - 3 }),
-          function () { setPanel(box, true); }));
+          function () { setPanel(true); }));
       }
     } else if (zoneDone(zone)) {
       hints.appendChild(el("span", "walk-hints__label is-ok", "✓ " + tx("walk.all_done")));
@@ -307,7 +341,9 @@
     }
     var words = el("span", "walk-rec__words");
     var line = el("span", "walk-item__line");
-    line.appendChild(W.level(rec.level));
+    var advice = rec.level === ADVICE_LEVEL;
+    // У рекомендации нет класса: вместо метки D-уровня — слово.
+    line.appendChild(advice ? el("span", "walk-level walk-level--advice", tx("walk.rec.advice")) : W.level(rec.level));
     line.appendChild(el("span", "walk-item__text", rec.text));
     words.appendChild(line);
     if (rec.comment) words.appendChild(el("span", "walk-rec__comment", tx("walk.rec.comment", { text: rec.comment })));
@@ -372,6 +408,31 @@
     return box;
   }
 
+  /** Замеры, которые методика ждёт именно в этой зоне: холодильник, печь.
+   *  Общие замеры (без зоны) здесь не повторяются — они в «+ Замер». */
+  function renderMeasures(zone) {
+    var wanted = S.data.items.filter(function (i) { return i.measure && i.zones.indexOf(zone.code) !== -1; });
+    if (!wanted.length) return null;
+    var box = el("section", "walk-ms");
+    box.appendChild(el("h2", "walk-sub", tx("walk.zone.measures")));
+    var list = el("ul", "walk-ms__list");
+    wanted.forEach(function (i) {
+      var got = zone.recorded.filter(function (r) { return r.code === i.code; });
+      var li = el("li");
+      var b = W.button("walk-ms__item" + (got.length ? " is-done" : ""), null, function () {
+        if (!writable()) return;
+        if (got.length) W.sheet.open({ record: got[0], zone: zone.code });
+        else W.sheet.open({ mode: "measure", zone: zone.code, code: i.code, level: "D0" });
+      });
+      b.appendChild(el("span", "walk-ms__text", i.q));
+      b.appendChild(el("span", "walk-ms__value", got.length ? got.map(function (r) { return r.text; }).join("; ") : tx("walk.zone.measure_add")));
+      li.appendChild(b);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+    return box;
+  }
+
   function renderStage(zone) {
     var stage = el("section", "walk-stage" + (S.dir > 0 ? " is-from-right" : S.dir < 0 ? " is-from-left" : ""));
     S.dir = 0;
@@ -381,24 +442,36 @@
       zone.previous.forEach(function (p) { prev.appendChild(renderPreviousItem(p, zone)); });
       stage.appendChild(prev);
     }
-    if (zone.recorded.length) {
+    // Замеры, которых зона ждёт, показаны своим блоком — здесь не повторяются.
+    var own = zone.recorded.filter(function (r) {
+      var it = r.level === "D0" && S.data.items.filter(function (i) { return i.code === r.code; })[0];
+      return !(it && it.zones.indexOf(zone.code) !== -1);
+    });
+    if (own.length) {
       stage.appendChild(el("h2", "walk-sub", tx("walk.zone.now")));
       var now = el("ul", "walk-list walk-list--records");
-      zone.recorded.forEach(function (r) { now.appendChild(renderRecord(r, zone)); });
+      own.forEach(function (r) { now.appendChild(renderRecord(r, zone)); });
       stage.appendChild(now);
     } else if (!zone.previous.length && writable()) {
       stage.appendChild(el("p", "walk-stage__note", zoneDone(zone) ? tx("walk.zone.clean_done") : tx("walk.zone.empty_hint")));
     }
+    var measures = renderMeasures(zone);
+    if (measures) stage.appendChild(measures);
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);
 
     var extra = el("div", "walk-stage__extra");
+    if (writable()) {
+      extra.appendChild(W.button("walk-link", "+ " + tx("walk.add.short_advice"), function () {
+        W.sheet.open({ mode: "advice", zone: zone.code });
+      }));
+    }
     if (writable() && hasMeasures(zone)) {
       extra.appendChild(W.button("walk-link", "+ " + tx("walk.add.short_measure"), function () {
         W.sheet.open({ mode: "measure", zone: zone.code });
       }));
     }
-    if (!zone.recorded.length && S.marks.z.indexOf(zone.code) !== -1) {
+    if (zoneDone(zone)) {
       extra.appendChild(W.button("walk-link walk-link--quiet", tx("walk.zone.unmark"), function () {
         S.marks.z = toggle(S.marks.z, zone.code);
         saveMarks();
@@ -412,6 +485,18 @@
   /* ── низ экрана: записать и дальше ─────────────────────────────────── */
 
   function markAndNext(zone) {
+    // Прошлое замечание здесь не отмечено — зону не засчитываем: это ровно
+    // то, что проверка обязана перепроверить, и забыть его дороже всего.
+    if (openPrevious(zone)) {
+      W.haptic("error");
+      W.toast(tx("walk.zone.need_prev"), "warn");
+      var prev = root.querySelector(".walk-item--prev");
+      if (prev) {
+        prev.scrollIntoView({ behavior: "smooth", block: "center" });
+        prev.classList.add("is-flash");
+      }
+      return;
+    }
     if (S.marks.z.indexOf(zone.code) === -1) S.marks.z = S.marks.z.concat([zone.code]);
     saveMarks();
     W.haptic("success");
@@ -584,6 +669,7 @@
       root.appendChild(renderSwitch(zones, zone));
       root.appendChild(renderStage(zone));
       if (writable()) root.appendChild(renderDock(zone));
+      renderZonesSheet(zones, zone);
     }
     if (S.info) renderInfoSheet();
     window.scrollTo(0, y);
@@ -644,6 +730,27 @@
     // Аудитор вернулся из чата, где мог записать нарушение, — данные свежие.
     tg.onEvent("activated", load);
   }
+  // Свайп по зоне влево-вправо — соседняя зона, как листают страницы.
+  // Только явно горизонтальный жест: вертикальная прокрутка его не задевает.
+  var touch = null;
+  root.addEventListener("touchstart", function (e) {
+    var t = e.touches[0];
+    touch = e.target.closest(".walk-stage") && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+  }, { passive: true });
+  root.addEventListener("touchend", function (e) {
+    if (!touch || !S.data || !S.data.zones || W.sheet.isOpen() || S.info || S.panel) return;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - touch.x;
+    var dy = t.clientY - touch.y;
+    touch = null;
+    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    var zones = S.data.zones;
+    var at = zoneIndex(S.open);
+    var n = zones.length;
+    if (dx < 0) go(zones[(at + 1) % n].code, 1);
+    else go(zones[(at - 1 + n) % n].code, -1);
+  }, { passive: true });
+
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "visible" && S.data) load();
   });

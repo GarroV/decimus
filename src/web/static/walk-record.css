@@ -387,6 +387,24 @@
 
 /* выбор пункта */
 
+.walk-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.walk-chip {
+  min-height: 36px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-control);
+  border-radius: 18px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+
 .walk-chip.is-on {
   border-color: var(--accent);
   background: var(--accent);
