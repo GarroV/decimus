@@ -166,6 +166,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Рейтинги РС/РКО (схема `ratings`). Заведена вместе с файлом, нигде не применена.
     "0038_ratings.sql": ("sql1:b6272b753acd2cd99d8e63ec83a50c943da6a7ba40aefec7b6d081e266f797a7"),
+    # Роль веб-учётки «контроль» (только HQ). Заведена вместе с файлом, нигде не применена.
+    "0039_control_role.sql": (
+        "sql1:149df9ece74bb0126f1a28a5bf383ffabeb794246d7bb6d2309e69d3f0c811a4"
+    ),
 }
 
 

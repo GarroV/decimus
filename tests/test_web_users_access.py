@@ -334,3 +334,86 @@ def test_отказ_правки_следа_не_оставляет(
         )
 
     assert not [з for з in caplog.records if з.name == "src.web.people"]
+
+
+def test_контроль_вне_уК_до_базы_не_доходит(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """Роль «контроль» у партнёра — отказ 400 на экране, а не 503 «база отказала»."""
+    ответ = админ_ук.post(
+        "/users/role", data={"login": "nino", "tenant": "GE", "role": "control"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 400
+    assert зовы["role"] == []
+
+
+def test_контроль_в_уК_назначается(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
+    ответ = админ_ук.post(
+        "/users/role", data={"login": "petr", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 200
+    assert зовы["role"] == [("petr", "HQ", "control")]
+
+
+def test_экран_предлагает_контроль_только_людям_уК(админ_ук: FlaskClient) -> None:
+    страница = админ_ук.get("/users").get_data(as_text=True)
+    строки = [r.split("</tr>")[0] for r in страница.split("<tr")]
+    ук = next(r for r in строки if "petr" in r and 'name="role"' in r)
+    партнёр = next(r for r in строки if "nino" in r and 'name="role"' in r)
+
+    assert 'value="control"' in ук
+    assert 'value="control"' not in партнёр
+
+
+def test_добавить_контроль_партнёру_отказ_до_базы(
+    админ_ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def завести(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(accounts, "add", завести)
+    ответ = админ_ук.post(
+        "/users/add",
+        data={"login": "ctl", "tenant": "GE", "role": "control"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 400
+    assert "только в пространстве УК" in ответ.get_data(as_text=True)
+
+
+@pytest.fixture
+def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
+    yield from стенд(monkeypatch, tenant="HQ", role="control")
+
+
+@pytest.mark.parametrize(
+    ("путь", "форма"),
+    [
+        ("/users/role", {"login": "petr", "tenant": "HQ", "role": "admin"}),
+        ("/users/add", {"login": "zed", "tenant": "HQ", "role": "auditor"}),
+        ("/users/disable", {"login": "petr", "tenant": "HQ"}),
+        ("/admin/publish", {}),
+        ("/admin/items", {"code": "X1"}),
+        ("/inspections/x/retract", {"reason": "дубль"}),
+    ],
+)
+def test_контроль_вне_рейтингов_не_пишет(
+    контроль: FlaskClient, зовы: dict[str, list[Any]], путь: str, форма: dict[str, str]
+) -> None:
+    """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут."""
+    ответ = контроль.post(путь, data=форма, headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 403
+    assert зовы == {"role": [], "email": []}
+
+
+def test_контроль_читает_остальные_разделы(контроль: FlaskClient) -> None:
+    assert контроль.get("/users").status_code == 200
+    assert контроль.get("/admin").status_code == 200
+
+
+def test_контроль_выходит_сам(контроль: FlaskClient) -> None:
+    assert контроль.post("/logout", headers=ЗАГОЛОВКИ).status_code == 302

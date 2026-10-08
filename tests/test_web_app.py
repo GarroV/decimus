@@ -777,6 +777,26 @@ def test_аудитор_не_отклоняет_проверку(стенд: Fla
     assert "/retract" not in карточка_аудитора
 
 
+@pytest.mark.parametrize("стенд", ["control"], indirect=True)
+def test_контроль_не_отклоняет_проверку(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — «контроль» (D319) вне рейтингов только читает.
+    def отклонить(*_a: Any, **_k: Any) -> Retraction:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(data, "retract_card", отклонить)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
+    )
+
+    # Assert
+    assert ответ.status_code == 403
+
+
 # --- перенос по дате и пиццерии (D195) ---------------------------------------
 
 
