@@ -187,4 +187,7 @@ grant insert, update, delete on
     ratings.violations, ratings.hard_rules, ratings.settings, ratings.import_issues
     to dodo_audit_app;
 -- Журнал не удаляется никем, кроме владельца схемы: след загрузки остаётся.
-grant insert, update on ratings.imports to dodo_audit_app;
+-- Роль приложения дописывает счётчики разбора, но не переписывает, кто, когда,
+-- каким файлом и с каким исходом загружал: actor, sha256, at, outcome — только вставка.
+grant insert on ratings.imports to dodo_audit_app;
+grant update (accepted, updated, skipped, unmatched) on ratings.imports to dodo_audit_app;

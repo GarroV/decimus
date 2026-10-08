@@ -97,3 +97,21 @@ def test_стартовые_пороги_и_хард_правила_на_мес�
         ]
         cur.execute("select count(*) from ratings.hard_rules where rating_type = 'rko'")
         assert cur.fetchone() == (6,)
+
+
+def test_журнал_загрузок_роль_приложения_правит_только_счётчики(db_env: str) -> None:
+    with psycopg.connect(db_env, autocommit=True) as conn, conn.cursor() as cur:
+        cur.execute("begin")
+        загрузка = _журнал(cur)
+        cur.execute("update ratings.imports set accepted = 5 where id = %s", (загрузка,))
+        cur.execute("rollback")
+    for sql in (
+        "delete from ratings.imports",
+        "update ratings.imports set actor = 'другой'",
+        "update ratings.imports set outcome = 'failed'",
+        "update ratings.imports set sha256 = repeat('b', 64)",
+    ):
+        with psycopg.connect(db_env) as conn, conn.cursor() as cur:
+            _журнал(cur)
+            with pytest.raises(psycopg.errors.InsufficientPrivilege):
+                cur.execute(sql)
