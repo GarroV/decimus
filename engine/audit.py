@@ -546,20 +546,44 @@ def zone_refusal(qid, zone, allowed):
             f"Допустимые зоны: {зоны}")
 
 
+# Рекомендация без нарушения (D201, #375): совет команде у пункта, без вычета
+# и срока. Общая заметка (D314) — тот же класс у служебного кода NOTE: совет не
+# про пункт, печатается в конце отчёта. Пару «пункт + зона» не занимают.
+ADVICE = "R"
+NOTE_QID = "NOTE"
+# Записи без вычета: пару не занимают и занятыми ею не считаются (#444).
+NON_DEDUCTING = {"D0", ADVICE}
+VIOLATION_LEVELS_SET = {"D1", "D2", "D3"}
+
+
+def check_level(qid, lvl, r, evidence):
+    """Класс годится пункту. У рекомендации свои правила: пункт-нарушение или NOTE, текст обязателен."""
+    if lvl == ADVICE:
+        if qid != NOTE_QID and not (set(r["levels"]) & VIOLATION_LEVELS_SET):
+            sys.exit(f"Рекомендация пишется к пункту-нарушению, у {qid} нарушений нет")
+        if not (evidence or "").strip():
+            sys.exit("У рекомендации нет текста: напишите, что сделать")
+        return
+    if qid == NOTE_QID:
+        sys.exit(f"{NOTE_QID} — общая заметка, только класс {ADVICE}")
+    if lvl not in r["levels"]:
+        sys.exit(f"У вопроса {qid} нет уровня {lvl}. Доступны: {'/'.join(r['levels'])}")
+
+
 def cmd_add(a):
     cl = {r["id"]: r for r in load_checklist()}
     zones = load_zones()
     zc = {z["code"] for z in zones}
     qid = a.qid.strip().upper()
-    if qid not in cl:
+    if qid not in cl and qid != NOTE_QID:
         sys.exit(f"Нет вопроса {qid} в чек-листе")
-    r = cl[qid]
+    r = cl.get(qid, {"levels": [], "question_ru": ""})
     lvl = a.level.strip().upper()
-    if lvl not in r["levels"]:
-        sys.exit(f"У вопроса {qid} нет уровня {lvl}. Доступны: {'/'.join(r['levels'])}")
+    check_level(qid, lvl, r, a.evidence)
     if a.zone not in zc:
         sys.exit(f"Нет зоны {a.zone}. Доступны: {', '.join(sorted(zc))}")
-    allowed = zone_codes(r, zones)
+    # У общей заметки пункта нет — зона любая, она только подсказка, где это видели.
+    allowed = sorted(zc) if qid == NOTE_QID else zone_codes(r, zones)
     # Зону, которую назвал человек, движок принимает (D206: зона — там, где
     # продукт). Отказ остаётся для зоны, выведенной машиной (T271): там он и
     # ловил пункт про печь, уехавший в холодный цех.
@@ -608,10 +632,10 @@ def check_pair_free(st, qid, zone, level, skip_n=None):
     — две записи, в отчёте отдельными строками. Временная мера до карточки
     пиццерии (#446).
     """
-    if level == "D0":
+    if level in NON_DEDUCTING:
         return
     for f in st["findings"]:
-        if f["level"] == "D0":
+        if f["level"] in NON_DEDUCTING:
             continue
         if f["n"] != skip_n and f["qid"] == qid and f["zone"] == zone:
             sys.exit(f"{qid} в зоне {zone} уже зафиксировано — запись #{f['n']}. "
@@ -636,14 +660,18 @@ def cmd_edit(a):
     qid = (a.qid if a.qid is not None else f["qid"]).strip().upper()
     lvl = (a.level if a.level is not None else f["level"]).strip().upper()
     zone = (a.zone if a.zone is not None else f["zone"]).strip()
-    if qid not in cl:
+    if qid not in cl and qid != NOTE_QID:
         sys.exit(f"Нет вопроса {qid} в чек-листе")
-    r = cl[qid]
-    if lvl not in r["levels"]:
-        sys.exit(f"У вопроса {qid} нет уровня {lvl}. Доступны: {'/'.join(r['levels'])}")
+    r = cl.get(qid, {"levels": [], "question_ru": ""})
+    # Совет и нарушение — разная цена: правка класса не превращает одно в
+    # другое молча. Передумал — удалить запись и записать заново.
+    if (lvl == ADVICE) != (f["level"] == ADVICE):
+        sys.exit(f"Запись #{f['n']}: рекомендацию и нарушение правкой класса не поменять — "
+                 "удалите запись и запишите заново")
+    check_level(qid, lvl, r, a.evidence if a.evidence is not None else f.get("evidence"))
     if zone not in zc:
         sys.exit(f"Нет зоны {zone}. Доступны: {', '.join(sorted(zc))}")
-    allowed = zone_codes(r, zones)
+    allowed = sorted(zc) if qid == NOTE_QID else zone_codes(r, zones)
     unusual = zone not in allowed
     # Зону оставили прежней, а она уже стояла нетипичной по слову человека —
     # правка класса или текста не обязана её заново подтверждать (D206).
@@ -691,7 +719,8 @@ def cmd_photo(a):
         if missing:
             sys.exit(f"У нарушения #{a.n} нет кадра {missing[0]}")
         rest = [x for x in cur if x not in gone]
-        if not rest and not a.add:
+        # У рекомендации кадр по желанию (D201): снять последний можно.
+        if not rest and not a.add and f["level"] != ADVICE:
             sys.exit(f"У нарушения #{a.n} это последний кадр: без фотофиксации запись не ведётся")
         cur = rest
     # Существование файла здесь НЕ проверяется намеренно: в боте фотография
@@ -788,14 +817,20 @@ def compute(st, cl_rows, zones, cfg):
     for f in st["findings"]:
         r = cl.get(f["qid"], {})
         lvl = f["level"]
-        counts[lvl] = counts.get(lvl, 0) + 1
+        advice = lvl == ADVICE
+        # Рекомендация в счётчики классов не входит: это не нарушение и не замер.
+        if not advice:
+            counts[lvl] = counts.get(lvl, 0) + 1
         z = per_zone.setdefault(f["zone"], {"name_ru": f["zone"], "name_en": f["zone"],
                                             "share": 0.0, "D1": 0, "D2": 0, "D3": 0,
                                             "loss": 0.0, "zeroed": False})
-        z[lvl] = z.get(lvl, 0) + 1
+        if not advice:
+            z[lvl] = z.get(lvl, 0) + 1
         counted = True
         cost = 0.0
-        if lvl == "D3":
+        if advice:
+            pass
+        elif lvl == "D3":
             z["zeroed"] = True
         else:
             if d3cfg.get("skip_other_violations_in_d3_zone", True) and f["zone"] in d3_zones:
@@ -809,8 +844,8 @@ def compute(st, cl_rows, zones, cfg):
                 # и цена остаётся прежней, а не удваивается молча.
                 if f.get("repeat"):
                     cost *= float(cfg.get("repeat_multiplier", 1.0))
-        days = min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
-        due = (inspected + timedelta(days=days)).isoformat()
+        days = 0 if advice else min(r.get("days", 0), cfg["deadlines"]["max_days"].get(lvl, 99))
+        due = "" if advice else (inspected + timedelta(days=days)).isoformat()
         items.append({**f, "photos": photos_of(f), "question_ru": r.get("question_ru", ""), "question_en": r.get("question_en", ""),
                       "process_code": r.get("process_code", ""),
                       "process_ru": r.get("process_ru", ""), "process_en": r.get("process_en", ""),
@@ -886,6 +921,8 @@ def compute(st, cl_rows, zones, cfg):
                                            "D1": 0, "D2": 0, "D3": 0, "loss": 0.0})
 
     for i in items:
+        if i["level"] == ADVICE:
+            continue
         p = _process(i)
         p[i["level"]] = p.get(i["level"], 0) + 1
 

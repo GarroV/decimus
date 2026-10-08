@@ -923,6 +923,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Новый класс для записи #{n}?",
         "en": "New class for record #{n}?",
     },
+    "edit.level_advice": {
+        "ru": (
+            "Запись #{n} — рекомендация, класса у неё нет. Если это нарушение — "
+            "удалите запись и запишите нарушение заново."
+        ),
+        "en": (
+            "Record #{n} is a recommendation and has no class. If it is a violation, "
+            "delete the record and record the violation again."
+        ),
+    },
     "edit.ask_text": {
         "ru": "Пришлите новую формулировку для записи #{n} одним сообщением.",
         "en": "Send the new wording for record #{n} in one message.",

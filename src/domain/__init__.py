@@ -26,6 +26,9 @@ from .handover import handed_over
 from .info import set_info
 from .kinds import INSPECTION_KINDS, kind_title
 from .models import (
+    ADVICE_LEVEL,
+    NON_DEDUCTING,
+    NOTE_CODE,
     SOURCE_COMMENT,
     SOURCE_PHOTO,
     SOURCES,
@@ -62,7 +65,10 @@ from .uncovered import (
 from .uploads import is_upload_ref, save_upload, upload_file
 
 __all__ = [
+    "ADVICE_LEVEL",
     "INSPECTION_KINDS",
+    "NON_DEDUCTING",
+    "NOTE_CODE",
     "OUTCOMES",
     "OUTCOME_ABANDONED",
     "OUTCOME_RECORDED",

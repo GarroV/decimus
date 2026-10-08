@@ -39,7 +39,7 @@ from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
 from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
-from src.domain.models import ChecklistItem, Inspection, Zone
+from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
 from . import walk_write
@@ -144,7 +144,7 @@ def build_walk(
     нет, не теряется — она добавляется в конец под своим кодом.
     """
     found = previous.found
-    again = {(f.code, f.zone) for f in inspection.findings if f.level != INFO_LEVEL}
+    again = {(f.code, f.zone) for f in inspection.findings if f.level not in NON_DEDUCTING}
     by_zone: dict[str, dict[str, Any]] = {}
     for zone in zones:
         by_zone[zone.code] = {
