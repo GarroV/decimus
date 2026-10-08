@@ -59,7 +59,9 @@ create index imports_at_idx on ratings.imports (at desc);
 create table ratings.import_issues (
     import_id bigint not null references ratings.imports (id),
     row_no integer not null check (row_no > 0),
-    reason text not null check (reason in ('unit_unmatched', 'country_unknown', 'bad_row')),
+    reason text not null check (
+        reason in ('unit_unmatched', 'country_unknown', 'bad_row', 'developer_conflict')
+    ),
     detail jsonb not null default '{}'::jsonb,
     primary key (import_id, row_no, reason)
 );

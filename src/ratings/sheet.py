@@ -189,6 +189,7 @@ def parse_sheet_scores(data: bytes, *, today: date) -> Parsed:
     scores: list[Score] = []
     issues: list[Issue] = []
     developers: dict[str, str] = {}
+    conflicted: set[str] = set()  # по одному замечанию на страну, не на строку
     skipped = 0
     for row_no, cells in rows:
         cells = cells + [""] * (len(header) - len(cells))
@@ -209,7 +210,8 @@ def parse_sheet_scores(data: bytes, *, today: date) -> Parsed:
             continue
         if developer:
             known = developers.setdefault(country, developer)
-            if known != developer:
+            if known != developer and country not in conflicted:
+                conflicted.add(country)
                 issues.append(
                     Issue(
                         row_no,
