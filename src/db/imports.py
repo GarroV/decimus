@@ -230,9 +230,39 @@ order by i.pushed_at desc
 limit %(limit)s
 """
 
-#: Предел перечня черновиков. Коллега грузит поштучно: сотня ждущих — уже
-#: сигнал, что что-то не подтверждается, а не рабочая очередь.
+#: Предел перечня черновиков и он же — предел НЕподтверждённых черновиков
+#: пространства. Коллега грузит поштучно: сотня ждущих — уже сигнал, что
+#: что-то не подтверждается, а не рабочая очередь. Без предела на заведение
+#: зациклившийся агент наплодил бы строк без счёта.
 MAX_DRAFTS = 200
+
+#: Пределы содержимого черновика (D305, ресурсы). Живая проверка — до ~140
+#: пунктов методики, плюс D0 и рекомендации, которые пару не занимают: 300
+#: записей с запасом покрывают любой настоящий отчёт и отсекают цикл агента.
+MAX_FINDINGS = 300
+#: Кадры: к записи — как в боте по смыслу «несколько ракурсов», к проверке —
+#: потолок места в хранилище на один черновик (сжатая копия ~100–200 КБ).
+MAX_PHOTOS_PER_FINDING = 10
+MAX_PHOTOS_PER_INSPECTION = 300
+#: Длина формулировки, комментария, имени аудитора и ссылки на источник —
+#: держится и здесь, а не только в обработчике MCP: слой базы зовут не только
+#: из MCP. Формулировка — тот же порог, что у правки на приёмке.
+MAX_WORDING = 1000
+MAX_AUDITOR = 200
+MAX_SOURCE_REF = 1000
+
+_COUNT_OPEN_DRAFTS_SQL = """
+select count(*) from inspections
+where tenant_code = %s and origin = 'import' and status = 'draft' and retracted_at is null
+"""
+
+#: Счёт черновиков и вставка нового — под замком пространства на транзакцию,
+#: иначе параллельные заведения проскочили бы предел все разом.
+_DRAFTS_LOCK_SQL = "select pg_advisory_xact_lock(hashtext('import-drafts:' || %s))"
+
+_COUNT_PHOTOS_SQL = """
+select count(*) filter (where finding_id = %s), count(*) from photos where inspection_id = %s
+"""
 
 
 def _connect() -> psycopg.Connection[Any]:
@@ -259,8 +289,11 @@ def create_draft(spec: NewDraft, *, apply_score: Callable[[InspectionDetail], Sc
     точки сверяет сторож схемы (0030) — точка чужой страны даёт отказ.
     """
     tenant = _require_tenant(spec.tenant)
+    _check_length(spec.auditor, field="auditor", limit=MAX_AUDITOR)
+    _check_length(spec.source_ref, field="source_ref", limit=MAX_SOURCE_REF)
     try:
         with _connect() as conn:
+            _check_open_drafts(conn, tenant)
             ident = _insert_draft(conn, spec, tenant)
             with conn.cursor() as cur:
                 detail = _locked_detail(cur, ident, tenant)
@@ -271,6 +304,28 @@ def create_draft(spec: NewDraft, *, apply_score: Callable[[InspectionDetail], Sc
         raise
     except psycopg.Error as exc:
         raise _refused(exc, "Завести черновик") from exc
+
+
+def _check_length(value: str | None, *, field: str, limit: int) -> None:
+    if value is not None and len(value) > limit:
+        raise HistoryImportError(f"Поле {field} длиннее {limit} знаков — ничего не записано")
+
+
+def _check_wording(wording: Wording) -> None:
+    _check_length(wording.text, field="text", limit=MAX_WORDING)
+    _check_length(wording.comment, field="comment", limit=MAX_WORDING)
+
+
+def _check_open_drafts(conn: psycopg.Connection[Any], tenant: str) -> None:
+    with conn.cursor() as cur:
+        cur.execute(_DRAFTS_LOCK_SQL, (tenant,))
+        cur.execute(_COUNT_OPEN_DRAFTS_SQL, (tenant,))
+        row = cur.fetchone()
+    if row is not None and int(row[0]) >= MAX_DRAFTS:
+        raise HistoryImportError(
+            f"В пространстве уже {MAX_DRAFTS} неподтверждённых черновиков загрузки — новый "
+            f"не заведён. Подтвердите или удалите ждущие (import_list_drafts)"
+        )
 
 
 def _insert_draft(conn: psycopg.Connection[Any], spec: NewDraft, tenant: str) -> str:
@@ -387,9 +442,10 @@ def import_head(inspection_id: str, *, tenant: str) -> ImportHead | None:
 def list_drafts(*, tenant: str, limit: int = MAX_DRAFTS) -> list[DraftRow]:
     """Загруженные черновики пространства, свежие первыми."""
     tenant_code = _require_tenant(tenant)
+    предел = min(max(int(limit), 1), MAX_DRAFTS)
     try:
         with _connect() as conn, conn.cursor() as cur:
-            cur.execute(_LIST_DRAFTS_SQL, {"tenant": tenant_code, "limit": limit})
+            cur.execute(_LIST_DRAFTS_SQL, {"tenant": tenant_code, "limit": предел})
             rows = cur.fetchall()
     except psycopg.Error as exc:
         raise HistoryImportError(
@@ -463,9 +519,15 @@ def add_finding(
     tenant_code = _require_tenant(tenant)
     if not (wording.text or "").strip():
         raise HistoryImportError("Формулировка записи пуста — запись без слов в отчёт не идёт")
+    _check_wording(wording)
     try:
         with _connect() as conn, conn.cursor() as cur:
             detail = _locked_detail(cur, ident, tenant_code)
+            if len(detail.findings) >= MAX_FINDINGS:
+                raise HistoryImportError(
+                    f"В черновике уже {MAX_FINDINGS} записей — больше не принимается. "
+                    f"Настоящий отчёт столько не содержит: проверьте, не повторяются ли записи"
+                )
             итог = apply(detail)
             были = {f.n for f in detail.findings}
             новые = [f for f in итог.findings if int(f.get("n", 0)) not in были]
@@ -496,6 +558,7 @@ def edit_finding(
     tenant_code = _require_tenant(tenant)
     if wording.text is not None and not wording.text.strip():
         raise HistoryImportError("Формулировка записи пуста — запись без слов в отчёт не идёт")
+    _check_wording(wording)
     try:
         with _connect() as conn, conn.cursor() as cur:
             detail = _locked_detail(cur, ident, tenant_code)
@@ -631,6 +694,7 @@ def add_photo(
         with _connect() as conn, conn.cursor() as cur:
             detail = _locked_detail(cur, ident, tenant_code)
             запись = _finding_by_n(detail, n)
+            _check_photo_room(cur, запись, ident, n)
             cur.execute(_PHOTO_TAKEN_SQL, (запись, ссылка))
             if cur.fetchone() is not None:
                 raise HistoryImportError(f"Этот кадр уже приложен к записи #{n}")
@@ -649,6 +713,21 @@ def add_photo(
         raise
     except psycopg.Error as exc:
         raise _refused(exc, "Приложить кадр") from exc
+
+
+def _check_photo_room(cur: Any, finding_id: str, ident: str, n: int) -> None:
+    """Предел кадров записи и черновика — под тем же замком, что и вставка."""
+    cur.execute(_COUNT_PHOTOS_SQL, (finding_id, ident))
+    row = cur.fetchone()
+    у_записи, у_проверки = (int(row[0]), int(row[1])) if row is not None else (0, 0)
+    if у_записи >= MAX_PHOTOS_PER_FINDING:
+        raise HistoryImportError(
+            f"У записи #{n} уже {MAX_PHOTOS_PER_FINDING} кадров — больше не прикладывается"
+        )
+    if у_проверки >= MAX_PHOTOS_PER_INSPECTION:
+        raise HistoryImportError(
+            f"У черновика уже {MAX_PHOTOS_PER_INSPECTION} кадров — больше не прикладывается"
+        )
 
 
 def forget_objects(storage: PhotoStorage, paths: Sequence[str]) -> int:
