@@ -695,6 +695,24 @@ cases = [
         "{% if false %}",
         "tests/test_web_ratings_flow.py",
     ),
+    (
+        "src/mcp/rpc.py",
+        "    if spec.kind == KIND_RATINGS and canonical_tenant(tenant) != HQ_TENANT:\n",
+        "    if False:\n",
+        "tests/test_mcp_ratings.py::test_токен_партнёра_отказ_до_двери",
+    ),
+    (
+        "src/mcp/ratings_tools.py",
+        "    if код != HQ_TENANT:\n",
+        "    if False:\n",
+        "tests/test_mcp_ratings.py::test_заслон_обработчика_не_пускает_партнёра",
+    ),
+    (
+        "src/mcp/catalogue.py",
+        "        kind=KIND_RATINGS,\n",
+        "        kind=KIND_INSPECTIONS,\n",
+        "tests/test_mcp_ratings.py::test_инструмент_своего_вида",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

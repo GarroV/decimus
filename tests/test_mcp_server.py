@@ -27,7 +27,13 @@ import pytest
 from conftest import requires_db
 from db_harness import accept_pushed, пространства_для_теста, точка_пространства
 
-from src.mcp.catalogue import KIND_CHECKLIST, KIND_CHECKLIST_SOURCE, KIND_RETRACTION, TOOLS
+from src.mcp.catalogue import (
+    KIND_CHECKLIST,
+    KIND_CHECKLIST_SOURCE,
+    KIND_RATINGS,
+    KIND_RETRACTION,
+    TOOLS,
+)
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
 from src.mcp.rpc import (
     CODE_INVALID_PARAMS,
@@ -346,6 +352,8 @@ def test_перечень_инструментов_отдаётся_целико
         "learned_phrases",
         "retract_learned_phrase",
         "repoint_learned_phrase",
+        # загрузка рейтингов РС/РКО (D320), только токен УК
+        "import_ratings",
     }
     assert all("inputSchema" in инструмент for инструмент in ответ["result"]["tools"])
 
@@ -445,6 +453,9 @@ def test_содержимое_проверки_остаётся_нетронут
             continue
         if spec.kind == KIND_CHECKLIST_SOURCE:
             assert spec.handler.__module__ == "src.mcp.checklist_source", spec.name
+            continue
+        if spec.kind == KIND_RATINGS:
+            assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
             continue
         assert spec.handler.__module__ == "src.mcp.tools", spec.name
         for запрещённое in ("create", "update", "delete", "insert", "push", "set_", "edit"):
