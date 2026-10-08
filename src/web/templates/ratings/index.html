@@ -11,7 +11,7 @@
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
-{% macro dlt(x) %}{% if x is none %}<span class="rt-delta">—</span>{% else %}{% set r = (x|round(1)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ '%+.1f'|format(r) }}</span>{% endif %}{% endmacro %}
+{% macro dlt(x) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(1)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ '%+.1f'|format(r) }}</span>{% endif %}{% endmacro %}
 {% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
 {#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
     данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
@@ -100,7 +100,8 @@
         <div class="rt-card rt-kpi rt-kpi--{{ kind }}">
           <div class="rt-kpi__label">{{ t('ratings.' ~ kind) }} · {{ t('ratings.total') }}</div>
           <div class="rt-kpi__value{% if value is none %} is-empty{% endif %}">{% if value is none %}—{% else %}{{ '%.1f'|format(value) }}<small>/100</small>{% endif %}</div>
-          <div class="rt-kpi__delta">{{ dlt(delta) }} <span>{{ t('ratings.col.delta', prev=prev) }}</span></div>
+          {% if value is none %}<div class="rt-kpi__why">{{ t('ratings.empty.' ~ kind) }}</div>
+          {% else %}<div class="rt-kpi__delta">{{ dlt(delta) }} <span>{{ t('ratings.col.delta', prev=prev) }}</span></div>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -135,7 +136,8 @@
       <h3 class="rt-card__title">{{ t('ratings.cluster') }}</h3>
       {{ vblock(cluster, kind) }}
     </div></div>
-    {% if summary.countries|length > 1 %}
+    {#- Нет проверок во всей группе — у каждой страны то же «нет данных»: не повторяем его карточкой на страну. -#}
+    {% if summary.countries|length > 1 and cluster.checkups != 0 %}
     <h3 class="rt-sub">{{ t('ratings.by_country') }}</h3>
     <div class="rt-viol">
       {% for code in summary.countries %}
@@ -183,7 +185,7 @@
       <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
     {% if summary.risk %}<div class="rt-card rt-alert rt-alert--warn"><ul class="rt-att">{% for u in summary.risk %}<li>
       <span class="rt-sev rt-sev--warn" aria-hidden="true">↓</span>
-      <div><div class="rt-att__title">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<span class="tag tag--warn">{{ t('ratings.' ~ u.rating_type) }}</span></div>
+      <div><div class="rt-att__title">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<span class="rt-kind">{{ t('ratings.' ~ u.rating_type) }}</span></div>
         <div class="rt-att__sub">{{ country_name(u.country) }}</div></div>
       <span class="rt-att__m">{% for s in u.scores %}{{ num(s) }}{% if not loop.last %} → {% endif %}{% endfor %}</span>
     </li>{% endfor %}</ul>
