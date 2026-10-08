@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
@@ -65,7 +66,14 @@ def _answer(offer: Offer) -> dict[str, Any]:
 
 
 def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify) -> None:
-    """Повесить поиск пункта. Опознание — то же, что у записи."""
+    """Повесить поиск пункта. Опознание — то же, что у записи.
+
+    Один поиск на чат за раз: каждый — оплачиваемый вызов модели, и второй,
+    пока идёт первый, — это двойное нажатие или зацикленный клиент, а не
+    работа аудитора.
+    """
+    busy: set[int] = set()
+    guard = threading.Lock()
 
     def refused(key: str, lang: str, status: int = 422) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]
@@ -85,6 +93,10 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         lang = inspection.ui_lang
         if handed_over(who):
             return refused("walk.sealed", lang, 409)
+        with guard:
+            if who in busy:
+                return refused("walk.err.suggest_busy", lang, 429)
+            busy.add(who)
         try:
             words = _text(body, "words")
             zone = _code(body, "zone") if body.get("zone") else None
@@ -108,6 +120,9 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         except (RecognizeError, DomainError) as exc:
             logger.warning("Обход: поиск пункта для чата %s не удался: %s", who, exc)
             return refused("walk.err.recognize", lang, 503)
+        finally:
+            with guard:
+                busy.discard(who)
         # Что ушло в поиск и что вернулось (#367) — тем же журналом, что у
         # бота: промах разбирается по нему, а не по скриншотам.
         journal.note(

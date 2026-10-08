@@ -40,6 +40,11 @@ from .phrases import recall
 #: Уверенность предложения, найденного без модели: слова назвали пункт прямо.
 CERTAIN = 1.0
 
+#: Сколько кадров одного разбора видит модель. У бота предел ставит сам
+#: Telegram — альбом не длиннее 10 снимков; у мини-аппа его не было бы вовсе,
+#: а платит каждый кадр. Лишние ракурсы остаются в записи, в модель не идут.
+MODEL_FRAMES_MAX = 10
+
 Via = Literal["fast", "learned", "model"]
 
 
@@ -113,6 +118,7 @@ def propose(
     показать вместо предложений, решает вызывающий.
     """
     words = note.strip()
+    frames = frames[:MODEL_FRAMES_MAX]
     if words and not album_mode(words, len(frames)):
         fast = fast_path(words, zone, lang=ui_lang, chat_id=chat_id).item
         if fast is not None:
