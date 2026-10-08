@@ -305,6 +305,42 @@ cases = [
         "        if False:\n",
         "tests/test_ratings_snapshot.py::test_два_id_с_одним_типом_и_началом_у_одной_пиццерии_в_журнал",
     ),
+    (
+        "src/ratings/importer.py",
+        '    except Exception as exc:\n        failed(f"сбой загрузки:',
+        '    except KeyError as exc:\n        failed(f"сбой загрузки:',
+        "tests/test_db_ratings_import.py::test_сбой_не_базы_оставляет_failed_и_уходит_наружу",
+    ),
+    (
+        "src/ratings/importer.py",
+        '    except Exception as exc:\n        failed(f"сбой разбора:',
+        '    except KeyError as exc:\n        failed(f"сбой разбора:',
+        "tests/test_db_ratings_import.py::test_сбой_разборщика_оставляет_failed_и_уходит_наружу",
+    ),
+    (
+        "src/ratings/importer.py",
+        "    except Exception as exc:\n        logger.warning(",
+        "    except psycopg.Error as exc:\n        logger.warning(",
+        "tests/test_db_ratings_import.py::test_сбой_следа_не_подменяет_причину_отказа",
+    ),
+    (
+        "src/db/ratings.py",
+        '"  or ratings.periods.dodo_id = excluded.dodo_id "',
+        '"  or true "',
+        "tests/test_db_ratings_import.py::test_период_того_же_слота_с_другим_id_отказ_а_не_склейка",
+    ),
+    (
+        "src/ratings/importer.py",
+        "    return f\"{prefix}:{hashlib.sha256(normalized.encode('utf-8')).hexdigest()}\"",
+        '    return f"{prefix}:{normalized}"',
+        "tests/test_db_ratings_import.py::test_длинный_текст_нарушения_ложится",
+    ),
+    (
+        "src/ratings/importer.py",
+        "            if r.unit.dodo_id is None:\n",
+        "            if False:\n",
+        "tests/test_db_ratings_import.py::test_замечание_без_id_пиццерии_в_журнал",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

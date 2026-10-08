@@ -35,6 +35,7 @@ from .model import (
     FORMAT_SHEET_SCORES,
     FORMAT_SNAPSHOT,
     FORMATS,
+    ISSUE_BAD_ROW,
     ISSUE_UNIT_UNMATCHED,
     Issue,
     Parsed,
@@ -200,16 +201,15 @@ class _Writer:
                     import_id=self.import_id,
                 )
             )
-            rows = [
-                _row(f"{c.rating_type}:chk:{c.dodo_id}:{v.category}:{v.text}", v)
-                for v in c.violations
-            ]
+            rows: dict[str, store.ViolationRow] = {}
+            for v in c.violations:
+                _merge(rows, _row_key(f"{c.rating_type}:chk:{c.dodo_id}:{v.category}", v.text), v)
             store.replace_checkup_violations(
                 self.conn,
                 rating_type=c.rating_type,
                 checkup=c.dodo_id,
                 unit=unit,
-                rows=rows,
+                rows=list(rows.values()),
                 import_id=self.import_id,
             )
 
@@ -259,15 +259,18 @@ class _Writer:
     def remarks(self) -> None:
         groups: dict[tuple[str, int], dict[str, store.ViolationRow]] = {}
         for r in self.parsed.remarks:
-            unit = self.unit(r.unit, 0) if r.unit.dodo_id else None
+            if r.unit.dodo_id is None:
+                # Замечание периода без пиццерии некуда положить — но и терять молча нельзя (D323).
+                detail = {"reason": "замечание без id пиццерии", "unit": r.unit.name}
+                self.issues.append(Issue(0, ISSUE_BAD_ROW, detail))
+                continue
+            unit = self.unit(r.unit, 0)
             if unit is None:
                 continue
             period_id = self.period(r.period)
-            key = f"rs:rem:{unit}:{period_id}:{r.violation.criterion_id or r.violation.text}"
-            rows = groups.setdefault((unit, period_id), {})
-            prior = rows.get(key)
-            amount = r.violation.amount + (prior.amount if prior else 0)
-            rows[key] = _row(key, r.violation, amount=amount)
+            tail = r.violation.criterion_id or r.violation.text
+            key = _row_key(f"rs:rem:{unit}:{period_id}", tail)
+            _merge(groups.setdefault((unit, period_id), {}), key, r.violation)
         for (unit, period_id), rows in groups.items():
             store.replace_remarks(
                 self.conn,
@@ -276,6 +279,19 @@ class _Writer:
                 rows=list(rows.values()),
                 import_id=self.import_id,
             )
+
+
+def _row_key(prefix: str, text: str) -> str:
+    """Ключ нарушения: хеш полного текста, а не сам текст — длинный текст не упрётся
+    в предел строки btree уникального индекса `row_key`."""
+    normalized = " ".join(text.split())
+    return f"{prefix}:{hashlib.sha256(normalized.encode('utf-8')).hexdigest()}"
+
+
+def _merge(rows: dict[str, store.ViolationRow], key: str, v: Violation) -> None:
+    """Совпавшие по ключу нарушения — одна строка с суммой повторов, а не отказ индекса."""
+    prior = rows.get(key)
+    rows[key] = _row(key, v, amount=v.amount + (prior.amount if prior else 0))
 
 
 def _row(key: str, v: Violation, *, amount: int | None = None) -> store.ViolationRow:
@@ -300,7 +316,8 @@ def _trace_failure(
         store.record_failure(
             channel=channel, actor=actor, file_name=file_name, sha=sha, note=note, fmt=fmt
         )
-    except psycopg.Error as exc:
+    # Любой сбой следа — в лог: подменить им исходную причину отказа файла нельзя.
+    except Exception as exc:
         logger.warning("ratings: след failed не записан (%s): %s", type(exc).__name__, note)
 
 
@@ -385,15 +402,23 @@ def import_file(
     today: date | None = None,
     source: str | None = None,
 ) -> ImportReport:
-    """Загрузить файл. `RatingsFormatError` — не разобран, `RatingsError` — база отказала;
-    в обоих случаях строка `failed` в журнале уже есть, данных из файла — нет."""
+    """Загрузить файл. `RatingsFormatError` — не разобран, `RatingsError` — база отказала
+    или файл противоречит базе; любой другой сбой уходит наружу как есть. Во всех
+    случаях строка `failed` в журнале уже есть, данных из файла — нет."""
     sha = hashlib.sha256(data).hexdigest()
+
+    def failed(note: str, fmt: str | None) -> None:
+        _trace_failure(
+            channel=channel, actor=actor, file_name=file_name, sha=sha, note=note, fmt=fmt
+        )
+
     try:
         parsed = parse_file(data, kind=kind, today=today or date.today())
     except RatingsFormatError as exc:
-        _trace_failure(
-            channel=channel, actor=actor, file_name=file_name, sha=sha, note=str(exc), fmt=None
-        )
+        failed(str(exc), None)
+        raise
+    except Exception as exc:
+        failed(f"сбой разбора: {type(exc).__name__}", None)
         raise
     try:
         return _write(
@@ -401,14 +426,13 @@ def import_file(
         )
     except psycopg.Error as exc:
         reason = _db_reason(exc)
-        _trace_failure(
-            channel=channel,
-            actor=actor,
-            file_name=file_name,
-            sha=sha,
-            note=f"база отказала: {reason}",
-            fmt=parsed.format,
-        )
+        failed(f"база отказала: {reason}", parsed.format)
         raise RatingsError(
             f"Загрузка не легла, база отказала ({reason}). Ничего не записано"
         ) from exc
+    except RatingsError as exc:
+        failed(str(exc), parsed.format)
+        raise
+    except Exception as exc:
+        failed(f"сбой загрузки: {type(exc).__name__}", parsed.format)
+        raise

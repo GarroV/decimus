@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from datetime import date
 
 import pytest
@@ -14,6 +15,7 @@ from conftest import requires_db
 from ratings_samples import (
     C1,
     C2,
+    P_RS,
     SHEET_RS_HEADER,
     U1,
     rko_evaluations,
@@ -26,9 +28,20 @@ from ratings_samples import (
 psycopg = pytest.importorskip("psycopg")
 
 from src.db import ratings as store  # noqa: E402
-from src.db.errors import RatingsError  # noqa: E402
+from src.db.errors import ConfigError, RatingsError  # noqa: E402
+from src.ratings import importer  # noqa: E402
 from src.ratings.importer import CHANNEL_MCP, CHANNEL_WEB, ImportReport, import_file  # noqa: E402
-from src.ratings.model import RatingsFormatError  # noqa: E402
+from src.ratings.model import (  # noqa: E402
+    CATEGORY_REMARK,
+    FORMAT_SNAPSHOT,
+    RS,
+    Parsed,
+    PeriodRef,
+    RatingsFormatError,
+    Remark,
+    UnitRef,
+    Violation,
+)
 
 pytestmark = requires_db
 
@@ -215,3 +228,82 @@ def test_отказ_базы_посреди_файла_не_оставляет_�
         0,
     )
     assert "CheckViolation" in str(_одно(db_env, "select note from ratings.imports"))
+
+
+def test_сбой_не_базы_оставляет_failed_и_уходит_наружу(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def падает(*a: object, **kw: object) -> None:
+        raise RuntimeError("порча")
+
+    monkeypatch.setattr(store, "replace_checkup_violations", падает)
+    with pytest.raises(RuntimeError):
+        _грузить(rko_violations())
+    assert _одно(db_env, "select count(*) from ratings.checkups") == 0
+    assert _строка(db_env, "select outcome, format from ratings.imports") == (
+        "failed",
+        "rko-violations",
+    )
+    assert "RuntimeError" in str(_одно(db_env, "select note from ratings.imports"))
+
+
+def test_сбой_следа_не_подменяет_причину_отказа(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def след_падает(**kw: object) -> int:
+        raise ConfigError("нет окружения")
+
+    monkeypatch.setattr(store, "record_failure", след_падает)
+    with pytest.raises(RatingsFormatError):
+        _грузить(b"a,b\r\n1,2\r\n")
+    assert _одно(db_env, "select count(*) from ratings.imports") == 0
+
+
+def test_период_того_же_слота_с_другим_id_отказ_а_не_склейка(db_env: str) -> None:
+    _грузить(snapshot())
+    другой = "ee" * 16
+    with pytest.raises(RatingsError, match="другим id"):
+        _грузить(snapshot().replace(P_RS.encode(), другой.encode()))
+    assert _строка(db_env, "select outcome from ratings.imports order by id desc limit 1") == (
+        "failed",
+    )
+    assert "другим id" in str(
+        _одно(db_env, "select note from ratings.imports order by id desc limit 1")
+    )
+    sql = "select dodo_id from ratings.periods where begin_on = '2026-09-16'"
+    assert _одно(db_env, sql) == P_RS
+    assert _одно(db_env, "select count(*) from ratings.periods where dodo_id = %s", (другой,)) == 0
+
+
+def test_длинный_текст_нарушения_ложится(db_env: str) -> None:
+    """Ключ — хеш текста: 8 КБ плохо сжимаемого текста не упираются в предел btree."""
+    длинный = "".join(hashlib.sha256(str(i).encode()).hexdigest() for i in range(125))
+    отчёт = _грузить(rko_violations(**{"Выявленные нарушения": длинный}))
+    assert (отчёт.outcome, отчёт.accepted) == ("loaded", 2)
+    assert _одно(db_env, "select max(length(text)) from ratings.violations") == 500
+    assert int(str(_одно(db_env, "select max(length(row_key)) from ratings.violations"))) < 200
+
+
+def test_замечание_без_id_пиццерии_в_журнал(db_env: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    период = PeriodRef(RS, date(2026, 9, 16), date(2026, 9, 30), "Сентябрь 2", "September 2")
+    замечание = Remark(UnitRef(None, "Testville-9", "RS"), период, Violation("x", CATEGORY_REMARK))
+    разобрано = Parsed(FORMAT_SNAPSHOT, remarks=(замечание,))
+    monkeypatch.setattr(importer, "parse_file", lambda *a, **kw: разобрано)
+    отчёт = _грузить(b"{}")
+    assert (отчёт.outcome, отчёт.issues) == ("loaded", 1)
+    assert _строка(db_env, "select row_no, reason from ratings.import_issues") == (1, "bad_row")
+
+
+def test_сбой_разборщика_оставляет_failed_и_уходит_наружу(
+    db_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def падает(*a: object, **kw: object) -> Parsed:
+        raise RuntimeError("порча")
+
+    monkeypatch.setattr(importer, "parse_file", падает)
+    with pytest.raises(RuntimeError):
+        _грузить(rko_violations())
+    assert _строка(db_env, "select outcome, note from ratings.imports") == (
+        "failed",
+        "сбой разбора: RuntimeError",
+    )
