@@ -313,3 +313,53 @@ def test_кадр_показывается_только_хозяину_запи�
     start_inspection(777, unit="Белград-2", kind="planned", report_lang="ru", ui_lang="ru")
     чужой = Клиент(клиент.c, user_id=777)
     assert чужой.показ(ref).status_code == 404, "отпечаток кадра не пропуск к чужой проверке"
+
+
+# ── рекомендация и общая заметка (D201, D314) ───────────────────────────
+
+
+def _совет(**сверх: Any) -> dict[str, Any]:
+    тело = {"op": "add", "zone": "hot_kitchen", "code": "CLN05", "level": "R"}
+    return тело | сверх
+
+
+def test_рекомендация_без_кадра_ложится_в_проверку(клиент: Клиент) -> None:
+    ответ = клиент.запись(**_совет(text="Смазать петли крышки линии."))
+
+    assert ответ.status_code == 200, ответ.get_json()
+    запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
+    assert (запись.code, запись.level, запись.photos) == ("CLN05", "R", [])
+    assert запись.text == "Смазать петли крышки линии."
+
+
+def test_рекомендация_без_слов_не_пишется(клиент: Клиент) -> None:
+    ответ = клиент.запись(**_совет())
+
+    assert ответ.status_code == 422, "пустой совет подменился бы вопросом пункта"
+    assert get_state(АУДИТОР).findings == []  # type: ignore[union-attr]
+
+
+def test_общая_заметка_пишется_без_пункта(клиент: Клиент) -> None:
+    ответ = клиент.запись(**_совет(code="NOTE", zone="dining", text="Очередь у кассы."))
+
+    assert ответ.status_code == 200, ответ.get_json()
+    запись = get_state(АУДИТОР).findings[0]  # type: ignore[union-attr]
+    assert (запись.code, запись.level) == ("NOTE", "R")
+
+
+def test_рекомендация_не_занимает_пару_нарушения(клиент: Клиент) -> None:
+    клиент.запись(**_совет(text="совет"))
+
+    ответ = клиент.запись(**_нарушение(клиент.ссылка()))
+
+    assert ответ.status_code == 200, ответ.get_json()
+
+
+def test_у_рекомендации_последний_кадр_снимается(клиент: Клиент) -> None:
+    ref = клиент.ссылка()
+    клиент.запись(**_совет(text="совет", photos=[ref]))
+
+    ответ = клиент.запись(op="detach", n=1, ref=ref)
+
+    assert ответ.status_code == 200, ответ.get_json()
+    assert get_state(АУДИТОР).findings[0].photos == []  # type: ignore[union-attr]

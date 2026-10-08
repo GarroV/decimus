@@ -693,6 +693,7 @@ with записи as (
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
       and i.status = 'finalized'
+      and f.level not in ('D0', 'R')
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -972,7 +973,7 @@ with прошлая as (
 )
 select прошлая.inspection_date, f.code
 from прошлая
-left join findings f on f.inspection_id = прошлая.id and f.level <> 'D0'
+left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
 """
 
 
@@ -988,7 +989,7 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
     Предыдущая — одна, последняя по дате обхода: правило говорит про
     предыдущую проверку, а не «когда-нибудь за год». Снятые проверки в счёт не
     идут: снятая проверка не является показанием о точке. Информационные
-    записи (`D0`) нарушениями не считаются и в коды не попадают.
+    записи (`D0`) и рекомендации (`R`) нарушениями не считаются и в коды не попадают.
 
     `None` — прошлых проверок нет либо точка чужая. Для вопроса это одно и то
     же: спрашивать не о чем.
@@ -1024,7 +1025,7 @@ select прошлая.inspection_date, f.code, f.level, f.zone,
       where t.entity_type = 'finding' and t.entity_id = f.id
         and t.field = 'text' and t.lang = прошлая.speech_lang)
 from прошлая
-left join findings f on f.inspection_id = прошлая.id and f.level <> 'D0'
+left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
 order by f.n
 """
 
@@ -1034,7 +1035,7 @@ def previous_findings(*, tenant: str, unit: str) -> PreviousFindings | None:
 
     Отдаёт факт, как и `previous_inspection`: что записали в прошлый раз, где и
     каким классом. Исправлено ли это сегодня, решает аудитор на месте.
-    Информационные записи (`D0`) нарушениями не являются и не отдаются.
+    Информационные записи (`D0`) и рекомендации (`R`) нарушениями не являются и не отдаются.
 
     `None` — прошлых проверок у точки нет (или точка чужая).
     """

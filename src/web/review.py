@@ -17,6 +17,7 @@ from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 from src.db.models import FindingRow, InspectionRow
+from src.domain.models import NON_DEDUCTING
 
 from . import methodology as method
 from .errors import MethodologyRefused
@@ -41,7 +42,8 @@ class SheetItem:
 
     @property
     def clean(self) -> bool:
-        return not self.findings
+        # Замер и рекомендация нарушением пункт не делают (#444, D201).
+        return not any(f.level not in NON_DEDUCTING for f in self.findings)
 
 
 @dataclass(frozen=True)
@@ -52,7 +54,7 @@ class SheetZone:
 
     @property
     def violations(self) -> int:
-        return sum(len(item.findings) for item in self.items)
+        return sum(1 for item in self.items for f in item.findings if f.level not in NON_DEDUCTING)
 
 
 @dataclass(frozen=True)

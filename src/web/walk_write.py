@@ -80,7 +80,11 @@ REPEAT_LEVELS = ("D1", "D2")
 
 #: Номер записи, код пункта, класс, зона — короткие слова, не тексты.
 _CODE = re.compile(r"^[A-Za-z0-9_]{1,32}$")
-_LEVEL = re.compile(r"^D[0-3]$")
+_LEVEL = re.compile(r"^(?:D[0-3]|R)$")
+
+#: Рекомендация без нарушения (D201) и общая заметка (D314): кадр по желанию,
+#: текст обязателен — подставлять формулировку пункта на месте совета нельзя.
+ADVICE_LEVEL = "R"
 
 #: Классы в начале формулировки пункта — «(D1, D2) …» (см. `walk._LEVEL_PREFIX`).
 _LEVEL_PREFIX = re.compile(r"^\(\s*D\d(?:\s*,\s*D\d)*\s*\)\s*")
@@ -158,8 +162,12 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     code = _code(body, "code")
     level = _code(body, "level", _LEVEL)
     zone = _code(body, "zone")
-    photos = _refs(body.get("photos"))
-    text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)
+    advice = level == ADVICE_LEVEL
+    photos = [] if advice and not body.get("photos") else _refs(body.get("photos"))
+    if advice:
+        text = _text(body, "text", required=True)
+    else:
+        text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)
     add_finding(
         chat_id,
         code=code,

@@ -574,6 +574,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.findings.col.text": {"ru": "Формулировка", "en": "Wording"},
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
+    "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
+    "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
         "ru": "Записей у проверки нет.",
