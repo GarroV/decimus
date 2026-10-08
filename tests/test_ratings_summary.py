@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import math
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -52,7 +54,7 @@ def test_дельта_к_прошлому_периоду() -> None:
     assert by["RS"].rs_delta == pytest.approx(0.0)
     assert by["BG"].rs is None and by["BG"].rs_delta is None
     assert total.country == "" and total.rs == pytest.approx(85.0)
-    assert total.rs_delta == pytest.approx(85.0 - (80 + 80 + 100) / 3)
+    assert total.rs_delta == -1.7  # 85 - 86.67, до одного знака
     assert delta(None, 80) is None
     assert delta(80, None) is None
     assert delta(70, 80) == pytest.approx(-10)
@@ -152,3 +154,49 @@ def test_зона_риска_три_подряд_строго_ниже() -> None
 
 def test_зона_риска_без_полного_окна_пуста() -> None:
     assert risk_zone([f("a", "SI", 50)], [1, 2], rating_type="rs", threshold=85) == ()
+
+
+def test_дельта_равных_средних_без_шума_и_минус_нуля() -> None:
+    cur = [f("a", "SI", 99.6), f("b", "SI", 99.8)]
+    prev = [f("a", "SI", 99.7), f("b", "SI", 99.7)]
+    result = score_lines(cur, prev, ["SI"])[1].rs_delta
+    assert result == 0.0 and math.copysign(1, result) > 0
+
+
+def test_хард_пометка_автодетекции_и_пробелы_не_мешают() -> None:
+    rules = [HardRule("rko", "text", "Пиццу привезли холодной")]
+    facts = [
+        v("Пиццу привезли  холодной (ML)", category="other"),
+        v("Пиццу привезли холодной (ИИ)"),
+    ]
+    assert len(hard_lines(facts, rules, "rko")) == 2
+
+
+def test_нарушение_с_пометкой_и_без_одно_в_топе() -> None:
+    block = violation_block([v("A (ML)", 2), v("A", 1), v("B", 1)], checkups=1)
+    assert [(line.text, line.count) for line in block.top] == [("A", 3), ("B", 1)]
+
+
+def test_contains_с_начала_слова() -> None:
+    rules = [HardRule("rs", "contains", "критичн"), HardRule("rs", "contains", "D3")]
+    assert not hard_lines([v("x", parent="Некритичные нарушения")], rules[:1], "rs")
+    assert hard_lines([v("x", parent="Критичные нарушения")], rules[:1], "rs")
+    assert hard_lines([v("x", parent="Уровень D3")], rules[1:], "rs")
+
+
+def test_равные_балл_и_имя_порядок_по_коду() -> None:
+    facts = [Fact(u, "Same", "SI", "rs", 1, date(2026, 7, 1), 90.0) for u in ("z", "m", "a")]
+    top, _ = top_bottom(facts, "rs", threshold=85)
+    assert [u.unit for u in top] == ["a", "m", "z"]
+
+
+def test_хард_порядок_не_зависит_от_входа() -> None:
+    rules = [HardRule("rs", "contains", "D3")]
+    a, b = v("T", parent="D3", unit="a"), v("T", parent="D3", unit="b")
+    a, b = replace(a, unit_name="Same"), replace(b, unit_name="Same")
+    assert hard_lines([b, a], rules, "rs") == hard_lines([a, b], rules, "rs")
+
+
+def test_страны_вне_списка_не_входят_в_группу() -> None:
+    facts = [f("a", "SI", 90), f("c", "RS", 10)]
+    assert group_average(facts, "rs", ["SI"]) == pytest.approx(90)
