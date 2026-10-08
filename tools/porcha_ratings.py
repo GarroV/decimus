@@ -341,6 +341,37 @@ cases = [
         "            if False:\n",
         "tests/test_db_ratings_import.py::test_замечание_без_id_пиццерии_в_журнал",
     ),
+    (
+        "src/ratings/periods.py",
+        "    last = calendar.monthrange(year, first + 2)[1]\n",
+        "    last = calendar.monthrange(year, first + 1)[1]\n",
+        "tests/test_ratings_periods.py::test_квартал_и_месяц_по_ключу",
+    ),
+    (
+        "src/ratings/periods.py",
+        "        return month_period(year - 1, 12) if month == 1 "
+        "else month_period(year, month - 1)\n",
+        "        return month_period(year, max(month - 1, 1))\n",
+        "tests/test_ratings_periods.py::test_прошлый_такой_же_период",
+    ),
+    (
+        "src/ratings/periods.py",
+        "    return _rating(max(earlier, key=lambda p: p.begin_on)) if earlier else None\n",
+        "    return _rating(min(earlier, key=lambda p: p.begin_on)) if earlier else None\n",
+        "tests/test_ratings_periods.py::test_прошлый_период_рейтинга_ближайший_а_не_первый",
+    ),
+    (
+        "src/ratings/periods.py",
+        'ReportPeriod(KIND_RATING, f"rs:{period.id}", period.begin_on, period.end_on)',
+        'ReportPeriod(KIND_RATING, f"rs:{period.begin_on}", period.begin_on, period.end_on)',
+        "tests/test_ratings_periods.py::test_прошлый_такой_же_период",
+    ),
+    (
+        "src/ratings/periods.py",
+        "    anchor = latest or today\n",
+        "    anchor = today\n",
+        "tests/test_ratings_periods.py::test_по_умолчанию_квартал_последних_данных",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
