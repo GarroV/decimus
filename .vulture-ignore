@@ -415,3 +415,7 @@ ratings_developer
 ratings_rule_add
 ratings_rule_remove
 ratings_settings
+
+# Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
+# а `paths` vulture его не охватывает.
+CHANNEL_SEED

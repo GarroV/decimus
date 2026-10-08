@@ -12,7 +12,6 @@ from datetime import date, datetime
 
 RS = "rs"
 RKO = "rko"
-RATING_TYPES = (RS, RKO)
 
 FORMAT_RKO_VIOLATIONS = "rko-violations"
 FORMAT_RKO_EVALUATIONS = "rko-evaluations"
