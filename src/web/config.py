@@ -50,6 +50,11 @@ WEB_HSTS_VAR = "WEB_HSTS"
 #: читает; пишет в него этот сервис, отдельным контейнером со своим томом на
 #: запись. Пусто — адресов обхода у админки нет.
 WEB_WALK_UPSTREAM_VAR = "WEB_WALK_UPSTREAM"
+#: Сервисный токен API чтения для Swarm (`/api/v1/*`, #567, D335). Пусто —
+#: API отвечает 503 «не настроен», а не открыт.
+SWARM_API_TOKEN_VAR = "SWARM_API_TOKEN"  # noqa: S105 — это ИМЯ переменной, а не значение
+#: Короче этого токен не принимается: тот же довод, что у ключа подписи.
+MIN_API_TOKEN_LENGTH = 32
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -114,6 +119,8 @@ class Settings:
     #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
     #: `None` — адреса обхода админкой не отдаются.
     walk_upstream: str | None = None
+    #: Сервисный токен API для Swarm (`SWARM_API_TOKEN`); `None` — API не настроен.
+    swarm_api_token: str | None = None
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -316,6 +323,23 @@ def _parse_trusted_proxies(raw: str) -> int:
     return число
 
 
+def _parse_api_token(raw: str) -> str | None:
+    """Токен API Swarm. Пусто — API выключен; заданный короткий — отказ запуска.
+
+    Короткий токен подбирается, а подобранный отдаёт рейтинги и проверки всей
+    сети: послабление «пусть хоть какой-нибудь» здесь дороже отказа подняться.
+    """
+    token = raw.strip()
+    if not token:
+        return None
+    if len(token) < MIN_API_TOKEN_LENGTH:
+        raise WebConfigError(
+            f"Токен {SWARM_API_TOKEN_VAR} короче {MIN_API_TOKEN_LENGTH} знаков. Взять новый: "
+            f"python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+    return token
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение админки. Отказ — `WebConfigError`."""
     src = os.environ if env is None else env
@@ -335,4 +359,5 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
         walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
+        swarm_api_token=_parse_api_token(src.get(SWARM_API_TOKEN_VAR) or ""),
     )
