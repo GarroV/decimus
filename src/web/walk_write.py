@@ -36,6 +36,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
+from src.bot.phrases import learn
 from src.domain import (
     SOURCE_COMMENT,
     HandedOverError,
@@ -56,8 +57,9 @@ from src.domain import (
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
-from src.domain.models import Inspection
+from src.domain.models import Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES
+from src.recognize.models import UNKNOWN_ZONE
 
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
@@ -161,6 +163,34 @@ def _default_text(chat_id: int, code: str, lang: str) -> str:
     return _LEVEL_PREFIX.sub("", get_item(code, chat_id=chat_id).question(lang)).strip()
 
 
+def _suggested(value: Any) -> tuple[Suggestion | None, bool]:
+    """Что предложила система до решения аудитора (T164, D330) и учиться ли на нём.
+
+    Так же, как у бота: предложение модели пишется с уверенностью, быстрого
+    пути — без неё (её никто не считал), выученной фразы — не пишется вовсе.
+    Учится карта синонимов (D119) только на предложении модели: быстрый путь и
+    выученная фраза и так находят пункт без неё.
+
+    Кривая тройка — не отказ записи, а «предложения не было»: запись аудитора
+    важнее статистики модели.
+    """
+    if not isinstance(value, dict) or value.get("via") not in ("fast", "model"):
+        return None, False
+    confidence = value.get("confidence")
+    model = value.get("via") == "model"
+    try:
+        return Suggestion(
+            code=_code(value, "code"),
+            level=_code(value, "level", _LEVEL),
+            zone=_code(value, "zone") if value.get("zone") else UNKNOWN_ZONE,
+            confidence=float(confidence)
+            if model and isinstance(confidence, (int, float)) and 0 <= confidence <= 1
+            else None,
+        ), model
+    except WalkRefused:
+        return None, model
+
+
 def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     code = _code(body, "code")
     level = _code(body, "level", _LEVEL)
@@ -171,6 +201,8 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         text = _text(body, "text", required=True)
     else:
         text = _text(body, "text") or _default_text(chat_id, code, inspection.report_lang)
+    words = _text(body, "words")
+    suggested, learns = _suggested(body.get("suggested"))
     add_finding(
         chat_id,
         code=code,
@@ -183,7 +215,13 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
         # Замер (D0) и D3 повтором не удваиваются (docs/02-domain.md).
         repeat=body.get("repeat") is True and level in REPEAT_LEVELS,
         photos=photos,
+        words=words,
+        suggested=suggested,
     )
+    if words and learns:
+        # Запомнить сказанное синонимом выбранного пункта (D119) — как бот после
+        # записи по предложению: в следующий раз эти слова найдут его без модели.
+        learn(words, item_code=code, lang=inspection.speech_lang, chat_id=chat_id)
 
 
 def _edit(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:

@@ -170,11 +170,55 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Finding #{n} already covers this item here. Add the recommendation to it.",
     },
     "walk.sheet.close": {"ru": "Закрыть", "en": "Close"},
-    "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
-    "walk.sheet.photos_hint": {
-        "ru": "Без фото запись не ведётся. Несколько ракурсов одного нарушения — в одну запись.",
-        "en": "A record needs a photo. Several angles of one issue go into one record.",
+    "walk.sheet.back": {"ru": "Назад", "en": "Back"},
+    "walk.sheet.kind": {"ru": "Что записываем", "en": "What are you recording"},
+    "walk.kind.violation_hint": {
+        "ru": "С вычетом и сроком устранения",
+        "en": "With a deduction and a fix-by date",
     },
+    "walk.kind.advice_hint": {
+        "ru": "Совет команде, без вычета, или общая заметка в конец отчёта",
+        "en": "Advice for the team, no deduction, or a general note at the end",
+    },
+    "walk.sheet.pick_zone": {"ru": "Выбрать зону", "en": "Choose area"},
+    "walk.photo.hero": {"ru": "Снять нарушение", "en": "Shoot the issue"},
+    "walk.photo.hero_hint": {
+        "ru": "Несколько ракурсов — в одну запись",
+        "en": "Several angles go into one record",
+    },
+    "walk.photo.gallery_link": {"ru": "или выбрать из галереи", "en": "or pick from gallery"},
+    "walk.photo.more": {"ru": "Ещё кадр", "en": "Another shot"},
+    "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
+    "walk.sheet.words_hint": {
+        "ru": "Пара слов: «нагар на крышке линии», «просрочка на сыре»",
+        "en": "A few words: “burnt residue on the lid”, “expired cheese”",
+    },
+    "walk.sheet.find": {"ru": "Найти пункт", "en": "Find the item"},
+    "walk.sheet.find_hint": {
+        "ru": (
+            "Пункт методики, класс и формулировку система найдёт по кадру и словам"
+            " — вы проверите и сохраните."
+        ),
+        "en": (
+            "The system finds the checklist item, class and wording from the photo and"
+            " words — you check and save."
+        ),
+    },
+    "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
+    "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
+    "walk.sheet.found": {"ru": "Система предлагает", "en": "Suggested"},
+    "walk.sheet.found_none": {
+        "ru": "Подходящего пункта система не нашла. Добавьте слов или выберите пункт вручную.",
+        "en": "No matching item found. Add a few words or pick the item yourself.",
+    },
+    "walk.sheet.found_stale": {
+        "ru": "Кадры или слова поменялись.",
+        "en": "Photos or words have changed.",
+    },
+    "walk.sheet.find_again": {"ru": "Найти заново", "en": "Search again"},
+    "walk.sheet.pick_manual": {"ru": "Выбрать пункт вручную", "en": "Pick the item yourself"},
+    "walk.sheet.pick_item": {"ru": "Выбрать пункт", "en": "Choose item"},
+    "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
     "walk.photo.camera": {"ru": "Снять", "en": "Take photo"},
     "walk.photo.gallery": {"ru": "Из галереи", "en": "From gallery"},
     "walk.photo.uploading": {"ru": "Загружаю…", "en": "Uploading…"},
@@ -193,12 +237,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Find an item: floor, date, gloves…",
     },
     "walk.sheet.search_empty": {
-        "ru": "Ничего не нашлось. Попробуйте другое слово или покажите все пункты.",
-        "en": "Nothing found. Try another word or show all items.",
-    },
-    "walk.sheet.show_all": {
-        "ru": "Все пункты, не только этой зоны",
-        "en": "All items, not just this zone",
+        "ru": "Ничего не нашлось. Попробуйте другое слово.",
+        "en": "Nothing found. Try another word.",
     },
     "walk.sheet.change": {"ru": "Изменить", "en": "Change"},
     "walk.sheet.was_here": {"ru": "было в прошлый раз", "en": "found last time"},
@@ -309,6 +349,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.err.repeat_level": {
         "ru": "Повтор ставится только нарушению класса D1 или D2.",
         "en": "Only a D1 or D2 issue can be marked as a repeat.",
+    },
+    "walk.err.suggest_busy": {
+        "ru": "Система ещё ищет пункт по прошлому нажатию — подождите пару секунд.",
+        "en": "Still looking for the item from your last tap — give it a few seconds.",
+    },
+    "walk.err.recognize": {
+        "ru": "Система сейчас не может найти пункт. Выберите его вручную — запись не потеряется.",
+        "en": "The system can't find the item right now. Pick it yourself — nothing is lost.",
     },
     "walk.err.server": {
         "ru": "Не получилось записать. Повторите через минуту.",
