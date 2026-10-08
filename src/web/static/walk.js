@@ -399,7 +399,7 @@
       .then(function (res) {
         if (!res.ok) {
           S.data = { texts: (res.body && res.body.texts) || {} };
-          renderEmpty(tx("walk.error"));
+          renderEmpty(tx(res.body && res.body.error === "closed" ? "walk.closed" : "walk.error"));
           return;
         }
         W.apply(res.body);

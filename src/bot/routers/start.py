@@ -257,7 +257,7 @@ def build_start_router(
                 ),
                 lang,
             ),
-            reply_markup=walk_keyboard(lang, settings.walk_url),
+            reply_markup=walk_keyboard(lang, settings.walk_url_for(message.chat.id)),
         )
 
     @router.callback_query(F.data == RESUME_NEW_CALLBACK)
@@ -617,7 +617,7 @@ def build_start_router(
             ),
             # Обход (#418) — тут же, под стартом: первое, что аудитор видит
             # после начала, и самое естественное место найти, что осматривать.
-            reply_markup=walk_keyboard(started_lang, settings.walk_url),
+            reply_markup=walk_keyboard(started_lang, settings.walk_url_for(message.chat.id)),
         )
 
     return router

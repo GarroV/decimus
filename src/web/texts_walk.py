@@ -69,6 +69,12 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "The walk-through will appear here by itself.",
     },
     "walk.back": {"ru": "Вернуться в чат", "en": "Back to the chat"},
+    "walk.closed": {
+        "ru": "Обход пока открыт только тестерам. Проверку ведите в чате, как обычно.",
+        "en": (
+            "The walk-through is open to testers only for now. Keep recording in the chat as usual."
+        ),
+    },
     "walk.error": {
         "ru": "Обход не загрузился. Закройте окно и откройте снова.",
         "en": "The walk-through did not load. Close the window and open it again.",

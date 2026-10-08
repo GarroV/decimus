@@ -29,6 +29,8 @@ from dataclasses import dataclass
 
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
+from src.domain.walk_users import parse_walk_users
+
 #: Сколько живёт подпись. Telegram выдаёт свежую при каждом открытии, а
 #: обход длится час-два; шесть часов — с запасом на свёрнутое окно, и при
 #: этом утёкшая строка не живёт до завтра.
@@ -79,6 +81,8 @@ class WalkSettings:
 
     bot_token: str | None
     preview_chat: int | None
+    #: Круг тестеров (`WALK_USERS`, тот же, что у кнопки бота). `None` — все.
+    users: frozenset[int] | None = None
 
     @property
     def enabled(self) -> bool:
@@ -109,6 +113,7 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
     return WalkSettings(
         bot_token=token,
         preview_chat=preview,
+        users=parse_walk_users(src),
     )
 
 
