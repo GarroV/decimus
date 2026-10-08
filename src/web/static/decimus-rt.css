@@ -89,7 +89,7 @@
    Top/Bottom: левее него зона бледно-красная. Итог группы — первой строкой.
    Одно движение на экране: при загрузке точки переезжают с прошлого места. */
 .rt-board {
-  --rt-name: minmax(8rem, 12rem);
+  --rt-name: minmax(7rem, 10rem);
   --rt-val: 8.25rem;
   display: grid;
   grid-template-columns: var(--rt-name) var(--rt-val) minmax(0, 1fr) var(--rt-val) minmax(0, 1fr);
