@@ -95,6 +95,36 @@ cases = [
         "    if not parts.fragment:\n",
         "tests/test_ratings_sheet.py::test_ссылка_листа_чужой_хост_id_не_берётся",
     ),
+    (
+        "src/ratings/formats.py",
+        "    if not (value.isascii() and value.isdigit()):",
+        "    if not value.isdigit():",
+        "tests/test_ratings_formats.py::test_продолжительность_надстрочная_цифра_строкой_журнала",
+    ),
+    (
+        "src/ratings/csvio.py",
+        "    except csv.Error as exc:",
+        "    except KeyError as exc:",
+        "tests/test_ratings_formats.py::test_ячейка_длиннее_лимита_csv_отказ_а_не_падение",
+    ),
+    (
+        "src/ratings/formats.py",
+        '"%d.%m.%Y %H:%M:%S", ',
+        "",
+        "tests/test_ratings_formats.py::test_дата_excel_с_секундами",
+    ),
+    (
+        "src/ratings/formats.py",
+        ', "%d.%m.%Y %H:%M")',
+        ")",
+        "tests/test_ratings_formats.py::test_сохранённый_в_excel_с_точкой_с_запятой_читается",
+    ),
+    (
+        "src/ratings/sheet.py",
+        "            if known != developer:",
+        "            if False:",
+        "tests/test_ratings_sheet.py::test_два_девелопера_у_страны_не_теряются_молча",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

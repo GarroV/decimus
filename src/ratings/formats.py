@@ -79,7 +79,8 @@ _AUTO_MARKS = ("(ML)", "(ИИ)", "(AI)")
 _CHANNELS = {"доставка": "delivery", "ресторан": "restaurant"}
 _RS_FORMATS = {"инспекция": "inspection", "онлайн": "online"}
 _ACCEPTANCE = {"принято": "accepted", "отклонено": "rejected"}
-_DATETIME = "%Y-%m-%d %H:%M:%S"
+#: ISO (Dodo IS) и вид, в который Excel переписывает даты при пересохранении.
+_DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M")
 _UNKNOWN = (
     "Формат файла не узнан по заголовку. Ожидаются выгрузки rko-violations, "
     "rko-evaluations, rs-checkups, лист «Качество по пиццериям» (sheet-scores) "
@@ -131,10 +132,12 @@ def _when(value: str) -> datetime | None:
     value = value.strip()
     if not value:
         return None
-    try:
-        return datetime.strptime(value, _DATETIME).replace(tzinfo=UTC)
-    except ValueError as exc:
-        raise _BadRow(f"дата «{value}» не по образцу ГГГГ-ММ-ДД чч:мм:сс") from exc
+    for pattern in _DATETIME_FORMATS:
+        try:
+            return datetime.strptime(value, pattern).replace(tzinfo=UTC)
+        except ValueError:
+            continue
+    raise _BadRow(f"дата «{value}» не по образцу ГГГГ-ММ-ДД чч:мм:сс или ДД.ММ.ГГГГ чч:мм")
 
 
 def _country(row: dict[str, str], row_no: int, issues: list[Issue]) -> str | None:
@@ -289,7 +292,7 @@ def _minutes(value: str) -> int | None:
     value = value.strip()
     if not value:
         return None
-    if not value.isdigit():
+    if not (value.isascii() and value.isdigit()):  # «²» и «①» — isdigit, но не число
         raise _BadRow(f"продолжительность «{value}» не целое число минут")
     return int(value)
 

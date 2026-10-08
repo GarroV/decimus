@@ -34,6 +34,7 @@ CATEGORY_REMARK = "remark"
 ISSUE_UNIT_UNMATCHED = "unit_unmatched"
 ISSUE_COUNTRY_UNKNOWN = "country_unknown"
 ISSUE_BAD_ROW = "bad_row"
+ISSUE_DEVELOPER_CONFLICT = "developer_conflict"
 
 
 ERR_NOT_UTF8 = "not_utf8"
@@ -42,6 +43,7 @@ ERR_UNKNOWN_FORMAT = "unknown_format"
 ERR_MISSING_COLUMNS = "missing_columns"
 ERR_NOT_SHEET = "not_sheet"
 ERR_BAD_PERIOD = "bad_period"
+ERR_BAD_CSV = "bad_csv"
 
 
 class RatingsFormatError(ValueError):
