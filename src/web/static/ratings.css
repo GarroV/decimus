@@ -1,0 +1,231 @@
+/*
+  Раздел «Рейтинги» — сводка и «Загрузки» (D334: визуал по стенду главной Swarm).
+  Подключается только шаблонами `templates/ratings/`, остальным экранам не мешает.
+
+  Своих цветов, шрифтов и радиусов здесь нет: всё — токены ядра `dodo-ds.css`,
+  поэтому тёмная тема приезжает сама. Из прототипа Swarm взяты приёмы, а не
+  значения: заголовок блока капителью с подписью справа, карточки с тенью,
+  крупные моноширинные цифры, цветная дельта, полосы топа нарушений, строки
+  «куда смотреть» с квадратом важности.
+*/
+
+.rt {
+  --rt-gap: var(--space-7);
+  --rt-pad: var(--space-7) var(--space-8);
+  --rt-kpi-size: 48px;
+  --rt-sev: 28px;
+  --rt-bar-w: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-10);
+  min-width: 0;
+}
+.rt a { text-decoration: none; }
+.rt a:hover { text-decoration: underline; }
+.rt .num, .rt-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+/* ── Шапка и отбор ─────────────────────────────────────────────── */
+.rt-head { display: flex; align-items: flex-start; gap: var(--space-7); flex-wrap: wrap; }
+.rt-head__main { flex: 1 1 20rem; min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.rt-head__kicker {
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: var(--tracking-micro);
+  text-transform: uppercase; font-weight: var(--w-bold); color: var(--accent);
+}
+.rt-head__title { margin: 0; font-size: 24px; line-height: 30px; font-weight: var(--w-bold); color: var(--ink); }
+.rt-head__meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.rt-head__meta b { font-weight: var(--w-semibold); color: var(--ink-2); }
+
+.rt-bar {
+  display: flex; align-items: flex-end; gap: var(--space-6) var(--space-7); flex-wrap: wrap;
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  box-shadow: var(--sh-card);
+}
+.rt-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+.rt-field__label {
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: var(--tracking-micro);
+  text-transform: uppercase; font-weight: var(--w-bold); color: var(--ink-3);
+}
+.rt-field--grow { flex: 1 1 14rem; }
+.rt-field .input { width: 100%; }
+.rt-seg {
+  display: inline-flex; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-1);
+  border: 1px solid var(--line-control); border-radius: var(--r-control); background: var(--surface-2);
+}
+.rt-seg a {
+  display: inline-flex; align-items: center; min-height: calc(var(--control-h) - 6px);
+  padding: 0 var(--space-6); border-radius: calc(var(--r-control) - 2px);
+  font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); white-space: nowrap;
+}
+.rt-seg a:hover { color: var(--accent); text-decoration: none; }
+.rt-seg a[aria-current="page"] { background: var(--ink); color: var(--surface); }
+
+/* ── Блок: заголовок капителью, подпись справа (как .sec-h Swarm) ── */
+.rt-sec { display: flex; flex-direction: column; gap: var(--space-6); min-width: 0; }
+.rt-sec__head { display: flex; align-items: baseline; gap: var(--space-4) var(--space-6); flex-wrap: wrap; }
+.rt-sec__title {
+  margin: 0; font-size: 13px; line-height: 18px; letter-spacing: .09em; text-transform: uppercase;
+  font-weight: var(--w-bold); color: var(--ink-2);
+}
+.rt-sec__meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.rt-sec__act { margin-left: auto; }
+
+.rt-card {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
+  box-shadow: var(--sh-card); min-width: 0;
+}
+.rt-card__body { padding: var(--rt-pad); display: flex; flex-direction: column; gap: var(--space-6); }
+.rt-card__title { margin: 0; font-size: var(--fs-lead); line-height: var(--lh-lead); font-weight: var(--w-bold); color: var(--ink); }
+.rt-card__meta { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
+.rt-sub { margin: 0; font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: var(--tracking-micro); text-transform: uppercase; font-weight: var(--w-bold); color: var(--ink-3); }
+
+/* Пустое состояние: спокойно, с причиной словами — не тревога и не «всё хорошо». */
+.rt-empty {
+  display: flex; align-items: center; gap: var(--space-5);
+  padding: var(--space-6) var(--space-7); border: 1px dashed var(--line-strong); border-radius: var(--r-block);
+  background: var(--surface-2); color: var(--ink-2); font-size: var(--fs-dense); line-height: var(--lh-dense);
+}
+.rt-empty::before {
+  content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-empty);
+}
+.rt-card .rt-empty { margin: var(--space-6) var(--space-7); }
+.rt-card__body .rt-empty { margin: 0; }
+
+/* ── Дельта: знак и цвет — по уже округлённому значению (P17) ── */
+.rt-delta { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: var(--w-semibold); color: var(--ink-3); white-space: nowrap; }
+.rt-delta--up { color: var(--ok); }
+.rt-delta--down { color: var(--err); }
+.rt-delta__arrow { font-size: .8em; margin-right: 2px; }
+
+/* ── Средние: две крупные цифры итога и таблица стран ─────────── */
+.rt-scores { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: var(--rt-gap); align-items: start; }
+.rt-kpis { display: grid; gap: var(--rt-gap); }
+.rt-kpi { padding: var(--space-8) var(--space-9); display: flex; flex-direction: column; gap: var(--space-2); }
+.rt-kpi--rs { background: linear-gradient(160deg, var(--surface) 55%, var(--accent-soft)); }
+.rt-kpi__label { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); display: flex; gap: var(--space-4); align-items: center; }
+.rt-kpi__value {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--rt-kpi-size);
+  font-weight: var(--w-semibold); letter-spacing: -.03em; line-height: 1.05; color: var(--ink);
+}
+.rt-kpi__value small { font-size: 16px; color: var(--ink-3); font-weight: var(--w-medium); margin-left: var(--space-2); letter-spacing: 0; }
+.rt-kpi__value.is-empty { color: var(--ink-empty); }
+.rt-kpi__delta { display: flex; gap: var(--space-4); align-items: baseline; flex-wrap: wrap; font-size: var(--fs-dense); }
+.rt-kpi__delta span:last-child { color: var(--ink-3); font-size: var(--fs-meta); }
+
+/* Таблица — по .tbl Swarm: шапка капителью, числа моноширинные справа. */
+.rt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rt-tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-dense); }
+.rt-tbl th, .rt-tbl td { padding: var(--space-5) var(--space-5); border-bottom: 1px solid var(--line); text-align: right; vertical-align: middle; }
+.rt-tbl thead th {
+  font-size: var(--fs-micro); line-height: var(--lh-micro); letter-spacing: .06em; text-transform: uppercase;
+  font-weight: var(--w-semibold); color: var(--ink-3); white-space: nowrap; background: var(--surface);
+}
+.rt-tbl th:first-child, .rt-tbl td:first-child { padding-left: var(--space-7); }
+.rt-tbl th:last-child, .rt-tbl td:last-child { padding-right: var(--space-7); }
+.rt-tbl .is-text { text-align: left; }
+.rt-tbl tbody th { font-weight: var(--w-semibold); color: var(--ink); }
+.rt-tbl td.num, .rt-tbl td .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rt-tbl tbody tr:hover > * { background: var(--surface-2); }
+.rt-tbl tbody tr:last-child > * { border-bottom: 0; }
+.rt-tbl .is-empty { color: var(--ink-empty); }
+.rt-tbl__total > * { background: var(--surface-2); font-weight: var(--w-bold); border-top: 1px solid var(--line-strong); }
+.rt-tbl__sum { margin-right: var(--space-3); color: var(--ink-3); }
+.rt-tbl small { color: var(--ink-3); font-size: var(--fs-meta); }
+.rt-tbl .rt-wrap { white-space: normal; overflow-wrap: anywhere; min-width: 12rem; }
+
+/* ── Нарушения: топ полосами (как «Топ-5 нарушений» Swarm) ───── */
+.rt-viol { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr)); gap: var(--rt-gap); }
+.rt-viol__cluster { border-color: var(--accent-line); }
+.rt-viol__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
+.rt-bars { list-style: none; margin: 0; padding: 0; }
+.rt-bars li {
+  display: grid; grid-template-columns: minmax(0, 1fr) var(--rt-bar-w) 2.5em; gap: var(--space-5); align-items: center;
+  padding: var(--space-3) 0; border-bottom: 1px dashed var(--line); font-size: var(--fs-dense);
+}
+.rt-bars li:last-child { border-bottom: 0; }
+.rt-bars__text { overflow-wrap: anywhere; }
+.rt-bars__track { height: 8px; border-radius: 4px; background: var(--surface-3); overflow: hidden; }
+.rt-bars__track b { display: block; height: 100%; border-radius: 0 4px 4px 0; background: var(--accent); }
+.rt-bars__n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: var(--w-semibold); text-align: right; }
+.rt-stats { display: flex; gap: var(--space-4); flex-wrap: wrap; }
+.rt-stat {
+  display: inline-flex; gap: var(--space-3); align-items: baseline; padding: var(--space-2) var(--space-5);
+  border: 1px solid var(--line); border-radius: var(--r-control); font-size: var(--fs-meta); color: var(--ink-3);
+}
+.rt-stat b { font-family: var(--font-mono); font-size: var(--fs-dense); color: var(--ink); font-weight: var(--w-semibold); }
+
+/* ── Top/Bottom-10: две колонки ────────────────────────────────── */
+.rt-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--rt-gap); }
+.rt-rank { list-style: none; margin: 0; padding: 0; counter-reset: rt-rank; }
+.rt-rank li {
+  counter-increment: rt-rank;
+  display: grid; grid-template-columns: 1.75em minmax(0, 1fr) auto; gap: var(--space-5); align-items: baseline;
+  padding: var(--space-4) 0; border-top: 1px solid var(--line); font-size: var(--fs-dense);
+}
+.rt-rank li:first-child { border-top: 0; }
+.rt-rank li::before { content: counter(rt-rank); font-family: var(--font-mono); font-size: var(--fs-meta); color: var(--ink-3); text-align: right; }
+.rt-rank__name { min-width: 0; overflow-wrap: anywhere; font-weight: var(--w-semibold); }
+.rt-rank__name small { display: inline-block; margin-left: var(--space-3); font-weight: var(--w-regular); color: var(--ink-3); font-size: var(--fs-meta); }
+.rt-rank__score { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: var(--w-semibold); padding: 0 var(--space-3); border-radius: var(--r-mark); }
+.rt-rank--top .rt-rank__score { color: var(--ok); background: var(--ok-soft); }
+.rt-rank--bottom .rt-rank__score { color: var(--err); background: var(--err-soft); }
+.rt-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-empty); flex: none; }
+.rt-dot--ok { background: var(--ok); }
+.rt-dot--err { background: var(--err); }
+.rt-dot--warn { background: var(--warn-mark); }
+
+/* ── Предупреждения: хард-нарушения и зона риска (как «Куда смотреть») ── */
+.rt-alert { border-left: 3px solid var(--err); }
+.rt-alert--warn { border-left-color: var(--warn-mark); }
+.rt-att { list-style: none; margin: 0; padding: 0; }
+.rt-att li {
+  display: grid; grid-template-columns: var(--rt-sev) minmax(0, 1fr) auto; gap: var(--space-6); align-items: center;
+  padding: var(--space-5) var(--space-7); border-top: 1px solid var(--line);
+}
+.rt-att li:first-child { border-top: 0; }
+.rt-att li:hover { background: var(--surface-2); }
+.rt-sev {
+  width: var(--rt-sev); height: var(--rt-sev); border-radius: var(--r-control); display: grid; place-items: center;
+  font-weight: var(--w-bold); font-size: var(--fs-lead); background: var(--err-soft); color: var(--err);
+}
+.rt-sev--warn { background: var(--warn-soft); color: var(--warn-ink); }
+.rt-att__title { font-weight: var(--w-semibold); font-size: var(--fs-body); overflow-wrap: anywhere; }
+.rt-att__where { font-weight: var(--w-medium); color: var(--ink-2); }
+.rt-att__sub { margin-top: var(--space-1); font-size: var(--fs-dense); color: var(--ink-2); overflow-wrap: anywhere; }
+.rt-att__m { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-body); font-weight: var(--w-semibold); text-align: right; white-space: nowrap; }
+.rt-att__m.is-bad { color: var(--err); }
+.rt-att .tag { margin-left: var(--space-3); vertical-align: 1px; }
+.rt-note { padding: var(--space-5) var(--space-7); border-top: 1px solid var(--line); font-size: var(--fs-dense); color: var(--ink-2); }
+
+/* ── «Загрузки» ─────────────────────────────────────────────── */
+.rt-form { display: flex; align-items: flex-end; gap: var(--space-6); flex-wrap: wrap; }
+.rt-form > label { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; flex: 0 1 auto; }
+.rt-form > label.rt-field--grow { flex: 1 1 16rem; }
+.rt-form .input { width: 100%; }
+.rt-form .input--num { width: 8rem; }
+.rt-drop { border: 1px dashed var(--line-control-2); border-radius: var(--r-block); padding: var(--space-7); background: var(--surface-2); }
+.rt-devs { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr)); gap: var(--space-6) var(--rt-gap); }
+.rt-devs .rt-form { flex-wrap: nowrap; }
+.rt-devs .rt-form > label { flex: 1 1 auto; }
+.rt-split { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--rt-gap); align-items: start; }
+.rt-split > .rt-sec { min-width: 0; }
+
+/* ── Узкие экраны ───────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .rt-scores { grid-template-columns: 1fr; }
+  .rt-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rt-split { grid-template-columns: 1fr; }
+}
+@media (max-width: 719px) {
+  .rt { --rt-kpi-size: 34px; --rt-pad: var(--space-6) var(--space-7); --rt-bar-w: 64px; gap: var(--space-9); }
+  .rt-head__title { font-size: var(--fs-display); line-height: var(--lh-display); }
+  .rt-head .btn { width: 100%; justify-content: center; }
+  .rt-bar { padding: var(--space-6); }
+  .rt-bar .rt-field, .rt-bar .btn { flex: 1 1 100%; }
+  .rt-seg { display: flex; }
+  .rt-seg a { flex: 1 1 auto; justify-content: center; padding: 0 var(--space-4); }
+  .rt-kpi { padding: var(--space-6) var(--space-7); }
+  .rt-two { grid-template-columns: 1fr; }
+  .rt-att li { padding: var(--space-5) var(--space-6); gap: var(--space-5); }
+  .rt-devs .rt-form { flex-wrap: wrap; }
+}
