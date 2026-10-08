@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.domain import INSPECTION_KINDS
@@ -97,6 +97,18 @@ def new_inspection_keyboard(lang: str) -> InlineKeyboardMarkup:
             text=t("btn.new_inspection", lang), callback_data=NEW_INSPECTION_CALLBACK
         )
     )
+    return builder.as_markup()
+
+
+def walk_keyboard(lang: str, url: str | None) -> InlineKeyboardMarkup | None:
+    """«Обход точки» — мини-апп с зонами и прошлой проверкой (#418).
+
+    Без адреса — `None`: сообщение уходит без кнопки, как до мини-аппа.
+    """
+    if url is None:
+        return None
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=t("btn.walk", lang), web_app=WebAppInfo(url=url)))
     return builder.as_markup()
 
 

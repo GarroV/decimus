@@ -21,10 +21,14 @@ from .checklist import (
     only_zone,
 )
 from .config import check_environment
-from .findings import add_finding, attach_photo, drop_finding, edit_finding
+from .findings import add_finding, attach_photo, detach_photo, drop_finding, edit_finding
+from .handover import HandedOverError, handed_over, while_open
 from .info import set_info
 from .kinds import INSPECTION_KINDS, kind_title
 from .models import (
+    ADVICE_LEVEL,
+    NON_DEDUCTING,
+    NOTE_CODE,
     SOURCE_COMMENT,
     SOURCE_PHOTO,
     SOURCES,
@@ -58,9 +62,13 @@ from .uncovered import (
     read_uncovered,
     record_uncovered,
 )
+from .uploads import is_upload_ref, save_upload, upload_file
 
 __all__ = [
+    "ADVICE_LEVEL",
     "INSPECTION_KINDS",
+    "NON_DEDUCTING",
+    "NOTE_CODE",
     "OUTCOMES",
     "OUTCOME_ABANDONED",
     "OUTCOME_RECORDED",
@@ -74,6 +82,7 @@ __all__ = [
     "ZONE_SOURCE_WORDS",
     "ChecklistItem",
     "Finding",
+    "HandedOverError",
     "Inspection",
     "Score",
     "Suggestion",
@@ -86,20 +95,26 @@ __all__ = [
     "attach_photo",
     "check_environment",
     "checklist_version",
+    "detach_photo",
     "drop_finding",
     "drop_inspection",
     "edit_finding",
     "get_item",
     "get_state",
+    "handed_over",
+    "is_upload_ref",
     "kind_title",
     "list_items",
     "list_zones",
     "only_zone",
     "read_uncovered",
     "record_uncovered",
+    "save_upload",
     "score",
     "set_info",
     "settings_for",
     "start_inspection",
     "sync_checklist_version",
+    "upload_file",
+    "while_open",
 ]

@@ -923,6 +923,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Новый класс для записи #{n}?",
         "en": "New class for record #{n}?",
     },
+    "edit.level_advice": {
+        "ru": (
+            "Запись #{n} — рекомендация, класса у неё нет. Если это нарушение — "
+            "удалите запись и запишите нарушение заново."
+        ),
+        "en": (
+            "Record #{n} is a recommendation and has no class. If it is a violation, "
+            "delete the record and record the violation again."
+        ),
+    },
     "edit.ask_text": {
         "ru": "Пришлите новую формулировку для записи #{n} одним сообщением.",
         "en": "Send the new wording for record #{n} in one message.",
@@ -1957,6 +1967,8 @@ TEXTS: dict[str, dict[str, str]] = {
     # в `keyboards.py` — единственные строки интерфейса мимо каталога, и потому
     # единственные, которые язык стенда не мог перекрасить.
     "btn.new_inspection": {"ru": "Новая проверка", "en": "New inspection"},
+    # Мини-апп обхода (#418): что не осмотрено и что было здесь в прошлый раз.
+    "btn.walk": {"ru": "Обход точки", "en": "Walk-through"},
     "btn.resume_continue": {"ru": "Продолжить", "en": "Continue"},
     "btn.sealed_drop": {"ru": "Убрать из чата", "en": "Remove from chat"},
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},

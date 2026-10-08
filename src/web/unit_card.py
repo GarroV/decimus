@@ -14,6 +14,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import date
 
+from src.domain.models import NON_DEDUCTING
+
 from ..db import queries
 from ..db.models import FindingRow, InspectionRow
 from ..db.reach import Reach
@@ -191,7 +193,8 @@ def _repeats(
     образец: dict[str, FindingRow] = {}
     for f in findings:
         n = место.get(f.inspection_id)
-        if n is None:
+        # Замер и рекомендация — не нарушение: «не чинится» про них не скажешь.
+        if n is None or f.level in NON_DEDUCTING:
             continue
         ряд = отметки.setdefault(f.code, [НЕТ] * len(окно))
         # Засчитанный повтор перекрывает наблюдение, но не наоборот: вторая

@@ -15,6 +15,9 @@
   {# Форма правки записи на приёмке (D200). Одна на запись в чек-листе и на
      запись вне его: запись, перенесённую в необычную зону, иначе нельзя было
      бы поправить обратно. #}
+  {# Замер и рекомендация правкой класса не становятся нарушением: форма
+     предлагает только D1–D3 и молча подставила бы D1 (D201). #}
+  {% if finding.level in levels %}
   <details class="review-revise">
     <summary class="field-note">{{ t('revise.open', n=finding.n) }}</summary>
     <form method="post" class="stack mt-gap"
@@ -39,6 +42,7 @@
       <button class="btn" type="submit">{{ t('revise.submit') }}</button>
     </form>
   </details>
+  {% endif %}
 {% endmacro %}
 {% block body %}
   <div class="row row--tight row--between">
@@ -248,12 +252,12 @@
         {% set shots = entry.shown if entry else () %}
         {% set lost = entry.missing if entry else 0 %}
         {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
-          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ finding.level }}</span>
+          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else finding.level }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
           <span class="find-row__main">
             <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
             <span class="find-row__meta">
-              {{ finding.code }} · {{ zone_names.get(finding.zone, finding.zone) }}
+              {{ t('card.findings.note') if finding.code == 'NOTE' else finding.code }} · {{ zone_names.get(finding.zone, finding.zone) }}
               {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
             </span>

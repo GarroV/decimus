@@ -60,6 +60,7 @@ from . import (
     security_headers,
     unit_add,
     view,
+    walk_proxy,
 )
 from . import country as country_data
 from . import inspections as data
@@ -132,6 +133,9 @@ def create_app(settings: Settings | None = None) -> Flask:
     prescriptions.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
+    # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
+    # адреса обхода передаются отдельному сервису со своим томом на запись.
+    walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
     _register_errors(app, conf)
     security_headers.install(app, hsts=conf.hsts)
     return app
