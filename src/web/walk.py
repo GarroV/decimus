@@ -42,7 +42,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_write
+from . import walk_suggest, walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -353,3 +353,4 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         return payload_response(who, ui_lang)
 
     walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=payload_response)
+    walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
