@@ -124,6 +124,18 @@ cases = [
         "    if False:\n",
         "tests/test_web_walk.py::test_кривой_круг_тестеров_отказ_на_старте",
     ),
+    (
+        "src/bot/propose.py",
+        "    if words and not album_mode(words, len(frames)):",
+        "    if words:",
+        "tests/test_web_walk_suggest.py::test_пачка_с_комментарием_идёт_в_модель_целиком",
+    ),
+    (
+        "src/web/walk_write.py",
+        "    if words and learns:",
+        "    if words:",
+        "tests/test_web_walk_suggest.py::test_выученная_фраза_второй_раз_не_учится",
+    ),
 ]
 bad = 0
 for path, old, new, test in cases:

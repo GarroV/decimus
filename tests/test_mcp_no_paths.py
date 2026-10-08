@@ -54,6 +54,43 @@ from src.mcp.rpc import handle
 #: Годные аргументы каждого инструмента: доводят до успеха там, где стенд
 #: собран, и до отказа окружения там, где он сломан.
 ГОДНЫЕ: dict[str, dict[str, Any]] = {
+    "import_create_inspection": {
+        "unit": "Белград-1",
+        "date": "2024-03-15",
+        "checklist_code": "bizdev",
+        "auditor": "Ivan",
+    },
+    "import_add_finding": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "code": "CLN01",
+        "level": "D1",
+        "zone": "fridge",
+        "text": "пол в пятнах",
+    },
+    "import_edit_finding": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "n": 1,
+        "level": "D2",
+    },
+    "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 1},
+    "import_get_inspection": {"inspection_id": "00000000-0000-0000-0000-000000000001"},
+    "import_list_drafts": {},
+    "import_add_photo": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "n": 1,
+        "image_base64": "aGVsbG8=",
+        "mime": "image/jpeg",
+    },
+    "import_accept_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "confirm_unit": "Белград-1",
+        "confirm_date": "2024-03-15",
+    },
+    "import_discard_draft": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "confirm_unit": "Белград-1",
+        "confirm_date": "2024-03-15",
+    },
     "list_inspections": {},
     "unit_history": {"unit": "Белград-1"},
     "network_summary": {},
@@ -170,6 +207,40 @@ from src.mcp.rpc import handle
 #: Инструменты методики здесь отказывают ДО движка намеренно: отказ движка
 #: стоит трёх подпроцессов, а годные аргументы через него и так проходят.
 НЕГОДНЫЕ: dict[str, dict[str, Any]] = {
+    "import_create_inspection": {
+        "unit": "Белград-1",
+        "date": "2024-03-15",
+        "checklist_code": "bizdev",
+        "checklist_version": ЗАГЛУШКА_ВЕРСИИ,
+        "auditor": "Ivan",
+    },
+    "import_add_finding": {
+        "inspection_id": "не-uuid",
+        "code": "CLN01",
+        "level": "D1",
+        "zone": "fridge",
+        "text": "x",
+    },
+    "import_edit_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": 0},
+    "import_remove_finding": {"inspection_id": "00000000-0000-0000-0000-000000000001", "n": -1},
+    "import_get_inspection": {"inspection_id": "не-uuid"},
+    "import_list_drafts": {},
+    "import_add_photo": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "n": 1,
+        "image_base64": "@@@",
+        "mime": "image/gif",
+    },
+    "import_accept_inspection": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "confirm_unit": "Белград-1",
+        "confirm_date": "15.03.2024",
+    },
+    "import_discard_draft": {
+        "inspection_id": "00000000-0000-0000-0000-000000000001",
+        "confirm_unit": "",
+        "confirm_date": "2024-03-15",
+    },
     "list_inspections": {"limit": 0},
     "unit_history": {"unit": "   "},
     "network_summary": {"date_from": "2026-09-02", "date_to": "2026-09-01"},
@@ -352,7 +423,17 @@ def _вызвать(имя: str, аргументы: dict[str, Any], *, store: S
     # Хранилище подставляется обоими способами — как право на правку и как
     # исходник эталона (T315): иначе тексты инструментов чтения эталона в эту
     # батарею не попали бы, а проверяются здесь именно они.
-    return handle(сообщение, tenant=АРЕНДАТОР, checklist=store, source=store, may_retract=True)
+    # Загрузка (D305) открыта тем же хранилищем и подписью — по той же причине:
+    # её собственные отказы обязаны попасть в батарею.
+    return handle(
+        сообщение,
+        tenant=АРЕНДАТОР,
+        checklist=store,
+        source=store,
+        may_retract=True,
+        imports=store,
+        actor="mcp:HQ",
+    )
 
 
 def _собрать(корень: Path) -> Батарея:

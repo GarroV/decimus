@@ -218,12 +218,6 @@
   text-overflow: ellipsis;
 }
 
-.walk-switch__caret {
-  flex: none;
-  color: var(--ink-3);
-  transition: transform .25s ease;
-}
-
 .walk-switch__label { flex: 1; min-width: 0; display: grid; }
 
 .walk-switch__label .walk-switch__name { flex: none; }
@@ -768,7 +762,6 @@
   .walk-zsheet__card,
   .walk-zsheet__scrim,
   .walk-cl__wrap,
-  .walk-switch__caret,
   .walk-cl__caret,
   .walk-toast { transition: none; }
 }

@@ -23,12 +23,14 @@ import inspect
 
 from src.mcp import checklist_source as checklist_source_module
 from src.mcp import checklist_tools, checklists_tools
+from src.mcp import imports as imports_module
 from src.mcp import phrases as phrases_module
 from src.mcp import retraction as retraction_module
 from src.mcp import tools as tools_module
 from src.mcp.catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
+    KIND_IMPORT,
     KIND_INSPECTIONS,
     KIND_RATINGS,
     KIND_RETRACTION,
@@ -126,12 +128,29 @@ from src.mcp.catalogue import (
     "apply_checklist",
 }
 
+#: Загрузка исторических проверок поштучно (D305–D310). Свой вид и своё право
+#: (`MCP_IMPORT_TENANTS`); обработчики — только `src.mcp.imports`. Пишут они
+#: лишь загруженные черновики своего пространства — это держит замок строки
+#: (`src/db/imports.py`) и `tests/test_db_imports.py`.
+ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ = {
+    "import_create_inspection",
+    "import_add_finding",
+    "import_edit_finding",
+    "import_remove_finding",
+    "import_get_inspection",
+    "import_list_drafts",
+    "import_add_photo",
+    "import_accept_inspection",
+    "import_discard_draft",
+}
+
 #: Загрузка рейтингов (D320). Своим модулем и своим видом: пишет в схему
 #: `ratings`, а не в проверки и не в методику; открыта только токену УК.
 ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ = {"import_ratings"}
 
 ИМЕНА_ИНСТРУМЕНТОВ = (
     ИМЕНА_ИНСТРУМЕНТОВ_ПРОВЕРОК
+    | ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ
     | ИМЕНА_ИНСТРУМЕНТОВ_МЕТОДИКИ
     | ИМЕНА_ИНСТРУМЕНТОВ_ИСХОДНИКА
     | ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ
@@ -174,10 +193,11 @@ from src.mcp.catalogue import (
 }
 
 
-def test_каталог_содержит_ровно_сорок_три_инструмента_с_ожидаемыми_именами() -> None:
+def test_каталог_содержит_ровно_пятьдесят_два_инструмента_с_ожидаемыми_именами() -> None:
     """Лишний инструмент в каталоге — не описанный обработчик, снятый —
-    инструмент, к которому агент внезапно теряет доступ."""
-    assert len(TOOLS) == 43
+    инструмент, к которому агент внезапно теряет доступ.
+    42 + 9 загрузки (D305) + 1 рейтингов (D320)."""
+    assert len(TOOLS) == 52
     assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
@@ -214,9 +234,12 @@ def test_свойства_схемы_совпадают_с_сигнатурой_
     сигнатуры: их подставляет точка входа, а не собеседник, поэтому в схеме
     им взяться неоткуда."""
     for spec in TOOLS:
+        # `actor` — подпись из токена для инструментов загрузки (D308): её
+        # тоже подставляет точка входа, а не собеседник.
         параметры_обработчика = set(inspect.signature(spec.handler).parameters) - {
             "tenant",
             "store",
+            "actor",
         }
         # `checklist` называет собеседник, а снимает точка входа (T344):
         # обработчику приходит хранилище, уже наведённое на нужный чек-лист,
@@ -257,6 +280,8 @@ def test_вид_инструмента_соответствует_его_гру�
             assert spec.kind == KIND_CHECKLIST_SOURCE, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.kind == KIND_RETRACTION, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ:
+            assert spec.kind == KIND_IMPORT, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.kind == KIND_RATINGS, spec.name
         else:
@@ -321,6 +346,8 @@ def test_обработчик_взят_из_правильного_модуля(
             assert spec.handler.__module__ == checklist_tools.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_СНЯТИЯ:
             assert spec.handler.__module__ == retraction_module.__name__, spec.name
+        elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_ЗАГРУЗКИ:
+            assert spec.handler.__module__ == imports_module.__name__, spec.name
         elif spec.name in ИМЕНА_ИНСТРУМЕНТОВ_РЕЙТИНГОВ:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
         else:
@@ -344,7 +371,7 @@ def test_as_list_отдаёт_ровно_три_нужных_ключа_на_з�
     """Протокол MCP `tools/list` ждёт camelCase `inputSchema` — лишний ключ
     или `input_schema` вместо него не разберёт клиент на другой стороне."""
     перечень = as_list()
-    assert len(перечень) == 43
+    assert len(перечень) == 52
     for запись in перечень:
         assert set(запись) == {"name", "description", "inputSchema"}
 

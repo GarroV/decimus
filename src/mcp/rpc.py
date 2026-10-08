@@ -29,6 +29,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from .catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
+    KIND_IMPORT,
     KIND_RATINGS,
     KIND_RETRACTION,
     ToolSpec,
@@ -197,6 +198,14 @@ RETRACTION_CLOSED = (
 #: партнёра вместо названного молча — подменить чек-лист без единого слова об
 #: этом. Отказ называет причину, а не просто «аргумент обязателен»: спросивший
 #: не пропустил параметр, он забыл, что на этой двери он больше не опционален.
+IMPORT_CLOSED = (
+    "Загрузка исторических проверок для этого доступа не открыта. Она открывается "
+    "пространству переменной MCP_IMPORT_TENANTS и требует хранилища версий методики "
+    "(MCP_CHECKLIST_STORE): оценку загруженной проверки считает движок по её версии. "
+    "Проверки при этом читаются как обычно"
+)
+
+
 NAME_THE_CHECKLIST = (
     "Назовите чек-лист аргументом checklist: правка без кода в пространстве партнёра не "
     "наводится ни на какой чек-лист, перечень отдаёт checklists"
@@ -302,6 +311,8 @@ def _call_tool(
     checklist: Store | None,
     source: Store | None,
     may_retract: bool,
+    imports: Store | None = None,
+    actor: str = "",
 ) -> dict[str, Any] | str:
     """Вызов инструмента. Строка в ответе — отказ протокола, словарь — результат.
 
@@ -332,6 +343,8 @@ def _call_tool(
         return _tool_text(RATINGS_CLOSED, failed=True)
     if spec.kind == KIND_RETRACTION and not may_retract:
         return _tool_text(RETRACTION_CLOSED, failed=True)
+    if spec.kind == KIND_IMPORT and (imports is None or not actor):
+        return _tool_text(IMPORT_CLOSED, failed=True)
     refusal = _check_arguments(spec, arguments)
     if refusal is not None:
         return refusal
@@ -361,6 +374,11 @@ def _call_tool(
         прочее: dict[str, Any] = (
             {} if база is None else {"store": _aimed(spec, база, tenant=tenant, код=код)}
         )
+        if spec.kind == KIND_IMPORT:
+            # Хранилище версий — для поиска версии методики черновика (D307),
+            # подпись — для подтверждения (D308). Обе приходят от транспорта,
+            # из токена, а не от собеседника.
+            прочее = {"store": imports, "actor": actor}
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
         return _tool_text(str(отказ), failed=True)
@@ -395,6 +413,11 @@ def _call_tool(
                 "чтение эталона",
                 "Это отказ чтения, а не пустая методика",
             ),
+            KIND_IMPORT: (
+                "загрузку проверки",
+                "Это отказ базы, движка или хранилища, а не отказ в загрузке; черновик "
+                "виден import_get_inspection",
+            ),
             KIND_RATINGS: (
                 "загрузку рейтингов",
                 "Это отказ базы, а не отказ в загрузке; повтор безопасен: тот же файл "
@@ -420,6 +443,8 @@ def handle(
     checklist: Store | None = None,
     source: Store | None = None,
     may_retract: bool = False,
+    imports: Store | None = None,
+    actor: str = "",
 ) -> dict[str, Any] | None:
     """Разобранное сообщение JSON-RPC → ответ. `None` — уведомление, ответа нет.
 
@@ -471,6 +496,8 @@ def handle(
             checklist=checklist,
             source=source,
             may_retract=may_retract,
+            imports=imports,
+            actor=actor,
         )
         if isinstance(outcome, str):
             return _error(request_id, CODE_INVALID_PARAMS, outcome)

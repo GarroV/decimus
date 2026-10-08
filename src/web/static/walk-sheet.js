@@ -1,24 +1,17 @@
 /* Мини-апп обхода: форма записи (D312) — нарушение, рекомендация, замер, правка.
+ * Как устроена и почему — docs/13-walk-mini-app.md, раздел о форме записи.
  *
- * Вид записи переключается сверху: «Нарушение · Рекомендация». Рекомендация
- * (D201, класс R) — «что сделать» у пункта без нарушения: без вычета и срока,
- * кадр по желанию, текст обязателен. Общая заметка (D314) — рекомендация с
- * кодом NOTE, без пункта: в отчёте — разделом «Заметки проверяющего». Замер
- * открывается со строки остановки «Печь и холодильники» (D315).
+ * Нарушение (D330): кадр и пара слов → «Найти пункт» → система (та же, что у
+ * бота, `/tg/walk/suggest`) предлагает карточки, верхняя выбрана → человек
+ * проверяет и жмёт «Сохранить». Ручной поиск — запасной путь из меню. Зона и
+ * вид записи — строкой над формой, выбор — меню снизу (`walk-menu.js`).
+ * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
+ * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
- * Одна форма на три случая, сверху вниз в том порядке, в каком аудитор
- * действует на точке: снял → где → что нарушено → насколько → что видно →
- * рекомендация. Шагов-экранов нет: всё видно сразу, и вернуться к фото после
- * выбора пункта — это прокрутка, а не «Назад, назад».
- *
- * Правила методики форма подсказывает, а не решает:
- * - без фото «Сохранить» не нажимается (D078);
- * - классы — только допустимые для пункта; один допустимый ставится сам;
- * - пункт, уже записанный в этой зоне, — не вторая запись, а новые фото к той
- *   (уникальность пары «пункт + зона»);
- * - повтор предлагается, только если в прошлый раз здесь было это же, и
- *   ставится нажатием человека (D191);
- * - окончательно всё проверяет движок, и его отказ показывается его словами.
+ * Правила методики форма подсказывает, а не решает: без фото не сохранить
+ * (D078), классы — только допустимые для пункта, пункт, уже записанный в этой
+ * зоне, — новые фото к той записи, повтор ставит человек (D191); окончательно
+ * проверяет движок, и его отказ показывается его словами.
  *
  * Поля ввода не перерисовываются на каждый знак — иначе на телефоне слетает
  * клавиатура. Перерисовываются только секции, которые от выбора зависят.
@@ -90,12 +83,12 @@
     return !!(it && f.zone && it.zones.length && it.zones.indexOf(f.zone) === -1);
   }
 
-  function choices() {
-    var q = (f.query || "").trim().toLowerCase();
+  function choices(query) {
+    var q = (query || "").trim().toLowerCase();
     var list = W.state.data.items.filter(function (i) {
       if (i.measure !== isMeasure()) return false;
       if (q) return (i.q + " " + i.code + " " + i.process).toLowerCase().indexOf(q) !== -1;
-      return f.showAll || !f.zone || !i.zones.length || i.zones.indexOf(f.zone) !== -1;
+      return !f.zone || !i.zones.length || i.zones.indexOf(f.zone) !== -1;
     });
     var before = list.filter(function (i) { return previousHere(i.code); });
     return before.concat(list.filter(function (i) { return !previousHere(i.code); }));
@@ -104,6 +97,16 @@
   function uploading() { return f.photos.some(function (p) { return p.state === "uploading"; }); }
 
   function readyPhotos() { return f.photos.filter(function (p) { return p.state === "done"; }); }
+
+  /** Новое нарушение без выбранного пункта: пункт ищет система (D330). */
+  function recognizing() { return !f.n && f.mode === "violation"; }
+
+  /** Что мешает спросить систему: без кадра нарушение не разбирается (D078). */
+  function findBlocker() {
+    if (!readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
+    if (uploading()) return "walk.sheet.need_upload";
+    return null;
+  }
 
   function blocker() {
     // Рекомендации кадр не обязателен: «крышка открывается туго» не снять.
@@ -117,7 +120,9 @@
   }
 
   function dirty() {
-    if (!f.n) return !!(f.photos.length || f.code || f.text || f.comment);
+    // Пункт, подставленный чек-листом или «Не исправлено», — не ввод человека:
+    // «Назад» без единого действия не спрашивает «выбросить?».
+    if (!f.n) return !!(f.photos.length || f.text || f.comment || f.words) || f.code !== f.preset;
     var o = f.original;
     return f.text !== o.text || f.comment !== o.comment || f.level !== o.level ||
       f.zone !== o.zone || f.code !== o.code || f.repeat !== o.repeat ||
@@ -128,7 +133,7 @@
     if (f.n) return;
     W.local.set(draftKey(), {
       mode: f.mode, zone: f.zone, code: f.code, level: f.level, text: f.text,
-      comment: f.comment, repeat: f.repeat,
+      comment: f.comment, repeat: f.repeat, words: f.words,
       photos: readyPhotos().map(function (p) { return p.ref; }),
     });
   }
@@ -148,7 +153,7 @@
       f.photos.push(p);
       send(p, file);
     });
-    redraw("photos", "footer");
+    redraw("photos", "item", "footer");
   }
 
   function send(p, file) {
@@ -163,13 +168,13 @@
       p.state = "done";
       W.photo.remember(ref, p.url);
       changed();
-      redraw("photos", "footer");
+      redraw("photos", "item", "footer");
     }, function (err) {
       if (!f || f.photos.indexOf(p) === -1) return;
       p.state = "failed";
       p.error = err && err.message;
       p.file = file;
-      redraw("photos", "footer");
+      redraw("photos", "item", "footer");
     });
   }
 
@@ -182,7 +187,7 @@
     if (!p.fresh && p.ref) f.removed.push(p.ref);
     f.photos = left;
     changed();
-    redraw("photos", "footer");
+    redraw("photos", "item", "footer");
   }
 
   /* ── секции ───────────────────────────────────────────────────────── */
@@ -209,6 +214,7 @@
       if (chosen && chosen.levels.length === 1) f.level = chosen.levels[0];
     }
     f.repeat = false;
+    f.picked = null;
     W.haptic();
     changed();
     node.querySelector(".walk-sheet__title").textContent = titleText();
@@ -221,103 +227,193 @@
     return isAdvice() ? tx("walk.sheet.new_advice") : tx("walk.sheet.new");
   }
 
+  /* ── выбор из меню ─────────────────────────────────────────────────── */
+
+  function zoneMenu() {
+    W.menu.open({
+      title: tx("walk.sheet.zone"),
+      options: W.state.data.zones.filter(function (z) { return !z.equipment; }).map(function (z) {
+        return { label: z.title, value: z.code, on: z.code === f.zone };
+      }),
+      onPick: function (code) {
+        f.zone = code;
+        changed();
+        redraw.apply(null, ORDER.concat(["footer"]));
+      },
+    });
+  }
+
+  function kindMenu() {
+    W.menu.open({
+      title: tx("walk.sheet.kind"),
+      options: KINDS.map(function (pair) {
+        return { label: tx(pair[1]), hint: tx(pair[1] + "_hint"), value: pair[0], on: f.mode === pair[0] };
+      }),
+      onPick: setMode,
+    });
+  }
+
+  /** Пункт вручную — запасной путь, когда система не нашла нужного. */
+  function itemMenu() {
+    var lead = isAdvice() ? [{ label: tx("walk.note.item"), hint: tx("walk.note.hint"), value: NOTE_CODE, lead: true }] : [];
+    W.menu.search({
+      title: isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"),
+      placeholder: isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search"),
+      lead: lead,
+      list: function (q) {
+        return choices(q).map(function (i) {
+          return { code: i.code, label: i.q, value: i.code, on: i.code === f.code, badge: previousHere(i.code) ? tx("walk.sheet.was_here") : null };
+        });
+      },
+      onPick: function (code) { pick(code, null); },
+    });
+  }
+
+  /**
+   * Выбрать пункт — предложенный системой (`cand`) или вручную.
+   * Класс и формулировку предложения форма берёт как черновик: поправить их
+   * можно ниже, а записывается всё только по «Сохранить».
+   */
+  function pick(code, cand) {
+    var i = item(code);
+    if (!i) return;
+    f.code = code;
+    f.picked = cand ? cand : null;
+    if (cand && cand.zone && zoneOf(cand.zone) && !zoneOf(cand.zone).equipment) f.zone = cand.zone;
+    if (i.measure) f.level = "D0";
+    else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
+    else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
+    else if (i.levels.length === 1) f.level = i.levels[0];
+    else if (i.levels.indexOf(f.level) === -1) f.level = null;
+    var before = previousHere(code);
+    if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+    if (cand && cand.wording && (!f.text.trim() || f.textAuto)) { f.text = cand.wording; f.textAuto = true; }
+    W.haptic();
+    changed();
+    redraw.apply(null, ORDER.concat(["footer"]));
+  }
+
+  /* ── система ищет пункт (D330) ─────────────────────────────────────── */
+
+  function find() {
+    if (findBlocker() || f.finding) return;
+    f.finding = true;
+    f.findError = null;
+    redraw("item", "footer");
+    var asked = { words: f.words.trim(), photos: readyPhotos().map(function (p) { return p.ref; }) };
+    W.post(W.urls.suggest, { zone: f.zone, words: asked.words, photos: asked.photos }).then(function (res) {
+      if (!f) return;
+      if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
+      f.finding = false;
+      f.found = (res.body && res.body.candidates) || [];
+      f.question = (res.body && res.body.question) || "";
+      f.via = (res.body && res.body.via) || "model";
+      f.asked = JSON.stringify(asked);
+      if (f.found.length) pick(f.found[0].code, f.found[0]);
+      else { redraw("item", "footer"); }
+    }).catch(function (err) {
+      if (!f) return;
+      f.finding = false;
+      f.findError = err && err.message && err.message !== "Failed to fetch" ? err.message : tx("walk.err.network");
+      redraw("item", "footer");
+    });
+  }
+
+  /** Слова или кадры поменялись после поиска — предложения могли устареть. */
+  function stale() {
+    if (!f.found) return false;
+    return f.asked !== JSON.stringify({ words: f.words.trim(), photos: readyPhotos().map(function (p) { return p.ref; }) });
+  }
+
+  function proposal(cand) {
+    var i = item(cand.code) || { q: cand.code };
+    var on = f.code === cand.code && (!f.picked || f.picked === cand);
+    var b = W.button("walk-found__card" + (on ? " is-on" : ""), null, function () { pick(cand.code, cand); });
+    b.setAttribute("aria-pressed", on ? "true" : "false");
+    var top = el("span", "walk-found__top");
+    top.appendChild(el("span", "walk-option__code", cand.code));
+    if (cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
+    var z = zoneOf(cand.zone);
+    if (z && cand.zone !== f.zone) top.appendChild(el("span", "walk-found__zone", z.title));
+    b.appendChild(top);
+    b.appendChild(el("span", "walk-found__q", i.q));
+    return b;
+  }
+
+  /* ── секции ───────────────────────────────────────────────────────── */
+
   var draw = {
-    kind: function () {
-      if (f.n) return null;
-      if (isMeasure()) return section(null, tx("walk.sheet.measure_hint"));
-      var seg = el("div", "walk-seg walk-seg--kind");
-      KINDS.forEach(function (pair) {
-        var on = f.mode === pair[0];
-        var b = W.button("walk-seg__opt" + (on ? " is-on" : ""), tx(pair[1]), function () { setMode(pair[0]); });
-        b.setAttribute("aria-pressed", on ? "true" : "false");
-        seg.appendChild(b);
-      });
-      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : null);
-      box.insertBefore(seg, box.firstChild);
+    context: function () {
+      var row = el("div", "walk-ctx");
+      if (!f.n && !isMeasure()) {
+        var kind = KINDS.filter(function (pair) { return pair[0] === f.mode; })[0];
+        row.appendChild(W.button("walk-ctx__pill", tx(kind[1]), kindMenu));
+      }
+      var z = zoneOf(f.zone);
+      var zb = W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
+        (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu);
+      zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
+      row.appendChild(zb);
+      var box = el("div", "walk-ctx__box");
+      box.appendChild(row);
+      if (isMeasure() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.measure_hint")));
+      if (isAdvice() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.advice_hint")));
+      if (unusual()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.unusual")));
       return box;
     },
 
     photos: function () {
       var hint = f.photos.length ? null : isAdvice() ? tx("walk.sheet.photos_optional")
-        : isMeasure() ? tx("walk.sheet.photos_measure") : tx("walk.sheet.photos_hint");
-      var box = section(tx("walk.sheet.photos"), hint);
-      if (f.photos.length) {
-        var strip = el("div", "walk-strip");
-        f.photos.forEach(function (p) {
-          var cell = el("div", "walk-strip__cell is-" + (p.state || "done"));
-          cell.appendChild(W.photo.thumb(p));
-          if (p.state === "uploading") cell.appendChild(el("span", "walk-strip__state", tx("walk.photo.uploading")));
-          if (p.state === "failed") {
-            cell.appendChild(W.button("walk-strip__retry", tx("walk.photo.failed"), function () {
-              send(p, p.file);
-              redraw("photos", "footer");
-            }));
-          }
-          var x = W.button("walk-strip__remove", "✕", function () { removePhoto(p); });
-          x.setAttribute("aria-label", tx("walk.photo.remove"));
-          cell.appendChild(x);
-          strip.appendChild(cell);
-        });
-        box.appendChild(strip);
-      }
-      var row = el("div", "walk-pickrow");
-      row.appendChild(W.photo.picker(tx("walk.photo.camera"), true, addFiles));
-      row.appendChild(W.photo.picker(tx("walk.photo.gallery"), false, addFiles));
-      box.appendChild(row);
+        : isMeasure() ? tx("walk.sheet.photos_measure") : null;
+      var box = section(f.photos.length || !recognizing() ? tx("walk.sheet.photos") : null, hint);
+      var hero = !f.photos.length && recognizing();
+      box.appendChild(W.photo.block(f.photos, {
+        hero: hero,
+        onFiles: addFiles,
+        onRetry: function (p) { send(p, p.file); redraw("photos", "item", "footer"); },
+        onRemove: removePhoto,
+      }));
       return box;
     },
 
-    zone: function () {
-      var box = section(tx("walk.sheet.zone"));
-      var chips = el("div", "walk-chips");
-      W.state.data.zones.filter(function (z) { return !z.equipment; }).forEach(function (z) {
-        var on = z.code === f.zone;
-        var chip = W.button("walk-chip" + (on ? " is-on" : ""), z.title, function () {
-          f.zone = z.code;
-          changed();
-          redraw("zone", "item", "level", "repeat", "footer");
-        });
-        chip.setAttribute("aria-pressed", on ? "true" : "false");
-        chips.appendChild(chip);
+    words: function () {
+      if (!recognizing()) return null;
+      var box = section(tx("walk.sheet.words"));
+      var area = el("textarea", "walk-area walk-area--words");
+      area.rows = 2;
+      area.maxLength = 1000;
+      area.placeholder = tx("walk.sheet.words_hint");
+      area.value = f.words;
+      area.addEventListener("input", function () {
+        var was = stale();
+        f.words = area.value;
+        changed();
+        if (was !== stale()) redraw("item", "footer");
       });
-      box.appendChild(chips);
-      if (unusual()) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.unusual")));
+      box.appendChild(area);
       return box;
     },
 
     item: function () {
+      if (recognizing()) return found();
       var box = section(isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"));
       var chosen = item(f.code);
-      if (chosen && !f.picking) {
-        var card = el("div", "walk-choice");
-        var line = el("div", "walk-choice__line");
-        if (!chosen.note) line.appendChild(el("span", "walk-choice__code", chosen.code));
-        line.appendChild(el("span", "walk-choice__text", chosen.q));
-        card.appendChild(line);
-        if (chosen.note) card.appendChild(el("p", "walk-form__hint", tx("walk.note.hint")));
-        card.appendChild(W.button("walk-link", tx("walk.sheet.change"), function () {
-          f.picking = true;
-          redraw("item");
-          var input = node.querySelector(".walk-search");
-          if (input) input.focus();
-        }));
-        box.appendChild(card);
-        var t = taken();
-        if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
-        var v = isAdvice() && !f.n ? violationHere() : null;
-        if (v) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.advice_has_violation", { n: v.n })));
+      if (!chosen) {
+        box.appendChild(W.button("walk-btn walk-btn--pick", tx("walk.sheet.pick_item"), itemMenu));
         return box;
       }
-      var input = el("input", "walk-search");
-      input.type = "search";
-      input.placeholder = isMeasure() ? tx("walk.sheet.search_measure") : tx("walk.sheet.search");
-      input.value = f.query || "";
-      input.setAttribute("enterkeyhint", "search");
-      var list = el("ul", "walk-options");
-      input.addEventListener("input", function () { f.query = input.value; fillOptions(list); });
-      box.appendChild(input);
-      box.appendChild(list);
-      fillOptions(list);
+      var card = el("div", "walk-choice");
+      var line = el("div", "walk-choice__line");
+      if (!chosen.note) line.appendChild(el("span", "walk-choice__code", chosen.code));
+      line.appendChild(el("span", "walk-choice__text", chosen.q));
+      card.appendChild(line);
+      if (chosen.note) card.appendChild(el("p", "walk-form__hint", tx("walk.note.hint")));
+      card.appendChild(W.button("walk-link", tx("walk.sheet.change"), itemMenu));
+      box.appendChild(card);
+      var t = taken();
+      if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+      var v = isAdvice() && !f.n ? violationHere() : null;
+      if (v) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.advice_has_violation", { n: v.n })));
       return box;
     },
 
@@ -346,7 +442,7 @@
     },
 
     text: function () {
-      if (taken()) return null;
+      if (taken() || (recognizing() && !f.code)) return null;
       var label = isMeasure() ? "walk.sheet.text_measure" : isAdvice() ? "walk.sheet.text_advice" : "walk.sheet.text";
       var box = section(tx(label));
       var area = el("textarea", "walk-area");
@@ -357,6 +453,7 @@
       area.addEventListener("input", function () {
         var was = !!f.text.trim();
         f.text = area.value;
+        f.textAuto = false;
         changed();
         // У рекомендации текст обязателен: кнопка оживает с первым словом.
         if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
@@ -366,7 +463,7 @@
     },
 
     comment: function () {
-      if (taken() || isMeasure() || isAdvice()) return null;
+      if (taken() || isMeasure() || isAdvice() || (recognizing() && !f.code)) return null;
       var box = section(f.commentOpen ? tx("walk.sheet.comment") : null);
       if (!f.commentOpen) {
         box.appendChild(W.button("walk-link walk-link--add", tx("walk.sheet.comment_add"), function () {
@@ -449,6 +546,14 @@
         return box;
       }
       if (f.error) box.appendChild(el("p", "walk-form__error", f.error));
+      if (recognizing() && !f.code) {
+        var blocked = findBlocker();
+        var go = W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find);
+        go.disabled = !!blocked || !!f.finding;
+        box.appendChild(go);
+        if (blocked) box.appendChild(el("p", "walk-sheet__why", tx(blocked)));
+        return box;
+      }
       var why = blocker();
       var label = f.saving ? tx("walk.sheet.saving") : taken() ? tx("walk.sheet.add_photos") : tx("walk.sheet.save");
       var save = W.button("walk-mark", label, save_);
@@ -459,62 +564,36 @@
     },
   };
 
-  function fillOptions(list) {
-    list.textContent = "";
-    var options = choices();
-    if (!options.length) {
-      list.appendChild(el("li", "walk-options__empty", tx("walk.sheet.search_empty")));
+  /** Что нашла система: карточки предложений, выбранное — сверху. */
+  function found() {
+    var box = section(f.found || f.finding || f.code ? tx("walk.sheet.found") : null);
+    if (f.finding) {
+      box.appendChild(el("p", "walk-found__wait", tx("walk.sheet.finding")));
+      return box;
     }
-    if (isAdvice() && !f.query) {
-      var noteLi = el("li");
-      var nb = W.button("walk-option walk-option--note", null, function () {
-        f.code = NOTE_CODE;
-        f.level = ADVICE_LEVEL;
-        f.picking = false;
-        W.haptic();
-        changed();
-        redraw("item", "footer");
-      });
-      nb.appendChild(el("span", "walk-option__text", tx("walk.note.item")));
-      nb.appendChild(el("span", "walk-option__hint", tx("walk.note.hint")));
-      noteLi.appendChild(nb);
-      list.appendChild(noteLi);
+    if (f.findError) box.appendChild(el("p", "walk-form__error", f.findError));
+    var list = el("div", "walk-found");
+    (f.found || []).forEach(function (cand) { list.appendChild(proposal(cand)); });
+    var manual = item(f.code);
+    var fromList = (f.found || []).some(function (c) { return c.code === f.code; });
+    if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone }));
+    if (list.childNodes.length) box.appendChild(list);
+    if (f.found && !f.found.length) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
+    if (f.question) box.appendChild(el("p", "walk-form__note walk-form__note--info", f.question));
+    if (stale()) {
+      var again = el("p", "walk-form__note walk-form__note--info");
+      again.appendChild(document.createTextNode(tx("walk.sheet.found_stale") + " "));
+      again.appendChild(W.button("walk-link", tx("walk.sheet.find_again"), find));
+      box.appendChild(again);
     }
-    options.slice(0, 60).forEach(function (i) {
-      var li = el("li");
-      var b = W.button("walk-option", null, function () {
-        f.code = i.code;
-        f.picking = false;
-        f.query = "";
-        if (i.measure) f.level = "D0";
-        else if (isAdvice()) f.level = ADVICE_LEVEL;
-        else if (i.levels.length === 1) f.level = i.levels[0];
-        else if (i.levels.indexOf(f.level) === -1) f.level = null;
-        var before = previousHere(i.code);
-        if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
-        W.haptic();
-        changed();
-        redraw("item", "level", "text", "comment", "repeat", "footer");
-      });
-      var top = el("span", "walk-option__top");
-      top.appendChild(el("span", "walk-option__code", i.code));
-      if (previousHere(i.code)) top.appendChild(el("span", "walk-option__was", tx("walk.sheet.was_here")));
-      b.appendChild(top);
-      b.appendChild(el("span", "walk-option__text", i.q));
-      li.appendChild(b);
-      list.appendChild(li);
-    });
-    if (!f.showAll && !f.query && f.zone) {
-      var li = el("li");
-      li.appendChild(W.button("walk-link", tx("walk.sheet.show_all"), function () {
-        f.showAll = true;
-        fillOptions(list);
-      }));
-      list.appendChild(li);
-    }
+    if (!f.found && !f.code) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.find_hint")));
+    box.appendChild(W.button("walk-link", tx("walk.sheet.pick_manual"), itemMenu));
+    var t = taken();
+    if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+    return box;
   }
 
-  var ORDER = ["kind", "photos", "zone", "item", "level", "text", "comment", "repeat", "danger"];
+  var ORDER = ["context", "photos", "words", "item", "level", "text", "comment", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
@@ -529,6 +608,17 @@
 
   /* ── сохранение ───────────────────────────────────────────────────── */
 
+  /**
+   * Что предложила система до решения человека (T164, D077): первая карточка,
+   * как у бота, — по ней считается, что аудитор поправил. Пункт вручную без
+   * поиска — предложения не было вовсе.
+   */
+  function suggested() {
+    if (!f.found || !f.found.length || stale()) return null;
+    var top = f.found[0];
+    return { code: top.code, level: top.level, zone: top.zone, confidence: top.confidence, via: f.via };
+  }
+
   function ops() {
     var refs = readyPhotos().filter(function (p) { return p.fresh; }).map(function (p) { return p.ref; });
     var t = taken();
@@ -538,6 +628,7 @@
         op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: readyPhotos().map(function (p) { return p.ref; }),
+        words: f.words.trim(), suggested: suggested(),
       }];
     }
     var o = f.original;
@@ -601,6 +692,7 @@
       return;
     }
     f = null;
+    if (W.menu) W.menu.close();
     if (node) node.remove();
     node = null;
     document.documentElement.classList.remove("has-sheet");
@@ -632,8 +724,9 @@
       repeat: !!opts.repeat,
       photos: [],
       removed: [],
-      query: "",
-      picking: false,
+      words: "",
+      found: null,
+      preset: opts.code || null,
     };
     if (rec) {
       f.mode = rec.level === "D0" ? "measure" : rec.level === ADVICE_LEVEL ? "advice" : "violation";
@@ -647,12 +740,13 @@
       f.original = { code: rec.code, level: rec.level, zone: opts.zone, text: rec.text, comment: rec.comment || "", repeat: !!rec.repeat };
     } else {
       var draft = W.local.get(draftKey());
-      if (draft && !opts.code && draft.mode === f.mode && (draft.code || (draft.photos || []).length)) {
+      if (draft && !opts.code && draft.mode === f.mode && (draft.code || draft.words || (draft.photos || []).length)) {
         f.zone = draft.zone || f.zone;
         f.code = draft.code;
         f.level = draft.level;
         f.text = draft.text || "";
         f.comment = draft.comment || "";
+        f.words = draft.words || "";
         f.commentOpen = !!draft.comment;
         f.repeat = !!draft.repeat;
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
@@ -667,10 +761,11 @@
     node.setAttribute("role", "dialog");
     node.setAttribute("aria-modal", "true");
     var head = el("header", "walk-sheet__head");
+    // «Назад» видна всегда, а не только кнопкой Telegram в его шапке: в
+    // браузере её нет вовсе, а в Telegram её не все замечают.
+    var back = W.button("walk-sheet__back", "‹ " + tx("walk.sheet.back"), function () { close(false); });
+    head.appendChild(back);
     head.appendChild(el("h2", "walk-sheet__title", titleText()));
-    var x = W.button("walk-sheet__close", "✕", function () { close(false); });
-    x.setAttribute("aria-label", tx("walk.sheet.close"));
-    head.appendChild(x);
     node.appendChild(head);
     var body = el("div", "walk-sheet__body");
     if (f.restored) body.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.restored")));
