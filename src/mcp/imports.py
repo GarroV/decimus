@@ -71,14 +71,24 @@ ACCEPT_NOT_CONNECTED = (
 #: отказал бы ещё до разбора, и отказ назвал бы тело, а не кадр.
 MAX_PHOTO_BYTES = 700_000
 
+#: Предел СТРОКИ base64 — проверяется до всякой обработки строки (разбора,
+#: чистки переносов): ровно столько знаков даёт кадр в MAX_PHOTO_BYTES, плюс
+#: запас на переносы строк каждые 76 знаков (MIME) и выравнивание.
+_B64_LINE = 76
+MAX_PHOTO_B64_CHARS = (MAX_PHOTO_BYTES + 2) // 3 * 4
+MAX_PHOTO_B64_RAW = MAX_PHOTO_B64_CHARS + 2 * (MAX_PHOTO_B64_CHARS // _B64_LINE + 1)
+
 #: Форматы кадров. Сжатую копию снимает `db.previews.make_preview`; формат,
 #: которого она не прочтёт, отклоняется ещё до хранилища.
 PHOTO_MIMES = frozenset({"image/jpeg", "image/png", "image/webp"})
 
 #: Пределы полей шапки и записи. Формулировка печатается в отчёте строкой —
-#: тот же порог, что у правки на приёмке (`web/revision.MAX_TEXT`).
+#: тот же порог, что у правки на приёмке (`web/revision.MAX_TEXT`). Слой базы
+#: держит те же пределы сам (`db/imports.MAX_WORDING` и соседи): здесь они
+#: повторены, чтобы отказ звучал до похода в базу, а модуль не тянул psycopg.
 MAX_TEXT = 1000
 MAX_AUDITOR = 200
+MAX_UNIT = 200
 MAX_SOURCE_REF = 1000
 MAX_GRADE = 8
 
@@ -144,11 +154,13 @@ def _text(value: str | None, *, field: str, limit: int, required: bool = False) 
         if required:
             raise ToolError(f"Не назван {field}")
         return None
+    # Длина — по сырой строке, до чистки: предел обязан срабатывать раньше
+    # любой работы над строкой, а пробелы по краям нужны только опечатке.
+    if len(value) > limit:
+        raise ToolError(f"Аргумент {field} длиннее {limit} знаков")
     чистое = value.strip()
     if required and not чистое:
         raise ToolError(f"Аргумент {field} пуст")
-    if len(чистое) > limit:
-        raise ToolError(f"Аргумент {field} длиннее {limit} знаков")
     return чистое
 
 
@@ -243,7 +255,7 @@ def import_create_inspection(
             f"Дата {день.isoformat()} в будущем. Загружаются прошедшие проверки — дата обхода "
             f"из старого отчёта"
         )
-    точка = _required(unit, field="unit", limit=MAX_SOURCE_REF)
+    точка = _required(unit, field="unit", limit=MAX_UNIT)
     аудитор = _required(auditor, field="auditor", limit=MAX_AUDITOR)
     if kind not in INSPECTION_KINDS:
         raise ToolError(f"Вид проверки kind — один из: {', '.join(INSPECTION_KINDS)}")
@@ -575,8 +587,12 @@ def import_add_photo(
     номер = _check_n(n)
     if mime.strip().lower() not in PHOTO_MIMES:
         raise ToolError(f"Формат кадра mime — один из: {', '.join(sorted(PHOTO_MIMES))}")
+    # Предел — по длине строки ДО всякой работы над ней: ни чистка переносов,
+    # ни разбор base64 не начинаются над строкой сверх предела.
+    if len(image_base64) > MAX_PHOTO_B64_RAW:
+        raise ToolError(_too_big())
     сырое = "".join(image_base64.split())
-    if len(сырое) > (MAX_PHOTO_BYTES * 4) // 3 + 4:
+    if len(сырое) > MAX_PHOTO_B64_CHARS:
         raise ToolError(_too_big())
     try:
         байты = base64.b64decode(сырое, validate=True)
