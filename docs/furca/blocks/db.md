@@ -178,7 +178,12 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 
 - `0039_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
 - `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
-- Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
+- Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`; для API — `periods_between`, `checkup_counts`, `period_violations`), `RatingsError` — в `src/db/errors.py`.
+
+### Токены API (миграция `0041`, #567, D336)
+
+- `0041_api_tokens.sql` — таблица `api_tokens`: потребитель, права `scopes` (CHECK: только `ratings:read`, `inspections:read`), отпечаток SHA-256 (CHECK 64 hex, сырой токен не ложится), `issued_by/at`, отзыв пометкой `revoked_at/by` (оба или ни одного), `last_used_at`. Роль приложения: `select` колонок сверки и `update (last_used_at)` — выпускать, отзывать, менять права и отпечаток не может. Администратор истории (`dodo_audit_admin`): `select`, `insert (consumer, scopes, fingerprint, issued_by)`, `update (revoked_at, revoked_by)`. RLS: отозванная строка не правится никем (сужающая политика).
+- Двери: `src/db/api_tokens.py` (выпуск, список, отзыв — ролью `managing_dsn`; сверка `resolve` — ролью приложения), `src/db/api_inspections.py` (итоги проверок истории для `/api/v1/inspections`, вся сеть, без пересчёта). Команда — `tools/api_token.py` (`make api-token`). Продуктовое описание — `docs/16-api.md`.
 
 ## Зависимости
 
@@ -610,7 +615,10 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0013_phrase_alias_curation.sql` | правка карты синонимов: пометка снятия с обязательной причиной и след правки (куда строка вела раньше, зачем переправили), `select` и `update` шести колонок роли `dodo_audit_admin` — ключ карты, сказанное человеком и происхождение записи неприкосновенны; роли приложения права не расширены (T292) |
 | `src/db/migrations/0026_photo_previews.sql` | `photos.preview_path` — сжатая копия кадра для показа в админке (D219): пишется той же выгрузкой (`upload_photos`, `src/db/previews.py`), хранится навсегда, убирается только снятием проверки. С D250/D253 оригинал не хранится: выгрузка кладёт один сжатый объект (1600 px, JPEG q75), `storage_path` и `preview_path` указывают на него; нечитаемый Pillow кадр ложится как пришёл, `preview_path` у него пуст. Кадры до D253 — два объекта, оригиналы старой выгрузки остаются в хранилище, пока владелец не решит иначе |
 | `src/db/migrations/0038_inspection_import.sql` | происхождение проверки `origin` (`field`/`import`) и сверка со старым отчётом (`reported_pct`, `reported_grade`, `source_ref`); у загрузки `chat_id = 0`; триггер `inspections_origin_fixed` — происхождение не переписывается; частичный индекс черновиков загрузки (D305–D310) |
+| `src/db/migrations/0041_api_tokens.sql` | токены сервисов для API `/api/v1`: потребитель, права, отпечаток SHA-256, отзыв пометкой, последнее использование; роль приложения только сверяет (#567) |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
+| `src/db/api_tokens.py` | токены API `/api/v1`: выпуск, список и отзыв ролью повышенных полномочий, сверка предъявленного токена по отпечатку ролью приложения (#567) |
+| `src/db/api_inspections.py` | итоги проверок истории для `/api/v1/inspections`: `pct`/`grade` движка как есть, вся сеть, фильтр стран и дат (#567) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
 | `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
 | `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |

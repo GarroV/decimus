@@ -43,6 +43,10 @@
 
 Раздел `ratings` (`/ratings`) читают все. Подраздел «Загрузки» (`/ratings/imports`) и формы записи (`POST /ratings/import|countries|hard-rules|settings`, `…/hard-rules/<id>/delete`) закрыты заслоном `may_manage_ratings` (`src/domain/tenants.py`): контроль и админ УК, остальным 403. Маршруты — `src/web/ratings.py`, сводка — `src/ratings/report.py`, тексты — `src/web/texts_ratings.py`. Продуктовое описание — `docs/15-ratings.md`.
 
+### API чтения (`/api/v1`, #567, D336)
+
+Четыре маршрута только на чтение — `GET /api/v1/ratings/scores`, `/api/v1/ratings/checkups`, `/api/v1/ratings/violations` (право `ratings:read`) и `GET /api/v1/inspections` (право `inspections:read`); прочие адреса под `/api/v1` — JSON 404 после проверки токена. Регистрируются только при `API_ENABLED=1` (`src/web/config.py`). Маршруты стоят в `auth.OPEN_ENDPOINTS` (кука админки их не открывает и не нужна), закрыты своим заслоном `api._guard`: `Authorization: Bearer` → `src/db/api_tokens.resolve` → лимит частоты (`src/web/api_limits.py`) → право маршрута. Формы ответов рейтингов — `src/ratings/api_payload.py`, проверки — `src/db/api_inspections.py`. Журнал обращений — логгер `src.web.api`. Продуктовое описание и контракт — `docs/16-api.md`.
+
 ### Признак «построен / не построен»
 
 Единственный источник — **данные** (реестр разделов в коде блока), а не разметка
