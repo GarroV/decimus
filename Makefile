@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest cov image regress web web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: bootstrap check test test-honest cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -307,6 +307,14 @@ mcp:
 #   WEB_TENANT=<код тенанта> make web
 web:
 	$(VENV)/python -m src.web
+
+# Сервис мини-аппа обхода на хосте — пара к `make web` (docs/13-walk-mini-app.md).
+# Пишет в состояние проверок, админка только передаёт ему /tg/walk*:
+#
+#   make walk                                            # в одном окне
+#   WEB_WALK_UPSTREAM=http://127.0.0.1:8269 make web     # в другом
+walk:
+	WEB_PORT=$${WEB_WALK_PORT:-8269} $(VENV)/python -m src.web.walk_main
 
 # Тенант веб-стенда. Демо — потому, что `make web-up` поднимает стенд ДЛЯ
 # ПОКАЗА и разработки поверхности; свой тенант передаётся в командной строке

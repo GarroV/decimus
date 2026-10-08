@@ -255,6 +255,39 @@ def test_сданная_проверка_не_правится(клиент: К�
     assert экран.get_json()["sealed"] is True
 
 
+@pytest.mark.parametrize("путь", ["запись", "сведение"])
+def test_сдача_между_ранней_проверкой_и_записью_не_пропускает_запись(
+    клиент: Клиент, domain_env: Path, monkeypatch: pytest.MonkeyPatch, путь: str
+) -> None:
+    """Бот отдал отчёт ровно после ранней проверки: запись обязана получить отказ.
+
+    Ранняя проверка подменена так, что видит «не сдана», а сразу за ней
+    признак сдачи ложится на диск — как если бы бот успел в этот миг.
+    Решающая проверка под замком заметок обязана его увидеть.
+    """
+    ref = клиент.ссылка()
+    заметки = domain_env / f"chat_{АУДИТОР}" / NOTES_FILE_NAME
+    настоящая = walk_write.handed_over
+
+    def сдали_сразу_после(chat_id: int) -> bool:
+        было = настоящая(chat_id)
+        заметки.write_text(json.dumps({HANDED_OVER_KEY: 0}), encoding="utf-8")
+        return было
+
+    monkeypatch.setattr(walk_write, "handed_over", сдали_сразу_после)
+
+    if путь == "запись":
+        ответ = клиент.запись(**_нарушение(ref))
+    else:
+        ответ = клиент.сведение(code="INF06", value="что-то")
+
+    assert ответ.status_code == 409, ответ.get_json()
+    проверка = get_state(АУДИТОР)
+    assert проверка is not None
+    assert проверка.findings == [], "запись легла после сдачи — D080"
+    assert "INF06" not in проверка.info, "сведение легло после сдачи — D080"
+
+
 def test_без_проверки_записи_некуда(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
     клиент = Клиент(_приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client())

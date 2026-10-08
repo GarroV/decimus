@@ -83,4 +83,24 @@ if ! "${compose[@]}" exec -T web sh -c \
     exit 1
 fi
 echo "админка видит хранилище версий"
+# Мини-апп обхода пишет в идущие проверки своим сервисом `walk`, админка их
+# только читает (docs/08-deploy.md, §8.14). Проверяется пробной записью, а не
+# `test -w`, по той же причине, что выше. Страница обхода — через админку: она
+# передаёт `/tg/walk*` сервису, и 200 значит, что дошло до него.
+step "мини-апп обхода"
+if "${compose[@]}" exec -T web sh -c 'touch /app/state/.walk-probe 2>/dev/null'; then
+    "${compose[@]}" exec -T web sh -c 'rm -f /app/state/.walk-probe'
+    echo "админка пишет в состояние проверок — у сервиса web том state обязан быть :ro" >&2
+    exit 1
+fi
+if ! "${compose[@]}" exec -T walk sh -c 'touch /app/state/.walk-probe && rm -f /app/state/.walk-probe'; then
+    echo "сервис обхода не пишет в состояние проверок — см. docker-compose.yml, сервис walk" >&2
+    exit 1
+fi
+walk_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$web_port/tg/walk")
+echo "обход /tg/walk через админку: $walk_code (ждём 200)"
+if [ "$walk_code" != "200" ]; then
+    echo "смоук обхода: провал — смотреть '${compose[*]} logs web walk'" >&2
+    exit 1
+fi
 echo "готово: $sha"
