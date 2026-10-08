@@ -263,6 +263,48 @@ cases = [
         "        return next(iter(exact))\n",
         "tests/test_ratings_matching.py::test_двусмысленность_нет",
     ),
+    (
+        "src/ratings/importer.py",
+        "        if prior is not None:\n",
+        "        if False:\n",
+        "tests/test_db_ratings_import.py::test_тот_же_файл_дубль_со_ссылкой",
+    ),
+    (
+        "src/db/ratings.py",
+        "\"where not (ratings.scores.source = 'snapshot' and excluded.source = 'sheet') \"",
+        '""',
+        "tests/test_db_ratings_import.py::test_снимок_главнее_листа",
+    ),
+    (
+        "src/db/ratings.py",
+        '"delete from ratings.violations where rating_type = %s and checkup_dodo_id = %s"',
+        '"select %s, %s"',
+        "tests/test_db_ratings_import.py::test_те_же_строки_другими_байтами_обновляются",
+    ),
+    (
+        "src/ratings/importer.py",
+        "        pool = [known for known in self.known if known.country is not None]\n",
+        "        pool = list(self.known)\n",
+        "tests/test_db_ratings_import.py::test_пиццерия_без_страны_не_цепляется_к_чужой_стране",
+    ),
+    (
+        "src/ratings/importer.py",
+        "        issues = _journal_issues(writer.issues)\n",
+        "        issues = [(max(i.row_no, 1), i.reason, i.detail) for i in writer.issues]\n",
+        "tests/test_db_ratings_import.py::test_несопоставленная_строка_листа_считается_строкой_а_не_баллами",
+    ),
+    (
+        "src/ratings/importer.py",
+        "    except psycopg.Error as exc:\n        reason = _db_reason(exc)\n",
+        "    except KeyError as exc:\n        reason = _db_reason(exc)\n",
+        "tests/test_db_ratings_import.py::test_отказ_базы_посреди_файла_не_оставляет_половины",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if (period.rating_type, period.begin_on) in slots:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_два_id_с_одним_типом_и_началом_у_одной_пиццерии_в_журнал",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
