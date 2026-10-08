@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import csv
 import io
+import json
 
 U1 = "aa000000000000000000000000000001"
 U2 = "aa000000000000000000000000000002"
@@ -19,6 +20,7 @@ C3 = "cc000000000000000000000000000003"
 C_RU = "cc0000000000000000000000000000ff"
 P_RKO = "dd000000000000000000000000000001"
 P_RS = "dd000000000000000000000000000002"
+P_RS_PREV = "dd000000000000000000000000000003"
 
 
 def kb(unit: str, kind: int, checkup: str, period: str) -> str:
@@ -294,3 +296,96 @@ def sheet_rko() -> bytes:
             ]
         ],
     )
+
+
+def snapshot_doc(**unit_override: object) -> dict[str, object]:
+    unit: dict[str, object] = {
+        "dodo_id": U1.upper(),
+        "name": "Testville-1",
+        "country_id": 12,
+        "history": [
+            {
+                "score": 97.5,
+                "status": "1",
+                "period": {
+                    "id": P_RS,
+                    "rating_type": 2,
+                    "begin": "2026-09-16T00:00:00",
+                    "end": "2026-09-30",
+                    "alias": "Сентябрь 2 часть 2026",
+                    "alias_en": "September part 2 2026",
+                },
+            },
+            {
+                "score": 91,
+                "status": "1",
+                "period": {
+                    "id": P_RKO,
+                    "rating_type": 1,
+                    "begin": "2026-09-29",
+                    "end": "2026-10-05",
+                    "alias": "29.09–05.10",
+                },
+            },
+            {
+                "score": None,
+                "status": "0",
+                "period": {
+                    "id": P_RS_PREV,
+                    "rating_type": 2,
+                    "begin": "2026-09-01",
+                    "end": "2026-09-15",
+                    "alias": "Сентябрь 1 часть 2026",
+                },
+            },
+        ],
+        "remarks": [
+            {
+                "period_id": P_RS,
+                "checkups": 4,
+                "items": [
+                    {
+                        "criterion_id": "17",
+                        "name": "Грязный пол",
+                        "parent": "D1",
+                        "deduction": -0.5,
+                        "auto": False,
+                        "amount": 2,
+                        "wow": False,
+                    },
+                    {
+                        "criterion_id": "99",
+                        "name": "Улыбка",
+                        "parent": "WOW",
+                        "deduction": 0,
+                        "auto": False,
+                        "amount": 1,
+                        "wow": True,
+                    },
+                ],
+            },
+            {
+                "period_id": P_RKO,
+                "checkups": 3,
+                "items": [{"criterion_id": "5", "name": "Белый борт", "amount": 1}],
+            },
+        ],
+    }
+    unit.update(unit_override)
+    return {
+        "version": 1,
+        "taken_at": "2026-10-08T10:00:00Z",
+        "chunk": {"index": 2, "of": 3},
+        "countries": [
+            {"id": 12, "name": "Serbia", "region": 2},
+            {"id": 1, "name": "Russia", "region": 1},
+        ],
+        "units": [
+            unit,
+            {"dodo_id": U_RU, "name": "Testgrad-1", "country_id": 1, "history": [], "remarks": []},
+        ],
+    }
+
+
+def snapshot(**unit_override: object) -> bytes:
+    return json.dumps(snapshot_doc(**unit_override), ensure_ascii=False).encode("utf-8")
