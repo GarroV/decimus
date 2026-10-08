@@ -399,14 +399,14 @@ cases = [
     ),
     (
         "src/ratings/summary.py",
-        "    top = sorted((u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name))\n",  # noqa: E501
-        "    top = sorted((u for u in scored if u.score >= threshold), key=lambda u: (-u.score, u.unit_name))\n",  # noqa: E501
+        "        (u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name, u.unit)\n",  # noqa: E501
+        "        (u for u in scored if u.score >= threshold), key=lambda u: (-u.score, u.unit_name, u.unit)\n",  # noqa: E501
         "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
     ),
     (
         "src/ratings/summary.py",
-        "        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name)\n",  # noqa: E501
-        "        (u for u in scored if u.score < threshold), key=lambda u: (u.score, u.unit_name)\n",  # noqa: E501
+        "        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name, u.unit)\n",  # noqa: E501
+        "        (u for u in scored if u.score < threshold), key=lambda u: (u.score, u.unit_name, u.unit)\n",  # noqa: E501
         "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
     ),
     (
@@ -423,8 +423,8 @@ cases = [
     ),
     (
         "src/ratings/summary.py",
-        "    return None if current is None or previous is None else current - previous\n",
-        "    return None if current is None or previous is None else previous - current\n",
+        "    return round(current - previous, DELTA_DIGITS) + 0.0  # + 0.0 убирает «-0.0»\n",
+        "    return previous - current\n",
         "tests/test_ratings_summary.py::test_дельта_к_прошлому_периоду",
     ),
     (
@@ -468,6 +468,42 @@ cases = [
         "    top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]\n",
         "    top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))\n",
         "tests/test_ratings_summary.py::test_топ5_и_на_одну_проверку",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    text = normalize_text(fact.text)\n",
+        "    text = fact.text.casefold()\n",
+        "tests/test_ratings_summary.py::test_хард_пометка_автодетекции_и_пробелы_не_мешают",
+    ),
+    (
+        "src/ratings/summary.py",
+        '    return re.search(r"(?<!\\w)" + re.escape(pattern), haystack, re.IGNORECASE) is not None\n',  # noqa: E501
+        "    return re.search(re.escape(pattern), haystack, re.IGNORECASE) is not None\n",
+        "tests/test_ratings_summary.py::test_contains_с_начала_слова",
+    ),
+    (
+        "src/ratings/summary.py",
+        "if where[unit] in countries\n",
+        "if True\n",
+        "tests/test_ratings_summary.py::test_страны_вне_списка_не_входят_в_группу",
+    ),
+    (
+        "src/ratings/summary.py",
+        "                fact.unit,\n                normalize_text(fact.text),\n",
+        "                normalize_text(fact.text),\n",
+        "tests/test_ratings_summary.py::test_хард_порядок_не_зависит_от_входа",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    return round(current - previous, DELTA_DIGITS) + 0.0  # + 0.0 убирает «-0.0»\n",
+        "    return current - previous\n",
+        "tests/test_ratings_summary.py::test_дельта_равных_средних_без_шума_и_минус_нуля",
+    ),
+    (
+        "src/ratings/summary.py",
+        "            key = normalize_text(fact.text)\n",
+        "            key = fact.text\n",
+        "tests/test_ratings_summary.py::test_нарушение_с_пометкой_и_без_одно_в_топе",
     ),
 ]
 

@@ -31,6 +31,9 @@ CATEGORY_VIOLATION = "violation"
 CATEGORY_OTHER = "other"
 CATEGORY_REMARK = "remark"
 
+# Хвостовая пометка автодетекции в тексте нарушения; нарушение то же, кто бы его ни нашёл.
+AUTO_MARKS = ("(ML)", "(ИИ)", "(AI)")
+
 ISSUE_UNIT_UNMATCHED = "unit_unmatched"
 ISSUE_COUNTRY_UNKNOWN = "country_unknown"
 ISSUE_BAD_ROW = "bad_row"

@@ -8,17 +8,33 @@
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from statistics import fmean
 
-from .model import CATEGORY_REMARK, CATEGORY_VIOLATION, RKO, RS
+from .model import AUTO_MARKS, CATEGORY_REMARK, CATEGORY_VIOLATION, RKO, RS
 
 TOP_LIMIT = 10
 VIOLATIONS_LIMIT = 5
 _COUNTED = (CATEGORY_VIOLATION, CATEGORY_REMARK)
+DELTA_DIGITS = 1  # точность показа на экране; знак дельты судится по ней
+
+
+def _strip_mark(text: str) -> str:
+    """Текст без пробелов-повторов и без хвостовой пометки автодетекции."""
+    clean = " ".join(text.split())
+    for mark in AUTO_MARKS:
+        if clean.endswith(mark):
+            return clean[: -len(mark)].rstrip()
+    return clean
+
+
+def normalize_text(text: str) -> str:
+    """Ключ сравнения нарушения: без пометки (ML)/(ИИ)/(AI), пробелы схлопнуты, casefold."""
+    return _strip_mark(text).casefold()
 
 
 @dataclass(frozen=True)
@@ -77,7 +93,9 @@ def country_average(facts: Sequence[Fact], rating_type: str, country: str) -> fl
 
 
 def delta(current: float | None, previous: float | None) -> float | None:
-    return None if current is None or previous is None else current - previous
+    if current is None or previous is None:
+        return None
+    return round(current - previous, DELTA_DIGITS) + 0.0  # + 0.0 убирает «-0.0»
 
 
 @dataclass(frozen=True)
@@ -126,9 +144,11 @@ def top_bottom(
         UnitScore(unit, *names[unit], avg)
         for unit, avg in unit_averages(facts, rating_type).items()
     ]
-    top = sorted((u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name))
+    top = sorted(
+        (u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name, u.unit)
+    )
     bottom = sorted(
-        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name)
+        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name, u.unit)
     )
     return tuple(top[:limit]), tuple(bottom[:limit])
 
@@ -153,29 +173,38 @@ def violation_block(
     facts: Sequence[ViolationFact], *, checkups: int, limit: int = VIOLATIONS_LIMIT
 ) -> ViolationBlock:
     counts: Counter[str] = Counter()
+    shown: dict[str, str] = {}  # ключ -> первое встретившееся написание без пометки
     for fact in facts:
         if fact.category in _COUNTED:
-            counts[fact.text] += fact.amount
+            key = normalize_text(fact.text)
+            counts[key] += fact.amount
+            shown.setdefault(key, _strip_mark(fact.text))
     total = sum(counts.values())
     top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
     return ViolationBlock(
         total,
         checkups,
         total / checkups if checkups else None,
-        tuple(ViolationLine(text, n) for text, n in top),
+        tuple(ViolationLine(shown[key], n) for key, n in top),
     )
 
 
+def _word_start(pattern: str, haystack: str) -> bool:
+    return re.search(r"(?<!\w)" + re.escape(pattern), haystack, re.IGNORECASE) is not None
+
+
 def is_hard(fact: ViolationFact, rules: Sequence[HardRule], rating_type: str) -> bool:
-    text = fact.text.casefold()
-    parent = (fact.parent_name or "").casefold()
+    text = normalize_text(fact.text)
+    parent = normalize_text(fact.parent_name or "")
     for rule in rules:
         if rule.rating_type != rating_type:
             continue
-        pattern = rule.pattern.casefold()
+        pattern = normalize_text(rule.pattern)
         if rule.match == "text" and text == pattern:
             return True
-        if rule.match == "contains" and (pattern in text or pattern in parent):
+        if rule.match == "contains" and (
+            _word_start(pattern, text) or _word_start(pattern, parent)
+        ):
             return True
     return False
 
@@ -184,7 +213,19 @@ def hard_lines(
     facts: Sequence[ViolationFact], rules: Sequence[HardRule], rating_type: str
 ) -> tuple[ViolationFact, ...]:
     hard = (fact for fact in facts if is_hard(fact, rules, rating_type))
-    return tuple(sorted(hard, key=lambda fact: (fact.country, fact.unit_name, fact.text)))
+    return tuple(
+        sorted(
+            hard,
+            key=lambda fact: (
+                fact.country,
+                fact.unit_name,
+                fact.unit,
+                normalize_text(fact.text),
+                fact.parent_name or "",
+                fact.amount,
+            ),
+        )
+    )
 
 
 @dataclass(frozen=True)

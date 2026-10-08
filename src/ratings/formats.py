@@ -23,6 +23,7 @@ from .links import (
     parse_rating_link,
 )
 from .model import (
+    AUTO_MARKS,
     CATEGORY_OTHER,
     CATEGORY_VIOLATION,
     ERR_MISSING_COLUMNS,
@@ -75,7 +76,6 @@ _REQUIRED: dict[str, frozenset[str]] = {
 #: Колонка приёмки: в живом файле «Результат оценки», в части выгрузок — с
 #: припиской «(Принято/Отклонено)». Ищется по началу имени.
 _RESULT_PREFIX = "Результат оценки"
-_AUTO_MARKS = ("(ML)", "(ИИ)", "(AI)")
 _CHANNELS = {"доставка": "delivery", "ресторан": "restaurant"}
 _RS_FORMATS = {"инспекция": "inspection", "онлайн": "online"}
 _ACCEPTANCE = {"принято": "accepted", "отклонено": "rejected"}
@@ -157,7 +157,7 @@ def _split(cell: str, category: str) -> tuple[Violation, ...]:
         if text:
             counts[text] = counts.get(text, 0) + 1
     return tuple(
-        Violation(text=text, category=category, auto_detected=text.endswith(_AUTO_MARKS), amount=n)
+        Violation(text=text, category=category, auto_detected=text.endswith(AUTO_MARKS), amount=n)
         for text, n in counts.items()
     )
 
