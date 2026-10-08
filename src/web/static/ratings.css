@@ -115,7 +115,7 @@
 .rt-kpi__delta span:last-child { color: var(--ink-3); font-size: var(--fs-meta); }
 
 /* Таблица — по .tbl Swarm: шапка капителью, числа моноширинные справа. */
-.rt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rt-scroll { position: relative; overflow-x: auto; -webkit-overflow-scrolling: touch; }  /* relative: скрытая подпись .sr-only не выпадает из прокрутки */
 .rt-tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-dense); }
 .rt-tbl th, .rt-tbl td { padding: var(--space-5) var(--space-5); border-bottom: 1px solid var(--line); text-align: right; vertical-align: middle; }
 .rt-tbl thead th {
@@ -134,10 +134,14 @@
 .rt-tbl__sum { margin-right: var(--space-3); color: var(--ink-3); }
 .rt-tbl small { color: var(--ink-3); font-size: var(--fs-meta); }
 .rt-tbl .rt-wrap { white-space: normal; overflow-wrap: anywhere; min-width: 12rem; }
+.rt-tbl thead th.rt-th-wrap { white-space: normal; min-width: 9rem; max-width: 14rem; }
 
 /* ── Нарушения: топ полосами (как «Топ-5 нарушений» Swarm) ───── */
 .rt-viol { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr)); gap: var(--rt-gap); align-items: start; }
-.rt-viol .rt-bars { --rt-bar-w: 56px; }
+/* В узкой карточке страны текст нарушения — своей строкой, полоса и число под ним:
+   иначе слово рвётся посередине. */
+.rt-viol .rt-bars li { grid-template-columns: minmax(0, 1fr) 2.5em; row-gap: var(--space-2); }
+.rt-viol .rt-bars__text { grid-column: 1 / -1; }
 .rt-viol__cluster { border-color: var(--accent-line); }
 .rt-viol__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); flex-wrap: wrap; }
 .rt-bars { list-style: none; margin: 0; padding: 0; }
@@ -233,6 +237,8 @@
   .rt-seg a { flex: 1 1 auto; justify-content: center; padding: 0 var(--space-4); }
   .rt-kpi { padding: var(--space-6) var(--space-7); }
   .rt-two { grid-template-columns: 1fr; }
+  .rt-tbl th, .rt-tbl td { padding: var(--space-4) var(--space-3); }
+  .rt-tbl th:first-child, .rt-tbl td:first-child { padding-left: var(--space-6); }
+  .rt-tbl th:last-child, .rt-tbl td:last-child { padding-right: var(--space-6); }
   .rt-att li { padding: var(--space-5) var(--space-6); gap: var(--space-5); }
-  .rt-devs .rt-form { flex-wrap: wrap; }
 }
