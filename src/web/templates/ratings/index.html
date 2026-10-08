@@ -6,8 +6,13 @@
   капителью и карточки. Стили — `static/decimus-rt.css`, только этого раздела.
 #}{% extends "base.html" %}
 {% block title %}{{ t('section.ratings.title') }}{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
+<script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
+{% macro cell(c) -%}
+  {%- if c.has_data -%}<a class="rt-cal__cell" href="{{ href(selection.group, selection.value, c.key) }}"{% if c.is_current %} aria-current="true"{% endif %}>{{ c.label }}</a>
+  {%- else -%}<span class="rt-cal__cell" aria-disabled="true"{% if c.is_current %} aria-current="true"{% endif %}>{{ c.label }}</span>{%- endif -%}
+{%- endmacro %}
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
@@ -56,7 +61,7 @@
     {% if may_manage %}<a class="btn btn--sm" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
   </header>
 
-  <form class="rt-bar" method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
+  <form class="rt-bar" data-rt-auto method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
     <input type="hidden" name="group" value="{{ selection.group }}">
     <input type="hidden" name="lang" value="{{ lang }}">
     <div class="rt-field">
@@ -76,18 +81,43 @@
     {% elif selection.group == 'country' %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.country') }}</span>
       <select class="input input--sm" name="value">
-        {% for c in choices.countries %}<option value="{{ c.code }}"{% if c.code == selection.value %} selected{% endif %}>{{ country_name(c.code) }}{% if c.developer %} · {{ c.developer }}{% endif %}</option>{% endfor %}
+        {% for c in choices.countries %}<option value="{{ c.code }}"{% if c.code == selection.value %} selected{% endif %}>{{ country_name(c.code) }}</option>{% endfor %}
       </select>
     </label>
     {% endif %}
-    <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.period') }}</span>
-      <select class="input input--sm" id="rt-period" name="period">
-        {% for g in periods %}<optgroup label="{{ t('ratings.period.' ~ g.kind) }}">
-          {% for key, title in g.options %}<option value="{{ key }}"{% if key == selection.period.key %} selected{% endif %}>{{ title }}</option>{% endfor %}
-        </optgroup>{% endfor %}
-      </select>
-    </label>
-    <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button>
+    <div class="rt-field">
+      <span class="rt-field__label">{{ t('ratings.period') }}</span>
+      <input type="hidden" name="period" value="{{ selection.period.key }}">
+      <div class="rt-cal">
+        {% if calendar.prev %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.prev) }}" aria-label="{{ t('ratings.cal.prev') }}">‹</a>
+        {% else %}<span class="rt-cal__arrow" aria-disabled="true">‹</span>{% endif %}
+        <details class="rt-cal__pick pick">
+          <summary class="rt-cal__title">{{ calendar.title }}</summary>
+          <div class="rt-cal__pop">
+            {% for y in calendar.years %}
+            <div class="rt-cal__year">
+              <div class="rt-cal__y">{{ y.year }}</div>
+              <div class="rt-cal__row rt-cal__row--q">
+                {% for c in y.quarters %}{{ cell(c) }}{% endfor %}
+              </div>
+              <div class="rt-cal__row rt-cal__row--m">
+                {% for c in y.months %}{{ cell(c) }}{% endfor %}
+              </div>
+            </div>
+            {% endfor %}
+            {% if calendar.rating %}
+            <div class="rt-cal__y">{{ t('ratings.period.rating') }}</div>
+            <div class="rt-cal__list">
+              {% for c in calendar.rating %}{{ cell(c) }}{% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </details>
+        {% if calendar.next %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.next) }}" aria-label="{{ t('ratings.cal.next') }}">›</a>
+        {% else %}<span class="rt-cal__arrow" aria-disabled="true">›</span>{% endif %}
+      </div>
+    </div>
+    <noscript><button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button></noscript>
   </form>
 
   {% if not summary.countries %}
