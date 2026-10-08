@@ -17,6 +17,16 @@ import re
 import subprocess
 import sys
 
+# Окно РКО (P34): строки SQL `src/db/ratings_read.py` — общие для фактов и счёта,
+# поэтому порча адресуется вместе с хвостом, который у них разный.
+_RKO_LO = "    \"and c.occurred_at >= (%s::date)::timestamp at time zone 'UTC' \"\n"
+_RKO_HI = "    \"and c.occurred_at < ((%s::date) + 1)::timestamp at time zone 'UTC' \"\n"
+_RKO_LO_LOCAL = '    "and c.occurred_at >= (%s::date)::timestamp "\n'
+_RKO_HI_LOCAL = '    "and c.occurred_at < ((%s::date) + 1)::timestamp "\n'
+_RKO_HI_SAME_DAY = "    \"and c.occurred_at < (%s::date)::timestamp at time zone 'UTC' \"\n"
+_RKO_FACTS_TAIL = "    \"and c.acceptance is distinct from 'rejected' \"\n"
+_RKO_COUNTS_TAIL = "    \"and c.acceptance is distinct from 'rejected' group by 1\"\n"
+
 cases = [
     (
         "src/domain/tenants.py",
@@ -558,6 +568,66 @@ cases = [
         "if row.developer and row.developer == selection.value\n",
         "if row.developer\n",
         "tests/test_db_ratings_read.py::test_группа_по_девелоперу_и_стране",
+    ),
+    (
+        "src/db/ratings_read.py",
+        _RKO_LO + _RKO_HI + _RKO_FACTS_TAIL,
+        _RKO_LO_LOCAL + _RKO_HI_LOCAL + _RKO_FACTS_TAIL,
+        "tests/test_db_ratings_read.py::test_сутки_ркО_по_utc_а_не_по_поясу_сессии",
+    ),
+    (
+        "src/db/ratings_read.py",
+        _RKO_LO + _RKO_HI + _RKO_COUNTS_TAIL,
+        _RKO_LO_LOCAL + _RKO_HI_LOCAL + _RKO_COUNTS_TAIL,
+        "tests/test_db_ratings_read.py::test_сутки_ркО_по_utc_а_не_по_поясу_сессии",
+    ),
+    (
+        "src/db/ratings_read.py",
+        _RKO_HI + _RKO_FACTS_TAIL,
+        _RKO_HI_SAME_DAY + _RKO_FACTS_TAIL,
+        "tests/test_db_ratings_read.py::test_сутки_ркО_по_utc_а_не_по_поясу_сессии",
+    ),
+    (
+        "src/db/ratings_read.py",
+        _RKO_HI + _RKO_COUNTS_TAIL,
+        _RKO_HI_SAME_DAY + _RKO_COUNTS_TAIL,
+        "tests/test_db_ratings_read.py::test_сутки_ркО_по_utc_а_не_по_поясу_сессии",
+    ),
+    (
+        "src/db/ratings_read.py",
+        '    "and u.country_code = any(%s) and p.begin_on between %s and %s "\n',
+        '    "and u.country_code = any(%s) and p.begin_on >= %s and p.begin_on < %s "\n',
+        "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
+    ),
+    (
+        "src/db/ratings_read.py",
+        '    "and u.country_code = any(%s) and p.begin_on between %s and %s "\n',
+        '    "and u.country_code = any(%s) and p.begin_on > %s and p.begin_on <= %s "\n',
+        "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
+    ),
+    (
+        "src/db/ratings_read.py",
+        '    "and p.begin_on between %s and %s group by 1"\n',
+        '    "and p.begin_on >= %s and p.begin_on < %s group by 1"\n',
+        "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
+    ),
+    (
+        "src/db/ratings_read.py",
+        '    "and p.begin_on between %s and %s group by 1"\n',
+        '    "and p.begin_on > %s and p.begin_on <= %s group by 1"\n',
+        "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
+    ),
+    (
+        "src/ratings/report.py",
+        "if row.developer and row.developer == selection.value\n",
+        "if row.developer == selection.value\n",
+        "tests/test_db_ratings_read.py::test_группа_по_девелоперу_и_стране",
+    ),
+    (
+        "src/db/ratings_read.py",
+        "    if rating_type not in _RULE_TYPES or match not in _RULE_MATCHES:\n",
+        "    if False:\n",
+        "tests/test_db_ratings_read.py::test_правило_неверного_типа_отказ_своим_кодом",
     ),
 ]
 

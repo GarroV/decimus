@@ -88,9 +88,15 @@ def test_принятая_проверка_в_счёте(db_env: str) -> None:
 
 
 def test_пустой_квартал_пустые_блоки(db_env: str) -> None:
+    """Страна есть, данных за квартал нет: строка страны с пустыми оценками, а не пустой список."""
+    _грузить(snapshot())
     summary = report.build(report.Selection(report.GROUP_IMF, None, quarter_period(2020, 1)))
-    assert summary.lines == () or all(line.rs is None for line in summary.lines)
+    assert summary.countries == ("RS",)
+    assert [(line.country, line.rs, line.rko) for line in summary.lines] == [("RS", None, None)]
+    assert (summary.total.rs, summary.total.rko) == (None, None)
     assert summary.rko_cluster.total == 0 and summary.rko_cluster.per_checkup is None
+    assert summary.rs_cluster.checkups == 0 and summary.rs_cluster.per_checkup is None
+    assert summary.rs_by_country["RS"].checkups == 0
 
 
 def test_окно_периодов_включает_оба_края(db_env: str) -> None:
@@ -185,6 +191,10 @@ def test_группа_по_девелоперу_и_стране() -> None:
     assert report.group_countries(
         report.Selection(report.GROUP_DEVELOPER, "Dev Two", period), rows
     ) == ("BY",)
+    # Девелопер не выбран: страна без девелопера в группу не попадает.
+    assert (
+        report.group_countries(report.Selection(report.GROUP_DEVELOPER, None, period), rows) == ()
+    )
     assert report.group_countries(report.Selection(report.GROUP_COUNTRY, "SI", period), rows) == (
         "SI",
     )
@@ -272,3 +282,48 @@ def test_оценки_за_оба_типа_рядом(db_env: str) -> None:
     by_type = {f[3]: f[6] for f in facts}
     assert by_type == {"rs": pytest.approx(97.5), "rko": pytest.approx(91.0)}
     assert all(isinstance(f[5], date) for f in facts)
+
+
+@pytest.mark.parametrize("zone", ["Europe/Belgrade", "America/New_York"])
+def test_сутки_ркО_по_utc_а_не_по_поясу_сессии(
+    db_env: str, monkeypatch: pytest.MonkeyPatch, zone: str
+) -> None:
+    """Дата заказа в файле — UTC: 30.09 23:30 — III квартал, 01.10 00:30 — IV, в любом поясе."""
+    monkeypatch.setenv("PGTZ", zone)
+    q3 = {"countries": ["RS", "BY"], "begin": date(2026, 7, 1), "end": date(2026, 9, 30)}
+    q4 = {"countries": ["RS", "BY"], "begin": date(2026, 10, 1), "end": date(2026, 12, 31)}
+    with psycopg.connect(db_env) as conn:
+        assert conn.execute("show timezone").fetchone()[0] == zone  # пояс сессии применился
+
+    _грузить(rko_violations(**{"Дата заказа": "2026-09-30 23:30:00"}))
+    facts, checkups = ratings_read.rko_violation_facts(**q3)  # type: ignore[arg-type]
+    assert ({f[2] for f in facts}, checkups) == ({"RS"}, {"RS": 1})
+    facts, checkups = ratings_read.rko_violation_facts(**q4)  # type: ignore[arg-type]
+    assert ({f[2] for f in facts}, checkups) == ({"BY"}, {"BY": 1})
+
+    _грузить(rko_violations(**{"Дата заказа": "2026-10-01 00:30:00"}))
+    facts, checkups = ratings_read.rko_violation_facts(**q3)  # type: ignore[arg-type]
+    assert (facts, checkups) == ([], {})
+    facts, checkups = ratings_read.rko_violation_facts(**q4)  # type: ignore[arg-type]
+    assert ({f[2] for f in facts}, checkups) == ({"RS", "BY"}, {"RS": 1, "BY": 1})
+
+
+def test_окно_замечаний_рс_включает_оба_края(db_env: str) -> None:
+    """Период РС начался 16.09: окно, кончающееся или начинающееся 16.09, его берёт."""
+    _грузить(snapshot())
+
+    def срез(begin: date, end: date) -> tuple[set[str], dict[str, int]]:
+        facts, checkups = ratings_read.rs_remark_facts(countries=["RS"], begin=begin, end=end)
+        return {f[3] for f in facts}, checkups
+
+    assert срез(date(2026, 9, 1), date(2026, 9, 16)) == ({"Грязный пол"}, {"RS": 4})
+    assert срез(date(2026, 9, 16), date(2026, 9, 30)) == ({"Грязный пол"}, {"RS": 4})
+    assert срез(date(2026, 9, 1), date(2026, 9, 15)) == (set(), {})
+    assert срез(date(2026, 9, 17), date(2026, 9, 30)) == (set(), {})
+
+
+def test_правило_неверного_типа_отказ_своим_кодом(db_env: str) -> None:
+    for rating_type, match in (("xx", "text"), ("rs", "regex")):
+        with pytest.raises(RatingsError) as exc:
+            ratings_read.add_hard_rule(rating_type, match, "гряз", actor="ctl")
+        assert exc.value.code == ratings_read.REFUSED_RULE_KIND  # type: ignore[attr-defined]

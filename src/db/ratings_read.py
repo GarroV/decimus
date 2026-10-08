@@ -25,6 +25,7 @@ from .errors import RatingsError
 #: интерфейса (P15), русский `str(exc)` остаётся журналу и MCP.
 REFUSED_DEVELOPER = "developer_invalid"
 REFUSED_RULE = "rule_invalid"
+REFUSED_RULE_KIND = "rule_kind_invalid"
 REFUSED_RULE_KEPT = "rule_kept"
 REFUSED_SETTING = "setting_invalid"
 REFUSED_SETTING_UNKNOWN = "setting_unknown"
@@ -133,13 +134,15 @@ def score_facts(
 
 
 #: Проверки РКО среза: дата заказа внутри периода, отклонённые на приёмке — вне
-#: счёта (решение плана 8).
+#: счёта (решение плана 8). Время заказа лежит в UTC (время файла), поэтому
+#: границы суток — явно в UTC, а не в часовом поясе сессии (P34).
 _RKO_FACTS = (
     "select v.unit_dodo_id, u.name, u.country_code, v.text, v.parent_name, v.category, v.amount "
     "from ratings.checkups c join ratings.units u on u.dodo_id = c.unit_dodo_id "
     "join ratings.violations v on v.rating_type = c.rating_type and v.checkup_dodo_id = c.dodo_id "
     "where c.rating_type = 'rko' and u.country_code = any(%s) "
-    "and c.occurred_at >= %s and c.occurred_at < %s::date + 1 "
+    "and c.occurred_at >= (%s::date)::timestamp at time zone 'UTC' "
+    "and c.occurred_at < ((%s::date) + 1)::timestamp at time zone 'UTC' "
     "and c.acceptance is distinct from 'rejected' "
     "order by v.id"
 )
@@ -147,7 +150,8 @@ _RKO_COUNTS = (
     "select u.country_code, count(*) "
     "from ratings.checkups c join ratings.units u on u.dodo_id = c.unit_dodo_id "
     "where c.rating_type = 'rko' and u.country_code = any(%s) "
-    "and c.occurred_at >= %s and c.occurred_at < %s::date + 1 "
+    "and c.occurred_at >= (%s::date)::timestamp at time zone 'UTC' "
+    "and c.occurred_at < ((%s::date) + 1)::timestamp at time zone 'UTC' "
     "and c.acceptance is distinct from 'rejected' group by 1"
 )
 
@@ -278,7 +282,17 @@ def set_developer(code: str, developer: str | None, *, actor: str) -> bool:
     return changed > 0
 
 
+#: Допустимые тип и способ совпадения правила (CHECK 0038). Коды `src.ratings.model`
+#: отсюда не видны — ярус ниже.
+_RULE_TYPES = ("rs", "rko")
+_RULE_MATCHES = ("text", "contains")
+
+
 def add_hard_rule(rating_type: str, match: str, pattern: str, *, actor: str) -> None:
+    if rating_type not in _RULE_TYPES or match not in _RULE_MATCHES:
+        raise RatingsEditError(
+            "Тип рейтинга — rs или rko; совпадение — text или contains", REFUSED_RULE_KIND
+        )
     _write(
         "insert into ratings.hard_rules (rating_type, match, pattern, created_by) "
         "values (%s, %s, %s, %s)",
