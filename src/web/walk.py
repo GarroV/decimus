@@ -40,6 +40,7 @@ from src.domain import get_item, get_state, handed_over, is_upload_ref, list_ite
 from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
 from src.domain.models import ChecklistItem, Inspection, Zone
+from src.domain.walk_users import walk_open_to
 
 from . import walk_write
 from .errors import WebTextError
@@ -308,6 +309,11 @@ def identify(
     except WalkAccessError as exc:
         logger.info("Обход: отказ в опознании — %s", exc)
         return jsonify({"error": "unauthorized"}), 401
+    if not walk_open_to(conf.users, chat_id):
+        # Пробный запуск на боевом боте: кнопки у человека нет, а адрес мог
+        # прийти пересланным — страница пускает ровно тех же, что и кнопка.
+        logger.info("Обход: чат %s не в круге тестеров — отказ", chat_id)
+        return jsonify({"error": "closed", "texts": texts_for(ui_lang)}), 403
     try:
         if conf.bot_token is not None and revoked(chat_id):
             logger.info("Обход: доступ чата %s снят — отказ", chat_id)

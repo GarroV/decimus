@@ -94,6 +94,24 @@ cases = [
         'repeat=body.get("repeat") is True,',
         "tests/test_web_walk_write.py::test_повтор_только_по_нажатию_и_не_у_замера",
     ),
+    (
+        "src/web/walk.py",
+        "    if not walk_open_to(conf.users, chat_id):",
+        "    if False:",
+        "tests/test_web_walk.py::test_вне_круга_тестеров_обход_закрыт_и_на_чтение_и_на_запись",
+    ),
+    (
+        "src/bot/config.py",
+        "        if self.walk_url is None or not walk_open_to(self.walk_users, user_id):",
+        "        if self.walk_url is None:",
+        "tests/test_bot_walk_button.py::test_круг_тестеров_кнопка_только_им",
+    ),
+    (
+        "src/domain/walk_users.py",
+        "    if not ids:\n",
+        "    if False:\n",
+        "tests/test_web_walk.py::test_кривой_круг_тестеров_отказ_на_старте",
+    ),
 ]
 bad = 0
 for path, old, new, test in cases:

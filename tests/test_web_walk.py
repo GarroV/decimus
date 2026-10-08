@@ -24,10 +24,11 @@ from src.db.bot_links import NEVER_BOUND, Standing
 from src.db.errors import AccessError, DbError
 from src.db.models import PreviousFinding, PreviousFindings
 from src.domain import add_finding, get_state, list_zones, start_inspection
-from src.web import walk
+from src.web import walk, walk_write
 from src.web.app import create_app
 from src.web.config import Settings
 from src.web.walk_auth import (
+    INIT_DATA_HEADER,
     MAX_AGE_SECONDS,
     WalkAccessError,
     WalkSettings,
@@ -266,3 +267,37 @@ def test_база_молчит_отказ_а_не_пропуск_вслепую(
     client = _подписанный_клиент(domain_env, monkeypatch, AccessError("нет базы"))
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
     assert ответ.status_code == 503
+
+
+# ── пробный запуск на боевом боте: круг тестеров (WALK_USERS) ───────────
+
+
+def test_вне_круга_тестеров_обход_закрыт_и_на_чтение_и_на_запись(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WALK_USERS", str(АУДИТОР + 1))
+    client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
+
+    чтение = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
+    запись = client.post(
+        walk_write.FINDING_PATH,
+        json={"op": "drop", "n": 1},
+        headers={INIT_DATA_HEADER: подписать(АУДИТОР)},
+    )
+
+    assert чтение.status_code == 403 and чтение.get_json()["error"] == "closed"
+    assert "walk.closed" in чтение.get_json()["texts"]
+    assert запись.status_code == 403, "пересланная ссылка открыла бы запись не тестеру"
+
+
+def test_тестер_из_круга_обход_видит(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("WALK_USERS", f"{АУДИТОР + 1}, {АУДИТОР}")
+    client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
+    ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
+    assert ответ.status_code == 200
+
+
+@pytest.mark.parametrize("значение", ["abc", " , "])
+def test_кривой_круг_тестеров_отказ_на_старте(значение: str) -> None:
+    with pytest.raises(ValueError, match="WALK_USERS"):
+        load_walk_settings({"TELEGRAM_BOT_TOKEN": ТОКЕН, "WALK_USERS": значение})

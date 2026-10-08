@@ -12,6 +12,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from src.domain.walk_users import parse_walk_users, walk_open_to
+
 from .errors import BotConfigError, BotTextError
 from .texts import DEFAULT_UI_LANG, UI_LANG_VAR, default_ui_lang
 
@@ -70,6 +72,14 @@ class BotSettings:
     #: забытая переменная раздавала бы историю проверок партнёров.
     mcp_owner_id: int | None = None
     walk_url: str | None = None
+    #: Круг тестеров мини-аппа (`WALK_USERS`). `None` — кнопка всем с доступом.
+    walk_users: frozenset[int] | None = None
+
+    def walk_url_for(self, user_id: int) -> str | None:
+        """Адрес мини-аппа для этого человека; `None` — кнопки ему нет."""
+        if self.walk_url is None or not walk_open_to(self.walk_users, user_id):
+            return None
+        return self.walk_url
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -189,6 +199,13 @@ def _parse_walk_url(raw: str) -> str | None:
     return url
 
 
+def _parse_walk_users(env: Mapping[str, str]) -> frozenset[int] | None:
+    try:
+        return parse_walk_users(env)
+    except ValueError as exc:
+        raise BotConfigError(str(exc)) from exc
+
+
 def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
     """Прочитать и проверить окружение бота. Отказ — `BotConfigError`."""
     src = os.environ if env is None else env
@@ -208,4 +225,5 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         auditor_names=names,
         mcp_owner_id=_parse_mcp_owner_id(src.get(MCP_OWNER_ID_VAR) or "", allowed_ids),
         walk_url=_parse_walk_url(src.get(WALK_URL_VAR) or ""),
+        walk_users=_parse_walk_users(src),
     )
