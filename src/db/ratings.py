@@ -20,6 +20,7 @@ import psycopg
 from psycopg.types.json import Jsonb
 
 from .config import check_environment
+from .errors import RatingsError
 
 INSERTED = "inserted"
 UPDATED = "updated"
@@ -197,7 +198,12 @@ def upsert_period(
     title_en: str,
     dodo_id: str | None,
 ) -> int:
-    """Период по типу и дате начала. Описание из снимка (с id Dodo IS) главнее листа."""
+    """Период по типу и дате начала. Описание из снимка (с id Dodo IS) главнее листа.
+
+    Слот (тип, начало) уже занят периодом с ДРУГИМ id Dodo IS — `RatingsError`, а
+    не склейка: иначе баллы нового периода молча легли бы на старый. Так же, как
+    тот же id с другим началом (там отказывает уникальный индекс `dodo_id`).
+    """
     row = conn.execute(
         "insert into ratings.periods (rating_type, dodo_id, begin_on, end_on, title_ru, title_en) "
         "values (%s, %s, %s, %s, %s, %s) "
@@ -209,10 +215,16 @@ def upsert_period(
         "    then ratings.periods.title_ru else excluded.title_ru end, "
         "  title_en = case when excluded.dodo_id is null "
         "    then ratings.periods.title_en else excluded.title_en end "
+        "where ratings.periods.dodo_id is null or excluded.dodo_id is null "
+        "  or ratings.periods.dodo_id = excluded.dodo_id "
         "returning id",
         (rating_type, dodo_id, begin_on, end_on, title_ru, title_en),
     ).fetchone()
-    assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
+    if row is None:
+        raise RatingsError(
+            f"Период {rating_type} с началом {begin_on:%d.%m.%Y} уже загружен с другим id "
+            f"Dodo IS, файл несёт {dodo_id}. Ничего не записано"
+        )
     return int(row[0])
 
 
