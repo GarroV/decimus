@@ -251,6 +251,18 @@ cases = [
         "        if False:\n",
         "tests/test_ratings_snapshot.py::test_страна_повторена_в_справочнике_отказ",
     ),
+    (
+        "src/ratings/matching.py",
+        "    candidates = [unit for unit in pool if _number(_canon(unit.name)) == number]\n",
+        "    candidates = pool\n",
+        "tests/test_ratings_matching.py::test_другой_номер_соседа_не_цепляется_и_без_ничьей",
+    ),
+    (
+        "src/ratings/matching.py",
+        "        return _only(exact)\n",
+        "        return next(iter(exact))\n",
+        "tests/test_ratings_matching.py::test_двусмысленность_нет",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
