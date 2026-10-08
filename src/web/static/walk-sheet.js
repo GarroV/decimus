@@ -120,7 +120,9 @@
   }
 
   function dirty() {
-    if (!f.n) return !!(f.photos.length || f.code || f.text || f.comment || f.words);
+    // Пункт, подставленный чек-листом или «Не исправлено», — не ввод человека:
+    // «Назад» без единого действия не спрашивает «выбросить?».
+    if (!f.n) return !!(f.photos.length || f.text || f.comment || f.words) || f.code !== f.preset;
     var o = f.original;
     return f.text !== o.text || f.comment !== o.comment || f.level !== o.level ||
       f.zone !== o.zone || f.code !== o.code || f.repeat !== o.repeat ||
@@ -724,6 +726,7 @@
       removed: [],
       words: "",
       found: null,
+      preset: opts.code || null,
     };
     if (rec) {
       f.mode = rec.level === "D0" ? "measure" : rec.level === ADVICE_LEVEL ? "advice" : "violation";
