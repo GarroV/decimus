@@ -179,7 +179,9 @@ def test_лимит_на_токен_429(admin_env: str, monkeypatch: pytest.Monk
     assert int(последний.headers["Retry-After"]) >= 1
 
 
-def test_неудачи_с_адреса_запираются_429(admin_env: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_неудачи_с_адреса_запирают_несверенный_токен_429(
+    admin_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(api_limits, "FAILURES_PER_MINUTE", 2)
     токен = _токен(ПРОВЕРКИ)
     with _приложение().test_client() as client:
@@ -191,6 +193,41 @@ def test_неудачи_с_адреса_запираются_429(admin_env: str,
 
     assert коды == [401, 401]
     assert запертый.status_code == 429
+
+
+def test_запертый_адрес_не_отрезает_сверенный_токен(
+    admin_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Адрес общий (выход облачных функций): чужой мусор не запирает живой токен."""
+    monkeypatch.setattr(api_limits, "FAILURES_PER_MINUTE", 2)
+    токен = _токен(ПРОВЕРКИ)
+    with _приложение().test_client() as client:
+        первый = client.get("/api/v1/inspections", headers=_с(токен)).status_code
+        for _ in range(3):
+            client.get("/api/v1/inspections", headers=_с("dcm_" + "x" * 43))
+        мусор = client.get("/api/v1/inspections", headers=_с("dcm_" + "y" * 43))
+        свой = client.get("/api/v1/inspections", headers=_с(токен))
+
+    assert первый == 200
+    assert мусор.status_code == 429
+    assert свой.status_code == 200
+
+
+def test_отозванный_токен_с_запертого_адреса_не_проходит(
+    admin_env: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(api_limits, "FAILURES_PER_MINUTE", 2)
+    выпущен = api_tokens.issue("swarm", scopes=[ПРОВЕРКИ], by="tester")
+    with _приложение().test_client() as client:
+        assert client.get("/api/v1/inspections", headers=_с(выпущен.value)).status_code == 200
+        for _ in range(2):
+            client.get("/api/v1/inspections", headers=_с("dcm_" + "x" * 43))
+        api_tokens.revoke(выпущен.id, by="tester")
+        после_отзыва = client.get("/api/v1/inspections", headers=_с(выпущен.value))
+        ещё_раз = client.get("/api/v1/inspections", headers=_с(выпущен.value))
+
+    assert после_отзыва.status_code == 401
+    assert ещё_раз.status_code == 429
 
 
 def test_журнал_без_токена(клиент: FlaskClient, caplog: pytest.LogCaptureFixture) -> None:

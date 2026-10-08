@@ -10,6 +10,12 @@
 
 Ключей два: токен (потолок потребителя) и адрес для НЕУДАЧНЫХ предъявлений
 (перебор токенов бесполезен — 256 бит, — но каждая попытка стоит похода в базу).
+
+**Запертый адрес не запирает живой токен** (`KnownTokens`). Адрес бывает общим:
+выходные адреса облачных функций (Swarm — Edge Function) делят чужие сервисы, и
+двадцать мусорных токенов с того же адреса иначе отрезали бы потребителя. Токен,
+который уже сверился в базе, с запертого адреса сверяется снова (отзыв видно
+сразу); незнакомый — нет, и база в запертую минуту не трогается.
 """
 
 from __future__ import annotations
@@ -28,6 +34,9 @@ FAILURES_PER_MINUTE = 20
 WINDOW_SECONDS = 60.0
 #: Больше ключей не держим: снаружи ключи адресов плодит кто угодно.
 MAX_KEYS = 10_000
+#: Предел памяти о сверенных токенах. Пополняет её только удачная сверка в базе,
+#: поэтому снаружи её не раздуть; живых токенов — единицы.
+MAX_KNOWN_TOKENS = 256
 
 
 @dataclass
@@ -77,3 +86,28 @@ class Window:
             if len(hits) >= self.limit:
                 return max(1, int(hits[0] + self.seconds - now) + 1)
             return 0
+
+
+@dataclass
+class KnownTokens:
+    """Отпечатки токенов, удачно сверенных в базе за жизнь процесса. Потокобезопасно.
+
+    Хранится отпечаток SHA-256, не значение: память процесса попадает в дамп.
+    """
+
+    _known: set[str] = field(default_factory=set)
+    _lock: threading.Lock = field(default_factory=threading.Lock)
+
+    def remember(self, fingerprint: str) -> None:
+        with self._lock:
+            if fingerprint not in self._known and len(self._known) >= MAX_KNOWN_TOKENS:
+                self._known.clear()
+            self._known.add(fingerprint)
+
+    def forget(self, fingerprint: str) -> None:
+        with self._lock:
+            self._known.discard(fingerprint)
+
+    def knows(self, fingerprint: str) -> bool:
+        with self._lock:
+            return fingerprint in self._known

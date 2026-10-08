@@ -10,7 +10,8 @@ Function), не браузер: CORS не включается, кука адм�
 доступа не даёт. И наоборот: заслон админки заголовок `Authorization` не
 читает вовсе, поэтому токен не открывает ни одного экрана.
 
-**Порядок заслона** (`_guard`): адрес не заперт за неудачи → токен есть, похож
+**Порядок заслона** (`_guard`): адрес не заперт за неудачи (или токен уже
+сверялся в этом процессе — общий адрес не отрезает живого потребителя) → токен есть, похож
 на выпущенный и живой в базе (иначе 401, один текст на «нет такого» и
 «отозван») → потолок частоты токена (429) → право маршрута (403). Значение
 токена и заголовок `Authorization` не попадают ни в журнал, ни в ответ.
@@ -34,6 +35,7 @@ from src.db import api_inspections, api_tokens
 from src.db import ratings_read as ratings_db
 from src.db.api_tokens import SCOPE_INSPECTIONS_READ, SCOPE_RATINGS_READ, ApiConsumer
 from src.db.errors import DbError
+from src.db.mcp_access import token_fingerprint
 from src.ratings import api_payload
 from src.ratings.countries import EXCLUDED, NAMES
 
@@ -308,6 +310,7 @@ def install(app: Flask, conf: Settings) -> None:
         return
     per_token = api_limits.Window(api_limits.PER_TOKEN_PER_MINUTE)
     per_address = api_limits.Window(api_limits.FAILURES_PER_MINUTE)
+    known = api_limits.KnownTokens()
 
     def address() -> str:
         return client_address(trusted_proxies=conf.trusted_proxies)
@@ -318,18 +321,26 @@ def install(app: Flask, conf: Settings) -> None:
             return None
         setattr(g, _STARTED, time.monotonic())
         откуда = address()
-        wait = per_address.blocked(откуда)
-        if wait:
-            return _error(429, "rate_limited", "Too many requests", retry_after=wait)
         token = bearer(request.headers.get("Authorization", ""))
+        отпечаток = (
+            token_fingerprint(token) if token and api_tokens.TOKEN_SHAPE.fullmatch(token) else None
+        )
+        wait = per_address.blocked(откуда)
+        # Запертый адрес не отрезает уже сверенный токен: адрес бывает общим.
+        if wait and not (отпечаток and known.knows(отпечаток)):
+            return _error(429, "rate_limited", "Too many requests", retry_after=wait)
         try:
             consumer = api_tokens.resolve(token) if token else None
         except DbError as exc:
             logger.warning("api: токен не сверен, база отказала (%s)", type(exc).__name__)
             return _error(503, "unavailable", "Data source is temporarily unavailable")
         if consumer is None:
+            if отпечаток:
+                known.forget(отпечаток)
             per_address.hit(откуда)
             return _error(401, "unauthorized", "A valid bearer token is required")
+        if отпечаток:
+            known.remember(отпечаток)
         setattr(g, _CONSUMER, consumer)
         wait = per_token.hit(consumer.token_id)
         if wait:
