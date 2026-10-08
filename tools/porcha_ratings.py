@@ -13,6 +13,7 @@
 
 import os
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -385,8 +386,11 @@ for path, original, broken, test in cases:
         continue
     file.write_text(text.replace(original, broken, 1), encoding="utf-8")
     try:
+        # Через `make test-honest`: только он подставляет тестовую базу. Голый
+        # pytest пропускает тесты блока db, и порча выглядит «не пойманной», а
+        # контрольный прогон с пропуском — «пройденным».
         run = subprocess.run(  # noqa: S603
-            [".venv/bin/pytest", "-q", "--no-cov", "-p", "no:cacheprovider", test],
+            ["make", "-s", "test-honest", f"ARGS=-q -rs -p no:cacheprovider {test}"],  # noqa: S607
             env=env,
             capture_output=True,
             text=True,
@@ -394,7 +398,12 @@ for path, original, broken, test in cases:
         )
     finally:
         file.write_text(text, encoding="utf-8")
-    if run.returncode == 0:
+    # Пропуск важен только у прошедшего прогона: упавший тест порчу поймал, а
+    # слово «skipped» в его выводе бывает полем отчёта загрузки.
+    if run.returncode == 0 and re.search(r"\b\d+ skipped\b", run.stdout):
+        print(f"НЕ ПРОВЕРЕНА (тест пропущен): {path} -> {test}")
+        failed = True
+    elif run.returncode == 0:
         print(f"НЕ ПОЙМАНА: {path}: {original.strip()!r} -> {test}")
         failed = True
     else:
