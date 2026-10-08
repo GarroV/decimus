@@ -45,11 +45,33 @@ while IFS= read -r line; do
     *'"id"'*) want_reply=1 ;;
     *) want_reply=0 ;;
   esac
-  resp="$(printf '%s' "$line" | curl -sS --max-time 120 -X POST "$URL" \
+  # Код ответа дописывается последней строкой: без него 404 от чужого сервера,
+  # 401 и обрыв связи выглядят одинаково — пустым ответом, на который клиент
+  # ждёт минуту и пишет «Request timed out», ни словом не называя причину
+  # (#535: так полдня искали устаревший адрес в конфиге).
+  out="$(printf '%s' "$line" | curl -sS --max-time 120 -X POST "$URL" \
       -H "Content-Type: application/json" \
       --config "$AUTH_FILE" \
-      --data-binary @- 2>/dev/null)"
-  if [ "$want_reply" = "1" ] && [ -n "$resp" ]; then
-    printf '%s\n' "$resp"
+      --data-binary @- -w '\n%{http_code}' 2>&1)"
+  code="${out##*$'\n'}"
+  resp="${out%$'\n'*}"
+  case "$code" in
+    2??) ok=1 ;;
+    *) ok=0 ;;
+  esac
+  if [ "$ok" = "1" ]; then
+    if [ "$want_reply" = "1" ] && [ -n "$resp" ]; then
+      printf '%s\n' "$resp"
+    fi
+    continue
+  fi
+  # Отказ — в stderr (Claude пишет его в лог сервера) и, если запрос ждёт
+  # ответа, ошибкой JSON-RPC с тем же id: клиент показывает её сразу.
+  reason="HTTP $code от $URL: $(printf '%s' "$resp" | tr -d '\r\n"\\' | cut -c1-200 | iconv -c -f UTF-8 -t UTF-8)"
+  [ "$code" = "000" ] && reason="нет связи с $URL: $(printf '%s' "$resp" | tr -d '\r\n"\\' | cut -c1-200 | iconv -c -f UTF-8 -t UTF-8)"
+  printf 'mcp_bridge: %s\n' "$reason" >&2
+  if [ "$want_reply" = "1" ] && [[ "$line" =~ \"id\"[[:space:]]*:[[:space:]]*(\"[^\"]*\"|-?[0-9]+) ]]; then
+    printf '{"jsonrpc":"2.0","id":%s,"error":{"code":-32000,"message":"%s"}}\n' \
+      "${BASH_REMATCH[1]}" "$reason"
   fi
 done
