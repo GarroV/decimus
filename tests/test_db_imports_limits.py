@@ -74,7 +74,9 @@ def test_строка_base64_сверх_предела_отклоняется_д
 
     # Act / Assert
     with pytest.raises(ToolError, match="КБ"):
-        _приложить(хранилище, ident, 1, "A" * (imports.MAX_PHOTO_B64_RAW + 1))
+        # Одни переносы строк: после чистки строка пуста, и отказать до
+        # разбора может только предел сырой длины.
+        _приложить(хранилище, ident, 1, "\n" * (imports.MAX_PHOTO_B64_RAW + 1))
     with pytest.raises(ToolError, match="КБ"):
         _приложить(хранилище, ident, 1, "A" * (imports.MAX_PHOTO_B64_CHARS + 4))
     assert склад.объекты == {}
