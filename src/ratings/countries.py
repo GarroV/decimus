@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import unicodedata
+
 from src.domain.geo import COUNTRIES
 
 #: Не IMF (D318): строки с ними отбрасываются по стране, а не по «Конвейеру» —
@@ -18,6 +20,8 @@ _EXTRA: dict[str, dict[str, str]] = {
     "RU": {"ru": "Россия", "en": "Russia"},
     "KZ": {"ru": "Казахстан", "en": "Kazakhstan"},
     "UZ": {"ru": "Узбекистан", "en": "Uzbekistan"},
+    # Есть в листе РКО «Качество по пиццериям», в справочнике Decimus нет.
+    "MX": {"ru": "Мексика", "en": "Mexico"},
 }
 
 #: Написания из выгрузок сверх русского и английского названий справочника.
@@ -32,8 +36,20 @@ _ALIASES = {
 NAMES: dict[str, dict[str, str]] = {**COUNTRIES, **_EXTRA}
 
 
+#: Флаг 🇳🇬 — пара символов категории `So`; эмодзи — `So` с селектором
+#: вариантов (`Mn` U+FE0F) и склейкой (`Cf` U+200D). Лист контроля пишет страну
+#: с флагом: «🇳🇬 Nigeria».
+_EMOJI_PARTS = frozenset({"So", "Cf"})
+_VARIATION_SELECTOR = "\ufe0f"
+
+
 def _key(name: str) -> str:
-    return " ".join(name.split()).casefold()
+    bare = "".join(
+        ch
+        for ch in name
+        if ch != _VARIATION_SELECTOR and unicodedata.category(ch) not in _EMOJI_PARTS
+    )
+    return " ".join(bare.split()).casefold()
 
 
 _BY_NAME: dict[str, str] = {
@@ -43,7 +59,10 @@ _BY_NAME: dict[str, str] = {
 
 
 def country_code(name: str) -> str | None:
-    """Код ISO по названию на любом из двух языков; незнакомое — `None`."""
+    """Код ISO по названию на любом из двух языков; флаг и эмодзи не мешают.
+
+    Незнакомое — `None`.
+    """
     return _BY_NAME.get(_key(name))
 
 
