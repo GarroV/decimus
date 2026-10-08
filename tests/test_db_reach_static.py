@@ -22,6 +22,7 @@ from types import ModuleType
 from src.db import (
     action_plans,
     directory,
+    imports,
     move,
     prescriptions,
     prescriptions_write,
@@ -204,7 +205,13 @@ def test_находки_по_идентификатору_читаются_то�
 #: Кто вправе звать `_read_detail` — и чем он перед этим ограничил проверку.
 #: `get_inspection` передаёт охват читающего; `revise._apply` — после замка
 #: строки своего пространства (`_LOCK_SQL` с `tenant_code`).
-_ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {("db/queries.py", "get_inspection"), ("db/revise.py", "_apply")}
+#: `imports._locked_detail` — после замка загруженного черновика своего
+#: пространства (D305, `imports._LOCK_SQL` с `tenant_code` и `origin`).
+_ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {
+    ("db/queries.py", "get_inspection"),
+    ("db/revise.py", "_apply"),
+    ("db/imports.py", "_locked_detail"),
+}
 
 
 def _зовущие_функции(дерево: ast.AST, имя: str) -> list[tuple[ast.FunctionDef, int]]:
@@ -256,6 +263,18 @@ def test_проверку_целиком_читают_только_после_о
     чтение = вызовы[("db/revise.py", "_apply")]
     assert замок and min(замок) < чтение, "правка читает проверку до замка своего пространства"
     assert отказ and min(отказ) < чтение, "нет выхода без замка до чтения проверки"
+
+    # Загрузка: тот же порядок, и замок берёт только загруженный черновик своего.
+    assert "tenant_code = %(tenant)s" in imports._LOCK_SQL
+    assert "origin = 'import'" in imports._LOCK_SQL
+    assert "for update" in imports._LOCK_SQL
+    загрузка = next(
+        у
+        for у in ast.walk(ast.parse(inspect.getsource(imports)))
+        if isinstance(у, ast.FunctionDef) and у.name == "_locked_detail"
+    )
+    замок = [строка for строка, запрос in _вызовы_execute(загрузка) if запрос == "_LOCK_SQL"]
+    assert замок and min(замок) < вызовы[("db/imports.py", "_locked_detail")]
 
 
 def test_слив_не_заводит_пространство() -> None:

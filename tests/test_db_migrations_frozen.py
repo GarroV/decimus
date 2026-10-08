@@ -164,6 +164,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0037_prescriptions.sql": (
         "sql1:43d57b3c91055a750ab725a703950240dd1bfec580248da175a760d73b6fdd09"
     ),
+    # Загрузка исторических проверок через MCP (D305–D310). Заведена вместе с
+    # файлом, нигде не применена.
+    "0038_inspection_import.sql": (
+        "sql1:5e9f5cd90945df496b6f6c9b1e76113ea233543793f6a46d28550c0352dad244"
+    ),
     # Рейтинги РС/РКО (схема `ratings`). Заведена вместе с файлом, нигде не применена.
     "0038_ratings.sql": ("sql1:d97a70b1143a49b404c12dfcb39fc4d9c908dd196670228da0437666e87ce90a"),
     # Роль веб-учётки «контроль» (только HQ). Заведена вместе с файлом, нигде не применена.

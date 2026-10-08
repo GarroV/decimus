@@ -112,21 +112,21 @@ def test_сказано_куда_но_не_сказано_кому_это_отк
     assert MCP_CHECKLIST_TENANTS_VAR in str(отказ.value)
 
 
-def test_неизвестный_арендатор_в_списке_это_отказ_на_старте(tmp_path: Path) -> None:
-    """Опечатка в коде арендатора означала бы доступ, выданный никому, — и
-    выглядела бы ровно как работающая настройка."""
-    with pytest.raises(McpConfigError) as отказ:
-        load_settings(
-            _окружение(
-                **{
-                    MCP_CHECKLIST_STORE_VAR: str(tmp_path / "s"),
-                    MCP_CHECKLIST_TENANTS_VAR: "укашкa",
-                    DATA_DIR_VAR: str(tmp_path),
-                }
-            )
+def test_арендатор_без_токена_стороны_допустим_личные_токены(tmp_path: Path) -> None:
+    """Методику правят по личным токенам бота (T253), их арендаторы живут в
+    базе. Требование «арендатор есть среди MCP_TOKENS» уронило прод 08.10.2026
+    (D311): `HQ` открыт методике, а токена стороны `HQ` нет."""
+    settings = load_settings(
+        _окружение(
+            **{
+                MCP_CHECKLIST_STORE_VAR: str(tmp_path / "s"),
+                MCP_CHECKLIST_TENANTS_VAR: "HQ",
+                DATA_DIR_VAR: str(tmp_path),
+            }
         )
+    )
 
-    assert "нет среди токенов" in str(отказ.value)
+    assert "HQ" in settings.checklist_tenants
 
 
 def test_методика_без_каталога_боевого_набора_это_отказ_на_старте(tmp_path: Path) -> None:

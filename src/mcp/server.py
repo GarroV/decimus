@@ -293,6 +293,8 @@ class _Handler(BaseHTTPRequestHandler):
             checklist=_checklist_for(self._settings, доступ.tenant),
             source=_checklist_source_for(self._settings, доступ.tenant),
             may_retract=доступ.may_retract,
+            imports=_imports_for(self._settings, доступ.tenant),
+            actor=доступ.actor,
         )
         if answer is None:
             self._send(_ACCEPTED)
@@ -343,6 +345,19 @@ def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
     if not settings.may_read_checklist(tenant):
         return None
     return Store(root=хранилище, live=методика, space=DEFAULT_SPACE)
+
+
+def _imports_for(settings: Settings, tenant: str) -> Store | None:
+    """Хранилище версий для инструментов загрузки — или `None`, если загрузка закрыта.
+
+    Право спрашивается здесь, на входе, по арендатору из токена, как у
+    методики (D305, `MCP_IMPORT_TENANTS`). Хранилище наведено на пространство
+    арендатора; видимый ему эталон УК находит `checklist_layout.locate`.
+    """
+    хранилище, методика = settings.checklist_store, settings.data_dir
+    if хранилище is None or методика is None or not settings.may_import(tenant):
+        return None
+    return Store(root=хранилище, live=методика, space=space_of(tenant))
 
 
 def build_server(settings: Settings) -> ThreadingHTTPServer:

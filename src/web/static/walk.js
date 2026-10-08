@@ -282,7 +282,8 @@
     label.appendChild(el("span", "walk-switch__state",
       zoneDone(zone) ? tx("walk.tile.done") : zoneStarted(zone) ? tx("walk.tile.started") : tx("walk.tile.todo")));
     main.appendChild(label);
-    main.appendChild(el("span", "walk-switch__caret", "▾"));
+    // Без стрелки «▾»: список зон выезжает снизу, а стрелка вниз обещает
+    // список, раскрывающийся под кнопкой (владелец, 08.10.2026).
     var fwd = W.button("walk-switch__arrow", "›", function () { go(zones[(at + 1) % n].code, 1); });
     fwd.setAttribute("aria-label", tx("walk.switch.next"));
     bar.appendChild(back);
