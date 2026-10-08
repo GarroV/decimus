@@ -96,7 +96,7 @@ cases = [
     ),
     (
         "engine/audit.py",
-        "        if not rest and not a.add and f[\"level\"] != ADVICE:\n",
+        '        if not rest and not a.add and f["level"] != ADVICE:\n',
         "        if False:\n",
         "tests/test_web_walk_write.py::test_последний_кадр_не_снимается",
     ),
