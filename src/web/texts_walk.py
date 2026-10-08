@@ -44,7 +44,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.tile.done": {"ru": "осмотрено", "en": "checked"},
     "walk.tile.todo": {"ru": "не были", "en": "not yet"},
     "walk.tile.started": {"ru": "в работе", "en": "in progress"},
-    "walk.zone.measures": {"ru": "Замеры зоны", "en": "Zone readings"},
     "walk.zone.measure_add": {"ru": "внести", "en": "add"},
     "walk.zone.need_prev": {
         "ru": "Сначала отметьте прошлое замечание: исправлено или нет.",
@@ -53,7 +52,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.add.short_advice": {"ru": "Рекомендация", "en": "Recommendation"},
     "walk.kind.violation": {"ru": "Нарушение", "en": "Finding"},
     "walk.kind.advice": {"ru": "Рекомендация", "en": "Recommendation"},
-    "walk.kind.measure": {"ru": "Замер", "en": "Reading"},
     "walk.rec.advice": {"ru": "Рек.", "en": "Rec."},
     "walk.cl.title": {"ru": "Чек-лист зоны", "en": "Zone checklist"},
     "walk.cl.count": {"ru": "{count} пунктов", "en": "{count} items"},
@@ -103,7 +101,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     # ── запись из мини-аппа (D312) ──────────────────────────────────────
     "walk.add.short": {"ru": "Нарушение", "en": "Issue"},
-    "walk.add.short_measure": {"ru": "Замер", "en": "Reading"},
     "walk.sheet.new": {"ru": "Новое нарушение", "en": "New issue"},
     "walk.sheet.new_measure": {"ru": "Новый замер", "en": "New reading"},
     "walk.sheet.new_advice": {"ru": "Новая рекомендация", "en": "New recommendation"},
@@ -141,6 +138,20 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.note.hint": {
         "ru": "Уйдёт в конец отчёта, в «Заметки проверяющего».",
         "en": "Goes to the end of the report, under “Auditor's notes”.",
+    },
+    "walk.eq.title": {
+        "ru": "Печь и холодильники",
+        "en": "Oven and fridges",
+    },
+    "walk.eq.hint": {
+        "ru": (
+            "Показания без вычета — уходят в приложение отчёта. "
+            "У каждого — снимок прибора или изделия."
+        ),
+        "en": (
+            "Readings with no deduction — they go to the report appendix. "
+            "Each needs a photo of the gauge or product."
+        ),
     },
     "walk.rec.note": {"ru": "Заметка", "en": "Note"},
     "walk.sheet.photos_optional": {
