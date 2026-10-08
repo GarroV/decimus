@@ -505,6 +505,60 @@ cases = [
         "            key = fact.text\n",
         "tests/test_ratings_summary.py::test_нарушение_с_пометкой_и_без_одно_в_топе",
     ),
+    (
+        "src/db/ratings_read.py",
+        '    "where u.country_code = any(%s) and p.begin_on between %s and %s "\n',
+        '    "where u.country_code = any(%s) and p.begin_on >= %s and %s is not null "\n',
+        "tests/test_db_ratings_read.py::test_окно_периодов_включает_оба_края",
+    ),
+    (
+        "src/db/ratings_read.py",
+        '    "where u.country_code = any(%s) and p.begin_on between %s and %s "\n',
+        '    "where u.country_code = any(%s) and p.begin_on >= %s and p.begin_on < %s "\n',
+        "tests/test_db_ratings_read.py::test_окно_периодов_включает_оба_края",
+    ),
+    (
+        "src/db/ratings_read.py",
+        "    \"and c.acceptance is distinct from 'rejected' \"\n",
+        '    " "\n',
+        "tests/test_db_ratings_read.py::test_отклонённая_проверка_вне_счёта",
+    ),
+    (
+        "src/db/ratings_read.py",
+        "    \"and c.acceptance is distinct from 'rejected' group by 1\"\n",
+        '    "group by 1"\n',
+        "tests/test_db_ratings_read.py::test_отклонённая_проверка_вне_счёта",
+    ),
+    (
+        "src/db/ratings_read.py",
+        "    return tuple(int(r[0]) for r in reversed(rows))\n",
+        "    return tuple(int(r[0]) for r in rows)\n",
+        "tests/test_db_ratings_read.py::test_зона_риска_окно_старыми_первыми",
+    ),
+    (
+        "src/db/ratings_read.py",
+        "    \"where v.category = 'remark' and p.rating_type = 'rs' \"\n",
+        "    \"where v.category = 'remark' \"\n",
+        "tests/test_db_ratings_read.py::test_замечания_только_периодов_рс",
+    ),
+    (
+        "src/ratings/report.py",
+        "        if len(ids) < window:\n",
+        "        if not ids:\n",
+        "tests/test_db_ratings_read.py::test_зона_риска_пуста_если_периодов_меньше_окна",
+    ),
+    (
+        "src/ratings/report.py",
+        "    imf = tuple(row for row in read.countries() if row.is_imf)\n",
+        "    imf = read.countries()\n",
+        "tests/test_db_ratings_read.py::test_группа_мф_без_стран_вне_охвата",
+    ),
+    (
+        "src/ratings/report.py",
+        "if row.developer and row.developer == selection.value\n",
+        "if row.developer\n",
+        "tests/test_db_ratings_read.py::test_группа_по_девелоперу_и_стране",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
