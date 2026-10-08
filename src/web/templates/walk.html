@@ -2,7 +2,7 @@
   Мини-апп обхода в Telegram (#418). Страница пустая и одинаковая для всех:
   данные приходят из `walk_data` после того, как скрипт предъявит подпись
   Telegram, а рисуют их скрипты `static/walk-*.js` (порядок подключения важен:
-  core → photo → sheet → walk). Адреса записи (D312) — в атрибутах `main`. Своего каркаса админки (панель,
+  core → photo → menu → sheet → walk). Адреса записи (D312) — в атрибутах `main`. Своего каркаса админки (панель,
   поиск, тема) здесь нет — это второй экран аудитора, а не раздел админки.
 
   `telegram-web-app.js` — с telegram.org и без `integrity`: Telegram требует
@@ -20,9 +20,11 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='walk.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='walk-record.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='walk-menu.css') }}">
   <script src="https://telegram.org/js/telegram-web-app.js?59"></script>
   <script src="{{ url_for('static', filename='walk-core.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-photo.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='walk-menu.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk-sheet.js') }}" defer></script>
   <script src="{{ url_for('static', filename='walk.js') }}" defer></script>
 </head>
@@ -32,7 +34,8 @@
         data-photo="{{ url_for('walk_photo') }}"
         data-photo-view="{{ url_for('walk_photo_view') }}"
         data-finding="{{ url_for('walk_finding') }}"
-        data-info="{{ url_for('walk_info') }}">
+        data-info="{{ url_for('walk_info') }}"
+        data-suggest="{{ url_for('walk_suggest') }}">
     <p class="walk__loading">…</p>
   </main>
 </body>

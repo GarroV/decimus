@@ -206,6 +206,40 @@
     return "walk:" + hex;
   }
 
+  /* Поиск пункта (D330). На проде это распознавание бота — модель по кадру и
+   * словам. Макет модель не зовёт: ищет пункт по совпадению основ слов с
+   * формулировкой пункта, чтобы было видно, как предложения ложатся на форму. */
+  function stem(w) { return w.toLowerCase().replace(/ё/g, "е").slice(0, 5); }
+
+  function stems(text) {
+    return (text.match(/[а-яёa-z]{3,}/gi) || []).map(stem);
+  }
+
+  function suggest(b) {
+    var said = stems(b.words || "");
+    var pool = SEED.payload.items.filter(function (i) { return !i.measure; });
+    var scored = pool.map(function (i) {
+      var own = stems(i.q + " " + i.process);
+      var hit = said.filter(function (w) { return own.indexOf(w) !== -1; }).length;
+      var here = !b.zone || !i.zones.length || i.zones.indexOf(b.zone) !== -1;
+      return { item: i, score: hit * 2 + (here ? 1 : 0) };
+    }).filter(function (x) { return said.length ? x.score >= 2 : x.score >= 1; });
+    scored.sort(function (a, c) { return c.score - a.score; });
+    var words = (b.words || "").trim();
+    var top = scored.slice(0, 3).map(function (x, k) {
+      var lv = x.item.levels.indexOf("D2") !== -1 && /просроч|плесен|грязн|нагар/i.test(words) ? "D2" : x.item.levels[0];
+      var zone = b.zone && (!x.item.zones.length || x.item.zones.indexOf(b.zone) !== -1) ? b.zone : (x.item.zones[0] || b.zone);
+      return {
+        code: x.item.code, level: lv, zone: zone, confidence: Math.max(0.35, 0.9 - k * 0.2),
+        wording: words ? words.charAt(0).toUpperCase() + words.slice(1).replace(/\.?$/, ".") : x.item.q,
+      };
+    });
+    return {
+      candidates: said.length ? top : top.slice(0, 2),
+      question: said.length ? "" : "По одному кадру система уверена меньше — пара слов помогает.",
+    };
+  }
+
   function route(path, init) {
     var body = init && init.body;
     if (path === "/mock/data") return Promise.resolve(json(payload()));
@@ -226,6 +260,11 @@
       return Promise.resolve(new Response(b64ToBlob(src), { headers: { "Content-Type": "image/jpeg" } }));
     }
     try {
+      if (path === "/mock/suggest") {
+        refs(data.photos);
+        // Модель думает дольше сети — так видно «Система ищет пункт…».
+        return new Promise(function (ok) { setTimeout(ok, 900); }).then(function () { return json(suggest(data)); });
+      }
       if (path === "/mock/finding") {
         var op = ops[data.op];
         if (!op) throw new Refused(said("walk.err.bad_request"), 400);
