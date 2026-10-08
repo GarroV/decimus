@@ -148,8 +148,8 @@ create index violations_period_idx on ratings.violations (period_id) where perio
 create table ratings.hard_rules (
     id bigint generated always as identity primary key,
     rating_type text not null check (rating_type in ('rs', 'rko')),
-    -- text — совпадение текста целиком без учёта регистра; contains — подстрока
-    -- в тексте нарушения или в его родителе (`parent_name`).
+    -- text — совпадение текста целиком без учёта регистра; contains — с начала
+    -- слова в тексте нарушения или в его родителе (`parent_name`).
     match text not null check (match in ('text', 'contains')),
     pattern text not null check (length(btrim(pattern)) between 1 and 200),
     created_by text not null,

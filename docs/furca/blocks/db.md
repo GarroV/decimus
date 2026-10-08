@@ -172,6 +172,14 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 Не путать с `DATABASE_ADMIN_URL`: та про накат схемы, и роль там обычно
 привилегированная — то есть RLS не подчиняется вовсе.
 
+### Рейтинги РС и РКО (миграции `0038`, `0039`)
+
+Отдельная схема `ratings` (D321); продуктовое описание — `docs/14-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
+
+- `0038_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
+- `0039_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
+- Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
+
 ## Зависимости
 
 `domain`.
