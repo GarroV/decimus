@@ -224,26 +224,87 @@
   transition: transform .25s ease;
 }
 
-.walk-switch.is-open .walk-switch__caret { transform: rotate(180deg); }
+.walk-switch__label { flex: 1; min-width: 0; display: grid; }
 
-/* Раскрытие — через высоту сетки 0fr → 1fr: плавно и без замера высоты. */
-.walk-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows .28s ease;
+.walk-switch__label .walk-switch__name { flex: none; }
+
+.walk-switch__state { font-size: 12px; line-height: 16px; color: var(--ink-3); }
+
+/* Три состояния зоны: пусто — не были; полкруга — в работе (есть записи,
+   но «Осмотрено» не нажато); галка — осмотрена. */
+.walk-switch__check.is-started,
+.walk-tile__check.is-started {
+  border-color: var(--accent);
+  background: linear-gradient(90deg, var(--accent) 50%, transparent 50%);
 }
 
-.walk-switch.is-open .walk-panel { grid-template-rows: 1fr; }
+.walk-progress__seg.is-started { background: var(--accent-line); }
 
-.walk-panel__inner { overflow: hidden; min-height: 0; }
+/* Все зоны — лист снизу: выбор под большим пальцем, после выбора он уезжает. */
+.walk-zsheet {
+  position: fixed;
+  inset: 0;
+  z-index: 8;
+  pointer-events: none;
+}
+
+.walk-zsheet.is-open { pointer-events: auto; }
+
+.walk-zsheet__scrim {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: 0;
+  background: rgba(10, 16, 24, .38);
+  opacity: 0;
+  transition: opacity .25s ease;
+  cursor: pointer;
+}
+
+.walk-zsheet.is-open .walk-zsheet__scrim { opacity: 1; }
+
+.walk-zsheet__card {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-width: 560px;
+  max-height: 78vh;
+  margin: 0 auto;
+  padding: 10px 16px calc(16px + env(safe-area-inset-bottom));
+  overflow-y: auto;
+  border-radius: 18px 18px 0 0;
+  background: var(--surface);
+  transform: translateY(100%);
+  transition: transform .28s cubic-bezier(.2, .8, .2, 1);
+}
+
+.walk-zsheet__card::before {
+  content: "";
+  display: block;
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 10px;
+  border-radius: 2px;
+  background: var(--line-strong);
+}
+
+.walk-zsheet.is-open .walk-zsheet__card { transform: none; }
+
+.walk-zsheet__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.walk-zsheet__title { margin: 0; font-size: 17px; font-weight: 600; }
+.walk-zsheet__count { color: var(--ink-3); font-size: 14px; font-variant-numeric: tabular-nums; }
 
 .walk-panel__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  padding-top: 8px;
-  max-height: 60vh;
-  overflow-y: auto;
 }
 
 .walk-tile {
@@ -296,8 +357,6 @@
 
 .walk-hints::-webkit-scrollbar { display: none; }
 
-.walk-switch.is-open .walk-hints { display: none; }
-
 .walk-hints__label {
   flex: none;
   font-size: 13px;
@@ -336,6 +395,8 @@
   0%   { box-shadow: 0 0 0 0 var(--warn-line); }
   100% { box-shadow: 0 0 0 7px transparent; }
 }
+
+.walk-hint.is-started { border-color: var(--accent-line); }
 
 .walk-hint--more {
   border-style: dashed;
@@ -475,6 +536,60 @@
 
 .walk-cl__item.is-recorded .walk-cl__text { color: var(--ink-2); }
 .walk-cl__item.is-recorded .walk-cl__act { background: var(--ok-soft); color: var(--ok); }
+
+/* замеры зоны: что методика ждёт здесь, и что уже внесено */
+
+.walk-ms { margin-bottom: 14px; }
+
+.walk-ms__list { list-style: none; margin: 0; padding: 0; }
+
+.walk-ms__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  border: 1px dashed var(--line-control);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.walk-ms__text { flex: 1; min-width: 0; }
+
+.walk-ms__value {
+  flex: none;
+  max-width: 45%;
+  color: var(--accent);
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.walk-ms__item.is-done { border-style: solid; border-color: var(--ok-line); background: var(--ok-soft); }
+.walk-ms__item.is-done .walk-ms__value { color: var(--ok); font-variant-numeric: tabular-nums; }
+
+/* метка рекомендации вместо класса: без вычета — спокойный тон */
+.walk-level--advice {
+  border-color: var(--accent-line);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-ui);
+}
+
+/* прошлое замечание, которое не дало засчитать зону, — коротко мигает */
+.walk-item--prev.is-flash { animation: walk-flash 1.2s ease 2; border-radius: 8px; }
+
+@keyframes walk-flash {
+  0%, 100% { background: transparent; }
+  50%      { background: var(--warn-soft); }
+}
 
 /* низ экрана: «+ Нарушение» и «Осмотрено →» под большим пальцем */
 
@@ -645,9 +760,11 @@
 @media (prefers-reduced-motion: reduce) {
   .walk-stage,
   .walk-hint::before,
+  .walk-item--prev.is-flash,
   .walk-sheet { animation: none !important; }
   .walk-progress__seg,
-  .walk-panel,
+  .walk-zsheet__card,
+  .walk-zsheet__scrim,
   .walk-cl__wrap,
   .walk-switch__caret,
   .walk-cl__caret,

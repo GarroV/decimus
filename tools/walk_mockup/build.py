@@ -141,6 +141,27 @@ def main() -> None:
     }
     for it in p["items"]:
         it["q"] = fix_items.get(it["code"], it["q"])
+    # Замеры по зонам, как в боевой методике: холодильник — в своих шкафах,
+    # настройки печи — в горячем цехе. В синтетической они общие.
+    fix_zones = {"INF10": ["fridge", "freezer"], "INF11": ["hot_kitchen"]}
+    for it in p["items"]:
+        it["zones"] = fix_zones.get(it["code"], it["zones"])
+    # Пример рекомендации без нарушения (D201): сервер её пока не пишет (#375),
+    # поэтому она кладётся в данные макета напрямую.
+    for zone in p["zones"]:
+        if zone["code"] == "hot_kitchen":
+            zone["recorded"].append(
+                {
+                    "n": 99,
+                    "code": "TEH05",
+                    "level": "R",
+                    "text": "Смазать петли крышки линии начинки — открывается туго.",
+                    "comment": "",
+                    "repeat": False,
+                    "unusual": False,
+                    "photos": [],
+                }
+            )
     fix_info = {
         "INF01": "Состав смены",
         "INF03": "Выдано предписание",

@@ -1,4 +1,9 @@
-/* Мини-апп обхода: форма записи (D312) — новое нарушение, замер, правка записи.
+/* Мини-апп обхода: форма записи (D312) — нарушение, рекомендация, замер, правка.
+ *
+ * Вид записи переключается сверху: «Нарушение · Рекомендация · Замер».
+ * Рекомендация (D201) — «что сделать» у пункта без нарушения: без класса и
+ * вычета, кадр по желанию. ПРОТОТИП: сервер её пока не принимает (#375),
+ * работает только в кликабельном макете.
  *
  * Одна форма на три случая, сверху вниз в том порядке, в каком аудитор
  * действует на точке: снял → где → что нарушено → насколько → что видно →
@@ -42,6 +47,20 @@
 
   function isMeasure() { return f.mode === "measure"; }
 
+  /** Рекомендация без нарушения (D201): у пункта, без класса и вычета. */
+  function isAdvice() { return f.mode === "advice"; }
+
+  var ADVICE_LEVEL = "R";
+
+  /** Нарушение по этому пункту в этой зоне — рекомендацию можно дописать в него. */
+  function violationHere() {
+    var zone = zoneOf(f.zone);
+    if (!zone || !f.code) return null;
+    return zone.recorded.filter(function (r) {
+      return r.code === f.code && r.level !== "D0" && r.level !== ADVICE_LEVEL;
+    })[0] || null;
+  }
+
   function previousHere(code) {
     var zone = zoneOf(f.zone);
     if (!zone) return null;
@@ -49,14 +68,12 @@
   }
 
   function taken() {
-    if (isMeasure() || !f.code || !f.zone || f.n) return null;
-    var zone = zoneOf(f.zone);
-    if (!zone) return null;
-    return zone.recorded.filter(function (r) { return r.code === f.code && r.level !== "D0"; })[0] || null;
+    if (isMeasure() || isAdvice() || !f.code || !f.zone || f.n) return null;
+    return violationHere();
   }
 
   function repeatOffered() {
-    return !isMeasure() && !taken() && !!f.code && (f.level === "D1" || f.level === "D2") && !!previousHere(f.code);
+    return !isMeasure() && !isAdvice() && !taken() && !!f.code && (f.level === "D1" || f.level === "D2") && !!previousHere(f.code);
   }
 
   function unusual() {
@@ -80,10 +97,12 @@
   function readyPhotos() { return f.photos.filter(function (p) { return p.state === "done"; }); }
 
   function blocker() {
-    if (!readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
+    // Рекомендации кадр не обязателен: «крышка открывается туго» не снять.
+    if (!isAdvice() && !readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
     if (uploading()) return "walk.sheet.need_upload";
     if (!f.zone) return "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
+    if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
     if (!taken() && !f.level) return "walk.sheet.need_level";
     return null;
   }
@@ -147,7 +166,7 @@
 
   function removePhoto(p) {
     var left = f.photos.filter(function (x) { return x !== p; });
-    if (f.n && !left.some(function (x) { return x.state === "done"; })) {
+    if (f.n && !isAdvice() && !left.some(function (x) { return x.state === "done"; })) {
       W.toast(tx("walk.photo.last"), "warn");
       return;
     }
@@ -166,9 +185,50 @@
     return box;
   }
 
+  var KINDS = [["violation", "walk.kind.violation"], ["advice", "walk.kind.advice"], ["measure", "walk.kind.measure"]];
+
+  /** Смена вида записи: пункт остаётся, если он годится новому виду. */
+  function setMode(mode) {
+    if (mode === f.mode) return;
+    f.mode = mode;
+    var it = item(f.code);
+    if (it && it.measure !== (mode === "measure")) f.code = null;
+    f.level = mode === "advice" ? ADVICE_LEVEL : mode === "measure" ? "D0" : null;
+    if (mode === "violation" && f.code) {
+      var chosen = item(f.code);
+      if (chosen && chosen.levels.length === 1) f.level = chosen.levels[0];
+    }
+    f.repeat = false;
+    W.haptic();
+    changed();
+    node.querySelector(".walk-sheet__title").textContent = titleText();
+    redraw.apply(null, ORDER.concat(["footer"]));
+  }
+
+  function titleText() {
+    if (f.n) return isAdvice() ? tx("walk.sheet.edit_advice", { n: f.n }) : tx("walk.sheet.edit", { n: f.n });
+    if (isMeasure()) return tx("walk.sheet.new_measure");
+    return isAdvice() ? tx("walk.sheet.new_advice") : tx("walk.sheet.new");
+  }
+
   var draw = {
+    kind: function () {
+      if (f.n) return null;
+      var seg = el("div", "walk-seg walk-seg--kind");
+      KINDS.forEach(function (pair) {
+        var on = f.mode === pair[0];
+        var b = W.button("walk-seg__opt" + (on ? " is-on" : ""), tx(pair[1]), function () { setMode(pair[0]); });
+        b.setAttribute("aria-pressed", on ? "true" : "false");
+        seg.appendChild(b);
+      });
+      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : null);
+      box.insertBefore(seg, box.firstChild);
+      return box;
+    },
+
     photos: function () {
-      var box = section(tx("walk.sheet.photos"), f.photos.length ? null : tx("walk.sheet.photos_hint"));
+      var hint = f.photos.length ? null : isAdvice() ? tx("walk.sheet.photos_optional") : tx("walk.sheet.photos_hint");
+      var box = section(tx("walk.sheet.photos"), hint);
       if (f.photos.length) {
         var strip = el("div", "walk-strip");
         f.photos.forEach(function (p) {
@@ -214,7 +274,7 @@
     },
 
     item: function () {
-      var box = section(isMeasure() ? tx("walk.sheet.item_measure") : tx("walk.sheet.item"));
+      var box = section(isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"));
       var chosen = item(f.code);
       if (chosen && !f.picking) {
         var card = el("div", "walk-choice");
@@ -231,6 +291,8 @@
         box.appendChild(card);
         var t = taken();
         if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));
+        var v = isAdvice() && !f.n ? violationHere() : null;
+        if (v) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.advice_has_violation", { n: v.n })));
         return box;
       }
       var input = el("input", "walk-search");
@@ -248,7 +310,7 @@
 
     level: function () {
       var it = item(f.code);
-      if (!it || isMeasure() || taken()) return null;
+      if (!it || isMeasure() || isAdvice() || taken()) return null;
       var box = section(tx("walk.sheet.level"));
       if (it.levels.length === 1) {
         box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
@@ -272,19 +334,26 @@
 
     text: function () {
       if (taken()) return null;
-      var box = section(isMeasure() ? tx("walk.sheet.text_measure") : tx("walk.sheet.text"));
+      var label = isMeasure() ? "walk.sheet.text_measure" : isAdvice() ? "walk.sheet.text_advice" : "walk.sheet.text";
+      var box = section(tx(label));
       var area = el("textarea", "walk-area");
       area.rows = 3;
       area.maxLength = 1000;
-      area.placeholder = isMeasure() ? tx("walk.sheet.text_measure_hint") : tx("walk.sheet.text_hint");
+      area.placeholder = tx(label + "_hint");
       area.value = f.text;
-      area.addEventListener("input", function () { f.text = area.value; changed(); });
+      area.addEventListener("input", function () {
+        var was = !!f.text.trim();
+        f.text = area.value;
+        changed();
+        // У рекомендации текст обязателен: кнопка оживает с первым словом.
+        if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
+      });
       box.appendChild(area);
       return box;
     },
 
     comment: function () {
-      if (taken() || isMeasure()) return null;
+      if (taken() || isMeasure() || isAdvice()) return null;
       var box = section(f.commentOpen ? tx("walk.sheet.comment") : null);
       if (!f.commentOpen) {
         box.appendChild(W.button("walk-link walk-link--add", tx("walk.sheet.comment_add"), function () {
@@ -390,10 +459,11 @@
         f.picking = false;
         f.query = "";
         if (i.measure) f.level = "D0";
+        else if (isAdvice()) f.level = ADVICE_LEVEL;
         else if (i.levels.length === 1) f.level = i.levels[0];
         else if (i.levels.indexOf(f.level) === -1) f.level = null;
         var before = previousHere(i.code);
-        if (before && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
+        if (before && !isAdvice() && !f.level && i.levels.indexOf(before.level) !== -1) f.level = before.level;
         W.haptic();
         changed();
         redraw("item", "level", "text", "comment", "repeat", "footer");
@@ -416,7 +486,7 @@
     }
   }
 
-  var ORDER = ["photos", "zone", "item", "level", "text", "comment", "repeat", "danger"];
+  var ORDER = ["kind", "photos", "zone", "item", "level", "text", "comment", "repeat", "danger"];
 
   function redraw() {
     var names = Array.prototype.slice.call(arguments);
@@ -437,7 +507,7 @@
     if (t) return refs.map(function (ref) { return { op: "attach", n: t.n, ref: ref }; });
     if (!f.n) {
       return [{
-        op: "add", zone: f.zone, code: f.code, level: f.level, text: f.text.trim(),
+        op: "add", zone: f.zone, code: f.code, level: isAdvice() ? ADVICE_LEVEL : f.level, text: f.text.trim(),
         comment: f.comment.trim(), repeat: !!f.repeat && repeatOffered(),
         photos: readyPhotos().map(function (p) { return p.ref; }),
       }];
@@ -517,7 +587,7 @@
 
   /**
    * Открыть форму.
-   *   { mode: "violation" | "measure", zone, code, level, repeat } — новая запись;
+   *   { mode: "violation" | "advice" | "measure", zone, code, level, repeat } — новая запись;
    *   { record: <запись из данных>, zone } — правка.
    */
   function open(opts) {
@@ -538,7 +608,7 @@
       picking: false,
     };
     if (rec) {
-      f.mode = rec.level === "D0" ? "measure" : "violation";
+      f.mode = rec.level === "D0" ? "measure" : rec.level === ADVICE_LEVEL ? "advice" : "violation";
       f.code = rec.code;
       f.level = rec.level;
       f.text = rec.text;
@@ -569,8 +639,7 @@
     node.setAttribute("role", "dialog");
     node.setAttribute("aria-modal", "true");
     var head = el("header", "walk-sheet__head");
-    var title = f.n ? tx("walk.sheet.edit", { n: f.n }) : isMeasure() ? tx("walk.sheet.new_measure") : tx("walk.sheet.new");
-    head.appendChild(el("h2", "walk-sheet__title", title));
+    head.appendChild(el("h2", "walk-sheet__title", titleText()));
     var x = W.button("walk-sheet__close", "✕", function () { close(false); });
     x.setAttribute("aria-label", tx("walk.sheet.close"));
     head.appendChild(x);

@@ -4,7 +4,7 @@
 (function () {
   "use strict";
   var SEED = window.__MOCK_SEED__;
-  var STORE = "decimus-walk-mock-v1";
+  var STORE = "decimus-walk-mock-v2";
   var LEVELS_REPEAT = ["D1", "D2"];
 
   function b64ToBlob(dataUrl) {
@@ -122,13 +122,22 @@
     return f;
   }
 
-  function taken(code, zone, except) {
-    return S.findings.some(function (f, i) { return i !== except && f.code === code && f.zone === zone; });
+  function taken(code, zone, except, level) {
+    // Пару «пункт + зона» занимает только нарушение: замер и рекомендация — нет.
+    if (level === "D0" || level === ADVICE) return false;
+    return S.findings.some(function (f, i) {
+      return i !== except && f.code === code && f.zone === zone && f.level !== "D0" && f.level !== ADVICE;
+    });
   }
+
+  // Рекомендация без нарушения (D201): у любого пункта, без класса. Сервер её
+  // ещё не принимает (#375) — здесь макет показывает, как это будет.
+  var ADVICE = "R";
 
   function checkLevel(code, level) {
     var item = items[code];
     if (!item) throw new Refused(said("walk.err.bad_request"));
+    if (level === ADVICE) return;
     if (item.levels.indexOf(level) === -1) {
       throw new Refused("Для пункта " + code + " класс " + level + " не предусмотрен.");
     }
@@ -137,8 +146,10 @@
   var ops = {
     add: function (b) {
       checkLevel(b.code, b.level);
-      var photos = refs(b.photos);
-      if (taken(b.code, b.zone, -1)) throw new Refused("Пункт " + b.code + " в этой зоне уже записан.");
+      var advice = b.level === ADVICE;
+      var photos = advice && !(b.photos || []).length ? [] : refs(b.photos);
+      if (taken(b.code, b.zone, -1, b.level)) throw new Refused("Пункт " + b.code + " в этой зоне уже записан.");
+      if (advice && !cleanText(b.text)) throw new Refused(said("walk.sheet.need_advice"));
       S.findings.push({
         code: b.code, level: b.level, zone: b.zone,
         text: cleanText(b.text) || items[b.code].q, comment: cleanText(b.comment),
@@ -154,7 +165,7 @@
       if ("level" in b) next.level = b.level;
       if ("zone" in b) next.zone = b.zone;
       checkLevel(next.code, next.level);
-      if (taken(next.code, next.zone, b.n - 1)) throw new Refused("Пункт " + next.code + " в этой зоне уже записан.");
+      if (taken(next.code, next.zone, b.n - 1, next.level)) throw new Refused("Пункт " + next.code + " в этой зоне уже записан.");
       var lvlOk = LEVELS_REPEAT.indexOf(next.level) !== -1;
       if (b.repeat === true && !lvlOk) throw new Refused(said("walk.err.repeat_level"));
       if (typeof b.repeat === "boolean") next.repeat = b.repeat;
@@ -170,7 +181,7 @@
     detach: function (b) {
       var f = finding(b.n);
       if (f.photos.indexOf(b.ref) === -1) throw new Refused("Такого фото у записи нет.");
-      if (f.photos.length === 1) throw new Refused("Последнее фото снять нельзя: запись без фото не принимается.");
+      if (f.photos.length === 1 && f.level !== ADVICE) throw new Refused("Последнее фото снять нельзя: запись без фото не принимается.");
       f.photos = f.photos.filter(function (r) { return r !== b.ref; });
     },
   };
