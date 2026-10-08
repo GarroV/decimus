@@ -235,6 +235,7 @@
       };
     });
     return {
+      via: "model",
       candidates: said.length ? top : top.slice(0, 2),
       question: said.length ? "" : "По одному кадру система уверена меньше — пара слов помогает.",
     };

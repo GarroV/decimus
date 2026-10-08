@@ -55,6 +55,8 @@ PHOTO_ENDPOINT = "walk_photo"
 PHOTO_VIEW_ENDPOINT = "walk_photo_view"
 FINDING_ENDPOINT = "walk_finding"
 INFO_ENDPOINT = "walk_info"
+#: Поиск пункта по кадру и словам (D330) — распознавание бота.
+SUGGEST_ENDPOINT = "walk_suggest"
 #: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
 #: (`walk.py`, `walk_write.py`), и админка, передающая ему запросы
 #: (`walk_proxy.py`), — две копии путей разошлись бы молча.
@@ -64,6 +66,7 @@ PHOTO_PATH = "/tg/walk/photo"
 PHOTO_VIEW_PATH = "/tg/walk/photo/view"
 FINDING_PATH = "/tg/walk/finding"
 INFO_PATH = "/tg/walk/info"
+SUGGEST_PATH = "/tg/walk/suggest"
 ENDPOINTS = frozenset(
     {
         PAGE_ENDPOINT,
@@ -72,6 +75,7 @@ ENDPOINTS = frozenset(
         PHOTO_VIEW_ENDPOINT,
         FINDING_ENDPOINT,
         INFO_ENDPOINT,
+        SUGGEST_ENDPOINT,
     }
 )
 

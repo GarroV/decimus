@@ -195,8 +195,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.find": {"ru": "Найти пункт", "en": "Find the item"},
     "walk.sheet.find_hint": {
-        "ru": "Пункт методики, класс и формулировку система найдёт по кадру и словам — вы проверите и сохраните.",
-        "en": "The system finds the checklist item, class and wording from the photo and words — you check and save.",
+        "ru": (
+            "Пункт методики, класс и формулировку система найдёт по кадру и словам"
+            " — вы проверите и сохраните."
+        ),
+        "en": (
+            "The system finds the checklist item, class and wording from the photo and"
+            " words — you check and save."
+        ),
     },
     "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
     "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
@@ -343,6 +349,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.err.repeat_level": {
         "ru": "Повтор ставится только нарушению класса D1 или D2.",
         "en": "Only a D1 or D2 issue can be marked as a repeat.",
+    },
+    "walk.err.recognize": {
+        "ru": "Система сейчас не может найти пункт. Выберите его вручную — запись не потеряется.",
+        "en": "The system can't find the item right now. Pick it yourself — nothing is lost.",
     },
     "walk.err.server": {
         "ru": "Не получилось записать. Повторите через минуту.",
