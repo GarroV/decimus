@@ -25,8 +25,8 @@ from src.db.errors import AccessError, DbError
 from src.db.models import PreviousFinding, PreviousFindings
 from src.domain import add_finding, get_state, list_zones, start_inspection
 from src.web import walk, walk_write
-from src.web.app import create_app
 from src.web.config import Settings
+from src.web.walk_app import create_walk_app
 from src.web.walk_auth import (
     INIT_DATA_HEADER,
     MAX_AGE_SECONDS,
@@ -173,7 +173,7 @@ def _приложение(monkeypatch: pytest.MonkeyPatch, **env: str) -> Flask:
     monkeypatch.delenv("WEB_WALK_PREVIEW_CHAT", raising=False)
     for имя, значение in env.items():
         monkeypatch.setenv(имя, значение)
-    app = create_app(
+    app = create_walk_app(
         Settings(host="127.0.0.1", port=8266, tenant="default", ui_lang="ru", secret_key=СЕКРЕТ)
     )
     app.config.update(TESTING=True)

@@ -19,7 +19,9 @@
   написал сам, модель в мини-аппе не участвует.
 * **Повтор ставит человек** (D191): флаг приходит только с его нажатия.
 * **Сданная проверка не правится** (D080): тот же признак, что у бота
-  (`domain.handed_over`).
+  (`domain.handed_over`). Ранняя проверка отвечает быстро и до чтения тела,
+  а решающая — под замком заметок вместе с самой записью (`domain.while_open`):
+  сдача, пришедшая между ними, получает отказ, а не запись после себя.
 * **Кадр показывается только хозяину**: ссылка должна висеть на записи или
   сведении его проверки.
 """
@@ -36,6 +38,7 @@ from flask import Flask, Response, jsonify, request
 
 from src.domain import (
     SOURCE_COMMENT,
+    HandedOverError,
     add_finding,
     attach_photo,
     check_environment,
@@ -49,6 +52,7 @@ from src.domain import (
     save_upload,
     set_info,
     upload_file,
+    while_open,
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
@@ -58,18 +62,17 @@ from src.domain.uploads import MAX_UPLOAD_BYTES
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     FINDING_ENDPOINT,
+    FINDING_PATH,
     INFO_ENDPOINT,
+    INFO_PATH,
     PHOTO_ENDPOINT,
+    PHOTO_PATH,
     PHOTO_VIEW_ENDPOINT,
+    PHOTO_VIEW_PATH,
     WalkSettings,
 )
 
 logger = logging.getLogger(__name__)
-
-PHOTO_PATH = "/tg/walk/photo"
-PHOTO_VIEW_PATH = "/tg/walk/photo/view"
-FINDING_PATH = "/tg/walk/finding"
-INFO_PATH = "/tg/walk/info"
 
 #: Предел формулировки и рекомендации. Абзац, а не страница: длиннее аудитор
 #: на ходу не пишет, а отчёт партнёру читается построчно.
@@ -298,7 +301,13 @@ def install(
             if not isinstance(inspection, Inspection):
                 return inspection
             lang = inspection.ui_lang
-            op(who, inspection, body)
+            # Решающая проверка сдачи — под замком заметок вместе с записью:
+            # ранняя выше могла пройти за миг до того, как бот отдал отчёт.
+            with while_open(who):
+                op(who, inspection, body)
+        except HandedOverError:
+            logger.info("Обход: чат %s сдал проверку во время записи — отказ", who)
+            return refused(said("walk.sealed", lang), 409)
         except WalkRefused as exc:
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:

@@ -591,3 +591,57 @@ def test_bot_reads_the_methodology_store_read_only(resolved: dict[str, dict]) ->
     том = next(v for v in бот["volumes"] if v["target"] == "/app/methodology")
     assert том.get("read_only") is True, "бот обязан читать хранилище, а не писать в него"
     assert бот["environment"].get("MCP_CHECKLIST_STORE") == "/app/methodology"
+
+
+# --- мини-апп обхода — свой сервис, админка только читает (D312) ------------
+
+
+def _сервисы(*файлы: str, профиль: str | None = None) -> dict[str, dict]:
+    аргументы = [x for f in файлы for x in ("-f", f)]
+    if профиль:
+        аргументы += ["--profile", профиль]
+    r = compose(*аргументы, "config", "--format", "json")
+    assert r.returncode == 0, r.stderr
+    services = json.loads(r.stdout)["services"]
+    assert isinstance(services, dict)
+    return services
+
+
+def _состояние(service: dict) -> dict:
+    найдено = [v for v in service.get("volumes", []) if v["target"] == "/app/state"]
+    assert найдено, "тому состояния нет у сервиса"
+    return dict(найдено[0])
+
+
+@requires_docker
+@pytest.mark.parametrize(
+    ("файлы", "профиль"),
+    [
+        pytest.param(("docker-compose.yml",), "web", id="стенд"),
+        pytest.param(("docker-compose.yml", "docker-compose.prod.yml"), None, id="прод"),
+    ],
+)
+def test_admin_reads_state_and_only_walk_writes_it(
+    файлы: tuple[str, ...], профиль: str | None
+) -> None:
+    """Запись в идущие проверки — только у сервиса обхода; админка — `:ro`.
+
+    Админка открыта наружу формой входа и десятком экранов. Дай ей том на
+    запись — и любая дыра в ней дотягивается до идущих проверок и признака
+    сдачи. Мини-апп пишет отдельным сервисом, и админка передаёт ему запросы.
+    """
+    services = _сервисы(*файлы, профиль=профиль)
+
+    assert _состояние(services["web"]).get("read_only") is True, (
+        "админке смонтирован том состояния на запись — запись принадлежит сервису `walk`"
+    )
+    assert _состояние(services["walk"]).get("read_only") is not True
+    assert services["walk"]["command"] == ["python", "-m", "src.web.walk_main"]
+    обход, админка = services["walk"]["build"], services["web"]["build"]
+    assert (обход["dockerfile"], обход["context"]) == (админка["dockerfile"], админка["context"])
+    assert not services["walk"].get("ports"), "сервис обхода не публикуется: до него ходит админка"
+    upstream = services["web"]["environment"]["WEB_WALK_UPSTREAM"]
+    порт = services["walk"]["environment"]["WEB_PORT"]
+    assert upstream == f"http://walk:{порт}", "админка передаёт обход не туда, где он слушает"
+    assert services["walk"]["environment"]["WEB_LISTEN_NETWORK"] == "1"
+    assert services["walk"]["healthcheck"]["test"] == ["CMD", "python", "tools/walk_healthcheck.py"]

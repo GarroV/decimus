@@ -54,6 +54,18 @@ cases = [
     ),
     (
         "src/web/walk_write.py",
+        "            with while_open(who):\n",
+        "            if True:\n",
+        "tests/test_web_walk_write.py::test_сдача_между_ранней_проверкой_и_записью_не_пропускает_запись",
+    ),
+    (
+        "src/domain/handover.py",
+        "    with state_lock(_notes_path(chat_id)):",
+        "    with state_lock(_notes_path(chat_id).with_suffix('.porcha')):",
+        "tests/test_domain_handover_lock.py::test_пока_идёт_запись_бот_не_сдаёт",
+    ),
+    (
+        "src/web/walk_write.py",
         "        if inspection is None or not _owns(inspection, ref):",
         "        if inspection is None:",
         "tests/test_web_walk_write.py::test_кадр_показывается_только_хозяину_записи",

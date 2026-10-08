@@ -48,8 +48,10 @@ from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     DATA_ENDPOINT,
+    DATA_PATH,
     INIT_DATA_HEADER,
     PAGE_ENDPOINT,
+    PAGE_PATH,
     WalkAccessError,
     WalkSettings,
     chat_of,
@@ -57,9 +59,6 @@ from .walk_auth import (
 )
 
 logger = logging.getLogger(__name__)
-
-PAGE_PATH = "/tg/walk"
-DATA_PATH = "/tg/walk/data"
 
 #: Предел тела запроса данных: строка initData — сотни байт, не мегабайты.
 MAX_INIT_DATA = 8192

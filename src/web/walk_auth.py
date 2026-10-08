@@ -55,6 +55,15 @@ PHOTO_ENDPOINT = "walk_photo"
 PHOTO_VIEW_ENDPOINT = "walk_photo_view"
 FINDING_ENDPOINT = "walk_finding"
 INFO_ENDPOINT = "walk_info"
+#: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
+#: (`walk.py`, `walk_write.py`), и админка, передающая ему запросы
+#: (`walk_proxy.py`), — две копии путей разошлись бы молча.
+PAGE_PATH = "/tg/walk"
+DATA_PATH = "/tg/walk/data"
+PHOTO_PATH = "/tg/walk/photo"
+PHOTO_VIEW_PATH = "/tg/walk/photo/view"
+FINDING_PATH = "/tg/walk/finding"
+INFO_PATH = "/tg/walk/info"
 ENDPOINTS = frozenset(
     {
         PAGE_ENDPOINT,
