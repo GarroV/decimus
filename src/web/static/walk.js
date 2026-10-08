@@ -343,7 +343,8 @@
     var line = el("span", "walk-item__line");
     var advice = rec.level === ADVICE_LEVEL;
     // У рекомендации нет класса: вместо метки D-уровня — слово.
-    line.appendChild(advice ? el("span", "walk-level walk-level--advice", tx("walk.rec.advice")) : W.level(rec.level));
+    var mark = rec.code === "NOTE" ? tx("walk.rec.note") : tx("walk.rec.advice");
+    line.appendChild(advice ? el("span", "walk-level walk-level--advice", mark) : W.level(rec.level));
     line.appendChild(el("span", "walk-item__text", rec.text));
     words.appendChild(line);
     if (rec.comment) words.appendChild(el("span", "walk-rec__comment", tx("walk.rec.comment", { text: rec.comment })));

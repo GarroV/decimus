@@ -135,6 +135,8 @@
   var ADVICE = "R";
 
   function checkLevel(code, level) {
+    // Общая заметка (NOTE) — рекомендация без пункта, уходит в конец отчёта.
+    if (code === "NOTE" && level === ADVICE) return;
     var item = items[code];
     if (!item) throw new Refused(said("walk.err.bad_request"));
     if (level === ADVICE) return;
@@ -152,7 +154,7 @@
       if (advice && !cleanText(b.text)) throw new Refused(said("walk.sheet.need_advice"));
       S.findings.push({
         code: b.code, level: b.level, zone: b.zone,
-        text: cleanText(b.text) || items[b.code].q, comment: cleanText(b.comment),
+        text: cleanText(b.text) || (items[b.code] || {}).q, comment: cleanText(b.comment),
         repeat: b.repeat === true && LEVELS_REPEAT.indexOf(b.level) !== -1, photos: photos,
       });
     },

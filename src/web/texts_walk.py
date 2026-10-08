@@ -110,9 +110,39 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.edit": {"ru": "Запись №{n}", "en": "Record #{n}"},
     "walk.sheet.edit_advice": {"ru": "Рекомендация №{n}", "en": "Recommendation #{n}"},
     "walk.sheet.advice_hint": {
-        "ru": "Не нарушение и без вычета: что команде стоит сделать. В отчёте — рядом с пунктом.",
-        "en": "Not a finding and no deduction: what the team should do. Printed next to the item.",
+        "ru": (
+            "Не нарушение и без вычета: что команде стоит сделать. В отчёте — "
+            "рядом с пунктом. Не про пункт — «Общая заметка», она уйдёт в конец отчёта."
+        ),
+        "en": (
+            "Not a finding and no deduction: what the team should do. Printed next "
+            "to the item. Not about an item — use “General note”, it goes to the end of the report."
+        ),
     },
+    "walk.sheet.measure_hint": {
+        "ru": (
+            "Показание без вычета: температура холодильника, настройки печи, "
+            "снимок готового изделия. В отчёте — приложением."
+        ),
+        "en": (
+            "A reading with no deduction: fridge temperature, oven settings, "
+            "finished product photo. Goes to the report appendix."
+        ),
+    },
+    "walk.sheet.photos_measure": {
+        "ru": "Снимок прибора, табло или изделия — обязателен.",
+        "en": "A photo of the gauge, display or product is required.",
+    },
+    "walk.sheet.search_measure": {
+        "ru": "Найти: температура, печь, изделие…",
+        "en": "Find: temperature, oven, product…",
+    },
+    "walk.note.item": {"ru": "Общая заметка — без пункта", "en": "General note — no item"},
+    "walk.note.hint": {
+        "ru": "Уйдёт в конец отчёта, в «Заметки проверяющего».",
+        "en": "Goes to the end of the report, under “Auditor's notes”.",
+    },
+    "walk.rec.note": {"ru": "Заметка", "en": "Note"},
     "walk.sheet.photos_optional": {
         "ru": "По желанию, но с фото команде понятнее.",
         "en": "Optional, but a photo makes it clearer for the team.",
