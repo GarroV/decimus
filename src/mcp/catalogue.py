@@ -1895,7 +1895,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "Upload a ratings file into Decimus (standards and customer-experience "
             "ratings, IMF only). kind: rko-violations | rko-evaluations | rs-checkups "
             "(Dodo IS CSV exports), sheet-scores (the 'quality by pizzeria' sheet as "
-            "CSV), snapshot (rating snapshot JSON, see docs/14-ratings.md). "
+            "CSV), snapshot (rating snapshot JSON, see docs/15-ratings.md). "
             "content: the file text as is. A snapshot goes in self-contained chunks of up to "
             f"{MCP_CHUNK_BYTES} bytes; send each chunk with its own call (the answer carries "
             "chunk_index and chunk_of). Re-sending the same content is safe: the answer says "

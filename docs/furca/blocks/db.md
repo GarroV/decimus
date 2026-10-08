@@ -174,7 +174,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 
 ### Рейтинги РС и РКО (миграции `0039`, `0040`)
 
-Отдельная схема `ratings` (D321); продуктовое описание — `docs/14-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
+Отдельная схема `ratings` (D321); продуктовое описание — `docs/15-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
 
 - `0039_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
 - `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
