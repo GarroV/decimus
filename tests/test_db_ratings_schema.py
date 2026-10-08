@@ -81,6 +81,22 @@ def test_замечание_без_периода_отказ(db_env: str) -> Non
             )
 
 
+def test_замечание_журнала_developer_conflict_ложится(db_env: str) -> None:
+    with psycopg.connect(db_env) as conn, conn.cursor() as cur:
+        загрузка = _журнал(cur)
+        cur.execute(
+            "insert into ratings.import_issues (import_id, row_no, reason, detail) "
+            "values (%s, 3, 'developer_conflict', '{\"country\": \"RS\"}')",
+            (загрузка,),
+        )
+        with pytest.raises(psycopg.errors.CheckViolation):
+            cur.execute(
+                "insert into ratings.import_issues (import_id, row_no, reason) "
+                "values (%s, 4, 'выдуманная_причина')",
+                (загрузка,),
+            )
+
+
 def test_число_периодов_зоны_риска_целое(db_env: str) -> None:
     with psycopg.connect(db_env) as conn, conn.cursor() as cur:
         with pytest.raises(psycopg.errors.CheckViolation):

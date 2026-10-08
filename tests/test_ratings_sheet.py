@@ -113,3 +113,13 @@ def test_два_девелопера_у_страны_не_теряются_мо�
     assert [(i.reason, i.detail["ignored"]) for i in parsed.issues] == [
         (ISSUE_DEVELOPER_CONFLICT, "Dev Two")
     ]
+
+
+def test_конфликт_девелопера_одно_замечание_на_страну() -> None:
+    rows = [
+        ["Dev One", "Serbia", "Testville-1", "", "1", "", ""],
+        ["Dev Two", "Serbia", "Testville-2", "", "2", "", ""],
+        ["Dev Three", "Serbia", "Testville-3", "", "3", "", ""],
+    ]
+    parsed = parse_sheet_scores(to_csv(SHEET_RS_HEADER, rows), today=СЕГОДНЯ)
+    assert [(i.reason, i.row_no) for i in parsed.issues] == [(ISSUE_DEVELOPER_CONFLICT, 3)]

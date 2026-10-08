@@ -121,9 +121,21 @@ cases = [
     ),
     (
         "src/ratings/sheet.py",
-        "            if known != developer:",
-        "            if False:",
+        "            if known != developer and country",
+        "            if False and country",
         "tests/test_ratings_sheet.py::test_два_девелопера_у_страны_не_теряются_молча",
+    ),
+    (
+        "src/ratings/sheet.py",
+        "            if known != developer and country not in conflicted:",
+        "            if known != developer:",
+        "tests/test_ratings_sheet.py::test_конфликт_девелопера_одно_замечание_на_страну",
+    ),
+    (
+        "src/db/migrations/0038_ratings.sql",
+        "'bad_row', 'developer_conflict'",
+        "'bad_row'",
+        "tests/test_db_ratings_schema.py::test_замечание_журнала_developer_conflict_ложится",
     ),
     (
         "src/ratings/snapshot.py",
