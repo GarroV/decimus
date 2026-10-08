@@ -44,6 +44,17 @@ def test_мусорный_ключ_нет() -> None:
         assert parse_period(key, rs_periods=РС) is None
 
 
+def test_год_ноль_и_нечестные_цифры_нет() -> None:
+    for key in ("0000-01", "0000-Q1", "2026-09\n", "2026-Q3\n", "rs:12\n", "٢٠٢٦-٠٩", "rs:١٢"):
+        assert parse_period(key, rs_periods=РС) is None
+
+
+def test_прошлый_у_первого_периода_эры_нет() -> None:
+    assert previous_period(month_period(1, 1), rs_periods=РС) is None
+    assert previous_period(quarter_period(1, 1), rs_periods=РС) is None
+    assert previous_period(month_period(1, 2), rs_periods=РС) == month_period(1, 1)
+
+
 def test_прошлый_такой_же_период() -> None:
     assert previous_period(quarter_period(2026, 1), rs_periods=РС) == quarter_period(2025, 4)
     assert previous_period(month_period(2026, 1), rs_periods=РС) == month_period(2025, 12)
