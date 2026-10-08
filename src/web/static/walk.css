@@ -561,7 +561,9 @@
   cursor: pointer;
 }
 
-.walk-ms__text { flex: 1; min-width: 0; }
+.walk-ms__words { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.walk-ms__text { min-width: 0; }
+.walk-ms__zone { font-size: 13px; line-height: 18px; color: var(--ink-2); }
 
 .walk-ms__value {
   flex: none;

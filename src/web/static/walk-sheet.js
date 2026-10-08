@@ -193,7 +193,8 @@
     return box;
   }
 
-  var KINDS = [["violation", "walk.kind.violation"], ["advice", "walk.kind.advice"], ["measure", "walk.kind.measure"]];
+  // Замер в переключателе не стоит: он вносится с остановки «Оборудование».
+  var KINDS = [["violation", "walk.kind.violation"], ["advice", "walk.kind.advice"]];
 
   /** Смена вида записи: пункт остаётся, если он годится новому виду. */
   function setMode(mode) {
@@ -222,6 +223,7 @@
   var draw = {
     kind: function () {
       if (f.n) return null;
+      if (isMeasure()) return section(null, tx("walk.sheet.measure_hint"));
       var seg = el("div", "walk-seg walk-seg--kind");
       KINDS.forEach(function (pair) {
         var on = f.mode === pair[0];
@@ -229,7 +231,7 @@
         b.setAttribute("aria-pressed", on ? "true" : "false");
         seg.appendChild(b);
       });
-      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : isMeasure() ? tx("walk.sheet.measure_hint") : null);
+      var box = section(null, isAdvice() ? tx("walk.sheet.advice_hint") : null);
       box.insertBefore(seg, box.firstChild);
       return box;
     },
@@ -267,7 +269,7 @@
     zone: function () {
       var box = section(tx("walk.sheet.zone"));
       var chips = el("div", "walk-chips");
-      W.state.data.zones.forEach(function (z) {
+      W.state.data.zones.filter(function (z) { return !z.equipment; }).forEach(function (z) {
         var on = z.code === f.zone;
         var chip = W.button("walk-chip" + (on ? " is-on" : ""), z.title, function () {
           f.zone = z.code;

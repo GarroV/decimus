@@ -5,7 +5,8 @@
  * стоит: сверху точка, прогресс и прошлый раз одной строкой; под ними
  * переключатель зон (текущая, три подсказки «осталось», лист «Все зоны»
  * снизу по нажатию, свайп — соседняя зона); дальше прошлое, записанное,
- * замеры и чек-лист этой зоны; внизу — «+ Нарушение» и «Осмотрено →».
+ * чек-лист этой зоны; внизу — «+ Нарушение» и «Осмотрено →». Замеры —
+ * последней остановкой «Печь и холодильники» (D315).
  * Зону засчитывает только явное «Осмотрено»: запись делает её «в работе».
  * Сведения о визите — отдельный лист из шапки.
  * Форма записи — `walk-sheet.js`, кадры — `walk-photo.js`, общее — `walk-core.js`.
@@ -79,8 +80,28 @@
     return zone.previous.filter(function (p) { return !rechecked(p, zone); }).length;
   }
 
-  function hasMeasures(zone) {
-    return S.data.items.some(function (i) { return i.measure && (!i.zones.length || i.zones.indexOf(zone.code) !== -1); });
+  /* Замеры (D0: печь, холодильники, снимок изделия) собраны в одну остановку
+   * обхода в конце списка — «Оборудование». В зонах их нет: так показания
+   * снимаются одним заходом и не теряются среди нарушений. Запись замера
+   * по-прежнему пишется в свою зону — остановка только собирает их. */
+  var EQ_CODE = "__equipment";
+
+  function withEquipment(body) {
+    if (!body.zones || !body.items.some(function (i) { return i.measure; })) return body;
+    var readings = [];
+    var zones = body.zones.map(function (z) {
+      z.recorded.forEach(function (r) {
+        if (r.level === "D0") readings.push(Object.assign({}, r, { zone: z.code }));
+      });
+      return Object.assign({}, z, { recorded: z.recorded.filter(function (r) { return r.level !== "D0"; }) });
+    });
+    var eq = { code: EQ_CODE, title: tx("walk.eq.title"), equipment: true, previous: [], recorded: readings };
+    return Object.assign({}, body, { zones: zones.concat([eq]) });
+  }
+
+  function zoneTitle(code) {
+    var z = S.data.zones.filter(function (x) { return x.code === code; })[0];
+    return z ? z.title : "";
   }
 
   function writable() { return !S.data.sealed; }
@@ -409,26 +430,31 @@
     return box;
   }
 
-  /** Замеры, которые методика ждёт именно в этой зоне: холодильник, печь.
-   *  Общие замеры (без зоны) здесь не повторяются — они в «+ Замер». */
-  function renderMeasures(zone) {
-    var wanted = S.data.items.filter(function (i) { return i.measure && i.zones.indexOf(zone.code) !== -1; });
-    if (!wanted.length) return null;
+  /** Остановка «Оборудование»: каждый замер методики — строкой; замер,
+   *  привязанный к нескольким зонам (холодильник в двух шкафах), — строкой
+   *  на зону. Нажатие открывает показание или форму замера уже с пунктом. */
+  function renderEquipment(zone) {
     var box = el("section", "walk-ms");
-    box.appendChild(el("h2", "walk-sub", tx("walk.zone.measures")));
+    box.appendChild(el("p", "walk-stage__note", tx("walk.eq.hint")));
     var list = el("ul", "walk-ms__list");
-    wanted.forEach(function (i) {
-      var got = zone.recorded.filter(function (r) { return r.code === i.code; });
-      var li = el("li");
-      var b = W.button("walk-ms__item" + (got.length ? " is-done" : ""), null, function () {
-        if (!writable()) return;
-        if (got.length) W.sheet.open({ record: got[0], zone: zone.code });
-        else W.sheet.open({ mode: "measure", zone: zone.code, code: i.code, level: "D0" });
+    S.data.items.filter(function (i) { return i.measure; }).forEach(function (i) {
+      (i.zones.length ? i.zones : [null]).forEach(function (target) {
+        var got = zone.recorded.filter(function (r) { return r.code === i.code && (!target || r.zone === target); });
+        var li = el("li");
+        var b = W.button("walk-ms__item" + (got.length ? " is-done" : ""), null, function () {
+          if (!writable()) return;
+          if (got.length) W.sheet.open({ record: got[0], zone: got[0].zone });
+          else W.sheet.open({ mode: "measure", zone: target, code: i.code, level: "D0" });
+        });
+        var words = el("span", "walk-ms__words");
+        words.appendChild(el("span", "walk-ms__text", i.q));
+        var where = target ? zoneTitle(target) : got.map(function (r) { return zoneTitle(r.zone); }).join(", ");
+        if (where) words.appendChild(el("span", "walk-ms__zone", where));
+        b.appendChild(words);
+        b.appendChild(el("span", "walk-ms__value", got.length ? got.map(function (r) { return r.text; }).join("; ") : tx("walk.zone.measure_add")));
+        li.appendChild(b);
+        list.appendChild(li);
       });
-      b.appendChild(el("span", "walk-ms__text", i.q));
-      b.appendChild(el("span", "walk-ms__value", got.length ? got.map(function (r) { return r.text; }).join("; ") : tx("walk.zone.measure_add")));
-      li.appendChild(b);
-      list.appendChild(li);
     });
     box.appendChild(list);
     return box;
@@ -437,17 +463,18 @@
   function renderStage(zone) {
     var stage = el("section", "walk-stage" + (S.dir > 0 ? " is-from-right" : S.dir < 0 ? " is-from-left" : ""));
     S.dir = 0;
+    if (zone.equipment) {
+      stage.appendChild(renderEquipment(zone));
+      if (zoneDone(zone)) stage.appendChild(unmarkRow(zone));
+      return stage;
+    }
     if (zone.previous.length) {
       stage.appendChild(el("h2", "walk-sub", tx("walk.zone.before")));
       var prev = el("ul", "walk-list");
       zone.previous.forEach(function (p) { prev.appendChild(renderPreviousItem(p, zone)); });
       stage.appendChild(prev);
     }
-    // Замеры, которых зона ждёт, показаны своим блоком — здесь не повторяются.
-    var own = zone.recorded.filter(function (r) {
-      var it = r.level === "D0" && S.data.items.filter(function (i) { return i.code === r.code; })[0];
-      return !(it && it.zones.indexOf(zone.code) !== -1);
-    });
+    var own = zone.recorded;
     if (own.length) {
       stage.appendChild(el("h2", "walk-sub", tx("walk.zone.now")));
       var now = el("ul", "walk-list walk-list--records");
@@ -456,8 +483,6 @@
     } else if (!zone.previous.length && writable()) {
       stage.appendChild(el("p", "walk-stage__note", zoneDone(zone) ? tx("walk.zone.clean_done") : tx("walk.zone.empty_hint")));
     }
-    var measures = renderMeasures(zone);
-    if (measures) stage.appendChild(measures);
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);
 
@@ -467,20 +492,23 @@
         W.sheet.open({ mode: "advice", zone: zone.code });
       }));
     }
-    if (writable() && hasMeasures(zone)) {
-      extra.appendChild(W.button("walk-link", "+ " + tx("walk.add.short_measure"), function () {
-        W.sheet.open({ mode: "measure", zone: zone.code });
-      }));
-    }
-    if (zoneDone(zone)) {
-      extra.appendChild(W.button("walk-link walk-link--quiet", tx("walk.zone.unmark"), function () {
-        S.marks.z = toggle(S.marks.z, zone.code);
-        saveMarks();
-        render();
-      }));
-    }
+    if (zoneDone(zone)) extra.appendChild(unmarkButton(zone));
     if (extra.childNodes.length) stage.appendChild(extra);
     return stage;
+  }
+
+  function unmarkButton(zone) {
+    return W.button("walk-link walk-link--quiet", tx("walk.zone.unmark"), function () {
+      S.marks.z = toggle(S.marks.z, zone.code);
+      saveMarks();
+      render();
+    });
+  }
+
+  function unmarkRow(zone) {
+    var extra = el("div", "walk-stage__extra");
+    extra.appendChild(unmarkButton(zone));
+    return extra;
   }
 
   /* ── низ экрана: записать и дальше ─────────────────────────────────── */
@@ -511,7 +539,8 @@
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
     row.appendChild(W.button("walk-mark walk-dock__add", "+ " + tx("walk.add.short"), function () {
-      W.sheet.open({ mode: "violation", zone: zone.code });
+      // На остановке «Оборудование» зоны нет — её выберут в форме.
+      W.sheet.open({ mode: "violation", zone: zone.equipment ? null : zone.code });
     }));
     var next = nextOpen(zone.code);
     var label;
@@ -689,6 +718,7 @@
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
     S.data = body;
+    S.data = withEquipment(body);
     document.documentElement.lang = body.lang;
     if (body.state !== "active") { if (!keepSheet) W.sheet.close(true); render(); return; }
     if (first) loadMarks(body.key, function (m) { S.marks = m; S.open = null; render(); });
