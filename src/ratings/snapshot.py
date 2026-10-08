@@ -190,7 +190,9 @@ def _history(
     return periods, history
 
 
-def _unit(raw: dict[str, Any], unit: UnitRef) -> tuple[list[Score], list[Remark], int]:
+def _unit(
+    raw: dict[str, Any], unit: UnitRef
+) -> tuple[list[Score], list[Remark], int, dict[str, PeriodRef]]:
     periods, history = _history(raw)
     remarks: list[Remark] = []
     counts: dict[str, int] = {}
@@ -223,7 +225,7 @@ def _unit(raw: dict[str, Any], unit: UnitRef) -> tuple[list[Score], list[Remark]
         Score(unit, period, score, status=status, checkups_count=counts.get(period.dodo_id or ""))
         for period, score, status in history
     ]
-    return scores, remarks, skipped
+    return scores, remarks, skipped, periods
 
 
 def _load(data: bytes) -> dict[str, Any]:
@@ -256,6 +258,12 @@ def _countries(raw: object) -> tuple[dict[int, tuple[str | None, object]], tuple
             raise RatingsFormatError(
                 "Страна снимка без числового id", ERR_BAD_SNAPSHOT, part="countries"
             )
+        if country_id in by_id:
+            raise RatingsFormatError(
+                f"Страна {country_id} повторена в справочнике снимка",
+                ERR_BAD_SNAPSHOT,
+                part="countries",
+            )
         name = item.get("name")
         code = country_code(name) if isinstance(name, str) else None
         by_id[country_id] = (code, item.get("region"))
@@ -264,12 +272,35 @@ def _countries(raw: object) -> tuple[dict[int, tuple[str | None, object]], tuple
     return by_id, tuple(refs)
 
 
-def _label(chunk: object) -> str | None:
-    if not isinstance(chunk, dict):
-        return None
-    index, total = chunk.get("index"), chunk.get("of")
+def _chunk(doc: dict[str, Any]) -> tuple[int | None, int | None, str | None]:
+    """Номер части, число частей и причина, если `chunk` есть, но не годится."""
+    if "chunk" not in doc:
+        return None, None, None
+    chunk = doc["chunk"]
+    index = chunk.get("index") if isinstance(chunk, dict) else None
+    total = chunk.get("of") if isinstance(chunk, dict) else None
     if _is_int(index) and _is_int(total) and 1 <= index <= total <= MAX_CHUNKS:
-        return f"часть {index} из {total}"
+        return index, total, None
+    return None, None, f"chunk должен быть {{index, of}}, 1 <= index <= of <= {MAX_CHUNKS}"
+
+
+def _period_conflict(
+    periods: dict[str, PeriodRef],
+    by_id: dict[str, PeriodRef],
+    by_slot: dict[tuple[str, date], str],
+) -> str | None:
+    """Период пиццерии против заявленных ранее в документе; причина расхождения или `None`."""
+    for period_id, period in periods.items():
+        known = by_id.get(period_id)
+        if known is not None and (known.rating_type, known.begin_on, known.end_on) != (
+            period.rating_type,
+            period.begin_on,
+            period.end_on,
+        ):
+            return f"период {period_id} расходится с ранее заявленным"
+        owner = by_slot.get((period.rating_type, period.begin_on))
+        if owner is not None and owner != period_id:
+            return f"периоды {owner} и {period_id} с одним типом и началом"
     return None
 
 
@@ -285,6 +316,9 @@ def parse_snapshot(data: bytes) -> Parsed:
     remarks: list[Remark] = []
     issues: list[Issue] = []
     skipped = 0
+    seen_units: set[str] = set()
+    period_by_id: dict[str, PeriodRef] = {}
+    period_by_slot: dict[tuple[str, date], str] = {}
     for row_no, raw in enumerate(units_raw, start=1):
         if not isinstance(raw, dict):
             issues.append(
@@ -302,6 +336,16 @@ def parse_snapshot(data: bytes) -> Parsed:
                 )
             )
             continue
+        if unit_id in seen_units:
+            issues.append(
+                Issue(
+                    row_no,
+                    ISSUE_BAD_ROW,
+                    {"reason": "пиццерия повторена в части", "unit": _clip(name)},
+                )
+            )
+            continue
+        seen_units.add(unit_id)
         country_id = raw.get("country_id")
         code, region = by_id.get(country_id, (None, None)) if _is_int(country_id) else (None, None)
         if code is None:
@@ -317,15 +361,26 @@ def parse_snapshot(data: bytes) -> Parsed:
             skipped += 1
             continue
         try:
-            unit_scores, unit_remarks, unit_skipped = _unit(
+            unit_scores, unit_remarks, unit_skipped, unit_periods = _unit(
                 raw, UnitRef(unit_id, name.strip(), code)
             )
         except _BadUnit as exc:
             issues.append(Issue(row_no, ISSUE_BAD_ROW, {"reason": str(exc), "unit": _clip(name)}))
             continue
+        conflict = _period_conflict(unit_periods, period_by_id, period_by_slot)
+        if conflict is not None:
+            issues.append(Issue(row_no, ISSUE_BAD_ROW, {"reason": conflict, "unit": _clip(name)}))
+            continue
+        period_by_id.update(unit_periods)
+        period_by_slot.update(
+            {(p.rating_type, p.begin_on): period_id for period_id, p in unit_periods.items()}
+        )
         scores += unit_scores
         remarks += unit_remarks
         skipped += unit_skipped
+    chunk_index, chunk_of, chunk_problem = _chunk(doc)
+    if chunk_problem is not None:
+        issues.append(Issue(0, ISSUE_BAD_ROW, {"reason": chunk_problem, "unit": ""}))
     return Parsed(
         FORMAT_SNAPSHOT,
         scores=tuple(scores),
@@ -333,5 +388,7 @@ def parse_snapshot(data: bytes) -> Parsed:
         countries=refs,
         issues=tuple(issues),
         skipped=skipped,
-        label=_label(doc.get("chunk")),
+        label=None if chunk_index is None else f"часть {chunk_index} из {chunk_of}",
+        chunk_index=chunk_index,
+        chunk_of=chunk_of,
     )

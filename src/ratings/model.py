@@ -158,3 +158,7 @@ class Parsed:
     skipped: int = 0
     #: Подпись для журнала, например «часть 2 из 3» у снимка.
     label: str | None = None
+    #: Номер части и их число у снимка (из `chunk`), иначе `None`: задача сверки
+    #: частей не должна разбирать `label`.
+    chunk_index: int | None = None
+    chunk_of: int | None = None

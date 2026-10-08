@@ -201,7 +201,55 @@ cases = [
         "src/ratings/snapshot.py",
         "    if _is_int(index) and _is_int(total) and 1 <= index <= total <= MAX_CHUNKS:",
         "    if True:",
-        "tests/test_ratings_snapshot.py::test_подпись_части_из_мусора_не_падает",
+        "tests/test_ratings_snapshot.py::test_chunk_невалиден_замечание_а_не_тихий_none",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if unit_id in seen_units:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_пиццерия_повторена_в_части_вторая_в_журнал_без_задвоения",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if known is not None and (",
+        "        if False and (",
+        "tests/test_ratings_snapshot.py::test_период_с_разными_датами_у_двух_пиццерий_вторая_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "            period.begin_on,\n            period.end_on,\n",
+        "            period.begin_on,\n            known.end_on,\n",
+        "tests/test_ratings_snapshot.py::test_период_с_разными_датами_у_двух_пиццерий_вторая_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "            period.rating_type,\n            period.begin_on,\n",
+        "            known.rating_type,\n            period.begin_on,\n",
+        "tests/test_ratings_snapshot.py::test_период_с_другим_типом_у_второй_пиццерии_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if owner is not None and owner != period_id:",
+        "        if False:",
+        "tests/test_ratings_snapshot.py::test_два_id_с_одним_типом_и_началом_вторая_пиццерия_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if conflict is not None:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_два_id_с_одним_типом_и_началом_вторая_пиццерия_в_журнал",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "    if chunk_problem is not None:\n",
+        "    if False:\n",
+        "tests/test_ratings_snapshot.py::test_chunk_невалиден_замечание_а_не_тихий_none",
+    ),
+    (
+        "src/ratings/snapshot.py",
+        "        if country_id in by_id:\n",
+        "        if False:\n",
+        "tests/test_ratings_snapshot.py::test_страна_повторена_в_справочнике_отказ",
     ),
 ]
 

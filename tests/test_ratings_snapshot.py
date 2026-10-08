@@ -320,9 +320,89 @@ def test_огромная_строка_в_журнале_обрезана() -> N
     assert len(str(parsed.issues[0].detail["unit"])) <= 200
 
 
-def test_подпись_части_из_мусора_не_падает() -> None:
+@pytest.mark.parametrize(
+    "chunk",
+    [
+        {"index": 3, "of": 2},
+        {"index": 0, "of": 3},
+        True,
+        "x",
+        {"index": True, "of": 3},
+        {"index": HUGE, "of": [3]},
+        {"index": 1, "of": 10**9},
+    ],
+)
+def test_chunk_невалиден_замечание_а_не_тихий_none(chunk: object) -> None:
     doc = snapshot_doc()
-    doc["chunk"] = {"index": HUGE, "of": [3]}
-    assert parse_snapshot(json.dumps(doc).encode()).label is None
-    doc["chunk"] = "x"
-    assert parse_snapshot(json.dumps(doc).encode()).label is None
+    doc["chunk"] = chunk
+    parsed = parse_snapshot(json.dumps(doc).encode())
+    assert (parsed.label, parsed.chunk_index, parsed.chunk_of) == (None, None, None)
+    assert [i.reason for i in parsed.issues] == [ISSUE_BAD_ROW]
+    assert "chunk" in parsed.issues[0].detail["reason"]
+
+
+def test_chunk_числами_рядом_с_подписью() -> None:
+    parsed = parse_snapshot(snapshot())
+    assert (parsed.chunk_index, parsed.chunk_of, parsed.label) == (2, 3, "часть 2 из 3")
+
+
+def test_chunk_нет_совсем_не_замечание() -> None:
+    doc = snapshot_doc()
+    del doc["chunk"]
+    parsed = parse_snapshot(json.dumps(doc).encode())
+    assert (parsed.label, parsed.chunk_index, parsed.issues) == (None, None, ())
+
+
+def test_страна_повторена_в_справочнике_отказ() -> None:
+    doc = snapshot_doc()
+    doc["countries"] = [
+        {"id": 12, "name": "Serbia", "region": 2},
+        {"id": 12, "name": "Russia", "region": 1},
+    ]
+    with pytest.raises(RatingsFormatError) as caught:
+        parse_snapshot(json.dumps(doc).encode())
+    assert caught.value.code == ERR_BAD_SNAPSHOT
+
+
+def test_пиццерия_повторена_в_части_вторая_в_журнал_без_задвоения() -> None:
+    doc = snapshot_doc()
+    doc["units"] = [doc["units"][0], copy.deepcopy(doc["units"][0])]  # type: ignore[index]
+    parsed = parse_snapshot(json.dumps(doc).encode())
+    assert [(i.row_no, i.reason) for i in parsed.issues] == [(2, ISSUE_BAD_ROW)]
+    assert "повторена" in parsed.issues[0].detail["reason"]
+    assert len(parsed.scores) == 2 and len(parsed.remarks) == 1
+
+
+def _two_units(first: list[dict[str, Any]], second: list[dict[str, Any]]) -> bytes:
+    """Две пиццерии страны IMF со своими историями и без замечаний."""
+    doc = snapshot_doc(history=first, remarks=[])
+    neighbour = copy.deepcopy(doc["units"][0])  # type: ignore[index]
+    neighbour.update({"dodo_id": U2, "name": "Testville-2", "history": second})
+    doc["units"] = [doc["units"][0], neighbour]  # type: ignore[index]
+    return json.dumps(doc).encode()
+
+
+def test_период_с_разными_датами_у_двух_пиццерий_вторая_в_журнал() -> None:
+    parsed = parse_snapshot(_two_units(_history(), _history(end="2026-09-29")))
+    assert [(i.row_no, i.reason) for i in parsed.issues] == [(2, ISSUE_BAD_ROW)]
+    assert "расходится" in parsed.issues[0].detail["reason"]
+    assert {s.unit.dodo_id for s in parsed.scores} == {U1}
+
+
+def test_период_с_другим_типом_у_второй_пиццерии_в_журнал() -> None:
+    parsed = parse_snapshot(_two_units(_history(), _history(rating_type=1)))
+    assert [i.row_no for i in parsed.issues] == [2]
+    assert "расходится" in parsed.issues[0].detail["reason"]
+
+
+def test_два_id_с_одним_типом_и_началом_вторая_пиццерия_в_журнал() -> None:
+    parsed = parse_snapshot(_two_units(_history(), _history(id="ee" * 16)))
+    assert [(i.row_no, i.reason) for i in parsed.issues] == [(2, ISSUE_BAD_ROW)]
+    assert "одним типом и началом" in parsed.issues[0].detail["reason"]
+    assert {s.unit.dodo_id for s in parsed.scores} == {U1}
+
+
+def test_одинаковые_периоды_у_разных_пиццерий_принимаются() -> None:
+    parsed = parse_snapshot(_with_neighbour())
+    assert parsed.issues == ()
+    assert {s.unit.dodo_id for s in parsed.scores} == {U1, U2}
