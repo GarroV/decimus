@@ -30,6 +30,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
+from .import_catalogue import IMPORT_TOOLS
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -60,6 +61,15 @@ KIND_RETRACTION = "retraction"
 #: нет вовсе: обработчики живут отдельным модулем `src.mcp.checklist_source`, и
 #: это проверяется снаружи (`tests/test_mcp_catalogue.py`).
 KIND_CHECKLIST_SOURCE = "checklist_source"
+
+#: Загрузка исторических проверок поштучно (D305–D310). Пятый вид, и второе
+#: названное исключение из правила «запись только у методики»: инструменты
+#: этого вида заводят, правят и удаляют загруженные ЧЕРНОВИКИ и подтверждают
+#: их. Право — по арендатору (`MCP_IMPORT_TENANTS`), спрашивается на входе
+#: (`rpc._call_tool`); обработчики — только в `src.mcp.imports`, а заслон
+#: «только загруженный черновик своего пространства» стоит в замке строки
+#: (`src/db/imports.py`). Описания — в `import_catalogue.py`.
+KIND_IMPORT = "import"
 
 
 @dataclass(frozen=True)
@@ -1864,6 +1874,20 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler=checklists_tools.apply_checklist,
         kind=KIND_CHECKLIST,
     ),
+)
+
+#: Инструменты загрузки (D305) — своим видом и одним местом: вид ставится здесь,
+#: а не в файле описаний, чтобы инструмент оттуда не мог попасть в каталог мимо
+#: права `MCP_IMPORT_TENANTS`.
+TOOLS = TOOLS + tuple(
+    ToolSpec(
+        name=t.name,
+        description=t.description,
+        input_schema=t.input_schema,
+        handler=t.handler,
+        kind=KIND_IMPORT,
+    )
+    for t in IMPORT_TOOLS
 )
 
 #: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним
