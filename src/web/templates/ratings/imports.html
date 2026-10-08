@@ -29,7 +29,7 @@
       <form method="post" enctype="multipart/form-data" action="{{ action('/import') }}" class="rt-form rt-drop">
         <label class="rt-field--grow"><span class="rt-field__label">{{ t('ratings.imports.file') }}</span>
           <input class="input" type="file" name="file" accept=".csv,.json,text/csv,application/json" required></label>
-        <button class="btn btn--primary" type="submit">{{ t('ratings.imports.submit') }}</button>
+        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.imports.submit') }}</button>
       </form>
     </div></div>
   </section>
@@ -77,7 +77,7 @@
       <form method="post" action="{{ action('/countries') }}" class="rt-form">
         <input type="hidden" name="code" value="{{ c.code }}">
         <label><span class="rt-field__label">{{ country_name(c.code) }}</span>
-          <input class="input" name="developer" value="{{ c.developer or '' }}" maxlength="120"></label>
+          <input class="input input--sm" name="developer" value="{{ c.developer or '' }}" maxlength="120"></label>
         <button class="btn btn--sm" type="submit">{{ t('ratings.developers.save') }}</button>
       </form>
       {% endfor %}
@@ -106,12 +106,12 @@
         <div class="rt-card__body">
           <form method="post" action="{{ action('/hard-rules') }}" class="rt-form">
             <label><span class="rt-field__label">{{ t('ratings.rules.type') }}</span>
-              <select class="input" name="rating_type"><option value="rko">{{ t('ratings.rko') }}</option><option value="rs">{{ t('ratings.rs') }}</option></select></label>
+              <select class="input input--sm" name="rating_type"><option value="rko">{{ t('ratings.rko') }}</option><option value="rs">{{ t('ratings.rs') }}</option></select></label>
             <label><span class="rt-field__label">{{ t('ratings.rules.match') }}</span>
-              <select class="input" name="match"><option value="text">{{ t('ratings.rules.match.text') }}</option><option value="contains">{{ t('ratings.rules.match.contains') }}</option></select></label>
+              <select class="input input--sm" name="match"><option value="text">{{ t('ratings.rules.match.text') }}</option><option value="contains">{{ t('ratings.rules.match.contains') }}</option></select></label>
             <label class="rt-field--grow"><span class="rt-field__label">{{ t('ratings.rules.pattern') }}</span>
-              <input class="input" name="pattern" required></label>
-            <button class="btn" type="submit">{{ t('ratings.rules.add') }}</button>
+              <input class="input input--sm" name="pattern" required></label>
+            <button class="btn btn--sm" type="submit">{{ t('ratings.rules.add') }}</button>
           </form>
         </div>
       </div>
@@ -123,11 +123,11 @@
         <form method="post" action="{{ action('/settings') }}" class="rt-form">
           {% for key in ('top_threshold', 'risk_threshold') %}
           <label><span class="rt-field__label">{{ t('ratings.settings.' ~ key) }}</span>
-            <input class="input input--num" type="number" name="{{ key }}" min="0" max="100" step="0.1" value="{{ settings[key] if key in settings else '' }}"></label>
+            <input class="input input--sm input--num" type="number" name="{{ key }}" min="0" max="100" step="0.1" value="{{ settings[key] if key in settings else '' }}"></label>
           {% endfor %}
           <label><span class="rt-field__label">{{ t('ratings.settings.risk_periods') }}</span>
-            <input class="input input--num" type="number" name="risk_periods" min="2" max="12" step="1" value="{{ settings.risk_periods|int if 'risk_periods' in settings else '' }}"></label>
-          <button class="btn" type="submit">{{ t('ratings.settings.save') }}</button>
+            <input class="input input--sm input--num" type="number" name="risk_periods" min="2" max="12" step="1" value="{{ settings.risk_periods|int if 'risk_periods' in settings else '' }}"></label>
+          <button class="btn btn--sm" type="submit">{{ t('ratings.settings.save') }}</button>
         </form>
       </div></div>
     </section>

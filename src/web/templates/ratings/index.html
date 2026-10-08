@@ -15,14 +15,16 @@
 {% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
 {#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
     данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
-{% macro vblock(block, kind) %}
+{% macro vblock(block, kind, title, level) %}
+  {% set has = block.checkups != 0 and block.total != 0 %}
+  <div class="rt-viol__head"><h{{ level }} class="rt-card__title">{{ title }}</h{{ level }}>
+    {% if has %}<span class="rt-stats">
+      <span class="rt-stat">{{ t('ratings.violations.total', n='') }}<b>{{ block.total }}</b></span>
+      <span class="rt-stat">{{ t('ratings.violations.per', x='') }}<b>{{ ('%.2f'|format(block.per_checkup)) if block.per_checkup is not none else '—' }}</b></span>
+    </span>{% endif %}</div>
   {% if block.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
   {% elif block.total == 0 %}<div class="rt-empty">{{ t('ratings.empty.violations') }}</div>
   {% else %}
-  <div class="rt-stats">
-    <span class="rt-stat">{{ t('ratings.violations.total', n='') }}<b>{{ block.total }}</b></span>
-    <span class="rt-stat">{{ t('ratings.violations.per', x='') }}<b>{{ ('%.2f'|format(block.per_checkup)) if block.per_checkup is not none else '—' }}</b></span>
-  </div>
   {% set most = block.top|map(attribute='count')|max %}
   <ol class="rt-bars">{% for line in block.top %}<li>
     <span class="rt-bars__text">{{ line.text }}</span>
@@ -51,7 +53,7 @@
         {% if summary.last_loaded %}<b>{{ t('ratings.loaded.title') }}:</b> {% for fmt, at in summary.last_loaded|dictsort %}{{ t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format)) }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ t('ratings.loaded.none') }}{% endif %}
       </div>
     </div>
-    {% if may_manage %}<a class="btn" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
+    {% if may_manage %}<a class="btn btn--sm" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
   </header>
 
   <form class="rt-bar" method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
@@ -67,25 +69,25 @@
     </div>
     {% if selection.group == 'developer' %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.developer') }}</span>
-      {% if choices.developers %}<select class="input" name="value">
+      {% if choices.developers %}<select class="input input--sm" name="value">
         {% for d in choices.developers %}<option value="{{ d }}"{% if d == selection.value %} selected{% endif %}>{{ d }}</option>{% endfor %}
       </select>{% else %}<span class="rt-head__meta">{{ t('ratings.empty.countries') }}</span>{% endif %}
     </label>
     {% elif selection.group == 'country' %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.country') }}</span>
-      <select class="input" name="value">
+      <select class="input input--sm" name="value">
         {% for c in choices.countries %}<option value="{{ c.code }}"{% if c.code == selection.value %} selected{% endif %}>{{ country_name(c.code) }}{% if c.developer %} · {{ c.developer }}{% endif %}</option>{% endfor %}
       </select>
     </label>
     {% endif %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.period') }}</span>
-      <select class="input" id="rt-period" name="period">
+      <select class="input input--sm" id="rt-period" name="period">
         {% for g in periods %}<optgroup label="{{ t('ratings.period.' ~ g.kind) }}">
           {% for key, title in g.options %}<option value="{{ key }}"{% if key == selection.period.key %} selected{% endif %}>{{ title }}</option>{% endfor %}
         </optgroup>{% endfor %}
       </select>
     </label>
-    <button class="btn btn--primary" type="submit">{{ t('ratings.show') }}</button>
+    <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button>
   </form>
 
   {% if not summary.countries %}
@@ -99,9 +101,9 @@
         {% for kind, value, delta in (('rs', summary.total.rs, summary.total.rs_delta), ('rko', summary.total.rko, summary.total.rko_delta)) %}
         <div class="rt-card rt-kpi rt-kpi--{{ kind }}">
           <div class="rt-kpi__label">{{ t('ratings.' ~ kind) }} · {{ t('ratings.total') }}</div>
-          <div class="rt-kpi__value{% if value is none %} is-empty{% endif %}">{% if value is none %}—{% else %}{{ '%.1f'|format(value) }}<small>/100</small>{% endif %}</div>
           {% if value is none %}<div class="rt-kpi__why">{{ t('ratings.empty.' ~ kind) }}</div>
-          {% else %}<div class="rt-kpi__delta">{{ dlt(delta) }} <span>{{ t('ratings.col.delta', prev=prev) }}</span></div>{% endif %}
+          {% else %}<div class="rt-kpi__row"><span class="rt-kpi__value">{{ '%.1f'|format(value) }}<small>/100</small></span>
+            <span class="rt-kpi__delta">{{ dlt(delta) }} <span>{{ t('ratings.col.delta', prev=prev) }}</span></span></div>{% endif %}
         </div>
         {% endfor %}
       </div>
@@ -133,8 +135,7 @@
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-viol">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-viol">{{ t('ratings.block.' ~ kind ~ '_violations') }}</h2></div>
     <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
-      <h3 class="rt-card__title">{{ t('ratings.cluster') }}</h3>
-      {{ vblock(cluster, kind) }}
+      {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
     </div></div>
     {#- Нет проверок во всей группе — у каждой страны то же «нет данных»: не повторяем его карточкой на страну. -#}
     {% if summary.countries|length > 1 and cluster.checkups != 0 %}
@@ -142,8 +143,7 @@
     <div class="rt-viol">
       {% for code in summary.countries %}
       <div class="rt-card"><div class="rt-card__body">
-        <h4 class="rt-card__title">{{ country_name(code) }}</h4>
-        {{ vblock(by[code], kind) }}
+        {{ vblock(by[code], kind, country_name(code), 4) }}
       </div></div>
       {% endfor %}
     </div>
