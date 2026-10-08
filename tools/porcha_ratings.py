@@ -397,6 +397,78 @@ cases = [
         "",
         "tests/test_ratings_periods.py::test_прошлый_у_первого_периода_эры_нет",
     ),
+    (
+        "src/ratings/summary.py",
+        "    top = sorted((u for u in scored if u.score > threshold), key=lambda u: (-u.score, u.unit_name))\n",  # noqa: E501
+        "    top = sorted((u for u in scored if u.score >= threshold), key=lambda u: (-u.score, u.unit_name))\n",  # noqa: E501
+        "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        (u for u in scored if u.score <= threshold), key=lambda u: (u.score, u.unit_name)\n",  # noqa: E501
+        "        (u for u in scored if u.score < threshold), key=lambda u: (u.score, u.unit_name)\n",  # noqa: E501
+        "tests/test_ratings_summary.py::test_top_выше_порога_bottom_не_выше",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    return tuple(top[:limit]), tuple(bottom[:limit])\n",
+        "    return tuple(top), tuple(bottom)\n",
+        "tests/test_ratings_summary.py::test_top_bottom_по_десять",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    return tuple(top[:limit]), tuple(bottom[:limit])\n",
+        "    return tuple(top[:limit]), tuple(bottom)\n",
+        "tests/test_ratings_summary.py::test_bottom_ограничен_десятью_худшими",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    return None if current is None or previous is None else current - previous\n",
+        "    return None if current is None or previous is None else previous - current\n",
+        "tests/test_ratings_summary.py::test_дельта_к_прошлому_периоду",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        if fact.category in _COUNTED:\n",
+        "        if True:\n",
+        "tests/test_ratings_summary.py::test_топ5_и_на_одну_проверку",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        if fact.category in _COUNTED:\n",
+        "        if fact.category == CATEGORY_VIOLATION:\n",
+        "tests/test_ratings_summary.py::test_замечание_считается_наравне_с_нарушением",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        total / checkups if checkups else None,\n",
+        "        total / checkups,\n",
+        "tests/test_ratings_summary.py::test_ноль_проверок_не_деление_на_ноль",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        if len(by_period) != len(period_ids):\n",
+        "        if not by_period:\n",
+        "tests/test_ratings_summary.py::test_зона_риска_три_подряд_строго_ниже",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        if all(score < threshold for score in scores):\n",
+        "        if any(score < threshold for score in scores):\n",
+        "tests/test_ratings_summary.py::test_зона_риска_три_подряд_строго_ниже",
+    ),
+    (
+        "src/ratings/summary.py",
+        "        if all(score < threshold for score in scores):\n",
+        "        if all(score <= threshold for score in scores):\n",
+        "tests/test_ratings_summary.py::test_зона_риска_три_подряд_строго_ниже",
+    ),
+    (
+        "src/ratings/summary.py",
+        "    top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]\n",
+        "    top = sorted(counts.items(), key=lambda item: (-item[1], item[0]))\n",
+        "tests/test_ratings_summary.py::test_топ5_и_на_одну_проверку",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
