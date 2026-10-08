@@ -29,7 +29,17 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
+from src.ratings.snapshot import MCP_CHUNK_BYTES
+
+from . import (
+    checklist_source,
+    checklist_tools,
+    checklists_tools,
+    phrases,
+    ratings_tools,
+    retraction,
+    tools,
+)
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -60,6 +70,11 @@ KIND_RETRACTION = "retraction"
 #: нет вовсе: обработчики живут отдельным модулем `src.mcp.checklist_source`, и
 #: это проверяется снаружи (`tests/test_mcp_catalogue.py`).
 KIND_CHECKLIST_SOURCE = "checklist_source"
+
+#: Загрузка рейтингов РС/РКО (D320). Пятый вид: пишет, но не в проверки и не в
+#: методику, а в схему `ratings`. Открыт только токену УК — заслон на входе
+#: (`rpc._call_tool`), обработчик живёт своим модулем `src.mcp.ratings_tools`.
+KIND_RATINGS = "ratings"
 
 
 @dataclass(frozen=True)
@@ -1863,6 +1878,43 @@ TOOLS: tuple[ToolSpec, ...] = (
         },
         handler=checklists_tools.apply_checklist,
         kind=KIND_CHECKLIST,
+    ),
+    ToolSpec(
+        name="import_ratings",
+        description=(
+            "Upload a ratings file into Decimus (standards and customer-experience "
+            "ratings, IMF only). kind: rko-violations | rko-evaluations | rs-checkups "
+            "(Dodo IS CSV exports), sheet-scores (the 'quality by pizzeria' sheet as "
+            "CSV), snapshot (rating snapshot JSON, see docs/14-ratings.md). "
+            "content: the file text as is. A snapshot goes in self-contained chunks of up to "
+            f"{MCP_CHUNK_BYTES} bytes; send each chunk with its own call (the answer carries "
+            "chunk_index and chunk_of). Re-sending the same content is safe: the answer says "
+            "'duplicate' with loaded_at and nothing changes. HQ token only."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "rko-violations",
+                        "rko-evaluations",
+                        "rs-checkups",
+                        "sheet-scores",
+                        "snapshot",
+                    ],
+                },
+                "content": {"type": "string", "description": "File content (UTF-8 text)."},
+                "file_name": {
+                    "type": "string",
+                    "description": "Original file name, for the upload log.",
+                },
+            },
+            "required": ["kind", "content"],
+            "additionalProperties": False,
+        },
+        handler=ratings_tools.import_ratings,
+        kind=KIND_RATINGS,
     ),
 )
 

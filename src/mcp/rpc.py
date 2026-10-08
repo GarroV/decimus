@@ -24,9 +24,12 @@ from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
+    KIND_RATINGS,
     KIND_RETRACTION,
     ToolSpec,
     as_list,
@@ -148,6 +151,13 @@ CHECKLIST_CLOSED = (
     "Работа с методикой через агента для этого доступа не открыта. Методика одна на всю "
     "сеть, и правит её управляющая компания: доступ включается переменными "
     "MCP_CHECKLIST_STORE и MCP_CHECKLIST_TENANTS. Проверки при этом читаются как обычно"
+)
+
+
+#: Отказ на загрузку рейтингов не-УК токеном (D320).
+RATINGS_CLOSED = (
+    "Загрузка рейтингов открыта только токену пространства УК. Рейтинги видны в "
+    "админке всем, а грузит их контроль УК"
 )
 
 
@@ -318,6 +328,8 @@ def _call_tool(
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
         return _tool_text(CHECKLIST_SOURCE_CLOSED, failed=True)
+    if spec.kind == KIND_RATINGS and canonical_tenant(tenant) != HQ_TENANT:
+        return _tool_text(RATINGS_CLOSED, failed=True)
     if spec.kind == KIND_RETRACTION and not may_retract:
         return _tool_text(RETRACTION_CLOSED, failed=True)
     refusal = _check_arguments(spec, arguments)
@@ -382,6 +394,11 @@ def _call_tool(
             KIND_CHECKLIST_SOURCE: (
                 "чтение эталона",
                 "Это отказ чтения, а не пустая методика",
+            ),
+            KIND_RATINGS: (
+                "загрузку рейтингов",
+                "Это отказ базы, а не отказ в загрузке; повтор безопасен: тот же файл "
+                "ответит «duplicate»",
             ),
             KIND_RETRACTION: (
                 "снятие проверки",
