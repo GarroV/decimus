@@ -397,6 +397,19 @@ def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator
         ("/users/disable", {"login": "petr", "tenant": "HQ"}),
         ("/admin/publish", {}),
         ("/admin/items", {"code": "X1"}),
+        ("/admin/items/X1", {"name_ru": "x", "name_en": "x"}),
+        ("/admin/items/X1/disable", {}),
+        ("/admin/items/X1/restore", {}),
+        ("/admin/zones", {"code": "Z1", "name_ru": "x", "name_en": "x"}),
+        ("/admin/zones/shares", {}),
+        ("/admin/zones/Z1/rename", {"name_ru": "x", "name_en": "x"}),
+        ("/admin/zones/Z1/remove", {}),
+        ("/admin/route", {}),
+        ("/admin/scoring", {}),
+        ("/admin/checklists", {"code": "c1"}),
+        ("/admin/checklists/c1/state", {"state": "active"}),
+        ("/admin/checklists/c1/apply", {}),
+        ("/admin/bot/c1", {}),
         ("/inspections/x/retract", {"reason": "дубль"}),
     ],
 )
@@ -405,9 +418,9 @@ def test_контроль_вне_рейтингов_не_пишет(
 ) -> None:
     """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут.
 
-    Заслон держат ТОЛЬКО `/admin/publish` и `/admin/items`: `/users/*` и retract
-    дают 403 и без него (`_hq_admin_only`, `_admin_only`). Убрать эти два случая
-    значит опустошить проверку заслона незаметно.
+    Заслон `_install_control_gate` — единственная защита методических POST
+    (`/admin/*`): маршрутной проверки роли у них нет. `/users/*` и retract
+    дополнительно закрыты маршрутными проверками (`_hq_admin_only`, `_admin_only`).
     """
     ответ = контроль.post(путь, data=форма, headers=ЗАГОЛОВКИ)
 
