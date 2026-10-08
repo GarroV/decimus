@@ -15,9 +15,10 @@ from datetime import date
 KIND_MONTH = "month"
 KIND_QUARTER = "quarter"
 KIND_RATING = "rating"
-_MONTH = re.compile(r"^(\d{4})-(\d{2})$")
-_QUARTER = re.compile(r"^(\d{4})-Q([1-4])$")
-_RATING = re.compile(r"^rs:(\d+)$")
+_MONTH = re.compile(r"(\d{4})-(\d{2})", re.ASCII)
+_QUARTER = re.compile(r"(\d{4})-Q([1-4])", re.ASCII)
+_MIN_YEAR = 1  # date() не знает года 0
+_RATING = re.compile(r"rs:(\d+)", re.ASCII)
 
 
 @dataclass(frozen=True)
@@ -57,12 +58,13 @@ def _rating(period: RatingPeriod) -> ReportPeriod:
 
 
 def parse_period(key: str, *, rs_periods: Sequence[RatingPeriod]) -> ReportPeriod | None:
-    if found := _MONTH.match(key):
-        month = int(found[2])
-        return month_period(int(found[1]), month) if 1 <= month <= 12 else None
-    if found := _QUARTER.match(key):
-        return quarter_period(int(found[1]), int(found[2]))
-    if found := _RATING.match(key):
+    if found := _MONTH.fullmatch(key):
+        year, month = int(found[1]), int(found[2])
+        return month_period(year, month) if year >= _MIN_YEAR and 1 <= month <= 12 else None
+    if found := _QUARTER.fullmatch(key):
+        year = int(found[1])
+        return quarter_period(year, int(found[2])) if year >= _MIN_YEAR else None
+    if found := _RATING.fullmatch(key):
         wanted = int(found[1])
         return next((_rating(p) for p in rs_periods if p.id == wanted), None)
     return None
@@ -73,9 +75,13 @@ def previous_period(
 ) -> ReportPeriod | None:
     if period.kind == KIND_MONTH:
         year, month = period.begin.year, period.begin.month
+        if year == _MIN_YEAR and month == 1:
+            return None
         return month_period(year - 1, 12) if month == 1 else month_period(year, month - 1)
     if period.kind == KIND_QUARTER:
         year, quarter = period.begin.year, (period.begin.month - 1) // 3 + 1
+        if year == _MIN_YEAR and quarter == 1:
+            return None
         return quarter_period(year - 1, 4) if quarter == 1 else quarter_period(year, quarter - 1)
     earlier = [p for p in rs_periods if p.begin_on < period.begin]
     return _rating(max(earlier, key=lambda p: p.begin_on)) if earlier else None

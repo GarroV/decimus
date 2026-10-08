@@ -373,6 +373,30 @@ cases = [
         "    anchor = today\n",
         "tests/test_ratings_periods.py::test_по_умолчанию_квартал_последних_данных",
     ),
+    (
+        "src/ratings/periods.py",
+        "if year >= _MIN_YEAR and 1 <= month <= 12",
+        "if 1 <= month <= 12",
+        "tests/test_ratings_periods.py::test_год_ноль_и_нечестные_цифры_нет",
+    ),
+    (
+        "src/ratings/periods.py",
+        "    if found := _MONTH.fullmatch(key):\n",
+        "    if found := _MONTH.match(key):\n",
+        "tests/test_ratings_periods.py::test_год_ноль_и_нечестные_цифры_нет",
+    ),
+    (
+        "src/ratings/periods.py",
+        '_RATING = re.compile(r"rs:(\\d+)", re.ASCII)\n',
+        '_RATING = re.compile(r"rs:(\\d+)")\n',
+        "tests/test_ratings_periods.py::test_год_ноль_и_нечестные_цифры_нет",
+    ),
+    (
+        "src/ratings/periods.py",
+        "        if year == _MIN_YEAR and quarter == 1:\n            return None\n",
+        "",
+        "tests/test_ratings_periods.py::test_прошлый_у_первого_периода_эры_нет",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
