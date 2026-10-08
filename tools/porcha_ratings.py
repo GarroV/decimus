@@ -207,7 +207,7 @@ cases = [
         "tests/test_ratings_sheet.py::test_две_колонки_с_одним_началом_недели_не_склеиваются",
     ),
     (
-        "src/db/migrations/0038_ratings.sql",
+        "src/db/migrations/0039_ratings.sql",
         "'bad_row', 'developer_conflict'",
         "'bad_row'",
         "tests/test_db_ratings_schema.py::test_замечание_журнала_developer_conflict_ложится",

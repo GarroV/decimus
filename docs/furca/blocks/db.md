@@ -172,12 +172,12 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 Не путать с `DATABASE_ADMIN_URL`: та про накат схемы, и роль там обычно
 привилегированная — то есть RLS не подчиняется вовсе.
 
-### Рейтинги РС и РКО (миграции `0038`, `0039`)
+### Рейтинги РС и РКО (миграции `0039`, `0040`)
 
 Отдельная схема `ratings` (D321); продуктовое описание — `docs/14-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
 
-- `0038_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
-- `0039_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
+- `0039_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
+- `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
 - Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
 
 ## Зависимости
@@ -612,7 +612,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0038_inspection_import.sql` | происхождение проверки `origin` (`field`/`import`) и сверка со старым отчётом (`reported_pct`, `reported_grade`, `source_ref`); у загрузки `chat_id = 0`; триггер `inspections_origin_fixed` — происхождение не переписывается; частичный индекс черновиков загрузки (D305–D310) |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
 | `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из

@@ -232,7 +232,7 @@ _CLOSE_SESSION_SQL = """
 #: ней до первой записи.
 ROLE_AUDITOR = "auditor"
 ROLE_ADMIN = "admin"
-#: Контроль УК (D319): рейтинги — загрузка и справочники. Только в HQ (`0039`).
+#: Контроль УК (D319): рейтинги — загрузка и справочники. Только в HQ (`0040`).
 ROLE_CONTROL = "control"
 ROLES = (ROLE_AUDITOR, ROLE_ADMIN, ROLE_CONTROL)
 
@@ -427,7 +427,7 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 
 
 def roles_for(tenant: str) -> tuple[str, ...]:
-    """Роли, которые бывают в пространстве: «контроль» — только в УК (`0039`)."""
+    """Роли, которые бывают в пространстве: «контроль» — только в УК (`0040`)."""
     if canonical_tenant(tenant) == HQ_TENANT:
         return ROLES
     return tuple(role for role in ROLES if role != ROLE_CONTROL)

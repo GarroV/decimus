@@ -1,4 +1,4 @@
--- 0038_ratings.sql
+-- 0039_ratings.sql
 --
 -- Рейтинги РС и РКО (спека docs/superpowers/specs/2026-10-08-ratings-design.md,
 -- D317–D329). Своя схема: данные рейтингов не смешиваются с проверками Decimus
@@ -168,20 +168,20 @@ create table ratings.settings (
 
 -- Стартовые значения из сводки скрипта (D324); правит контроль (D328).
 insert into ratings.settings (key, value, updated_by) values
-    ('top_threshold', 85, 'migration 0038'),
-    ('risk_threshold', 85, 'migration 0038'),
-    ('risk_periods', 3, 'migration 0038');
+    ('top_threshold', 85, 'migration 0039'),
+    ('risk_threshold', 85, 'migration 0039'),
+    ('risk_periods', 3, 'migration 0039');
 
 insert into ratings.hard_rules (rating_type, match, pattern, created_by) values
-    ('rko', 'text', 'Критично белое дно', 'migration 0038'),
-    ('rko', 'text', 'Пиццу привезли холодной', 'migration 0038'),
-    ('rko', 'text', 'Нарушен рецепт', 'migration 0038'),
-    ('rko', 'text', 'Сильно деформирована', 'migration 0038'),
-    ('rko', 'text', 'Все борты белые', 'migration 0038'),
-    ('rko', 'text', 'Дисквалифицировать пиццу', 'migration 0038'),
-    ('rs', 'contains', 'D3', 'migration 0038'),
-    ('rs', 'contains', 'критич', 'migration 0038'),
-    ('rs', 'contains', 'обнул', 'migration 0038');
+    ('rko', 'text', 'Критично белое дно', 'migration 0039'),
+    ('rko', 'text', 'Пиццу привезли холодной', 'migration 0039'),
+    ('rko', 'text', 'Нарушен рецепт', 'migration 0039'),
+    ('rko', 'text', 'Сильно деформирована', 'migration 0039'),
+    ('rko', 'text', 'Все борты белые', 'migration 0039'),
+    ('rko', 'text', 'Дисквалифицировать пиццу', 'migration 0039'),
+    ('rs', 'contains', 'D3', 'migration 0039'),
+    ('rs', 'contains', 'критич', 'migration 0039'),
+    ('rs', 'contains', 'обнул', 'migration 0039');
 
 grant select on all tables in schema ratings to dodo_audit_app, dodo_audit_admin;
 grant insert, update, delete on
