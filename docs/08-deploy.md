@@ -1336,3 +1336,24 @@ curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${WEB_HOST_PORT:-8268
    проверка видна в истории точки, запроса экшн-плана по ней нет; вызов
    `import_*` токеном пространства вне `MCP_IMPORT_TENANTS` — отказ доступа.
    Руководство коллеге — `docs/14-history-import.md`.
+
+### 8.16. API чтения для Swarm (#567, D335)
+
+Код сервиса `web`, отдельного сервиса и миграции нет: адреса `/api/v1/*`
+приезжают с образом веба. Раскатка — по «да» владельца и в окне (скилл
+`deploy-window`). Контракт — `docs/12-web-admin.md`, раздел «API чтения для Swarm».
+
+1. **Токен.** `python -c 'import secrets; print(secrets.token_urlsafe(32))'` →
+   `SWARM_API_TOKEN=<токен>` в `.env` VPS (`/srv/decimus/.env`), затем
+   пересоздать сервис `web` (compose, `up -d web`). Без переменной адреса
+   отвечают 503 `not_configured`; короче 32 знаков — веб не стартует.
+2. **Секреты Swarm** (Supabase Edge Functions):
+   `DECIMUS_API_URL=https://decimus.vasiliy-garro.workers.dev` (вход через
+   Worker, §8.9; Worker передаёт `Authorization` как есть) и
+   `DECIMUS_API_TOKEN=<тот же токен>`. Кладёт Claude, не владелец (#567).
+3. **Смоук:** `curl -s -o /dev/null -w '%{http_code}' <адрес>/api/v1/ratings/scores?type=rs`
+   без заголовка → 401; с `-H "Authorization: Bearer $DECIMUS_API_TOKEN"` → 200
+   и JSON с `periods`. Токен в командную строку не вписывать — брать из
+   переменной окружения, чтобы он не осел в истории шелла.
+4. **Смена токена** — новое значение в оба места (п.1 и п.2); старое перестаёт
+   действовать с пересозданием веба.

@@ -31,6 +31,7 @@ from src.db import (
     queries,
     reports,
     revise,
+    swarm_read,
 )
 from src.db.prescriptions import PRESCRIPTION_REACH_SQL
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
@@ -81,7 +82,7 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
-    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions)
+    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions, swarm_read)
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
     дыры = [имя for имя in сверено if имя not in ВНЕ_ОХВАТА and REACH_SQL not in запросы[имя]]
