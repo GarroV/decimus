@@ -1852,3 +1852,5 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .rx-chips { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
 /* Кнопки отправки черновика — одной ширины: форма не заводит свою коробку. */
 .rx-send form { display: contents; }
+
+/* Раздел «Рейтинги» — свои стили в decimus-rt.css, подключаются только его шаблонами (D354). */

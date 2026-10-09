@@ -32,6 +32,7 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
         "plans",
         "orders",
         "country",
+        "ratings",
         "calendar",
         "admin",
         "tenants",
@@ -43,7 +44,17 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
 
 def test_built_keys_are_the_built_screens() -> None:
     assert built_keys() == frozenset(
-        {"overview", "registry", "plans", "orders", "country", "admin", "users", "actions"}
+        {
+            "overview",
+            "registry",
+            "plans",
+            "orders",
+            "country",
+            "ratings",
+            "admin",
+            "users",
+            "actions",
+        }
     )
 
 
@@ -66,7 +77,17 @@ def test_section_refuses_an_unknown_key() -> None:
 
 def test_check_registry_accepts_exactly_the_built_sections() -> None:
     check_registry(
-        ("overview", "registry", "plans", "orders", "country", "admin", "users", "actions")
+        (
+            "overview",
+            "registry",
+            "plans",
+            "orders",
+            "country",
+            "ratings",
+            "admin",
+            "users",
+            "actions",
+        )
     )
 
 
@@ -85,6 +106,7 @@ def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
                 "orders",
                 "actions",
                 "country",
+                "ratings",
                 "admin",
                 "users",
                 "calendar",

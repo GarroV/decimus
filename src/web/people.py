@@ -4,10 +4,11 @@
 тоже. Экран зовёт те же двери базы (`reassign_role`, `set_email`) под той же ролью
 повышенных полномочий, что заведение и отключение.
 
-Здесь — только проверка ввода и перевод исхода в код ответа. Кому можно
-править, решает маршрут (`_hq_admin_only` в `app.py`): админ УК, в любом
-пространстве — как заведение и отключение. Админ партнёра людьми не управляет,
-его права не решены (D288).
+Здесь — проверка ввода, перевод исхода в код ответа и круг людей «контроля».
+Кому можно править, решает маршрут (`_people_scope` в `app.py`): админ УК — в
+любом пространстве, как заведение и отключение; «контроль» (D360) — только
+учётки роли «контроль» в УК, без смены ролей. Админ партнёра людьми не
+управляет, его права не решены (D288).
 
 «Доверенные почты» (список адресов или правило домена) — открытый вопрос
 владельца и здесь не строятся: почта привязывается к уже заведённому человеку
@@ -21,6 +22,7 @@ import re
 from dataclasses import dataclass
 
 from src.db.errors import DbError, EmailTakenError
+from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, canonical_tenant
 
 from . import accounts
 
@@ -43,6 +45,26 @@ class Outcome:
     status: int
 
 
+def control_circle(rows: tuple[accounts.AccountRow, ...]) -> tuple[accounts.AccountRow, ...]:
+    """Люди, которых видит и ведёт «контроль» (D360): роль «контроль» в УК, и только они.
+
+    Фильтр по обоим признакам, а не по одной роли: перечень приходит из базы
+    целиком, и строка чужого пространства с той же ролью сюда не проходит,
+    даже если ограничение `0040` когда-нибудь ослабнет.
+    """
+    return tuple(
+        r for r in rows if r.role == CONTROL_ROLE and canonical_tenant(r.tenant) == HQ_TENANT
+    )
+
+
+def in_control_circle(rows: tuple[accounts.AccountRow, ...], *, login: str, tenant: str) -> bool:
+    """Та ли это учётка, которую «контролю» можно трогать: пара (пространство, логин) из круга."""
+    if canonical_tenant(tenant) != HQ_TENANT:
+        return False
+    имя = login.strip().lower()
+    return any(r.login.strip().lower() == имя for r in control_circle(rows))
+
+
 def is_self(*, login: str, tenant: str, actor_login: str, actor_tenant: str) -> bool:
     """Та же ли это учётка, что у правящего: пара (пространство, логин).
 
@@ -57,7 +79,7 @@ def change_role(
     *, login: str, tenant: str, role: str, actor_login: str, actor_tenant: str
 ) -> Outcome:
     """Назначить роль. Свою — нельзя: снять с себя админа значит закрыть экран людей."""
-    if role not in accounts.ROLES:
+    if role not in accounts.roles_for(tenant):
         return Outcome("role.unknown", 400)
     if is_self(login=login, tenant=tenant, actor_login=actor_login, actor_tenant=actor_tenant):
         return Outcome("role.self", 400)

@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, canonical_tenant
 
 from .errors import SectionRegistryError
 
@@ -69,6 +69,10 @@ SECTIONS: tuple[Section, ...] = (
     # статус и ответ. У УК для них вкладка в «Действиях» (D264).
     Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     Section(key="country", path="/country", built=True, icon="globe"),
+    # Рейтинги РС/РКО (спека 2026-10-08): видят все — УК и любой партнёр
+    # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
+    # (`src/web/ratings.py`), не флаг раздела.
+    Section(key="ratings", path="/ratings", built=True, icon="graph"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
     Section(key="tenants", path="/tenants", built=False, hq_only=True, icon="board"),
@@ -148,6 +152,10 @@ def current_section(path: str) -> str | None:
     return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
 
+#: Разделы контролинга (D358): рейтинги и «Пользователи» — там свой пароль и бот.
+CONTROL_SECTIONS = frozenset({"ratings", "users"})
+
+
 def visible_sections(account: object | None) -> tuple[Section, ...]:
     """Разделы, которые этому человеку показывать.
 
@@ -155,7 +163,10 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     известен, и набрать его руками может кто угодно. Смысл ровно в том, чтобы
     не звать человека туда, куда его не пустят.
     """
-    админ = getattr(account, "role", None) == "admin"
+    роль = getattr(account, "role", None)
+    if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
+        return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
+    админ = роль == "admin"
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(
         item
