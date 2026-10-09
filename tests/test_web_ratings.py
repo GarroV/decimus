@@ -242,5 +242,6 @@ def test_контроль_сдвигает_и_прячет_блок(monkeypatch:
             ("top", False),
             ("risk", True),
             ("hard", True),
+            ("maps", False),  # не пришёл в форме — встаёт в конец, галочки нет
         ]
     ]
