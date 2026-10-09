@@ -927,6 +927,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     # --- люди проекта (T338, #322) -----------------------------------------
     "users.count": {"ru": "{count} чел.", "en": "{count} people"},
+    "users.control.scope": {
+        "ru": "Здесь только люди контролинга: их можно завести, задать почту и отключить.",
+        "en": "Only controlling people are listed: add them, set an email, disable them.",
+    },
     "users.unknown": {
         "ru": "Список сейчас недоступен — это не значит, что людей нет.",
         "en": "The list is unavailable right now — that does not mean there is nobody.",

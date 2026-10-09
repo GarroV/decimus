@@ -1072,18 +1072,25 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         password: profile.Outcome | None = None,
         edit: people.Outcome | None = None,
     ) -> tuple[str, int]:
-        # Перечень людей и форма заведения — только админу УК (D288). Остальные
-        # видят свою строку: вкладка открыта всем ради привязки бота (D286).
-        управляет = _hq_admin_only() is None
+        # Перечень людей и форма заведения — админу УК всех (D288), «контролю» —
+        # только людей контролинга (D340). Остальные видят свою строку: вкладка
+        # открыта всем ради привязки бота (D286).
+        круг = _people_scope()
+        управляет = круг is not None
+        ведёт_всех = круг == _SCOPE_ALL
         люди: tuple[accounts.AccountRow, ...] = ()
         пространства: tuple[str, ...] = ()
         перечень_известен = True
         привязки: dict[str, bot_links.Binding] = {}
         if управляет:
             try:
-                люди = accounts.everyone(tenant=None)
-                пространства = accounts.spaces()
-                привязки = bot_links.live_bindings()
+                if ведёт_всех:
+                    люди = accounts.everyone(tenant=None)
+                    пространства = accounts.spaces()
+                    привязки = bot_links.live_bindings()
+                else:
+                    люди = people.control_circle(accounts.everyone(tenant=HQ_TENANT))
+                    пространства = (HQ_TENANT,)
             except DbError as exc:
                 note_target_mismatch(exc)
                 # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
@@ -1103,12 +1110,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             render_template(
                 "users/index.html",
                 manage=управляет,
+                manage_all=ведёт_всех,
                 people=люди,
                 people_known=перечень_известен,
                 spaces=пространства,
                 added=added,
                 outcome=outcome,
-                roles=accounts.ROLES,
+                roles=accounts.ROLES if ведёт_всех else (accounts.ROLE_CONTROL,),
                 roles_for=accounts.roles_for,
                 users_path=users_path,
                 bindings=привязки,
@@ -1124,6 +1132,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 edit=edit,
             ),
             code,
+        )
+
+    def _в_круге_контроля(логин: str) -> bool:
+        """Учётка из формы — человек контролинга в УК (D340); сверка с базой, не с формой."""
+        пространство = canonical_tenant((request.form.get("tenant") or "").strip())
+        return people.in_control_circle(
+            accounts.everyone(tenant=HQ_TENANT), login=логин, tenant=пространство
         )
 
     def _пространство_из_формы() -> str | None:
@@ -1206,19 +1221,25 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     def _правка_человека(
         действие: Callable[[str, str], people.Outcome],
+        *,
+        контролю_можно: bool = False,
     ) -> FlaskResponse | tuple[str, int]:
         """Общее у правки роли и почты: заслон, происхождение, пространство из формы.
 
         Пространство — из строки учётки в перечне, сверенное с заведёнными:
         человека правят там, где он живёт, а не в пространстве админа.
+        `контролю_можно` — правку открыть «контролю», но только над его кругом
+        (D340); роль ему не открывается никогда.
         """
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
+        круг = _people_scope()
+        if круг is None or (круг == _SCOPE_CONTROL and not контролю_можно):
+            return _forbidden_people()
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         try:
             пространство = _пространство_из_формы()
+            if круг == _SCOPE_CONTROL and not _в_круге_контроля(логин):
+                return _forbidden_people()
         except DbError:
             return _страница_учёток(edit=people.Outcome("edit.failed", 503), code=503)
         if пространство is None or not логин:
@@ -1253,7 +1274,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 email=почта,
                 actor_login=вошедший.login if вошедший else "",
                 actor_tenant=вошедший.tenant if вошедший else "",
-            )
+            ),
+            контролю_можно=True,
         )
 
     @app.post(f"{users_path}/add")
@@ -1263,13 +1285,21 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         Страница, а не перенаправление: пароль в адресе остался бы в истории
         браузера и в журнале обратного прокси, то есть перестал бы быть
         паролем ровно в момент показа.
+
+        «Контроль» заводит только контроль в УК (D340): иная роль или
+        пространство в форме — подделка, отказ 403 до базы.
         """
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
+        круг = _people_scope()
+        if круг is None:
+            return _forbidden_people()
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         роль = request.form.get("role") or accounts.ROLE_AUDITOR
+        if круг == _SCOPE_CONTROL and (
+            роль != accounts.ROLE_CONTROL
+            or canonical_tenant((request.form.get("tenant") or "").strip()) != HQ_TENANT
+        ):
+            return _forbidden_people()
         try:
             пространство = _пространство_из_формы()
             if пространство is None:
@@ -1284,9 +1314,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{users_path}/disable")
     def disable_user() -> FlaskResponse | tuple[str, int]:
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
+        """Отключить учётку: админ УК — любую, «контроль» — человека контролинга (D340)."""
+        круг = _people_scope()
+        if круг is None:
+            return _forbidden_people()
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         вошедший = auth.current_account()
@@ -1296,6 +1327,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             # пометку изнутри продукта нечем.
             return _страница_учёток(outcome="disable_self", code=400)
         try:
+            if круг == _SCOPE_CONTROL and not _в_круге_контроля(логин):
+                return _forbidden_people()
             # Пространство — из строки учётки в перечне, сверенное с заведёнными:
             # учётку отключают там, где она живёт, а не в пространстве админа.
             пространство = _пространство_из_формы()
@@ -1465,6 +1498,11 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/password",
         f"{users_path}/bot-link",
         f"{users_path}/bot-unlink",
+        # Люди контролинга (D340): заведение, почта, отключение. Смены роли
+        # (`/role`) здесь нет намеренно; кого можно трогать, решает маршрут.
+        f"{users_path}/add",
+        f"{users_path}/email",
+        f"{users_path}/disable",
     )
     return path in own
 
@@ -1504,6 +1542,33 @@ def link_url(bot_username: str, token: str) -> str:
     return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
 
 
+#: Кругом людей на экране «Пользователи» управляет: админ УК — всеми,
+#: «контроль» — только людьми контролинга в УК (D340).
+_SCOPE_ALL = "all"
+_SCOPE_CONTROL = "control"
+
+
+def _people_scope() -> str | None:
+    """Чьими учётками управляет вошедший: `_SCOPE_ALL`, `_SCOPE_CONTROL` или `None`.
+
+    Обе роли — только в УК: админ партнёра людьми не управляет (D288), а
+    «контроль» вне УК не бывает (`0040`), но сверка стоит и здесь.
+    """
+    вошедший = auth.current_account()
+    if вошедший is None or canonical_tenant(вошедший.tenant) != HQ_TENANT:
+        return None
+    if вошедший.role == accounts.ROLE_ADMIN:
+        return _SCOPE_ALL
+    if вошедший.role == accounts.ROLE_CONTROL:
+        return _SCOPE_CONTROL
+    return None
+
+
+def _forbidden_people() -> FlaskResponse:
+    """Отказ 403 на экране людей — той же страницей, что у `_hq_admin_only`."""
+    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+
+
 def _hq_admin_only() -> FlaskResponse | None:
     """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
 
@@ -1518,7 +1583,7 @@ def _hq_admin_only() -> FlaskResponse | None:
         and canonical_tenant(вошедший.tenant) == HQ_TENANT
     ):
         return None
-    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    return _forbidden_people()
 
 
 def _admin_only() -> FlaskResponse | None:
