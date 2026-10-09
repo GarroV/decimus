@@ -33,7 +33,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from src.db import bot_links, queries
+from src.db import queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
@@ -42,7 +42,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_suggest, walk_write
+from . import walk_access, walk_suggest, walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -220,19 +220,6 @@ def _previous(inspection: Inspection) -> PreviousOutcome:
         return PreviousOutcome(None, unavailable=True)
 
 
-def revoked(chat_id: int) -> bool:
-    """Сняли ли у человека доступ — привязку бота или учётку (`src/bot/access.py`, п.5).
-
-    Проверка ЕГО проверки ещё лежит на диске, но бот его уже не пускает — и
-    экран обхода не должен становиться обходным путём. Привязки не было
-    никогда — не отказ: такой человек мог завести проверку только по старому
-    списку бота, и раз она есть, бот его пустил. База молчит — `DbError`
-    наверх: сверить снятие нечем, а отвечать «пускаю» вслепую нельзя.
-    """
-    положение = bot_links.standing(chat_id)
-    return положение.binding is None and положение.ever_bound
-
-
 def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
     """Сведения о визите: поля методики этой проверки с уже данными ответами.
 
@@ -292,10 +279,10 @@ def identify(
 ) -> int | tuple[Response, int]:
     """Чей это запрос — номер чата или готовый отказ.
 
-    Одна дверь на чтение и запись: подпись, затем снятый доступ. Запись
-    (`header_only`) берёт подпись только из заголовка. Снятие
-    сверяется только при живом токене — на стенде без бота его не с чем
-    сверить. База молчит — 503, а не «пускаю вслепую».
+    Одна дверь на чтение и запись: подпись, затем доступ бота (D372). Запись
+    (`header_only`) берёт подпись только из заголовка. Доступ сверяется
+    только при живом токене — на стенде без бота его не с чем сверить. База
+    молчит — 503, а не «пускаю вслепую».
     """
     if not conf.enabled:
         return jsonify({"error": "disabled"}), 404
@@ -314,8 +301,10 @@ def identify(
         logger.info("Обход: чат %s не в круге тестеров — отказ", chat_id)
         return jsonify({"error": "closed", "texts": texts_for(ui_lang)}), 403
     try:
-        if conf.bot_token is not None and revoked(chat_id):
-            logger.info("Обход: доступ чата %s снят — отказ", chat_id)
+        if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:
+            # Бот этого человека не пускает (не привязан, доступ снят) — и
+            # мини-апп тоже, хоть подпись и настоящая (D372).
+            logger.info("Обход: бот не пускает чат %s — отказ", chat_id)
             return jsonify({"error": "unauthorized"}), 401
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)

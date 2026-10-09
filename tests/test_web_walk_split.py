@@ -21,7 +21,7 @@ from werkzeug.serving import BaseWSGIServer, make_server
 
 from src.db.bot_links import NEVER_BOUND
 from src.domain import get_state, start_inspection
-from src.web import walk, walk_proxy, walk_write
+from src.web import walk, walk_access, walk_proxy, walk_write
 from src.web.app import create_app
 from src.web.config import Settings
 from src.web.walk_app import create_walk_app
@@ -49,9 +49,10 @@ def сервис_обхода(
 ) -> Iterator[tuple[str, BaseWSGIServer]]:
     """Настоящий сервис обхода на свободном порту петли — как контейнер `walk`."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", ТОКЕН)
+    monkeypatch.setenv("ALLOWED_TELEGRAM_IDS", str(АУДИТОР))
     monkeypatch.delenv("WEB_WALK_PREVIEW_CHAT", raising=False)
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
-    monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
+    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
     start_inspection(АУДИТОР, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
     сервер = make_server("127.0.0.1", 0, create_walk_app(_настройки()), threaded=True)
     поток = threading.Thread(target=сервер.serve_forever, daemon=True)
@@ -65,6 +66,7 @@ def сервис_обхода(
 
 def test_сервис_обхода_не_отвечает_ничем_кроме_обхода(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", ТОКЕН)
+    monkeypatch.setenv("ALLOWED_TELEGRAM_IDS", str(АУДИТОР))
 
     маршруты = set(_маршруты(create_walk_app(_настройки())))
 
@@ -73,6 +75,7 @@ def test_сервис_обхода_не_отвечает_ничем_кроме_�
 
 def test_админка_без_адреса_сервиса_обхода_не_отдаёт(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", ТОКЕН)
+    monkeypatch.setenv("ALLOWED_TELEGRAM_IDS", str(АУДИТОР))
 
     app = create_app(_настройки())
 
@@ -84,6 +87,7 @@ def test_админка_без_адреса_сервиса_обхода_не_о�
 def test_админка_сама_не_пишет_а_передаёт(monkeypatch: pytest.MonkeyPatch) -> None:
     """Каждый адрес обхода в админке — передача сервису, а не запись на месте."""
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", ТОКЕН)
+    monkeypatch.setenv("ALLOWED_TELEGRAM_IDS", str(АУДИТОР))
 
     маршруты = _маршруты(create_app(_настройки(walk_upstream="http://walk:8269")))
 

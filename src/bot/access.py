@@ -175,33 +175,51 @@ class AccessMiddleware(BaseMiddleware):
         await _answer(event, "access.linked", login=привязка.login)
 
     def _space_of(self, user_id: int) -> str | None:
-        положение = (
-            self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND
+        return space_from(
+            user_id,
+            self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND,
+            allowed_ids=self._allowed_ids,
+            roster=self._roster,
         )
-        if положение is None:
-            # База молчит дольше допустимого: ни привязку, ни её отсутствие
-            # сверить нечем — совместимость тоже не применяется (п.6).
-            return None
-        if положение.binding is not None:
-            return canonical_tenant(положение.binding.tenant)
-        if положение.ever_bound:
-            # Отвязан или учётка отключена: прежний пропуск из окружения не
-            # возвращает того, у кого доступ сняли (п.5).
-            return None
-        # Совместимость (вопрос 2): кто пускался до D286 — сотрудник УК. Только
-        # если привязки не было никогда — это проверено выше.
-        откуда = self._compat_source(user_id)
-        if откуда is None:
-            return None
-        logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", user_id, откуда)
-        return HQ_TENANT
 
-    def _compat_source(self, user_id: int) -> str | None:
-        if is_allowed(user_id, self._allowed_ids):
-            return "ALLOWED_TELEGRAM_IDS"
-        if self._roster is not None and self._roster.knows(user_id):
-            return "roster.json"
+
+def space_from(
+    user_id: int,
+    положение: Standing | None,
+    *,
+    allowed_ids: frozenset[int],
+    roster: Roster | None,
+) -> str | None:
+    """Пространство человека — или `None`: бот его не пускает.
+
+    Одно правило на бота и мини-апп (D372): кнопку меню видит каждый, кто
+    открыл бота, и мини-апп обязан пускать ровно тех же, кого пускает бот.
+    """
+    if положение is None:
+        # База молчит дольше допустимого: ни привязку, ни её отсутствие
+        # сверить нечем — совместимость тоже не применяется (п.6).
         return None
+    if положение.binding is not None:
+        return canonical_tenant(положение.binding.tenant)
+    if положение.ever_bound:
+        # Отвязан или учётка отключена: прежний пропуск из окружения не
+        # возвращает того, у кого доступ сняли (п.5).
+        return None
+    # Совместимость (вопрос 2): кто пускался до D286 — сотрудник УК. Только
+    # если привязки не было никогда — это проверено выше.
+    откуда = _compat_source(user_id, allowed_ids, roster)
+    if откуда is None:
+        return None
+    logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", user_id, откуда)
+    return HQ_TENANT
+
+
+def _compat_source(user_id: int, allowed_ids: frozenset[int], roster: Roster | None) -> str | None:
+    if is_allowed(user_id, allowed_ids):
+        return "ALLOWED_TELEGRAM_IDS"
+    if roster is not None and roster.knows(user_id):
+        return "roster.json"
+    return None
 
 
 def _link_token(event: TelegramObject) -> str | None:

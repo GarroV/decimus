@@ -24,7 +24,7 @@ from src.db.bot_links import NEVER_BOUND, Standing
 from src.db.errors import AccessError, DbError
 from src.db.models import PreviousFinding, PreviousFindings
 from src.domain import add_finding, get_state, list_zones, start_inspection
-from src.web import walk, walk_write
+from src.web import walk, walk_access, walk_write
 from src.web.config import Settings
 from src.web.walk_app import create_walk_app
 from src.web.walk_auth import (
@@ -187,8 +187,10 @@ def test_данные_по_подписи_и_без_истории(domain_env: P
         raise DbError("нет базы")
 
     monkeypatch.setattr(walk.queries, "previous_findings", база_молчит)
-    monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
-    client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
+    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
+    client = _приложение(
+        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
+    ).test_client()
 
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
 
@@ -216,7 +218,9 @@ def test_выключенный_обход_не_отвечает(monkeypatch: py
 
 
 def test_страница_пускает_в_рамку_только_telegram(monkeypatch: pytest.MonkeyPatch) -> None:
-    client = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
+    client = _приложение(
+        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
+    ).test_client()
 
     ответ = client.get(walk.PAGE_PATH)
 
@@ -241,8 +245,10 @@ def _подписанный_клиент(
             raise положение
         return положение
 
-    monkeypatch.setattr(walk.bot_links, "standing", standing)
-    return _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client()
+    monkeypatch.setattr(walk_access.bot_links, "standing", standing)
+    return _приложение(
+        monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=str(АУДИТОР)
+    ).test_client()
 
 
 def test_снятый_доступ_не_открывает_даже_свою_проверку(
@@ -259,6 +265,24 @@ def test_без_привязки_пускает_тот_кого_пустил_б�
     client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
     ответ = client.post(walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain")
     assert ответ.status_code == 200
+
+
+def test_чужой_с_настоящей_подписью_не_проходит(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D372: кнопку меню бота видит каждый, кто его открыл, — а пускать надо тех же, что бот."""
+    client = _подписанный_клиент(domain_env, monkeypatch, NEVER_BOUND)
+    посторонний = АУДИТОР + 1
+
+    чтение = client.post(walk.DATA_PATH, data=подписать(посторонний), content_type="text/plain")
+    запись = client.post(
+        walk_write.FINDING_PATH,
+        json={"op": "drop", "n": 1},
+        headers={INIT_DATA_HEADER: подписать(посторонний)},
+    )
+
+    assert чтение.status_code == 401, "посторонний видел бы экран бота, который его не пускает"
+    assert запись.status_code == 401
 
 
 def test_база_молчит_отказ_а_не_пропуск_вслепую(
