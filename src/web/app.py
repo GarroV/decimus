@@ -1076,7 +1076,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/accept")
     def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Подтвердить проверку на приёмке (D199). Админ своего пространства (D283)."""
+        """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1101,7 +1101,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Исправить запись ждущей проверки с пересчётом (D200). Админ своего пространства."""
+        """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1130,7 +1130,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Перенести проверку по дате и пиццерии (D195). Только администратор."""
+        """Перенести проверку по дате и пиццерии (D195). Только админ УК (D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1252,14 +1252,21 @@ _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def _admin_only() -> FlaskResponse | None:
-    """Отказ 403 всем, кроме администратора; `None` — можно.
+    """Отказ 403 всем, кроме админа и главного админа УК; `None` — можно.
+
+    Снятие, приёмка, правка записи и перенос проверки — только УК: партнёр
+    задним числом не меняет ничего, даже админ своего пространства (D341).
 
     Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
     руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
     её с выносом кадров мог любой аудитор.
     """
     вошедший = auth.current_account()
-    if вошедший is not None and is_admin_role(вошедший.role):
+    if (
+        вошедший is not None
+        and is_admin_role(вошедший.role)
+        and canonical_tenant(вошедший.tenant or "") == HQ_TENANT
+    ):
         return None
     # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
     # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
@@ -1292,7 +1299,7 @@ def _render_card(
         and not detail.inspection.on_review
     )
     # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
-    # админ своего пространства (D283), и ровно до подтверждения (D199, D200).
+    # админ УК по своей проверке (D283, D341), и ровно до подтверждения (D199, D200).
     # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
     можно_подтвердить = (
         админ

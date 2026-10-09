@@ -102,6 +102,26 @@ def test_последнего_главного_держит_база_а_не_к�
             conn.rollback()
 
 
+def test_последнего_главного_не_удалить_и_не_снять_всех_одной_командой(
+    роль_веба: str, pg_dsn: str
+) -> None:
+    """Удаление и снятие нескольких строк одной командой — тот же отказ, даже владельцем схемы."""
+    web_access.create_account("boss", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
+    web_access.create_account("dev", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
+
+    with psycopg.connect(pg_dsn) as conn:
+        for запрос in (
+            "delete from web_users where role = 'superadmin'",
+            "update web_users set disabled_at = now() where role = 'superadmin'",
+            "update web_users set role = 'admin' where role = 'superadmin'",
+        ):
+            with pytest.raises(psycopg.Error) as отказ:
+                conn.execute(запрос)
+            assert отказ.value.sqlstate == web_access.LAST_SUPERADMIN_SQLSTATE
+            conn.rollback()
+    assert _живые_главные(pg_dsn) == {"boss", "dev"}
+
+
 def test_из_двух_главных_одного_снять_можно_второго_нет(роль_веба: str, pg_dsn: str) -> None:
     web_access.create_account("boss", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
     web_access.create_account("dev", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
