@@ -189,6 +189,19 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.settings.save": {"ru": "Сохранить пороги", "en": "Save thresholds"},
     "ratings.saved": {"ru": "Сохранено.", "en": "Saved."},
+    "ratings.layout": {"ru": "Компоновка страницы", "en": "Page layout"},
+    "ratings.layout.hint": {
+        "ru": "Что показывать и в каком порядке — для всех, кто смотрит рейтинги",
+        "en": "What to show and in which order — for everyone who views the ratings",
+    },
+    "ratings.layout.scores": {"ru": "Оценки по странам", "en": "Scores by country"},
+    "ratings.layout.violations": {"ru": "Нарушения РКО и РС", "en": "Violations"},
+    "ratings.layout.top": {"ru": "Top и Bottom", "en": "Top and bottom"},
+    "ratings.layout.hard": {"ru": "Хард-нарушения", "en": "Hard violations"},
+    "ratings.layout.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},
+    "ratings.layout.up": {"ru": "{name} — выше", "en": "Move {name} up"},
+    "ratings.layout.down": {"ru": "{name} — ниже", "en": "Move {name} down"},
+    "ratings.layout.save": {"ru": "Сохранить компоновку", "en": "Save layout"},
     "ratings.refused": {"ru": "Не сохранено: {reason}", "en": "Not saved: {reason}"},
 }
 
