@@ -40,6 +40,7 @@ from psycopg.types.json import Json
 
 from ..domain.models import Score
 from .config import check_environment
+from .cross_space import Entry, record
 from .errors import ReviseError
 from .models import InspectionDetail
 from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
@@ -102,6 +103,7 @@ def revise_finding(
     tenant: str,
     revision: Revision,
     score_of: Callable[[InspectionDetail], Score],
+    journal: Entry | None = None,
 ) -> None:
     """Исправить запись ждущей проверки и положить оценку, посчитанную после замка.
 
@@ -119,6 +121,7 @@ def revise_finding(
     try:
         with psycopg.connect(check_environment().dsn) as conn:
             _apply(conn, ident, запись, tenant_code, revision, score_of)
+            record(conn, journal)  # той же транзакцией, что правка и оценка
             conn.commit()
     except ReviseError:
         raise

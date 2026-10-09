@@ -25,6 +25,7 @@ import logging
 from collections.abc import Mapping
 
 from src.db import queries, revise
+from src.db.cross_space import Entry
 from src.db.errors import ReviseError
 from src.db.reach import reach_of
 from src.domain.tenants import canonical_tenant
@@ -60,6 +61,7 @@ def revise_card(
     level: str,
     zone: str,
     text: str,
+    journal: Entry | None = None,
 ) -> None:
     """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`."""
     detail = queries.get_inspection(inspection_id, reach=reach_of(tenant), include_on_review=True)
@@ -114,6 +116,7 @@ def revise_card(
             # Движок считает ВНУТРИ транзакции правки, после замка проверки:
             # соседняя правка той же проверки уже учтена (`src/db/revise.py`).
             score_of=lambda current: rescore(current, papers=бумаги),
+            journal=journal,
         )
     except LetterError as exc:
         raise ReviseError(f"Пересчитать проверку не удалось, запись не тронута: {exc}") from exc

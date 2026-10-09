@@ -28,6 +28,7 @@ import psycopg
 
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
+from .cross_space import Entry, record
 from .errors import AcceptError, ActionPlanError, ConfigError
 from .queries import _require_inspection_id, _require_tenant
 
@@ -49,11 +50,15 @@ where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and retracte
 """
 
 
-def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
+def accept_inspection(
+    inspection_id: str, *, tenant: str, actor: str, journal: Entry | None = None
+) -> None:
     """Подтвердить проверку на приёмке.
 
     Отказ — `AcceptError` с объяснением: нет проверки, она уже принята,
     отклонена, не назван подтверждающий.
+
+    `journal` — строка журнала действий УК в чужом пространстве (пишется до коммита).
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -68,6 +73,7 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
         with psycopg.connect(settings.dsn) as conn:
             _apply(conn, ident, tenant_code, автор)
             _open_plan_request(conn, ident, автор)
+            record(conn, journal)  # той же транзакцией: откат подтверждения уносит строку
             conn.commit()
     except AcceptError:
         raise

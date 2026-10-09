@@ -20,6 +20,7 @@ from typing import Any
 import psycopg
 
 from .config import load_retraction_settings
+from .cross_space import Entry, record
 from .errors import MoveError
 from .queries import _require_inspection_id, _require_tenant
 from .reach import Reach, require_reach
@@ -95,11 +96,15 @@ def move_inspection(
     new_unit_id: str,
     reason: str,
     actor: str,
+    journal: Entry | None = None,
 ) -> bool:
     """Перенести сданную проверку. `False` — переносить нечего, всё уже так.
 
     Отказ — `MoveError` с объяснением: нет проверки, она не сдана или
     отклонена, пиццерия чужая, не названа причина.
+
+    `journal` — строка журнала действий УК в чужом пространстве: пишется той же
+    транзакцией и только если перенос состоялся.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -113,6 +118,8 @@ def move_inspection(
     try:
         with psycopg.connect(settings.dsn) as conn:
             изменено = _apply(conn, ident, tenant_code, new_date, new_unit_id, причина, автор)
+            if изменено:  # «всё уже так» следа не оставляет
+                record(conn, journal)
             conn.commit()
             return изменено
     except MoveError:
