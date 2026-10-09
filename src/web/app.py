@@ -741,6 +741,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     # Вход тоже ведёт сюда (через `home`), чтобы выбор жил в одном месте.
     @app.get("/")
     def home() -> Response:
+        вошедший = auth.current_account()
+        if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
+            return redirect(url_for("ratings"))  # контролинг — только рейтинги (D338)
         return redirect(url_for("overview"))
 
     @app.get(section("registry").path)
@@ -1447,19 +1450,17 @@ def _install_hq_gate(app: Flask) -> None:
             abort(404)
 
 
-#: Безопасные методы: читать «контроль» может везде (спека: остальные разделы — на чтение).
-_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
+    """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D338).
 
-
-def _control_may_write(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
-    """Куда «контроль» может писать: рейтинги и дела самого человека (выход, пароль, бот).
-
-    Рейтинги — единственный раздел, где «контроль» (D319) что-то правит; адрес
-    берётся из реестра разделов, а не повторяется здесь строкой.
+    Свои дела — экран «Пользователи» (там свой пароль и бот), выход, смена
+    пароля, привязка бота. Адреса разделов — из реестра, а не строками здесь.
     """
     if path == ratings_path or path.startswith(f"{ratings_path}/"):
         return True
     own = (
+        "/",
+        users_path,
         logout_path,
         f"{users_path}/password",
         f"{users_path}/bot-link",
@@ -1469,30 +1470,33 @@ def _control_may_write(path: str, *, ratings_path: str, users_path: str, logout_
 
 
 def _install_control_gate(app: Flask) -> None:
-    """Роль «контроль» вне рейтингов только читает (D319, спека «Роль «контроль»»).
+    """Роль «контроль» видит только рейтинги (D338; было «остальное на чтение», D319).
 
-    Заслон на запись стоит `before_request`, а не на каждом маршруте: новый
-    правящий маршрут закрыт для контроля с момента появления, и закрывать его
-    не придётся помнить. Свои дела человека (выход, свой пароль, привязка
-    бота) открыты: это не правка разделов.
+    Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
+    для контроля с момента появления, и закрывать его не придётся помнить.
+    Чужой раздел на чтение — 404, как закрытый раздел партнёру; запись — 403.
     """
     users_path = section("users").path
     ratings_path = section("ratings").path
 
     @app.before_request
-    def _контроль_читает() -> None:
-        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
+    def _контроль_только_рейтинги() -> None:
+        if request.endpoint in auth.OPEN_ENDPOINTS:
             return
         вошедший = auth.current_account()
         if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
             return
-        if not _control_may_write(
+        if not _control_may_enter(
             request.path,
             ratings_path=ratings_path,
             users_path=users_path,
             logout_path=auth.LOGOUT_PATH,
         ):
-            abort(403)
+            abort(404 if request.method in _READ_METHODS else 403)
+
+
+#: Безопасные методы: чужой раздел на чтение — 404, на запись — 403.
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
 def link_url(bot_username: str, token: str) -> str:

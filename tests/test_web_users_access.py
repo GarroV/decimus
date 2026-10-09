@@ -428,9 +428,25 @@ def test_контроль_вне_рейтингов_не_пишет(
     assert зовы == {"role": [], "email": []}
 
 
-def test_контроль_читает_остальные_разделы(контроль: FlaskClient) -> None:
+@pytest.mark.parametrize(
+    "путь", ["/overview", "/inspections", "/country", "/admin", "/actions", "/calendar", "/tenants"]
+)
+def test_контроль_не_видит_разделов_кроме_рейтингов(контроль: FlaskClient, путь: str) -> None:
+    """D338: контролинг не имеет отношения ко всему остальному — чужой раздел не открывается."""
+    assert контроль.get(путь).status_code == 404
+
+
+def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
     assert контроль.get("/users").status_code == 200
-    assert контроль.get("/admin").status_code == 200
+    вход = контроль.get("/")
+    assert вход.status_code == 302 and вход.headers["Location"].endswith("/ratings")
+
+
+def test_контроль_в_навигации_только_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
+    страница = контроль.get("/users").get_data(as_text=True)
+    assert 'href="/ratings?lang=' in страница
+    for чужой in ("/overview", "/inspections", "/admin", "/actions", "/country"):
+        assert f'href="{чужой}?lang=' not in страница, чужой
 
 
 def test_контроль_выходит_сам(контроль: FlaskClient) -> None:
