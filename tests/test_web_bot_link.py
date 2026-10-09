@@ -8,6 +8,7 @@ Review Focus 1–3 волны 1 (#340) на стороне веба: ссылк�
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -101,9 +102,31 @@ def test_админ_уК_отвязывает_чужую_привязку(monkey
     отвязано: list[Any] = []
     monkeypatch.setattr(bot_links, "unbind", lambda u: отвязано.append(u) or True)
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
-    monkeypatch.setattr("src.web.accounts.everyone", lambda **_k: ())
+    человек = SimpleNamespace(
+        id="другой",
+        login="petr",
+        tenant="HQ",
+        role="auditor",
+        email=None,
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
+        disabled_at=None,
+    )
+    админ = SimpleNamespace(
+        id="админ",
+        login="dev",
+        tenant="HQ",
+        role="admin",
+        email=None,
+        created_at=datetime(2026, 9, 1, tzinfo=UTC),
+        disabled_at=None,
+    )
+    monkeypatch.setattr("src.web.accounts.everyone", lambda **_k: (человек, админ))
     monkeypatch.setattr("src.web.accounts.spaces", lambda: ("HQ", "GE"))
+    monkeypatch.setattr(bot_links, "live_bindings", dict)
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
         ответ = client.post("/users/bot-unlink", headers=ЗАГОЛОВКИ, data={"user_id": "другой"})
+        # #585: админ УК — только в охвате; привязку другого админа УК не снимает.
+        вне_охвата = client.post("/users/bot-unlink", headers=ЗАГОЛОВКИ, data={"user_id": "админ"})
     assert ответ.status_code == 200 and отвязано == ["другой"]
+    assert вне_охвата.status_code == 403
