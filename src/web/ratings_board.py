@@ -100,6 +100,7 @@ def _ordered(
 ) -> list[CountryLine]:
     if sort == "name":
         return list(lines)
+
     def weakest_first(line: CountryLine) -> tuple[bool, float, str]:
         # Слабые сверху; без оценки — в конце, по имени.
         value = line.rs if sort == "rs" else line.rko
