@@ -77,7 +77,7 @@
             <a class="pt-bars__col" href="{{ url(registry_path ~ '/' ~ bar.inspection_id) }}?lang={{ lang }}"
                title="{{ bar.on }} · {{ '%.1f'|format(bar.pct) }}% · {{ bar.grade }}">
               <span class="pt-bars__num">{{ '%.1f'|format(bar.pct) }}</span>
-              <span class="pt-bars__bar{% if not bar.comparable %} pt-bars__bar--other{% endif %}"
+              <span class="pt-bars__bar"
                     style="height: {{ bar.height }}%"></span>
               <span class="pt-bars__date">{{ bar.on.strftime('%d.%m') }}</span>
               <span class="grade grade--{{ grade_tone(bar.grade) }}">{{ bar.grade or '—' }}</span>

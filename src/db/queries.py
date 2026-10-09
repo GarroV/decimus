@@ -737,11 +737,11 @@ limit %(limit)s
 # Сводка среза для плиток (#503): сколько проверок, сколько точек, буквы и
 # сумма процентов — по ВСЕМУ срезу, а не по прочитанному ряду с пределом. Числа
 # движка складываются, но не выводятся: процент и буква взяты такими, какими он
-# их записал. Разбивка по изданию нужна, чтобы потребитель решил, законно ли
-# усреднять срез (T349): разные цены не усредняются.
+# их записал. Проверки разных методик складываются вместе: оценка каждой верна
+# по своей методике (D352).
 _SLICE_SUMMARY_SQL = """
 with срез as (
-    select i.unit_id, i.checklist_code, i.checklist_version, i.grade, i.pct
+    select i.unit_id, i.grade, i.pct
     from inspections i
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -754,11 +754,11 @@ with срез as (
   and (%(grade)s::text is null or i.grade = %(grade)s)
 )
 select
-    coalesce(checklist_code, ''), checklist_version, grade, count(*), sum(pct),
+    grade, count(*), sum(pct),
     (select count(distinct unit_id) from срез)
 from срез
-group by 1, 2, 3
-order by 1, 2, 3
+group by 1
+order by 1
 """
 
 _UNITS_TOTAL_SQL = """
@@ -859,8 +859,8 @@ def slice_summary(
     city: str = "",
     country: str = "",
     grade: str = "",
-) -> tuple[int, list[tuple[str, str, str, int, float]]]:
-    """Сводка среза без предела: `(точек, [(код чек-листа, издание, буква, проверок, сумма %)])`.
+) -> tuple[int, list[tuple[str, int, float]]]:
+    """Сводка среза без предела: `(точек, [(буква, проверок, сумма %)])`.
 
     Ряд проверок экрана ограничен пределом, а плитки (средняя, буквы, число
     проверок и точек) обязаны говорить о том же множестве, что потери по зонам
@@ -880,11 +880,8 @@ def slice_summary(
             },
         )
         строки = cur.fetchall()
-    точек = int(строки[0][5]) if строки else 0
-    return точек, [
-        (str(code), str(version), str(буква), int(n), float(сумма))
-        for code, version, буква, n, сумма, _ in строки
-    ]
+    точек = int(строки[0][3]) if строки else 0
+    return точек, [(str(буква or ""), int(n), float(сумма)) for буква, n, сумма, _ in строки]
 
 
 def units_total(*, reach: Reach) -> int:
