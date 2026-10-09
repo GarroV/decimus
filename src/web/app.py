@@ -1085,8 +1085,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/accept")
     def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341)."""
-        отказ = _admin_only()
+        """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341),
+        админ партнёра — свежую проверку своих сотрудников (D367)."""
+        отказ = _reviewer_only(inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1110,8 +1111,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341)."""
-        отказ = _admin_only()
+        """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341),
+        админ партнёра — в свежей проверке своих сотрудников (D367)."""
+        отказ = _reviewer_only(inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1306,6 +1308,38 @@ def _admin_only() -> FlaskResponse | None:
     return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
+def _partner_may_review(detail: Any) -> bool:
+    """Свежая проверка сотрудников партнёра — её вычитывает сам партнёр (D367).
+
+    Своя (пространство партнёра, а это значит — проведена его людьми; проверки УК
+    и сторонних проверяющих лежат в пространстве УК), из обхода, ещё на приёмке.
+    Страну держит охват: карточка вне стран партнёра ему не загрузится.
+    """
+    проверка = detail.inspection
+    return (
+        _own(detail)
+        and проверка.origin == "field"
+        and проверка.on_review
+        and not проверка.retracted
+    )
+
+
+def _reviewer_only(inspection_id: str) -> FlaskResponse | None:
+    """Заслон вычитки: админ УК — как раньше (D341); админ партнёра — только
+    свежая проверка своих сотрудников (D367). Снятие и перенос сюда не ходят."""
+    if _admin_only() is None:
+        return None
+    вошедший = auth.current_account()
+    if вошедший is None or not is_admin_role(вошедший.role):
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    detail = data.load_card(inspection_id, reach=auth.current_reach())
+    if detail is None:
+        return render_template("inspections/not_found.html"), 404  # type: ignore[return-value]
+    if not _partner_may_review(detail):
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    return None
+
+
 def _render_card(
     inspection_id: str, *, conf: Settings, notice: str | None, failure: str | None
 ) -> str | tuple[str, int]:
@@ -1334,8 +1368,12 @@ def _render_card(
     # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
     # админ УК по своей проверке (D283, D341), и ровно до подтверждения (D199, D200).
     # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
+    вошедший = auth.current_account()
+    админ_партнёра = (
+        вошедший is not None and is_admin_role(вошедший.role) and _partner_may_review(detail)
+    )
     можно_подтвердить = (
-        админ
+        (админ or админ_партнёра)
         and своя
         and data.retraction_available()
         and detail.inspection.on_review
