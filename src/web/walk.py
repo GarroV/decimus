@@ -33,7 +33,8 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 
-from src.db import bot_links, queries
+from src.bot.config import BotSettings
+from src.db import queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
@@ -42,7 +43,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_suggest, walk_write
+from . import walk_access, walk_settings, walk_suggest, walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -220,19 +221,6 @@ def _previous(inspection: Inspection) -> PreviousOutcome:
         return PreviousOutcome(None, unavailable=True)
 
 
-def revoked(chat_id: int) -> bool:
-    """Сняли ли у человека доступ — привязку бота или учётку (`src/bot/access.py`, п.5).
-
-    Проверка ЕГО проверки ещё лежит на диске, но бот его уже не пускает — и
-    экран обхода не должен становиться обходным путём. Привязки не было
-    никогда — не отказ: такой человек мог завести проверку только по старому
-    списку бота, и раз она есть, бот его пустил. База молчит — `DbError`
-    наверх: сверить снятие нечем, а отвечать «пускаю» вслепую нельзя.
-    """
-    положение = bot_links.standing(chat_id)
-    return положение.binding is None and положение.ever_bound
-
-
 def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
     """Сведения о визите: поля методики этой проверки с уже данными ответами.
 
@@ -257,13 +245,25 @@ def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
     return out
 
 
-def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
-    """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`."""
+def walk_payload(
+    chat_id: int, *, fallback_lang: str, bot: BotSettings | None = None
+) -> dict[str, Any]:
+    """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`.
+
+    Язык — как у бота (D303): выбор человека, затем язык начатой проверки,
+    затем язык стенда. `app` — что знают о человеке главная и настройки (D373).
+    """
     inspection = get_state(chat_id)
+    chosen = walk_settings.chosen_lang(chat_id) if bot is not None else None
     if inspection is None:
-        lang = fallback_lang
-        return {"state": "none", "lang": lang, "texts": texts_for(lang)}
-    lang = inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang
+        lang = chosen or fallback_lang
+        return {
+            "state": "none",
+            "lang": lang,
+            "texts": texts_for(lang),
+            "app": walk_settings.app_block(chat_id, lang, bot),
+        }
+    lang = chosen or (inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang)
     items = list_items(chat_id=chat_id)
     questions = {item.code: item.question(lang) for item in items}
     payload = build_walk(
@@ -276,7 +276,7 @@ def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
-    return {**payload, "texts": texts_for(lang)}
+    return {**payload, "texts": texts_for(lang), "app": walk_settings.app_block(chat_id, lang, bot)}
 
 
 def init_data_of() -> str:
@@ -292,10 +292,10 @@ def identify(
 ) -> int | tuple[Response, int]:
     """Чей это запрос — номер чата или готовый отказ.
 
-    Одна дверь на чтение и запись: подпись, затем снятый доступ. Запись
-    (`header_only`) берёт подпись только из заголовка. Снятие
-    сверяется только при живом токене — на стенде без бота его не с чем
-    сверить. База молчит — 503, а не «пускаю вслепую».
+    Одна дверь на чтение и запись: подпись, затем доступ бота (D372). Запись
+    (`header_only`) берёт подпись только из заголовка. Доступ сверяется
+    только при живом токене — на стенде без бота его не с чем сверить. База
+    молчит — 503, а не «пускаю вслепую».
     """
     if not conf.enabled:
         return jsonify({"error": "disabled"}), 404
@@ -314,8 +314,10 @@ def identify(
         logger.info("Обход: чат %s не в круге тестеров — отказ", chat_id)
         return jsonify({"error": "closed", "texts": texts_for(ui_lang)}), 403
     try:
-        if conf.bot_token is not None and revoked(chat_id):
-            logger.info("Обход: доступ чата %s снят — отказ", chat_id)
+        if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:
+            # Бот этого человека не пускает (не привязан, доступ снят) — и
+            # мини-апп тоже, хоть подпись и настоящая (D372).
+            logger.info("Обход: бот не пускает чат %s — отказ", chat_id)
             return jsonify({"error": "unauthorized"}), 401
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
@@ -323,10 +325,12 @@ def identify(
     return chat_id
 
 
-def payload_response(chat_id: int, ui_lang: str) -> tuple[Response, int]:
+def payload_response(
+    chat_id: int, ui_lang: str, *, bot: BotSettings | None = None
+) -> tuple[Response, int]:
     """Свежие данные экрана — ответ на чтение и на каждую запись."""
     try:
-        ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang))
+        ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang, bot=bot))
     except STATE_FAILURES:
         logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
         return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
@@ -338,6 +342,12 @@ def payload_response(chat_id: int, ui_lang: str) -> tuple[Response, int]:
 def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -> None:
     """Повесить страницу, данные и запись обхода. Без настроек — адреса отвечают 404."""
     conf = settings or load_walk_settings()
+    # Настройки бота — только при живом токене: на стенде без бота ни круга
+    # MCP, ни выбора языка нет.
+    bot = walk_settings.bot_settings() if conf.bot_token is not None else None
+
+    def respond(chat_id: int, lang: str) -> tuple[Response, int]:
+        return payload_response(chat_id, lang, bot=bot)
 
     @app.get(PAGE_PATH, endpoint=PAGE_ENDPOINT)
     def walk_page() -> Response | tuple[str, int]:
@@ -350,7 +360,10 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         who = identify(conf, ui_lang)
         if not isinstance(who, int):
             return who
-        return payload_response(who, ui_lang)
+        return respond(who, ui_lang)
 
-    walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=payload_response)
+    walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
+    walk_settings.install(
+        app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot
+    )
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)

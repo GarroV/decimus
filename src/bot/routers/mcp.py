@@ -84,7 +84,8 @@ MCP_WHO_COMMAND = "mcp_who"
 #: слушает петлю (`127.0.0.1`), и человеку с другой машины эта строка не
 #: подходит — он идёт туннелем, и в команде у него стоит свой адрес. Это разные
 #: факты, и копией одного другой не является.
-MCP_URL_VAR = "BOT_MCP_URL"
+#: Живёт в `mcp_setup` (D373): её читает и мини-апп, а роутеры aiogram ему не нужны.
+from ..mcp_setup import MCP_URL_VAR as MCP_URL_VAR  # noqa: E402
 
 
 def setup_url(lang: str) -> str:

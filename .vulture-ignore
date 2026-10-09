@@ -443,3 +443,13 @@ added_email_failed
 bot_link_until
 label_key
 actor_in_circle
+# Поля свечей сводки рейтингов (D384) читает только шаблон `ratings/index.html`.
+rs_candles
+rko_candles
+wick_top
+wick_bottom
+body_top
+body_height
+trend
+in_period
+threshold_y
