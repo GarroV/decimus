@@ -166,10 +166,10 @@ def _own_binding() -> tuple[Any, bool]:
 def _pick(
     show: Show, люди: tuple[Any, ...], список: tuple[Any, ...], manage: bool
 ) -> tuple[str, Any, bool]:
-    """Что в правой колонке: (вид, строка, выбрано ли явно).
+    """Что в панели справа: (вид, строка, выбрано ли явно).
 
-    Явный выбор — из адреса или после действия. Без него на компьютере справа
-    первый человек списка (как у Swarm), на телефоне — только список.
+    Явный выбор — из адреса или после действия; только он открывает панель.
+    Без него вид — первый человек списка, но панель закрыта.
     """
     вошедший = auth.current_account()
     if show.add or (request.args.get("add") == "1" and manage):
@@ -240,7 +240,9 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             link=link,
             link_reset=screen_url(адрес, lang=язык, f=Filters()),
             users_url=адрес,
-            split_open=выбрано_пространство if вкладка == TAB_SPACES else явно,
+            # Панель справа — только по явному выбору; без права вести людей
+            # своя карточка стоит на странице, а не в панели (закрывать некуда).
+            split_open=выбрано_пространство if вкладка == TAB_SPACES else явно and manage,
             split_back=link(tab=вкладка if вкладка == TAB_SPACES else ""),
             bot_username=current_app.config.get(BOT_USERNAME_KEY),
             bot_var=WEB_BOT_USERNAME_VAR,

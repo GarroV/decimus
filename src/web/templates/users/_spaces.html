@@ -9,7 +9,7 @@
     <div class="sbar">
       <span class="sbar__count">{{ t('users.spaces.count', count=rows|length) }}</span>
       {% if manages %}
-        <a class="sbtn sbtn--primary sbar__add" href="{{ link(tab='spaces', add_space='1') }}">{{ icon('plus') }}<span>{{ t('users.spaces.add.open') }}</span></a>
+        <a class="sbtn sbtn--primary sbar__add" href="{{ link(tab='spaces', add_space='1') }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('users.spaces.add.open') }}</span></a>
       {% endif %}
     </div>
     {% if not known %}
@@ -19,7 +19,7 @@
         <p class="sempty__title">{{ t('users.spaces.none') }}</p>
         {% if manages %}
           <p class="sempty__text">{{ t('users.spaces.none_text') }}</p>
-          <a class="sbtn sbtn--primary" href="{{ link(tab='spaces', add_space='1') }}">{{ t('users.spaces.add.open') }}</a>
+          <a class="sbtn sbtn--primary" href="{{ link(tab='spaces', add_space='1') }}" data-drawer-open>{{ t('users.spaces.add.open') }}</a>
         {% endif %}
       </div>
     {% else %}
@@ -31,7 +31,7 @@
         </div>
         <ul class="slist__rows">
           {% for пр in rows %}
-            {% set текущее = picked is not none and picked.code == пр.code and not space_add %}
+            {% set текущее = split_open and picked is not none and picked.code == пр.code and not space_add %}
             <li>
               <a class="srow{% if текущее %} is-current{% endif %}" href="{{ link(tab='spaces', space_code=пр.code) }}"{% if текущее %} aria-current="true"{% endif %}>
                 <span class="srow__main"><b class="mono">{{ пр.code }}</b><small>{{ пр.name or '—' }}</small></span>

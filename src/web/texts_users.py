@@ -112,6 +112,8 @@ _SCREEN: dict[str, dict[str, str]] = {
 }
 
 _PANEL: dict[str, dict[str, str]] = {
+    "users.drawer.person": {"ru": "Карточка человека", "en": "Person"},
+    "users.drawer.space": {"ru": "Пространство", "en": "Space"},
     "users.panel.close": {"ru": "Закрыть", "en": "Close"},
     "users.panel.created": {"ru": "Добавлен", "en": "Added"},
     "users.panel.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
