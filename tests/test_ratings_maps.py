@@ -82,3 +82,51 @@ def test_история_филиала_разбирается_по_дням() ->
     assert [(r.on_date, r.avg_rating, r.ratings_count) for r in оценки] == [
         (date(2026, 9, 9), 4.6, 1051)
     ]
+
+
+def test_филиал_связывается_с_ближайшей_пиццерией_в_пороге() -> None:
+    from src.ratings.maps_link import DodoUnit, Point, match
+
+    # Arrange — Ozo 18 в Вильнюсе: филиал в ~30 м от пиццерии; второй филиал —
+    # дубль той же точки дальше; третий — ближе всего к Vilnius-5, но за порогом.
+    озас = DodoUnit("a" * 32, "Vilnius-4", 54.7140677, 25.272872)
+    лайсвес = DodoUnit("b" * 32, "Vilnius-5", 54.6945595, 25.2171669)
+    точки = [
+        Point("p1", 54.71430, 25.27260),
+        Point("p2", 54.71450, 25.27200),
+        Point("p3", 54.70, 25.20),  # ~1,2 км от Vilnius-5 — за порогом
+    ]
+
+    # Act
+    связи = match(точки, [озас, лайсвес])
+
+    # Assert
+    assert [(x.company_uuid, x.dodo_name) for x in связи] == [("p1", "Vilnius-4")]
+    assert связи[0].distance_m < 50
+
+
+def test_пиццерия_из_публичного_api_без_координат_и_офис_отбрасываются() -> None:
+    from src.ratings.maps_link import parse_units
+
+    ответ = [
+        {
+            "Type": 0,
+            "UUId": "c" * 32,
+            "Name": "Office",
+            "Location": {"Latitude": 1, "Longitude": 1},
+        },
+        {
+            "Type": 1,
+            "UUId": "D" * 32,
+            "Name": "Vilnius-1",
+            "Location": {"Latitude": 54.7, "Longitude": 25.3},
+        },
+        {
+            "Type": 1,
+            "UUId": "e" * 32,
+            "Name": "Без точки",
+            "Location": {"Latitude": 0, "Longitude": 0},
+        },
+        {"Type": 1, "UUId": "короткий", "Name": "x", "Location": {"Latitude": 1, "Longitude": 1}},
+    ]
+    assert [(u.dodo_id, u.name) for u in parse_units(ответ)] == [("d" * 32, "Vilnius-1")]

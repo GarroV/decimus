@@ -208,6 +208,10 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.maps.provider.2": {"ru": "Google", "en": "Google"},
     "ratings.maps.provider.1": {"ru": "Яндекс", "en": "Yandex"},
     "ratings.maps.branches": {"ru": "Филиалов", "en": "Branches"},
+    "ratings.maps.unit_title": {
+        "ru": "Оценка в Google Картах, отзывов: {n}",
+        "en": "Google Maps rating, reviews: {n}",
+    },
     "ratings.maps.reviews": {"ru": "· {n} отз.", "en": "· {n} reviews"},
     "ratings.empty.maps": {
         "ru": "Оценок с карт по этим странам ещё нет.",

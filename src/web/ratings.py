@@ -31,6 +31,7 @@ from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, i
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RATING, ReportPeriod
+from src.ratings.pointer import GOOGLE
 
 from . import auth, ratings_board, ratings_calendar
 from .action_plans import FORM_OVERHEAD_BYTES
@@ -136,6 +137,15 @@ def _maps(
         return None
 
 
+def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
+    """Оценка Google по пиццериям, связанным с филиалами карт; сбой — пусто."""
+    try:
+        return maps_store.unit_scores(GOOGLE, until=until)
+    except RatingsError:
+        logger.warning("Оценки пиццерий на картах не прочитались", exc_info=True)
+        return {}
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
@@ -162,6 +172,7 @@ def render_summary(conf: Settings) -> str:
             summary.previous.end if summary.previous else None,
         ),
         map_providers=rmaps.SHOWN_PROVIDERS,
+        unit_maps=_unit_maps(min(selection.period.end, date.today())),
         board=board,
         summary=summary,
         choices=found,

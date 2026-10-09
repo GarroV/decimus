@@ -19,7 +19,7 @@ from datetime import date, timedelta
 from src.db import maps_store
 from src.db.maps_store import LatestRating
 
-from . import pointer
+from . import maps_link, pointer
 
 logger = logging.getLogger(__name__)
 
@@ -125,6 +125,19 @@ def backfill(months: int, *, today: date, fetch: pointer.Fetch | None = None) ->
     return saved
 
 
+def link_once() -> int:
+    """Связать филиалы с пиццериями Dodo по координатам и записать связи."""
+    found = maps_link.match(
+        [maps_link.Point(*p) for p in maps_store.points()],
+        maps_link.fetch_units(maps_store.link_countries()),
+    )
+    linked = maps_store.save_links(
+        [(x.company_uuid, x.dodo_id, x.dodo_name, x.distance_m) for x in found]
+    )
+    logger.info("Филиалы карт связаны с пиццериями: %d", linked)
+    return linked
+
+
 def load_once(fetch: pointer.Fetch | None = None) -> tuple[int, int]:
     """Забрать сети и филиалы с оценками и записать снимок. След — в журнале загрузок."""
     fetch = fetch or _key_fetch()
@@ -156,6 +169,11 @@ def load_once(fetch: pointer.Fetch | None = None) -> tuple[int, int]:
         maps_store.log_load(ok=False, error=str(exc))
         raise
     maps_store.log_load(ok=True, companies=saved[0], ratings=saved[1])
+    try:
+        link_once()
+    except Exception:
+        # Связь — дополнение: её сбой не отменяет загруженные оценки.
+        logger.exception("Филиалы карт не связались с пиццериями")
     logger.info("Оценки карт загружены: филиалов %d, оценок %d", *saved)
     return saved
 
@@ -167,7 +185,9 @@ def main() -> None:
         level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s"
     )
     args = sys.argv[1:]
-    if args[:1] == ["history"]:
+    if args[:1] == ["link"]:
+        link_once()
+    elif args[:1] == ["history"]:
         backfill(int(args[1]) if len(args) > 1 else 12, today=date.today())
     else:
         load_once()
