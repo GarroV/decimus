@@ -9,9 +9,10 @@
 НИ ОДНОЙ ЦИФРЫ СОБСТВЕННОГО ПРОИЗВОДСТВА, как и в соседнем модуле раздела
 «Проверки». Процент и буква приходят такими, какими их записал движок; потери
 по зонам складываются запросом из `by_zone`, куда их положил он же. Среднее по
-сети — единственное вычисляемое число, и оно снабжено признаком сравнимости:
-усреднять проверки, посчитанные по разным ставкам, нельзя, и экран об этом
-говорит вслух, а не показывает бодрую цифру (T349).
+сети — единственное вычисляемое число, и оно берётся по всем проверкам среза,
+как они записаны: оценка каждой проверки верна по методике, которой её
+поставили, и смена методики (издание, ценовая форма, историческая проверка)
+средние, движение и разбивки не гасит (D352).
 """
 
 from __future__ import annotations
@@ -22,8 +23,6 @@ from datetime import date, timedelta
 from src.db import queries
 from src.db.models import InspectionRow
 from src.db.reach import Reach
-
-from .pricing import price_key, price_key_of
 
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
@@ -127,9 +126,8 @@ class Selection:
 class CityRow:
     """Строка разбивки: город, его точки и что с ними за период.
 
-    Средняя считается по записанным процентам ровно так же, как по сети, и
-    подчиняется тому же признаку сравнимости: ряд из разных изданий методики
-    не усредняется вовсе (T349).
+    Средняя считается по записанным процентам ровно так же, как по сети: по
+    всем проверкам города, какой бы методикой каждая ни была оценена (D352).
     """
 
     city: str
@@ -137,12 +135,11 @@ class CityRow:
     units: int
     inspections: int
     average: float | None
-    comparable: bool
     grades: tuple[tuple[str, int], ...]
     critical: int
     #: Движение средней против такого же периода перед этим. `None` — не с
-    #: чем сравнивать или сравнивать нельзя, и тогда на экране прочерк, а не
-    #: ноль: ноль читался бы как «ничего не изменилось».
+    #: чем сравнивать, и тогда на экране прочерк, а не ноль: ноль читался бы
+    #: как «ничего не изменилось».
     delta: float | None = None
 
 
@@ -150,9 +147,8 @@ class CityRow:
 class PointRow:
     """Точка выборки: её последняя проверка и куда она движется.
 
-    `delta` — разница с предыдущей проверкой ТОЙ ЖЕ точки, и только если обе
-    посчитаны одной ценой (`pricing`, #405): иначе это разница ставок, а не работы
-    точки, и стрелка вниз соврала бы человеку прямо на главном экране.
+    `delta` — разница с предыдущей проверкой ТОЙ ЖЕ точки, какой бы методикой
+    каждая из двух ни была оценена: обе оценки верны по своей методике (D352).
     """
 
     unit: str
@@ -179,13 +175,12 @@ class Overview:
     inspections: tuple[InspectionRow, ...]
     grades: tuple[tuple[str, int], ...]
     average: float | None
-    comparable: bool
     zone_losses: tuple[ZoneLoss, ...]
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problems: tuple[PointRow, ...] = ()
     #: Движение средней против такого же периода перед этим. `None` — не с чем
-    #: или нельзя сравнивать.
+    #: сравнивать.
     average_delta: float | None = None
     #: Сколько точек выборки за период не проверяли ни разу. Знаменатель
     #: берётся из справочника: «проверено 12» без «из 150» — это не ответ.
@@ -235,15 +230,9 @@ class _Summary:
     units: int
     average: float | None
     grades: tuple[tuple[str, int], ...]
-    #: Ключи цены (`price_key_of`) всех проверок среза — для сравнимости.
-    prices: frozenset[tuple[str, str]]
-
-    @property
-    def comparable(self) -> bool:
-        return len(self.prices) <= 1
 
 
-_НИЧЕГО = _Summary(inspections=0, units=0, average=None, grades=(), prices=frozenset())
+_НИЧЕГО = _Summary(inspections=0, units=0, average=None, grades=())
 
 
 def _summary(
@@ -262,41 +251,28 @@ def _summary(
         country=selection.country,
         grade=selection.grade,
     )
-    проверок = sum(группа[3] for группа in группы)
+    проверок = sum(группа[1] for группа in группы)
     счёт = {буква: 0 for буква in ("A", "B", "C", "D")}
-    for группа in группы:
-        if группа[2] in счёт:
-            счёт[группа[2]] += группа[3]
+    for буква, число, _ in группы:
+        if буква in счёт:
+            счёт[буква] += число
     return _Summary(
         inspections=проверок,
         units=точек,
-        average=round(sum(группа[4] for группа in группы) / проверок, 1) if проверок else None,
+        average=round(sum(группа[2] for группа in группы) / проверок, 1) if проверок else None,
         grades=tuple(счёт.items()),
-        prices=frozenset(price_key_of(группа[0], группа[1]) for группа in группы),
     )
 
 
-def _summary_movement(сейчас: _Summary, раньше: _Summary) -> float | None:
-    """Движение средней всего среза против прошлого окна — по правилам `_movement`."""
-    if сейчас.average is None or раньше.average is None:
-        return None
-    if len(сейчас.prices | раньше.prices) > 1:
-        return None
-    return round(сейчас.average - раньше.average, 1)
+def _difference(сейчас: float | None, раньше: float | None) -> float | None:
+    """Насколько средняя сдвинулась. `None` — одной из двух средних нет.
 
-
-def _comparable(rows: tuple[InspectionRow, ...]) -> bool:
-    """Можно ли усреднять этот ряд: все проверки одного чек-листа одной ценой.
-
-    Сравнивается «код чек-листа + оценочная форма издания» (`pricing`, D187),
-    а не имя издания: имя меняется и от правки формулировки, которая цену не
-    двигает, и до #405 обзор отказывался считать среднюю по проверкам,
-    посчитанным одинаково. Издания нет на машине — сравнивается его имя, то
-    есть ряд рвётся в безопасную сторону (T349).
+    Смена методики между окнами движение не гасит (D352): каждая оценка верна
+    по своей методике, и средняя из них — тоже ответ, а не разница ставок.
     """
-    if len(rows) < 2:
-        return True
-    return len({price_key(row) for row in rows}) == 1
+    if сейчас is None or раньше is None:
+        return None
+    return round(сейчас - раньше, 1)
 
 
 def _average(rows: tuple[InspectionRow, ...]) -> float | None:
@@ -381,21 +357,6 @@ def window_before(period: str, *, today: date) -> tuple[date | None, date | None
     return конец - timedelta(days=дней), конец
 
 
-def _movement(сейчас: tuple[InspectionRow, ...], раньше: tuple[InspectionRow, ...]) -> float | None:
-    """Насколько средняя сдвинулась. `None` — сравнивать нечего или нельзя.
-
-    Нельзя — это когда хоть один из двух рядов посчитан разными изданиями
-    методики или когда ряды посчитаны РАЗНЫМИ изданиями между собой: тогда
-    разница показывает смену ставок, а не работу сети (T349).
-    """
-    если_сейчас, если_раньше = _average(сейчас), _average(раньше)
-    if если_сейчас is None or если_раньше is None:
-        return None
-    if not _comparable(сейчас) or not _comparable(раньше) or not _comparable(сейчас + раньше):
-        return None
-    return round(если_сейчас - если_раньше, 1)
-
-
 def _by_city(
     rows: tuple[InspectionRow, ...], *, geo: dict[str, tuple[str, str]]
 ) -> dict[tuple[str, str], list[InspectionRow]]:
@@ -429,10 +390,11 @@ def _breakdown(
             units=len({row.unit_name for row in ряд}),
             inspections=len(ряд),
             average=_average(tuple(ряд)),
-            comparable=_comparable(tuple(ряд)),
             grades=_grades(tuple(ряд)),
             critical=sum(counts.get(row.id, {}).get(CRITICAL, 0) for row in ряд),
-            delta=_movement(tuple(ряд), tuple(было_по_городам.get((country, city), ()))),
+            delta=_difference(
+                _average(tuple(ряд)), _average(tuple(было_по_городам.get((country, city), ())))
+            ),
         )
         for (country, city), ряд in по_городам.items()
     ]
@@ -464,7 +426,6 @@ def _points(
     for имя, row in последние.items():
         country, city = geo.get(имя, ("", ""))
         было = предыдущие.get(имя)
-        сравнимо = было is not None and price_key(было) == price_key(row)
         зона = worst.get(row.id, ("", "", "", 0.0))
         точки.append(
             PointRow(
@@ -475,7 +436,7 @@ def _points(
                 when=row.inspection_date,
                 grade=row.grade,
                 pct=row.pct,
-                delta=round(row.pct - было.pct, 1) if сравнимо and было else None,
+                delta=round(row.pct - было.pct, 1) if было is not None else None,
                 worst_zone_ru=зона[1],
                 worst_zone_en=зона[2],
                 critical=counts.get(row.id, {}).get(CRITICAL, 0),
@@ -668,7 +629,6 @@ def load(
         inspections=rows,
         grades=сводка.grades,
         average=сводка.average,
-        comparable=сводка.comparable,
         zone_losses=tuple(
             ZoneLoss(
                 code=code,
@@ -692,7 +652,7 @@ def load(
         ),
         attention=_attention(rows, counts=counts),
         problems=_problems(точки),
-        average_delta=_summary_movement(сводка, сводка_было),
+        average_delta=_difference(сводка.average, сводка_было.average),
         # Точки справочника, по которым за период нет ни одной проверки.
         # Считается от того же справочника, что и знаменатель плитки: иначе
         # «не проверено» и «всего» пришли бы из разных мест и разошлись.

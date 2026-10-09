@@ -59,8 +59,9 @@
         <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/report') }}?lang={{ lang }}">{{ t('card.report.download') }}</a>
       {% endif %}
       {# Письмо партнёру — запись от имени пространства: у проверки, которую
-         вошедший только читает (УК у партнёра, D283), кнопки нет. #}
-      {% if own %}
+         вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
+         задним числом (текущей и исторической) письма нет вовсе (D310). #}
+      {% if own and not head.is_uploaded %}
       <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
       {% endif %}
     </div>
@@ -98,9 +99,20 @@
     </div>
   {% endif %}
 
+  {# Историческая (D332): оценка из старого отчёта как есть — сказано словами,
+     чтобы её не читали как посчитанную по нынешнему чек-листу. #}
+  {% if head.is_legacy %}
+    <div class="note mt-gap">
+      <div>
+        <div class="note__title">{{ t('card.legacy.title') }}</div>
+        <div class="note__text">{{ t('card.legacy.text', method=detail.legacy_method or t('card.legacy.unlabelled'), status=detail.reported_status or '—') }}</div>
+      </div>
+    </div>
+  {% endif %}
+
   <div class="card mt-gap">
     <div class="card__head head-line">
-      <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade }}</span>
+      <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
       <div class="head-line__score">
         <span class="num num--hero">{{ head.pct }}</span>
         <span class="muted">{{ t('card.score.unit') }}</span>
@@ -111,9 +123,11 @@
         {# Сколько вычтено и записи по классам — одной строкой: отдельный блок
            «Записи по классам» под шапкой занимал целый ряд ради трёх меток. #}
         <div class="meta row row--tight head-line__counts">
+          {% if not head.is_legacy %}
           <span>{{ t('card.score.note', deductions=detail.deductions) }}</span>
+          {% endif %}
           {% for line in counts %}
-            <span class="tag {{ line.tone }}">{{ line.level }}<span class="tag__note">{{ line.count }}</span></span>
+            <span class="tag {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>
           {% endfor %}
         </div>
       </div>
@@ -194,7 +208,9 @@
      Полосой, а не колонкой цифр (D190). Колонка «доля / потеря / остаток»
      требовала читать три числа и держать их в голове, чтобы понять, где
      выжжено больше; полоса отвечает на это первым взглядом, а числа остаются
-     рядом — записанными, ни одно из них не пересчитано. #}
+     рядом — записанными, ни одно из них не пересчитано. У исторической разбивки
+     по зонам нет (D332) — блока тоже нет, а не «потеряно 0». #}
+  {% if not head.is_legacy %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('card.zones.title') }}</div>
@@ -221,6 +237,7 @@
       </div>
     {% endfor %}
   </section>
+  {% endif %}
 
   {# ── Записи ────────────────────────────────────────────────────────────
      Списком, а не таблицей: главное в записи — её формулировка, и в колонке
@@ -252,12 +269,13 @@
         {% set shots = entry.shown if entry else () %}
         {% set lost = entry.missing if entry else 0 %}
         {% if shots %}<details class="find-row find-row--photos"><summary class="find-row__summary">{% else %}<div class="find-row">{% endif %}
-          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else finding.level }}</span>
+          <span class="tag {{ level_tone(finding.level) }} find-row__level">{{ t('card.findings.advice') if finding.level == 'R' else (t('card.findings.no_class') if finding.level == 'NC' else finding.level) }}</span>
           <span class="find-row__num">{{ finding.n }}</span>
           <span class="find-row__main">
             <span class="find-row__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
             <span class="find-row__meta">
-              {{ t('card.findings.note') if finding.code == 'NOTE' else finding.code }} · {{ zone_names.get(finding.zone, finding.zone) }}
+              {#- Маркеры исторической записи (D332): LEGACY — пункт не назван, пустая зона — не названа. #}
+              {{ t('card.findings.note') if finding.code == 'NOTE' else (t('card.findings.no_item') if finding.code == 'LEGACY' else finding.code) }} · {{ zone_names.get(finding.zone, finding.zone) if finding.zone else t('card.findings.no_zone') }}
               {%- if finding.zone_unusual %} · {{ t('card.findings.zone_unusual') }}{% endif %}
               {%- if mixed_speech %} · {{ t('card.findings.speech_lang', lang=finding.lang) }}{% endif %}
             </span>
@@ -424,7 +442,11 @@
     <summary>{{ t('card.build.title') }}</summary>
     <dl class="kv mt-gap">
       <div><dt class="muted">{{ t('card.build.checklist') }}</dt><dd>{{ checklist_name }}</dd></div>
+      {% if head.is_legacy %}
+      <div><dt class="muted">{{ t('card.legacy.method') }}</dt><dd>{{ detail.legacy_method or t('card.legacy.unlabelled') }}</dd></div>
+      {% else %}
       <div><dt class="muted">{{ t('card.build.since') }}</dt><dd title="{{ head.checklist_version }}">{{ build_since or t('card.build.since_unknown') }}</dd></div>
+      {% endif %}
     </dl>
   </details>
 

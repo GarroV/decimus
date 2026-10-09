@@ -140,6 +140,42 @@ def test_зона_вне_списка_пункта_помечается_необ
     assert стенд["записано"]["revision"].zone_unusual is True
 
 
+@pytest.mark.parametrize("lang", ["ru", "en"])
+def test_историческая_отказывает_честно_до_чтения_чек_листа(
+    стенд: dict[str, Any], monkeypatch: pytest.MonkeyPatch, lang: str
+) -> None:
+    """Историческая (D332) — не «чек-лист не прочитан», а сказано, что она такое."""
+    # Arrange — чтение чек-листа упало бы, как у исторической на стенде.
+    стенд["проверка"] = replace(
+        стенд["проверка"],
+        inspection=replace(
+            стенд["проверка"].inspection, origin="legacy", checklist_version="legacy:old 253"
+        ),
+    )
+
+    def не_читать(*_a: Any, **_k: Any) -> Composition:
+        raise MethodologyRefused("методики legacy:old 253 нет")
+
+    monkeypatch.setattr(revision, "checklist_of", не_читать)
+
+    # Act / Assert
+    with pytest.raises(ReviseError) as отказ:
+        revision.revise_card(
+            "11111111-1111-1111-1111-111111111111",
+            ЗАПИСЬ,
+            tenant="HQ",
+            lang=lang,
+            code="CLN05",
+            level="D2",
+            zone="hot_kitchen",
+            text="грязный пол",
+        )
+    assert "MCP" in str(отказ.value)
+    assert ("историческая" if lang == "ru" else "historical") in str(отказ.value)
+    assert "не прочитан" not in str(отказ.value)
+    assert "посчитано" not in стенд and "записано" not in стенд
+
+
 @pytest.mark.parametrize(
     ("поля", "причина"),
     [

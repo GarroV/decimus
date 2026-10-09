@@ -84,7 +84,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by,
+    -- Происхождение (0042, D334) — в конец по той же причине.
+    i.origin
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -116,7 +118,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by,
+    -- Происхождение (0042, D334) — в конец по той же причине.
+    i.origin
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -158,7 +162,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
-    i.deductions, i.counts, i.by_zone
+    i.origin,
+    i.deductions, i.counts, i.by_zone,
+    i.reported_status, i.legacy_method
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -307,6 +313,8 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         on_review=row[19] == "draft",
         accepted_at=row[20].isoformat() if row[20] is not None else "",
         accepted_by=str(row[21] or ""),
+        # Происхождение (0042, D334): колонка `not null default 'field'`.
+        origin=str(row[22]),
     )
 
 
@@ -585,6 +593,8 @@ def _read_detail(
         by_zone=by_zone,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
+        reported_status=str(row[колонки["reported_status"]] or ""),
+        legacy_method=str(row[колонки["legacy_method"]] or ""),
     )
 
 
@@ -694,6 +704,14 @@ with записи as (
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
       and i.status = 'finalized'
       and f.level not in ('D0', 'R')
+      -- Маркеры исторической записи (`models.LEGACY_CODE`, `models.NO_CLASS`,
+      -- 0042): «пункт не назван» и «без класса» — не пункт и не класс, и в
+      -- систему одинаковых нарушений сети не складываются (D332).
+      and f.code <> 'LEGACY' and f.level <> 'NC'
+      -- Записи исторической вовсе не идут в системные нарушения: код пункта из
+      -- старой методики значит там другое, чем в нынешнем чек-листе. Её ОЦЕНКА
+      -- при этом в средних остаётся (D352) — исключается только статистика пунктов.
+      and i.origin <> 'legacy'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -723,11 +741,11 @@ limit %(limit)s
 # Сводка среза для плиток (#503): сколько проверок, сколько точек, буквы и
 # сумма процентов — по ВСЕМУ срезу, а не по прочитанному ряду с пределом. Числа
 # движка складываются, но не выводятся: процент и буква взяты такими, какими он
-# их записал. Разбивка по изданию нужна, чтобы потребитель решил, законно ли
-# усреднять срез (T349): разные цены не усредняются.
+# их записал. Проверки разных методик складываются вместе: оценка каждой верна
+# по своей методике (D352).
 _SLICE_SUMMARY_SQL = """
 with срез as (
-    select i.unit_id, i.checklist_code, i.checklist_version, i.grade, i.pct
+    select i.unit_id, i.grade, i.pct
     from inspections i
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -740,11 +758,11 @@ with срез as (
   and (%(grade)s::text is null or i.grade = %(grade)s)
 )
 select
-    coalesce(checklist_code, ''), checklist_version, grade, count(*), sum(pct),
+    grade, count(*), sum(pct),
     (select count(distinct unit_id) from срез)
 from срез
-group by 1, 2, 3
-order by 1, 2, 3
+group by 1
+order by 1
 """
 
 _UNITS_TOTAL_SQL = """
@@ -845,8 +863,8 @@ def slice_summary(
     city: str = "",
     country: str = "",
     grade: str = "",
-) -> tuple[int, list[tuple[str, str, str, int, float]]]:
-    """Сводка среза без предела: `(точек, [(код чек-листа, издание, буква, проверок, сумма %)])`.
+) -> tuple[int, list[tuple[str, int, float]]]:
+    """Сводка среза без предела: `(точек, [(буква, проверок, сумма %)])`.
 
     Ряд проверок экрана ограничен пределом, а плитки (средняя, буквы, число
     проверок и точек) обязаны говорить о том же множестве, что потери по зонам
@@ -866,11 +884,8 @@ def slice_summary(
             },
         )
         строки = cur.fetchall()
-    точек = int(строки[0][5]) if строки else 0
-    return точек, [
-        (str(code), str(version), str(буква), int(n), float(сумма))
-        for code, version, буква, n, сумма, _ in строки
-    ]
+    точек = int(строки[0][3]) if строки else 0
+    return точек, [(str(буква or ""), int(n), float(сумма)) for буква, n, сумма, _ in строки]
 
 
 def units_total(*, reach: Reach) -> int:
@@ -968,6 +983,9 @@ with прошлая as (
     where i.tenant_code = %(tenant)s
       and u.name = %(unit)s
       and i.retracted_at is null
+      -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
+      -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
+      and i.origin <> 'legacy'
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
@@ -1017,6 +1035,9 @@ with прошлая as (
     where i.tenant_code = %(tenant)s
       and u.name = %(unit)s
       and i.retracted_at is null
+      -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
+      -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
+      and i.origin <> 'legacy'
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
@@ -1167,6 +1188,8 @@ _ITEM_RECORDS = """
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'
       and i.retracted_at is null
+      -- Историческая: код пункта старой методики — не этот пункт (D332, D352).
+      and i.origin <> 'legacy'
 """
 
 _ITEM_SUMMARY_SQL = (

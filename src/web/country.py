@@ -30,7 +30,6 @@ _EMPTY = Overview(
     inspections=(),
     grades=(),
     average=None,
-    comparable=True,
     zone_losses=(),
     systemic=(),
     attention=(),

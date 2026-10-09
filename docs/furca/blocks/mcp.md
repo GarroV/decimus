@@ -20,13 +20,17 @@ findings_by_unit(unit, limit?)                            inspection_letter(id, 
 # снятие проверки из истории (T211, D086/D089) — ровно один инструмент, право личное токену
 retract_inspection(id, reason, confirm_unit, confirm_date)
 
-# загрузка исторических проверок (D305–D310) — право пространству по MCP_IMPORT_TENANTS.
-# Пишут только загруженные черновики своего пространства; оценку считает движок
-# по версии черновика; подтверждение не открывает запрос экшн-плана (D310).
+# загрузка проверок задним числом (D305–D310, D332–D335) — только УК: MCP_IMPORT_TENANTS=HQ
+# (иное — отказ на старте). Два режима, задаются при создании и не меняются (D334):
+# history — оценка из старого отчёта как есть, движок не зовётся (D332), записи
+# описательные (code/level/zone необязательны); current — только действующая версия
+# эталона, записи и оценку считает движок. Пишут только загруженные черновики своего
+# пространства; подтверждение не открывает запрос экшн-плана, письма нет (D310).
 # Как вести загрузку — docs/14-history-import.md
-import_create_inspection(unit, date, checklist_code, auditor, checklist_version?, kind?,
-                         report_lang?, text_lang?, reported_pct?, reported_grade?, source_ref?)
-import_add_finding(inspection_id, code, level, zone, text, comment?, repeat?)
+import_create_inspection(mode, unit, date, auditor?, reported_pct?, reported_grade?,
+                         reported_status?, legacy_method?, checklist_code?, checklist_version?,
+                         kind?, report_lang?, text_lang?, source_ref?)
+import_add_finding(inspection_id, text, code?, level?, zone?, comment?, repeat?)
 import_edit_finding(inspection_id, n, code?, level?, zone?, text?, comment?, repeat?)
 import_remove_finding(inspection_id, n)        import_add_photo(inspection_id, n, image_base64, mime)
 import_get_inspection(inspection_id)           import_list_drafts()
@@ -76,7 +80,7 @@ import_ratings(kind, content, file_name?)   # kind: rko-violations | rko-evaluat
 
 **Подпись действия (D308).** Кроме арендатора токен даёт подпись `Access.actor`: `mcp:tg:<telegram_id>` для личного токена, `mcp:<арендатор>` для токена из `MCP_TOKENS`. Ею подписано подтверждение загруженной проверки (`accepted_by`); из аргументов вызова подпись не берётся.
 
-**Право загрузки (D305).** `MCP_IMPORT_TENANTS=HQ,...` — пространства, токенам которых открыты инструменты `import_*`. Требует `MCP_CHECKLIST_STORE` и `AUDIT_DATA_DIR` (черновик считается по версии из хранилища), иначе отказ на старте. Без права вызов отказывает до обработчика (`rpc.IMPORT_CLOSED`). Подтверждению нужна `DATABASE_RETRACTION_URL` (роль администратора истории), кадрам — `S3_*`; без них соответствующий инструмент отвечает отказом, остальные работают. Пределы (строка base64 кадра, записи и кадры черновика, число черновиков, длины полей) — именованные константы в `src/mcp/imports.py` и `src/db/imports.py`.
+**Право загрузки (D305, D335).** `MCP_IMPORT_TENANTS=HQ` — единственное допустимое значение: любое другое пространство (после `canonical_tenant`) — отказ на старте (`config._parse_import`), партнёрам загрузка задним числом не открывается. Пусто — загрузка закрыта (выключатель). Требует `MCP_CHECKLIST_STORE` и `AUDIT_DATA_DIR` (режим `current` берёт оттуда действующую версию эталона), иначе отказ на старте. Без права вызов отказывает до обработчика (`rpc.IMPORT_CLOSED`). Подтверждению нужна `DATABASE_RETRACTION_URL` (роль администратора истории), кадрам — `S3_*`; без них соответствующий инструмент отвечает отказом, остальные работают. Режимы и разбор их аргументов — `src/mcp/import_modes.py`. Пределы (строка base64 кадра, записи и кадры черновика, число черновиков, длины полей) — именованные константы в `src/mcp/imports.py`, `src/db/imports.py` и `src/mcp/import_modes.py`.
 
 **Пространства (волна 1, #340).** Чтение проверок — по охвату тенанта токена
 (`src/db/reach.py:reach_of`): УК — вся сеть, партнёр — пиццерии своих стран,

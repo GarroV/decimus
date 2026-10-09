@@ -95,10 +95,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "За выбранный период проверок нет — разбивать нечего.",
         "en": "No inspections in the selected period — nothing to break down.",
     },
-    "overview.breakdown.incomparable": {
-        "ru": "разные издания методики",
-        "en": "different methodology editions",
-    },
     "overview.sort": {"ru": "Сортировка", "en": "Sort"},
     "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
     "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
@@ -121,8 +117,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No inspected unit in this selection. Clear part of the filter.",
     },
     "overview.points.nodelta": {
-        "ru": "первая сравнимая проверка",
-        "en": "first comparable inspection",
+        "ru": "первая проверка точки в выборке",
+        "en": "the unit's first inspection in the selection",
     },
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
@@ -179,9 +175,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "over recorded percentages",
     },
     "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
-    # Средней нет, потому что в выборке разные чек-листы — другие пункты или
-    # веса (D218). Причина одной строкой в самой плитке, без плашки.
-    "overview.tile.note.average_mixed": {"ru": "разные чек-листы", "en": "different checklists"},
     "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     # Число ПОКАЗАННЫХ поводов: список ограничен, и «поводов: 6» читалось бы как
@@ -539,6 +532,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Запись исправлена, оценка пересчитана.",
         "en": "The record is corrected and the score recalculated.",
     },
+    "revise.legacy": {
+        "ru": (
+            "это историческая проверка: оценка поставлена по методике того времени и "
+            "движком не пересчитывается, сверять запись с нынешним чек-листом не с чем. "
+            "Записи исторической правятся только через MCP"
+        ),
+        "en": (
+            "this is a historical inspection: its score was given under the methodology "
+            "of that time and is never recalculated by the engine, so there is no checklist "
+            "to check the record against. Records of a historical inspection are edited "
+            "only through MCP"
+        ),
+    },
     "revise.failed": {
         "ru": "Запись не исправлена: {reason}",
         "en": "The record was not corrected: {reason}",
@@ -578,6 +584,36 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
     "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
     "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
+    # Историческая проверка (D332): записи старого отчёта без пункта, класса, зоны.
+    "card.findings.no_class": {"ru": "без класса", "en": "no class"},
+    "card.findings.no_item": {"ru": "пункт не назван", "en": "item not given"},
+    "card.findings.no_zone": {"ru": "зона не названа", "en": "zone not given"},
+    "card.legacy.title": {
+        "ru": "Историческая проверка, оценка по методике того времени",
+        "en": "Historical inspection, scored under the methodology of that time",
+    },
+    "card.legacy.text": {
+        "ru": (
+            "Оценка перенесена из старого отчёта как есть и не пересчитывается по "
+            "нынешнему чек-листу. Методика: {method}. Статус в отчёте: {status}."
+        ),
+        "en": (
+            "The score is transferred from the old report as is and is not recomputed "
+            "under today's checklist. Methodology: {method}. Status in the report: {status}."
+        ),
+    },
+    "card.legacy.method": {"ru": "Методика того времени", "en": "Methodology of that time"},
+    "card.legacy.unlabelled": {"ru": "не названа", "en": "not named"},
+    "letter.uploaded": {
+        "ru": (
+            "Проверка заведена задним числом через загрузку — письма партнёру по ней нет, "
+            "и никому ничего не отправляется."
+        ),
+        "en": (
+            "This inspection was entered after the fact through import — there is no "
+            "partner letter for it, and nothing is sent to anyone."
+        ),
+    },
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
         "ru": "Записей у проверки нет.",
