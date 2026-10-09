@@ -29,8 +29,7 @@ from flask import Flask, Response, jsonify, request
 from src.bot import stops
 from src.bot.config import BotSettings, load_bot_settings
 from src.bot.errors import BotConfigError
-from src.bot.mcp_setup import setup_command
-from src.bot.routers.mcp import MCP_URL_VAR
+from src.bot.mcp_setup import MCP_URL_VAR, setup_command
 from src.bot.texts import t
 from src.bot.version import build_version
 from src.db import bot_langs, mcp_access
@@ -78,12 +77,17 @@ def chosen_lang(chat_id: int) -> str | None:
     return lang if lang in UI_LANGS else None
 
 
-def in_circle(chat_id: int, bot: BotSettings | None) -> bool:
-    """В круге доступа к MCP ли человек. Основатель — по настройке, как у бота."""
+def in_circle(chat_id: int, bot: BotSettings | None, *, restore: bool = True) -> bool:
+    """В круге доступа к MCP ли человек. Основатель — по настройке, как у бота.
+
+    `restore` — вернуть основателя в таблицу, как делает бот. На чтении экрана
+    (каждые данные) не нужно: там вопрос только «показывать ли пункт».
+    """
     if bot is None or bot.mcp_owner_id is None:
         return False
     if chat_id == bot.mcp_owner_id:
-        mcp_access.add_admin(chat_id, by=None)
+        if restore:
+            mcp_access.add_admin(chat_id, by=None)
         return True
     return mcp_access.is_admin(chat_id)
 
@@ -91,7 +95,7 @@ def in_circle(chat_id: int, bot: BotSettings | None) -> bool:
 def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any]:
     """Что знает о человеке главная и настройки. Отказ базы — круг скрыт."""
     try:
-        circle = in_circle(chat_id, bot)
+        circle = in_circle(chat_id, bot, restore=False)
     except DbError:
         logger.warning("Мини-апп: круг MCP не прочитался для %s", chat_id, exc_info=True)
         circle = False
@@ -181,6 +185,13 @@ def install(
     def refused(key: str, lang: str, status: int) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]
         return jsonify({"error": "refused", "message": entry.get(lang) or entry[ui_lang]}), status
+
+    @app.after_request
+    def no_store(response: Response) -> Response:
+        # Команда с токеном и состав круга — данные одного человека.
+        if request.endpoint == APP_ENDPOINT:
+            response.headers["Cache-Control"] = "no-store"
+        return response
 
     @app.post(APP_PATH, endpoint=APP_ENDPOINT)
     def walk_app() -> tuple[Response, int]:

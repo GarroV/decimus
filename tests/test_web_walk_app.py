@@ -130,6 +130,7 @@ def test_токен_кругу_на_его_пространство(база: Б
     assert ответ.status_code == 200, ответ.get_json()
     assert база.выпущено == [(АУДИТОР, HQ_TENANT)], "сотрудник УК без привязки — пространство УК"
     assert "tok-SECRET" in ответ.get_json()["command"] and ответ.get_json()["replaced"] is True
+    assert ответ.headers["Cache-Control"] == "no-store", "команду с токеном не кэшировать"
 
 
 def test_привести_можно_только_того_кого_пускает_бот(
