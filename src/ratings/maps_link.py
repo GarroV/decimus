@@ -2,7 +2,11 @@
 
 У Pointer нет нашего кода пиццерии, зато у филиала есть координаты, а у
 пиццерии Dodo они есть в публичном API (`publicapi.dodois.io`). Филиал
-связывается с ближайшей пиццерией, если она не дальше `MAX_DISTANCE_M`.
+связывается с ближайшей пиццерией: сразу — если она не дальше `NEAR_M`; до
+`FAR_M` — если совпадение однозначное, то есть следующая пиццерия хотя бы в
+`CLEAR_RATIO` раз дальше. Метка на карте бывает неточной на сотни метров, а
+пиццерии Dodo стоят минимум в нескольких кварталах друг от друга (владелец,
+09.10.2026) — поэтому ближайшая при большом отрыве и есть та самая.
 Пиццерия достаётся одному филиалу — ближайшему: два филиала на одной точке
 (дубль карточки на карте) не делят её оценку.
 
@@ -24,7 +28,9 @@ logger = logging.getLogger(__name__)
 
 PUBLIC_API = "https://publicapi.dodois.io/{country}/api/v1/unitinfo/all"
 PIZZERIA_TYPE = 1  # у Dodo `Type == 1` — пиццерия; 0 — офис
-MAX_DISTANCE_M = 300
+NEAR_M = 300
+FAR_M = 1500
+CLEAR_RATIO = 2.0
 REQUEST_GAP_SEC = 0.5
 TIMEOUT_SEC = 30
 EARTH_RADIUS_M = 6_371_000
@@ -62,16 +68,19 @@ def distance_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
 
 
 def match(points: Sequence[Point], units: Sequence[DodoUnit]) -> tuple[Link, ...]:
-    """Филиал → ближайшая пиццерия не дальше порога; пиццерия — одному филиалу."""
+    """Филиал → ближайшая пиццерия (правило — в описании модуля); пиццерия —
+    одному филиалу, ближайшему."""
     candidates: list[Link] = []
     for point in points:
-        best = min(
+        near = sorted(
             ((distance_m(point.lat, point.lng, u.lat, u.lng), u) for u in units),
-            default=None,
             key=lambda pair: pair[0],
-        )
-        if best is not None and best[0] <= MAX_DISTANCE_M:
-            candidates.append(Link(point.uuid, best[1].dodo_id, best[1].name, round(best[0])))
+        )[:2]
+        if not near:
+            continue
+        (best, unit), runner_up = near[0], (near[1][0] if len(near) > 1 else math.inf)
+        if best <= NEAR_M or (best <= FAR_M and runner_up >= CLEAR_RATIO * best):
+            candidates.append(Link(point.uuid, unit.dodo_id, unit.name, round(best)))
     taken: dict[str, Link] = {}
     for link in sorted(candidates, key=lambda c: c.distance_m):
         taken.setdefault(link.dodo_id, link)

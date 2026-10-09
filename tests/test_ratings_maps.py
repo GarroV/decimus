@@ -88,20 +88,25 @@ def test_филиал_связывается_с_ближайшей_пиццер�
     from src.ratings.maps_link import DodoUnit, Point, match
 
     # Arrange — Ozo 18 в Вильнюсе: филиал в ~30 м от пиццерии; второй филиал —
-    # дубль той же точки дальше; третий — ближе всего к Vilnius-5, но за порогом.
+    # дубль той же точки дальше; третий — в 1,2 км от Vilnius-5 при однозначном
+    # отрыве; четвёртый — в 2 км от Vilnius-5, дальше предела.
     озас = DodoUnit("a" * 32, "Vilnius-4", 54.7140677, 25.272872)
     лайсвес = DodoUnit("b" * 32, "Vilnius-5", 54.6945595, 25.2171669)
     точки = [
         Point("p1", 54.71430, 25.27260),
         Point("p2", 54.71450, 25.27200),
-        Point("p3", 54.70, 25.20),  # ~1,2 км от Vilnius-5 — за порогом
+        Point("p3", 54.70, 25.20),  # ~1,2 км от Vilnius-5, Vilnius-4 вчетверо дальше
+        Point("p4", 54.6765, 25.1885),  # ~2,8 км от Vilnius-5 — дальше предела
     ]
 
     # Act
     связи = match(точки, [озас, лайсвес])
 
     # Assert
-    assert [(x.company_uuid, x.dodo_name) for x in связи] == [("p1", "Vilnius-4")]
+    assert sorted((x.company_uuid, x.dodo_name) for x in связи) == [
+        ("p1", "Vilnius-4"),
+        ("p3", "Vilnius-5"),
+    ]
     assert связи[0].distance_m < 50
 
 
@@ -130,3 +135,12 @@ def test_пиццерия_из_публичного_api_без_координа�
         {"Type": 1, "UUId": "короткий", "Name": "x", "Location": {"Latitude": 1, "Longitude": 1}},
     ]
     assert [(u.dodo_id, u.name) for u in parse_units(ответ)] == [("d" * 32, "Vilnius-1")]
+
+
+def test_спорная_дальняя_пиццерия_не_связывается() -> None:
+    """В 800 м от филиала две пиццерии почти на равном расстоянии — не угадываем."""
+    from src.ratings.maps_link import DodoUnit, Point, match
+
+    левая = DodoUnit("a" * 32, "Город-1", 54.700, 25.000)
+    правая = DodoUnit("b" * 32, "Город-2", 54.700, 25.024)
+    assert match([Point("p", 54.7065, 25.012)], [левая, правая]) == ()
