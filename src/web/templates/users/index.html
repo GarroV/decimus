@@ -1,386 +1,167 @@
 {#
-  Люди проекта: кто заведён, что ему можно, кто отключён.
+  «Пользователи»: кто имеет доступ и что может. Слева список людей, справа
+  карточка выбранного — единственное место всех его настроек и доступов (роль,
+  вход, бот, Claude, отключение). Своя карточка — `?person=me`, туда ведёт меню
+  учётки внизу слева.
 
-  Отключённые показываются вместе с живыми. Вопрос «у кого был доступ»
-  задают после инцидента, и пустое место на него не отвечает.
-#}{% extends "base.html" %}
+  Строки — только люди охвата вошедшего (#585, D364): отфильтрованы на
+  сервере, чужой логин и почта сюда не попадают. В строках нет ни одной формы:
+  всё, что можно сделать с человеком, — в его карточке, и только то, что
+  вошедшему разрешено правилом.
+
+  Пароль новой учётки (карточка «Новый человек» после добавления) показан ЗДЕСЬ
+  и больше нигде: в базе от него остаётся только свёртка, а в адрес он не
+  попадает намеренно — адреса остаются в истории браузера и в журнале
+  обратного прокси.
+#}{% extends "_split_page.html" %}
+{% from "users/_card.html" import person_card, add_card with context %}
+{% from "users/_spaces.html" import spaces_list, space_card with context %}
 {% block title %}{{ t('section.users.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
 
-{% block body %}
-  <div class="ov-head">
-    <div class="ov-head__main">
-      <h1 class="ov-head__title">{{ t('section.users.title') }}</h1>
-      {% if manage %}<div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>{% endif %}
-      {% if scope_kind == 'control' %}<div class="ov-head__sub">{{ t('users.control.scope') }}</div>
-      {% elif scope_kind %}<div class="ov-head__sub">{{ t('users.scope.' ~ scope_kind) }}</div>{% endif %}
-    </div>
-  </div>
-
-  {% if added %}
-    {#
-      Пароль показан ЗДЕСЬ и больше нигде: в базе от него остаётся только
-      свёртка, а в адрес он не попадает намеренно — адреса остаются в истории
-      браузера и в журнале обратного прокси.
-    #}
-    <div class="note note--ok mt-gap">
-      <div>
-        <div class="note__title">{{ t('users.added.title', login=added.login) }}</div>
-        <div class="note__text">{{ t('users.added.text') }}</div>
-        <p class="pass"><code>{{ added.password }}</code></p>
-      </div>
-    </div>
-  {% elif outcome == 'add_space_unknown' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.add.space_unknown') }}</div>
-    </div>
-  {% elif outcome == 'add_role_space' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.add.role_space') }}</div>
-    </div>
-  {% elif outcome == 'add_failed' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.add.failed') }}</div>
-    </div>
-  {% elif outcome == 'disabled' %}
-    <div class="note note--ok mt-gap">
-      <div class="note__text">{{ t('users.disable.ok') }}</div>
-    </div>
-  {% elif outcome == 'disable_missing' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.disable.missing') }}</div>
-    </div>
-  {% elif outcome == 'disable_self' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.disable.self') }}</div>
-    </div>
-  {% elif outcome == 'disable_last_super' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.disable.last_super') }}</div>
-    </div>
-  {% elif outcome == 'disable_failed' %}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.disable.failed') }}</div>
-    </div>
-  {% endif %}
-
-  {% if outcome == 'bot_unset' %}
-    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unset', var=bot_var) }}</div></div>
-  {% elif outcome == 'bot_link_failed' %}
-    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.link_failed') }}</div></div>
-  {% elif outcome == 'bot_unlinked' %}
-    <div class="note note--ok mt-gap"><div class="note__text">{{ t('users.bot.unlinked') }}</div></div>
-  {% elif outcome == 'bot_unlink_missing' %}
-    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_missing') }}</div></div>
-  {% elif outcome == 'bot_unlink_failed' %}
-    <div class="note note--warn mt-gap"><div class="note__text">{{ t('users.bot.unlink_failed') }}</div></div>
-  {% endif %}
-
-  {# Привязка бота (D286): человек сам связывает свой Telegram со своей
-     учёткой — и тем самым со своим пространством. #}
-  <section class="ov-card ov-card--wide mt-gap">
-    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.bot.title') }}</div></div>
-    <div class="card__body">
-      {% if bot_link %}
-        {# Ссылка показана ЗДЕСЬ и один раз: в адрес она не попадает, а живёт
-           десять минут и срабатывает однажды. #}
-        <p>{{ t('users.bot.link') }}</p>
-        <p class="pass"><a href="{{ bot_link }}" rel="noopener noreferrer"><code>{{ bot_link }}</code></a></p>
-        <p class="field-note">{{ t('users.bot.until', time=bot_link_until.strftime('%H:%M') if bot_link_until else '') }}</p>
-      {% elif not own_binding_known %}
-        <p class="field-note">{{ t('users.bot.unknown') }}</p>
-      {% elif own_binding %}
-        <p>{{ t('users.bot.bound', id=own_binding.telegram_id, date=own_binding.bound_at.strftime('%Y-%m-%d %H:%M')) }}</p>
-        <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}" class="row">
-          <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
-        </form>
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+      {% if manage %}
+        <p class="shead__sub">
+          {{ t('users.count', count=people_total) }}{% if people_off %} · {{ t('users.count_off', count=people_off) }}{% endif %}
+          {% if scope_kind %} · {{ t('users.scope.' ~ scope_kind) }}{% endif %}
+        </p>
       {% else %}
-        <p>{{ t('users.bot.unbound') }}</p>
+        <p class="shead__sub">{{ t('users.self.text') }}</p>
       {% endif %}
-      {% if not bot_link and own_binding_known %}
-        {% if bot_username %}
-          <form method="post" action="{{ url(users_path ~ '/bot-link') }}?lang={{ lang }}" class="row mt-gap">
-            <button class="btn btn--primary" type="submit">{{ t('users.bot.link_submit') }}</button>
-          </form>
-        {% else %}
-          <p class="field-note">{{ t('users.bot.unset', var=bot_var) }}</p>
+    </div>
+    {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
+    {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
+  </header>
+  {% if has_spaces_tab %}
+    <nav class="stabs" aria-label="{{ t('section.users.title') }}">
+      <a class="stabs__item{% if tab == 'people' %} is-current{% endif %}" href="{{ link() }}"{% if tab == 'people' %} aria-current="page"{% endif %}>{{ t('users.tab.people') }}</a>
+      <a class="stabs__item{% if tab == 'spaces' %} is-current{% endif %}" href="{{ link(tab='spaces') }}"{% if tab == 'spaces' %} aria-current="page"{% endif %}>{{ t('users.spaces.title' if manages_spaces else 'users.spaces.own_title') }}</a>
+    </nav>
+  {% endif %}
+  {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
+  {% if show.flash and not split_open and tab == 'people' %}
+    <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>
+  {% endif %}
+{% endblock %}
+
+{% block split_list %}
+  {% if tab == 'spaces' %}
+    {{ spaces_list(partner_spaces, partner_spaces_known, space_pick, manages_spaces, link) }}
+  {% elif manage %}
+    <div class="sbox">
+      <form class="sbar" method="get" action="{{ users_url }}" role="search" data-autosubmit>
+        <input type="hidden" name="lang" value="{{ lang }}">
+        <label class="spill spill--search">
+          {{ icon('search') }}
+          <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ t('users.filter.search') }}"
+                 aria-label="{{ t('users.filter.search') }}" autocomplete="off" spellcheck="false">
+        </label>
+        {% if space_filter|length > 1 %}
+          <select class="spill" name="space" aria-label="{{ t('users.col.space') }}">
+            <option value="">{{ t('users.filter.space_all') }}</option>
+            {% for код in space_filter %}<option value="{{ код }}"{% if filters.space == код %} selected{% endif %}>{{ код }}</option>{% endfor %}
+          </select>
         {% endif %}
-      {% endif %}
-    </div>
-  </section>
-
-  {% if not manage %}
-    {# Не админ УК видит себя: вкладка открыта всем ради привязки бота (D286),
-       а управлять людьми может только админ УК (D288). #}
-    <section class="ov-card ov-card--wide mt-gap">
-      <div class="ov-card__head"><div class="ov-card__title">{{ t('users.self.title') }}</div></div>
-      <div class="card__body">
-        <div class="table-wrap">
-          <table class="table table--list">
-            <thead>
-              <tr>
-                <th class="is-text">{{ t('users.col.login') }}</th>
-                <th class="is-text">{{ t('users.col.space') }}</th>
-                <th class="is-text">{{ t('users.col.role') }}</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td class="is-text">{{ account.login }}</td>
-                <td class="is-text mono">{{ tenant }}</td>
-                <td class="is-text">{{ t('users.role.' ~ account.role) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p class="field-note">{{ t('users.self.text') }}</p>
-      </div>
-    </section>
-  {% endif %}
-
-  {# Свой пароль (#324): меняет каждый вошедший, и только себе — чью строку
-     трогать, решает сессия, а не поле формы. Введённое обратно в разметку не
-     возвращается: среди него пароли. #}
-  <section class="ov-card ov-card--wide mt-gap" id="password">
-    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.password.title') }}</div></div>
-    <div class="card__body">
-      {% if password %}
-        <div class="note {{ 'note--ok' if password.key == 'ok' else 'note--warn' }}">
-          <div class="note__text">{{ t('users.password.' ~ password.key, min=min_password, max=max_password, minutes=password.locked_minutes) }}</div>
-        </div>
-      {% endif %}
-      <form method="post" action="{{ url(users_path ~ '/password') }}?lang={{ lang }}" class="row users-add mt-gap">
-        <label class="grow">
-          <span class="field-label">{{ t('users.password.current') }}</span>
-          <input class="input" type="password" name="current" required autocomplete="current-password">
-        </label>
-        <label class="grow">
-          <span class="field-label">{{ t('users.password.new') }}</span>
-          <input class="input" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password">
-        </label>
-        <label class="grow">
-          <span class="field-label">{{ t('users.password.repeat') }}</span>
-          <input class="input" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password">
-        </label>
-        <button class="btn btn--primary" type="submit">{{ t('users.password.submit') }}</button>
+        {% if role_filter|length > 1 %}
+          <select class="spill" name="role" aria-label="{{ t('users.col.role') }}">
+            <option value="">{{ t('users.filter.role_all') }}</option>
+            {% for р in role_filter %}<option value="{{ р.code }}"{% if filters.role == р.code %} selected{% endif %}>{{ t(р.label_key) }}</option>{% endfor %}
+          </select>
+        {% endif %}
+        {% if people_off %}
+          <label class="spill spill--check{% if filters.off %} is-on{% endif %}">
+            <input type="checkbox" name="off" value="1"{% if filters.off %} checked{% endif %}>
+            <span>{{ t('users.filter.off') }}</span>
+          </label>
+        {% endif %}
+        <button class="sbtn" type="submit" data-autosubmit-button>{{ t('users.filter.apply') }}</button>
+        {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ link_reset }}">{{ t('users.filter.reset') }}</a>{% endif %}
+        <a class="sbtn sbtn--primary sbar__add" href="{{ link(add='1') }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('users.add.open') }}</span></a>
       </form>
-      <p class="field-note">{{ t('users.password.hint', min=min_password) }}</p>
-    </div>
-  </section>
 
-  {% if edit %}
-    <div class="note {{ 'note--ok' if edit.status == 200 and edit.key != 'edit.missing' else 'note--warn' }} mt-gap">
-      <div class="note__text">{{ t('users.' ~ edit.key) }}</div>
-    </div>
-  {% endif %}
-
-  {% if not people_known %}
-    {# «База недоступна» и «людей нет» — разные вещи, и вторая была бы
-       молчаливой ложью на экране, где считают людей с доступом. #}
-    <div class="note note--warn mt-gap">
-      <div class="note__text">{{ t('users.unknown') }}</div>
-    </div>
-  {% endif %}
-
-
-  {# Список — первым: экран открывают посмотреть, у кого доступ, а заводят
-     человека реже. Отключённые остаются в списке приглушёнными.
-     Строки — только люди охвата вошедшего (#585, D364): отфильтрованы на
-     сервере, чужой логин и почта сюда не попадают. Роль-форма — где охват
-     позволяет сменить роль (контролю — никогда, себе — никогда); колонка бота —
-     главному админу и админу УК. #}
-  {% if manage and people %}
-    <div class="table-wrap mt-gap">
-      <table class="table table--list">
-        <thead>
-          <tr>
-            <th class="is-text">{{ t('users.col.login') }}</th>
-            <th class="is-text">{{ t('users.col.space') }}</th>
-            <th class="is-text">{{ t('users.col.role') }}</th>
-            <th class="is-text">{{ t('users.col.state') }}</th>
-            <th class="is-text">{{ t('users.col.email') }}</th>
-            {% if show_bindings %}<th class="is-text">{{ t('users.col.bot') }}</th>{% endif %}
-            <th>{{ t('users.col.created') }}</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for человек in people %}
-            <tr{% if человек.disabled_at %} class="is-muted"{% endif %}>
-              <td class="is-text">{{ человек.login }}</td>
-              <td class="is-text mono">{{ человек.tenant }}</td>
-              <td class="is-text">
-                {% set варианты = role_choices(человек) %}
-                {% if варианты %}
-                  <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row users-inline">
-                    <input type="hidden" name="login" value="{{ человек.login }}">
-                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
-                    <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
-                      {% for код in варианты %}
-                        <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
-                      {% endfor %}
-                    </select>
-                    <button class="btn btn--sm" type="submit">{{ t('users.role.submit') }}</button>
-                  </form>
-                {% else %}
-                  {{ t('users.role.' ~ человек.role) }}
-                {% endif %}
-              </td>
-              <td class="is-text">
-                {% if человек.disabled_at %}
-                  {{ t('users.state.disabled', date=человек.disabled_at.strftime('%Y-%m-%d')) }}
-                {% else %}
-                  {{ t('users.state.active') }}
-                {% endif %}
-              </td>
-              <td class="is-text">
-                {% if not человек.disabled_at %}
-                  <form method="post" action="{{ url(users_path ~ '/email') }}?lang={{ lang }}" class="row users-inline">
-                    <input type="hidden" name="login" value="{{ человек.login }}">
-                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
-                    <input class="input input--sm users-email" type="email" name="email" value="{{ человек.email or '' }}"
-                           placeholder="{{ t('users.email.placeholder') }}" aria-label="{{ t('users.col.email') }}"
-                           autocomplete="off" spellcheck="false">
-                    <button class="btn btn--sm" type="submit">{{ t('users.email.submit') }}</button>
-                  </form>
-                {% else %}
-                  {{ человек.email or '—' }}
-                {% endif %}
-              </td>
-              {% if show_bindings %}
-              <td class="is-text">
-                {% set привязка = bindings.get(человек.id) %}
-                {% if привязка %}
-                  <span class="mono">{{ привязка.telegram_id }}</span>
-                  <span class="mx-muted">{{ привязка.bound_at.strftime('%Y-%m-%d') }}</span>
-                  <form method="post" action="{{ url(users_path ~ '/bot-unlink') }}?lang={{ lang }}">
-                    <input type="hidden" name="user_id" value="{{ человек.id }}">
-                    <button class="btn btn--sm" type="submit">{{ t('users.bot.unlink') }}</button>
-                  </form>
-                {% else %}
-                  —
-                {% endif %}
-              </td>
-              {% endif %}
-              <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
-              <td>
-                {% if not человек.disabled_at and человек.login != account.login %}
-                  <form method="post" action="{{ url(users_path ~ '/disable') }}?lang={{ lang }}">
-                    <input type="hidden" name="login" value="{{ человек.login }}">
-                    <input type="hidden" name="tenant" value="{{ человек.tenant }}">
-                    <button class="btn btn--sm" type="submit">{{ t('users.disable.submit') }}</button>
-                  </form>
-                {% endif %}
-              </td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% endif %}
-  {% if manage %}
-  <section class="ov-card ov-card--wide">
-    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.add.title') }}</div></div>
-    <div class="card__body">
-    <form method="post" action="{{ url(users_path ~ '/add') }}?lang={{ lang }}" class="row users-add">
-      <label class="grow">
-        <span class="field-label">{{ t('users.add.login') }}</span>
-        <input class="input" name="login" required autocomplete="off"
-               pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false">
-      </label>
-      <label>
-        <span class="field-label">{{ t('users.add.space') }}</span>
-        <select class="input" name="tenant">
-          {% for код in spaces %}
-            <option value="{{ код }}"{% if код == tenant %} selected{% endif %}>{{ код }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        <span class="field-label">{{ t('users.add.role') }}</span>
-        <select class="input" name="role">
-          {% for код in add_roles %}
-            <option value="{{ код }}">{{ t('users.role.' ~ код) }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <button class="btn btn--primary" type="submit">{{ t('users.add.submit') }}</button>
-    </form>
-    <p class="field-note">{{ t('users.add.hint') }}</p>
-    </div>
-  </section>
-  {% endif %}
-
-  {# Пространства партнёров (#585, D364) — на этом же экране: вопрос один,
-     «у кого какой доступ». Главный админ и админ УК заводят пространство со
-     странами и добавляют страны; админ партнёра видит своё на чтение. #}
-  {% if manages_spaces or scope_kind == 'partner_admin' %}
-  <section class="ov-card ov-card--wide mt-gap" id="spaces">
-    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.spaces.title' if manages_spaces else 'users.spaces.own_title') }}</div></div>
-    <div class="card__body">
-      {% if space_outcome %}
-        <div class="note {{ 'note--warn' if space_outcome.endswith('_failed') else 'note--ok' }}">
-          <div class="note__text">{{ t('users.spaces.' ~ space_outcome) }}</div>
+      {% if not people_known %}
+        <div class="sempty">
+          <p class="sempty__title">{{ t('users.unknown.title') }}</p>
+          <p class="sempty__text">{{ t('users.unknown') }}</p>
         </div>
-      {% endif %}
-      {% if not partner_spaces_known %}
-        <div class="note note--warn"><div class="note__text">{{ t('users.spaces.unknown') }}</div></div>
-      {% elif not partner_spaces %}
-        <p class="field-note">{{ t('users.spaces.none') }}</p>
+      {% elif not people %}
+        <div class="sempty">
+          {% if filters.active %}
+            <p class="sempty__title">{{ t('users.empty_filter.title') }}</p>
+            <p class="sempty__text">{{ t('users.empty_filter.text') }}</p>
+            <a class="sbtn" href="{{ link_reset }}">{{ t('users.filter.reset') }}</a>
+          {% else %}
+            <p class="sempty__title">{{ t('users.empty.title') }}</p>
+            <p class="sempty__text">{{ t('users.empty.text') }}</p>
+            <a class="sbtn sbtn--primary" href="{{ link(add='1') }}" data-drawer-open>{{ t('users.add.open') }}</a>
+          {% endif %}
+        </div>
       {% else %}
-        <div class="table-wrap">
-          <table class="table table--list">
-            <thead>
-              <tr>
-                <th class="is-text">{{ t('users.spaces.col.code') }}</th>
-                <th class="is-text">{{ t('users.spaces.col.name') }}</th>
-                <th class="is-text">{{ t('users.spaces.col.countries') }}</th>
-                <th class="is-num">{{ t('users.spaces.col.people') }}</th>
-                {% if manages_spaces %}<th class="is-text">{{ t('users.spaces.countries.add') }}</th>{% endif %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for пр in partner_spaces %}
-                <tr>
-                  <td class="is-text mono">{{ пр.code }}</td>
-                  <td class="is-text">{{ пр.name or '—' }}</td>
-                  <td class="is-text mono">{{ пр.countries|join(', ') or '—' }}</td>
-                  <td class="is-num">{{ пр.people }}</td>
-                  {% if manages_spaces %}
-                  <td class="is-text">
-                    <form method="post" action="{{ url(users_path ~ '/spaces/countries') }}?lang={{ lang }}" class="row users-inline">
-                      <input type="hidden" name="code" value="{{ пр.code }}">
-                      <input class="input input--sm" name="countries" required autocomplete="off" spellcheck="false"
-                             aria-label="{{ t('users.spaces.countries.add') }}" placeholder="AM AZ">
-                      <button class="btn btn--sm" type="submit">{{ t('users.spaces.countries.submit') }}</button>
-                    </form>
-                  </td>
+        <div class="slist slist--users{% if not show_bindings %} slist--nobot{% endif %}">
+          <div class="slist__head" aria-hidden="true">
+            <span>{{ t('users.col.person') }}</span>
+            <span>{{ t('users.col.space') }}</span>
+            <span>{{ t('users.col.role') }}</span>
+            {% if show_bindings %}<span>{{ t('users.col.bot') }}</span>{% endif %}
+            <span>{{ t('users.col.status') }}</span>
+          </div>
+          <ul class="slist__rows">
+            {% for р in people %}
+              {% set текущий = split_open and card_row is not none and card_row.id == р.id and card in ('person', 'me') %}
+              <li>
+                <a class="srow{% if текущий %} is-current{% endif %}{% if р.disabled_at %} is-off{% endif %}"
+                   href="{{ link(person=р.id) }}"{% if текущий %} aria-current="true"{% endif %}>
+                  <span class="srow__main">
+                    <b>{{ р.login }}{% if me and р.id == me.id %} <em class="sbadge">{{ t('users.me') }}</em>{% endif %}</b>
+                    <small>{{ р.email or t('users.no_email') }}</small>
+                  </span>
+                  <span class="srow__cell mono" data-label="{{ t('users.col.space') }}">{{ р.tenant }}</span>
+                  <span class="srow__cell"><span class="sbadge{% if р.role in ('superadmin', 'admin') %} sbadge--accent{% endif %}">{{ t(role_key(р.role, р.tenant)) }}</span></span>
+                  {% if show_bindings %}
+                    <span class="srow__cell srow__bot">{% if bindings.get(р.id) %}<span class="sdot sdot--ok"></span>{{ t('users.bot.yes') }}{% else %}<span class="srow__none">{{ t('users.bot.no') }}</span>{% endif %}</span>
                   {% endif %}
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
+                  <span class="srow__cell">
+                    {% if р.disabled_at %}<span class="sdot"></span>{{ t('users.status.off') }}{% else %}<span class="sdot sdot--ok"></span>{{ t('users.status.active') }}{% endif %}
+                  </span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
         </div>
       {% endif %}
-      {% if manages_spaces %}
-        <form method="post" action="{{ url(users_path ~ '/spaces/add') }}?lang={{ lang }}" class="row users-add mt-gap">
-          <label>
-            <span class="field-label">{{ t('users.spaces.add.code') }}</span>
-            <input class="input" name="code" required autocomplete="off" spellcheck="false"
-                   pattern="[A-Za-z][A-Za-z0-9_-]{1,31}" placeholder="GE">
-          </label>
-          <label class="grow">
-            <span class="field-label">{{ t('users.spaces.add.name') }}</span>
-            <input class="input" name="name" autocomplete="off">
-          </label>
-          <label class="grow">
-            <span class="field-label">{{ t('users.spaces.add.countries') }}</span>
-            <input class="input" name="countries" required autocomplete="off" spellcheck="false" placeholder="GE">
-          </label>
-          <button class="btn btn--primary" type="submit">{{ t('users.spaces.add.submit') }}</button>
-        </form>
-        <p class="field-note">{{ t('users.spaces.add.hint') }}</p>
-      {% endif %}
     </div>
-  </section>
+  {% else %}
+    {# Без права вести людей экран — только своя карточка, прямо на странице. #}
+    <div class="sbox sbox--card">{{ person_card(card, card_row) }}</div>
+  {% endif %}
+{% endblock %}
+
+{% block split_title %}
+  {%- if tab == 'spaces' -%}
+    {{ t('users.spaces.add.title') if space_add else t('users.drawer.space') }}
+  {%- elif card == 'add' -%}
+    {{ t('users.add.title') }}
+  {%- elif card == 'me' -%}
+    {{ t('profile.open') }}
+  {%- else -%}
+    {{ t('users.drawer.person') }}
+  {%- endif -%}
+{% endblock %}
+
+{% block split_detail %}
+  {% if tab == 'spaces' %}
+    {{ space_card(space_pick, space_add, manages_spaces, show, link) }}
+  {% elif card == 'add' %}
+    {{ add_card(show, add_spaces, grantable, link) }}
+  {% elif card in ('person', 'me') %}
+    {{ person_card(card, card_row) }}
+  {% else %}
+    <div class="sdetail sdetail--hint">
+      <p class="sdetail__title">{{ t('users.panel.pick_title') }}</p>
+      <p class="sdetail__hint">{{ t('users.panel.pick_text') }}</p>
+    </div>
   {% endif %}
 {% endblock %}

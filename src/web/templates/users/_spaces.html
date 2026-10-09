@@ -1,0 +1,101 @@
+{#
+  Вкладка «Пространства партнёров» (#585, D364): слева пространства, справа
+  выбранное — его страны и «Добавить страны». Главный админ и админ УК
+  заводят пространства и страны; админ партнёра видит своё на чтение.
+#}
+
+{% macro spaces_list(rows, known, picked, manages, link) %}
+  <div class="sbox">
+    <div class="sbar">
+      <span class="sbar__count">{{ t('users.spaces.count', count=rows|length) }}</span>
+      {% if manages %}
+        <a class="sbtn sbtn--primary sbar__add" href="{{ link(tab='spaces', add_space='1') }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('users.spaces.add.open') }}</span></a>
+      {% endif %}
+    </div>
+    {% if not known %}
+      <div class="sempty"><p class="sempty__title">{{ t('users.spaces.unknown') }}</p></div>
+    {% elif not rows %}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('users.spaces.none') }}</p>
+        {% if manages %}
+          <p class="sempty__text">{{ t('users.spaces.none_text') }}</p>
+          <a class="sbtn sbtn--primary" href="{{ link(tab='spaces', add_space='1') }}" data-drawer-open>{{ t('users.spaces.add.open') }}</a>
+        {% endif %}
+      </div>
+    {% else %}
+      <div class="slist slist--spaces">
+        <div class="slist__head" aria-hidden="true">
+          <span>{{ t('users.spaces.col.space') }}</span>
+          <span>{{ t('users.spaces.col.countries') }}</span>
+          <span class="is-num">{{ t('users.spaces.col.people') }}</span>
+        </div>
+        <ul class="slist__rows">
+          {% for пр in rows %}
+            {% set текущее = split_open and picked is not none and picked.code == пр.code and not space_add %}
+            <li>
+              <a class="srow{% if текущее %} is-current{% endif %}" href="{{ link(tab='spaces', space_code=пр.code) }}"{% if текущее %} aria-current="true"{% endif %}>
+                <span class="srow__main"><b class="mono">{{ пр.code }}</b><small>{{ пр.name or '—' }}</small></span>
+                <span class="srow__cell mono">{{ пр.countries|join(' ') or '—' }}</span>
+                <span class="srow__cell is-num">{{ пр.people }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% macro space_card(picked, adding, manages, show, link) %}
+  {% if adding and manages %}
+    <article class="sdetail" aria-labelledby="space-add-title">
+      <header class="sdetail__head"><div class="sdetail__who">
+        <h2 class="sdetail__title" id="space-add-title">{{ t('users.spaces.add.title') }}</h2>
+      </div></header>
+      {% if show.flash %}<div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>{% endif %}
+      <form method="post" action="{{ users_url }}/spaces/add?lang={{ lang }}" class="sform">
+        <label><span class="sform__label">{{ t('users.spaces.add.code') }}</span>
+          <input class="sinput" name="code" required autocomplete="off" spellcheck="false" pattern="[A-Za-z][A-Za-z0-9_-]{1,31}" placeholder="GE">
+          <small class="sform__hint">{{ t('users.spaces.add.code_hint') }}</small></label>
+        <label><span class="sform__label">{{ t('users.spaces.add.name') }}</span>
+          <input class="sinput" name="name" autocomplete="off"></label>
+        <label><span class="sform__label">{{ t('users.spaces.add.countries') }}</span>
+          <input class="sinput" name="countries" required autocomplete="off" spellcheck="false" placeholder="GE">
+          <small class="sform__hint">{{ t('users.spaces.add.countries_hint') }}</small></label>
+        <div class="sactions">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('users.spaces.add.submit') }}</button>
+          <a class="sbtn sbtn--ghost" href="{{ link(tab='spaces') }}">{{ t('users.panel.close') }}</a>
+        </div>
+      </form>
+    </article>
+  {% elif picked %}
+    <article class="sdetail" aria-labelledby="space-title">
+      <header class="sdetail__head"><div class="sdetail__who">
+        <h2 class="sdetail__title mono" id="space-title">{{ picked.code }}</h2>
+        <p class="sdetail__hint">{{ picked.name or '—' }}</p>
+      </div></header>
+      {% if show.flash %}<div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>{% endif %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('users.spaces.col.countries') }}</h3>
+        <p class="ssec__text">{% for c in picked.countries %}<span class="sbadge mono">{{ c }}</span> {% else %}—{% endfor %}</p>
+        {% if manages %}
+          <form method="post" action="{{ users_url }}/spaces/countries?lang={{ lang }}" class="sform sform--inline">
+            <input type="hidden" name="code" value="{{ picked.code }}">
+            <label class="grow"><span class="sform__label">{{ t('users.spaces.countries.add') }}</span>
+              <input class="sinput" name="countries" required autocomplete="off" spellcheck="false" placeholder="AM AZ"></label>
+            <button class="sbtn" type="submit">{{ t('users.spaces.countries.submit') }}</button>
+          </form>
+          <p class="ssec__note">{{ t('users.spaces.add.countries_hint') }}</p>
+        {% else %}
+          <p class="ssec__note">{{ t('users.spaces.readonly') }}</p>
+        {% endif %}
+      </section>
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('users.spaces.col.people') }}</h3>
+        <p class="ssec__text"><b>{{ picked.people }}</b> · <a href="{{ link(space=picked.code) }}">{{ t('users.spaces.show_people') }}</a></p>
+      </section>
+    </article>
+  {% else %}
+    <div class="sdetail sdetail--hint"><p class="sdetail__title">{{ t('users.spaces.none') }}</p></div>
+  {% endif %}
+{% endmacro %}
