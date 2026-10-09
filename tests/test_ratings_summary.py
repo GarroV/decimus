@@ -216,3 +216,57 @@ def test_зона_риска_по_показанному_значению() -> N
     ]
     zone = risk_zone(facts, [1, 2], rating_type="rs", threshold=85)
     assert [u.unit for u in zone] == ["b"]
+
+
+def test_свеча_месяца_от_первого_периода_к_последнему() -> None:
+    """D383: средняя группы за период — по пиццериям; свеча месяца — первая,
+    наибольшая, наименьшая, последняя из средних периодов этого месяца."""
+    from datetime import date
+
+    from src.ratings.summary import Candle, Fact, candles
+
+    def f(unit: str, country: str, pid: int, day: date, score: float) -> Fact:
+        return Fact(unit, unit, country, "rs", pid, day, score)
+
+    факты = [
+        f("a", "RS", 1, date(2026, 9, 2), 90), f("b", "RS", 1, date(2026, 9, 2), 80),
+        f("a", "RS", 2, date(2026, 9, 16), 96), f("b", "RS", 2, date(2026, 9, 16), 70),
+        f("a", "RS", 3, date(2026, 9, 30), 92), f("b", "RS", 3, date(2026, 9, 30), 90),
+        f("c", "NG", 3, date(2026, 9, 30), 10),  # чужая страна в группу не входит
+    ]  # fmt: skip
+    сент, авг = date(2026, 9, 1), date(2026, 8, 1)
+
+    assert candles(факты, "rs", ["RS"], [авг, сент]) == (None, Candle(сент, 85, 91, 83, 91, 3))
+    assert candles(факты, "rko", ["RS"], [сент]) == (None,)
+
+
+def test_кластер_IMF_делит_страны_по_справочнику() -> None:
+    from datetime import date
+
+    from src.db.ratings_read import CountryRow
+    from src.ratings.periods import ReportPeriod
+    from src.ratings.report import Choices, GroupLine, Selection, group_countries, group_lines
+    from src.ratings.summary import Fact
+
+    страны = (
+        CountryRow("RS", "Сербия", "Serbia", None, True, "CEE"),
+        CountryRow("NG", "Нигерия", "Nigeria", None, True, "OTHER"),
+    )
+    found = Choices((), страны, ())
+    период = ReportPeriod("month", "2026-09", date(2026, 9, 1), date(2026, 9, 30))
+    факты = [Fact("a", "a", "RS", "rs", 1, date(2026, 9, 2), 90.0),
+             Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
+
+    imf = group_lines(
+        Selection("imf", None, период), found, ("RS", "NG"), (факты, [], факты), [date(2026, 9, 1)]
+    )
+    assert [(g.key, g.countries, g.rs) for g in imf] == [
+        ("CEE", ("RS",), 90.0),
+        ("OTHER", ("NG",), 70.0),
+    ]
+
+    кластер = Selection("cluster", "OTHER", период)
+    assert group_countries(кластер, страны) == ("NG",)
+    one = group_lines(кластер, found, ("NG",), (факты, [], факты), [date(2026, 9, 1)])
+    assert [(g.key, g.rs) for g in one] == [(None, 70.0)]
+    assert isinstance(one[0], GroupLine)

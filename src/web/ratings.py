@@ -33,7 +33,8 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, ratings_board, ratings_calendar
+from . import auth, ratings_calendar
+from . import ratings_candles as rc
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
 from .errors import WebTextError
@@ -121,16 +122,17 @@ def _layout_from_form() -> tuple[rl.Block, ...]:
 
 
 def _maps(
-    countries: tuple[str, ...], until: date, before: date | None
+    groups: tuple[tuple[str, tuple[str, ...]], ...], until: date, before: date | None
 ) -> tuple[rmaps.CountryMaps, ...] | None:
-    """Оценки на картах по странам среза на конец периода и изменение к концу
-    прошлого. База не ответила — `None` и след в журнале: блок скажет «нет
-    данных», страница живёт."""
+    """Оценки на картах по группам сводки (кластеры или срез) на конец периода и
+    изменение к концу прошлого. База не ответила — `None` и след в журнале:
+    блок скажет «нет данных», страница живёт."""
+    countries = tuple(c for _, members in groups for c in members)
     try:
-        now = rmaps.summarize(maps_store.latest(countries, until=until), countries)
+        now = rmaps.summarize_groups(maps_store.latest(countries, until=until), groups)
         if before is None:
             return now
-        was = rmaps.summarize(maps_store.latest(countries, until=before), countries)
+        was = rmaps.summarize_groups(maps_store.latest(countries, until=before), groups)
         return rmaps.with_delta(now, was)
     except RatingsError:
         logger.warning("Оценки карт не прочитались", exc_info=True)
@@ -146,6 +148,47 @@ def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
         return {}
 
 
+def _group_name(
+    line: report.GroupLine,
+    selection: report.Selection,
+    lang: str,
+    country_name: Callable[[str], str],
+) -> str:
+    """Подпись строки сводки: кластер в срезе IMF, иначе сам срез."""
+    if line.key is not None:
+        return t(f"ratings.cluster.{line.key}", lang)
+    if selection.group == report.GROUP_COUNTRY and selection.value:
+        return country_name(selection.value)
+    if selection.group == report.GROUP_CLUSTER and selection.value:
+        return t(f"ratings.cluster.{selection.value}", lang)
+    return selection.value or t("ratings.group.imf", lang)
+
+
+def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
+    """Строки сводки со свечами: шкала общая на вид рейтинга (D383)."""
+    period = (
+        summary.selection.period.begin.replace(day=1),
+        summary.selection.period.end.replace(day=1),
+    )
+    threshold = summary.thresholds["top_threshold"]
+    title = TEXTS["ratings.candle.title"][lang]  # шаблон: поля заполняет `sticks`
+    kinds = {}
+    for kind in ("rs", "rko"):
+        series = [getattr(g, f"{kind}_candles") for g in summary.groups]
+        sc = rc.scale(series, threshold)
+        kinds[kind] = {
+            "scale": sc,
+            "rows": [rc.sticks(s, sc, period=period, lang=lang, title=title) for s in series],
+        }
+    return {
+        "names": names,
+        "kinds": kinds,
+        "months": [rc.month_label(m, lang) for m in summary.months],
+        "width": rc.WIDTH,
+        "height": rc.HEIGHT,
+    }
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
@@ -155,25 +198,19 @@ def render_summary(conf: Settings) -> str:
     def country_name(code: str) -> str:
         return names.get(code) or country_title(code, lang)
 
-    board = ratings_board.build(
-        summary.lines,
-        summary.total,
-        threshold=summary.thresholds["top_threshold"],
-        sort=request.args.get("sort", ""),
-        name=country_name,
-        total_name=t("ratings.total", lang),
-    )
+    names_of_groups = [_group_name(g, selection, lang, country_name) for g in summary.groups]
     return render_template(
         "ratings/index.html",
         blocks=tuple(b.key for b in _layout() if b.visible),
         maps=_maps(
-            summary.countries,
+            tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True)),
             min(selection.period.end, date.today()),
             summary.previous.end if summary.previous else None,
         ),
         map_providers=rmaps.SHOWN_PROVIDERS,
         unit_maps=_unit_maps(min(selection.period.end, date.today())),
-        board=board,
+        chart=_chart(summary, names_of_groups, lang),
+        clusters=report.CLUSTERS,
         summary=summary,
         choices=found,
         selection=selection,

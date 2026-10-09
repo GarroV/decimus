@@ -38,8 +38,8 @@
   </li>{% endfor %}</ol>
   {% endif %}
 {% endmacro %}
-{% macro href(group, value=none, period=selection.period.key, sort=board.sort) -%}
-  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}{% if sort != 'name' %}&amp;sort={{ sort }}{% endif %}&amp;lang={{ lang }}
+{% macro href(group, value=none, period=selection.period.key) -%}
+  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}
 {%- endmacro %}
 {% macro ranked(units, kind, side) %}
   <ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}<li>
@@ -65,16 +65,21 @@
   <form class="rt-bar" data-rt-auto method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
     <input type="hidden" name="group" value="{{ selection.group }}">
     <input type="hidden" name="lang" value="{{ lang }}">
-    {% if board.sort != 'name' %}<input type="hidden" name="sort" value="{{ board.sort }}">{% endif %}
     <div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.group') }}</span>
       <nav class="rt-seg" aria-label="{{ t('ratings.group') }}">
-        {% for g in ('imf', 'developer', 'country') %}
+        {% for g in ('imf', 'cluster', 'developer', 'country') %}
         <a href="{{ href(g) }}"{% if selection.group == g %} aria-current="page"{% endif %}>{{ t('ratings.group.' ~ g) }}</a>
         {% endfor %}
       </nav>
     </div>
-    {% if selection.group == 'developer' %}
+    {% if selection.group == 'cluster' %}
+    <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.cluster') }}</span>
+      <select class="input input--sm" name="value">
+        {% for c in clusters %}<option value="{{ c }}"{% if c == selection.value %} selected{% endif %}>{{ t('ratings.cluster.' ~ c) }}</option>{% endfor %}
+      </select>
+    </label>
+    {% elif selection.group == 'developer' %}
     <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.developer') }}</span>
       {% if choices.developers %}<select class="input input--sm" name="value">
         {% for d in choices.developers %}<option value="{{ d }}"{% if d == selection.value %} selected{% endif %}>{{ d }}</option>{% endfor %}
@@ -129,44 +134,33 @@
   {#- Порядок и видимость блоков — компоновка контролинга (D368, D370). -#}
   {% for block in blocks %}
   {% if block == 'scores' %}
+  {#- Сводка по группам (D382, D383): в срезе IMF — кластеры, иначе сам срез;
+      подробности по странам — фильтром, а не стеной строк. Свеча — месяц. -#}
   <section class="rt-sec" aria-labelledby="rt-scores">
     <div class="rt-sec__head">
       <h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2>
-      <span class="rt-sec__meta">{{ t('ratings.col.delta', prev=prev) }}</span>
-      {% if board.rows|length > 2 %}<nav class="rt-sort" aria-label="{{ t('ratings.sort') }}">
-        <span class="rt-sort__label">{{ t('ratings.sort') }}</span>
-        {% for s in ('name', 'rs', 'rko') %}<a href="{{ href(selection.group, selection.value, selection.period.key, s) }}"{% if board.sort == s %} aria-current="true"{% endif %}>{{ t('ratings.sort.' ~ s) }}</a>{% endfor %}
-      </nav>{% endif %}
+      {% if selection.group == 'imf' %}<span class="rt-sec__meta">{{ t('ratings.group.imf') }}: {{ t('ratings.rs') }} <b class="num">{{ num(summary.total.rs) }}</b> {{ dlt(summary.total.rs_delta) }} · {{ t('ratings.rko') }} <b class="num">{{ num(summary.total.rko) }}</b> {{ dlt(summary.total.rko_delta) }}</span>{% endif %}
     </div>
-    {#- Легенда шкалы: без неё точки и полосы читались как ползунки (владелец, 09.10.2026). -#}
-    <p class="rt-legend">
-      <span><i class="rt-legend__dot rt-legend__dot--up" aria-hidden="true"></i><i class="rt-legend__dot rt-legend__dot--down" aria-hidden="true"></i>{{ t('ratings.legend.now', period=calendar.title) }}</span>
-      <span><i class="rt-legend__ghost" aria-hidden="true"></i>{{ t('ratings.legend.prev', prev=prev) }}</span>
-      <span><i class="rt-legend__trail" aria-hidden="true"></i>{{ t('ratings.legend.move') }}</span>
-      <span><i class="rt-legend__thr" aria-hidden="true"></i>{{ t('ratings.legend.thr', x=thr(summary.thresholds.top_threshold)) }}</span>
-    </p>
-    <div class="rt-board" role="table" aria-labelledby="rt-scores">
-      <div class="rt-board__head" role="row">
-        <span role="columnheader" class="rt-board__name">{{ t('ratings.col.country') }}</span>
-        {% for kind in ('rs', 'rko') %}
-        <span role="columnheader" class="rt-board__kind">{{ t('ratings.' ~ kind) }}</span>
-        <span class="rt-scale" aria-hidden="true" style="--thr: {{ board.threshold }}%">
-          {% for v, at in board.ticks %}<i style="left: {{ at }}%">{{ v }}</i>{% endfor %}
-        </span>
-        {% endfor %}
-      </div>
-      {% for row in board.rows %}
-      <div class="rt-board__row{% if row.is_total %} is-total{% endif %}" role="row" style="--i: {{ loop.index0 }}">
-        <span role="rowheader" class="rt-board__name">{% if row.is_total %}<span class="rt-board__sum" aria-hidden="true">Σ</span>{% endif %}{{ row.name }}</span>
-        {% for kind, tr in (('rs', row.rs), ('rko', row.rko)) %}
-        <span role="cell" class="rt-board__val" data-k="{{ t('ratings.' ~ kind) }}">{% if tr.value is none %}<span class="is-empty">—</span>{% else %}<b class="num">{{ '%.1f'|format(tr.value) }}</b>{{ dlt(tr.delta) }}{% endif %}</span>
-        <span class="rt-track rt-track--{{ tr.trend }}" aria-hidden="true" style="--thr: {{ board.threshold }}%; --cur: {{ tr.cur }}%{% if tr.prev is not none %}; --prev: {{ tr.prev }}%{% endif %}">
-          {% if tr.value is not none %}{% if tr.prev is not none %}<i class="rt-track__trail"></i><i class="rt-track__ghost"></i>{% endif %}<i class="rt-track__dot"></i>{% endif %}
-        </span>
-        {% endfor %}
+    <div class="rt-cl" role="table" aria-labelledby="rt-scores">
+      <span class="rt-cl__head" role="columnheader"></span>
+      {% for kind in ('rs', 'rko') %}<span class="rt-cl__head" role="columnheader">{{ t('ratings.' ~ kind) }} · {{ t('ratings.col.delta', prev=prev) }}</span>{% endfor %}
+      {% for g in summary.groups %}{% set i = loop.index0 %}
+      <span class="rt-cl__name" role="rowheader">{{ chart.names[i] }}<small>{{ t('ratings.countries.n', n=g.countries|length) }}</small></span>
+      {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}
+      <div role="cell">
+        <div class="rt-cl__kpi"><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
+        <svg class="rt-candles" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.candle.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
+          {% if k.scale.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ k.scale.threshold_y }}" y2="{{ k.scale.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
+          {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}"><title>{{ c.title }}</title>
+            <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.wick_top }}" y2="{{ c.wick_bottom }}" vector-effect="non-scaling-stroke"/>
+            <rect x="{{ c.x - c.width / 2 }}" y="{{ c.body_top }}" width="{{ c.width }}" height="{{ c.body_height }}" rx="1"/></g>{% endfor %}
+        </svg>
+        <div class="rt-cl__axis" aria-hidden="true"><span>{{ chart.months[0] }}</span><span>{{ k.scale.low|int }}–100</span><span>{{ chart.months[-1] }}</span></div>
       </div>
       {% endfor %}
+      {% endfor %}
     </div>
+    <p class="rt-cl__note">{{ t('ratings.candle.hint', x=thr(summary.thresholds.top_threshold)) }}</p>
   </section>
   {% elif block == 'violations' %}
   <div class="rt-pair">
@@ -177,17 +171,6 @@
     <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
       {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
     </div></div>{% endif %}
-    {#- Нет проверок во всей группе — у каждой страны то же «нет данных»: не повторяем его карточкой на страну. -#}
-    {% if summary.countries|length > 1 and cluster.checkups != 0 %}
-    <h3 class="rt-sub">{{ t('ratings.by_country') }}</h3>
-    <div class="rt-viol">
-      {% for code in summary.countries %}
-      <div class="rt-card"><div class="rt-card__body">
-        {{ vblock(by[code], kind, country_name(code), 4) }}
-      </div></div>
-      {% endfor %}
-    </div>
-    {% endif %}
   </section>
   {% endfor %}
 
@@ -229,17 +212,15 @@
   {% endfor %}
   </div>
   {% elif block == 'risk' %}
+  {#- Зона риска — отдельной строкой-сигналом (D383): сколько и кто, без таблицы. -#}
   <section class="rt-sec" aria-labelledby="rt-risk">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-risk">{{ t('ratings.block.risk') }}</h2>
       <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
-    {% if summary.risk %}<div class="rt-card rt-alert rt-alert--warn"><ul class="rt-att">{% for u in summary.risk %}<li>
-      <span class="rt-sev rt-sev--warn" aria-hidden="true">↓</span>
-      <div><div class="rt-att__title">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<span class="rt-kind">{{ t('ratings.' ~ u.rating_type) }}</span></div>
-        <div class="rt-att__sub">{{ country_name(u.country) }}</div></div>
-      <span class="rt-att__m">{% for s in u.scores %}{{ num(s) }}{% if not loop.last %} → {% endif %}{% endfor %}</span>
-    </li>{% endfor %}</ul>
-      {% if summary.risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
+    {% if summary.risk %}<div class="rt-risk">
+      <span class="rt-risk__n">{{ summary.risk|length }}</span>
+      {% for u in summary.risk %}<a href="{{ unit_url(u.unit, u.rating_type) }}" target="_blank" rel="noopener noreferrer" title="{% for s in u.scores %}{{ '%.1f'|format(s) }}{% if not loop.last %} → {% endif %}{% endfor %}">{{ u.unit_name }}<small>{{ t('ratings.' ~ u.rating_type) }}</small></a>{% endfor %}
     </div>
+    {% if summary.risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
     {#- Неполное окно — тип не судили; «никого» только когда судили все (P37). -#}
     {% elif summary.risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
@@ -251,11 +232,11 @@
       <span class="rt-sec__meta">{{ t('ratings.maps.hint') }} · {{ t('ratings.col.delta', prev=previous_title or '—') }}</span></div>
     {% if not maps or not (maps|selectattr('as_of')|list) %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
     {% else %}<div class="rt-card"><table class="rt-maps">
-      <thead><tr><th scope="col">{{ t('ratings.col.country') }}</th>
+      <thead><tr><th scope="col"></th>
         {% for p in map_providers %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p) }}</th>{% endfor %}
         <th scope="col" class="num">{{ t('ratings.maps.branches') }}</th></tr></thead>
       <tbody>{% for row in maps %}<tr>
-        <th scope="row">{{ country_name(row.country) }}</th>
+        <th scope="row">{{ row.country }}</th>
         {% for p in map_providers %}{% set s = row.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b>{% if s.delta is not none %} {{ dlt(s.delta, 2) }}{% endif %} <span class="rt-maps__n">{{ t('ratings.maps.reviews', n=s.reviews) }}</span>{% endif %}</td>{% endfor %}
         <td class="num">{{ row.scores.values()|map(attribute='branches')|max }}</td>
       </tr>{% endfor %}</tbody>

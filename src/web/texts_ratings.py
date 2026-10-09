@@ -36,10 +36,6 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.month.10": {"ru": "Окт", "en": "Oct"},
     "ratings.month.11": {"ru": "Ноя", "en": "Nov"},
     "ratings.month.12": {"ru": "Дек", "en": "Dec"},
-    "ratings.sort": {"ru": "Порядок", "en": "Order"},
-    "ratings.sort.name": {"ru": "по алфавиту", "en": "by name"},
-    "ratings.sort.rs": {"ru": "слабые по РС", "en": "weakest standards"},
-    "ratings.sort.rko": {"ru": "слабые по РКО", "en": "weakest customer exp."},
     "ratings.cal.prev": {"ru": "Предыдущий период", "en": "Previous period"},
     "ratings.cal.next": {"ru": "Следующий период", "en": "Next period"},
     "ratings.show": {"ru": "Показать", "en": "Show"},
@@ -48,23 +44,35 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.loaded.none": {"ru": "Загрузок ещё не было.", "en": "Nothing has been uploaded yet."},
     "ratings.manage": {"ru": "Загрузки и справочники", "en": "Uploads and settings"},
     "ratings.block.scores": {
-        "ru": "Средний РС и РКО по странам",
-        "en": "Average standards and customer experience by country",
+        "ru": "Средний РС и РКО",
+        "en": "Average standards and customer experience",
+    },
+    "ratings.group.cluster": {"ru": "Кластер", "en": "Cluster"},
+    "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
+    "ratings.cluster.OTHER": {"ru": "Другие страны", "en": "Other countries"},
+    "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
+    "ratings.candle.title": {
+        "ru": "{m}: открытие {o}, максимум {h}, минимум {l}, закрытие {c} · периодов: {n}",
+        "en": "{m}: open {o}, high {h}, low {l}, close {c} · periods: {n}",
+    },
+    "ratings.candle.aria": {
+        "ru": "{name}, {kind}: динамика по месяцам",
+        "en": "{name}, {kind}: monthly trend",
+    },
+    "ratings.candle.hint": {
+        "ru": "Свеча — месяц: тело от первого периода рейтинга к последнему (зелёное — рост, "
+        "красное — спад), тени — лучший и худший период. Пунктир — порог {x}. "
+        "Подробнее по стране — фильтром «Страна».",
+        "en": "Each candle is a month: the body runs from the first rating period to the last "
+        "(green — up, red — down), the wicks show the best and worst period. Dashed line — "
+        "threshold {x}. For a single country, use the Country filter.",
     },
     "ratings.col.country": {"ru": "Страна", "en": "Country"},
     "ratings.col.delta": {"ru": "Δ к {prev}", "en": "Δ vs {prev}"},
-    "ratings.legend.now": {
-        "ru": "оценка за {period}: зелёная — выросла, красная — упала",
-        "en": "score for {period}: green — up, red — down",
-    },
-    "ratings.legend.prev": {"ru": "оценка за {prev}", "en": "score for {prev}"},
-    "ratings.legend.move": {"ru": "сдвиг за период", "en": "change over the period"},
-    "ratings.legend.thr": {"ru": "порог Top/Bottom — {x}", "en": "top/bottom threshold — {x}"},
     "ratings.total": {"ru": "Итого", "en": "Total"},
     "ratings.block.rko_violations": {"ru": "Нарушения РКО", "en": "Customer experience violations"},
     "ratings.block.rs_violations": {"ru": "Нарушения РС", "en": "Standards violations"},
-    "ratings.cluster": {"ru": "Топ-5 по кластеру", "en": "Top 5 in the cluster"},
-    "ratings.by_country": {"ru": "По каждой стране", "en": "By country"},
+    "ratings.cluster": {"ru": "Топ-5", "en": "Top 5"},
     "ratings.violations.total": {"ru": "Всего: {n}", "en": "Total: {n}"},
     "ratings.violations.per": {"ru": "На проверку: {x}", "en": "Per check: {x}"},
     "ratings.block.rs_top": {
@@ -82,7 +90,7 @@ _SCREEN: dict[str, dict[str, str]] = {
         "ru": "Хард-нарушения РКО",
         "en": "Customer experience: hard violations",
     },
-    "ratings.block.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},
+    "ratings.block.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
     "ratings.risk.hint": {
         "ru": "{n} последних периода подряд ниже {x}",
         "en": "Last {n} periods in a row below {x}",
