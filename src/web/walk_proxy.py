@@ -29,6 +29,8 @@ from src.domain.uploads import MAX_UPLOAD_BYTES
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
+    APP_ENDPOINT,
+    APP_PATH,
     DATA_ENDPOINT,
     DATA_PATH,
     FINDING_ENDPOINT,
@@ -119,3 +121,4 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(FINDING_PATH, FINDING_ENDPOINT, "POST")
     route(INFO_PATH, INFO_ENDPOINT, "POST")
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
+    route(APP_PATH, APP_ENDPOINT, "POST")

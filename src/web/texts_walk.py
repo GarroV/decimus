@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+from .texts_app import APP_TEXTS
+
 WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.progress": {
         "ru": "Осмотрено зон: {done} из {total}",
@@ -369,3 +371,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "No connection. The draft is kept on the phone — retry when you are back online.",
     },
 }
+
+# Главная и настройки приложения (D373) — тем же каталогом, одним ответом.
+WALK_TEXTS.update(APP_TEXTS)
