@@ -91,7 +91,7 @@ def _required(env: Mapping[str, str], name: str) -> str:
     return raw
 
 
-def _parse_allowed_ids(raw: str) -> frozenset[int]:
+def parse_allowed_ids(raw: str) -> frozenset[int]:
     ids: set[int] = set()
     for chunk in raw.split(","):
         piece = chunk.strip()
@@ -210,7 +210,7 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
     """Прочитать и проверить окружение бота. Отказ — `BotConfigError`."""
     src = os.environ if env is None else env
     token = _required(src, TOKEN_VAR)
-    allowed_ids = _parse_allowed_ids(_required(src, ALLOWED_IDS_VAR))
+    allowed_ids = parse_allowed_ids(_required(src, ALLOWED_IDS_VAR))
     mode = (src.get(MODE_VAR) or DEFAULT_MODE).strip().lower()
     if mode not in KNOWN_MODES:
         raise BotConfigError(
