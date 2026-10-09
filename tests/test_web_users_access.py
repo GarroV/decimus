@@ -454,11 +454,22 @@ def test_контроль_вне_рейтингов_не_пишет(
 
 
 @pytest.mark.parametrize(
-    "путь", ["/overview", "/inspections", "/country", "/admin", "/actions", "/calendar", "/tenants"]
+    "путь", ["/country", "/admin", "/actions", "/calendar", "/tenants"]
 )
-def test_контроль_не_видит_разделов_кроме_рейтингов(контроль: FlaskClient, путь: str) -> None:
-    """D358: контролинг не имеет отношения ко всему остальному — чужой раздел не открывается."""
+def test_контроль_не_видит_разделов_кроме_своих(контроль: FlaskClient, путь: str) -> None:
+    """D358, D366: кроме обзора, проверок, рейтингов и своих людей — не открывается."""
     assert контроль.get(путь).status_code == 404
+
+
+@pytest.mark.parametrize("путь", ["/overview", "/inspections"])
+def test_контроль_читает_обзор_и_проверки(контроль: FlaskClient, путь: str) -> None:
+    """D366: контролинг видит обзор и все проверки — заслон пропускает (без базы стенда — 503)."""
+    assert контроль.get(путь).status_code not in (403, 404)
+
+
+@pytest.mark.parametrize("путь", ["/inspections/x/retract", "/inspections/x/letter/save"])
+def test_контроль_в_проверках_не_пишет(контроль: FlaskClient, путь: str) -> None:
+    assert контроль.post(путь, data={}, headers=ЗАГОЛОВКИ).status_code == 403
 
 
 def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
@@ -467,10 +478,11 @@ def test_контроль_видит_рейтинги_и_свои_дела(ко�
     assert вход.status_code == 302 and вход.headers["Location"].endswith("/ratings")
 
 
-def test_контроль_в_навигации_только_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
+def test_контроль_в_навигации_только_свои_разделы(контроль: FlaskClient) -> None:
     страница = контроль.get("/users").get_data(as_text=True)
-    assert 'href="/ratings?lang=' in страница
-    for чужой in ("/overview", "/inspections", "/admin", "/actions", "/country"):
+    for свой in ("/overview", "/inspections", "/ratings"):
+        assert f'href="{свой}?lang=' in страница, свой
+    for чужой in ("/admin", "/actions", "/country"):
         assert f'href="{чужой}?lang=' not in страница, чужой
 
 
