@@ -62,8 +62,8 @@ def scale(series: Sequence[Sequence[Candle | None]], threshold: float) -> Scale:
     values = [v for s in series for c in s if c is not None for v in (c.low, c.high)]
     if not values:
         return Scale(SCALE_TOP - MIN_SPAN, SCALE_TOP, None, ())
-    high = min(math.ceil(max(values) + SCALE_MARGIN), SCALE_TOP)
-    low = math.floor(min(values) - SCALE_MARGIN)
+    high = float(min(math.ceil(max(values) + SCALE_MARGIN), SCALE_TOP))
+    low = float(math.floor(min(values) - SCALE_MARGIN))
     if high - low < MIN_SPAN:
         low = high - MIN_SPAN
     result = Scale(float(low), float(high), None, ())
