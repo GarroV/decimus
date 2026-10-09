@@ -86,7 +86,7 @@
 .rt-delta__arrow { font-size: .75em; margin-right: 2px; }
 
 /* ── Кластеры: строка — группа, у РС и РКО число, изменение и свечи по
-   месяцам (D382, D383). Свеча — средняя группы по периодам месяца: тело от
+   месяцам (D383, D384). Свеча — средняя группы по периодам месяца: тело от
    первого периода к последнему, тени — лучший и худший. Месяцы вне выбранного
    периода приглушены, пунктир — порог Top/Bottom. */
 .rt-cl { display: grid; grid-template-columns: minmax(6rem, 9rem) repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
@@ -109,7 +109,7 @@
 .rt-cl__axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 .rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
 
-/* ── Зона риска — отдельной строкой-сигналом (D383): имена чипами, без таблицы. */
+/* ── Зона риска — отдельной строкой-сигналом (D384): имена чипами, без таблицы. */
 .rt-risk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-block); background: var(--surface); }
 .rt-risk__n { font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--warn); margin-right: var(--space-2); }
 .rt-risk a { display: inline-flex; gap: 6px; align-items: baseline; padding: 1px var(--space-3); border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink); font-size: var(--fs-meta); }

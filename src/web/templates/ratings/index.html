@@ -134,7 +134,7 @@
   {#- Порядок и видимость блоков — компоновка контролинга (D368, D370). -#}
   {% for block in blocks %}
   {% if block == 'scores' %}
-  {#- Сводка по группам (D382, D383): в срезе IMF — кластеры, иначе сам срез;
+  {#- Сводка по группам (D383, D384): в срезе IMF — кластеры, иначе сам срез;
       подробности по странам — фильтром, а не стеной строк. Свеча — месяц. -#}
   <section class="rt-sec" aria-labelledby="rt-scores">
     <div class="rt-sec__head">
@@ -212,7 +212,7 @@
   {% endfor %}
   </div>
   {% elif block == 'risk' %}
-  {#- Зона риска — отдельной строкой-сигналом (D383): сколько и кто, без таблицы. -#}
+  {#- Зона риска — отдельной строкой-сигналом (D384): сколько и кто, без таблицы. -#}
   <section class="rt-sec" aria-labelledby="rt-risk">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-risk">{{ t('ratings.block.risk') }}</h2>
       <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
