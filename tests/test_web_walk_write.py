@@ -21,7 +21,7 @@ from test_web_walk import АУДИТОР, ТОКЕН, _приложение, п�
 from src.db.bot_links import NEVER_BOUND, Standing
 from src.domain import get_state, start_inspection
 from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
-from src.web import walk, walk_write
+from src.web import walk, walk_access, walk_write
 
 
 def _jpeg(цвет: tuple[int, int, int]) -> bytes:
@@ -83,8 +83,12 @@ class Клиент:
 def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клиент:
     start_inspection(АУДИТОР, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
-    monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
-    return Клиент(_приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client())
+    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
+    return Клиент(
+        _приложение(
+            monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777"
+        ).test_client()
+    )
 
 
 def _нарушение(ref: str, **сверх: Any) -> dict[str, Any]:
@@ -233,7 +237,7 @@ def test_без_подписи_запись_не_принимается(клие
 def test_снятый_доступ_не_пишет(клиент: Клиент, monkeypatch: pytest.MonkeyPatch) -> None:
     ref = клиент.ссылка()
     monkeypatch.setattr(
-        walk.bot_links, "standing", lambda _: Standing(binding=None, ever_bound=True)
+        walk_access.bot_links, "standing", lambda _: Standing(binding=None, ever_bound=True)
     )
 
     assert клиент.запись(**_нарушение(ref)).status_code == 401
@@ -289,8 +293,12 @@ def test_сдача_между_ранней_проверкой_и_записью
 
 
 def test_без_проверки_записи_некуда(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(walk.bot_links, "standing", lambda _: NEVER_BOUND)
-    клиент = Клиент(_приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН).test_client())
+    monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
+    клиент = Клиент(
+        _приложение(
+            monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777"
+        ).test_client()
+    )
 
     assert клиент.кадр().status_code == 409
     assert клиент.запись(**_нарушение("walk:" + "0" * 32)).status_code == 409
