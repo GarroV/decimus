@@ -125,6 +125,9 @@
     <div class="rt-empty">{{ t('ratings.empty.countries') }}</div>
   {% else %}
   {% set prev = previous_title or '—' %}
+  {#- Порядок и видимость блоков — компоновка контролинга (D368, D370). -#}
+  {% for block in blocks %}
+  {% if block == 'scores' %}
   <section class="rt-sec" aria-labelledby="rt-scores">
     <div class="rt-sec__head">
       <h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2>
@@ -157,7 +160,7 @@
       {% endfor %}
     </div>
   </section>
-
+  {% elif block == 'violations' %}
   <div class="rt-pair">
   {% for kind, cluster, by in (('rko', summary.rko_cluster, summary.rko_by_country), ('rs', summary.rs_cluster, summary.rs_by_country)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-viol">
@@ -181,7 +184,7 @@
   {% endfor %}
 
   </div>
-
+  {% elif block == 'top' %}
   <div class="rt-pair">
   {% for kind, top, bottom, hard, cluster in (('rs', summary.rs_top, summary.rs_bottom, summary.rs_hard, summary.rs_cluster), ('rko', summary.rko_top, summary.rko_bottom, summary.rko_hard, summary.rko_cluster)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-top">
@@ -200,6 +203,7 @@
   </section>
   {% endfor %}
   </div>
+  {% elif block == 'hard' %}
   <div class="rt-pair">
   {% for kind, top, bottom, hard, cluster in (('rs', summary.rs_top, summary.rs_bottom, summary.rs_hard, summary.rs_cluster), ('rko', summary.rko_top, summary.rko_bottom, summary.rko_hard, summary.rko_cluster)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-hard">
@@ -216,7 +220,7 @@
   </section>
   {% endfor %}
   </div>
-
+  {% elif block == 'risk' %}
   <section class="rt-sec" aria-labelledby="rt-risk">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-risk">{{ t('ratings.block.risk') }}</h2>
       <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
@@ -232,6 +236,8 @@
     {% elif summary.risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
   </section>
+  {% endif %}
+  {% endfor %}
   {% endif %}
 </div>
 {% endblock %}
