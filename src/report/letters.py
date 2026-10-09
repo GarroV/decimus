@@ -536,6 +536,22 @@ def pinned(version: str, papers: Papers) -> tuple[Path, str] | None:
     return None
 
 
+def refuse_uploaded(detail: InspectionDetail) -> None:
+    """Письма партнёру по проверке, заведённой задним числом, нет (D310, D332).
+
+    Ни текущей, ни исторической: по загруженным никому ничего не отправляется.
+    Историческую к тому же сверять нечем — её оценка из старого отчёта, и
+    сверка письма пересчитала бы её движком по чужой методике. Отказ стоит
+    первым, до поиска методики: путь письма для загруженной не начинается вовсе.
+    """
+    if detail.inspection.is_uploaded:
+        raise LetterError(
+            "Проверка заведена задним числом через загрузку — письма партнёру по ней нет и "
+            "никому ничего не отправляется (D310). Историческую к тому же не пересчитывают: "
+            "её оценка — из старого отчёта (D332)"
+        )
+
+
 def _methodology(version: str, papers: Papers) -> tuple[Path, str]:
     """Каталог методики для ПИСЬМА — или отказ, объясняющий, чего не хватило.
 
@@ -722,6 +738,7 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
     аудитора), но слой чтения к ней готов, и строка из базы не имеет права
     заставить письмо соврать.
     """
+    refuse_uploaded(detail)
     язык = _lang(detail, lang)
     каталог, откуда = _methodology(detail.inspection.checklist_version, papers)
     _, пусто_в_шапке = _cover(detail, lang=язык)
