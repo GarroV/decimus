@@ -250,6 +250,33 @@
       {% endif %}
     </section>
   </div>
+
+  {# ── Пиццерии страны по своду девелопмента (D376): работающие, стройка,
+     закрытые. Имя ведёт в карточку, если точка есть в справочнике. #}
+  <section class="ov-card ov-card--wide">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.register.title') }}</div>
+      <div class="ov-card__hint">{{ t('country.register.hint', open=units_count.open, pipeline=units_count.pipeline, closed=units_count.closed) }}</div>
+    </div>
+    {% if units_profiles %}
+      {% for p in units_profiles %}
+        <div class="ov-row">
+          <span class="ov-row__name">
+            {% if p.dodo_id and units_links.get(p.dodo_id) %}<a href="{{ url('/units/' ~ units_links[p.dodo_id]) }}?lang={{ lang }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}
+            <span class="ov-row__meta">{{ [p.partner, p.address]|select|join(' · ') }}</span>
+          </span>
+          <span class="ov-row__meta">
+            {% if p.stage == 'closed' %}{{ t('unit.profile.closed') }} {{ p.closed_on or '' }}
+            {% elif p.restaurant_on or p.delivery_on %}{{ t('country.register.since', day=p.restaurant_on or p.delivery_on) }}
+            {% else %}{{ p.status }}{% endif %}
+          </span>
+          <span class="tag{% if p.stage == 'open' %} tag--ok{% elif p.stage == 'closed' %} tag--err{% else %} tag--neutral{% endif %}">{{ t('unit.stage.' ~ p.stage) }}</span>
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="ov-card__empty">{{ t('country.register.empty') }}</div>
+    {% endif %}
+  </section>
 {% endif %}
   </div>
 </div>
