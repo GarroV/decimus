@@ -270,3 +270,28 @@ def test_кластер_IMF_делит_страны_по_справочнику(
     one = group_lines(кластер, found, ("NG",), (факты, [], факты), [date(2026, 9, 1)])
     assert [(g.key, g.rs) for g in one] == [(None, 70.0)]
     assert isinstance(one[0], GroupLine)
+
+
+def test_девелопер_общая_строка_и_по_стране() -> None:
+    """D385: срез девелопера — общая строка по всем его странам и строка на страну."""
+    from datetime import date
+
+    from src.db.ratings_read import CountryRow
+    from src.ratings.periods import ReportPeriod
+    from src.ratings.report import Choices, Selection, group_lines
+    from src.ratings.summary import Fact
+
+    страны = (
+        CountryRow("RS", "Сербия", "Serbia", "Dev", True, "CEE"),
+        CountryRow("SI", "Словения", "Slovenia", "Dev", True, "CEE"),
+    )
+    период = ReportPeriod("month", "2026-09", date(2026, 9, 1), date(2026, 9, 30))
+    факты = [Fact("a", "a", "RS", "rs", 1, date(2026, 9, 2), 90.0),
+             Fact("b", "b", "SI", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
+    строки = group_lines(
+        Selection("developer", "Dev", период), Choices(("Dev",), страны, ()), ("RS", "SI"),
+        (факты, [], факты), [date(2026, 9, 1)],
+    )  # fmt: skip
+    assert [(g.level, g.key, g.rs) for g in строки] == [
+        ("slice", None, 80.0), ("country", "RS", 90.0), ("country", "SI", 70.0),
+    ]  # fmt: skip

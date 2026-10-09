@@ -149,14 +149,14 @@
       <span class="rt-cl__head" role="columnheader"></span>
       {% for kind in ('rs', 'rko') %}<span class="rt-cl__head" role="columnheader">{{ t('ratings.' ~ kind) }} · {{ t('ratings.col.delta', prev=prev) }}</span>{% endfor %}
       {% for g in summary.groups %}{% set i = loop.index0 %}
-      <span class="rt-cl__name" role="rowheader">{{ chart.names[i] }}<small>{{ t('ratings.countries.n', n=g.countries|length) }}</small></span>
+      <span class="rt-cl__name{% if g.level == 'country' %} is-sub{% endif %}" role="rowheader">{{ chart.names[i] }}{% if g.level != 'country' %}<small>{{ t('ratings.countries.n', n=g.countries|length) }}</small>{% endif %}</span>
       {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}{% set sc = k.scales[i] %}
       <div role="cell">
         <div class="rt-cl__kpi"><span class="rt-cl__k">{{ t('ratings.' ~ kind) }}</span><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
         <div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
         <svg class="rt-candles" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.candle.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
           {% if sc.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
-          {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}"><title>{{ c.title }}</title>
+          {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}" data-tip="{{ c.title }}" tabindex="0"><title>{{ c.title }}</title>
             <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.wick_top }}" y2="{{ c.wick_bottom }}" vector-effect="non-scaling-stroke"/>
             <rect x="{{ c.x - c.width / 2 }}" y="{{ c.body_top }}" width="{{ c.width }}" height="{{ c.body_height }}" rx="1"/></g>{% endfor %}
         </svg></div>
@@ -166,6 +166,7 @@
       {% endfor %}
     </div>
     <p class="rt-cl__note">{{ t('ratings.candle.hint', x=thr(summary.thresholds.top_threshold)) }}</p>
+    <div class="rt-tip" role="tooltip" hidden></div>
   </section>
   {% elif block == 'violations' %}
   <div class="rt-pair">
@@ -176,6 +177,15 @@
     <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
       {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
     </div></div>{% endif %}
+    {% if selection.group == 'developer' and summary.countries|length > 1 and cluster.checkups != 0 %}
+    <div class="rt-viol">
+      {% for code in summary.countries %}
+      <div class="rt-card"><div class="rt-card__body">
+        {{ vblock(by[code], kind, country_name(code), 4) }}
+      </div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
   </section>
   {% endfor %}
 
