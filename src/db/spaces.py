@@ -1,9 +1,11 @@
 """Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340).
 
 Пространство — это строка `tenants`; страна партнёра — строка `space_countries`
-(миграция 0029). Продукт ни того, ни другого не заводит: новое пространство —
-новый заказчик, а не новый сотрудник, и пишет это роль владельца схемы
-(`DATABASE_ADMIN_URL`) командой `make space`.
+(миграция 0029). Заводит их команда `make space` ролью владельца схемы
+(`DATABASE_ADMIN_URL`) — и с #585 (D364) главный админ и админ УК на экране
+«Пользователи», той же ролью, что учётки (`_managing`, права — `0041`).
+Пространство с экрана заводится вместе со странами одной транзакцией: без
+стран партнёр не видит ничего, и полузаведённое пространство было бы пустым.
 
 Правила, которые держит этот модуль, а не человек у консоли:
 
@@ -20,11 +22,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from src.domain.tenants import HQ_TENANT, LEGACY_TENANTS, canonical_tenant
 
 from .errors import AccessError
-from .web_access import _connected, _owned
+from .web_access import _connected, _managing, _owned
 
 SPACE_CODE = re.compile(r"^[A-Z][A-Z0-9_-]{1,31}$")
 COUNTRY_CODE = re.compile(r"^[A-Z]{2}$")
@@ -108,7 +111,15 @@ def bind_countries(space: str, countries: tuple[str, ...]) -> tuple[str, ...]:
             f"К странам привязывается заведённое пространство партнёра, а не «{space}». "
             f"У УК стран нет: она видит всю сеть"
         )
-    страны = tuple(dict.fromkeys(c.strip() for c in countries))
+    страны = _checked_countries(countries)
+    with _owned(f"привязать «{код}» к странам") as conn, conn.cursor() as cur:
+        _bind_in(cur, код, страны)
+    return next(s.countries for s in list_spaces() if s.code == код)
+
+
+def _checked_countries(countries: tuple[str, ...]) -> tuple[str, ...]:
+    """Коды стран без повторов — или отказ с правилом."""
+    страны = tuple(dict.fromkeys(c.strip().upper() for c in countries if c.strip()))
     if not страны:
         raise AccessError("Не названо ни одной страны")
     for страна in страны:
@@ -116,14 +127,68 @@ def bind_countries(space: str, countries: tuple[str, ...]) -> tuple[str, ...]:
             raise AccessError(
                 f"Код страны «{страна}» не годится: две заглавные буквы ISO, например GE"
             )
-    with _owned(f"привязать «{код}» к странам") as conn, conn.cursor() as cur:
-        for страна in страны:
-            cur.execute(_OWNER_OF_COUNTRY_SQL, (страна,))
-            чья = cur.fetchone()
-            if чья is not None and чья[0] != код:
-                raise AccessError(
-                    f"Страна {страна} уже у пространства {чья[0]}: одна страна — один партнёр"
-                )
-            if чья is None:
-                cur.execute(_BIND_COUNTRY_SQL, (страна, код))
-    return next(s.countries for s in list_spaces() if s.code == код)
+    return страны
+
+
+def _bind_in(cur: Any, код: str, страны: tuple[str, ...]) -> None:
+    """Привязать страны внутри уже открытой транзакции; занятая чужим — отказ (откат всего)."""
+    for страна in страны:
+        cur.execute(_OWNER_OF_COUNTRY_SQL, (страна,))
+        чья = cur.fetchone()
+        if чья is not None and чья[0] != код:
+            raise AccessError(
+                f"Страна {страна} уже у пространства {чья[0]}: одна страна — один партнёр"
+            )
+        if чья is None:
+            cur.execute(_BIND_COUNTRY_SQL, (страна, код))
+
+
+def overview() -> tuple[SpaceRow, ...]:
+    """Пространства со странами и числом живых учёток — для экрана «Пользователи».
+
+    Читает роль приложения: таблицы пространств, стран и учёток ей читать
+    дано (`0004`, `0014`, `0029`), а владелец схемы веб-процессу не положен.
+    """
+    with _connected("перечислить пространства") as conn, conn.cursor() as cur:
+        cur.execute(_LIST_SPACES_SQL)
+        строки = cur.fetchall()
+    return tuple(
+        SpaceRow(code=str(r[0]), name=str(r[1]), countries=tuple(r[2]), people=int(r[3]))
+        for r in строки
+    )
+
+
+def create_partner_space(code: str, *, name: str, countries: tuple[str, ...]) -> SpaceRow:
+    """Завести пространство партнёра вместе со странами — всё или ничего (#585).
+
+    Код УК — отказ: УК заведена схемой и стран не имеет. Совпадение с
+    заведённым без учёта регистра — отказ, как у `create_space`.
+    """
+    код = check_space_code(code)
+    if код == HQ_TENANT:
+        raise AccessError("Пространство УК заведено схемой; партнёру нужен свой код")
+    страны = _checked_countries(countries)
+    название = (name or "").strip()
+    if код.lower() in {s.code.lower() for s in overview()}:
+        raise AccessError(
+            f"Пространство «{код}» уже заведено (или совпадает с заведённым без учёта "
+            f"регистра — каталог методики у них был бы один)"
+        )
+    with _managing(f"завести пространство «{код}»") as conn, conn.cursor() as cur:
+        cur.execute(_INSERT_SPACE_SQL, (код, название))
+        _bind_in(cur, код, страны)
+    return SpaceRow(code=код, name=название, countries=tuple(sorted(страны)), people=0)
+
+
+def add_countries(space: str, countries: tuple[str, ...]) -> tuple[str, ...]:
+    """Добавить страны пространству партнёра с экрана; вернуть его страны после этого."""
+    код = canonical_tenant(space)
+    if код == HQ_TENANT or код not in {s.code for s in overview()}:
+        raise AccessError(
+            f"К странам привязывается заведённое пространство партнёра, а не «{space}». "
+            f"У УК стран нет: она видит всю сеть"
+        )
+    страны = _checked_countries(countries)
+    with _managing(f"привязать «{код}» к странам") as conn, conn.cursor() as cur:
+        _bind_in(cur, код, страны)
+    return next(s.countries for s in overview() if s.code == код)

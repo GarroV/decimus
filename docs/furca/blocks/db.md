@@ -180,6 +180,11 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 - `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
 - Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
 
+### Экран доступа: главный админ и пространства с экрана (миграция `0041`, #585)
+
+- `0041_superadmin.sql` — роль веб-учётки `superadmin` (главный админ, D364), только в пространстве УК (ограничение `web_users_superadmin_only_hq`); триггер `web_users_keep_last_superadmin` → функция `keep_last_superadmin()`: отключение, смена роли или удаление последнего действующего главного — отказ `SQLSTATE DC001`, гонку закрывает `pg_advisory_xact_lock`; роли `dodo_audit_admin` выданы `select, insert on tenants` и `insert on space_countries` — экран «Пользователи» заводит пространство партнёра со странами. Никого не назначает: первого главного — `tools/web_user.py role <логин> superadmin --tenant HQ` (`docs/08-deploy.md`).
+- Двери: `src/db/web_access.py` — `ROLE_SUPERADMIN`, `LastSuperadminError`, `only_roles` у `reassign_role`, `set_email`, `disable_account` (охват по роли цели условием в запросе); `src/db/spaces.py` — `create_partner_space`, `add_countries` (роль `_managing`, всё или ничего), `overview` (роль приложения).
+
 ## Зависимости
 
 `domain`.

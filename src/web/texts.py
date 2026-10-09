@@ -61,6 +61,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
+    "nav.role.superadmin": {"ru": "Главный админ", "en": "Super admin"},
     "overview.assign": {"ru": "Назначить проверку", "en": "Schedule an audit"},
     "overview.scope.all": {"ru": "Вся сеть", "en": "The whole network"},
     "overview.filter.title": {"ru": "Выборка", "en": "Selection"},
@@ -287,7 +288,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.country.title": {"ru": "Страна", "en": "Country"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
-    "section.tenants.title": {"ru": "Проект", "en": "Project"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
     "section.users.title": {"ru": "Пользователи", "en": "Users"},
     "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
@@ -931,6 +931,77 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Здесь только люди контролинга: их можно завести, задать почту и отключить.",
         "en": "Only controlling people are listed: add them, set an email, disable them.",
     },
+    # Охват экрана по роли (#585, D364): одна строка под заголовком.
+    "users.scope.super": {
+        "ru": "Вы главный админ: люди всех пространств, пространства партнёров и их страны.",
+        "en": "You are a super admin: people of every space, partner spaces and their countries.",
+    },
+    "users.scope.hq_admin": {
+        "ru": (
+            "Люди УК, кроме админов, и люди партнёров; пространства партнёров и их страны. "
+            "Админов назначает главный админ."
+        ),
+        "en": (
+            "HQ people except admins, and partner people; partner spaces and their countries. "
+            "Admins are appointed by a super admin."
+        ),
+    },
+    "users.scope.partner_admin": {
+        "ru": "Люди вашего пространства: админы и сотрудники.",
+        "en": "People of your space: admins and staff.",
+    },
+    "users.spaces.title": {"ru": "Пространства партнёров", "en": "Partner spaces"},
+    "users.spaces.own_title": {"ru": "Ваше пространство", "en": "Your space"},
+    "users.spaces.col.code": {"ru": "Код", "en": "Code"},
+    "users.spaces.col.name": {"ru": "Название", "en": "Name"},
+    "users.spaces.col.countries": {"ru": "Страны", "en": "Countries"},
+    "users.spaces.col.people": {"ru": "Живых учёток", "en": "Active accounts"},
+    "users.spaces.none": {"ru": "Пространств партнёров пока нет.", "en": "No partner spaces yet."},
+    "users.spaces.unknown": {
+        "ru": "Список пространств сейчас неизвестен: база не ответила.",
+        "en": "The list of spaces is unknown right now: the database did not answer.",
+    },
+    "users.spaces.add.code": {"ru": "Код", "en": "Code"},
+    "users.spaces.add.name": {"ru": "Название", "en": "Name"},
+    "users.spaces.add.countries": {
+        "ru": "Страны (ISO, через пробел)",
+        "en": "Countries (ISO, space-separated)",
+    },
+    "users.spaces.add.submit": {"ru": "Завести", "en": "Create"},
+    "users.spaces.add.hint": {
+        "ru": (
+            "Код — заглавная латиница, например GE; не меняется никогда. "
+            "Одна страна — один партнёр. Людей пространства заводите формой выше."
+        ),
+        "en": (
+            "Code is upper-case Latin, e.g. GE; it never changes. "
+            "One country — one partner. Add the space's people with the form above."
+        ),
+    },
+    "users.spaces.countries.add": {"ru": "Добавить страны", "en": "Add countries"},
+    "users.spaces.countries.submit": {"ru": "Добавить", "en": "Add"},
+    "users.spaces.space_added": {"ru": "Пространство заведено.", "en": "Space created."},
+    "users.spaces.space_failed": {
+        "ru": (
+            "Пространство не заведено: код занят или не годится, страна уже у другого партнёра "
+            "или база не ответила. Ничего не записано."
+        ),
+        "en": (
+            "Space not created: the code is taken or invalid, a country belongs to another "
+            "partner, or the database did not answer. Nothing was saved."
+        ),
+    },
+    "users.spaces.countries_added": {"ru": "Страны добавлены.", "en": "Countries added."},
+    "users.spaces.countries_failed": {
+        "ru": (
+            "Страны не добавлены: код страны не годится, страна уже у другого партнёра "
+            "или база не ответила. Ничего не записано."
+        ),
+        "en": (
+            "Countries not added: a code is invalid, a country belongs to another partner, "
+            "or the database did not answer. Nothing was saved."
+        ),
+    },
     "users.unknown": {
         "ru": "Список сейчас недоступен — это не значит, что людей нет.",
         "en": "The list is unavailable right now — that does not mean there is nobody.",
@@ -960,6 +1031,11 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
     "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
+    # Главный админ (D364): всё по проекту, назначает других главных.
+    "users.role.superadmin": {
+        "ru": "Главный админ: всё по проекту (только УК)",
+        "en": "Super admin: everything in the project (HQ only)",
+    },
     "users.role.control": {
         "ru": "Рейтинги: загрузка и справочники (только УК)",
         "en": "Ratings: uploads and settings (HQ only)",
@@ -971,10 +1047,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "users.add.space": {"ru": "Пространство", "en": "Space"},
     "users.add.role_space": {
         "ru": (
-            "Роль «контроль» бывает только в пространстве УК (HQ). "
+            "Роли «контроль» и «главный админ» бывают только в пространстве УК (HQ). "
             "Выберите другую роль или пространство."
         ),
-        "en": "The Control role exists only in the HQ space. Pick another role or space.",
+        "en": (
+            "The Control and Super admin roles exist only in the HQ space. "
+            "Pick another role or space."
+        ),
     },
     "users.add.space_unknown": {
         "ru": "Такого пространства нет. Выберите из списка.",
@@ -1056,6 +1135,14 @@ TEXTS: dict[str, dict[str, str]] = {
     "users.role.failed": {
         "ru": "Роль не изменена: база не ответила. Попробуйте ещё раз.",
         "en": "Role not changed: the database did not respond. Please try again.",
+    },
+    "users.role.forbidden": {
+        "ru": "Эту роль вы выдать не можете: она вне вашего охвата.",
+        "en": "You cannot grant this role: it is outside your scope.",
+    },
+    "users.role.last_super": {
+        "ru": "Это последний действующий главный админ: сначала назначьте другого.",
+        "en": "This is the last active super admin: appoint another one first.",
     },
     "users.email.ok": {
         "ru": "Почта сохранена: человек может входить через Google.",
@@ -1151,6 +1238,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "users.disable.failed": {
         "ru": "Отключить не вышло — база не ответила.",
         "en": "Could not disable — the database did not answer.",
+    },
+    "users.disable.last_super": {
+        "ru": "Последнего главного админа отключить нельзя: сначала назначьте другого.",
+        "en": "The last active super admin cannot be disabled: appoint another one first.",
     },
     "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
     "users.forbidden.note": {
