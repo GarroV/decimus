@@ -85,99 +85,35 @@
 .rt-delta--down { color: var(--err); }
 .rt-delta__arrow { font-size: .75em; margin-right: 2px; }
 
-/* ── Табло стран: шкала вместо стены цифр ───────────────────────
-   Строка — страна; у РС и РКО своя шкала. Бледное кольцо — прошлый период,
-   цветной след — куда сдвинулась, точка — где сейчас. Пунктир — порог
-   Top/Bottom: левее него зона бледно-красная. Итог группы — первой строкой.
-   Одно движение на экране: при загрузке точки переезжают с прошлого места. */
-.rt-board {
-  --rt-name: minmax(7rem, 10rem);
-  --rt-val: 8.25rem;
-  display: grid;
-  grid-template-columns: var(--rt-name) var(--rt-val) minmax(0, 1fr) var(--rt-val) minmax(0, 1fr);
-  column-gap: 0;
-  background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-block);
-  overflow: hidden;
-}
-.rt-board__head, .rt-board__row { display: contents; }
-.rt-board__head > * {
-  padding: var(--space-3) 0; border-bottom: 1px solid var(--line);
-  font-size: var(--fs-micro); line-height: var(--lh-micro); font-weight: var(--w-semibold); color: var(--ink-3);
-  background: var(--surface-2);
-}
-.rt-board__head > :first-child, .rt-board__row > :first-child { padding-left: var(--space-5); }
-.rt-board__head > :last-child, .rt-board__row > :last-child { margin-right: var(--space-5); }
-.rt-board__kind { text-align: right; padding-right: var(--space-5); font-size: var(--fs-dense); color: var(--ink-2); }
-.rt-board__row > * {
-  display: flex; align-items: center; min-height: 30px; padding: var(--space-1) 0;
-  border-bottom: 1px solid var(--line); transition: background-color .12s;
-}
-.rt-board__row:last-child > * { border-bottom: 0; }
-.rt-board__row:hover > * { background: var(--surface-2); }
-.rt-board__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rt-board__val { justify-content: flex-end; gap: var(--space-3); padding-left: var(--space-5); padding-right: var(--space-5); font-size: var(--fs-dense); white-space: nowrap; }
-.rt-board__val b { font-weight: var(--w-semibold); color: var(--ink); }
-.rt-board__val .rt-delta { min-width: 3.4em; text-align: right; font-size: var(--fs-meta); }
-.rt-board__row.is-total > * { background: var(--accent-soft); border-bottom: 1px solid var(--accent-line); min-height: 40px; }
-.rt-board__row.is-total .rt-board__val b { font-size: 17px; }
-.rt-board__sum { margin-right: var(--space-3); color: var(--accent); font-family: var(--font-mono); }
+/* ── Кластеры: строка — группа, у РС и РКО число, изменение и свечи по
+   месяцам (D383, D384). Свеча — средняя группы по периодам месяца: тело от
+   первого периода к последнему, тени — лучший и худший. Месяцы вне выбранного
+   периода приглушены, пунктир — порог Top/Bottom. */
+.rt-cl { display: grid; grid-template-columns: minmax(6rem, 9rem) repeat(2, minmax(0, 1fr)); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface); }
+.rt-cl > * { padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--line); min-width: 0; }
+.rt-cl > :nth-last-child(-n+3) { border-bottom: 0; }
+.rt-cl__head { font-size: var(--fs-meta); color: var(--ink-3); padding-bottom: var(--space-2); }
+.rt-cl__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); display: flex; flex-direction: column; justify-content: center; }
+.rt-cl__name small { font-weight: var(--w-regular); color: var(--ink-3); font-size: var(--fs-meta); }
+.rt-cl__kpi { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
+.rt-cl__kpi b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: var(--w-semibold); color: var(--ink); }
+.rt-cl__kpi .rt-delta { font-size: var(--fs-meta); }
+.rt-candles { display: block; width: 100%; height: 64px; overflow: visible; }
+.rt-candles__thr { stroke: var(--line-strong); stroke-dasharray: 3 3; }
+.rt-candle line { stroke-width: 1.25; }
+.rt-candle--up rect, .rt-candle--up line { fill: var(--ok); stroke: var(--ok); }
+.rt-candle--down rect, .rt-candle--down line { fill: var(--err); stroke: var(--err); }
+.rt-candle--flat rect, .rt-candle--flat line { fill: var(--ink-3); stroke: var(--ink-3); }
+.rt-candle.is-out { opacity: .4; }
+.rt-candle:hover { opacity: 1; }
+.rt-cl__axis { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+.rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
 
-/* Подписи шкалы в шапке */
-.rt-scale { position: relative; display: block; height: 1.1em; }
-.rt-scale i {
-  position: absolute; top: var(--space-3); transform: translateX(-50%);
-  font-style: normal; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-}
-.rt-scale i:first-child { transform: none; }
-.rt-scale i:last-child { transform: translateX(-100%); }
-
-/* Шкала строки */
-.rt-track { position: relative; align-self: stretch; }
-.rt-track::before {  /* ось: левее порога — зона ниже Top */
-  content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px;
-  background: linear-gradient(90deg, var(--err-soft) 0 var(--thr), var(--surface-3) var(--thr) 100%);
-}
-.rt-track::after {  /* порог */
-  content: ""; position: absolute; left: var(--thr); top: 22%; bottom: 22%; border-left: 1px dashed var(--line-strong);
-}
-.rt-track i { position: absolute; top: 50%; display: block; }
-.rt-track__dot {
-  z-index: 2; left: var(--cur); width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%;
-  background: var(--ink-2); box-shadow: 0 0 0 2px var(--surface);
-  animation: rt-slide .7s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 30ms);
-}
-.rt-track__ghost {
-  z-index: 1; left: var(--prev); width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; border-radius: 50%;
-  border: 1.5px solid var(--ink-3); background: var(--surface);
-}
-.rt-track__trail {
-  left: min(var(--prev), var(--cur)); width: calc(max(var(--prev), var(--cur)) - min(var(--prev), var(--cur)));
-  height: 4px; margin-top: -2px; border-radius: 2px; background: var(--ink-3); opacity: .55;
-  animation: rt-fade .7s ease-out both; animation-delay: calc(var(--i, 0) * 30ms + .25s);
-}
-.rt-track--up .rt-track__dot, .rt-track--up .rt-track__trail { background: var(--ok); }
-.rt-track--down .rt-track__dot, .rt-track--down .rt-track__trail { background: var(--err); }
-.rt-board__row:hover .rt-track__dot { transform: scale(1.35); }
-.rt-board__row.is-total .rt-track__dot { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; }
-.rt-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-2); color: var(--ink-3); font-size: 13px; }
-.rt-legend span { display: inline-flex; align-items: center; gap: 6px; }
-.rt-legend i { display: inline-block; flex: none; }
-.rt-legend__dot { width: 9px; height: 9px; border-radius: 50%; }
-.rt-legend__dot--up { background: var(--ok); }
-.rt-legend__dot--down { background: var(--err); margin-left: -3px; }
-.rt-legend__ghost { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ink-3); }
-.rt-legend__trail { width: 18px; height: 4px; border-radius: 2px; background: var(--ink-3); opacity: .55; }
-.rt-legend__thr { height: 12px; border-left: 1px dashed var(--line-strong); }
-@keyframes rt-slide { from { left: var(--prev, var(--cur)); } }
-@keyframes rt-fade { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .rt-track__dot, .rt-track__trail { animation: none; } }
-
-/* Сортировка табло */
-.rt-sort { margin-left: auto; display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); }
-.rt-sort__label { color: var(--ink-3); margin-right: var(--space-1); }
-.rt-sort a { padding: 1px var(--space-3); border-radius: var(--r-pill); color: var(--ink-2); }
-.rt-sort a:hover { color: var(--accent); text-decoration: none; }
-.rt-sort a[aria-current="true"] { background: var(--accent-soft); color: var(--accent); }
+/* ── Зона риска — отдельной строкой-сигналом (D384): имена чипами, без таблицы. */
+.rt-risk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-block); background: var(--surface); }
+.rt-risk__n { font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--warn); margin-right: var(--space-2); }
+.rt-risk a { display: inline-flex; gap: 6px; align-items: baseline; padding: 1px var(--space-3); border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink); font-size: var(--fs-meta); }
+.rt-risk a small { color: var(--ink-3); }
 
 /* Пары РС | РКО: блоки нижней части встают рядом, а не лентой */
 .rt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); align-items: start; }
@@ -293,13 +229,11 @@
   .rt-split { grid-template-columns: 1fr; }
 }
 @media (max-width: 719px) {
-  .rt-board { grid-template-columns: 8.5rem minmax(0, 1fr); column-gap: var(--space-4); }
-  .rt-board__head { display: none; }
-  .rt-board__row > .rt-board__name { grid-column: 1 / -1; padding: var(--space-3) var(--space-5) 0; border-bottom: 0; }
-  .rt-board__row > .rt-board__val { padding-left: var(--space-5); justify-content: flex-start; border-bottom: 0; }
-  .rt-board__row > .rt-board__val::before { content: attr(data-k); color: var(--ink-3); font-size: var(--fs-meta); margin-right: auto; }
-  .rt-board__row > .rt-board__val { flex-wrap: wrap; }
-  .rt-board__row > .rt-track { margin-right: var(--space-5); border-bottom: 0; }
+  .rt-cl { grid-template-columns: 1fr; }
+  .rt-cl__head { display: none; }
+  .rt-cl > * { border-bottom: 0; }
+  .rt-cl__name { border-top: 1px solid var(--line); flex-direction: row; gap: var(--space-3); align-items: baseline; }
+  .rt-cl__name:first-of-type { border-top: 0; }
   .rt { --rt-bar-w: 64px; --rt-cell: var(--space-3) var(--space-3); gap: var(--space-7); }
   .rt-head__title { font-size: var(--fs-display); line-height: var(--lh-display); }
   .rt-sec__title { font-size: var(--fs-title); line-height: var(--lh-title); }

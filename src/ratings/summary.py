@@ -100,6 +100,48 @@ def country_average(facts: Sequence[Fact], rating_type: str, country: str) -> fl
     return group_average(facts, rating_type, [country])
 
 
+@dataclass(frozen=True)
+class Candle:
+    """Месяц на графике: средняя группы по периодам рейтинга, начавшимся в месяце
+    (D384) — первая, наибольшая, наименьшая, последняя; `periods` — сколько их."""
+
+    month: date
+    open: float
+    high: float
+    low: float
+    close: float
+    periods: int
+
+
+def period_averages(
+    facts: Sequence[Fact], rating_type: str, countries: Sequence[str]
+) -> list[tuple[date, float]]:
+    """Средняя группы за каждый период рейтинга — по пиццериям (D353), старые первыми."""
+    by_period: dict[int, tuple[date, list[float]]] = {}
+    for fact in facts:
+        if fact.rating_type == rating_type and fact.country in countries:
+            by_period.setdefault(fact.period_id, (fact.begin_on, []))[1].append(fact.score)
+    return sorted((begin, fmean(scores)) for begin, scores in by_period.values())
+
+
+def candles(
+    facts: Sequence[Fact], rating_type: str, countries: Sequence[str], months: Sequence[date]
+) -> tuple[Candle | None, ...]:
+    """Свеча на каждый месяц из `months` (первые числа); месяц без периодов — `None`."""
+    by_month: dict[date, list[float]] = {}
+    for begin, avg in period_averages(facts, rating_type, countries):
+        by_month.setdefault(begin.replace(day=1), []).append(avg)
+    out: list[Candle | None] = []
+    for month in months:
+        values = by_month.get(month)
+        out.append(
+            Candle(month, values[0], max(values), min(values), values[-1], len(values))
+            if values
+            else None
+        )
+    return tuple(out)
+
+
 def delta(current: float | None, previous: float | None) -> float | None:
     if current is None or previous is None:
         return None
