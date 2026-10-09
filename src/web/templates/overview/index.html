@@ -93,13 +93,12 @@
                href="{{ country_url(row.country, city=row.city) if row.country else registry_url(city=row.city) }}">
               <span class="ov-cell__name">{{ city_title(row.city) or t('overview.breakdown.nocity') }}</span>
               <span class="ov-num">{{ row.units }}</span>
-              <span class="ov-num ov-num--strong"
-                    {% if not row.comparable %}title="{{ t('overview.breakdown.incomparable') }}"{% endif %}>
-                {{ '—' if row.average is none or not row.comparable else '%.1f'|format(row.average) }}
+              <span class="ov-num ov-num--strong">
+                {{ '—' if row.average is none else '%.1f'|format(row.average) }}
               </span>
               {# Движение против такого же периода перед этим. Прочерк, а не
-                 ноль: сравнивать бывает не с чем и бывает нельзя — ряд из
-                 разных изданий методики сравнению не подлежит (T349). #}
+                 ноль: сравнивать бывает не с чем. Смена методики движение не
+                 гасит (D352). #}
               <span class="ov-num{% if row.delta is not none and row.delta < 0 %} ov-num--err{% endif %}">
                 {{ '—' if row.delta is none else ('%+.1f'|format(row.delta)) }}
               </span>
@@ -196,7 +195,7 @@
       {% if data.problems %}
         {% for point in data.problems %}
           <a class="ov-row" href="{{ url(registry_path ~ '/' ~ point.inspection_id) }}">
-            <span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span>
+            <span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span>
             <span class="ov-row__name">
               {{ point.unit }}
               <span class="ov-row__meta">
@@ -281,7 +280,7 @@
              href="{% if unit_id and point.country %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
             <span class="ov-cell__name">{{ point.unit }}</span>
             <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
-            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
+            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span></span>
             <span class="ov-num ov-num--strong">{{ '%.1f'|format(point.pct) }}</span>
             {# Движение показывается только против СРАВНИМОЙ проверки: иначе
                это разница ставок методики, а не работы точки. #}

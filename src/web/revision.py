@@ -34,6 +34,7 @@ from src.report.rescore import rescore
 
 from .errors import MethodologyRefused
 from .review import VIOLATION, checklist_of
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,11 @@ def revise_card(
             "Проверка уже принята — записи принятой не исправляются (D200). "
             "Поправить можно только шапку, под журналом"
         )
+    if detail.inspection.is_legacy:
+        # Историческая (D332): чек-листа её методики в хранилище нет и не
+        # будет, а оценку движок не пересчитывает никогда — сверять запись не
+        # с чем, и это не поломка, а свойство проверки.
+        raise ReviseError(t("revise.legacy", lang))
     прежняя = next((f for f in detail.findings if f.id == finding_id), None)
     if прежняя is None:
         raise ReviseError("Такой записи в этой проверке нет")

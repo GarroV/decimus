@@ -180,6 +180,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0041_superadmin.sql": (
         "sql1:47c04207c4e497800c915e85679e06630363fdd0fb703f84eaf198fb681cbeec"
     ),
+    # Два режима загрузки: текущая (import) и историческая (legacy), D332/D334.
+    # Заведена вместе с файлом, нигде не применена.
+    "0042_import_modes.sql": (
+        "sql1:62a7dcd535fddeab514a696d0a7b3a82438d9abb1b195f5d1c669741f4d1ab30"
+    ),
 }
 
 
