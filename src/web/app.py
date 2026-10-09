@@ -743,7 +743,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     def home() -> Response:
         вошедший = auth.current_account()
         if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
-            return redirect(url_for("ratings"))  # контролинг — только рейтинги (D338)
+            return redirect(url_for("ratings"))  # контролинг — только рейтинги (D358)
         return redirect(url_for("overview"))
 
     @app.get(section("registry").path)
@@ -1073,7 +1073,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         edit: people.Outcome | None = None,
     ) -> tuple[str, int]:
         # Перечень людей и форма заведения — админу УК всех (D288), «контролю» —
-        # только людей контролинга (D340). Остальные видят свою строку: вкладка
+        # только людей контролинга (D360). Остальные видят свою строку: вкладка
         # открыта всем ради привязки бота (D286).
         круг = _people_scope()
         управляет = круг is not None
@@ -1135,7 +1135,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         )
 
     def _в_круге_контроля(логин: str) -> bool:
-        """Учётка из формы — человек контролинга в УК (D340); сверка с базой, не с формой."""
+        """Учётка из формы — человек контролинга в УК (D360); сверка с базой, не с формой."""
         пространство = canonical_tenant((request.form.get("tenant") or "").strip())
         return people.in_control_circle(
             accounts.everyone(tenant=HQ_TENANT), login=логин, tenant=пространство
@@ -1229,7 +1229,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         Пространство — из строки учётки в перечне, сверенное с заведёнными:
         человека правят там, где он живёт, а не в пространстве админа.
         `контролю_можно` — правку открыть «контролю», но только над его кругом
-        (D340); роль ему не открывается никогда.
+        (D360); роль ему не открывается никогда.
         """
         круг = _people_scope()
         if круг is None or (круг == _SCOPE_CONTROL and not контролю_можно):
@@ -1286,7 +1286,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         браузера и в журнале обратного прокси, то есть перестал бы быть
         паролем ровно в момент показа.
 
-        «Контроль» заводит только контроль в УК (D340): иная роль или
+        «Контроль» заводит только контроль в УК (D360): иная роль или
         пространство в форме — подделка, отказ 403 до базы.
         """
         круг = _people_scope()
@@ -1314,7 +1314,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{users_path}/disable")
     def disable_user() -> FlaskResponse | tuple[str, int]:
-        """Отключить учётку: админ УК — любую, «контроль» — человека контролинга (D340)."""
+        """Отключить учётку: админ УК — любую, «контроль» — человека контролинга (D360)."""
         круг = _people_scope()
         if круг is None:
             return _forbidden_people()
@@ -1484,7 +1484,7 @@ def _install_hq_gate(app: Flask) -> None:
 
 
 def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
-    """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D338).
+    """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D358).
 
     Свои дела — экран «Пользователи» (там свой пароль и бот), выход, смена
     пароля, привязка бота. Адреса разделов — из реестра, а не строками здесь.
@@ -1498,7 +1498,7 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/password",
         f"{users_path}/bot-link",
         f"{users_path}/bot-unlink",
-        # Люди контролинга (D340): заведение, почта, отключение. Смены роли
+        # Люди контролинга (D360): заведение, почта, отключение. Смены роли
         # (`/role`) здесь нет намеренно; кого можно трогать, решает маршрут.
         f"{users_path}/add",
         f"{users_path}/email",
@@ -1508,7 +1508,7 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
 
 
 def _install_control_gate(app: Flask) -> None:
-    """Роль «контроль» видит только рейтинги (D338; было «остальное на чтение», D319).
+    """Роль «контроль» видит только рейтинги (D358; было «остальное на чтение», D319).
 
     Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
     для контроля с момента появления, и закрывать его не придётся помнить.
@@ -1543,7 +1543,7 @@ def link_url(bot_username: str, token: str) -> str:
 
 
 #: Кругом людей на экране «Пользователи» управляет: админ УК — всеми,
-#: «контроль» — только людьми контролинга в УК (D340).
+#: «контроль» — только людьми контролинга в УК (D360).
 _SCOPE_ALL = "all"
 _SCOPE_CONTROL = "control"
 

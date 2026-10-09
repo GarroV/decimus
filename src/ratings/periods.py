@@ -88,7 +88,7 @@ def previous_period(
 
 
 def next_period(period: ReportPeriod, *, rs_periods: Sequence[RatingPeriod]) -> ReportPeriod | None:
-    """Следующий такой же период — для стрелки → календаря (D337)."""
+    """Следующий такой же период — для стрелки → календаря (D357)."""
     if period.kind == KIND_MONTH:
         year, month = period.begin.year, period.begin.month
         return month_period(year + 1, 1) if month == 12 else month_period(year, month + 1)
