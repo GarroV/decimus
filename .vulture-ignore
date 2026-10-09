@@ -429,3 +429,13 @@ add_space
 space_countries
 # `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
 _методику_правят_админы
+# Поля свечей сводки рейтингов (D384) читает только шаблон `ratings/index.html`.
+rs_candles
+rko_candles
+wick_top
+wick_bottom
+body_top
+body_height
+trend
+in_period
+threshold_y
