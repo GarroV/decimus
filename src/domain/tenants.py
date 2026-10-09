@@ -31,8 +31,11 @@ def may_add_units(tenant: str) -> bool:
     return canonical_tenant(tenant) == HQ_TENANT
 
 
+#: Контролинг: видит и ведёт только раздел «Рейтинги» (D319, D338).
+CONTROL_ROLE = "control"
+
 #: Роли, которым открыта загрузка рейтингов и их справочники (D319).
-RATINGS_MANAGER_ROLES = ("control", "admin")
+RATINGS_MANAGER_ROLES = (CONTROL_ROLE, "admin")
 
 
 def may_manage_ratings(role: str | None, tenant: str) -> bool:

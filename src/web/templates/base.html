@@ -79,7 +79,7 @@
       те же элементы, что в панели, а не свои копии.
     #}
     <header class="mbar">
-      <a class="mbar__brand" href="{{ url('/overview') }}?lang={{ lang }}">
+      <a class="mbar__brand" href="{{ url('/') }}?lang={{ lang }}">
         <img class="topbar__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
         <span class="topbar__name">{{ t('app.name') }}</span>
       </a>
@@ -92,7 +92,7 @@
   <div class="shell">
     {% if account %}
       <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
-        <a class="sidenav__brand" href="{{ url('/overview') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
+        <a class="sidenav__brand" href="{{ url('/') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
           <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
           <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
         </a>
