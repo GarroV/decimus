@@ -177,6 +177,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0040_control_role.sql": (
         "sql1:149df9ece74bb0126f1a28a5bf383ffabeb794246d7bb6d2309e69d3f0c811a4"
     ),
+    "0041_superadmin.sql": (
+        "sql1:47c04207c4e497800c915e85679e06630363fdd0fb703f84eaf198fb681cbeec"
+    ),
 }
 
 
