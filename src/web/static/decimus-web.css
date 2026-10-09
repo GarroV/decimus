@@ -1705,11 +1705,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .ap-table th[scope=row] { font-weight: var(--w-regular); color: var(--ink-2); width: 30%; }
 .ap-table tr.ap-diff td { font-weight: var(--w-semibold); background: var(--warn-soft); }
 .users-add { align-items: flex-end; }
-/* Правка роли и почты в строке перечня (#399): кнопка стоит при своём поле и
-   переносится под него, когда колонке тесно, — так перечень помещается в
-   карточку на 1280–1440 и «Отключить» не уезжает за край. */
-.users-inline { flex-wrap: wrap; gap: var(--space-2) var(--space-3); padding: var(--space-3) 0; }
-.users-email { width: 11rem; }
+/* Меню учётки внизу слева ведёт в свою карточку на «Пользователях». */
+.sidenav__me { display: flex; align-items: center; gap: var(--space-4); flex: 1; min-width: 0; color: inherit; text-decoration: none; border-radius: var(--r-control); }
+.sidenav__me:hover { text-decoration: none; }
+.sidenav__me:hover b { color: var(--accent); }
 
 /* Таблица-перечень (люди): у `.table` ядра ячейки текста без полей — она
    построена под денежные таблицы, где поля даёт закреплённая колонка имени.

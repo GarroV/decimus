@@ -429,6 +429,20 @@ add_space
 space_countries
 # `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
 _методику_правят_админы
+
+# Экран «Пользователи» слева список, справа карточка (переделка экрана, 09.10.2026).
+# Маршруты Flask (`src/web/users_screen.py`) — регистрирует декоратор:
+bot_link
+mcp_grant
+mcp_revoke
+# Поля, которые читает только шаблон карточки (`users/_card.html`, `users/index.html`):
+# исход действия (`Show.flash`, `added_email_failed`, ссылка привязки и её срок),
+# подпись пункта фильтра ролей и «вошедший в круге Claude».
+flash
+added_email_failed
+bot_link_until
+label_key
+actor_in_circle
 # Поля свечей сводки рейтингов (D384) читает только шаблон `ratings/index.html`.
 rs_candles
 rko_candles

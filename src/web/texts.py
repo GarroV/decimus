@@ -26,7 +26,9 @@ from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
+from .texts_registry import REGISTRY_TEXTS
 from .texts_units import UNIT_TEXTS
+from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
@@ -50,18 +52,16 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    "split.back": {"ru": "Назад", "en": "Back"},
+    "split.close": {"ru": "Закрыть", "en": "Close"},
     "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
     "nav.theme": {"ru": "Тема", "en": "Theme"},
     "nav.theme.system": {"ru": "Как в системе", "en": "System"},
     "nav.theme.light": {"ru": "Светлая", "en": "Light"},
     "nav.theme.dark": {"ru": "Тёмная", "en": "Dark"},
-    "nav.role.admin": {"ru": "Админ", "en": "Admin"},
-    "nav.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
-    "nav.role.control": {"ru": "Контроль", "en": "Control"},
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
-    "nav.role.superadmin": {"ru": "Главный админ", "en": "Super admin"},
     "overview.assign": {"ru": "Назначить проверку", "en": "Schedule an audit"},
     "overview.scope.all": {"ru": "Вся сеть", "en": "The whole network"},
     "overview.filter.title": {"ru": "Выборка", "en": "Selection"},
@@ -990,335 +990,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
-    # --- люди проекта (T338, #322) -----------------------------------------
-    "users.count": {"ru": "{count} чел.", "en": "{count} people"},
-    "users.control.scope": {
-        "ru": "Здесь только люди контролинга: их можно завести, задать почту и отключить.",
-        "en": "Only controlling people are listed: add them, set an email, disable them.",
-    },
-    # Охват экрана по роли (#585, D364): одна строка под заголовком.
-    "users.scope.super": {
-        "ru": "Вы главный админ: люди всех пространств, пространства партнёров и их страны.",
-        "en": "You are a super admin: people of every space, partner spaces and their countries.",
-    },
-    "users.scope.hq_admin": {
-        "ru": (
-            "Люди УК, кроме админов, и люди партнёров; пространства партнёров и их страны. "
-            "Админов назначает главный админ."
-        ),
-        "en": (
-            "HQ people except admins, and partner people; partner spaces and their countries. "
-            "Admins are appointed by a super admin."
-        ),
-    },
-    "users.scope.partner_admin": {
-        "ru": "Люди вашего пространства: админы и сотрудники.",
-        "en": "People of your space: admins and staff.",
-    },
-    "users.spaces.title": {"ru": "Пространства партнёров", "en": "Partner spaces"},
-    "users.spaces.own_title": {"ru": "Ваше пространство", "en": "Your space"},
-    "users.spaces.col.code": {"ru": "Код", "en": "Code"},
-    "users.spaces.col.name": {"ru": "Название", "en": "Name"},
-    "users.spaces.col.countries": {"ru": "Страны", "en": "Countries"},
-    "users.spaces.col.people": {"ru": "Живых учёток", "en": "Active accounts"},
-    "users.spaces.none": {"ru": "Пространств партнёров пока нет.", "en": "No partner spaces yet."},
-    "users.spaces.unknown": {
-        "ru": "Список пространств сейчас неизвестен: база не ответила.",
-        "en": "The list of spaces is unknown right now: the database did not answer.",
-    },
-    "users.spaces.add.code": {"ru": "Код", "en": "Code"},
-    "users.spaces.add.name": {"ru": "Название", "en": "Name"},
-    "users.spaces.add.countries": {
-        "ru": "Страны (ISO, через пробел)",
-        "en": "Countries (ISO, space-separated)",
-    },
-    "users.spaces.add.submit": {"ru": "Завести", "en": "Create"},
-    "users.spaces.add.hint": {
-        "ru": (
-            "Код — заглавная латиница, например GE; не меняется никогда. "
-            "Одна страна — один партнёр. Людей пространства заводите формой выше."
-        ),
-        "en": (
-            "Code is upper-case Latin, e.g. GE; it never changes. "
-            "One country — one partner. Add the space's people with the form above."
-        ),
-    },
-    "users.spaces.countries.add": {"ru": "Добавить страны", "en": "Add countries"},
-    "users.spaces.countries.submit": {"ru": "Добавить", "en": "Add"},
-    "users.spaces.space_added": {"ru": "Пространство заведено.", "en": "Space created."},
-    "users.spaces.space_failed": {
-        "ru": (
-            "Пространство не заведено: код занят или не годится, страна уже у другого партнёра "
-            "или база не ответила. Ничего не записано."
-        ),
-        "en": (
-            "Space not created: the code is taken or invalid, a country belongs to another "
-            "partner, or the database did not answer. Nothing was saved."
-        ),
-    },
-    "users.spaces.countries_added": {"ru": "Страны добавлены.", "en": "Countries added."},
-    "users.spaces.countries_failed": {
-        "ru": (
-            "Страны не добавлены: код страны не годится, страна уже у другого партнёра "
-            "или база не ответила. Ничего не записано."
-        ),
-        "en": (
-            "Countries not added: a code is invalid, a country belongs to another partner, "
-            "or the database did not answer. Nothing was saved."
-        ),
-    },
-    "users.unknown": {
-        "ru": "Список сейчас недоступен — это не значит, что людей нет.",
-        "en": "The list is unavailable right now — that does not mean there is nobody.",
-    },
-    "users.add.title": {"ru": "Завести человека", "en": "Add a person"},
-    "users.add.login": {"ru": "Логин", "en": "Login"},
-    "users.add.role": {"ru": "Что можно", "en": "Access"},
-    "users.add.submit": {"ru": "Завести", "en": "Add"},
-    "users.add.hint": {
-        "ru": (
-            "Пароль придумает система и покажет один раз — записать его "
-            "нужно сразу. В базе от него остаётся только свёртка."
-        ),
-        "en": (
-            "The system makes the password and shows it once — write it down "
-            "right away. Only a hash of it is kept."
-        ),
-    },
-    "users.add.failed": {
-        "ru": "Завести не вышло. Логин уже занят или не годится по форме.",
-        "en": "Could not add. The login is taken or malformed.",
-    },
-    "users.added.title": {"ru": "Учётка «{login}» заведена", "en": "Account «{login}» created"},
-    "users.added.text": {
-        "ru": "Пароль показан один раз — передайте его человеку и закройте страницу.",
-        "en": "The password is shown once — pass it on and close this page.",
-    },
-    "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
-    "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
-    # Главный админ (D364): всё по проекту, назначает других главных.
-    "users.role.superadmin": {
-        "ru": "Главный админ: всё по проекту (только УК)",
-        "en": "Super admin: everything in the project (HQ only)",
-    },
-    "users.role.control": {
-        "ru": "Рейтинги: загрузка и справочники (только УК)",
-        "en": "Ratings: uploads and settings (HQ only)",
-    },
-    "users.col.login": {"ru": "Логин", "en": "Login"},
-    # Пространства (волна 1, #340): админ УК видит людей всех пространств и
-    # заводит человека в выбранное (D282, D286).
-    "users.col.space": {"ru": "Пространство", "en": "Space"},
-    "users.add.space": {"ru": "Пространство", "en": "Space"},
-    "users.add.role_space": {
-        "ru": (
-            "Роли «контроль» и «главный админ» бывают только в пространстве УК (HQ). "
-            "Выберите другую роль или пространство."
-        ),
-        "en": (
-            "The Control and Super admin roles exist only in the HQ space. "
-            "Pick another role or space."
-        ),
-    },
-    "users.add.space_unknown": {
-        "ru": "Такого пространства нет. Выберите из списка.",
-        "en": "There is no such space. Pick one from the list.",
-    },
-    # Привязка бота через веб (D286): одноразовая ссылка своей учётке.
-    "users.col.bot": {"ru": "Бот", "en": "Bot"},
-    "users.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
-    "users.bot.bound": {
-        "ru": "Бот привязан: Telegram ID {id}, с {date}.",
-        "en": "The bot is linked: Telegram ID {id}, since {date}.",
-    },
-    "users.bot.unbound": {
-        "ru": "Бот не привязан. Привяжите его, чтобы проводить проверки в Telegram.",
-        "en": "The bot is not linked. Link it to run inspections in Telegram.",
-    },
-    "users.bot.unknown": {
-        "ru": "Не удалось узнать, привязан ли бот. Это не значит, что не привязан.",
-        "en": "Could not check whether the bot is linked. That does not mean it is not.",
-    },
-    "users.bot.link_submit": {"ru": "Привязать бота", "en": "Link the bot"},
-    "users.bot.link": {
-        "ru": "Откройте эту ссылку в Telegram на своём телефоне — бот привяжется к вашей учётке:",
-        "en": "Open this link in Telegram on your phone — the bot will link to your account:",
-    },
-    "users.bot.until": {
-        "ru": "Ссылка одноразовая и действует 10 минут (до {time}). Новая ссылка отменяет прежнюю.",
-        "en": (
-            "The link works once and for 10 minutes (until {time}). A new link cancels the old one."
-        ),
-    },
-    "users.bot.unset": {
-        "ru": "Привязка бота на этом стенде не настроена: не задана переменная {var}.",
-        "en": "Bot linking is not set up on this server: the {var} variable is not set.",
-    },
-    "users.bot.link_failed": {
-        "ru": "Ссылку выпустить не вышло — база не ответила. Попробуйте ещё раз.",
-        "en": "Could not issue the link — the database did not respond. Try again.",
-    },
-    "users.bot.unlink": {"ru": "Отвязать", "en": "Unlink"},
-    "users.bot.unlinked": {
-        "ru": "Бот отвязан. Этот Telegram больше не проводит проверки от учётки.",
-        "en": "The bot is unlinked. This Telegram no longer runs inspections for the account.",
-    },
-    "users.bot.unlink_missing": {
-        "ru": "Привязки не было — отвязывать нечего.",
-        "en": "There was no link — nothing to unlink.",
-    },
-    "users.bot.unlink_failed": {
-        "ru": "Отвязать не вышло — база не ответила. Попробуйте ещё раз.",
-        "en": "Could not unlink — the database did not respond. Try again.",
-    },
-    "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
-    "users.col.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
-    "users.email.placeholder": {"ru": "не задана", "en": "not set"},
-    "users.email.submit": {"ru": "Сохранить", "en": "Save"},
-    "users.role.submit": {"ru": "Назначить", "en": "Assign"},
-    "users.edit.missing": {
-        "ru": "Учётка не найдена или отключена — ничего не изменено.",
-        "en": "Account not found or disabled — nothing changed.",
-    },
-    "users.edit.space": {
-        "ru": "Такого пространства нет — ничего не изменено.",
-        "en": "No such space — nothing changed.",
-    },
-    "users.edit.failed": {
-        "ru": "База не ответила — ничего не изменено. Попробуйте ещё раз.",
-        "en": "The database did not respond — nothing changed. Please try again.",
-    },
-    "users.role.ok": {"ru": "Роль изменена.", "en": "Role changed."},
-    "users.role.unknown": {
-        "ru": "Такой роли нет — ничего не изменено.",
-        "en": "No such role — nothing changed.",
-    },
-    "users.role.self": {
-        "ru": "Свою роль сменить нельзя: так можно закрыть себе экран людей.",
-        "en": "You cannot change your own role: it could lock you out of this screen.",
-    },
-    "users.role.failed": {
-        "ru": "Роль не изменена: база не ответила. Попробуйте ещё раз.",
-        "en": "Role not changed: the database did not respond. Please try again.",
-    },
-    "users.role.forbidden": {
-        "ru": "Эту роль вы выдать не можете: она вне вашего охвата.",
-        "en": "You cannot grant this role: it is outside your scope.",
-    },
-    "users.role.last_super": {
-        "ru": "Это последний действующий главный админ: сначала назначьте другого.",
-        "en": "This is the last active super admin: appoint another one first.",
-    },
-    "users.email.ok": {
-        "ru": "Почта сохранена: человек может входить через Google.",
-        "en": "Email saved: the person can sign in with Google.",
-    },
-    "users.email.removed": {
-        "ru": "Почта снята: вход через Google закрыт, пароль остался.",
-        "en": "Email removed: Google sign-in is closed, the password still works.",
-    },
-    "users.email.shape": {
-        "ru": "Это не похоже на почту — ничего не изменено.",
-        "en": "This does not look like an email address — nothing changed.",
-    },
-    "users.email.taken": {
-        "ru": "Эта почта уже привязана к другой учётке — ничего не изменено.",
-        "en": "This email is already linked to another account — nothing changed.",
-    },
-    "users.email.failed": {
-        "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
-        "en": "Email not saved: the database did not respond. Please try again.",
-    },
-    "users.password.title": {"ru": "Сменить пароль", "en": "Change password"},
-    "users.password.current": {"ru": "Текущий пароль", "en": "Current password"},
-    "users.password.new": {"ru": "Новый пароль", "en": "New password"},
-    "users.password.repeat": {"ru": "Повтор нового", "en": "Repeat new password"},
-    "users.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
-    "users.password.hint": {
-        "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
-        "этот остаётся.",
-        "en": "At least {min} characters. After the change all your other sessions are "
-        "signed out; this one stays.",
-    },
-    "users.password.ok": {
-        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
-        "en": "Password changed. Your other sessions have been signed out.",
-    },
-    "users.password.wrong": {
-        "ru": "Пароль не сменён: проверьте текущий пароль.",
-        "en": "Password not changed: check your current password.",
-    },
-    "users.password.mismatch": {
-        "ru": "Пароль не сменён: повтор не совпадает с новым.",
-        "en": "Password not changed: the repeat does not match the new password.",
-    },
-    "users.password.short": {
-        "ru": "Пароль не сменён: новый короче {min} знаков.",
-        "en": "Password not changed: the new password is shorter than {min} characters.",
-    },
-    "users.password.long": {
-        "ru": "Пароль не сменён: новый длиннее {max} знаков.",
-        "en": "Password not changed: the new password is longer than {max} characters.",
-    },
-    "users.password.empty": {
-        "ru": "Пароль не сменён: заполните текущий и новый пароль.",
-        "en": "Password not changed: fill in the current and the new password.",
-    },
-    "users.password.locked": {
-        "ru": "Слишком много неудачных попыток. Попробуйте через {minutes} мин.",
-        "en": "Too many failed attempts. Try again in {minutes} min.",
-    },
-    "users.password.failed": {
-        "ru": "Пароль не сменён: база не ответила. Попробуйте ещё раз.",
-        "en": "Password not changed: the database did not respond. Please try again.",
-    },
-    "users.self.text": {
-        "ru": "Людей заводит и отключает администратор УК.",
-        "en": "People are added and disabled by an HQ administrator.",
-    },
-    "users.col.role": {"ru": "Что можно", "en": "Access"},
-    "users.col.state": {"ru": "Состояние", "en": "State"},
-    "users.col.created": {"ru": "Заведён", "en": "Added"},
-    "users.state.active": {"ru": "работает", "en": "active"},
-    "users.state.disabled": {"ru": "отключён {date}", "en": "disabled {date}"},
-    "users.disable.submit": {"ru": "Отключить", "en": "Disable"},
-    "users.disable.ok": {
-        "ru": "Учётка отключена. Открытые по ней сессии перестали действовать.",
-        "en": "The account is disabled. Sessions opened with it stopped working.",
-    },
-    "users.disable.missing": {
-        "ru": "Такой живой учётки нет — возможно, её уже отключили.",
-        "en": "No such active account — it may already be disabled.",
-    },
-    "users.disable.self": {
-        "ru": (
-            "Себя отключить нельзя: это выход без возврата, а на стенде с "
-            "одним администратором — ещё и закрытый навсегда экран людей."
-        ),
-        "en": (
-            "You cannot disable yourself: that is a one-way exit, and on a "
-            "stand with a single admin it closes this screen for good."
-        ),
-    },
-    "users.disable.failed": {
-        "ru": "Отключить не вышло — база не ответила.",
-        "en": "Could not disable — the database did not answer.",
-    },
-    "users.disable.last_super": {
-        "ru": "Последнего главного админа отключить нельзя: сначала назначьте другого.",
-        "en": "The last active super admin cannot be disabled: appoint another one first.",
-    },
-    "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
-    "users.forbidden.note": {
-        "ru": (
-            "Людей заводит администратор. Если он нужен вам — попросите того, "
-            "кто уже им является: роль назначается изнутри админки."
-        ),
-        "en": (
-            "Only an administrator manages people. If you need that, ask "
-            "someone who already is one — the role is granted from inside."
-        ),
-    },
     "letter.draft.shown": {
         "ru": (
             "В поле — заготовка, собранная сейчас. Зафиксированное письмо "
@@ -1937,7 +1608,9 @@ _ЧАСТИ = (
     PRESCRIPTION_TEXTS,
     RATINGS_TEXTS,
     REFUSAL_TEXTS,
+    REGISTRY_TEXTS,
     UNIT_TEXTS,
+    USERS_TEXTS,
     WALK_TEXTS,
 )
 _ПЕРЕСЕЧЕНИЕ = {
@@ -1954,7 +1627,9 @@ TEXTS = {
     **PRESCRIPTION_TEXTS,
     **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
+    **REGISTRY_TEXTS,
     **UNIT_TEXTS,
+    **USERS_TEXTS,
     **WALK_TEXTS,
 }
 

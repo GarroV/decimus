@@ -103,6 +103,9 @@
         #}
         <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
           <input type="hidden" name="lang" value="{{ lang }}">
+          {# Пиццерию ищут по всей истории, а не в текущем месяце — реестр без
+             периода в адресе открывается месяцем. #}
+          <input type="hidden" name="period" value="all">
           <label class="sidenav__field" title="{{ t('nav.search') }}">
             {{ icon('search') }}
             <input type="search" name="q" data-hotkey="k" placeholder="{{ t('nav.search') }}"
@@ -139,8 +142,12 @@
         </div>
 
         <div class="sidenav__user">
-          <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
-          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.' ~ account.role) }}</small></span>
+          {# Меню учётки ведёт в свою карточку на «Пользователях»: там роль,
+             пароль, бот и доступ к Claude — всё своё в одном месте. #}
+          <a class="sidenav__me" href="{{ my_card_url }}" title="{{ t('profile.open') }}">
+            <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
+            <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t(role_key(account.role, account.tenant)) }}</small></span>
+          </a>
           {#
             Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
             чужой странице, выбив человека из админки без единого его движения.

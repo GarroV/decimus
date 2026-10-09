@@ -171,7 +171,7 @@
      партнёр — к себе); нет — кнопка УК «запросить» (D272: с D2/D3 запрос
      появляется сам). Без запроса и без права запросить блока нет (D217). #}
   {% if plan %}
-    <div class="section">
+    <div class="section" id="plan">
       <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
       <div class="card"><div class="card__body row">
         <span class="tag tag--micro {{ plan_state_tones[plan.state] }}">{{ t('plans.state.' ~ plan.state) }}</span>
@@ -190,7 +190,7 @@
       <div class="note__text">{{ t('card.plan.no_country_hint') }}</div>
     </div></div>
   {% elif may_request_plan %}
-    <div class="section">
+    <div class="section" id="plan">
       <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
       <div class="card"><div class="card__body">
         <p class="field-note">{{ t('card.plan.request_hint_needed') if plan_needed else t('card.plan.request_hint') }}</p>
@@ -305,7 +305,7 @@
      Зона с нарушениями раскрыта, чистая свёрнута — но есть: вычитывающий
      обязан видеть и то, что аудитор счёл чистым. #}
   {% if sheet %}
-    <section class="ov-card ov-card--wide mt-gap">
+    <section class="ov-card ov-card--wide mt-gap" id="review">
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('review.sheet.title') }}</div>
       </div>
@@ -408,7 +408,7 @@
   {% endif %}
 
   {% if may_move %}
-    <div class="section">
+    <div class="section" id="move">
       <div class="section__head"><h2 class="section__title">{{ t('move.title') }}</h2></div>
       <div class="card"><div class="card__body">
         <p class="field-note">{{ t('move.hint') }}</p>
