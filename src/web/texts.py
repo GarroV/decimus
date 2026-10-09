@@ -530,6 +530,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Запись исправлена, оценка пересчитана.",
         "en": "The record is corrected and the score recalculated.",
     },
+    "revise.legacy": {
+        "ru": (
+            "это историческая проверка: оценка поставлена по методике того времени и "
+            "движком не пересчитывается, сверять запись с нынешним чек-листом не с чем. "
+            "Записи исторической правятся только через MCP"
+        ),
+        "en": (
+            "this is a historical inspection: its score was given under the methodology "
+            "of that time and is never recalculated by the engine, so there is no checklist "
+            "to check the record against. Records of a historical inspection are edited "
+            "only through MCP"
+        ),
+    },
     "revise.failed": {
         "ru": "Запись не исправлена: {reason}",
         "en": "The record was not corrected: {reason}",

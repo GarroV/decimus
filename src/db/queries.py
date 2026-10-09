@@ -708,6 +708,10 @@ with записи as (
       -- 0042): «пункт не назван» и «без класса» — не пункт и не класс, и в
       -- систему одинаковых нарушений сети не складываются (D332).
       and f.code <> 'LEGACY' and f.level <> 'NC'
+      -- Записи исторической вовсе не идут в системные нарушения: код пункта из
+      -- старой методики значит там другое, чем в нынешнем чек-листе. Её ОЦЕНКА
+      -- при этом в средних остаётся (D352) — исключается только статистика пунктов.
+      and i.origin <> 'legacy'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -1184,6 +1188,8 @@ _ITEM_RECORDS = """
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'
       and i.retracted_at is null
+      -- Историческая: код пункта старой методики — не этот пункт (D332, D352).
+      and i.origin <> 'legacy'
 """
 
 _ITEM_SUMMARY_SQL = (
