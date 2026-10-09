@@ -151,8 +151,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "units with no inspection in the period",
     },
     "overview.problem.critical": {
-        "ru": "сожжена зона: критических {count}",
-        "en": "a zone burned: {count} critical",
+        "ru": "критических нарушений: {count}, зона обнулена",
+        "en": "critical findings: {count}, zone zeroed",
     },
     "overview.problem.dropped": {
         "ru": "просела против прошлой проверки на {delta}",
@@ -160,8 +160,8 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "overview.problem.low_grade": {"ru": "оценка ниже порога", "en": "score below threshold"},
     "overview.units.hint2": {
-        "ru": "Сожжённые зоны, падение оценки, слабая буква",
-        "en": "Burned zones, dropped scores, weak grades",
+        "ru": "Критические нарушения, падение оценки, слабая буква",
+        "en": "Critical findings, dropped scores, weak grades",
     },
     "overview.tile.units": {"ru": "Точек в справочнике", "en": "Units on file"},
     "overview.tile.inspections": {"ru": "Проверок", "en": "Inspections"},
@@ -174,15 +174,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "over recorded percentages",
     },
     "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
-    "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
+    "overview.tile.note.critical": {"ru": "зона обнулена целиком", "en": "a whole zone zeroed"},
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     # Число ПОКАЗАННЫХ поводов: список ограничен, и «поводов: 6» читалось бы как
     # «всего шесть» рядом с плиткой критических по всему срезу (#503).
     "overview.attention.count": {"ru": "показано: {count}", "en": "{count} shown"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
     "overview.attention.hint": {
-        "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
-        "en": "Burned zones and dropped scores, most urgent first",
+        "ru": "Критические нарушения и просевшие оценки, самое срочное сверху",
+        "en": "Critical findings and dropped scores, most urgent first",
     },
     "overview.attention.empty": {
         "ru": "Поводов нет: критических нарушений и оценок ниже порога в выборке не записано.",
@@ -363,6 +363,35 @@ TEXTS: dict[str, dict[str, str]] = {
     "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
     "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
     "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
+    "unit.profile": {"ru": "Сведения", "en": "Details"},
+    "country.register.title": {"ru": "Свод пиццерий", "en": "Pizzeria register"},
+    "country.register.hint": {
+        "ru": "работают {open}, открываются {pipeline}, закрыты {closed}",
+        "en": "open {open}, opening {pipeline}, closed {closed}",
+    },
+    "country.register.since": {"ru": "с {day}", "en": "since {day}"},
+    "country.register.empty": {
+        "ru": "Свод пиццерий по этой стране не загружен.",
+        "en": "The pizzeria register has nothing for this country yet.",
+    },
+    "unit.profile.hint": {"ru": "из свода пиццерий", "en": "from the pizzeria register"},
+    "unit.profile.empty": {
+        "ru": "В своде пиццерий строки для этой точки нет.",
+        "en": "The pizzeria register has no row for this unit.",
+    },
+    "unit.profile.status": {"ru": "Статус", "en": "Status"},
+    "unit.profile.address": {"ru": "Адрес", "en": "Address"},
+    "unit.profile.partner": {"ru": "Партнёр", "en": "Partner"},
+    "unit.profile.email": {"ru": "Почта партнёра", "en": "Partner email"},
+    "unit.profile.restaurant": {"ru": "Ресторан с", "en": "Restaurant since"},
+    "unit.profile.delivery": {"ru": "Доставка с", "en": "Delivery since"},
+    "unit.profile.closed": {"ru": "Закрыта", "en": "Closed on"},
+    "unit.profile.area": {"ru": "Площадь", "en": "Area"},
+    "unit.profile.seats": {"ru": "Посадочных мест", "en": "Seats"},
+    "unit.stage.open": {"ru": "Работает", "en": "Open"},
+    "unit.stage.paused": {"ru": "Временно закрыта", "en": "Temporarily closed"},
+    "unit.stage.pipeline": {"ru": "Открывается", "en": "Opening"},
+    "unit.stage.closed": {"ru": "Закрыта", "en": "Closed"},
     "unit.movement.hint": {
         "ru": "клик по столбику — открыть отчёт",
         "en": "click a bar to open the report",
