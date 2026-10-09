@@ -453,9 +453,7 @@ def test_контроль_вне_рейтингов_не_пишет(
     assert зовы == {"role": [], "email": []}
 
 
-@pytest.mark.parametrize(
-    "путь", ["/country", "/admin", "/actions", "/calendar", "/tenants"]
-)
+@pytest.mark.parametrize("путь", ["/country", "/admin", "/actions", "/calendar", "/tenants"])
 def test_контроль_не_видит_разделов_кроме_своих(контроль: FlaskClient, путь: str) -> None:
     """D358, D366: кроме обзора, проверок, рейтингов и своих людей — не открывается."""
     assert контроль.get(путь).status_code == 404

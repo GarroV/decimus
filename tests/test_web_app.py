@@ -694,6 +694,17 @@ def test_адрес_без_отпечатка_перепроверяется(с�
     assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
 
 
+def test_чужой_отпечаток_на_год_не_кешируется(стенд: FlaskClient) -> None:
+    # Act — отпечаток не от этого содержимого: страница новой версии, а файл
+    # отдала старая копия во время выкладки. Закешированный на год, такой ответ
+    # навсегда подменил бы стили под новым адресом.
+    ответ = стенд.get("/static/decimus-web.css?v=000000000000")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
+
+
 def test_шрифт_кешируется_на_неделю_без_отпечатка(стенд: FlaskClient) -> None:
     # Act
     ответ = стенд.get("/static/fonts/golos-text-cyrillic.woff2")
