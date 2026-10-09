@@ -38,6 +38,7 @@ from .config import (
     load_storage_settings,
 )
 from .errors import ActionPlanError, DbError, StorageError
+from .models import UPLOADED_ORIGINS
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
@@ -330,7 +331,7 @@ _SET_STATUS_SQL = "update action_plan_requests set status = %(status)s where id 
 # Двери УК (администратор истории): проверка по id, без охвата — пишет только
 # УК и только по проверкам своего пространства (условие `tenant_code`).
 _INSPECTION_FOR_REQUEST_SQL = """
-select i.tenant_code, i.status, i.retracted_at, i.counts, u.country
+select i.tenant_code, i.status, i.retracted_at, i.counts, u.country, i.origin
 from inspections i
 join units u on u.id = i.unit_id
 where i.id = %s
@@ -552,8 +553,10 @@ def open_auto_request(
     row = cur.fetchone()
     if row is None:
         return None
-    tenant, _status, _retracted, counts, country = row
-    if tenant != HQ_TENANT or not needs_action_plan(counts or {}):
+    tenant, _status, _retracted, counts, country, origin = row
+    # Загруженная (D310): `accept.py` сюда её не пускает, а здесь — второй замок
+    # на том же правиле, что у ручного запроса.
+    if tenant != HQ_TENANT or origin in UPLOADED_ORIGINS or not needs_action_plan(counts or {}):
         return None
     if not country:
         # Без страны запрос некому показать. Подтверждение не роняем: проверка
@@ -635,9 +638,15 @@ def request_plan(inspection_id: str, *, actor: str, due_on: date) -> str:
 def _require_requestable(ident: str, row: tuple[Any, ...] | None) -> None:
     if row is None:
         raise ActionPlanError(f"Проверки {ident} нет")
-    tenant, status, retracted, _counts, country = row
+    tenant, status, retracted, _counts, country, origin = row
     if tenant != HQ_TENANT:
         raise ActionPlanError("Экшн-план запрашивают по проверке УК, а это проверка партнёра")
+    # Загруженная задним числом (MCP, D310): ни автозапроса при подтверждении,
+    # ни ручного — по ней план не запрашивают вовсе.
+    if origin in UPLOADED_ORIGINS:
+        raise ActionPlanError(
+            "Проверка загружена задним числом — по загруженным экшн-план не запрашивают (D310)"
+        )
     if retracted is not None:
         raise ActionPlanError("Проверка отклонена — запрашивать план не по чему")
     if status != "finalized":

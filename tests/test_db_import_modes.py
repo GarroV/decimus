@@ -14,11 +14,12 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
 from conftest import requires_db
+from db_harness import set_retraction_env
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -32,11 +33,17 @@ from test_db_imports import (  # noqa: E402, F401 — фикстуры набо�
     хранилище,
 )
 
+from src.db import action_plans as plans  # noqa: E402
 from src.db import imports as db  # noqa: E402
 from src.db import imports_legacy as legacy  # noqa: E402
 from src.db import revise  # noqa: E402
-from src.db.errors import HistoryImportError, ReviseError  # noqa: E402
-from src.db.queries import list_inspections  # noqa: E402
+from src.db.errors import ActionPlanError, HistoryImportError, ReviseError  # noqa: E402
+from src.db.queries import (  # noqa: E402
+    item_usage,
+    list_inspections,
+    slice_summary,
+    systemic_findings,
+)
 from src.db.reach import reach_of  # noqa: E402
 from src.mcp import imports  # noqa: E402
 from src.mcp.checklist import Store  # noqa: E402
@@ -163,6 +170,42 @@ def test_историческая_без_буквы_хранит_пустую_и
     assert _записано(ident).counts == {"NC": 1}
 
 
+def test_записи_исторической_не_в_статистике_пунктов_а_оценка_в_средней(
+    хранилище: Store,
+) -> None:
+    """Код пункта старой методики значит другое, чем в нынешнем чек-листе.
+
+    Поэтому записи исторической не идут ни в «системные нарушения сети», ни в
+    статистику пункта на экране методики. Оценка же её — истина (D352) и в
+    сводке среза остаётся.
+    """
+    # Arrange — историческая с записью под кодом, который есть и в нынешнем.
+    ident = _историческая(хранилище)
+    _запись(хранилище, ident, code="CLN03", level="D3", zone="hot_kitchen")
+    imports.import_accept_inspection(
+        tenant="HQ",
+        store=хранилище,
+        actor=КТО,
+        inspection_id=ident,
+        confirm_unit=ТОЧКА,
+        confirm_date=ДЕНЬ,
+    )
+    охват = reach_of("HQ")
+    чек_лист = _записано(ident).inspection.checklist_code
+
+    # Act
+    системные = systemic_findings(reach=охват)
+    пункт = item_usage(reach=охват, code="CLN03", checklist=чек_лист)
+    точек, сводка = slice_summary(reach=охват)
+
+    # Assert
+    assert "CLN03" not in {код for код, *_ in системные}
+    assert (пункт.records, пункт.inspections) == (0, 0)
+    assert точек == 1
+    assert sum(n for _буква, n, _сумма in сводка) == 1
+    assert sum(сумма for _буква, _n, сумма in сводка) == 95.29
+
+
 def test_незнакомый_код_исторической_предупреждение_а_не_отказ(хранилище: Store) -> None:
     ident = _историческая(хранилище)
     ответ = _запись(хранилище, ident, code="ZZZ999", text="пункт старого чек-листа")
@@ -193,6 +236,33 @@ def test_подтверждение_исторической_с_d3_не_откр
             "select count(*) from action_plan_requests where inspection_id = %s", (ident,)
         ).fetchone()
     assert запросов == (0,)
+
+
+@pytest.mark.parametrize("режим", ["history", "current"])
+def test_по_загруженной_план_руками_не_запрашивают(
+    хранилище: Store, db_env: str, monkeypatch: pytest.MonkeyPatch, режим: str
+) -> None:
+    """D310: кнопка «Запросить план» (POST `/request`) по загруженной — отказ словами.
+
+    Автозапрос при подтверждении закрыт `accept.py`; ручной запрос шёл мимо
+    него и до правки заводил план по загруженной проверке.
+    """
+    # Arrange — принятая загруженная проверка УК.
+    set_retraction_env(db_env, monkeypatch)
+    ident = _историческая(хранилище) if режим == "history" else _черновик(хранилище)
+    imports.import_accept_inspection(
+        tenant="HQ",
+        store=хранилище,
+        actor=КТО,
+        inspection_id=ident,
+        confirm_unit=ТОЧКА,
+        confirm_date=ДЕНЬ,
+    )
+
+    # Act / Assert
+    with pytest.raises(ActionPlanError, match="загружена задним числом"):
+        plans.request_plan(ident, actor="hq", due_on=date.today() + timedelta(days=3))
+    assert plans.request_of_inspection(ident, reach=reach_of("HQ")) is None
 
 
 def test_правка_на_приёмке_исторической_отказ_до_движка(хранилище: Store) -> None:
