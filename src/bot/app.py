@@ -28,7 +28,7 @@ from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
 
 from src import domain
 
-from . import frame_copies, photo_backfill
+from . import frame_copies, maps_loader, photo_backfill
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
@@ -422,11 +422,14 @@ async def start_polling() -> None:
     # на MUSPELHEIM засыпает, и вернуть кадры потом может только бот — байты
     # есть у телеграма, а токен у него одного.
     backfill = asyncio.create_task(photo_backfill.backfill_forever(bot))
+    # Оценки пиццерий на картах из Pointer — раз в сутки (docs/09-pointer-api.md).
+    map_ratings = asyncio.create_task(maps_loader.load_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
         sweeper.cancel()
         backfill.cancel()
+        map_ratings.cancel()
         await bot.session.close()
 
 

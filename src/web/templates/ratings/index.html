@@ -236,6 +236,23 @@
     {% elif summary.risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
     {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
   </section>
+  {% elif block == 'maps' %}
+  {#- Оценки на картах из Pointer: средняя по всем отзывам страны, вес — число отзывов. -#}
+  <section class="rt-sec" aria-labelledby="rt-maps">
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-maps">{{ t('ratings.block.maps') }}</h2>
+      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }}</span></div>
+    {% if not maps or not (maps|selectattr('as_of')|list) %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
+    {% else %}<div class="rt-card"><table class="rt-maps">
+      <thead><tr><th scope="col">{{ t('ratings.col.country') }}</th>
+        {% for p in map_providers %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p) }}</th>{% endfor %}
+        <th scope="col" class="num">{{ t('ratings.maps.branches') }}</th></tr></thead>
+      <tbody>{% for row in maps %}<tr>
+        <th scope="row">{{ country_name(row.country) }}</th>
+        {% for p in map_providers %}{% set s = row.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b> <span class="rt-maps__n">{{ t('ratings.maps.reviews', n=s.reviews) }}</span>{% endif %}</td>{% endfor %}
+        <td class="num">{{ row.scores.values()|map(attribute='branches')|max }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>{% endif %}
+  </section>
   {% endif %}
   {% endfor %}
   {% endif %}

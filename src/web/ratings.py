@@ -19,11 +19,13 @@ from datetime import date
 from flask import Flask, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from src.db import maps_store
 from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import may_manage_ratings
 from src.ratings import layout as rl
+from src.ratings import maps as rmaps
 from src.ratings import report
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
@@ -117,6 +119,16 @@ def _layout_from_form() -> tuple[rl.Block, ...]:
     return rl.moved(blocks, key, 1 if step == "1" else -1) if step in ("1", "-1") else blocks
 
 
+def _maps(countries: tuple[str, ...]) -> tuple[rmaps.CountryMaps, ...] | None:
+    """Оценки на картах по странам среза. База не ответила — `None` и след в
+    журнале: блок скажет «нет данных», страница живёт."""
+    try:
+        return rmaps.summarize(maps_store.latest(countries), countries)
+    except RatingsError:
+        logger.warning("Оценки карт не прочитались", exc_info=True)
+        return None
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
@@ -137,6 +149,8 @@ def render_summary(conf: Settings) -> str:
     return render_template(
         "ratings/index.html",
         blocks=tuple(b.key for b in _layout() if b.visible),
+        maps=_maps(summary.countries),
+        map_providers=rmaps.SHOWN_PROVIDERS,
         board=board,
         summary=summary,
         choices=found,
