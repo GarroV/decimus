@@ -1,0 +1,170 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DECIMUS · мини-апп как приложение аудитора (D373): главная и настройки.
+   Подключается после walk.css. Правило слоя то же: ни одного своего цвета.
+
+   Главная — карточки разделов (сейчас один: проверка пиццерии). Настройки —
+   список строк, как настройки телефона: подпись слева, значение справа, «›»
+   у того, что открывается дальше.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.walk-app__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  margin-bottom: 16px;
+}
+
+.walk-app__head .walk-sheet__back { flex: none; }
+
+.walk-app__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 22px;
+  line-height: 28px;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.walk-app__gear {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line-control);
+  border-radius: 22px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+/* ── главная: карточка раздела ─────────────────────────────────────────── */
+
+.walk-app__card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-2);
+}
+
+.walk-app__card + .walk-app__card { margin-top: 12px; }
+
+.walk-app__card-title {
+  margin: 0;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.walk-app__card-unit { margin: 0; font-size: 20px; line-height: 26px; font-weight: 700; }
+
+.walk-app__card-text { margin: 0 0 4px; color: var(--ink-2); }
+
+/* ── настройки: строки ─────────────────────────────────────────────────── */
+
+.walk-app__list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.walk-app__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 16px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.walk-app__row + .walk-app__row { border-top: 1px solid var(--line); }
+
+.walk-app__row.is-link { width: 100%; cursor: pointer; }
+
+.walk-app__row.is-link:active { background: var(--surface-2); }
+
+.walk-app__row--stack { flex-wrap: wrap; justify-content: space-between; }
+
+.walk-app__row-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+.walk-app__row-value {
+  flex: none;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.walk-app__chev { flex: none; color: var(--ink-3); font-size: 20px; }
+
+.walk-app__subtitle {
+  margin: 24px 0 8px;
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.walk-app__prose {
+  margin: 0 0 16px;
+  max-width: 62ch;
+  color: var(--ink-2);
+  white-space: pre-line;
+}
+
+.walk-app__note { margin: 8px 0; color: var(--ink-3); font-size: 14px; }
+
+/* ── команда подключения: выделяется целиком, переносится внутри ─────── */
+
+.walk-app__code {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow: auto;
+  user-select: all;
+}
+
+.walk-app__add { display: flex; gap: 8px; margin-top: 12px; }
+
+.walk-app__add .walk-input { flex: 1; min-width: 0; }
+
+/* ── обход: «‹» к главной в шапке ──────────────────────────────────────── */
+
+.walk-top__home {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.walk-top__home:active { background: var(--surface-2); }
+
+.walk-app__card .walk-mark { margin-top: 4px; }
