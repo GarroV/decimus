@@ -538,7 +538,8 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             selection=selection,
             select_url=отбор,
             registry_url=в_реестр,
-            country_url=в_страну,
+            # Партнёру «Страна» закрыта (D371): его клики ведут в проверки и точки.
+            country_url=в_страну if auth.current_tenant() == HQ_TENANT else None,
             periods=tuple(overview_data.PERIODS),
             item_titles=_item_titles(conf, _lang(conf)),
             # Идентификаторы точек нужны таблице, чтобы строка вела в карточку

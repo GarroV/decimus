@@ -68,7 +68,8 @@ SECTIONS: tuple[Section, ...] = (
     # Предписания партнёра (волна 3, D266): пришедшие предписания, срок,
     # статус и ответ. У УК для них вкладка в «Действиях» (D264).
     Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
-    Section(key="country", path="/country", built=True, icon="globe"),
+    # «Страна» — только УК (D371, пробно): партнёру хватает своих проверок.
+    Section(key="country", path="/country", built=True, hq_only=True, icon="globe"),
     # Рейтинги РС/РКО (спека 2026-10-08): видят все — УК и любой партнёр
     # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
     # (`src/web/ratings.py`), не флаг раздела.
@@ -178,6 +179,9 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
         for item in SECTIONS
         if (админ or not item.admin_only)
         and (уК or not item.hq_only)
+        # Партнёру заглушки «в разработке» не показываем (D371): его меню —
+        # только то, чем он работает.
+        and (уК or item.built)
         and not (уК and item.partner_only)
     )
 
