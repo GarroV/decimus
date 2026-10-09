@@ -63,7 +63,11 @@ def install(app: Flask) -> None:
             values[VERSION_ARG] = digest
 
     def _max_age(filename: str | None) -> int | None:
-        if request.args.get(VERSION_ARG):
+        # Год — только когда отпечаток в адресе совпадает с содержимым. Во время
+        # выкладки страница новой версии может получить файл от старой копии;
+        # закешированный на год, он навсегда подменил бы стили под новым адресом.
+        asked = request.args.get(VERSION_ARG)
+        if asked and filename and asked == fingerprint(static_dir, filename):
             return IMMUTABLE_MAX_AGE
         if filename and filename.startswith(FONTS_DIR):
             return FONT_MAX_AGE
