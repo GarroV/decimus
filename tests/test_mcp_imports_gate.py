@@ -119,3 +119,32 @@ def test_подпись_личного_токена_по_телеграму(
 
     # Assert
     assert (доступ.tenant, доступ.actor) == ("HQ", "mcp:tg:4242")
+
+
+# --- D335: загрузка задним числом только у УК, держит код ----------------------
+
+
+@pytest.mark.parametrize("названо", ["GE", "HQ,GE", "default,RS", "hq"])
+def test_загрузка_не_HQ_отказ_на_старте(tmp_path: Path, названо: str) -> None:
+    with pytest.raises(McpConfigError, match="только УК"):
+        load_settings(_env(tmp_path, MCP_IMPORT_TENANTS=названо))
+
+
+def test_старый_код_УК_переводится_и_открывает_загрузку(tmp_path: Path) -> None:
+    настройки = load_settings(_env(tmp_path, MCP_IMPORT_TENANTS="default"))
+    assert настройки.import_tenants == ("HQ",)
+    assert настройки.may_import("HQ") and настройки.may_import("default")
+
+
+def test_пустая_переменная_выключатель_загрузки(tmp_path: Path) -> None:
+    настройки = load_settings(_env(tmp_path, MCP_IMPORT_TENANTS=" , "))
+    assert настройки.import_tenants == ()
+    assert not настройки.may_import("HQ")
+
+
+def test_методика_по_старому_коду_УК(tmp_path: Path) -> None:
+    """`may_manage_checklist` переводит код, как `may_import` (D335)."""
+    настройки = load_settings(_env(tmp_path))
+    assert настройки.may_manage_checklist("HQ")
+    assert настройки.may_manage_checklist("default")
+    assert not настройки.may_manage_checklist("GE")
