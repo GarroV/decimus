@@ -150,6 +150,12 @@ def _записи(база: dict[str, list[Any]]) -> dict[str, list[Any]]:
 }
 
 
+def добавление(client: FlaskClient) -> str:
+    """Форма «Новый человек» — в правой колонке экрана по `?add=1`."""
+    страница = client.get("/users?add=1").get_data(as_text=True)
+    return страница.split('action="/users/add')[1].split("</form>")[0]
+
+
 # --- главный админ ------------------------------------------------------------
 
 
@@ -158,9 +164,11 @@ def test_главный_админ_видит_всех_и_пространств
 
     for r in ПЕРЕЧЕНЬ:
         assert r.login in страница and r.email in страница, r.login
-    assert 'action="/users/spaces/add' in страница
-    assert 'action="/users/spaces/countries' in страница
-    форма = страница.split('action="/users/add')[1].split("</form>")[0]
+    пространства = главный.get("/users?tab=spaces").get_data(as_text=True)
+    assert 'action="/users/spaces/countries' in пространства
+    новое = главный.get("/users?tab=spaces&add_space=1").get_data(as_text=True)
+    assert 'action="/users/spaces/add' in новое
+    форма = добавление(главный)
     assert 'value="superadmin"' in форма and 'value="admin"' in форма
 
 
@@ -230,7 +238,7 @@ def test_админ_уК_видит_без_админов_уК(админ_уК: 
         assert свой in страница and f"{свой}@mail.example" in страница, свой
     for чужое in ("boss2", "boss2@mail.example", "kostya@mail.example"):
         assert чужое not in страница, чужое
-    форма = страница.split('action="/users/add')[1].split("</form>")[0]
+    форма = добавление(админ_уК)
     assert 'value="superadmin"' not in форма
 
 
@@ -321,9 +329,11 @@ def test_админ_партнёра_видит_только_своё_прост
         assert f"{чужое}@mail.example" not in страница, чужое
     assert база["everyone"] == ["GE"]
     # Свои страны — на чтение: формы пространств нет, чужого пространства нет.
-    assert 'action="/users/spaces' not in страница
-    assert "Партнёр Г" in страница and "Партнёр А" not in страница
-    форма = страница.split('action="/users/add')[1].split("</form>")[0]
+    своё = админ_GE.get("/users?tab=spaces").get_data(as_text=True)
+    for вид in (страница, своё):
+        assert 'action="/users/spaces' not in вид
+    assert "Партнёр Г" in своё and "Партнёр А" not in своё
+    форма = добавление(админ_GE)
     assert 'value="GE"' in форма
     for лишнее in ('value="HQ"', 'value="AM"', 'value="control"', 'value="superadmin"'):
         assert лишнее not in форма, лишнее
@@ -454,6 +464,7 @@ def test_тексты_экрана_есть_по_английски(
     with собрать(tenant="HQ", ui_lang="en").test_client() as client:
         войти(client)
         страница = client.get("/users?lang=en").get_data(as_text=True)
+        страница += client.get("/users?lang=en&tab=spaces").get_data(as_text=True)
 
-    for текст in ("Partner spaces", "Super admin", "Add countries", "You are a super admin"):
+    for текст in ("Partner spaces", "Super admin", "Add countries", "Every space"):
         assert текст in страница, текст

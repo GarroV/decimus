@@ -1,0 +1,34 @@
+{#
+  Каркас «слева список, справа выбранное» — один на все экраны с этой
+  раскладкой («Пользователи», «Проверки»). Образец — Swarm Brain (раздел
+  интеграций `ConnectorsSection.tsx` и правая панель задач; решение владельца
+  30.09.2026: «слева список, справа настройки»).
+
+  Выбор живёт в адресе, поэтому раскладка работает без скриптов: ссылка строки
+  открывает выбранное справа, перезагрузка его не теряет. Скрипт `split.js`
+  только добавляет Esc («назад к списку» на телефоне) и фокус.
+
+  Что передаёт экран:
+    split_open — выбор сделан ЯВНО (адресом или действием). На телефоне тогда
+                 показывается только правая колонка с «Назад», иначе — список;
+    split_back — куда ведёт «Назад» (тот же экран без выбора).
+  Слоты: `split_top` (шапка экрана), `split_list`, `split_detail`.
+#}{% extends "base.html" %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  {% block split_assets %}{% endblock %}
+  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+{% endblock %}
+{% block page_class %} page--split{% endblock %}
+{% block body %}
+  {% block split_top %}{% endblock %}
+  <div class="split{% if split_open %} split--open{% endif %}">
+    <section class="split__list">{% block split_list %}{% endblock %}</section>
+    <aside class="split__detail" id="detail" aria-live="polite">
+      {% if split_back %}
+        <a class="split__back" href="{{ split_back }}" data-split-back>{{ icon('cleft') }}<span>{{ t('split.back') }}</span></a>
+      {% endif %}
+      {% block split_detail %}{% endblock %}
+    </aside>
+  </div>
+{% endblock %}

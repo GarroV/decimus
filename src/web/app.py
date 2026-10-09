@@ -57,6 +57,7 @@ from . import (
     security_headers,
     unit_add,
     users_screen,
+    users_view,
     view,
     walk_proxy,
 )
@@ -204,6 +205,11 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # через заслон, а не спрашивается у базы второй раз.
             "account": account,
             "logout_path": auth.LOGOUT_PATH,
+            # Роль словами — как должность; у партнёра свои названия (D346).
+            "role_key": users_view.role_key,
+            "hint_key": users_view.hint_key,
+            # Своя карточка — на экране «Пользователи», меню учётки ведёт туда.
+            "my_card_url": f"{request.script_root}{section('users').path}?person=me&lang={lang}",
         }
 
 
