@@ -43,7 +43,8 @@
 {%- endmacro %}
 {% macro ranked(units, kind, side) %}
   <ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}<li>
-    <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}</small></span>
+    {% set m = unit_maps.get(u.unit) %}
+    <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}{% if m %} · <span class="rt-rank__map" title="{{ t('ratings.maps.unit_title', n=m[1]) }}">Google {{ '%.1f'|format(m[0]) }}</span>{% endif %}</small></span>
     <span class="rt-rank__score">{{ num(u.score) }}</span>
   </li>{% endfor %}</ol>
 {% endmacro %}
