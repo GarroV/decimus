@@ -53,6 +53,13 @@ _SCREEN: dict[str, dict[str, str]] = {
     },
     "ratings.col.country": {"ru": "Страна", "en": "Country"},
     "ratings.col.delta": {"ru": "Δ к {prev}", "en": "Δ vs {prev}"},
+    "ratings.legend.now": {
+        "ru": "оценка за {period}: зелёная — выросла, красная — упала",
+        "en": "score for {period}: green — up, red — down",
+    },
+    "ratings.legend.prev": {"ru": "оценка за {prev}", "en": "score for {prev}"},
+    "ratings.legend.move": {"ru": "сдвиг за период", "en": "change over the period"},
+    "ratings.legend.thr": {"ru": "порог Top/Bottom — {x}", "en": "top/bottom threshold — {x}"},
     "ratings.total": {"ru": "Итого", "en": "Total"},
     "ratings.block.rko_violations": {"ru": "Нарушения РКО", "en": "Customer experience violations"},
     "ratings.block.rs_violations": {"ru": "Нарушения РС", "en": "Standards violations"},

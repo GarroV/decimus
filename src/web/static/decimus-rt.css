@@ -159,6 +159,15 @@
 .rt-track--down .rt-track__dot, .rt-track--down .rt-track__trail { background: var(--err); }
 .rt-board__row:hover .rt-track__dot { transform: scale(1.35); }
 .rt-board__row.is-total .rt-track__dot { width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; }
+.rt-legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); margin: 0 0 var(--space-2); color: var(--ink-3); font-size: 13px; }
+.rt-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.rt-legend i { display: inline-block; flex: none; }
+.rt-legend__dot { width: 9px; height: 9px; border-radius: 50%; }
+.rt-legend__dot--up { background: var(--ok); }
+.rt-legend__dot--down { background: var(--err); margin-left: -3px; }
+.rt-legend__ghost { width: 8px; height: 8px; border-radius: 50%; border: 1.5px solid var(--ink-3); }
+.rt-legend__trail { width: 18px; height: 4px; border-radius: 2px; background: var(--ink-3); opacity: .55; }
+.rt-legend__thr { height: 12px; border-left: 1px dashed var(--line-strong); }
 @keyframes rt-slide { from { left: var(--prev, var(--cur)); } }
 @keyframes rt-fade { from { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .rt-track__dot, .rt-track__trail { animation: none; } }
