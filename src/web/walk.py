@@ -33,6 +33,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, render_template, request
 
+from src.bot.config import BotSettings
 from src.db import queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
@@ -42,7 +43,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_access, walk_suggest, walk_write
+from . import walk_access, walk_settings, walk_suggest, walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -244,13 +245,25 @@ def info_fields(inspection: Inspection, lang: str) -> list[dict[str, Any]]:
     return out
 
 
-def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
-    """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`."""
+def walk_payload(
+    chat_id: int, *, fallback_lang: str, bot: BotSettings | None = None
+) -> dict[str, Any]:
+    """Всё, что отдаётся экрану по чату. Отказ чтения состояния — `STATE_FAILURES`.
+
+    Язык — как у бота (D303): выбор человека, затем язык начатой проверки,
+    затем язык стенда. `app` — что знают о человеке главная и настройки (D373).
+    """
     inspection = get_state(chat_id)
+    chosen = walk_settings.chosen_lang(chat_id) if bot is not None else None
     if inspection is None:
-        lang = fallback_lang
-        return {"state": "none", "lang": lang, "texts": texts_for(lang)}
-    lang = inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang
+        lang = chosen or fallback_lang
+        return {
+            "state": "none",
+            "lang": lang,
+            "texts": texts_for(lang),
+            "app": walk_settings.app_block(chat_id, lang, bot),
+        }
+    lang = chosen or (inspection.ui_lang if inspection.ui_lang in UI_LANGS else fallback_lang)
     items = list_items(chat_id=chat_id)
     questions = {item.code: item.question(lang) for item in items}
     payload = build_walk(
@@ -263,7 +276,7 @@ def walk_payload(chat_id: int, *, fallback_lang: str) -> dict[str, Any]:
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
-    return {**payload, "texts": texts_for(lang)}
+    return {**payload, "texts": texts_for(lang), "app": walk_settings.app_block(chat_id, lang, bot)}
 
 
 def init_data_of() -> str:
@@ -312,10 +325,12 @@ def identify(
     return chat_id
 
 
-def payload_response(chat_id: int, ui_lang: str) -> tuple[Response, int]:
+def payload_response(
+    chat_id: int, ui_lang: str, *, bot: BotSettings | None = None
+) -> tuple[Response, int]:
     """Свежие данные экрана — ответ на чтение и на каждую запись."""
     try:
-        ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang))
+        ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang, bot=bot))
     except STATE_FAILURES:
         logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
         return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
@@ -327,6 +342,12 @@ def payload_response(chat_id: int, ui_lang: str) -> tuple[Response, int]:
 def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -> None:
     """Повесить страницу, данные и запись обхода. Без настроек — адреса отвечают 404."""
     conf = settings or load_walk_settings()
+    # Настройки бота — только при живом токене: на стенде без бота ни круга
+    # MCP, ни выбора языка нет.
+    bot = walk_settings.bot_settings() if conf.bot_token is not None else None
+
+    def respond(chat_id: int, lang: str) -> tuple[Response, int]:
+        return payload_response(chat_id, lang, bot=bot)
 
     @app.get(PAGE_PATH, endpoint=PAGE_ENDPOINT)
     def walk_page() -> Response | tuple[str, int]:
@@ -339,7 +360,10 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
         who = identify(conf, ui_lang)
         if not isinstance(who, int):
             return who
-        return payload_response(who, ui_lang)
+        return respond(who, ui_lang)
 
-    walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=payload_response)
+    walk_write.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond)
+    walk_settings.install(
+        app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot
+    )
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
