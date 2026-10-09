@@ -48,6 +48,7 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "Average standards and customer experience",
     },
     "ratings.group.cluster": {"ru": "Кластер", "en": "Cluster"},
+    "ratings.more": {"ru": "ещё {n}", "en": "{n} more"},
     "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
     "ratings.cluster.OTHER": {"ru": "Другие страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},

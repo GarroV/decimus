@@ -16,13 +16,13 @@ from datetime import date
 from src.ratings.summary import Candle
 
 WIDTH = 240.0
-HEIGHT = 64.0
+HEIGHT = 80.0
 TOP_PAD = 4.0
 BOTTOM_PAD = 4.0
 BODY_SHARE = 0.56  # ширина тела свечи от шага месяца
 MIN_BODY = 1.5  # плоская свеча всё равно видна черточкой
 SCALE_TOP = 100.0
-SCALE_STEP = 5  # нижний край шкалы — кратно пяти
+MIN_SPAN = 4  # самая узкая шкала, баллы: меньше — шум выглядит обвалом
 SCALE_MARGIN = 1.0
 MONTHS = {
     "ru": ("янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"),
@@ -56,19 +56,19 @@ def month_label(month: date, lang: str) -> str:
 
 
 def scale(series: Sequence[Sequence[Candle | None]], threshold: float) -> Scale:
-    """Общая шкала для строк одного вида рейтинга: от кратного пяти ниже
-    наименьшего до 100."""
-    lows = [c.low for s in series for c in s if c is not None]
-    if not lows:
-        return Scale(SCALE_TOP - 10, SCALE_TOP, None, ())
-    low = float(
-        min(
-            math.floor((min(lows) - SCALE_MARGIN) / SCALE_STEP) * SCALE_STEP, SCALE_TOP - SCALE_STEP
-        )
-    )
-    result = Scale(low, SCALE_TOP, None, ())
-    ticks = tuple((f"{v:g}", y(result, v)) for v in (low, SCALE_TOP))
-    thr = y(result, threshold) if low < threshold < SCALE_TOP else None
+    """Общая шкала для строк одного вида рейтинга — по самим данным: от целого
+    ниже наименьшего до целого выше наибольшего, не уже `MIN_SPAN` и не выше 100.
+    Шкала от 70 до 100 сплющивала свечи в черту: оценки группы ходят в паре баллов."""
+    values = [v for s in series for c in s if c is not None for v in (c.low, c.high)]
+    if not values:
+        return Scale(SCALE_TOP - MIN_SPAN, SCALE_TOP, None, ())
+    high = min(math.ceil(max(values) + SCALE_MARGIN), SCALE_TOP)
+    low = math.floor(min(values) - SCALE_MARGIN)
+    if high - low < MIN_SPAN:
+        low = high - MIN_SPAN
+    result = Scale(float(low), float(high), None, ())
+    ticks = ((f"{high:g}", y(result, high)), (f"{low:g}", y(result, low)))
+    thr = y(result, threshold) if low < threshold < high else None
     return Scale(result.low, result.high, thr, ticks)
 
 

@@ -42,11 +42,15 @@
   {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}
 {%- endmacro %}
 {% macro ranked(units, kind, side) %}
-  <ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}<li>
+  <ol class="rt-rank rt-rank--{{ side }}">{% for u in units[:5] %}{{ rank_item(u, kind, loop.index) }}{% endfor %}</ol>
+  {% if units|length > 5 %}<details class="rt-more"><summary>{{ t('ratings.more', n=units|length - 5) }}</summary>
+  <ol class="rt-rank rt-rank--{{ side }}" start="6">{% for u in units[5:] %}{{ rank_item(u, kind, loop.index + 5) }}{% endfor %}</ol></details>{% endif %}
+{% endmacro %}
+{% macro rank_item(u, kind, n) %}<li>
     {% set m = unit_maps.get(u.unit) %}
     <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}{% if m %} · <span class="rt-rank__map" title="{{ t('ratings.maps.unit_title', n=m[1]) }}">Google {{ '%.1f'|format(m[0]) }}</span>{% endif %}</small></span>
     <span class="rt-rank__score">{{ num(u.score) }}</span>
-  </li>{% endfor %}</ol>
+  </li>
 {% endmacro %}
 
 {% block body %}
@@ -149,13 +153,14 @@
       {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}
       <div role="cell">
         <div class="rt-cl__kpi"><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
+        <div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ k.scale.high|int }}</i><i>{{ k.scale.low|int }}</i></span>
         <svg class="rt-candles" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.candle.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
           {% if k.scale.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ k.scale.threshold_y }}" y2="{{ k.scale.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
           {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}"><title>{{ c.title }}</title>
             <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.wick_top }}" y2="{{ c.wick_bottom }}" vector-effect="non-scaling-stroke"/>
             <rect x="{{ c.x - c.width / 2 }}" y="{{ c.body_top }}" width="{{ c.width }}" height="{{ c.body_height }}" rx="1"/></g>{% endfor %}
-        </svg>
-        <div class="rt-cl__axis" aria-hidden="true"><span>{{ chart.months[0] }}</span><span>{{ k.scale.low|int }}–100</span><span>{{ chart.months[-1] }}</span></div>
+        </svg></div>
+        <div class="rt-cl__axis" aria-hidden="true"><span>{{ chart.months[0] }}</span><span>{{ chart.months[-1] }}</span></div>
       </div>
       {% endfor %}
       {% endfor %}
