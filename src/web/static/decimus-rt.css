@@ -344,3 +344,10 @@
 a.rt-cal__cell:hover { background: var(--accent-soft); color: var(--accent); text-decoration: none; }
 .rt-cal__cell[aria-disabled="true"] { color: var(--ink-3); opacity: .45; }
 .rt-cal__cell[aria-current="true"] { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent-line); font-weight: var(--w-semibold); }
+
+/* Компоновка страницы на «Загрузках» (D368). */
+.rt-layout { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); }
+.rt-layout__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
+.rt-layout__row:last-child { border-bottom: 0; }
+.rt-layout__name { display: flex; align-items: center; gap: var(--space-2); }
+.rt-layout__moves { display: flex; gap: var(--space-1); }

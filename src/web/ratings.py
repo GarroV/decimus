@@ -23,6 +23,7 @@ from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import may_manage_ratings
+from src.ratings import layout as rl
 from src.ratings import report
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
@@ -93,6 +94,29 @@ def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str)
     return period.key
 
 
+def _layout() -> tuple[rl.Block, ...]:
+    """Компоновка из базы (D368). База не ответила — порядок по умолчанию и след
+    в журнале: страница рейтингов не должна падать из-за расстановки блоков."""
+    try:
+        return rl.arrange(read.layout_rows())
+    except RatingsError:
+        logger.warning("Компоновка рейтингов не прочиталась — порядок по умолчанию", exc_info=True)
+        return rl.arrange(())
+
+
+def _layout_from_form() -> tuple[rl.Block, ...]:
+    """Порядок — скрытые поля `order`, видимость — галочки `show`, сдвиг — кнопка
+    `move` вида `<блок>:-1|1`. Незнакомое отбрасывает `arrange`."""
+    form = request.form
+    shown = set(form.getlist("show"))
+    blocks = tuple(
+        rl.Block(b.key, b.key in shown)
+        for b in rl.arrange((key, i, True) for i, key in enumerate(form.getlist("order")))
+    )
+    key, _, step = (form.get("move") or "").partition(":")
+    return rl.moved(blocks, key, 1 if step == "1" else -1) if step in ("1", "-1") else blocks
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
@@ -112,6 +136,7 @@ def render_summary(conf: Settings) -> str:
     )
     return render_template(
         "ratings/index.html",
+        blocks=tuple(b.key for b in _layout() if b.visible),
         board=board,
         summary=summary,
         choices=found,
@@ -141,6 +166,7 @@ def render_imports(conf: Settings, *, notice: str | None = None, failure: str | 
         issues=read.open_issues(),
         countries=countries,
         rules=read.hard_rules(),
+        layout=_layout(),
         settings=read.settings(),
         max_mb=UPLOAD_MAX_BYTES // _MB,
         ratings_path=section("ratings").path,
@@ -276,6 +302,18 @@ def install(app: Flask, conf: Settings) -> None:
             return _forbidden()
         refuse_foreign_origin()
         return _saved(conf, lambda: read.remove_hard_rule(rule_id))
+
+    @app.post(f"{путь}/layout")
+    def ratings_layout() -> tuple[str, int]:
+        """Компоновка страницы (D368, D370) — тот же круг, что ведёт рейтинги."""
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        blocks = _layout_from_form()
+        return _saved(
+            conf,
+            lambda: read.save_layout([(b.key, b.visible) for b in blocks], actor=_actor()),
+        )
 
     @app.post(f"{путь}/settings")
     def ratings_settings() -> tuple[str, int]:
