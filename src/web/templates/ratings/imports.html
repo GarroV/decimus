@@ -34,6 +34,28 @@
     </div></div>
   </section>
 
+  {#- Компоновка страницы (D368, D370): видимость и порядок готовых блоков. -#}
+  <section class="rt-sec" aria-labelledby="rt-layout">
+    {{ sec_head('rt-layout', 'ratings.layout', t('ratings.layout.hint')) }}
+    <div class="rt-card"><div class="rt-card__body">
+      <form method="post" action="{{ action('/layout') }}">
+        <ol class="rt-layout">
+          {% for b in layout %}
+          <li class="rt-layout__row">
+            <input type="hidden" name="order" value="{{ b.key }}">
+            <label class="rt-layout__name"><input type="checkbox" name="show" value="{{ b.key }}"{% if b.visible %} checked{% endif %}> {{ t('ratings.layout.' ~ b.key) }}</label>
+            <span class="rt-layout__moves">
+              <button class="btn btn--sm" type="submit" name="move" value="{{ b.key }}:-1"{% if loop.first %} disabled{% endif %} aria-label="{{ t('ratings.layout.up', name=t('ratings.layout.' ~ b.key)) }}">↑</button>
+              <button class="btn btn--sm" type="submit" name="move" value="{{ b.key }}:1"{% if loop.last %} disabled{% endif %} aria-label="{{ t('ratings.layout.down', name=t('ratings.layout.' ~ b.key)) }}">↓</button>
+            </span>
+          </li>
+          {% endfor %}
+        </ol>
+        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.layout.save') }}</button>
+      </form>
+    </div></div>
+  </section>
+
   <section class="rt-sec" aria-labelledby="rt-journal">
     {{ sec_head('rt-journal', 'ratings.journal') }}
     {% if journal %}

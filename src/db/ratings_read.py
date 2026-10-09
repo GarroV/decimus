@@ -336,3 +336,27 @@ def set_setting(key: str, value: float, *, actor: str) -> None:
     )
     if changed == 0:
         raise RatingsEditError(f"Настройки «{key}» нет", REFUSED_SETTING_UNKNOWN, key=key)
+
+
+def layout_rows() -> tuple[tuple[str, int, bool], ...]:
+    """Компоновка страницы (D368): код блока, место, виден ли."""
+    return tuple(
+        (str(r[0]), int(r[1]), bool(r[2]))
+        for r in _rows("select block, position, visible from ratings.layout")
+    )
+
+
+def save_layout(blocks: Sequence[tuple[str, bool]], *, actor: str) -> None:
+    """Записать порядок и видимость одним заходом: половина порядка не ложится."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+            for position, (block, visible) in enumerate(blocks):
+                conn.execute(
+                    "update ratings.layout set position = %s, visible = %s, "
+                    "updated_by = %s, updated_at = now() where block = %s",
+                    (position, visible, actor, block),
+                )
+    except psycopg.Error as exc:
+        raise RatingsEditError(
+            f"Компоновка не легла: база отказала ({exc.__class__.__name__})", REFUSED_DB
+        ) from exc
