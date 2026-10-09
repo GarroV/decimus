@@ -844,7 +844,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return _url("registry", **{к: з for к, з in параметры.items() if з})
 
         выбрано = request.args.get("inspection", "").strip()[:64]
-        панель = _registry_panel(выбрано, first=(registry_data.review + строки)[:1], conf=conf)
+        панель = _registry_panel(выбрано, conf=conf)
         return render_template(
             "inspections/list.html",
             registry=registry_data,
@@ -1346,37 +1346,31 @@ class _RegistryPanel:
     context: dict[str, Any] | None
     #: Выбор по адресу есть, а проверки в охвате нет (или её не видно).
     missing: bool
-    #: Выбор сделан явно (`?inspection=`): на телефоне тогда открыта карточка.
+    #: Выбор сделан явно (`?inspection=`): панель справа открыта.
     explicit: bool
     #: Карточка не прочиталась (база ответила отказом) — список при этом жив.
     failed: bool = False
 
 
-def _registry_panel(
-    chosen: str, *, first: tuple[InspectionRow, ...], conf: Settings
-) -> _RegistryPanel:
-    """Карточка справа: выбранная адресом, иначе первая строка списка.
+def _registry_panel(chosen: str, *, conf: Settings) -> _RegistryPanel:
+    """Карточка в панели справа — только по явному выбору адресом (`?inspection=`).
 
-    Без выбора открывается первая строка (очередь приёмки идёт первой), а не
-    пустая колонка: так экран сразу отвечает «что с последней проверкой».
-    Права и данные — та же `_card_context`, что у отдельной карточки.
-
-    Отказ базы на карточке не роняет список: реестр уже прочитан, и экран
-    честно говорит, что справа сейчас пусто по причине, а не «выберите». Стенд,
-    смотрящий не в ту базу (`DatabaseTargetError`), — не частичный сбой: он
-    уходит наверх и показывается страницей с названными базами.
+    Права и данные — та же `_card_context`, что у отдельной карточки. Отказ
+    базы на карточке не роняет список: реестр уже прочитан, и панель честно
+    говорит, что карточка не открылась. Стенд, смотрящий не в ту базу
+    (`DatabaseTargetError`), — не частичный сбой: он уходит наверх и
+    показывается страницей с названными базами.
     """
-    номер = chosen or (first[0].id if first else "")
-    if not номер:
+    if not chosen:
         return _RegistryPanel("", None, False, False)
     try:
-        контекст = _card_context(номер, conf=conf, notice=None, failure=None, compact=True)
+        контекст = _card_context(chosen, conf=conf, notice=None, failure=None, compact=True)
     except DatabaseTargetError:
         raise
     except DbError as exc:
-        logger.warning("карточка проверки %s в реестре не прочиталась: %s", номер, exc)
-        return _RegistryPanel(номер, None, False, bool(chosen), failed=True)
-    return _RegistryPanel(номер, контекст, bool(chosen) and контекст is None, bool(chosen))
+        logger.warning("карточка проверки %s в реестре не прочиталась: %s", chosen, exc)
+        return _RegistryPanel(chosen, None, False, True, failed=True)
+    return _RegistryPanel(chosen, контекст, контекст is None, True)
 
 
 def _registry_picks(

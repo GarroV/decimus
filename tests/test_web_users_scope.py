@@ -164,7 +164,7 @@ def test_главный_админ_видит_всех_и_пространств
 
     for r in ПЕРЕЧЕНЬ:
         assert r.login in страница and r.email in страница, r.login
-    пространства = главный.get("/users?tab=spaces").get_data(as_text=True)
+    пространства = главный.get("/users?tab=spaces&space_code=GE").get_data(as_text=True)
     assert 'action="/users/spaces/countries' in пространства
     новое = главный.get("/users?tab=spaces&add_space=1").get_data(as_text=True)
     assert 'action="/users/spaces/add' in новое
@@ -464,7 +464,7 @@ def test_тексты_экрана_есть_по_английски(
     with собрать(tenant="HQ", ui_lang="en").test_client() as client:
         войти(client)
         страница = client.get("/users?lang=en").get_data(as_text=True)
-        страница += client.get("/users?lang=en&tab=spaces").get_data(as_text=True)
+        страница += client.get("/users?lang=en&tab=spaces&space_code=GE").get_data(as_text=True)
 
     for текст in ("Partner spaces", "Super admin", "Add countries", "Every space"):
         assert текст in страница, текст

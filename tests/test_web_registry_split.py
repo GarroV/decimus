@@ -132,7 +132,7 @@ def test_выбранная_адресом_проверка_открыта_сп�
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    assert "split--open" in страница
+    assert "data-drawer" in страница
     assert 'id="inspection-title">Тбилиси-2<' in страница
     assert f'href="/inspections/{строка.id}?lang=ru"' in страница
 
@@ -176,3 +176,16 @@ def test_аудитор_не_видит_отклонения_справа(
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
     assert "/retract" not in страница and "#move" not in страница
+
+
+def test_без_выбора_панели_нет_и_карточка_не_читается(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Панель выезжает только по выбору: без него нет ни панели, ни запроса карточки."""
+    _ловушка(monkeypatch, rows=(шапка(),))
+    прочитано: list[str] = []
+    monkeypatch.setattr(data, "load_card", lambda i, **_: прочитано.append(i))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert "data-drawer" not in страница and прочитано == []
