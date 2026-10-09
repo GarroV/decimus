@@ -130,6 +130,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _install_hq_gate(app)
     _install_control_gate(app)
+    _install_methodology_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -1219,6 +1220,27 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/disable",
     )
     return path in own
+
+
+def _install_methodology_gate(app: Flask) -> None:
+    """Методику правят только админы (D344): любая запись в разделе «Методика» — 403.
+
+    Заслон `before_request`, а не проверка в каждом маршруте: у правящих
+    маршрутов `/admin/*` своей проверки роли нет, и новый закрыт с момента
+    появления. Читать методику по-прежнему могут все, кому открыт раздел.
+    """
+    methodology_path = section("admin").path
+
+    @app.before_request
+    def _методику_правят_админы() -> None:
+        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
+            return
+        путь = request.path
+        if путь != methodology_path and not путь.startswith(f"{methodology_path}/"):
+            return
+        вошедший = auth.current_account()
+        if вошедший is not None and not is_admin_role(вошедший.role):
+            abort(403)
 
 
 def _install_control_gate(app: Flask) -> None:
