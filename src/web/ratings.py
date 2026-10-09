@@ -119,11 +119,18 @@ def _layout_from_form() -> tuple[rl.Block, ...]:
     return rl.moved(blocks, key, 1 if step == "1" else -1) if step in ("1", "-1") else blocks
 
 
-def _maps(countries: tuple[str, ...]) -> tuple[rmaps.CountryMaps, ...] | None:
-    """Оценки на картах по странам среза. База не ответила — `None` и след в
-    журнале: блок скажет «нет данных», страница живёт."""
+def _maps(
+    countries: tuple[str, ...], until: date, before: date | None
+) -> tuple[rmaps.CountryMaps, ...] | None:
+    """Оценки на картах по странам среза на конец периода и изменение к концу
+    прошлого. База не ответила — `None` и след в журнале: блок скажет «нет
+    данных», страница живёт."""
     try:
-        return rmaps.summarize(maps_store.latest(countries), countries)
+        now = rmaps.summarize(maps_store.latest(countries, until=until), countries)
+        if before is None:
+            return now
+        was = rmaps.summarize(maps_store.latest(countries, until=before), countries)
+        return rmaps.with_delta(now, was)
     except RatingsError:
         logger.warning("Оценки карт не прочитались", exc_info=True)
         return None
@@ -149,7 +156,11 @@ def render_summary(conf: Settings) -> str:
     return render_template(
         "ratings/index.html",
         blocks=tuple(b.key for b in _layout() if b.visible),
-        maps=_maps(summary.countries),
+        maps=_maps(
+            summary.countries,
+            min(selection.period.end, date.today()),
+            summary.previous.end if summary.previous else None,
+        ),
         map_providers=rmaps.SHOWN_PROVIDERS,
         board=board,
         summary=summary,

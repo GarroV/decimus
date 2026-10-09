@@ -28,6 +28,7 @@ PAGE_SIZE = 100  # максимум API
 REQUEST_GAP_SEC = 1.1  # лимит Pointer — не чаще раза в секунду
 TIMEOUT_SEC = 30
 MAX_PAGES = 50  # предохранитель от бесконечной пагинации: 5000 филиалов
+HISTORY_WINDOW_DAYS = 30  # Pointer: «период не должен превышать 31 день»
 
 #: Карты, которые показываем. Остальные провайдеры (Tripadvisor, 2ГИС и т. д.)
 #: хранятся, но на страницу не выходят.
@@ -182,3 +183,27 @@ def companies(fetch: Fetch) -> tuple[Company, ...]:
     if skipped:
         logger.warning("Pointer: пропущено филиалов без идентификатора или имени: %d", skipped)
     return tuple(found.values())
+
+
+def history(fetch: Fetch, company_uuid: str, start: date, end: date) -> tuple[Rating, ...]:
+    """Оценки филиала по дням за окно `start..end` (не длиннее 31 дня).
+
+    Ответ: `items[] = {date, ratings[{provider_id, avg_rating, ratings_count}]}`.
+    Кривой день или кривая оценка отбрасываются, как и в списке филиалов.
+    """
+    body = fetch(
+        f"/companies/{company_uuid}/ratings?date_from={start.isoformat()}&date_to={end.isoformat()}"
+    )
+    days = body.get("items")
+    if not isinstance(days, list):
+        raise PointerError("В истории оценок нет списка items")
+    found: list[Rating] = []
+    for day in days:
+        if not isinstance(day, dict) or not isinstance(day.get("ratings"), list):
+            continue
+        for raw in day["ratings"]:
+            if isinstance(raw, dict):
+                rating = _rating({**raw, "date": day.get("date")})
+                if rating is not None:
+                    found.append(rating)
+    return tuple(found)
