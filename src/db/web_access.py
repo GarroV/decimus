@@ -47,6 +47,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .config import check_environment
 from .database_target import managing_dsn, same_database_or_deny
 from .errors import AccessError, EmailTakenError
@@ -125,10 +127,14 @@ _LIST_USERS_SQL = """
 
 _LIST_SPACES_SQL = "select code from tenants order by code"
 
+#: `roles` — охват правящего по роли ЦЕЛИ (#585): условие в самом запросе, а не
+#: только в маршруте. Цель, ставшая админом между чтением перечня и записью,
+#: не правится тем, кому админы вне охвата. `null` — без ограничения.
 _DISABLE_USER_SQL = """
     update web_users
        set disabled_at = now()
-     where tenant_code = %s and login = %s and disabled_at is null
+     where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+       and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
 """
 
 #: Прежняя роль читается той же командой, что пишет новую: строка запирается
@@ -137,11 +143,12 @@ _SET_ROLE_SQL = """
     with прежняя as (
         select id, role
           from web_users
-         where tenant_code = %s and login = %s and disabled_at is null
+         where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+           and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
            for update
     )
     update web_users u
-       set role = %s
+       set role = %(role)s
       from прежняя
      where u.id = прежняя.id
  returning прежняя.role
@@ -183,11 +190,12 @@ _SET_EMAIL_SQL = """
     with прежняя as (
         select id, email
           from web_users
-         where tenant_code = %s and login = %s and disabled_at is null
+         where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+           and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
            for update
     )
     update web_users u
-       set email = %s
+       set email = %(email)s
       from прежняя
      where u.id = прежняя.id
  returning u.id, прежняя.email is distinct from u.email
@@ -230,7 +238,40 @@ _CLOSE_SESSION_SQL = """
 #: ней до первой записи.
 ROLE_AUDITOR = "auditor"
 ROLE_ADMIN = "admin"
-ROLES = (ROLE_AUDITOR, ROLE_ADMIN)
+#: Контроль УК (D319): рейтинги — загрузка и справочники. Только в HQ (`0040`).
+ROLE_CONTROL = "control"
+#: Главный админ (D364): всё по проекту. Только в HQ; последнего действующего
+#: отключить или понизить не даёт база (`0041`, триггер на `web_users`).
+ROLE_SUPERADMIN = "superadmin"
+ROLES = (ROLE_AUDITOR, ROLE_ADMIN, ROLE_CONTROL, ROLE_SUPERADMIN)
+#: Роли, которые бывают только в пространстве УК (`0040`, `0041`).
+HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN)
+
+
+#: Код отказа триггера `keep_last_superadmin` (`0041`): последнего действующего
+#: главного админа отключить или понизить нельзя.
+LAST_SUPERADMIN_SQLSTATE = "DC001"
+
+
+class LastSuperadminError(AccessError):
+    """Отказ базы: правка сняла бы последнего действующего главного админа (D364).
+
+    Отдельным классом: это ответ по существу («назначьте сначала другого»), а
+    не сбой, и экран говорит его словами, а не «база недоступна».
+    """
+
+
+@contextmanager
+def _guarding_last_superadmin() -> Iterator[None]:
+    """Перевести отказ триггера `0041` в `LastSuperadminError`; остальное — как было."""
+    try:
+        yield
+    except psycopg.Error as exc:
+        if exc.sqlstate == LAST_SUPERADMIN_SQLSTATE:
+            raise LastSuperadminError(
+                "Это последний действующий главный админ: сначала назначьте другого"
+            ) from exc
+        raise
 
 
 @dataclass(frozen=True)
@@ -422,9 +463,22 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
-def _checked_role(role: str) -> str:
+def roles_for(tenant: str) -> tuple[str, ...]:
+    """Роли, которые бывают в пространстве: «контроль» и главный админ — только в УК.
+
+    У партнёра две роли (D346): админ пространства (`admin`) и сотрудник
+    (`auditor`).
+    """
+    if canonical_tenant(tenant) == HQ_TENANT:
+        return ROLES
+    return tuple(role for role in ROLES if role not in HQ_ONLY_ROLES)
+
+
+def _checked_role(role: str, *, tenant: str) -> str:
     if role not in ROLES:
         raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
+    if role not in roles_for(tenant):
+        raise AccessError(f"Роль «{role}» бывает только в пространстве УК (HQ)")
     return role
 
 
@@ -484,7 +538,7 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
     # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
     # бы админов молча.
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant=tenant)
     хеш = password_hash(_checked_password(password))
     _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
@@ -529,14 +583,27 @@ def list_spaces() -> tuple[str, ...]:
         return tuple(str(r[0]) for r in cur.fetchall())
 
 
-def disable_account(login: str, *, tenant: str) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет. Роль владельца схемы.
+def _roles_param(only_roles: tuple[str, ...] | None) -> list[str] | None:
+    return None if only_roles is None else list(only_roles)
+
+
+def disable_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Отключить учётку. `False` — такой живой учётки нет (или её роль вне `only_roles`).
 
     Действует немедленно и на уже открытые сессии: опознание сверяет учётку
     вместе с сессией на каждом запросе, а не запоминает её при входе.
+    Последнего главного админа не отключает — `LastSuperadminError` (`0041`).
     """
     with _managing("отключить учётку") as conn, conn.cursor() as cur:
-        cur.execute(_DISABLE_USER_SQL, (tenant, login.strip().lower()))
+        with _guarding_last_superadmin():
+            cur.execute(
+                _DISABLE_USER_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "roles": _roles_param(only_roles),
+                },
+            )
         return cur.rowcount > 0
 
 
@@ -551,15 +618,28 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     return reassign_role(login, tenant=tenant, role=role) is not None
 
 
-def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
+def reassign_role(
+    login: str, *, tenant: str, role: str, only_roles: tuple[str, ...] | None = None
+) -> str | None:
     """Назначить роль живой учётке и вернуть ПРЕЖНЮЮ. `None` — такой живой учётки нет.
 
     Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
     экран правит роли, а таблицы истории ролей нет и не заводится.
+    `only_roles` — нынешняя роль цели обязана быть из них (охват правящего);
+    иначе `None`. Последнего главного админа не понижает — `LastSuperadminError`.
     """
-    роль = _checked_role(role)
+    роль = _checked_role(role, tenant=tenant)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
-        cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
+        with _guarding_last_superadmin():
+            cur.execute(
+                _SET_ROLE_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "role": роль,
+                    "roles": _roles_param(only_roles),
+                },
+            )
         строка = cur.fetchone()
     return None if строка is None else str(строка[0])
 
@@ -644,7 +724,9 @@ def normalize_email(email: str) -> str:
     return приведённая
 
 
-def set_email(login: str, *, tenant: str, email: str | None) -> bool:
+def set_email(
+    login: str, *, tenant: str, email: str | None, only_roles: tuple[str, ...] | None = None
+) -> bool:
     """Привязать почту к живой учётке (или снять её, `None`). `False` — учётки нет.
 
     Снятие — не удаление учётки: человек остаётся и входит паролем. Это и есть
@@ -662,7 +744,15 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
     значение = None if email is None else normalize_email(email)
     with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
         try:
-            cur.execute(_SET_EMAIL_SQL, (tenant, login.strip().lower(), значение))
+            cur.execute(
+                _SET_EMAIL_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "email": значение,
+                    "roles": _roles_param(only_roles),
+                },
+            )
         except psycopg.errors.UniqueViolation as занято:
             # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
             # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку

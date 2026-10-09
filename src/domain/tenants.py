@@ -29,3 +29,33 @@ def may_add_units(tenant: str) -> bool:
     один и принадлежит УК (D284). Одно правило на бота и на веб-админку (#437).
     """
     return canonical_tenant(tenant) == HQ_TENANT
+
+
+#: Контролинг: видит и ведёт только раздел «Рейтинги» (D319, D358).
+CONTROL_ROLE = "control"
+
+#: Главный админ (D362, D364): всё по проекту, включая назначение других
+#: главных админов. Только в УК (`0041`); последнего действующего снять нельзя —
+#: держит база, а не экран.
+SUPERADMIN_ROLE = "superadmin"
+
+#: Роли, которым открыто всё, что открыто админу: главный админ — админ и больше.
+ADMIN_ROLES = ("admin", SUPERADMIN_ROLE)
+
+
+def is_admin_role(role: str | None) -> bool:
+    """Админ или главный админ: всё, что открыто админу, открыто и главному."""
+    return role in ADMIN_ROLES
+
+
+#: Роли, которым открыта загрузка рейтингов и их справочники (D319).
+RATINGS_MANAGER_ROLES = (CONTROL_ROLE, *ADMIN_ROLES)
+
+
+def may_manage_ratings(role: str | None, tenant: str) -> bool:
+    """Загружать рейтинги и править их справочники — контроль и админ УК (D319).
+
+    Видеть рейтинги могут все (D327, «рейтинги видят все») — это решает не
+    эта функция, а отсутствие заслона на чтении.
+    """
+    return canonical_tenant(tenant) == HQ_TENANT and role in RATINGS_MANAGER_ROLES

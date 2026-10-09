@@ -28,6 +28,9 @@ from src.web.app import MoveError, RetractionError
     f"/inspections/{ЧУЖАЯ}/letter/save",
     f"/inspections/{ЧУЖАЯ}/letter/draft",
 ]
+#: Снятие и перенос партнёру закрыты целиком (D341): 403 ещё до чтения
+#: проверки, поэтому своя, чужая и несуществующая снаружи неразличимы.
+ЗАДНИМ_ЧИСЛОМ = (f"/inspections/{ЧУЖАЯ}/retract", f"/inspections/{ЧУЖАЯ}/move")
 ОХВАТ_GE = Reach("GE", None, ("GE",))
 
 
@@ -68,7 +71,7 @@ def двери(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, Any]]:
         ("get", f"/inspections/{ЧУЖАЯ}/photos/{КАДР}"),
         ("get", f"/inspections/{ЧУЖАЯ}/letter"),
     ]
-    + [("post", a) for a in ЗАПИСЬ],
+    + [("post", a) for a in ЗАПИСЬ if a not in ЗАДНИМ_ЧИСЛОМ],
 )
 def test_партнёру_чужая_проверка_не_найдена(
     двери: list[tuple[str, Any]], метод: str, адрес: str
@@ -82,6 +85,17 @@ def test_партнёру_чужая_проверка_не_найдена(
     for имя, чем in двери:
         assert чем in (ОХВАТ_GE, "GE"), (имя, чем)
     assert not [имя for имя, _ in двери if имя in ("retract_card", "move_card")]
+
+
+@pytest.mark.parametrize("адрес", ЗАДНИМ_ЧИСЛОМ)
+def test_партнёру_снятие_и_перенос_закрыты_до_чтения(
+    двери: list[tuple[str, Any]], адрес: str
+) -> None:
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        ответ = client.post(адрес, headers={"Origin": СВОЙ}, data={"reason": "x"})
+    assert ответ.status_code == 403, ответ.data[:300]
+    assert двери == [], "партнёру снятие и перенос закрыты до любой двери (D341)"
 
 
 def test_ответ_на_чужую_такой_же_как_на_несуществующую(двери: list[tuple[str, Any]]) -> None:

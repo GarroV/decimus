@@ -183,7 +183,7 @@ def test_refusal_without_code_is_shown_as_is() -> None:
 
 @pytest.fixture
 def клиент(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="admin")  # D344
     методика = tmp_path / "живая-методика"
     build_edition(методика, name="imf", day="2026-09-01")
     monkeypatch.setenv(method.STORE_VAR, str(tmp_path / "хранилище"))

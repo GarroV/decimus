@@ -22,7 +22,7 @@ from src.web import methodology as method
 
 @pytest.fixture
 def клиент(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="admin")  # D344
     методика = tmp_path / "живая-методика"
     build_edition(методика, name="imf", day="2026-09-01")
     monkeypatch.setenv(method.STORE_VAR, str(tmp_path / "хранилище"))

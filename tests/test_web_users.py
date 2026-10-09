@@ -36,6 +36,8 @@ def строка(login: str, *, role: str = "auditor", disabled: bool = False) -
         login=login,
         role=role,
         tenant=ТЕНАНТ,
+        id=f"id-{login}",
+        email=None,
         created_at=datetime(2026, 9, 1, tzinfo=UTC),
         disabled_at=datetime(2026, 9, 10, tzinfo=UTC) if disabled else None,
     )
@@ -150,7 +152,7 @@ def test_отключение_чужой_учётки_доходит_до_баз
     monkeypatch.setattr(accounts, "disable", _disable)
 
     ответ = стенд_админа.post(
-        "/users/disable", data={"login": "petr", "tenant": "GE"}, headers=СВОЙ
+        "/users/disable", data={"login": "petr", "tenant": ТЕНАНТ}, headers=СВОЙ
     )
 
     assert ответ.status_code == 200
@@ -160,12 +162,12 @@ def test_отключение_чужой_учётки_доходит_до_баз
 # --- пространства (волна 1, #340; D282, D286, D288) ------------------------
 
 
-def test_админ_партнёра_не_заводит_людей(monkeypatch: pytest.MonkeyPatch) -> None:
-    """D288: права админа партнёра не построены — вкладка ему ничего не открывает."""
+def test_сотрудник_партнёра_не_заводит_людей(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D346: сотрудник партнёра не администрирует. Админ партнёра — `test_web_users_scope.py`."""
     заведено: list[Any] = []
     monkeypatch.setattr(accounts, "add", lambda *a, **k: заведено.append(k))
     monkeypatch.setattr(accounts, "spaces", lambda: ("HQ", "GE"))
-    подменить_двери(monkeypatch, tenant="GE", role="admin")
+    подменить_двери(monkeypatch, tenant="GE", role="auditor")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
         ответ = client.post("/users/add", headers=СВОЙ, data={"login": "x", "tenant": "GE"})
@@ -227,7 +229,7 @@ def test_не_админ_видит_только_себя(monkeypatch: pytest.Mo
     monkeypatch.setattr(
         accounts, "everyone", lambda **k: pytest.fail("перечень людей отдан не-админу")
     )
-    подменить_двери(monkeypatch, tenant="GE", role="admin")
+    подменить_двери(monkeypatch, tenant="GE", role="auditor")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
         ответ = client.get("/users")

@@ -11,6 +11,8 @@
     <div class="ov-head__main">
       <h1 class="ov-head__title">{{ t('section.users.title') }}</h1>
       {% if manage %}<div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>{% endif %}
+      {% if scope_kind == 'control' %}<div class="ov-head__sub">{{ t('users.control.scope') }}</div>
+      {% elif scope_kind %}<div class="ov-head__sub">{{ t('users.scope.' ~ scope_kind) }}</div>{% endif %}
     </div>
   </div>
 
@@ -31,6 +33,10 @@
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.add.space_unknown') }}</div>
     </div>
+  {% elif outcome == 'add_role_space' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.add.role_space') }}</div>
+    </div>
   {% elif outcome == 'add_failed' %}
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.add.failed') }}</div>
@@ -46,6 +52,10 @@
   {% elif outcome == 'disable_self' %}
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.disable.self') }}</div>
+    </div>
+  {% elif outcome == 'disable_last_super' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.disable.last_super') }}</div>
     </div>
   {% elif outcome == 'disable_failed' %}
     <div class="note note--warn mt-gap">
@@ -173,7 +183,11 @@
 
 
   {# Список — первым: экран открывают посмотреть, у кого доступ, а заводят
-     человека реже. Отключённые остаются в списке приглушёнными. #}
+     человека реже. Отключённые остаются в списке приглушёнными.
+     Строки — только люди охвата вошедшего (#585, D364): отфильтрованы на
+     сервере, чужой логин и почта сюда не попадают. Роль-форма — где охват
+     позволяет сменить роль (контролю — никогда, себе — никогда); колонка бота —
+     главному админу и админу УК. #}
   {% if manage and people %}
     <div class="table-wrap mt-gap">
       <table class="table table--list">
@@ -184,7 +198,7 @@
             <th class="is-text">{{ t('users.col.role') }}</th>
             <th class="is-text">{{ t('users.col.state') }}</th>
             <th class="is-text">{{ t('users.col.email') }}</th>
-            <th class="is-text">{{ t('users.col.bot') }}</th>
+            {% if show_bindings %}<th class="is-text">{{ t('users.col.bot') }}</th>{% endif %}
             <th>{{ t('users.col.created') }}</th>
             <th></th>
           </tr>
@@ -195,12 +209,13 @@
               <td class="is-text">{{ человек.login }}</td>
               <td class="is-text mono">{{ человек.tenant }}</td>
               <td class="is-text">
-                {% if not человек.disabled_at and человек.login != account.login %}
+                {% set варианты = role_choices(человек) %}
+                {% if варианты %}
                   <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row users-inline">
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
-                      {% for код in roles %}
+                      {% for код in варианты %}
                         <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
                       {% endfor %}
                     </select>
@@ -231,6 +246,7 @@
                   {{ человек.email or '—' }}
                 {% endif %}
               </td>
+              {% if show_bindings %}
               <td class="is-text">
                 {% set привязка = bindings.get(человек.id) %}
                 {% if привязка %}
@@ -244,6 +260,7 @@
                   —
                 {% endif %}
               </td>
+              {% endif %}
               <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
                 {% if not человек.disabled_at and человек.login != account.login %}
@@ -281,7 +298,7 @@
       <label>
         <span class="field-label">{{ t('users.add.role') }}</span>
         <select class="input" name="role">
-          {% for код in roles %}
+          {% for код in add_roles %}
             <option value="{{ код }}">{{ t('users.role.' ~ код) }}</option>
           {% endfor %}
         </select>
@@ -289,6 +306,80 @@
       <button class="btn btn--primary" type="submit">{{ t('users.add.submit') }}</button>
     </form>
     <p class="field-note">{{ t('users.add.hint') }}</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {# Пространства партнёров (#585, D364) — на этом же экране: вопрос один,
+     «у кого какой доступ». Главный админ и админ УК заводят пространство со
+     странами и добавляют страны; админ партнёра видит своё на чтение. #}
+  {% if manages_spaces or scope_kind == 'partner_admin' %}
+  <section class="ov-card ov-card--wide mt-gap" id="spaces">
+    <div class="ov-card__head"><div class="ov-card__title">{{ t('users.spaces.title' if manages_spaces else 'users.spaces.own_title') }}</div></div>
+    <div class="card__body">
+      {% if space_outcome %}
+        <div class="note {{ 'note--warn' if space_outcome.endswith('_failed') else 'note--ok' }}">
+          <div class="note__text">{{ t('users.spaces.' ~ space_outcome) }}</div>
+        </div>
+      {% endif %}
+      {% if not partner_spaces_known %}
+        <div class="note note--warn"><div class="note__text">{{ t('users.spaces.unknown') }}</div></div>
+      {% elif not partner_spaces %}
+        <p class="field-note">{{ t('users.spaces.none') }}</p>
+      {% else %}
+        <div class="table-wrap">
+          <table class="table table--list">
+            <thead>
+              <tr>
+                <th class="is-text">{{ t('users.spaces.col.code') }}</th>
+                <th class="is-text">{{ t('users.spaces.col.name') }}</th>
+                <th class="is-text">{{ t('users.spaces.col.countries') }}</th>
+                <th class="is-num">{{ t('users.spaces.col.people') }}</th>
+                {% if manages_spaces %}<th class="is-text">{{ t('users.spaces.countries.add') }}</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for пр in partner_spaces %}
+                <tr>
+                  <td class="is-text mono">{{ пр.code }}</td>
+                  <td class="is-text">{{ пр.name or '—' }}</td>
+                  <td class="is-text mono">{{ пр.countries|join(', ') or '—' }}</td>
+                  <td class="is-num">{{ пр.people }}</td>
+                  {% if manages_spaces %}
+                  <td class="is-text">
+                    <form method="post" action="{{ url(users_path ~ '/spaces/countries') }}?lang={{ lang }}" class="row users-inline">
+                      <input type="hidden" name="code" value="{{ пр.code }}">
+                      <input class="input input--sm" name="countries" required autocomplete="off" spellcheck="false"
+                             aria-label="{{ t('users.spaces.countries.add') }}" placeholder="AM AZ">
+                      <button class="btn btn--sm" type="submit">{{ t('users.spaces.countries.submit') }}</button>
+                    </form>
+                  </td>
+                  {% endif %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+      {% if manages_spaces %}
+        <form method="post" action="{{ url(users_path ~ '/spaces/add') }}?lang={{ lang }}" class="row users-add mt-gap">
+          <label>
+            <span class="field-label">{{ t('users.spaces.add.code') }}</span>
+            <input class="input" name="code" required autocomplete="off" spellcheck="false"
+                   pattern="[A-Za-z][A-Za-z0-9_-]{1,31}" placeholder="GE">
+          </label>
+          <label class="grow">
+            <span class="field-label">{{ t('users.spaces.add.name') }}</span>
+            <input class="input" name="name" autocomplete="off">
+          </label>
+          <label class="grow">
+            <span class="field-label">{{ t('users.spaces.add.countries') }}</span>
+            <input class="input" name="countries" required autocomplete="off" spellcheck="false" placeholder="GE">
+          </label>
+          <button class="btn btn--primary" type="submit">{{ t('users.spaces.add.submit') }}</button>
+        </form>
+        <p class="field-note">{{ t('users.spaces.add.hint') }}</p>
+      {% endif %}
     </div>
   </section>
   {% endif %}
