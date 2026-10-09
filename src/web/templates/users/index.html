@@ -11,6 +11,7 @@
     <div class="ov-head__main">
       <h1 class="ov-head__title">{{ t('section.users.title') }}</h1>
       {% if manage %}<div class="ov-head__sub">{{ t('users.count', count=people|length) }}</div>{% endif %}
+      {% if manage and not manage_all %}<div class="ov-head__sub">{{ t('users.control.scope') }}</div>{% endif %}
     </div>
   </div>
 
@@ -30,6 +31,10 @@
   {% elif outcome == 'add_space_unknown' %}
     <div class="note note--warn mt-gap">
       <div class="note__text">{{ t('users.add.space_unknown') }}</div>
+    </div>
+  {% elif outcome == 'add_role_space' %}
+    <div class="note note--warn mt-gap">
+      <div class="note__text">{{ t('users.add.role_space') }}</div>
     </div>
   {% elif outcome == 'add_failed' %}
     <div class="note note--warn mt-gap">
@@ -173,7 +178,9 @@
 
 
   {# Список — первым: экран открывают посмотреть, у кого доступ, а заводят
-     человека реже. Отключённые остаются в списке приглушёнными. #}
+     человека реже. Отключённые остаются в списке приглушёнными.
+     «Контроль» (D360) видит здесь только людей контролинга: роль не меняет,
+     чужих привязок бота не видит — колонки роли-формы и бота только админу УК. #}
   {% if manage and people %}
     <div class="table-wrap mt-gap">
       <table class="table table--list">
@@ -184,7 +191,7 @@
             <th class="is-text">{{ t('users.col.role') }}</th>
             <th class="is-text">{{ t('users.col.state') }}</th>
             <th class="is-text">{{ t('users.col.email') }}</th>
-            <th class="is-text">{{ t('users.col.bot') }}</th>
+            {% if manage_all %}<th class="is-text">{{ t('users.col.bot') }}</th>{% endif %}
             <th>{{ t('users.col.created') }}</th>
             <th></th>
           </tr>
@@ -195,12 +202,12 @@
               <td class="is-text">{{ человек.login }}</td>
               <td class="is-text mono">{{ человек.tenant }}</td>
               <td class="is-text">
-                {% if not человек.disabled_at and человек.login != account.login %}
+                {% if manage_all and not человек.disabled_at and человек.login != account.login %}
                   <form method="post" action="{{ url(users_path ~ '/role') }}?lang={{ lang }}" class="row users-inline">
                     <input type="hidden" name="login" value="{{ человек.login }}">
                     <input type="hidden" name="tenant" value="{{ человек.tenant }}">
                     <select class="input input--sm" name="role" aria-label="{{ t('users.col.role') }}">
-                      {% for код in roles %}
+                      {% for код in roles_for(человек.tenant) %}
                         <option value="{{ код }}"{% if код == человек.role %} selected{% endif %}>{{ t('users.role.' ~ код) }}</option>
                       {% endfor %}
                     </select>
@@ -231,6 +238,7 @@
                   {{ человек.email or '—' }}
                 {% endif %}
               </td>
+              {% if manage_all %}
               <td class="is-text">
                 {% set привязка = bindings.get(человек.id) %}
                 {% if привязка %}
@@ -244,6 +252,7 @@
                   —
                 {% endif %}
               </td>
+              {% endif %}
               <td class="is-num">{{ человек.created_at.strftime('%Y-%m-%d') }}</td>
               <td>
                 {% if not человек.disabled_at and человек.login != account.login %}

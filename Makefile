@@ -347,6 +347,7 @@ web-up: db-up web-demo web-stand-user
 # новые. В неместную базу писать отказывается (tools/seed_web_demo.py).
 web-demo:
 	$(VENV)/python tools/seed_web_demo.py
+	$(VENV)/python tools/seed_ratings_demo.py
 
 # Учётки веб-админки (T323). Регистрации снаружи у админки нет — человек
 # появляется в круге тем, что команда проекта выполнила эту цель. Идёт под

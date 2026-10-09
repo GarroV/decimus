@@ -29,3 +29,19 @@ def may_add_units(tenant: str) -> bool:
     один и принадлежит УК (D284). Одно правило на бота и на веб-админку (#437).
     """
     return canonical_tenant(tenant) == HQ_TENANT
+
+
+#: Контролинг: видит и ведёт только раздел «Рейтинги» (D319, D358).
+CONTROL_ROLE = "control"
+
+#: Роли, которым открыта загрузка рейтингов и их справочники (D319).
+RATINGS_MANAGER_ROLES = (CONTROL_ROLE, "admin")
+
+
+def may_manage_ratings(role: str | None, tenant: str) -> bool:
+    """Загружать рейтинги и править их справочники — контроль и админ УК (D319).
+
+    Видеть рейтинги могут все (D327, «рейтинги видят все») — это решает не
+    эта функция, а отсутствие заслона на чтении.
+    """
+    return canonical_tenant(tenant) == HQ_TENANT and role in RATINGS_MANAGER_ROLES

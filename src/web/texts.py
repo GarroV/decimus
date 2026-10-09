@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
+from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_walk import WALK_TEXTS
@@ -56,6 +57,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.theme.dark": {"ru": "Тёмная", "en": "Dark"},
     "nav.role.admin": {"ru": "Админ", "en": "Admin"},
     "nav.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
+    "nav.role.control": {"ru": "Контроль", "en": "Control"},
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
@@ -925,6 +927,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     # --- люди проекта (T338, #322) -----------------------------------------
     "users.count": {"ru": "{count} чел.", "en": "{count} people"},
+    "users.control.scope": {
+        "ru": "Здесь только люди контролинга: их можно завести, задать почту и отключить.",
+        "en": "Only controlling people are listed: add them, set an email, disable them.",
+    },
     "users.unknown": {
         "ru": "Список сейчас недоступен — это не значит, что людей нет.",
         "en": "The list is unavailable right now — that does not mean there is nobody.",
@@ -954,11 +960,22 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
     "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
+    "users.role.control": {
+        "ru": "Рейтинги: загрузка и справочники (только УК)",
+        "en": "Ratings: uploads and settings (HQ only)",
+    },
     "users.col.login": {"ru": "Логин", "en": "Login"},
     # Пространства (волна 1, #340): админ УК видит людей всех пространств и
     # заводит человека в выбранное (D282, D286).
     "users.col.space": {"ru": "Пространство", "en": "Space"},
     "users.add.space": {"ru": "Пространство", "en": "Space"},
+    "users.add.role_space": {
+        "ru": (
+            "Роль «контроль» бывает только в пространстве УК (HQ). "
+            "Выберите другую роль или пространство."
+        ),
+        "en": "The Control role exists only in the HQ space. Pick another role or space.",
+    },
     "users.add.space_unknown": {
         "ru": "Такого пространства нет. Выберите из списка.",
         "en": "There is no such space. Pick one from the list.",
@@ -1756,8 +1773,17 @@ TEXTS: dict[str, dict[str, str]] = {
 
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
-# Предписания (волна 3), отказы «Методики» (#475) и заведение пиццерии (#437) — так же.
-_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS, UNIT_TEXTS, WALK_TEXTS)
+# Предписания (волна 3), отказы «Методики» (#475), заведение пиццерии (#437) и
+# рейтинги (спека 2026-10-08) — так же.
+_ЧАСТИ = (
+    TEXTS,
+    PLAN_TEXTS,
+    PRESCRIPTION_TEXTS,
+    RATINGS_TEXTS,
+    REFUSAL_TEXTS,
+    UNIT_TEXTS,
+    WALK_TEXTS,
+)
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
     for номер, часть in enumerate(_ЧАСТИ)
@@ -1770,6 +1796,7 @@ TEXTS = {
     **TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
+    **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
     **UNIT_TEXTS,
     **WALK_TEXTS,
