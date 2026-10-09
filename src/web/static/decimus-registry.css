@@ -1,0 +1,82 @@
+/* «Проверки» поверх общего каркаса (`decimus-split.css`): только то, чего нет
+   у «Пользователей», — колонки реестра, период со стрелками, группа «Ждут
+   приёмки» и карточка проверки в правой колонке.
+
+   Образец тот же — Swarm Brain (miniapp/src/components):
+     заголовок группы строк капсом на surface-2 — tasks/table/TasksTable.tsx:186;
+     «всё время» как явный выбор периода — roy/screens/MeetingsDesk.tsx:26;
+     период по умолчанию назван словами — tasks/table/TaskCalendar.tsx:45.
+   Стрелки ‹ заголовок › — свой приём decimus, раздел «Рейтинги» (D357,
+   ratings_calendar.py). Колонка выбранного шире, чем у людей: в ней
+   содержимое проверки, а не форма. Цвета — токены ядра. */
+
+/* Карточке проверки нужно больше места, чем карточке человека. */
+.split { --split-detail-w: clamp(360px, 34vw, 480px); }
+
+/* Выпадающие чипы и период живут в полосе фильтров — рамка их не обрезает. */
+.sbox:has(.sbar--registry) { overflow: visible; }
+.sbar--registry { border-radius: var(--r-block) var(--r-block) 0 0; }
+.sbar--registry .sbar__search { display: contents; }
+.sbar--registry .ov-chip { height: 30px; padding: 0 var(--space-6); border-radius: var(--r-pill); font-size: 12.5px; }
+
+/* ── период: ‹ Октябрь 2026 › ───────────────────────────────────────── */
+.speriod { display: inline-flex; align-items: center; gap: var(--space-2); }
+.speriod__arrow { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
+  border: 1px solid var(--line-control); border-radius: 50%; background: var(--surface); color: var(--ink-2); }
+.speriod__arrow:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.speriod__arrow[aria-disabled="true"] { opacity: .4; }
+.speriod__arrow svg { width: 14px; height: 14px; }
+.speriod__title { cursor: pointer; color: var(--ink); font-weight: var(--w-semibold); }
+.speriod__title svg { width: 14px; height: 14px; color: var(--ink-3); }
+.speriod__menu { min-width: 17rem; max-height: none; padding: var(--space-5); }
+.speriod__dates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+.speriod__quick { display: flex; flex-direction: column; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+
+/* ── список: буква | пиццерия + мета | итог | дата ──────────────────── */
+.slist--registry { --slist-cols: 30px minmax(0, 1fr) 64px 92px; }
+.slist--registry + .slist--registry { border-top: 1px solid var(--line); }
+.slist__group { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-7); background: var(--surface-2); border-bottom: 1px solid var(--line);
+  font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-semibold); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.slist__note { margin: 0; padding: var(--space-3) var(--space-7); font-size: 12px; line-height: 1.45; color: var(--ink-3); }
+.srow__grade { width: 26px; height: 26px; font-size: 13px; }
+.srow__score { font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--ink); }
+.srow.is-frozen { color: var(--ink-3); }
+.srow__warn { color: var(--warn); }
+.srow__err { color: var(--err); }
+
+/* ── карточка проверки справа ────────────────────────────────────────── */
+.spanel .sdetail__head { align-items: flex-start; }
+.spanel .sdetail__who { flex: 1; }
+.spanel__score { display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-2); }
+.spanel__score b { font-size: 22px; line-height: 26px; font-weight: var(--w-semibold); color: var(--ink); }
+.spanel__actions { margin-top: var(--space-6); }
+.spanel > .note { margin-top: var(--space-5); }
+.spanel__counts { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.spanel__muted { color: var(--ink-3); font-size: 12px; }
+.spanel__row { margin-top: var(--space-4); }
+.sbadge--warn { border-color: transparent; background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.sbadge--err { border-color: transparent; background: color-mix(in srgb, var(--err) 12%, transparent); color: var(--err); }
+
+.spanel__zones, .spanel__findings { margin: 0; padding: 0; list-style: none; }
+.spanel__zones li { display: grid; grid-template-columns: minmax(0, 1fr) 72px 44px; align-items: center; gap: var(--space-4);
+  padding: 4px 0; font-size: 12.5px; }
+.spanel__zones li.is-zeroed .spanel__zone { color: var(--err); }
+.spanel__zone { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.spanel__loss { text-align: right; color: var(--ink-3); }
+.spanel__loss.is-loss { color: var(--err); font-weight: var(--w-semibold); }
+.spanel__findings li { display: flex; align-items: flex-start; gap: var(--space-4); padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; line-height: 1.45; }
+.spanel__findings li:first-child { border-top: 0; padding-top: 0; }
+.spanel__findings .tag { flex: none; min-width: 26px; justify-content: center; }
+.spanel__text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; color: var(--ink); }
+
+/* ── телефон ─────────────────────────────────────────────────────────── */
+@media (max-width: 719px) {
+  .slist--registry .srow { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 0 var(--space-4); }
+  .slist--registry .srow > .srow__cell.mono { grid-column: 2 / -1; font-size: 11.5px; color: var(--ink-3); justify-content: flex-start; }
+  .slist__group, .slist__note { padding-left: var(--space-5); padding-right: var(--space-5); }
+  .speriod { flex: 1 1 100%; }
+  .speriod__pick { flex: 1; }
+  .speriod__title { width: 100%; justify-content: center; }
+  .speriod__arrow { width: 40px; height: 40px; }
+  .speriod__menu { left: 50%; transform: translateX(-50%); }
+}

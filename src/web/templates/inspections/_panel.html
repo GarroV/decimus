@@ -1,0 +1,127 @@
+{#
+  Карточка проверки в правой колонке реестра — короткий вид отдельной
+  карточки (`inspections/card.html`). Данные и права — тот же словарь
+  `_card_context(compact=True)`: кнопки здесь ровно те, что у полной карточки.
+
+  Тяжёлое — лист вычитки, кадры, перенос, запрос плана — живёт в полной
+  карточке: панель ведёт туда якорем. Здесь из действий на месте только
+  отклонение (с причиной и подтверждением) и скачивание PDF.
+#}
+{% from "_split_ui.html" import confirm %}
+
+{% macro inspection_panel(c) %}
+  {% set head = c.head %}
+  {% set FINDINGS_SHOWN = 8 %}
+  {% set full = url('/inspections/' ~ head.id) %}
+  <article class="sdetail spanel" aria-labelledby="inspection-title">
+    <header class="sdetail__head">
+      <span class="grade grade--lg tag {{ c.grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="inspection-title">{{ head.unit_name }}</h2>
+        <p class="sdetail__hint">{{ head.inspection_date }} · {{ c.kind }}</p>
+      </div>
+      <div class="spanel__score">
+        <b class="mono">{{ head.pct }}</b>
+        {% if head.retracted %}<span class="sbadge sbadge--err">{{ t('state.retracted') }}</span>
+        {% elif head.on_review %}<span class="sbadge sbadge--warn">{{ t('state.review') }}</span>
+        {% else %}<span class="sbadge">{{ t('state.sealed') }}</span>{% endif %}
+      </div>
+    </header>
+
+    <div class="sactions spanel__actions">
+      <a class="sbtn sbtn--primary" href="{{ full }}?lang={{ lang }}">{{ t('registry.panel.open') }}</a>
+      {% if c.report %}<a class="sbtn" href="{{ full }}/report?lang={{ lang }}">{{ icon('pdf') }}<span>{{ t('card.report.download') }}</span></a>{% endif %}
+      {% if c.own and not head.is_uploaded %}<a class="sbtn" href="{{ full }}/letter?lang={{ lang }}">{{ t('letter.open') }}</a>{% endif %}
+    </div>
+
+    {% if head.retracted %}
+      <div class="note note--error"><div class="note__text">{{ t('retract.banner.text', reason=head.retraction_reason or '—') }}</div></div>
+    {% elif head.on_review %}
+      <div class="note note--warn"><div class="note__text">{{ t('accept.banner.text') if c.own else t('accept.foreign') }}</div></div>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('registry.panel.facts') }}</h3>
+      <dl class="sprops">
+        <div><dt>{{ t('card.fact.auditor') }}</dt><dd>{{ head.auditor or '—' }}</dd></div>
+        <div><dt>{{ t('card.fact.city') }}</dt><dd>{{ city_title(head.city) or '—' }}</dd></div>
+        {% if head.partner %}<div><dt>{{ t('card.fact.partner') }}</dt><dd>{{ head.partner }}</dd></div>{% endif %}
+        <div><dt>{{ t('registry.panel.checklist') }}</dt><dd>{{ c.checklist_name }}</dd></div>
+        <div><dt>{{ t('card.findings.title') }}</dt><dd class="spanel__counts">
+          {% for line in c.counts %}<span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>{% else %}0{% endfor %}
+        </dd></div>
+      </dl>
+      {% if head.is_legacy %}<p class="ssec__note">{{ t('card.legacy.title') }}</p>{% endif %}
+    </section>
+
+    {% if not head.is_legacy and c.zones %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('card.zones.title') }} · −{{ c.detail.deductions }}</h3>
+        <ul class="spanel__zones">
+          {% for zone in c.zones %}
+            <li class="{% if zone.zeroed %}is-zeroed{% endif %}">
+              <span class="spanel__zone">{{ zone.name }}</span>
+              <span class="ov-bar"><span class="ov-bar__part" style="flex:{{ zone.fill }};background:var(--err)"></span><span class="ov-bar__part" style="flex:{{ 100 - zone.fill }}"></span></span>
+              <span class="mono spanel__loss{% if zone.fill %} is-loss{% endif %}">{% if zone.fill %}−{{ zone.loss }}{% else %}0{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('card.findings.title') }} · {{ head.findings_count }}</h3>
+      {% if c.detail.findings %}
+        <ul class="spanel__findings">
+          {% for finding in c.detail.findings[:FINDINGS_SHOWN] %}
+            <li>
+              <span class="tag tag--micro {{ c.level_tone(finding.level) }}">{{ t('card.findings.advice') if finding.level == 'R' else (t('card.findings.no_class') if finding.level == 'NC' else finding.level) }}</span>
+              <span class="spanel__text" lang="{{ finding.lang }}">{{ finding.text or '—' }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if c.detail.findings|length > FINDINGS_SHOWN %}
+          <p class="ssec__note"><a href="{{ full }}?lang={{ lang }}">{{ t('registry.panel.findings_more', n=c.detail.findings|length - FINDINGS_SHOWN) }}</a></p>
+        {% endif %}
+      {% else %}
+        <p class="ssec__note">{{ t('card.findings.empty') }}</p>
+      {% endif %}
+    </section>
+
+    {% if c.plan or c.may_request_plan or c.plan_no_country %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('card.plan.title') }}</h3>
+        {% if c.plan %}
+          <p class="ssec__text">
+            <span class="tag tag--micro {{ c.plan_state_tones[c.plan.state] }}">{{ t('plans.state.' ~ c.plan.state) }}</span>
+            {% if c.plan.overdue(c.plan_today) %}<span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
+            <span class="spanel__muted">{{ t('actions.request.due', due=c.plan.due_on) }}</span>
+          </p>
+          <a class="sbtn" href="{{ url(c.plan_link) }}?lang={{ lang }}">{{ t('card.plan.open') }}</a>
+        {% elif c.plan_no_country %}
+          <p class="ssec__note">{{ t('card.plan.no_country') }}</p>
+        {% else %}
+          <p class="ssec__note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
+          <a class="sbtn" href="{{ full }}?lang={{ lang }}#plan">{{ t('registry.panel.plan_go') }}</a>
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if c.may_accept or c.may_move or (c.may_retract and not head.retracted) %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('registry.panel.actions') }}</h3>
+        {% if c.may_accept %}
+          <p class="ssec__note">{{ t('registry.panel.review_read') }}</p>
+          <a class="sbtn sbtn--primary" href="{{ full }}?lang={{ lang }}#review">{{ t('registry.panel.review_go') }}</a>
+        {% endif %}
+        {% if c.may_move %}
+          <div class="sactions spanel__row"><a class="sbtn" href="{{ full }}?lang={{ lang }}#move">{{ t('registry.panel.move_go') }}</a></div>
+        {% endif %}
+        {% if c.may_retract and not head.retracted %}
+          {{ confirm('retract-' ~ head.id, t('retract.title'), t('registry.panel.retract_text'), t('retract.submit'),
+                     full ~ '/retract?lang=' ~ lang, (), reason=t('retract.reason_label')) }}
+        {% endif %}
+      </section>
+    {% endif %}
+  </article>
+{% endmacro %}

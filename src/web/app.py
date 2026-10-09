@@ -18,6 +18,7 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
+from datetime import date
 from typing import Any
 
 import psycopg
@@ -34,7 +35,14 @@ from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
 from src.db import directory
-from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
+from src.db.errors import (
+    AcceptError,
+    DatabaseTargetError,
+    DbError,
+    MoveError,
+    RetractionError,
+    ReviseError,
+)
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
@@ -52,6 +60,8 @@ from . import (
     letter_markup,
     prescriptions,
     ratings,
+    registry_period,
+    registry_view,
     review,
     revision,
     security_headers,
@@ -402,12 +412,16 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
             С 30.09.2026 клик по городу ведёт в страну (D260, `в_страну`);
             сюда — только город без страны в справочнике: экрана страны с
-            пустым кодом не бывает. Период в реестр не уходит: там его отбора нет.
+            пустым кодом не бывает. Реестр без периода в адресе открывается
+            текущим месяцем, поэтому окно обзора уезжает с человеком явно:
+            «всё время» — словом `period=all`, иначе — датами «с — по».
             """
+            начало, конец = overview_data.window(selection.period, today=date.today())
             параметры = {
                 "country": selection.country,
                 "city": city or "",
                 "grade": selection.grade,
+                **(registry_period.Period(начало, конец).params()),
                 "lang": _lang(conf),
             }
             return _url("registry", **{к: з for к, з in параметры.items() if з})
@@ -750,137 +764,70 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.get(section("registry").path)
     def registry() -> str:
-        registry_data = data.load_registry(reach=auth.current_reach(), limit=REGISTRY_LIMIT)
         # Отбор реестра живёт в адресе ровно по той же причине, что и на
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        буква = request.args.get("grade", "").strip().upper()[:1]
-        вид = request.args.get("kind", "").strip()[:20]
-        # Страна и город — по справочнику точек, кодами: сюда приводит клик по
-        # городу на «Обзоре», и реестр обязан показать ровно эти проверки.
-        страна = request.args.get("country", "").strip().upper()[:2]
-        город = request.args.get("city", "").strip()[:80]
-        # Поиск из левой панели: часть названия пиццерии, без учёта регистра.
-        искомое = request.args.get("q", "").strip()[:80]
+        период = registry_period.read(request.args, today=date.today())
+        registry_data = data.load_registry(
+            reach=auth.current_reach(),
+            limit=REGISTRY_LIMIT,
+            date_from=период.start,
+            date_to=период.end,
+        )
+        отбор_в = registry_view.Filter(
+            grade=request.args.get("grade", "").strip().upper()[:1],
+            kind=request.args.get("kind", "").strip()[:20],
+            # Страна и город — по справочнику точек, кодами: сюда приводит
+            # клик по городу на «Обзоре», и реестр обязан показать ровно эти.
+            country=request.args.get("country", "").strip().upper()[:2],
+            city=request.args.get("city", "").strip()[:80],
+            # Поиск: часть названия пиццерии, без учёта регистра.
+            q=request.args.get("q", "").strip()[:80],
+        )
         гео = data.load_geography(reach=auth.current_reach())
 
         def место(row: InspectionRow) -> tuple[str, str]:
             страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
             return страна_точки or "", город_точки or ""
 
-        строки = tuple(
-            row
-            for row in registry_data.rows
-            if (not буква or row.grade == буква)
-            and (not вид or row.kind == вид)
-            and (not страна or место(row)[0] == страна)
-            and (not город or место(row)[1] == город)
-            and (not искомое or искомое.casefold() in row.unit_name.casefold())
-        )
+        строки = tuple(row for row in registry_data.rows if отбор_в.keeps(row, место(row)))
+        язык = _lang(conf)
 
         def отбор(**изменения: str) -> str:
-            параметры = {
-                "q": искомое,
-                "country": страна,
-                "city": город,
-                "grade": буква,
-                "kind": вид,
-                "lang": _lang(conf),
-                **изменения,
-            }
-            живые = {ключ: значение for ключ, значение in параметры.items() if значение}
-            return _url("registry", **живые)
+            параметры = {**отбор_в.params(), **период.params(), "lang": язык, **изменения}
+            return _url("registry", **{к: з for к, з in параметры.items() if з})
 
-        язык = _lang(conf)
-        # Буквы — шкалой со счётом по выборке: сколько проверок за каждой.
-        буквы = tuple(
-            (значение, sum(1 for row in registry_data.rows if row.grade == значение))
-            for значение in ("A", "B", "C", "D")
-        )
-        виды = tuple(
-            (код, sum(1 for row in registry_data.rows if row.kind == код))
-            for код in dict.fromkeys(row.kind for row in registry_data.rows)
-        )
-        чипы = []
-        страны = tuple(
-            (код, sum(1 for row in registry_data.rows if место(row)[0] == код))
-            for код in sorted({место(row)[0] for row in registry_data.rows} - {""})
-        )
-        # Города — только выбранной страны, как и на «Обзоре».
-        города = tuple(
-            (код, sum(1 for row in registry_data.rows if место(row)[1] == код))
-            for код in sorted(
-                {
-                    место(row)[1]
-                    for row in registry_data.rows
-                    if not страна or место(row)[0] == страна
-                }
-                - {""}
-            )
-        )
-        if страны:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.country", язык),
-                    empty_title=t("overview.filter.all_countries", язык),
-                    current=страна,
-                    values=страны,
-                    href=lambda значение: отбор(country=значение, city=""),
-                    title=lambda код: country_title(код, язык),
-                )
-            )
-        if города:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.city", язык),
-                    empty_title=t("overview.filter.all_cities", язык),
-                    current=город,
-                    values=города,
-                    href=lambda значение: отбор(city=значение),
-                    title=lambda код: city_title(код, язык),
-                )
-            )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.grade", язык),
-                empty_title=t("overview.filter.all_grades", язык),
-                current=буква,
-                values=буквы,
-                href=lambda значение: отбор(grade=значение),
-            )
-        )
-        if виды:
-            чипы.append(
-                _pick(
-                    label=t("registry.col.kind", язык),
-                    empty_title=t("registry.all_kinds", язык),
-                    current=вид,
-                    values=виды,
-                    href=lambda значение: отбор(kind=значение),
-                    title=lambda код: _kind_title(код, язык),
-                )
-            )
+        выбрано = request.args.get("inspection", "").strip()[:64]
+        панель = _registry_panel(выбрано, first=(registry_data.review + строки)[:1], conf=conf)
         return render_template(
             "inspections/list.html",
             registry=registry_data,
             rows=строки,
-            picks=tuple(чипы),
+            picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
-            # одного: иначе это одно и то же слово в каждой строке. Издание
-            # (хэш) в строку не идёт — оно на карточке проверки.
+            # одного: иначе это одно и то же слово в каждой строке.
             checklist_names=(
                 _checklist_names(язык) if len({row.checklist_code for row in строки}) > 1 else None
             ),
-            # Буквы — шкалой, а не по частоте: полоса отбора не должна менять
-            # порядок от выборки к выборке (то же правило, что на обзоре).
-            grades=("A", "B", "C", "D"),
-            kinds=tuple(dict.fromkeys(row.kind for row in registry_data.rows)),
-            grade=буква,
-            kind=вид,
+            filters=отбор_в,
+            period=период,
+            period_title=registry_view.period_title(период, язык),
+            period_prev=registry_view.period_link(период, -1, отбор),
+            period_next=registry_view.period_link(период, 1, отбор),
+            period_month=отбор(period="", **registry_period.month_of(date.today()).params()),
+            period_is_this_month=период == registry_period.month_of(date.today()),
+            period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
             select_url=отбор,
+            reset_url=отбор(grade="", kind="", country="", city="", q=""),
+            picked=панель.picked,
+            card=панель.context,
+            card_missing=панель.missing,
+            card_failed=панель.failed,
+            split_open=панель.explicit,
+            split_back=отбор(),
         )
 
     @app.get(f"{section('registry').path}/<inspection_id>")
@@ -1346,12 +1293,153 @@ def _reviewer_only(inspection_id: str) -> FlaskResponse | None:
     return None
 
 
+@dataclass(frozen=True)
+class _RegistryPanel:
+    """Правая колонка реестра: какая проверка открыта и что о ней известно."""
+
+    picked: str
+    context: dict[str, Any] | None
+    #: Выбор по адресу есть, а проверки в охвате нет (или её не видно).
+    missing: bool
+    #: Выбор сделан явно (`?inspection=`): на телефоне тогда открыта карточка.
+    explicit: bool
+    #: Карточка не прочиталась (база ответила отказом) — список при этом жив.
+    failed: bool = False
+
+
+def _registry_panel(
+    chosen: str, *, first: tuple[InspectionRow, ...], conf: Settings
+) -> _RegistryPanel:
+    """Карточка справа: выбранная адресом, иначе первая строка списка.
+
+    Без выбора открывается первая строка (очередь приёмки идёт первой), а не
+    пустая колонка: так экран сразу отвечает «что с последней проверкой».
+    Права и данные — та же `_card_context`, что у отдельной карточки.
+
+    Отказ базы на карточке не роняет список: реестр уже прочитан, и экран
+    честно говорит, что справа сейчас пусто по причине, а не «выберите». Стенд,
+    смотрящий не в ту базу (`DatabaseTargetError`), — не частичный сбой: он
+    уходит наверх и показывается страницей с названными базами.
+    """
+    номер = chosen or (first[0].id if first else "")
+    if not номер:
+        return _RegistryPanel("", None, False, False)
+    try:
+        контекст = _card_context(номер, conf=conf, notice=None, failure=None, compact=True)
+    except DatabaseTargetError:
+        raise
+    except DbError as exc:
+        logger.warning("карточка проверки %s в реестре не прочиталась: %s", номер, exc)
+        return _RegistryPanel(номер, None, False, bool(chosen), failed=True)
+    return _RegistryPanel(номер, контекст, bool(chosen) and контекст is None, bool(chosen))
+
+
+def _registry_picks(
+    rows: tuple[InspectionRow, ...],
+    current: registry_view.Filter,
+    place: Callable[[InspectionRow], tuple[str, str]],
+    select: Callable[..., str],
+    lang: str,
+) -> tuple[Pick, ...]:
+    """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду."""
+    чипы = []
+    страны = tuple(
+        (код, sum(1 for row in rows if place(row)[0] == код))
+        for код in sorted({place(row)[0] for row in rows} - {""})
+    )
+    # Города — только выбранной страны, как и на «Обзоре».
+    города = tuple(
+        (код, sum(1 for row in rows if place(row)[1] == код))
+        for код in sorted(
+            {
+                place(row)[1]
+                for row in rows
+                if not current.country or place(row)[0] == current.country
+            }
+            - {""}
+        )
+    )
+    if страны:
+        чипы.append(
+            _pick(
+                label=t("overview.filter.country", lang),
+                empty_title=t("overview.filter.all_countries", lang),
+                current=current.country,
+                values=страны,
+                href=lambda значение: select(country=значение, city=""),
+                title=lambda код: country_title(код, lang),
+            )
+        )
+    if города:
+        чипы.append(
+            _pick(
+                label=t("overview.filter.city", lang),
+                empty_title=t("overview.filter.all_cities", lang),
+                current=current.city,
+                values=города,
+                href=lambda значение: select(city=значение),
+                title=lambda код: city_title(код, lang),
+            )
+        )
+    # Буквы — шкалой, а не по частоте: полоса отбора не должна менять порядок
+    # от выборки к выборке (то же правило, что на обзоре).
+    чипы.append(
+        _pick(
+            label=t("overview.filter.grade", lang),
+            empty_title=t("overview.filter.all_grades", lang),
+            current=current.grade,
+            values=tuple((буква, sum(1 for row in rows if row.grade == буква)) for буква in "ABCD"),
+            href=lambda значение: select(grade=значение),
+        )
+    )
+    виды = tuple(
+        (код, sum(1 for row in rows if row.kind == код))
+        for код in dict.fromkeys(row.kind for row in rows)
+    )
+    if виды:
+        чипы.append(
+            _pick(
+                label=t("registry.col.kind", lang),
+                empty_title=t("registry.all_kinds", lang),
+                current=current.kind,
+                values=виды,
+                href=lambda значение: select(kind=значение),
+                title=lambda код: _kind_title(код, lang),
+            )
+        )
+    return tuple(чипы)
+
+
 def _render_card(
     inspection_id: str, *, conf: Settings, notice: str | None, failure: str | None
 ) -> str | tuple[str, int]:
+    контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
+    if контекст is None:
+        return render_template("inspections/not_found.html"), 404
+    return render_template("inspections/card.html", **контекст)
+
+
+def _card_context(
+    inspection_id: str,
+    *,
+    conf: Settings,
+    notice: str | None,
+    failure: str | None,
+    compact: bool = False,
+) -> dict[str, Any] | None:
+    """Всё, что карточка проверки знает и разрешает; `None` — проверки нет в охвате.
+
+    Одна функция на две поверхности: отдельную страницу карточки и правую
+    колонку реестра (`?inspection=`). Права (`may_*`) считаются здесь и только
+    здесь — у панели не может оказаться кнопки, которой нет у карточки.
+
+    `compact` — для панели: лист вычитки, кадры, информационная часть и
+    список точек для переноса не читаются. Панель их не показывает, а ведёт
+    в полную карточку, и платить за них на каждом щелчке по строке незачем.
+    """
     detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
-        return render_template("inspections/not_found.html"), 404
+        return None
     lang = _lang(conf)
     админ = _admin_only() is None
     try:
@@ -1389,7 +1477,7 @@ def _render_card(
     # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
     лист = (
         review.load_sheet(detail.inspection, detail.findings, lang=lang)
-        if detail.inspection.on_review
+        if detail.inspection.on_review and not compact
         else None
     )
     # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
@@ -1401,15 +1489,16 @@ def _render_card(
     except DbError:
         отчёт = None
         отчёт_известен = False
-    поля, методика_полей = data.load_info(detail, lang=lang)
+    поля, методика_полей = ((), "") if compact else data.load_info(detail, lang=lang)
     # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
     # роняет, записи показываются без кадров, и это сказано словами.
-    try:
-        кадры = data.load_previews(inspection_id, reach=auth.current_reach())
-        кадры_известны = True
-    except DbError:
-        кадры = {}
-        кадры_известны = False
+    кадры: dict[str, Any] = {}
+    кадры_известны = True
+    if not compact:
+        try:
+            кадры = data.load_previews(inspection_id, reach=auth.current_reach())
+        except DbError:
+            кадры_известны = False
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
@@ -1425,8 +1514,7 @@ def _render_card(
         and action_plans.needs_plan(detail.counts)
     )
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
-    return render_template(
-        "inspections/card.html",
+    return dict(
         plan=план,
         plan_known=план_известен,
         plan_link=(
@@ -1460,7 +1548,9 @@ def _render_card(
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
-        units=data.load_units(reach=auth.current_reach()) if можно_переносить else (),
+        units=data.load_units(reach=auth.current_reach())
+        if можно_переносить and not compact
+        else (),
         detail=detail,
         head=detail.inspection,
         zones=view.zone_lines(detail.by_zone, lang),

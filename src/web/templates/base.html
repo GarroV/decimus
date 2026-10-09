@@ -103,6 +103,9 @@
         #}
         <form class="sidenav__search" method="get" action="{{ url('/inspections') }}" role="search">
           <input type="hidden" name="lang" value="{{ lang }}">
+          {# Пиццерию ищут по всей истории, а не в текущем месяце — реестр без
+             периода в адресе открывается месяцем. #}
+          <input type="hidden" name="period" value="all">
           <label class="sidenav__field" title="{{ t('nav.search') }}">
             {{ icon('search') }}
             <input type="search" name="q" data-hotkey="k" placeholder="{{ t('nav.search') }}"

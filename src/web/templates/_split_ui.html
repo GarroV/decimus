@@ -1,0 +1,26 @@
+{#
+  Общие детали колонки выбранного (`_split_page.html`) — одни на все экраны
+  с раскладкой «слева список, справа выбранное».
+
+  confirm — подтверждение опасного действия без скрипта: раскрывающийся блок
+  (приём Meridius) в тоне диалога подтверждения Swarm (`ui/confirm.tsx`).
+  `reason` — подпись обязательного поля причины, если действие её требует
+  (отклонение проверки); без неё — только кнопка.
+#}
+
+{% macro confirm(id, title, text, yes, action, fields, reason=none) %}
+  <details class="sconfirm">
+    <summary class="sbtn sbtn--danger">{{ title }}</summary>
+    <div class="sconfirm__body" role="group" aria-labelledby="{{ id }}">
+      <p class="sconfirm__text" id="{{ id }}">{{ text }}</p>
+      <form method="post" action="{{ action }}" class="sform">
+        {% for name, value in fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        {% if reason %}
+          <label><span class="sform__label">{{ reason }}</span>
+            <input class="sinput" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+        {% endif %}
+        <button class="sbtn sbtn--danger-solid" type="submit">{{ yes }}</button>
+      </form>
+    </div>
+  </details>
+{% endmacro %}

@@ -7,6 +7,7 @@
   админ УК, круг Claude — тот, кто сам в круге. Маршрут сверяет то же самое ещё
   раз: разметка здесь — подсказка, а не заслон.
 #}
+{% from "_split_ui.html" import confirm %}
 
 {% macro flash() %}
   {% if show.flash %}
@@ -14,19 +15,6 @@
   {% endif %}
 {% endmacro %}
 
-{% macro confirm(id, title, text, yes, action, fields) %}
-  {# Подтверждение без скрипта: раскрывающийся блок с красной кнопкой. #}
-  <details class="sconfirm">
-    <summary class="sbtn sbtn--danger">{{ title }}</summary>
-    <div class="sconfirm__body" role="group" aria-labelledby="{{ id }}">
-      <p class="sconfirm__text" id="{{ id }}">{{ text }}</p>
-      <form method="post" action="{{ action }}">
-        {% for name, value in fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-        <button class="sbtn sbtn--danger-solid" type="submit">{{ yes }}</button>
-      </form>
-    </div>
-  </details>
-{% endmacro %}
 
 {% macro person_card(kind, row) %}
   {% set свой = kind == 'me' %}
