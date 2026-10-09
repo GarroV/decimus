@@ -152,7 +152,7 @@ def current_section(path: str) -> str | None:
     return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
 
-#: Разделы контролинга (D338): рейтинги и «Пользователи» — там свой пароль и бот.
+#: Разделы контролинга (D358): рейтинги и «Пользователи» — там свой пароль и бот.
 CONTROL_SECTIONS = frozenset({"ratings", "users"})
 
 
@@ -164,7 +164,7 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     не звать человека туда, куда его не пустят.
     """
     роль = getattr(account, "role", None)
-    if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D338)
+    if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
         return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
     админ = роль == "admin"
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
