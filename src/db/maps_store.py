@@ -97,6 +97,7 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
         from maps.ratings r
         join maps.companies c on c.uuid = r.company_uuid
         where c.country_code = any(%s) and (%s::date is null or r.on_date <= %s::date)
+          and c.excluded_reason is null
         order by r.company_uuid, r.provider_id, r.on_date desc
     """
     try:
@@ -186,6 +187,7 @@ def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]
         from maps.ratings r
         join maps.companies c on c.uuid = r.company_uuid
         where c.dodo_id is not null and r.provider_id = %s and r.on_date <= %s
+          and c.excluded_reason is null
           and r.ratings_count > 0
         order by c.dodo_id, r.on_date desc
     """
