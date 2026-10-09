@@ -26,6 +26,7 @@ from datetime import date
 from src.db import accept, move, previews, queries, reports, retract
 from src.db import letters as letters_store
 from src.db.config import load_retraction_settings
+from src.db.cross_space import Entry
 from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.db.reach import Reach
@@ -225,23 +226,27 @@ def load_letter(detail: InspectionDetail, *, lang: str | None = None) -> Letter:
     )
 
 
-def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
+def accept_card(
+    inspection_id: str, *, tenant: str, actor: str, journal: Entry | None = None
+) -> None:
     """Подтвердить проверку своего пространства на приёмке (D199).
 
     Отказ — `AcceptError` блока `db`; проверка чужого пространства отвечает
     им же, тем же «нет», что несуществующая.
     """
-    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor)
+    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor, journal=journal)
 
 
-def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Retraction:
+def retract_card(
+    inspection_id: str, *, tenant: str, reason: str, journal: Entry | None = None
+) -> retract.Retraction:
     """Снять проверку из истории. Отказ — `RetractionError` блока `db`.
 
     Своей проверки причины здесь нет: обязательность причины — правило снятия
     (D089), и живёт оно в `src/db/retract.py`. Продублированное здесь, оно
     разошлось бы с оригиналом при первой же правке.
     """
-    return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
+    return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason, journal=journal)
 
 
 def load_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
@@ -283,7 +288,14 @@ def load_edition_since(*, reach: Reach, version: str) -> date | None:
 
 
 def move_card(
-    inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
+    inspection_id: str,
+    *,
+    tenant: str,
+    new_date: str,
+    new_unit_id: str,
+    reason: str,
+    actor: str,
+    journal: Entry | None = None,
 ) -> bool:
     """Перенести проверку по дате и пиццерии (D195). Отказ — `MoveError`.
 
@@ -302,6 +314,7 @@ def move_card(
         new_unit_id=new_unit_id,
         reason=reason,
         actor=actor,
+        journal=journal,
     )
 
 
@@ -338,7 +351,13 @@ def saved_letter(
 
 
 def remember_letter(
-    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
+    inspection_id: str,
+    *,
+    tenant: str,
+    body: str,
+    lang: str,
+    saved_by: str,
+    journal: Entry | None = None,
 ) -> letters_store.SavedLetter:
     """Зафиксировать письмо так, как его подтвердил человек.
 
@@ -354,7 +373,7 @@ def remember_letter(
     if not letter_markup.to_plain(чистое).strip():
         чистое = ""
     return letters_store.save_letter(
-        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by
+        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by, journal=journal
     )
 
 

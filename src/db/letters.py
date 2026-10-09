@@ -19,6 +19,7 @@ from datetime import datetime
 import psycopg
 
 from .config import check_environment
+from .cross_space import Entry, record
 from .errors import PushError
 from .queries import _require_inspection_id, _require_tenant
 
@@ -54,7 +55,13 @@ class SavedLetter:
 
 
 def save_letter(
-    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
+    inspection_id: str,
+    *,
+    tenant: str,
+    body: str,
+    lang: str,
+    saved_by: str,
+    journal: Entry | None = None,
 ) -> SavedLetter:
     """Зафиксировать письмо партнёру в том виде, в каком его подтвердил человек.
 
@@ -96,6 +103,7 @@ def save_letter(
                 raise PushError(
                     f"Проверки {ident} нет в истории пространства — письму не к чему лечь"
                 )
+        record(conn, journal)  # той же транзакцией, что письмо
         conn.commit()
 
     return SavedLetter(id=str(row[0]), body=body, lang=lang, saved_by=saved_by, created_at=row[1])
