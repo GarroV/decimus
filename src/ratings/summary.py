@@ -103,7 +103,7 @@ def country_average(facts: Sequence[Fact], rating_type: str, country: str) -> fl
 @dataclass(frozen=True)
 class Candle:
     """Месяц на графике: средняя группы по периодам рейтинга, начавшимся в месяце
-    (D383) — первая, наибольшая, наименьшая, последняя; `periods` — сколько их."""
+    (D384) — первая, наибольшая, наименьшая, последняя; `periods` — сколько их."""
 
     month: date
     open: float

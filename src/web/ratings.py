@@ -165,7 +165,7 @@ def _group_name(
 
 
 def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
-    """Строки сводки со свечами: шкала общая на вид рейтинга (D383)."""
+    """Строки сводки со свечами: шкала общая на вид рейтинга (D384)."""
     period = (
         summary.selection.period.begin.replace(day=1),
         summary.selection.period.end.replace(day=1),

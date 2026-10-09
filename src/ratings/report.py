@@ -41,7 +41,7 @@ GROUP_DEVELOPER = "developer"
 GROUP_COUNTRY = "country"
 GROUP_CLUSTER = "cluster"
 GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
-#: Кластеры IMF (D383): CEE — вся Европа, OTHER — Other countries.
+#: Кластеры IMF (D384): CEE — вся Европа, OTHER — Other countries.
 CLUSTERS = ("CEE", "OTHER")
 #: Сколько месяцев на графике свечей — по конец выбранного периода.
 CANDLE_MONTHS = 12
@@ -51,7 +51,7 @@ CANDLE_MONTHS = 12
 class GroupLine:
     """Строка сводки по группе: кластер в срезе IMF, иначе сам срез (`key` — None).
 
-    Подробности — фильтром (D382): по странам строк здесь нет."""
+    Подробности — фильтром (D383): по странам строк здесь нет."""
 
     key: str | None
     countries: tuple[str, ...]
