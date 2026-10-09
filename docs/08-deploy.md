@@ -1119,9 +1119,12 @@ docker run --rm -v decimus_storage-data:/v -v "$PWD":/in alpine:3.22 tar -xzf /i
 убирать, пока MUSPELHEIM не выключен):
 
 ```
-https://decimus.95-111-249-216.sslip.io/auth/google/callback
-https://decimus.95-111-249-216.sslip.io/auth/google/mail
+https://decimus.vasiliy-garro.workers.dev/auth/google/callback
+https://decimus.vasiliy-garro.workers.dev/auth/google/mail
 ```
+
+С 09.10.2026 адреса возврата — только на Worker'е (D304): sslip-адреса из
+клиента Google убраны, вход людей — только через фронт.
 
 В `.env` VPS: `GOOGLE_REDIRECT_URI` и `GOOGLE_MAIL_REDIRECT_URI` — те же строки,
 `WEB_URL_PREFIX` пустой (у админки свой адрес). Пути заданы в коде:
@@ -1178,8 +1181,8 @@ SNI и Host, по которым Caddy выбирает сайт, — его DNS
 `GOOGLE_FRONT_REDIRECT_URI=https://decimus.vasiliy-garro.workers.dev/auth/google/callback`,
 и та же строка — в **Authorized redirect URIs** клиента `decimus-web` в Google
 Console (за владельцем). Метку фронта (`X-Decimus-Front`) ставит только Caddy;
-без переменной фронт входит паролем. Черновик письма в Gmail через фронт не
-заведён — у него свой адрес возврата (`GOOGLE_MAIL_REDIRECT_URI`).
+без переменной фронт входит паролем. Черновик письма в Gmail возвращается на
+`GOOGLE_MAIL_REDIRECT_URI`, с 09.10.2026 он тоже на Worker'е.
 
 ### 8.10. Раскатка пространств, волна 1 (#340)
 
