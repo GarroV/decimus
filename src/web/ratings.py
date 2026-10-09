@@ -165,7 +165,9 @@ def _group_name(
 
 
 def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
-    """Строки сводки со свечами: шкала общая на вид рейтинга (D384)."""
+    """Строки сводки со свечами (D384). Шкала — своя у каждой строки: общая
+    растягивалась выбросом соседней группы, и свечи сжимались в черту; группы
+    сравнивают по числу слева, а не по высоте свечей."""
     period = (
         summary.selection.period.begin.replace(day=1),
         summary.selection.period.end.replace(day=1),
@@ -175,10 +177,13 @@ def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, ob
     kinds = {}
     for kind in ("rs", "rko"):
         series = [getattr(g, f"{kind}_candles") for g in summary.groups]
-        sc = rc.scale(series, threshold)
+        scales = [rc.scale([s], threshold) for s in series]
         kinds[kind] = {
-            "scale": sc,
-            "rows": [rc.sticks(s, sc, period=period, lang=lang, title=title) for s in series],
+            "scales": scales,
+            "rows": [
+                rc.sticks(s, sc, period=period, lang=lang, title=title)
+                for s, sc in zip(series, scales, strict=True)
+            ],
         }
     return {
         "names": names,
