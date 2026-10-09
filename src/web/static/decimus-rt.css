@@ -94,6 +94,7 @@
 .rt-cl > :nth-last-child(-n+3) { border-bottom: 0; }
 .rt-cl__head { font-size: var(--fs-meta); color: var(--ink-3); padding-bottom: var(--space-2); }
 .rt-cl__name { font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink); display: flex; flex-direction: column; justify-content: center; }
+.rt-cl__name.is-sub { font-weight: var(--w-regular); color: var(--ink-2); padding-left: var(--space-6); }
 .rt-cl__name small { font-weight: var(--w-regular); color: var(--ink-3); font-size: var(--fs-meta); }
 .rt-cl__kpi { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-2); }
 .rt-cl__kpi b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: var(--w-semibold); color: var(--ink); }
@@ -112,6 +113,9 @@
 .rt-candle--down rect, .rt-candle--down line { fill: var(--err); stroke: var(--err); }
 .rt-candle--flat rect, .rt-candle--flat line { fill: var(--ink-3); stroke: var(--ink-3); }
 .rt-candle.is-out { opacity: .4; }
+.rt-candle { cursor: default; outline: none; }
+.rt-candle:focus-visible rect { stroke: var(--accent); stroke-width: 2; }
+.rt-tip { position: fixed; z-index: 50; pointer-events: none; max-width: 22rem; padding: var(--space-2) var(--space-3); border-radius: var(--r-control); background: var(--ink); color: var(--surface); font-size: var(--fs-meta); line-height: 1.35; box-shadow: 0 4px 16px rgba(0, 0, 0, .25); }
 .rt-candle:hover { opacity: 1; }
 .rt-cl__axis { padding-left: 1.6rem; display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
 .rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
