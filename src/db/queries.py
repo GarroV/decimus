@@ -73,6 +73,7 @@ select
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 order by i.inspection_date desc, i.pushed_at desc
@@ -96,6 +97,7 @@ select
 from inspections i
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
 order by i.inspection_date desc, i.pushed_at desc
@@ -166,6 +168,7 @@ from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s and u.name_normalized = %(unit)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
 order by i.inspection_date desc, i.pushed_at desc, f.n
 limit %(limit)s
 """
@@ -576,6 +579,7 @@ from inspections i
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -745,6 +749,7 @@ from findings f
      join inspections i on i.id = f.inspection_id
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -815,6 +820,7 @@ where f.inspection_id = (
     where i.tenant_code = %(tenant)s
       and u.name = %(unit)s
       and i.retracted_at is null
+      and i.status = 'finalized'
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
@@ -887,6 +893,7 @@ from inspections i
      join units u on u.tenant_code = i.tenant_code and u.id = i.unit_id
      cross join lateral jsonb_each(i.by_zone) as zone
 where i.tenant_code = %(tenant)s
+  and i.status = 'finalized'  -- историей сети считается принятое (D199)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)

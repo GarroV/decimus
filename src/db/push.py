@@ -69,12 +69,18 @@ on conflict (source_fingerprint) where retracted_at is null do nothing
 returning id
 """
 
-#: Печать проверки. Условие `status = 'draft'` не украшение: запечатать можно
-#: только незапечатанное, и число затронутых строк ниже проверяется, а не
+#: Закрытие слива. Условие `status = 'draft'` не украшение: закрыть можно
+#: только собираемое, и число затронутых строк ниже проверяется, а не
 #: считается заведомо единицей (конституция: у операции с наблюдаемым
 #: результатом проверяется результат, а не отсутствие исключения).
+#:
+#: Слив заканчивается НЕ печатью, а ожиданием вычитки (D199): проверка уходит
+#: в `review`, историей сети её делает человек в админке (`db/review.py`). До
+#: этого решения слив печатал проверку сразу, и невычитанная запись в ту же
+#: секунду становилась результатом партнёра и основанием для подсказки о
+#: повторе, который стоит вдвое.
 _SEAL_INSPECTION_SQL = (
-    "update inspections set status = 'finalized' where id = %s and status = 'draft'"
+    "update inspections set status = 'review' where id = %s and status = 'draft'"
 )
 
 _SELECT_BY_FINGERPRINT_SQL = "select id from inspections where source_fingerprint = %s"
