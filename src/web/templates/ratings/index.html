@@ -138,6 +138,13 @@
         {% for s in ('name', 'rs', 'rko') %}<a href="{{ href(selection.group, selection.value, selection.period.key, s) }}"{% if board.sort == s %} aria-current="true"{% endif %}>{{ t('ratings.sort.' ~ s) }}</a>{% endfor %}
       </nav>{% endif %}
     </div>
+    {#- Легенда шкалы: без неё точки и полосы читались как ползунки (владелец, 09.10.2026). -#}
+    <p class="rt-legend">
+      <span><i class="rt-legend__dot rt-legend__dot--up" aria-hidden="true"></i><i class="rt-legend__dot rt-legend__dot--down" aria-hidden="true"></i>{{ t('ratings.legend.now', period=calendar.title) }}</span>
+      <span><i class="rt-legend__ghost" aria-hidden="true"></i>{{ t('ratings.legend.prev', prev=prev) }}</span>
+      <span><i class="rt-legend__trail" aria-hidden="true"></i>{{ t('ratings.legend.move') }}</span>
+      <span><i class="rt-legend__thr" aria-hidden="true"></i>{{ t('ratings.legend.thr', x=thr(summary.thresholds.top_threshold)) }}</span>
+    </p>
     <div class="rt-board" role="table" aria-labelledby="rt-scores">
       <div class="rt-board__head" role="row">
         <span role="columnheader" class="rt-board__name">{{ t('ratings.col.country') }}</span>
