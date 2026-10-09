@@ -51,7 +51,6 @@ from . import (
     letter_draft,
     letter_markup,
     prescriptions,
-    profile,
     ratings,
     review,
     revision,
