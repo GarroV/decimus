@@ -16,7 +16,7 @@
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
-{% macro dlt(x) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(1)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ '%+.1f'|format(r) }}</span>{% endif %}{% endmacro %}
+{% macro dlt(x, digits=1) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(digits)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ ('%+.' ~ digits ~ 'f')|format(r) }}</span>{% endif %}{% endmacro %}
 {% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
 {#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
     данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
@@ -240,7 +240,7 @@
   {#- Оценки на картах из Pointer: средняя по всем отзывам страны, вес — число отзывов. -#}
   <section class="rt-sec" aria-labelledby="rt-maps">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-maps">{{ t('ratings.block.maps') }}</h2>
-      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }}</span></div>
+      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }} · {{ t('ratings.col.delta', prev=previous_title or '—') }}</span></div>
     {% if not maps or not (maps|selectattr('as_of')|list) %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
     {% else %}<div class="rt-card"><table class="rt-maps">
       <thead><tr><th scope="col">{{ t('ratings.col.country') }}</th>
@@ -248,7 +248,7 @@
         <th scope="col" class="num">{{ t('ratings.maps.branches') }}</th></tr></thead>
       <tbody>{% for row in maps %}<tr>
         <th scope="row">{{ country_name(row.country) }}</th>
-        {% for p in map_providers %}{% set s = row.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b> <span class="rt-maps__n">{{ t('ratings.maps.reviews', n=s.reviews) }}</span>{% endif %}</td>{% endfor %}
+        {% for p in map_providers %}{% set s = row.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b>{% if s.delta is not none %} {{ dlt(s.delta, 2) }}{% endif %} <span class="rt-maps__n">{{ t('ratings.maps.reviews', n=s.reviews) }}</span>{% endif %}</td>{% endfor %}
         <td class="num">{{ row.scores.values()|map(attribute='branches')|max }}</td>
       </tr>{% endfor %}</tbody>
     </table></div>{% endif %}

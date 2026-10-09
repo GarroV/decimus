@@ -51,3 +51,34 @@ def test_кривой_филиал_и_кривая_оценка_отбрасыв
     )
     assert филиал is not None and филиал.country_code == "RS"
     assert [(r.provider_id, r.avg_rating) for r in филиал.ratings] == [(2, 4.5)]
+
+
+def test_изменение_страны_к_прошлому_периоду() -> None:
+    from src.ratings.maps import with_delta
+
+    сейчас = summarize([LatestRating("RS", pointer.GOOGLE, 4.5, 100, ДЕНЬ)], ("RS",))
+    было = summarize([LatestRating("RS", pointer.GOOGLE, 4.4, 80, ДЕНЬ)], ("RS",))
+    пусто = summarize([], ("RS",))
+
+    assert with_delta(сейчас, было)[0].scores[pointer.GOOGLE].delta == 0.1
+    assert with_delta(сейчас, пусто)[0].scores[pointer.GOOGLE].delta is None
+    assert with_delta(сейчас, было)[0].scores[pointer.YANDEX].delta is None
+
+
+def test_история_филиала_разбирается_по_дням() -> None:
+    ответ = {
+        "items": [
+            {
+                "date": "2026-09-09",
+                "ratings": [{"provider_id": 2, "avg_rating": 4.6, "ratings_count": 1051}],
+            },
+            {
+                "date": "кривая",
+                "ratings": [{"provider_id": 2, "avg_rating": 4.6, "ratings_count": 1}],
+            },
+        ]
+    }
+    оценки = pointer.history(lambda _путь: ответ, "u1", ДЕНЬ, ДЕНЬ)
+    assert [(r.on_date, r.avg_rating, r.ratings_count) for r in оценки] == [
+        (date(2026, 9, 9), 4.6, 1051)
+    ]
