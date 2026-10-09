@@ -90,7 +90,7 @@
                и их история. Город без страны в справочнике — в «Проверки»,
                как раньше: экрана страны с пустым кодом не бывает. #}
             <a class="ov-table__row"
-               href="{{ country_url(row.country, city=row.city) if row.country else registry_url(city=row.city) }}">
+               href="{{ country_url(row.country, city=row.city) if row.country and country_url else registry_url(city=row.city) }}">
               <span class="ov-cell__name">{{ city_title(row.city) or t('overview.breakdown.nocity') }}</span>
               <span class="ov-num">{{ row.units }}</span>
               <span class="ov-num ov-num--strong">
@@ -277,7 +277,7 @@
         {% for point in data.points %}
           {% set unit_id = unit_ids.get(point.unit) %}
           <a class="ov-table__row"
-             href="{% if unit_id and point.country %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
+             href="{% if unit_id and point.country and country_url %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
             <span class="ov-cell__name">{{ point.unit }}</span>
             <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
             <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span></span>
