@@ -150,12 +150,12 @@
       {% for kind in ('rs', 'rko') %}<span class="rt-cl__head" role="columnheader">{{ t('ratings.' ~ kind) }} · {{ t('ratings.col.delta', prev=prev) }}</span>{% endfor %}
       {% for g in summary.groups %}{% set i = loop.index0 %}
       <span class="rt-cl__name" role="rowheader">{{ chart.names[i] }}<small>{{ t('ratings.countries.n', n=g.countries|length) }}</small></span>
-      {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}
+      {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}{% set sc = k.scales[i] %}
       <div role="cell">
-        <div class="rt-cl__kpi"><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
-        <div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ k.scale.high|int }}</i><i>{{ k.scale.low|int }}</i></span>
+        <div class="rt-cl__kpi"><span class="rt-cl__k">{{ t('ratings.' ~ kind) }}</span><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
+        <div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
         <svg class="rt-candles" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.candle.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
-          {% if k.scale.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ k.scale.threshold_y }}" y2="{{ k.scale.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
+          {% if sc.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
           {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}"><title>{{ c.title }}</title>
             <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.wick_top }}" y2="{{ c.wick_bottom }}" vector-effect="non-scaling-stroke"/>
             <rect x="{{ c.x - c.width / 2 }}" y="{{ c.body_top }}" width="{{ c.width }}" height="{{ c.body_height }}" rx="1"/></g>{% endfor %}
@@ -236,7 +236,7 @@
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-maps">{{ t('ratings.block.maps') }}</h2>
       <span class="rt-sec__meta">{{ t('ratings.maps.hint') }} · {{ t('ratings.col.delta', prev=previous_title or '—') }}</span></div>
     {% if not maps or not (maps|selectattr('as_of')|list) %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
-    {% else %}<div class="rt-card"><table class="rt-maps">
+    {% else %}<div class="rt-card rt-scroll"><table class="rt-maps">
       <thead><tr><th scope="col"></th>
         {% for p in map_providers %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p) }}</th>{% endfor %}
         <th scope="col" class="num">{{ t('ratings.maps.branches') }}</th></tr></thead>
