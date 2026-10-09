@@ -155,7 +155,10 @@ def current_section(path: str) -> str | None:
 
 
 #: Разделы контролинга (D358): рейтинги и «Пользователи» — там свой пароль и бот.
-CONTROL_SECTIONS = frozenset({"ratings", "users"})
+CONTROL_SECTIONS = frozenset({"overview", "registry", "ratings", "users"})
+
+#: Из них контролингу только на чтение (D366): обзор и все проверки.
+CONTROL_READ_ONLY = frozenset({"overview", "registry"})
 
 
 def visible_sections(account: object | None) -> tuple[Section, ...]:
