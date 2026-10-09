@@ -202,8 +202,8 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.layout.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
     "ratings.block.maps": {"ru": "Оценки на картах", "en": "Ratings on maps"},
     "ratings.maps.hint": {
-        "ru": "Средняя по всем отзывам страны, по данным Pointer на последнюю загрузку",
-        "en": "Average over all reviews in the country, from Pointer as of the last load",
+        "ru": "Средняя по всем отзывам страны на конец периода, данные Pointer",
+        "en": "Average over all reviews in the country at the end of the period, from Pointer",
     },
     "ratings.maps.provider.2": {"ru": "Google", "en": "Google"},
     "ratings.maps.provider.1": {"ru": "Яндекс", "en": "Yandex"},

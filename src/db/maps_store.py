@@ -86,8 +86,9 @@ class LatestRating:
     on_date: date
 
 
-def latest(countries: Sequence[str]) -> tuple[LatestRating, ...]:
-    """Последняя оценка каждого филиала на каждой карте по этим странам."""
+def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[LatestRating, ...]:
+    """Последняя оценка каждого филиала на каждой карте по этим странам —
+    на `until` включительно (не задан — на сегодня)."""
     if not countries:
         return ()
     sql = """
@@ -95,12 +96,37 @@ def latest(countries: Sequence[str]) -> tuple[LatestRating, ...]:
                c.country_code, r.provider_id, r.avg_rating, r.ratings_count, r.on_date
         from maps.ratings r
         join maps.companies c on c.uuid = r.company_uuid
-        where c.country_code = any(%s)
+        where c.country_code = any(%s) and (%s::date is null or r.on_date <= %s::date)
         order by r.company_uuid, r.provider_id, r.on_date desc
     """
     try:
         with psycopg.connect(check_environment().dsn) as conn:
-            rows = conn.execute(sql, (list(countries),)).fetchall()
+            rows = conn.execute(sql, (list(countries), until, until)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Оценки карт не прочитались ({exc.__class__.__name__})") from exc
     return tuple(LatestRating(str(r[0]), int(r[1]), float(r[2]), int(r[3]), r[4]) for r in rows)
+
+
+def company_uuids() -> tuple[str, ...]:
+    """Все известные филиалы — для дозагрузки истории."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            rows = conn.execute("select uuid::text from maps.companies order by uuid").fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(f"Филиалы карт не прочитались ({exc.__class__.__name__})") from exc
+    return tuple(str(r[0]) for r in rows)
+
+
+def covered_days(company_uuid: str, start: date, end: date) -> int:
+    """Сколько дней окна у филиала уже есть — чтобы повторная дозагрузка не
+    тратила запросы на то, что уже легло."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            row = conn.execute(
+                "select count(distinct on_date) from maps.ratings "
+                "where company_uuid = %s and on_date between %s and %s",
+                (company_uuid, start, end),
+            ).fetchone()
+    except psycopg.Error as exc:
+        raise RatingsError(f"История карт не прочиталась ({exc.__class__.__name__})") from exc
+    return int(row[0]) if row else 0
