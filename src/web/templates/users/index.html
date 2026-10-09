@@ -33,7 +33,7 @@
       {% endif %}
     </div>
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
-    {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}">{{ t('profile.open') }}</a>{% endif %}
+    {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
   {% if has_spaces_tab %}
     <nav class="stabs" aria-label="{{ t('section.users.title') }}">
@@ -41,7 +41,8 @@
       <a class="stabs__item{% if tab == 'spaces' %} is-current{% endif %}" href="{{ link(tab='spaces') }}"{% if tab == 'spaces' %} aria-current="page"{% endif %}>{{ t('users.spaces.title' if manages_spaces else 'users.spaces.own_title') }}</a>
     </nav>
   {% endif %}
-  {% if show.flash and card == 'none' and tab == 'people' %}
+  {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
+  {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>
   {% endif %}
 {% endblock %}
@@ -78,7 +79,7 @@
         {% endif %}
         <button class="sbtn" type="submit" data-autosubmit-button>{{ t('users.filter.apply') }}</button>
         {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ link_reset }}">{{ t('users.filter.reset') }}</a>{% endif %}
-        <a class="sbtn sbtn--primary sbar__add" href="{{ link(add='1') }}">{{ icon('plus') }}<span>{{ t('users.add.open') }}</span></a>
+        <a class="sbtn sbtn--primary sbar__add" href="{{ link(add='1') }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('users.add.open') }}</span></a>
       </form>
 
       {% if not people_known %}
@@ -95,7 +96,7 @@
           {% else %}
             <p class="sempty__title">{{ t('users.empty.title') }}</p>
             <p class="sempty__text">{{ t('users.empty.text') }}</p>
-            <a class="sbtn sbtn--primary" href="{{ link(add='1') }}">{{ t('users.add.open') }}</a>
+            <a class="sbtn sbtn--primary" href="{{ link(add='1') }}" data-drawer-open>{{ t('users.add.open') }}</a>
           {% endif %}
         </div>
       {% else %}
@@ -109,7 +110,7 @@
           </div>
           <ul class="slist__rows">
             {% for р in people %}
-              {% set текущий = card_row is not none and card_row.id == р.id and card in ('person', 'me') %}
+              {% set текущий = split_open and card_row is not none and card_row.id == р.id and card in ('person', 'me') %}
               <li>
                 <a class="srow{% if текущий %} is-current{% endif %}{% if р.disabled_at %} is-off{% endif %}"
                    href="{{ link(person=р.id) }}"{% if текущий %} aria-current="true"{% endif %}>
@@ -132,7 +133,22 @@
         </div>
       {% endif %}
     </div>
+  {% else %}
+    {# Без права вести людей экран — только своя карточка, прямо на странице. #}
+    <div class="sbox sbox--card">{{ person_card(card, card_row) }}</div>
   {% endif %}
+{% endblock %}
+
+{% block split_title %}
+  {%- if tab == 'spaces' -%}
+    {{ t('users.spaces.add.title') if space_add else t('users.drawer.space') }}
+  {%- elif card == 'add' -%}
+    {{ t('users.add.title') }}
+  {%- elif card == 'me' -%}
+    {{ t('profile.open') }}
+  {%- else -%}
+    {{ t('users.drawer.person') }}
+  {%- endif -%}
 {% endblock %}
 
 {% block split_detail %}

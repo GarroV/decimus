@@ -1,18 +1,23 @@
 {#
-  Каркас «слева список, справа выбранное» — один на все экраны с этой
-  раскладкой («Пользователи», «Проверки»). Образец — Swarm Brain (раздел
-  интеграций `ConnectorsSection.tsx` и правая панель задач; решение владельца
-  30.09.2026: «слева список, справа настройки»).
+  Каркас «список на всю ширину, выбранное — в панели, выезжающей справа» —
+  один на все экраны с этой раскладкой («Пользователи», «Проверки»).
 
-  Выбор живёт в адресе, поэтому раскладка работает без скриптов: ссылка строки
-  открывает выбранное справа, перезагрузка его не теряет. Скрипт `split.js`
-  только добавляет Esc («назад к списку» на телефоне) и фокус.
+  Образец — Swarm Brain, панель задачи: `miniapp/src/components/TaskModal.tsx:104`
+  (`DRAWER_CLS`, режим drawer) поверх `components/ui/dialog.tsx`.
+  Было: решение владельца 30.09.2026: «слева список, справа настройки» —
+  постоянной колонкой. Уточнено 09.10.2026, решение владельца: «как в Сворме: с
+  правой стороны выезжает слайдер, и там настройки».
+
+  Выбор живёт в адресе, поэтому панель работает без скриптов: адрес с выбором
+  рисует страницу с открытой панелью, закрытие (✕ и щелчок по затемнению) —
+  обычная ссылка на тот же экран без выбора. Скрипт `split.js` добавляет Esc,
+  открытие без перезагрузки и анимацию закрытия.
 
   Что передаёт экран:
-    split_open — выбор сделан ЯВНО (адресом или действием). На телефоне тогда
-                 показывается только правая колонка с «Назад», иначе — список;
-    split_back — куда ведёт «Назад» (тот же экран без выбора).
-  Слоты: `split_top` (шапка экрана), `split_list`, `split_detail`.
+    split_open — выбор сделан (адресом или действием): панель открыта;
+    split_back — адрес закрытия (тот же экран без выбора).
+  Слоты: `split_top` (шапка), `split_list`, `split_title` (заголовок панели),
+  `split_detail` (содержимое панели).
 #}{% extends "base.html" %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
@@ -22,13 +27,19 @@
 {% block page_class %} page--split{% endblock %}
 {% block body %}
   {% block split_top %}{% endblock %}
-  <div class="split{% if split_open %} split--open{% endif %}">
+  <div class="split">
     <section class="split__list">{% block split_list %}{% endblock %}</section>
-    <aside class="split__detail" id="detail" aria-live="polite">
-      {% if split_back %}
-        <a class="split__back" href="{{ split_back }}" data-split-back>{{ icon('cleft') }}<span>{{ t('split.back') }}</span></a>
-      {% endif %}
-      {% block split_detail %}{% endblock %}
-    </aside>
   </div>
+  {% if split_open %}
+    <div class="sdrawer" data-drawer>
+      <a class="sdrawer__scrim" href="{{ split_back }}" data-drawer-close tabindex="-1" aria-hidden="true"></a>
+      <aside class="sdrawer__panel" role="dialog" aria-modal="true" aria-labelledby="sdrawer-title">
+        <header class="sdrawer__head">
+          <h2 class="sdrawer__title" id="sdrawer-title">{% block split_title %}{% endblock %}</h2>
+          <a class="sdrawer__close" href="{{ split_back }}" data-drawer-close aria-label="{{ t('split.close') }}">{{ icon('x') }}</a>
+        </header>
+        <div class="sdrawer__body">{% block split_detail %}{% endblock %}</div>
+      </aside>
+    </div>
+  {% endif %}
 {% endblock %}

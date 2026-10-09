@@ -84,7 +84,7 @@ def админ_ук(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[
 
 
 def test_админ_уК_видит_почту_и_формы_правки(админ_ук: FlaskClient) -> None:
-    страница = админ_ук.get("/users").get_data(as_text=True)
+    страница = админ_ук.get("/users?person=id-petr").get_data(as_text=True)
 
     assert "petr@dodobrands.io" in страница
     assert 'action="/users/role' in страница and 'action="/users/email' in страница
@@ -633,7 +633,7 @@ def test_контроль_не_меняет_роли_даже_своим(
 def test_контроль_видит_только_людей_контролинга(
     контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
-    страница = контроль.get("/users").get_data(as_text=True)
+    страница = контроль.get("/users?person=id-vika").get_data(as_text=True)
 
     assert "vika" in страница and "vika@dodobrands.io" in страница
     for чужое in ("petr", "boss", "nino", "petr@dodobrands.io", "boss@dodobrands.io"):
