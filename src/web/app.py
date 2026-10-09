@@ -18,14 +18,12 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
 from typing import Any
 
 import psycopg
 from flask import (
     Flask,
     abort,
-    make_response,
     redirect,
     render_template,
     request,
@@ -35,13 +33,13 @@ from flask import (
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import bot_links, directory
+from src.db import directory
 from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant, is_admin_role
 from src.report.info_titles import FOUND
 
 from . import (
@@ -51,15 +49,14 @@ from . import (
     auth,
     letter_draft,
     letter_markup,
-    people,
     prescriptions,
     pricing,
-    profile,
     ratings,
     review,
     revision,
     security_headers,
     unit_add,
+    users_screen,
     view,
     walk_proxy,
 )
@@ -69,13 +66,12 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
-from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
-from .db_refusal import note_target_mismatch, public_reason
+from .config import Settings, load_settings
+from .db_refusal import public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
-from .remote import client_address
 from .sections import (
     SECTIONS,
     check_registry,
@@ -134,6 +130,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _install_hq_gate(app)
     _install_control_gate(app)
+    _install_methodology_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -142,6 +139,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
+    users_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
     _register_methodology(app, conf)
@@ -1057,289 +1055,6 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             code=303,
         )
 
-    # --- учётки админки (T338, #322) ---------------------------------------
-    # Заведение переехало из командной строки на экран, и заслон стоит ЗДЕСЬ, а
-    # не в навигации: адрес известен, набрать его руками может кто угодно.
-    users_path = section("users").path
-
-    def _страница_учёток(
-        *,
-        added: accounts.Added | None = None,
-        outcome: str | None = None,
-        code: int = 200,
-        bot_link: str | None = None,
-        bot_link_until: datetime | None = None,
-        password: profile.Outcome | None = None,
-        edit: people.Outcome | None = None,
-    ) -> tuple[str, int]:
-        # Перечень людей и форма заведения — админу УК всех (D288), «контролю» —
-        # только людей контролинга (D360). Остальные видят свою строку: вкладка
-        # открыта всем ради привязки бота (D286).
-        круг = _people_scope()
-        управляет = круг is not None
-        ведёт_всех = круг == _SCOPE_ALL
-        люди: tuple[accounts.AccountRow, ...] = ()
-        пространства: tuple[str, ...] = ()
-        перечень_известен = True
-        привязки: dict[str, bot_links.Binding] = {}
-        if управляет:
-            try:
-                if ведёт_всех:
-                    люди = accounts.everyone(tenant=None)
-                    пространства = accounts.spaces()
-                    привязки = bot_links.live_bindings()
-                else:
-                    люди = people.control_circle(accounts.everyone(tenant=HQ_TENANT))
-                    пространства = (HQ_TENANT,)
-            except DbError as exc:
-                note_target_mismatch(exc)
-                # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
-                # вторая была бы молчаливой ложью на экране, где считают людей
-                # с доступом.
-                перечень_известен = False
-        вошедший = auth.current_account()
-        своя_привязка: bot_links.Binding | None = None
-        привязка_известна = True
-        try:
-            своя_привязка = bot_links.binding_of(вошедший.id) if вошедший else None
-        except DbError:
-            # «Не привязан» и «не смогли узнать» — разные ответы: второй не
-            # предлагает привязать заново то, что, может быть, привязано.
-            привязка_известна = False
-        return (
-            render_template(
-                "users/index.html",
-                manage=управляет,
-                manage_all=ведёт_всех,
-                people=люди,
-                people_known=перечень_известен,
-                spaces=пространства,
-                added=added,
-                outcome=outcome,
-                roles=accounts.ROLES if ведёт_всех else (accounts.ROLE_CONTROL,),
-                roles_for=accounts.roles_for,
-                users_path=users_path,
-                bindings=привязки,
-                own_binding=своя_привязка,
-                own_binding_known=привязка_известна,
-                bot_username=conf.bot_username,
-                bot_link=bot_link,
-                bot_link_until=bot_link_until,
-                bot_var=WEB_BOT_USERNAME_VAR,
-                password=password,
-                min_password=accounts.MIN_PASSWORD_LENGTH,
-                max_password=accounts.MAX_PASSWORD_LENGTH,
-                edit=edit,
-            ),
-            code,
-        )
-
-    def _в_круге_контроля(логин: str) -> bool:
-        """Учётка из формы — человек контролинга в УК (D360); сверка с базой, не с формой."""
-        пространство = canonical_tenant((request.form.get("tenant") or "").strip())
-        return people.in_control_circle(
-            accounts.everyone(tenant=HQ_TENANT), login=логин, tenant=пространство
-        )
-
-    def _пространство_из_формы() -> str | None:
-        """Пространство из формы — только из заведённых; незнакомое — `None`."""
-        выбрано = canonical_tenant((request.form.get("tenant") or "").strip())
-        return выбрано if выбрано and выбрано in accounts.spaces() else None
-
-    @app.get(users_path)
-    def users() -> FlaskResponse | tuple[str, int]:
-        return _страница_учёток()
-
-    @app.post(f"{users_path}/bot-link")
-    def bot_link() -> FlaskResponse | tuple[str, int]:
-        """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
-
-        Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
-        Telegram к выбранному человеку. Ссылка показывается на странице ответа,
-        а не в адресе: адрес оседает в истории браузера и журнале прокси — тот
-        же довод, что у пароля новой учётки.
-        """
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("выпуск ссылки привязки без вошедшего: маршрут прошёл мимо заслона")
-        if not conf.bot_username:
-            return _страница_учёток(outcome="bot_unset", code=503)
-        try:
-            ссылка = bot_links.issue_link(вошедший.id)
-        except DbError:
-            return _страница_учёток(outcome="bot_link_failed", code=503)
-        return _страница_учёток(
-            bot_link=link_url(conf.bot_username, ссылка.token),
-            bot_link_until=ссылка.expires_at,
-        )
-
-    @app.post(f"{users_path}/bot-unlink")
-    def bot_unlink() -> FlaskResponse | tuple[str, int]:
-        """Отвязать бота: свою привязку — каждый, чужую — только админ УК (D288)."""
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("отвязка бота без вошедшего: маршрут прошёл мимо заслона")
-        чей = (request.form.get("user_id") or "").strip() or вошедший.id
-        if чей != вошедший.id:
-            отказ = _hq_admin_only()
-            if отказ is not None:
-                return отказ
-        try:
-            отвязано = bot_links.unbind(чей)
-        except DbError:
-            return _страница_учёток(outcome="bot_unlink_failed", code=503)
-        return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
-
-    @app.post(f"{users_path}/password")
-    def own_password() -> FlaskResponse | tuple[str, int]:
-        """Сменить СВОЙ пароль (#324). Чей — решает сессия этого запроса, не форма.
-
-        Страница, а не перенаправление: исход показывается на месте, а
-        введённое обратно в разметку не возвращается — среди него пароли.
-        """
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("смена пароля без вошедшего: маршрут прошёл мимо заслона")
-        исход = profile.change_own(
-            current=request.form.get("current") or "",
-            new=request.form.get("new") or "",
-            repeat=request.form.get("repeat") or "",
-            token=auth.current_session_token(),
-            login=вошедший.login,
-            stand=auth.throttle_tenant(),
-            address=client_address(trusted_proxies=conf.trusted_proxies),
-        )
-        страница, код = _страница_учёток(password=исход, code=исход.status)
-        if исход.retry_after_seconds is None:
-            return страница, код
-        ответ = make_response(страница, код)
-        ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
-        return ответ
-
-    def _правка_человека(
-        действие: Callable[[str, str], people.Outcome],
-        *,
-        контролю_можно: bool = False,
-    ) -> FlaskResponse | tuple[str, int]:
-        """Общее у правки роли и почты: заслон, происхождение, пространство из формы.
-
-        Пространство — из строки учётки в перечне, сверенное с заведёнными:
-        человека правят там, где он живёт, а не в пространстве админа.
-        `контролю_можно` — правку открыть «контролю», но только над его кругом
-        (D360); роль ему не открывается никогда.
-        """
-        круг = _people_scope()
-        if круг is None or (круг == _SCOPE_CONTROL and not контролю_можно):
-            return _forbidden_people()
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        try:
-            пространство = _пространство_из_формы()
-            if круг == _SCOPE_CONTROL and not _в_круге_контроля(логин):
-                return _forbidden_people()
-        except DbError:
-            return _страница_учёток(edit=people.Outcome("edit.failed", 503), code=503)
-        if пространство is None or not логин:
-            return _страница_учёток(edit=people.Outcome("edit.space", 400), code=400)
-        исход = действие(логин, пространство)
-        return _страница_учёток(edit=исход, code=исход.status)
-
-    @app.post(f"{users_path}/role")
-    def user_role() -> FlaskResponse | tuple[str, int]:
-        """Назначить роль человеку (#399). Только админ УК; свою — нельзя."""
-        вошедший = auth.current_account()
-        роль = (request.form.get("role") or "").strip()
-        return _правка_человека(
-            lambda логин, пространство: people.change_role(
-                login=логин,
-                tenant=пространство,
-                role=роль,
-                actor_login=вошедший.login if вошедший else "",
-                actor_tenant=вошедший.tenant if вошедший else "",
-            )
-        )
-
-    @app.post(f"{users_path}/email")
-    def user_email() -> FlaskResponse | tuple[str, int]:
-        """Почта входа через Google (#399): задать или снять (пустое поле). Только админ УК."""
-        вошедший = auth.current_account()
-        почта = request.form.get("email") or ""
-        return _правка_человека(
-            lambda логин, пространство: people.change_email(
-                login=логин,
-                tenant=пространство,
-                email=почта,
-                actor_login=вошедший.login if вошедший else "",
-                actor_tenant=вошедший.tenant if вошедший else "",
-            ),
-            контролю_можно=True,
-        )
-
-    @app.post(f"{users_path}/add")
-    def add_user() -> FlaskResponse | tuple[str, int]:
-        """Завести человека. Пароль показывается ОДИН раз — на этой же странице.
-
-        Страница, а не перенаправление: пароль в адресе остался бы в истории
-        браузера и в журнале обратного прокси, то есть перестал бы быть
-        паролем ровно в момент показа.
-
-        «Контроль» заводит только контроль в УК (D360): иная роль или
-        пространство в форме — подделка, отказ 403 до базы.
-        """
-        круг = _people_scope()
-        if круг is None:
-            return _forbidden_people()
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        роль = request.form.get("role") or accounts.ROLE_AUDITOR
-        if круг == _SCOPE_CONTROL and (
-            роль != accounts.ROLE_CONTROL
-            or canonical_tenant((request.form.get("tenant") or "").strip()) != HQ_TENANT
-        ):
-            return _forbidden_people()
-        try:
-            пространство = _пространство_из_формы()
-            if пространство is None:
-                return _страница_учёток(outcome="add_space_unknown", code=400)
-            if роль not in accounts.roles_for(пространство):
-                return _страница_учёток(outcome="add_role_space", code=400)
-            заведённый = accounts.add(логин, tenant=пространство, role=роль)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return _страница_учёток(outcome="add_failed", code=400)
-        return _страница_учёток(added=заведённый, outcome="added")
-
-    @app.post(f"{users_path}/disable")
-    def disable_user() -> FlaskResponse | tuple[str, int]:
-        """Отключить учётку: админ УК — любую, «контроль» — человека контролинга (D360)."""
-        круг = _people_scope()
-        if круг is None:
-            return _forbidden_people()
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        вошедший = auth.current_account()
-        if вошедший is not None and логин == вошедший.login:
-            # Отключить себя — это выйти и не вернуться, а на стенде с одним
-            # администратором ещё и закрыть экран учёток навсегда: снять
-            # пометку изнутри продукта нечем.
-            return _страница_учёток(outcome="disable_self", code=400)
-        try:
-            if круг == _SCOPE_CONTROL and not _в_круге_контроля(логин):
-                return _forbidden_people()
-            # Пространство — из строки учётки в перечне, сверенное с заведёнными:
-            # учётку отключают там, где она живёт, а не в пространстве админа.
-            пространство = _пространство_из_формы()
-            if пространство is None:
-                return _страница_учёток(outcome="disable_missing", code=400)
-            отключено = accounts.disable(логин, tenant=пространство)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return _страница_учёток(outcome="disable_failed", code=400)
-        return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
-
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         отказ = _admin_only()
@@ -1362,7 +1077,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/accept")
     def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Подтвердить проверку на приёмке (D199). Админ своего пространства (D283)."""
+        """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1387,7 +1102,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Исправить запись ждущей проверки с пересчётом (D200). Админ своего пространства."""
+        """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1416,7 +1131,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Перенести проверку по дате и пиццерии (D195). Только администратор."""
+        """Перенести проверку по дате и пиццерии (D195). Только админ УК (D341)."""
         отказ = _admin_only()
         if отказ is not None:
             return отказ
@@ -1507,6 +1222,27 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
     return path in own
 
 
+def _install_methodology_gate(app: Flask) -> None:
+    """Методику правят только админы (D344): любая запись в разделе «Методика» — 403.
+
+    Заслон `before_request`, а не проверка в каждом маршруте: у правящих
+    маршрутов `/admin/*` своей проверки роли нет, и новый закрыт с момента
+    появления. Читать методику по-прежнему могут все, кому открыт раздел.
+    """
+    methodology_path = section("admin").path
+
+    @app.before_request
+    def _методику_правят_админы() -> None:
+        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
+            return
+        путь = request.path
+        if путь != methodology_path and not путь.startswith(f"{methodology_path}/"):
+            return
+        вошедший = auth.current_account()
+        if вошедший is not None and not is_admin_role(вошедший.role):
+            abort(403)
+
+
 def _install_control_gate(app: Flask) -> None:
     """Роль «контроль» видит только рейтинги (D358; было «остальное на чтение», D319).
 
@@ -1537,64 +1273,22 @@ def _install_control_gate(app: Flask) -> None:
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
-def link_url(bot_username: str, token: str) -> str:
-    """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
-    return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
-
-
-#: Кругом людей на экране «Пользователи» управляет: админ УК — всеми,
-#: «контроль» — только людьми контролинга в УК (D360).
-_SCOPE_ALL = "all"
-_SCOPE_CONTROL = "control"
-
-
-def _people_scope() -> str | None:
-    """Чьими учётками управляет вошедший: `_SCOPE_ALL`, `_SCOPE_CONTROL` или `None`.
-
-    Обе роли — только в УК: админ партнёра людьми не управляет (D288), а
-    «контроль» вне УК не бывает (`0040`), но сверка стоит и здесь.
-    """
-    вошедший = auth.current_account()
-    if вошедший is None or canonical_tenant(вошедший.tenant) != HQ_TENANT:
-        return None
-    if вошедший.role == accounts.ROLE_ADMIN:
-        return _SCOPE_ALL
-    if вошедший.role == accounts.ROLE_CONTROL:
-        return _SCOPE_CONTROL
-    return None
-
-
-def _forbidden_people() -> FlaskResponse:
-    """Отказ 403 на экране людей — той же страницей, что у `_hq_admin_only`."""
-    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
-
-
-def _hq_admin_only() -> FlaskResponse | None:
-    """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
-
-    Админ партнёра на вкладке «Пользователи» не управляет никем: его права не
-    построены (D288 открыт), и роль `admin` у учётки партнёра здесь ничего не
-    открывает.
-    """
-    вошедший = auth.current_account()
-    if (
-        вошедший is not None
-        and вошедший.role == accounts.ROLE_ADMIN
-        and canonical_tenant(вошедший.tenant) == HQ_TENANT
-    ):
-        return None
-    return _forbidden_people()
-
-
 def _admin_only() -> FlaskResponse | None:
-    """Отказ 403 всем, кроме администратора; `None` — можно.
+    """Отказ 403 всем, кроме админа и главного админа УК; `None` — можно.
+
+    Снятие, приёмка, правка записи и перенос проверки — только УК: партнёр
+    задним числом не меняет ничего, даже админ своего пространства (D341).
 
     Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
     руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
     её с выносом кадров мог любой аудитор.
     """
     вошедший = auth.current_account()
-    if вошедший is not None and вошедший.role == accounts.ROLE_ADMIN:
+    if (
+        вошедший is not None
+        and is_admin_role(вошедший.role)
+        and canonical_tenant(вошедший.tenant or "") == HQ_TENANT
+    ):
         return None
     # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
     # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
@@ -1627,7 +1321,7 @@ def _render_card(
         and not detail.inspection.on_review
     )
     # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
-    # админ своего пространства (D283), и ровно до подтверждения (D199, D200).
+    # админ УК по своей проверке (D283, D341), и ровно до подтверждения (D199, D200).
     # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
     можно_подтвердить = (
         админ

@@ -42,7 +42,7 @@ from src.web import methodology as method
 
 @pytest.fixture
 def двери(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
-    return подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    return подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="admin")  # D344
 
 
 @pytest.fixture
