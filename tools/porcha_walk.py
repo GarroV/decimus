@@ -78,7 +78,7 @@ cases = [
     ),
     (
         "src/web/walk.py",
-        "        if conf.bot_token is not None and revoked(chat_id):",
+        "        if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:",
         "        if False:",
         "tests/test_web_walk_write.py::test_снятый_доступ_не_пишет",
     ),
@@ -135,6 +135,32 @@ cases = [
         "    if words and learns:",
         "    if words:",
         "tests/test_web_walk_suggest.py::test_выученная_фраза_второй_раз_не_учится",
+    ),
+    # D372: посторонний с настоящей подписью — бот его не пускает, и мини-апп тоже.
+    (
+        "src/bot/access.py",
+        "    if положение.ever_bound:\n        # Отвязан",
+        "    if False:\n        # Отвязан",
+        "tests/test_web_walk.py::test_снятый_доступ_не_открывает_даже_свою_проверку",
+    ),
+    # D373: команда с токеном ко всей истории — только кругу доступа к MCP.
+    (
+        "src/web/walk_settings.py",
+        "            if bot is None or not in_circle(who, bot):",
+        "            if bot is None:",
+        "tests/test_web_walk_app.py::test_токен_только_кругу",
+    ),
+    (
+        "src/web/walk_settings.py",
+        "        if кому not in bot.allowed_ids:",
+        "        if False:",
+        "tests/test_web_walk_app.py::test_привести_можно_только_того_кого_пускает_бот",
+    ),
+    (
+        "src/web/walk_settings.py",
+        "        if у_кого == bot.mcp_owner_id:",
+        "        if False:",
+        "tests/test_web_walk_app.py::test_основателя_не_отозвать",
     ),
 ]
 bad = 0

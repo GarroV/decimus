@@ -24,7 +24,15 @@ from dataclasses import replace
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
+from aiogram.types import (
+    BotCommand,
+    BotCommandScopeChat,
+    ErrorEvent,
+    MenuButtonDefault,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
 
 from src import domain
 
@@ -331,6 +339,42 @@ async def announce_commands(bot: Bot, circle: tuple[int, ...] = ()) -> None:
             logger.exception("меню круга доступа не объявилось человеку %s", user_id)
 
 
+async def announce_app_button(bot: Bot, settings: BotSettings) -> None:
+    """Кнопка запуска мини-аппа у поля ввода вместо ☰ (D372).
+
+    Постоянный вход: до D372 мини-апп открывался только кнопкой под
+    сообщением «проверка начата», и вне проверки его было не найти. Команды
+    при этом не пропадают — их список открывается набором «/».
+
+    Адреса нет — возвращается ☰: очищенный `BOT_WALK_URL` снимает и кнопку.
+    Круг тестеров (`WALK_USERS`) — кнопка только им, остальным ☰. Кого бот не
+    пускает, кнопка не пустит тоже: мини-апп сверяет доступ тем же правилом
+    (`web.walk_access`). Отказ телеграма — в журнал: без кнопки бот работает.
+    """
+    кнопка: MenuButtonDefault | MenuButtonWebApp = MenuButtonDefault()
+    if settings.walk_url is not None:
+        кнопка = MenuButtonWebApp(
+            text=t("btn.app", default_ui_lang()), web_app=WebAppInfo(url=settings.walk_url)
+        )
+    общая = кнопка if settings.walk_users is None else MenuButtonDefault()
+    await _menu_button(bot, None, общая)
+    # Каждому тестеру — отдельно и со своим отказом: не нажавший /start не
+    # должен оставить без кнопки остальных. Без адреса личные тоже снимаются.
+    # Выведенного из круга тут не знают — его кнопка остаётся, но мини-апп
+    # ему ответит 403 (`walk_open_to`).
+    for user_id in sorted(settings.walk_users or ()):
+        await _menu_button(bot, user_id, кнопка)
+
+
+async def _menu_button(
+    bot: Bot, chat_id: int | None, кнопка: MenuButtonDefault | MenuButtonWebApp
+) -> None:
+    try:
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=кнопка)
+    except Exception:
+        logger.exception("кнопка у поля ввода не объявилась (%s) — бот работает без неё", chat_id)
+
+
 async def announce_personal_menu(bot: Bot, user_id: int, *, in_circle: bool) -> None:
     """Объявить или убрать личное меню круга у одного человека (T253).
 
@@ -413,6 +457,7 @@ async def start_polling() -> None:
     roster = Roster.load(domain_settings.state_dir)
     bot = create_bot(settings)
     await announce_commands(bot, circle_at_startup(settings))
+    await announce_app_button(bot, settings)
     dispatcher = build_dispatcher(settings, roster=roster)
     log_startup(settings)
     # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца

@@ -1894,6 +1894,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— Сданную проверку править нельзя.\n"
             "— Сбой — /start. /version — версия сборки.\n"
             "— /lang — язык бота.\n"
+            "— «Приложение» у поля ввода — обход по зонам, настройки, подключение Claude.\n"
         ),
         "en": (
             "How to work with the bot\n"
@@ -1934,6 +1935,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— A handed-over inspection cannot be edited.\n"
             "— Something broke — /start. /version tells the build.\n"
             "— /lang — the bot language.\n"
+            "— “App” next to the message field — the walk by zone, settings, connecting Claude.\n"
         ),
     },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
@@ -1969,6 +1971,8 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.new_inspection": {"ru": "Новая проверка", "en": "New inspection"},
     # Мини-апп обхода (#418): что не осмотрено и что было здесь в прошлый раз.
     "btn.walk": {"ru": "Обход точки", "en": "Walk-through"},
+    # Кнопка у поля ввода (D372): открывает приложение целиком, не только обход.
+    "btn.app": {"ru": "Приложение", "en": "App"},
     "btn.resume_continue": {"ru": "Продолжить", "en": "Continue"},
     "btn.sealed_drop": {"ru": "Убрать из чата", "en": "Remove from chat"},
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},

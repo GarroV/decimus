@@ -698,7 +698,7 @@
     document.documentElement.classList.remove("has-sheet");
     if (W.tg && W.supports("6.1")) {
       W.tg.BackButton.offClick(onBack);
-      W.tg.BackButton.hide();
+      W.app.syncBack();
     }
     if (W.tg && W.supports("6.2")) W.tg.disableClosingConfirmation();
   }

@@ -164,6 +164,9 @@
   function renderTop(zones) {
     var top = el("header", "walk-top");
     var row = el("div", "walk-top__row");
+    var home = W.button("walk-top__home", "‹", function () { W.app.go("home"); });
+    home.setAttribute("aria-label", tx("walk.app.home"));
+    row.appendChild(home);
     var title = el("div", "walk-top__title");
     title.appendChild(el("h1", "walk-top__unit", S.data.unit));
     title.appendChild(el("span", "walk-top__date", W.day(S.data.date)));
@@ -641,7 +644,7 @@
     renderInfoSheet();
     if (W.supports("6.1")) {
       tg.BackButton.offClick(onInfoBack);
-      tg.BackButton.hide();
+      W.app.syncBack();
     }
     render();
   }
@@ -689,10 +692,9 @@
   function render() {
     var y = window.scrollY;
     root.textContent = "";
-    if (S.data.state === "none") {
-      renderEmpty(tx("walk.none.title"), tx("walk.none.text"));
-      return;
-    }
+    // Обход — раздел приложения (D373): всё остальное рисует walk-app.js.
+    W.app.start();
+    if (!W.app.showsWalk()) return W.app.render(root);
     var zones = S.data.zones;
     var zone = current();
     root.appendChild(renderTop(zones));
@@ -714,6 +716,8 @@
     if (W.inTelegram()) box.appendChild(W.button("walk-mark", tx("walk.back"), function () { tg.close(); }));
     root.appendChild(box);
   }
+
+  W.render = render;
 
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
