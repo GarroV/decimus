@@ -19,8 +19,9 @@
 очереди.
 
 Подтверждение обойдённой проверки с D2/D3 тем же движением открывает запрос
-экшн-плана (D272). Загруженная историческая (`origin = 'import'`, D305) его не
-открывает (D310) — решает строка базы, а не тот, кто подтверждает.
+экшн-плана (D272). Загруженная задним числом — текущая (`origin = 'import'`) и
+историческая (`'legacy'`, D334) — его не открывает (D310): решает строка базы, а
+не тот, кто подтверждает.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ import psycopg
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
 from .errors import AcceptError, ActionPlanError, ConfigError
-from .models import ORIGIN_IMPORT
+from .models import UPLOADED_ORIGINS
 from .queries import _require_inspection_id, _require_tenant
 
 logger = logging.getLogger(__name__)
@@ -72,13 +73,14 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
     try:
         with psycopg.connect(settings.dsn) as conn:
             происхождение = _apply(conn, ident, tenant_code, автор)
-            # Загруженная историческая проверка (D305) запроса экшн-плана не
-            # открывает и никому ничего не шлёт (D310): проверка трёхлетней
-            # давности не может требовать от партнёра план сегодня. Решает
+            # Загруженная задним числом проверка (текущая или историческая,
+            # D334) запроса экшн-плана не открывает и никому ничего не шлёт
+            # (D310): проверка трёхлетней давности не может требовать от
+            # партнёра план сегодня. Решает
             # строка базы, а не вызывающий, поэтому подтверждение из веба
             # («Ждут приёмки») и из MCP ведут себя одинаково, а переписать
             # происхождение не даёт триггер `inspections_origin_fixed` (0038).
-            if происхождение != ORIGIN_IMPORT:
+            if происхождение not in UPLOADED_ORIGINS:
                 _open_plan_request(conn, ident, автор)
             conn.commit()
     except AcceptError:
