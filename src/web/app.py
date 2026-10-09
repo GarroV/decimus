@@ -73,6 +73,7 @@ from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
 from .sections import (
+    CONTROL_READ_ONLY,
     SECTIONS,
     check_registry,
     current_section,
@@ -1250,7 +1251,7 @@ def _install_methodology_gate(app: Flask) -> None:
 
 
 def _install_control_gate(app: Flask) -> None:
-    """Роль «контроль» видит только рейтинги (D358; было «остальное на чтение», D319).
+    """Роль «контроль»: правит только рейтинги и своих людей, читает обзор и проверки (D358, D366).
 
     Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
     для контроля с момента появления, и закрывать его не придётся помнить.
@@ -1265,6 +1266,9 @@ def _install_control_gate(app: Flask) -> None:
             return
         вошедший = auth.current_account()
         if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
+            return
+        # Обзор и проверки — на чтение (D366); запись в них закрыта, как везде.
+        if request.method in _READ_METHODS and current_section(request.path) in CONTROL_READ_ONLY:
             return
         if not _control_may_enter(
             request.path,
