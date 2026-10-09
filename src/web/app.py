@@ -34,7 +34,7 @@ from flask import (
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import directory
+from src.db import directory, unit_profiles
 from src.db.errors import (
     AcceptError,
     DatabaseTargetError,
@@ -684,9 +684,41 @@ def _register_country(app: Flask, conf: Settings) -> None:
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
             can_add_units=unit_add.can_add_here(код),
+            **_country_units(код),
             **_country_plans(код),
             **prescriptions.country_block(код),
         )
+
+
+STAGE_ORDER = {"open": 0, "paused": 1, "pipeline": 2, "closed": 3}
+
+
+def _country_units(код: str) -> dict[str, Any]:
+    """Пиццерии страны по своду (D376): строки, счёт по стадиям, ссылки в карточки.
+    Блок справочный: сбой чтения гасит только его, а не экран страны."""
+    try:
+        строки = unit_profiles.by_country(код) if код else ()
+        ссылки = (
+            {
+                u.code: u.id
+                for u in directory.list_units(reach=auth.current_reach(), country=код)
+                if u.code
+            }
+            if строки
+            else {}
+        )
+    except DbError:
+        logger.warning("Сведения о пиццериях страны не прочитались", exc_info=True)
+        строки, ссылки = (), {}
+    счёт = {
+        стадия: sum(1 for p in строки if p.stage == стадия)
+        for стадия in ("open", "pipeline", "closed")
+    }
+    return {
+        "units_profiles": sorted(строки, key=lambda p: (STAGE_ORDER.get(p.stage, 9), p.name)),
+        "units_count": счёт,
+        "units_links": ссылки,
+    }
 
 
 def _country_plans(код: str) -> dict[str, Any]:
@@ -704,6 +736,17 @@ def _country_plans(код: str) -> dict[str, Any]:
         "plans_act_country": уК,
         "state_tones": action_plans.STATE_TONES,
     }
+
+
+def _unit_profile(code: str | None) -> unit_profiles.Profile | None:
+    """Строка свода пиццерий по коду Dodo точки (D374); сбой чтения — блок пуст."""
+    if not code:
+        return None
+    try:
+        return unit_profiles.by_code(code)
+    except DbError:
+        logger.warning("Сведения о пиццерии не прочитались", exc_info=True)
+        return None
 
 
 def _register_units(app: Flask, conf: Settings) -> None:
@@ -737,6 +780,8 @@ def _register_units(app: Flask, conf: Settings) -> None:
         return render_template(
             "units/card.html",
             data=снимок,
+            profile=_unit_profile(точка.code),
+            show_email=auth.current_tenant() == HQ_TENANT,
             added=request.args.get("added") == "1",
             alias_taken=request.args.get("alias_taken") == "1",
             lang=lang,
