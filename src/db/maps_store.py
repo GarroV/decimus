@@ -130,3 +130,70 @@ def covered_days(company_uuid: str, start: date, end: date) -> int:
     except psycopg.Error as exc:
         raise RatingsError(f"История карт не прочиталась ({exc.__class__.__name__})") from exc
     return int(row[0]) if row else 0
+
+
+def points() -> tuple[tuple[str, float, float], ...]:
+    """Филиалы с координатами: (uuid, широта, долгота)."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            rows = conn.execute(
+                "select uuid::text, lat, lng from maps.companies "
+                "where lat is not null and lng is not null"
+            ).fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(f"Филиалы карт не прочитались ({exc.__class__.__name__})") from exc
+    return tuple((str(r[0]), float(r[1]), float(r[2])) for r in rows)
+
+
+def link_countries() -> tuple[str, ...]:
+    """Страны, где искать пиццерии Dodo: страны филиалов и страны рейтингов."""
+    sql = """
+        select country_code from maps.companies where country_code is not null
+        union select code from ratings.countries
+    """
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            rows = conn.execute(sql).fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(f"Страны карт не прочитались ({exc.__class__.__name__})") from exc
+    return tuple(str(r[0]) for r in rows)
+
+
+def save_links(links: Sequence[tuple[str, str, str, int]]) -> int:
+    """Заменить связи целиком одним заходом: (филиал, код пиццерии, имя, метры).
+    Филиал без связи в новом наборе связь теряет — пиццерия могла переехать."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+            conn.execute(
+                "update maps.companies set dodo_id = null, dodo_name = null, "
+                "link_distance_m = null, linked_at = null where dodo_id is not null"
+            )
+            with conn.cursor() as cur:
+                cur.executemany(
+                    "update maps.companies set dodo_id = %s, dodo_name = %s, "
+                    "link_distance_m = %s, linked_at = now() where uuid = %s",
+                    [(dodo, name, metres, uuid) for uuid, dodo, name, metres in links],
+                )
+    except psycopg.Error as exc:
+        raise RatingsError(f"Связи карт не легли ({exc.__class__.__name__})") from exc
+    return len(links)
+
+
+def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]]:
+    """Оценка каждой связанной пиццерии на карте на дату: код → (оценка, отзывов)."""
+    sql = """
+        select distinct on (c.dodo_id) c.dodo_id, r.avg_rating, r.ratings_count
+        from maps.ratings r
+        join maps.companies c on c.uuid = r.company_uuid
+        where c.dodo_id is not null and r.provider_id = %s and r.on_date <= %s
+          and r.ratings_count > 0
+        order by c.dodo_id, r.on_date desc
+    """
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            rows = conn.execute(sql, (provider_id, until)).fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(
+            f"Оценки пиццерий на картах не прочитались ({exc.__class__.__name__})"
+        ) from exc
+    return {str(r[0]): (float(r[1]), int(r[2])) for r in rows}
