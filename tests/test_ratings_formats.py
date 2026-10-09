@@ -58,6 +58,8 @@ def test_ссылка_на_рейтинг_разбирается() -> None:
 def test_испорченная_ссылка_не_разбирается() -> None:
     assert parse_rating_link(kb(U1, 2, C1, P_RS).replace(U1, "не-id")) is None
     assert parse_rating_link("https://evil.example/rating#/" + U1 + "/2") is None
+    new_host = kb(U1, 2, C1, P_RS).replace("dodopizza.info", "knowledgebase.dodois.io")
+    assert parse_rating_link(new_host) == parse_rating_link(kb(U1, 2, C1, P_RS))
     assert backoffice_checkup_id("https://control.dodois.io/backoffice/checkups/xyz") is None
 
 
@@ -67,7 +69,7 @@ def test_id_с_дефисами_и_заглавными_приводится() -
 
 
 def test_ссылка_на_страницу_пиццерии() -> None:
-    assert unit_rating_url(U1, RKO) == f"https://dodopizza.info/rating#/{U1}/1"
+    assert unit_rating_url(U1, RKO) == f"https://knowledgebase.dodois.io/rating#/{U1}/1"
 
 
 # --- страны ------------------------------------------------------------------
@@ -315,7 +317,7 @@ def test_ссылки_в_результате_собраны_заново_а_н�
     first = parse_rko_violations(rko_violations(**{field: link})).checkups[0]
     assert first.backoffice_url == f"https://control.dodois.io/backoffice/checkups/{C1}"
     assert first.rating_url == (
-        f"https://dodopizza.info/rating#/{U1}/1?selectedRemarkType=0&openRemarkDetails=1"
+        f"https://knowledgebase.dodois.io/rating#/{U1}/1?selectedRemarkType=0&openRemarkDetails=1"
         f"&checkupId={C1}&ratingPeriodId={P_RKO}"
     )
     assert "script" not in first.backoffice_url + first.rating_url
