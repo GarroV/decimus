@@ -426,3 +426,5 @@ is_current
 # (`src/web/users_screen.py`) — регистрирует декоратор, по имени их не зовёт никто.
 add_space
 space_countries
+# `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
+_методику_правят_админы
