@@ -12,7 +12,7 @@ from dataclasses import dataclass
 
 #: Блоки страницы в порядке по умолчанию. Код блока — ключ текста
 #: `ratings.layout.<код>` и ветка шаблона `ratings/index.html`.
-BLOCKS: tuple[str, ...] = ("scores", "violations", "top", "hard", "risk")
+BLOCKS: tuple[str, ...] = ("scores", "violations", "top", "hard", "risk", "maps")
 
 
 @dataclass(frozen=True)
