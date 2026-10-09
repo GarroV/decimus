@@ -196,7 +196,7 @@
       {% if data.problems %}
         {% for point in data.problems %}
           <a class="ov-row" href="{{ url(registry_path ~ '/' ~ point.inspection_id) }}">
-            <span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span>
+            <span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span>
             <span class="ov-row__name">
               {{ point.unit }}
               <span class="ov-row__meta">
@@ -281,7 +281,7 @@
              href="{% if unit_id and point.country %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
             <span class="ov-cell__name">{{ point.unit }}</span>
             <span class="ov-cell__muted">{{ city_title(point.city) or '—' }}</span>
-            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade }}</span></span>
+            <span class="ov-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span></span>
             <span class="ov-num ov-num--strong">{{ '%.1f'|format(point.pct) }}</span>
             {# Движение показывается только против СРАВНИМОЙ проверки: иначе
                это разница ставок методики, а не работы точки. #}

@@ -17,7 +17,7 @@ from datetime import date
 from src.domain.models import NON_DEDUCTING
 
 from ..db import queries
-from ..db.models import FindingRow, InspectionRow
+from ..db.models import LEGACY_CODE, NO_CLASS, FindingRow, InspectionRow
 from ..db.reach import Reach
 from .pricing import price_key
 
@@ -194,7 +194,9 @@ def _repeats(
     for f in findings:
         n = место.get(f.inspection_id)
         # Замер и рекомендация — не нарушение: «не чинится» про них не скажешь.
-        if n is None or f.level in NON_DEDUCTING:
+        # Маркеры исторической записи (D332) — «пункт не назван» и «без класса»:
+        # повтором «пункта LEGACY» они не являются.
+        if n is None or f.level in NON_DEDUCTING or f.level == NO_CLASS or f.code == LEGACY_CODE:
             continue
         ряд = отметки.setdefault(f.code, [НЕТ] * len(окно))
         # Засчитанный повтор перекрывает наблюдение, но не наоборот: вторая

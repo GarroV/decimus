@@ -576,6 +576,36 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
     "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
     "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
+    # Историческая проверка (D332): записи старого отчёта без пункта, класса, зоны.
+    "card.findings.no_class": {"ru": "без класса", "en": "no class"},
+    "card.findings.no_item": {"ru": "пункт не назван", "en": "item not given"},
+    "card.findings.no_zone": {"ru": "зона не названа", "en": "zone not given"},
+    "card.legacy.title": {
+        "ru": "Историческая проверка, оценка по методике того времени",
+        "en": "Historical inspection, scored under the methodology of that time",
+    },
+    "card.legacy.text": {
+        "ru": (
+            "Оценка перенесена из старого отчёта как есть и не пересчитывается по "
+            "нынешнему чек-листу. Методика: {method}. Статус в отчёте: {status}."
+        ),
+        "en": (
+            "The score is transferred from the old report as is and is not recomputed "
+            "under today's checklist. Methodology: {method}. Status in the report: {status}."
+        ),
+    },
+    "card.legacy.method": {"ru": "Методика того времени", "en": "Methodology of that time"},
+    "card.legacy.unlabelled": {"ru": "не названа", "en": "not named"},
+    "letter.uploaded": {
+        "ru": (
+            "Проверка заведена задним числом через загрузку — письма партнёру по ней нет, "
+            "и никому ничего не отправляется."
+        ),
+        "en": (
+            "This inspection was entered after the fact through import — there is no "
+            "partner letter for it, and nothing is sent to anyone."
+        ),
+    },
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
         "ru": "Записей у проверки нет.",
