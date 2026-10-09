@@ -391,9 +391,15 @@ def _series(rows: Sequence[InspectionRow]) -> tuple[dict[str, object], str]:
 
 
 def _grades(rows: Iterable[InspectionRow]) -> dict[str, int]:
-    """Распределение ЗАПИСАННЫХ букв. Новых букв здесь не появляется."""
+    """Распределение ЗАПИСАННЫХ букв. Новых букв здесь не появляется.
+
+    Пустая буква — историческая проверка, в старом отчёте которой буквы не было
+    (D332): в распределение букв она не идёт, иначе в нём появился бы ключ «».
+    """
     counts: dict[str, int] = {}
     for row in rows:
+        if not row.grade:
+            continue
         counts[row.grade] = counts.get(row.grade, 0) + 1
     return dict(sorted(counts.items()))
 

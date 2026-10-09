@@ -1,28 +1,26 @@
-"""Инструменты загрузки исторических проверок поштучно (D305–D310).
+"""Инструменты загрузки проверок задним числом поштучно (D305–D310, D332–D335).
 
-Коллега с Claude разбирает старый отчёт — Битрикс, PDF, таблица — и вносит его
-через этот MCP: черновик → записи (и кадры, где есть, D309) → сверка с оценкой,
-напечатанной в старом отчёте → подтверждение. Подтверждает тот же коллега
-(D308); после этого загруженная — обычная проверка своей версии методики в
-истории точки и аналитике (D306), а запрос экшн-плана не открывается и никому
-ничего не уходит (D310).
+Коллега УК с Claude разбирает отчёт — Битрикс, PDF Qvalon, таблица — и вносит его
+через этот MCP: черновик → записи (и кадры, где есть, D309) → подтверждение.
+Подтверждает тот же коллега (D308); после этого загруженная — проверка в истории
+точки и аналитике рядом с обходами (D306), а запрос экшн-плана не открывается и
+никому ничего не уходит (D310).
 
-Три правила, которые здесь важнее удобства.
+**Два режима, задаются при создании и не меняются (D334, `import_modes.py`).**
+`history` — старый отчёт по прежней методике: оценка переносится как в отчёте и
+движком НЕ пересчитывается нигде (D332), записи описательные. `current` —
+недавняя проверка по действующей версии эталона: записи сверяет и оценку
+считает движок, ровно как у обхода (`src/report/rescore.apply_command`), здесь
+не переписано ни одного его правила.
 
 **Модель предлагает, фиксирует человек.** Каждый инструмент — одно действие
-коллеги; инструмента «загрузить отчёт целиком» нет и не будет. Агент читает
-старый документ и предлагает записи, коллега видит их и подтверждает проверку
-сам, сверив посчитанную оценку с напечатанной (`import_get_inspection`).
-
-**Оценку считает движок, правила записи — тоже движок.** Пункт, класс, зона,
-уникальность пары «пункт + зона» сверяет `engine/audit.py` той версии методики,
-которой помечена проверка (`src/report/rescore.apply_command`): ровно те же
-отказы, что получает аудитор в боте. Здесь не переписано ни одного правила.
+коллеги; инструмента «загрузить отчёт целиком» нет и не будет.
 
 **Только загруженные черновики своего пространства.** Проверку обхода эти
 инструменты не правят, не удаляют и не подтверждают — условие стоит в замке
 строки (`src/db/imports.py`), а не только здесь. Право на сами инструменты —
-по арендатору (`MCP_IMPORT_TENANTS`), спрашивается на входе (`rpc._call_tool`).
+по пространству (`MCP_IMPORT_TENANTS`, только `HQ` — D335), спрашивается на входе
+(`rpc._call_tool`).
 
 Запросов к базе в этом модуле нет: черновик живёт в `src/db/imports.py`,
 подтверждение — в `src/db/accept.py`, чтение — в `src/db/queries.py`.
@@ -39,11 +37,12 @@ from contextlib import contextmanager
 from datetime import date
 from typing import TYPE_CHECKING, Any
 
+from ..db.models import ORIGIN_IMPORT, ORIGIN_LEGACY
 from ..domain.kinds import INSPECTION_KINDS
 from ..domain.models import TEXT_LANGS
-from .checklist import current_version, versions
-from .checklist_layout import Store, check_slug, locate
-from .errors import ChecklistError, ToolError
+from . import import_modes as modes
+from .checklist_layout import Store
+from .errors import ToolError
 from .retraction import _same_unit
 from .tools import _finding, _parse_date, _require_inspection_id
 
@@ -180,43 +179,6 @@ def _check_n(n: int) -> int:
 # --- черновик -----------------------------------------------------------------
 
 
-def _resolve_version(store: Store, *, tenant: str, code: str, version: str | None) -> str:
-    """Версия чек-листа, по которой будет считаться проверка (D307).
-
-    Чек-лист ищется среди видимых пространству (своё, затем эталон УК) — тем
-    же `locate`, что у инструментов методики. Версия, если названа, обязана
-    лежать в изданиях ЭТОГО чек-листа: издание чужого чек-листа с тем же
-    именем подписало бы проверку чужой методикой. Не названа — действующее
-    издание чек-листа.
-    """
-    код = _checked(lambda: check_slug(code, что="Код чек-листа"))
-    найден = locate(store, tenant=tenant, code=код)
-    if найден is None:
-        raise ToolError(
-            f"Чек-листа «{код}» у этого пространства нет. Перечень отдаёт checklists; "
-            f"старую методику заводят инструментами методики (create_checklist, "
-            f"add_checklist_item, publish_checklist_version) — по версии на каждое её "
-            f"изменение (D307)"
-        )
-    if version is None or not version.strip():
-        return _checked(lambda: current_version(найден))
-    хотим = version.strip()
-    есть = [v.version for v in _checked(lambda: versions(найден))]
-    if хотим not in есть:
-        raise ToolError(
-            f"Версии «{хотим}» у чек-листа «{код}» нет. Есть: {', '.join(есть) or 'ни одной'}. "
-            f"Перечень с датами отдаёт checklist_versions"
-        )
-    return хотим
-
-
-def _checked[T](call: Callable[[], T]) -> T:
-    try:
-        return call()
-    except ChecklistError as отказ:
-        raise ToolError(str(отказ)) from None
-
-
 def _reported(pct: float | int | None, grade: str | None) -> tuple[float | None, str | None]:
     if pct is not None:
         if isinstance(pct, bool) or not 0 <= float(pct) <= 100:
@@ -231,22 +193,30 @@ def import_create_inspection(
     tenant: str,
     store: Store,
     actor: str,
+    mode: str,
     unit: str,
     date: str,
-    checklist_code: str,
-    auditor: str,
+    auditor: str | None = None,
+    checklist_code: str | None = None,
     checklist_version: str | None = None,
     kind: str = "planned",
     report_lang: str = "ru",
     text_lang: str | None = None,
     reported_pct: float | None = None,
     reported_grade: str | None = None,
+    reported_status: str | None = None,
+    legacy_method: str | None = None,
     source_ref: str | None = None,
 ) -> dict[str, object]:
-    """Завести черновик загруженной проверки без записей, с оценкой движка."""
+    """Завести черновик без записей в названном режиме (D334).
+
+    `current` — по действующей версии эталона, оценку считает движок.
+    `history` — оценка из старого отчёта как есть (D332), движок не зовётся.
+    """
     from ..db import imports as db
 
     del actor  # черновик подписывается на подтверждении (D199), а не здесь
+    режим = modes.parse_mode(mode)
     день = _parse_date(date, field="date")
     if день is None:
         raise ToolError("Не названа дата проверки в date (ГГГГ-ММ-ДД)")
@@ -256,7 +226,6 @@ def import_create_inspection(
             f"из старого отчёта"
         )
     точка = _required(unit, field="unit", limit=MAX_UNIT)
-    аудитор = _required(auditor, field="auditor", limit=MAX_AUDITOR)
     if kind not in INSPECTION_KINDS:
         raise ToolError(f"Вид проверки kind — один из: {', '.join(INSPECTION_KINDS)}")
     if report_lang not in TEXT_LANGS:
@@ -266,27 +235,55 @@ def import_create_inspection(
         raise ToolError("text_lang — код языка из двух латинских букв (ru, en, sr …)")
     процент, буква = _reported(reported_pct, reported_grade)
     ссылка = _text(source_ref, field="source_ref", limit=MAX_SOURCE_REF) or None
-    код = _checked(lambda: check_slug(checklist_code, что="Код чек-листа"))
-    версия = _resolve_version(store, tenant=tenant, code=код, version=checklist_version)
-    with _db():
-        ident = db.create_draft(
-            db.NewDraft(
-                tenant=tenant,
-                unit=точка,
-                inspection_date=день,
-                kind=kind,
-                checklist_code=код,
-                checklist_version=версия,
-                auditor=аудитор,
-                report_lang=report_lang,
-                speech_lang=язык_слов,
-                reported_pct=процент,
-                reported_grade=буква,
-                source_ref=ссылка,
-            ),
-            apply_score=_rescorer(),
+    шапка: dict[str, Any] = {
+        "tenant": tenant,
+        "unit": точка,
+        "inspection_date": день,
+        "kind": kind,
+        "report_lang": report_lang,
+        "speech_lang": язык_слов,
+        "reported_pct": процент,
+        "reported_grade": буква,
+        "source_ref": ссылка,
+    }
+    if режим == modes.MODE_CURRENT:
+        modes.refuse_history_fields(reported_status, legacy_method)
+        эталон = modes.current_only(
+            store, tenant=tenant, code=checklist_code, version=checklist_version
         )
-    return _view(ident, tenant=tenant, note="draft created with no findings")
+        черновик = db.NewDraft(
+            **шапка,
+            origin=ORIGIN_IMPORT,
+            checklist_code=эталон.code,
+            checklist_version=эталон.version,
+            auditor=_required(auditor or "", field="auditor", limit=MAX_AUDITOR),
+        )
+        with _db():
+            ident = db.create_draft(черновик, apply_score=_rescorer())
+        return _view(ident, tenant=tenant, note="current-mode draft created with no findings")
+    modes.refuse_history_choice(checklist_code, checklist_version)
+    if процент is None:
+        raise ToolError(
+            "В режиме history оценка из старого отчёта обязательна: reported_pct — процент, "
+            "как напечатан в отчёте (например, Score 95.29 → 95.29). Она и станет оценкой "
+            "проверки, без пересчёта (D332)"
+        )
+    метка = _text(legacy_method, field="legacy_method", limit=modes.MAX_LEGACY_METHOD) or None
+    черновик = db.NewDraft(
+        **шапка,
+        origin=ORIGIN_LEGACY,
+        checklist_code=modes.reference(store, tenant=tenant).code,
+        checklist_version=modes.legacy_version(метка),
+        auditor=_text(auditor, field="auditor", limit=MAX_AUDITOR) or "",
+        reported_status=_text(
+            reported_status, field="reported_status", limit=modes.MAX_REPORTED_STATUS
+        )
+        or None,
+        legacy_method=метка,
+    )
+    with _db():
+        ident = db.create_draft(черновик, apply_score=None)
+    return _view(ident, tenant=tenant, note="history-mode draft created with no findings")
 
 
 def _today() -> date:
@@ -299,7 +296,7 @@ def _today() -> date:
 def _read(ident: str, *, tenant: str) -> tuple[InspectionDetail, Any]:
     """Загруженная проверка своего пространства и её поля сверки. Нет — отказ."""
     from ..db import imports as db
-    from ..db.models import ORIGIN_IMPORT
+    from ..db.models import UPLOADED_ORIGINS
     from ..db.queries import get_inspection
     from ..db.reach import own_reach
 
@@ -311,7 +308,7 @@ def _read(ident: str, *, tenant: str) -> tuple[InspectionDetail, Any]:
             f"Проверки {ident} у этого доступа нет. Черновики загрузки перечисляет "
             f"import_list_drafts"
         )
-    if шапка.origin != ORIGIN_IMPORT:
+    if шапка.origin not in UPLOADED_ORIGINS:
         raise ToolError(
             f"Проверка {ident} — проверка обхода из бота, а не загруженная. Её читают "
             f"get_inspection; инструменты загрузки её не трогают"
@@ -319,15 +316,16 @@ def _read(ident: str, *, tenant: str) -> tuple[InspectionDetail, Any]:
     return detail, шапка
 
 
-def _only_import(ident: str, *, tenant: str) -> None:
+def _only_import(ident: str, *, tenant: str) -> tuple[InspectionDetail, Any]:
     """Заслон в обработчике до записи: только загруженная проверка своего пространства.
 
     Второй, а не единственный: тот же заслон стоит в замке строки
-    (`src/db/imports._LOCK_SQL`, `origin = 'import'`). Здесь он нужен, чтобы
-    отказ на проверку обхода пришёл до движка и хранилища кадров, а забытое
-    условие в одном из двух мест не открывало правку обхода молча.
+    (`src/db/imports._LOCK_SQL`, `origin in ('import', 'legacy')`). Здесь он
+    нужен, чтобы отказ на проверку обхода пришёл до движка и хранилища кадров, а
+    забытое условие в одном из двух мест не открывало правку обхода молча.
+    Возвращает прочитанное: по происхождению обработчик выбирает путь.
     """
-    _read(ident, tenant=tenant)
+    return _read(ident, tenant=tenant)
 
 
 def _comparison(detail: InspectionDetail, шапка: Any) -> dict[str, object]:
@@ -360,11 +358,18 @@ def _comparison(detail: InspectionDetail, шапка: Any) -> dict[str, object]:
     }
 
 
-def _view(ident: str, *, tenant: str, note: str) -> dict[str, object]:
+def _mode_of(origin: str) -> str:
+    return modes.MODE_HISTORY if origin == ORIGIN_LEGACY else modes.MODE_CURRENT
+
+
+def _view(ident: str, *, tenant: str, note: str, warnings: Sequence[str] = ()) -> dict[str, object]:
     detail, шапка = _read(ident, tenant=tenant)
+    if шапка.origin == ORIGIN_LEGACY:
+        return _legacy_view(detail, шапка, note=note, warnings=warnings)
     строка = detail.inspection
     return {
         "id": строка.id,
+        "mode": modes.MODE_CURRENT,
         "status": "draft" if строка.on_review else "accepted",
         "note": note,
         "unit": строка.unit_name,
@@ -387,10 +392,44 @@ def _view(ident: str, *, tenant: str, note: str) -> dict[str, object]:
     }
 
 
+def _legacy_view(
+    detail: InspectionDetail, шапка: Any, *, note: str, warnings: Sequence[str]
+) -> dict[str, object]:
+    """Историческая для агента: оценка как в отчёте, без вычетов и зон (D332)."""
+    строка = detail.inspection
+    return {
+        "id": строка.id,
+        "mode": modes.MODE_HISTORY,
+        "status": "draft" if строка.on_review else "accepted",
+        "note": note,
+        **({"warnings": list(warnings)} if warnings else {}),
+        "unit": строка.unit_name,
+        "inspection_date": строка.inspection_date.isoformat(),
+        "kind": строка.kind,
+        "auditor": строка.auditor,
+        "checklist_code": строка.checklist_code,
+        "legacy_method": шапка.legacy_method,
+        "report_lang": строка.report_lang,
+        "source_ref": шапка.source_ref,
+        "pct": строка.pct,
+        "grade": строка.grade or None,
+        "reported_status": шапка.reported_status,
+        "score": (
+            "historical inspection: the score is the old report's, transferred as is "
+            "under the methodology of that time; it is NOT recomputed and findings do "
+            "not change it (D332)"
+        ),
+        "counts": detail.counts,
+        "findings": [
+            modes.legacy_finding_view(f) for f in sorted(detail.findings, key=lambda f: f.n)
+        ],
+    }
+
+
 def import_get_inspection(
     *, tenant: str, store: Store, actor: str, inspection_id: str
 ) -> dict[str, object]:
-    """Загруженная проверка: шапка, записи, оценка движка и сверка со старым отчётом."""
+    """Загруженная проверка: режим, шапка, записи и оценка (как в отчёте или движка)."""
     del store, actor
     return _view(_require_inspection_id(inspection_id), tenant=tenant, note="read")
 
@@ -408,6 +447,7 @@ def import_list_drafts(*, tenant: str, store: Store, actor: str) -> dict[str, ob
         "drafts": [
             {
                 "id": r.id,
+                "mode": _mode_of(r.origin),
                 "unit": r.unit_name,
                 "inspection_date": r.inspection_date.isoformat(),
                 "checklist_code": r.checklist_code,
@@ -443,22 +483,39 @@ def import_add_finding(
     store: Store,
     actor: str,
     inspection_id: str,
-    code: str,
-    level: str,
-    zone: str,
     text: str,
+    code: str | None = None,
+    level: str | None = None,
+    zone: str | None = None,
     comment: str | None = None,
     repeat: bool = False,
 ) -> dict[str, object]:
-    """Добавить запись в загруженный черновик; движок проверяет её и пересчитывает оценку."""
+    """Добавить запись в черновик: текущая — через движок, историческая — как в отчёте."""
     from ..db import imports as db
+    from ..db import imports_legacy as legacy
 
-    del store, actor
+    del actor
     ident = _require_inspection_id(inspection_id)
-    _only_import(ident, tenant=tenant)
+    _, шапка = _only_import(ident, tenant=tenant)
     слова = _wording(text, comment)
     if not (слова.text or ""):
         raise ToolError("Формулировка записи text пуста — запись без слов в отчёт не идёт")
+    if шапка.origin == ORIGIN_LEGACY:
+        запись = legacy.LegacyFinding(
+            code=modes.legacy_code(code),
+            level=modes.legacy_level(level),
+            zone=modes.legacy_zone(zone),
+            repeat=bool(repeat),
+        )
+        with _db():
+            n = legacy.add_legacy_finding(ident, tenant=tenant, finding=запись, wording=слова)
+        return _view(
+            ident,
+            tenant=tenant,
+            note=f"finding #{n} added",
+            warnings=modes.soft_warnings(store, code=запись.code, zone=запись.zone),
+        )
+    code, level, zone = _engine_triple(code, level, zone)
     args = [
         "add",
         f"--qid={code.strip()}",
@@ -476,6 +533,17 @@ def import_add_finding(
     return _view(ident, tenant=tenant, note=f"finding #{n} added")
 
 
+def _engine_triple(code: str | None, level: str | None, zone: str | None) -> tuple[str, str, str]:
+    """Текущей записи код, класс и зона обязательны: их сверяет движок."""
+    if not (code or "").strip() or not (level or "").strip() or not (zone or "").strip():
+        raise ToolError(
+            "Проверка в режиме current: у записи обязательны code, level и zone — их сверяет "
+            "движок по действующей версии, как в боте. Пересказ без пункта и класса — только "
+            "у исторической (режим history)"
+        )
+    return str(code), str(level), str(zone)
+
+
 def import_edit_finding(
     *,
     tenant: str,
@@ -490,16 +558,25 @@ def import_edit_finding(
     comment: str | None = None,
     repeat: bool | None = None,
 ) -> dict[str, object]:
-    """Исправить запись загруженного черновика по номеру; оценку пересчитывает движок."""
+    """Исправить запись по номеру: текущая — с пересчётом движком, историческая — без."""
     from ..db import imports as db
 
-    del store, actor
+    del actor
     ident = _require_inspection_id(inspection_id)
-    _only_import(ident, tenant=tenant)
+    detail, шапка = _only_import(ident, tenant=tenant)
     номер = _check_n(n)
     слова = _wording(text, comment)
     if слова.text is not None and not слова.text:
         raise ToolError("Формулировка записи text пуста — запись без слов в отчёт не идёт")
+    if шапка.origin == ORIGIN_LEGACY:
+        return _edit_legacy(
+            store,
+            detail,
+            номер,
+            tenant=tenant,
+            wording=слова,
+            fields={"code": code, "level": level, "zone": zone, "repeat": repeat},
+        )
     args = [
         "edit",
         f"--n={номер}",
@@ -519,20 +596,60 @@ def import_edit_finding(
     return _view(ident, tenant=tenant, note=f"finding #{номер} edited")
 
 
+def _edit_legacy(
+    store: Store,
+    detail: InspectionDetail,
+    n: int,
+    *,
+    tenant: str,
+    wording: Any,
+    fields: dict[str, Any],
+) -> dict[str, object]:
+    """Правка исторической записи: поверх прежней, без движка (D332)."""
+    from ..db import imports_legacy as legacy
+
+    if all(v is None for v in fields.values()) and wording.text is None and wording.comment is None:
+        raise ToolError(
+            "Нечего менять: назовите хотя бы одно из code, level, zone, text, comment, repeat"
+        )
+    прежняя = next((f for f in detail.findings if f.n == n), None)
+    if прежняя is None:
+        raise ToolError(f"Записи #{n} в этом черновике нет")
+    итог = modes.merged(прежняя, **fields)
+    with _db():
+        legacy.edit_legacy_finding(
+            detail.inspection.id,
+            n,
+            tenant=tenant,
+            finding=legacy.LegacyFinding(**итог),
+            wording=wording,
+        )
+    return _view(
+        detail.inspection.id,
+        tenant=tenant,
+        note=f"finding #{n} edited",
+        warnings=modes.soft_warnings(store, code=итог["code"], zone=итог["zone"]),
+    )
+
+
 def import_remove_finding(
     *, tenant: str, store: Store, actor: str, inspection_id: str, n: int
 ) -> dict[str, object]:
-    """Снять запись с загруженного черновика вместе с её кадрами; пересчитать оценку."""
+    """Снять запись вместе с её кадрами; у текущей — пересчитать оценку движком."""
     from ..db import imports as db
+    from ..db import imports_legacy as legacy
 
     del store, actor
     ident = _require_inspection_id(inspection_id)
-    _only_import(ident, tenant=tenant)
+    _, шапка = _only_import(ident, tenant=tenant)
     номер = _check_n(n)
     with _db():
-        _, кадры = db.remove_finding(
-            ident, номер, tenant=tenant, apply=_engine(["drop", str(номер)])
-        )
+        if шапка.origin == ORIGIN_LEGACY:
+            кадры = legacy.remove_legacy_finding(ident, номер, tenant=tenant)
+        else:
+            _, кадры = db.remove_finding(
+                ident, номер, tenant=tenant, apply=_engine(["drop", str(номер)])
+            )
     _forget(кадры)
     return _view(ident, tenant=tenant, note=f"finding #{номер} removed")
 
@@ -653,7 +770,7 @@ def import_accept_inspection(
     confirm_unit: str,
     confirm_date: str,
 ) -> dict[str, object]:
-    """Подтвердить загруженный черновик (D308): он входит в историю как обычная проверка."""
+    """Подтвердить загруженный черновик (D308): он входит в историю точки рядом с обходами."""
     from ..db.accept import accept_inspection
 
     del store
@@ -664,19 +781,25 @@ def import_accept_inspection(
     _confirm(detail, unit=confirm_unit, day=confirm_date, что="подтверждение")
     with _db(accept=True):
         accept_inspection(ident, tenant=tenant, actor=actor)
-    сверка = _comparison(detail, шапка)
+    история = шапка.origin == ORIGIN_LEGACY
     return {
         "id": ident,
+        "mode": _mode_of(шапка.origin),
         "unit": detail.inspection.unit_name,
         "inspection_date": detail.inspection.inspection_date.isoformat(),
         "pct": detail.inspection.pct,
-        "grade": detail.inspection.grade,
+        "grade": detail.inspection.grade or None,
         "accepted_by": actor,
-        **сверка,
+        **({} if история else _comparison(detail, шапка)),
         "status": (
-            "accepted: the inspection is now part of the unit's history like any other "
-            "inspection of its checklist version (get_inspection, unit_history, "
-            "network_summary, inspection_letter). No action-plan request was opened and "
+            "accepted: the inspection is now in the unit's history next to the others "
+            "(get_inspection, unit_history, network_summary). "
+            + (
+                "Its score stays exactly as in the old report — it is never recomputed. "
+                if история
+                else ""
+            )
+            + "No action-plan request was opened, there is no partner letter for it, and "
             "nothing was sent to anyone. It can no longer be edited or discarded"
         ),
     }

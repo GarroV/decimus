@@ -31,7 +31,7 @@ from __future__ import annotations
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
-from src.db.models import InspectionRow
+from src.db.models import LEGACY_VERSION_PREFIX, InspectionRow
 from src.domain.shape import scoring_shape
 from src.mcp.errors import ToolError
 from src.mcp.letters import Papers, pinned, sources
@@ -104,6 +104,11 @@ def _note(*, groups: Sequence[Group], unknown: bool) -> str:
             f"{len(groups)} incomparable groups. Averaging or ranking across them is meaningless; "
             f"compare within a group."
         )
+    if any((г.shape or "").startswith(LEGACY_VERSION_PREFIX) for г in groups):
+        части.append(
+            "Historical inspections keep the score of their old report, given under the "
+            "methodology of that time and never recomputed; each old methodology is its own group."
+        )
     if unknown:
         части.append(
             "For some editions the methodology is not on this machine, so their scoring rules "
@@ -135,7 +140,13 @@ def of(
     for row in rows:
         version = row.checklist_version
         if version not in формы:
-            формы[version] = читать(version, row.checklist_code, бумаги)
+            # Историческая (D332): методики её издания в хранилище нет и не
+            # будет — это прежняя методика по метке. Каждая метка — своя группа,
+            # а не «цену не установить»: иначе все прежние методики слились бы
+            # в одну с изданиями, которых просто нет на машине.
+            формы[version] = (
+                version if row.is_legacy else читать(version, row.checklist_code, бумаги)
+            )
         ключ = (row.checklist_code, формы[version])
         собранные.setdefault(ключ, []).append(row)
 
