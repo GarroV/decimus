@@ -1,0 +1,271 @@
+{#
+  Карточка человека справа: все его настройки и доступы, сверху вниз —
+  кто, роль, вход, бот в Telegram, Claude (MCP), доступ к учётке.
+
+  Кнопка рисуется, только если правило разрешает действие вошедшему: роль —
+  `role_choices` (контролю и себе — никогда), бот чужого — главный админ и
+  админ УК, круг Claude — тот, кто сам в круге. Маршрут сверяет то же самое ещё
+  раз: разметка здесь — подсказка, а не заслон.
+#}
+
+{% macro flash() %}
+  {% if show.flash %}
+    <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>
+  {% endif %}
+{% endmacro %}
+
+{% macro confirm(id, title, text, yes, action, fields) %}
+  {# Подтверждение без скрипта: раскрывающийся блок с красной кнопкой. #}
+  <details class="sconfirm">
+    <summary class="sbtn sbtn--danger">{{ title }}</summary>
+    <div class="sconfirm__body" role="group" aria-labelledby="{{ id }}">
+      <p class="sconfirm__text" id="{{ id }}">{{ text }}</p>
+      <form method="post" action="{{ action }}">
+        {% for name, value in fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <button class="sbtn sbtn--danger-solid" type="submit">{{ yes }}</button>
+      </form>
+    </div>
+  </details>
+{% endmacro %}
+
+{% macro person_card(kind, row) %}
+  {% set свой = kind == 'me' %}
+  {% set логин = row.login if row else me.login %}
+  {% set пространство = row.tenant if row else me.tenant %}
+  {% set роль = row.role if row else me.role %}
+  {% set варианты = role_choices(row) if row and not свой else () %}
+  {% set привязка = own_binding if свой else (bindings.get(row.id) if row else none) %}
+  {% set видит_бота = свой or show_bindings %}
+  <article class="sdetail" aria-labelledby="card-title">
+    <header class="sdetail__head">
+      <span class="avatar avatar--lg" aria-hidden="true">{{ логин[:2]|upper }}</span>
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="card-title">{{ логин }}{% if свой %} <em class="sbadge">{{ t('users.me') }}</em>{% endif %}</h2>
+        <p class="sdetail__hint">{{ t(role_key(роль, пространство)) }} · <span class="mono">{{ пространство }}</span></p>
+      </div>
+    </header>
+    {{ flash() }}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('users.panel.who') }}</h3>
+      <dl class="sprops">
+        <div><dt>{{ t('users.panel.login') }}</dt><dd>{{ логин }}</dd></div>
+        <div><dt>{{ t('users.panel.email') }}</dt><dd>{% if row and row.email %}{{ row.email }}{% else %}<span class="srow__none">{{ t('users.no_email') }}</span>{% endif %}</dd></div>
+        <div><dt>{{ t('users.panel.space') }}</dt><dd class="mono">{{ пространство }}</dd></div>
+        {% if row %}<div><dt>{{ t('users.panel.created') }}</dt><dd>{{ row.created_at.strftime('%Y-%m-%d') }}</dd></div>{% endif %}
+      </dl>
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('users.panel.role_title') }}</h3>
+      {% if варианты %}
+        <form method="post" action="{{ users_url }}/role?lang={{ lang }}" class="sform">
+          <input type="hidden" name="login" value="{{ row.login }}">
+          <input type="hidden" name="tenant" value="{{ row.tenant }}">
+          <div class="sroles">
+            {% for код in варианты %}
+              <label class="srole">
+                <input type="radio" name="role" value="{{ код }}"{% if код == роль %} checked{% endif %}>
+                <span><b>{{ t(role_key(код, пространство)) }}</b><small>{{ t(hint_key(код, пространство)) }}</small></span>
+              </label>
+            {% endfor %}
+          </div>
+          <button class="sbtn sbtn--primary" type="submit">{{ t('users.save') }}</button>
+        </form>
+      {% else %}
+        <p class="srole srole--static"><span><b>{{ t(role_key(роль, пространство)) }}</b><small>{{ t(hint_key(роль, пространство)) }}</small></span></p>
+        {% if свой and manage %}<p class="ssec__note">{{ t('users.panel.role_self') }}</p>{% endif %}
+      {% endif %}
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('users.panel.signin_title') }}</h3>
+      {% if свой %}
+        {% if show.password %}
+          <div class="note {{ 'note--ok' if show.password.key == 'ok' else 'note--warn' }}">
+            <div class="note__text">{{ t('profile.password.' ~ show.password.key, min=min_password, max=max_password, minutes=show.password.locked_minutes) }}</div>
+          </div>
+        {% endif %}
+        {# Свой пароль (#324): чью строку трогать, решает сессия, а не поле
+           формы. Введённое обратно в разметку не возвращается. #}
+        <details class="sfold"{% if show.password %} open{% endif %}>
+        <summary class="sbtn">{{ t('profile.password.submit') }}</summary>
+        <form method="post" action="{{ users_url }}/password?lang={{ lang }}" class="sform" id="password">
+          <label><span class="sform__label">{{ t('profile.password.current') }}</span>
+            <input class="sinput" type="password" name="current" required autocomplete="current-password"></label>
+          <label><span class="sform__label">{{ t('profile.password.new') }}</span>
+            <input class="sinput" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+          <label><span class="sform__label">{{ t('profile.password.repeat') }}</span>
+            <input class="sinput" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+          <p class="ssec__note">{{ t('profile.password.hint', min=min_password) }}</p>
+          <button class="sbtn sbtn--primary" type="submit">{{ t('profile.password.submit') }}</button>
+        </form>
+        </details>
+      {% else %}
+        <p class="ssec__note">{{ t('users.panel.password_other') }}</p>
+      {% endif %}
+      {% if row and not row.disabled_at %}
+        <form method="post" action="{{ users_url }}/email?lang={{ lang }}" class="sform sform--inline">
+          <input type="hidden" name="login" value="{{ row.login }}">
+          <input type="hidden" name="tenant" value="{{ row.tenant }}">
+          <label class="grow"><span class="sform__label">{{ t('users.panel.email_title') }}</span>
+            <input class="sinput" type="email" name="email" value="{{ row.email or '' }}" placeholder="{{ t('users.email.placeholder') }}"
+                   autocomplete="off" spellcheck="false"></label>
+          <button class="sbtn" type="submit">{{ t('users.save') }}</button>
+        </form>
+        <p class="ssec__note">{{ t('users.panel.email_hint') }}</p>
+      {% endif %}
+    </section>
+
+    {% if видит_бота %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('users.panel.bot_title') }}</h3>
+        {% if свой and show.bot_link %}
+          {# Ссылка показана ЗДЕСЬ и один раз: в адрес она не попадает, а живёт
+             десять минут и срабатывает однажды. #}
+          <p class="ssec__text">{{ t('profile.bot.link') }}</p>
+          <p class="ssecret"><a href="{{ show.bot_link }}" rel="noopener noreferrer"><code>{{ show.bot_link }}</code></a></p>
+          <p class="ssec__note">{{ t('profile.bot.until', time=show.bot_link_until.strftime('%H:%M') if show.bot_link_until else '') }}</p>
+        {% elif свой and not own_binding_known %}
+          <p class="ssec__note">{{ t('profile.bot.unknown') }}</p>
+        {% elif привязка %}
+          <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.panel.bot_bound', id=привязка.telegram_id, date=привязка.bound_at.strftime('%Y-%m-%d %H:%M')) }}</p>
+          <form method="post" action="{{ users_url }}/bot-unlink?lang={{ lang }}" class="sform">
+            {% if not свой %}<input type="hidden" name="user_id" value="{{ row.id }}">{% endif %}
+            <button class="sbtn" type="submit">{{ t('profile.bot.unlink') }}</button>
+          </form>
+        {% else %}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('profile.bot.unbound') if свой else t('users.panel.bot_unbound') }}</p>
+          {% if свой %}
+            {% if bot_username %}
+              <form method="post" action="{{ users_url }}/bot-link?lang={{ lang }}" class="sform">
+                <button class="sbtn sbtn--primary" type="submit">{{ icon('tg') }}<span>{{ t('profile.bot.link_submit') }}</span></button>
+              </form>
+            {% else %}
+              <p class="ssec__note">{{ t('profile.bot.unset', var=bot_var) }}</p>
+            {% endif %}
+          {% else %}
+            <p class="ssec__note">{{ t('users.panel.bot_self_only') }}</p>
+          {% endif %}
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if видит_бота %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('users.mcp.title') }}</h3>
+        {% if not привязка %}
+          <p class="ssec__note">{{ t('users.mcp.need_bot') }}</p>
+        {% elif not mcp.known %}
+          <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
+        {% else %}
+          {% set круг = mcp.of(привязка.telegram_id) %}
+          {% set основатель = mcp.founder is not none and привязка.telegram_id == mcp.founder %}
+          <p class="ssec__text">
+            {% if основатель or (круг and круг.is_live) %}
+              <span class="sdot sdot--ok"></span>{{ t('users.mcp.on') }} · {{ t('users.mcp.token') if круг and круг.has_live_token else t('users.mcp.no_token') }}
+            {% elif круг %}<span class="sdot"></span>{{ t('users.mcp.was') }}
+            {% else %}<span class="sdot"></span>{{ t('users.mcp.off') }}{% endif %}
+          </p>
+          {% if свой %}
+            {% if основатель or (круг and круг.is_live) %}<p class="ssec__note">{{ t('users.mcp.setup_bot') }}</p>{% endif %}
+          {% elif основатель %}
+            <p class="ssec__note">{{ t('users.mcp.founder_note') }}</p>
+          {% elif mcp.actor_in_circle %}
+            {% if круг and круг.is_live %}
+              {{ confirm('mcp-' ~ row.id, t('users.mcp.revoke'), t('users.mcp.revoke_confirm'), t('users.mcp.revoke_yes'),
+                         users_url ~ '/mcp-revoke?lang=' ~ lang, [('user_id', row.id)]) }}
+            {% else %}
+              <form method="post" action="{{ users_url }}/mcp-grant?lang={{ lang }}" class="sform">
+                <input type="hidden" name="user_id" value="{{ row.id }}">
+                <button class="sbtn" type="submit">{{ t('users.mcp.grant') }}</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <p class="ssec__note">{{ t('users.mcp.who_can') }}</p>
+          {% endif %}
+        {% endif %}
+      </section>
+    {% endif %}
+
+    {% if row and manage %}
+      <section class="ssec ssec--danger">
+        <h3 class="ssec__title">{{ t('users.panel.access_title') }}</h3>
+        {% if row.disabled_at %}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('users.panel.disabled', date=row.disabled_at.strftime('%Y-%m-%d')) }}</p>
+        {% elif свой %}
+          <p class="ssec__note">{{ t('users.disable.self') }}</p>
+        {% else %}
+          <p class="ssec__note">{{ t('users.panel.active') }}</p>
+          {{ confirm('off-' ~ row.id, t('users.disable.open'), t('users.disable.confirm', login=row.login), t('users.disable.yes'),
+                     users_url ~ '/disable?lang=' ~ lang, [('login', row.login), ('tenant', row.tenant)]) }}
+        {% endif %}
+      </section>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro add_card(show, spaces, grantable, link) %}
+  <article class="sdetail" aria-labelledby="add-title">
+    <header class="sdetail__head">
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="add-title">{{ t('users.added.title', login=show.added.login) if show.added else t('users.add.title') }}</h2>
+        <p class="sdetail__hint">{{ t('users.added.text') if show.added else t('users.add.hint') }}</p>
+      </div>
+    </header>
+    {{ flash() }}
+    {% if show.added %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('users.added.password') }}</h3>
+        <div class="ssecret">
+          <code id="new-password">{{ show.added.password }}</code>
+          <button class="sbtn" type="button" data-copy="#new-password" data-copied="{{ t('users.added.copied') }}" hidden>{{ t('users.added.copy') }}</button>
+        </div>
+        {% if show.added_email_failed %}<div class="note note--warn"><div class="note__text">{{ t('users.added.email_failed') }}</div></div>{% endif %}
+        <div class="sactions">
+          <a class="sbtn sbtn--primary" href="{{ link() }}">{{ t('users.added.done') }}</a>
+          <a class="sbtn" href="{{ link(add='1') }}">{{ t('users.added.more') }}</a>
+        </div>
+      </section>
+    {% else %}
+      <form method="post" action="{{ users_url }}/add?lang={{ lang }}" class="sform" data-role-by-space>
+        <label><span class="sform__label">{{ t('users.add.login') }}</span>
+          <input class="sinput" name="login" required autocomplete="off" pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false" autofocus>
+          <small class="sform__hint">{{ t('users.add.login_hint') }}</small></label>
+        <label><span class="sform__label">{{ t('users.add.email') }}</span>
+          <input class="sinput" type="email" name="email" autocomplete="off" spellcheck="false" placeholder="{{ t('users.email.placeholder') }}">
+          <small class="sform__hint">{{ t('users.add.email_hint') }}</small></label>
+        {% if spaces|length > 1 %}
+          <label><span class="sform__label">{{ t('users.add.space') }}</span>
+            <select class="sinput" name="tenant" data-space-select>
+              {% for код in spaces %}<option value="{{ код }}"{% if код == tenant %} selected{% endif %}>{{ код }}</option>{% endfor %}
+            </select></label>
+        {% elif spaces %}
+          <input type="hidden" name="tenant" value="{{ spaces[0] }}">
+        {% endif %}
+        <fieldset class="sfield">
+          <legend class="sform__label">{{ t('users.add.role') }}</legend>
+          <div class="sroles">
+            {% set показано = [] %}
+            {% for код_пр in spaces %}
+              {% for код in grantable(код_пр) %}
+                {% set ключ = role_key(код, код_пр) %}
+                {% if ключ not in показано %}
+                  {% set _ = показано.append(ключ) %}
+                  <label class="srole" data-spaces="{% for s in spaces %}{% if код in grantable(s) and role_key(код, s) == ключ %}{{ s }} {% endif %}{% endfor %}">
+                    <input type="radio" name="role" value="{{ код }}"{% if показано|length == 1 %} checked{% endif %}>
+                    <span><b>{{ t(ключ) }}</b><small>{{ t(hint_key(код, код_пр)) }}</small></span>
+                  </label>
+                {% endif %}
+              {% endfor %}
+            {% endfor %}
+          </div>
+        </fieldset>
+        <div class="sactions">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('users.add.submit') }}</button>
+          <a class="sbtn sbtn--ghost" href="{{ link() }}">{{ t('users.panel.close') }}</a>
+        </div>
+      </form>
+    {% endif %}
+  </article>
+{% endmacro %}

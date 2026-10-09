@@ -382,10 +382,12 @@ def test_контроль_в_уК_назначается(админ_ук: FlaskC
 
 
 def test_экран_предлагает_контроль_только_людям_уК(админ_ук: FlaskClient) -> None:
-    страница = админ_ук.get("/users").get_data(as_text=True)
-    строки = [r.split("</tr>")[0] for r in страница.split("<tr")]
-    ук = next(r for r in строки if "petr" in r and 'name="role"' in r)
-    партнёр = next(r for r in строки if "nino" in r and 'name="role"' in r)
+    # Смена роли — в карточке человека справа (`?person=<ключ>`).
+    def роли(ключ: str) -> str:
+        страница = админ_ук.get(f"/users?person={ключ}").get_data(as_text=True)
+        return страница.split('action="/users/role')[1].split("</form>")[0]
+
+    ук, партнёр = роли("id-petr"), роли("id-nino")
 
     assert 'value="control"' in ук
     assert 'value="control"' not in партнёр
@@ -637,8 +639,10 @@ def test_контроль_видит_только_людей_контролин�
     for чужое in ("petr", "boss", "nino", "petr@dodobrands.io", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
     assert 'action="/users/role' not in страница
-    assert 'action="/users/add' in страница and 'action="/users/disable' in страница
-    форма = страница.split('action="/users/add')[1].split("</form>")[0]
+    assert 'href="/users?lang=&amp;add=1"' in страница or "add=1" in страница
+    assert 'action="/users/disable' in страница
+    новый = контроль.get("/users?add=1").get_data(as_text=True)
+    форма = новый.split('action="/users/add')[1].split("</form>")[0]
     assert 'value="control"' in форма and 'value="HQ"' in форма
     for лишнее in ('value="admin"', 'value="auditor"', 'value="GE"'):
         assert лишнее not in форма, лишнее
@@ -654,7 +658,8 @@ def test_админ_уК_видит_всех_при_людях_контроли�
         assert свой in страница, свой
     for чужое in ("boss", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
-    assert 'action="/users/role' in страница
+    карточка = админ_ук.get("/users?person=id-petr").get_data(as_text=True)
+    assert 'action="/users/role' in карточка
 
 
 @pytest.fixture
