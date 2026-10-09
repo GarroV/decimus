@@ -1,129 +1,178 @@
 {#
-  Реестр проведённых проверок. Облик — прототип владельца (D190): список
-  строк-карточек, а не таблица.
+  «Проверки»: слева реестр, справа карточка выбранной проверки. Раскладка —
+  общий каркас `_split_page.html` (тот же, что у «Пользователей»), образец —
+  Swarm Brain: список с фильтрами в одну строку и постоянная правая колонка.
 
-  ПОЧЕМУ НЕ ТАБЛИЦА. Восемь колонок читались слева направо одинаково
-  внимательно, и главное в строке — точка, её буква и её оценка — весило
-  столько же, сколько имя аудитора. В прототипе строка устроена иначе: буква
-  крупным знаком слева, точка и оценка одной строкой, всё остальное — мелкой
-  мета-строкой под ними. На узком экране это к тому же переносится, а таблица
-  из восьми колонок — нет.
+  Выбор — в адресе (`?inspection=<id>`), поэтому всё работает без скриптов и
+  ссылкой на открытую проверку можно поделиться. Без выбора справа первая
+  строка списка. Отдельная страница карточки (`/inspections/<id>`) осталась:
+  правая колонка — её короткий вид, и туда ведёт «Открыть полностью».
 
-  Процент и буква печатаются такими, какими они лежат в базе. Ни одного
-  действия над ними в шаблоне нет и быть не может — на экран приходит уже
-  подготовленная строка (`src/web/view.py`).
-#}{% extends "base.html" %}
+  Строка списка: первая линия — буква, пиццерия, итог и дата обхода; вторая,
+  мелкая, — вид проверки и аудитор. Процент и буква печатаются такими, какими
+  лежат в базе, — на экран приходит уже подготовленная строка (`view.py`).
+
+  Период — «с — по» по дате обхода со стрелками ← →, по умолчанию текущий
+  месяц (`registry_period.py`). Ждущие приёмки (D199) — отдельной группой
+  сверху и мимо отбора: их мало, и ни одна не должна потеряться за выбранным
+  месяцем или буквой.
+#}{% extends "_split_page.html" %}
 {% from "_pick.html" import pick %}
+{% from "inspections/_panel.html" import inspection_panel with context %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
 
-{% block body %}
-  <div class="ov-head">
-    <div class="ov-head__main">
-      <div class="ov-head__kicker">{{ t('registry.kicker') }}</div>
-      <h1 class="ov-head__title">{{ t('section.registry.title') }}</h1>
+{% macro row_link(row, review=false) %}
+  {% set текущая = picked == row.id %}
+  <li>
+    <a class="srow{% if текущая %} is-current{% endif %}{% if row.retracted %} is-frozen{% endif %}"
+       href="{{ select_url(inspection=row.id) }}"{% if текущая %} aria-current="true"{% endif %}>
+      <span class="grade tag {{ grade_tone(row.grade) }} srow__grade">{{ row.grade or '—' }}</span>
+      <span class="srow__main">
+        <b>{{ row.unit_name }}</b>
+        <small>
+          {{ kind_title(row.kind, lang) }} · {{ row.auditor or '—' }}
+          {%- if checklist_names is not none %} · {{ checklist_names.get(row.checklist_code, row.checklist_code) }}{% endif %}
+          {%- if review %} · <span class="srow__warn">{{ t('state.review') }}</span>{% endif %}
+          {%- if row.retracted %} · <span class="srow__err">{{ t('state.retracted') }}</span>{% endif %}
+        </small>
+      </span>
+      <span class="srow__cell is-num srow__score">{{ row.pct }}</span>
+      <span class="srow__cell is-num mono">{{ row.inspection_date }}</span>
+    </a>
+  </li>
+{% endmacro %}
+
+{% macro hidden_filters(skip=()) %}
+  <input type="hidden" name="lang" value="{{ lang }}">
+  {% for name, value in filters.params().items() if value and name not in skip %}
+    <input type="hidden" name="{{ name }}" value="{{ value }}">
+  {% endfor %}
+{% endmacro %}
+
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
+      <p class="shead__sub">
+        {{ period_title }} · {{ t('registry.count', count=rows|length) }}
+        {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
+        {%- if registry.review %} · {{ t('registry.review.title') }}: {{ registry.review|length }}{% endif %}
+      </p>
     </div>
-  </div>
+  </header>
+{% endblock %}
 
-  {# Отбор реестра — теми же выпадающими чипами, что на обзоре: один язык
-     отбора на весь продукт, а не свой на каждом экране. #}
-  <div class="ov-filters">
-    <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
-    {% for chip in picks %}{{ pick(chip) }}{% endfor %}
-    <span class="ov-filters__gap"></span>
-    <a class="ov-chip ov-chip--reset{% if not (grade or kind) %} is-idle{% endif %}"
-       href="{{ url(current_path) }}?lang={{ lang }}">{{ t('overview.filter.reset') }}</a>
-    <span class="ov-card__count">
-      {{ t('registry.count', count=rows|length) }}{% if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
-    </span>
-  </div>
-
-  {#
-    Плашки «снятые проверки не видны» здесь больше нет (D193): роль
-    администратора истории на площадке не заведена (#305), значит снять
-    проверку не мог никто и снятых нет. Предупреждение о невозможном — шум.
-  #}
-
-  {# Ждущие приёмки (D199) — отдельным блоком над историей и мимо отбора:
-     их мало, и ни одна не должна потеряться за выбранной буквой. Блок идёт
-     по охвату вошедшего: УК видит здесь и ждущие партнёра — на чтение. #}
-  {% if registry.review %}
-    <section class="ov-card ov-card--wide mt-gap">
-      <div class="ov-card__head">
-        <div class="ov-card__title">{{ t('registry.review.title') }}</div>
-        <div class="ov-card__count">{{ registry.review|length }}</div>
+{% block split_list %}
+  <div class="sbox">
+    <div class="sbar sbar--registry">
+      {# Период: стрелки листают на длину выбранного, по заголовку — «с — по». #}
+      <div class="speriod" role="group" aria-label="{{ t('registry.period.label') }}">
+        {% if period_prev %}<a class="speriod__arrow" href="{{ period_prev }}" aria-label="{{ t('registry.period.prev') }}">{{ icon('cleft') }}</a>
+        {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cleft') }}</span>{% endif %}
+        <details class="pick speriod__pick" name="pick">
+          <summary class="spill speriod__title">{{ icon('cal') }}<span>{{ period_title }}</span></summary>
+          <div class="pick__menu speriod__menu">
+            <form method="get" action="{{ url(current_path) }}" class="sform">
+              {{ hidden_filters() }}
+              <div class="speriod__dates">
+                <label><span class="sform__label">{{ t('registry.period.from') }}</span>
+                  <input class="sinput" type="date" name="from" value="{{ period.start or '' }}"></label>
+                <label><span class="sform__label">{{ t('registry.period.to') }}</span>
+                  <input class="sinput" type="date" name="to" value="{{ period.end or '' }}"></label>
+              </div>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('registry.period.apply') }}</button>
+            </form>
+            <div class="speriod__quick">
+              <a class="pick__item{% if period_is_this_month %} is-on{% endif %}" href="{{ period_month }}">{{ t('registry.period.this_month') }}</a>
+              <a class="pick__item{% if period.is_all %} is-on{% endif %}" href="{{ period_all }}">{{ t('registry.period.all') }}</a>
+            </div>
+          </div>
+        </details>
+        {% if period_next %}<a class="speriod__arrow" href="{{ period_next }}" aria-label="{{ t('registry.period.next') }}">{{ icon('cright') }}</a>
+        {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
       </div>
-      <p class="field-note">{{ t('registry.review.hint') }}</p>
-      {% for row in registry.review %}
-        <a class="ins-row" href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
-          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
-          <span class="ins-row__main">
-            <span class="ins-row__title">
-              <span class="ins-row__unit">{{ row.unit_name }}</span>
-              <span class="ins-row__score">{{ row.pct }}</span>
-            </span>
-            <span class="ins-row__meta">
-              {{ row.inspection_date }} ·
-              {{ kind_title(row.kind, lang) }} ·
-              {% if row.city %}{{ city_title(row.city) }} · {% endif %}
-              {{ row.auditor or '—' }} ·
-              {{ t('registry.col.findings') }}: {{ row.findings_count }}
-            </span>
-          </span>
-          <span class="ins-row__state">
-            <span class="ov-dot ov-dot--warn"></span>
-            <span class="ins-row__state-text">{{ t('state.review') }}</span>
-          </span>
-          <span class="ins-row__go">›</span>
-        </a>
-      {% endfor %}
-    </section>
-  {% endif %}
 
-  {% if rows %}
-    <section class="ov-card ov-card--wide">
-      {% for row in rows %}
-        <a class="ins-row{% if row.retracted %} is-frozen{% endif %}"
-           href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
-          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
-          <span class="ins-row__main">
-            <span class="ins-row__title">
-              <span class="ins-row__unit">{{ row.unit_name }}</span>
-              <span class="ins-row__score">{{ row.pct }}</span>
-            </span>
-            <span class="ins-row__meta">
-              {{ row.inspection_date }} ·
-              {{ kind_title(row.kind, lang) }} ·
-              {% if row.city %}{{ city_title(row.city) }} · {% endif %}
-              {{ row.auditor or '—' }} ·
-              {{ t('registry.col.findings') }}: {{ row.findings_count }}
-              {%- if checklist_names is not none %} · {{ checklist_names.get(row.checklist_code, row.checklist_code) }}{% endif %}
-            </span>
-          </span>
-          {# Состояние называется только у снятой проверки: её числа в отчёт
-             не идут, и отличаться она обязана с одного взгляда. «Завершена»
-             в каждой обычной строке — одно и то же слово, которое прячет то
-             единственное, что здесь надо увидеть. #}
-          {% if row.retracted %}
-            <span class="ins-row__state">
-              <span class="ov-dot ov-dot--err"></span>
-              <span class="ins-row__state-text">{{ t('state.retracted') }}</span>
-            </span>
-          {% endif %}
-          <span class="ins-row__go">›</span>
-        </a>
-      {% endfor %}
-    </section>
-  {% elif registry.rows %}
-    {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
-       реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
-    <div class="empty mt-gap">
-      <div class="empty__title">{{ t('registry.filtered_out.title') }}</div>
-      <p class="empty__text">{{ t('registry.filtered_out.text') }}</p>
+      {% for chip in picks %}{{ pick(chip) }}{% endfor %}
+
+      <form class="sbar__search" method="get" action="{{ url(current_path) }}" role="search">
+        {{ hidden_filters(skip=('q',)) }}
+        {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <label class="spill spill--search">
+          {{ icon('search') }}
+          <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ t('registry.search') }}"
+                 aria-label="{{ t('registry.search') }}" autocomplete="off" spellcheck="false">
+        </label>
+      </form>
+      {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
+    </div>
+
+    {% if registry.review %}
+      <div class="slist slist--registry">
+        <div class="slist__group">
+          <span>{{ t('registry.review.title') }}</span><span class="sbadge">{{ registry.review|length }}</span>
+        </div>
+        <p class="slist__note">{{ t('registry.review.hint') }}</p>
+        <ul class="slist__rows">{% for row in registry.review %}{{ row_link(row, review=true) }}{% endfor %}</ul>
+      </div>
+    {% endif %}
+
+    {% if rows %}
+      <div class="slist slist--registry">
+        {% if registry.review %}<div class="slist__group"><span>{{ t('registry.history') }}</span><span class="sbadge">{{ rows|length }}</span></div>{% endif %}
+        <div class="slist__head" aria-hidden="true">
+          <span></span>
+          <span>{{ t('registry.col.unit') }}</span>
+          <span class="is-num">{{ t('registry.col.score') }}</span>
+          <span class="is-num">{{ t('registry.col.date') }}</span>
+        </div>
+        <ul class="slist__rows">{% for row in rows %}{{ row_link(row) }}{% endfor %}</ul>
+      </div>
+    {% elif registry.rows %}
+      {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
+         реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('registry.filtered_out.title') }}</p>
+        <p class="sempty__text">{{ t('registry.filtered_out.text') }}</p>
+        <a class="sbtn" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>
+      </div>
+    {% elif not period.is_all %}
+      {# Пустой месяц — не пустой реестр: подсказать, куда листать. #}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('registry.period.empty.title') }}</p>
+        <p class="sempty__text">{{ t('registry.period.empty.text') }}</p>
+        <div class="sactions">
+          {% if period_prev %}<a class="sbtn" href="{{ period_prev }}">{{ icon('cleft') }}<span>{{ t('registry.period.prev') }}</span></a>{% endif %}
+          <a class="sbtn sbtn--primary" href="{{ period_all }}">{{ t('registry.period.all') }}</a>
+        </div>
+      </div>
+    {% else %}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('registry.empty.title') }}</p>
+        <p class="sempty__text">{{ t('registry.empty.text') }}</p>
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block split_detail %}
+  {% if card %}
+    {{ inspection_panel(card) }}
+  {% elif card_failed %}
+    <div class="sdetail sdetail--hint">
+      <p class="sdetail__title">{{ t('registry.panel.failed.title') }}</p>
+      <p class="sdetail__hint">{{ t('registry.panel.failed.text') }}</p>
+      <a class="sbtn" href="{{ url('/inspections/' ~ picked) }}?lang={{ lang }}">{{ t('registry.panel.open') }}</a>
+    </div>
+  {% elif card_missing %}
+    <div class="sdetail sdetail--hint">
+      <p class="sdetail__title">{{ t('registry.panel.missing.title') }}</p>
+      <p class="sdetail__hint">{{ t('registry.panel.missing.text') }}</p>
     </div>
   {% else %}
-    <div class="empty mt-gap">
-      <div class="empty__title">{{ t('registry.empty.title') }}</div>
-      <p class="empty__text">{{ t('registry.empty.text') }}</p>
+    <div class="sdetail sdetail--hint">
+      <p class="sdetail__title">{{ t('registry.panel.pick_title') }}</p>
+      <p class="sdetail__hint">{{ t('registry.panel.pick_text') }}</p>
     </div>
   {% endif %}
 {% endblock %}
