@@ -53,6 +53,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
     "split.back": {"ru": "Назад", "en": "Back"},
+    "split.close": {"ru": "Закрыть", "en": "Close"},
     "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
     "nav.theme": {"ru": "Тема", "en": "Theme"},
     "nav.theme.system": {"ru": "Как в системе", "en": "System"},

@@ -50,6 +50,7 @@ _BAR: dict[str, dict[str, str]] = {
 }
 
 _PANEL: dict[str, dict[str, str]] = {
+    "registry.drawer.title": {"ru": "Проверка", "en": "Inspection"},
     "registry.panel.open": {"ru": "Открыть полностью", "en": "Open in full"},
     "registry.panel.pick_title": {"ru": "Выберите проверку", "en": "Pick an inspection"},
     "registry.panel.pick_text": {
