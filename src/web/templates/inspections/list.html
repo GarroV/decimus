@@ -55,7 +55,7 @@
       <p class="field-note">{{ t('registry.review.hint') }}</p>
       {% for row in registry.review %}
         <a class="ins-row" href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
-          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
           <span class="ins-row__main">
             <span class="ins-row__title">
               <span class="ins-row__unit">{{ row.unit_name }}</span>
@@ -84,7 +84,7 @@
       {% for row in rows %}
         <a class="ins-row{% if row.retracted %} is-frozen{% endif %}"
            href="{{ url('/inspections/' ~ row.id) }}?lang={{ lang }}">
-          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade }}</span>
+          <span class="ins-row__grade grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
           <span class="ins-row__main">
             <span class="ins-row__title">
               <span class="ins-row__unit">{{ row.unit_name }}</span>

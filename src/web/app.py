@@ -930,6 +930,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        if detail.inspection.is_uploaded:
+            # Заведённая задним числом: письма нет (D310), а историческую сверка
+            # письма пересчитала бы движком (D332). Отказ до сборки.
+            return _card_refusal(
+                inspection_id, conf=conf, text=t("letter.uploaded", lang), status=409
+            )
         # Язык ПИСЬМА — третий язык продукта, и он свой: партнёру пишут на его
         # языке, а не на языке того, кто открыл админку. По умолчанию это язык
         # отчёта проверки; переключатель нужен там, где письмо уходит партнёру
@@ -1002,6 +1008,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return render_template("inspections/not_found.html"), 404
         if not _own(detail):
             return render_template("users/forbidden.html"), 403
+        if detail.inspection.is_uploaded:
+            return _card_refusal(
+                inspection_id, conf=conf, text=t("letter.uploaded", _lang(conf)), status=409
+            )
 
         текст = request.form.get("text") or ""
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
@@ -1538,6 +1548,8 @@ def _render_card(
         and план_известен
         and not detail.inspection.on_review
         and not detail.inspection.retracted
+        # Заведённая задним числом плана не требует и запроса не открывает (D310).
+        and not detail.inspection.is_uploaded
         and action_plans.needs_plan(detail.counts)
     )
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
@@ -1561,6 +1573,7 @@ def _render_card(
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
+            and not detail.inspection.is_uploaded
         ),
         sheet=лист,
         may_accept=можно_подтвердить,
@@ -1586,9 +1599,15 @@ def _render_card(
         checklist_name=_checklist_names(lang).get(
             detail.inspection.checklist_code, detail.inspection.checklist_code
         ),
-        build_since=pricing.edition_day(detail.inspection.checklist_version)
-        or data.load_edition_since(
-            reach=auth.current_reach(), version=detail.inspection.checklist_version
+        # У исторической издания нет — вместо даты сборки карточка показывает
+        # метку прежней методики (D332).
+        build_since=None
+        if detail.inspection.is_legacy
+        else (
+            pricing.edition_day(detail.inspection.checklist_version)
+            or data.load_edition_since(
+                reach=auth.current_reach(), version=detail.inspection.checklist_version
+            )
         ),
         # Ждущую приёмки не снимают: снятие — для принятой (retract.py), а
         # ошибку на приёмке чинят правкой записи (D200).
