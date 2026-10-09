@@ -45,22 +45,30 @@ class CountryMaps:
 
 def summarize(rows: Iterable[LatestRating], countries: Sequence[str]) -> tuple[CountryMaps, ...]:
     """Сводка по странам в их порядке; страна без филиалов — с пустыми оценками."""
+    return summarize_groups(rows, [(country, (country,)) for country in countries])
+
+
+def summarize_groups(
+    rows: Iterable[LatestRating], groups: Sequence[tuple[str, Sequence[str]]]
+) -> tuple[CountryMaps, ...]:
+    """Сводка по группам стран (кластер, срез) в их порядке: средняя по всем
+    отзывам группы. Ключ группы ложится в `CountryMaps.country`."""
     acc: dict[tuple[str, int], list[LatestRating]] = {}
     for row in rows:
         acc.setdefault((row.country_code, row.provider_id), []).append(row)
     result = []
-    for country in countries:
+    for key, members in groups:
         scores: dict[int, MapScore] = {}
         dates: list[date] = []
         for provider in SHOWN_PROVIDERS:
-            items = acc.get((country, provider), [])
+            items = [r for country in members for r in acc.get((country, provider), [])]
             reviews = sum(r.ratings_count for r in items)
             weighted = sum(r.avg_rating * r.ratings_count for r in items)
             scores[provider] = MapScore(
                 round(weighted / reviews, 2) if reviews else None, reviews, len(items)
             )
             dates += [r.on_date for r in items]
-        result.append(CountryMaps(country, scores, max(dates) if dates else None))
+        result.append(CountryMaps(key, scores, max(dates) if dates else None))
     return tuple(result)
 
 

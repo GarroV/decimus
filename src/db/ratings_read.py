@@ -70,13 +70,14 @@ class CountryRow:
     name_en: str
     developer: str | None
     is_imf: bool
+    cluster: str = "OTHER"
 
 
 def countries() -> tuple[CountryRow, ...]:
     return tuple(
         CountryRow(*r)
         for r in _rows(
-            "select code, name_ru, name_en, developer, is_imf from ratings.countries "
+            "select code, name_ru, name_en, developer, is_imf, cluster from ratings.countries "
             "order by name_en, code"
         )
     )
