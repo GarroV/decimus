@@ -655,3 +655,18 @@ def test_админ_уК_видит_всех_при_людях_контроли�
     for чужое in ("boss", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
     assert 'action="/users/role' in страница
+
+
+@pytest.fixture
+def админ_партнёра(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
+    yield from стенд(monkeypatch, tenant="GE", role="admin")
+
+
+def test_партнёру_страна_закрыта_и_не_в_меню(админ_партнёра: FlaskClient) -> None:
+    """D371: «Страна» — только УК; партнёр не видит её в меню и не открывает адресом."""
+    assert админ_партнёра.get("/country/GE").status_code == 404
+    страница = админ_партнёра.get("/users").get_data(as_text=True)
+    for чужой in ("/country", "/calendar", "/mini"):
+        assert f'href="{чужой}?lang=' not in страница, чужой
+    for свой in ("/overview", "/inspections", "/admin", "/users", "/ratings"):
+        assert f'href="{свой}?lang=' in страница, свой
