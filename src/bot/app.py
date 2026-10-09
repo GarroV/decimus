@@ -351,21 +351,28 @@ async def announce_app_button(bot: Bot, settings: BotSettings) -> None:
     пускает, кнопка не пустит тоже: мини-апп сверяет доступ тем же правилом
     (`web.walk_access`). Отказ телеграма — в журнал: без кнопки бот работает.
     """
-    try:
-        if settings.walk_url is None:
-            await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-            return
+    кнопка: MenuButtonDefault | MenuButtonWebApp = MenuButtonDefault()
+    if settings.walk_url is not None:
         кнопка = MenuButtonWebApp(
             text=t("btn.app", default_ui_lang()), web_app=WebAppInfo(url=settings.walk_url)
         )
-        if settings.walk_users is None:
-            await bot.set_chat_menu_button(menu_button=кнопка)
-            return
-        await bot.set_chat_menu_button(menu_button=MenuButtonDefault())
-        for user_id in sorted(settings.walk_users):
-            await bot.set_chat_menu_button(chat_id=user_id, menu_button=кнопка)
+    общая = кнопка if settings.walk_users is None else MenuButtonDefault()
+    await _menu_button(bot, None, общая)
+    # Каждому тестеру — отдельно и со своим отказом: не нажавший /start не
+    # должен оставить без кнопки остальных. Без адреса личные тоже снимаются.
+    # Выведенного из круга тут не знают — его кнопка остаётся, но мини-апп
+    # ему ответит 403 (`walk_open_to`).
+    for user_id in sorted(settings.walk_users or ()):
+        await _menu_button(bot, user_id, кнопка)
+
+
+async def _menu_button(
+    bot: Bot, chat_id: int | None, кнопка: MenuButtonDefault | MenuButtonWebApp
+) -> None:
+    try:
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=кнопка)
     except Exception:
-        logger.exception("кнопка запуска мини-аппа не объявилась — бот работает без неё")
+        logger.exception("кнопка у поля ввода не объявилась (%s) — бот работает без неё", chat_id)
 
 
 async def announce_personal_menu(bot: Bot, user_id: int, *, in_circle: bool) -> None:
