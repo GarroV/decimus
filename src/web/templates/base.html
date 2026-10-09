@@ -47,6 +47,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
+  {#- Стили одного раздела — только на его страницах (рейтинги: decimus-rt.css). -#}
+  {% block head %}{% endblock %}
   <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
   <script src="{{ url_for('static', filename='shell.js') }}" defer></script>
   <script src="{{ url_for('static', filename='nav.js') }}" defer></script>
@@ -77,7 +79,7 @@
       те же элементы, что в панели, а не свои копии.
     #}
     <header class="mbar">
-      <a class="mbar__brand" href="{{ url('/overview') }}?lang={{ lang }}">
+      <a class="mbar__brand" href="{{ url('/') }}?lang={{ lang }}">
         <img class="topbar__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
         <span class="topbar__name">{{ t('app.name') }}</span>
       </a>
@@ -90,7 +92,7 @@
   <div class="shell">
     {% if account %}
       <nav class="sidenav shell__nav" aria-label="{{ t('nav.sections') }}">
-        <a class="sidenav__brand" href="{{ url('/overview') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
+        <a class="sidenav__brand" href="{{ url('/') }}?lang={{ lang }}" title="{{ t('app.tenant_label') }}: {{ tenant }}">
           <img class="sidenav__logo" src="{{ url_for('static', filename='mark-small.svg') }}" alt="">
           <span class="sidenav__name"><b>{{ t('app.name') }}</b><small>Dodo · {{ tenant }}</small></span>
         </a>
@@ -138,7 +140,7 @@
 
         <div class="sidenav__user">
           <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
-          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.admin') if account.role == 'admin' else t('nav.role.auditor') }}</small></span>
+          <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t('nav.role.' ~ account.role) }}</small></span>
           {#
             Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
             чужой странице, выбив человека из админки без единого его движения.

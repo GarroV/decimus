@@ -44,11 +44,11 @@ def строка(login: str, *, tenant: str = "HQ", role: str = "auditor", email
 def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     позвали: dict[str, list[Any]] = {"role": [], "email": []}
 
-    def _роль(login: str, *, tenant: str, role: str) -> str | None:
+    def _роль(login: str, *, tenant: str, role: str, only_roles: Any = None) -> str | None:
         позвали["role"].append((login, tenant, role))
         return None if login == "nobody" else "auditor"
 
-    def _почта(login: str, *, tenant: str, email: str | None) -> bool:
+    def _почта(login: str, *, tenant: str, email: str | None, only_roles: Any = None) -> bool:
         позвали["email"].append((login, tenant, email))
         if email == "taken@dodobrands.io":
             raise EmailTakenError("занята")
@@ -63,6 +63,8 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
             строка(ЛОГИН, role="admin"),
             строка("petr", email="petr@dodobrands.io"),
             строка("nino", tenant="GE"),
+            # Тёзка в другом пространстве — для проверки «свой = пара».
+            строка(ЛОГИН, tenant="GE"),
         ),
     )
     monkeypatch.setattr(accounts, "spaces", lambda: ("HQ", "GE"))
@@ -89,19 +91,20 @@ def test_админ_уК_видит_почту_и_формы_правки(адм
 
 
 def test_админ_уК_назначает_роль(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
+    """Аудитора — в контроль: роль из охвата админа УК (D364)."""
     ответ = админ_ук.post(
-        "/users/role", data={"login": "petr", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+        "/users/role", data={"login": "petr", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
     )
 
     assert ответ.status_code == 200
     assert "Роль изменена" in ответ.get_data(as_text=True)
-    assert зовы["role"] == [("petr", "HQ", "admin")]
+    assert зовы["role"] == [("petr", "HQ", "control")]
 
 
 def test_админ_уК_правит_человека_партнёра_в_его_пространстве(
     админ_ук: FlaskClient, зовы: dict[str, list[Any]]
 ) -> None:
-    """Как заведение и отключение: админ УК управляет людьми всех пространств."""
+    """Админ УК ведёт людей партнёров (D364)."""
     админ_ук.post(
         "/users/email",
         data={"login": "nino", "tenant": "GE", "email": "nino@partner.ge"},
@@ -169,11 +172,12 @@ def test_незаведённая_роль_до_базы_не_доходит(
 def test_незаведённое_пространство_до_базы_не_доходит(
     админ_ук: FlaskClient, зовы: dict[str, list[Any]]
 ) -> None:
-    for путь, поле in (("/users/role", ("role", "admin")), ("/users/email", ("email", "a@b.c"))):
+    """Цель ищется по базе (#585): в незаведённом пространстве её нет — 403, как чужая."""
+    for путь, поле in (("/users/role", ("role", "auditor")), ("/users/email", ("email", "a@b.c"))):
         ответ = админ_ук.post(
             путь, data={"login": "petr", "tenant": "XX", поле[0]: поле[1]}, headers=ЗАГОЛОВКИ
         )
-        assert ответ.status_code == 400
+        assert ответ.status_code == 403
 
     assert зовы == {"role": [], "email": []}
 
@@ -214,22 +218,42 @@ def test_тот_же_логин_в_другом_пространстве_не_с
     assert зовы["role"] == [(ЛОГИН, "GE", "auditor")]
 
 
-def test_нет_такой_учётки_сказано(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
+def test_нет_такой_учётки_неотличимо_от_чужой(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """#585: «нет такой» и «не ваша» снаружи неразличимы — обе 403, до двери базы."""
     ответ = админ_ук.post(
-        "/users/role", data={"login": "nobody", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+        "/users/role",
+        data={"login": "nobody", "tenant": "HQ", "role": "auditor"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 403
+    assert зовы["role"] == []
+
+
+def test_учётка_пропавшая_между_чтением_и_записью_сказано(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Дверь базы не нашла цель (сменилась роль или отключили) — «не найдена», не успех."""
+    monkeypatch.setattr(accounts, "reassign_role", lambda *_a, **_k: None)
+    ответ = админ_ук.post(
+        "/users/role", data={"login": "petr", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
     )
 
     assert ответ.status_code == 200
     assert "не найдена" in ответ.get_data(as_text=True)
 
 
-@pytest.mark.parametrize(
-    ("tenant", "role"), [("HQ", "auditor"), ("GE", "admin"), ("GE", "auditor")]
-)
-def test_кроме_админа_уК_никто_не_правит_даже_прямой_отправкой(
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "auditor"), ("GE", "auditor")])
+def test_аудитор_и_сотрудник_партнёра_не_правят_даже_прямой_отправкой(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], tenant: str, role: str
 ) -> None:
-    """Админ партнёра тоже: его права над людьми не решены (D288)."""
+    """Аудитор УК и сотрудник партнёра людьми не управляют (D346, D364).
+
+    Админ партнёра с #585 ведёт людей своего пространства —
+    `test_web_users_scope.py`.
+    """
     for client in стенд(monkeypatch, tenant=tenant, role=role):
         роль = client.post(
             "/users/role",
@@ -334,3 +358,290 @@ def test_отказ_правки_следа_не_оставляет(
         )
 
     assert not [з for з in caplog.records if з.name == "src.web.people"]
+
+
+def test_контроль_вне_уК_до_базы_не_доходит(
+    админ_ук: FlaskClient, зовы: dict[str, list[Any]]
+) -> None:
+    """Роль «контроль» у партнёра — отказ 400 на экране, а не 503 «база отказала»."""
+    ответ = админ_ук.post(
+        "/users/role", data={"login": "nino", "tenant": "GE", "role": "control"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 400
+    assert зовы["role"] == []
+
+
+def test_контроль_в_уК_назначается(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
+    ответ = админ_ук.post(
+        "/users/role", data={"login": "petr", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 200
+    assert зовы["role"] == [("petr", "HQ", "control")]
+
+
+def test_экран_предлагает_контроль_только_людям_уК(админ_ук: FlaskClient) -> None:
+    страница = админ_ук.get("/users").get_data(as_text=True)
+    строки = [r.split("</tr>")[0] for r in страница.split("<tr")]
+    ук = next(r for r in строки if "petr" in r and 'name="role"' in r)
+    партнёр = next(r for r in строки if "nino" in r and 'name="role"' in r)
+
+    assert 'value="control"' in ук
+    assert 'value="control"' not in партнёр
+
+
+def test_добавить_контроль_партнёру_отказ_до_базы(
+    админ_ук: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def завести(*_a: Any, **_k: Any) -> Any:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(accounts, "add", завести)
+    ответ = админ_ук.post(
+        "/users/add",
+        data={"login": "ctl", "tenant": "GE", "role": "control"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 400
+    assert "только в пространстве УК" in ответ.get_data(as_text=True)
+
+
+@pytest.fixture
+def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
+    yield from стенд(monkeypatch, tenant="HQ", role="control")
+
+
+@pytest.mark.parametrize(
+    ("путь", "форма"),
+    [
+        ("/users/role", {"login": "petr", "tenant": "HQ", "role": "admin"}),
+        ("/users/add", {"login": "zed", "tenant": "HQ", "role": "auditor"}),
+        ("/users/disable", {"login": "petr", "tenant": "HQ"}),
+        ("/admin/publish", {}),
+        ("/admin/items", {"code": "X1"}),
+        ("/admin/items/X1", {"name_ru": "x", "name_en": "x"}),
+        ("/admin/items/X1/disable", {}),
+        ("/admin/items/X1/restore", {}),
+        ("/admin/zones", {"code": "Z1", "name_ru": "x", "name_en": "x"}),
+        ("/admin/zones/shares", {}),
+        ("/admin/zones/Z1/rename", {"name_ru": "x", "name_en": "x"}),
+        ("/admin/zones/Z1/remove", {}),
+        ("/admin/route", {}),
+        ("/admin/scoring", {}),
+        ("/admin/checklists", {"code": "c1"}),
+        ("/admin/checklists/c1/state", {"state": "active"}),
+        ("/admin/checklists/c1/apply", {}),
+        ("/admin/bot/c1", {}),
+        ("/inspections/x/retract", {"reason": "дубль"}),
+    ],
+)
+def test_контроль_вне_рейтингов_не_пишет(
+    контроль: FlaskClient, зовы: dict[str, list[Any]], путь: str, форма: dict[str, str]
+) -> None:
+    """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут.
+
+    Заслон `_install_control_gate` — единственная защита методических POST
+    (`/admin/*`): маршрутной проверки роли у них нет. `/users/role` и retract
+    закрыты ещё и маршрутом; `/users/add` и `/users/disable` заслон пропускает
+    (D360), и чужую роль или человека отсекает маршрут (`_people_scope`).
+    """
+    ответ = контроль.post(путь, data=форма, headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 403
+    assert зовы == {"role": [], "email": []}
+
+
+@pytest.mark.parametrize(
+    "путь", ["/overview", "/inspections", "/country", "/admin", "/actions", "/calendar", "/tenants"]
+)
+def test_контроль_не_видит_разделов_кроме_рейтингов(контроль: FlaskClient, путь: str) -> None:
+    """D358: контролинг не имеет отношения ко всему остальному — чужой раздел не открывается."""
+    assert контроль.get(путь).status_code == 404
+
+
+def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
+    assert контроль.get("/users").status_code == 200
+    вход = контроль.get("/")
+    assert вход.status_code == 302 and вход.headers["Location"].endswith("/ratings")
+
+
+def test_контроль_в_навигации_только_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
+    страница = контроль.get("/users").get_data(as_text=True)
+    assert 'href="/ratings?lang=' in страница
+    for чужой in ("/overview", "/inspections", "/admin", "/actions", "/country"):
+        assert f'href="{чужой}?lang=' not in страница, чужой
+
+
+def test_контроль_выходит_сам(контроль: FlaskClient) -> None:
+    assert контроль.post("/logout", headers=ЗАГОЛОВКИ).status_code == 302
+
+
+# --- D360: контроль сам заводит людей контролинга -------------------------
+# Права — ядро: экран прячет чужие формы, но довод здесь — ответ на ПОДДЕЛАННУЮ
+# отправку. Контроль трогает только учётки роли «контроль» в УК; чужая роль,
+# чужое пространство, чужой человек — отказ до двери базы.
+
+
+@pytest.fixture
+def люди_контроля(
+    monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
+) -> dict[str, list[Any]]:
+    """Перечень с людьми контролинга; заведение и отключение пишут, кого звали."""
+    зовы["add"] = []
+    зовы["disable"] = []
+
+    def _завести(login: str, *, tenant: str, role: str = "auditor") -> accounts.Added:
+        зовы["add"].append((login, tenant, role))
+        return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
+
+    def _отключить(login: str, *, tenant: str, only_roles: Any = None) -> bool:
+        зовы["disable"].append((login, tenant))
+        return True
+
+    monkeypatch.setattr(accounts, "add", _завести)
+    monkeypatch.setattr(accounts, "disable", _отключить)
+    monkeypatch.setattr(
+        accounts,
+        "everyone",
+        lambda **_: (
+            строка(ЛОГИН, role="control", email="director@dodobrands.io"),
+            строка("vika", role="control", email="vika@dodobrands.io"),
+            строка("boss", role="admin", email="boss@dodobrands.io"),
+            строка("petr", email="petr@dodobrands.io"),
+            строка("nino", tenant="GE", email="nino@partner.ge"),
+        ),
+    )
+    return зовы
+
+
+def test_контроль_заводит_контроль_в_уК(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    ответ = контроль.post(
+        "/users/add", data={"login": "olga", "tenant": "HQ", "role": "control"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 200
+    assert "одноразовый-пароль-24-знака" in ответ.get_data(as_text=True)
+    assert люди_контроля["add"] == [("olga", "HQ", "control")]
+
+
+@pytest.mark.parametrize(
+    "форма",
+    [
+        {"login": "olga", "tenant": "HQ", "role": "admin"},
+        {"login": "olga", "tenant": "HQ", "role": "auditor"},
+        {"login": "olga", "tenant": "GE", "role": "control"},
+        {"login": "olga", "tenant": "GE", "role": "admin"},
+        {"login": "olga", "tenant": "HQ"},
+    ],
+)
+def test_контроль_не_заводит_чужую_роль_и_пространство(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]], форма: dict[str, str]
+) -> None:
+    ответ = контроль.post("/users/add", data=форма, headers=ЗАГОЛОВКИ)
+
+    assert ответ.status_code == 403
+    assert люди_контроля["add"] == []
+
+
+@pytest.mark.parametrize(
+    ("логин", "пространство"),
+    [("petr", "HQ"), ("boss", "HQ"), ("nino", "GE"), ("vika", "GE"), ("ghost", "HQ")],
+)
+def test_контроль_не_трогает_чужих_людей(
+    контроль: FlaskClient,
+    люди_контроля: dict[str, list[Any]],
+    логин: str,
+    пространство: str,
+) -> None:
+    """Аудитор, админ, партнёр, чужое пространство, незнакомец — отказ до базы."""
+    почта = контроль.post(
+        "/users/email",
+        data={"login": логин, "tenant": пространство, "email": "me@evil.example"},
+        headers=ЗАГОЛОВКИ,
+    )
+    отключение = контроль.post(
+        "/users/disable", data={"login": логин, "tenant": пространство}, headers=ЗАГОЛОВКИ
+    )
+
+    assert (почта.status_code, отключение.status_code) == (403, 403)
+    assert люди_контроля["email"] == [] and люди_контроля["disable"] == []
+
+
+def test_контроль_задаёт_почту_контролю(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    ответ = контроль.post(
+        "/users/email",
+        data={"login": "vika", "tenant": "HQ", "email": "v.new@dodobrands.io"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 200
+    assert люди_контроля["email"] == [("vika", "HQ", "v.new@dodobrands.io")]
+
+
+def test_контроль_отключает_контроль(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    ответ = контроль.post(
+        "/users/disable", data={"login": "vika", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 200
+    assert люди_контроля["disable"] == [("vika", "HQ")]
+
+
+def test_контроль_не_отключает_себя(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    """То же правило, что у админа: отключить себя — выйти и не вернуться."""
+    ответ = контроль.post(
+        "/users/disable", data={"login": ЛОГИН, "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert ответ.status_code == 400
+    assert люди_контроля["disable"] == []
+
+
+def test_контроль_не_меняет_роли_даже_своим(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    for роль in ("control", "admin"):
+        ответ = контроль.post(
+            "/users/role", data={"login": "vika", "tenant": "HQ", "role": роль}, headers=ЗАГОЛОВКИ
+        )
+        assert ответ.status_code == 403
+    assert люди_контроля["role"] == []
+
+
+def test_контроль_видит_только_людей_контролинга(
+    контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    страница = контроль.get("/users").get_data(as_text=True)
+
+    assert "vika" in страница and "vika@dodobrands.io" in страница
+    for чужое in ("petr", "boss", "nino", "petr@dodobrands.io", "boss@dodobrands.io"):
+        assert чужое not in страница, чужое
+    assert 'action="/users/role' not in страница
+    assert 'action="/users/add' in страница and 'action="/users/disable' in страница
+    форма = страница.split('action="/users/add')[1].split("</form>")[0]
+    assert 'value="control"' in форма and 'value="HQ"' in форма
+    for лишнее in ('value="admin"', 'value="auditor"', 'value="GE"'):
+        assert лишнее not in форма, лишнее
+
+
+def test_админ_уК_видит_всех_при_людях_контролинга(
+    админ_ук: FlaskClient, люди_контроля: dict[str, list[Any]]
+) -> None:
+    """Админ УК видит людей УК, кроме админов, и партнёров (D364): админ «boss» — вне охвата."""
+    страница = админ_ук.get("/users").get_data(as_text=True)
+
+    for свой in ("vika", "petr", "nino", "petr@dodobrands.io"):
+        assert свой in страница, свой
+    for чужое in ("boss", "boss@dodobrands.io"):
+        assert чужое not in страница, чужое
+    assert 'action="/users/role' in страница

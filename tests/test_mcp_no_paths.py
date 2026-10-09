@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from ratings_samples import rko_violations
 
 from src.mcp.catalogue import TOOLS
 from src.mcp.checklist import Store, current_version
@@ -90,6 +91,13 @@ from src.mcp.rpc import handle
         "inspection_id": "00000000-0000-0000-0000-000000000001",
         "confirm_unit": "Белград-1",
         "confirm_date": "2024-03-15",
+    },
+    # Загрузка рейтингов (D320): разобранный файл доходит до базы, а её здесь нет —
+    # отказ базы тоже обязан прийти без путей.
+    "import_ratings": {
+        "kind": "rko-violations",
+        "content": rko_violations().decode("utf-8"),
+        "file_name": "rko.csv",
     },
     "list_inspections": {},
     "unit_history": {"unit": "Белград-1"},
@@ -241,6 +249,7 @@ from src.mcp.rpc import handle
         "confirm_unit": "",
         "confirm_date": "2024-03-15",
     },
+    "import_ratings": {"kind": "rko-violations", "content": "не,таблица\n1,2\n"},
     "list_inspections": {"limit": 0},
     "unit_history": {"unit": "   "},
     "network_summary": {"date_from": "2026-09-02", "date_to": "2026-09-01"},

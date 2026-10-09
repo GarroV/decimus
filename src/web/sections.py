@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, canonical_tenant, is_admin_role
 
 from .errors import SectionRegistryError
 
@@ -69,16 +69,22 @@ SECTIONS: tuple[Section, ...] = (
     # статус и ответ. У УК для них вкладка в «Действиях» (D264).
     Section(key="orders", path="/prescriptions", built=True, partner_only=True, icon="flag"),
     Section(key="country", path="/country", built=True, icon="globe"),
+    # Рейтинги РС/РКО (спека 2026-10-08): видят все — УК и любой партнёр
+    # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
+    # (`src/web/ratings.py`), не флаг раздела.
+    Section(key="ratings", path="/ratings", built=True, icon="graph"),
     Section(key="calendar", path="/calendar", built=False, icon="cal"),
     Section(key="admin", path="/admin", built=True, icon="book"),
-    Section(key="tenants", path="/tenants", built=False, hq_only=True, icon="board"),
     # Действия УК (D264): очередь экшн-планов, приём и возврат. Имя рабочее —
     # названия разделов прорабатываются в #462.
     Section(key="actions", path="/actions", built=True, hq_only=True, icon="check"),
     # Люди проекта (T338, #322). В прототипе раздела нет: заведение учёток
     # жило в командной строке, и владелец попросил перенести его на экран.
     # Открыт каждому вошедшему (D286): человек видит здесь себя и привязывает
-    # бота; управляет людьми только админ УК — это решает экран (D288).
+    # бота. Один экран доступа для всех (D362, D364, #585): кого человек ведёт,
+    # решает его охват (`access_policy.py`). Пространства партнёров и их страны
+    # живут на этом же экране — отдельного раздела «Проект» (`/tenants`,
+    # заглушка прототипа) больше нет: один вопрос «у кого какой доступ» — один экран.
     Section(key="users", path="/users", built=True, icon="team"),
     Section(key="mini", path="/mini", built=False, icon="tg"),
 )
@@ -148,6 +154,10 @@ def current_section(path: str) -> str | None:
     return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
 
+#: Разделы контролинга (D358): рейтинги и «Пользователи» — там свой пароль и бот.
+CONTROL_SECTIONS = frozenset({"ratings", "users"})
+
+
 def visible_sections(account: object | None) -> tuple[Section, ...]:
     """Разделы, которые этому человеку показывать.
 
@@ -155,7 +165,10 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     известен, и набрать его руками может кто угодно. Смысл ровно в том, чтобы
     не звать человека туда, куда его не пустят.
     """
-    админ = getattr(account, "role", None) == "admin"
+    роль = getattr(account, "role", None)
+    if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
+        return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
+    админ = is_admin_role(роль)
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(
         item

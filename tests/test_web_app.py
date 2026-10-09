@@ -40,6 +40,7 @@ from src.web import action_plans
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
+from src.web import ratings as ratings_screen
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.inspections import load_registry as настоящий_реестр
 from src.web.inspections import retraction_available as настоящая_проверка_истории
@@ -138,6 +139,8 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
+    # Сводка рейтингов читает базу; её путь на настоящей базе — test_web_ratings_flow.
+    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -170,7 +173,8 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 3
+    # «Проект» (`/tenants`) снят в #585: пространства — на «Пользователях».
+    assert len(непостроенные) == 2
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key
@@ -774,6 +778,26 @@ def test_аудитор_не_отклоняет_проверку(стенд: Fla
     # Assert — отказ, и формы ему не показывают.
     assert ответ.status_code == 403
     assert "/retract" not in карточка_аудитора
+
+
+@pytest.mark.parametrize("стенд", ["control"], indirect=True)
+def test_контроль_не_отклоняет_проверку(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — «контроль» (D319) вне рейтингов только читает.
+    def отклонить(*_a: Any, **_k: Any) -> Retraction:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(data, "retract_card", отклонить)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
+    )
+
+    # Assert
+    assert ответ.status_code == 403
 
 
 # --- перенос по дате и пиццерии (D195) ---------------------------------------

@@ -32,9 +32,9 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
         "plans",
         "orders",
         "country",
+        "ratings",
         "calendar",
         "admin",
-        "tenants",
         "actions",
         "users",
         "mini",
@@ -43,7 +43,17 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
 
 def test_built_keys_are_the_built_screens() -> None:
     assert built_keys() == frozenset(
-        {"overview", "registry", "plans", "orders", "country", "admin", "users", "actions"}
+        {
+            "overview",
+            "registry",
+            "plans",
+            "orders",
+            "country",
+            "ratings",
+            "admin",
+            "users",
+            "actions",
+        }
     )
 
 
@@ -66,7 +76,17 @@ def test_section_refuses_an_unknown_key() -> None:
 
 def test_check_registry_accepts_exactly_the_built_sections() -> None:
     check_registry(
-        ("overview", "registry", "plans", "orders", "country", "admin", "users", "actions")
+        (
+            "overview",
+            "registry",
+            "plans",
+            "orders",
+            "country",
+            "ratings",
+            "admin",
+            "users",
+            "actions",
+        )
     )
 
 
@@ -85,6 +105,7 @@ def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
                 "orders",
                 "actions",
                 "country",
+                "ratings",
                 "admin",
                 "users",
                 "calendar",
@@ -106,9 +127,14 @@ class _Кто:
 
 
 def test_раздел_уК_скрыт_у_партнёра() -> None:
-    assert "tenants" not in {s.key for s in visible_sections(_Кто("GE"))}
-    assert "tenants" in {s.key for s in visible_sections(_Кто("HQ"))}
-    assert "tenants" in {s.key for s in visible_sections(_Кто("default"))}
+    assert "actions" not in {s.key for s in visible_sections(_Кто("GE"))}
+    assert "actions" in {s.key for s in visible_sections(_Кто("HQ"))}
+    assert "actions" in {s.key for s in visible_sections(_Кто("default"))}
+
+
+def test_раздела_проект_нет_пространства_на_экране_пользователей() -> None:
+    """#585: пространства партнёров ведутся на «Пользователях», заглушки «Проект» нет."""
+    assert "tenants" not in {s.key for s in SECTIONS}
 
 
 def test_пользователи_видны_каждому() -> None:
@@ -116,7 +142,7 @@ def test_пользователи_видны_каждому() -> None:
 
 
 def test_адрес_раздела_уК_отказывает_партнёру_и_вложенный_тоже() -> None:
-    путь = section("tenants").path
+    путь = section("actions").path
     assert refused_for(путь, "GE") and refused_for(путь + "/GE", "GE")
     assert not refused_for(путь, "HQ")
     assert not refused_for(section("registry").path, "GE")
