@@ -206,7 +206,7 @@ def test_находки_по_идентификатору_читаются_то�
 #: `get_inspection` передаёт охват читающего; `revise._apply` — после замка
 #: строки своего пространства (`_LOCK_SQL` с `tenant_code`).
 #: `imports._locked_detail` — после замка загруженного черновика своего
-#: пространства (D305, `imports._LOCK_SQL` с `tenant_code` и `origin`).
+#: пространства (D305, D334, `imports._LOCK_SQL` с `tenant_code` и `origin`).
 _ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {
     ("db/queries.py", "get_inspection"),
     ("db/revise.py", "_apply"),
@@ -266,7 +266,7 @@ def test_проверку_целиком_читают_только_после_о
 
     # Загрузка: тот же порядок, и замок берёт только загруженный черновик своего.
     assert "tenant_code = %(tenant)s" in imports._LOCK_SQL
-    assert "origin = 'import'" in imports._LOCK_SQL
+    assert "origin in ('import', 'legacy')" in imports._LOCK_SQL
     assert "for update" in imports._LOCK_SQL
     загрузка = next(
         у
