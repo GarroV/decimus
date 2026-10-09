@@ -49,11 +49,11 @@ from . import (
     action_plans,
     assets,
     auth,
+    edition,
     letter_draft,
     letter_markup,
     people,
     prescriptions,
-    pricing,
     profile,
     review,
     revision,
@@ -412,8 +412,6 @@ def _register_overview(app: Flask, conf: Settings) -> None:
         критических = snapshot.critical_total
         if snapshot.average is None:
             среднее = t("overview.tile.note.average_none", _lang(conf))
-        elif not snapshot.comparable:
-            среднее = t("overview.tile.note.average_mixed", _lang(conf))
         else:
             среднее = t("overview.tile.note.average", _lang(conf))
         # Плиток пять, и они РАЗНЫЕ на вид: бриф прямо запрещает полосу
@@ -445,14 +443,12 @@ def _register_overview(app: Flask, conf: Settings) -> None:
             ),
             overview_data.Tile(
                 key="average",
-                value="—"
-                if snapshot.average is None or not snapshot.comparable
-                else f"{snapshot.average:.1f}",
+                value="—" if snapshot.average is None else f"{snapshot.average:.1f}",
                 note=среднее,
                 href=registry_path,
-                # Движение показывается только там, где его есть с чем
-                # сравнить И где сравнение законно: ряд одного издания
-                # методики против такого же ряда прошлого периода (T349).
+                # Движение показывается там, где его есть с чем сравнить:
+                # средняя прошлого периода, какими бы методиками ни были
+                # оценены его проверки (D352).
                 delta="" if snapshot.average_delta is None else f"{snapshot.average_delta:+.1f}",
                 tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
             ),
@@ -1604,7 +1600,7 @@ def _render_card(
         build_since=None
         if detail.inspection.is_legacy
         else (
-            pricing.edition_day(detail.inspection.checklist_version)
+            edition.edition_day(detail.inspection.checklist_version)
             or data.load_edition_since(
                 reach=auth.current_reach(), version=detail.inspection.checklist_version
             )

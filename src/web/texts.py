@@ -92,10 +92,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "За выбранный период проверок нет — разбивать нечего.",
         "en": "No inspections in the selected period — nothing to break down.",
     },
-    "overview.breakdown.incomparable": {
-        "ru": "разные издания методики",
-        "en": "different methodology editions",
-    },
     "overview.sort": {"ru": "Сортировка", "en": "Sort"},
     "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
     "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
@@ -118,8 +114,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No inspected unit in this selection. Clear part of the filter.",
     },
     "overview.points.nodelta": {
-        "ru": "первая сравнимая проверка",
-        "en": "first comparable inspection",
+        "ru": "первая проверка точки в выборке",
+        "en": "the unit's first inspection in the selection",
     },
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
@@ -176,9 +172,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "over recorded percentages",
     },
     "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
-    # Средней нет, потому что в выборке разные чек-листы — другие пункты или
-    # веса (D218). Причина одной строкой в самой плитке, без плашки.
-    "overview.tile.note.average_mixed": {"ru": "разные чек-листы", "en": "different checklists"},
     "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     # Число ПОКАЗАННЫХ поводов: список ограничен, и «поводов: 6» читалось бы как

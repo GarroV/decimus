@@ -19,7 +19,6 @@ from src.domain.models import NON_DEDUCTING
 from ..db import queries
 from ..db.models import LEGACY_CODE, NO_CLASS, FindingRow, InspectionRow
 from ..db.reach import Reach
-from .pricing import price_key
 
 #: Сколько последних проверок показывает полоса движения и по скольким
 #: считается повтор. Цифра из прототипа владельца: шесть обходов — это около
@@ -43,9 +42,6 @@ class Bar:
     #: Высота в процентах поля. Считается от обрезанной шкалы (см. `_floor`),
     #: поэтому сама по себе цифрой оценки не является и на экран не выводится.
     height: float
-    #: Того же издания методики, что и последняя проверка. Разошлось —
-    #: столбик стоит рядом, но сравнивать его высоту с соседями нельзя.
-    comparable: bool
 
 
 @dataclass(frozen=True)
@@ -96,7 +92,6 @@ class UnitCard:
     #: Нижняя граница шкалы столбиков. Обрезанная ось без подписи — вранье
     #: картинкой, поэтому граница уезжает на экран и подписывается там.
     floor: float
-    comparable: bool
     weak: tuple[WeakZone, ...] = ()
     last_findings: tuple[FindingRow, ...] = ()
     repeats: tuple[Repeat, ...] = ()
@@ -119,10 +114,12 @@ def _floor(rows: tuple[InspectionRow, ...]) -> float:
     return max(0.0, math.floor((низ - 2) / 5) * 5)
 
 
-def _bars(
-    rows: tuple[InspectionRow, ...], *, floor: float, издание: tuple[str, str] | None
-) -> tuple[Bar, ...]:
-    """Столбики от старой проверки к свежей."""
+def _bars(rows: tuple[InspectionRow, ...], *, floor: float) -> tuple[Bar, ...]:
+    """Столбики от старой проверки к свежей.
+
+    Все столбики одного вида, какой бы методикой ни была оценена проверка:
+    оценка каждой верна по своей методике и стоит в ряду наравне (D352).
+    """
     высота_поля = 100.0 - floor
     столбики = []
     for row in rows:
@@ -134,7 +131,6 @@ def _bars(
                 pct=row.pct,
                 grade=row.grade,
                 height=round(max(МИНИМУМ_СТОЛБИКА, min(100.0, доля)), 1),
-                comparable=(издание is None or price_key(row) == издание),
             )
         )
     return tuple(столбики)
@@ -232,16 +228,13 @@ def load(*, reach: Reach, unit: str, lang: str = "ru", окно: int = ОКНО)
             last=None,
             bars=(),
             floor=0.0,
-            comparable=True,
         )
     # Выборка отдаёт свежие первыми; полоса движения читается слева направо от
     # старой к новой, как в любом графике времени.
     по_времени = tuple(reversed(ряд))
     последняя = ряд[0]
-    # Ключ цены, а не имя издания (#405): переиздание формулировок ряд не рвёт.
-    издание = price_key(последняя)
     floor = _floor(по_времени)
-    столбики = _bars(по_времени, floor=floor, издание=издание)
+    столбики = _bars(по_времени, floor=floor)
     detail = queries.get_inspection(последняя.id, reach=reach)
     находки = tuple(queries.findings_by_unit(reach=reach, unit=unit, limit=окно * 60))
     # География — у точки, а не у шапки проверки: город в шапке аудитор пишет
@@ -258,7 +251,6 @@ def load(*, reach: Reach, unit: str, lang: str = "ru", окно: int = ОКНО)
         last=последняя,
         bars=столбики,
         floor=floor,
-        comparable=all(b.comparable for b in столбики),
         weak=_weak(detail.by_zone if detail else {}, lang=lang),
         last_findings=tuple(detail.findings) if detail else (),
         repeats=_repeats(находки, окно=tuple(row.id for row in по_времени)),

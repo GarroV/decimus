@@ -14,7 +14,7 @@ from pathlib import Path
 import pytest
 
 from src.db.models import InspectionDetail, InspectionRow
-from src.mcp import comparability
+from src.mcp import methodologies
 from src.report import letters, rescore
 from src.report.letters import LetterError, Papers
 
@@ -76,7 +76,7 @@ def test_письма_по_загруженной_нет(origin: str, бумаг
         letters.build(_проверка(origin), lang=None, papers=бумаги_повсюду)
 
 
-def test_каждая_прежняя_методика_своя_группа_сопоставимости() -> None:
+def test_каждая_прежняя_методика_своя_группа_в_справке() -> None:
     def цена(_version: str, _code: str, _papers: Papers) -> str | None:
         raise AssertionError("цену исторической не читают — методики её нет")
 
@@ -85,8 +85,7 @@ def test_каждая_прежняя_методика_своя_группа_со
         _строка("legacy", version="legacy:Qvalon 133"),
         _строка("legacy", version="legacy:old 253"),
     ]
-    признак = comparability.of(ряд, papers=Papers(live=None, store=None, shelf=None), shape=цена)
-    assert признак["comparable"] is False
-    assert признак["unknown"] is False
-    assert [g["inspections"] for g in признак["groups"]] == [2, 1]  # type: ignore[index]
-    assert "Historical" in str(признак["note"])
+    справка = methodologies.of(ряд, papers=Papers(live=None, store=None, shelf=None), shape=цена)
+    assert [g["inspections"] for g in справка["groups"]] == [2, 1]  # type: ignore[index]
+    assert "Historical" in str(справка["note"])
+    assert "accepted as true" in str(справка["note"])

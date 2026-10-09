@@ -1182,19 +1182,6 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
   transition: background 120ms ease;
 }
 .pt-bars__col:hover .pt-bars__bar { background: var(--accent); }
-/* Столбик другого издания методики штрихуется: его высота стоит рядом с
-   соседями, но сравнивать её с ними нельзя — сменились ставки, а не работа
-   точки (T349). Цветом это не показать: цвет читается как оценка. */
-.pt-bars__bar--other {
-  background: repeating-linear-gradient(
-    45deg,
-    var(--surface-2),
-    var(--surface-2) 3px,
-    var(--line) 3px,
-    var(--line) 6px
-  );
-  border-color: var(--line-2);
-}
 .pt-bars__date {
   font-size: var(--fs-micro);
   color: var(--ink-3);
