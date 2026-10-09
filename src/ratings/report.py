@@ -47,11 +47,16 @@ CLUSTERS = ("CEE", "OTHER")
 CANDLE_MONTHS = 12
 
 
+LEVEL_CLUSTER = "cluster"
+LEVEL_SLICE = "slice"
+LEVEL_COUNTRY = "country"
+
+
 @dataclass(frozen=True)
 class GroupLine:
-    """Строка сводки по группе: кластер в срезе IMF, иначе сам срез (`key` — None).
-
-    Подробности — фильтром (D383): по странам строк здесь нет."""
+    """Строка сводки по группе (`level`): `cluster` — кластер в срезе IMF,
+    `slice` — весь выбранный срез (`key` — None), `country` — страна среза
+    девелопера (D385). Срез кластера и страны — одной строкой (D383)."""
 
     key: str | None
     countries: tuple[str, ...]
@@ -61,6 +66,7 @@ class GroupLine:
     rko_delta: float | None
     rs_candles: tuple[Candle | None, ...]
     rko_candles: tuple[Candle | None, ...]
+    level: str = LEVEL_SLICE
 
 
 @dataclass(frozen=True)
@@ -207,19 +213,26 @@ def group_lines(
     facts: tuple[Sequence[Fact], Sequence[Fact], Sequence[Fact]],
     months: Sequence[date],
 ) -> tuple[GroupLine, ...]:
-    """В срезе IMF — строка на кластер; в остальных — одна строка среза.
+    """В срезе IMF — строка на кластер; у девелопера — общая строка и строка на
+    каждую его страну (D385); в остальных — одна строка среза.
     `facts` — (текущий период, прошлый, окно свечей)."""
     current, previous, history = facts
-    parts: list[tuple[str | None, tuple[str, ...]]]
+    parts: list[tuple[str, str | None, tuple[str, ...]]]
     if selection.group == GROUP_IMF:
         parts = [
-            (key, tuple(r.code for r in found.countries if r.cluster == key and r.code in codes))
+            (
+                LEVEL_CLUSTER,
+                key,
+                tuple(r.code for r in found.countries if r.cluster == key and r.code in codes),
+            )
             for key in CLUSTERS
         ]
     else:
-        parts = [(None, tuple(codes))]
+        parts = [(LEVEL_SLICE, None, tuple(codes))]
+        if selection.group == GROUP_DEVELOPER and len(codes) > 1:
+            parts += [(LEVEL_COUNTRY, code, (code,)) for code in codes]
     out = []
-    for key, part in parts:
+    for level, key, part in parts:
         values = {k: group_average(current, k, part) for k in (RS, RKO)}
         before = {k: group_average(previous, k, part) for k in (RS, RKO)}
         out.append(
@@ -232,6 +245,7 @@ def group_lines(
                 rko_delta=delta(values[RKO], before[RKO]),
                 rs_candles=candles(history, RS, part, months),
                 rko_candles=candles(history, RKO, part, months),
+                level=level,
             )
         )
     return tuple(out)

@@ -154,7 +154,9 @@ def _group_name(
     lang: str,
     country_name: Callable[[str], str],
 ) -> str:
-    """Подпись строки сводки: кластер в срезе IMF, иначе сам срез."""
+    """Подпись строки сводки: кластер, страна девелопера или сам срез."""
+    if line.level == report.LEVEL_COUNTRY and line.key:
+        return country_name(line.key)
     if line.key is not None:
         return t(f"ratings.cluster.{line.key}", lang)
     if selection.group == report.GROUP_COUNTRY and selection.value:
