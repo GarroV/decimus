@@ -733,3 +733,16 @@ def test_главная_собирает_доску_рейтинги_и_стра
     assert "hm-chart__imf" in страница
     assert "Сербия" in страница and "3<small>/12</small>" in страница
     assert 'href="/overview?country=RS' in страница
+
+
+def test_страна_вне_охвата_из_адреса_главную_не_сужает(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Партнёр с чужой страной в адресе видит свой охват, а не чужие рейтинги."""
+    подменить_двери(monkeypatch, tenant="GE")
+    спрошено: list[object] = []
+    monkeypatch.setattr(home_ratings, "load", lambda codes, **_: спрошено.append(codes))
+    with собрать(tenant="GE").test_client() as client:
+        assert войти(client).status_code == 302
+        monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: снимок())
+        страница = client.get("/overview?country=HR").get_data(as_text=True)
+    assert спрошено == [("GE",)]
+    assert "Только Хорватия" not in страница
