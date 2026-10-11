@@ -205,7 +205,7 @@ def chart(g: Gauge) -> Chart | None:
 
 @dataclass(frozen=True)
 class Ratings:
-    """Оба блока и значения стран — для таблицы «Мои страны» (в месяце блока)."""
+    """Оба блока и значения стран — для таблицы «Страны» (в месяце блока)."""
 
     rs: Gauge
     rko: Gauge
