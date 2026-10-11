@@ -45,8 +45,15 @@
 {% else %}
   <a class="cn-back" href="{{ url('/country') }}?lang={{ lang }}">‹ {{ t('country.rail.title') }}</a>
   {% set data = view.snapshot %}
-  <div class="ov-head">
-    <div class="ov-head__main">
+  {% set has_inspections = data.inspections_total > 0 or selection.narrowed %}
+  {% set plans_count = (plans|length) if plans_known else none %}
+  {% set rx_count = (rx_rows|length) if rx_known else none %}
+  {# Шапка как у Swarm: имя и строка итога слева, всё управление — мелкими
+     кнопками справа (D402 владельца 11.10.2026: никаких больших блоков и
+     ничего внизу). Счётчик на кнопке — сколько там сейчас; ссылки и права те
+     же, что были у больших кнопок «Действовать» / «Мои …». #}
+  <div class="cn-head">
+    <div class="cn-head__main">
       <div class="ov-head__kicker">{{ t('country.kicker') }}</div>
       <h1 class="ov-head__title">{{ country_title(view.code) or '—' }}</h1>
       <div class="ov-card__hint">
@@ -55,6 +62,18 @@
              average=('—' if data.average is none else '%.1f'|format(data.average)),
              unchecked=data.unchecked) }}
       </div>
+      <div class="ov-card__hint">{{ t('country.register.hint', open=units_count.open, pipeline=units_count.pipeline, closed=units_count.closed) }}</div>
+    </div>
+    <div class="cn-actions">
+      {% if can_add_units %}
+        <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>
+      {% endif %}
+      <a class="btn btn--sm" href="{{ url(plans_act_path) }}{% if plans_act_country %}?country={{ view.code }}&amp;lang={{ lang }}{% else %}?lang={{ lang }}{% endif %}"
+         title="{{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}">
+        {{ t('country.plans.title') }}<span class="cn-count{% if plans_count %} is-on{% endif %}">{{ '—' if plans_count is none else plans_count }}</span></a>
+      <a class="btn btn--sm" href="{{ url(rx_hq_path if rx_act_hq else rx_partner_path) }}?lang={{ lang }}{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}"
+         title="{{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}">
+        {{ t('country.rx.title') }}<span class="cn-count{% if rx_count %} is-on{% endif %}">{{ '—' if rx_count is none else rx_count }}</span></a>
     </div>
   </div>
 
@@ -62,7 +81,9 @@
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
   {# Отбор — ссылками, как на «Обзоре»: срез живёт в адресе. Страна здесь не
-     фильтр, а сам экран, поэтому она в адресе пути, а не в `?country=`. #}
+     фильтр, а сам экран, поэтому она в адресе пути, а не в `?country=`.
+     Без единой проверки отбирать нечего — строки нет. #}
+  {% if has_inspections %}
   <div class="ov-filters">
     <span class="ov-filters__label">{{ t('overview.filter.title') }}</span>
     {% for chip in picks %}{{ pick(chip) }}{% endfor %}
@@ -70,19 +91,29 @@
     <a class="ov-chip ov-chip--reset{% if not selection.narrowed %} is-idle{% endif %}"
        href="{{ reset_url }}">{{ t('overview.filter.reset') }}</a>
   </div>
+  {% endif %}
 
-  {# ── Пиццерии страны ──────────────────────────────────────────────────
+  {# Пустое схлопывается в одну тихую строку: пять пустых рамок друг под
+     другом ничего не сообщали (#657). Не прочитанное (`unknown`) — не «пусто»,
+     об этом говорим отдельно. #}
+  {% set nothing = [] %}
+  {% if plans_known and not plans %}{% set _ = nothing.append(t('country.none.plans')) %}{% endif %}
+  {% if rx_known and not rx_rows %}{% set _ = nothing.append(t('country.none.rx')) %}{% endif %}
+  {% if not data.systemic %}{% set _ = nothing.append(t('country.none.systemic')) %}{% endif %}
+  {% if not data.zone_losses %}{% set _ = nothing.append(t('country.none.zones')) %}{% endif %}
+  {% if nothing %}<div class="cn-quiet">{{ t('country.none', what=nothing|join(', ')) }}</div>{% endif %}
+  {% if not plans_known %}<div class="cn-quiet">{{ t('country.plans.unknown') }}</div>{% endif %}
+  {% if not rx_known %}<div class="cn-quiet">{{ t('country.rx.unknown') }}</div>{% endif %}
+
+  {# ── Результаты проверок по пиццериям ─────────────────────────────────
      Строка раскрывает историю точки прямо под собой (D260): вопрос «что с
      этой пиццерией» решается на месте, а карточка точки — на шаг глубже.
      Точки нет в справочнике — строка ведёт в отчёт, это лучше мёртвой. #}
+  {% if data.points or has_inspections %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('country.units.title') }}</div>
-      <div class="ov-card__hint">{{ t('country.units.hint') }}</div>
-      <div class="ov-card__count">{{ data.points|length }}</div>
-      {% if can_add_units %}
-        <a class="btn btn--sm" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">{{ t('unitnew.open') }}</a>
-      {% endif %}
+      <div class="ov-card__count" title="{{ t('country.units.hint') }}">{{ data.points|length }}</div>
     </div>
     {% if data.points %}
       <div class="ov-table ov-table--points">
@@ -137,142 +168,142 @@
       <div class="ov-card__empty">{{ t('country.units.empty') }}</div>
     {% endif %}
   </section>
+  {% endif %}
 
   {# ── Экшн-планы страны (волна 2) ──────────────────────────────────────
-     Запрос, версии, комментарии УК, итог. Действий здесь нет (D264): УК
-     переходит в «Действия», партнёр — в свой раздел. #}
+     Только когда есть что показать; пустое — в тихой строке выше, вход —
+     кнопка в шапке. Действий здесь нет (D264). #}
+  {% if plans_known and plans %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('country.plans.title') }}</div>
       <div class="ov-card__hint">{{ t('country.plans.hint') }}</div>
-      <a class="btn btn--sm" href="{{ url(plans_act_path) }}{% if plans_act_country %}?country={{ view.code }}&amp;lang={{ lang }}{% else %}?lang={{ lang }}{% endif %}">
-        {{ t('country.plans.act') if plans_act_country else t('country.plans.mine') }}</a>
+      <div class="ov-card__count">{{ plans|length }}</div>
     </div>
     {% if plans_truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('plans.truncated', n=plans_limit) }}</div></div></div>{% endif %}
-    {% if not plans_known %}
-      <div class="ov-card__empty">{{ t('country.plans.unknown') }}</div>
-    {% elif plans %}
-      {% for r in plans %}
-        <div class="ov-history">
-          <div class="ov-row">
-            <span class="ov-row__name">
-              <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ r.unit_name }} · {{ r.inspection_date }}</a>
-              <span class="ov-row__meta">{{ t('actions.request.due', due=r.due_on) }}</span>
-            </span>
-            {{ state_tag(r, plans_today) }}
-          </div>
-          {{ versions(r, plans_path) }}
+    {% for r in plans %}
+      <div class="ov-history">
+        <div class="ov-row">
+          <span class="ov-row__name">
+            <a href="{{ url(registry_path ~ '/' ~ r.inspection_id) }}?lang={{ lang }}">{{ r.unit_name }} · {{ r.inspection_date }}</a>
+            <span class="ov-row__meta">{{ t('actions.request.due', due=r.due_on) }}</span>
+          </span>
+          {{ state_tag(r, plans_today) }}
         </div>
-      {% endfor %}
-    {% else %}
-      <div class="ov-card__empty">{{ t('country.plans.empty') }}</div>
-    {% endif %}
+        {{ versions(r, plans_path) }}
+      </div>
+    {% endfor %}
   </section>
+  {% endif %}
 
   {# ── Предписания страны (волна 3) ─────────────────────────────────────
      Что отправлено партнёру этой страны: дата, суть, срок, статус; письмо
      открывается. Действий здесь нет (D264). #}
+  {% if rx_known and rx_rows %}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('country.rx.title') }}</div>
       <div class="ov-card__hint">{{ t('country.rx.hint') }}</div>
-      <a class="btn btn--sm" href="{{ url(rx_hq_path if rx_act_hq else rx_partner_path) }}?lang={{ lang }}{% if rx_act_hq %}&amp;country={{ view.code }}{% endif %}">
-        {{ t('country.rx.act') if rx_act_hq else t('country.rx.mine') }}</a>
+      <div class="ov-card__count">{{ rx_rows|length }}</div>
     </div>
     {% if rx_truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('rx.truncated', n=rx_limit) }}</div></div></div>{% endif %}
-    {% if not rx_known %}
-      <div class="ov-card__empty">{{ t('country.rx.unknown') }}</div>
-    {% elif rx_rows %}
-      {% for p in rx_rows %}
-        <div class="ov-row">
-          <span class="ov-row__name">
-            <a href="{{ url((rx_hq_path if rx_act_hq else rx_partner_path) ~ '/' ~ p.id) }}?lang={{ lang }}">{{ p.subject }}</a>
-            <span class="ov-row__meta">{{ p.issued_at.strftime('%Y-%m-%d') if p.issued_at else '' }} · {{ rx_units(p) }} · {{ t('rx.due', due=p.due_on) }}</span>
-          </span>
-          <span>{{ rx_tag(p, today_rx) }}{{ rx_replied(p) }}</span>
-        </div>
-      {% endfor %}
-    {% else %}
-      <div class="ov-card__empty">{{ t('country.rx.empty') }}</div>
-    {% endif %}
+    {% for p in rx_rows %}
+      <div class="ov-row">
+        <span class="ov-row__name">
+          <a href="{{ url((rx_hq_path if rx_act_hq else rx_partner_path) ~ '/' ~ p.id) }}?lang={{ lang }}">{{ p.subject }}</a>
+          <span class="ov-row__meta">{{ p.issued_at.strftime('%Y-%m-%d') if p.issued_at else '' }} · {{ rx_units(p) }} · {{ t('rx.due', due=p.due_on) }}</span>
+        </span>
+        <span>{{ rx_tag(p, today_rx) }}{{ rx_replied(p) }}</span>
+      </div>
+    {% endfor %}
   </section>
+  {% endif %}
 
+  {% if data.systemic or data.zone_losses %}
   <div class="ov-grid">
     {# ── Что системно болит: пункты, нарушенные в нескольких пиццериях.
        Подпись — как на «Обзоре»: пункт методики, иначе формулировка
        свежей записи, иначе код. #}
+    {% if data.systemic %}
     <section class="ov-card">
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('country.systemic.title') }}</div>
       </div>
-      {% if data.systemic %}
-        {% for item in data.systemic %}
-          <div class="ov-row">
-            <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
-            <span class="ov-row__name">
-              {% if item_titles.get(item.code) %}
-                {{ item_titles.get(item.code) }}
-              {% elif item.text %}
-                <span lang="{{ item.lang }}">{{ item.text }}</span>
-              {% else %}
-                {{ item.code }}
-              {% endif %}
-              <span class="ov-row__meta">
-                {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
-                {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
-              </span>
+      {% for item in data.systemic %}
+        <div class="ov-row">
+          <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
+          <span class="ov-row__name">
+            {% if item_titles.get(item.code) %}
+              {{ item_titles.get(item.code) }}
+            {% elif item.text %}
+              <span lang="{{ item.lang }}">{{ item.text }}</span>
+            {% else %}
+              {{ item.code }}
+            {% endif %}
+            <span class="ov-row__meta">
+              {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
+              {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
             </span>
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="ov-card__empty">{{ t('country.systemic.empty') }}</div>
-      {% endif %}
+          </span>
+        </div>
+      {% endfor %}
     </section>
+    {% endif %}
 
     {# ── Где страна теряет больше всего ─────────────────────────────── #}
+    {% if data.zone_losses %}
     <section class="ov-card">
       <div class="ov-card__head">
         <div class="ov-card__title">{{ t('country.zones.title') }}</div>
       </div>
-      {% if data.zone_losses %}
-        {% for zone in data.zone_losses %}
-          <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
-            <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
-            <span class="ov-bar">
-              <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
-              <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
-            </span>
-            <span class="ov-row__num">−{{ '%.1f'|format(zone.loss) }}</span>
-          </div>
-        {% endfor %}
-      {% else %}
-        <div class="ov-card__empty">{{ t('country.zones.empty') }}</div>
-      {% endif %}
+      {% for zone in data.zone_losses %}
+        <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+          <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
+          <span class="ov-bar">
+            <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
+            <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
+          </span>
+          <span class="ov-row__num">−{{ '%.1f'|format(zone.loss) }}</span>
+        </div>
+      {% endfor %}
     </section>
+    {% endif %}
   </div>
+  {% endif %}
 
-  {# ── Пиццерии страны по своду девелопмента (D376): работающие, стройка,
-     закрытые. Имя ведёт в карточку, если точка есть в справочнике. #}
+  {# ── Пиццерии страны по своду девелопмента (D376): плотная таблица —
+     название, партнёр, город и адрес, дата открытия, тихая метка статуса.
+     Имя ведёт в карточку, если точка есть в справочнике. #}
   <section class="ov-card ov-card--wide">
     <div class="ov-card__head">
       <div class="ov-card__title">{{ t('country.register.title') }}</div>
-      <div class="ov-card__hint">{{ t('country.register.hint', open=units_count.open, pipeline=units_count.pipeline, closed=units_count.closed) }}</div>
+      <div class="ov-card__count">{{ units_profiles|length }}</div>
     </div>
     {% if units_profiles %}
-      {% for p in units_profiles %}
-        <div class="ov-row">
-          <span class="ov-row__name">
-            {% if p.dodo_id and units_links.get(p.dodo_id) %}<a href="{{ url('/units/' ~ units_links[p.dodo_id]) }}?lang={{ lang }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}
-            <span class="ov-row__meta">{{ [p.partner, p.address]|select|join(' · ') }}</span>
-          </span>
-          <span class="ov-row__meta">
-            {% if p.stage == 'closed' %}{{ t('unit.profile.closed') }} {{ p.closed_on or '' }}
-            {% elif p.restaurant_on or p.delivery_on %}{{ t('country.register.since', day=p.restaurant_on or p.delivery_on) }}
-            {% else %}{{ p.status }}{% endif %}
-          </span>
-          <span class="tag{% if p.stage == 'open' %} tag--ok{% elif p.stage == 'closed' %} tag--err{% else %} tag--neutral{% endif %}">{{ t('unit.stage.' ~ p.stage) }}</span>
+      <div class="ov-table cn-table">
+        <div class="ov-table__head">
+          <span>{{ t('country.register.col.unit') }}</span>
+          <span>{{ t('country.register.col.partner') }}</span>
+          <span>{{ t('country.register.col.place') }}</span>
+          <span class="ov-num">{{ t('country.register.col.opened') }}</span>
+          <span>{{ t('country.register.col.status') }}</span>
         </div>
-      {% endfor %}
+        {% for p in units_profiles %}
+          {% set opened = p.restaurant_on or p.delivery_on %}
+          <div class="ov-table__row">
+            <span class="cn-cell cn-cell--name">
+              {% if p.dodo_id and units_links.get(p.dodo_id) %}<a href="{{ url('/units/' ~ units_links[p.dodo_id]) }}?lang={{ lang }}">{{ p.name }}</a>{% else %}{{ p.name }}{% endif %}
+            </span>
+            <span class="cn-cell cn-cell--partner ov-cell__muted" title="{{ p.partner or '' }}">{{ p.partner or '—' }}</span>
+            <span class="cn-cell cn-cell--place ov-cell__muted" title="{{ p.address or '' }}">{{ p.city or p.address or '—' }}</span>
+            <span class="cn-cell cn-cell--date ov-num ov-cell__muted">{{ opened or '—' }}</span>
+            <span class="cn-cell cn-cell--status">
+              <span class="cn-st cn-st--{{ p.stage }}"{% if p.stage == 'closed' and p.closed_on %} title="{{ t('unit.profile.closed') }} {{ p.closed_on }}"{% endif %}>
+                <i class="cn-st__dot" aria-hidden="true"></i>{{ t('unit.stage.' ~ p.stage) }}</span>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
     {% else %}
       <div class="ov-card__empty">{{ t('country.register.empty') }}</div>
     {% endif %}
