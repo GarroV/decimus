@@ -233,6 +233,46 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "ru": "Оценок с карт по этим странам ещё нет.",
         "en": "No map ratings for these countries yet.",
     },
+    "ratings.layout.aggregators": {"ru": "Оценки в агрегаторах", "en": "Delivery app ratings"},
+    "ratings.block.aggregators": {
+        "ru": "Оценки в агрегаторах доставки",
+        "en": "Ratings in delivery apps",
+    },
+    "ratings.agg.hint": {
+        "ru": "Средняя по всем оценкам пиццерий на витрине, в шкале агрегатора; сбор раз в сутки",
+        "en": (
+            "Average over all ratings of the pizzerias in the app, on the app's own scale; "
+            "collected daily"
+        ),
+    },
+    "ratings.agg.scale.5": {"ru": "из 5", "en": "of 5"},
+    "ratings.agg.scale.10": {"ru": "из 10", "en": "of 10"},
+    "ratings.agg.scale.100": {"ru": "% довольных", "en": "% positive"},
+    "ratings.agg.points": {"ru": "· пиццерий: {n}", "en": "· pizzerias: {n}"},
+    "ratings.agg.votes": {"ru": "оценок: {n}", "en": "ratings: {n}"},
+    "ratings.agg.as_of": {"ru": "Данные на {date}", "en": "As of {date}"},
+    "ratings.agg.failed": {
+        "ru": "Не собралось: {names}. Показаны последние удачные данные.",
+        "en": "Not collected: {names}. Showing the last successful data.",
+    },
+    "ratings.agg.failed_one": {
+        "ru": "{name}: последний сбор {at} не удался{ok}",
+        "en": "{name}: last collection {at} failed{ok}",
+    },
+    "ratings.agg.last_ok": {"ru": ", последний удачный — {at}", "en": ", last successful — {at}"},
+    "ratings.agg.never_ok": {"ru": ", удачных ещё не было", "en": ", never succeeded yet"},
+    "ratings.empty.aggregators": {
+        "ru": "Оценок из агрегаторов по этим странам ещё нет.",
+        "en": "No delivery app ratings for these countries yet.",
+    },
+    "ratings.agg.name.wolt": {"ru": "Wolt", "en": "Wolt"},
+    "ratings.agg.name.glovo": {"ru": "Glovo", "en": "Glovo"},
+    "ratings.agg.name.bolt_food": {"ru": "Bolt Food", "en": "Bolt Food"},
+    "ratings.agg.name.yandex_eda": {"ru": "Яндекс Еда", "en": "Yandex Eats"},
+    "ratings.agg.name.yemeksepeti": {"ru": "Yemeksepeti", "en": "Yemeksepeti"},
+    "ratings.agg.name.trendyol_go": {"ru": "Trendyol Go", "en": "Trendyol Go"},
+    "ratings.agg.name.pyszne_pl": {"ru": "Pyszne.pl", "en": "Pyszne.pl"},
+    "ratings.agg.name.chowdeck": {"ru": "Chowdeck", "en": "Chowdeck"},
     "ratings.layout.up": {"ru": "{name} — выше", "en": "Move {name} up"},
     "ratings.layout.down": {"ru": "{name} — ниже", "en": "Move {name} down"},
     "ratings.layout.save": {"ru": "Сохранить компоновку", "en": "Save layout"},
