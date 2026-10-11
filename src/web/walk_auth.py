@@ -26,6 +26,7 @@ import os
 import time
 from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
 
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
@@ -63,6 +64,8 @@ SUGGEST_ENDPOINT = "walk_suggest"
 TRANSLATE_ENDPOINT = "walk_translate"
 #: Приложение аудитора (D373): настройки и круг доступа к MCP.
 APP_ENDPOINT = "walk_app"
+#: Начало проверки из мини-аппа (D392): мастер с полями вместо чата.
+START_ENDPOINT = "walk_start"
 #: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
 #: (`walk.py`, `walk_write.py`), и админка, передающая ему запросы
 #: (`walk_proxy.py`), — две копии путей разошлись бы молча.
@@ -75,6 +78,7 @@ INFO_PATH = "/tg/walk/info"
 SUGGEST_PATH = "/tg/walk/suggest"
 TRANSLATE_PATH = "/tg/walk/translate"
 APP_PATH = "/tg/walk/app"
+START_PATH = "/tg/walk/start"
 ENDPOINTS = frozenset(
     {
         PAGE_ENDPOINT,
@@ -86,6 +90,7 @@ ENDPOINTS = frozenset(
         SUGGEST_ENDPOINT,
         TRANSLATE_ENDPOINT,
         APP_ENDPOINT,
+        START_ENDPOINT,
     }
 )
 
@@ -159,9 +164,26 @@ def chat_of(init_data: str, settings: WalkSettings, *, now: float | None = None)
     Мини-апп открывается из личного чата с ботом, а там номер чата равен
     номеру пользователя, — по нему бот и хранит проверку (`chat_<id>`).
     """
+    if not init_data and settings.preview_chat is not None:
+        return settings.preview_chat
+    return int(_signed_user(init_data, settings, now=now).id)
+
+
+def full_name_of(init_data: str, settings: WalkSettings) -> str:
+    """Имя профиля Telegram из подписанной строки — как `User.full_name` у бота (D392).
+
+    Нужно началу проверки: проверяющего в шапке отчёта называют по профилю, если
+    его нет в карте имён. Просмотр без подписи имени не имеет — пусто.
+    """
+    if not init_data and settings.preview_chat is not None:
+        return ""
+    user = _signed_user(init_data, settings)
+    return " ".join(part for part in (user.first_name, user.last_name) if part)
+
+
+def _signed_user(init_data: str, settings: WalkSettings, *, now: float | None = None) -> Any:
+    """Пользователь из строки с проверенной подписью и свежестью."""
     if not init_data:
-        if settings.preview_chat is not None:
-            return settings.preview_chat
         raise WalkAccessError("нет initData")
     if settings.bot_token is None:
         raise WalkAccessError("токен бота не задан — подпись нечем проверить")
@@ -174,4 +196,4 @@ def chat_of(init_data: str, settings: WalkSettings, *, now: float | None = None)
         raise WalkAccessError("подпись initData устарела")
     if data.user is None:
         raise WalkAccessError("в initData нет пользователя")
-    return data.user.id
+    return data.user

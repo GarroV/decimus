@@ -199,8 +199,10 @@ def build_dispatcher(
     dispatcher.message.outer_middleware(space_guard)
     dispatcher.callback_query.outer_middleware(space_guard)
 
-    store = MaterialStore()
-    pending = PendingStore()
+    # Память бота сверяется с личностью проверки на диске (D392): проверку
+    # может начать и мини-апп, а он до этой памяти не дотягивается.
+    store = MaterialStore(domain.run_id)
+    pending = PendingStore(domain.run_id)
 
     # Мастер получает оба хранилища в памяти (`pending`, `store`) не ради
     # работы, а ради забывания: начатая проверка обязана начинаться с чистого

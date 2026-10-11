@@ -43,7 +43,7 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_access, walk_settings, walk_suggest, walk_translate, walk_write
+from . import walk_access, walk_settings, walk_start, walk_suggest, walk_translate, walk_write
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -369,3 +369,4 @@ def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -
     )
     walk_suggest.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
     walk_translate.install(app, conf=conf, ui_lang=ui_lang, identify=identify)
+    walk_start.install(app, conf=conf, ui_lang=ui_lang, identify=identify, respond=respond, bot=bot)
