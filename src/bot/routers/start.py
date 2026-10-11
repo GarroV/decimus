@@ -52,7 +52,6 @@ from ..keyboards import (
     lang_keyboard,
     new_inspection_keyboard,
     resume_keyboard,
-    sealed_keyboard,
     speech_lang_keyboard,
     unit_new_keyboard,
     walk_keyboard,
@@ -79,33 +78,27 @@ logger = logging.getLogger(__name__)
 
 
 async def _offer_resume(message: Message, inspection: domain.Inspection, lang: str) -> None:
-    """Показать оставшуюся в чате проверку и дать выбор, какой у неё есть.
+    """Показать оставшуюся в чате НЕсданную проверку и дать выбор: продолжить или начать новую.
 
-    Развилок две, и разница между ними не косметическая (T153, T201). Проверке
-    в работе правда, что она незавершённая и что новая её сотрёт. Проверке, по
-    которой отчёт уже собран и отдан, — неправда и то и другое.
-
-    У сданной проверки выбор другой и меньше: дописать в неё нельзя вовсе
-    (решение владельца D080, `src/bot/sealed.py`), поэтому кнопки «Продолжить»
-    здесь нет. Остаются двери, названные владельцем: начать новую или убрать
-    сданную из чата. До T201 бот сам предлагал «Продолжить её — можно дописать
-    и собрать отчёт заново» — из-за этого тот же обход и вставал в историю
-    точки второй строкой.
+    Сюда доходит только проверка в работе (T052, T153): сданная аудитора не
+    спрашивает вовсе — её копия молча убирается, и мастер начинается сразу
+    (`_drop_sealed_copy`, решение владельца D397). Старая версия говорила о
+    сданной «уже сдана… начните новую или уберите из чата» и держала аудитора
+    на вопросе о проверке, которая была давно.
 
     Признака «завершена» у движка нет, и бот его не выдумывает: он опирается на
     то, что сделал сам, — отдал ли он по этой проверке отчёт (`sidecar`).
     """
-    сдана = sealed.is_sealed(message.chat.id)
     await message.answer(
         t(
-            "start.resume_handed_over" if сдана else "start.resume_found",
+            "start.resume_found",
             lang,
             unit=inspection.unit,
             date=inspection.date,
             auditor=inspection.auditor or "—",
             findings=len(inspection.findings),
         ),
-        reply_markup=sealed_keyboard(lang) if сдана else resume_keyboard(lang),
+        reply_markup=resume_keyboard(lang),
     )
 
 
@@ -148,6 +141,42 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
     )
 
 
+def _forget_chat_notes(
+    chat_id: int, pending: PendingStore | None, store: MaterialStore | None
+) -> None:
+    """Заметки уходят вместе с проверкой: кадры, зона и карта сообщений — её, а не чата."""
+    sidecar.reset(chat_id)
+    if pending is not None:
+        pending.forget(chat_id)
+    if store is not None:
+        # Проверки в чате больше нет вовсе — ждать её кадрам и словам не для чего (T249).
+        store.forget(chat_id)
+
+
+async def _drop_sealed_copy(
+    chat_id: int, pending: PendingStore | None, store: MaterialStore | None
+) -> bool:
+    """Тихо убрать из чата сданную проверку (D397). Истина — убрана; ложь — убирать не вышло.
+
+    Убирается копия в чате — и только она: отданный отчёт и строка в истории
+    точки остаются (D080). Проверяет сданность сам, поэтому незавершённую не
+    тронет ни при каком вызове: потерять обход одним нажатием — ровно то
+    затирание, от которого защищает T052.
+    """
+    if not sealed.is_sealed(chat_id):
+        return False
+    try:
+        убрана = await asyncio.to_thread(domain.drop_inspection, chat_id)
+    except DomainError:
+        logger.exception("сданная проверка чата %s не убралась", chat_id)
+        return False
+    if not убрана:
+        logger.error("сданная проверка чата %s не убралась: drop_inspection вернул ложь", chat_id)
+        return False
+    _forget_chat_notes(chat_id, pending, store)
+    return True
+
+
 def build_start_router(
     settings: BotSettings,
     pending: PendingStore | None = None,
@@ -168,7 +197,7 @@ def build_start_router(
     router = Router(name="start")
 
     @router.message(Command("start"))
-    async def on_start(message: Message, state: FSMContext) -> None:
+    async def on_start(message: Message, state: FSMContext, space: str) -> None:
         """`/start` обязан работать всегда — это единственный выход из тупика.
 
         Испорченное состояние роняло здесь всё: аудитор не мог ни продолжить
@@ -192,6 +221,14 @@ def build_start_router(
             )
             return
         if inspection is not None:
+            if sealed.is_sealed(message.chat.id):
+                # Сданная проверка аудитора не спрашивает (D397): убирается молча,
+                # и сразу идёт мастер новой.
+                if not await _drop_sealed_copy(message.chat.id, pending, store):
+                    await stops.refuse(message, lang, step="start", key="start.failed")
+                    return
+                await _ask_checklist(message, state, lang, space)
+                return
             await _offer_resume(message, inspection, lang)
             return
         await message.answer(t("start.greeting", lang), reply_markup=new_inspection_keyboard(lang))
@@ -213,6 +250,12 @@ def build_start_router(
             await _ask_checklist(message, state, lang, space)
             return
         if inspection is not None:
+            if sealed.is_sealed(message.chat.id):
+                if not await _drop_sealed_copy(message.chat.id, pending, store):
+                    await stops.refuse(message, lang, step="start", key="start.failed")
+                    return
+                await _ask_checklist(message, state, lang, space)
+                return
             await _offer_resume(message, inspection, lang)
             return
         await _ask_checklist(message, state, lang, space)
@@ -298,15 +341,7 @@ def build_start_router(
         if not убрана:
             await stops.refuse(message, lang, step="start.drop", key="sealed.drop_gone")
             return
-        # Заметки уходят вместе с проверкой: список кадров, последняя зона и
-        # карта сообщений относятся к ней, а не к чату.
-        sidecar.reset(chat_id)
-        if pending is not None:
-            pending.forget(chat_id)
-        if store is not None:
-            # Проверки в чате больше нет вовсе — ждать её кадрам и словам не
-            # для чего (T249).
-            store.forget(chat_id)
+        _forget_chat_notes(chat_id, pending, store)
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))

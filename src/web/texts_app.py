@@ -16,8 +16,6 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     "walk.app.audit.new_other": {"ru": "Начать новую", "en": "Start a new one"},
     "walk.app.audit.records": {"ru": "Записей: {count}", "en": "Records: {count}"},
     "walk.app.audit.continue": {"ru": "Продолжить обход", "en": "Continue the walk"},
-    "walk.app.audit.sealed": {"ru": "Отчёт сдан", "en": "Report handed over"},
-    "walk.app.audit.open": {"ru": "Открыть", "en": "Open"},
     # ── начало проверки (D392) ───────────────────────────────────────────
     "walk.start.title": {"ru": "Новая проверка", "en": "New inspection"},
     "walk.start.checklist": {"ru": "Чек-лист", "en": "Checklist"},
