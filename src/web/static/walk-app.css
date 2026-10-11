@@ -168,3 +168,21 @@
 .walk-top__home:active { background: var(--surface-2); }
 
 .walk-app__card .walk-mark { margin-top: 4px; }
+
+/* ── начало проверки (D392): форма полями ─────────────────────────────── */
+
+.walk-app__card .walk-link { min-height: 44px; justify-self: start; }
+
+.walk-app__form { display: grid; gap: 0; }
+
+.walk-app__suggest { margin-top: 8px; }
+
+.walk-app__suggest:empty { display: none; }
+
+.walk-app__ask { margin-top: 8px; }
+
+.walk-app__go { margin-top: 24px; }
+
+.walk-app__go:disabled { cursor: default; }
+
+.walk-app__card .walk-btn { width: 100%; }

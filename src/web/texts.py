@@ -207,10 +207,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
-    "overview.zones.empty": {
-        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
-        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
-    },
     "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
     "overview.systemic.hint": {
         "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
@@ -219,10 +215,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.systemic.spread": {
         "ru": "точек: {units} · записей: {records}",
         "en": "units: {units} · records: {records}",
-    },
-    "overview.systemic.empty": {
-        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
-        "en": "No repeats: no item was breached at more than one unit.",
     },
     "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
     "overview.units.hint": {
@@ -599,10 +591,9 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Deducted {deductions} %",
     },
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
-    "card.zones.col.zone": {"ru": "Зона", "en": "Zone"},
-    "card.zones.col.share": {"ru": "Доля", "en": "Share"},
-    "card.zones.col.loss": {"ru": "Потеряно", "en": "Lost"},
-    "card.zones.col.left": {"ru": "Осталось", "en": "Left"},
+    "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
+    "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
+    "card.act.move": {"ru": "Исправить", "en": "Correct"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},

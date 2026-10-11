@@ -86,6 +86,11 @@ def test_сводки_и_справочные_чтения_стоят_на_ох�
     assert queries.units_total(reach=ge) == 1
     assert set(queries.unit_ids(reach=ge)) == {"Batumi-1"}
     assert set(queries.unit_geography(reach=ge)) == {"Batumi-1"}
+    assert {u[0] for u in queries.unit_last_inspections(reach=ge)} == {"Batumi-1"}
+    assert {u[0] for u in queries.unit_last_inspections(reach=reach_of("HQ"))} == {
+        "Batumi-1",
+        "Yerevan-1",
+    }
     assert set(queries.class_counts(reach=ge)) == {сеть["уК_батуми"], сеть["партнёр_батуми"]}
     assert set(queries.worst_zones(reach=ge)) == {сеть["уК_батуми"], сеть["партнёр_батуми"]}
     assert {z[4] for z in queries.zone_losses(reach=ge)} == {2}
