@@ -127,11 +127,25 @@ _LOADED_AT_SQL = (
 _INSPECTIONS_SQL = """
 select
     i.id, u.id, (select min(r.dodo_id) from ratings.units r where r.decimus_unit_id = u.id),
-    u.name, u.country, i.inspection_date, i.kind, i.pct::float, i.grade
+    u.name, u.country, i.inspection_date, i.kind, i.pct::float, i.grade,
+    prev.id, prev.inspection_date, prev.pct, prev.grade
 from inspections i
 join units u on u.id = i.unit_id
+left join lateral (
+    -- Предыдущая принятая проверка той же пиццерии — вне окна дат запроса, но в
+    -- том же охвате: «движение к прошлой» не должно зависеть от выбранного окна.
+    select p.id, p.inspection_date, p.pct::float as pct, p.grade
+    from inspections p
+    where p.unit_id = i.unit_id
+      and p.status = 'finalized'
+      and (%(tenants)s::text[] is null or p.tenant_code = any(%(tenants)s))
+      and (p.inspection_date, p.pushed_at) < (i.inspection_date, i.pushed_at)
+    order by p.inspection_date desc, p.pushed_at desc
+    limit 1
+) prev on true
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and (%(id)s::uuid is null or i.id = %(id)s::uuid)
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and i.status = 'finalized'
@@ -179,6 +193,14 @@ class MapUnitRow:
 
 
 @dataclass(frozen=True)
+class PreviousInspection:
+    id: str
+    inspection_date: date
+    pct: float
+    grade: str
+
+
+@dataclass(frozen=True)
 class InspectionRow:
     id: str
     unit_id: str
@@ -189,6 +211,8 @@ class InspectionRow:
     kind: str
     pct: float
     grade: str
+    #: Предыдущая принятая проверка той же пиццерии; `None` — это первая.
+    previous: PreviousInspection | None = None
 
 
 def _rows(что: str, sql: str, params: dict[str, Any]) -> list[tuple[Any, ...]]:
@@ -249,6 +273,24 @@ def loaded_at(formats: Sequence[str]) -> datetime | None:
     return rows[0][0] if rows else None
 
 
+def _inspection_row(r: Sequence[Any]) -> InspectionRow:
+    previous = (
+        PreviousInspection(str(r[9]), r[10], float(r[11]), str(r[12])) if r[9] is not None else None
+    )
+    return InspectionRow(
+        id=str(r[0]),
+        unit_id=str(r[1]),
+        unit_dodo_id=r[2],
+        unit_name=r[3],
+        country=r[4],
+        inspection_date=r[5],
+        kind=r[6],
+        pct=r[7],
+        grade=r[8],
+        previous=previous,
+    )
+
+
 def inspections(
     *, reach: Reach, date_from: date | None, date_to: date | None, limit: int
 ) -> list[InspectionRow]:
@@ -256,11 +298,26 @@ def inspections(
     охват = _require_reach(reach)
     if not 1 <= limit <= MAX_INSPECTIONS + 1:
         raise DbError(f"Предел выдачи {limit} вне 1…{MAX_INSPECTIONS + 1}")
-    params = {**охват.params(), "date_from": date_from, "date_to": date_to, "limit": limit}
-    return [
-        InspectionRow(str(r[0]), str(r[1]), *r[2:])
-        for r in _rows("проверки для Swarm", _INSPECTIONS_SQL, params)
-    ]
+    params = {
+        **охват.params(),
+        "id": None,
+        "date_from": date_from,
+        "date_to": date_to,
+        "limit": limit,
+    }
+    return [_inspection_row(r) for r in _rows("проверки для Swarm", _INSPECTIONS_SQL, params)]
+
+
+def inspection(*, reach: Reach, inspection_id: str) -> InspectionRow | None:
+    """Одна принятая проверка в охвате — та же запись, что в списке; `None` — нет такой.
+
+    `inspection_id` — уже проверенный UUID: кривой отбивает вызывающий (400),
+    здесь он стал бы ошибкой базы.
+    """
+    охват = _require_reach(reach)
+    params = {**охват.params(), "id": inspection_id, "date_from": None, "date_to": None, "limit": 1}
+    rows = _rows("проверка для Swarm", _INSPECTIONS_SQL, params)
+    return _inspection_row(rows[0]) if rows else None
 
 
 def map_units(*, countries: Sequence[str], on: date) -> list[MapUnitRow]:

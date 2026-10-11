@@ -163,7 +163,7 @@ def test_проверки_принятые_по_всей_сети(клиент: 
         assert x["score_pct"] == pytest.approx(записано[x["id"]].pct)
         assert x["grade"] == записано[x["id"]].grade
         assert x["kind"] == "planned" and x["path"] == f"/inspections/{x['id']}"
-        assert set(x) == {"id", "unit", "date", "kind", "score_pct", "grade", "path"}
+        assert set(x) == {"id", "unit", "date", "kind", "score_pct", "grade", "path", "previous"}
         assert set(x["unit"]) == {"id", "dodo_id", "name", "cc"}
 
 
@@ -175,6 +175,63 @@ def test_проверки_по_стране_датам_и_пределу(кли�
     тело = _get(клиент, f"{swarm_api.INSPECTIONS_PATH}?limit=1")
     assert [x["id"] for x in тело["inspections"]] == [проверки["ереван"]]
     assert тело["truncated"] is True
+
+
+# --- прошлая проверка и детали (D391) ---------------------------------------------
+
+
+@pytest.fixture
+def история(pg_dsn: str, db_env: str, domain_env: Path) -> dict[str, str]:
+    """Батуми: принятая в сентябре, ждущая приёмки между ними, принятая в октябре."""
+    точка_справочника("Batumi-1", country="GE", city="Batumi")
+    return {
+        "сентябрь": слить_проверку(unit="Batumi-1", tenant="HQ", date="2026-09-01"),
+        "ждёт": слить_проверку(unit="Batumi-1", tenant="HQ", date="2026-09-15", accept=False),
+        "октябрь": слить_проверку(
+            unit="Batumi-1", tenant="HQ", date="2026-10-02", text="грязный пол у мойки"
+        ),
+    }
+
+
+def test_прошлая_проверка_принятая_и_вне_окна(клиент: FlaskClient, история: dict[str, str]) -> None:
+    (x,) = _get(клиент, f"{swarm_api.INSPECTIONS_PATH}?from=2026-10-01")["inspections"]
+    assert x["id"] == история["октябрь"]
+    прошлая = x["previous"]
+    assert прошлая is not None and прошлая["id"] == история["сентябрь"], (
+        "прошлая — принятая, а не ждущая приёмки, и не зависит от окна дат"
+    )
+    assert прошлая["date"] == "2026-09-01"
+    сентябрьская = queries.get_inspection(история["сентябрь"], reach=reach_of("HQ"))
+    assert сентябрьская is not None
+    assert прошлая["score_pct"] == pytest.approx(сентябрьская.inspection.pct)
+    assert прошлая["grade"] == сентябрьская.inspection.grade
+    первая = _get(клиент, f"{swarm_api.INSPECTIONS_PATH}?to=2026-09-30")["inspections"]
+    assert [p["previous"] for p in первая] == [None], "у первой проверки пиццерии прошлой нет"
+
+
+def test_деталь_принятой_проверки(клиент: FlaskClient, история: dict[str, str]) -> None:
+    тело = _get(клиент, f"{swarm_api.INSPECTIONS_PATH}/{история['октябрь']}")
+    записано = queries.get_inspection(история["октябрь"], reach=reach_of("HQ"))
+    assert записано is not None
+    проверка = тело["inspection"]
+    assert проверка["id"] == история["октябрь"]
+    assert проверка["previous"]["id"] == история["сентябрь"]
+    assert проверка["score_pct"] == pytest.approx(записано.inspection.pct)
+    assert проверка["deductions"] == pytest.approx(записано.deductions)
+    assert проверка["counts"] == записано.counts
+    assert {z["zone"] for z in проверка["zones"]} == set(записано.by_zone)
+    (запись,) = тело["findings"]
+    assert запись["code"] == "CLN03" and запись["level"] == "D1"
+    assert запись["zone"] == "hot_kitchen" and запись["text"] == "грязный пол у мойки"
+    assert запись["repeat"] is False
+    assert запись["title_ru"], "подпись пункта из издания проверки (D391)"
+
+
+def test_деталь_ждущей_и_чужой_404(клиент: FlaskClient, история: dict[str, str]) -> None:
+    for ident in (история["ждёт"], "00000000-0000-0000-0000-00000000abcd"):
+        ответ = клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ident}", headers=ВЕРНЫЙ)
+        assert ответ.status_code == 404, ident
+        assert ответ.get_json()["error"] == "not_found"
 
 
 # --- оценки на картах (D390) ---------------------------------------------------
