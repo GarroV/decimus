@@ -56,6 +56,7 @@ from . import (
     assets,
     auth,
     edition,
+    home_page,
     letter_draft,
     letter_markup,
     prescriptions,
@@ -355,218 +356,16 @@ def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
 
 
 def _register_overview(app: Flask, conf: Settings) -> None:
-    """Раздел «Обзор»: сеть целиком одним экраном.
-
-    Плитки собираются здесь, а не в шаблоне: у каждой есть адрес перехода, и
-    адрес — это решение приложения, а не оформление. Цифра, из которой нельзя
-    провалиться в список, на вопрос экрана не отвечает (бриф на визуал).
-    """
+    """Раздел «Главная» (D378, адрес прежний — `/overview`): сборка в `home_page`."""
 
     @app.get(section("overview").path)
     def overview() -> str:
-        # Выборка приходит адресом, а не состоянием сессии: ссылку на срез
-        # («Белград, буква D, за 30 дней») человек отправляет коллеге, и тот
-        # обязан увидеть ровно тот же экран. Значения — коды; непонятное
-        # значение сужает выборку в пустоту, но страницу не роняет.
-        selection = overview_data.Selection(
-            country=request.args.get("country", "").strip().upper()[:2],
-            city=request.args.get("city", "").strip()[:80],
-            grade=request.args.get("grade", "").strip().upper()[:1],
-            period=request.args.get("period", "all").strip()[:8],
-            sort=request.args.get("sort", "score").strip()[:8],
-        )
-        snapshot = overview_data.load(
-            reach=auth.current_reach(), limit=REGISTRY_LIMIT, selection=selection
-        )
-        registry_path = section("registry").path
-
-        def отбор(**изменения: str) -> str:
-            """Адрес того же экрана с изменённым срезом.
-
-            Собирается здесь, а не склейкой в шаблоне: пустое значение обязано
-            ИСЧЕЗАТЬ из адреса, иначе «сбросить город» оставляет в ссылке
-            `city=` и срез выглядит суженным, хотя он полный.
-            """
-            параметры = {
-                "country": selection.country,
-                "city": selection.city,
-                "grade": selection.grade,
-                "period": selection.period,
-                "sort": selection.sort,
-                "lang": _lang(conf),
-                **изменения,
-            }
-            # Умолчания из адреса ВЫПАДАЮТ: иначе «сбросить город» оставляет
-            # в ссылке `city=`, а `sort=score` висит в каждом адресе и срез
-            # выглядит настроенным, хотя он обычный.
-            умолчания = {"period": "all", "sort": "score"}
-            живые: dict[str, Any] = {
-                ключ: значение
-                for ключ, значение in параметры.items()
-                if значение and умолчания.get(ключ) != значение
-            }
-            return _url("overview", **живые)
-
-        def в_реестр(city: str | None = None) -> str:
-            """Проверки этого среза в разделе «Проверки».
-
-            С 30.09.2026 клик по городу ведёт в страну (D260, `в_страну`);
-            сюда — только город без страны в справочнике: экрана страны с
-            пустым кодом не бывает. Реестр без периода в адресе открывается
-            текущим месяцем, поэтому окно обзора уезжает с человеком явно:
-            «всё время» — словом `period=all`, иначе — датами «с — по».
-            """
-            начало, конец = overview_data.window(selection.period, today=date.today())
-            параметры = {
-                "country": selection.country,
-                "city": city or "",
-                "grade": selection.grade,
-                **(registry_period.Period(начало, конец).params()),
-                "lang": _lang(conf),
-            }
-            return _url("registry", **{к: з for к, з in параметры.items() if з})
-
-        def в_страну(country: str, **параметры: str) -> str:
-            """Экран страны с этим срезом (D260). Период уезжает вместе с человеком.
-
-            Буква не уезжает: строка точки и город уже названы, и отбор буквой
-            на экране страны спрятал бы соседние пиццерии без объяснения.
-            """
-            живые = {
-                "period": selection.period if selection.period != "all" else "",
-                "lang": _lang(conf),
-                **параметры,
-            }
-            return _url("country", code=country, **{к: з for к, з in живые.items() if з})
-
-        # По всему срезу, как остальные плитки (#503), а не по списку поводов:
-        # тот обрезан рядом с пределом и `TOP`.
-        критических = snapshot.critical_total
-        if snapshot.average is None:
-            среднее = t("overview.tile.note.average_none", _lang(conf))
-        else:
-            среднее = t("overview.tile.note.average", _lang(conf))
-        # Плиток пять, и они РАЗНЫЕ на вид: бриф прямо запрещает полосу
-        # одинаковых плиток, и различие здесь несёт смысл, а не украшает —
-        # цветом помечено только то, что требует действия.
-        tiles = (
-            overview_data.Tile(
-                key="units",
-                value=str(snapshot.units_total),
-                note=t(
-                    "overview.tile.note.units",
-                    _lang(conf),
-                    checked=snapshot.units_checked,
-                ),
-                href=registry_path,
-            ),
-            overview_data.Tile(
-                key="unchecked",
-                value=str(snapshot.unchecked),
-                note=t("overview.tile.note.unchecked", _lang(conf)),
-                href=registry_path,
-                tone="warn" if snapshot.unchecked else "plain",
-            ),
-            overview_data.Tile(
-                key="inspections",
-                value=str(snapshot.inspections_total),
-                note=t("overview.tile.note.inspections", _lang(conf)),
-                href=registry_path,
-            ),
-            overview_data.Tile(
-                key="average",
-                value="—" if snapshot.average is None else f"{snapshot.average:.1f}",
-                note=среднее,
-                href=registry_path,
-                # Движение показывается там, где его есть с чем сравнить:
-                # средняя прошлого периода, какими бы методиками ни были
-                # оценены его проверки (D352).
-                delta="" if snapshot.average_delta is None else f"{snapshot.average_delta:+.1f}",
-                tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
-            ),
-            overview_data.Tile(
-                key="critical",
-                value=str(критических),
-                note=t("overview.tile.note.critical", _lang(conf)),
-                href=registry_path,
-                tone="err" if критических else "ok",
-            ),
-        )
         язык = _lang(conf)
-        чипы = []
-        if snapshot.countries:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.country", язык),
-                    empty_title=t("overview.filter.all_countries", язык),
-                    current=selection.country,
-                    values=snapshot.countries,
-                    # Смена страны сбрасывает город: город другой страны в
-                    # отборе дал бы пустую выборку без единого объяснения.
-                    href=lambda значение: отбор(country=значение, city=""),
-                    title=lambda код: country_title(код, язык),
-                )
-            )
-        if snapshot.cities:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.city", язык),
-                    empty_title=t("overview.filter.all_cities", язык),
-                    current=selection.city,
-                    values=snapshot.cities,
-                    href=lambda значение: отбор(city=значение),
-                    title=lambda код: city_title(код, язык),
-                )
-            )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.grade", язык),
-                empty_title=t("overview.filter.all_grades", язык),
-                current=selection.grade,
-                values=snapshot.grades,
-                href=lambda значение: отбор(grade=значение),
-            )
-        )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.period", язык),
-                empty_title=t("overview.period.all", язык),
-                current="" if selection.period == "all" else selection.period,
-                values=tuple((код, None) for код in overview_data.PERIODS if код != "all"),
-                href=lambda значение: отбор(period=значение or "all"),
-                title=lambda код: t("overview.period." + код, язык),
-            )
-        )
-        порядок = _pick(
-            label=t("overview.sort", язык),
-            empty_title=t("overview.sort.score", язык),
-            current="" if selection.sort == "score" else selection.sort,
-            values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),
-            href=lambda значение: отбор(sort=значение or "score"),
-            title=lambda код: t("overview.sort." + код, язык),
-        )
-        return render_template(
-            "overview/index.html",
-            data=snapshot,
-            tiles=tiles,
-            picks=tuple(чипы),
-            sort_pick=порядок,
-            registry_path=registry_path,
-            grade_tone=view.grade_tone,
-            level_tone=view.level_tone,
-            lang=_lang(conf),
-            selection=selection,
-            select_url=отбор,
-            registry_url=в_реестр,
-            # Партнёру «Страна» закрыта (D371): его клики ведут в проверки и точки.
-            country_url=в_страну if auth.current_tenant() == HQ_TENANT else None,
-            periods=tuple(overview_data.PERIODS),
-            item_titles=_item_titles(conf, _lang(conf)),
-            # Идентификаторы точек нужны таблице, чтобы строка вела в карточку
-            # точки, а не в последний отчёт: по прототипу владельца клик по
-            # точке открывает точку. Связь идёт идентификатором справочника —
-            # название в ссылке сломалось бы на первой же правке названия.
-            unit_ids=snapshot.unit_ids,
+        return home_page.render(
+            lang=язык,
+            limit=REGISTRY_LIMIT,
+            pick=_pick,
+            item_titles=_item_titles(conf, язык),
         )
 
 
@@ -802,10 +601,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     # Вход тоже ведёт сюда (через `home`), чтобы выбор жил в одном месте.
     @app.get("/")
     def home() -> Response:
-        вошедший = auth.current_account()
-        if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
-            return redirect(url_for("ratings"))  # контролинг — только рейтинги (D358)
-        return redirect(url_for("overview"))
+        return redirect(url_for("overview"))  # при входе все — на «Главной» (D378)
 
     @app.get(section("registry").path)
     def registry() -> str:

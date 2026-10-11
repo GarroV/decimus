@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from datetime import date
 
@@ -29,6 +28,7 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
 from src.db.reach import own_reach
 from src.web import app as app_mod
+from src.web import home_board, home_page, home_ratings
 from src.web import overview as ov
 from src.web.texts import t as _t
 
@@ -179,34 +179,16 @@ def test_пустые_блоки_говорят_словами_а_не_исче�
 
     # Assert — заголовок каждого блока на месте, и рядом сказано, почему пусто.
     for заголовок in (
-        "Требует решения сегодня",
+        "Куда смотреть",
         "Где сеть теряет проценты",
         "Системные нарушения",
-        "Проблемные точки",
+        "Пиццерии",
     ):
         assert заголовок in страница
-    assert "Поводов нет" in страница
+    assert t_ru("home.attention.empty") in страница
     assert "Потерь не записано" in страница
     assert "Повторов нет" in страница
-
-
-def test_каждая_плитка_ведёт_куда_то(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Цифра, из которой нельзя провалиться, на вопрос экрана не отвечает.
-
-    Бриф запрещает «шаблонный дашборд-вид с четырьмя одинаковыми плитками», и
-    отличие ровно здесь: у каждой плитки есть адрес перехода.
-    """
-    # Act
-    страница = показать(стенд, monkeypatch, снимок())
-
-    # Assert — плитка на экране ровно одна форма: ссылка. Кнопок без
-    # перехода и мёртвых блоков с цифрой быть не должно ни одного.
-    плитки = re.findall(r'<(\w+) class="ov-tile[ "]', страница)
-    assert плитки, "плиток на экране нет вовсе"
-    assert set(плитки) == {"a"}, (
-        f"плитка нарисована тегами {sorted(set(плитки))}: всё, что не ссылка, — "
-        f"цифра без перехода, а такую бриф на этом экране запрещает"
-    )
+    assert t_ru("home.units.empty") in страница
 
 
 def test_средняя_без_проверок_не_выдумывается() -> None:
@@ -489,7 +471,8 @@ def test_умолчания_не_висят_в_адресе_среза(
 
     # Assert
     assert "sort=score" not in страница
-    assert "period=all" not in страница
+    # «Всё время» — единственная ссылка, которая этот период и выбирает.
+    assert страница.count("period=all") == 1
 
 
 class ЗаписнаяБаза:
@@ -614,35 +597,6 @@ def test_при_выбранной_стране_города_только_её()
     assert города == (("antalya", 1),)
 
 
-def test_город_без_страны_в_разбивке_ведёт_в_реестр_проверок_города(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Arrange
-    данные = снимок(
-        breakdown=(
-            ov.CityRow(
-                city="tbilisi",
-                country="",
-                units=3,
-                inspections=2,
-                average=90.0,
-                grades=(),
-                critical=0,
-                delta=None,
-            ),
-        )
-    )
-
-    # Act
-    страница = показать(стенд, monkeypatch, данные)
-
-    # Assert — без страны экрана страны нет (D260): ссылка в реестр с кодом
-    # города, а на экране город словом.
-    assert 'href="/inspections?city=tbilisi' in страница
-    assert "Тбилиси" in страница
-    assert ">tbilisi<" not in страница
-
-
 def test_точки_справочника_считаются_в_выбранном_месте() -> None:
     # Arrange — 25.09.2026 при Грузии плитка показывала 151 точку всей сети.
     гео = {
@@ -721,22 +675,6 @@ def test_точка_без_страны_ведёт_в_карточку_как_р
     assert "/country/?" not in страница and "/country/-" not in страница
 
 
-def test_город_в_разбивке_ведёт_в_страну_с_городом(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    город = ov.CityRow(
-        city="batumi",
-        country="GE",
-        units=1,
-        inspections=1,
-        average=90.0,
-        grades=(("B", 1),),
-        critical=0,
-    )
-    страница = показать(стенд, monkeypatch, снимок(breakdown=(город,)))
-    assert "/country/GE?" in страница and "city=batumi" in страница
-
-
 def test_назначить_проверку_на_обзоре_нет(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -754,3 +692,44 @@ def test_обрезанный_срез_экран_называет_вслух(
 
     assert "В срезе больше 2 проверок" in обрезан
     assert "В срезе больше" not in целый
+
+
+def test_главная_собирает_доску_рейтинги_и_страны(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Сквозной показ «Главной» (D378) со всеми блоками: шаблон не падает ни на одном."""
+    # Arrange
+    месяцы = home_ratings.month_window(date(2026, 9, 1))
+    блок = home_ratings.Gauge(
+        kind="rs",
+        months=месяцы,
+        series=(None,) * 6 + (88.0, 90.5),
+        imf_series=(None,) * 6 + (87.0, 89.0),
+        month=месяцы[-1],
+        value=90.5,
+        delta=2.5,
+        imf=89.0,
+        rated=12,
+        below=3,
+        threshold=85,
+    )
+    рейтинги = home_ratings.Ratings(
+        блок, home_ratings.Gauge(**{**блок.__dict__, "kind": "rko"}), {"RS": (90.5, 95.0)}
+    )
+    monkeypatch.setattr(home_ratings, "load", lambda *_, **__: рейтинги)
+    monkeypatch.setattr(
+        home_page.queries, "country_summary", lambda **_: [("RS", 12, 3, 4, 360.0, 1)]
+    )
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
+
+    # Act
+    страница = показать(стенд, monkeypatch, снимок())
+
+    # Assert
+    assert t_ru("home.board.title") in страница
+    assert "Проверок ждут приёмки: 2" in страница
+    assert "90.5" in страница and "IMF 89.0" in страница and "▲+2.5" in страница
+    assert "hm-chart__imf" in страница
+    assert "Сербия" in страница and "3<small>/12</small>" in страница
+    assert 'href="/overview?country=RS' in страница

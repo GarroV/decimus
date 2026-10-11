@@ -36,23 +36,6 @@ CRITICAL = "D3"
 
 
 @dataclass(frozen=True)
-class Tile:
-    """Плитка сводки. `href` обязателен: цифра без перехода — мёртвая цифра.
-
-    `delta` — движение числа против прошлого периода, уже готовой строкой со
-    знаком. Пусто — движения не показываем: ни нуля, ни стрелки в никуда.
-    Бриф требует у средней именно движение, а не голое число.
-    """
-
-    key: str
-    value: str
-    note: str
-    href: str
-    tone: str = "plain"
-    delta: str = ""
-
-
-@dataclass(frozen=True)
 class ZoneLoss:
     """Потеря по зоне за период — сложенная, а не пересчитанная."""
 
@@ -578,9 +561,21 @@ def load(
     limit: int,
     selection: Selection = БЕЗ_ОТБОРА,
     today: date | None = None,
+    dates: tuple[date | None, date | None] | None = None,
+    dates_before: tuple[date | None, date | None] | None = None,
 ) -> Overview:
-    """Снимок сети за период. Один проход по базе на каждый блок, не по строке."""
-    date_from, date_to = window(selection.period, today=today or date.today())
+    """Снимок сети за период. Один проход по базе на каждый блок, не по строке.
+
+    Период — кодом окна в `selection` («Страна») или датами «с — по» в `dates`
+    («Главная», D378: календарь со стрелками); тогда прошлое окно для движения —
+    `dates_before`, и без него движение не показывается.
+    """
+    if dates is None:
+        date_from, date_to = window(selection.period, today=today or date.today())
+        было_от, было_до = window_before(selection.period, today=today or date.today())
+    else:
+        date_from, date_to = dates
+        было_от, было_до = dates_before or (None, None)
     # Отбор человека едет В БАЗУ, а не применяется поверх ответа. Иначе блоки,
     # которые считаются запросом (потери по зонам, системные нарушения),
     # показывают сеть целиком, пока соседние блоки на том же экране показывают
@@ -603,7 +598,6 @@ def load(
     # Прошлое окно читается ТОЛЬКО ради движения и только когда период задан:
     # у «всего времени» предыдущего окна не существует, и лишний поход в базу
     # на каждом открытии экрана был бы платой ни за что.
-    было_от, было_до = window_before(selection.period, today=today or date.today())
     было, было_обрезано = (
         _slice(reach=охват, limit=limit, selection=selection, date_from=было_от, date_to=было_до)
         if было_от is not None
