@@ -9,10 +9,6 @@
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
 <script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
 
-{% macro cell(c) -%}
-  {%- if c.has_data -%}<a class="rt-cal__cell" href="{{ href(selection.group, selection.value, c.key) }}"{% if c.is_current %} aria-current="true"{% endif %}>{{ c.label }}</a>
-  {%- else -%}<span class="rt-cal__cell" aria-disabled="true"{% if c.is_current %} aria-current="true"{% endif %}>{{ c.label }}</span>{%- endif -%}
-{%- endmacro %}
 {% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
 {% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
 {#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
@@ -98,30 +94,21 @@
     {% endif %}
     <div class="rt-field">
       <span class="rt-field__label">{{ t('ratings.period') }}</span>
-      <input type="hidden" name="period" value="{{ selection.period.key }}">
       <div class="rt-cal">
         {% if calendar.prev %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.prev) }}" aria-label="{{ t('ratings.cal.prev') }}">‹</a>
         {% else %}<span class="rt-cal__arrow" aria-disabled="true">‹</span>{% endif %}
+        {#- Один календарь «с — по» (interface-logic п. 3): совпал с месяцем, кварталом
+            или периодом РС — сводка узнаёт его сама (`periods.range_period`). -#}
         <details class="rt-cal__pick pick">
           <summary class="rt-cal__title">{{ calendar.title }}</summary>
           <div class="rt-cal__pop">
-            {% for y in calendar.years %}
-            <div class="rt-cal__year">
-              <div class="rt-cal__y">{{ y.year }}</div>
-              <div class="rt-cal__row rt-cal__row--q">
-                {% for c in y.quarters %}{{ cell(c) }}{% endfor %}
-              </div>
-              <div class="rt-cal__row rt-cal__row--m">
-                {% for c in y.months %}{{ cell(c) }}{% endfor %}
-              </div>
+            <div class="rt-cal__dates">
+              <label><span class="rt-field__label">{{ t('ratings.cal.from') }}</span>
+                <input class="input" type="date" name="from" value="{{ calendar.begin.isoformat() }}"></label>
+              <label><span class="rt-field__label">{{ t('ratings.cal.to') }}</span>
+                <input class="input" type="date" name="to" value="{{ calendar.end.isoformat() }}"></label>
             </div>
-            {% endfor %}
-            {% if calendar.rating %}
-            <div class="rt-cal__y">{{ t('ratings.period.rating') }}</div>
-            <div class="rt-cal__list">
-              {% for c in calendar.rating %}{{ cell(c) }}{% endfor %}
-            </div>
-            {% endif %}
+            <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button>
           </div>
         </details>
         {% if calendar.next %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.next) }}" aria-label="{{ t('ratings.cal.next') }}">›</a>

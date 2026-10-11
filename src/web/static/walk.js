@@ -760,6 +760,11 @@
   if (tg) {
     tg.ready();
     tg.expand();
+    // Во весь экран (D392), без шапки клиента — только на телефоне: на
+    // компьютере полный экран закрыл бы весь монитор. Bot API 8.0.
+    if (W.supports("8.0") && tg.requestFullscreen && /^(ios|android)/.test(tg.platform || "")) {
+      try { tg.requestFullscreen(); } catch (e) { /* старый клиент — остаётся развёрнутым */ }
+    }
     // Прокрутка длинной формы вниз не должна сворачивать окно (Bot API 7.7).
     if (W.supports("7.7") && tg.disableVerticalSwipes) tg.disableVerticalSwipes();
     tg.onEvent("themeChanged", theme);
