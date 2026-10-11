@@ -17,7 +17,7 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from openai import OpenAI, OpenAIError
+from openai import OpenAI, OpenAIError, omit
 
 from .config import RecognizeSettings, load_recognize_settings
 from .errors import TranscriptionFailed
@@ -79,8 +79,15 @@ def _reencode(audio: bytes, ffmpeg: str) -> bytes:
         return data
 
 
-def transcribe(audio: bytes, *, settings: RecognizeSettings | None = None) -> str:
+def transcribe(
+    audio: bytes, *, lang: str | None = None, settings: RecognizeSettings | None = None
+) -> str:
     """Голосовое → текст. Пустая расшифровка — тоже отказ: разбирать нечего.
+
+    `lang` — язык речи проверки (`Inspection.speech_lang`, D393, #538): код
+    ISO-639-1 уходит модели подсказкой, без неё она угадывает язык по звуку и
+    на коротких репликах путает русский с соседними. Проверки нет — `None`,
+    и язык определяется сам, как раньше.
 
     `settings` — тот же шов, что и у `classify`: тесты подменяют настройки,
     бот вызывает без аргумента и получает конфиг из окружения.
@@ -98,6 +105,7 @@ def transcribe(audio: bytes, *, settings: RecognizeSettings | None = None) -> st
         result = client.audio.transcriptions.create(
             model=cfg.transcribe_model,
             file=("audio.wav", wav, "audio/wav"),
+            language=lang or omit,
         )
     except OpenAIError as exc:
         raise TranscriptionFailed(f"Транскрипция не ответила: {exc}") from exc

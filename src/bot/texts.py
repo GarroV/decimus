@@ -194,19 +194,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Вид проверки?",
         "en": "Inspection type?",
     },
-    # Вопрос один, а языков в проверке три (`docs/06-mvp-bot.md`). Ответ
-    # ложится во все три, и сказать об этом надо здесь: аудитор выбирает не
-    # только язык документа для партнёра, но и язык, на котором с ним говорят.
+    # Языков в проверке три (`docs/06-mvp-bot.md`), и в мастере спрашиваются два
+    # из них — раздельно (D393): язык проверки (на нём аудитор говорит и пишет) и
+    # язык отчёта (на нём PDF и письмо партнёру). Третий, интерфейс, — выбор
+    # человека (`/lang`, D303), мастер о нём не спрашивает.
+    "start.ask_speech_lang": {
+        "ru": "На каком языке будете проводить проверку (говорить и писать)?",
+        "en": "In which language will you conduct the inspection (speak and write)?",
+    },
     "start.ask_lang": {
-        "ru": "Язык проверки? На нём будут и отчёт, и наш разговор.",
-        "en": "Inspection language? Both the report and this chat will use it.",
+        "ru": "На каком языке отчёт для партнёра?",
+        "en": "In which language is the report for the partner?",
     },
     "start.started": {
         "ru": (
             "Проверка начата.\n"
             "Пиццерия: {unit}\n"
             "Вид: {kind}\n"
-            "Язык отчёта: {lang}\n"
+            "Язык проверки: {speech_lang}\n"
+            "Язык отчёта: {report_lang}\n"
             "Проверяющий: {auditor}\n"
             "{auditor_note}"
             # Хвоста «Присылайте фотографии с комментариями» здесь больше нет:
@@ -219,7 +225,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "Inspection started.\n"
             "Pizzeria: {unit}\n"
             "Type: {kind}\n"
-            "Report language: {lang}\n"
+            "Inspection language: {speech_lang}\n"
+            "Report language: {report_lang}\n"
             "Auditor: {auditor}\n"
             "{auditor_note}"
             "Date: {date}"

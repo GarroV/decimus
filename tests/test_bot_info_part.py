@@ -230,6 +230,21 @@ async def test_голос_показывается_расшифровкой_до
     assert записано()["INF01"] == "коллектив держит стандарт"
 
 
+async def test_голос_информационной_части_слушается_на_языке_речи(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D393, #538: язык речи проверки уходит расшифровке; язык отчёта её не определяет."""
+    start_inspection(CHAT_ID, "Белград 2", "planned", "en", speech_lang="ru")
+    heard = stub_transcribe(monkeypatch, "коллектив держит стандарт")
+    bot, _session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await дойти_до_информационной_части(dp, bot)
+    await feed(dp, bot, voice_message("voice-1"))
+
+    assert [lang for _audio, lang in heard] == ["ru"]
+
+
 async def test_расшифровку_можно_поправить_текстом(
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
