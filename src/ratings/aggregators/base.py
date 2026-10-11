@@ -22,7 +22,7 @@ USER_AGENT = (
 )
 TIMEOUT_SEC = 40
 RETRIES = 3
-RETRY_PAUSE_SEC = 15
+BACKOFF_SEC = 15
 RETRY_CODES = frozenset({429, 500, 502, 503, 504})
 
 
@@ -118,7 +118,7 @@ class Http:
     def _call(self, request: urllib.request.Request) -> object:
         last = ""
         for attempt in range(RETRIES):
-            time.sleep(self.gap_sec if attempt == 0 else RETRY_PAUSE_SEC * attempt)
+            time.sleep(self.gap_sec if attempt == 0 else BACKOFF_SEC * attempt)
             try:
                 with urllib.request.urlopen(request, timeout=TIMEOUT_SEC) as response:  # noqa: S310
                     return json.load(response)
