@@ -73,6 +73,16 @@
     return Promise.all(waits);
   }
 
+  // Скрипты экрана в `<head>` (блок `head`: `split.js` реестра и «Пользователей»,
+  // `decimus-rt.js` «Рейтингов») ищут свои элементы при загрузке, а `<head>`
+  // при переходе не меняется: экран приходил без них, и строки, отборы,
+  // кнопки молчали до перезагрузки (#664). Такой экран открывается обычным
+  // переходом. Скрипты оболочки (`data-shell` в `base.html`) общие для всех
+  // экранов и работают через события документа — они переход не ломают.
+  function hasPageHeadScripts(doc) {
+    return doc.querySelector("head script[src]:not([data-shell])") !== null;
+  }
+
   function apply(doc, url, push) {
     var fresh = doc.querySelector("main.shell__main");
     var here = document.querySelector("main.shell__main");
@@ -99,6 +109,7 @@
       })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, "text/html");
+        if (hasPageHeadScripts(doc)) throw new Error("head scripts");
         return ensureStyles(doc).then(function () { return doc; });
       })
       .then(function (doc) {

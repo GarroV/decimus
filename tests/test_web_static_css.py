@@ -51,3 +51,25 @@ def test_подключённые_в_шаблонах_таблицы_сущес�
 
 def file_text(path: Path) -> str:
     return path.read_text("utf-8")
+
+
+_HEAD_SCRIPT = re.compile(r"<script\b[^>]*>", re.S)
+
+
+def _скрипты_без_метки(html: str) -> list[str]:
+    return [s for s in _HEAD_SCRIPT.findall(html) if "data-shell" not in s]
+
+
+def test_скрипты_оболочки_помечены_для_перехода() -> None:
+    """#664: `nav.js` отличает скрипты оболочки по `data-shell`; без метки
+    каждый переход между разделами стал бы полной перезагрузкой."""
+    base = (TEMPLATES / "base.html").read_text("utf-8")
+    шапка = base.split("</head>", 1)[0]
+    assert _HEAD_SCRIPT.findall(шапка), "в шапке base.html нет скриптов — тест устарел"
+    assert _скрипты_без_метки(шапка) == []
+    assert "script[src]:not([data-shell])" in file_text(STATIC / "nav.js")
+
+
+def test_проверка_метки_видит_скрипт_без_неё() -> None:
+    # Порча: скрипт оболочки без метки обязан найтись.
+    assert _скрипты_без_метки('<script src="x.js" defer></script>') == ['<script src="x.js" defer>']
