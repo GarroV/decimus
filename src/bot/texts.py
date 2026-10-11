@@ -274,34 +274,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "Continue it or start a new one? A new one erases this."
         ),
     },
-    # Та же развилка, но по сданной проверке (T153). Прежняя фраза утверждала
-    # о ней две неправды разом: что она незавершённая и что новая её сотрёт.
-    # Признака «завершена» у движка нет, и выдумывать его бот не вправе — зато
-    # он помнит, что сам собрал и отдал отчёт, и говорит ровно это.
-    "start.resume_handed_over": {
-        "ru": (
-            "Проверка в этом чате уже сдана: отчёт по ней собран и отправлен.\n"
-            "Пиццерия: {unit}\n"
-            "Дата: {date}\n"
-            "Проверяющий: {auditor}\n"
-            "Записей: {findings}\n\n"
-            "Дописать в неё нельзя: отчёт уже у получателя и в истории точки, "
-            "а дописанное в него не попадёт. Начните новую проверку — или "
-            "уберите эту из чата, если она тут больше не нужна."
-        ),
-        "en": (
-            "The inspection in this chat is already handed over: its report was built "
-            "and sent.\n"
-            "Pizzeria: {unit}\n"
-            "Date: {date}\n"
-            "Auditor: {auditor}\n"
-            "Records: {findings}\n\n"
-            "It can no longer be added to: the report is already with its recipient "
-            "and in the unit’s history, and anything added now would not reach it. "
-            "Start a new inspection — or remove this one from the chat if you no "
-            "longer need it here."
-        ),
-    },
     # Отказ на любую попытку изменить сданную проверку (T201, D080). Один текст
     # на все входы: аудитор упирается в запрет то кадром, то кнопкой, и разные
     # слова об одном и том же читались бы как разные запреты.

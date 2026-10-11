@@ -117,8 +117,9 @@
     var d = data();
     var card = el("section", "walk-app__card");
     card.appendChild(el("h2", "walk-app__card-title", tx("walk.app.audit")));
-    if (d.state !== "active") {
-      // Начать проверку можно всегда, когда нет идущей (D392): кнопка — главное на карточке.
+    if (d.state !== "active" || d.sealed) {
+      // Начать проверку можно всегда, когда нет идущей (D392). Сданная для
+      // аудитора — как отсутствующая (D397): прошлую карточку не показываем.
       card.appendChild(el("p", "walk-app__card-text", tx("walk.app.audit.none")));
       card.appendChild(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart));
       return card;
@@ -126,13 +127,6 @@
     var records = (d.zones || []).reduce(function (n, z) { return n + z.recorded.length; }, 0);
     card.appendChild(el("p", "walk-app__card-unit", d.unit));
     card.appendChild(el("p", "walk-app__card-text", W.day(d.date) + " · " + tx("walk.app.audit.records", { count: records })));
-    if (d.sealed) {
-      // Сданную не продолжить: главное — начать следующую, обход остаётся вторым ходом.
-      card.appendChild(el("p", "walk-banner", tx("walk.app.audit.sealed")));
-      card.appendChild(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart));
-      card.appendChild(W.button("walk-link", tx("walk.app.audit.open"), function () { A.go("walk"); }));
-      return card;
-    }
     card.appendChild(W.button("walk-mark", tx("walk.app.audit.continue"), function () { A.go("walk"); }));
     card.appendChild(W.button("walk-link", tx("walk.app.audit.new_other"), A.openStart));
     return card;
