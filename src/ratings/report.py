@@ -25,18 +25,18 @@ from .periods import (
     range_period,
 )
 from .summary import (
-    Candle,
     CountryLine,
     Fact,
     HardRule,
+    Point,
     RiskUnit,
     UnitScore,
     ViolationBlock,
     ViolationFact,
-    candles,
     delta,
     group_average,
     hard_lines,
+    points,
     risk_zone,
     score_lines,
     top_bottom,
@@ -51,7 +51,6 @@ GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
 #: Кластеры IMF (D384): CEE — вся Европа, OTHER — Other countries.
 CLUSTERS = ("CEE", "OTHER")
 #: Сколько месяцев на графике свечей — по конец выбранного периода.
-CANDLE_MONTHS = 12
 
 
 LEVEL_CLUSTER = "cluster"
@@ -71,8 +70,8 @@ class GroupLine:
     rs_delta: float | None
     rko: float | None
     rko_delta: float | None
-    rs_candles: tuple[Candle | None, ...]
-    rko_candles: tuple[Candle | None, ...]
+    rs_points: tuple[Point, ...]
+    rko_points: tuple[Point, ...]
     level: str = LEVEL_SLICE
 
 
@@ -95,7 +94,6 @@ class Summary:
     selection: Selection
     countries: tuple[str, ...]
     groups: tuple[GroupLine, ...]
-    months: tuple[date, ...]
     lines: tuple[CountryLine, ...]
     total: CountryLine
     previous: ReportPeriod | None
@@ -215,27 +213,16 @@ def _risk(
     return tuple(risk), tuple(short)
 
 
-def candle_months(end: date, n: int = CANDLE_MONTHS) -> tuple[date, ...]:
-    """Первые числа `n` месяцев по месяц `end` включительно, старые первыми."""
-    months = []
-    year, month = end.year, end.month
-    for _ in range(n):
-        months.append(date(year, month, 1))
-        year, month = (year - 1, 12) if month == 1 else (year, month - 1)
-    return tuple(reversed(months))
-
-
 def group_lines(
     selection: Selection,
     found: Choices,
     codes: Sequence[str],
-    facts: tuple[Sequence[Fact], Sequence[Fact], Sequence[Fact]],
-    months: Sequence[date],
+    facts: tuple[Sequence[Fact], Sequence[Fact]],
 ) -> tuple[GroupLine, ...]:
     """В срезе IMF — строка на кластер; у девелопера — общая строка и строка на
     каждую его страну (D385); в остальных — одна строка среза.
-    `facts` — (текущий период, прошлый, окно свечей)."""
-    current, previous, history = facts
+    `facts` — (текущий период, прошлый); точки графика — из текущего (D396)."""
+    current, previous = facts
     parts: list[tuple[str, str | None, tuple[str, ...]]]
     if selection.group == GROUP_IMF:
         parts = [
@@ -262,8 +249,8 @@ def group_lines(
                 rs_delta=delta(values[RS], before[RS]),
                 rko=values[RKO],
                 rko_delta=delta(values[RKO], before[RKO]),
-                rs_candles=candles(history, RS, part, months),
-                rko_candles=candles(history, RKO, part, months),
+                rs_points=points(current, RS, part),
+                rko_points=points(current, RKO, part),
                 level=level,
             )
         )
@@ -280,9 +267,7 @@ def build(selection: Selection) -> Summary:
         _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
     )
     lines, total = score_lines(current, previous, codes)
-    months = candle_months(period.end)
-    history = _facts(read.score_facts(countries=codes, begin=months[0], end=period.end))
-    groups = group_lines(selection, found, codes, (current, previous, history), months)
+    groups = group_lines(selection, found, codes, (current, previous))
     limits = read.settings()
     rules = [HardRule(r[1], r[2], r[3]) for r in read.hard_rules()]
     rko_rows, rko_counts = read.rko_violation_facts(
@@ -300,7 +285,6 @@ def build(selection: Selection) -> Summary:
         selection=selection,
         countries=codes,
         groups=groups,
-        months=months,
         lines=lines,
         total=total,
         previous=prev,

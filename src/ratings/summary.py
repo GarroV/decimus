@@ -54,6 +54,7 @@ class Fact:
     period_id: int
     begin_on: date
     score: float
+    end_on: date | None = None
 
 
 @dataclass(frozen=True)
@@ -101,45 +102,30 @@ def country_average(facts: Sequence[Fact], rating_type: str, country: str) -> fl
 
 
 @dataclass(frozen=True)
-class Candle:
-    """Месяц на графике: средняя группы по периодам рейтинга, начавшимся в месяце
-    (D384) — первая, наибольшая, наименьшая, последняя; `periods` — сколько их."""
+class Point:
+    """Точка графика (D396): средняя группы за один период рейтинга — по
+    пиццериям (D353); `units` — сколько пиццерий в ней."""
 
-    month: date
-    open: float
-    high: float
-    low: float
-    close: float
-    periods: int
+    begin: date
+    end: date
+    avg: float
+    units: int
 
 
-def period_averages(
-    facts: Sequence[Fact], rating_type: str, countries: Sequence[str]
-) -> list[tuple[date, float]]:
-    """Средняя группы за каждый период рейтинга — по пиццериям (D353), старые первыми."""
-    by_period: dict[int, tuple[date, list[float]]] = {}
+def points(facts: Sequence[Fact], rating_type: str, countries: Sequence[str]) -> tuple[Point, ...]:
+    """Точка на каждый период рейтинга в фактах, старые первыми. Факты — те же,
+    что у средней за период: график показывает, из чего она сложилась."""
+    by_period: dict[int, tuple[date, date, list[float]]] = {}
     for fact in facts:
         if fact.rating_type == rating_type and fact.country in countries:
-            by_period.setdefault(fact.period_id, (fact.begin_on, []))[1].append(fact.score)
-    return sorted((begin, fmean(scores)) for begin, scores in by_period.values())
-
-
-def candles(
-    facts: Sequence[Fact], rating_type: str, countries: Sequence[str], months: Sequence[date]
-) -> tuple[Candle | None, ...]:
-    """Свеча на каждый месяц из `months` (первые числа); месяц без периодов — `None`."""
-    by_month: dict[date, list[float]] = {}
-    for begin, avg in period_averages(facts, rating_type, countries):
-        by_month.setdefault(begin.replace(day=1), []).append(avg)
-    out: list[Candle | None] = []
-    for month in months:
-        values = by_month.get(month)
-        out.append(
-            Candle(month, values[0], max(values), min(values), values[-1], len(values))
-            if values
-            else None
-        )
-    return tuple(out)
+            entry = by_period.setdefault(
+                fact.period_id, (fact.begin_on, fact.end_on or fact.begin_on, [])
+            )
+            entry[2].append(fact.score)
+    return tuple(
+        Point(begin, end, fmean(scores), len(scores))
+        for begin, end, scores in sorted(by_period.values(), key=lambda e: e[0])
+    )
 
 
 def delta(current: float | None, previous: float | None) -> float | None:
