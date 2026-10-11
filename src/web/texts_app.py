@@ -11,15 +11,60 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     # ── главная ──────────────────────────────────────────────────────────
     "walk.app.home": {"ru": "Главная", "en": "Home"},
     "walk.app.audit": {"ru": "Проверка пиццерии", "en": "Pizzeria inspection"},
-    "walk.app.audit.none": {
-        "ru": "Проверки нет. Начните её в чате: /start.",
-        "en": "No inspection yet. Start one in the chat: /start.",
-    },
-    "walk.app.audit.to_chat": {"ru": "Открыть чат", "en": "Open the chat"},
+    "walk.app.audit.none": {"ru": "Проверка не начата", "en": "No inspection in progress"},
+    "walk.app.audit.new": {"ru": "Начать проверку", "en": "Start inspection"},
+    "walk.app.audit.new_other": {"ru": "Начать новую", "en": "Start a new one"},
     "walk.app.audit.records": {"ru": "Записей: {count}", "en": "Records: {count}"},
     "walk.app.audit.continue": {"ru": "Продолжить обход", "en": "Continue the walk"},
     "walk.app.audit.sealed": {"ru": "Отчёт сдан", "en": "Report handed over"},
     "walk.app.audit.open": {"ru": "Открыть", "en": "Open"},
+    # ── начало проверки (D392) ───────────────────────────────────────────
+    "walk.start.title": {"ru": "Новая проверка", "en": "New inspection"},
+    "walk.start.checklist": {"ru": "Чек-лист", "en": "Checklist"},
+    "walk.start.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "walk.start.unit_hint": {
+        "ru": "Город и номер, например Belgrade-1",
+        "en": "City and number, e.g. Belgrade-1",
+    },
+    "walk.start.kind": {"ru": "Вид проверки", "en": "Inspection type"},
+    "walk.start.speech": {"ru": "Язык речи", "en": "Spoken language"},
+    "walk.start.report": {"ru": "Язык отчёта", "en": "Report language"},
+    "walk.start.go": {"ru": "Начать проверку", "en": "Start inspection"},
+    "walk.start.going": {"ru": "Начинаем…", "en": "Starting…"},
+    "walk.start.running": {
+        "ru": "Сейчас идёт проверка «{unit}». Новая заменит её: то, что не сдано, пропадёт.",
+        "en": (
+            "Inspection “{unit}” is in progress. A new one replaces it: "
+            "anything not handed over is lost."
+        ),
+    },
+    "walk.start.replace_title": {
+        "ru": "Заменить текущую проверку?",
+        "en": "Replace the current inspection?",
+    },
+    "walk.start.replace_yes": {"ru": "Да, начать новую", "en": "Yes, start a new one"},
+    "walk.start.keep": {"ru": "Оставить текущую", "en": "Keep the current one"},
+    "walk.start.cancel": {"ru": "Отмена", "en": "Cancel"},
+    "walk.start.new_yes": {"ru": "Да, добавить", "en": "Yes, add it"},
+    "walk.start.new_no": {"ru": "Нет, изменить название", "en": "No, edit the name"},
+    "walk.start.err.failed": {
+        "ru": (
+            "Не получилось начать проверку. Повторите через минуту; "
+            "если снова не выйдет, скажите администратору."
+        ),
+        "en": (
+            "Could not start the inspection. Try again in a minute; "
+            "if it fails again, tell the administrator."
+        ),
+    },
+    "walk.start.err.checklist_gone": {
+        "ru": "Этот чек-лист только что закрыли. Выберите другой.",
+        "en": "That checklist was just closed. Pick another one.",
+    },
+    "walk.start.err.running": {
+        "ru": "Идёт другая проверка — подтвердите, что её нужно заменить.",
+        "en": "Another inspection is in progress — confirm that it should be replaced.",
+    },
     # ── настройки ────────────────────────────────────────────────────────
     "walk.app.settings": {"ru": "Настройки", "en": "Settings"},
     "walk.app.lang": {"ru": "Язык", "en": "Language"},
@@ -32,8 +77,9 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "зону и ведёт к следующей.\n\n"
             "«Сведения» в шапке обхода — вопросы для отчёта; что заполнено здесь, бот в "
             "конце не спросит.\n\n"
-            "Чат с ботом работает как раньше: начать (/start) и завершить (/finish) "
-            "проверку — там. Всё записанное в чате видно здесь, и наоборот."
+            "Проверку можно начать здесь — «Начать проверку» на главной — или в чате "
+            "(/start); завершить (/finish) — в чате. Всё записанное в чате видно здесь, "
+            "и наоборот."
         ),
         "en": (
             "Home shows what is going on and where to go next.\n\n"
@@ -42,8 +88,9 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "zone and moves to the next one.\n\n"
             "“Details” in the walk header are the report questions; whatever is filled in "
             "here the bot will not ask at the end.\n\n"
-            "The bot chat works as before: start (/start) and finish (/finish) the "
-            "inspection there. Everything recorded in the chat shows here, and back."
+            "You can start an inspection here — “Start inspection” on Home — or in the "
+            "chat (/start); finish it (/finish) in the chat. Everything recorded in the "
+            "chat shows here, and back."
         ),
     },
     "walk.app.version": {"ru": "Версия", "en": "Version"},

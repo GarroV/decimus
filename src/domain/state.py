@@ -22,6 +22,7 @@ import os
 import re
 import tempfile
 import time
+import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
@@ -506,6 +507,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         auditor=str(meta.get("auditor") or ""),
         findings=[_finding(f, sources, suggestions, words) for f in (raw.get("findings") or [])],
         info=read_info(raw),
+        run_id=str(block.get("run_id") or ""),
     )
 
 
@@ -612,6 +614,9 @@ def start_inspection(
         "checklist_code": выбран.code,
         "ui_lang": _clean_lang(ui_lang, "язык интерфейса"),
         "speech_lang": _clean_lang(speech_lang, "язык речи аудитора"),
+        # Личность проверки (D392): по ней память бота узнаёт, что проверку
+        # начали заново, и не отдаёт новой предложения и слова старой.
+        "run_id": uuid.uuid4().hex,
     }
     run_audit(args, chat_id=chat_id, settings=init_settings, create=True)
     patch_domain_block(state_file(chat_id, settings), block)
@@ -621,6 +626,23 @@ def start_inspection(
             f"Движок отчитался об успехе, но состояния нет: {state_file(chat_id, settings)}"
         )
     return started
+
+
+def run_id(chat_id: int) -> str:
+    """Личность проверки чата (`Inspection.run_id`) без разбора всего состояния.
+
+    Пусто — проверки нет, она начата до D392 или файл не читается: для сверки
+    памяти бота это одно и то же «своей метки нет». Отказом не становится: её
+    зовут на каждом обращении к памяти бота, и падать там нельзя.
+    """
+    path = state_file(chat_id, check_environment())
+    if not path.is_file():
+        return ""
+    try:
+        raw = _read_raw(path)
+    except (DomainError, OSError):
+        return ""
+    return str((raw.get(DOMAIN_KEY) or {}).get("run_id") or "")
 
 
 def settings_for(chat_id: int) -> Settings:
