@@ -11,6 +11,7 @@
 {% block title %}{{ t('section.overview.title') }}{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-home.css') }}">
 {% endblock %}
 {% block page_class %} page--split page--home{% endblock %}
@@ -149,7 +150,9 @@
         <span class="hm-big__value">{{ '—' if data.average is none else '%.1f'|format(data.average) }}</span>
         {% if data.average is not none %}<span class="hm-big__of">%</span>{% endif %}
         {{ delta(data.average_delta) }}
-        <span class="hm-big__note">{{ t('home.inspections.average') }}</span>
+        {# «К прошлому периоду» — только когда есть с чем сравнить: у «Всего
+           времени» и у периода без проверок до него дельты нет. #}
+        <span class="hm-big__note">{{ t('home.inspections.average' if data.average_delta is not none else 'home.inspections.average_only') }}</span>
       </div>
       <div class="hm-plaques hm-plaques--4">
         <div class="hm-plaque"><span class="hm-plaque__label">{{ t('overview.tile.inspections') }}</span><span class="hm-plaque__value">{{ data.inspections_total }}</span></div>
