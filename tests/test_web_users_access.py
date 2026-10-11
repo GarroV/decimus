@@ -474,8 +474,9 @@ def test_контроль_в_проверках_не_пишет(контроль
 
 def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
     assert контроль.get("/users").status_code == 200
+    # При входе все — на «Главной» (D378, было: контролинг — сразу в рейтинги).
     вход = контроль.get("/")
-    assert вход.status_code == 302 and вход.headers["Location"].endswith("/ratings")
+    assert вход.status_code == 302 and вход.headers["Location"].endswith("/overview")
 
 
 def test_контроль_в_навигации_только_свои_разделы(контроль: FlaskClient) -> None:
