@@ -55,7 +55,9 @@ def test_у_главной_без_периода_в_адресе_текущий_
     """Умолчание задаёт экран: «Главная» осталась на месяце (D378)."""
     assert rp.read({}, today=СЕГОДНЯ) == rp.month_of(СЕГОДНЯ)
     assert rp.read({}, today=СЕГОДНЯ, default_all=True) == rp.Period(None, None)
-    assert rp.read({"from": "2026-03-05"}, today=СЕГОДНЯ, default_all=True).start == date(2026, 3, 5)
+    assert rp.read({"from": "2026-03-05"}, today=СЕГОДНЯ, default_all=True).start == date(
+        2026, 3, 5
+    )
 
 
 @pytest.mark.parametrize(
@@ -98,6 +100,20 @@ def test_стрелка_листает_на_длину_периода(
     период: rp.Period, шаг: int, ждём: rp.Period | None
 ) -> None:
     assert rp.shift(период, шаг) == ждём
+
+
+def test_период_реестра_общий_календарь_с_быстрыми_выборами(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D395: календарь тот же, что на «Главной»; без скрипта — форма с датами."""
+    _ловушка(monkeypatch)
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert "data-pcal" in страница
+    for ключ in ("registry.period.all", "registry.period.this_month", "registry.period.last_month"):
+        assert t(ключ, "ru") in страница, ключ
+    assert 'name="from"' in страница and 'name="to"' in страница
 
 
 # --- состояния списка -------------------------------------------------------
