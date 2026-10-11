@@ -22,7 +22,7 @@ from .checklist import (
 )
 from .config import check_environment
 from .findings import add_finding, attach_photo, detach_photo, drop_finding, edit_finding
-from .handover import HandedOverError, handed_over, while_open
+from .handover import HandedOverError, handed_over, holding_notes, reset_notes, while_open
 from .info import set_info
 from .kinds import INSPECTION_KINDS, kind_title
 from .models import (
@@ -44,6 +44,7 @@ from .scoring import score
 from .state import (
     drop_inspection,
     get_state,
+    run_id,
     settings_for,
     start_inspection,
     sync_checklist_version,
@@ -102,6 +103,7 @@ __all__ = [
     "get_item",
     "get_state",
     "handed_over",
+    "holding_notes",
     "is_upload_ref",
     "kind_title",
     "list_items",
@@ -109,6 +111,8 @@ __all__ = [
     "only_zone",
     "read_uncovered",
     "record_uncovered",
+    "reset_notes",
+    "run_id",
     "save_upload",
     "score",
     "set_info",

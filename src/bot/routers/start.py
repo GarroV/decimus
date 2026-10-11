@@ -25,11 +25,9 @@ from aiogram.types import CallbackQuery, Message
 from src import domain
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
-from src.domain.bot_checklists import BotChecklist, available
-from src.domain.config import check_environment
 from src.domain.errors import DomainError
-from src.domain.geo import COUNTRIES
-from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, UnitName, canonical_unit
+from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT as UNIT_NAME_BYTE_LIMIT
+from src.domain.unit_name import UNIT_NAME_LIMIT, UnitName, check_unit_name
 
 from .. import sealed, sidecar, stops
 from ..auditor import auditor_name, auditor_name_was_shortened
@@ -62,9 +60,17 @@ from ..keyboards import (
 from ..lang import chat_ui_lang, person_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
+from ..start_options import open_checklists
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
-from ..unit_pick import match_unit, may_add_units
+from ..unit_pick import (
+    UNIT_KNOWN,
+    UNIT_PARTNER_REFUSED,
+    match_unit,
+    may_add_units,
+    resolve_unit,
+    where_suffix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -110,26 +116,9 @@ async def _unit_chosen(message: Message, state: FSMContext, lang: str, unit: str
     await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
 
-def _where(имя: UnitName, lang: str) -> str:
-    """Страна точки словом для вопроса «Новая пиццерия?»; незнакомая — пусто."""
-    if имя.country is None:
-        return ""
-    names = COUNTRIES.get(имя.country, {})
-    return f" ({names.get(lang) or names.get('en') or имя.country})"
-
-
 async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
     await state.set_state(StartFlow.waiting_unit)
     await message.answer(t("start.ask_unit", lang))
-
-
-def _open_checklists(space: str) -> list[BotChecklist] | None:
-    """Открытые в боте чек-листы пространства аудитора — или `None`, если их не прочитать."""
-    try:
-        return available(check_environment(), tenant=space)
-    except (DomainError, OSError, ValueError):
-        logger.exception("список чек-листов для бота не прочитался")
-        return None
 
 
 async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: str) -> None:
@@ -139,7 +128,7 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
     названиями на языке интерфейса. Ни одного — прямо говорим, что начать не
     по чему и кто это чинит, и мастер дальше не идёт.
     """
-    открыты = _open_checklists(space)
+    открыты = open_checklists(space)
     if открыты is None:
         await state.clear()
         await stops.refuse(message, lang, step="start.checklist", key="start.failed")
@@ -324,54 +313,32 @@ def build_start_router(
     async def on_unit(message: Message, state: FSMContext, space: str) -> None:
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
-        if not unit:
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_empty")
-            return
-        if len(unit) > UNIT_NAME_LIMIT:
-            # Отказ здесь, а не отказом сборки отчёта в конце проверки: там
-            # аудитор уже уехал с точки, и переименовать пиццерию ему нечем.
+        # Пределы и каноничность — одна проверка на бота и мини-апп (D392).
+        проверка = check_unit_name(unit)
+        if проверка.name is None:
             await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
+                message,
+                lang,
+                step="start.unit",
+                key=f"start.{проверка.problem}",
+                limit=UNIT_NAME_LIMIT,
+                typed=unit,
             )
             return
-        if len(unit.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
-            # Предел в знаках это не ловит: 60 эмодзи проходят его же знаками,
-            # а по байтам уже почти весь бюджет имени файла разом (T128).
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
-            return
-        # Имя точки — город по-английски и номер, как бы его ни написали (D233).
-        имя = canonical_unit(unit)
-        if имя is None:
-            await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_need_number", typed=unit
-            )
-            return
-        if len(имя.name) > UNIT_NAME_LIMIT:
-            # Латиница бывает длиннее написанного («Щ» → «shch»): предел имени
-            # файла отчёта сверяется с тем, что ляжет в шапку, а не с вводом.
-            await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
-            )
-            return
-        if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
-            # «щ» → «shch» добавляет байты, а нелатинский незнакомый город
-            # остаётся многобайтным: ввод прошёл предел, сведённое имя — нет.
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
-            return
+        имя = проверка.name
         сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
-        if сверка.name is not None or not сверка.checked:
-            # Совпало со справочником — или справочник недоступен, и тогда не
-            # повод держать аудитора на точке: имя уже каноническое.
-            await _unit_chosen(message, state, lang, сверка.name or имя.name)
+        решение = resolve_unit(имя, сверка, space)
+        if решение.status == UNIT_KNOWN:
+            await _unit_chosen(message, state, lang, решение.name)
             return
-        if not may_add_units(space):
+        if решение.status == UNIT_PARTNER_REFUSED:
             await stops.refuse(
                 message, lang, step="start.unit", key="start.unit_new_partner", name=имя.name
             )
             return
         await state.update_data(unit_new=asdict(имя), unit_typed=unit)
         await message.answer(
-            t("start.unit_new_ask", lang, name=имя.name, where=_where(имя, lang)),
+            t("start.unit_new_ask", lang, name=имя.name, where=where_suffix(имя, lang)),
             reply_markup=unit_new_keyboard(lang),
         )
 
@@ -420,7 +387,7 @@ def build_start_router(
             logger.warning("новая пиццерия %s не записана в справочник: %s", имя.name, exc)
         else:
             await message.answer(
-                t("start.unit_added", lang, name=имя.name, where=_where(имя, lang))
+                t("start.unit_added", lang, name=имя.name, where=where_suffix(имя, lang))
             )
         await _unit_chosen(message, state, lang, имя.name)
 
@@ -476,7 +443,7 @@ def build_start_router(
             return
         lang = chat_ui_lang(message.chat.id)
         code = (callback.data or "").removeprefix(CHECKLIST_PREFIX)
-        открыты = _open_checklists(space) or []
+        открыты = open_checklists(space) or []
         if code not in {c.code for c in открыты}:
             # Методист закрыл чек-лист, пока аудитор смотрел на кнопки: не
             # подменяем соседним молча, а показываем свежий список.
