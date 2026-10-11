@@ -1,5 +1,5 @@
 /* «Проверки» поверх общего каркаса (`decimus-split.css`): только то, чего нет
-   у «Пользователей», — колонки реестра, период со стрелками, группа «Ждут
+   у «Пользователей», — колонки реестра, группа «Ждут
    приёмки» и карточка проверки в панели справа.
 
    Образец тот же — Swarm Brain (miniapp/src/components):
@@ -16,18 +16,6 @@
 .sbar--registry .sbar__search { display: contents; }
 .sbar--registry .ov-chip { height: 30px; padding: 0 var(--space-6); border-radius: var(--r-pill); font-size: 12.5px; }
 
-/* ── период: ‹ Октябрь 2026 › ───────────────────────────────────────── */
-.speriod { display: inline-flex; align-items: center; gap: var(--space-2); }
-.speriod__arrow { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px;
-  border: 1px solid var(--line-control); border-radius: 50%; background: var(--surface); color: var(--ink-2); }
-.speriod__arrow:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
-.speriod__arrow[aria-disabled="true"] { opacity: .4; }
-.speriod__arrow svg { width: 14px; height: 14px; }
-.speriod__title { cursor: pointer; color: var(--ink); font-weight: var(--w-semibold); }
-.speriod__title svg { width: 14px; height: 14px; color: var(--ink-3); }
-.speriod__menu { min-width: 17rem; max-height: none; padding: var(--space-5); }
-.speriod__dates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-.speriod__quick { display: flex; flex-direction: column; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
 
 /* ── список: буква | пиццерия + мета | итог | дата ──────────────────── */
 .slist--registry { --slist-cols: 30px minmax(0, 1fr) 64px 92px; }
@@ -71,9 +59,4 @@
   .slist--registry .srow { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 0 var(--space-4); }
   .slist--registry .srow > .srow__cell.mono { grid-column: 2 / -1; font-size: 11.5px; color: var(--ink-3); justify-content: flex-start; }
   .slist__group, .slist__note { padding-left: var(--space-5); padding-right: var(--space-5); }
-  .speriod { flex: 1 1 100%; }
-  .speriod__pick { flex: 1; }
-  .speriod__title { width: 100%; justify-content: center; }
-  .speriod__arrow { width: 40px; height: 40px; }
-  .speriod__menu { left: 50%; transform: translateX(-50%); }
 }
