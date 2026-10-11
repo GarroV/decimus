@@ -537,6 +537,18 @@ def test_умолчания_не_висят_в_адресе_среза(
     assert страница.count("period=all") == 1
 
 
+def test_период_главной_общий_календарь_с_быстрыми_выборами(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D404: один календарь на все экраны с периодом; без скрипта — форма с датами."""
+    страница = показать(стенд, monkeypatch, снимок())
+
+    assert "data-pcal" in страница
+    for ключ in ("registry.period.all", "registry.period.this_month", "registry.period.last_month"):
+        assert _t(ключ, "ru") in страница, ключ
+    assert 'name="from"' in страница and 'name="to"' in страница
+
+
 class ЗаписнаяБаза:
     """Заглушка слоя базы, запоминающая, с чем её позвали.
 

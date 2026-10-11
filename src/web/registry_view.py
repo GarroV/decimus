@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 from src.db.models import InspectionRow
 
@@ -68,3 +69,33 @@ def period_link(period: Period, step: int, select: Callable[..., str]) -> str | 
     if сосед is None:
         return None
     return select(**{"period": "", **сосед.params()})
+
+
+def period_quick(
+    period: Period, today: date, lang: str, select: Callable[..., str]
+) -> tuple[dict[str, object], ...]:
+    """Быстрые выборы периода: всё время, этот месяц, прошлый.
+
+    Адреса явные (с датами или `period=all`), а не «без параметров»: у «Проверок»
+    без параметров — всё время, у «Главной» — месяц, и ссылка не должна
+    зависеть от умолчания экрана.
+    """
+    этот = registry_period.month_of(today)
+    прошлый = registry_period.month_of(today.replace(day=1) - timedelta(days=1))
+    return (
+        {
+            "title": t("registry.period.all", lang),
+            "href": select(**{"from": "", "to": "", "period": registry_period.ALL}),
+            "on": period.is_all,
+        },
+        {
+            "title": t("registry.period.this_month", lang),
+            "href": select(period="", **этот.params()),
+            "on": period == этот,
+        },
+        {
+            "title": t("registry.period.last_month", lang),
+            "href": select(period="", **прошлый.params()),
+            "on": period == прошлый,
+        },
+    )

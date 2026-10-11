@@ -26,10 +26,22 @@ _MONTHS: dict[str, dict[str, str]] = {
 _PERIOD: dict[str, dict[str, str]] = {
     "registry.period.label": {"ru": "Период", "en": "Period"},
     "registry.period.all": {"ru": "Всё время", "en": "All time"},
-    "registry.period.this_month": {"ru": "Текущий месяц", "en": "This month"},
+    "registry.period.this_month": {"ru": "Этот месяц", "en": "This month"},
+    "registry.period.last_month": {"ru": "Прошлый месяц", "en": "Last month"},
+    "registry.period.pick_end": {
+        "ru": "Выберите конец периода",
+        "en": "Pick the end of the period",
+    },
+    "registry.period.pick_start": {
+        "ru": "Выберите начало периода",
+        "en": "Pick the start of the period",
+    },
+    "registry.period.prev_month": {"ru": "Предыдущий месяц", "en": "Previous month"},
+    "registry.period.next_month": {"ru": "Следующий месяц", "en": "Next month"},
+    "registry.weekdays": {"ru": "Пн Вт Ср Чт Пт Сб Вс", "en": "Mo Tu We Th Fr Sa Su"},
     "registry.period.from": {"ru": "С", "en": "From"},
     "registry.period.to": {"ru": "По", "en": "To"},
-    "registry.period.apply": {"ru": "Показать", "en": "Show"},
+    "registry.period.apply": {"ru": "Применить", "en": "Apply"},
     "registry.period.prev": {"ru": "Предыдущий период", "en": "Previous period"},
     "registry.period.next": {"ru": "Следующий период", "en": "Next period"},
     "registry.period.empty.title": {

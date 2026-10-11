@@ -612,7 +612,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        период = registry_period.read(request.args, today=date.today())
+        период = registry_period.read(request.args, today=date.today(), default_all=True)
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
@@ -661,9 +661,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_title=registry_view.period_title(период, язык),
             period_prev=registry_view.period_link(период, -1, отбор),
             period_next=registry_view.period_link(период, 1, отбор),
-            period_month=отбор(period="", **registry_period.month_of(date.today()).params()),
-            period_is_this_month=период == registry_period.month_of(date.today()),
-            period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
+            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
             select_url=отбор,
             reset_url=отбор(grade="", kind="", country="", city="", q=""),
             picked=панель.picked,
