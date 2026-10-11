@@ -39,6 +39,7 @@ _MONTHS_SHORT_EN = (
 HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.only": {"ru": "Только {country}", "en": "Only {country}"},
     "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
+    "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.more.ratings": {"ru": "Рейтинги", "en": "Ratings"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D395) ─────────────
