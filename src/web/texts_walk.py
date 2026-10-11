@@ -360,6 +360,27 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Система сейчас не может найти пункт. Выберите его вручную — запись не потеряется.",
         "en": "The system can't find the item right now. Pick it yourself — nothing is lost.",
     },
+    "walk.err.translate": {
+        "ru": "Перевод сейчас недоступен. Текст остался как был — его можно перевести самому.",
+        "en": "Translation is unavailable right now. Your text is unchanged — translate it by hand.",
+    },
+    "walk.err.translate_busy": {
+        "ru": "Система ещё переводит по прошлому нажатию — подождите пару секунд.",
+        "en": "Still translating from your last tap — give it a few seconds.",
+    },
+    "walk.err.translate_long": {
+        "ru": "Перевод вышел длиннее 1000 знаков. Сократите текст и переведите снова.",
+        "en": "The translation came out over 1000 characters. Shorten the text and retry.",
+    },
+    "walk.translate.btn": {"ru": "Перевести на {lang}", "en": "Translate to {lang}"},
+    "walk.translate.busy": {"ru": "Перевожу…", "en": "Translating…"},
+    "walk.translate.undo": {"ru": "Вернуть как было", "en": "Restore original"},
+    "walk.translate.hint": {
+        "ru": "Перевод предложен системой — проверьте текст и сохраните.",
+        "en": "Translation proposed by the system — check the text, then save.",
+    },
+    "walk.translate.lang.ru": {"ru": "русский", "en": "Russian"},
+    "walk.translate.lang.en": {"ru": "английский", "en": "English"},
     "walk.err.server": {
         "ru": "Не получилось записать. Повторите через минуту.",
         "en": "Could not save. Try again in a minute.",
