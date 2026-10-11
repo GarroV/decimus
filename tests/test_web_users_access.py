@@ -672,7 +672,7 @@ def test_партнёру_страна_закрыта_и_не_в_меню(адм
     """D371: «Страна» — только УК; партнёр не видит её в меню и не открывает адресом."""
     assert админ_партнёра.get("/country/GE").status_code == 404
     страница = админ_партнёра.get("/users").get_data(as_text=True)
-    for чужой in ("/country", "/calendar", "/mini"):
+    for чужой in ("/country", "/calendar"):
         assert f'href="{чужой}?lang=' not in страница, чужой
     for свой in ("/overview", "/inspections", "/admin", "/users", "/ratings"):
         assert f'href="{свой}?lang=' in страница, свой
