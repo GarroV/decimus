@@ -207,10 +207,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
-    "overview.zones.empty": {
-        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
-        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
-    },
     "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
     "overview.systemic.hint": {
         "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
@@ -219,10 +215,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.systemic.spread": {
         "ru": "точек: {units} · записей: {records}",
         "en": "units: {units} · records: {records}",
-    },
-    "overview.systemic.empty": {
-        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
-        "en": "No repeats: no item was breached at more than one unit.",
     },
     "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
     "overview.units.hint": {

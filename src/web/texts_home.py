@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378): доска «Ждёт действия», блоки РС / РКО, «Мои страны».
+"""Тексты «Главной» (D378, D395): «Требует внимания», проверки, колонки РС / РКО, «Мои страны».
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -7,46 +7,12 @@
 
 from __future__ import annotations
 
-_MONTHS_SHORT_RU = (
-    "янв",
-    "фев",
-    "мар",
-    "апр",
-    "май",
-    "июн",
-    "июл",
-    "авг",
-    "сен",
-    "окт",
-    "ноя",
-    "дек",
-)
-_MONTHS_SHORT_EN = (
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-)
-
 HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.only": {"ru": "Только {country}", "en": "Only {country}"},
     "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
-    "home.more.ratings": {"ru": "Рейтинги", "en": "Ratings"},
+    "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
-    # ── Доска «Ждёт действия»: только живые счётчики (D217) ─────────────
-    "home.board.title": {"ru": "Ждёт действия", "en": "Waiting for you"},
-    "home.board.done": {
-        "ru": "Всё сделано: на приёмке, в экшн-планах и предписаниях ничего не ждёт.",
-        "en": "All done: nothing is waiting in review, action plans or notices.",
-    },
+    # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D395) ─────────────
     "home.board.failed": {
         "ru": "Задания не загрузились: база не ответила. Обновите страницу.",
         "en": "Tasks did not load: the database did not answer. Reload the page.",
@@ -82,7 +48,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "en": "RS and CX not loaded for {count} days",
     },
     "home.board.ratings_stale.cta": {"ru": "Загрузить", "en": "Upload"},
-    # ── Проверки за период и «Куда смотреть» ────────────────────────────
+    # ── Проверки за период ────────────────────────────
     "home.inspections.title": {"ru": "Проверки за период", "en": "Inspections in the period"},
     "home.inspections.average": {
         "ru": "средняя оценка, к прошлому периоду",
@@ -93,38 +59,30 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "en": "average score in the period",
     },
     "home.inspections.checked": {"ru": "Пиццерий проверено", "en": "Pizzerias inspected"},
-    "home.attention.title": {"ru": "Куда смотреть", "en": "Where to look"},
-    "home.attention.empty": {
-        "ru": "Всё в пределах норм: критических нарушений и оценок D за период нет.",
-        "en": "All within norms: no critical findings and no D grades in the period.",
+    "home.attention.title": {"ru": "Требует внимания", "en": "Needs attention"},
+    "home.inspections.none": {
+        "ru": "За период проверок нет.",
+        "en": "No inspections in the period.",
     },
-    # ── РС и РКО (D378, D379) ───────────────────────────────────────────
-    "home.rs.title": {"ru": "Стандарты · РС", "en": "Standards · RS"},
-    "home.rko.title": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
+    # ── Где нужно проверить, последние проверки (D396) ──────────────────
+    "home.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "home.tocheck.hint": {"ru": "нет проверок за период", "en": "no inspection in the period"},
+    "home.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
+    "home.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
+    "home.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
+    "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
+    "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
+    # ── Колонки рейтинга клиента в таблице пиццерий (D396) ──────────────
     "home.rs.short": {"ru": "РС", "en": "RS"},
     "home.rko.short": {"ru": "РКО", "en": "CX"},
-    "home.ratings.horizon": {"ru": "8 месяцев", "en": "8 months"},
-    "home.ratings.month": {
-        "ru": "за {month}, к прошлому месяцу",
-        "en": "for {month}, vs previous month",
-    },
-    "home.ratings.mine": {"ru": "Мои страны", "en": "My countries"},
-    "home.ratings.rated": {"ru": "Пиццерий с оценкой", "en": "Pizzerias rated"},
-    "home.ratings.below": {
-        "ru": "Ниже порога Top / Bottom ({threshold})",
-        "en": "Below the Top / Bottom line ({threshold})",
-    },
-    "home.ratings.none": {
-        "ru": "Рейтинги ещё не загружены: стран IMF в базе нет.",
-        "en": "Ratings are not loaded yet: no IMF countries in the database.",
-    },
-    "home.ratings.no_scores": {
-        "ru": "У этих стран нет оценок за последние 8 месяцев.",
-        "en": "These countries have no scores in the last 8 months.",
+    "home.ratings.open": {
+        "ru": "Последняя оценка рейтинга — открыть страницу «Рейтинги»",
+        "en": "Latest rating score — open the Ratings page",
     },
     "home.ratings.failed": {
-        "ru": "Рейтинги не загрузились: база не ответила. Обновите страницу.",
-        "en": "Ratings did not load: the database did not answer. Reload the page.",
+        "ru": "Оценки рейтинга не загрузились: в колонках РС и РКО прочерки.",
+        "en": "Rating scores did not load: the RS and CX columns show dashes.",
     },
     # ── Мои страны ──────────────────────────────────────────────────────
     "home.countries.title": {"ru": "Мои страны", "en": "My countries"},
@@ -135,19 +93,10 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.countries.country": {"ru": "Страна", "en": "Country"},
     "home.countries.units": {"ru": "Проверено", "en": "Inspected"},
     "home.countries.average": {"ru": "Средняя", "en": "Average"},
-    "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
-    "home.countries.empty": {
-        "ru": "В охвате нет стран: в справочнике нет пиццерий.",
-        "en": "No countries in reach: the directory has no pizzerias.",
-    },
     # ── Пиццерии ────────────────────────────────────────────────────────
     "home.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "home.units.empty": {
         "ru": "За период проверок нет. Листните период стрелкой ← или выберите «Всё время».",
         "en": "No inspections in the period. Step back with ← or choose «All time».",
-    },
-    **{
-        f"home.month_short.{n}": {"ru": ru, "en": en}
-        for n, (ru, en) in enumerate(zip(_MONTHS_SHORT_RU, _MONTHS_SHORT_EN, strict=True), 1)
     },
 }
