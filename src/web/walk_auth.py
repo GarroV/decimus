@@ -59,6 +59,8 @@ FINDING_ENDPOINT = "walk_finding"
 INFO_ENDPOINT = "walk_info"
 #: Поиск пункта по кадру и словам (D330) — распознавание бота.
 SUGGEST_ENDPOINT = "walk_suggest"
+#: Перевод свободного текста на язык отчёта (D394): ничего не пишет.
+TRANSLATE_ENDPOINT = "walk_translate"
 #: Приложение аудитора (D373): настройки и круг доступа к MCP.
 APP_ENDPOINT = "walk_app"
 #: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
@@ -71,6 +73,7 @@ PHOTO_VIEW_PATH = "/tg/walk/photo/view"
 FINDING_PATH = "/tg/walk/finding"
 INFO_PATH = "/tg/walk/info"
 SUGGEST_PATH = "/tg/walk/suggest"
+TRANSLATE_PATH = "/tg/walk/translate"
 APP_PATH = "/tg/walk/app"
 ENDPOINTS = frozenset(
     {
@@ -81,6 +84,7 @@ ENDPOINTS = frozenset(
         FINDING_ENDPOINT,
         INFO_ENDPOINT,
         SUGGEST_ENDPOINT,
+        TRANSLATE_ENDPOINT,
         APP_ENDPOINT,
     }
 )
