@@ -145,5 +145,6 @@ def selected[R: _Row](rows: Iterable[R], person_id: str) -> R | None:
 
 def screen_url(base: str, *, lang: str, f: Filters, **extra: str) -> str:
     """Адрес экрана с фильтрами вошедшего и выбором (`person`, `add`, `tab`, `space_code`)."""
-    пары = {"lang": lang, **f.params(), **{k: v for k, v in extra.items() if v}}
+    язык = {"lang": lang} if lang else {}
+    пары = {**язык, **f.params(), **{k: v for k, v in extra.items() if v}}
     return f"{base}?{urlencode(пары)}"

@@ -639,7 +639,7 @@ def test_контроль_видит_только_людей_контролин�
     for чужое in ("petr", "boss", "nino", "petr@dodobrands.io", "boss@dodobrands.io"):
         assert чужое not in страница, чужое
     assert 'action="/users/role' not in страница
-    assert 'href="/users?lang=&amp;add=1"' in страница or "add=1" in страница
+    assert 'href="/users?add=1"' in страница
     assert 'action="/users/disable' in страница
     новый = контроль.get("/users?add=1").get_data(as_text=True)
     форма = новый.split('action="/users/add')[1].split("</form>")[0]
