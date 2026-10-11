@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378): доска «Ждёт действия», блоки РС / РКО, «Мои страны».
+"""Тексты «Главной» (D378): доска «Ждёт действия», блоки РС / РКО, «Страны».
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -108,7 +108,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "за {month}, к прошлому месяцу",
         "en": "for {month}, vs previous month",
     },
-    "home.ratings.mine": {"ru": "Мои страны", "en": "My countries"},
+    "home.ratings.mine": {"ru": "Все страны", "en": "All countries"},
     "home.ratings.rated": {"ru": "Пиццерий с оценкой", "en": "Pizzerias rated"},
     "home.ratings.below": {
         "ru": "Ниже порога Top / Bottom ({threshold})",
@@ -126,8 +126,8 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Рейтинги не загрузились: база не ответила. Обновите страницу.",
         "en": "Ratings did not load: the database did not answer. Reload the page.",
     },
-    # ── Мои страны ──────────────────────────────────────────────────────
-    "home.countries.title": {"ru": "Мои страны", "en": "My countries"},
+    # ── Страны ──────────────────────────────────────────────────────
+    "home.countries.title": {"ru": "Страны", "en": "Countries"},
     "home.countries.hint": {
         "ru": "Щелчок по стране сужает всю главную",
         "en": "Click a country to narrow the whole page",
