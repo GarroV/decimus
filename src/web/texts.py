@@ -970,7 +970,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
     # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
     # делает, — иначе человек закроет экран, считая письмо ушедшим.
-    "letter.gmail.submit": {"ru": "В черновики Google", "en": "Save to Google drafts"},
+    "letter.gmail.submit": {"ru": "Сохранить черновик на почте", "en": "Save draft to mail"},
     "letter.gmail.ok": {
         "ru": "Черновик лежит в вашей почте — отправьте его оттуда.",
         "en": "The draft is in your mailbox — send it from there.",

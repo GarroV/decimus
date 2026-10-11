@@ -45,6 +45,34 @@
     return known;
   }
 
+  // Стили экрана лежат в `<head>` (блок `head` шаблона), а он при переходе
+  // не меняется: без этого «Главная», открытая из «Проверок», приходила без
+  // своего `decimus-home.css` и рассыпалась до перезагрузки (11.10.2026).
+  // Недостающие таблицы добавляются и ждутся ДО подмены, чтобы экран не
+  // мигнул голым; не загрузилась за STYLE_WAIT_MS — меняем всё равно.
+  var STYLE_WAIT_MS = 3000;
+  function ensureStyles(doc) {
+    var have = {};
+    document.querySelectorAll('link[rel="stylesheet"]').forEach(function (l) {
+      have[l.getAttribute("href")] = true;
+    });
+    var waits = [];
+    doc.querySelectorAll('head link[rel="stylesheet"]').forEach(function (l) {
+      var href = l.getAttribute("href");
+      if (have[href]) return;
+      have[href] = true;
+      var link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = href;
+      waits.push(new Promise(function (done) {
+        link.onload = link.onerror = done;
+        setTimeout(done, STYLE_WAIT_MS);
+      }));
+      document.head.appendChild(link);
+    });
+    return Promise.all(waits);
+  }
+
   function apply(doc, url, push) {
     var fresh = doc.querySelector("main.shell__main");
     var here = document.querySelector("main.shell__main");
@@ -71,6 +99,9 @@
       })
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, "text/html");
+        return ensureStyles(doc).then(function () { return doc; });
+      })
+      .then(function (doc) {
         var swap = function () { if (!apply(doc, url, push)) throw new Error("layout"); };
         if (document.startViewTransition) document.startViewTransition(swap);
         else swap();

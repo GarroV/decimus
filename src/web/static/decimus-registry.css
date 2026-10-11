@@ -60,3 +60,21 @@
   .slist--registry .srow > .srow__cell.mono { grid-column: 2 / -1; font-size: 11.5px; color: var(--ink-3); justify-content: flex-start; }
   .slist__group, .slist__note { padding-left: var(--space-5); padding-right: var(--space-5); }
 }
+
+/* ── панель проверки: широкая, левым краем почти к названию пиццерии ──
+   Карточка проверки — основная рабочая поверхность (владелец 11.10.2026:
+   «расширь окно проверки… чтобы она почти до названия выезжала»). Слева
+   остаётся колонка «буква + пиццерия»: левый край = ширина панели навигации
+   (216px, на узком 56px, `dodo-ds.css` .sidenav) + отступ страницы и строки
+   (~88px) + место под название (~220px), но не уже прежних 560px. На экране шире каркаса страница
+   стоит по центру — край сдвигается вместе с ней. */
+.page--split:has(.slist--registry) .sdrawer__panel {
+  left: min(max(530px, calc((100vw + 216px - 110rem) / 2 + 310px)), calc(100vw - 560px));
+  width: auto; max-width: none;
+}
+@media (max-width: 1099px) {
+  .page--split:has(.slist--registry) .sdrawer__panel { left: min(370px, calc(100vw - 560px)); }
+}
+@media (max-width: 719px) {
+  .page--split:has(.slist--registry) .sdrawer__panel { left: 0; }
+}
