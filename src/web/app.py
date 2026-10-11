@@ -1254,7 +1254,7 @@ def _render_card(
     контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
     if контекст is None:
         return render_template("inspections/not_found.html"), 404
-    return render_template("inspections/card.html", **контекст)
+    return render_template("inspections/card.html", c=контекст, **контекст)
 
 
 def _card_context(
@@ -1337,6 +1337,7 @@ def _card_context(
             кадры = data.load_previews(inspection_id, reach=auth.current_reach())
         except DbError:
             кадры_известны = False
+    zone_lines = view.zone_lines(detail.by_zone, lang)
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
@@ -1391,7 +1392,8 @@ def _card_context(
         else (),
         detail=detail,
         head=detail.inspection,
-        zones=view.zone_lines(detail.by_zone, lang),
+        zones=zone_lines,
+        loss_zones=view.loss_zones(zone_lines),
         counts=view.count_lines(detail.counts),
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
