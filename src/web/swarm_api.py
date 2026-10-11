@@ -63,6 +63,9 @@ ENDPOINTS = frozenset(
     {SCORES_ENDPOINT, CHECKUPS_ENDPOINT, VIOLATIONS_ENDPOINT, INSPECTIONS_ENDPOINT}
 )
 
+#: Код отказа запертому адресу: перебор токена с него уже записан счётчиком.
+LOCKED = "locked"
+
 RATING_TYPES = (RS, RKO)
 #: Сколько стран можно назвать в одном запросе — с запасом на всю сеть.
 MAX_COUNTRIES = 50
@@ -123,8 +126,12 @@ def _bearer() -> str | None:
 def _identify(address: str) -> api_access.ApiToken:
     """Опознать токен. Отказ — `ApiRefusal`.
 
-    Порядок намеренный: запертый адрес отбивается до сверки токена (перебор
-    обязан дешеветь), неудача записывается до ответа 401.
+    Порядок намеренный: сначала сверка токена, потом запрет адреса. Верный
+    токен проходит и с запертого адреса: Swarm ходит из Edge Functions, чьи
+    исходящие адреса делят с ним чужие клиенты Supabase, и посторонний, набрав
+    20 неудач с того же адреса, иначе запер бы его на час. Перебор от этого не
+    дешевеет: неверный токен с запертого адреса отбивается 429 без новой
+    отметки, а сверка отпечатка — один запрос по уникальному индексу.
 
     Счётчик — тот же, что у формы входа (`auth.throttle_tenant`): подбор токена
     и подбор пароля с одного адреса — один перебор. Импорт здесь, а не вверху:
@@ -132,18 +139,18 @@ def _identify(address: str) -> api_access.ApiToken:
     """
     from .auth import throttle_tenant
 
+    предъявлен = _bearer()
+    токен = api_access.resolve(предъявлен) if предъявлен else None
+    if токен is not None:
+        return токен
     рубеж = throttle_tenant()
     запрет = web_throttle.address_verdict(tenant=рубеж, address=address)
     if запрет.locked:
-        raise ApiRefusal(429, "locked", "too many failed attempts", запрет.retry_after_seconds)
-    предъявлен = _bearer()
-    токен = api_access.resolve(предъявлен) if предъявлен else None
-    if токен is None:
-        web_throttle.note_address_failure(tenant=рубеж, address=address)
-        if предъявлен is None:
-            raise ApiRefusal(401, "unauthorized", "Authorization: Bearer <token> required")
-        raise ApiRefusal(401, "unauthorized", "invalid token")
-    return токен
+        raise ApiRefusal(429, LOCKED, "too many failed attempts", запрет.retry_after_seconds)
+    web_throttle.note_address_failure(tenant=рубеж, address=address)
+    if предъявлен is None:
+        raise ApiRefusal(401, "unauthorized", "Authorization: Bearer <token> required")
+    raise ApiRefusal(401, "unauthorized", "invalid token")
 
 
 def _authorize(токен: api_access.ApiToken, scope: str) -> None:
@@ -323,6 +330,10 @@ def _serve(
 ) -> tuple[Response, int]:
     """Ответить и записать обращение в журнал. Не записалось — 503, а не ответ без следа."""
     ответ, статус, токен_id = _respond(conf, scope, build)
+    if статус == 429 and токен_id is None:
+        # Отказ запертому адресу в журнал не идёт: перебор с него не должен
+        # раздувать `api.access_log`. Неудачи до запрета записаны поштучно.
+        return ответ, статус
     try:
         api_access.log_access(
             токен_id, request.path, статус, client_address(trusted_proxies=conf.trusted_proxies)
