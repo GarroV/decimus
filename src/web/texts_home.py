@@ -88,6 +88,10 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "средняя оценка, к прошлому периоду",
         "en": "average score, against the previous period",
     },
+    "home.inspections.average_only": {
+        "ru": "средняя оценка за период",
+        "en": "average score in the period",
+    },
     "home.inspections.checked": {"ru": "Пиццерий проверено", "en": "Pizzerias inspected"},
     "home.attention.title": {"ru": "Куда смотреть", "en": "Where to look"},
     "home.attention.empty": {

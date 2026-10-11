@@ -20,7 +20,7 @@
 {% from "_pick.html" import pick %}
 {% from "inspections/_panel.html" import inspection_panel with context %}
 {% block title %}{{ t('section.registry.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
 
 {% macro row_link(row, review=false) %}
   {% set текущая = split_open and picked == row.id %}
