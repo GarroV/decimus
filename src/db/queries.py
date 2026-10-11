@@ -1159,6 +1159,49 @@ def unit_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
         }
 
 
+_UNIT_LAST_INSPECTIONS_SQL = """
+select
+    u.name,
+    u.code,
+    max(i.inspection_date) as last_date,
+    count(i.id) filter (
+        where i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+          and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+    ) as in_period
+from units u
+     left join inspections i
+            on i.unit_id = u.id
+           and i.status = 'finalized'
+           and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+where u.tenant_code = 'HQ'
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+group by u.id, u.name, u.code
+"""
+
+
+def unit_last_inspections(
+    *, reach: Reach, date_from: date | None = None, date_to: date | None = None
+) -> list[tuple[str, str, date | None, int]]:
+    """Точки справочника охвата: `(название, код Dodo, последняя проверка, проверок за период)`.
+
+    «Где нужно проверить» строится от справочника, а не от проверок: точка без
+    единой проверки в ряду проверок не появится вовсе. Последняя проверка —
+    за всё время (`None` — не проверяли ни разу), счётчик — внутри периода.
+    Проверки читаются в охвате вошедшего, точки — по его странам: партнёр
+    чужих точек не получает.
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("последние проверки точек") as conn, conn.cursor() as cur:
+        cur.execute(
+            _UNIT_LAST_INSPECTIONS_SQL,
+            {**охват.params(), "date_from": date_from, "date_to": date_to},
+        )
+        return [
+            (str(name), str(code or ""), last, int(n)) for name, code, last, n in cur.fetchall()
+        ]
+
+
 _WORST_ZONES_SQL = """
 select distinct on (i.id)
     i.id,
