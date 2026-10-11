@@ -1,5 +1,5 @@
 {#
-  «Главная» (D378, D397, D398) — в первую очередь про проверки: «Требует внимания»
+  «Главная» (D378, D398, D399) — в первую очередь про проверки: «Требует внимания»
   (доска + «куда смотреть» в одной карточке), итог периода, «Где нужно проверить» |
   «Последние проверки», «Топ нарушений» | потери по зонам, пиццерии с колонками
   последней оценки РС / РКО, страны (если их больше одной).
@@ -48,7 +48,7 @@
     {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
     {% if only_country %}
       <a class="hm-only" href="{{ clear_country }}" aria-label="{{ t('home.only.clear') }}">{{ t('home.only', country=country_title(only_country)) }} <span aria-hidden="true">×</span></a>
-      {# Вход на экран страны: таблица стран при одной стране скрыта (D397). #}
+      {# Вход на экран страны: таблица стран при одной стране скрыта (D398). #}
       {% if country_url %}<a class="hm-more" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
     {% endif %}
   </div>
@@ -56,7 +56,7 @@
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
   <div class="hm-grid">
-    {# ── 1. Требует внимания (D397): задания доски и пиццерии «куда смотреть» —
+    {# ── 1. Требует внимания (D398): задания доски и пиццерии «куда смотреть» —
           одна карточка; нечего показать — карточки нет, «всё сделано» не пишем.
           Отказ доски — строка с ошибкой: тишина читалась бы как «всё в порядке». #}
     {% if board_failed or stickers or data.attention %}
@@ -130,7 +130,7 @@
       {% endif %}
     </section>
 
-    {# ── 3. Где нужно проверить | Последние проверки (D398). Пустое скрыто. #}
+    {# ── 3. Где нужно проверить | Последние проверки (D399). Пустое скрыто. #}
     {% set has_check = data.to_check|length > 0 %}
     {% set has_latest = data.inspections|length > 0 %}
     {% if has_check %}
@@ -211,7 +211,7 @@
       </section>
     {% endif %}
 
-    {# ── 5. Пиццерии: проверки и последние оценки рейтинга колонками (D398) ─── #}
+    {# ── 5. Пиццерии: проверки и последние оценки рейтинга колонками (D399) ─── #}
     <section class="hm-card hm-card--wide">
       <header class="hm-card__head">
         <h2 class="hm-label">{{ t('home.units.title') }}</h2>

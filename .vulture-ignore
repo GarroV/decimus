@@ -459,7 +459,7 @@ body_height
 trend
 in_period
 threshold_y
-# «Где нужно проверить» на «Главной» (D398) читает только шаблон `overview/index.html`.
+# «Где нужно проверить» на «Главной» (D399) читает только шаблон `overview/index.html`.
 to_check
 to_check_more
 # Обработчик выбора языка речи регистрирует декоратор `router.callback_query` (D393).

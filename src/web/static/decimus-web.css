@@ -950,7 +950,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
    Зоны — полосами, записи — списком (D190). Числа рядом с полосой остаются
    записанными: полоса показывает, ГДЕ выжжено, число — СКОЛЬКО. */
 
-/* Потери по зонам (D400): только зоны с потерей; полоса и число рядом с
+/* Потери по зонам (D401): только зоны с потерей; полоса и число рядом с
    именем, а не у дальнего края. */
 .zlist { margin: 0; padding: 0; list-style: none; }
 .zlist li { display: grid; grid-template-columns: minmax(0, 15rem) 6rem auto; justify-content: start; align-items: center;
@@ -963,13 +963,13 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .zlist__none { margin: 0; font-size: var(--fs-dense); color: var(--ink-3); }
 .ov-card__body { padding: var(--space-5) var(--space-7); }
 
-/* Карточка проверки на странице не растягивается на весь экран (D400). */
+/* Карточка проверки на странице не растягивается на весь экран (D401). */
 .icard { max-width: 760px; }
 .fhead { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
 .fhead .ssec__title { margin: 0 var(--space-2) 0 0; }
 .ov-card__head .tag { align-self: center; }
 
-/* Действия в шапке карточки проверки — маленькие кнопки, как в Swarm (D400).
+/* Действия в шапке карточки проверки — маленькие кнопки, как в Swarm (D401).
    Форма действия с полями раскрывается под рядом, на его ширину. */
 .hact { position: relative; display: flex; flex-wrap: wrap; gap: var(--space-3); flex: 1 1 100%; min-width: 0; }
 .hact__item > summary { list-style: none; }
