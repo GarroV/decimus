@@ -82,7 +82,7 @@
   </header>
 
   {# ── Срез: один период на экран и страна. Всё — ссылками, срез живёт в адресе. #}
-  <div class="sbar hm-bar">
+  <div class="sbar hm-pbar">
     {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
     {% if only_country %}
       <a class="hm-only" href="{{ clear_country }}" aria-label="{{ t('home.only.clear') }}">{{ t('home.only', country=country_title(only_country)) }} <span aria-hidden="true">×</span></a>
