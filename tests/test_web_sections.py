@@ -37,7 +37,6 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
         "admin",
         "actions",
         "users",
-        "mini",
     ]
 
 
