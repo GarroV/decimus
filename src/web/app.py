@@ -66,6 +66,7 @@ from . import (
     review,
     revision,
     security_headers,
+    swarm_api,
     unit_add,
     users_screen,
     users_view,
@@ -155,6 +156,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     users_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
+    # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
+    swarm_api.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
