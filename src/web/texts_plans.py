@@ -112,7 +112,6 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     },
     "card.plan.due": {"ru": "Срок ответа", "en": "Due date"},
     "card.plan.request_submit": {"ru": "Запросить экшн-план", "en": "Request action plan"},
-    "card.plan.open": {"ru": "Открыть запрос", "en": "Open request"},
     "card.plan.unknown": {
         "ru": "Экшн-план сейчас не прочитать.",
         "en": "The action plan cannot be read right now.",

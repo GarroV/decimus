@@ -1,0 +1,135 @@
+{#
+  Общие куски карточки проверки (D398): одни и те же и в панели реестра
+  (`_panel.html`), и на отдельной странице (`card.html`). Права — те же
+  `c.may_*` из `app._card_context`: кнопка есть только у того, кто это вправе.
+
+  card_actions — действия маленькими кнопками в шапке (как у карточки задачи
+  в Swarm), и каждое живёт ровно в одном месте. Действию с полями (запрос
+  плана, перенос, отклонение) кнопка раскрывает форму под рядом кнопок, без
+  скрипта: `<details name>` держит открытой не больше одной.
+  В панели то, что требует листа вычитки или списка точек (подтвердить,
+  исправить дату), кнопкой ведёт в полную карточку — читать их там.
+#}
+
+{% macro _pop(id, ico, label, tone='') %}
+  <details class="hact__item" name="hact" id="{{ id }}">
+    <summary class="hbtn {{ tone }}">{{ icon(ico) }}<span>{{ label }}</span></summary>
+    <div class="hact__pop">{{ caller() }}</div>
+  </details>
+{% endmacro %}
+
+{% macro card_actions(c, panel=False) %}
+  {% set head = c.head %}
+  {% set full = url('/inspections/' ~ head.id) %}
+  <div class="hact" role="group" aria-label="{{ t('card.actions.label') }}">
+    {% if panel %}
+      <a class="hbtn hbtn--primary" href="{{ full }}?lang={{ lang }}">{{ icon('arrow') }}<span>{{ t('registry.panel.open') }}</span></a>
+    {% endif %}
+    {# PDF — тот самый файл, что получил аудитор (D204); кнопка только когда он
+       сохранён: ссылка, ведущая в отказ, хуже её отсутствия. #}
+    {% if c.report %}
+      <a class="hbtn" href="{{ full }}/report?lang={{ lang }}">{{ icon('pdf') }}<span>{{ t('card.report.download') }}</span></a>
+    {% endif %}
+    {# Письмо партнёру — запись от имени пространства: у проверки, которую
+       вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
+       задним числом письма нет вовсе (D310). #}
+    {% if c.own and not head.is_uploaded %}
+      <a class="hbtn" href="{{ full }}/letter?lang={{ lang }}">{{ icon('doc') }}<span>{{ t('letter.open') }}</span></a>
+    {% endif %}
+
+    {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
+       Без запроса и без права запросить кнопки нет (D217). #}
+    {% if c.plan %}
+      <a class="hbtn{% if c.plan.overdue(c.plan_today) %} hbtn--err{% endif %}" href="{{ url(c.plan_link) }}?lang={{ lang }}"
+         title="{{ t('actions.request.due', due=c.plan.due_on) }}">{{ icon('task') }}<span>{{ t('card.plan.title') }} · {{ t('plans.state.' ~ c.plan.state) }}{% if c.plan.overdue(c.plan_today) %} · {{ t('plans.overdue') }}{% endif %}</span></a>
+    {% elif c.plan_known and not c.plan_no_country and c.may_request_plan %}
+      {% if panel %}
+        <a class="hbtn" href="{{ full }}?lang={{ lang }}">{{ icon('task') }}<span>{{ t('card.plan.title') }}</span></a>
+      {% else %}
+        {% call _pop('plan', 'task', t('card.plan.title')) %}
+          <p class="field-note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
+          <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="hact__form">
+            <input type="hidden" name="inspection_id" value="{{ head.id }}">
+            <label><span class="field-label">{{ t('card.plan.due') }}</span>
+              <input class="input" type="date" name="due" value="{{ c.plan_due_default }}" min="{{ c.plan_today }}" required></label>
+            <button class="btn btn--primary btn--sm" type="submit">{{ t('card.plan.request_submit') }}</button>
+          </form>
+        {% endcall %}
+      {% endif %}
+    {% endif %}
+
+    {% if c.may_accept %}
+      {% if panel %}
+        <a class="hbtn" href="{{ full }}?lang={{ lang }}#review">{{ icon('check') }}<span>{{ t('accept.title') }}</span></a>
+      {% else %}
+        {% call _pop('accept', 'check', t('accept.title')) %}
+          <p class="field-note">{{ t('accept.hint') }}</p>
+          <form method="post" action="{{ full }}/accept?lang={{ lang }}" class="hact__form">
+            <button class="btn btn--primary btn--sm" type="submit">{{ t('accept.submit') }}</button>
+          </form>
+        {% endcall %}
+      {% endif %}
+    {% endif %}
+
+    {% if c.may_move %}
+      {% if panel %}
+        <a class="hbtn" href="{{ full }}?lang={{ lang }}">{{ icon('pencil') }}<span>{{ t('card.act.move') }}</span></a>
+      {% else %}
+        {% call _pop('move', 'pencil', t('card.act.move')) %}
+          <p class="field-note">{{ t('move.hint') }}</p>
+          <form method="post" action="{{ full }}/move?lang={{ lang }}" class="hact__form">
+            <label><span class="field-label">{{ t('move.date_label') }}</span>
+              <input class="input" type="date" name="date" required value="{{ head.inspection_date }}"></label>
+            <label><span class="field-label">{{ t('move.unit_label') }}</span>
+              <select class="input" name="unit" required>
+                {% for unit_id, unit_name in c.units %}
+                  <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+                {% endfor %}
+              </select></label>
+            <label><span class="field-label">{{ t('move.reason_label') }}</span>
+              <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+            <button class="btn btn--sm" type="submit">{{ t('move.submit') }}</button>
+          </form>
+        {% endcall %}
+      {% endif %}
+    {% endif %}
+
+    {% if c.may_retract and not head.retracted %}
+      {% call _pop('retract', 'x', t('retract.title'), 'hbtn--danger') %}
+        <p class="field-note">{{ t('retract.hint') }}</p>
+        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form">
+          <label><span class="field-label">{{ t('retract.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+          <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>
+        </form>
+      {% endcall %}
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{# Потери по зонам — только зоны с потерей, от большей к меньшей; полоса и число
+   рядом с именем, а не у дальнего края. Нет потерь — одна короткая строка.
+   У исторической разбивки по зонам нет (D332) — блока тоже нет. #}
+{% macro loss_zone_list(c) %}
+  {% if c.loss_zones %}
+    <ul class="zlist">
+      {% for zone in c.loss_zones %}
+        <li class="{% if zone.zeroed %}is-zeroed{% endif %}">
+          <span class="zlist__name">{{ zone.name }}{% if zone.zeroed %} <span class="zlist__flag">· {{ t('card.zones.zeroed') }}</span>{% endif %}</span>
+          <span class="ov-bar zlist__bar"><span class="ov-bar__part" style="flex:{{ zone.fill }};background:var(--err)"></span><span class="ov-bar__part" style="flex:{{ 100 - zone.fill }}"></span></span>
+          <span class="mono zlist__loss">−{{ zone.loss }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="zlist__none">{{ t('card.zones.none') }}</p>
+  {% endif %}
+{% endmacro %}
+
+{# Записи по классам — метками в шапке списка записей; класс без записей
+   (D3 0) не показывается. Сводки отдельной строкой нет: одно место. #}
+{% macro level_chips(c) %}
+  {% for line in c.counts if line.count|int > 0 %}
+    <span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>
+  {% endfor %}
+{% endmacro %}
