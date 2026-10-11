@@ -15,8 +15,10 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from typing import Any
 
-from src.db.swarm_read import PeriodRow
+from src.db.swarm_read import MapUnitRow, PeriodRow
 
+from . import pointer
+from .maps import SHOWN_PROVIDERS, CountryMaps
 from .model import (
     FORMAT_RKO_EVALUATIONS,
     FORMAT_RKO_VIOLATIONS,
@@ -173,3 +175,63 @@ def _violation_cell(
         "per_checkup": block.per_checkup,
         "top": [{"text": line.text, "count": line.count} for line in block.top],
     }
+
+
+#: Ключи карт в ответе API (контракт `/api/v1/maps/ratings`, D390).
+MAP_KEYS = {pointer.GOOGLE: "google", pointer.YANDEX: "yandex"}
+
+
+def map_providers() -> list[str]:
+    return [MAP_KEYS[p] for p in SHOWN_PROVIDERS]
+
+
+def map_countries(rows: Sequence[CountryMaps]) -> list[dict[str, Any]]:
+    """Сводка стран (`maps.summarize` + `with_delta`) — в ключах контракта."""
+    return [
+        {
+            "cc": row.country,
+            "as_of": row.as_of.isoformat() if row.as_of else None,
+            "maps": {
+                MAP_KEYS[provider]: {
+                    "avg": score.avg,
+                    "reviews": score.reviews,
+                    "branches": score.branches,
+                    "delta": score.delta,
+                }
+                for provider, score in row.scores.items()
+            },
+        }
+        for row in rows
+    ]
+
+
+def map_units(
+    current: Iterable[MapUnitRow], before: Iterable[MapUnitRow] | None
+) -> list[dict[str, Any]]:
+    """Пиццерии на картах: оценка на срез и на дату сравнения.
+
+    Карта, где у филиала нет отзывов, — `null`: оценка без отзывов ничего не
+    говорит (так же она не входит в среднюю страны, `maps.summarize`).
+    """
+    was = {(r.dodo_id, r.provider_id): round(r.avg, 2) for r in before or () if r.reviews > 0}
+    units: dict[str, dict[str, Any]] = {}
+    for row in current:
+        if row.provider_id not in MAP_KEYS:
+            continue
+        unit = units.setdefault(
+            row.dodo_id,
+            {
+                "id": row.dodo_id,
+                "name": row.name,
+                "cc": row.country,
+                "city": row.city,
+                "maps": dict.fromkeys(map_providers()),
+            },
+        )
+        if row.reviews > 0:
+            unit["maps"][MAP_KEYS[row.provider_id]] = {
+                "avg": round(row.avg, 2),
+                "reviews": row.reviews,
+                "prev_avg": was.get((row.dodo_id, row.provider_id)),
+            }
+    return sorted(units.values(), key=lambda u: (u["cc"], u["name"]))
