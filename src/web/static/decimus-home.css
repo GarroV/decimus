@@ -62,7 +62,6 @@
 
 .hm-grades { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
 .hm-grades__item { display: inline-flex; align-items: center; gap: 6px; }
-  .hm-table--countries .hm-table__head { font-size: 10px; letter-spacing: 0; }
 
 /* ── график ─────────────────────────────────────────────────────────── */
 .hm-chart { display: block; width: 100%; height: auto; overflow: visible; }
@@ -132,6 +131,7 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
   .hm-big__value { font-size: 38px; }
   /* Пять колонок «Моих стран» влезают в телефон целиком: РКО не уезжает за край. */
   .hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(3.5rem, 1fr) 5rem 4.25rem 2.75rem 2.75rem; gap: 10px; }
+  .hm-table--countries .hm-table__head { font-size: 10px; letter-spacing: 0; }
   .hm-card { padding: 14px 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .hm-sticker { transition: none; } }
