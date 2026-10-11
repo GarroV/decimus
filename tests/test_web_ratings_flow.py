@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import io
-import re
 from pathlib import Path
 
 import pytest
@@ -15,6 +14,7 @@ pytest.importorskip("psycopg")
 
 pytestmark = requires_db
 ORIGIN = {"Origin": "http://localhost"}
+СЕНТЯБРЬ_2 = "from=2026-09-16&to=2026-09-30"  # даты периода РС из образца снимка
 ПРОШЛЫЙ_РС = {
     "id": P_RS_PREV,
     "rating_type": 2,
@@ -77,17 +77,18 @@ def test_контроль_грузит_партнёр_видит(
         текст = client.get("/ratings?group=developer&value=Dev+One&period=2026-Q1").get_data(
             as_text=True
         )
-        rs_id = re.search(r'period=rs(?::|%3A)(\d+)[^"]*"[^>]*>Сентябрь 2 часть 2026', текст)
-        assert rs_id, "период РС не предложен в календаре"
-        период = client.get(f"/ratings?group=developer&value=Dev+One&period=rs:{rs_id[1]}")
+        # Календарь «с — по»: даты периода РС узнаются как он сам — его имя в
+        # заголовке и «Δ к прошлому периоду РС» его названием.
+        период = client.get(f"/ratings?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
         период_текст = период.get_data(as_text=True)
+        assert "Сентябрь 2 часть 2026" in период_текст.split("rt-cal__title")[1][:80]
         assert "Δ к Сентябрь 1 часть 2026" in период_текст and "Δ к rs:" not in период_текст
 
     подменить_двери(monkeypatch, tenant="GE", role="admin")
     with собрать(tenant="GE").test_client() as client:
         assert войти(client).status_code == 302
         # Период РС второй половины сентября: квартал теперь усредняет и прошлый период.
-        страница = client.get(f"/ratings?group=developer&value=Dev+One&period=rs:{rs_id[1]}")
+        страница = client.get(f"/ratings?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
         assert страница.status_code == 200
         текст = страница.get_data(as_text=True)
         assert "97.5" in текст
