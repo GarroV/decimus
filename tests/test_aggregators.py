@@ -269,3 +269,23 @@ def test_сводка_взвешена_числом_оценок_в_родной
     assert ro.scores["wolt"].points == 2 and ro.scores["glovo"].avg == 98.3
     assert cee.scores["wolt"].points == 3 and hr.scores == {} and hr.as_of is None
     assert summary.aggregators_of(строки) == ("wolt", "glovo")
+
+
+def test_агрегаторы_собираются_одновременно_и_в_своём_порядке(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Каждый агрегатор ждёт, пока стартуют все: подряд это зависло бы навсегда.
+    import threading
+
+    модули = collect.SEARCHERS + collect.KNOWN
+    все_стартовали = threading.Barrier(len(модули), timeout=5)
+
+    def собрать(module: object, units: object, today: date) -> collect.Outcome:
+        все_стартовали.wait()
+        return collect.Outcome(module.KEY, True, 0, 0, None)  # type: ignore[attr-defined]
+
+    monkeypatch.setattr(collect, "run_one", собрать)
+
+    итог = collect.run_all(ДЕНЬ, fetch_units=lambda _: ())
+
+    assert [o.aggregator for o in итог] == [m.KEY for m in модули]
