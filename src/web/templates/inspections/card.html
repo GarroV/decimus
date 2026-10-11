@@ -9,7 +9,12 @@
   записаны, а подписи вокруг — на языке интерфейса. Это разные языки, и
   смешивать их нельзя (`CLAUDE.md`).
 #}{% extends "base.html" %}
+{% from "inspections/_actions.html" import inspection_actions with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
+{% block head %}
+  {#- Кнопки-пилюли и поля Swarm (`.sbtn`, `.sinput`, `.sform`) — из каркаса «список + панель». -#}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+{% endblock %}
 
 {% macro revise_form(finding) %}
   {# Форма правки записи на приёмке (D200). Одна на запись в чек-листе и на
@@ -45,26 +50,17 @@
   {% endif %}
 {% endmacro %}
 {% block body %}
-  <div class="row row--tight row--between">
+  <div class="card-top">
     <a class="back" href="{{ url('/inspections') }}?lang={{ lang }}">‹ {{ t('card.back') }}</a>
     {#
-      Письмо — отдельный экран, а не блок здесь. Оно собирается движком в
-      подпроцессе, и карточка, ждущая этой сборки, открывалась бы секундами
-      там, где сейчас открывается сразу.
+      Все действия с проверкой — одним рядом компактных кнопок (D393): скачать
+      PDF, письмо (отдельный экран: оно собирается движком в подпроцессе, и
+      карточка, ждущая сборки, открывалась бы секундами), экшн-план, предписание,
+      исправление даты и пиццерии, отклонение, приём. Что требует ввода — во
+      всплывающем блоке под кнопкой, а не разделом внизу. Права — `may_*` из
+      `_card_context`.
     #}
-    <div class="row row--tight">
-      {# PDF — тот самый файл, что получил аудитор (D204); кнопка только когда
-         он сохранён: ссылка, ведущая в отказ, хуже её отсутствия. #}
-      {% if report %}
-        <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/report') }}?lang={{ lang }}">{{ t('card.report.download') }}</a>
-      {% endif %}
-      {# Письмо партнёру — запись от имени пространства: у проверки, которую
-         вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
-         задним числом (текущей и исторической) письма нет вовсе (D310). #}
-      {% if own and not head.is_uploaded %}
-      <a class="btn btn--sm" href="{{ url('/inspections/' ~ head.id ~ '/letter') }}?lang={{ lang }}">{{ t('letter.open') }}</a>
-      {% endif %}
-    </div>
+    {{ inspection_actions(c) }}
   </div>
   {% if not report and not failure %}
     <div class="note mt-gap"><div><div class="note__text">{{ t('card.report.none') if report_known else t('card.report.unknown') }}</div></div></div>
@@ -131,6 +127,10 @@
           {% endfor %}
         </div>
       </div>
+      {% if plan %}
+        <a class="tag tag--micro {% if plan.overdue(plan_today) %}tag--err{% else %}{{ plan_state_tones[plan.state] }}{% endif %}"
+           href="{{ url(plan_link) }}?lang={{ lang }}" title="{{ t('plans.state.' ~ plan.state) }}">{{ t('card.act.plan_tag', due=plan.due_on) }}</a>
+      {% endif %}
       {% if head.retracted %}
         <span class="tag tag--err tag--micro">{{ t('state.retracted') }}</span>
       {% elif head.on_review %}
@@ -166,44 +166,6 @@
 
   </div>
 
-  {# ── Экшн-план (волна 2) ─────────────────────────────────────────────
-     Запрос по проверке УК: открыт — ссылка в раздел (УК — в «Действия»,
-     партнёр — к себе); нет — кнопка УК «запросить» (D272: с D2/D3 запрос
-     появляется сам). Без запроса и без права запросить блока нет (D217). #}
-  {% if plan %}
-    <div class="section" id="plan">
-      <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
-      <div class="card"><div class="card__body row">
-        <span class="tag tag--micro {{ plan_state_tones[plan.state] }}">{{ t('plans.state.' ~ plan.state) }}</span>
-        {% if plan.overdue(plan_today) %}<span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
-        <span class="ov-cell__muted">{{ t('actions.request.due', due=plan.due_on) }}</span>
-        <a class="btn btn--sm" href="{{ url(plan_link) }}?lang={{ lang }}">{{ t('card.plan.open') }}</a>
-      </div></div>
-    </div>
-  {% elif not plan_known %}
-    <div class="note mt-gap"><div><div class="note__text">{{ t('card.plan.unknown') }}</div></div></div>
-  {% elif plan_no_country %}
-    {# D2/D3 есть, а запрос не завёлся: у точки нет страны (ревью #495, п.4).
-       Только отметка на экране — никаких уведомлений. #}
-    <div class="note note--warn mt-gap"><div>
-      <div class="note__title">{{ t('card.plan.no_country') }}</div>
-      <div class="note__text">{{ t('card.plan.no_country_hint') }}</div>
-    </div></div>
-  {% elif may_request_plan %}
-    <div class="section" id="plan">
-      <div class="section__head"><h2 class="section__title">{{ t('card.plan.title') }}</h2></div>
-      <div class="card"><div class="card__body">
-        <p class="field-note">{{ t('card.plan.request_hint_needed') if plan_needed else t('card.plan.request_hint') }}</p>
-        <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="row mt-gap">
-          <input type="hidden" name="inspection_id" value="{{ head.id }}">
-          <label><span class="field-label">{{ t('card.plan.due') }}</span>
-            <input class="input" type="date" name="due" value="{{ plan_due_default }}" min="{{ plan_today }}" required></label>
-          <button class="btn btn--primary" type="submit">{{ t('card.plan.request_submit') }}</button>
-        </form>
-      </div></div>
-    </div>
-  {% endif %}
-
   {# ── Потери по блокам чек-листа ────────────────────────────────────────
      Полосой, а не колонкой цифр (D190). Колонка «доля / потеря / остаток»
      требовала читать три числа и держать их в голове, чтобы понять, где
@@ -221,7 +183,7 @@
         <span class="zone-row__name">
           {{ zone.name }}
           <span class="zone-row__meta">
-            {{ t('card.zones.col.share') }}: {{ zone.share }}
+            {{ t('card.zones.col.share') }} {{ zone.share }}
             {%- if zone.zeroed %} · {{ t('card.zones.zeroed') }}{% endif %}
           </span>
         </span>
@@ -387,9 +349,9 @@
 
   {#
     Перенос (D195): меняет «когда и где», а не документ. История показывается
-    всем, кто видит карточку; форма — только администратору и только при
-    живой истории: перенос без следа база не примет, и форма, которая заведомо
-    упадёт, хуже отсутствующей.
+    всем, кто видит карточку и остаётся здесь только журналом; сама форма —
+    в ряду действий («Исправить»), она нужна администратору и только при
+    живой истории: перенос без следа база не примет.
   #}
   {% if moves %}
     <div class="section">
@@ -407,34 +369,6 @@
     <div class="note mt-gap"><div><div class="note__text">{{ t('move.history.unknown') }}</div></div></div>
   {% endif %}
 
-  {% if may_move %}
-    <div class="section" id="move">
-      <div class="section__head"><h2 class="section__title">{{ t('move.title') }}</h2></div>
-      <div class="card"><div class="card__body">
-        <p class="field-note">{{ t('move.hint') }}</p>
-        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/move') }}?lang={{ lang }}" class="row mt-gap">
-          <label>
-            <span class="field-label">{{ t('move.date_label') }}</span>
-            <input class="input" type="date" name="date" required value="{{ head.inspection_date }}">
-          </label>
-          <label>
-            <span class="field-label">{{ t('move.unit_label') }}</span>
-            <select class="input" name="unit" required>
-              {% for unit_id, unit_name in units %}
-                <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="grow">
-            <span class="field-label">{{ t('move.reason_label') }}</span>
-            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">
-          </label>
-          <button class="btn" type="submit">{{ t('move.submit') }}</button>
-        </form>
-      </div></div>
-    </div>
-  {% endif %}
-
   {# Сборка чек-листа — свёрнутой справкой внизу (D218), и названа она ДАТОЙ:
      номер сборки человеку ничего не говорит. Номер остаётся подсказкой к дате —
      он нужен только при разборе расхождений. #}
@@ -449,32 +383,4 @@
       {% endif %}
     </dl>
   </details>
-
-  {% if may_accept %}
-    <div class="section">
-      <div class="section__head"><h2 class="section__title">{{ t('accept.title') }}</h2></div>
-      <div class="card"><div class="card__body">
-        <p class="field-note">{{ t('accept.hint') }}</p>
-        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/accept') }}?lang={{ lang }}" class="row mt-gap">
-          <button class="btn btn--primary" type="submit">{{ t('accept.submit') }}</button>
-        </form>
-      </div></div>
-    </div>
-  {% endif %}
-
-  {% if may_retract and not head.retracted %}
-    <div class="section">
-      <div class="section__head"><h2 class="section__title">{{ t('retract.title') }}</h2></div>
-      <div class="card"><div class="card__body">
-        <p class="field-note">{{ t('retract.hint') }}</p>
-        <form method="post" action="{{ url('/inspections/' ~ head.id ~ '/retract') }}?lang={{ lang }}" class="row mt-gap">
-          <label class="grow">
-            <span class="field-label">{{ t('retract.reason_label') }}</span>
-            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off">
-          </label>
-          <button class="btn btn--danger" type="submit">{{ t('retract.submit') }}</button>
-        </form>
-      </div></div>
-    </div>
-  {% endif %}
 {% endblock %}

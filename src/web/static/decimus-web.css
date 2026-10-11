@@ -960,7 +960,8 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 }
 .zone-row:last-child { border-bottom: 0; }
 .zone-row__name { flex: 1; min-width: 9rem; font-weight: var(--w-semibold); font-size: var(--fs-dense); }
-.zone-row__meta { display: block; font-size: var(--fs-micro); color: var(--ink-3); margin-top: var(--space-1); }
+/* «Доля» — той же строкой, мелко: второй ряд под названием раздувал каждую зону. */
+.zone-row__meta { display: inline; font-size: var(--fs-micro); font-weight: var(--w-regular, 400); color: var(--ink-3); margin-left: var(--space-3); }
 .zone-row__left { color: var(--ink-3); min-width: 3rem; }
 /* Обнулённая зона — её доля сгорела целиком, и строка обязана отличаться от
    просто дорогой: это разные вещи для разговора с партнёром. */
@@ -1126,6 +1127,46 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 /* Сбросить нечего — кнопка на месте, но не зовёт нажать: исчезающая кнопка
    сдвигает панель ровно под рукой. */
 .ov-chip--reset.is-idle { opacity: .45; }
+
+/* ── Ряд действий с проверкой (карточка и панель реестра, D393) ──────────
+   Образец — тулбар Swarm Brain: кнопки-пилюли 30px (`.sbtn` из
+   `decimus-split.css`) в один ряд, ввод — в небольшом всплывающем блоке под
+   кнопкой. Блок — тот же `<details class="pick">`, что у чипов отбора, поэтому
+   закрывается кликом мимо и Esc без нового скрипта. */
+.card-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-4) var(--space-7); }
+.cbar { position: relative; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.cbar > form { margin: 0; }
+.cbar__end { margin-left: var(--space-5); }
+.cpop > summary.sbtn { list-style: none; user-select: none; }
+.cpop__menu {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  left: 0;
+  z-index: 60;
+  width: 19rem;
+  max-width: calc(100vw - 2rem);
+  padding: var(--space-6);
+  border-radius: var(--r-block);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-pop);
+}
+.cpop--end .cpop__menu { left: auto; right: 0; }
+.cpop__menu--danger { border-color: var(--err-line, var(--line)); }
+.cpop__menu .sform > .sbtn { align-self: stretch; }
+.cpop__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); }
+.cpop__text { margin: 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--ink-2); }
+.cpop__muted { font-size: var(--fs-meta); color: var(--ink-3); }
+/* Панель реестра узкая: блок во всю ширину ряда, а не от края кнопки. */
+.cbar--panel { margin-top: var(--space-6); }
+.cbar--panel .cpop { position: static; }
+.cbar--panel .cpop__menu { left: 0; right: 0; width: auto; max-width: none; }
+@media (max-width: 767px) {
+  .card-top { align-items: stretch; }
+  .cbar .cpop { position: static; }
+  .cbar .cpop__menu { left: 0; right: 0; width: auto; max-width: none; }
+  .cbar__end { margin-left: 0; }
+}
 
 /* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
    Столбики движения оценки, отметки повторов и шапка с действиями. Высоту
