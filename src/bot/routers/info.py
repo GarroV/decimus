@@ -62,7 +62,7 @@ from ..keyboards import (
     info_heard_keyboard,
     info_keyboard,
 )
-from ..lang import chat_langs
+from ..lang import chat_langs, chat_voice_lang
 from ..photos import fetch_bytes
 from ..states import InfoFlow
 from ..texts import t
@@ -321,9 +321,9 @@ def build_info_router() -> Router:
             await stops.refuse(message, lang, step="finish.info", key="record.voice_not_downloaded")
             return
         try:
-            # Язык речи в `transcribe` не передаётся: у него его нет в
-            # сигнатуре, и разбор кадра зовёт его так же (`routers/record.py`).
-            heard = await asyncio.to_thread(transcribe, raw)
+            # Язык речи проверки уходит расшифровке подсказкой (D393, #538) —
+            # так же, как при разборе кадра (`routers/record.py`).
+            heard = await asyncio.to_thread(lambda: transcribe(raw, lang=chat_voice_lang(chat_id)))
         except RecognizeError as exc:
             await stops.refuse(
                 message, lang, step="finish.info", key="record.voice_failed", reason=f"{exc}."

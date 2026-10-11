@@ -248,6 +248,7 @@ async def test_выбор_посреди_проверки_меняет_разг�
     await feed(dp, bot, callback_query("start:new"))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
 
     await _choose(dp, bot, "en")

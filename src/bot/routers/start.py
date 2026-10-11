@@ -45,6 +45,7 @@ from ..keyboards import (
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    SPEECH_LANG_PREFIX,
     UNIT_NEW_PREFIX,
     UNIT_NEW_YES,
     checklist_keyboard,
@@ -54,6 +55,7 @@ from ..keyboards import (
     new_inspection_keyboard,
     resume_keyboard,
     sealed_keyboard,
+    speech_lang_keyboard,
     unit_new_keyboard,
     walk_keyboard,
 )
@@ -494,6 +496,24 @@ def build_start_router(
         if code not in KIND_TITLES:
             return
         await state.update_data(kind=code)
+        await state.set_state(StartFlow.waiting_speech_lang)
+        await message.answer(
+            t("start.ask_speech_lang", chat_ui_lang(message.chat.id)),
+            reply_markup=speech_lang_keyboard(),
+        )
+
+    @router.callback_query(
+        StateFilter(StartFlow.waiting_speech_lang), F.data.startswith(SPEECH_LANG_PREFIX)
+    )
+    async def on_speech_lang(callback: CallbackQuery, state: FSMContext) -> None:
+        await callback.answer()
+        message = callback.message
+        if not isinstance(message, Message):
+            return
+        speech_lang = (callback.data or "").removeprefix(SPEECH_LANG_PREFIX)
+        if speech_lang not in LANG_LABELS:
+            return
+        await state.update_data(speech_lang=speech_lang)
         await state.set_state(StartFlow.waiting_lang)
         await message.answer(
             t("start.ask_lang", chat_ui_lang(message.chat.id)), reply_markup=lang_keyboard()
@@ -512,7 +532,8 @@ def build_start_router(
         data = await state.get_data()
         unit = str(data.get("unit", "")).strip()
         kind_code = str(data.get("kind", ""))
-        if not unit or kind_code not in KIND_TITLES:
+        speech_lang = str(data.get("speech_lang", ""))
+        if not unit or kind_code not in KIND_TITLES or speech_lang not in LANG_LABELS:
             # Мастер потерял ответы прошлых шагов (перезапуск, старая кнопка) и
             # начинается заново — для человека это тот же отказ, и он посчитан.
             await state.clear()
@@ -549,13 +570,12 @@ def build_start_router(
                 # партнёру в документ он уезжает на языке отчёта.
                 kind=kind_code,
                 report_lang=report_lang,
-                # Языка в проверке три (T025). Интерфейс — язык ЧЕЛОВЕКА
-                # (D303): его выбор `/lang`, иначе язык стенда; отчёт к нему
-                # больше не привязан — до D303 английский отчёт заодно
-                # переключал и разговор. Речь по-прежнему идёт за отчётом:
-                # отдельного вопроса о ней в мастере нет.
+                # Языка в проверке три (T025), и друг от друга они не зависят.
+                # Интерфейс — язык ЧЕЛОВЕКА (D303): его выбор `/lang`, иначе
+                # язык стенда. Речь и отчёт — два отдельных вопроса мастера
+                # (D393): русская речь с английским отчётом — обычный случай.
                 ui_lang=person_ui_lang(),
-                speech_lang=report_lang,
+                speech_lang=speech_lang,
                 auditor=auditor,
                 # Пространство того, кто начал (волна 1, #340): в нём проверка
                 # сливается в базу и в нём ищет прошлые проверки точки.
@@ -608,7 +628,8 @@ def build_start_router(
                     # тут язык начатой проверки, а не язык кнопки: сообщение о
                     # старте читает он же, но уже внутри проверки.
                     kind=kind_title(inspection.kind, started_lang),
-                    lang=LANG_LABELS[report_lang],
+                    speech_lang=LANG_LABELS[speech_lang],
+                    report_lang=LANG_LABELS[report_lang],
                     auditor=inspection.auditor,
                     auditor_note=auditor_note,
                     date=inspection.date,
