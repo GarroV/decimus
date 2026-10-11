@@ -1,0 +1,124 @@
+{#
+  Ряд действий с проверкой — один на полную карточку и на панель реестра (D393).
+
+  Образец — панель инструментов Swarm Brain: компактные кнопки-пилюли 30px в
+  один ряд, всё, что требует ввода (срок, дата, пиццерия, причина), — в
+  небольшом всплывающем блоке под кнопкой, а не отдельным разделом внизу
+  страницы. Блок построен на `<details>` без скрипта, как чипы `_pick.html`
+  (закрытие по клику мимо и Esc добавляет `pick.js`).
+
+  Права не считаются здесь: шаблон берёт готовые `may_*` из `_card_context`
+  (`app.py`) — у панели не может оказаться кнопки, которой нет у карточки.
+  `full=False` — панель реестра: форме переноса там нужен список точек, который
+  панель не читает, и кнопка ведёт в полную карточку.
+#}
+{% macro inspection_actions(c, full=true) %}
+  {% set head = c.head %}
+  {% set base = url('/inspections/' ~ head.id) %}
+  <div class="cbar{% if not full %} cbar--panel{% endif %}" role="group" aria-label="{{ t('card.act.label') }}">
+    {% if c.report %}
+      <a class="sbtn" href="{{ base }}/report?lang={{ lang }}">{{ icon('pdf') }}<span>{{ t('card.report.download') }}</span></a>
+    {% endif %}
+    {# Письмо партнёру — запись от имени пространства: у проверки, которую
+       вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
+       задним числом письма нет вовсе (D310). #}
+    {% if c.own and not head.is_uploaded %}
+      <a class="sbtn" href="{{ base }}/letter?lang={{ lang }}">{{ t('letter.open') }}</a>
+    {% endif %}
+
+    {# Экшн-план: запрос по проверке УК. Открыт — статус и ссылка; нет — срок и
+       «Запросить» (D272: с D2/D3 запрос появляется сам). Без запроса и без
+       права запросить кнопки нет (D217). #}
+    {% if c.plan or not c.plan_known or c.plan_no_country or c.may_request_plan %}
+      <details class="pick cpop" name="pick">
+        <summary class="sbtn"><span>{{ t('card.act.plan') }}</span><span class="pick__caret" aria-hidden="true">▾</span></summary>
+        <div class="cpop__menu">
+          {% if c.plan %}
+            <div class="cpop__row">
+              <span class="tag tag--micro {{ c.plan_state_tones[c.plan.state] }}">{{ t('plans.state.' ~ c.plan.state) }}</span>
+              {% if c.plan.overdue(c.plan_today) %}<span class="tag tag--micro tag--err">{{ t('plans.overdue') }}</span>{% endif %}
+              <span class="cpop__muted">{{ t('actions.request.due', due=c.plan.due_on) }}</span>
+            </div>
+            <a class="sbtn" href="{{ url(c.plan_link) }}?lang={{ lang }}">{{ t('card.act.plan_open') }}</a>
+          {% elif not c.plan_known %}
+            <p class="cpop__text">{{ t('card.plan.unknown') }}</p>
+          {% elif c.plan_no_country %}
+            {# D2/D3 есть, а запрос не завёлся: у точки нет страны. Только
+               отметка на экране — никаких уведомлений. #}
+            <p class="cpop__text"><b>{{ t('card.plan.no_country') }}</b><br>{{ t('card.plan.no_country_hint') }}</p>
+          {% else %}
+            <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="sform" id="plan">
+              <p class="cpop__text">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
+              <input type="hidden" name="inspection_id" value="{{ head.id }}">
+              <label><span class="sform__label">{{ t('card.plan.due') }}</span>
+                <input class="sinput" type="date" name="due" value="{{ c.plan_due_default }}" min="{{ c.plan_today }}" required></label>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('card.act.request') }}</button>
+            </form>
+          {% endif %}
+        </div>
+      </details>
+    {% endif %}
+
+    {# Предписание — форма раздела УК; эта проверка уже выбрана основанием. #}
+    {% if c.may_prescribe %}
+      <a class="sbtn" href="{{ url('/actions/prescriptions/new') }}?inspection={{ head.id }}&amp;lang={{ lang }}">{{ t('card.act.rx') }}</a>
+    {% endif %}
+
+    {# Перенос (D195): меняет «когда и где», а не документ. Только администратору
+       и только при живой истории: перенос без следа база не примет. #}
+    {% if c.may_move %}
+      {% if full %}
+        <details class="pick cpop cpop--end" name="pick">
+          <summary class="sbtn"><span>{{ t('card.act.fix') }}</span><span class="pick__caret" aria-hidden="true">▾</span></summary>
+          <div class="cpop__menu">
+            <form method="post" action="{{ base }}/move?lang={{ lang }}" class="sform" id="move">
+              <p class="cpop__text">{{ t('move.hint') }}</p>
+              <label><span class="sform__label">{{ t('move.date_label') }}</span>
+                <input class="sinput" type="date" name="date" required value="{{ head.inspection_date }}"></label>
+              <label><span class="sform__label">{{ t('move.unit_label') }}</span>
+                <select class="sinput" name="unit" required>
+                  {% for unit_id, unit_name in c.units %}
+                    <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+                  {% endfor %}
+                </select></label>
+              <label><span class="sform__label">{{ t('move.reason_label') }}</span>
+                <input class="sinput" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('card.act.save') }}</button>
+            </form>
+          </div>
+        </details>
+      {% else %}
+        <a class="sbtn" href="{{ base }}?lang={{ lang }}#move">{{ t('card.act.fix') }}</a>
+      {% endif %}
+    {% endif %}
+
+    {# Отклонение — пометка с причиной, а не удаление; подтверждается вторым шагом
+       внутри блока. Ждущую приёмки не снимают (retract.py): ошибку на приёмке
+       чинят правкой записи (D200). #}
+    {% if c.may_retract and not head.retracted %}
+      <details class="pick cpop cpop--end" name="pick">
+        <summary class="sbtn sbtn--danger"><span>{{ t('card.act.reject') }}</span></summary>
+        <div class="cpop__menu cpop__menu--danger">
+          <form method="post" action="{{ base }}/retract?lang={{ lang }}" class="sform">
+            <p class="cpop__text">{{ t('card.act.reject_text') }}</p>
+            <label><span class="sform__label">{{ t('retract.reason_label') }}</span>
+              <input class="sinput" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+            <button class="sbtn sbtn--danger-solid" type="submit">{{ t('retract.submit') }}</button>
+          </form>
+        </div>
+      </details>
+    {% endif %}
+
+    {# Принять — единственная залитая кнопка и только пока проверка ждёт приёмки.
+       В панели ведёт к вычитке: подтверждать, не прочитав чек-лист, незачем. #}
+    {% if c.may_accept %}
+      {% if full %}
+        <form method="post" action="{{ base }}/accept?lang={{ lang }}" class="cbar__end">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('card.act.accept') }}</button>
+        </form>
+      {% else %}
+        <a class="sbtn sbtn--primary cbar__end" href="{{ base }}?lang={{ lang }}#review">{{ t('registry.panel.review_go') }}</a>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endmacro %}

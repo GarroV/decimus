@@ -1254,7 +1254,9 @@ def _render_card(
     контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
     if контекст is None:
         return render_template("inspections/not_found.html"), 404
-    return render_template("inspections/card.html", **контекст)
+    # `c` — тот же словарь целиком: ряд действий (`_actions.html`) один на карточку
+    # и на панель, а панель зовёт его с `c`.
+    return render_template("inspections/card.html", c=контекст, **контекст)
 
 
 def _card_context(
@@ -1372,6 +1374,14 @@ def _card_context(
             and not detail.inspection.on_review
             and not detail.inspection.retracted
             and not detail.inspection.is_uploaded
+        ),
+        # Предписание с карточки (D393): раздел УК, принятая проверка УК. Какие
+        # проверки годятся основанием, решает база (`inspection_basis`).
+        may_prescribe=(
+            action_plans.is_hq()
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
         ),
         sheet=лист,
         may_accept=можно_подтвердить,

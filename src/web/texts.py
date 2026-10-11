@@ -707,6 +707,27 @@ TEXTS: dict[str, dict[str, str]] = {
             "deliberately so."
         ),
     },
+    # --- ряд действий в шапке карточки проверки (D393) -----------------------------
+    "card.act.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
+    "card.act.plan": {"ru": "Экшн-план", "en": "Action plan"},
+    "card.act.plan_open": {"ru": "Открыть план", "en": "Open plan"},
+    "card.act.plan_tag": {"ru": "План до {due}", "en": "Plan due {due}"},
+    "card.act.request": {"ru": "Запросить", "en": "Request"},
+    "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
+    "card.act.fix": {"ru": "Исправить", "en": "Correct"},
+    "card.act.save": {"ru": "Сохранить", "en": "Save"},
+    "card.act.reject": {"ru": "Отклонить", "en": "Reject"},
+    "card.act.accept": {"ru": "Принять", "en": "Accept"},
+    "card.act.reject_text": {
+        "ru": (
+            "Проверка останется в истории с пометкой и причиной, кадры уйдут из хранилища, "
+            "в отчёты её числа не пойдут."
+        ),
+        "en": (
+            "The inspection stays in history, marked with the reason; its photos are purged "
+            "from storage and its numbers leave the reports."
+        ),
+    },
     # --- исправление даты и пиццерии (D195; в коде — move) --------------------------
     "move.title": {"ru": "Исправить дату или пиццерию", "en": "Correct the date or pizzeria"},
     "move.hint": {
