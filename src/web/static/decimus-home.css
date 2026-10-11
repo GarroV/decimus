@@ -10,7 +10,7 @@
    Цвета — только токены ядра (dodo-ds.css), поэтому тёмная тема работает сама. */
 
 .page--home { max-width: 110rem; }
-.hm-bar { margin-top: var(--space-5); border-radius: 12px; }
+.hm-pbar { margin-top: var(--space-5); border-radius: 12px; } /* полоса периода; не `.hm-bar` — это столбик доли ниже */
 
 .hm-only { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border-radius: 999px;
   background: var(--ink); color: var(--surface); font-size: 12.5px; font-weight: var(--w-semibold); text-decoration: none; }
@@ -31,7 +31,6 @@
 .hm-meta { font-size: 12px; color: var(--ink-3); }
 .hm-more { margin-left: auto; font-size: 12.5px; color: var(--accent); text-decoration: none; white-space: nowrap; }
 .hm-more:hover { text-decoration: underline; }
-.hm-more--foot { margin-left: 0; }
 
 .hm-empty { display: flex; align-items: center; justify-content: center; min-height: 96px; padding: 16px;
   border: 1px dashed var(--line-control); border-radius: 10px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
@@ -45,8 +44,6 @@
 .hm-delta { font-family: var(--font-mono); font-size: 13px; font-weight: var(--w-semibold); color: var(--ink-2); }
 .hm-delta.is-up { color: var(--ok); }
 .hm-delta.is-down { color: var(--err); }
-.hm-imf { padding: 2px 8px; border: 1px solid var(--line-control); border-radius: 999px; font-family: var(--font-mono);
-  font-size: 11.5px; color: var(--ink-2); }
 
 .hm-plaques { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .hm-plaques--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -62,18 +59,6 @@
 
 .hm-grades { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
 .hm-grades__item { display: inline-flex; align-items: center; gap: 6px; }
-
-/* ── график ─────────────────────────────────────────────────────────── */
-.hm-chart { display: block; width: 100%; height: auto; overflow: visible; }
-.hm-chart__grid { stroke: var(--line); stroke-width: 1; }
-.hm-chart__tick { font-family: var(--font-mono); font-size: 8px; fill: var(--ink-3); }
-.hm-chart__line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
-.hm-chart__dot { fill: var(--accent); }
-.hm-chart__imf { fill: none; stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 4 3; }
-.hm-legend { display: flex; gap: 16px; font-size: 11.5px; color: var(--ink-2); }
-.hm-legend__item { display: inline-flex; align-items: center; gap: 6px; }
-.hm-legend__line { width: 16px; border-top: 2px solid var(--accent); }
-.hm-legend__line.is-imf { border-top: 2px dashed var(--ink-3); }
 
 /* ── строки и таблицы ───────────────────────────────────────────────── */
 .hm-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
@@ -100,11 +85,12 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-table .is-num { text-align: right; font-family: var(--font-mono); font-size: 12.5px; }
 .hm-table .is-strong { font-weight: var(--w-semibold); }
 .hm-table .is-err { color: var(--err); }
+.hm-table__head a { color: inherit; text-decoration: underline dotted; }
 .hm-table small { color: var(--ink-3); }
 .hm-cell__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--w-medium); }
 .hm-cell__muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
-.hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(7rem, 1fr) 6rem 5rem 3.5rem 3.5rem; }
-.hm-table--units .hm-table__head, .hm-table--units .hm-table__row { grid-template-columns: minmax(8rem, 1.4fr) minmax(5rem, 1fr) 3rem 4rem 4rem minmax(6rem, 1fr) 6rem; min-width: 44rem; }
+.hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(7rem, 1fr) 6rem 5rem; }
+.hm-table--units .hm-table__head, .hm-table--units .hm-table__row { grid-template-columns: minmax(8rem, 1.4fr) minmax(5rem, 1fr) 3rem 4rem 4rem minmax(6rem, 1fr) 6rem 3.5rem 3.5rem; min-width: 51rem; }
 
 /* ── доска стикеров ─────────────────────────────────────────────────── */
 .hm-board { background-color: var(--surface);
@@ -125,12 +111,11 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-sticker__title { font-size: 19px; line-height: 1.2; font-weight: var(--w-semibold); letter-spacing: -.01em; }
 .hm-sticker__urgent { font-size: 12px; font-weight: var(--w-semibold); color: var(--err); }
 .hm-sticker__cta { margin-top: auto; font-size: 12.5px; font-weight: var(--w-semibold); color: var(--accent); }
-.hm-done { margin: 0; padding: 10px 4px; font-size: 13px; color: var(--ink-2); }
 
 @media (max-width: 719px) {
   .hm-big__value { font-size: 38px; }
-  /* Пять колонок «Моих стран» влезают в телефон целиком: РКО не уезжает за край. */
-  .hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(3.5rem, 1fr) 5rem 4.25rem 2.75rem 2.75rem; gap: 10px; }
+  /* Пять колонок блока «Страны» влезают в телефон целиком: РКО не уезжает за край. */
+  .hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(3.5rem, 1fr) 5rem 4.25rem; gap: 10px; }
   .hm-table--countries .hm-table__head { font-size: 10px; letter-spacing: 0; }
   .hm-card { padding: 14px 12px; }
 }

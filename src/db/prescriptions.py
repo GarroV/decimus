@@ -414,6 +414,19 @@ order by i.inspection_date desc, u.name
 limit %(limit)s
 """  # noqa: E501
 
+# Основание «с карточки»: страна и подпись одной принятой проверки УК по её коду.
+_BASIS_SQL = """
+select u.country, i.id, u.name, i.inspection_date, i.grade, i.pct
+from inspections i
+join units u on u.id = i.unit_id
+where i.id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.tenant_code = 'HQ'
+  and i.status = 'finalized'
+  and i.retracted_at is null
+  and coalesce(u.country, '') <> ''
+"""  # noqa: E501
+
 # ── Чтение ──────────────────────────────────────────────────────────────────
 
 
@@ -624,3 +637,32 @@ def choices(country: str, *, reach: Reach) -> tuple[tuple[Choice, ...], tuple[Ch
             for r in bases
         ),
     )
+
+
+def inspection_basis(inspection_id: str, *, reach: Reach) -> tuple[str, Choice] | None:
+    """Страна и строка выбора принятой проверки УК — для предписания «с карточки».
+
+    Чужая, снятая, ждущая приёмки, без страны у точки и несуществующая — одинаково
+    `None`: форма тогда открывается пустой, а не с чужим основанием.
+    """
+    try:
+        ident = str(uuid.UUID(inspection_id))
+    except ValueError:
+        return None
+    params = {**require_reach(reach).params(), "id": ident}
+    try:
+        with connect_read() as conn, conn.cursor() as cur:
+            cur.execute(_BASIS_SQL, params)
+            row = cur.fetchone()
+    except psycopg.Error as exc:
+        raise PrescriptionError(
+            f"Не удалось прочитать проверку-основание ({type(exc).__name__})"
+        ) from exc
+    if row is None:
+        return None
+    detail = " ".join(
+        part
+        for part in (str(row[4] or ""), "" if row[5] is None else f"{float(row[5]):.1f}%")
+        if part
+    )
+    return str(row[0]), Choice(id=str(row[1]), title=f"{row[2]} · {row[3]}", detail=detail)

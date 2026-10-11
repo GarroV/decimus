@@ -1,0 +1,45 @@
+{#
+  Период экрана — один на экран, общий для «Проверок» и «Главной»:
+  `‹ Октябрь 2026 ›`, по заголовку открывается маленький календарь.
+
+  ОСНОВА БЕЗ JS: `<details>` раскрывается сам; внутри быстрые выборы ссылками
+  («Всё время», «Этот месяц», «Прошлый») и обычная GET-форма с двумя полями
+  даты и кнопкой «Применить». С `static/period.js` поля и кнопка прячутся, а
+  вместо них рисуется месяц с выбором отрезка двумя щелчками (начало → конец,
+  порядок не важен), как у Swarm (`RangePicker.tsx`); второй щелчок применяет.
+
+  Адреса стрелок и быстрых выборов собраны заранее в обработчике (`registry_view`).
+  hidden — словарь параметров, которые форма обязана сохранить (язык, отбор).
+#}
+{% macro period_picker(period, title, prev, next, quick, action, hidden) %}
+  <div class="speriod" role="group" aria-label="{{ t('registry.period.label') }}">
+    {% if prev %}<a class="speriod__arrow" href="{{ prev }}" aria-label="{{ t('registry.period.prev') }}">{{ icon('cleft') }}</a>
+    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cleft') }}</span>{% endif %}
+    <details class="pick speriod__pick" name="pick">
+      <summary class="spill speriod__title">{{ icon('cal') }}<span>{{ title }}</span></summary>
+      <div class="pick__menu speriod__menu">
+        <div class="speriod__quick">
+          {% for q in quick %}<a class="speriod__chip{% if q.on %} is-on{% endif %}" href="{{ q.href }}">{{ q.title }}</a>{% endfor %}
+        </div>
+        <form method="get" action="{{ action }}" class="pcal"
+              data-pcal data-from="{{ period.start or '' }}" data-to="{{ period.end or '' }}"
+              data-weekdays="{{ t('registry.weekdays') }}"
+              data-months="{% for m in range(1, 13) %}{{ t('registry.month.' ~ m) }}{% if not loop.last %}|{% endif %}{% endfor %}"
+              data-hint-start="{{ t('registry.period.pick_start') }}" data-hint-end="{{ t('registry.period.pick_end') }}"
+              data-label-prev="{{ t('registry.period.prev_month') }}" data-label-next="{{ t('registry.period.next_month') }}">
+          {% for name, value in hidden.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+          <div class="pcal__native">
+            <label><span class="sform__label">{{ t('registry.period.from') }}</span>
+              <input class="sinput" type="date" name="from" value="{{ period.start or '' }}"></label>
+            <label><span class="sform__label">{{ t('registry.period.to') }}</span>
+              <input class="sinput" type="date" name="to" value="{{ period.end or '' }}"></label>
+            <button class="sbtn sbtn--primary" type="submit">{{ t('registry.period.apply') }}</button>
+          </div>
+          <div class="pcal__grid" data-pcal-grid hidden></div>
+        </form>
+      </div>
+    </details>
+    {% if next %}<a class="speriod__arrow" href="{{ next }}" aria-label="{{ t('registry.period.next') }}">{{ icon('cright') }}</a>
+    {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
+  </div>
+{% endmacro %}

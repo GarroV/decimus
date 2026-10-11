@@ -26,10 +26,22 @@ _MONTHS: dict[str, dict[str, str]] = {
 _PERIOD: dict[str, dict[str, str]] = {
     "registry.period.label": {"ru": "Период", "en": "Period"},
     "registry.period.all": {"ru": "Всё время", "en": "All time"},
-    "registry.period.this_month": {"ru": "Текущий месяц", "en": "This month"},
+    "registry.period.this_month": {"ru": "Этот месяц", "en": "This month"},
+    "registry.period.last_month": {"ru": "Прошлый месяц", "en": "Last month"},
+    "registry.period.pick_end": {
+        "ru": "Выберите конец периода",
+        "en": "Pick the end of the period",
+    },
+    "registry.period.pick_start": {
+        "ru": "Выберите начало периода",
+        "en": "Pick the start of the period",
+    },
+    "registry.period.prev_month": {"ru": "Предыдущий месяц", "en": "Previous month"},
+    "registry.period.next_month": {"ru": "Следующий месяц", "en": "Next month"},
+    "registry.weekdays": {"ru": "Пн Вт Ср Чт Пт Сб Вс", "en": "Mo Tu We Th Fr Sa Su"},
     "registry.period.from": {"ru": "С", "en": "From"},
     "registry.period.to": {"ru": "По", "en": "To"},
-    "registry.period.apply": {"ru": "Показать", "en": "Show"},
+    "registry.period.apply": {"ru": "Применить", "en": "Apply"},
     "registry.period.prev": {"ru": "Предыдущий период", "en": "Previous period"},
     "registry.period.next": {"ru": "Следующий период", "en": "Next period"},
     "registry.period.empty.title": {
@@ -78,24 +90,9 @@ _PANEL: dict[str, dict[str, str]] = {
     "registry.panel.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.panel.kind": {"ru": "Вид", "en": "Kind"},
     "registry.panel.checklist": {"ru": "Чек-лист", "en": "Checklist"},
-    "registry.panel.actions": {"ru": "Действия", "en": "Actions"},
     "registry.panel.findings_more": {
         "ru": "Ещё {n} — в полной карточке",
         "en": "{n} more in the full card",
-    },
-    "registry.panel.review_go": {"ru": "Вычитать и подтвердить", "en": "Review and accept"},
-    "registry.panel.review_read": {
-        "ru": "Вычитка — в полной карточке: там весь чек-лист по зонам.",
-        "en": "Review in the full card: it shows the whole checklist by zone.",
-    },
-    "registry.panel.move_go": {
-        "ru": "Исправить дату или пиццерию",
-        "en": "Correct date or pizzeria",
-    },
-    "registry.panel.plan_go": {"ru": "Запросить экшн-план", "en": "Request an action plan"},
-    "registry.panel.retract_text": {
-        "ru": "Проверка останется в истории с пометкой и причиной, в отчёты её числа не пойдут.",
-        "en": "The inspection stays in history, marked with the reason; its numbers leave reports.",
     },
 }
 
