@@ -185,6 +185,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0042_import_modes.sql": (
         "sql1:62a7dcd535fddeab514a696d0a7b3a82438d9abb1b195f5d1c669741f4d1ab30"
     ),
+    # Сервисные токены внешнего API и журнал обращений (D356, D388). Заведена вместе
+    # с файлом, нигде не применена.
+    "0049_api_tokens.sql": (
+        "sql1:eee1e66a7944c3b719d87bcb70ca4e10691fcbaf28eb70e10e369f8cbf237ab9"
+    ),
 }
 
 

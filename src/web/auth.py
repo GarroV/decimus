@@ -50,7 +50,7 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import canonical_tenant
 
-from . import walk_auth
+from . import swarm_api, walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -97,8 +97,14 @@ COOKIE_SALT = "web-session"
 #:
 #: `walk_page` и `walk_data` — мини-апп обхода в Telegram (#418, `walk.py`):
 #: у аудитора нет учётки админки, его опознаёт подпись Telegram, а не кука.
+#:
+#: `swarm_api_*` — API чтения для Swarm (#567, D387): опознаёт сервисный токен
+#: из `api.tokens` по отпечатку (`swarm_api._authorize`, D388), а не кука; без
+#: живого токена с нужным правом каждый адрес отвечает 401/403/429.
 OPEN_ENDPOINTS = (
-    frozenset({"login", "static", "google_start", "google_callback"}) | walk_auth.ENDPOINTS
+    frozenset({"login", "static", "google_start", "google_callback"})
+    | walk_auth.ENDPOINTS
+    | swarm_api.ENDPOINTS
 )
 
 #: Ключ в `g`, под которым живёт вошедший на время запроса.
