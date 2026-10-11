@@ -1429,3 +1429,25 @@ curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${WEB_HOST_PORT:-8268
 5. **Смена токена** — `issue` нового, новый в секреты Swarm, проверка, затем
    `dc exec web python tools/api_token.py revoke <№ старого>`. Веб не
    перезапускается: отозванный получает 401 со следующего запроса.
+
+### 8.18. Оценки в агрегаторах доставки (#638, D389)
+
+Отдельного сервиса нет: сборщик — задача бота (`src/bot/agg_loader.py`), блок
+страницы приезжает с образом веба. Как собирается — `docs/17-aggregators.md`.
+
+1. **Миграция `0050_aggregators.sql`** — схема `agg` (`points`, `ratings`,
+   `loads`) и строка `aggregators` в `ratings.layout`. Данных о пиццериях не
+   трогает. Накат: `docker compose exec -T bot python -m src.db.migrate`.
+2. **Справочник Glovo и Chowdeck** — разово после наката, файл разведки (вне git)
+   копируется в контейнер бота:
+   `docker exec decimus-bot-1 python -m src.ratings.aggregators seed /tmp/seed.json`.
+   Без справочника Glovo и Chowdeck пусты, остальные агрегаторы собираются.
+3. **Первый сбор** — бот сделает сам в течение часа после подъёма (журнал пуст —
+   пора). Сразу: `docker exec decimus-bot-1 python -m src.ratings.aggregators`
+   (≈ полчаса: пауза между запросами 1,5–2,5 с).
+4. **Новых переменных нет**, писем и уведомлений нет. Боту нужен исходящий HTTPS
+   к витринам агрегаторов — с площадки проверено 11.10.2026.
+5. **Смоук:** в базе
+   `select aggregator, outcome, points, ratings, error from agg.loads order by id desc limit 10`
+   — строка на каждый агрегатор, `ok`; на `/ratings` блок «Оценки в агрегаторах
+   доставки» с колонками агрегаторов.
