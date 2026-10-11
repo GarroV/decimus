@@ -52,7 +52,7 @@
 |---|---|---|---|
 | `wolt` | AZ BG CY EE GE HR LT PL RO RS SI | каталог у координат (`restaurant-api.wolt.com/v1/pages/restaurants`) | из 10 |
 | `bolt_food` | AZ BG CY EE GE LT PL RO | `findProviders` у координат; код 5812 — Bolt в городе нет, это не сбой | из 5 |
-| `yandex_eda` | BY AM KG | полнотекстовый поиск у координат, затем карточка точки (`x-platform: desktop_web`) | из 5 |
+| `yandex_eda` | BY AM KG | **на паузе** (D397, #670): поиск отвечает 429, затем 401; оценки 11.10.2026 остались в базе. Было: полнотекстовый поиск у координат, затем карточка точки (`x-platform: desktop_web`) | из 5 |
 | `yemeksepeti` | TR | `disco.deliveryhero.io` — список заведений у координат, страницы по 500 | из 5 |
 | `trendyol_go` | TR | подсказки поиска у координат, затем карточка ресторана | из 5 |
 | `pyszne_pl` | PL | `jet-external … /restaurants/enriched` у координат | из 5 |
@@ -104,6 +104,7 @@ scp seed.json contabo:/tmp/ && ssh contabo 'docker cp /tmp/seed.json decimus-bot
 - **Foody, Uber Eats, Just Eat, Deliveroo, Getir, Noon** — сайт закрыт проверкой «вы не
   робот»; обход не делаем. Решение — за владельцем.
 - **Grab** — только после входа в учётную запись.
+- **Яндекс Еда** — на паузе с 11.10.2026 (D397): сборщик цел (`PAUSED` в `collect.py`), вернуть — перенести в `SEARCHERS`.
 - **Migros Yemek, Talabat** — следующим заходом: у Migros нет координат в ответе, у
   Talabat нет списка веток (#647).
 - Пиццерии Хорватии закрыты — на витринах их нет, пусто там честное.

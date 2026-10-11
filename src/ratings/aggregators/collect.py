@@ -34,7 +34,11 @@ from .base import AggregatorError, Found
 
 logger = logging.getLogger(__name__)
 
-SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yandex_eda, yemeksepeti, trendyol, pyszne)
+SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
+#: Сборщики на паузе: модуль цел, но бот к агрегатору не ходит. Яндекс Еда —
+#: 429, затем 401 на поиске (#670); владелец 11.10.2026: «у яндекса в целом беда
+#: сейчас, так что давай пока его пропустим» (D397). Вернуть — перенести в SEARCHERS.
+PAUSED: tuple[ModuleType, ...] = (yandex_eda,)
 KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck)
 MAX_LINK_M = 400
 
@@ -212,8 +216,8 @@ def run_one(module: ModuleType, units: Sequence[DodoUnit], today: date) -> Outco
     return outcome
 
 
-def countries() -> frozenset[str]:
-    return frozenset().union(*(m.COUNTRIES for m in SEARCHERS))
+def countries(modules: Sequence[ModuleType] = SEARCHERS) -> frozenset[str]:
+    return frozenset().union(*(m.COUNTRIES for m in modules if m in SEARCHERS + PAUSED))
 
 
 def run_all(
@@ -228,9 +232,13 @@ def run_all(
     своей паузой, а разные агрегаторы — разные сайты. Подряд сбор длится сумму
     всех агрегаторов (на проде 11.10.2026 один Wolt — 9 минут), параллельно —
     самый долгий из них."""
-    modules = [m for m in SEARCHERS + KNOWN if not only or m.KEY in only]
+    # Сборщик на паузе бот не зовёт, но руками (`run yandex_eda`) он работает —
+    # так проверяют, вернулся ли агрегатор.
+    every = SEARCHERS + KNOWN + PAUSED
+    modules = [m for m in every if m.KEY in only] if only else list(SEARCHERS + KNOWN)
     if not modules:
         return ()
-    units = fetch_units(countries()) if any(m in SEARCHERS for m in modules) else ()
+    searching = [m for m in modules if m in SEARCHERS + PAUSED]
+    units = fetch_units(countries(searching)) if searching else ()
     with ThreadPoolExecutor(max_workers=len(modules), thread_name_prefix="agg") as pool:
         return tuple(pool.map(lambda m: run_one(m, units, today), modules))
