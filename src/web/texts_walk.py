@@ -362,7 +362,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.err.translate": {
         "ru": "Перевод сейчас недоступен. Текст остался как был — его можно перевести самому.",
-        "en": "Translation is unavailable right now. Your text is unchanged — translate it by hand.",
+        "en": "Translation is unavailable right now. Your text is unchanged — translate by hand.",
     },
     "walk.err.translate_busy": {
         "ru": "Система ещё переводит по прошлому нажатию — подождите пару секунд.",
