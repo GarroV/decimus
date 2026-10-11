@@ -12,6 +12,7 @@ from src.ratings.periods import (
     parse_period,
     previous_period,
     quarter_period,
+    range_period,
 )
 
 РС = (
@@ -86,3 +87,35 @@ def test_следующий_такой_же_период() -> None:
     nxt = next_period(parse_period("rs:11", rs_periods=РС), rs_periods=РС)  # type: ignore[arg-type]
     assert nxt is not None and nxt.key == "rs:12"
     assert next_period(parse_period("rs:12", rs_periods=РС), rs_periods=РС) is None  # type: ignore[arg-type]
+
+
+def test_отрезок_совпавший_с_месяцем_кварталом_или_периодом_рс_становится_им() -> None:
+    def отрезок(с: date, по: date) -> str:
+        return range_period(с, по, rs_periods=РС).key
+
+    assert отрезок(date(2026, 9, 1), date(2026, 9, 30)) == "2026-09"
+    assert отрезок(date(2026, 7, 1), date(2026, 9, 30)) == "2026-Q3"
+    assert отрезок(date(2026, 9, 16), date(2026, 9, 30)) == "rs:12"
+    assert отрезок(date(2026, 9, 30), date(2026, 9, 16)) == "rs:12"  # перепутаны местами
+    assert отрезок(date(2026, 7, 5), date(2026, 8, 20)) == "2026-07-05..2026-08-20"
+
+
+def test_произвольный_отрезок_по_ключу_и_листается_на_свою_длину() -> None:
+    период = parse_period("2026-07-05..2026-07-14", rs_periods=РС)
+    assert период is not None and (период.begin, период.end) == (
+        date(2026, 7, 5),
+        date(2026, 7, 14),
+    )
+    прошлый = previous_period(период, rs_periods=РС)
+    следующий = next_period(период, rs_periods=РС)
+    assert прошлый is not None and прошлый.key == "2026-06-25..2026-07-04"
+    assert следующий is not None and следующий.key == "2026-07-15..2026-07-24"
+    assert parse_period("2026-07-05..мусор", rs_periods=РС) is None
+    assert parse_period("..", rs_periods=РС) is None
+    # Ключ, совпавший с периодом РС, — это он (у него своё имя и «Δ к прошлому РС»).
+    assert parse_period("2026-09-01..2026-09-15", rs_periods=РС).key == "rs:11"  # type: ignore[union-attr]
+
+
+def test_отрезок_у_края_календаря_не_листается() -> None:
+    период = parse_period("0001-01-01..0001-01-10", rs_periods=РС)
+    assert период is not None and previous_period(период, rs_periods=РС) is None

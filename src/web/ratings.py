@@ -31,7 +31,7 @@ from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
-from src.ratings.periods import KIND_RATING, ReportPeriod
+from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
 from . import auth, ratings_calendar
@@ -96,6 +96,8 @@ def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str)
         for p in found.rs_periods:
             if f"rs:{p.id}" == period.key:
                 return p.title_ru if lang == "ru" else p.title_en
+    if period.kind == KIND_RANGE:
+        return f"{period.begin:%d.%m.%Y} — {period.end:%d.%m.%Y}"
     return period.key
 
 

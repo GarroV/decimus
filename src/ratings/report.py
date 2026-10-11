@@ -16,7 +16,14 @@ from src.db import ratings_read as read
 from src.db.ratings_read import CountryRow
 
 from .model import RKO, RS
-from .periods import RatingPeriod, ReportPeriod, default_period, parse_period, previous_period
+from .periods import (
+    RatingPeriod,
+    ReportPeriod,
+    default_period,
+    parse_period,
+    previous_period,
+    range_period,
+)
 from .summary import (
     Candle,
     CountryLine,
@@ -139,10 +146,22 @@ def select(args: Mapping[str, str], *, today: date) -> tuple[Selection, Choices]
     group = group if group in GROUPS else GROUP_IMF
     value = _value(group, args.get("value") or None, found)
     latest = found.rs_periods[0].begin_on if found.rs_periods else None
-    period = parse_period(args.get("period", ""), rs_periods=found.rs_periods) or default_period(
-        latest, today=today
+    period = (
+        _dates(args, found.rs_periods)
+        or parse_period(args.get("period", ""), rs_periods=found.rs_periods)
+        or default_period(latest, today=today)
     )
     return Selection(group, value, period), found
+
+
+def _dates(args: Mapping[str, str], rs_periods: Sequence[RatingPeriod]) -> ReportPeriod | None:
+    """Период из календаря «с — по» (`from`, `to`); нет обеих дат — нет периода."""
+    try:
+        begin = date.fromisoformat((args.get("from") or "").strip())
+        end = date.fromisoformat((args.get("to") or "").strip())
+    except ValueError:
+        return None
+    return range_period(begin, end, rs_periods=rs_periods)
 
 
 def group_countries(selection: Selection, countries: Sequence[CountryRow]) -> tuple[str, ...]:
