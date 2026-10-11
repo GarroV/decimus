@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378, D397): «Требует внимания», проверки, колонки РС / РКО, «Страны».
+"""Тексты «Главной» (D378, D398): «Требует внимания», проверки, колонки РС / РКО, «Страны».
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -12,7 +12,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
-    # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D397) ─────────────
+    # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D398) ─────────────
     "home.board.failed": {
         "ru": "Задания не загрузились: база не ответила. Обновите страницу.",
         "en": "Tasks did not load: the database did not answer. Reload the page.",
@@ -64,7 +64,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "За период проверок нет.",
         "en": "No inspections in the period.",
     },
-    # ── Где нужно проверить, последние проверки (D398) ──────────────────
+    # ── Где нужно проверить, последние проверки (D399) ──────────────────
     "home.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
     "home.tocheck.hint": {"ru": "нет проверок за период", "en": "no inspection in the period"},
     "home.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
@@ -73,7 +73,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
     "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
     "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
-    # ── Колонки рейтинга клиента в таблице пиццерий (D398) ──────────────
+    # ── Колонки рейтинга клиента в таблице пиццерий (D399) ──────────────
     "home.rs.short": {"ru": "РС", "en": "RS"},
     "home.rko.short": {"ru": "РКО", "en": "CX"},
     "home.ratings.open": {

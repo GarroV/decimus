@@ -82,7 +82,7 @@ async def _offer_resume(message: Message, inspection: domain.Inspection, lang: s
 
     Сюда доходит только проверка в работе (T052, T153): сданная аудитора не
     спрашивает вовсе — её копия молча убирается, и мастер начинается сразу
-    (`_drop_sealed_copy`, решение владельца D399). Старая версия говорила о
+    (`_drop_sealed_copy`, решение владельца D400). Старая версия говорила о
     сданной «уже сдана… начните новую или уберите из чата» и держала аудитора
     на вопросе о проверке, которая была давно.
 
@@ -156,7 +156,7 @@ def _forget_chat_notes(
 async def _drop_sealed_copy(
     chat_id: int, pending: PendingStore | None, store: MaterialStore | None
 ) -> bool:
-    """Тихо убрать из чата сданную проверку (D399). Истина — убрана; ложь — убирать не вышло.
+    """Тихо убрать из чата сданную проверку (D400). Истина — убрана; ложь — убирать не вышло.
 
     Убирается копия в чате — и только она: отданный отчёт и строка в истории
     точки остаются (D080). Проверяет сданность сам, поэтому незавершённую не
@@ -222,7 +222,7 @@ def build_start_router(
             return
         if inspection is not None:
             if sealed.is_sealed(message.chat.id):
-                # Сданная проверка аудитора не спрашивает (D399): убирается молча,
+                # Сданная проверка аудитора не спрашивает (D400): убирается молча,
                 # и сразу идёт мастер новой.
                 if not await _drop_sealed_copy(message.chat.id, pending, store):
                     await stops.refuse(message, lang, step="start", key="start.failed")

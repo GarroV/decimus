@@ -119,7 +119,7 @@
     card.appendChild(el("h2", "walk-app__card-title", tx("walk.app.audit")));
     if (d.state !== "active" || d.sealed) {
       // Начать проверку можно всегда, когда нет идущей (D392). Сданная для
-      // аудитора — как отсутствующая (D399): прошлую карточку не показываем.
+      // аудитора — как отсутствующая (D400): прошлую карточку не показываем.
       card.appendChild(el("p", "walk-app__card-text", tx("walk.app.audit.none")));
       card.appendChild(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart));
       return card;
