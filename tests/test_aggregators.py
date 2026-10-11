@@ -289,3 +289,27 @@ def test_агрегаторы_собираются_одновременно_и_�
     итог = collect.run_all(ДЕНЬ, fetch_units=lambda _: ())
 
     assert [o.aggregator for o in итог] == [m.KEY for m in модули]
+
+
+def test_агрегатор_на_паузе_бот_не_зовёт_а_руками_можно(monkeypatch: pytest.MonkeyPatch) -> None:
+    """D397: Яндекс Еда на паузе — в сбор бота не входит, `run yandex_eda` работает."""
+
+    def собрать(module: object, units: object, today: date) -> collect.Outcome:
+        return collect.Outcome(module.KEY, True, 0, 0, None)  # type: ignore[attr-defined]
+
+    страны: list[frozenset[str]] = []
+
+    def пиццерии(codes: frozenset[str]) -> tuple[()]:
+        страны.append(codes)
+        return ()
+
+    monkeypatch.setattr(collect, "run_one", собрать)
+
+    бот = [o.aggregator for o in collect.run_all(ДЕНЬ, fetch_units=пиццерии)]
+    руками = [
+        o.aggregator for o in collect.run_all(ДЕНЬ, only=["yandex_eda"], fetch_units=пиццерии)
+    ]
+
+    assert "yandex_eda" not in бот and "wolt" in бот
+    assert руками == ["yandex_eda"]
+    assert "BY" not in страны[0] and страны[1] == yandex_eda.COUNTRIES
