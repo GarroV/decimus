@@ -177,8 +177,21 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         _require_hq()
         lang = _lang(conf)
         страна = country_data.normalize_code(request.args.get("country") or "")
+        # «Предписание» с карточки проверки (D393): проверка уже выбрана
+        # основанием, страна берётся с её точки. Проверка вне охвата, чужая или
+        # не принятая — форма открывается пустой, без молчаливого чужого основания.
+        основание = _basis_from_card()
+        значения = _defaults(страна, lang)
+        if основание is not None:
+            страна = основание[0]
+            значения = {**_defaults(страна, lang), "inspections": (основание[1].id,)}
         return _render_form(
-            lang=lang, country=страна, current=None, values=_defaults(страна, lang), failure=None
+            lang=lang,
+            country=страна,
+            current=None,
+            values=значения,
+            failure=None,
+            extra_bases=(основание[1],) if основание is not None else (),
         )
 
     @app.post(путь, endpoint="rx_create")
@@ -336,6 +349,17 @@ def _defaults(country: str, lang: str) -> dict[str, Any]:
     }
 
 
+def _basis_from_card() -> tuple[str, rx.Choice] | None:
+    ident = (request.args.get("inspection") or "").strip()
+    if not ident:
+        return None
+    try:
+        return rx.inspection_basis(ident, reach=auth.current_reach())
+    except PrescriptionError as exc:
+        logger.warning("основание предписания %s не прочитано: %s", ident, exc)
+        return None
+
+
 def _form_values() -> dict[str, Any]:
     return {
         "recipients": request.form.get("recipients") or "",
@@ -365,11 +389,16 @@ def _render_form(
     current: rx.Prescription | None,
     values: Mapping[str, Any],
     failure: str | None,
+    extra_bases: tuple[rx.Choice, ...] = (),
 ) -> str:
     точки: tuple[rx.Choice, ...] = ()
     основания: tuple[rx.Choice, ...] = ()
     if country:
         точки, основания = rx.choices(country, reach=auth.current_reach())
+    # Основание с карточки старше последних проверок страны в выбор не попадает —
+    # без этой строки его нечем было бы отметить.
+    есть_с_карточки = {c.id for c in основания}
+    основания = основания + tuple(c for c in extra_bases if c.id not in есть_с_карточки)
     if current is not None:
         # Основание черновика старше последних проверок страны в выбор не
         # попадает — без этого сохранение молча сняло бы его с предписания.
