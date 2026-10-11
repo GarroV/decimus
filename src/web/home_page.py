@@ -109,11 +109,16 @@ def render(
     today = date.today()
     period = registry_period.read(request.args, today=today)
     before = registry_period.shift(period, -1)
+    reach = auth.current_reach()
+    страна = request.args.get("country", "").strip().upper()[:2]
+    # Страна вне охвата из адреса не сужает экран: иначе рейтинги показали бы
+    # её, а проверки (их держит охват в запросе) — пустоту, без объяснения.
+    if reach.countries is not None and страна not in reach.countries:
+        страна = ""
     selection = overview_data.Selection(
-        country=request.args.get("country", "").strip().upper()[:2],
+        country=страна,
         sort=request.args.get("sort", "score").strip()[:8],
     )
-    reach = auth.current_reach()
     snapshot = overview_data.load(
         reach=reach,
         limit=limit,
