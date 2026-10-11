@@ -98,7 +98,7 @@ COOKIE_SALT = "web-session"
 #: `walk_page` и `walk_data` — мини-апп обхода в Telegram (#418, `walk.py`):
 #: у аудитора нет учётки админки, его опознаёт подпись Telegram, а не кука.
 #:
-#: `swarm_api_*` — API чтения для Swarm (#567, D335): опознаёт сервисный токен
+#: `swarm_api_*` — API чтения для Swarm (#567, D387): опознаёт сервисный токен
 #: (`swarm_api._authorize`), а не кука; без токена каждый адрес отвечает 401/503.
 OPEN_ENDPOINTS = (
     frozenset({"login", "static", "google_start", "google_callback"})

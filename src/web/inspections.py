@@ -80,20 +80,32 @@ def retraction_available() -> bool:
     return True
 
 
-def load_registry(*, reach: Reach, limit: int) -> Registry:
+def load_registry(
+    *, reach: Reach, limit: int, date_from: date | None = None, date_to: date | None = None
+) -> Registry:
     """Проверки в охвате, свежие по дате обхода — первыми, и отдельно — ждущие приёмки.
 
     Очередь приёмки идёт по тому же охвату, что история (D283, D289): УК видит
     ждущие партнёра, но подтверждать их не может — это решает карточка.
+
+    Период (`date_from`/`date_to`, по дате обхода) сужает только историю:
+    очередь приёмки показывается целиком — ждущая не должна потеряться за
+    выбранным месяцем.
     """
     review = tuple(queries.list_inspections(reach=reach, limit=limit, on_review=True))
     if retraction_available():
         try:
-            rows = queries.list_inspections(reach=reach, limit=limit, include_retracted=True)
+            rows = queries.list_inspections(
+                reach=reach,
+                limit=limit,
+                include_retracted=True,
+                date_from=date_from,
+                date_to=date_to,
+            )
             return Registry(rows=tuple(rows), retracted_visible=True, review=review)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
-    rows = queries.list_inspections(reach=reach, limit=limit)
+    rows = queries.list_inspections(reach=reach, limit=limit, date_from=date_from, date_to=date_to)
     return Registry(rows=tuple(rows), retracted_visible=False, review=review)
 
 

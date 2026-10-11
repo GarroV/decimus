@@ -14,23 +14,27 @@ from __future__ import annotations
 import logging
 import math
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
 from datetime import date
 
 from flask import Flask, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
+from src.db import maps_store
 from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import may_manage_ratings
+from src.ratings import layout as rl
+from src.ratings import maps as rmaps
 from src.ratings import report
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
-from src.ratings.periods import KIND_RATING, ReportPeriod, month_period, quarter_period
+from src.ratings.periods import KIND_RATING, ReportPeriod
+from src.ratings.pointer import GOOGLE
 
-from . import auth
+from . import auth, ratings_calendar
+from . import ratings_candles as rc
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
 from .errors import WebTextError
@@ -78,32 +82,6 @@ def _coded(prefix: str, code: str, params: Mapping[str, str], lang: str, fallbac
         return t(fallback, lang)
 
 
-@dataclass(frozen=True)
-class PeriodGroup:
-    """Группа выпадающего списка периода: месяцы, кварталы, периоды рейтинга РС."""
-
-    kind: str
-    options: tuple[tuple[str, str], ...]
-
-
-def period_groups(
-    months: tuple[date, ...], found: report.Choices, selected: str, lang: str
-) -> tuple[PeriodGroup, ...]:
-    """Периоды с данными (P14): ключ строит форма, руками его не набирают."""
-    month_keys = [month_period(m.year, m.month).key for m in months]
-    quarters = dict.fromkeys(quarter_period(m.year, (m.month - 1) // 3 + 1).key for m in months)
-    rating = [(f"rs:{p.id}", p.title_ru if lang == "ru" else p.title_en) for p in found.rs_periods]
-    groups = [
-        PeriodGroup("month", tuple((k, k) for k in month_keys)),
-        PeriodGroup("quarter", tuple((k, k.replace("-", " ")) for k in quarters)),
-        PeriodGroup("rating", tuple(rating)),
-    ]
-    known = {key for g in groups for key, _ in g.options}
-    if selected not in known:  # период по умолчанию без данных — всё равно виден выбранным
-        groups.insert(0, PeriodGroup("current", ((selected, selected.replace("-Q", " Q")),)))
-    return tuple(g for g in groups if g.options)
-
-
 def _country_names(rows: tuple[read.CountryRow, ...], lang: str) -> dict[str, str]:
     """Имя страны из справочника рейтингов: он знает все страны снимка, `geo_names` — нет."""
     return {row.code: row.name_ru if lang == "ru" else row.name_en for row in rows}
@@ -120,22 +98,137 @@ def _period_title(period: ReportPeriod | None, found: report.Choices, lang: str)
     return period.key
 
 
+def _layout() -> tuple[rl.Block, ...]:
+    """Компоновка из базы (D368). База не ответила — порядок по умолчанию и след
+    в журнале: страница рейтингов не должна падать из-за расстановки блоков."""
+    try:
+        return rl.arrange(read.layout_rows())
+    except RatingsError:
+        logger.warning("Компоновка рейтингов не прочиталась — порядок по умолчанию", exc_info=True)
+        return rl.arrange(())
+
+
+def _layout_from_form() -> tuple[rl.Block, ...]:
+    """Порядок — скрытые поля `order`, видимость — галочки `show`, сдвиг — кнопка
+    `move` вида `<блок>:-1|1`. Незнакомое отбрасывает `arrange`."""
+    form = request.form
+    shown = set(form.getlist("show"))
+    blocks = tuple(
+        rl.Block(b.key, b.key in shown)
+        for b in rl.arrange((key, i, True) for i, key in enumerate(form.getlist("order")))
+    )
+    key, _, step = (form.get("move") or "").partition(":")
+    return rl.moved(blocks, key, 1 if step == "1" else -1) if step in ("1", "-1") else blocks
+
+
+def _maps(
+    groups: tuple[tuple[str, tuple[str, ...]], ...], until: date, before: date | None
+) -> tuple[rmaps.CountryMaps, ...] | None:
+    """Оценки на картах по группам сводки (кластеры или срез) на конец периода и
+    изменение к концу прошлого. База не ответила — `None` и след в журнале:
+    блок скажет «нет данных», страница живёт."""
+    countries = tuple(c for _, members in groups for c in members)
+    try:
+        now = rmaps.summarize_groups(maps_store.latest(countries, until=until), groups)
+        if before is None:
+            return now
+        was = rmaps.summarize_groups(maps_store.latest(countries, until=before), groups)
+        return rmaps.with_delta(now, was)
+    except RatingsError:
+        logger.warning("Оценки карт не прочитались", exc_info=True)
+        return None
+
+
+def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
+    """Оценка Google по пиццериям, связанным с филиалами карт; сбой — пусто."""
+    try:
+        return maps_store.unit_scores(GOOGLE, until=until)
+    except RatingsError:
+        logger.warning("Оценки пиццерий на картах не прочитались", exc_info=True)
+        return {}
+
+
+def _group_name(
+    line: report.GroupLine,
+    selection: report.Selection,
+    lang: str,
+    country_name: Callable[[str], str],
+) -> str:
+    """Подпись строки сводки: кластер, страна девелопера или сам срез."""
+    if line.level == report.LEVEL_COUNTRY and line.key:
+        return country_name(line.key)
+    if line.key is not None:
+        return t(f"ratings.cluster.{line.key}", lang)
+    if selection.group == report.GROUP_COUNTRY and selection.value:
+        return country_name(selection.value)
+    if selection.group == report.GROUP_CLUSTER and selection.value:
+        return t(f"ratings.cluster.{selection.value}", lang)
+    return selection.value or t("ratings.group.imf", lang)
+
+
+def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
+    """Строки сводки со свечами (D384). Шкала — своя у каждой строки: общая
+    растягивалась выбросом соседней группы, и свечи сжимались в черту; группы
+    сравнивают по числу слева, а не по высоте свечей."""
+    period = (
+        summary.selection.period.begin.replace(day=1),
+        summary.selection.period.end.replace(day=1),
+    )
+    threshold = summary.thresholds["top_threshold"]
+    title = TEXTS["ratings.candle.title"][lang]  # шаблон: поля заполняет `sticks`
+    kinds = {}
+    for kind in ("rs", "rko"):
+        series = [getattr(g, f"{kind}_candles") for g in summary.groups]
+        scales = [rc.scale([s], threshold) for s in series]
+        kinds[kind] = {
+            "scales": scales,
+            "rows": [
+                rc.sticks(s, sc, period=period, lang=lang, title=title)
+                for s, sc in zip(series, scales, strict=True)
+            ],
+        }
+    return {
+        "names": names,
+        "kinds": kinds,
+        "months": [rc.month_label(m, lang) for m in summary.months],
+        "width": rc.WIDTH,
+        "height": rc.HEIGHT,
+    }
+
+
 def render_summary(conf: Settings) -> str:
     lang = _lang(conf)
     selection, found = report.select(request.args, today=date.today())
     summary = report.build(selection)
     names = _country_names(found.countries, lang)
+
+    def country_name(code: str) -> str:
+        return names.get(code) or country_title(code, lang)
+
+    names_of_groups = [_group_name(g, selection, lang, country_name) for g in summary.groups]
     return render_template(
         "ratings/index.html",
+        blocks=tuple(b.key for b in _layout() if b.visible),
+        maps=_maps(
+            tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True)),
+            min(selection.period.end, date.today()),
+            summary.previous.end if summary.previous else None,
+        ),
+        map_providers=rmaps.SHOWN_PROVIDERS,
+        unit_maps=_unit_maps(min(selection.period.end, date.today())),
+        chart=_chart(summary, names_of_groups, lang),
+        clusters=report.CLUSTERS,
         summary=summary,
         choices=found,
         selection=selection,
-        periods=period_groups(read.period_months(), found, selection.period.key, lang),
+        calendar=ratings_calendar.build(
+            selection.period, read.period_months(), found.rs_periods, lang
+        ),
         previous_title=_period_title(summary.previous, found, lang),
         risk_short_names=", ".join(t(f"ratings.{kind}", lang) for kind in summary.risk_short),
         may_manage=may_manage(),
         unit_url=unit_rating_url,
-        country_name=lambda code: names.get(code) or country_title(code, lang),
+        country_name=country_name,
         ratings_path=section("ratings").path,
         at_format=_AT,
     )
@@ -153,6 +246,7 @@ def render_imports(conf: Settings, *, notice: str | None = None, failure: str | 
         issues=read.open_issues(),
         countries=countries,
         rules=read.hard_rules(),
+        layout=_layout(),
         settings=read.settings(),
         max_mb=UPLOAD_MAX_BYTES // _MB,
         ratings_path=section("ratings").path,
@@ -288,6 +382,18 @@ def install(app: Flask, conf: Settings) -> None:
             return _forbidden()
         refuse_foreign_origin()
         return _saved(conf, lambda: read.remove_hard_rule(rule_id))
+
+    @app.post(f"{путь}/layout")
+    def ratings_layout() -> tuple[str, int]:
+        """Компоновка страницы (D368, D370) — тот же круг, что ведёт рейтинги."""
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        blocks = _layout_from_form()
+        return _saved(
+            conf,
+            lambda: read.save_layout([(b.key, b.visible) for b in blocks], actor=_actor()),
+        )
 
     @app.post(f"{путь}/settings")
     def ratings_settings() -> tuple[str, int]:

@@ -56,7 +56,6 @@ from src.web.sections import SECTIONS
     inspections=(),
     grades=(),
     average=None,
-    comparable=True,
     zone_losses=(),
     systemic=(),
     attention=(),
@@ -174,7 +173,8 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 3
+    # «Проект» (`/tenants`) снят в #585: пространства — на «Пользователях».
+    assert len(непостроенные) == 2
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key
@@ -691,6 +691,17 @@ def test_адрес_без_отпечатка_перепроверяется(с�
     ответ = стенд.get("/static/decimus-web.css")
 
     # Assert
+    assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
+
+
+def test_чужой_отпечаток_на_год_не_кешируется(стенд: FlaskClient) -> None:
+    # Act — отпечаток не от этого содержимого: страница новой версии, а файл
+    # отдала старая копия во время выкладки. Закешированный на год, такой ответ
+    # навсегда подменил бы стили под новым адресом.
+    ответ = стенд.get("/static/decimus-web.css?v=000000000000")
+
+    # Assert
+    assert ответ.status_code == 200
     assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
 
 

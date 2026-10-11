@@ -124,7 +124,7 @@ def generate(repo: Path) -> dict:
     walk.queries.previous_findings = lambda **_: prev
     walk.handed_over = lambda _c: False
     payload = walk.walk_payload(CHAT, fallback_lang="ru")
-    return {"payload": payload, "pics": pics}
+    return {"payload": payload, "pics": pics, "texts_en": walk.texts_for("en")}
 
 
 #: Названия зон рабочей методики (`<AUDIT_DATA_DIR>/zones.csv`): в публичном
@@ -212,11 +212,19 @@ def main() -> None:
             "walk.css",
             "walk-record.css",
             "walk-menu.css",
+            "walk-app.css",
         ]
     )
     scripts = "\n".join(
         (static / n).read_text()
-        for n in ["walk-core.js", "walk-photo.js", "walk-menu.js", "walk-sheet.js", "walk.js"]
+        for n in [
+            "walk-core.js",
+            "walk-photo.js",
+            "walk-menu.js",
+            "walk-sheet.js",
+            "walk-app.js",
+            "walk.js",
+        ]
     )
     mock = (Path(__file__).parent / "mock.js").read_text()
     seed_js = json.dumps(seed, ensure_ascii=False).replace("</", "<\\/")
@@ -234,7 +242,7 @@ def main() -> None:
     <style>{styles}
     {bar_css}</style>
     <div class="mk-bar" role="note"><p><b>Макет для отзывов.</b> Пиццерия выдуманная, фото учебные. Всё, что вы запишете, остаётся только в этом браузере.</p><button type="button" id="mk-reset">Начать заново</button></div>
-    <main id="walk" class="walk__root" data-endpoint="/mock/data" data-photo="/mock/photo" data-photo-view="/mock/photo/view" data-finding="/mock/finding" data-info="/mock/info" data-suggest="/mock/suggest"><p class="walk__loading">…</p></main>
+    <main id="walk" class="walk__root" data-endpoint="/mock/data" data-photo="/mock/photo" data-photo-view="/mock/photo/view" data-finding="/mock/finding" data-info="/mock/info" data-suggest="/mock/suggest" data-app="/mock/app"><p class="walk__loading">…</p></main>
     <script>window.__MOCK_SEED__ = {seed_js};</script>
     <script>{mock}</script>
     <script>document.body.classList.add("walk");document.getElementById("mk-reset").addEventListener("click",function(){{window.__mockReset();}});</script>

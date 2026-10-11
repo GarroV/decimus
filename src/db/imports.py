@@ -1,17 +1,26 @@
-"""Загрузка исторической проверки поштучно: черновик, записи, кадры (D305–D310).
+"""Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334).
 
-Коллега с Claude разбирает старый отчёт (Битрикс, PDF, таблица) и вносит его
-через MCP: заводит черновик, добавляет, правит и снимает записи, сверяет
-посчитанную оценку с напечатанной в старом отчёте и подтверждает сам (D308).
-Подтверждение — общее (`accept.py`): загруженная после него обычная проверка
-своей версии методики (D306), а запрос экшн-плана не открывается (D310).
+Коллега с Claude разбирает отчёт (Битрикс, PDF, таблица) и вносит его через
+MCP: заводит черновик, добавляет, правит и снимает записи и подтверждает сам
+(D308). Подтверждение — общее (`accept.py`): загруженная после него — проверка в
+истории точки рядом с обходами (D306), а запрос экшн-плана не открывается (D310).
 
-**Оценку считает движок, правила записи — тоже движок.** Этот модуль чисел не
-считает и правил записи не знает: вызывающий передаёт `apply` — функцию, которая
-применяет команду движка к проверке, прочитанной ПОСЛЕ замка, и возвращает
-оценку и записи, как их увидел движок (`src/report/rescore.apply_command`).
-Здесь кладётся ровно то, что движок вернул: номер новой записи, пометка
-необычной зоны (D206), класс, приведённый к верхнему регистру.
+**Два режима, и режим — это происхождение черновика (D334).** Задаётся при
+создании и потом не меняется (триггер `inspections_origin_fixed`):
+
+- `import` — ТЕКУЩАЯ: по действующей версии эталона. Оценку считает движок,
+  правила записи — тоже движок. Этот модуль чисел не считает и правил записи не
+  знает: вызывающий передаёт `apply` — функцию, которая применяет команду движка
+  к проверке, прочитанной ПОСЛЕ замка, и возвращает оценку и записи, как их
+  увидел движок (`src/report/rescore.apply_command`). Здесь кладётся ровно то,
+  что движок вернул.
+- `legacy` — ИСТОРИЧЕСКАЯ: оценка старого отчёта переносится как есть (D332).
+  Движок не зовётся НИ на одном пути: функции `*_legacy_*` его не принимают
+  вовсе, а функции с `apply` отказывают на историческом черновике ещё под
+  замком, до вызова. Записи описательные — формулировка обязательна, код,
+  класс и зона — если есть; отсутствующие хранятся явными маркерами
+  (`LEGACY_CODE`, `NO_CLASS`, `NO_ZONE`). Счёт записей по классам (`counts`)
+  — это не оценка, его кладёт сама база одним запросом.
 
 **Правки одного черновика идут по очереди** — тот же замок строки, что у правки
 на приёмке (`revise.py`) и у подтверждения (`accept.py`), и запись с оценкой
@@ -44,7 +53,13 @@ from ..domain.tenants import HQ_TENANT
 from .config import check_environment
 from .directory import resolve_unit_id
 from .errors import HistoryImportError, StorageError
-from .models import ORIGIN_IMPORT, InspectionDetail
+from .models import (
+    LEGACY_VERSION_PREFIX,
+    ORIGIN_IMPORT,
+    ORIGIN_LEGACY,
+    UPLOADED_ORIGINS,
+    InspectionDetail,
+)
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .push import _INSERT_TRANSLATION_SQL
 from .queries import _read_detail, _require_inspection_id, _require_tenant
@@ -56,6 +71,7 @@ logger = logging.getLogger(__name__)
 
 #: Чата у загрузки нет (0038): ноль однозначно значит «не из бота».
 IMPORT_CHAT_ID = 0
+
 
 #: Префикс ссылки кадра, принесённого загрузкой. Колонка называется
 #: `telegram_file_id` по истории, а значит «откуда кадр»: `walk:` — обход в
@@ -84,7 +100,7 @@ Apply = Callable[[InspectionDetail], Applied]
 
 @dataclass(frozen=True)
 class NewDraft:
-    """Шапка загружаемой проверки — то, что напечатано в старом отчёте."""
+    """Шапка загружаемой проверки — то, что напечатано в отчёте."""
 
     tenant: str
     unit: str
@@ -97,9 +113,14 @@ class NewDraft:
     #: Язык, на котором записаны формулировки (язык речи, D025) — у загрузки
     #: это язык исходного документа.
     speech_lang: str
+    #: Режим (D334): `ORIGIN_IMPORT` — текущая, `ORIGIN_LEGACY` — историческая.
+    origin: str = ORIGIN_IMPORT
     reported_pct: float | None = None
     reported_grade: str | None = None
     source_ref: str | None = None
+    #: Только у исторической: статус из старого отчёта и метка прежней методики.
+    reported_status: str | None = None
+    legacy_method: str | None = None
 
 
 @dataclass(frozen=True)
@@ -118,11 +139,12 @@ class DraftRow:
     source_ref: str | None
     findings_count: int
     pushed_at: str
+    origin: str = ORIGIN_IMPORT
 
 
 @dataclass(frozen=True)
 class ImportHead:
-    """Поля проверки, которых нет в общем чтении: происхождение и сверка (0038)."""
+    """Поля проверки, которых нет в общем чтении: происхождение и отчёт (0038, 0042)."""
 
     origin: str
     status: str
@@ -130,23 +152,26 @@ class ImportHead:
     reported_pct: float | None
     reported_grade: str | None
     source_ref: str | None
+    reported_status: str | None = None
+    legacy_method: str | None = None
 
 
-# Вставка черновика. Оценка-заглушка живёт ровно до конца этой же транзакции:
-# следом движок считает проверку по её версии, и `_write_score` кладёт его
-# итог. Отказ движка откатывает вставку целиком — черновика без оценки движка
-# не бывает.
+# Вставка черновика. У текущей (`import`) оценка-заглушка живёт ровно до конца
+# этой же транзакции: следом движок считает проверку по её версии, и
+# `_write_score` кладёт его итог; отказ движка откатывает вставку целиком. У
+# исторической (`legacy`) оценка — сразу та, что в старом отчёте (D332), и
+# больше её не трогает никто: `pct = reported_pct` держит и сама база (0042).
 _INSERT_DRAFT_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor,
     pct, grade, source_fingerprint, status, origin,
-    reported_pct, reported_grade, source_ref
+    reported_pct, reported_grade, source_ref, reported_status, legacy_method
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s, %(report_lang)s,
     %(speech_lang)s, %(speech_lang)s, %(checklist_version)s, %(checklist_code)s, %(auditor)s,
-    0, '', %(fingerprint)s, 'draft', 'import',
-    %(reported_pct)s, %(reported_grade)s, %(source_ref)s
+    %(pct)s, %(grade)s, %(fingerprint)s, 'draft', %(origin)s,
+    %(reported_pct)s, %(reported_grade)s, %(source_ref)s, %(reported_status)s, %(legacy_method)s
 )
 returning id
 """
@@ -154,17 +179,19 @@ returning id
 # Замок загруженного черновика своего пространства — первое действие каждой
 # правки. Всё, что не загруженный черновик этого пространства, замка не
 # получает, а почему — объясняет `_refuse_lock` вторым, обычным запросом.
+# Происхождение возвращается: по нему правка выбирает путь (движок или нет).
 _LOCK_SQL = """
-select i.speech_lang
+select i.origin
 from inspections i
-where i.id = %(id)s and i.tenant_code = %(tenant)s and i.origin = 'import'
+where i.id = %(id)s and i.tenant_code = %(tenant)s and i.origin in ('import', 'legacy')
   and i.status = 'draft' and i.retracted_at is null
 for update
 """
 
 _SELECT_HEAD_SQL = """
 select i.origin, i.status, i.retracted_at is not null,
-       i.reported_pct, i.reported_grade, i.source_ref
+       i.reported_pct, i.reported_grade, i.source_ref,
+       i.reported_status, i.legacy_method
 from inspections i
 where i.id = %(id)s and i.tenant_code = %(tenant)s
 """
@@ -205,7 +232,7 @@ where (entity_type = 'inspection' and entity_id = %(id)s)
 
 _DELETE_DRAFT_SQL = """
 delete from inspections
-where id = %(id)s and tenant_code = %(tenant)s and origin = 'import'
+where id = %(id)s and tenant_code = %(tenant)s and origin in ('import', 'legacy')
   and status = 'draft' and retracted_at is null
 """
 
@@ -221,10 +248,10 @@ _LIST_DRAFTS_SQL = """
 select i.id, u.name, i.inspection_date, i.checklist_code, i.checklist_version,
        i.pct, i.grade, i.reported_pct, i.reported_grade, i.source_ref,
        (select count(*) from findings f where f.inspection_id = i.id),
-       i.pushed_at
+       i.pushed_at, i.origin
 from inspections i
 join units u on u.id = i.unit_id
-where i.tenant_code = %(tenant)s and i.origin = 'import'
+where i.tenant_code = %(tenant)s and i.origin in ('import', 'legacy')
   and i.status = 'draft' and i.retracted_at is null
 order by i.pushed_at desc
 limit %(limit)s
@@ -250,10 +277,14 @@ MAX_PHOTOS_PER_INSPECTION = 300
 MAX_WORDING = 1000
 MAX_AUDITOR = 200
 MAX_SOURCE_REF = 1000
-
+#: Статус из старого отчёта и метка прежней методики — те же пределы, что в
+#: схеме (0042).
+MAX_REPORTED_STATUS = 60
+MAX_LEGACY_METHOD = 100
 _COUNT_OPEN_DRAFTS_SQL = """
 select count(*) from inspections
-where tenant_code = %s and origin = 'import' and status = 'draft' and retracted_at is null
+where tenant_code = %s and origin in ('import', 'legacy') and status = 'draft'
+  and retracted_at is null
 """
 
 #: Счёт черновиков и вставка нового — под замком пространства на транзакцию,
@@ -280,8 +311,13 @@ def _refused(exc: psycopg.Error, что: str) -> HistoryImportError:
 # --- черновик -----------------------------------------------------------------
 
 
-def create_draft(spec: NewDraft, *, apply_score: Callable[[InspectionDetail], Score]) -> str:
-    """Завести черновик загрузки без записей и с оценкой движка; вернуть его id.
+def create_draft(spec: NewDraft, *, apply_score: Callable[[InspectionDetail], Score] | None) -> str:
+    """Завести черновик загрузки без записей; вернуть его id.
+
+    Текущая (`import`) — с оценкой движка: `apply_score` обязателен. Историческая
+    (`legacy`) — с оценкой старого отчёта как есть (D332): `apply_score` у неё
+    запрещён, движок не зовётся. Перепутанная пара — отказ до базы: это ошибка
+    вызывающего, и молча посчитать историческую движком нельзя.
 
     Точка берётся только из справочника УК (с картой синонимов, T092):
     загрузка точек не заводит. Опечатка в названии иначе завела бы вторую
@@ -289,21 +325,52 @@ def create_draft(spec: NewDraft, *, apply_score: Callable[[InspectionDetail], Sc
     точки сверяет сторож схемы (0030) — точка чужой страны даёт отказ.
     """
     tenant = _require_tenant(spec.tenant)
+    _check_mode(spec, apply_score=apply_score)
     _check_length(spec.auditor, field="auditor", limit=MAX_AUDITOR)
     _check_length(spec.source_ref, field="source_ref", limit=MAX_SOURCE_REF)
+    _check_length(spec.reported_status, field="reported_status", limit=MAX_REPORTED_STATUS)
+    _check_length(spec.legacy_method, field="legacy_method", limit=MAX_LEGACY_METHOD)
     try:
         with _connect() as conn:
             _check_open_drafts(conn, tenant)
             ident = _insert_draft(conn, spec, tenant)
-            with conn.cursor() as cur:
-                detail = _locked_detail(cur, ident, tenant)
-                _write_score(cur, ident, tenant, apply_score(detail))
+            if apply_score is not None:
+                with conn.cursor() as cur:
+                    detail = _locked_detail(cur, ident, tenant, mode=ORIGIN_IMPORT)
+                    _write_score(cur, ident, tenant, apply_score(detail))
             conn.commit()
             return ident
     except HistoryImportError:
         raise
     except psycopg.Error as exc:
         raise _refused(exc, "Завести черновик") from exc
+
+
+def _check_mode(spec: NewDraft, *, apply_score: object | None) -> None:
+    """Режим и способ оценки обязаны совпасть (D332, D334)."""
+    if spec.origin == ORIGIN_IMPORT:
+        if apply_score is None:
+            raise HistoryImportError("Текущую проверку без оценки движка не заводят")
+        if spec.reported_status is not None or spec.legacy_method is not None:
+            raise HistoryImportError(
+                "Статус старого отчёта и метка прежней методики — только у исторической "
+                "проверки (режим history)"
+            )
+        return
+    if spec.origin != ORIGIN_LEGACY:
+        raise HistoryImportError(f"Режим загрузки «{spec.origin}» неизвестен")
+    if apply_score is not None:
+        raise HistoryImportError(
+            "Историческую проверку движок не считает (D332): её оценка — из старого отчёта"
+        )
+    if spec.reported_pct is None:
+        raise HistoryImportError(
+            "У исторической проверки оценка из старого отчёта обязательна (reported_pct)"
+        )
+    if not spec.checklist_version.startswith(LEGACY_VERSION_PREFIX):
+        raise HistoryImportError(
+            "Версия исторической проверки — метка прежней методики, а не версия хранилища"
+        )
 
 
 def _check_length(value: str | None, *, field: str, limit: int) -> None:
@@ -350,9 +417,15 @@ def _insert_draft(conn: psycopg.Connection[Any], spec: NewDraft, tenant: str) ->
                     # По одному на черновик: у загрузки нет повторного слива,
                     # от которого отпечаток по содержимому защищает (0038).
                     "fingerprint": f"import:{uuid.uuid4().hex}",
+                    "origin": spec.origin,
+                    # Историческая: оценка старого отчёта как есть (D332). Текущая:
+                    # заглушка до `_write_score` в этой же транзакции.
+                    **_initial_score(spec),
                     "reported_pct": spec.reported_pct,
                     "reported_grade": spec.reported_grade,
                     "source_ref": spec.source_ref,
+                    "reported_status": spec.reported_status,
+                    "legacy_method": spec.legacy_method,
                 },
             )
         except psycopg.errors.RaiseException as exc:
@@ -365,6 +438,13 @@ def _insert_draft(conn: psycopg.Connection[Any], spec: NewDraft, tenant: str) ->
         return str(row[0])
 
 
+def _initial_score(spec: NewDraft) -> dict[str, object]:
+    """Оценка во вставке: у исторической — из старого отчёта, у текущей — заглушка."""
+    if spec.origin == ORIGIN_LEGACY:
+        return {"pct": spec.reported_pct, "grade": spec.reported_grade or ""}
+    return {"pct": 0, "grade": ""}
+
+
 def _unit_refused(unit: str, tenant: str) -> HistoryImportError:
     """Один отказ на «точки нет» и «точка чужой страны» — как у слива (ревью #340, п.10)."""
     return HistoryImportError(
@@ -374,19 +454,41 @@ def _unit_refused(unit: str, tenant: str) -> HistoryImportError:
     )
 
 
-def _locked_detail(cur: Any, ident: str, tenant: str) -> InspectionDetail:
+def _locked_detail(
+    cur: Any, ident: str, tenant: str, *, mode: str | None = None
+) -> InspectionDetail:
     """Замок загруженного черновика своего пространства — и проверка, прочитанная после него.
 
     Всё, что читается и считается ниже, читается после замка: соседняя правка
     того же черновика уже записана целиком или ещё не началась.
+
+    `mode` — какой режим ждёт вызывающий. Путь с движком зовёт с `ORIGIN_IMPORT`,
+    путь исторической — с `ORIGIN_LEGACY`; черновик другого режима — отказ здесь,
+    под замком и ДО движка (D332: историческую движок не считает ни на одном
+    пути). `None` — путь, которому режим безразличен (кадры, удаление).
     """
     cur.execute(_LOCK_SQL, {"id": ident, "tenant": tenant})
-    if cur.fetchone() is None:
+    замок = cur.fetchone()
+    if замок is None:
         raise _refuse_lock(cur, ident, tenant)
+    if mode is not None and str(замок[0]) != mode:
+        raise _wrong_mode(ident, origin=str(замок[0]))
     detail = _read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)
     if detail is None:
         raise HistoryImportError(f"Проверки {ident} у этого доступа нет")
     return detail
+
+
+def _wrong_mode(ident: str, *, origin: str) -> HistoryImportError:
+    if origin == ORIGIN_LEGACY:
+        return HistoryImportError(
+            f"Проверка {ident} — историческая (режим history): её оценка из старого отчёта, "
+            f"движок её не считает и записи не сверяет (D332). Ничего не изменено"
+        )
+    return HistoryImportError(
+        f"Проверка {ident} — текущая (режим current): её записи сверяет движок, путь "
+        f"исторической к ней не применяется (D334). Ничего не изменено"
+    )
 
 
 def _refuse_lock(cur: Any, ident: str, tenant: str) -> HistoryImportError:
@@ -399,7 +501,7 @@ def _refuse_lock(cur: Any, ident: str, tenant: str) -> HistoryImportError:
             f"пространства. Черновики загрузки перечисляет import_list_drafts"
         )
     происхождение, статус, отклонена = шапка[0], шапка[1], шапка[2]
-    if происхождение != ORIGIN_IMPORT:
+    if происхождение not in UPLOADED_ORIGINS:
         return HistoryImportError(
             f"Проверка {ident} — проверка обхода из бота, а не загруженная. Инструменты "
             f"загрузки правят и удаляют только загруженные черновики; обойдённую правят "
@@ -436,6 +538,8 @@ def import_head(inspection_id: str, *, tenant: str) -> ImportHead | None:
         reported_pct=None if row[3] is None else float(row[3]),
         reported_grade=row[4],
         source_ref=row[5],
+        reported_status=row[6],
+        legacy_method=row[7],
     )
 
 
@@ -465,6 +569,7 @@ def list_drafts(*, tenant: str, limit: int = MAX_DRAFTS) -> list[DraftRow]:
             source_ref=r[9],
             findings_count=int(r[10]),
             pushed_at=r[11].isoformat(),
+            origin=str(r[12]),
         )
         for r in rows
     ]
@@ -522,12 +627,8 @@ def add_finding(
     _check_wording(wording)
     try:
         with _connect() as conn, conn.cursor() as cur:
-            detail = _locked_detail(cur, ident, tenant_code)
-            if len(detail.findings) >= MAX_FINDINGS:
-                raise HistoryImportError(
-                    f"В черновике уже {MAX_FINDINGS} записей — больше не принимается. "
-                    f"Настоящий отчёт столько не содержит: проверьте, не повторяются ли записи"
-                )
+            detail = _locked_detail(cur, ident, tenant_code, mode=ORIGIN_IMPORT)
+            _check_room(detail)
             итог = apply(detail)
             были = {f.n for f in detail.findings}
             новые = [f for f in итог.findings if int(f.get("n", 0)) not in были]
@@ -561,7 +662,7 @@ def edit_finding(
     _check_wording(wording)
     try:
         with _connect() as conn, conn.cursor() as cur:
-            detail = _locked_detail(cur, ident, tenant_code)
+            detail = _locked_detail(cur, ident, tenant_code, mode=ORIGIN_IMPORT)
             прежняя = _finding_by_n(detail, n)
             итог = apply(detail)
             запись = next((f for f in итог.findings if int(f.get("n", 0)) == n), None)
@@ -585,7 +686,7 @@ def edit_finding(
 def remove_finding(
     inspection_id: str, n: int, *, tenant: str, apply: Apply
 ) -> tuple[Applied, tuple[str, ...]]:
-    """Снять запись с черновика вместе с её формулировками и кадрами.
+    """Снять запись с текущего черновика вместе с её формулировками и кадрами.
 
     Возвращает итог движка и ссылки кадров записи — убрать их из хранилища
     вызывающий обязан после этой транзакции: строки кадров уходят каскадом.
@@ -594,18 +695,12 @@ def remove_finding(
     tenant_code = _require_tenant(tenant)
     try:
         with _connect() as conn, conn.cursor() as cur:
-            detail = _locked_detail(cur, ident, tenant_code)
+            detail = _locked_detail(cur, ident, tenant_code, mode=ORIGIN_IMPORT)
             запись = _finding_by_n(detail, n)
             итог = apply(detail)
             if any(int(f.get("n", 0)) == n for f in итог.findings):
                 raise HistoryImportError(f"Движок не снял запись #{n} — ничего не записано")
-            cur.execute(_PHOTOS_OF_FINDING_SQL, (запись,))
-            кадры = tuple(str(r[0]) for r in cur.fetchall())
-            for поле in ("text", "comment"):
-                cur.execute(_DELETE_TRANSLATION_SQL, ("finding", запись, поле))
-            cur.execute(_DELETE_FINDING_SQL, {"id": ident, "finding": запись})
-            if cur.rowcount != 1:
-                raise HistoryImportError(f"Запись #{n} не снята — ничего не записано")
+            кадры = _delete_finding(cur, ident, запись, n)
             _write_score(cur, ident, tenant_code, итог.score)
             conn.commit()
             return итог, кадры
@@ -613,6 +708,26 @@ def remove_finding(
         raise
     except psycopg.Error as exc:
         raise _refused(exc, "Снять запись") from exc
+
+
+def _delete_finding(cur: Any, ident: str, запись: str, n: int) -> tuple[str, ...]:
+    """Строка записи, её формулировки; вернуть ссылки её кадров (строки уходят каскадом)."""
+    cur.execute(_PHOTOS_OF_FINDING_SQL, (запись,))
+    кадры = tuple(str(r[0]) for r in cur.fetchall())
+    for поле in ("text", "comment"):
+        cur.execute(_DELETE_TRANSLATION_SQL, ("finding", запись, поле))
+    cur.execute(_DELETE_FINDING_SQL, {"id": ident, "finding": запись})
+    if cur.rowcount != 1:
+        raise HistoryImportError(f"Запись #{n} не снята — ничего не записано")
+    return кадры
+
+
+def _check_room(detail: InspectionDetail) -> None:
+    if len(detail.findings) >= MAX_FINDINGS:
+        raise HistoryImportError(
+            f"В черновике уже {MAX_FINDINGS} записей — больше не принимается. "
+            f"Настоящий отчёт столько не содержит: проверьте, не повторяются ли записи"
+        )
 
 
 def _finding_by_n(detail: InspectionDetail, n: int) -> str:

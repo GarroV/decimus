@@ -25,6 +25,22 @@ from .engine_call import clean as _clean
 from .letters import LetterError, Papers
 
 
+def refuse_legacy(detail: InspectionDetail) -> None:
+    """Историческую проверку движок не пересчитывает никогда (D332).
+
+    Её оценка — та, что выставлена тогда по тогдашней методике, и она же
+    остаётся. Отказ стоит первым в обоих входах движка этого модуля, до поиска
+    методики: версия исторической (`legacy:<метка>`) в хранилище не лежит, и без
+    этого заслона отказ звучал бы как «снимка нет», то есть как поломка, а не
+    как правило.
+    """
+    if detail.inspection.is_legacy:
+        raise LetterError(
+            "Проверка историческая: её оценка перенесена из старого отчёта как есть и "
+            "движком не пересчитывается (D332)"
+        )
+
+
 def rescore(detail: InspectionDetail, *, papers: Papers) -> Score:
     """Оценка проверки такой, какой её посчитает движок по её же методике.
 
@@ -32,6 +48,7 @@ def rescore(detail: InspectionDetail, *, papers: Papers) -> Score:
     принял состояние. Молча вернуть прежнюю оценку нельзя: исправленная запись
     с неисправленной буквой выглядела бы пересчитанной.
     """
+    refuse_legacy(detail)
     каталог, _ = letters._methodology(detail.inspection.checklist_version, papers)
     with tempfile.TemporaryDirectory(prefix="rescore-") as рядом:
         состояние = Path(рядом) / "inspection.json"
@@ -88,6 +105,7 @@ def apply_command(detail: InspectionDetail, *, papers: Papers, args: Sequence[st
     Отказ — `LetterError` с текстом движка (пути вычищены): его и показывают
     человеку, как показывает бот.
     """
+    refuse_legacy(detail)
     if not args or args[0] not in ENGINE_EDITS:
         raise LetterError(f"Команда движка «{args[0] if args else ''}» здесь не принимается")
     каталог, _ = letters._methodology(detail.inspection.checklist_version, papers)

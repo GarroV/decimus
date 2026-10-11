@@ -17,7 +17,6 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Iterator
 from datetime import date
 
@@ -26,9 +25,10 @@ from flask.testing import FlaskClient
 from test_web_app import ТЕНАНТ
 from web_harness import войти, подменить_двери, собрать
 
-from src.db.models import InspectionRow
+from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
 from src.db.reach import own_reach
 from src.web import app as app_mod
+from src.web import home_board, home_page, home_ratings
 from src.web import overview as ov
 from src.web.texts import t as _t
 
@@ -37,7 +37,6 @@ from src.web.texts import t as _t
     inspections=(),
     grades=(),
     average=None,
-    comparable=True,
     zone_losses=(),
     systemic=(),
     attention=(),
@@ -73,7 +72,6 @@ def снимок(**поля: object) -> ov.Overview:
         "units_total": 150,
         "inspections": (строка("Белград-1", 71.5, "D"), строка("Тбилиси-2", 95.5, "B")),
         "average": 83.5,
-        "comparable": True,
         "zone_losses": (
             ov.ZoneLoss(
                 code="kitchen",
@@ -159,18 +157,17 @@ def test_системные_нарушения_названы_кодом_пун�
     assert "точек: 4" in страница
 
 
-def test_несравнимый_ряд_среднюю_не_показывает(
+def test_средняя_в_плитке_показывается_всегда_когда_есть(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Ряд из разных чек-листов усреднять нельзя (T349) — причина одной
-    строкой в плитке, без плашки над разбивкой (D218)."""
+    """Смена методики плитку не гасит (D352): средняя есть — она на экране."""
     # Act
-    страница = показать(стенд, monkeypatch, снимок(comparable=False))
+    страница = показать(стенд, monkeypatch, снимок(average_delta=-1.5))
 
     # Assert
-    assert "разные чек-листы" in страница
-    assert "83.5" not in страница
-    assert "Средняя по этой выборке не считается" not in страница
+    assert "83.5" in страница
+    assert "-1.5" in страница
+    assert "разные чек-листы" not in страница
 
 
 def test_пустые_блоки_говорят_словами_а_не_исчезают(
@@ -182,34 +179,16 @@ def test_пустые_блоки_говорят_словами_а_не_исче�
 
     # Assert — заголовок каждого блока на месте, и рядом сказано, почему пусто.
     for заголовок in (
-        "Требует решения сегодня",
+        "Куда смотреть",
         "Где сеть теряет проценты",
         "Системные нарушения",
-        "Проблемные точки",
+        "Пиццерии",
     ):
         assert заголовок in страница
-    assert "Поводов нет" in страница
+    assert t_ru("home.attention.empty") in страница
     assert "Потерь не записано" in страница
     assert "Повторов нет" in страница
-
-
-def test_каждая_плитка_ведёт_куда_то(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Цифра, из которой нельзя провалиться, на вопрос экрана не отвечает.
-
-    Бриф запрещает «шаблонный дашборд-вид с четырьмя одинаковыми плитками», и
-    отличие ровно здесь: у каждой плитки есть адрес перехода.
-    """
-    # Act
-    страница = показать(стенд, monkeypatch, снимок())
-
-    # Assert — плитка на экране ровно одна форма: ссылка. Кнопок без
-    # перехода и мёртвых блоков с цифрой быть не должно ни одного.
-    плитки = re.findall(r'<(\w+) class="ov-tile[ "]', страница)
-    assert плитки, "плиток на экране нет вовсе"
-    assert set(плитки) == {"a"}, (
-        f"плитка нарисована тегами {sorted(set(плитки))}: всё, что не ссылка, — "
-        f"цифра без перехода, а такую бриф на этом экране запрещает"
-    )
+    assert t_ru("home.units.empty") in страница
 
 
 def test_средняя_без_проверок_не_выдумывается() -> None:
@@ -232,8 +211,16 @@ def test_буквы_идут_по_шкале_а_не_по_частоте() -> No
 # ── Отбор выборки, разбивка и движение оценки (канон прототипа) ───────────
 
 
-def проверка(unit: str, pct: float, grade: str, *, версия: str, когда: date) -> InspectionRow:
-    """Строка ряда с заданными изданием методики и датой — для срезов."""
+def проверка(
+    unit: str,
+    pct: float,
+    grade: str,
+    *,
+    версия: str,
+    когда: date,
+    происхождение: str = ORIGIN_FIELD,
+) -> InspectionRow:
+    """Строка ряда с заданными изданием методики, датой и происхождением."""
     основа = строка(unit, pct, grade)
     return InspectionRow(
         **{
@@ -241,6 +228,7 @@ def проверка(unit: str, pct: float, grade: str, *, версия: str, к
             "checklist_version": версия,
             "inspection_date": когда,
             "id": f"{unit}-{когда.isoformat()}",
+            "origin": происхождение,
         }
     )
 
@@ -267,34 +255,37 @@ def test_окно_периода_считается_от_сегодня_а_не_
     assert (начало, конец) == (date(2026, 8, 25), date(2026, 9, 24))
 
 
-def test_разбивка_не_усредняет_несравнимый_ряд() -> None:
-    """Город, где проверки считались разными изданиями, средней не получает.
-
-    Это то же правило, что для сети целиком (T349), и оно обязано работать на
-    каждом уровне: средняя по городу из разных ставок — такое же среднее по
-    несравнимому, только менее заметное, потому что стоит в строке таблицы.
-    """
-    # Arrange
+def test_разбивка_усредняет_город_из_разных_изданий_и_исторической() -> None:
+    """Оценка каждой проверки верна по своей методике (D352): средняя города
+    и её движение считаются по всем проверкам, в том числе исторической."""
+    # Arrange — сейчас два издания, раньше историческая по старой методике.
     ряд = (
         проверка("Белград-1", 90.0, "A", версия="2026.09", когда=date(2026, 9, 20)),
         проверка("Белград-2", 70.0, "D", версия="2026.06", когда=date(2026, 9, 18)),
     )
+    раньше = (
+        проверка(
+            "Белград-1",
+            85.0,
+            "",
+            версия="legacy:Qvalon 133",
+            когда=date(2026, 8, 1),
+            происхождение=ORIGIN_LEGACY,
+        ),
+    )
     гео = {"Белград-1": ("RS", "Белград"), "Белград-2": ("RS", "Белград")}
 
     # Act
-    разбивка = ov._breakdown(ряд, geo=гео, counts={})
+    разбивка = ov._breakdown(ряд, geo=гео, counts={}, before=раньше)
 
     # Assert
     assert len(разбивка) == 1
-    assert разбивка[0].comparable is False, "ряд из разных изданий сравнимым не бывает"
+    assert разбивка[0].average == 80.0
+    assert разбивка[0].delta == -5.0
 
 
-def test_движение_оценки_считается_только_против_сравнимой_проверки() -> None:
-    """Стрелка против проверки другого издания означала бы смену ставок.
-
-    Показать её как движение точки — соврать человеку на главном экране: он
-    прочтёт «точка просела», хотя просела методика.
-    """
+def test_движение_точки_считается_против_проверки_другого_издания() -> None:
+    """Смена издания движение точки не гасит (D352): обе оценки верны."""
     # Arrange — у точки две проверки, и они посчитаны разными изданиями.
     ряд = (
         проверка("Белград-1", 71.5, "D", версия="2026.09", когда=date(2026, 9, 20)),
@@ -306,7 +297,25 @@ def test_движение_оценки_считается_только_прот�
 
     # Assert
     assert len(точки) == 1
-    assert точки[0].delta is None, "движение против другого издания не считается"
+    assert точки[0].delta == -18.5
+
+
+def test_движение_точки_считается_против_исторической() -> None:
+    # Arrange — прошлая проверка загружена из старого отчёта (D332).
+    ряд = (
+        проверка("Белград-1", 92.0, "A", версия="2026.09", когда=date(2026, 9, 20)),
+        проверка(
+            "Белград-1",
+            88.0,
+            "",
+            версия="legacy:old 253",
+            когда=date(2025, 9, 20),
+            происхождение=ORIGIN_LEGACY,
+        ),
+    )
+
+    # Act / Assert
+    assert ov._points(ряд, geo={}, counts={}, worst={})[0].delta == 4.0
 
 
 def test_движение_оценки_считается_когда_издание_то_же() -> None:
@@ -379,26 +388,35 @@ def test_причина_попадания_в_проблемные_записа�
     ]
 
 
-def test_движение_сети_не_считается_против_несравнимого_периода() -> None:
-    """Разница между изданиями методики — это смена ставок, а не работа сети."""
+def test_средняя_и_движение_сети_считаются_по_разным_изданиям_и_исторической(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D352: смена методики не гасит ни среднюю, ни её движение.
+
+    Сводка среза из базы — уже без разбивки по изданиям: в окне сейчас
+    проверки двух изданий, в прошлом окне — историческая без буквы.
+    """
+
     # Arrange
-    сейчас = (проверка("Белград-1", 90.0, "A", версия="2026.09", когда=date(2026, 9, 20)),)
-    раньше = (проверка("Белград-1", 80.0, "B", версия="2026.06", когда=date(2026, 8, 20)),)
+    class База(ЗаписнаяБаза):
+        def slice_summary(self, **kw: object) -> tuple[int, list[tuple[str, int, float]]]:
+            if kw.get("date_from") == date(2026, 8, 25):
+                return 2, [("A", 1, 90.0), ("D", 1, 70.0)]
+            return 1, [("", 1, 85.0)]
+
+    monkeypatch.setattr(ov, "queries", База())
 
     # Act
-    движение = ov._movement(сейчас, раньше)
+    данные = ov.load(
+        reach=own_reach(ТЕНАНТ),
+        limit=50,
+        selection=ov.Selection(period="d30"),
+        today=date(2026, 9, 24),
+    )
 
     # Assert
-    assert движение is None
-
-
-def test_движение_сети_считается_когда_издание_то_же() -> None:
-    # Arrange
-    сейчас = (проверка("Белград-1", 90.0, "A", версия="2026.09", когда=date(2026, 9, 20)),)
-    раньше = (проверка("Белград-1", 80.0, "B", версия="2026.09", когда=date(2026, 8, 20)),)
-
-    # Act & Assert
-    assert ov._movement(сейчас, раньше) == 10.0
+    assert данные.average == 80.0
+    assert данные.average_delta == -5.0
 
 
 def test_у_периода_всё_время_прошлого_окна_нет() -> None:
@@ -453,7 +471,8 @@ def test_умолчания_не_висят_в_адресе_среза(
 
     # Assert
     assert "sort=score" not in страница
-    assert "period=all" not in страница
+    # «Всё время» — единственная ссылка, которая этот период и выбирает.
+    assert страница.count("period=all") == 1
 
 
 class ЗаписнаяБаза:
@@ -484,7 +503,7 @@ class ЗаписнаяБаза:
         self._записать("list_inspections", kw)
         return ()
 
-    def slice_summary(self, **kw: object) -> tuple[int, list[tuple[str, str, str, int, float]]]:
+    def slice_summary(self, **kw: object) -> tuple[int, list[tuple[str, int, float]]]:
         self._записать("slice_summary", kw)
         return 0, []
 
@@ -578,36 +597,6 @@ def test_при_выбранной_стране_города_только_её()
     assert города == (("antalya", 1),)
 
 
-def test_город_без_страны_в_разбивке_ведёт_в_реестр_проверок_города(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Arrange
-    данные = снимок(
-        breakdown=(
-            ov.CityRow(
-                city="tbilisi",
-                country="",
-                units=3,
-                inspections=2,
-                average=90.0,
-                comparable=True,
-                grades=(),
-                critical=0,
-                delta=None,
-            ),
-        )
-    )
-
-    # Act
-    страница = показать(стенд, monkeypatch, данные)
-
-    # Assert — без страны экрана страны нет (D260): ссылка в реестр с кодом
-    # города, а на экране город словом.
-    assert 'href="/inspections?city=tbilisi' in страница
-    assert "Тбилиси" in страница
-    assert ">tbilisi<" not in страница
-
-
 def test_точки_справочника_считаются_в_выбранном_месте() -> None:
     # Arrange — 25.09.2026 при Грузии плитка показывала 151 точку всей сети.
     гео = {
@@ -621,64 +610,6 @@ def test_точки_справочника_считаются_в_выбранн�
     assert ov._units_in(гео, selection=ov.Selection(city="batumi")) == 1
     assert ov._units_in(гео, selection=ov.Selection(country="RS")) == 0
     assert ov._units_in(гео, selection=ov.Selection(grade="D")) is None
-
-
-# ── Ряд рвётся на смене цены, а не на смене издания (#405, D187) ─────────
-
-
-@pytest.fixture
-def цены():
-    """Читатель цены издания без методики на диске: имя → отпечаток."""
-    from src.web import pricing
-
-    таблица: dict[str, str | None] = {}
-    pricing.use_reader(таблица.get)
-    yield таблица
-    pricing.use_reader(None)
-
-
-def test_издания_одной_цены_усредняются(цены) -> None:
-    """Прод, 28.09: переиздание формулировок цены не меняло, а средняя пропадала."""
-    # Arrange — два издания, одна цена.
-    цены.update({"local-b9e1": "p1", "local-9155": "p1"})
-    ряд = (
-        проверка("Tbilisi-1", 89.0, "C", версия="local-9155", когда=date(2026, 9, 21)),
-        проверка("Tbilisi-1", 90.0, "D", версия="local-b9e1", когда=date(2026, 9, 17)),
-    )
-
-    # Act
-    сравнимо = ov._comparable(ряд)
-    точки = ov._points(ряд, geo={}, counts={}, worst={})
-
-    # Assert
-    assert сравнимо is True
-    assert точки[0].delta == -1.0
-
-
-def test_издания_разной_цены_не_усредняются(цены) -> None:
-    # Arrange — сменилась ставка: цена другая.
-    цены.update({"local-9155": "p1", "local-0c57": "p2"})
-    ряд = (
-        проверка("Batumi-1", 85.5, "D", версия="local-0c57", когда=date(2026, 9, 24)),
-        проверка("Batumi-1", 95.5, "B", версия="local-9155", когда=date(2026, 9, 23)),
-    )
-
-    # Act / Assert
-    assert ov._comparable(ряд) is False
-    assert ov._points(ряд, geo={}, counts={}, worst={})[0].delta is None
-
-
-def test_издание_без_методики_на_машине_сравнимым_не_считается(цены) -> None:
-    """Незнание за совпадение не выдаётся: ключом становится имя издания."""
-    # Arrange — цена одного издания известна, другого нет.
-    цены.update({"local-9155": "p1"})
-    ряд = (
-        проверка("Ереван-1", 90.0, "B", версия="local-9155", когда=date(2026, 9, 25)),
-        проверка("Ереван-1", 91.0, "B", версия="local-dead", когда=date(2026, 9, 1)),
-    )
-
-    # Act / Assert
-    assert ov._comparable(ряд) is False
 
 
 def test_пункт_на_одной_точке_системным_не_считается(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -744,23 +675,6 @@ def test_точка_без_страны_ведёт_в_карточку_как_р
     assert "/country/?" not in страница and "/country/-" not in страница
 
 
-def test_город_в_разбивке_ведёт_в_страну_с_городом(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    город = ov.CityRow(
-        city="batumi",
-        country="GE",
-        units=1,
-        inspections=1,
-        average=90.0,
-        comparable=True,
-        grades=(("B", 1),),
-        critical=0,
-    )
-    страница = показать(стенд, monkeypatch, снимок(breakdown=(город,)))
-    assert "/country/GE?" in страница and "city=batumi" in страница
-
-
 def test_назначить_проверку_на_обзоре_нет(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -778,3 +692,57 @@ def test_обрезанный_срез_экран_называет_вслух(
 
     assert "В срезе больше 2 проверок" in обрезан
     assert "В срезе больше" not in целый
+
+
+def test_главная_собирает_доску_рейтинги_и_страны(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Сквозной показ «Главной» (D378) со всеми блоками: шаблон не падает ни на одном."""
+    # Arrange
+    месяцы = home_ratings.month_window(date(2026, 9, 1))
+    блок = home_ratings.Gauge(
+        kind="rs",
+        months=месяцы,
+        series=(None,) * 6 + (88.0, 90.5),
+        imf_series=(None,) * 6 + (87.0, 89.0),
+        month=месяцы[-1],
+        value=90.5,
+        delta=2.5,
+        imf=89.0,
+        rated=12,
+        below=3,
+        threshold=85,
+    )
+    рейтинги = home_ratings.Ratings(
+        блок, home_ratings.Gauge(**{**блок.__dict__, "kind": "rko"}), {"RS": (90.5, 95.0)}
+    )
+    monkeypatch.setattr(home_ratings, "load", lambda *_, **__: рейтинги)
+    monkeypatch.setattr(
+        home_page.queries, "country_summary", lambda **_: [("RS", 12, 3, 4, 360.0, 1)]
+    )
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
+
+    # Act
+    страница = показать(стенд, monkeypatch, снимок())
+
+    # Assert
+    assert t_ru("home.board.title") in страница
+    assert "Проверок ждут приёмки: 2" in страница
+    assert "90.5" in страница and "IMF 89.0" in страница and "▲+2.5" in страница
+    assert "hm-chart__imf" in страница
+    assert "Сербия" in страница and "3<small>/12</small>" in страница
+    assert 'href="/overview?country=RS' in страница
+
+
+def test_страна_вне_охвата_из_адреса_главную_не_сужает(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Партнёр с чужой страной в адресе видит свой охват, а не чужие рейтинги."""
+    подменить_двери(monkeypatch, tenant="GE")
+    спрошено: list[object] = []
+    monkeypatch.setattr(home_ratings, "load", lambda codes, **_: спрошено.append(codes))
+    with собрать(tenant="GE").test_client() as client:
+        assert войти(client).status_code == 302
+        monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: снимок())
+        страница = client.get("/overview?country=HR").get_data(as_text=True)
+    assert спрошено == [("GE",)]
+    assert "Только Хорватия" not in страница

@@ -271,8 +271,8 @@ _запомнить_пространство_вошедшего
 # `_только_уК` — заслон разделов «только УК» (D264): крюк Flask
 # `@app.before_request`, его регистрирует декоратор, по имени не зовёт никто.
 _только_уК
-# `_контроль_читает` — заслон роли «контроль» (D319): крюк Flask `@app.before_request`.
-_контроль_читает
+# `_контроль_только_рейтинги` — заслон роли «контроль» (D319, D358): крюк Flask `@app.before_request`.
+_контроль_только_рейтинги
 # Привязка бота (D286): `bot_unlink` — маршрут Flask, его регистрирует
 # декоратор; `bound_at` привязки читает шаблон вкладки «Пользователи».
 bot_unlink
@@ -418,7 +418,41 @@ ratings_developer
 ratings_rule_add
 ratings_rule_remove
 ratings_settings
+ratings_layout
 
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
 CHANNEL_SEED
+# Календарь рейтингов (D357): отметку текущей ячейки читает шаблон, vulture его не видит.
+is_current
+
+# Пространства партнёров на экране «Пользователи» (#585, D364): маршруты Flask
+# (`src/web/users_screen.py`) — регистрирует декоратор, по имени их не зовёт никто.
+add_space
+space_countries
+# `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
+_методику_правят_админы
+
+# Экран «Пользователи» слева список, справа карточка (переделка экрана, 09.10.2026).
+# Маршруты Flask (`src/web/users_screen.py`) — регистрирует декоратор:
+bot_link
+mcp_grant
+mcp_revoke
+# Поля, которые читает только шаблон карточки (`users/_card.html`, `users/index.html`):
+# исход действия (`Show.flash`, `added_email_failed`, ссылка привязки и её срок),
+# подпись пункта фильтра ролей и «вошедший в круге Claude».
+flash
+added_email_failed
+bot_link_until
+label_key
+actor_in_circle
+# Поля свечей сводки рейтингов (D384) читает только шаблон `ratings/index.html`.
+rs_candles
+rko_candles
+wick_top
+wick_bottom
+body_top
+body_height
+trend
+in_period
+threshold_y

@@ -18,6 +18,7 @@ from src.db.ratings_read import CountryRow
 from .model import RKO, RS
 from .periods import RatingPeriod, ReportPeriod, default_period, parse_period, previous_period
 from .summary import (
+    Candle,
     CountryLine,
     Fact,
     HardRule,
@@ -25,6 +26,9 @@ from .summary import (
     UnitScore,
     ViolationBlock,
     ViolationFact,
+    candles,
+    delta,
+    group_average,
     hard_lines,
     risk_zone,
     score_lines,
@@ -35,7 +39,34 @@ from .summary import (
 GROUP_IMF = "imf"
 GROUP_DEVELOPER = "developer"
 GROUP_COUNTRY = "country"
-GROUPS = (GROUP_IMF, GROUP_DEVELOPER, GROUP_COUNTRY)
+GROUP_CLUSTER = "cluster"
+GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
+#: Кластеры IMF (D384): CEE — вся Европа, OTHER — Other countries.
+CLUSTERS = ("CEE", "OTHER")
+#: Сколько месяцев на графике свечей — по конец выбранного периода.
+CANDLE_MONTHS = 12
+
+
+LEVEL_CLUSTER = "cluster"
+LEVEL_SLICE = "slice"
+LEVEL_COUNTRY = "country"
+
+
+@dataclass(frozen=True)
+class GroupLine:
+    """Строка сводки по группе (`level`): `cluster` — кластер в срезе IMF,
+    `slice` — весь выбранный срез (`key` — None), `country` — страна среза
+    девелопера (D385). Срез кластера и страны — одной строкой (D383)."""
+
+    key: str | None
+    countries: tuple[str, ...]
+    rs: float | None
+    rs_delta: float | None
+    rko: float | None
+    rko_delta: float | None
+    rs_candles: tuple[Candle | None, ...]
+    rko_candles: tuple[Candle | None, ...]
+    level: str = LEVEL_SLICE
 
 
 @dataclass(frozen=True)
@@ -56,6 +87,8 @@ class Choices:
 class Summary:
     selection: Selection
     countries: tuple[str, ...]
+    groups: tuple[GroupLine, ...]
+    months: tuple[date, ...]
     lines: tuple[CountryLine, ...]
     total: CountryLine
     previous: ReportPeriod | None
@@ -89,6 +122,8 @@ def _value(group: str, wanted: str | None, found: Choices) -> str | None:
         if wanted in found.developers:
             return wanted
         return found.developers[0] if found.developers else None
+    if group == GROUP_CLUSTER:
+        return wanted if wanted in CLUSTERS else CLUSTERS[0]
     if group == GROUP_COUNTRY:
         codes = tuple(row.code for row in found.countries)
         if wanted in codes:
@@ -117,6 +152,8 @@ def group_countries(selection: Selection, countries: Sequence[CountryRow]) -> tu
         return tuple(
             row.code for row in countries if row.developer and row.developer == selection.value
         )
+    if selection.group == GROUP_CLUSTER:
+        return tuple(row.code for row in countries if row.cluster == selection.value)
     return tuple(row.code for row in countries)
 
 
@@ -159,6 +196,61 @@ def _risk(
     return tuple(risk), tuple(short)
 
 
+def candle_months(end: date, n: int = CANDLE_MONTHS) -> tuple[date, ...]:
+    """Первые числа `n` месяцев по месяц `end` включительно, старые первыми."""
+    months = []
+    year, month = end.year, end.month
+    for _ in range(n):
+        months.append(date(year, month, 1))
+        year, month = (year - 1, 12) if month == 1 else (year, month - 1)
+    return tuple(reversed(months))
+
+
+def group_lines(
+    selection: Selection,
+    found: Choices,
+    codes: Sequence[str],
+    facts: tuple[Sequence[Fact], Sequence[Fact], Sequence[Fact]],
+    months: Sequence[date],
+) -> tuple[GroupLine, ...]:
+    """В срезе IMF — строка на кластер; у девелопера — общая строка и строка на
+    каждую его страну (D385); в остальных — одна строка среза.
+    `facts` — (текущий период, прошлый, окно свечей)."""
+    current, previous, history = facts
+    parts: list[tuple[str, str | None, tuple[str, ...]]]
+    if selection.group == GROUP_IMF:
+        parts = [
+            (
+                LEVEL_CLUSTER,
+                key,
+                tuple(r.code for r in found.countries if r.cluster == key and r.code in codes),
+            )
+            for key in CLUSTERS
+        ]
+    else:
+        parts = [(LEVEL_SLICE, None, tuple(codes))]
+        if selection.group == GROUP_DEVELOPER and len(codes) > 1:
+            parts += [(LEVEL_COUNTRY, code, (code,)) for code in codes]
+    out = []
+    for level, key, part in parts:
+        values = {k: group_average(current, k, part) for k in (RS, RKO)}
+        before = {k: group_average(previous, k, part) for k in (RS, RKO)}
+        out.append(
+            GroupLine(
+                key=key,
+                countries=part,
+                rs=values[RS],
+                rs_delta=delta(values[RS], before[RS]),
+                rko=values[RKO],
+                rko_delta=delta(values[RKO], before[RKO]),
+                rs_candles=candles(history, RS, part, months),
+                rko_candles=candles(history, RKO, part, months),
+                level=level,
+            )
+        )
+    return tuple(out)
+
+
 def build(selection: Selection) -> Summary:
     found = choices()
     codes = group_countries(selection, found.countries)
@@ -169,6 +261,9 @@ def build(selection: Selection) -> Summary:
         _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
     )
     lines, total = score_lines(current, previous, codes)
+    months = candle_months(period.end)
+    history = _facts(read.score_facts(countries=codes, begin=months[0], end=period.end))
+    groups = group_lines(selection, found, codes, (current, previous, history), months)
     limits = read.settings()
     rules = [HardRule(r[1], r[2], r[3]) for r in read.hard_rules()]
     rko_rows, rko_counts = read.rko_violation_facts(
@@ -185,6 +280,8 @@ def build(selection: Selection) -> Summary:
     return Summary(
         selection=selection,
         countries=codes,
+        groups=groups,
+        months=months,
         lines=lines,
         total=total,
         previous=prev,

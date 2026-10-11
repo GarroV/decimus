@@ -77,8 +77,8 @@ def test_контроль_грузит_партнёр_видит(
         текст = client.get("/ratings?group=developer&value=Dev+One&period=2026-Q1").get_data(
             as_text=True
         )
-        rs_id = re.search(r'value="rs:(\d+)"[^>]*>Сентябрь 2 часть 2026', текст)
-        assert rs_id, "период РС не предложен в выборе"
+        rs_id = re.search(r'period=rs(?::|%3A)(\d+)[^"]*"[^>]*>Сентябрь 2 часть 2026', текст)
+        assert rs_id, "период РС не предложен в календаре"
         период = client.get(f"/ratings?group=developer&value=Dev+One&period=rs:{rs_id[1]}")
         период_текст = период.get_data(as_text=True)
         assert "Δ к Сентябрь 1 часть 2026" in период_текст and "Δ к rs:" not in период_текст
