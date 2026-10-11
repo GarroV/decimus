@@ -38,6 +38,7 @@ from src.bot.keyboards import (
     LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
     PICK_PREFIX,
+    SPEECH_LANG_PREFIX,
 )
 from src.domain import get_state, score
 
@@ -65,6 +66,7 @@ async def test_проверка_проходится_целиком_и_оцен�
     await feed(dp, bot, callback(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
+    await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}ru"))
     await feed(dp, bot, callback(f"{LANG_PREFIX}ru"))
 
     начатая = get_state(CHAT_ID)
@@ -130,6 +132,7 @@ async def test_прерванная_проверка_продолжается(
     await feed(dp, bot, callback(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
+    await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}ru"))
     await feed(dp, bot, callback(f"{LANG_PREFIX}ru"))
     stub_classify(
         monkeypatch,

@@ -78,24 +78,9 @@ _PANEL: dict[str, dict[str, str]] = {
     "registry.panel.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.panel.kind": {"ru": "Вид", "en": "Kind"},
     "registry.panel.checklist": {"ru": "Чек-лист", "en": "Checklist"},
-    "registry.panel.actions": {"ru": "Действия", "en": "Actions"},
     "registry.panel.findings_more": {
         "ru": "Ещё {n} — в полной карточке",
         "en": "{n} more in the full card",
-    },
-    "registry.panel.review_go": {"ru": "Вычитать и подтвердить", "en": "Review and accept"},
-    "registry.panel.review_read": {
-        "ru": "Вычитка — в полной карточке: там весь чек-лист по зонам.",
-        "en": "Review in the full card: it shows the whole checklist by zone.",
-    },
-    "registry.panel.move_go": {
-        "ru": "Исправить дату или пиццерию",
-        "en": "Correct date or pizzeria",
-    },
-    "registry.panel.plan_go": {"ru": "Запросить экшн-план", "en": "Request an action plan"},
-    "registry.panel.retract_text": {
-        "ru": "Проверка останется в истории с пометкой и причиной, в отчёты её числа не пойдут.",
-        "en": "The inspection stays in history, marked with the reason; its numbers leave reports.",
     },
 }
 

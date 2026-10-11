@@ -127,3 +127,46 @@ def canonical_unit(typed: str) -> UnitName | None:
         return UnitName(name=f"{_latin(сырой_город)}-{номер}", city=None, country=None)
     город = _ascii(CITIES[код]["en"])
     return UnitName(name=f"{город}-{номер}", city=код, country=CITY_COUNTRY.get(код))
+
+
+#: Почему написанное не годится названием точки. Значения совпадают с хвостом
+#: ключей текстов бота (`start.<проблема>`): бот и мини-апп (D392) отказывают
+#: одними и теми же словами, а проверка — одна, здесь.
+PROBLEM_EMPTY = "unit_empty"
+PROBLEM_TOO_LONG = "unit_too_long"
+PROBLEM_TOO_LONG_BYTES = "unit_too_long_bytes"
+PROBLEM_NEED_NUMBER = "unit_need_number"
+
+
+@dataclass(frozen=True)
+class UnitCheck:
+    """Итог проверки написанного: каноничное имя или причина отказа (`PROBLEM_*`)."""
+
+    name: UnitName | None
+    problem: str = ""
+
+
+def check_unit_name(typed: str) -> UnitCheck:
+    """Пределы и каноничность названия — те же, что у мастера бота и у мини-аппа.
+
+    Отказ здесь, а не отказом сборки отчёта в конце проверки: там аудитор уже
+    уехал с точки, и переименовать пиццерию ему нечем. Пределы проверяются
+    дважды — по написанному и по сведённому имени: латиница бывает длиннее
+    («Щ» → «shch»), а 60 эмодзи проходят предел в знаках, но не в байтах (T128).
+    """
+    unit = typed.strip()
+    if not unit:
+        return UnitCheck(None, PROBLEM_EMPTY)
+    if len(unit) > UNIT_NAME_LIMIT:
+        return UnitCheck(None, PROBLEM_TOO_LONG)
+    if len(unit.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+        return UnitCheck(None, PROBLEM_TOO_LONG_BYTES)
+    # Имя точки — город по-английски и номер, как бы его ни написали (D233).
+    имя = canonical_unit(unit)
+    if имя is None:
+        return UnitCheck(None, PROBLEM_NEED_NUMBER)
+    if len(имя.name) > UNIT_NAME_LIMIT:
+        return UnitCheck(None, PROBLEM_TOO_LONG)
+    if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
+        return UnitCheck(None, PROBLEM_TOO_LONG_BYTES)
+    return UnitCheck(имя)

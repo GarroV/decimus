@@ -27,6 +27,8 @@ from src.db.reach import Reach
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
 TOP = 6
+#: Сколько точек «Где нужно проверить» показывать на экране; остальные — числом.
+TO_CHECK_TOP = 8
 #: С какого числа точек нарушение пункта считается системным. Пункт на одной
 #: точке — это одна точка, и её уже показывают «Проблемные точки».
 SYSTEMIC_MIN_UNITS = 2
@@ -151,6 +153,18 @@ class PointRow:
 
 
 @dataclass(frozen=True)
+class ToCheck:
+    """Точка, которую за период не проверяли: когда проверяли в последний раз."""
+
+    unit: str
+    unit_id: str
+    country: str
+    city: str
+    #: Последняя проверка за всё время; `None` — не проверяли ни разу.
+    last: date | None
+
+
+@dataclass(frozen=True)
 class Overview:
     """Всё, что показывает экран, одним снимком."""
 
@@ -178,6 +192,14 @@ class Overview:
     #: обработчика прошёл бы мимо подменяемого слоя и сломал бы проверки
     #: экрана, которые до базы не доходят.
     unit_ids: dict[str, str] = field(default_factory=dict)
+    #: Где нужно проверить (D398): точки, не проверенные за период, — те, что
+    #: ждут дольше всех, первыми, не проверявшиеся ни разу — перед ними. Ряд
+    #: ограничен `TO_CHECK_TOP`, остаток — числом.
+    to_check: tuple[ToCheck, ...] = ()
+    to_check_more: int = 0
+    #: `{название точки: код Dodo}` — ключ, по которому к точке цепляются
+    #: оценки рейтинга (колонка РС / РКО в таблице пиццерий).
+    unit_codes: dict[str, str] = field(default_factory=dict)
     #: Срез за период больше предела ряда: ряд `inspections` и всё, что из него
     #: строится (таблицы точек и городов, поводы), взяты по последним `limit`
     #: проверкам среза. Плитки, буквы, потери и системные — по всему срезу
@@ -489,6 +511,26 @@ def _problems(points: tuple[PointRow, ...]) -> tuple[PointRow, ...]:
     return tuple(отобранные[:TOP])
 
 
+def _to_check(
+    rows: list[tuple[str, str, date | None, int]],
+    *,
+    geo: dict[str, tuple[str, str]],
+    ids: dict[str, str],
+    selection: Selection,
+) -> tuple[tuple[ToCheck, ...], int]:
+    """Точки без проверок за период: не проверявшиеся ни разу, затем давнее всех."""
+    ждут = []
+    for имя, _, последняя, за_период in rows:
+        страна, город = geo.get(имя, ("", ""))
+        if за_период or (selection.country and страна != selection.country):
+            continue
+        if selection.city and город != selection.city:
+            continue
+        ждут.append(ToCheck(имя, ids.get(имя, ""), страна, город, последняя))
+    ждут.sort(key=lambda т: (т.last is not None, т.last or date.min, т.unit))
+    return tuple(ждут[:TO_CHECK_TOP]), max(len(ждут) - TO_CHECK_TOP, 0)
+
+
 def _units_in(geo: dict[str, tuple[str, str]], *, selection: Selection) -> int | None:
     """Точек справочника в выбранном месте; `None` — место не выбрано, считать всю сеть.
 
@@ -590,6 +632,8 @@ def load(
     охват = reach
     geo = queries.unit_geography(reach=охват)
     ид_точек = queries.unit_ids(reach=охват)
+    последние = queries.unit_last_inspections(reach=охват, date_from=date_from, date_to=date_to)
+    ждут, ждут_ещё = _to_check(последние, geo=geo, ids=ид_точек, selection=selection)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
     worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
     rows, обрезан = _slice(
@@ -620,6 +664,9 @@ def load(
     return Overview(
         units_total=всего_точек,
         unit_ids=ид_точек,
+        to_check=ждут,
+        to_check_more=ждут_ещё,
+        unit_codes={имя: код for имя, код, _п, _н in последние if код},
         inspections=rows,
         grades=сводка.grades,
         average=сводка.average,

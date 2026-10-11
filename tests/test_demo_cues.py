@@ -40,7 +40,12 @@ from bot_harness import callback_query as callback
 
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
-from src.bot.keyboards import KIND_PREFIX, LANG_PREFIX, NEW_INSPECTION_CALLBACK
+from src.bot.keyboards import (
+    KIND_PREFIX,
+    LANG_PREFIX,
+    NEW_INSPECTION_CALLBACK,
+    SPEECH_LANG_PREFIX,
+)
 from src.domain import get_state
 from src.recognize.config import NO_CHAT
 from src.recognize.cues import load_cues
@@ -176,6 +181,7 @@ async def test_демо_доходит_до_записи_без_модели(
     await feed(dp, bot, callback(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Demo Pizzeria #1"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
+    await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}en"))
     await feed(dp, bot, callback(f"{LANG_PREFIX}en"))
     await feed(dp, bot, photo_message("demo-frame-1", caption=DEMO_NOTE))
 

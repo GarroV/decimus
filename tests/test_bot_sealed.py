@@ -97,28 +97,57 @@ async def сданная() -> tuple[object, object, object]:
     return bot, session, build_dispatcher(SETTINGS)
 
 
-async def test_продолжить_сданную_больше_не_предлагается(domain_env: Path) -> None:
-    """Главное требование D080: кнопки «Продолжить» на сданной проверке нет."""
+async def test_старт_на_сданной_сразу_ведёт_в_мастер(domain_env: Path) -> None:
+    """D399: сданная проверка аудитора не спрашивает — убирается молча, мастер идёт сразу."""
     bot, session, dp = await сданная()
 
     await feed(dp, bot, text_message("/start"))
 
-    assert RESUME_CONTINUE_CALLBACK not in session.keyboard_data(), (
-        "бот снова предлагает дописать в сданную проверку"
-    )
-    assert session.keyboard_data() == [RESUME_NEW_CALLBACK, SEALED_DROP_CALLBACK]
+    assert get_state(CHAT_ID) is None, "сданная копия осталась в чате"
+    assert sidecar.read(CHAT_ID).frames == (), "заметки сданной проверки пережили сброс"
+    assert RESUME_CONTINUE_CALLBACK not in session.keyboard_data()
+    assert RESUME_NEW_CALLBACK not in session.keyboard_data()
+    assert SEALED_DROP_CALLBACK not in session.keyboard_data()
+    for key in ("sealed.blocked", "sealed.dropped"):
+        assert t(key, "ru") not in session.texts
+    assert not any("сдана" in text for text in session.texts), "бот напомнил о сданной проверке"
+    assert session.last_text in {t("start.ask_unit", "ru"), t("start.ask_checklist", "ru")}
+
+
+async def test_новая_проверка_на_сданной_сразу_ведёт_в_мастер(domain_env: Path) -> None:
+    """Та же развилка с кнопки «Новая проверка» (D399)."""
+    bot, session, dp = await сданная()
+
+    await feed(dp, bot, callback(NEW_INSPECTION_CALLBACK))
+
+    assert get_state(CHAT_ID) is None
+    assert not any("сдана" in text for text in session.texts)
+    assert session.last_text in {t("start.ask_unit", "ru"), t("start.ask_checklist", "ru")}
+
+
+async def test_старт_на_несданной_не_стирает_проверку(domain_env: Path) -> None:
+    """Ядро D399: проверка в работе не сбрасывается никогда — спрашиваем, как по T052."""
+    начать()
+    записать()
+    bot, session = make_bot()
+
+    await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))
+
+    assert get_state(CHAT_ID) is not None, "несданная проверка убрана из чата"
+    assert len(записи()) == 1
+    assert session.keyboard_data() == [RESUME_CONTINUE_CALLBACK, RESUME_NEW_CALLBACK]
 
 
 async def test_отказ_объясняет_причину_и_называет_выход(domain_env: Path) -> None:
     """«Нельзя» без причины человек на точке читает как поломку продукта."""
     bot, session, dp = await сданная()
 
-    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, photo_message("frame-late", caption="печь грязная"))
 
     сказанное = session.last_text
     assert "сдана" in сказанное
-    assert "дописать" in сказанное.lower(), "не сказано, чего именно нельзя"
-    assert "истории" in сказанное, "не сказано, что отданный отчёт остаётся у получателя"
+    assert "дописывать" in сказанное.lower(), "не сказано, чего именно нельзя"
+    assert "истори" in сказанное, "не сказано, почему нельзя: проверка уже в истории точки"
 
 
 async def test_устаревшая_кнопка_продолжить_не_стреляет(domain_env: Path) -> None:

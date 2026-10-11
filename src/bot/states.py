@@ -18,7 +18,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 
 class StartFlow(StatesGroup):
-    """Пошаговый мастер начала проверки: [чек-лист →] пиццерия → вид → язык отчёта."""
+    """Пошаговый мастер начала проверки: [чек-лист →] пиццерия → вид → языки проверки и отчёта."""
 
     #: Ждём тап по чек-листу — только когда в боте открыто несколько (волна 3).
     waiting_checklist = State()
@@ -27,6 +27,8 @@ class StartFlow(StatesGroup):
     waiting_unit = State()
     #: Ждём тап по одной из кнопок вида проверки.
     waiting_kind = State()
+    #: Ждём тап по одной из кнопок языка проверки (D393): на нём аудитор говорит и пишет.
+    waiting_speech_lang = State()
     #: Ждём тап по одной из кнопок языка отчёта.
     waiting_lang = State()
 

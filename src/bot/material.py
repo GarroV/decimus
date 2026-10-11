@@ -23,6 +23,8 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 
+from .run_guard import RunGuard, RunOf
+
 
 @dataclass(frozen=True)
 class PhotoGroup:
@@ -198,18 +200,25 @@ class MaterialStore:
     партнёру под формулировкой, сказанной в другой. Перезапуск бота дефект
     маскировал: после него в памяти пусто.
 
-    Второго ключа (номера проверки) здесь нет намеренно: он превратил бы
-    забытую очистку в тихое накопление очередей, а так лишнее удаляется, а не
-    отфильтровывается. Зовёт `forget` тот же модуль и в тех же двух местах,
-    что и `PendingStore.forget` (`routers/start.py`): начало новой проверки и
-    «Убрать из чата».
+    Лишнее удаляется, а не отфильтровывается: забытая очистка иначе стала бы
+    тихим накоплением очередей. Проверку может начать и мини-апп (D392) — другой
+    процесс, `forget` ему не позвать, — поэтому очередь помнит личность проверки,
+    при которой наполнялась (`run_guard.py`), и при смене отдаёт пустую. Зовёт
+    `forget` тот же модуль и в тех же двух местах, что и `PendingStore.forget`
+    (`routers/start.py`): начало новой проверки и «Убрать из чата».
     """
 
-    def __init__(self) -> None:
+    def __init__(self, run_of: RunOf | None = None) -> None:
+        """`run_of` — личность проверки чата; сменилась (начал мини-апп) — очередь пуста."""
         self._queues: dict[int, ChatMaterialQueue] = {}
+        self._guard = RunGuard(run_of)
 
     def queue(self, chat_id: int) -> ChatMaterialQueue:
         """Очередь этого чата, создать при первом обращении."""
+        if self._guard.is_stale(chat_id):
+            # Проверку начали заново не здесь (D392): слова старой не должны
+            # достаться кадру новой.
+            self._queues.pop(chat_id, None)
         if chat_id not in self._queues:
             self._queues[chat_id] = ChatMaterialQueue()
         return self._queues[chat_id]
