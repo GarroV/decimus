@@ -22,12 +22,13 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 logger = logging.getLogger(__name__)
 
 PUBLIC_API = "https://publicapi.dodois.io/{country}/api/v1/unitinfo/all"
 PIZZERIA_TYPE = 1  # у Dodo `Type == 1` — пиццерия; 0 — офис
+WORKING_STATE = 1  # `State == 1` — работает; иные — закрыта или ещё не открыта
 NEAR_M = 300
 FAR_M = 1500
 CLEAR_RATIO = 2.0
@@ -42,6 +43,8 @@ class DodoUnit:
     name: str
     lat: float
     lng: float
+    country: str = ""  # ISO-2 заглавными; заполняет `fetch_units`
+    working: bool = True  # `State == 1` в публичном API: открыта, не закрыта насовсем
 
 
 @dataclass(frozen=True)
@@ -103,7 +106,15 @@ def parse_units(payload: object) -> tuple[DodoUnit, ...]:
             continue
         if lat == 0 and lng == 0:
             continue
-        found.append(DodoUnit(uuid.lower(), str(name or ""), float(lat), float(lng)))
+        found.append(
+            DodoUnit(
+                uuid.lower(),
+                str(name or ""),
+                float(lat),
+                float(lng),
+                working=raw.get("State") == WORKING_STATE,
+            )
+        )
     return tuple(found)
 
 
@@ -116,7 +127,9 @@ def fetch_units(countries: Iterable[str]) -> tuple[DodoUnit, ...]:
         time.sleep(REQUEST_GAP_SEC)
         try:
             with urllib.request.urlopen(url, timeout=TIMEOUT_SEC) as response:  # noqa: S310
-                found.extend(parse_units(json.load(response)))
+                found.extend(
+                    replace(u, country=country.upper()) for u in parse_units(json.load(response))
+                )
         except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
             logger.warning("Публичный API Dodo: страна %s не прочиталась (%s)", country, exc)
     return tuple(found)
