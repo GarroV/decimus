@@ -612,7 +612,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        период = registry_period.read(request.args, today=date.today())
+        период = registry_period.read(request.args, today=date.today(), default_all=True)
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
