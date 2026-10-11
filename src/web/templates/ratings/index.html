@@ -126,7 +126,7 @@
   {% for block in blocks %}
   {% if block == 'scores' %}
   {#- Сводка по группам (D383, D384): в срезе IMF — кластеры, иначе сам срез;
-      подробности по странам — фильтром, а не стеной строк. Свеча — месяц. -#}
+      подробности по странам — фильтром, а не стеной строк. Точка — период рейтинга (D396). -#}
   <section class="rt-sec" aria-labelledby="rt-scores">
     <div class="rt-sec__head">
       <h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2>
@@ -140,19 +140,22 @@
       {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}{% set sc = k.scales[i] %}
       <div role="cell">
         <div class="rt-cl__kpi"><span class="rt-cl__k">{{ t('ratings.' ~ kind) }}</span><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
-        <div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
-        <svg class="rt-candles" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.candle.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
-          {% if sc.threshold_y is not none %}<line class="rt-candles__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
-          {% for c in k.rows[i] %}<g class="rt-candle rt-candle--{{ c.trend }}{% if not c.in_period %} is-out{% endif %}" data-tip="{{ c.title }}" tabindex="0"><title>{{ c.title }}</title>
-            <line x1="{{ c.x }}" x2="{{ c.x }}" y1="{{ c.wick_top }}" y2="{{ c.wick_bottom }}" vector-effect="non-scaling-stroke"/>
-            <rect x="{{ c.x - c.width / 2 }}" y="{{ c.body_top }}" width="{{ c.width }}" height="{{ c.body_height }}" rx="1"/></g>{% endfor %}
-        </svg></div>
-        <div class="rt-cl__axis" aria-hidden="true"><span>{{ chart.months[0] }}</span><span>{{ chart.months[-1] }}</span></div>
+        {% set ln = k.rows[i] %}
+        {% if ln.dots %}<div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
+        <div class="rt-line">
+          <svg class="rt-line__svg" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.line.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
+            {% if sc.threshold_y is not none %}<line class="rt-line__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
+            <polyline class="rt-line__path" points="{{ ln.path }}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          {% for d in ln.dots %}<span class="rt-line__dot" style="left: {{ d.left }}%; top: {{ d.top }}%" data-tip="{{ d.title }}" title="{{ d.title }}" tabindex="0"></span>{% endfor %}
+        </div>
+        <span></span><div class="rt-line__axis" aria-hidden="true">{% for left, label in ln.labels %}<span style="left: {{ left }}%">{{ label }}</span>{% endfor %}</div></div>
+        {% else %}<div class="rt-line__empty">{{ t('ratings.line.empty') }}</div>{% endif %}
       </div>
       {% endfor %}
       {% endfor %}
     </div>
-    <p class="rt-cl__note">{{ t('ratings.candle.hint', x=thr(summary.thresholds.top_threshold)) }}</p>
+    <p class="rt-cl__note">{{ t('ratings.line.hint', x=thr(summary.thresholds.top_threshold)) }}</p>
     <div class="rt-tip" role="tooltip" hidden></div>
   </section>
   {% elif block == 'violations' %}

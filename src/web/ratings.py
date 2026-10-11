@@ -35,7 +35,7 @@ from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
 from . import auth, ratings_calendar
-from . import ratings_candles as rc
+from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
 from .errors import WebTextError
@@ -200,33 +200,22 @@ def _group_name(
 
 
 def _chart(summary: report.Summary, names: list[str], lang: str) -> dict[str, object]:
-    """Строки сводки со свечами (D384). Шкала — своя у каждой строки: общая
-    растягивалась выбросом соседней группы, и свечи сжимались в черту; группы
-    сравнивают по числу слева, а не по высоте свечей."""
-    period = (
-        summary.selection.period.begin.replace(day=1),
-        summary.selection.period.end.replace(day=1),
-    )
+    """Строки сводки с линией по периодам рейтинга (D396). Шкала — своя у каждой
+    строки: общая растягивалась выбросом соседней группы, и линия ложилась в черту;
+    группы сравнивают по числу слева, а не по высоте графика."""
     threshold = summary.thresholds["top_threshold"]
-    title = TEXTS["ratings.candle.title"][lang]  # шаблон: поля заполняет `sticks`
+    title = TEXTS["ratings.line.title"][lang]  # шаблон: поля заполняет `line`
     kinds = {}
     for kind in ("rs", "rko"):
-        series = [getattr(g, f"{kind}_candles") for g in summary.groups]
-        scales = [rc.scale([s], threshold) for s in series]
+        series = [g.rs_points if kind == "rs" else g.rko_points for g in summary.groups]
+        scales = [rl_chart.scale([p.avg for p in s], threshold) for s in series]
         kinds[kind] = {
             "scales": scales,
             "rows": [
-                rc.sticks(s, sc, period=period, lang=lang, title=title)
-                for s, sc in zip(series, scales, strict=True)
+                rl_chart.line(s, sc, title=title) for s, sc in zip(series, scales, strict=True)
             ],
         }
-    return {
-        "names": names,
-        "kinds": kinds,
-        "months": [rc.month_label(m, lang) for m in summary.months],
-        "width": rc.WIDTH,
-        "height": rc.HEIGHT,
-    }
+    return {"names": names, "kinds": kinds, "width": rl_chart.WIDTH, "height": rl_chart.HEIGHT}
 
 
 def render_summary(conf: Settings) -> str:

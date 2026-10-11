@@ -120,15 +120,15 @@ def last_period_ids(rating_type: str, *, until: date, n: int) -> tuple[int, ...]
 
 _SCORES_BY_DATES = (
     "select s.unit_dodo_id, u.name, u.country_code, p.rating_type, p.id, p.begin_on, "
-    "s.score::float "
+    "s.score::float, p.end_on "
     "from ratings.scores s join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "join ratings.periods p on p.id = s.period_id "
-    "where u.country_code = any(%s) and p.begin_on between %s and %s "
+    "where u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "
     "order by p.begin_on, s.unit_dodo_id"
 )
 _SCORES_BY_IDS = (
     "select s.unit_dodo_id, u.name, u.country_code, p.rating_type, p.id, p.begin_on, "
-    "s.score::float "
+    "s.score::float, p.end_on "
     "from ratings.scores s join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "join ratings.periods p on p.id = s.period_id "
     "where u.country_code = any(%s) and p.id = any(%s) "
@@ -139,9 +139,10 @@ _SCORES_BY_IDS = (
 def score_facts(
     *, countries: Sequence[str], begin: date, end: date, period_ids: Sequence[int] = ()
 ) -> list[tuple[Any, ...]]:
-    """`(unit, unit_name, country, rating_type, period_id, begin_on, score)`.
+    """`(unit, unit_name, country, rating_type, period_id, begin_on, score, end_on)`.
 
-    Периоды, начавшиеся в `[begin, end]`, или ровно `period_ids`, если даны.
+    Периоды, задевающие `[begin, end]` (D396: выбранная рамка захватывает каждый
+    период, попавший в неё хотя бы днём), или ровно `period_ids`, если даны.
     """
     if period_ids:
         return _rows(_SCORES_BY_IDS, (list(countries), list(period_ids)))
@@ -187,7 +188,7 @@ _RS_REMARKS = (
     "from ratings.violations v join ratings.units u on u.dodo_id = v.unit_dodo_id "
     "join ratings.periods p on p.id = v.period_id "
     "where v.category = 'remark' and p.rating_type = 'rs' "
-    "and u.country_code = any(%s) and p.begin_on between %s and %s "
+    "and u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "
     "order by v.id"
 )
 _RS_CHECKUPS = (
@@ -195,14 +196,14 @@ _RS_CHECKUPS = (
     "join ratings.units u on u.dodo_id = s.unit_dodo_id "
     "join ratings.periods p on p.id = s.period_id "
     "where p.rating_type = 'rs' and u.country_code = any(%s) "
-    "and p.begin_on between %s and %s group by 1"
+    "and p.end_on >= %s and p.begin_on <= %s group by 1"
 )
 
 
 def rs_remark_facts(
     *, countries: Sequence[str], begin: date, end: date
 ) -> tuple[list[tuple[Any, ...]], dict[str, int]]:
-    """Замечания периодов РС, начавшихся в `[begin, end]`, и сумма проверок по стране."""
+    """Замечания периодов РС, задевающих `[begin, end]` (D396), и сумма проверок по стране."""
     params = (list(countries), begin, end)
     counts = {r[0]: int(r[1] or 0) for r in _rows(_RS_CHECKUPS, params)}
     return _rows(_RS_REMARKS, params), counts
