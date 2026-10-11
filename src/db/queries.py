@@ -888,6 +888,56 @@ def slice_summary(
     return точек, [(str(буква or ""), int(n), float(сумма)) for буква, n, сумма, _ in строки]
 
 
+_COUNTRY_SUMMARY_SQL = """
+with точки as (
+    select u.id, u.country from units u
+    where u.tenant_code = 'HQ' and u.country is not null and u.country <> ''
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+),
+срез as (
+    select u.country, i.unit_id, i.pct, i.grade
+    from inspections i
+         join units u on u.id = i.unit_id
+    where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and i.status = 'finalized'
+      and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+      and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+),
+по_срезу as (
+    select country, count(distinct unit_id) as checked, count(*) as n, sum(pct) as total,
+           count(*) filter (where grade = 'D') as d
+    from срез group by 1
+),
+по_точкам as (select country, count(*) as units from точки group by 1)
+select coalesce(т.country, с.country), coalesce(т.units, 0), coalesce(с.checked, 0),
+       coalesce(с.n, 0), coalesce(с.total, 0), coalesce(с.d, 0)
+from по_точкам т full join по_срезу с on с.country = т.country
+order by 1
+"""
+
+
+def country_summary(
+    *, reach: Reach, date_from: date | None = None, date_to: date | None = None
+) -> list[tuple[str, int, int, int, float, int]]:
+    """Сводка по странам охвата: `(страна, точек, проверено точек, проверок, сумма %, с буквой D)`.
+
+    Знаменатель — точки справочника страны, как у плитки «Пиццерий» (#503):
+    «проверено 3 из 12» говорит о стране, «проверено 3» — нет. Страна, где
+    точек в справочнике нет, а проверки есть, не пропадает (full join).
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("сводка по странам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _COUNTRY_SUMMARY_SQL, {**охват.params(), "date_from": date_from, "date_to": date_to}
+        )
+        return [
+            (str(c), int(u), int(ch), int(n), float(total), int(d))
+            for c, u, ch, n, total, d in cur.fetchall()
+        ]
+
+
 def units_total(*, reach: Reach) -> int:
     """Сколько точек справочника в охвате — всего, а не «с проверками».
 

@@ -22,6 +22,7 @@ import os
 from collections.abc import Mapping
 
 from .errors import WebTextError
+from .texts_home import HOME_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
@@ -274,7 +275,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Потерь по зонам за период нет.",
         "en": "No zone losses for the period.",
     },
-    "section.overview.title": {"ru": "Обзор", "en": "Overview"},
+    "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
     "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
@@ -1623,6 +1624,7 @@ if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
 TEXTS = {
     **TEXTS,
+    **HOME_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **RATINGS_TEXTS,
