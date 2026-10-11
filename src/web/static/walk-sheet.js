@@ -459,6 +459,8 @@
         if (isAdvice() && was !== !!f.text.trim()) redraw("footer");
       });
       box.appendChild(area);
+      var bar = W.translateBar(area);
+      if (bar) box.appendChild(bar);
       return box;
     },
 
@@ -481,6 +483,8 @@
       area.value = f.comment;
       area.addEventListener("input", function () { f.comment = area.value; changed(); });
       box.appendChild(area);
+      var bar = W.translateBar(area);
+      if (bar) box.appendChild(bar);
       return box;
     },
 
