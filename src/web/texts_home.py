@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378): доска «Ждёт действия», блоки РС / РКО, «Мои страны».
+"""Тексты «Главной» (D378, D395): «Требует внимания», блоки РС / РКО, «Мои страны».
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -41,12 +41,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
     "home.more.ratings": {"ru": "Рейтинги", "en": "Ratings"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
-    # ── Доска «Ждёт действия»: только живые счётчики (D217) ─────────────
-    "home.board.title": {"ru": "Ждёт действия", "en": "Waiting for you"},
-    "home.board.done": {
-        "ru": "Всё сделано: на приёмке, в экшн-планах и предписаниях ничего не ждёт.",
-        "en": "All done: nothing is waiting in review, action plans or notices.",
-    },
+    # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D395) ─────────────
     "home.board.failed": {
         "ru": "Задания не загрузились: база не ответила. Обновите страницу.",
         "en": "Tasks did not load: the database did not answer. Reload the page.",
@@ -82,7 +77,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "en": "RS and CX not loaded for {count} days",
     },
     "home.board.ratings_stale.cta": {"ru": "Загрузить", "en": "Upload"},
-    # ── Проверки за период и «Куда смотреть» ────────────────────────────
+    # ── Проверки за период ────────────────────────────
     "home.inspections.title": {"ru": "Проверки за период", "en": "Inspections in the period"},
     "home.inspections.average": {
         "ru": "средняя оценка, к прошлому периоду",
@@ -93,11 +88,12 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "en": "average score in the period",
     },
     "home.inspections.checked": {"ru": "Пиццерий проверено", "en": "Pizzerias inspected"},
-    "home.attention.title": {"ru": "Куда смотреть", "en": "Where to look"},
-    "home.attention.empty": {
-        "ru": "Всё в пределах норм: критических нарушений и оценок D за период нет.",
-        "en": "All within norms: no critical findings and no D grades in the period.",
+    "home.attention.title": {"ru": "Требует внимания", "en": "Needs attention"},
+    "home.inspections.none": {
+        "ru": "За период проверок нет.",
+        "en": "No inspections in the period.",
     },
+    "home.loss.title": {"ru": "Где теряем баллы", "en": "Where we lose points"},
     # ── РС и РКО (D378, D379) ───────────────────────────────────────────
     "home.rs.title": {"ru": "Стандарты · РС", "en": "Standards · RS"},
     "home.rko.title": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
@@ -135,11 +131,6 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.countries.country": {"ru": "Страна", "en": "Country"},
     "home.countries.units": {"ru": "Проверено", "en": "Inspected"},
     "home.countries.average": {"ru": "Средняя", "en": "Average"},
-    "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
-    "home.countries.empty": {
-        "ru": "В охвате нет стран: в справочнике нет пиццерий.",
-        "en": "No countries in reach: the directory has no pizzerias.",
-    },
     # ── Пиццерии ────────────────────────────────────────────────────────
     "home.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "home.units.empty": {
