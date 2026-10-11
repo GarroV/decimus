@@ -1,6 +1,7 @@
-"""API чтения для Swarm (#567, D387): токен, отказы ввода, форма ответа — без базы.
+"""API чтения для Swarm (#567, D387, D388): токен, права, лимит, ввод, ответ — без базы.
 
-Двери базы подменены на границе `src/db/swarm_read`: здесь проверяется
+Двери базы подменены на границе `src/db/swarm_read`, `src/db/api_access` и
+`src/db/web_throttle`: здесь проверяется
 поверхность — кто пройдёт, что отбивается 4xx/5xx до похода в базу и как
 устроен ответ. Чтение настоящей базы — `tests/test_db_swarm_api.py`.
 """
@@ -8,21 +9,25 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
 
-from src.db import ratings_read, swarm_read
-from src.db.errors import DbError
+from src.db import api_access, ratings_read, swarm_read, web_throttle
+from src.db.errors import AccessError, DbError
 from src.web import swarm_api
 from src.web.app import create_app
-from src.web.config import Settings, load_settings
-from src.web.errors import WebConfigError
+from src.web.config import Settings
 
 ТОКЕН = "сервисный-токен-swarm-длиннее-тридцати-двух-знаков"
+ТОЛЬКО_РЕЙТИНГИ = "токен-только-с-правом-рейтингов-тоже-длинный"
 ВЕРНЫЙ = {"Authorization": f"Bearer {ТОКЕН}"}
+ТОКЕНЫ = {
+    ТОКЕН: api_access.ApiToken(1, "swarm", api_access.SCOPES),
+    ТОЛЬКО_РЕЙТИНГИ: api_access.ApiToken(2, "swarm", (api_access.SCOPE_RATINGS_READ,)),
+}
 АДРЕСА = (
     f"{swarm_api.SCORES_PATH}?type=rs",
     f"{swarm_api.CHECKUPS_PATH}?type=rko",
@@ -35,7 +40,7 @@ from src.web.errors import WebConfigError
 ]
 
 
-def _клиент(token: str | None) -> FlaskClient:
+def _клиент() -> FlaskClient:
     app = create_app(
         Settings(
             host="127.0.0.1",
@@ -43,7 +48,6 @@ def _клиент(token: str | None) -> FlaskClient:
             tenant="HQ",
             ui_lang="ru",
             secret_key="ключ-подписи-куки-этого-набора-длиннее-тридцати-двух",
-            swarm_api_token=token,
         )
     )
     app.config.update(TESTING=True)
@@ -103,8 +107,32 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
 
 
 @pytest.fixture
-def клиент(база: dict[str, list[Any]]) -> Iterator[FlaskClient]:
-    with _клиент(ТОКЕН) as client:
+def доступ(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    """Подменённые токены, журнал и счётчик неудач по адресу."""
+    состояние: dict[str, Any] = {"журнал": [], "неудачи": 0, "запрет": 0, "недавних": 0}
+
+    def записать(token_id: int | None, path: str, status: int, client: str | None) -> None:
+        состояние["журнал"].append((token_id, path, status))
+
+    def неудача(**_: Any) -> web_throttle.Verdict:
+        состояние["неудачи"] += 1
+        return web_throttle.Verdict()
+
+    monkeypatch.setattr(api_access, "resolve", ТОКЕНЫ.get)
+    monkeypatch.setattr(api_access, "recent_requests", lambda *_: состояние["недавних"])
+    monkeypatch.setattr(api_access, "log_access", записать)
+    monkeypatch.setattr(
+        web_throttle,
+        "address_verdict",
+        lambda **_: web_throttle.Verdict(timedelta(seconds=состояние["запрет"])),
+    )
+    monkeypatch.setattr(web_throttle, "note_address_failure", неудача)
+    return состояние
+
+
+@pytest.fixture
+def клиент(база: dict[str, list[Any]], доступ: dict[str, Any]) -> Iterator[FlaskClient]:
+    with _клиент() as client:
         yield client
 
 
@@ -123,31 +151,96 @@ def клиент(база: dict[str, list[Any]]) -> Iterator[FlaskClient]:
     ],
 )
 def test_без_верного_токена_401(
-    клиент: FlaskClient, база: dict[str, list[Any]], адрес: str, заголовки: dict[str, str]
+    клиент: FlaskClient,
+    база: dict[str, list[Any]],
+    доступ: dict[str, Any],
+    адрес: str,
+    заголовки: dict[str, str],
 ) -> None:
     ответ = клиент.get(адрес, headers=заголовки)
     assert ответ.status_code == 401
     assert ответ.get_json()["error"] == "unauthorized"
     assert ответ.headers["WWW-Authenticate"].startswith("Bearer")
     assert база == {"periods": [], "inspections": []}, "до базы дошёл неопознанный"
+    assert доступ["неудачи"] == 1, "неудача не записана в счётчик адреса"
+    assert доступ["журнал"] == [(None, адрес.split("?")[0], 401)]
 
 
 @pytest.mark.parametrize("адрес", АДРЕСА)
-def test_токен_не_задан_503_а_не_открыто(база: dict[str, list[Any]], адрес: str) -> None:
-    with _клиент(None) as client:
-        ответ = client.get(адрес, headers=ВЕРНЫЙ)
-    assert ответ.status_code == 503
-    assert ответ.get_json() == {
-        "error": "not_configured",
-        "message": "SWARM_API_TOKEN is not set on this server",
-    }
-
-
-@pytest.mark.parametrize("адрес", АДРЕСА)
-def test_верный_токен_пускает(клиент: FlaskClient, адрес: str) -> None:
+def test_верный_токен_пускает_и_пишется_в_журнал(
+    клиент: FlaskClient, доступ: dict[str, Any], адрес: str
+) -> None:
     ответ = клиент.get(адрес, headers=ВЕРНЫЙ)
     assert ответ.status_code == 200, ответ.get_data(as_text=True)
     assert ответ.headers["Cache-Control"] == "private, max-age=300"
+    assert доступ["журнал"] == [(1, адрес.split("?")[0], 200)]
+    assert доступ["неудачи"] == 0
+
+
+def test_нет_права_маршрута_403(
+    клиент: FlaskClient, база: dict[str, list[Any]], доступ: dict[str, Any]
+) -> None:
+    заголовки = {"Authorization": f"Bearer {ТОЛЬКО_РЕЙТИНГИ}"}
+    assert клиент.get(АДРЕСА[0], headers=заголовки).status_code == 200
+    ответ = клиент.get(swarm_api.INSPECTIONS_PATH, headers=заголовки)
+    assert ответ.status_code == 403
+    assert ответ.get_json()["error"] == "forbidden"
+    assert база["inspections"] == [], "до базы дошёл токен без права"
+    assert доступ["журнал"][-1] == (2, swarm_api.INSPECTIONS_PATH, 403)
+
+
+def test_запертый_адрес_429_до_сверки_токена(
+    клиент: FlaskClient,
+    база: dict[str, list[Any]],
+    доступ: dict[str, Any],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    доступ["запрет"] = 90
+    сверено: list[str] = []
+    monkeypatch.setattr(api_access, "resolve", lambda t: сверено.append(t))
+    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    assert ответ.status_code == 429
+    assert ответ.get_json()["error"] == "locked"
+    assert ответ.headers["Retry-After"] == "90"
+    assert сверено == [] and база["periods"] == []
+    assert доступ["журнал"] == [(None, swarm_api.SCORES_PATH, 429)]
+
+
+def test_лимит_частоты_на_токен_429(
+    клиент: FlaskClient, база: dict[str, list[Any]], доступ: dict[str, Any]
+) -> None:
+    доступ["недавних"] = swarm_api.RATE_LIMIT_PER_MINUTE - 1
+    assert клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ).status_code == 200
+    доступ["недавних"] = swarm_api.RATE_LIMIT_PER_MINUTE
+    база["periods"].clear()
+    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    assert ответ.status_code == 429
+    assert ответ.get_json()["error"] == "rate_limited"
+    assert ответ.headers["Retry-After"] == "60"
+    assert база["periods"] == []
+    assert доступ["журнал"][-1] == (1, swarm_api.SCORES_PATH, 429)
+
+
+def test_база_опознания_не_ответила_503_а_не_открыто(
+    клиент: FlaskClient, база: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def отказ(_: str) -> None:
+        raise AccessError("Не удалось сверить токен API (OperationalError)")
+
+    monkeypatch.setattr(api_access, "resolve", отказ)
+    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    assert ответ.status_code == 503 and ответ.get_json()["error"] == "db_unavailable"
+    assert база["periods"] == []
+
+
+def test_журнал_не_записался_503(клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def отказ(*_: Any) -> None:
+        raise AccessError("Не удалось записать обращение к API (OperationalError)")
+
+    monkeypatch.setattr(api_access, "log_access", отказ)
+    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    assert ответ.status_code == 503 and ответ.get_json()["error"] == "db_unavailable"
+    assert "periods" not in ответ.get_data(as_text=True)
 
 
 def test_схема_bearer_без_учёта_регистра(клиент: FlaskClient) -> None:
@@ -165,13 +258,6 @@ def test_токен_не_открывает_остальную_админку(к
 def test_только_чтение(клиент: FlaskClient) -> None:
     ответ = клиент.post(swarm_api.SCORES_PATH, headers=ВЕРНЫЙ)
     assert ответ.status_code in (302, 405)
-
-
-def test_короткий_токен_в_окружении_отказ_запуска() -> None:
-    with pytest.raises(WebConfigError, match="SWARM_API_TOKEN"):
-        load_settings({"WEB_TENANT": "HQ", "SWARM_API_TOKEN": "short"})
-    assert load_settings({"WEB_TENANT": "HQ"}).swarm_api_token is None
-    assert load_settings({"WEB_TENANT": "HQ", "SWARM_API_TOKEN": ТОКЕН}).swarm_api_token == ТОКЕН
 
 
 # --- отказы ввода ------------------------------------------------------------

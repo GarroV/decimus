@@ -22,7 +22,7 @@ psycopg = pytest.importorskip("psycopg")
 from db_harness import слить_проверку, точка_справочника  # noqa: E402
 from flask.testing import FlaskClient  # noqa: E402
 
-from src.db import queries  # noqa: E402
+from src.db import api_access, queries  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
 from src.ratings.importer import CHANNEL_WEB, import_file  # noqa: E402
 from src.web import swarm_api  # noqa: E402
@@ -31,8 +31,8 @@ from src.web.config import Settings  # noqa: E402
 
 pytestmark = requires_db
 
-ТОКЕН = "сервисный-токен-swarm-длиннее-тридцати-двух-знаков"
-ВЕРНЫЙ = {"Authorization": f"Bearer {ТОКЕН}"}
+#: Заголовок с токеном, выпущенным в базе фикстурой `клиент` (D388).
+ВЕРНЫЙ: dict[str, str] = {}
 
 
 def _грузить(data: bytes) -> None:
@@ -42,7 +42,10 @@ def _грузить(data: bytes) -> None:
 
 
 @pytest.fixture
-def клиент() -> Iterator[FlaskClient]:
+def клиент(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    выпущен = api_access.issue("swarm", api_access.SCOPES, by="test")
+    monkeypatch.setitem(ВЕРНЫЙ, "Authorization", f"Bearer {выпущен.value}")
     app = create_app(
         Settings(
             host="127.0.0.1",
@@ -50,7 +53,6 @@ def клиент() -> Iterator[FlaskClient]:
             tenant="HQ",
             ui_lang="ru",
             secret_key="ключ-подписи-куки-этого-набора-длиннее-тридцати-двух",
-            swarm_api_token=ТОКЕН,
         )
     )
     app.config.update(TESTING=True)
