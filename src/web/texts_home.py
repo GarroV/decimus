@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378, D395): «Требует внимания», блоки РС / РКО, «Мои страны».
+"""Тексты «Главной» (D378, D395): «Требует внимания», проверки, колонки РС / РКО, «Мои страны».
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -7,40 +7,10 @@
 
 from __future__ import annotations
 
-_MONTHS_SHORT_RU = (
-    "янв",
-    "фев",
-    "мар",
-    "апр",
-    "май",
-    "июн",
-    "июл",
-    "авг",
-    "сен",
-    "окт",
-    "ноя",
-    "дек",
-)
-_MONTHS_SHORT_EN = (
-    "Jan",
-    "Feb",
-    "Mar",
-    "Apr",
-    "May",
-    "Jun",
-    "Jul",
-    "Aug",
-    "Sep",
-    "Oct",
-    "Nov",
-    "Dec",
-)
-
 HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.only": {"ru": "Только {country}", "en": "Only {country}"},
     "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
-    "home.more.ratings": {"ru": "Рейтинги", "en": "Ratings"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D395) ─────────────
     "home.board.failed": {
@@ -94,34 +64,25 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "За период проверок нет.",
         "en": "No inspections in the period.",
     },
-    "home.loss.title": {"ru": "Где теряем баллы", "en": "Where we lose points"},
-    # ── РС и РКО (D378, D379) ───────────────────────────────────────────
-    "home.rs.title": {"ru": "Стандарты · РС", "en": "Standards · RS"},
-    "home.rko.title": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
+    # ── Где нужно проверить, последние проверки (D396) ──────────────────
+    "home.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "home.tocheck.hint": {"ru": "нет проверок за период", "en": "no inspection in the period"},
+    "home.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
+    "home.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
+    "home.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
+    "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
+    "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
+    # ── Колонки рейтинга клиента в таблице пиццерий (D396) ──────────────
     "home.rs.short": {"ru": "РС", "en": "RS"},
     "home.rko.short": {"ru": "РКО", "en": "CX"},
-    "home.ratings.horizon": {"ru": "8 месяцев", "en": "8 months"},
-    "home.ratings.month": {
-        "ru": "за {month}, к прошлому месяцу",
-        "en": "for {month}, vs previous month",
-    },
-    "home.ratings.mine": {"ru": "Мои страны", "en": "My countries"},
-    "home.ratings.rated": {"ru": "Пиццерий с оценкой", "en": "Pizzerias rated"},
-    "home.ratings.below": {
-        "ru": "Ниже порога Top / Bottom ({threshold})",
-        "en": "Below the Top / Bottom line ({threshold})",
-    },
-    "home.ratings.none": {
-        "ru": "Рейтинги ещё не загружены: стран IMF в базе нет.",
-        "en": "Ratings are not loaded yet: no IMF countries in the database.",
-    },
-    "home.ratings.no_scores": {
-        "ru": "У этих стран нет оценок за последние 8 месяцев.",
-        "en": "These countries have no scores in the last 8 months.",
+    "home.ratings.open": {
+        "ru": "Последняя оценка рейтинга — открыть страницу «Рейтинги»",
+        "en": "Latest rating score — open the Ratings page",
     },
     "home.ratings.failed": {
-        "ru": "Рейтинги не загрузились: база не ответила. Обновите страницу.",
-        "en": "Ratings did not load: the database did not answer. Reload the page.",
+        "ru": "Оценки рейтинга не загрузились: в колонках РС и РКО прочерки.",
+        "en": "Rating scores did not load: the RS and CX columns show dashes.",
     },
     # ── Мои страны ──────────────────────────────────────────────────────
     "home.countries.title": {"ru": "Мои страны", "en": "My countries"},
@@ -137,9 +98,5 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.units.empty": {
         "ru": "За период проверок нет. Листните период стрелкой ← или выберите «Всё время».",
         "en": "No inspections in the period. Step back with ← or choose «All time».",
-    },
-    **{
-        f"home.month_short.{n}": {"ru": ru, "en": en}
-        for n, (ru, en) in enumerate(zip(_MONTHS_SHORT_RU, _MONTHS_SHORT_EN, strict=True), 1)
     },
 }

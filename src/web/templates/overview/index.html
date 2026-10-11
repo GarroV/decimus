@@ -1,7 +1,8 @@
 {#
-  «Главная» (D378, раскладка D395): сверху вниз — итог → разбивка → строки.
-  «Требует внимания» (доска + «куда смотреть» в одной карточке), итог периода,
-  «Где теряем баллы», пиццерии (и страны, если их больше одной), РС и РКО.
+  «Главная» (D378, D395, D396) — в первую очередь про проверки: «Требует внимания»
+  (доска + «куда смотреть» в одной карточке), итог периода, «Где нужно проверить» |
+  «Последние проверки», «Топ нарушений» | потери по зонам, пиццерии с колонками
+  последней оценки РС / РКО, страны (если их больше одной).
   Сборка данных — `src/web/home_page.py`;
   в шаблоне ни одного вычисления: проценты и буквы записал движок, средние
   рейтингов посчитал `home_ratings` по D353.
@@ -26,53 +27,12 @@
 
 {% macro empty(text) %}<div class="hm-empty">{{ text }}</div>{% endmacro %}
 
-{% macro rating(kind) %}
-  {% set g = ratings[kind] if ratings else none %}
-  <section class="hm-card">
-    <header class="hm-card__head">
-      <h2 class="hm-label">{{ t('home.' ~ kind ~ '.title') }}</h2>
-      <span class="hm-meta">{{ t('home.ratings.horizon') }}</span>
-      <a class="hm-more" href="{{ url(ratings_path) }}?lang={{ lang }}">{{ t('home.more.ratings') }} →</a>
-    </header>
-    {% if ratings_failed %}
-      {{ empty(t('home.ratings.failed')) }}
-    {% elif not ratings %}
-      {{ empty(t('home.ratings.none')) }}
-    {% elif g.value is none %}
-      {{ empty(t('home.ratings.no_scores')) }}
-    {% else %}
-      <div class="hm-big">
-        <span class="hm-big__value">{{ '%.1f'|format(g.value) }}</span><span class="hm-big__of">/100</span>
-        {{ delta(g.delta) }}
-        <span class="hm-big__note">{{ t('home.ratings.month', month=t('registry.month.' ~ g.month.month) ~ ' ' ~ g.month.year) }}</span>
-        {% if g.imf is not none %}<span class="hm-imf">IMF {{ '%.1f'|format(g.imf) }}</span>{% endif %}
-      </div>
-      <div class="hm-plaques">
-        <div class="hm-plaque"><span class="hm-plaque__label">{{ t('home.ratings.rated') }}</span><span class="hm-plaque__value">{{ g.rated }}</span></div>
-        <div class="hm-plaque{% if g.below %} is-err{% endif %}"><span class="hm-plaque__label">{{ t('home.ratings.below', threshold='%g'|format(g.threshold)) }}</span><span class="hm-plaque__value">{{ g.below }}</span></div>
-      </div>
-      {% set c = charts[kind] %}
-      {% if c %}
-        <svg class="hm-chart" viewBox="0 0 {{ c.width }} {{ c.height }}" role="img" aria-label="{{ t('home.' ~ kind ~ '.title') }}">
-          {% for y, label in c.ticks %}
-            <line class="hm-chart__grid" x1="28" x2="{{ c.width - 6 }}" y1="{{ y }}" y2="{{ y }}"/>
-            <text class="hm-chart__tick" x="24" y="{{ y + 3 }}" text-anchor="end">{{ label }}</text>
-          {% endfor %}
-          {% for x, month in c.labels %}
-            <text class="hm-chart__tick" x="{{ x }}" y="{{ c.height - 4 }}" text-anchor="middle">{{ t('home.month_short.' ~ month.month) }}</text>
-          {% endfor %}
-          {% for d in c.imf %}<path class="hm-chart__imf" d="{{ d }}"/>{% endfor %}
-          {% for d in c.line %}<path class="hm-chart__line" d="{{ d }}"/>{% endfor %}
-          {% for x, y in c.dots %}<circle class="hm-chart__dot" cx="{{ x }}" cy="{{ y }}" r="2.5"/>{% endfor %}
-        </svg>
-        <div class="hm-legend">
-          <span class="hm-legend__item"><span class="hm-legend__line"></span>{{ country_title(only_country) if only_country else t('home.ratings.mine') }}</span>
-          <span class="hm-legend__item"><span class="hm-legend__line is-imf"></span>IMF</span>
-        </div>
-      {% endif %}
-    {% endif %}
-  </section>
-{% endmacro %}
+{# Куда ведёт точка: её карточка в «Стране» (УК) или в «Пиццериях»; нет id — запасной адрес. #}
+{% macro unit_href(unit_id, country, fallback) -%}
+  {%- if unit_id and country and country_url -%}{{ country_url(country, unit=unit_id) }}#unit-{{ unit_id }}
+  {%- elif unit_id -%}{{ url('/units/' ~ unit_id) }}
+  {%- else -%}{{ fallback }}{%- endif -%}
+{%- endmacro %}
 
 {% block body %}
   <header class="shead">
@@ -194,53 +154,93 @@
       {% endif %}
     </section>
 
-    {# ── 3. Где теряем баллы (D395): потери по зонам | системные нарушения;
-          пустое скрыто, а если пусты оба — пропадает и ряд. #}
-    {% if data.zone_losses or data.systemic %}
-      <h2 class="hm-label hm-group">{{ t('home.loss.title') }}</h2>
-      {% if data.zone_losses %}
-        <section class="hm-card{% if not data.systemic %} hm-card--wide{% endif %}">
-          <header class="hm-card__head">
-            <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
-            <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
-          </header>
-          <ul class="hm-rows">
-            {% for zone in data.zone_losses %}
-              <li class="hm-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
-                <span class="hm-row__main">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
-                <span class="hm-bar"><span class="hm-bar__fill" style="width:{{ zone.share }}%"></span></span>
-                <span class="hm-row__num mono">−{{ '%.1f'|format(zone.loss) }}</span>
-              </li>
-            {% endfor %}
-          </ul>
-        </section>
-      {% endif %}
-      {% if data.systemic %}
-        <section class="hm-card{% if not data.zone_losses %} hm-card--wide{% endif %}">
-          <header class="hm-card__head">
-            <h2 class="hm-label">{{ t('overview.systemic.title') }}</h2>
-            <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
-          </header>
-          <ul class="hm-rows">
-            {% for item in data.systemic %}
-              <li class="hm-row">
-                <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
-                <span class="hm-row__main">
-                  {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}{% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>{% else %}{{ item.code }}{% endif %}
-                  <span class="hm-row__meta">{% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
-                </span>
-              </li>
-            {% endfor %}
-          </ul>
-        </section>
-      {% endif %}
+    {# ── 3. Где нужно проверить | Последние проверки (D396). Пустое скрыто. #}
+    {% set has_check = data.to_check|length > 0 %}
+    {% set has_latest = data.inspections|length > 0 %}
+    {% if has_check %}
+      <section class="hm-card{% if not has_latest %} hm-card--wide{% endif %}">
+        <header class="hm-card__head">
+          <h2 class="hm-label">{{ t('home.tocheck.title') }}</h2>
+          <span class="hm-meta">{{ t('home.tocheck.hint') }} · {{ data.to_check|length + data.to_check_more }}</span>
+        </header>
+        <ul class="hm-rows">
+          {% for item in data.to_check %}
+            <li>
+              <a class="hm-row" href="{{ unit_href(item.unit_id, item.country, url(registry_path) ~ '?lang=' ~ lang) }}">
+                <span class="hm-dot hm-dot--warn"></span>
+                <span class="hm-row__main">{{ item.unit }}<span class="hm-row__meta">{{ city_title(item.city) or '' }}</span></span>
+                <span class="hm-row__num mono">{% if item.last %}{{ t('home.tocheck.last', date=item.last) }}{% else %}{{ t('home.tocheck.never') }}{% endif %}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if data.to_check_more %}<p class="hm-meta">{{ t('home.tocheck.more', count=data.to_check_more) }}</p>{% endif %}
+      </section>
+    {% endif %}
+    {% if has_latest %}
+      <section class="hm-card{% if not has_check %} hm-card--wide{% endif %}">
+        <header class="hm-card__head">
+          <h2 class="hm-label">{{ t('home.latest.title') }}</h2>
+          <a class="hm-more" href="{{ url(registry_path) }}?lang={{ lang }}{% for k, v in period.params().items() if v %}&amp;{{ k }}={{ v }}{% endfor %}{% if only_country %}&amp;country={{ only_country }}{% endif %}">{{ t('home.latest.all') }} →</a>
+        </header>
+        <ul class="hm-rows">
+          {% for row in data.inspections[:latest_count] %}
+            <li>
+              <a class="hm-row" href="{{ url(registry_path ~ '/' ~ row.id) }}?lang={{ lang }}">
+                <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
+                <span class="hm-row__main">{{ row.unit_name }}<span class="hm-row__meta">{{ '%.1f'|format(row.pct) }}%</span></span>
+                <span class="hm-row__num mono">{{ row.inspection_date }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
     {% endif %}
 
-    {# ── 4. Пиццерии; «Мои страны» — только тому, у кого их больше одной ───── #}
+    {# ── 4. Топ нарушений | Потери по зонам; пустое скрыто, пусты оба — ряда нет. #}
+    {% if data.systemic %}
+      <section class="hm-card{% if not data.zone_losses %} hm-card--wide{% endif %}">
+        <header class="hm-card__head">
+          <h2 class="hm-label">{{ t('home.top.title') }}</h2>
+          <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
+        </header>
+        <ul class="hm-rows">
+          {% for item in data.systemic %}
+            <li class="hm-row">
+              <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
+              <span class="hm-row__main">
+                {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}{% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>{% else %}{{ item.code }}{% endif %}
+                <span class="hm-row__meta">{% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}{{ t('overview.systemic.spread', units=item.units, records=item.records) }}</span>
+              </span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+    {% if data.zone_losses %}
+      <section class="hm-card{% if not data.systemic %} hm-card--wide{% endif %}">
+        <header class="hm-card__head">
+          <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
+          <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
+        </header>
+        <ul class="hm-rows">
+          {% for zone in data.zone_losses %}
+            <li class="hm-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+              <span class="hm-row__main">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
+              <span class="hm-bar"><span class="hm-bar__fill" style="width:{{ zone.share }}%"></span></span>
+              <span class="hm-row__num mono">−{{ '%.1f'|format(zone.loss) }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    {# ── 5. Пиццерии: проверки и последние оценки рейтинга колонками (D396) ─── #}
     <section class="hm-card hm-card--wide">
       <header class="hm-card__head">
         <h2 class="hm-label">{{ t('home.units.title') }}</h2>
         <span class="hm-meta">{{ data.points|length }}</span>
+        {% if ratings_failed %}<span class="hm-meta">{{ t('home.ratings.failed') }}</span>{% endif %}
         <span class="hm-card__tools">{{ pick(sort_pick) }}</span>
       </header>
       {% if data.points %}
@@ -253,11 +253,15 @@
             <span class="is-num">{{ t('overview.points.delta') }}</span>
             <span>{{ t('overview.points.zone') }}</span>
             <span class="is-num">{{ t('overview.points.date') }}</span>
+            {# Строка таблицы — сама ссылка, вкладывать ссылки в ячейки нельзя: ведёт на «Рейтинги» заголовок колонки. #}
+            <a class="is-num" href="{{ ratings_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rs.short') }}</a>
+            <a class="is-num" href="{{ ratings_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rko.short') }}</a>
           </div>
           {% for point in data.points %}
             {% set unit_id = unit_ids.get(point.unit) %}
+            {% set score = unit_ratings.get(data.unit_codes.get(point.unit, ''), (none, none)) %}
             <a class="hm-table__row"
-               href="{% if unit_id and point.country and country_url %}{{ country_url(point.country, unit=unit_id) }}#unit-{{ unit_id }}{% elif unit_id %}{{ url('/units/' ~ unit_id) }}{% else %}{{ url(registry_path ~ '/' ~ point.inspection_id) }}{% endif %}">
+               href="{{ unit_href(unit_id, point.country, url(registry_path ~ '/' ~ point.inspection_id)) }}">
               <span class="hm-cell__name">{{ point.unit }}</span>
               <span class="hm-cell__muted">{{ city_title(point.city) or '—' }}</span>
               <span class="is-num"><span class="grade tag {{ grade_tone(point.grade) }}">{{ point.grade or '—' }}</span></span>
@@ -266,6 +270,8 @@
                     {% if point.delta is none %}title="{{ t('overview.points.nodelta') }}"{% endif %}>{{ '—' if point.delta is none else ('%+.1f'|format(point.delta)) }}</span>
               <span class="hm-cell__muted">{{ (point.worst_zone_ru if lang == 'ru' else point.worst_zone_en) or '—' }}</span>
               <span class="is-num hm-cell__muted mono">{{ point.when }}</span>
+              <span class="is-num">{{ '—' if score[0] is none else '%.1f'|format(score[0]) }}</span>
+              <span class="is-num">{{ '—' if score[1] is none else '%.1f'|format(score[1]) }}</span>
             </a>
           {% endfor %}
         </div>
@@ -274,6 +280,7 @@
       {% endif %}
     </section>
 
+    {# ── 6. Страны: только тому, у кого их больше одной ── #}
     {% if countries|length > 1 %}
       <section class="hm-card hm-card--wide">
         <header class="hm-card__head">
@@ -285,24 +292,16 @@
             <span>{{ t('home.countries.country') }}</span>
             <span class="is-num">{{ t('home.countries.units') }}</span>
             <span class="is-num">{{ t('home.countries.average') }}</span>
-            <span class="is-num">{{ t('home.rs.short') }}</span>
-            <span class="is-num">{{ t('home.rko.short') }}</span>
           </div>
           {% for row in countries %}
             <a class="hm-table__row" href="{{ row.href }}">
               <span class="hm-cell__name">{{ country_title(row.code) }}</span>
               <span class="is-num">{{ row.checked }}<small>/{{ row.units }}</small></span>
               <span class="is-num is-strong">{{ '—' if row.average is none else '%.1f'|format(row.average) }}</span>
-              <span class="is-num">{{ '—' if row.rs is none else '%.1f'|format(row.rs) }}</span>
-              <span class="is-num">{{ '—' if row.rko is none else '%.1f'|format(row.rko) }}</span>
             </a>
           {% endfor %}
         </div>
       </section>
     {% endif %}
-
-    {# ── 5. РС | РКО ─────────────────────────────────────────────────────── #}
-    {{ rating('rs') }}
-    {{ rating('rko') }}
   </div>
 {% endblock %}

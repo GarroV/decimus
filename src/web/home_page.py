@@ -1,18 +1,20 @@
 """Экран «Главная» (D378): по образцу новой главной Swarm Brain.
 
 Вопрос экрана — «что в моих пиццериях требует внимания и как они проверены за
-период» (D395, пересматривает раскладку D378). Сверху вниз (итог → разбивка →
-строки):
+период» (D395); в первую очередь про проверки, рейтинг клиента — колонками
+(D396). Партнёр видит свои пиццерии, УК — всю сеть: страница одна, различается
+охват. Сверху вниз:
 
 1. «Требует внимания» — одна карточка: стикеры доски по живым счётчикам
    (`home_board`) и под ними пиццерии, куда смотреть. Нечего показать — карточки
    нет вовсе; отказ доски остаётся строкой с ошибкой, не тишиной;
 2. «Проверки за период» — итог; без проверок — одной строкой;
-3. «Где теряем баллы»: «Потери по зонам» | «Системные нарушения», пустое скрыто;
-4. «Пиццерии» — на всю строку, с порядком на самом блоке; «Мои страны» — только
-   тому, у кого стран больше одной;
-5. «Стандарты · РС» | «Клиентский опыт · РКО» (`home_ratings`) — у графиков
-   свой горизонт в 8 месяцев, он подписан на блоках.
+3. «Где нужно проверить» (точки без проверок за период) | «Последние проверки»;
+4. «Топ нарушений» | «Потери по зонам», пустое скрыто;
+5. «Пиццерии» — на всю строку, с порядком на самом блоке и колонками последней
+   оценки РС / РКО (`home_ratings.load_latest`; сбой — прочерки и строка в
+   шапке блока, экран остаётся);
+6. «Мои страны» — только тому, у кого стран больше одной.
 
 Период — один на экран: календарь «с — по» со стрелками, по умолчанию текущий
 месяц (D378, тот же `registry_period`, что у «Проверок»). Срез живёт в адресе,
@@ -45,18 +47,19 @@ from .texts import t
 
 log = logging.getLogger(__name__)
 
+#: Сколько последних проверок показывает карточка «Последние проверки».
+LATEST_COUNT = 8
+
 
 @dataclass(frozen=True)
 class CountryRow:
-    """Строка «Моих стран»: проверки за период и рейтинги в месяце блоков."""
+    """Строка «Моих стран»: проверки за период."""
 
     code: str
     units: int
     checked: int
     inspections: int
     average: float | None
-    rs: float | None
-    rko: float | None
     href: str
 
 
@@ -93,14 +96,15 @@ def _board(reach: Any) -> tuple[tuple[home_board.Sticker, ...], bool]:
     return home_board.compose(who, counts, lambda k: _board_href(k, hq=who.hq)), False
 
 
-def _ratings(
+def _latest_ratings(
     codes: tuple[str, ...] | None, until: date
-) -> tuple[home_ratings.Ratings | None, bool]:
+) -> tuple[dict[str, tuple[float | None, float | None]], bool]:
+    """Последние РС / РКО по пиццериям; сбой — пусто и отметка: главная остаётся."""
     try:
-        return home_ratings.load(codes, until=until), False
+        return home_ratings.load_latest(codes, until=until), False
     except DbError as exc:
-        log.warning("главная: рейтинги не прочитались (%s)", exc.__class__.__name__)
-        return None, True
+        log.warning("главная: оценки рейтинга не прочитались (%s)", exc.__class__.__name__)
+        return {}, True
 
 
 def render(
@@ -149,10 +153,9 @@ def render(
         return _url("country", code=country, **{к: з for к, з in живые.items() if з})
 
     codes = (selection.country,) if selection.country else reach.countries
-    рейтинги, рейтинги_отказ = _ratings(codes, min(period.end or today, today))
+    рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
     стикеры, доска_отказ = _board(reach)
 
-    by_country = рейтинги.by_country if рейтинги else {}
     страны = tuple(
         CountryRow(
             code=код,
@@ -160,14 +163,16 @@ def render(
             checked=проверено,
             inspections=проверок,
             average=round(сумма / проверок, 1) if проверок else None,
-            rs=by_country.get(код, (None, None))[0],
-            rko=by_country.get(код, (None, None))[1],
             href=select(country=код),
         )
         for код, точек, проверено, проверок, сумма, _d in queries.country_summary(
             reach=reach, date_from=period.start, date_to=period.end
         )
         if not selection.country or код == selection.country
+    )
+    # Заголовок колонки РС / РКО ведёт на «Рейтинги»; суженная страна — в её срез.
+    ratings_href = _url(
+        "ratings", lang=lang, **({"group": "country", "value": страна} if страна else {})
     )
     порядок = pick(
         label=t("overview.sort", lang),
@@ -197,15 +202,13 @@ def render(
         clear_country=select(country=""),
         stickers=стикеры,
         board_failed=доска_отказ,
-        ratings=рейтинги,
+        latest_count=LATEST_COUNT,
+        ratings_href=ratings_href,
+        unit_ratings=рейтинги,
         ratings_failed=рейтинги_отказ,
-        charts={
-            g.kind: home_ratings.chart(g) for g in ((рейтинги.rs, рейтинги.rko) if рейтинги else ())
-        },
         countries=страны,
         sort_pick=порядок,
         registry_path=section("registry").path,
-        ratings_path=section("ratings").path,
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         lang=lang,
