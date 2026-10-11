@@ -1373,6 +1373,14 @@ def _card_context(
             and not detail.inspection.retracted
             and not detail.inspection.is_uploaded
         ),
+        # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
+        # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
+        may_prescribe=(
+            action_plans.is_hq()
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
+        ),
         sheet=лист,
         may_accept=можно_подтвердить,
         may_revise=можно_подтвердить,

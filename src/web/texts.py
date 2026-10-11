@@ -603,6 +603,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
     "card.act.move": {"ru": "Исправить", "en": "Correct"},
+    "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},

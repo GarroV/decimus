@@ -58,6 +58,12 @@
       {% endif %}
     {% endif %}
 
+    {# Предписание по этой проверке (D402): форма раздела УК, где проверка уже
+       выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
+    {% if c.may_prescribe %}
+      <a class="hbtn" href="{{ url('/actions/prescriptions/new') }}?inspection={{ head.id }}&amp;lang={{ lang }}">{{ icon('doc') }}<span>{{ t('card.act.rx') }}</span></a>
+    {% endif %}
+
     {% if c.may_accept %}
       {% if panel %}
         <a class="hbtn" href="{{ full }}?lang={{ lang }}#review">{{ icon('check') }}<span>{{ t('accept.title') }}</span></a>
