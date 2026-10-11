@@ -190,9 +190,7 @@ def render(
         period_title=registry_view.period_title(period, lang),
         period_prev=registry_view.period_link(period, -1, select),
         period_next=registry_view.period_link(period, 1, select),
-        period_month=select(period="", **{"from": "", "to": ""}),
-        period_all=select(period=registry_period.ALL, **{"from": "", "to": ""}),
-        period_is_this_month=period == registry_period.month_of(today),
+        period_quick=registry_view.period_quick(period, today, lang, select),
         hidden_params={
             к: з
             for к, з in (("country", selection.country), ("sort", selection.sort))

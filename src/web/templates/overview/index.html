@@ -11,6 +11,7 @@
   говорит. Отказ данных — наоборот, строка с ошибкой, а не тишина.
 #}{% extends "base.html" %}
 {% from "_pick.html" import pick %}
+{% from "_period.html" import period_picker with context %}
 {% block title %}{{ t('section.overview.title') }}{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
@@ -43,33 +44,8 @@
   </header>
 
   {# ── Срез: один период на экран и страна. Всё — ссылками, срез живёт в адресе. #}
-  <div class="sbar hm-bar">
-    <div class="speriod" role="group" aria-label="{{ t('registry.period.label') }}">
-      {% if period_prev %}<a class="speriod__arrow" href="{{ period_prev }}" aria-label="{{ t('registry.period.prev') }}">{{ icon('cleft') }}</a>
-      {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cleft') }}</span>{% endif %}
-      <details class="pick speriod__pick" name="pick">
-        <summary class="spill speriod__title">{{ icon('cal') }}<span>{{ period_title }}</span></summary>
-        <div class="pick__menu speriod__menu">
-          <form method="get" action="{{ url(current_path) }}" class="sform">
-            <input type="hidden" name="lang" value="{{ lang }}">
-            {% for name, value in hidden_params.items() %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-            <div class="speriod__dates">
-              <label><span class="sform__label">{{ t('registry.period.from') }}</span>
-                <input class="sinput" type="date" name="from" value="{{ period.start or '' }}"></label>
-              <label><span class="sform__label">{{ t('registry.period.to') }}</span>
-                <input class="sinput" type="date" name="to" value="{{ period.end or '' }}"></label>
-            </div>
-            <button class="sbtn sbtn--primary" type="submit">{{ t('registry.period.apply') }}</button>
-          </form>
-          <div class="speriod__quick">
-            <a class="pick__item{% if period_is_this_month %} is-on{% endif %}" href="{{ period_month }}">{{ t('registry.period.this_month') }}</a>
-            <a class="pick__item{% if period.is_all %} is-on{% endif %}" href="{{ period_all }}">{{ t('registry.period.all') }}</a>
-          </div>
-        </div>
-      </details>
-      {% if period_next %}<a class="speriod__arrow" href="{{ period_next }}" aria-label="{{ t('registry.period.next') }}">{{ icon('cright') }}</a>
-      {% else %}<span class="speriod__arrow" aria-disabled="true">{{ icon('cright') }}</span>{% endif %}
-    </div>
+  <div class="sbar hm-pbar">
+    {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
     {% if only_country %}
       <a class="hm-only" href="{{ clear_country }}" aria-label="{{ t('home.only.clear') }}">{{ t('home.only', country=country_title(only_country)) }} <span aria-hidden="true">×</span></a>
       {# Вход на экран страны: таблица стран при одной стране скрыта (D397). #}
