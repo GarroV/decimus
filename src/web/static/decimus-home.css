@@ -114,7 +114,7 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 
 @media (max-width: 719px) {
   .hm-big__value { font-size: 38px; }
-  /* Пять колонок «Моих стран» влезают в телефон целиком: РКО не уезжает за край. */
+  /* Пять колонок блока «Страны» влезают в телефон целиком: РКО не уезжает за край. */
   .hm-table--countries .hm-table__head, .hm-table--countries .hm-table__row { grid-template-columns: minmax(3.5rem, 1fr) 5rem 4.25rem; gap: 10px; }
   .hm-table--countries .hm-table__head { font-size: 10px; letter-spacing: 0; }
   .hm-card { padding: 14px 12px; }
