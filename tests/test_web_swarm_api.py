@@ -189,21 +189,27 @@ def test_нет_права_маршрута_403(
     assert доступ["журнал"][-1] == (2, swarm_api.INSPECTIONS_PATH, 403)
 
 
-def test_запертый_адрес_429_до_сверки_токена(
-    клиент: FlaskClient,
-    база: dict[str, list[Any]],
-    доступ: dict[str, Any],
-    monkeypatch: pytest.MonkeyPatch,
+def test_запертый_адрес_отбивает_неверный_токен_без_журнала(
+    клиент: FlaskClient, база: dict[str, list[Any]], доступ: dict[str, Any]
 ) -> None:
     доступ["запрет"] = 90
-    сверено: list[str] = []
-    monkeypatch.setattr(api_access, "resolve", lambda t: сверено.append(t))
-    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    ответ = клиент.get(АДРЕСА[0], headers={"Authorization": "Bearer подбор-подбор-подбор-подбор-1"})
     assert ответ.status_code == 429
     assert ответ.get_json()["error"] == "locked"
     assert ответ.headers["Retry-After"] == "90"
-    assert сверено == [] and база["periods"] == []
-    assert доступ["журнал"] == [(None, swarm_api.SCORES_PATH, 429)]
+    assert база["periods"] == []
+    assert доступ["неудачи"] == 0, "запертый адрес копит отметки — перебор не дешевеет"
+    assert доступ["журнал"] == [], "отказ запертому адресу раздувает журнал"
+
+
+def test_верный_токен_проходит_с_запертого_адреса(
+    клиент: FlaskClient, база: dict[str, list[Any]], доступ: dict[str, Any]
+) -> None:
+    """Исходящие адреса Edge Functions общие: чужой перебор не запирает Swarm."""
+    доступ["запрет"] = 90
+    ответ = клиент.get(АДРЕСА[0], headers=ВЕРНЫЙ)
+    assert ответ.status_code == 200
+    assert доступ["журнал"][-1][2] == 200
 
 
 def test_лимит_частоты_на_токен_429(
