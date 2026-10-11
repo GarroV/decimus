@@ -121,6 +121,24 @@ def zone_lines(by_zone: dict[str, Any], lang: str) -> tuple[ZoneLine, ...]:
     return tuple(lines)
 
 
+def _loss_value(line: ZoneLine) -> float:
+    """Записанная потеря зоны числом — только чтобы отобрать и упорядочить."""
+    try:
+        return float(line.loss)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def loss_zones(lines: tuple[ZoneLine, ...]) -> tuple[ZoneLine, ...]:
+    """Зоны с потерей, от большей к меньшей (D398).
+
+    Зоны без потерь на карточке не показываются: строка с нулём ничего не
+    говорит, а список из всех зон растягивал блок ради нулей. Числа не
+    трогаются — отбирается и упорядочивается, а не считается.
+    """
+    return tuple(sorted((x for x in lines if _loss_value(x) > 0), key=_loss_value, reverse=True))
+
+
 @dataclass(frozen=True)
 class CountLine:
     """Счётчик записей одного класса."""

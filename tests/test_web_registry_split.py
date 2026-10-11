@@ -162,7 +162,7 @@ def test_действия_справа_те_же_что_у_карточки(
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    for действие in ("/retract", "/letter", "#move"):
+    for действие in ("/retract", "/letter", t("card.act.move", "ru")):
         assert (действие in страница) is свои_действия, действие
 
 
@@ -175,7 +175,7 @@ def test_аудитор_не_видит_отклонения_справа(
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    assert "/retract" not in страница and "#move" not in страница
+    assert "/retract" not in страница and t("card.act.move", "ru") not in страница
 
 
 def test_без_выбора_панели_нет_и_карточка_не_читается(
