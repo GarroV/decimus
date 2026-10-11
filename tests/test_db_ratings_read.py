@@ -99,16 +99,21 @@ def test_пустой_квартал_пустые_блоки(db_env: str) -> Non
     assert summary.rs_by_country["RS"].checkups == 0
 
 
-def test_окно_периодов_включает_оба_края(db_env: str) -> None:
+def test_рамка_берёт_каждый_период_который_задевает(db_env: str) -> None:
+    """D396: период РС 16–30.09 попадает в любую рамку, задевшую его хоть днём, —
+    и начатую после его начала; рамка после его конца его не берёт."""
     _грузить(snapshot())
-    один_день = ratings_read.score_facts(
-        countries=["RS"], begin=date(2026, 9, 16), end=date(2026, 9, 16)
-    )
-    assert [(f[0], f[3]) for f in один_день] == [(U1, "rs")]
-    до_конца = ratings_read.score_facts(
-        countries=["RS"], begin=date(2026, 9, 17), end=date(2026, 9, 29)
-    )
-    assert [(f[0], f[3], f[5]) for f in до_конца] == [(U1, "rko", date(2026, 9, 29))]
+
+    def рамка(begin: date, end: date) -> list[tuple[object, ...]]:
+        rows = ratings_read.score_facts(countries=["RS"], begin=begin, end=end)
+        return [(f[0], f[3], f[5], f[7]) for f in rows]
+
+    рс = (U1, "rs", date(2026, 9, 16), date(2026, 9, 30))
+    assert рамка(date(2026, 9, 16), date(2026, 9, 16)) == [рс]
+    assert рамка(date(2026, 9, 30), date(2026, 9, 30))[0] == рс
+    assert рс in рамка(date(2026, 9, 17), date(2026, 9, 29))
+    assert рс not in рамка(date(2026, 9, 1), date(2026, 9, 15))
+    assert рс not in рамка(date(2026, 10, 1), date(2026, 10, 31))
 
 
 def test_оценка_не_размножается_повторной_загрузкой(db_env: str) -> None:
@@ -309,7 +314,7 @@ def test_сутки_ркО_по_utc_а_не_по_поясу_сессии(
 
 
 def test_окно_замечаний_рс_включает_оба_края(db_env: str) -> None:
-    """Период РС начался 16.09: окно, кончающееся или начинающееся 16.09, его берёт."""
+    """Период РС 16–30.09: окно, задевшее его хоть днём, его берёт (D396)."""
     _грузить(snapshot())
 
     def срез(begin: date, end: date) -> tuple[set[str], dict[str, int]]:
@@ -319,7 +324,8 @@ def test_окно_замечаний_рс_включает_оба_края(db_en
     assert срез(date(2026, 9, 1), date(2026, 9, 16)) == ({"Грязный пол"}, {"RS": 4})
     assert срез(date(2026, 9, 16), date(2026, 9, 30)) == ({"Грязный пол"}, {"RS": 4})
     assert срез(date(2026, 9, 1), date(2026, 9, 15)) == (set(), {})
-    assert срез(date(2026, 9, 17), date(2026, 9, 30)) == (set(), {})
+    assert срез(date(2026, 9, 17), date(2026, 9, 30)) == ({"Грязный пол"}, {"RS": 4})
+    assert срез(date(2026, 10, 1), date(2026, 10, 31)) == (set(), {})
 
 
 def test_правило_неверного_типа_отказ_своим_кодом(db_env: str) -> None:

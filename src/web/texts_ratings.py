@@ -53,22 +53,23 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
     "ratings.cluster.OTHER": {"ru": "Другие страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
-    "ratings.candle.title": {
-        "ru": "{m}: открытие {o}, максимум {h}, минимум {l}, закрытие {c} · периодов: {n}",
-        "en": "{m}: open {o}, high {h}, low {l}, close {c} · periods: {n}",
+    "ratings.line.title": {
+        "ru": "{p}: {v} · пиццерий: {n}",
+        "en": "{p}: {v} · pizzerias: {n}",
     },
-    "ratings.candle.aria": {
-        "ru": "{name}, {kind}: динамика по месяцам",
-        "en": "{name}, {kind}: monthly trend",
+    "ratings.line.aria": {
+        "ru": "{name}, {kind}: динамика по периодам рейтинга",
+        "en": "{name}, {kind}: trend by rating period",
     },
-    "ratings.candle.hint": {
-        "ru": "Свеча — месяц: тело от первого периода рейтинга к последнему (зелёное — рост, "
-        "красное — спад), тени — лучший и худший период. Пунктир — порог {x}. "
+    "ratings.line.hint": {
+        "ru": "Точка — период рейтинга (РС — полмесяца, РКО — неделя), задевший выбранные "
+        "даты; подписи снизу — его даты. Пунктир — порог {x}. "
         "Подробнее по стране — фильтром «Страна».",
-        "en": "Each candle is a month: the body runs from the first rating period to the last "
-        "(green — up, red — down), the wicks show the best and worst period. Dashed line — "
-        "threshold {x}. For a single country, use the Country filter.",
+        "en": "Each point is a rating period (RS — half a month, RKO — a week) that touches "
+        "the selected dates; the labels below are its dates. Dashed line — threshold {x}. "
+        "For a single country, use the Country filter.",
     },
+    "ratings.line.empty": {"ru": "За период нет данных.", "en": "No data for the period."},
     "ratings.col.country": {"ru": "Страна", "en": "Country"},
     "ratings.col.delta": {"ru": "Δ к {prev}", "en": "Δ vs {prev}"},
     "ratings.total": {"ru": "Итого", "en": "Total"},

@@ -103,21 +103,22 @@
 .rt-cl__plot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-2); }
 .rt-cl__y { display: flex; flex-direction: column; justify-content: space-between; font-family: var(--font-mono); font-size: 10px; color: var(--ink-3); padding: 2px 0; }
 .rt-cl__y i { font-style: normal; }
-.rt-candles { display: block; width: 100%; height: 80px; overflow: visible; }
 .rt-more summary { cursor: pointer; font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-2) 0 0; list-style: none; }
 .rt-more summary::-webkit-details-marker { display: none; }
 .rt-more summary:hover { color: var(--accent); }
-.rt-candles__thr { stroke: var(--line-strong); stroke-dasharray: 3 3; }
-.rt-candle line { stroke-width: 1.25; }
-.rt-candle--up rect, .rt-candle--up line { fill: var(--ok); stroke: var(--ok); }
-.rt-candle--down rect, .rt-candle--down line { fill: var(--err); stroke: var(--err); }
-.rt-candle--flat rect, .rt-candle--flat line { fill: var(--ink-3); stroke: var(--ink-3); }
-.rt-candle.is-out { opacity: .4; }
-.rt-candle { cursor: default; outline: none; }
-.rt-candle:focus-visible rect { stroke: var(--accent); stroke-width: 2; }
 .rt-tip { position: fixed; z-index: 50; pointer-events: none; max-width: 22rem; padding: var(--space-2) var(--space-3); border-radius: var(--r-control); background: var(--ink); color: var(--surface); font-size: var(--fs-meta); line-height: 1.35; box-shadow: 0 4px 16px rgba(0, 0, 0, .25); }
-.rt-candle:hover { opacity: 1; }
-.rt-cl__axis { padding-left: 1.6rem; display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-3); margin-top: 2px; }
+/* Линия по периодам рейтинга (D396): SVG тянется по ширине, точки и подписи —
+   HTML в процентах поверх, чтобы не сплющивались вместе с viewBox. */
+.rt-line { position: relative; height: 80px; }
+.rt-line__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.rt-line__thr { stroke: var(--line-strong); stroke-dasharray: 3 3; }
+.rt-line__path { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.rt-line__dot { position: absolute; width: 8px; height: 8px; margin: -4px 0 0 -4px; border-radius: 50%;
+  background: var(--surface); border: 2px solid var(--accent); cursor: default; outline: none; }
+.rt-line__dot:hover, .rt-line__dot:focus-visible { background: var(--accent); }
+.rt-line__axis { position: relative; height: 16px; margin-top: 4px; font-size: 11px; color: var(--ink-3); white-space: nowrap; }
+.rt-line__axis span { position: absolute; transform: translateX(-50%); }
+.rt-line__empty { font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-4) 0; }
 .rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
 
 /* ── Зона риска — отдельной строкой-сигналом (D384): имена чипами, без таблицы. */
@@ -240,6 +241,7 @@
   .rt-split { grid-template-columns: 1fr; }
 }
 @media (max-width: 719px) {
+  .rt-line__axis span:nth-child(even) { display: none; }  /* узко: каждая вторая подпись, иначе налезают */
   .rt-cl { grid-template-columns: 1fr; }
   .rt-cl__head { display: none; }
   .rt-cl__k { display: inline; }

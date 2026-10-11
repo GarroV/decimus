@@ -218,26 +218,27 @@ def test_зона_риска_по_показанному_значению() -> N
     assert [u.unit for u in zone] == ["b"]
 
 
-def test_свеча_месяца_от_первого_периода_к_последнему() -> None:
-    """D384: средняя группы за период — по пиццериям; свеча месяца — первая,
-    наибольшая, наименьшая, последняя из средних периодов этого месяца."""
+def test_точка_графика_на_каждый_период_рейтинга() -> None:
+    """D396: точка графика — период рейтинга; средняя за период — по пиццериям
+    (D353), с датами периода для подписи под графиком; старые первыми."""
     from datetime import date
 
-    from src.ratings.summary import Candle, Fact, candles
+    from src.ratings.summary import Fact, Point, points
 
     def f(unit: str, country: str, pid: int, day: date, score: float) -> Fact:
-        return Fact(unit, unit, country, "rs", pid, day, score)
+        return Fact(unit, unit, country, "rs", pid, day, score, date(day.year, day.month, 15))
 
     факты = [
-        f("a", "RS", 1, date(2026, 9, 2), 90), f("b", "RS", 1, date(2026, 9, 2), 80),
-        f("a", "RS", 2, date(2026, 9, 16), 96), f("b", "RS", 2, date(2026, 9, 16), 70),
-        f("a", "RS", 3, date(2026, 9, 30), 92), f("b", "RS", 3, date(2026, 9, 30), 90),
-        f("c", "NG", 3, date(2026, 9, 30), 10),  # чужая страна в группу не входит
+        f("a", "RS", 2, date(2026, 9, 1), 96), f("b", "RS", 2, date(2026, 9, 1), 70),
+        f("a", "RS", 1, date(2026, 8, 1), 90), f("b", "RS", 1, date(2026, 8, 1), 80),
+        f("c", "NG", 2, date(2026, 9, 1), 10),  # чужая страна в группу не входит
     ]  # fmt: skip
-    сент, авг = date(2026, 9, 1), date(2026, 8, 1)
 
-    assert candles(факты, "rs", ["RS"], [авг, сент]) == (None, Candle(сент, 85, 91, 83, 91, 3))
-    assert candles(факты, "rko", ["RS"], [сент]) == (None,)
+    assert points(факты, "rs", ["RS"]) == (
+        Point(date(2026, 8, 1), date(2026, 8, 15), 85, 2),
+        Point(date(2026, 9, 1), date(2026, 9, 15), 83, 2),
+    )
+    assert points(факты, "rko", ["RS"]) == ()
 
 
 def test_кластер_IMF_делит_страны_по_справочнику() -> None:
@@ -257,9 +258,7 @@ def test_кластер_IMF_делит_страны_по_справочнику(
     факты = [Fact("a", "a", "RS", "rs", 1, date(2026, 9, 2), 90.0),
              Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
 
-    imf = group_lines(
-        Selection("imf", None, период), found, ("RS", "NG"), (факты, [], факты), [date(2026, 9, 1)]
-    )
+    imf = group_lines(Selection("imf", None, период), found, ("RS", "NG"), (факты, []))
     assert [(g.key, g.countries, g.rs) for g in imf] == [
         ("CEE", ("RS",), 90.0),
         ("OTHER", ("NG",), 70.0),
@@ -267,7 +266,7 @@ def test_кластер_IMF_делит_страны_по_справочнику(
 
     кластер = Selection("cluster", "OTHER", период)
     assert group_countries(кластер, страны) == ("NG",)
-    one = group_lines(кластер, found, ("NG",), (факты, [], факты), [date(2026, 9, 1)])
+    one = group_lines(кластер, found, ("NG",), (факты, []))
     assert [(g.key, g.rs) for g in one] == [(None, 70.0)]
     assert isinstance(one[0], GroupLine)
 
@@ -290,7 +289,7 @@ def test_девелопер_общая_строка_и_по_стране() -> No
              Fact("b", "b", "SI", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
     строки = group_lines(
         Selection("developer", "Dev", период), Choices(("Dev",), страны, ()), ("RS", "SI"),
-        (факты, [], факты), [date(2026, 9, 1)],
+        (факты, []),
     )  # fmt: skip
     assert [(g.level, g.key, g.rs) for g in строки] == [
         ("slice", None, 80.0), ("country", "RS", 90.0), ("country", "SI", 70.0),
