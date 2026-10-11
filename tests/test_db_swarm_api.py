@@ -175,3 +175,80 @@ def test_проверки_по_стране_датам_и_пределу(кли�
     тело = _get(клиент, f"{swarm_api.INSPECTIONS_PATH}?limit=1")
     assert [x["id"] for x in тело["inspections"]] == [проверки["ереван"]]
     assert тело["truncated"] is True
+
+
+# --- оценки на картах (D390) ---------------------------------------------------
+
+СВЯЗАН = "11111111-1111-1111-1111-111111111111"
+НЕ_СВЯЗАН = "22222222-2222-2222-2222-222222222222"
+ИСКЛЮЧЁН = "33333333-3333-3333-3333-333333333333"
+ЧУЖАЯ_СТРАНА = "44444444-4444-4444-4444-444444444444"
+
+
+@pytest.fixture
+def карты(pg_dsn: str, db_env: str) -> None:
+    """Сербия: связанный филиал, несвязанный и исключённый как «не пиццерия»; Хорватия — связанный.
+
+    Оценки Google на две даты, у связанного — и Яндекс без отзывов. Пишется
+    дверями загрузки (`maps_store.save`, `save_links`, `log_load`); отметку
+    исключения ставит человек руками (0047) — здесь ролью владельца схемы.
+    """
+    from src.db import maps_store
+    from src.ratings import pointer
+
+    def филиал(uuid: str, cc: str, name: str) -> tuple[Any, ...]:
+        return (uuid, None, "Dodo", name, cc, "City", "addr", 44.8, 20.4, 1, None)
+
+    maps_store.save(
+        [
+            филиал(СВЯЗАН, "RS", "Dodo Beograd"),
+            филиал(НЕ_СВЯЗАН, "RS", "Dodo Novi Sad"),
+            филиал(ИСКЛЮЧЁН, "RS", "Training center"),
+            филиал(ЧУЖАЯ_СТРАНА, "HR", "Dodo Zagreb"),
+        ],
+        [
+            (СВЯЗАН, pointer.GOOGLE, date(2026, 9, 10), 4.4, 70),
+            (СВЯЗАН, pointer.GOOGLE, date(2026, 10, 10), 4.6, 80),
+            (СВЯЗАН, pointer.YANDEX, date(2026, 10, 10), 0, 0),
+            (НЕ_СВЯЗАН, pointer.GOOGLE, date(2026, 10, 10), 3.0, 10),
+            (ИСКЛЮЧЁН, pointer.GOOGLE, date(2026, 10, 10), 1.0, 50),
+            (ЧУЖАЯ_СТРАНА, pointer.GOOGLE, date(2026, 10, 10), 4.9, 5),
+        ],
+    )
+    maps_store.save_links(
+        [
+            (СВЯЗАН, "aa" * 16, "Belgrade-1", 40),
+            (ИСКЛЮЧЁН, "bb" * 16, "Belgrade-2", 90),
+            (ЧУЖАЯ_СТРАНА, "cc" * 16, "Zagreb-1", 10),
+        ]
+    )
+    maps_store.log_load(ok=True, companies=4, ratings=6)
+    with psycopg.connect(pg_dsn) as conn:
+        conn.execute(
+            "update maps.companies set excluded_reason = 'учебный центр' where uuid = %s",
+            (ИСКЛЮЧЁН,),
+        )
+
+
+@pytest.mark.usefixtures("карты")
+def test_карты_только_связанные_и_неисключённые(клиент: FlaskClient) -> None:
+    тело = _get(клиент, f"{swarm_api.MAPS_PATH}?countries=RS&on=2026-10-11&compare=2026-09-30")
+    assert [u["id"] for u in тело["units"]] == ["aa" * 16], "в выдаче несвязанный или исключённый"
+    [пиццерия] = тело["units"]
+    assert пиццерия["maps"] == {
+        "google": {"avg": 4.6, "reviews": 80, "prev_avg": 4.4},
+        "yandex": None,
+    }
+    [сербия] = тело["countries"]
+    # Средняя страны — по отзывам связанного и несвязанного; исключённый не входит.
+    assert сербия["maps"]["google"]["avg"] == round((4.6 * 80 + 3.0 * 10) / 90, 2)
+    assert сербия["maps"]["google"]["delta"] == round(сербия["maps"]["google"]["avg"] - 4.4, 2)
+    assert тело["loaded_at"] is not None
+
+
+@pytest.mark.usefixtures("карты")
+def test_карты_оценка_на_дату_среза(клиент: FlaskClient) -> None:
+    тело = _get(клиент, f"{swarm_api.MAPS_PATH}?countries=RS,HR&on=2026-09-30")
+    assert {u["id"]: u["maps"]["google"]["avg"] for u in тело["units"]} == {"aa" * 16: 4.4}
+    assert [c["cc"] for c in тело["countries"]] == ["RS", "HR"]
+    assert тело["countries"][1]["maps"]["google"]["avg"] is None

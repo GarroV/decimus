@@ -149,6 +149,35 @@ class PeriodRow:
     title_en: str
 
 
+# Оценки на картах по связанным пиццериям (блок 2, D390): последняя оценка
+# каждого филиала на каждой карте на дату. Только филиалы, связанные с
+# пиццерией Dodo (`dodo_id`), и не исключённые как «не пиццерия» (D377) —
+# ровно те, что входят в оценки стран на странице «Рейтинги».
+_MAP_UNITS_SQL = """
+select distinct on (c.uuid, r.provider_id)
+    c.dodo_id, c.name, c.country_code, c.city, r.provider_id,
+    r.avg_rating::float, r.ratings_count
+from maps.ratings r
+join maps.companies c on c.uuid = r.company_uuid
+where c.dodo_id is not null
+  and c.excluded_reason is null
+  and c.country_code = any(%(countries)s)
+  and r.on_date <= %(on)s
+order by c.uuid, r.provider_id, r.on_date desc
+"""
+
+
+@dataclass(frozen=True)
+class MapUnitRow:
+    dodo_id: str
+    name: str
+    country: str
+    city: str | None
+    provider_id: int
+    avg: float
+    reviews: int
+
+
 @dataclass(frozen=True)
 class InspectionRow:
     id: str
@@ -231,4 +260,15 @@ def inspections(
     return [
         InspectionRow(str(r[0]), str(r[1]), *r[2:])
         for r in _rows("проверки для Swarm", _INSPECTIONS_SQL, params)
+    ]
+
+
+def map_units(*, countries: Sequence[str], on: date) -> list[MapUnitRow]:
+    """Последняя оценка связанных филиалов на `on` включительно, по каждой карте."""
+    if not countries:
+        return []
+    params = {"countries": list(countries), "on": on}
+    return [
+        MapUnitRow(str(r[0]), str(r[1]), str(r[2]), r[3], int(r[4]), float(r[5]), int(r[6]))
+        for r in _rows("оценки пиццерий на картах", _MAP_UNITS_SQL, params)
     ]
