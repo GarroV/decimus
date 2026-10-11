@@ -1394,23 +1394,36 @@ curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${WEB_HOST_PORT:-8268
    только людей своего пространства и его страны на чтение, запрос с чужим
    `tenant` — 403.
 
-### 8.17. API чтения для Swarm (#567, D387)
+### 8.17. API чтения для Swarm (#567, D387, D388)
 
-Код сервиса `web`, отдельного сервиса и миграции нет: адреса `/api/v1/*`
-приезжают с образом веба. Раскатка — по «да» владельца и в окне (скилл
-`deploy-window`). Контракт — `docs/12-web-admin.md`, раздел «API чтения для Swarm».
+Отдельного сервиса нет: адреса `/api/v1/*` приезжают с образом веба. Контракт —
+`docs/12-web-admin.md`, раздел «API чтения для Swarm». Токен — по модели D356:
+в базе только отпечаток, права, лимит, журнал; переменной окружения у токена нет.
 
-1. **Токен.** `python -c 'import secrets; print(secrets.token_urlsafe(32))'` →
-   `SWARM_API_TOKEN=<токен>` в `.env` VPS (`/srv/decimus/.env`), затем
-   пересоздать сервис `web` (compose, `up -d web`). Без переменной адреса
-   отвечают 503 `not_configured`; короче 32 знаков — веб не стартует.
-2. **Секреты Swarm** (Supabase Edge Functions):
+1. **Миграция `0049_api_tokens.sql`** — схема `api`: `api.tokens` (отпечатки,
+   права, отзыв) и `api.access_log` (журнал обращений). Данных не трогает.
+   Накат: `docker compose exec -T bot python -m src.db.migrate`. До наката
+   адреса API отвечают 503 `db_unavailable`.
+2. **Токен Swarm** — на машине площадки, ролью администратора истории (как
+   учётки):
+
+   ```bash
+   dc exec web python tools/api_token.py issue swarm --scope ratings:read,inspections:read
+   ```
+
+   Токен печатается ОДИН раз — сразу в секреты Swarm (п.3), никуда больше.
+   `dc exec web python tools/api_token.py list` — перечень со следом выдачи и
+   отзыва (без значений).
+3. **Секреты Swarm** (Supabase Edge Functions):
    `DECIMUS_API_URL=https://decimus.vasiliy-garro.workers.dev` (вход через
    Worker, §8.9; Worker передаёт `Authorization` как есть) и
-   `DECIMUS_API_TOKEN=<тот же токен>`. Кладёт Claude, не владелец (#567).
-3. **Смоук:** `curl -s -o /dev/null -w '%{http_code}' <адрес>/api/v1/ratings/scores?type=rs`
+   `DECIMUS_API_TOKEN=<токен из п.2>`. Кладёт Claude, не владелец (#567).
+4. **Смоук:** `curl -s -o /dev/null -w '%{http_code}' <адрес>/api/v1/ratings/scores?type=rs`
    без заголовка → 401; с `-H "Authorization: Bearer $DECIMUS_API_TOKEN"` → 200
    и JSON с `periods`. Токен в командную строку не вписывать — брать из
-   переменной окружения, чтобы он не осел в истории шелла.
-4. **Смена токена** — новое значение в оба места (п.1 и п.2); старое перестаёт
-   действовать с пересозданием веба.
+   переменной окружения, чтобы он не осел в истории шелла. Затем в базе:
+   `select token_id, path, status from api.access_log order by id desc limit 5` —
+   оба обращения записаны (первое с пустым `token_id` и 401).
+5. **Смена токена** — `issue` нового, новый в секреты Swarm, проверка, затем
+   `dc exec web python tools/api_token.py revoke <№ старого>`. Веб не
+   перезапускается: отозванный получает 401 со следующего запроса.
