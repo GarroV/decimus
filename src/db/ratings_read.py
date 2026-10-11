@@ -1,4 +1,4 @@
-"""Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0038).
+"""Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039).
 
 Читают все роли приложения (D327, «рейтинги видят все»): заслона по охвату
 здесь нет намеренно. Правка справочников — роль приложения; кто вправе её
@@ -70,13 +70,14 @@ class CountryRow:
     name_en: str
     developer: str | None
     is_imf: bool
+    cluster: str = "OTHER"
 
 
 def countries() -> tuple[CountryRow, ...]:
     return tuple(
         CountryRow(*r)
         for r in _rows(
-            "select code, name_ru, name_en, developer, is_imf from ratings.countries "
+            "select code, name_ru, name_en, developer, is_imf, cluster from ratings.countries "
             "order by name_en, code"
         )
     )
@@ -296,7 +297,7 @@ def set_developer(code: str, developer: str | None, *, actor: str) -> bool:
     return changed > 0
 
 
-#: Допустимые тип и способ совпадения правила (CHECK 0038). Коды `src.ratings.model`
+#: Допустимые тип и способ совпадения правила (CHECK 0039). Коды `src.ratings.model`
 #: отсюда не видны — ярус ниже.
 _RULE_TYPES = ("rs", "rko")
 _RULE_MATCHES = ("text", "contains")
@@ -336,3 +337,27 @@ def set_setting(key: str, value: float, *, actor: str) -> None:
     )
     if changed == 0:
         raise RatingsEditError(f"Настройки «{key}» нет", REFUSED_SETTING_UNKNOWN, key=key)
+
+
+def layout_rows() -> tuple[tuple[str, int, bool], ...]:
+    """Компоновка страницы (D368): код блока, место, виден ли."""
+    return tuple(
+        (str(r[0]), int(r[1]), bool(r[2]))
+        for r in _rows("select block, position, visible from ratings.layout")
+    )
+
+
+def save_layout(blocks: Sequence[tuple[str, bool]], *, actor: str) -> None:
+    """Записать порядок и видимость одним заходом: половина порядка не ложится."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+            for position, (block, visible) in enumerate(blocks):
+                conn.execute(
+                    "update ratings.layout set position = %s, visible = %s, "
+                    "updated_by = %s, updated_at = now() where block = %s",
+                    (position, visible, actor, block),
+                )
+    except psycopg.Error as exc:
+        raise RatingsEditError(
+            f"Компоновка не легла: база отказала ({exc.__class__.__name__})", REFUSED_DB
+        ) from exc

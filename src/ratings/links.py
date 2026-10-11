@@ -3,6 +3,10 @@
 Ключ пиццерии — id Dodo IS (32 hex). Он стоит в ссылке на рейтинг во всех
 трёх выгрузках: `https://dodopizza.info/rating#/<пиццерия>/<тип>?…&checkupId=…
 &ratingPeriodId=…`. Тип в пути: `1` — РКО, `2` — РС (сверено по живым выгрузкам).
+
+Свои ссылки собираются на `knowledgebase.dodois.io` — то же приложение, что и
+`dodopizza.info`, но сессия у команды живёт на нём: ссылка на `.info` упиралась
+во вход (D386). Разбор выгрузок принимает оба адреса.
 """
 
 from __future__ import annotations
@@ -14,7 +18,8 @@ from urllib.parse import parse_qs, urlsplit
 from .model import RKO, RS
 
 HEX32 = re.compile(r"^[0-9a-f]{32}$")
-RATING_HOST = "dodopizza.info"
+RATING_HOST = "knowledgebase.dodois.io"
+RATING_HOSTS = frozenset({RATING_HOST, "dodopizza.info"})
 BACKOFFICE_DOMAIN = "dodois.io"
 _TYPE_BY_SEGMENT = {"1": RKO, "2": RS}
 _SEGMENT_BY_TYPE = {code: segment for segment, code in _TYPE_BY_SEGMENT.items()}
@@ -39,7 +44,7 @@ class RatingLink:
 def parse_rating_link(url: str) -> RatingLink | None:
     """Ссылка на рейтинг → id. Чужой адрес или нет id пиццерии — `None`."""
     parts = urlsplit(url.strip())
-    if parts.hostname != RATING_HOST or not parts.fragment:
+    if parts.hostname not in RATING_HOSTS or not parts.fragment:
         return None
     path, _, query = parts.fragment.partition("?")
     segments = [segment for segment in path.split("/") if segment]

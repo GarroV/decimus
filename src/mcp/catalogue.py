@@ -321,6 +321,17 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
 }
 
 
+#: Одна фраза о поле `methodologies` на три инструмента ряда (D352): справка,
+#: а не запрет — оценка каждой проверки верна по своей методике.
+_METHODOLOGIES_NOTE = (
+    "The `methodologies` field is reference information: it groups the "
+    "inspections by the checklist and scoring rules they were scored "
+    "under. Each score is correct under its own methodology and is taken "
+    "as recorded, so averaging, ranking and comparing across groups is "
+    "valid."
+)
+
+
 TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="list_inspections",
@@ -330,12 +341,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "and finding count exactly as they were recorded when that "
             "inspection was completed — nothing is recalculated here. "
             "Optionally filter by unit name and by the date range the "
-            "inspections took place in. "
-            "Every answer carries a `comparability` field: inspections scored "
-            "under different checklists, or under editions whose scoring rules "
-            "changed, do not belong in one series — averaging or ranking "
-            "across them is meaningless, and the field says where the series "
-            "breaks."
+            "inspections took place in. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -362,10 +368,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "recent inspection first — a series of percentages and letter "
             "grades exactly as recorded at the time of each inspection. No "
             "trend, average, or difference between entries is computed here; "
-            "the caller compares the series itself. Before comparing, read the "
-            "`comparability` field: a series whose scoring rules changed "
-            "between editions is not a trend, and the field says where it "
-            "breaks."
+            "the caller compares the series itself. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -386,11 +389,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "many inspections and units, total findings, the distribution of "
             "recorded letter grades, and the best- and worst-scoring recorded "
             "inspections. No average score is computed — that number was "
-            "never recorded by the audit engine, so it is not invented here. "
-            "The `comparability` field says whether the summarized inspections "
-            "were scored the same way at all: different checklists, or "
-            "editions whose scoring rules changed, make the grade distribution "
-            "a mix of incomparable series."
+            "never recorded by the audit engine, so it is not invented here. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -1895,7 +1894,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "Upload a ratings file into Decimus (standards and customer-experience "
             "ratings, IMF only). kind: rko-violations | rko-evaluations | rs-checkups "
             "(Dodo IS CSV exports), sheet-scores (the 'quality by pizzeria' sheet as "
-            "CSV), snapshot (rating snapshot JSON, see docs/14-ratings.md). "
+            "CSV), snapshot (rating snapshot JSON, see docs/15-ratings.md). "
             "content: the file text as is. A snapshot goes in self-contained chunks of up to "
             f"{MCP_CHUNK_BYTES} bytes; send each chunk with its own call (the answer carries "
             "chunk_index and chunk_of). Re-sending the same content is safe: the answer says "

@@ -100,6 +100,10 @@ WALK_HEADERS: dict[str, str] = {
 }
 
 
+#: Страницы, которые браузер не кэширует: экран людей показывает новый пароль один раз.
+NO_STORE_PREFIX = "/users"
+
+
 def install(app: Flask, *, hsts: bool) -> None:
     """Повесить заголовки на каждый ответ приложения."""
     заголовки = dict(BASE_HEADERS)
@@ -115,4 +119,7 @@ def install(app: Flask, *, hsts: bool) -> None:
             response.headers.update(обход)
         else:
             response.headers.update(заголовки)
+        путь = request.path
+        if путь == NO_STORE_PREFIX or путь.startswith(f"{NO_STORE_PREFIX}/"):
+            response.headers["Cache-Control"] = "no-store"
         return response

@@ -1,4 +1,4 @@
-"""Каталог инструментов загрузки исторических проверок (D305–D310): описания для агента.
+"""Каталог инструментов загрузки проверок задним числом (D305–D310, D332–D335): описания для агента.
 
 Отдельным файлом от `catalogue.py` только по размеру: тот и так перерос
 предел. Здесь — данные, а не логика: имя, текст для агента, схема аргументов
@@ -8,7 +8,9 @@
 `MCP_IMPORT_TENANTS`.
 
 Текст описаний — для LLM-агента, который ведёт коллегу по загрузке: что
-передать, что проверить до вызова и что показать человеку после.
+передать, что проверить до вызова и что показать человеку после. Главное в нём
+— два режима (D334): агент обязан однозначно понять, когда `history` (старый
+отчёт, оценку переносить как есть и НЕ подгонять), а когда `current`.
 """
 
 from __future__ import annotations
@@ -48,30 +50,54 @@ _CONFIRM_DATE: dict[str, object] = {
     ),
 }
 
+#: Общее вступление: два режима. Повторяется в описании создания черновика —
+#: агент читает описания по одному, и выбор режима обязан быть виден там, где
+#: он делается.
+_MODES = (
+    "TWO MODES — chosen when the draft is created and never changed:\n"
+    "• mode=history — an OLD report made under the PREVIOUS methodology (Qvalon PDF "
+    "with 'Score 95.29, Status, Issues', old checklists of 253/217/150 questions, "
+    "Bitrix, spreadsheets, free text). The score is transferred EXACTLY as printed in "
+    "the report and is never recomputed: do NOT adjust findings to make any number "
+    "match, do NOT convert the old score to the current scale. Findings are a "
+    "description of the report: wording is required; item code, class (D1/D2/D3) and "
+    "zone only if the report states them.\n"
+    "• mode=current — a RECENT inspection made under TODAY's checklist (e.g. two weeks "
+    "ago), entered after the fact. Only the current version of the reference checklist "
+    "is allowed; the engine checks every finding and computes the score exactly as for "
+    "a live audit.\n"
+    "If unsure which mode applies — ask the person; never guess."
+)
+
 _CODE = (
-    "Checklist item code (e.g. CLN05), never its wording. Must exist in the draft's "
-    "own checklist version; take it from checklist_items/checklist_item of that version."
+    "Checklist item code (e.g. CLN05), never its wording. current: required, must exist "
+    "in the current checklist version (checklist_items). history: optional — give it "
+    "only if the old report names the item; an unknown code is kept and returned as a "
+    "warning, not refused. Pass an empty string on edit to clear it."
 )
 _LEVEL = (
-    "Class: D1, D2 or D3 for a violation (must be allowed for this item), D0 for an "
-    "informational record (temperatures, oven settings, product photo — items whose "
-    "levels are D0), or R for a recommendation (any violation item, or the code NOTE "
-    "for a general note). Decide the class by the item's criteria, never by feel."
+    "current: required — D1, D2 or D3 for a violation (must be allowed for this item), "
+    "D0 for an informational record, or R for a recommendation (code NOTE for a general "
+    "note); decide by the item's criteria, never by feel. history: optional — D1, D2 or "
+    "D3 only if the old report states the class; omitted means 'no class' (old "
+    "checklists had none). Pass an empty string on edit to clear it."
 )
 _ZONE = (
-    "Zone code from the version's zone directory (e.g. hot_kitchen) — the PLACE where "
-    "it was seen, as the original report says. A zone outside the item's usual list is "
-    "accepted and flagged zone_unusual."
+    "Zone code (e.g. hot_kitchen) — the PLACE where it was seen, as the report says. "
+    "current: required, from the version's zone directory; outside the item's usual "
+    "list it is accepted and flagged zone_unusual. history: optional — only if the "
+    "report names the place. Pass an empty string on edit to clear it."
 )
 _TEXT = (
-    "Finding wording exactly as the original report states the fact, in the draft's "
-    "text language. Only the fact: no scale beyond what the report says, no guessed "
-    "damage, no remarks to the person. Max 1000 characters."
+    "Finding wording exactly as the report states the fact, in the draft's text "
+    "language. Only the fact: no scale beyond what the report says, no guessed "
+    "damage, no remarks to the person. Max 1000 characters. Required in both modes."
 )
 _COMMENT = "Optional recommendation inside the finding, as in the original report."
 _REPEAT = (
-    "True if the original report marks this finding as a REPEAT of the previous "
-    "inspection (its deduction is doubled). Only when the report says so."
+    "True if the report marks this finding as a REPEAT of the previous inspection. "
+    "Only when the report says so. current: its deduction is doubled. history: stored "
+    "as a mark only, the score does not change."
 )
 
 
@@ -98,45 +124,81 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
     ImportTool(
         name="import_create_inspection",
         description=(
-            "Start importing ONE historical inspection from an old report (Bitrix, PDF, "
-            "spreadsheet): creates a DRAFT with no findings, scored by the engine against "
-            "the given checklist version. Imported inspections are ordinary inspections "
-            "of their own checklist version once accepted — they appear in unit history "
-            "and analytics like any other.\n\n"
-            "Before calling: make sure the old methodology exists as a checklist version "
-            "(checklists, checklist_versions; build missing old versions with the "
-            "checklist tools — one version per change of the old methodology). The unit "
-            "must already exist in the unit directory: imports never create units. "
-            "Pass the score printed in the old report as reported_pct/reported_grade — "
-            "it is used ONLY to compare against the engine's score before acceptance.\n\n"
-            "Next: add each finding with import_add_finding, then compare with "
+            "Start entering ONE inspection after the fact: creates a DRAFT with no "
+            "findings. Accepted drafts appear in the unit's history and analytics next to "
+            "live audits.\n\n" + _MODES + "\n\n"
+            "mode=history requires unit, date and reported_pct (the score printed in the "
+            "old report, e.g. 'Score 95.29' → 95.29 — it BECOMES the inspection's score). "
+            "Optional: reported_grade (only if the report prints a letter), "
+            "reported_status (the report's status words as printed: 'Passed', "
+            "'Not passed', 'Issues (D2)', 'Critical (D3)'…), legacy_method (which old "
+            "methodology: 'Qvalon 133', 'old checklist 253'…), auditor, source_ref. Do not "
+            "pass checklist_code/checklist_version in this mode.\n"
+            "mode=current requires unit, date and auditor. The draft is bound to the "
+            "current version of the reference checklist automatically; naming another "
+            "checklist or an older version is refused. reported_pct/reported_grade are "
+            "optional and used only to compare with the engine's score.\n\n"
+            "The unit must already exist in the unit directory: imports never create "
+            "units. Next: add each finding with import_add_finding, review with "
             "import_get_inspection, then import_accept_inspection."
         ),
         input_schema=_schema(
             {
+                "mode": {
+                    "type": "string",
+                    "enum": ["history", "current"],
+                    "description": "history — old report under the previous methodology, "
+                    "score as printed, never recomputed; current — recent inspection "
+                    "under today's checklist, scored by the engine. Fixed for the draft.",
+                },
                 "unit": {
                     "type": "string",
                     "description": "Unit (pizzeria) name as in the unit directory.",
                 },
                 "date": {
                     "type": "string",
-                    "description": "Date of the visit from the old report, YYYY-MM-DD. "
+                    "description": "Date of the visit from the report, YYYY-MM-DD. "
                     "Not in the future.",
                 },
-                "checklist_code": {
-                    "type": "string",
-                    "description": "Code of the checklist the old report was made by "
-                    "(see checklists).",
+                "reported_pct": {
+                    "type": "number",
+                    "description": "Score printed in the report, 0–100. history: REQUIRED "
+                    "and it is the inspection's score as is. current: optional, only "
+                    "compared with the engine's score.",
                 },
-                "checklist_version": {
+                "reported_grade": {
                     "type": "string",
-                    "description": "Exact version id of that checklist the inspection was "
-                    "scored by (see checklist_versions). Omitted — the checklist's current "
-                    "version; for old reports name the old version explicitly.",
+                    "description": "Grade letter printed in the report, if any. history: "
+                    "kept as the inspection's letter (omit when the report has none). "
+                    "current: comparison only.",
+                },
+                "reported_status": {
+                    "type": "string",
+                    "description": "history only: the old report's status words as "
+                    "printed (e.g. Passed, Not passed, Good, Issues (D2), Critical (D3)). "
+                    "Max 60 characters.",
+                },
+                "legacy_method": {
+                    "type": "string",
+                    "description": "history only: label of the old methodology the "
+                    "inspection was made by (e.g. 'Qvalon 133', 'old checklist 253'). "
+                    "Max 100 characters.",
                 },
                 "auditor": {
                     "type": "string",
-                    "description": "Auditor name as printed in the old report.",
+                    "description": "Auditor name as printed in the report. Required in "
+                    "current, optional in history.",
+                },
+                "checklist_code": {
+                    "type": "string",
+                    "description": "current only, optional: the reference checklist code "
+                    "(anything else is refused). Do not pass in history.",
+                },
+                "checklist_version": {
+                    "type": "string",
+                    "description": "current only, optional: must equal the current "
+                    "version (checklist_versions); an older one is refused. Do not pass "
+                    "in history.",
                 },
                 "kind": {
                     "type": "string",
@@ -151,37 +213,32 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
                     "description": "Language the finding wordings are written in, two "
                     "letters (default: report_lang).",
                 },
-                "reported_pct": {
-                    "type": "number",
-                    "description": "Percentage printed in the old report, 0–100. For "
-                    "comparison only.",
-                },
-                "reported_grade": {
-                    "type": "string",
-                    "description": "Grade letter printed in the old report. For comparison only.",
-                },
                 "source_ref": {
                     "type": "string",
                     "description": "Link or name of the original document (Bitrix link, "
                     "file name), so the import can be traced back.",
                 },
             },
-            ["unit", "date", "checklist_code", "auditor"],
+            ["mode", "unit", "date"],
         ),
         handler=imports.import_create_inspection,
     ),
     ImportTool(
         name="import_add_finding",
         description=(
-            "Add one finding from the old report to an imported draft. The engine checks "
-            "it against the draft's OWN checklist version exactly as for a live audit: "
-            "the item exists, the class is allowed for it, the zone exists, and one item "
-            "+ zone pair is one finding (several objects of one item in one zone are ONE "
-            "finding). D0 and R records do not occupy the pair. On refusal nothing is "
-            "written and the engine's reason is returned. The score is recomputed by the "
-            "engine in the same step.\n\n"
+            "Add one finding from the report to an imported draft. Behaviour depends on "
+            "the draft's mode (see import_get_inspection → mode).\n"
+            "current: code, level, zone and text are required; the engine checks the "
+            "finding against the current checklist version exactly as for a live audit "
+            "(item exists, class allowed, zone exists, one item + zone pair is one "
+            "finding; D0 and R do not occupy the pair) and recomputes the score. On "
+            "refusal nothing is written and the engine's reason is returned.\n"
+            "history: text is required; code, level (D1/D2/D3) and zone only if the old "
+            "report states them — omitted ones are stored as 'not given' ('no class' for "
+            "level). The score does NOT change: it stays as in the old report. Unknown "
+            "codes/zones come back as warnings — show them to the person.\n\n"
             "One call per finding, as the person confirms it. Never invent findings, "
-            "classes or zones the report does not state — ask the person instead."
+            "codes, classes or zones the report does not state — ask the person instead."
         ),
         input_schema=_schema(
             {
@@ -193,7 +250,7 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
                 "comment": {"type": "string", "description": _COMMENT},
                 "repeat": {"type": "boolean", "description": _REPEAT},
             },
-            ["inspection_id", "code", "level", "zone", "text"],
+            ["inspection_id", "text"],
         ),
         handler=imports.import_add_finding,
     ),
@@ -201,10 +258,11 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         name="import_edit_finding",
         description=(
             "Correct one finding of an imported draft by its number n. Only the given "
-            "fields change; the engine re-checks the finding against the draft's "
-            "checklist version and recomputes the score. A recommendation (R) and a "
-            "violation cannot be turned into each other by editing — remove and add "
-            "again. Pass comment as an empty string to clear it."
+            "fields change. current: the engine re-checks the finding against the "
+            "current checklist version and recomputes the score; a recommendation (R) and "
+            "a violation cannot be turned into each other by editing — remove and add "
+            "again. history: nothing is recomputed; pass an empty string for code, level "
+            "or zone to mark it 'not given'. Pass comment as an empty string to clear it."
         ),
         input_schema=_schema(
             {
@@ -225,7 +283,8 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         name="import_remove_finding",
         description=(
             "Remove one finding (with its photos) from an imported draft by its number "
-            "n. The score is recomputed by the engine."
+            "n. current: the score is recomputed by the engine. history: the score stays "
+            "as in the old report."
         ),
         input_schema=_schema({"inspection_id": _ID, "n": _N}, ["inspection_id", "n"]),
         handler=imports.import_remove_finding,
@@ -233,12 +292,17 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
     ImportTool(
         name="import_get_inspection",
         description=(
-            "Read an imported inspection (draft or accepted): header, findings with "
-            "their numbers, the engine's score (pct, grade, deductions, per-zone "
-            "breakdown) and the comparison with the score printed in the old report — "
-            "matches_reported and pct_diff. Show the comparison to the person before "
-            "accepting; a difference usually means a missing, extra or mis-levelled "
-            "finding, a missed repeat mark, or the wrong checklist version."
+            "Read an imported inspection (draft or accepted): its mode, header and "
+            "findings with their numbers.\n"
+            "mode=history: the score (pct, grade) is the old report's, as is, with the "
+            "report's status and the old methodology label; there are no deductions or "
+            "per-zone breakdown and nothing to compare — check with the person that pct, "
+            "letter and status match the report exactly.\n"
+            "mode=current: the engine's score (pct, grade, deductions, per-zone "
+            "breakdown) and, if the report's score was given, the comparison "
+            "(matches_reported, pct_diff). A difference usually means a missing, extra or "
+            "mis-levelled finding or a missed repeat mark — show it to the person before "
+            "accepting."
         ),
         input_schema=_schema({"inspection_id": _ID}, ["inspection_id"]),
         handler=imports.import_get_inspection,
@@ -246,8 +310,9 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
     ImportTool(
         name="import_list_drafts",
         description=(
-            "List this space's imported drafts that are not accepted yet: unit, date, "
-            "checklist version, computed and reported score, number of findings."
+            "List this space's imported drafts that are not accepted yet: mode "
+            "(history/current), unit, date, checklist version (legacy:<label> for "
+            "history), score and reported score, number of findings."
         ),
         input_schema=_schema({}, []),
         handler=imports.import_list_drafts,
@@ -282,11 +347,12 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
         name="import_accept_inspection",
         description=(
             "Accept an imported draft after the person has checked it (the person who "
-            "imported it accepts it). It becomes an ordinary inspection of its checklist "
-            "version in the unit's history and analytics and can no longer be edited or "
-            "discarded. Accepting an import opens NO action-plan request and sends "
-            "nothing to anyone.\n\n"
-            "Confirm with the person first, showing the computed vs reported score. The "
+            "imported it accepts it). It enters the unit's history and analytics next to "
+            "live audits and can no longer be edited or discarded. Accepting opens NO "
+            "action-plan request, there is no partner letter for imported inspections, "
+            "and nothing is sent to anyone.\n\n"
+            "Confirm with the person first: history — the score, letter and status exactly "
+            "as in the old report; current — the engine's score vs the reported one. The "
             "call must name the unit and the date as recorded; on mismatch nothing is "
             "accepted."
         ),

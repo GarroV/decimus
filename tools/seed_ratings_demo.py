@@ -165,9 +165,7 @@ def wipe(conn: psycopg.Connection) -> None:
     conn.execute("delete from ratings.scores where unit_dodo_id like %s", (like,))
     conn.execute("delete from ratings.periods where dodo_id like %s", (like,))
     conn.execute("delete from ratings.units where dodo_id like %s", (like,))
-    conn.execute(
-        "update ratings.countries set developer = null where developer = %s", (DEVELOPER,)
-    )
+    conn.execute("update ratings.countries set developer = null where developer = %s", (DEVELOPER,))
     conn.execute(
         "delete from ratings.import_issues where import_id in "
         "(select id from ratings.imports where channel = 'seed')"

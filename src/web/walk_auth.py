@@ -29,6 +29,8 @@ from dataclasses import dataclass
 
 from aiogram.utils.web_app import safe_parse_webapp_init_data
 
+from src.bot.config import ALLOWED_IDS_VAR, parse_allowed_ids
+from src.bot.errors import BotConfigError
 from src.domain.walk_users import parse_walk_users
 
 #: Сколько живёт подпись. Telegram выдаёт свежую при каждом открытии, а
@@ -57,6 +59,8 @@ FINDING_ENDPOINT = "walk_finding"
 INFO_ENDPOINT = "walk_info"
 #: Поиск пункта по кадру и словам (D330) — распознавание бота.
 SUGGEST_ENDPOINT = "walk_suggest"
+#: Приложение аудитора (D373): настройки и круг доступа к MCP.
+APP_ENDPOINT = "walk_app"
 #: Пути тех же адресов. Здесь, а не в `walk.py`: их вешают и сервис обхода
 #: (`walk.py`, `walk_write.py`), и админка, передающая ему запросы
 #: (`walk_proxy.py`), — две копии путей разошлись бы молча.
@@ -67,6 +71,7 @@ PHOTO_VIEW_PATH = "/tg/walk/photo/view"
 FINDING_PATH = "/tg/walk/finding"
 INFO_PATH = "/tg/walk/info"
 SUGGEST_PATH = "/tg/walk/suggest"
+APP_PATH = "/tg/walk/app"
 ENDPOINTS = frozenset(
     {
         PAGE_ENDPOINT,
@@ -76,6 +81,7 @@ ENDPOINTS = frozenset(
         FINDING_ENDPOINT,
         INFO_ENDPOINT,
         SUGGEST_ENDPOINT,
+        APP_ENDPOINT,
     }
 )
 
@@ -96,6 +102,10 @@ class WalkSettings:
     preview_chat: int | None
     #: Круг тестеров (`WALK_USERS`, тот же, что у кнопки бота). `None` — все.
     users: frozenset[int] | None = None
+    #: Кого пускает бот без привязки (`ALLOWED_TELEGRAM_IDS`). С токеном
+    #: мини-апп пускает ровно тех, кого бот (D372): кнопку меню видит каждый,
+    #: кто открыл бота, а не только те, кому бот прислал сообщение с кнопкой.
+    allowed_ids: frozenset[int] = frozenset()
 
     @property
     def enabled(self) -> bool:
@@ -123,10 +133,19 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
                 f"{PREVIEW_CHATS[0]}–{PREVIEW_CHATS[1]}. Просмотр без подписи пишет в "
                 "проверку (D312) и на настоящий чат не открывается"
             )
+    allowed = frozenset[int]()
+    # Пустой список — пускает только привязка учётки; обязательным его делает
+    # бот, у которого без списка нет ни одного своего.
+    if token is not None and (src.get(ALLOWED_IDS_VAR) or "").strip():
+        try:
+            allowed = parse_allowed_ids(src.get(ALLOWED_IDS_VAR) or "")
+        except BotConfigError as exc:
+            raise ValueError(str(exc)) from exc
     return WalkSettings(
         bot_token=token,
         preview_chat=preview,
         users=parse_walk_users(src),
+        allowed_ids=allowed,
     )
 
 

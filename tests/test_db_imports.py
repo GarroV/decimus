@@ -88,6 +88,9 @@ def _старое_издание(склад: Store) -> str:
 
 def _черновик(склад: Store, *, tenant: str = "HQ", **поля: Any) -> str:
     аргументы: dict[str, Any] = {
+        # Текущая (D334): этот набор — путь с движком. Историческая — в
+        # `test_db_import_modes.py`.
+        "mode": "current",
         "unit": ТОЧКА,
         "date": ДЕНЬ,
         "checklist_code": "bizdev",
@@ -190,21 +193,27 @@ def test_формулировка_и_комментарий_лежат_на_яз
     assert (запись.lang, запись.text, запись.comment) == ("en", "streaks", None)
 
 
-def test_проверка_считается_по_названной_старой_версии_и_её_пунктам(
+def test_текущая_не_заводится_по_старой_версии_даже_существующей(
     сеть: None, хранилище: Store
 ) -> None:
-    # Arrange — в старом издании два пункта (CLN01, CLN02) и две зоны.
+    """D334: в режиме current только действующая версия — старую выбрать нельзя."""
+    # Arrange — старое издание в хранилище есть (D307).
     старое = _старое_издание(хранилище)
-    ident = _черновик(хранилище, checklist_version=старое)
 
-    # Act
-    _добавить(хранилище, ident, "CLN01", "D2", "fridge")
+    # Act / Assert
+    with pytest.raises(ToolError, match="выбрать версию нельзя"):
+        _черновик(хранилище, checklist_version=старое)
+    assert imports.import_list_drafts(tenant="HQ", store=хранилище, actor=КТО)["count"] == 0
 
-    # Assert — пункт действующей версии в старой не принимается.
-    assert _записано(ident).inspection.checklist_version == старое
-    assert _движок_согласен(ident) == (98.0, "C")
-    with pytest.raises(ToolError, match="CLN03"):
-        _добавить(хранилище, ident, "CLN03", "D1", "fridge")
+
+def test_текущая_заводится_по_названной_действующей_версии(сеть: None, хранилище: Store) -> None:
+    ident = _черновик(хранилище, checklist_version=current_version(хранилище))
+    assert _записано(ident).inspection.checklist_version == current_version(хранилище)
+
+
+def test_текущая_не_заводится_по_другому_чек_листу(сеть: None, хранилище: Store) -> None:
+    with pytest.raises(ToolError, match="действующему эталону"):
+        _черновик(хранилище, checklist_code="old-checklist")
 
 
 def test_сверка_со_старым_отчётом_показывает_расхождение(сеть: None, хранилище: Store) -> None:
@@ -285,7 +294,7 @@ def test_дата_в_будущем_не_принимается(сеть: None, 
 
 
 def test_неизвестная_версия_не_принимается(сеть: None, хранилище: Store) -> None:
-    with pytest.raises(ToolError, match="Версии"):
+    with pytest.raises(ToolError, match="выбрать версию нельзя"):
         _черновик(хранилище, checklist_version="bizdev-2020-01-01-000000000000")
 
 
