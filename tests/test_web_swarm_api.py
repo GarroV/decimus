@@ -15,11 +15,13 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 
-from src.db import api_access, maps_store, ratings_read, swarm_read, web_throttle
+from src.db import api_access, maps_store, queries, ratings_read, swarm_read, web_throttle
 from src.db.errors import AccessError, DbError
 from src.db.maps_store import LatestRating
+from src.db.models import FindingRow, InspectionDetail
+from src.db.models import InspectionRow as DetailRow
 from src.ratings import pointer
-from src.web import swarm_api
+from src.web import inspection_titles, swarm_api
 from src.web.app import create_app
 from src.web.config import Settings
 
@@ -444,6 +446,7 @@ def test_проверки_форма_и_обрезка(клиент: FlaskClient
                 "score_pct": 97.5,
                 "grade": "A",
                 "path": "/inspections/11111111-1111-1111-1111-111111111111",
+                "previous": None,
             }
         ],
         "truncated": False,
@@ -452,6 +455,201 @@ def test_проверки_форма_и_обрезка(клиент: FlaskClient
     assert зов["limit"] == 2, "читается на одну больше предела — так видна обрезка"
     assert зов["reach"].countries == ("GE",) and зов["reach"].tenants is None
     assert зов["date_from"] == date(2026, 10, 1) and зов["date_to"] is None
+
+
+# --- детали проверки (D391) ------------------------------------------------------
+
+ПРОВЕРКА = "11111111-1111-1111-1111-111111111111"
+ПД = {"auditor", "partner", "contact", "chat_id", "city", "comment", "words", "photos"}
+
+
+def _деталь() -> InspectionDetail:
+    шапка = DetailRow(
+        id=ПРОВЕРКА,
+        tenant_code="HQ",
+        unit_name="Batumi-1",
+        chat_id=777,
+        kind="planned",
+        inspection_date=date(2026, 10, 2),
+        report_lang="ru",
+        checklist_version="1.4",
+        pct=97.5,
+        grade="A",
+        findings_count=2,
+        pushed_at="2026-10-02T10:00:00",
+        auditor="Аудитор Аудиторович",
+        city="Батуми",
+        partner="Партнёр",
+        contact="+995 000",
+    )
+
+    def запись(n: int, code: str, repeat: bool) -> FindingRow:
+        return FindingRow(
+            id=f"f{n}",
+            inspection_id=ПРОВЕРКА,
+            unit_name="Batumi-1",
+            inspection_date=date(2026, 10, 2),
+            n=n,
+            code=code,
+            level="D1",
+            zone="KIT",
+            zone_unusual=False,
+            source="voice",
+            lang="ru",
+            text=f"факт {n}",
+            comment="комментарий аудитора с именем",
+            words="сырые слова",
+            repeat=repeat,
+        )
+
+    return InspectionDetail(
+        inspection=шапка,
+        deductions=2.5,
+        counts={"D1": 2},
+        by_zone={
+            "KIT": {
+                "code": "KIT",
+                "name_ru": "Кухня",
+                "name_en": "Kitchen",
+                "share": 40,
+                "loss": 2.5,
+                "left": 37.5,
+                "zeroed": False,
+            }
+        },
+        findings=(запись(2, "B2", True), запись(1, "A1", False)),
+    )
+
+
+@pytest.fixture
+def деталь(monkeypatch: pytest.MonkeyPatch, база: dict[str, list[Any]]) -> dict[str, Any]:
+    зовы: dict[str, Any] = {"one": [], "card": [], "есть": True}
+    строка = swarm_read.InspectionRow(
+        ПРОВЕРКА,
+        "22222222-2222-2222-2222-222222222222",
+        None,
+        "Batumi-1",
+        "GE",
+        date(2026, 10, 2),
+        "planned",
+        97.5,
+        "A",
+        previous=swarm_read.PreviousInspection(
+            "33333333-3333-3333-3333-333333333333", date(2026, 7, 1), 94.0, "B"
+        ),
+    )
+
+    def одна(**kw: Any) -> swarm_read.InspectionRow | None:
+        зовы["one"].append(kw)
+        return строка if зовы["есть"] else None
+
+    def карточка(ident: str, **kw: Any) -> InspectionDetail | None:
+        зовы["card"].append((ident, kw))
+        return _деталь()
+
+    monkeypatch.setattr(swarm_read, "inspection", одна)
+    monkeypatch.setattr(queries, "get_inspection", карточка)
+    monkeypatch.setattr(
+        inspection_titles, "item_titles", lambda v: {"A1": ("Пол чистый", "Floor clean")}
+    )
+    return зовы
+
+
+def _ключи(значение: Any) -> set[str]:
+    if isinstance(значение, dict):
+        return set(значение) | {k for v in значение.values() for k in _ключи(v)}
+    if isinstance(значение, list):
+        return {k for v in значение for k in _ключи(v)}
+    return set()
+
+
+def test_деталь_проверки_форма(клиент: FlaskClient, деталь: dict[str, Any]) -> None:
+    ответ = клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА.upper()}", headers=ВЕРНЫЙ)
+    assert ответ.status_code == 200
+    тело = ответ.get_json()
+    проверка = тело["inspection"]
+    assert проверка["previous"] == {
+        "id": "33333333-3333-3333-3333-333333333333",
+        "date": "2026-07-01",
+        "score_pct": 94.0,
+        "grade": "B",
+    }
+    assert проверка["deductions"] == 2.5 and проверка["counts"] == {"D1": 2}
+    assert проверка["zones"] == [
+        {
+            "zone": "KIT",
+            "title_ru": "Кухня",
+            "title_en": "Kitchen",
+            "share": 40,
+            "loss": 2.5,
+            "left": 37.5,
+            "zeroed": False,
+        }
+    ]
+    assert [f["n"] for f in тело["findings"]] == [1, 2], "записи по номеру"
+    assert тело["findings"][0] == {
+        "n": 1,
+        "code": "A1",
+        "title_ru": "Пол чистый",
+        "title_en": "Floor clean",
+        "level": "D1",
+        "zone": "KIT",
+        "text": "факт 1",
+        "repeat": False,
+    }
+    assert тело["findings"][1]["title_ru"] is None and тело["findings"][1]["repeat"] is True
+    ((ident, kw),) = деталь["card"]
+    assert ident == ПРОВЕРКА, "идентификатор приведён к нижнему регистру"
+    assert kw["reach"].tenants is None and kw["reach"].countries is None
+    assert "include_on_review" not in kw and "include_retracted" not in kw, (
+        "деталь читает только принятые — без приёмки и снятых"
+    )
+
+
+def test_деталь_проверки_без_персональных_данных(
+    клиент: FlaskClient, деталь: dict[str, Any]
+) -> None:
+    тело = клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА}", headers=ВЕРНЫЙ).get_json()
+    утекло = _ключи(тело) & ПД
+    assert not утекло, f"в ответ попали персональные поля: {утекло}"
+    текст = str(тело)
+    for значение in ("Аудитор Аудиторович", "Партнёр", "+995 000", "777", "с именем", "сырые"):
+        assert значение not in текст, f"в ответ попало «{значение}»"
+
+
+def test_деталь_проверки_нет_такой_404(клиент: FlaskClient, деталь: dict[str, Any]) -> None:
+    деталь["есть"] = False
+    ответ = клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА}", headers=ВЕРНЫЙ)
+    assert ответ.status_code == 404
+    assert ответ.get_json()["error"] == "not_found"
+    assert деталь["card"] == [], "без принятой строки карточка не читается"
+
+
+@pytest.mark.parametrize("ident", ["не-uuid", "1111", f"{ПРОВЕРКА}x", "' or 1=1 --"])
+def test_деталь_проверки_кривой_id_400(
+    клиент: FlaskClient, деталь: dict[str, Any], ident: str
+) -> None:
+    ответ = клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ident}", headers=ВЕРНЫЙ)
+    assert ответ.status_code == 400
+    assert ответ.get_json()["error"] == "bad_id"
+    assert деталь["one"] == [] and деталь["card"] == []
+
+
+def test_деталь_проверки_без_права_403(
+    клиент: FlaskClient, деталь: dict[str, Any], доступ: dict[str, Any]
+) -> None:
+    ответ = клиент.get(
+        f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА}",
+        headers={"Authorization": f"Bearer {ТОЛЬКО_РЕЙТИНГИ}"},
+    )
+    assert ответ.status_code == 403
+    assert деталь["one"] == []
+    assert доступ["журнал"][-1] == (2, f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА}", 403)
+
+
+def test_деталь_проверки_без_токена_401(клиент: FlaskClient, деталь: dict[str, Any]) -> None:
+    assert клиент.get(f"{swarm_api.INSPECTIONS_PATH}/{ПРОВЕРКА}").status_code == 401
+    assert деталь["one"] == []
 
 
 # --- оценки на картах (D390) ---------------------------------------------------

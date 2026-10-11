@@ -166,7 +166,7 @@ def render(
         if not selection.country or код == selection.country
     )
     порядок = pick(
-        label="",
+        label=t("overview.sort", lang),
         empty_title=t("overview.sort.score", lang),
         current="" if selection.sort == "score" else selection.sort,
         values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),

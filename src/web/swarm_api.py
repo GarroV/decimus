@@ -37,13 +37,14 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from src.db import api_access, maps_store, ratings_read, swarm_read, web_throttle
+from src.db import api_access, maps_store, queries, ratings_read, swarm_read, web_throttle
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT
 from src.ratings import feed, maps
 from src.ratings.model import RKO, RS
 
+from . import inspection_titles
 from .config import Settings
 from .remote import client_address
 from .sections import section
@@ -53,16 +54,25 @@ SCORES_PATH = f"{PREFIX}/ratings/scores"
 CHECKUPS_PATH = f"{PREFIX}/ratings/checkups"
 VIOLATIONS_PATH = f"{PREFIX}/ratings/violations"
 INSPECTIONS_PATH = f"{PREFIX}/inspections"
+INSPECTION_PATH = f"{PREFIX}/inspections/<inspection_id>"
 MAPS_PATH = f"{PREFIX}/maps/ratings"
 
 SCORES_ENDPOINT = "swarm_api_scores"
 CHECKUPS_ENDPOINT = "swarm_api_checkups"
 VIOLATIONS_ENDPOINT = "swarm_api_violations"
 INSPECTIONS_ENDPOINT = "swarm_api_inspections"
+INSPECTION_ENDPOINT = "swarm_api_inspection"
 MAPS_ENDPOINT = "swarm_api_maps"
 #: Открыты заслону входа (`auth.OPEN_ENDPOINTS`): опознаёт токен, а не кука.
 ENDPOINTS = frozenset(
-    {SCORES_ENDPOINT, CHECKUPS_ENDPOINT, VIOLATIONS_ENDPOINT, INSPECTIONS_ENDPOINT, MAPS_ENDPOINT}
+    {
+        SCORES_ENDPOINT,
+        CHECKUPS_ENDPOINT,
+        VIOLATIONS_ENDPOINT,
+        INSPECTIONS_ENDPOINT,
+        INSPECTION_ENDPOINT,
+        MAPS_ENDPOINT,
+    }
 )
 
 #: Код отказа запертому адресу: перебор токена с него уже записан счётчиком.
@@ -83,6 +93,7 @@ CACHE_CONTROL = "private, max-age=300"
 RATE_LIMIT_PER_MINUTE = 120
 RATE_WINDOW = timedelta(minutes=1)
 
+_UUID = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
 _COUNTRY = re.compile(r"[A-Z]{2}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 
@@ -277,6 +288,41 @@ def _violations(_: Settings) -> dict[str, Any]:
     }
 
 
+def _inspection_json(row: swarm_read.InspectionRow) -> dict[str, Any]:
+    """Запись проверки — одна форма в списке и в деталях. Без ПД: ни аудитора,
+    ни партнёра, ни контакта, ни чата (D391)."""
+    prev = row.previous
+    return {
+        "id": row.id,
+        "unit": {
+            "id": row.unit_id,
+            "dodo_id": row.unit_dodo_id,
+            "name": row.unit_name,
+            "cc": row.country,
+        },
+        "date": row.inspection_date.isoformat(),
+        "kind": row.kind,
+        "score_pct": row.pct,
+        "grade": row.grade,
+        "path": f"{section('registry').path}/{row.id}",
+        "previous": (
+            {
+                "id": prev.id,
+                "date": prev.inspection_date.isoformat(),
+                "score_pct": prev.pct,
+                "grade": prev.grade,
+            }
+            if prev
+            else None
+        ),
+    }
+
+
+def _network() -> Reach:
+    """Охват API: вся сеть УК, страны — фильтр запроса (D387)."""
+    return Reach(tenant=HQ_TENANT, tenants=None, countries=None)
+
+
 def _inspections(_: Settings) -> dict[str, Any]:
     query = _query()
     limit = _int("limit", DEFAULT_INSPECTIONS, swarm_read.MAX_INSPECTIONS)
@@ -285,26 +331,56 @@ def _inspections(_: Settings) -> dict[str, Any]:
     rows = swarm_read.inspections(
         reach=reach, date_from=query.date_from, date_to=query.date_to, limit=limit + 1
     )
-    card = section("registry").path
     return {
-        "inspections": [
-            {
-                "id": row.id,
-                "unit": {
-                    "id": row.unit_id,
-                    "dodo_id": row.unit_dodo_id,
-                    "name": row.unit_name,
-                    "cc": row.country,
-                },
-                "date": row.inspection_date.isoformat(),
-                "kind": row.kind,
-                "score_pct": row.pct,
-                "grade": row.grade,
-                "path": f"{card}/{row.id}",
-            }
-            for row in rows[:limit]
-        ],
+        "inspections": [_inspection_json(row) for row in rows[:limit]],
         "truncated": len(rows) > limit,
+    }
+
+
+def _inspection(_: Settings) -> dict[str, Any]:
+    """Одна принятая проверка с разбивкой и записями (D391). Только формулировка
+    записи (`text`, факт по правилам фиксации); комментарий и сырые слова
+    аудитора, кадры, шапка с аудитором и партнёром наружу не идут."""
+    ident = str((request.view_args or {}).get("inspection_id", ""))
+    if not _UUID.fullmatch(ident):
+        raise ApiRefusal(400, "bad_id", "inspection id: UUID expected")
+    ident = ident.lower()
+    row = swarm_read.inspection(reach=_network(), inspection_id=ident)
+    detail = queries.get_inspection(ident, reach=_network()) if row else None
+    if row is None or detail is None:
+        raise ApiRefusal(404, "not_found", "no such finalized inspection")
+    titles = inspection_titles.item_titles(detail.inspection.checklist_version)
+    return {
+        "inspection": {
+            **_inspection_json(row),
+            "deductions": detail.deductions,
+            "counts": detail.counts,
+            "zones": [
+                {
+                    "zone": str(zone.get("code", code)),
+                    "title_ru": zone.get("name_ru"),
+                    "title_en": zone.get("name_en"),
+                    "share": zone.get("share"),
+                    "loss": zone.get("loss"),
+                    "left": zone.get("left"),
+                    "zeroed": bool(zone.get("zeroed", False)),
+                }
+                for code, zone in sorted(detail.by_zone.items())
+            ],
+        },
+        "findings": [
+            {
+                "n": f.n,
+                "code": f.code,
+                "title_ru": titles.get(f.code.strip().upper(), (None, None))[0],
+                "title_en": titles.get(f.code.strip().upper(), (None, None))[1],
+                "level": f.level,
+                "zone": f.zone,
+                "text": f.text,
+                "repeat": f.repeat,
+            }
+            for f in sorted(detail.findings, key=lambda f: f.n)
+        ],
     }
 
 
@@ -380,12 +456,14 @@ def install(app: Flask, conf: Settings) -> None:
         (CHECKUPS_PATH, CHECKUPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _checkups),
         (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _violations),
         (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspections),
+        (INSPECTION_PATH, INSPECTION_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspection),
         (MAPS_PATH, MAPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _maps),
     )
     for путь, имя, право, build in маршруты:
         app.add_url_rule(
             путь,
             endpoint=имя,
-            view_func=lambda право=право, build=build: _serve(conf, право, build),
+            # Аргументы адреса (`<inspection_id>`) build читает из `request.view_args`.
+            view_func=lambda право=право, build=build, **_: _serve(conf, право, build),
             methods=("GET",),
         )
