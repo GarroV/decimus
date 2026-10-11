@@ -40,15 +40,22 @@ def _ловушка(
 # --- период: что уходит в базу ---------------------------------------------
 
 
-def test_без_периода_в_адресе_база_отбирает_текущий_месяц(
+def test_без_периода_в_адресе_база_отдаёт_всё_время(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """D394: «Проверки» открываются со всеми проверками, без деления по месяцам."""
     вызовы = _ловушка(monkeypatch)
 
     стенд.get("/inspections")
 
-    месяц = rp.month_of(СЕГОДНЯ)
-    assert (вызовы[0]["date_from"], вызовы[0]["date_to"]) == (месяц.start, месяц.end)
+    assert (вызовы[0]["date_from"], вызовы[0]["date_to"]) == (None, None)
+
+
+def test_у_главной_без_периода_в_адресе_текущий_месяц() -> None:
+    """Умолчание задаёт экран: «Главная» осталась на месяце (D378)."""
+    assert rp.read({}, today=СЕГОДНЯ) == rp.month_of(СЕГОДНЯ)
+    assert rp.read({}, today=СЕГОДНЯ, default_all=True) == rp.Period(None, None)
+    assert rp.read({"from": "2026-03-05"}, today=СЕГОДНЯ, default_all=True).start == date(2026, 3, 5)
 
 
 @pytest.mark.parametrize(
@@ -101,7 +108,8 @@ def test_пустой_месяц_назван_пустым_периодом_а_�
 ) -> None:
     _ловушка(monkeypatch)
 
-    страница = стенд.get("/inspections").get_data(as_text=True)
+    месяц = rp.month_of(СЕГОДНЯ)
+    страница = стенд.get(f"/inspections?from={месяц.start}&to={месяц.end}").get_data(as_text=True)
 
     assert t("registry.period.empty.title", "ru") in страница
     assert t("registry.empty.title", "ru") not in страница
