@@ -134,6 +134,16 @@ def chat_speech_lang(chat_id: int) -> str:
     return inspection.speech_lang
 
 
+def chat_voice_lang(chat_id: int) -> str | None:
+    """Язык, на котором аудитор говорит в этом чате, — подсказка расшифровке голоса (D393, #538).
+
+    Проверки нет — `None`: говорить не о чем, и расшифровка определяет язык
+    сама, а не по умолчанию, которое могло бы исказить чужую речь.
+    """
+    inspection = _state(chat_id)
+    return None if inspection is None else inspection.speech_lang
+
+
 def chat_langs(chat_id: int) -> tuple[str, str]:
     """Язык интерфейса и язык отчёта этого чата.
 

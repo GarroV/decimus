@@ -199,6 +199,7 @@ async def test_новая_проверка_признак_обнуляет(domai
     await feed(dp, bot, callback("start:resume:new"))
     await feed(dp, bot, text_message("Белград 1"))
     await feed(dp, bot, callback("start:kind:planned"))
+    await feed(dp, bot, callback("start:speech:ru"))
     await feed(dp, bot, callback("start:lang:ru"))
     session.clear()
 

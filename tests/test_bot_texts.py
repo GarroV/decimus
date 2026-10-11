@@ -91,7 +91,8 @@ def test_parameter_named_lang_does_not_collide_with_interface_language() -> None
         "ru",
         unit="Белград 2",
         kind="Плановая",
-        lang="English",
+        speech_lang="Русский",
+        report_lang="English",
         auditor="Владимир Гарро",
         # Строка про обрезку имени (T128): пустая, когда обрезки не было, — но
         # параметр обязателен, потому что `t()` отказывает на недостающем.
