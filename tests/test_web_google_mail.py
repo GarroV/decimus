@@ -219,6 +219,38 @@ def test_отказ_прав_объясняется_словами_а_не_об�
     assert "согласие" in str(сбой.value).lower()
 
 
+def test_403_несёт_машинную_причину_google_без_текста_ответа() -> None:
+    """403 даёт и отозванное согласие, и выключенный Gmail API — чинятся по-разному.
+
+    Причина из тела (`SERVICE_DISABLED`) попадает в сообщение и в журнал;
+    человекочитаемый текст Google — нет: в нём бывает адрес почты.
+    """
+    тело = {
+        "error": {
+            "code": 403,
+            "message": "Gmail API has not been used in project 1 by me@example.com",
+            "status": "PERMISSION_DENIED",
+            "details": [{"reason": "SERVICE_DISABLED"}],
+        }
+    }
+
+    class Отказ(Exception):
+        code = 403
+
+        def read(self) -> bytes:
+            return json.dumps(тело).encode()
+
+    def открыватель(запрос: object, timeout: float) -> ОтветЗаглушка:
+        raise Отказ("forbidden")
+
+    with pytest.raises(GoogleMailError) as сбой:
+        create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)
+    текст = str(сбой.value)
+    assert "SERVICE_DISABLED" in текст
+    assert "PERMISSION_DENIED" in текст
+    assert "example.com" not in текст
+
+
 def test_ответ_без_номера_черновика_не_выдаётся_за_успех() -> None:
     def открыватель(запрос: object, timeout: float) -> ОтветЗаглушка:
         return ОтветЗаглушка(json.dumps({"message": {"id": "m-1"}}).encode())

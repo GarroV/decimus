@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -50,6 +51,9 @@ MAIL_CALLBACK_PATH = "/auth/google/mail"
 
 MAIL_STATE_COOKIE = "dodo_audit_mail_state"
 MAIL_STATE_SALT = "google-mail-state"
+
+logger = logging.getLogger(__name__)
+
 #: Десять минут на согласие. Больше — окно, в котором чужая страница может
 #: подсунуть свой возврат; меньше — человек не успевает прочитать экран Google.
 MAIL_STATE_TTL_SECONDS = 600
@@ -300,7 +304,10 @@ def install(app: Flask, conf: Settings) -> None:
                 ),
                 body=записанное.body,
             )
-        except GoogleMailError:
+        except GoogleMailError as сбой:
+            # Без записи кнопка «не работала» молча: человек видел «не вышло»,
+            # а в журнале не было ничего (11.10.2026).
+            logger.warning("черновик письма в Gmail не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
 
         ответ = к_письму(inspection_id, lang=письмо_на, исход="ok")
