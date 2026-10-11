@@ -1,5 +1,5 @@
 {#
-  «Главная» (D378, D395, D396) — в первую очередь про проверки: «Требует внимания»
+  «Главная» (D378, D399, D396) — в первую очередь про проверки: «Требует внимания»
   (доска + «куда смотреть» в одной карточке), итог периода, «Где нужно проверить» |
   «Последние проверки», «Топ нарушений» | потери по зонам, пиццерии с колонками
   последней оценки РС / РКО, страны (если их больше одной).
@@ -72,7 +72,7 @@
     </div>
     {% if only_country %}
       <a class="hm-only" href="{{ clear_country }}" aria-label="{{ t('home.only.clear') }}">{{ t('home.only', country=country_title(only_country)) }} <span aria-hidden="true">×</span></a>
-      {# Вход на экран страны: таблица стран при одной стране скрыта (D395). #}
+      {# Вход на экран страны: таблица стран при одной стране скрыта (D399). #}
       {% if country_url %}<a class="hm-more" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
     {% endif %}
   </div>
@@ -80,7 +80,7 @@
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
   <div class="hm-grid">
-    {# ── 1. Требует внимания (D395): задания доски и пиццерии «куда смотреть» —
+    {# ── 1. Требует внимания (D399): задания доски и пиццерии «куда смотреть» —
           одна карточка; нечего показать — карточки нет, «всё сделано» не пишем.
           Отказ доски — строка с ошибкой: тишина читалась бы как «всё в порядке». #}
     {% if board_failed or stickers or data.attention %}
