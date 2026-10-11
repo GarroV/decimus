@@ -445,3 +445,29 @@ def note_success(*, tenant: str, address: str, login: str) -> None:
     """
     for scope, отпечаток in _keys(address, login):
         forget_counter(tenant=tenant, scope=scope, fingerprint=отпечаток)
+
+
+def _address_key(address: str) -> tuple[str, str]:
+    return (SCOPE_ADDRESS, key_fingerprint(canonical_address(address)))
+
+
+def address_verdict(*, tenant: str, address: str) -> Verdict:
+    """Заперт ли адрес — для входов без логина (API по сервисному токену, D388).
+
+    Только чтение: пропущенный запрос счётчик не трогает. Неудача записывается
+    отдельно (`note_address_failure`), когда токен не опознан.
+    """
+    scope, отпечаток = _address_key(address)
+    return verdict_of(load_counter(tenant=tenant, scope=scope, fingerprint=отпечаток), scope=scope)
+
+
+def note_address_failure(*, tenant: str, address: str) -> Verdict:
+    """Записать неудачу по адресу и вернуть приговор ПОСЛЕ неё.
+
+    Счётчик тот же, что у формы входа (порог по адресу, `FAILURES_BEFORE_LOCK`):
+    подбор токена API и подбор пароля с одного адреса — один и тот же перебор.
+    """
+    ключ = _address_key(address)
+    with attempt_transaction(tenant=tenant, keys=(ключ,)) as строки:
+        счётчик = строки.bump(scope=ключ[0], fingerprint=ключ[1])
+    return verdict_of(счётчик, scope=ключ[0])

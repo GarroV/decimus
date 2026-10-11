@@ -4,12 +4,20 @@
 себя, а забирает отсюда с сервера (Edge Function), не из браузера. Контракт —
 `docs/12-web-admin.md`, раздел «API чтения для Swarm».
 
-**Опознание — сервисный токен, а не учётка.** Адреса открыты заслону входа
-(`auth.OPEN_ENDPOINTS`), как мини-апп обхода, и опознаются здесь же:
-`Authorization: Bearer <SWARM_API_TOKEN>`, сверка за постоянное время. Токен
-открывает ровно эти четыре адреса на чтение: в остальном приложении он ничего
-не значит — заслон входа смотрит на куку, а не на заголовок. Переменная не
-задана — 503 «не настроен», а не открытый доступ.
+**Опознание — сервисный токен, а не учётка** (D356, D388). Адреса открыты
+заслону входа (`auth.OPEN_ENDPOINTS`), как мини-апп обхода, и опознаются здесь
+же: `Authorization: Bearer <токен>`. Токен ищется по отпечатку SHA-256 в
+`api.tokens` (`src/db/api_access.py`, миграция `0049`); значение нигде не
+хранится. В остальном приложении токен ничего не значит — заслон входа
+смотрит на куку, а не на заголовок.
+
+- неизвестный или отозванный токен — 401 и неудача в счётчике адреса (тот же,
+  что у формы входа, `web_throttle`); адрес заперт — 429 с `Retry-After`;
+- у токена нет права маршрута (`ratings:read` — баллы, собираемость,
+  нарушения; `inspections:read` — проверки) — 403;
+- больше `RATE_LIMIT_PER_MINUTE` обращений токеном за минуту — 429;
+- каждое обращение, включая отказы, пишется в `api.access_log`; не удалось
+  записать или сверить — 503, а не открытый доступ.
 
 **Доступ по странам решает Swarm** (D387): API отдаёт то, что попросили, по
 всей сети, как УК. Персональных данных в ответах нет — ни аудиторов, ни почт,
@@ -21,16 +29,15 @@
 
 from __future__ import annotations
 
-import hmac
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from src.db import ratings_read, swarm_read
+from src.db import api_access, ratings_read, swarm_read, web_throttle
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT
@@ -38,6 +45,7 @@ from src.ratings import feed
 from src.ratings.model import RKO, RS
 
 from .config import Settings
+from .remote import client_address
 from .sections import section
 
 PREFIX = "/api/v1"
@@ -65,19 +73,27 @@ MAX_TOP = 20
 DEFAULT_INSPECTIONS = 500
 #: Кэш на той стороне: данные обновляются загрузкой раз в неделю-две.
 CACHE_CONTROL = "private, max-age=300"
+#: Обращений одним токеном за минуту. Swarm кэширует ответы на пять минут и
+#: ходит единицами запросов; сотня с лишним в минуту — это уже не он.
+RATE_LIMIT_PER_MINUTE = 120
+RATE_WINDOW = timedelta(minutes=1)
 
 _COUNTRY = re.compile(r"[A-Z]{2}")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 class ApiRefusal(Exception):
-    """Отказ запроса: код ошибки, текст для разработчика, HTTP-статус."""
+    """Отказ запроса: код ошибки, текст для разработчика, HTTP-статус.
 
-    def __init__(self, status: int, code: str, message: str) -> None:
+    `retry_after` (секунды) больше нуля — ответ несёт заголовок `Retry-After`.
+    """
+
+    def __init__(self, status: int, code: str, message: str, retry_after: int = 0) -> None:
         super().__init__(message)
         self.status = status
         self.code = code
         self.message = message
+        self.retry_after = retry_after
 
 
 @dataclass(frozen=True)
@@ -87,23 +103,57 @@ class Query:
     date_to: date | None
 
 
-def _error(status: int, code: str, message: str) -> tuple[Response, int]:
+def _error(status: int, code: str, message: str, retry_after: int = 0) -> tuple[Response, int]:
     ответ = jsonify({"error": code, "message": message})
     ответ.headers["Cache-Control"] = "no-store"
+    if retry_after > 0:
+        ответ.headers["Retry-After"] = str(retry_after)
     if status == 401:
         ответ.headers["WWW-Authenticate"] = 'Bearer realm="decimus-api"'
     return ответ, status
 
 
-def _authorize(expected: str | None) -> None:
-    """Токен из заголовка против `SWARM_API_TOKEN`. Не задан — 503, не сошёлся — 401."""
-    if not expected:
-        raise ApiRefusal(503, "not_configured", "SWARM_API_TOKEN is not set on this server")
+def _bearer() -> str | None:
     схема, _, токен = (request.headers.get("Authorization") or "").partition(" ")
     if схема.lower() != "bearer" or not токен.strip():
-        raise ApiRefusal(401, "unauthorized", "Authorization: Bearer <token> required")
-    if not hmac.compare_digest(токен.strip().encode(), expected.encode()):
+        return None
+    return токен.strip()
+
+
+def _identify(address: str) -> api_access.ApiToken:
+    """Опознать токен. Отказ — `ApiRefusal`.
+
+    Порядок намеренный: запертый адрес отбивается до сверки токена (перебор
+    обязан дешеветь), неудача записывается до ответа 401.
+
+    Счётчик — тот же, что у формы входа (`auth.throttle_tenant`): подбор токена
+    и подбор пароля с одного адреса — один перебор. Импорт здесь, а не вверху:
+    `auth` сам импортирует этот модуль ради `ENDPOINTS`.
+    """
+    from .auth import throttle_tenant
+
+    рубеж = throttle_tenant()
+    запрет = web_throttle.address_verdict(tenant=рубеж, address=address)
+    if запрет.locked:
+        raise ApiRefusal(429, "locked", "too many failed attempts", запрет.retry_after_seconds)
+    предъявлен = _bearer()
+    токен = api_access.resolve(предъявлен) if предъявлен else None
+    if токен is None:
+        web_throttle.note_address_failure(tenant=рубеж, address=address)
+        if предъявлен is None:
+            raise ApiRefusal(401, "unauthorized", "Authorization: Bearer <token> required")
         raise ApiRefusal(401, "unauthorized", "invalid token")
+    return токен
+
+
+def _authorize(токен: api_access.ApiToken, scope: str) -> None:
+    """Право маршрута и лимит частоты для уже опознанного токена."""
+    if not токен.allows(scope):
+        raise ApiRefusal(403, "forbidden", f"token lacks scope {scope}")
+    if api_access.recent_requests(токен.id, RATE_WINDOW) >= RATE_LIMIT_PER_MINUTE:
+        raise ApiRefusal(
+            429, "rate_limited", f"at most {RATE_LIMIT_PER_MINUTE} requests per minute", 60
+        )
 
 
 def _day(name: str) -> date | None:
@@ -244,32 +294,56 @@ def _inspections(_: Settings) -> dict[str, Any]:
     }
 
 
-def _serve(conf: Settings, build: Callable[[Settings], dict[str, Any]]) -> tuple[Response, int]:
+def _respond(
+    conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
+) -> tuple[Response, int, int | None]:
+    """Ответ на запрос и номер токена для журнала (`None` — не опознан)."""
+    адрес = client_address(trusted_proxies=conf.trusted_proxies)
+    токен_id: int | None = None
     try:
-        _authorize(conf.swarm_api_token)
+        токен = _identify(адрес)
+        токен_id = токен.id
+        _authorize(токен, scope)
         payload = build(conf)
     except ApiRefusal as refusal:
-        return _error(refusal.status, refusal.code, refusal.message)
+        return (
+            *_error(refusal.status, refusal.code, refusal.message, refusal.retry_after),
+            токен_id,
+        )
     except DbError:
-        return _error(503, "db_unavailable", "database did not answer; retry later")
+        return (*_error(503, "db_unavailable", "database did not answer; retry later"), токен_id)
     ответ = jsonify(payload)
     ответ.headers["Cache-Control"] = CACHE_CONTROL
     ответ.headers["Vary"] = "Authorization"
-    return ответ, 200
+    return ответ, 200, токен_id
+
+
+def _serve(
+    conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
+) -> tuple[Response, int]:
+    """Ответить и записать обращение в журнал. Не записалось — 503, а не ответ без следа."""
+    ответ, статус, токен_id = _respond(conf, scope, build)
+    try:
+        api_access.log_access(
+            токен_id, request.path, статус, client_address(trusted_proxies=conf.trusted_proxies)
+        )
+    except DbError:
+        return _error(503, "db_unavailable", "database did not answer; retry later")
+    return ответ, статус
 
 
 def install(app: Flask, conf: Settings) -> None:
     """Повесить четыре адреса API. Только GET (и HEAD, который Flask даёт сам)."""
     маршруты = (
-        (SCORES_PATH, SCORES_ENDPOINT, _scores),
-        (CHECKUPS_PATH, CHECKUPS_ENDPOINT, _checkups),
-        (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, _violations),
-        (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, _inspections),
+        (SCORES_PATH, SCORES_ENDPOINT, api_access.SCOPE_RATINGS_READ, _scores),
+        (CHECKUPS_PATH, CHECKUPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _checkups),
+        (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _violations),
+        (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspections),
     )
-    for путь, имя, build in маршруты:
+    for путь, имя, право, build in маршруты:
         app.add_url_rule(
             путь,
             endpoint=имя,
-            view_func=lambda build=build: _serve(conf, build),
+            view_func=lambda право=право, build=build: _serve(conf, право, build),
             methods=("GET",),
         )
