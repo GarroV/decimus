@@ -242,3 +242,47 @@ def load(countries: Sequence[str] | None, *, until: date) -> Ratings | None:
     )
     rs_by, rko_by = by_country(facts, rs, mine), by_country(facts, rko, mine)
     return Ratings(rs, rko, {code: (rs_by[code], rko_by[code]) for code in mine})
+
+
+#: Сколько месяцев назад искать последнюю оценку пиццерии для колонки таблицы.
+LATEST_MONTHS = 6
+
+
+def latest_by_unit(facts: Sequence[Fact]) -> dict[str, tuple[float | None, float | None]]:
+    """Последняя оценка каждой пиццерии: `{код Dodo: (РС, РКО)}` (D396).
+
+    «Последняя» — по началу периода рейтинга; у пиццерии без оценки нужного вида
+    в окне там `None`, и таблица рисует прочерк, а не ноль.
+    """
+    newest: dict[tuple[str, str], Fact] = {}
+    for fact in facts:
+        key = (fact.unit, fact.rating_type)
+        seen = newest.get(key)
+        if seen is None or (fact.begin_on, fact.period_id) > (seen.begin_on, seen.period_id):
+            newest[key] = fact
+    units = {unit for unit, _ in newest}
+    return {
+        unit: (
+            newest[(unit, RS)].score if (unit, RS) in newest else None,
+            newest[(unit, RKO)].score if (unit, RKO) in newest else None,
+        )
+        for unit in units
+    }
+
+
+def load_latest(
+    countries: Sequence[str] | None, *, until: date
+) -> dict[str, tuple[float | None, float | None]]:
+    """Последние оценки пиццерий охвата на дату `until`; стран IMF в базе нет — пусто."""
+    imf = tuple(row.code for row in read.countries() if row.is_imf)
+    mine = imf if countries is None else tuple(code for code in countries if code in imf)
+    if not mine:
+        return {}
+    months = month_window(until, LATEST_MONTHS)
+    end = date(until.year + until.month // 12, until.month % 12 + 1, 1)
+    facts = [
+        Fact(*row)
+        for row in read.score_facts(countries=mine, begin=months[0], end=end)
+        if row[5] < end
+    ]
+    return latest_by_unit(facts)
