@@ -105,14 +105,11 @@ PLAN_TEXTS: dict[str, dict[str, str]] = {
     "actions.due.submit": {"ru": "Изменить срок", "en": "Change due date"},
     "actions.back_to_inspection": {"ru": "К проверке", "en": "Back to the inspection"},
     # --- карточка проверки и экран страны --------------------------------
-    "card.plan.title": {"ru": "Экшн-план", "en": "Action plan"},
     "card.plan.request_hint": {
         "ru": "В проверке нет D2 и D3 — план можно запросить вручную.",
         "en": "The inspection has no D2 or D3 — a plan can be requested manually.",
     },
     "card.plan.due": {"ru": "Срок ответа", "en": "Due date"},
-    "card.plan.request_submit": {"ru": "Запросить экшн-план", "en": "Request action plan"},
-    "card.plan.open": {"ru": "Открыть запрос", "en": "Open request"},
     "card.plan.unknown": {
         "ru": "Экшн-план сейчас не прочитать.",
         "en": "The action plan cannot be read right now.",

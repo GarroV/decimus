@@ -222,7 +222,7 @@ def test_форма_подставляет_адресатов_страны(уК:
 def test_форма_с_карточки_отмечает_проверку_основанием(
     уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Arrange — страны в адресе нет: она берётся с точки проверки (D393).
+    # Arrange — страны в адресе нет: она берётся с точки проверки (решение владельца 11.10.2026).
     monkeypatch.setattr(
         rx,
         "inspection_basis",

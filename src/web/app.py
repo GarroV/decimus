@@ -1375,8 +1375,8 @@ def _card_context(
             and not detail.inspection.retracted
             and not detail.inspection.is_uploaded
         ),
-        # Предписание с карточки (D393): раздел УК, принятая проверка УК. Какие
-        # проверки годятся основанием, решает база (`inspection_basis`).
+        # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
+        # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
         may_prescribe=(
             action_plans.is_hq()
             and своя
