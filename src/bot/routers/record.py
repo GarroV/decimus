@@ -101,7 +101,7 @@ from ..keyboards import (
     zone_conflict_keyboard,
     zones_keyboard,
 )
-from ..lang import chat_langs, chat_speech_lang
+from ..lang import chat_langs, chat_speech_lang, chat_voice_lang
 from ..material import Comment, Material, MaterialStore, PhotoGroup
 from ..pending import Offer, PendingStore, Proposal
 from ..photos import fetch_bytes
@@ -184,7 +184,9 @@ async def hear_voice(message: Message, file_id: str, lang: str) -> str | None:
         await message.answer(t("record.voice_not_downloaded", lang))
         return None
     try:
-        heard = await asyncio.to_thread(transcribe, raw)
+        heard = await asyncio.to_thread(
+            lambda: transcribe(raw, lang=chat_voice_lang(message.chat.id))
+        )
     except RecognizeError as exc:
         await message.answer(t("record.voice_failed", lang, reason=f"{exc}."))
         return None

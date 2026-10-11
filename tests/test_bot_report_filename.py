@@ -49,6 +49,7 @@ async def пройти_мастер(
     await feed(dp, bot, callback("start:new", full_name=full_name))
     await feed(dp, bot, text_message(unit, full_name=full_name))
     await feed(dp, bot, callback("start:kind:planned", full_name=full_name))
+    await feed(dp, bot, callback(f"start:speech:{lang}", full_name=full_name))
     await feed(dp, bot, callback(f"start:lang:{lang}", full_name=full_name))
     return session
 

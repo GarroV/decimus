@@ -166,6 +166,7 @@ async def test_отказ_старта_проверки_не_показывае�
     await feed(dp, bot, callback("start:new"))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback("start:kind:planned"))
+    await feed(dp, bot, callback("start:speech:ru"))
     await feed(dp, bot, callback("start:lang:ru"))
 
     assert "Traceback" not in session.last_text, "аудитору показан стек движка"

@@ -406,7 +406,8 @@ def stub_transcribe(monkeypatch: Any, result: str | Exception) -> Calls:
     calls = Calls()
 
     def fake(audio: bytes, **kw: object) -> str:
-        calls.append((audio,))
+        # Второй элемент — язык речи, который бот подсказал расшифровке (D393).
+        calls.append((audio, kw.get("lang")))
         if isinstance(result, Exception):
             raise result
         return result
