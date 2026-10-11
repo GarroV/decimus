@@ -614,6 +614,10 @@
       var made = infoInput(field);
       if (made.input) label.htmlFor = made.input.id;
       row.appendChild(made.node);
+      if (made.input && made.input.tagName === "TEXTAREA") {
+        var bar = W.translateBar(made.input);
+        if (bar) row.appendChild(bar);
+      }
       if (made.input && writable()) {
         var save = W.button("walk-btn walk-btn--small", tx("walk.info.save"), function () {
           saveInfo(field.code, made.input.value);
