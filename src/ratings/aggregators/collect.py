@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, MutableMapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date
 from types import ModuleType
@@ -221,7 +222,15 @@ def run_all(
     only: Sequence[str] = (),
     fetch_units: Callable[[frozenset[str]], Sequence[DodoUnit]] = maps_link.fetch_units,
 ) -> tuple[Outcome, ...]:
-    """Все агрегаторы (или перечисленные) по очереди."""
+    """Все агрегаторы (или перечисленные) параллельно — по потоку на агрегатор.
+
+    Нагрузка на каждую витрину та же, что и подряд: у агрегатора свой `Http` со
+    своей паузой, а разные агрегаторы — разные сайты. Подряд сбор длится сумму
+    всех агрегаторов (на проде 11.10.2026 один Wolt — 9 минут), параллельно —
+    самый долгий из них."""
     modules = [m for m in SEARCHERS + KNOWN if not only or m.KEY in only]
+    if not modules:
+        return ()
     units = fetch_units(countries()) if any(m in SEARCHERS for m in modules) else ()
-    return tuple(run_one(m, units, today) for m in modules)
+    with ThreadPoolExecutor(max_workers=len(modules), thread_name_prefix="agg") as pool:
+        return tuple(pool.map(lambda m: run_one(m, units, today), modules))
