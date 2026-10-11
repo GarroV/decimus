@@ -15,8 +15,10 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 
-from src.db import api_access, ratings_read, swarm_read, web_throttle
+from src.db import api_access, maps_store, ratings_read, swarm_read, web_throttle
 from src.db.errors import AccessError, DbError
+from src.db.maps_store import LatestRating
+from src.ratings import pointer
 from src.web import swarm_api
 from src.web.app import create_app
 from src.web.config import Settings
@@ -33,6 +35,7 @@ from src.web.config import Settings
     f"{swarm_api.CHECKUPS_PATH}?type=rko",
     f"{swarm_api.VIOLATIONS_PATH}?type=rs",
     swarm_api.INSPECTIONS_PATH,
+    swarm_api.MAPS_PATH,
 )
 ПЕРИОДЫ = [
     swarm_read.PeriodRow(11, date(2026, 9, 1), date(2026, 9, 15), "Сентябрь 1", "September 1"),
@@ -57,7 +60,7 @@ def _клиент() -> FlaskClient:
 @pytest.fixture
 def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     """Подменённые двери чтения; журнал вызовов — чтобы видеть, что дошло до базы."""
-    зовы: dict[str, list[Any]] = {"periods": [], "inspections": []}
+    зовы: dict[str, list[Any]] = {"periods": [], "inspections": [], "maps": []}
 
     def периоды(rating_type: str, **kw: Any) -> list[swarm_read.PeriodRow]:
         зовы["periods"].append((rating_type, kw))
@@ -102,6 +105,32 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
             ratings_read.CountryRow("RS", "Сербия", "Serbia", None, True),
             ratings_read.CountryRow("RU", "Россия", "Russia", None, False),
         ),
+    )
+
+    def последние(countries: Any, *, until: date) -> tuple[LatestRating, ...]:
+        зовы["maps"].append(("latest", list(countries), until))
+        оценка = 4.6 if until >= date(2026, 10, 1) else 4.5
+        return (
+            LatestRating("RS", pointer.GOOGLE, оценка, 100, until),
+            LatestRating("RS", pointer.GOOGLE, 4.0, 0, until),
+        )
+
+    def пиццерии(*, countries: Any, on: date) -> list[swarm_read.MapUnitRow]:
+        зовы["maps"].append(("units", list(countries), on))
+        оценка = 4.71 if on >= date(2026, 10, 1) else 4.6
+        return [
+            swarm_read.MapUnitRow(
+                "aa" * 16, "Dodo Beograd", "RS", "Belgrade", pointer.GOOGLE, оценка, 80
+            ),
+            swarm_read.MapUnitRow(
+                "aa" * 16, "Dodo Beograd", "RS", "Belgrade", pointer.YANDEX, 0.0, 0
+            ),
+        ]
+
+    monkeypatch.setattr(maps_store, "latest", последние)
+    monkeypatch.setattr(swarm_read, "map_units", пиццерии)
+    monkeypatch.setattr(
+        maps_store, "last_ok_load", lambda: datetime(2026, 10, 11, 3, 10, tzinfo=UTC)
     )
     return зовы
 
@@ -161,7 +190,7 @@ def test_без_верного_токена_401(
     assert ответ.status_code == 401
     assert ответ.get_json()["error"] == "unauthorized"
     assert ответ.headers["WWW-Authenticate"].startswith("Bearer")
-    assert база == {"periods": [], "inspections": []}, "до базы дошёл неопознанный"
+    assert база == {"periods": [], "inspections": [], "maps": []}, "до базы дошёл неопознанный"
     assert доступ["неудачи"] == 1, "неудача не записана в счётчик адреса"
     assert доступ["журнал"] == [(None, адрес.split("?")[0], 401)]
 
@@ -287,6 +316,10 @@ def test_только_чтение(клиент: FlaskClient) -> None:
         (f"{swarm_api.INSPECTIONS_PATH}?limit=1001", "bad_limit"),
         (f"{swarm_api.INSPECTIONS_PATH}?countries=ge;am", "bad_countries"),
         (f"{swarm_api.INSPECTIONS_PATH}?from=2026-02-30", "bad_date"),
+        (f"{swarm_api.MAPS_PATH}?on=2026-10-32", "bad_date"),
+        (f"{swarm_api.MAPS_PATH}?on=2026-10-11&compare=2026-10-11", "bad_range"),
+        (f"{swarm_api.MAPS_PATH}?on=2026-10-11&compare=2026-10-12", "bad_range"),
+        (f"{swarm_api.MAPS_PATH}?countries=R", "bad_countries"),
     ],
 )
 def test_кривой_ввод_400(
@@ -419,3 +452,61 @@ def test_проверки_форма_и_обрезка(клиент: FlaskClient
     assert зов["limit"] == 2, "читается на одну больше предела — так видна обрезка"
     assert зов["reach"].countries == ("GE",) and зов["reach"].tenants is None
     assert зов["date_from"] == date(2026, 10, 1) and зов["date_to"] is None
+
+
+# --- оценки на картах (D390) ---------------------------------------------------
+
+
+def test_карты_страны_и_пиццерии_со_сравнением(
+    клиент: FlaskClient, база: dict[str, list[Any]]
+) -> None:
+    ответ = клиент.get(f"{swarm_api.MAPS_PATH}?on=2026-10-11&compare=2026-09-11", headers=ВЕРНЫЙ)
+    assert ответ.status_code == 200, ответ.get_data(as_text=True)
+    тело = ответ.get_json()
+    assert тело["on"] == "2026-10-11" and тело["compare"] == "2026-09-11"
+    assert тело["providers"] == ["google", "yandex"]
+    assert тело["loaded_at"] == "2026-10-11T03:10:00Z"
+    [страна] = тело["countries"]
+    assert страна["cc"] == "RS" and страна["as_of"] == "2026-10-11"
+    # Филиал без отзывов в среднюю не входит, но в счёт филиалов — да (maps.summarize).
+    assert страна["maps"]["google"] == {"avg": 4.6, "reviews": 100, "branches": 2, "delta": 0.1}
+    assert страна["maps"]["yandex"] == {"avg": None, "reviews": 0, "branches": 0, "delta": None}
+    assert тело["units"] == [
+        {
+            "id": "aa" * 16,
+            "name": "Dodo Beograd",
+            "cc": "RS",
+            "city": "Belgrade",
+            "maps": {"google": {"avg": 4.71, "reviews": 80, "prev_avg": 4.6}, "yandex": None},
+        }
+    ]
+    assert ("units", ["RS"], date(2026, 9, 11)) in база["maps"], "страны по умолчанию — не IMF"
+
+
+def test_карты_без_сравнения_и_дата_по_умолчанию(
+    клиент: FlaskClient, база: dict[str, list[Any]]
+) -> None:
+    тело = клиент.get(f"{swarm_api.MAPS_PATH}?countries=rs", headers=ВЕРНЫЙ).get_json()
+    сегодня = datetime.now(UTC).date()
+    assert тело["on"] == сегодня.isoformat() and тело["compare"] is None
+    assert тело["countries"][0]["maps"]["google"]["delta"] is None
+    assert тело["units"][0]["maps"]["google"]["prev_avg"] is None
+    assert база["maps"] == [("latest", ["RS"], сегодня), ("units", ["RS"], сегодня)]
+
+
+def test_карты_с_токеном_без_права_рейтингов_403(
+    клиент: FlaskClient, база: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    без_рейтингов = "токен-только-с-правом-проверок-тоже-очень-длинный"
+    monkeypatch.setattr(
+        api_access,
+        "resolve",
+        lambda t: (
+            api_access.ApiToken(3, "x", (api_access.SCOPE_INSPECTIONS_READ,))
+            if t == без_рейтингов
+            else None
+        ),
+    )
+    ответ = клиент.get(swarm_api.MAPS_PATH, headers={"Authorization": f"Bearer {без_рейтингов}"})
+    assert ответ.status_code == 403
+    assert база["maps"] == []

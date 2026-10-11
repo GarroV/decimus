@@ -1,4 +1,4 @@
-"""API чтения для Swarm, v1 (#567, D387): рейтинги, собираемость, нарушения, проверки.
+"""API чтения для Swarm, v1 (#567, D387, D390): рейтинги, нарушения, проверки, карты.
 
 Децимус — единственный источник этих данных; Swarm их не хранит и не грузит у
 себя, а забирает отсюда с сервера (Edge Function), не из браузера. Контракт —
@@ -32,16 +32,16 @@ from __future__ import annotations
 import re
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
-from src.db import api_access, ratings_read, swarm_read, web_throttle
+from src.db import api_access, maps_store, ratings_read, swarm_read, web_throttle
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT
-from src.ratings import feed
+from src.ratings import feed, maps
 from src.ratings.model import RKO, RS
 
 from .config import Settings
@@ -53,14 +53,16 @@ SCORES_PATH = f"{PREFIX}/ratings/scores"
 CHECKUPS_PATH = f"{PREFIX}/ratings/checkups"
 VIOLATIONS_PATH = f"{PREFIX}/ratings/violations"
 INSPECTIONS_PATH = f"{PREFIX}/inspections"
+MAPS_PATH = f"{PREFIX}/maps/ratings"
 
 SCORES_ENDPOINT = "swarm_api_scores"
 CHECKUPS_ENDPOINT = "swarm_api_checkups"
 VIOLATIONS_ENDPOINT = "swarm_api_violations"
 INSPECTIONS_ENDPOINT = "swarm_api_inspections"
+MAPS_ENDPOINT = "swarm_api_maps"
 #: Открыты заслону входа (`auth.OPEN_ENDPOINTS`): опознаёт токен, а не кука.
 ENDPOINTS = frozenset(
-    {SCORES_ENDPOINT, CHECKUPS_ENDPOINT, VIOLATIONS_ENDPOINT, INSPECTIONS_ENDPOINT}
+    {SCORES_ENDPOINT, CHECKUPS_ENDPOINT, VIOLATIONS_ENDPOINT, INSPECTIONS_ENDPOINT, MAPS_ENDPOINT}
 )
 
 #: Код отказа запертому адресу: перебор токена с него уже записан счётчиком.
@@ -217,9 +219,14 @@ def _rating_scope(query: Query, rating_type: str) -> tuple[list[swarm_read.Perio
         raise ApiRefusal(
             400, "range_too_large", f"{len(periods)} periods match; narrow from/to to {MAX_PERIODS}"
         )
-    if query.countries is not None:
-        return periods, list(query.countries)
-    return periods, [c.code for c in ratings_read.countries() if c.is_imf]
+    return periods, _countries_or_imf(query.countries)
+
+
+def _countries_or_imf(countries: tuple[str, ...] | None) -> list[str]:
+    """Названные страны или, без фильтра, все страны IMF."""
+    if countries is not None:
+        return list(countries)
+    return [c.code for c in ratings_read.countries() if c.is_imf]
 
 
 def _scores(_: Settings) -> dict[str, Any]:
@@ -301,6 +308,29 @@ def _inspections(_: Settings) -> dict[str, Any]:
     }
 
 
+def _maps(_: Settings) -> dict[str, Any]:
+    """Оценки на картах (D390): средние стран как на «Рейтингах» и пиццерии."""
+    countries = _countries_or_imf(_countries())
+    on = _day("on") or datetime.now(UTC).date()
+    compare = _day("compare")
+    if compare is not None and compare >= on:
+        raise ApiRefusal(400, "bad_range", "compare must be earlier than on")
+    current = maps.summarize(maps_store.latest(countries, until=on), countries)
+    if compare is not None:
+        current = maps.with_delta(
+            current, maps.summarize(maps_store.latest(countries, until=compare), countries)
+        )
+    before = swarm_read.map_units(countries=countries, on=compare) if compare else None
+    return {
+        "on": on.isoformat(),
+        "compare": compare.isoformat() if compare else None,
+        "providers": feed.map_providers(),
+        "countries": feed.map_countries(current),
+        "units": feed.map_units(swarm_read.map_units(countries=countries, on=on), before),
+        "loaded_at": feed.iso_utc(maps_store.last_ok_load()),
+    }
+
+
 def _respond(
     conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
 ) -> tuple[Response, int, int | None]:
@@ -344,12 +374,13 @@ def _serve(
 
 
 def install(app: Flask, conf: Settings) -> None:
-    """Повесить четыре адреса API. Только GET (и HEAD, который Flask даёт сам)."""
+    """Повесить адреса API. Только GET (и HEAD, который Flask даёт сам)."""
     маршруты = (
         (SCORES_PATH, SCORES_ENDPOINT, api_access.SCOPE_RATINGS_READ, _scores),
         (CHECKUPS_PATH, CHECKUPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _checkups),
         (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _violations),
         (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspections),
+        (MAPS_PATH, MAPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _maps),
     )
     for путь, имя, право, build in маршруты:
         app.add_url_rule(
