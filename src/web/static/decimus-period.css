@@ -12,9 +12,30 @@
 .speriod__arrow svg { width: 14px; height: 14px; }
 .speriod__title { cursor: pointer; color: var(--ink); font-weight: var(--w-semibold); }
 .speriod__title svg { width: 14px; height: 14px; color: var(--ink-3); }
-.speriod__menu { min-width: 17rem; max-height: none; padding: var(--space-5); }
-.speriod__dates { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-.speriod__quick { display: flex; flex-direction: column; margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--line); }
+.speriod__menu { width: 248px; min-width: 0; max-height: none; overflow: visible; padding: var(--space-4); }
+.speriod__quick { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-4); }
+.speriod__chip { display: inline-flex; align-items: center; height: 24px; padding: 0 var(--space-4); border: 1px solid var(--line-control); border-radius: var(--r-pill);
+  font-size: 11.5px; font-weight: var(--w-semibold); color: var(--ink-2); background: var(--surface); white-space: nowrap; }
+.speriod__chip:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.speriod__chip.is-on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+/* Календарь периода (`period.js`). Без скрипта виден только `.pcal__native`:
+   два поля даты и «Применить». Со скриптом — месяц, поля и кнопка прячутся. */
+.pcal__native { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: end; }
+.pcal__native .sbtn { grid-column: 1 / -1; height: 28px; }
+.pcal.is-js .pcal__native { display: none; }
+.pcal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-2); }
+.pcal__month { font-size: 12.5px; font-weight: var(--w-semibold); color: var(--ink); }
+.pcal__nav { width: 26px; height: 26px; border: 0; border-radius: 50%; background: transparent; color: var(--ink-2); font-size: 16px; line-height: 1; cursor: pointer; }
+.pcal__nav:hover { background: var(--surface-2); color: var(--ink); }
+.pcal__days { display: grid; grid-template-columns: repeat(7, 1fr); row-gap: 2px; }
+.pcal__wd { padding: 2px 0; text-align: center; font-size: 10px; font-weight: var(--w-semibold); color: var(--ink-3); }
+.pcal__day { height: 28px; border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); font: inherit; font-size: 12.5px; cursor: pointer; }
+.pcal__day:hover { background: var(--surface-2); }
+.pcal__day.is-today { font-weight: var(--w-semibold); color: var(--accent); }
+.pcal__day.is-inside { background: var(--accent-soft); color: var(--accent); border-radius: 0; }
+.pcal__day.is-edge { background: var(--accent); color: var(--ink-inverse); font-weight: var(--w-semibold); }
+.pcal__hint { margin: var(--space-3) 0 0; font-size: 11px; color: var(--ink-3); text-align: center; }
 
 /* ── телефон ── */
 @media (max-width: 719px) {
@@ -22,5 +43,6 @@
   .speriod__pick { flex: 1; }
   .speriod__title { width: 100%; justify-content: center; }
   .speriod__arrow { width: 40px; height: 40px; }
-  .speriod__menu { left: 50%; transform: translateX(-50%); }
+  .speriod__menu { left: 50%; transform: translateX(-50%); width: min(280px, calc(100vw - 32px)); }
+  .pcal__day { height: 36px; }
 }
