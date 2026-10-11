@@ -43,8 +43,12 @@ from .walk_auth import (
     PHOTO_PATH,
     PHOTO_VIEW_ENDPOINT,
     PHOTO_VIEW_PATH,
+    START_ENDPOINT,
+    START_PATH,
     SUGGEST_ENDPOINT,
     SUGGEST_PATH,
+    TRANSLATE_ENDPOINT,
+    TRANSLATE_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -121,4 +125,6 @@ def install(app: Flask, *, upstream: str | None, ui_lang: str) -> None:
     route(FINDING_PATH, FINDING_ENDPOINT, "POST")
     route(INFO_PATH, INFO_ENDPOINT, "POST")
     route(SUGGEST_PATH, SUGGEST_ENDPOINT, "POST")
+    route(TRANSLATE_PATH, TRANSLATE_ENDPOINT, "POST")
     route(APP_PATH, APP_ENDPOINT, "POST")
+    route(START_PATH, START_ENDPOINT, "POST")

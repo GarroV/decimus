@@ -28,7 +28,9 @@
     finding: root.getAttribute("data-finding"),
     info: root.getAttribute("data-info"),
     suggest: root.getAttribute("data-suggest"),
+    translate: root.getAttribute("data-translate"),
     app: root.getAttribute("data-app"),
+    start: root.getAttribute("data-start"),
   };
 
   W.inTelegram = function () { return !!(tg && tg.initData); };

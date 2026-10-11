@@ -207,10 +207,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
-    "overview.zones.empty": {
-        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
-        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
-    },
     "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
     "overview.systemic.hint": {
         "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
@@ -219,10 +215,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.systemic.spread": {
         "ru": "точек: {units} · записей: {records}",
         "en": "units: {units} · records: {records}",
-    },
-    "overview.systemic.empty": {
-        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
-        "en": "No repeats: no item was breached at more than one unit.",
     },
     "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
     "overview.units.hint": {
@@ -246,7 +238,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок: {inspections} · средняя: {average} · не проверено точек: {unchecked}",
         "en": "Inspections: {inspections} · average: {average} · units not inspected: {unchecked}",
     },
-    "country.units.title": {"ru": "Пиццерии страны", "en": "Pizzerias of the country"},
+    "country.units.title": {"ru": "Последние проверки", "en": "Latest inspections"},
     "country.units.hint": {
         "ru": "Последняя проверка каждой точки. Нажмите строку — откроется история проверок.",
         "en": "Latest inspection of each unit. Click a row to open its inspection history.",
@@ -284,7 +276,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
     "section.users.title": {"ru": "Пользователи", "en": "Users"},
-    "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
     # --- вход, выход, отказ (T323) -----------------------------------------
     # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
     # тот» превращают форму в справочник заведённых людей: перебором по ней
@@ -371,6 +362,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "работают {open}, открываются {pipeline}, закрыты {closed}",
         "en": "open {open}, opening {pipeline}, closed {closed}",
     },
+    "country.register.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "country.register.col.partner": {"ru": "Партнёр", "en": "Partner"},
+    "country.register.col.place": {"ru": "Город", "en": "City"},
+    "country.register.col.opened": {"ru": "Открыта", "en": "Opened"},
+    "country.register.col.status": {"ru": "Статус", "en": "Status"},
+    "country.none": {"ru": "Пока нет: {what}.", "en": "Nothing yet: {what}."},
+    "country.none.plans": {"ru": "экшн-планов", "en": "action plans"},
+    "country.none.rx": {"ru": "предписаний", "en": "notices"},
+    "country.none.systemic": {"ru": "системных нарушений", "en": "systemic issues"},
+    "country.none.zones": {"ru": "потерь по зонам", "en": "zone losses"},
     "country.register.since": {"ru": "с {day}", "en": "since {day}"},
     "country.register.empty": {
         "ru": "Свод пиццерий по этой стране не загружен.",
@@ -599,10 +600,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Deducted {deductions} %",
     },
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
-    "card.zones.col.zone": {"ru": "Зона", "en": "Zone"},
-    "card.zones.col.share": {"ru": "Доля", "en": "Share"},
-    "card.zones.col.loss": {"ru": "Потеряно", "en": "Lost"},
-    "card.zones.col.left": {"ru": "Осталось", "en": "Left"},
+    "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
+    "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
+    "card.act.move": {"ru": "Исправить", "en": "Correct"},
+    "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},

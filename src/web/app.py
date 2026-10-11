@@ -612,7 +612,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        период = registry_period.read(request.args, today=date.today())
+        период = registry_period.read(request.args, today=date.today(), default_all=True)
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
@@ -661,9 +661,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_title=registry_view.period_title(период, язык),
             period_prev=registry_view.period_link(период, -1, отбор),
             period_next=registry_view.period_link(период, 1, отбор),
-            period_month=отбор(period="", **registry_period.month_of(date.today()).params()),
-            period_is_this_month=период == registry_period.month_of(date.today()),
-            period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
+            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
             select_url=отбор,
             reset_url=отбор(grade="", kind="", country="", city="", q=""),
             picked=панель.picked,
@@ -1254,7 +1253,7 @@ def _render_card(
     контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
     if контекст is None:
         return render_template("inspections/not_found.html"), 404
-    return render_template("inspections/card.html", **контекст)
+    return render_template("inspections/card.html", c=контекст, **контекст)
 
 
 def _card_context(
@@ -1337,6 +1336,7 @@ def _card_context(
             кадры = data.load_previews(inspection_id, reach=auth.current_reach())
         except DbError:
             кадры_известны = False
+    zone_lines = view.zone_lines(detail.by_zone, lang)
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
@@ -1373,6 +1373,14 @@ def _card_context(
             and not detail.inspection.retracted
             and not detail.inspection.is_uploaded
         ),
+        # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
+        # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
+        may_prescribe=(
+            action_plans.is_hq()
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
+        ),
         sheet=лист,
         may_accept=можно_подтвердить,
         may_revise=можно_подтвердить,
@@ -1391,7 +1399,8 @@ def _card_context(
         else (),
         detail=detail,
         head=detail.inspection,
-        zones=view.zone_lines(detail.by_zone, lang),
+        zones=zone_lines,
+        loss_zones=view.loss_zones(zone_lines),
         counts=view.count_lines(detail.counts),
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,

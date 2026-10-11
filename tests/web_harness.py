@@ -190,7 +190,7 @@ def подменить_двери(
     # «Главная» (D378) читает сводку по странам, рейтинги и счётчики доски —
     # по умолчанию пусто. Наборы про эти блоки подменяют сами.
     monkeypatch.setattr(queries, "country_summary", lambda **_: [])
-    monkeypatch.setattr(home_ratings, "load", lambda *_, **__: None)
+    monkeypatch.setattr(home_ratings, "load_latest", lambda *_, **__: {})
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть

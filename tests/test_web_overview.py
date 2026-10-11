@@ -25,8 +25,9 @@ from flask.testing import FlaskClient
 from test_web_app import ТЕНАНТ
 from web_harness import войти, подменить_двери, собрать
 
+from src.db.errors import DbError
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
-from src.db.reach import own_reach
+from src.db.reach import Reach, own_reach
 from src.web import app as app_mod
 from src.web import home_board, home_page, home_ratings
 from src.web import overview as ov
@@ -170,25 +171,86 @@ def test_средняя_в_плитке_показывается_всегда_к
     assert "разные чек-листы" not in страница
 
 
-def test_пустые_блоки_говорят_словами_а_не_исчезают(
+def test_пустые_вспомогательные_блоки_не_показываются(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Исчезнувший блок читается как «здесь всё в порядке» — а это неправда."""
+    """D398: «всё сделано» экрану ни о чём не говорит — пустое скрыто, итог — строкой."""
     # Act
     страница = показать(стенд, monkeypatch, ПУСТО)
 
-    # Assert — заголовок каждого блока на месте, и рядом сказано, почему пусто.
-    for заголовок in (
-        "Куда смотреть",
-        "Где сеть теряет проценты",
-        "Системные нарушения",
-        "Пиццерии",
-    ):
-        assert заголовок in страница
-    assert t_ru("home.attention.empty") in страница
-    assert "Потерь не записано" in страница
-    assert "Повторов нет" in страница
+    # Assert
+    assert t_ru("home.attention.title") not in страница
+    assert t_ru("home.tocheck.title") not in страница
+    assert t_ru("home.latest.title") not in страница
+    assert t_ru("home.top.title") not in страница
+    assert t_ru("overview.zones.title") not in страница
+    assert t_ru("overview.systemic.title") not in страница
+    assert t_ru("home.countries.title") not in страница
+    assert t_ru("home.inspections.none") in страница
+    assert "hm-plaques" not in страница
     assert t_ru("home.units.empty") in страница
+
+
+def test_карточка_требует_внимания_есть_только_когда_есть_что_показать(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Нет ни заданий, ни пиццерий «куда смотреть» — карточки нет; одно задание — есть."""
+    # Arrange
+    заголовок = t_ru("home.attention.title")
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
+
+    # Act
+    без_заданий = показать(стенд, monkeypatch, ПУСТО)
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=1))
+    с_заданием = показать(стенд, monkeypatch, ПУСТО)
+
+    # Assert
+    assert заголовок not in без_заданий
+    assert заголовок in с_заданием
+    assert "Проверок ждут приёмки: 1" in с_заданием
+
+
+def test_отказ_доски_не_молчит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Карточки нет из-за сбоя базы, а не из-за «нечего делать» — это надо сказать."""
+
+    # Arrange
+    def отказ(*_: object, **__: object) -> home_board.Counts:
+        raise DbError("нет связи")
+
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
+    monkeypatch.setattr(home_board, "load_counts", отказ)
+
+    # Act
+    страница = показать(стенд, monkeypatch, ПУСТО)
+
+    # Assert
+    assert t_ru("home.board.failed") in страница
+
+
+def test_порядок_блоков_главной(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D399: внимание → итог → где проверить | последние → топ нарушений | зоны → пиццерии."""
+    # Arrange
+    monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
+
+    # Act
+    страница = показать(стенд, monkeypatch, с_оценками())
+
+    # Assert
+    порядок = [
+        страница.index(t_ru(ключ))
+        for ключ in (
+            "home.attention.title",
+            "home.inspections.title",
+            "home.tocheck.title",
+            "home.latest.title",
+            "home.top.title",
+            "overview.zones.title",
+            "home.units.title",
+        )
+    ]
+    assert порядок == sorted(порядок)
 
 
 def test_средняя_без_проверок_не_выдумывается() -> None:
@@ -475,6 +537,18 @@ def test_умолчания_не_висят_в_адресе_среза(
     assert страница.count("period=all") == 1
 
 
+def test_период_главной_общий_календарь_с_быстрыми_выборами(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D405: один календарь на все экраны с периодом; без скрипта — форма с датами."""
+    страница = показать(стенд, monkeypatch, снимок())
+
+    assert "data-pcal" in страница
+    for ключ in ("registry.period.all", "registry.period.this_month", "registry.period.last_month"):
+        assert _t(ключ, "ru") in страница, ключ
+    assert 'name="from"' in страница and 'name="to"' in страница
+
+
 class ЗаписнаяБаза:
     """Заглушка слоя базы, запоминающая, с чем её позвали.
 
@@ -486,6 +560,7 @@ class ЗаписнаяБаза:
 
     def __init__(self) -> None:
         self.звонки: dict[str, dict[str, object]] = {}
+        self.последние: dict[str, object] = {}
 
     def _записать(self, имя: str, kwargs: dict[str, object]) -> None:
         self.звонки[имя] = kwargs
@@ -498,6 +573,12 @@ class ЗаписнаяБаза:
 
     def units_total(self, **kw: object) -> int:
         return 1
+
+    def unit_last_inspections(self, **kw: object) -> list[tuple[str, str, date | None, int]]:
+        # Не в `звонки`: отбор по городу и стране этот запрос не получает, а режется
+        # в `_to_check` поверх справочника; здесь важен только охват и период.
+        self.последние = kw
+        return []
 
     def list_inspections(self, **kw: object) -> tuple[InspectionRow, ...]:
         self._записать("list_inspections", kw)
@@ -694,52 +775,147 @@ def test_обрезанный_срез_экран_называет_вслух(
     assert "В срезе больше" not in целый
 
 
-def test_главная_собирает_доску_рейтинги_и_страны(
+def с_оценками(**поля: object) -> ov.Overview:
+    return снимок(
+        points=(точка("Белград-1", "RS", "beograd"),),
+        unit_codes={"Белград-1": "a" * 32},
+        to_check=(ov.ToCheck("Нови-Сад-3", "u-ns3", "RS", "", date(2026, 7, 1)),),
+        to_check_more=2,
+        **поля,
+    )
+
+
+def test_главная_собирает_доску_проверки_и_страны(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Сквозной показ «Главной» (D378) со всеми блоками: шаблон не падает ни на одном."""
+    """Сквозной показ «Главной» (D399) со всеми блоками: шаблон не падает ни на одном."""
     # Arrange
-    месяцы = home_ratings.month_window(date(2026, 9, 1))
-    блок = home_ratings.Gauge(
-        kind="rs",
-        months=месяцы,
-        series=(None,) * 6 + (88.0, 90.5),
-        imf_series=(None,) * 6 + (87.0, 89.0),
-        month=месяцы[-1],
-        value=90.5,
-        delta=2.5,
-        imf=89.0,
-        rated=12,
-        below=3,
-        threshold=85,
-    )
-    рейтинги = home_ratings.Ratings(
-        блок, home_ratings.Gauge(**{**блок.__dict__, "kind": "rko"}), {"RS": (90.5, 95.0)}
-    )
-    monkeypatch.setattr(home_ratings, "load", lambda *_, **__: рейтинги)
     monkeypatch.setattr(
-        home_page.queries, "country_summary", lambda **_: [("RS", 12, 3, 4, 360.0, 1)]
+        home_page.queries,
+        "country_summary",
+        lambda **_: [("RS", 12, 3, 4, 360.0, 1), ("GE", 5, 2, 2, 190.0, 0)],
     )
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
 
     # Act
+    страница = показать(стенд, monkeypatch, с_оценками())
+
+    # Assert
+    assert t_ru("home.attention.title") in страница
+    assert "Проверок ждут приёмки: 2" in страница
+    assert "Нови-Сад-3" in страница and "и ещё 2" in страница
+    assert (
+        "Белград-1" in страница and "/inspections/11111111-2222-3333-4444-000000000001" in страница
+    )
+    assert "Сербия" in страница and "3<small>/12</small>" in страница
+    assert 'href="/overview?country=RS' in страница
+    assert "hm-chart" not in страница
+
+
+def test_колонки_рейтинга_в_таблице_пиццерий_ведут_на_страницу_рейтингов(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D399: последняя оценка РС / РКО у пиццерии; заголовок колонки — вход на «Рейтинги»."""
+    # Arrange
+    monkeypatch.setattr(home_ratings, "load_latest", lambda *_, **__: {"a" * 32: (91.25, 88.5)})
+
+    # Act
+    страница = показать(стенд, monkeypatch, с_оценками())
+
+    # Assert
+    assert '<a class="is-num" href="/ratings?lang=ru"' in страница
+    assert "91.2" in страница and "88.5" in страница
+    assert t_ru("home.ratings.failed") not in страница
+
+
+def test_сбой_рейтингов_главную_не_роняет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """База рейтингов не ответила: страница на месте, в колонках прочерки и строка о сбое."""
+
+    # Arrange
+    def отказ(*_: object, **__: object) -> dict[str, tuple[float | None, float | None]]:
+        raise DbError("нет связи")
+
+    monkeypatch.setattr(home_ratings, "load_latest", отказ)
+
+    # Act
+    страница = показать(стенд, monkeypatch, с_оценками())
+
+    # Assert
+    assert t_ru("home.ratings.failed") in страница
+    assert "Белград-1" in страница
+
+
+def test_где_нужно_проверить_отбирает_точки_без_проверок_за_период() -> None:
+    """Проверенные за период не попадают; ни разу не проверенные — первыми, затем давнее всех."""
+    # Arrange
+    строки = [
+        ("Свежая", "c1", date(2026, 9, 20), 1),
+        ("Давняя", "c2", date(2026, 3, 1), 0),
+        ("Недавняя", "c3", date(2026, 8, 1), 0),
+        ("Новая", "c4", None, 0),
+        ("Чужая страна", "c5", None, 0),
+    ]
+    гео = {n: ("RS", "") for n, *_ in строки} | {"Чужая страна": ("GE", "")}
+
+    # Act
+    ждут, ещё = ov._to_check(строки, geo=гео, ids={}, selection=ov.Selection(country="RS"))
+
+    # Assert
+    assert [т.unit for т in ждут] == ["Новая", "Давняя", "Недавняя"]
+    assert ещё == 0
+
+
+def test_где_нужно_проверить_ограничено_остаток_числом() -> None:
+    строки = [(f"П-{n:02d}", "", None, 0) for n in range(ov.TO_CHECK_TOP + 3)]
+
+    ждут, ещё = ov._to_check(строки, geo={}, ids={}, selection=ov.БЕЗ_ОТБОРА)
+
+    assert len(ждут) == ov.TO_CHECK_TOP and ещё == 3
+
+
+def test_где_нужно_проверить_читается_в_охвате_вошедшего(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Партнёр получает точки только своего охвата: запрос зовут именно с его `reach`."""
+    # Arrange
+    база = ЗаписнаяБаза()
+    monkeypatch.setattr(ov, "queries", база)
+    партнёр = Reach(tenant="GE", tenants=None, countries=("GE",))
+
+    # Act
+    ov.load(reach=партнёр, limit=50, today=date(2026, 9, 24), dates=(date(2026, 9, 1), None))
+
+    # Assert
+    assert база.последние["reach"] == партнёр
+    assert база.последние["date_from"] == date(2026, 9, 1)
+
+
+def test_мои_страны_только_когда_стран_больше_одной(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D398: таблица из одной страны повторяла бы итог — её нет."""
+    # Arrange
+    monkeypatch.setattr(
+        home_page.queries, "country_summary", lambda **_: [("RS", 12, 3, 4, 360.0, 1)]
+    )
+
+    # Act
     страница = показать(стенд, monkeypatch, снимок())
 
     # Assert
-    assert t_ru("home.board.title") in страница
-    assert "Проверок ждут приёмки: 2" in страница
-    assert "90.5" in страница and "IMF 89.0" in страница and "▲+2.5" in страница
-    assert "hm-chart__imf" in страница
-    assert "Сербия" in страница and "3<small>/12</small>" in страница
-    assert 'href="/overview?country=RS' in страница
+    assert t_ru("home.countries.title") not in страница
 
 
 def test_страна_вне_охвата_из_адреса_главную_не_сужает(monkeypatch: pytest.MonkeyPatch) -> None:
     """Партнёр с чужой страной в адресе видит свой охват, а не чужие рейтинги."""
     подменить_двери(monkeypatch, tenant="GE")
     спрошено: list[object] = []
-    monkeypatch.setattr(home_ratings, "load", lambda codes, **_: спрошено.append(codes))
+    monkeypatch.setattr(
+        home_ratings, "load_latest", lambda codes, **_: спрошено.append(codes) or {}
+    )
     with собрать(tenant="GE").test_client() as client:
         assert войти(client).status_code == 302
         monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: снимок())

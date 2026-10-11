@@ -220,6 +220,7 @@ def main() -> None:
         for n in [
             "walk-core.js",
             "walk-photo.js",
+            "walk-translate.js",
             "walk-menu.js",
             "walk-sheet.js",
             "walk-app.js",

@@ -89,6 +89,7 @@ async def test_проверка_партнёра_начинается_в_его_
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Батуми 1"))
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
     состояние = get_state(CHAT_ID)
     assert состояние is not None and состояние.tenant == "GE"
