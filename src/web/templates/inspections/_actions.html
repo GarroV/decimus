@@ -1,5 +1,5 @@
 {#
-  Ряд действий с проверкой — один на полную карточку и на панель реестра (D393).
+  Ряд действий с проверкой — один на полную карточку и на панель реестра (решение владельца 11.10.2026).
 
   Образец — панель инструментов Swarm Brain: компактные кнопки-пилюли 30px в
   один ряд, всё, что требует ввода (срок, дата, пиццерия, причина), — в
@@ -16,6 +16,7 @@
   {% set head = c.head %}
   {% set base = url('/inspections/' ~ head.id) %}
   <div class="cbar{% if not full %} cbar--panel{% endif %}" role="group" aria-label="{{ t('card.act.label') }}">
+    {% if not full %}<a class="sbtn" href="{{ base }}?lang={{ lang }}">{{ t('registry.panel.open') }}</a>{% endif %}
     {% if c.report %}
       <a class="sbtn" href="{{ base }}/report?lang={{ lang }}">{{ icon('pdf') }}<span>{{ t('card.report.download') }}</span></a>
     {% endif %}
@@ -72,7 +73,6 @@
           <summary class="sbtn"><span>{{ t('card.act.fix') }}</span><span class="pick__caret" aria-hidden="true">▾</span></summary>
           <div class="cpop__menu">
             <form method="post" action="{{ base }}/move?lang={{ lang }}" class="sform" id="move">
-              <p class="cpop__text">{{ t('move.hint') }}</p>
               <label><span class="sform__label">{{ t('move.date_label') }}</span>
                 <input class="sinput" type="date" name="date" required value="{{ head.inspection_date }}"></label>
               <label><span class="sform__label">{{ t('move.unit_label') }}</span>

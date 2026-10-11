@@ -508,17 +508,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "Here it is read-only."
         ),
     },
-    "accept.title": {"ru": "Подтвердить проверку", "en": "Accept inspection"},
-    "accept.hint": {
-        "ru": (
-            "После подтверждения проверка входит в историю сети, а её записи больше не "
-            "правятся. Вернуть на приёмку нельзя."
-        ),
-        "en": (
-            "Once accepted, the inspection joins the network history and its records can no "
-            "longer be edited. It cannot be sent back for review."
-        ),
-    },
     "accept.submit": {"ru": "Подтвердить", "en": "Accept"},
     "accept.done": {"ru": "Проверка принята.", "en": "The inspection is accepted."},
     "accept.failed": {
@@ -707,7 +696,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "deliberately so."
         ),
     },
-    # --- ряд действий в шапке карточки проверки (D393) -----------------------------
+    # --- ряд действий в шапке карточки проверки (решение владельца 11.10.2026) ------
     "card.act.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
     "card.act.plan": {"ru": "Экшн-план", "en": "Action plan"},
     "card.act.plan_open": {"ru": "Открыть план", "en": "Open plan"},
@@ -729,19 +718,6 @@ TEXTS: dict[str, dict[str, str]] = {
         ),
     },
     # --- исправление даты и пиццерии (D195; в коде — move) --------------------------
-    "move.title": {"ru": "Исправить дату или пиццерию", "en": "Correct the date or pizzeria"},
-    "move.hint": {
-        "ru": (
-            "Если при заведении проверки ошиблись датой или пиццерией — исправьте здесь. "
-            "Записи, оценка и буква не меняются. Каждое исправление остаётся в истории "
-            "вместе с причиной."
-        ),
-        "en": (
-            "If the inspection was filed with the wrong date or pizzeria, correct it here. "
-            "Findings, score and grade do not change. Every correction is kept in the "
-            "history with its reason."
-        ),
-    },
     "move.date_label": {"ru": "Дата проверки", "en": "Inspection date"},
     "move.unit_label": {"ru": "Пиццерия", "en": "Pizzeria"},
     "move.reason_label": {"ru": "Что было не так", "en": "What was wrong"},
@@ -766,18 +742,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The correction history is unavailable — corrections are disabled until it is back.",
     },
     # --- отклонение проверки (код остаётся retract, D194) ------------------
-    "retract.title": {"ru": "Отклонить проверку", "en": "Reject inspection"},
-    "retract.hint": {
-        "ru": (
-            "Отклонение — пометка, а не удаление: строка остаётся в истории вместе с причиной, "
-            "обычной роли не видна, кадры убираются из хранилища. Причина обязательна."
-        ),
-        "en": (
-            "Rejection marks, it does not delete: the row stays in history with its reason, "
-            "is invisible to the ordinary role, and the photos are purged from storage. "
-            "A reason is required."
-        ),
-    },
     "retract.reason_label": {"ru": "Причина отклонения", "en": "Reason for rejection"},
     "retract.submit": {"ru": "Отклонить проверку", "en": "Reject inspection"},
     "retract.done": {

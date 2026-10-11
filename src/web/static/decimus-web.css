@@ -1128,7 +1128,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
    сдвигает панель ровно под рукой. */
 .ov-chip--reset.is-idle { opacity: .45; }
 
-/* ── Ряд действий с проверкой (карточка и панель реестра, D393) ──────────
+/* ── Ряд действий с проверкой (карточка и панель реестра, решение владельца 11.10.2026) ──────────
    Образец — тулбар Swarm Brain: кнопки-пилюли 30px (`.sbtn` из
    `decimus-split.css`) в один ряд, ввод — в небольшом всплывающем блоке под
    кнопкой. Блок — тот же `<details class="pick">`, что у чипов отбора, поэтому
@@ -1153,7 +1153,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 }
 .cpop--end .cpop__menu { left: auto; right: 0; }
 .cpop__menu--danger { border-color: var(--err-line, var(--line)); }
-.cpop__menu .sform > .sbtn { align-self: stretch; }
+.cpop__menu .sform > .sbtn { align-self: flex-end; }
 .cpop__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-5); }
 .cpop__text { margin: 0; font-size: var(--fs-meta); line-height: 1.5; color: var(--ink-2); }
 .cpop__muted { font-size: var(--fs-meta); color: var(--ink-3); }
@@ -1161,11 +1161,19 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .cbar--panel { margin-top: var(--space-6); }
 .cbar--panel .cpop { position: static; }
 .cbar--panel .cpop__menu { left: 0; right: 0; width: auto; max-width: none; }
+.cbar--panel .cpop--end .cpop__menu { left: 0; right: 0; }
 @media (max-width: 767px) {
   .card-top { align-items: stretch; }
   .cbar .cpop { position: static; }
-  .cbar .cpop__menu { left: 0; right: 0; width: auto; max-width: none; }
-  .cbar__end { margin-left: 0; }
+  .cbar .cpop__menu { left: 0; right: auto; width: min(22rem, 100%); max-width: none; }
+  .cbar .cpop--end .cpop__menu { left: 0; right: auto; }
+  .cpop__menu .sbtn { height: 32px; }
+  .cpop__menu .sinput { height: 36px; }
+  /* Ряд остаётся компактным и на телефоне: общее правило каркаса растит `.sbtn`
+     до 40px, а здесь их шесть в одном ряду. Поля в блоках остаются крупными —
+     16px, иначе iOS приближает страницу при фокусе. */
+  .cbar > .sbtn, .cbar > .pick > .sbtn, .cbar > form > .sbtn { height: 32px; padding: 0 var(--space-5); }
+  .cbar__end { margin-left: auto; }
 }
 
 /* ── Карточка точки (экран «point» прототипа, T355) ───────────────────────
