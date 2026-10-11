@@ -190,6 +190,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0049_api_tokens.sql": (
         "sql1:eee1e66a7944c3b719d87bcb70ca4e10691fcbaf28eb70e10e369f8cbf237ab9"
     ),
+    # Оценки в агрегаторах доставки: точки, снимки, журнал сбора (#638, D389).
+    # Заведена вместе с файлом, нигде не применена.
+    "0050_aggregators.sql": (
+        "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
+    ),
 }
 
 

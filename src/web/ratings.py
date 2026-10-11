@@ -19,7 +19,7 @@ from datetime import date
 from flask import Flask, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 
-from src.db import maps_store
+from src.db import agg_store, maps_store
 from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
@@ -27,6 +27,7 @@ from src.domain.tenants import may_manage_ratings
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
 from src.ratings import report
+from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
 from src.ratings.model import RatingsFormatError
@@ -139,6 +140,36 @@ def _maps(
         return None
 
 
+def _aggs(
+    groups: tuple[tuple[str, tuple[str, ...]], ...], until: date
+) -> tuple[tuple[str, ...], tuple[ragg.GroupAggs, ...]] | None:
+    """Оценки агрегаторов по группам сводки на конец периода: (колонки, строки).
+    База не ответила — `None` и след в журнале: блок скажет «нет данных»."""
+    countries = tuple(c for _, members in groups for c in members)
+    try:
+        rows = agg_store.latest(countries, until=until)
+    except RatingsError:
+        logger.warning("Оценки агрегаторов не прочитались", exc_info=True)
+        return None
+    return ragg.aggregators_of(rows), ragg.summarize(rows, groups)
+
+
+def _agg_names(lang: str) -> dict[str, str]:
+    """Название агрегатора на экране; незнакомый код — как есть."""
+    prefix = "ratings.agg.name."
+    return {key[len(prefix) :]: t(key, lang) for key in TEXTS if key.startswith(prefix)}
+
+
+def _agg_failures() -> tuple[agg_store.LoadState, ...]:
+    """Агрегаторы, чей последний сбор не удался, — их видно на странице, а не
+    тишиной. Журнал не прочитался — пусто и след в журнале."""
+    try:
+        return tuple(s for s in agg_store.load_states() if s.outcome != "ok")
+    except RatingsError:
+        logger.warning("Журнал сбора агрегаторов не прочитался", exc_info=True)
+        return ()
+
+
 def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
     """Оценка Google по пиццериям, связанным с филиалами карт; сбой — пусто."""
     try:
@@ -206,6 +237,7 @@ def render_summary(conf: Settings) -> str:
         return names.get(code) or country_title(code, lang)
 
     names_of_groups = [_group_name(g, selection, lang, country_name) for g in summary.groups]
+    agg_failures, agg_names = _agg_failures(), _agg_names(lang)
     return render_template(
         "ratings/index.html",
         blocks=tuple(b.key for b in _layout() if b.visible),
@@ -215,6 +247,13 @@ def render_summary(conf: Settings) -> str:
             summary.previous.end if summary.previous else None,
         ),
         map_providers=rmaps.SHOWN_PROVIDERS,
+        aggs=_aggs(
+            tuple(zip(names_of_groups, (g.countries for g in summary.groups), strict=True)),
+            min(selection.period.end, date.today()),
+        ),
+        agg_failures=agg_failures,
+        agg_failed_names=", ".join(agg_names.get(f.aggregator, f.aggregator) for f in agg_failures),
+        agg_names=agg_names,
         unit_maps=_unit_maps(min(selection.period.end, date.today())),
         chart=_chart(summary, names_of_groups, lang),
         clusters=report.CLUSTERS,
