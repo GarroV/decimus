@@ -1173,8 +1173,8 @@ from units u
             on i.unit_id = u.id
            and i.status = 'finalized'
            and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
-where u.tenant_code = 'HQ'
-  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+           and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 group by u.id, u.name, u.code
 """
 
