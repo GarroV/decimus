@@ -15,7 +15,8 @@ from collections.abc import MutableMapping
 from .base import Found, Http, dig, is_dodo, number, votes_of
 
 KEY = "yandex_eda"
-GAP_SEC = 1.5
+# 1,5 с на проде 11.10.2026 — 12 отказов 429 на 76 пиццерий; 4 с — с запасом.
+GAP_SEC = 4.0
 SCALE = 5
 HOST = "https://eda.yandex.by"
 SEARCH = HOST + "/eats/v1/full-text-search/v1/search"
