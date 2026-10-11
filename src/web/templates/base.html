@@ -43,16 +43,16 @@
     Тема ставится ДО первой отрисовки, поэтому файл без defer. Встроенным
     скриптом его не держим: политика источников (#489) такие не исполняет.
   #}
-  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <script data-shell src="{{ url_for('static', filename='theme.js') }}"></script>
   <link rel="stylesheet" href="{{ url_for('static', filename='dodo-ds.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-domain.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-web.css') }}">
   {#- Стили одного раздела — только на его страницах (рейтинги: decimus-rt.css). -#}
   {% block head %}{% endblock %}
-  <script src="{{ url_for('static', filename='pick.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='period.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='shell.js') }}" defer></script>
-  <script src="{{ url_for('static', filename='nav.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='pick.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='period.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='shell.js') }}" defer></script>
+  <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
 </head>
 <body>
   {% if not account %}
