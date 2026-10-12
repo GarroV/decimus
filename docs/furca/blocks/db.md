@@ -180,12 +180,12 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 - `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
 - Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
 
-### Оценки в агрегаторах доставки (миграции `0050`, `0052`)
+### Оценки в агрегаторах доставки (миграции `0050`, `0051`, `0053`)
 
 Отдельная схема `agg`; продуктовое описание — `docs/17-aggregators.md`. Пишет роль приложения, читают все.
 
 - `0050_aggregators.sql` — `agg.points` (справочник точек агрегатора с привязкой к пиццерии), `agg.ratings` (снимок дня `(aggregator, point_key, on_date)`, шкала хранится при оценке), `agg.loads` (журнал сбора: исход, точки, ошибка); новый блок `aggregators` в `ratings.layout`.
-- `0052_agg_requests.sql` — `agg.requests`: заявка на обновление вне суточного расписания (D420). Кто просил (`requested_by`), какие агрегаторы (`aggregators`, `null` — все), исход (`done_at`, `outcome` ok/failed, `error`). Незакрытая заявка одна: частичный уникальный индекс `requests_one_open_idx` (`where done_at is null`) — повторная просьба получает «уже в очереди». Роли приложения: `select, insert` и колоночный `update (done_at, outcome, error)`; принимают веб и MCP, закрывает бот.
+- `0053_agg_requests.sql` — `agg.requests`: заявка на обновление вне суточного расписания (D420). Кто просил (`requested_by`), какие агрегаторы (`aggregators`, `null` — все), исход (`done_at`, `outcome` ok/failed, `error`). Незакрытая заявка одна: частичный уникальный индекс `requests_one_open_idx` (`where done_at is null`) — повторная просьба получает «уже в очереди». Роли приложения: `select, insert` и колоночный `update (done_at, outcome, error)`; принимают веб и MCP, закрывает бот.
 - Дверь: `src/db/agg_store.py` — `save`, `log_load`, `last_run`, `last_ok_points`, `known_points`, `latest`, `load_states`; заявки — `UpdateRequest`, `request_update`, `open_request`, `finish_request`.
 
 ### Экран доступа: главный админ и пространства с экрана (миграция `0041`, #585)

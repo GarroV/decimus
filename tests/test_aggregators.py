@@ -11,7 +11,9 @@ from datetime import date
 
 import pytest
 
+from src.db import agg_store
 from src.db.agg_store import LatestRating, PointRow
+from src.db.errors import RatingsError
 from src.ratings.aggregators import (
     bolt,
     chowdeck,
@@ -27,6 +29,13 @@ from src.ratings.aggregators import (
 from src.ratings.aggregators.base import AggregatorError, is_dodo, votes_of
 
 ДЕНЬ = date(2026, 10, 11)
+
+
+@pytest.fixture(autouse=True)
+def _без_базы_реестра(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Реестр пиццерий и страны IMF в базе — здесь подставные: сбор их не требует."""
+    monkeypatch.setattr(agg_store, "imf_countries", lambda: ())
+    monkeypatch.setattr(agg_store, "save_units", lambda units, today: len(units))
 
 
 def test_додо_узнаётся_по_названию_сети_а_двойники_нет() -> None:
@@ -313,3 +322,85 @@ def test_агрегатор_на_паузе_бот_не_зовёт_а_рукам
     assert "yandex_eda" not in бот and "wolt" in бот
     assert руками == ["yandex_eda"]
     assert "BY" not in страны[0] and страны[1] == yandex_eda.COUNTRIES
+
+
+def test_сбор_читает_пиццерии_всех_стран_imf_и_пишет_реестр(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D424: реестр — по всем странам IMF, не только по странам сборщиков."""
+    monkeypatch.setattr(agg_store, "imf_countries", lambda: ("RS", "ZZ"))
+    монтаж: list[object] = []
+    monkeypatch.setattr(agg_store, "save_units", lambda units, today: монтаж.append(units) or 1)
+    monkeypatch.setattr(
+        collect, "run_one", lambda m, u, d: collect.Outcome(m.KEY, True, 0, 0, None)
+    )
+    страны: list[frozenset[str]] = []
+
+    def пиццерии(codes: frozenset[str]) -> tuple[str, ...]:
+        страны.append(codes)
+        return ("пиццерия",)
+
+    collect.run_all(ДЕНЬ, only=["glovo"], fetch_units=пиццерии)  # type: ignore[arg-type]
+
+    assert "ZZ" in страны[0] and "RS" in страны[0]  # IMF — даже когда идёт один Glovo
+    assert монтаж == [("пиццерия",)]
+
+
+def test_сбой_записи_реестра_и_стран_не_останавливает_сбор(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def упало(*_: object) -> None:
+        raise RatingsError("база отказала")
+
+    monkeypatch.setattr(agg_store, "imf_countries", упало)
+    monkeypatch.setattr(agg_store, "save_units", упало)
+    monkeypatch.setattr(
+        collect, "run_one", lambda m, u, d: collect.Outcome(m.KEY, True, 0, 0, None)
+    )
+    страны: list[frozenset[str]] = []
+    пиццерии = lambda codes: страны.append(codes) or ()  # noqa: E731
+
+    итог = collect.run_all(ДЕНЬ, fetch_units=пиццерии)  # type: ignore[arg-type]
+
+    assert [o.aggregator for o in итог] == [m.KEY for m in collect.SEARCHERS + collect.KNOWN]
+    assert страны[0] == collect.countries()  # без базы — страны сборщиков
+
+
+def test_glovo_после_известных_точек_ищет_новые_и_пишет_их_вместе(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Автопоиск (D424) встроен в сбор Glovo: найденное ложится тем же снимком."""
+    from src.db.agg_store import RatingRow
+    from src.ratings.aggregators import base, glovo_link
+    from src.ratings.maps_link import DodoUnit
+
+    известная, новая = _точка("glovo", "1"), _точка("glovo", "2")
+    записано: list[tuple[list[PointRow], list[RatingRow]]] = []
+    monkeypatch.setattr(agg_store, "known_points", lambda key: (известная,))
+    monkeypatch.setattr(agg_store, "point_keys", lambda key: frozenset({"1"}))
+    monkeypatch.setattr(agg_store, "last_ok_points", lambda key: 1)
+    monkeypatch.setattr(agg_store, "log_load", lambda *a, **k: None)
+    monkeypatch.setattr(
+        agg_store, "save", lambda p, r: (записано.append((list(p), list(r))), (len(p), len(r)))[1]
+    )
+    monkeypatch.setattr(
+        glovo,
+        "refresh",
+        lambda http, row: base.Found("1", "Dodo", None, None, None, 90.0, 100, 5, True, True),
+    )
+    рейтинг = RatingRow("glovo", "2", ДЕНЬ, 95.0, 100, 7, True, True)
+    монтаж: list[object] = []
+
+    def поиск(http: object, units: object, known: object, taken: object, today: date) -> object:
+        монтаж.append((list(units), taken))  # type: ignore[call-overload]
+        return [новая], [рейтинг]
+
+    monkeypatch.setattr(glovo_link, "discover", поиск)
+    unit = DodoUnit("b" * 32, "Новая", 44.4, 26.1, "RO")
+    закрытая = DodoUnit("c" * 32, "Закрыта", 44.4, 26.1, "RO", working=False)
+
+    итог = collect.run_one(glovo, [unit, закрытая], ДЕНЬ)
+
+    assert (итог.ok, итог.points, итог.ratings) == (True, 2, 2)
+    assert [p.point_key for p in записано[0][0]] == ["1", "2"]
+    assert монтаж == [([unit], frozenset({"1"}))]  # закрытые в поиск не идут
