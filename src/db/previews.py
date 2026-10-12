@@ -23,6 +23,7 @@ from PIL import Image, ImageOps, UnidentifiedImageError
 
 from .config import check_environment, load_storage_settings
 from .errors import DbError, StorageError
+from .pool import connection
 from .reach import Reach, require_reach
 from .storage import S3PhotoStorage, key_of_uri
 
@@ -90,7 +91,7 @@ where p.id = %(photo)s and p.inspection_id = %(id)s
 def _read(sql: str, params: dict[str, object]) -> list[tuple[Any, ...]]:
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(sql, params)
             return cur.fetchall()
     except psycopg.Error as exc:

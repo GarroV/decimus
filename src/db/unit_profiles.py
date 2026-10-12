@@ -18,6 +18,7 @@ from psycopg.types.json import Jsonb
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 _INSERT = """
 insert into unit_profiles (country_code, name_normalized, name, dodo_id, stage, status, city,
@@ -71,7 +72,7 @@ def save(profiles: Sequence[Profile]) -> int:
              p.total_area, p.seats, Jsonb(p.extra))
         )  # fmt: skip
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             conn.execute("delete from unit_profiles")
             with conn.cursor() as cur:
                 cur.executemany(_INSERT, rows)
@@ -89,7 +90,7 @@ def hq_units() -> tuple[tuple[str, str | None, tuple[str, ...], str | None], ...
         where u.tenant_code = 'HQ' group by u.id
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Точки справочника не прочитались ({exc.__class__.__name__})") from exc
@@ -100,7 +101,7 @@ def set_unit_codes(codes: Sequence[tuple[str, str]]) -> int:
     """Проставить точкам HQ код Dodo: (id точки, код). Код, уже занятый другой
     точкой, не переносится — это повод разобраться руками, а не молча перевесить."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             done = 0
             for unit_id, code in codes:
                 cur = conn.execute(
@@ -117,7 +118,7 @@ def set_unit_codes(codes: Sequence[tuple[str, str]]) -> int:
 
 def _read(sql: str, params: tuple[Any, ...]) -> tuple[Profile, ...]:
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, params).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(
