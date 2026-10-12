@@ -244,7 +244,9 @@ class _Wizard:
     def start(self, body: dict[str, Any], full_name: str) -> None:
         kind = _choice(body, "kind", KIND_TITLES)
         speech_lang = _choice(body, "speech_lang", LANG_LABELS)
-        report_lang = _choice(body, "report_lang", LANG_LABELS)
+        # Язык отчёта на старте не спрашивается (D415): до готовности проверки он
+        # равен языку чек-листа, а задаёт его бот/мини-апп в конце. `report_lang`
+        # от старого клиента принимается и игнорируется.
         replace = body.get("replace") is True
         checklist = self.checklist(body)
         if _state_of(self.who) == STATE_RUNNING and not replace:
@@ -266,7 +268,7 @@ class _Wizard:
                     self.who,
                     unit=unit,
                     kind=kind,
-                    report_lang=report_lang,
+                    report_lang=speech_lang,
                     ui_lang=self.lang,
                     speech_lang=speech_lang,
                     auditor=auditor,

@@ -102,7 +102,6 @@ async def test_живые_кнопки_рубежом_не_перехвачен�
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     assert get_state(CHAT_ID) is not None, "мастер не дошёл до старта проверки"
     gone = t("error.button_gone", "ru")

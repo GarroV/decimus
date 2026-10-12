@@ -39,7 +39,6 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "report and the inspection on the web can be viewed in any platform language."
         ),
     },
-    "walk.start.report": {"ru": "Язык отчёта", "en": "Report language"},
     "walk.start.go": {"ru": "Начать проверку", "en": "Start inspection"},
     "walk.start.going": {"ru": "Начинаем…", "en": "Starting…"},
     "walk.start.running": {
