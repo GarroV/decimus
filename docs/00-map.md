@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,google_link,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,google_link,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -166,6 +166,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
+| `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
@@ -256,7 +257,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 1 | index.html |
+| `src/web/templates/settings/` | 2 | confirm.html, index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -404,7 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0044_maps.sql` | Оценки пиццерий на картах (Google, Яндекс и др.) из Pointer API (docs/09-pointer-api.md) |
 | `0045_maps_link.sql` | Связь филиала Pointer с пиццерией Dodo (docs/09-pointer-api.md) |
 | `0046_unit_profiles.sql` | Справочные сведения о пиццерии из «Свода пиццерий» девелопмента (D374–D376): адрес, партнёр и его почта, статус, даты запуска ресторана и доставки, закрытие, помещение |
-| `0047_maps_excluded.sql` | Филиал на картах, который не пиццерия (тестовая карточка, учебный центр), — исключается из оценок стран и пиццерий (D377) |
+| `0047_maps_excluded.sql` | Филиал на картах, который не пиццерия (тестовая карточка, учебный центр), — исключается из оценок стран и пиццерий (D453) |
 | `0048_ratings_clusters.sql` | Кластер страны IMF для сводки рейтингов (D383, D384): CEE — вся Европа, остальные — OTHER (Other countries) |
 | `0049_api_tokens.sql` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `0050_aggregators.sql` | Оценки пиццерий в агрегаторах доставки — Wolt, Glovo, Bolt Food, Яндекс Еда, Yemeksepeti и другие (#638, D389, docs/17-aggregators.md) |
@@ -514,6 +515,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/stops.py` | Отказы, которые останавливают мастер проверки: журнал и счётчик (#436) |
 | `src/bot/texts.py` | Тексты интерфейса бота: каталог по ключам, язык — параметр |
 | `src/bot/unit_pick.py` | Пиццерия проверки — из справочника, а не из написанного (D196) |
+| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) |
 | `src/bot/version.py` | Версия сборки: чем именно отвечает этот процесс (T246, #201) |
 | `src/bot/view.py` | Из чего складываются строки, которые аудитор читает в чате |
 | `src/bot/zones.py` | Зона из слов аудитора (задача T124, решения D047 и D048, правило 6) |
@@ -621,6 +623,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
+| `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
@@ -633,6 +636,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
 | `src/domain/unit_name.py` | Имя пиццерии «Город-N» по-английски — из написанного как угодно (D233) |
 | `src/domain/unit_new.py` | Новая пиццерия справочника из веб-админки: что заводится и почему нет (#437) |
+| `src/domain/upload_sweep.py` | Уборка кадров мини-аппа, не попавших ни в одну проверку (F-033, #531) |
 | `src/domain/uploads.py` | Кадры, снятые в мини-аппе обхода (D312): где лежат и как на них сослаться |
 | `src/domain/version.py` | Идентификатор версии методики: имя набора, дата публикации, отпечаток данных |
 | `src/domain/walk_users.py` | Кому открыт мини-апп обхода (#418): все проверяющие или только тестеры |

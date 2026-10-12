@@ -349,6 +349,9 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/google-link",
     "/settings/google-unlink",
     "/settings/lang",
+    # Подтверждение входа перед долгоживущим доступом — своя же учётка.
+    "/settings/confirm",
+    "/settings/confirm/google",
 }
 
 

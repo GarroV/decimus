@@ -53,6 +53,7 @@ class Учётка:
         role: str = "auditor",
         email: str | None = None,
         web_lang: str | None = None,
+        signed_in_at: datetime | None = None,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
@@ -63,6 +64,9 @@ class Учётка:
         # Язык сайта из профиля (`web_users.web_lang`, 0061): по умолчанию не
         # выбран — страницы говорят языком стенда.
         self.web_lang = web_lang
+        # Когда открыта сессия: по умолчанию только что — вход свежий, и
+        # действия, требующие свежего входа (`web.reauth`), не переспрашивают.
+        self.signed_in_at = signed_in_at or datetime.now(UTC)
         # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
         # прятал бы отказ раздела людей во всех тестах разом.
         self.role = role

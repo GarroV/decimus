@@ -27,6 +27,8 @@ from collections.abc import Callable
 
 from aiogram.types import Message
 
+from src.domain.log_ids import log_id
+
 from . import sidecar
 from .errors import BotNotesError
 from .keyboards import edit_keyboard
@@ -47,7 +49,7 @@ def _quietly(запомнить: Callable[[], None], chat_id: int, n: int, по�
         logger.warning(
             "запись #%s в чате %s не попала в карту сообщений — %s",
             n,
-            chat_id,
+            log_id(chat_id),
             потеря,
             exc_info=True,
         )

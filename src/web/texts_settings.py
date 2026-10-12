@@ -163,6 +163,35 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Password sign-in is closed for this account: you sign in with Google. To "
         "sign in with a password again, use “Unlink Google” above.",
     },
+    "settings.confirm.title": {"ru": "Подтвердите вход", "en": "Confirm it's you"},
+    "settings.confirm.why": {
+        "ru": "Это действие даёт долгий доступ к вашей учётке — токен Claude, бот, почта "
+        "Google или подключение Claude. Поэтому вход должен быть свежим: не старше 15 "
+        "минут. Подтвердите, что это вы, и вернитесь к действию.",
+        "en": "This action grants long-lived access to your account — a Claude token, the "
+        "bot, a Google account or a Claude connection. So the sign-in must be recent: no "
+        "older than 15 minutes. Confirm it's you and go back to the action.",
+    },
+    "settings.confirm.submit": {"ru": "Подтвердить", "en": "Confirm"},
+    "settings.confirm.google": {
+        "ru": "Подтвердить через Google",
+        "en": "Confirm with Google",
+    },
+    "settings.confirm.failed": {
+        "ru": "Пароль не подошёл.",
+        "en": "Wrong password.",
+    },
+    "settings.confirm.failed_google": {
+        "ru": "Google не подтвердил вход этой учётки — войдите тем аккаунтом, чья почта "
+        "к ней привязана.",
+        "en": "Google did not confirm this account — use the Google account whose email is "
+        "linked to it.",
+    },
+    "settings.confirm.locked": {
+        "ru": "Слишком много попыток. Попробуйте через {minutes} мин.",
+        "en": "Too many attempts. Try again in {minutes} min.",
+    },
+    "settings.confirm.back": {"ru": "Вернуться в «Настройки»", "en": "Back to Settings"},
     "users.panel.own_settings": {
         "ru": "Пароль, бот, Claude и язык — в «Настройках».",
         "en": "Password, bot, Claude and language are in “Settings”.",

@@ -36,9 +36,10 @@ from werkzeug.wrappers import Response
 from src.db import bot_links, mcp_access, oauth_store, web_own_profile
 from src.db.errors import DbError
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import accounts, auth, google_link, profile, ui_lang, users_claude, users_mcp
+from . import accounts, auth, google_link, profile, reauth, ui_lang, users_claude, users_mcp
 from .config import WEB_BOT_USERNAME_VAR, Settings
 from .db_refusal import note_target_mismatch
 from .google_auth import load_hq_domains
@@ -74,6 +75,8 @@ def own_post_paths() -> frozenset[str]:
             f"{base}/google-link",
             f"{base}/google-unlink",
             f"{base}/lang",
+            reauth.CONFIRM_PATH,
+            reauth.CONFIRM_GOOGLE_PATH,
         }
     )
 
@@ -203,13 +206,16 @@ def _install_bot(app: Flask, base: str, conf: Settings) -> None:
     """Привязка бота к своей учётке и отвязка (D286)."""
 
     @app.post(f"{base}/bot-link")
-    def settings_bot_link() -> FlaskResponse | tuple[str, int]:
+    def settings_bot_link() -> Response | FlaskResponse | tuple[str, int]:
         """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
 
         Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
         Telegram к выбранному человеку.
         """
         refuse_foreign_origin()
+        # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
+        if (переспрос := reauth.require_fresh(f"{base}#bot")) is not None:
+            return переспрос
         чей = _current_id()
         if not conf.bot_username:
             return render(
@@ -248,6 +254,9 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
     def settings_google_link() -> Response:
         """Увести к Google. Только POST со своей страницы: чужая не начнёт привязку."""
         refuse_foreign_origin()
+        # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
+        if (переспрос := reauth.require_fresh(f"{base}#google")) is not None:
+            return переспрос
         вошедший = auth.current_account()
         if вошедший is not None and вошедший.email:
             return google_link.back_to_settings("already")
@@ -261,6 +270,9 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
         форма стала бы вторым входом для подбора пароля из чужой открытой вкладки.
         """
         refuse_foreign_origin()
+        # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
+        if (переспрос := reauth.require_fresh(f"{base}#google")) is not None:
+            return переспрос
         вошедший = auth.current_account()
         if вошедший is None:
             raise RuntimeError("снятие почты без вошедшего: маршрут прошёл мимо заслона")
@@ -284,9 +296,8 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
         if итог == "none":
             return google_link.back_to_settings()
         logger.info(
-            "Google: %s/%s снял почту %s",
-            canonical_tenant(вошедший.tenant),
-            вошедший.login,
+            "Google: учётка %s сняла почту %s",
+            log_id(вошедший.id),
             google_link.mask_email(вошедший.email or ""),
         )
         return google_link.back_to_settings("unlinked")
@@ -311,9 +322,12 @@ def _install_claude_token(app: Flask, base: str) -> None:
     """Личный токен Claude: выпустить себе и отозвать свой (D447, D448)."""
 
     @app.post(f"{base}/claude-token")
-    def settings_claude_token() -> FlaskResponse | tuple[str, int]:
+    def settings_claude_token() -> Response | FlaskResponse | tuple[str, int]:
         """Выпустить себе токен; команда показывается этим ответом один раз."""
         refuse_foreign_origin()
+        # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
+        if (переспрос := reauth.require_fresh(f"{base}#claude-token")) is not None:
+            return переспрос
         чей = _current_id()
         try:
             выпуск = users_mcp.issue_own(чей)
@@ -321,7 +335,7 @@ def _install_claude_token(app: Flask, base: str) -> None:
             note_target_mismatch(exc)
             return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
         # Значения токена в журнале нет: только факт выпуска.
-        logger.info("Веб: учётка %s выпустила себе токен MCP", чей)
+        logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
         return render(Show(token=выпуск))
 
     @app.post(f"{base}/claude-token-revoke")

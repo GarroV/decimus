@@ -41,6 +41,7 @@ from src.db import oauth_store, web_throttle
 from src.db.errors import AccessError, OAuthGrantError
 from src.domain.public_urls import AUTHORIZATION_SERVER_PATH
 
+from . import reauth
 from .config import Settings
 from .origin import refuse_foreign_origin
 from .remote import client_address
@@ -299,6 +300,12 @@ def install(app: Flask, conf: Settings) -> None:
             # Заслон входа сюда неопознанного не пускает; на случай, если
             # маршрут однажды окажется открытым, — отказ, а не код без человека.
             return refused_page("no_account")
+        if not reauth.is_fresh(account):
+            # Разрешение Claude — долгоживущий доступ: только по свежему входу.
+            # После подтверждения человек вернётся на это же согласие.
+            исходные = request.form if request.method == "POST" else request.args
+            параметры = [(к, з) for к, з in исходные.items(multi=True) if к != "decision"]
+            return reauth.ask_confirm(f"{AUTHORIZE_PATH}?{urlencode(параметры)}")
         if request.method == "GET":
             return render_template(
                 "oauth/consent.html",

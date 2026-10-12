@@ -47,6 +47,7 @@ from aiogram.types import CallbackQuery, Message
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
 from src.recognize.transcribe import transcribe
 
@@ -212,7 +213,9 @@ async def _save(message: Message, state: FSMContext, lang: str, value: str) -> N
         # Подпроцесс движка — в поток, как и все остальные его вызовы (T101).
         await asyncio.to_thread(domain.set_info, message.chat.id, code, value, photos=shots)
     except DomainError:
-        logger.exception("информационное поле %s чата %s не записалось", code, message.chat.id)
+        logger.exception(
+            "информационное поле %s чата %s не записалось", code, log_id(message.chat.id)
+        )
         await stops.refuse(message, lang, step="finish.info", key="info.not_saved")
         return
     # Кадры сняты только после удачной записи: отказ движка оставляет их при

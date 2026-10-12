@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 120 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 123 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -113,6 +113,9 @@
 | `/settings/claude-revoke` | POST | `settings_claude_revoke` | `src/web/settings_screen.py` |
 | `/settings/claude-token` | POST | `settings_claude_token` | `src/web/settings_screen.py` |
 | `/settings/claude-token-revoke` | POST | `settings_claude_token_revoke` | `src/web/settings_screen.py` |
+| `/settings/confirm` | GET | `reauth_confirm` | `src/web/reauth.py` |
+| `/settings/confirm` | POST | `reauth_confirm_password` | `src/web/reauth.py` |
+| `/settings/confirm/google` | POST | `reauth_confirm_google` | `src/web/reauth.py` |
 | `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
@@ -270,6 +273,7 @@
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |
