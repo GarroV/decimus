@@ -23,6 +23,8 @@ from src.db.web_access import (
     ROLE_ADMIN,
     ROLE_AUDITOR,
     ROLE_CONTROL,
+    ROLE_DEVELOPER,
+    ROLE_GUEST,
     ROLE_SUPERADMIN,
     ROLES,
     AccountRow,
@@ -44,6 +46,8 @@ __all__ = [
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
     "ROLE_CONTROL",
+    "ROLE_DEVELOPER",
+    "ROLE_GUEST",
     "ROLE_SUPERADMIN",
     "AccountRow",
     "Added",
@@ -82,7 +86,7 @@ def everyone(*, tenant: str | None) -> tuple[AccountRow, ...]:
     return list_accounts(tenant=tenant)
 
 
-def add(login: str, *, tenant: str, role: str = ROLE_AUDITOR) -> Added:
+def add(login: str, *, tenant: str, role: str | None = None) -> Added:
     """Завести человека и вернуть его пароль — единственный раз, когда он виден."""
     пароль = secrets.token_urlsafe(_PASSWORD_BYTES)
     заведённая = create_account(login, tenant=tenant, password=пароль, role=role)

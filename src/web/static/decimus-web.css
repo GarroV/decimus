@@ -1479,13 +1479,16 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .mx-shell .mx-switch .pick__caret { display: none; }
 .mx-shell .mx-switch__btn { pointer-events: none; }
 
-/* Версия — строкой под шапкой. Имя набора крупно, идентификатор мелко: он
-   нужен для сверки, а не для чтения. */
-.mx-ver { margin-top: var(--space-3); font-size: var(--fs-meta); display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: baseline; }
+/* Шапка методики: метка «Главный», индикатор неопубликованных правок, имя
+   набора и идентификатор в панели «Версии» (идентификатор — для сверки). */
+.mx-bar__dot { margin-left: var(--space-2); color: var(--ink-3); }
+.mx-pending > summary.mx-pending__btn { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--fs-meta); color: var(--ink-2); padding: var(--space-2) var(--space-3); border-radius: var(--r-block); border: 1px solid var(--line); }
+.mx-pending__dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--warn, #d9a400); flex: none; }
+.mx-pending__menu { min-width: 18rem; max-width: min(24rem, 90vw); }
+.mx-pending__text { margin: 0 0 var(--space-3); font-size: var(--fs-meta); }
+.mx-pending__row { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; }
+.mx-master-form { display: inline-flex; margin: 0; }
 .mx-ver__name { font-weight: var(--w-semibold); color: var(--ink); }
-.mx-ver__id { font-size: var(--fs-micro); color: var(--ink-3); }
-.mx-draft { margin-top: var(--space-6); align-items: center; gap: var(--space-5); flex-wrap: wrap; }
-.mx-draft > .grow { flex: 1 1 22rem; min-width: 0; }
 .mx-ver__id { overflow-wrap: anywhere; }
 
 /* Список */

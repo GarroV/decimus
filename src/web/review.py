@@ -145,6 +145,7 @@ def checklist_of(head: InspectionRow, *, lang: str) -> method.Composition:
         space=None,
         write=False,
         lang=lang,
+        role=None,
     )
     return method.load_composition(store, tenant=head.tenant_code, version=head.checklist_version)
 

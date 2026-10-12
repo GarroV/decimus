@@ -22,7 +22,13 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, canonical_tenant, is_admin_role
+from src.domain.tenants import (
+    CONTROL_ROLE,
+    GUEST_ROLE,
+    HQ_TENANT,
+    canonical_tenant,
+    is_admin_role,
+)
 
 from .errors import SectionRegistryError
 
@@ -164,6 +170,11 @@ CONTROL_SECTIONS = frozenset({"overview", "registry", "ratings", "users"})
 CONTROL_READ_ONLY = frozenset({"overview", "registry"})
 
 
+#: Разделы гостя УК (D440): вся сеть на чтение — обзор, проверки и отчёты, страна,
+#: рейтинги; «Пользователи» — своя карточка. Методики и действий УК у него нет.
+GUEST_SECTIONS = frozenset({"overview", "registry", "country", "ratings", "users"})
+
+
 def visible_sections(account: object | None) -> tuple[Section, ...]:
     """Разделы, которые этому человеку показывать.
 
@@ -174,6 +185,8 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     роль = getattr(account, "role", None)
     if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
         return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
+    if роль == GUEST_ROLE:  # гость — вся сеть на чтение (D440)
+        return tuple(item for item in SECTIONS if item.key in GUEST_SECTIONS)
     админ = is_admin_role(роль)
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(

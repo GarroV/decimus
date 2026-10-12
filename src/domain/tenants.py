@@ -48,6 +48,34 @@ def is_admin_role(role: str | None) -> bool:
     return role in ADMIN_ROLES
 
 
+#: Бизнес-девелопер (D440): пользуется сервисом полностью (проверки, приёмка,
+#: письма, предписания, экшн-планы, рейтинги на чтение), но людей, страны и
+#: ключи не трогает. Только УК (`0056`); заменил аудитора УК.
+DEVELOPER_ROLE = "developer"
+
+#: Гость (D440): вся сеть только на чтение; ничего не меняет и не отправляет.
+#: Только УК (`0056`).
+GUEST_ROLE = "guest"
+
+#: Кто в УК работает с проверками: правит, принимает, снимает, переносит, пишет письма.
+HQ_WORKER_ROLES = (*ADMIN_ROLES, DEVELOPER_ROLE)
+
+
+def is_hq_guest(role: str | None, tenant: str | None) -> bool:
+    """Гость УК: читает всю сеть и не пишет ничего (D440)."""
+    return role == GUEST_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
+
+
+def is_hq_developer(role: str | None, tenant: str | None) -> bool:
+    """Бизнес-девелопер УК (D440)."""
+    return role == DEVELOPER_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
+
+
+def is_hq_worker(role: str | None, tenant: str | None) -> bool:
+    """Работающий в УК с проверками: главный админ, админ, бизнес-девелопер (D440)."""
+    return role in HQ_WORKER_ROLES and canonical_tenant(tenant or "") == HQ_TENANT
+
+
 #: Роли, которым открыта загрузка рейтингов и их справочники (D319).
 RATINGS_MANAGER_ROLES = (CONTROL_ROLE, *ADMIN_ROLES)
 

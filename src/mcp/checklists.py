@@ -73,6 +73,7 @@ from .checklist_layout import (
     check_state,
     in_bot_of,
     known,
+    master_of,
     point_prod_at,
     read_meta,
     write_meta,
@@ -99,6 +100,8 @@ class Overview:
     version: str | None
     #: Доступен аудиторам в боте (волна 3): флаг карточки и «в работе».
     in_bot: bool = False
+    #: Главный (D440): правят только админы, остальные читают и проводят по нему проверки.
+    master: bool = False
 
 
 def _signed(note: str, by: str | None) -> str:
@@ -151,6 +154,7 @@ def overview(store: Store, *, spaces: tuple[str, ...] | None = None) -> list[Ove
                 in_production=в_проде == (space, code),
                 version=_published_edition(свой),
                 in_bot=in_bot_of(карточка, space, code, в_проде),
+                master=master_of(карточка, space, code),
             )
         )
     return ответ
@@ -547,7 +551,48 @@ def _overview_of(store: Store, карточка: Meta) -> Overview:
         in_production=applied(store.root) == (store.space, store.code),
         version=_published_edition(store),
         in_bot=in_bot_of(карточка, store.space, store.code, applied(store.root)),
+        master=master_of(карточка, store.space, store.code),
     )
+
+
+def is_master(store: Store) -> bool:
+    """Главный ли этот чек-лист (D440). Карточки нет — решает умолчание `master_of`."""
+    return master_of(read_meta(store), store.space, store.code)
+
+
+def set_master(store: Store, *, tenant: str, on: bool, by: str | None = None) -> Overview:
+    """Поставить или снять метку «главный» (D440).
+
+    Дверь не знает, кто спрашивает: роль проверяет экран (метку ставят и снимают
+    только админы). Метка — запись в карточке, а не свойство кода: главным можно
+    сделать и другой чек-лист, и снять метку с первого. Чек-лист, применённый к
+    проду, главным остаётся по умолчанию, но решение за админом.
+    """
+    _alive(store)
+    есть = read_meta(store)
+    if есть is None and (store.space, store.code) not in known(store.root):
+        raise ChecklistError(
+            f"Чек-листа «{store.code}» в пространстве «{store.space}» нет. Перечень отдаёт "
+            f"checklists",
+            refusal="checklist_missing",
+            params={"code": store.code, "space": store.space},
+        )
+    карточка = есть if есть is not None else _meta_or_default(store)
+    новая = replace(карточка, master=on)
+    write_meta(store, новая)
+    _journal(
+        store,
+        {
+            "tenant": tenant,
+            "tool": "set_checklist_master",
+            "outcome": "accepted",
+            "base_version": None,
+            "version": None,
+            "refusal": None,
+            "note": _signed("помечен главным" if on else "метка «главный» снята", by),
+        },
+    )
+    return _overview_of(store, новая)
 
 
 __all__ = [
@@ -557,8 +602,10 @@ __all__ = [
     "apply_to_production",
     "create",
     "difference",
+    "is_master",
     "overview",
     "rename",
+    "set_master",
     "set_state",
     "summary",
 ]

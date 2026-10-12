@@ -39,7 +39,8 @@ def строка(login: str, tenant: str, role: str) -> Any:
     строка("boss", "HQ", "superadmin"),
     строка("dev", "HQ", "admin"),
     строка("vika", "HQ", "control"),
-    строка("petr", "HQ", "auditor"),
+    строка("petr", "HQ", "developer"),
+    строка("gus", "HQ", "guest"),
     строка("nino", "GE", "admin"),
     строка("gia", "GE", "auditor"),
     строка("ani", "AM", "admin"),
@@ -56,6 +57,8 @@ def строка(login: str, tenant: str, role: str) -> Any:
         ("control", "HQ", CONTROL),
         ("admin", "GE", PARTNER_ADMIN),
         ("auditor", "HQ", None),
+        ("developer", "HQ", None),
+        ("guest", "HQ", None),
         ("auditor", "GE", None),
         # Главный админ и контроль вне УК не бывают (схема), но правило не верит
         # схеме на слово: такая учётка не ведёт никого.
@@ -80,8 +83,8 @@ def test_главный_админ_видит_всех() -> None:
     assert _видит("superadmin", "HQ") == {r.login for r in ВСЕ}
 
 
-def test_админ_уК_видит_уК_без_админов_и_всех_партнёров() -> None:
-    assert _видит("admin", "HQ") == {"vika", "petr", "nino", "gia", "ani", "aram"}
+def test_админ_уК_видит_уК_без_главного_админа_и_всех_партнёров() -> None:
+    assert _видит("admin", "HQ") == {"dev", "vika", "petr", "gus", "nino", "gia", "ani", "aram"}
 
 
 def test_контроль_видит_только_контроль() -> None:
@@ -99,8 +102,10 @@ def test_админ_партнёра_видит_только_своё_прост
 ТРОГАЕТ: dict[tuple[str, str], set[tuple[str, str]]] = {
     ("superadmin", "HQ"): set(ЦЕЛИ),
     ("admin", "HQ"): {
+        ("HQ", "admin"),
         ("HQ", "control"),
-        ("HQ", "auditor"),
+        ("HQ", "developer"),
+        ("HQ", "guest"),
         ("GE", "admin"),
         ("GE", "auditor"),
         ("AM", "admin"),
@@ -122,10 +127,13 @@ def test_кого_можно_трогать(кто: tuple[str, str], цель: t
 #: Какие роли вошедший может ВЫДАТЬ в пространстве (заведение и смена роли).
 ВЫДАЁТ: dict[tuple[str, str], dict[str, tuple[str, ...]]] = {
     ("superadmin", "HQ"): {
-        "HQ": ("auditor", "admin", "control", "superadmin"),
+        "HQ": ("guest", "developer", "control", "admin", "superadmin"),
         "GE": ("auditor", "admin"),
     },
-    ("admin", "HQ"): {"HQ": ("auditor", "control"), "GE": ("auditor", "admin")},
+    ("admin", "HQ"): {
+        "HQ": ("guest", "developer", "control", "admin"),
+        "GE": ("auditor", "admin"),
+    },
     ("control", "HQ"): {"HQ": ("control",), "GE": ()},
     ("admin", "GE"): {"HQ": (), "GE": ("auditor", "admin"), "AM": ()},
 }
@@ -139,7 +147,7 @@ def test_какие_роли_выдаются(кто: tuple[str, str], прос�
     охват = scope_of(*кто)
     assert охват is not None
     assert grantable_roles(охват, пространство) == ВЫДАЁТ[кто][пространство]
-    for роль in ("auditor", "admin", "control", "superadmin", "owner"):
+    for роль in ("auditor", "guest", "developer", "admin", "control", "superadmin", "owner"):
         assert may_grant(охват, tenant=пространство, role=роль) is (
             роль in ВЫДАЁТ[кто][пространство]
         )

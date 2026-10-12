@@ -26,7 +26,7 @@ from src.web import accounts
 ЕГО_TG = 2002
 
 
-def строка(login: str, *, tenant: str = "HQ", role: str = "auditor") -> Any:
+def строка(login: str, *, tenant: str = "HQ", role: str = "developer") -> Any:
     return SimpleNamespace(
         login=login,
         role=role,
@@ -134,7 +134,7 @@ def test_снятие_гасит_доступ_одним_движением(ад
 
 
 @pytest.mark.parametrize(
-    ("tenant", "role"), [("HQ", "control"), ("GE", "admin"), ("HQ", "auditor")]
+    ("tenant", "role"), [("HQ", "control"), ("GE", "admin"), ("HQ", "developer")]
 )
 def test_кто_не_видит_чужих_привязок_кругом_не_правит(
     monkeypatch: pytest.MonkeyPatch, круг: dict[str, Any], tenant: str, role: str

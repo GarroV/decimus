@@ -42,7 +42,7 @@ from src.db import bot_links
 from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
 from src.domain.errors import DomainError
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant, is_hq_guest
 
 from .inspection import read_inspection
 from .lang import chat_ui_lang
@@ -200,6 +200,11 @@ def space_from(
         # сверить нечем — совместимость тоже не применяется (п.6).
         return None
     if положение.binding is not None:
+        if is_hq_guest(положение.binding.role, положение.binding.tenant):
+            # Гость УК (D440) читает сеть в вебе и проверок не начинает: ни бот,
+            # ни мини-апп его не пускают, как постороннего.
+            logger.info("гость УК: бот и мини-апп закрыты, Telegram ID %s", user_id)
+            return None
         return canonical_tenant(положение.binding.tenant)
     if положение.ever_bound:
         # Отвязан или учётка отключена: прежний пропуск из окружения не

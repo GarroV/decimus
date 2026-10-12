@@ -59,12 +59,12 @@ _UNBIND_USER_SQL = """
 """
 _BIND_SQL = "insert into bot_bindings (telegram_id, user_id) values (%s, %s)"
 _RESOLVE_BY_TELEGRAM_SQL = """
-    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at, u.role
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.unbound_at is null and u.disabled_at is null and b.telegram_id = %s
 """
 _RESOLVE_BY_USER_SQL = """
-    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at, u.role
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.unbound_at is null and u.disabled_at is null and u.id = %s
 """
@@ -72,7 +72,7 @@ _RESOLVE_BY_USER_SQL = """
 # Бывшая — снятая отвязкой или на отключённой учётке: такой ID путь
 # совместимости не пускает (ревью #340, п.5).
 _STANDING_SQL = """
-    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at,
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at, u.role,
            (b.unbound_at is null and u.disabled_at is null) as live
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.telegram_id = %s
@@ -81,7 +81,7 @@ _STANDING_SQL = """
 """
 
 _LIVE_BINDINGS_SQL = """
-    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at
+    select b.telegram_id, u.id, u.login, u.tenant_code, b.bound_at, u.role
       from bot_bindings b join web_users u on u.id = b.user_id
      where b.unbound_at is null and u.disabled_at is null
 """
@@ -104,6 +104,8 @@ class Binding:
     login: str
     tenant: str
     bound_at: datetime
+    #: Роль учётки (D440): гость УК ботом не пользуется. Пусто — роль не известна.
+    role: str = ""
 
 
 @dataclass(frozen=True)
@@ -193,7 +195,7 @@ def standing(telegram_id: int) -> Standing:
         row = cur.fetchone()
     if row is None:
         return NEVER_BOUND
-    if not row[5]:
+    if not row[6]:
         return Standing(binding=None, ever_bound=True)
     return Standing.live(_binding(row))
 
@@ -236,4 +238,5 @@ def _binding(row: tuple[Any, ...]) -> Binding:
         login=str(row[2]),
         tenant=str(row[3]),
         bound_at=row[4],
+        role=str(row[5]),
     )

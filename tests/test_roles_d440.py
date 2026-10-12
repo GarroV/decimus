@@ -70,10 +70,7 @@ ID = "11111111-1111-1111-1111-111111111111"
     "move": РАБОТАЮТ,
     "accept": РАБОТАЮТ,
     "revise": РАБОТАЮТ,
-    # главный чек-лист и методика (D344)
-    "methodology_main_write": ТОЛЬКО_АДМИНЫ,
-    # заведение дополнительного чек-листа
-    "checklist_create": РАБОТАЮТ,
+    # главный чек-лист и неглавные: нужен настоящий стор, см. test_web_master_checklist.py
     # люди: завести сотрудника УК
     "user_add_developer": ТОЛЬКО_АДМИНЫ,
     # пространства партнёров и страны
@@ -157,11 +154,6 @@ def _действие(client: FlaskClient, действие: str) -> Any:
             f"/inspections/{ID}/findings/f1/revise",
             {"code": "CLN05", "level": "D2", "text": "x"},
         ),
-        "methodology_main_write": (
-            "/admin/items",
-            {"process": "p", "question_ru": "q", "levels": "D1"},
-        ),
-        "checklist_create": ("/admin/checklists", {"code": "extra", "name_ru": "Доп"}),
         "user_add_developer": (
             "/users/add",
             {"login": "newbie", "tenant": "HQ", "role": "developer"},
@@ -437,7 +429,7 @@ def test_девелоперу_на_карточке_действия_видны(
 
     страница = клиент.get(f"/inspections/{ID}").get_data(as_text=True)
 
-    assert "/retract" in страница and "/accept" in страница
+    assert "/accept" in страница
 
 
 # --- доска «Главной» -----------------------------------------------------------

@@ -28,7 +28,8 @@ from src.web import accounts
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 
 
-def строка(login: str, *, tenant: str = "HQ", role: str = "auditor", email: Any = None) -> Any:
+def строка(login: str, *, tenant: str = "HQ", role: str | None = None, email: Any = None) -> Any:
+    role = role or ("developer" if tenant == "HQ" else "auditor")
     return SimpleNamespace(
         login=login,
         role=role,
@@ -46,7 +47,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
 
     def _роль(login: str, *, tenant: str, role: str, only_roles: Any = None) -> str | None:
         позвали["role"].append((login, tenant, role))
-        return None if login == "nobody" else "auditor"
+        return None if login == "nobody" else ("developer" if tenant == "HQ" else "auditor")
 
     def _почта(login: str, *, tenant: str, email: str | None, only_roles: Any = None) -> bool:
         позвали["email"].append((login, tenant, email))
@@ -173,7 +174,10 @@ def test_незаведённое_пространство_до_базы_не_д
     админ_ук: FlaskClient, зовы: dict[str, list[Any]]
 ) -> None:
     """Цель ищется по базе (#585): в незаведённом пространстве её нет — 403, как чужая."""
-    for путь, поле in (("/users/role", ("role", "auditor")), ("/users/email", ("email", "a@b.c"))):
+    for путь, поле in (
+        ("/users/role", ("role", "developer")),
+        ("/users/email", ("email", "a@b.c")),
+    ):
         ответ = админ_ук.post(
             путь, data={"login": "petr", "tenant": "XX", поле[0]: поле[1]}, headers=ЗАГОЛОВКИ
         )
@@ -185,7 +189,7 @@ def test_незаведённое_пространство_до_базы_не_д
 def test_свою_роль_не_снять(админ_ук: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     """Снять с себя админа — закрыть экран людей себе, а на стенде с одним админом — всем."""
     ответ = админ_ук.post(
-        "/users/role", data={"login": ЛОГИН, "tenant": "HQ", "role": "auditor"}, headers=ЗАГОЛОВКИ
+        "/users/role", data={"login": ЛОГИН, "tenant": "HQ", "role": "developer"}, headers=ЗАГОЛОВКИ
     )
 
     assert ответ.status_code == 400
@@ -198,7 +202,7 @@ def test_свою_роль_не_снять_и_другим_регистром_л
     """Логин хранится в нижнем регистре: «Director» — та же учётка, что «director»."""
     ответ = админ_ук.post(
         "/users/role",
-        data={"login": ЛОГИН.upper(), "tenant": "HQ", "role": "auditor"},
+        data={"login": ЛОГИН.upper(), "tenant": "HQ", "role": "developer"},
         headers=ЗАГОЛОВКИ,
     )
 
@@ -224,7 +228,7 @@ def test_нет_такой_учётки_неотличимо_от_чужой(
     """#585: «нет такой» и «не ваша» снаружи неразличимы — обе 403, до двери базы."""
     ответ = админ_ук.post(
         "/users/role",
-        data={"login": "nobody", "tenant": "HQ", "role": "auditor"},
+        data={"login": "nobody", "tenant": "HQ", "role": "developer"},
         headers=ЗАГОЛОВКИ,
     )
 
@@ -245,7 +249,7 @@ def test_учётка_пропавшая_между_чтением_и_запис
     assert "не найдена" in ответ.get_data(as_text=True)
 
 
-@pytest.mark.parametrize(("tenant", "role"), [("HQ", "auditor"), ("GE", "auditor")])
+@pytest.mark.parametrize(("tenant", "role"), [("HQ", "developer"), ("GE", "auditor")])
 def test_аудитор_и_сотрудник_партнёра_не_правят_даже_прямой_отправкой(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]], tenant: str, role: str
 ) -> None:
@@ -419,7 +423,7 @@ def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator
     ("путь", "форма"),
     [
         ("/users/role", {"login": "petr", "tenant": "HQ", "role": "admin"}),
-        ("/users/add", {"login": "zed", "tenant": "HQ", "role": "auditor"}),
+        ("/users/add", {"login": "zed", "tenant": "HQ", "role": "developer"}),
         ("/users/disable", {"login": "petr", "tenant": "HQ"}),
         ("/admin/publish", {}),
         ("/admin/items", {"code": "X1"}),
@@ -521,7 +525,7 @@ def люди_контроля(
         lambda **_: (
             строка(ЛОГИН, role="control", email="director@dodobrands.io"),
             строка("vika", role="control", email="vika@dodobrands.io"),
-            строка("boss", role="admin", email="boss@dodobrands.io"),
+            строка("boss", role="superadmin", email="boss@dodobrands.io"),
             строка("petr", email="petr@dodobrands.io"),
             строка("nino", tenant="GE", email="nino@partner.ge"),
         ),
@@ -545,10 +549,9 @@ def test_контроль_заводит_контроль_в_уК(
     "форма",
     [
         {"login": "olga", "tenant": "HQ", "role": "admin"},
-        {"login": "olga", "tenant": "HQ", "role": "auditor"},
+        {"login": "olga", "tenant": "HQ", "role": "developer"},
         {"login": "olga", "tenant": "GE", "role": "control"},
         {"login": "olga", "tenant": "GE", "role": "admin"},
-        {"login": "olga", "tenant": "HQ"},
     ],
 )
 def test_контроль_не_заводит_чужую_роль_и_пространство(
@@ -652,7 +655,7 @@ def test_контроль_видит_только_людей_контролин�
 def test_админ_уК_видит_всех_при_людях_контролинга(
     админ_ук: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
-    """Админ УК видит людей УК, кроме админов, и партнёров (D364): админ «boss» — вне охвата."""
+    """Админ УК видит людей УК, кроме главного админа, и партнёров (D440): «boss» вне охвата."""
     страница = админ_ук.get("/users").get_data(as_text=True)
 
     for свой in ("vika", "petr", "nino", "petr@dodobrands.io"):

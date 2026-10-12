@@ -65,7 +65,7 @@
       <div class="ov-card__hint">{{ t('country.register.hint', open=units_count.open, pipeline=units_count.pipeline, closed=units_count.closed) }}</div>
     </div>
     <div class="cn-actions">
-      {% if can_add_units %}
+      {% if can_add_units and not read_only %}
         <a class="btn btn--sm btn--primary" href="{{ url('/country/' ~ view.code ~ '/units/new') }}?lang={{ lang }}">＋ {{ t('unitnew.open') }}</a>
       {% endif %}
       <a class="btn btn--sm" href="{{ url(plans_act_path) }}{% if plans_act_country %}?country={{ view.code }}&amp;lang={{ lang }}{% else %}?lang={{ lang }}{% endif %}"

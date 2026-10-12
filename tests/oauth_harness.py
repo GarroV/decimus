@@ -232,7 +232,7 @@ class ПамятьOAuth:
             return None
         подключение.last_used_at = datetime.now(UTC)
         логин, пространство, роль = self.accounts.get(
-            подключение.user_id, ("director", "HQ", "auditor")
+            подключение.user_id, ("director", "HQ", "developer")
         )
         return OAuthOwner(user_id=подключение.user_id, login=логин, tenant=пространство, role=роль)
 
