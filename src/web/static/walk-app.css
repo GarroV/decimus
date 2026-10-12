@@ -186,3 +186,61 @@
 .walk-app__go:disabled { cursor: default; }
 
 .walk-app__card .walk-btn { width: 100%; }
+
+/* Язык интерфейса пилюлей в шапке главной (D414). */
+.walk-app__lang {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-control);
+  border-radius: 22px;
+  background: var(--surface);
+}
+
+.walk-app__lang-opt {
+  min-width: 44px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 19px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.walk-app__lang-opt.is-on {
+  background: var(--accent);
+  color: var(--ink-inverse);
+}
+
+/* Подпись поля и «?» к ней в одну строку (D414). */
+.walk-app__label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.walk-app__label-row .walk-form__label { margin-bottom: 0; }
+
+.walk-app__hint {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-control);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.walk-app__hint.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}
