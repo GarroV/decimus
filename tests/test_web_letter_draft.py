@@ -28,12 +28,14 @@ from src.db.models import InspectionDetail, InspectionRow
 from src.domain.tenants import canonical_tenant
 from src.web import inspections as data
 from src.web import letter_draft
-from src.web.google_mail import DRAFT_SCOPE
+from src.web.google_mail import DRAFT_SCOPE, MailGrant
 from src.web.texts import t
 
 ТЕНАНТ = "default"
 ПРОВЕРКА = "11111111-1111-1111-1111-111111111111"
 ЗАФИКСИРОВАННОЕ = "Здравствуйте! Это письмо человек подтвердил."
+#: Почта входа через Google у вошедшего: черновик ложится только в неё (D176).
+ПОЧТА = "director@example.com"
 
 
 def карточка() -> InspectionDetail:
@@ -62,7 +64,7 @@ def карточка() -> InspectionDetail:
 
 @pytest.fixture
 def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient, dict[str, list[Any]]]]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА)
     следы: dict[str, list[Any]] = {"remember": [], "draft": [], "token": []}
 
     monkeypatch.setattr(data, "load_card", lambda _id, *, reach: карточка())
@@ -88,7 +90,9 @@ def клиент(monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[FlaskClient,
             created_at=datetime.now(),
         ),
     )
-    monkeypatch.setattr(letter_draft, "exchange_code_for_token", lambda _s, *, code: "токен")
+    monkeypatch.setattr(
+        letter_draft, "exchange_code_for_grant", lambda _s, *, code: MailGrant("токен", ПОЧТА)
+    )
 
     def _create(token: str, *, to: str, subject: str, body: str, **_: Any) -> str:
         следы["draft"].append((token, to, subject, body))
@@ -136,7 +140,10 @@ def test_уход_просит_почтовый_скоуп_и_ставит_ме�
     client, _ = клиент
     ответ = увести(client)
     поля = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(ответ.headers["Location"]).query))
-    assert поля["scope"] == DRAFT_SCOPE
+    # Почтовое право и «кто это»: без `openid email` возврат не узнал бы, какой
+    # аккаунт выдал доступ (D176).
+    assert поля["scope"].split() == ["openid", "email", DRAFT_SCOPE]
+    assert поля["login_hint"] == ПОЧТА
     assert поля["redirect_uri"] == "https://стенд/auth/google/mail"
     assert ответ.headers.getlist("Set-Cookie")
 
@@ -173,6 +180,35 @@ def test_черновик_собирается_из_зафиксированно
     assert тело == ЗАФИКСИРОВАННОЕ
     assert кому == "partner@example.com"
     assert тема == "Проверка пиццерии · Белград · 2026-09-12"
+
+
+def test_черновик_в_чужой_аккаунт_google_не_ложится(
+    клиент: tuple[FlaskClient, dict[str, list[Any]]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D176: доступ выдал не тот аккаунт, которым вошли, — черновика нет, исход словами."""
+    включить_почту(monkeypatch)
+    client, следы = клиент
+    monkeypatch.setattr(
+        letter_draft,
+        "exchange_code_for_grant",
+        lambda _s, *, code: MailGrant("токен", "someone-else@example.com"),
+    )
+    уход = увести(client)
+    метка = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(уход.headers["Location"]).query))[
+        "state"
+    ]
+    ответ = client.get(f"/auth/google/mail?state={метка}&code=код")
+    assert "gmail=wrong_account" in ответ.headers["Location"]
+    assert not следы["draft"], "черновик лёг в чужой аккаунт"
+    monkeypatch.setattr(
+        data,
+        "load_letter",
+        lambda detail, *, lang=None: data.Letter(
+            text="Заготовка", lang="ru", source="pinned", ready=True, caveats=(), failure=None
+        ),
+    )
+    экран = client.get(ответ.headers["Location"]).get_data(as_text=True)
+    assert t("letter.gmail.wrong_account", "ru") in экран
 
 
 def test_подделанная_метка_до_почты_не_доходит(

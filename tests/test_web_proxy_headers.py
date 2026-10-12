@@ -25,12 +25,12 @@ import pytest
 from waitress import serve
 
 from src.web.config import Settings
-from src.web.proxy import _proxy_options
+from src.web.proxy import _proxy_options, guard_forwarded, serve_options, untrusted_network
 
 КЛЮЧ = "ключ-подписи-длиной-не-меньше-тридцати-двух-знаков"
 
 
-def настройки(*, звенья: int, префикс: str = "") -> Settings:
+def настройки(*, звенья: int, префикс: str = "", звено: tuple[str, ...] = ()) -> Settings:
     return Settings(
         host="127.0.0.1",
         port=_свободный_порт(),
@@ -38,6 +38,7 @@ def настройки(*, звенья: int, префикс: str = "") -> Settin
         ui_lang="ru",
         secret_key=КЛЮЧ,
         trusted_proxies=звенья,
+        trusted_proxy_addrs=звено,
         url_prefix=префикс,
     )
 
@@ -73,14 +74,15 @@ def поднятый_сервер() -> Iterator[Any]:
     запущенные: list[Any] = []
 
     def поднять(settings: Settings) -> str:
+        # Как поднимает админку точка входа: обёртка звена и её опции.
         поток = threading.Thread(
             target=serve,
-            args=(приложение_эхо,),
+            args=(guard_forwarded(приложение_эхо, settings),),
             kwargs={
                 "host": settings.host,
                 "port": settings.port,
                 "ident": "decimus-test",
-                **_proxy_options(settings),
+                **serve_options(settings),
             },
             daemon=True,
         )
@@ -153,10 +155,38 @@ def test_путь_общего_входа_доезжает_корнем_прил
     assert увиденное == "нет|нет|/audit"
 
 
-def test_в_сети_контейнера_звено_узнаётся_с_любого_адреса() -> None:
-    """В проде сервер слушает 0.0.0.0, а прокси приходит с адреса docker-сети."""
+def test_названному_звену_заголовки_доезжают(поднятый_сервер: Any) -> None:
+    """Адрес звена назван подсетью — запрос с него приносит схему и адрес клиента."""
+    адрес = поднятый_сервер(настройки(звенья=1, звено=("127.0.0.0/8",)))
+
+    увиденное = _спросить(адрес)
+
+    assert увиденное == "https|203.0.113.7|"
+
+
+def test_соседу_не_из_звена_заголовки_режутся(поднятый_сервер: Any) -> None:
+    """F-038: сосед, дотянувшийся до порта мимо прокси, не выбирает себе адрес и схему."""
+    адрес = поднятый_сервер(настройки(звенья=1, звено=("10.0.0.0/8",)))
+
+    увиденное = _спросить(адрес)
+
+    assert увиденное == "нет|нет|"
+
+
+def test_в_сети_контейнера_любому_соседу_не_верим() -> None:
+    """F-038: в проде сервер слушает 0.0.0.0, и «любой сосед» (`*`) звеном не становится."""
     сетевые = replace(настройки(звенья=1), host="0.0.0.0")  # noqa: S104 — так слушает прод
-    assert _proxy_options(сетевые)["trusted_proxy"] == "*"
+    assert "trusted_proxy" not in _proxy_options(сетевые)
+    assert "trusted_proxy" not in serve_options(сетевые)
+    assert untrusted_network(сетевые)
+
+
+def test_в_сети_контейнера_с_названным_звеном_решает_обёртка() -> None:
+    сетевые = replace(настройки(звенья=1, звено=("172.18.0.0/16",)), host="0.0.0.0")  # noqa: S104
+    опции = serve_options(сетевые)
+    assert "trusted_proxy" not in опции
+    assert опции["clear_untrusted_proxy_headers"] is False
+    assert not untrusted_network(сетевые)
 
 
 def test_на_петле_звено_остаётся_петлёй() -> None:

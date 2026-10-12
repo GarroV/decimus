@@ -36,6 +36,9 @@ WEB_PORT_VAR = "WEB_PORT"
 WEB_TENANT_VAR = "WEB_TENANT"
 WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ переменной, а не значение
 WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
+#: Адреса своих звеньев (адрес или подсеть, через запятую; `*` — любой сосед):
+#: только от них верим `X-Forwarded-*` (F-038 аудита 12.10, `src/web/proxy.py`).
+WEB_TRUSTED_PROXY_ADDR_VAR = "WEB_TRUSTED_PROXY_ADDR"
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 #: Имя бота в Telegram без «@» — для ссылки привязки `t.me/<бот>?start=...`
@@ -72,6 +75,10 @@ MIN_SECRET_KEY_LENGTH = 32
 #: Сколько байт случайности берёт временный ключ, когда переменная не задана.
 SECRET_KEY_BYTES = 32
 
+#: «Любой сосед» в `WEB_TRUSTED_PROXY_ADDR`. Только явно: пустая переменная
+#: значит «никому», а не «всем».
+ANY_PEER = "*"
+
 DEFAULT_HOST = "127.0.0.1"
 #: Следующий свободный за MCP: 8265 занимает сам сервер, 8266 — звено до него
 #: (`docker-compose.yml`, сервис `link`). Номер — умолчание продукта, а не
@@ -103,6 +110,9 @@ class Settings:
     #: От этого зависит, чей адрес считает ограничитель перебора: ноль —
     #: адрес соединения, больше — соответствующее звено `X-Forwarded-For`.
     trusted_proxies: int = DEFAULT_TRUSTED_PROXIES
+    #: Адреса и подсети своих звеньев (`WEB_TRUSTED_PROXY_ADDR`): заголовкам
+    #: `X-Forwarded-*` верим только от них. Пусто — звено не названо.
+    trusted_proxy_addrs: tuple[str, ...] = ()
     #: Путь, на котором админка живёт снаружи, когда общий вход площадки отдан
     #: не ей. Пусто — своё имя целиком, и это умолчание. Непустой префикс
     #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
@@ -282,6 +292,47 @@ def _parse_tenant(raw: str) -> str:
     return tenant
 
 
+def _parse_trusted_proxy_addrs(raw: str) -> tuple[str, ...]:
+    """Адреса своих звеньев: адрес или подсеть через запятую, `*` — любой сосед.
+
+    Кривая запись — отказ запуска: опечатка в адресе звена тихо означала бы
+    «не верить никому», а в проде это 403 на каждую отправку формы.
+    """
+    части = tuple(часть.strip() for часть in raw.split(",") if часть.strip())
+    for часть in части:
+        if часть == ANY_PEER:
+            continue
+        try:
+            ipaddress.ip_network(часть, strict=False)
+        except ValueError:
+            raise WebConfigError(
+                f"{WEB_TRUSTED_PROXY_ADDR_VAR}: «{часть}» не адрес и не подсеть. Ожидается "
+                f"адрес или подсеть своего звена через запятую, например 172.18.0.0/16"
+            ) from None
+    return части
+
+
+def require_signing_key(settings: Settings) -> None:
+    """Админка в сети контейнера без заданного ключа подписи — отказ запуска (F-008 аудита 12.10).
+
+    Сеть контейнера (`WEB_LISTEN_NETWORK=1`, хост не петля) у админки — это прод
+    за общим прокси; там временный ключ означает, что каждая выкатка молча
+    выбрасывает всех и рвёт уход за согласием Google на полпути. На петле
+    (разработка, стенд одной командой) временный ключ остаётся законным.
+
+    Отдельной функцией, а не внутри `load_settings`: те же настройки читает
+    сервис обхода, который слушает сеть на любом стенде, а ключом не подписывает
+    ничего.
+    """
+    на_петле = settings.host == "localhost" or ipaddress.ip_address(settings.host).is_loopback
+    if settings.secret_key_is_ephemeral and not на_петле:
+        raise WebConfigError(
+            f"Не задан {WEB_SECRET_KEY_VAR}, а админка слушает сеть контейнера "
+            f"({WEB_LISTEN_NETWORK_VAR}=1). Временный ключ здесь — выход всех при каждой "
+            f"выкатке. Взять ключ: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+
+
 def _parse_secret_key(raw: str) -> tuple[str, bool]:
     """Ключ подписи сессионной куки: заданный или сделанный на этот запуск.
 
@@ -338,17 +389,16 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение админки. Отказ — `WebConfigError`."""
     src = os.environ if env is None else env
     secret_key, ephemeral = _parse_secret_key(src.get(WEB_SECRET_KEY_VAR) or "")
+    listen_network = _parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or "")
     return Settings(
-        host=_parse_host(
-            src.get(WEB_HOST_VAR) or "",
-            listen_network=_parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or ""),
-        ),
+        host=_parse_host(src.get(WEB_HOST_VAR) or "", listen_network=listen_network),
         port=_parse_port(src.get(WEB_PORT_VAR) or ""),
         tenant=_parse_tenant(src.get(WEB_TENANT_VAR) or ""),
         ui_lang=default_ui_lang(src),
         secret_key=secret_key,
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
+        trusted_proxy_addrs=_parse_trusted_proxy_addrs(src.get(WEB_TRUSTED_PROXY_ADDR_VAR) or ""),
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),

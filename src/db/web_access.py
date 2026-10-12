@@ -112,7 +112,7 @@ _INSERT_USER_SQL = """
 """
 
 _SELECT_USER_SQL = """
-    select id, login, tenant_code, password_hash, role
+    select id, login, tenant_code, password_hash, role, email
       from web_users
      where login = %s and disabled_at is null
 """
@@ -220,7 +220,7 @@ _SET_EMAIL_SQL = """
 """
 
 _SELECT_USER_BY_EMAIL_SQL = """
-    select id, login, tenant_code, role
+    select id, login, tenant_code, role, email
       from web_users
      where email = %s and disabled_at is null
 """
@@ -235,7 +235,7 @@ _OPEN_SESSION_SQL = """
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code, u.role
+    select u.id, u.login, u.tenant_code, u.role, u.email
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -304,6 +304,10 @@ class Account:
     #: Приезжает вместе с опознанием, одним запросом с ним: спрошенная
     #: отдельно, она успела бы устареть между двумя запросами.
     role: str = ROLE_AUDITOR
+    #: Почта входа через Google (`web_users.email`); `None` — не привязана.
+    #: Привязанная закрывает вход паролем и решает, в чью почту ложится
+    #: черновик письма (D176).
+    email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -798,7 +802,9 @@ def find_by_email(email: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
 
 
 def authenticate(login: str, password: str) -> Account | None:
@@ -830,7 +836,9 @@ def authenticate(login: str, password: str) -> Account | None:
         return None
     if not password_matches(password, str(row[3])):
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[4]), email=row[5]
+    )
 
 
 def open_session(account: Account) -> OpenedSession:
@@ -864,7 +872,9 @@ def resolve_session(token: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return Account(id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[-1]))
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
 
 
 def close_session(token: str) -> bool:
