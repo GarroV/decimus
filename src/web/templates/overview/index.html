@@ -127,29 +127,46 @@
       {% endif %}
     </section>
 
-    {# ── 3. Где нужно проверить | Последние проверки (D399). Пустое скрыто. #}
-    {% set has_check = data.to_check|length > 0 %}
-    {% set has_latest = data.inspections|length > 0 %}
-    {% if has_check %}
-      <section class="hm-card">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.tocheck.title') }}</h2>
-          <span class="hm-meta">{{ t('home.tocheck.hint') }} · {{ data.to_check|length + data.to_check_more }}</span>
-        </header>
-        <ul class="hm-rows">
-          {% for item in data.to_check %}
-            <li>
-              <a class="hm-row" href="{{ unit_href(item.unit_id, item.country, url(registry_path) ~ '?lang=' ~ lang) }}">
-                <span class="hm-dot hm-dot--warn"></span>
-                <span class="hm-row__main">{{ item.unit }}<span class="hm-row__meta">{{ city_title(item.city) or '' }}</span></span>
-                <span class="hm-row__num mono">{% if item.last %}{{ t('home.tocheck.last', date=item.last) }}{% else %}{{ t('home.tocheck.never') }}{% endif %}</span>
-              </a>
-            </li>
+    {# ── 3. Рейтинги (D418): РС, РКО и карты — CEE и остальные страны. Числа берёт
+          та же функция, что у страницы «Рейтингов», ссылка ведёт туда же. Отказ — строка. #}
+    <section class="hm-card hm-ratings">
+      <header class="hm-card__head">
+        <h2 class="hm-label"><a class="hm-label__link" href="{{ ratings_block_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rb.title') }}</a></h2>
+        {% if ratings_block.maps_failed %}<span class="hm-meta">{{ t('home.rb.maps_failed') }}</span>{% endif %}
+        <a class="hm-more" href="{{ ratings_block_href }}">{{ t('home.rb.more') }} →</a>
+      </header>
+      {% if ratings_block.failed %}
+        {{ empty(t('home.rb.failed')) }}
+      {% elif not ratings_block.columns %}
+        {{ empty(t('home.rb.none')) }}
+      {% else %}
+        <div class="hm-rb" style="--hm-rb-cols: {{ ratings_block.columns|length }}">
+          <span class="hm-rb__corner"></span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__col">{{ t('ratings.cluster.' ~ col.key) if col.is_cluster else country_title(col.key) }}</span>
           {% endfor %}
-        </ul>
-        {% if data.to_check_more %}<p class="hm-meta">{{ t('home.tocheck.more', count=data.to_check_more) }}</p>{% endif %}
-      </section>
-    {% endif %}
+          <span class="hm-rb__label">{{ t('home.rb.rs') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rs is none else '%.1f'|format(col.rs) }} {{ delta(col.rs_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label">{{ t('home.rb.rko') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rko is none else '%.1f'|format(col.rko) }} {{ delta(col.rko_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label is-last">{{ t('home.rb.maps') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell hm-rb__cell--maps is-last">
+              {% for m in col.maps %}
+                <span class="hm-rb__map"><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+
+    {# ── 4. Последние проверки (D399). Пустое скрыто. #}
+    {% set has_latest = data.inspections|length > 0 %}
     {% if has_latest %}
       <section class="hm-card">
         <header class="hm-card__head">

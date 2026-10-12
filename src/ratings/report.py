@@ -257,15 +257,51 @@ def group_lines(
     return tuple(out)
 
 
+def _period_facts(
+    codes: Sequence[str], period: ReportPeriod, prev: ReportPeriod | None
+) -> tuple[list[Fact], list[Fact]]:
+    """Факты периода и прошлого периода — общий вход `build` и `group_summary`."""
+    current = _facts(read.score_facts(countries=codes, begin=period.begin, end=period.end))
+    previous = (
+        _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
+    )
+    return current, previous
+
+
+@dataclass(frozen=True)
+class GroupSummary:
+    """Только строки сводки по группам: для экранов, которым нужна сводка, а не весь отчёт."""
+
+    selection: Selection
+    groups: tuple[GroupLine, ...]
+    previous: ReportPeriod | None
+
+
+def group_summary(
+    args: Mapping[str, str], *, today: date, scope: Sequence[str] | None = None
+) -> GroupSummary:
+    """Строки сводки по группам для отбора из `args` — те же, что даёт `build`.
+
+    Отбор и период читаются так же, как на экране «Рейтинги» (`select`), а числа
+    считает та же `group_lines`: экран, который показывает сводку рядом, не
+    считает её сам и не расходится с «Рейтингами». `scope` сужает страны группы
+    до охвата вошедшего (`None` — без сужения).
+    """
+    selection, found = select(args, today=today)
+    codes = group_countries(selection, found.countries)
+    if scope is not None:
+        codes = tuple(code for code in codes if code in scope)
+    prev = previous_period(selection.period, rs_periods=found.rs_periods)
+    facts = _period_facts(codes, selection.period, prev)
+    return GroupSummary(selection, group_lines(selection, found, codes, facts), prev)
+
+
 def build(selection: Selection) -> Summary:
     found = choices()
     codes = group_countries(selection, found.countries)
     period = selection.period
     prev = previous_period(period, rs_periods=found.rs_periods)
-    current = _facts(read.score_facts(countries=codes, begin=period.begin, end=period.end))
-    previous = (
-        _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
-    )
+    current, previous = _period_facts(codes, period, prev)
     lines, total = score_lines(current, previous, codes)
     groups = group_lines(selection, found, codes, (current, previous))
     limits = read.settings()

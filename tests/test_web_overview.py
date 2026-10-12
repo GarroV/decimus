@@ -27,9 +27,9 @@ from web_harness import войти, подменить_двери, собрат�
 
 from src.db.errors import DbError
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
-from src.db.reach import Reach, own_reach
+from src.db.reach import own_reach
 from src.web import app as app_mod
-from src.web import home_board, home_ratings
+from src.web import home_board, home_ratings, home_ratings_block
 from src.web import overview as ov
 from src.web.texts import t as _t
 
@@ -180,7 +180,6 @@ def test_пустые_вспомогательные_блоки_не_показ�
 
     # Assert
     assert t_ru("home.attention.title") not in страница
-    assert t_ru("home.tocheck.title") not in страница
     assert t_ru("home.latest.title") not in страница
     assert t_ru("home.top.title") not in страница
     assert t_ru("overview.zones.title") not in страница
@@ -229,10 +228,14 @@ def test_отказ_доски_не_молчит(стенд: FlaskClient, monkey
 
 
 def test_порядок_блоков_главной(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """D399: внимание → итог → где проверить | последние → топ нарушений | зоны → пиццерии."""
+    """D418: внимание → итог → рейтинги → последние → топ нарушений | зоны → пиццерии."""
     # Arrange
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
+    колонка = home_ratings_block.Column("CEE", True, 85.0, None, None, None, ())
+    monkeypatch.setattr(
+        home_ratings_block, "load", lambda **_: home_ratings_block.Block(columns=(колонка,))
+    )
 
     # Act
     страница = показать(стенд, monkeypatch, с_оценками())
@@ -243,7 +246,7 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
         for ключ in (
             "home.attention.title",
             "home.inspections.title",
-            "home.tocheck.title",
+            "home.rb.rs",
             "home.latest.title",
             "home.top.title",
             "overview.zones.title",
@@ -576,7 +579,7 @@ class ЗаписнаяБаза:
 
     def unit_last_inspections(self, **kw: object) -> list[tuple[str, str, date | None, int]]:
         # Не в `звонки`: отбор по городу и стране этот запрос не получает, а режется
-        # в `_to_check` поверх справочника; здесь важен только охват и период.
+        # поверх справочника (`to_inspect`); здесь важен только охват и период.
         self.последние = kw
         return []
 
@@ -779,8 +782,6 @@ def с_оценками(**поля: object) -> ov.Overview:
     return снимок(
         points=(точка("Белград-1", "RS", "beograd"),),
         unit_codes={"Белград-1": "a" * 32},
-        to_check=(ov.ToCheck("Нови-Сад-3", "u-ns3", "RS", "", date(2026, 7, 1)),),
-        to_check_more=2,
         **поля,
     )
 
@@ -799,7 +800,7 @@ def test_главная_собирает_доску_проверки_и_стра
     # Assert
     assert t_ru("home.attention.title") in страница
     assert "Проверок ждут приёмки: 2" in страница
-    assert "Нови-Сад-3" in страница and "и ещё 2" in страница
+    assert "Где нужно проверить" not in страница  # переехало в «Проверки» (D418)
     assert (
         "Белград-1" in страница and "/inspections/11111111-2222-3333-4444-000000000001" in страница
     )
@@ -841,51 +842,6 @@ def test_сбой_рейтингов_главную_не_роняет(
     # Assert
     assert t_ru("home.ratings.failed") in страница
     assert "Белград-1" in страница
-
-
-def test_где_нужно_проверить_отбирает_точки_без_проверок_за_период() -> None:
-    """Проверенные за период не попадают; ни разу не проверенные — первыми, затем давнее всех."""
-    # Arrange
-    строки = [
-        ("Свежая", "c1", date(2026, 9, 20), 1),
-        ("Давняя", "c2", date(2026, 3, 1), 0),
-        ("Недавняя", "c3", date(2026, 8, 1), 0),
-        ("Новая", "c4", None, 0),
-        ("Чужая страна", "c5", None, 0),
-    ]
-    гео = {n: ("RS", "") for n, *_ in строки} | {"Чужая страна": ("GE", "")}
-
-    # Act
-    ждут, ещё = ov._to_check(строки, geo=гео, ids={}, selection=ov.Selection(country="RS"))
-
-    # Assert
-    assert [т.unit for т in ждут] == ["Новая", "Давняя", "Недавняя"]
-    assert ещё == 0
-
-
-def test_где_нужно_проверить_ограничено_остаток_числом() -> None:
-    строки = [(f"П-{n:02d}", "", None, 0) for n in range(ov.TO_CHECK_TOP + 3)]
-
-    ждут, ещё = ov._to_check(строки, geo={}, ids={}, selection=ov.БЕЗ_ОТБОРА)
-
-    assert len(ждут) == ov.TO_CHECK_TOP and ещё == 3
-
-
-def test_где_нужно_проверить_читается_в_охвате_вошедшего(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Партнёр получает точки только своего охвата: запрос зовут именно с его `reach`."""
-    # Arrange
-    база = ЗаписнаяБаза()
-    monkeypatch.setattr(ov, "queries", база)
-    партнёр = Reach(tenant="GE", tenants=None, countries=("GE",))
-
-    # Act
-    ov.load(reach=партнёр, limit=50, today=date(2026, 9, 24), dates=(date(2026, 9, 1), None))
-
-    # Assert
-    assert база.последние["reach"] == партнёр
-    assert база.последние["date_from"] == date(2026, 9, 1)
 
 
 def test_список_стран_только_когда_стран_больше_одной(

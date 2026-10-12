@@ -63,12 +63,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "За период проверок нет.",
         "en": "No inspections in the period.",
     },
-    # ── Где нужно проверить, последние проверки (D399) ──────────────────
-    "home.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
-    "home.tocheck.hint": {"ru": "нет проверок за период", "en": "no inspection in the period"},
-    "home.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
-    "home.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
-    "home.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    # ── Последние проверки (D399) ───────────────────────────────────────
     "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
     "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
     "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
@@ -82,6 +77,24 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.ratings.failed": {
         "ru": "Оценки рейтинга не загрузились: в колонках РС и РКО прочерки.",
         "en": "Rating scores did not load: the RS and CX columns show dashes.",
+    },
+    # ── Блок «Рейтинги» (D418) ──────────────────────────────────────────
+    "home.rb.title": {"ru": "Рейтинги", "en": "Ratings"},
+    "home.rb.more": {"ru": "Все рейтинги", "en": "All ratings"},
+    "home.rb.rs": {"ru": "Стандарты · РС", "en": "Standards · RS"},
+    "home.rb.rko": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
+    "home.rb.maps": {"ru": "Карты", "en": "Maps"},
+    "home.rb.none": {
+        "ru": "Для выбранной страны рейтингов нет.",
+        "en": "No ratings for the selected country.",
+    },
+    "home.rb.failed": {
+        "ru": "Рейтинги не загрузились: база не ответила. Обновите страницу.",
+        "en": "Ratings did not load: the database did not answer. Reload the page.",
+    },
+    "home.rb.maps_failed": {
+        "ru": "Оценки карт не загрузились.",
+        "en": "Map ratings did not load.",
     },
     # ── Пиццерии ────────────────────────────────────────────────────────
     "home.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},

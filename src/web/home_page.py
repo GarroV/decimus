@@ -12,9 +12,9 @@
    (`home_board`) и под ними пиццерии, куда смотреть. Нечего показать — карточки
    нет вовсе; отказ доски остаётся строкой с ошибкой, не тишиной;
 2. «Проверки за период» — итог; без проверок — одной строкой;
-3. «Последние проверки» — короткий список;
-4. «Топ нарушений», «Потери по зонам», пустое скрыто;
-5. «Рейтинги» — РС, РКО и карты: CEE и остальные страны (`home_ratings_block`);
+3. «Рейтинги» — РС, РКО и карты: CEE и остальные страны (`home_ratings_block`);
+4. «Последние проверки» — короткий список;
+5. «Топ нарушений», «Потери по зонам», пустое скрыто;
 6. «Пиццерии» — на всю строку, с порядком на самом блоке и колонками последней
    оценки РС / РКО (`home_ratings.load_latest`; сбой — прочерки и строка в
    шапке блока, экран остаётся).
@@ -43,7 +43,15 @@ from flask import render_template, request, url_for
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT
 
-from . import auth, home_board, home_ratings, registry_period, registry_view, view
+from . import (
+    auth,
+    home_board,
+    home_ratings,
+    home_ratings_block,
+    registry_period,
+    registry_view,
+    view,
+)
 from . import overview as overview_data
 from .geo_names import country_title
 from .sections import section
@@ -147,6 +155,10 @@ def render(
     codes = (selection.country,) if selection.country else reach.countries
     рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
     стикеры, доска_отказ = _board(reach)
+    # Блок «Рейтинги» (D418): среднее группы считают «Рейтинги», здесь — только показ.
+    блок_рейтингов = home_ratings_block.load(
+        scope=reach.countries, country=страна, period=period, today=today
+    )
 
     # Заголовок колонки РС / РКО ведёт на «Рейтинги»; суженная страна — в её срез.
     ratings_href = _url(
@@ -193,6 +205,8 @@ def render(
         board_failed=доска_отказ,
         latest_count=LATEST_COUNT,
         ratings_href=ratings_href,
+        ratings_block=блок_рейтингов,
+        ratings_block_href=_url("ratings", lang=lang, **dict(блок_рейтингов.link)),
         unit_ratings=рейтинги,
         ratings_failed=рейтинги_отказ,
         country_pick=выбор_страны,
