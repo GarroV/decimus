@@ -1805,7 +1805,7 @@ Swarm (`DECIMUS_API_URL`): за Worker'ом сервер своего внешн
 (`src/ratings/maps.py: summarize`, `with_delta`): по всем отзывам, оценка
 филиала взвешена числом его отзывов, филиал без отзывов в среднюю не входит.
 `units[]` — только филиалы, связанные с пиццерией (`maps.companies.dodo_id`,
-миграция `0045`) и не исключённые как «не пиццерия» (`excluded_reason`, D377);
+миграция `0045`) и не исключённые как «не пиццерия» (`excluded_reason`, D453);
 `id` — тот же код, что `units[].id` в `ratings/scores`. Карта, где у филиала нет
 отзывов, — `null`. `loaded_at` — последняя удачная загрузка (`maps.loads`).
 Чтение — `src/db/swarm_read.py: map_units` и `src/db/maps_store.py: latest`,
