@@ -1403,6 +1403,11 @@ curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${WEB_HOST_PORT:-8268
 миграций нет, право — уже выданное `ratings:read`.
 Детали проверки и прошлая проверка в списке (`/api/v1/inspections/<uuid>`,
 D391) — так же: миграций нет, право — уже выданное `inspections:read`.
+**Права по методам, страны и срок токена, два новых адреса** (D425, D426) —
+миграция `0052_api_methods.sql`: накатывается обычным `prod-update.sh`, живой
+токен Swarm переводится на права по методам без перерыва (`ratings:read` и
+`inspections:read` больше не существуют). Смоук после наката — п.4 на
+`/api/v1/aggregators/ratings` и `/api/v1/inspections/violations`.
 
 1. **Миграция `0049_api_tokens.sql`** — схема `api`: `api.tokens` (отпечатки,
    права, отзыв) и `api.access_log` (журнал обращений). Данных не трогает.
@@ -1412,7 +1417,7 @@ D391) — так же: миграций нет, право — уже выдан
    учётки):
 
    ```bash
-   dc exec web python tools/api_token.py issue swarm --scope ratings:read,inspections:read
+   dc exec web python tools/api_token.py issue swarm --scope ratings:scores,ratings:checkups,ratings:violations,maps:ratings,aggregators:ratings,inspections:list,inspections:detail,inspections:violations
    ```
 
    Токен печатается ОДИН раз — сразу в секреты Swarm (п.3), никуда больше.
@@ -1454,6 +1459,14 @@ D391) — так же: миграций нет, право — уже выдан
    `select aggregator, outcome, points, ratings, error from agg.loads order by id desc limit 10`
    — строка на каждый агрегатор, `ok`; на `/ratings` блок «Оценки в агрегаторах
    доставки» с колонками агрегаторов.
+6. **Реестр пиццерий (D424)** — миграция `0051_units_registry.sql` (`agg.units`)
+   накатывается как обычно. Реестр наполняет первый же сбор после наката; он же
+   «базовый»: пиццерии первого заполнения идут без `first_seen` и «новыми» не
+   числятся. Поэтому первый сбор после наката не откладывать на потом и не
+   прогонять урезанным (`run …` читает пиццерии тоже по всем странам IMF, но если
+   база не отдала страны IMF, реестр заполнится только странами сборщиков — тогда
+   недостающие страны придут позже и будут помечены «новыми»). Экран
+   `/ratings/coverage` до первого сбора пишет «реестр пока пуст».
 
 ### 8.19. Подключение Claude входом через сайт (OAuth, D417)
 
@@ -1462,7 +1475,7 @@ D391) — так же: миграций нет, право — уже выдан
 Как устроено — `docs/furca/blocks/mcp.md`, раздел «Вход через сайт (OAuth)»;
 экран — `docs/12-web-admin.md`.
 
-1. **Миграция `0051_oauth.sql`** — таблицы `oauth_clients`, `oauth_codes`,
+1. **Миграция `0054_oauth.sql`** — таблицы `oauth_clients`, `oauth_codes`,
    `oauth_grants` (подключения), `oauth_tokens` (только отпечатки SHA-256).
    Данных не трогает. Накат: `docker compose exec -T bot python -m src.db.migrate`.
 2. **Переменные** — в `.env` площадки, читают и `web`, и `mcp` (общий `env_file`):
