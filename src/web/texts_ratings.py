@@ -281,7 +281,7 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "en": "The database did not accept the request. Try again later.",
     },
     "ratings.agg.update.pending": {
-        "ru": "Обновление в очереди с {at} ({by}); собирается ботом, страницу можно обновить позже.",
+        "ru": "Обновление в очереди с {at} ({by}); собирает бот, страницу можно открыть позже.",
         "en": "Update queued since {at} ({by}); the bot is collecting it, reload the page later.",
     },
     "ratings.empty.aggregators": {
