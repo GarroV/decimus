@@ -31,6 +31,7 @@ from typing import Any
 from src.domain import check_environment
 from src.domain.engine import chat_dir
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,9 @@ def note(chat_id: int, event: str, **fields: Any) -> None:
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(line, ensure_ascii=False, default=str) + "\n")
     except (OSError, DomainError, TypeError, ValueError):
-        logger.exception("журнал разбора: событие %s в чате %s не записалось", event, chat_id)
+        logger.exception(
+            "журнал разбора: событие %s в чате %s не записалось", event, log_id(chat_id)
+        )
 
 
 def close(chat_id: int) -> Path | None:
@@ -77,7 +80,7 @@ def close(chat_id: int) -> Path | None:
         path.rename(target)
         return target
     except (OSError, DomainError):
-        logger.exception("журнал разбора в чате %s не закрылся", chat_id)
+        logger.exception("журнал разбора в чате %s не закрылся", log_id(chat_id))
         return None
 
 

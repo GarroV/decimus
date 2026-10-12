@@ -35,6 +35,7 @@ from src.bot.config import BotSettings
 from src.bot.keyboards import NEW_INSPECTION_CALLBACK
 from src.bot.texts import t
 from src.bot.unit_pick import UnitMatch
+from src.domain.log_ids import log_id
 
 pytestmark = pytest.mark.asyncio
 
@@ -80,7 +81,7 @@ async def test_отказ_на_шаге_названия_пишется_с_ко�
     assert журнал, "отказ мастера не оставил строки в журнале"
     assert "шаг=start.unit" in журнал[-1]
     assert "причина=start.unit_need_number" in журнал[-1]
-    assert f"telegram_id={CHAT_ID}" in журнал[-1]
+    assert f"telegram_id={log_id(CHAT_ID)}" in журнал[-1]
     assert all("Гарро" not in строка and "Владимир" not in строка for строка in журнал)
     счётчик = строки_счётчика(domain_env)
     assert [(r["step"], r["reason"], r["telegram_id"]) for r in счётчик] == [

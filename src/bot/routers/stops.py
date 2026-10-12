@@ -24,6 +24,7 @@ from aiogram.types import Message
 from src.db import bot_links
 from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.domain.tenants import is_admin_role
 
 from .. import stops
@@ -58,7 +59,7 @@ async def _admin(message: Message, lang: str) -> bool:
     try:
         положение = await asyncio.to_thread(bot_links.standing, user.id)
     except DbError:
-        logger.exception("привязка %s не прочиталась для /stops", user.id)
+        logger.exception("привязка %s не прочиталась для /stops", log_id(user.id))
         await message.answer(t("stops.unreadable", lang))
         return False
     if положение.binding is None or not is_admin_role(положение.binding.role):

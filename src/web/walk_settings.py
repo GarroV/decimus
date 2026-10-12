@@ -40,6 +40,8 @@ from src.bot.texts import t
 from src.bot.version import build_version
 from src.db import bot_langs, finish_modes, mcp_access, translate_modes
 from src.db.errors import DbError, UnboundError
+from src.domain.log_ids import log_id
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
 
 from . import walk_finish
 from .texts import UI_LANGS
@@ -83,7 +85,7 @@ def chosen_lang(chat_id: int) -> str | None:
     try:
         lang = bot_langs.chosen_lang(chat_id)
     except DbError:
-        logger.warning("Мини-апп: выбор языка %s не прочитался", chat_id, exc_info=True)
+        logger.warning("Мини-апп: выбор языка %s не прочитался", log_id(chat_id), exc_info=True)
         return None
     return lang if lang in UI_LANGS else None
 
@@ -93,7 +95,9 @@ def finish_mode_of(chat_id: int) -> str:
     try:
         mode = finish_modes.chosen_finish_mode(chat_id)
     except DbError:
-        logger.warning("Мини-апп: режим завершения %s не прочитался", chat_id, exc_info=True)
+        logger.warning(
+            "Мини-апп: режим завершения %s не прочитался", log_id(chat_id), exc_info=True
+        )
         return finish_modes.DEFAULT_MODE
     return mode if mode in finish_modes.MODES else finish_modes.DEFAULT_MODE
 
@@ -103,9 +107,25 @@ def translate_mode_of(chat_id: int) -> str:
     try:
         mode = translate_modes.chosen_translate_mode(chat_id)
     except DbError:
-        logger.warning("Мини-апп: режим перевода %s не прочитался", chat_id, exc_info=True)
+        logger.warning("Мини-апп: режим перевода %s не прочитался", log_id(chat_id), exc_info=True)
         return translate_modes.DEFAULT_MODE
     return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
+
+
+def web_settings_url() -> str | None:
+    """Адрес «Настроек» на сайте (D447) — из внешнего адреса админки; не задан — `None`.
+
+    Мини-апп не повторяет настройки сайта, а ведёт в них: пароль, Google и
+    остальное подключение живут там одним набором. Кривой адрес — тоже «не
+    задан»: ссылка в никуда хуже отсутствующей.
+    """
+    try:
+        base = parse_public_url(
+            os.environ.get(ADMIN_PUBLIC_URL_VAR) or "", var=ADMIN_PUBLIC_URL_VAR
+        )
+    except ValueError:
+        return None
+    return f"{base}/settings" if base else None
 
 
 def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any]:
@@ -123,6 +143,7 @@ def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any
         "translate_mode": translate_mode_of(chat_id),
         "version": build_version(),
         "mcp": bot is not None,
+        "settings_url": web_settings_url(),
         "sections": ["audit"],
     }
 
@@ -263,10 +284,10 @@ def install(
             _fresh(who, conf)
             выпуск = _issue(who, lang)
             # Значения токена в журнале нет: только факт выпуска.
-            logger.info("Мини-апп: чат %s выпустил себе токен MCP", who)
+            logger.info("Мини-апп: чат %s выпустил себе токен MCP", log_id(who))
             return jsonify(выпуск), 200
         except Refused as exc:
             return refused(exc.key, lang, exc.status, exc.extra)
         except DbError:
-            logger.exception("Мини-апп: действие %s чата %s — база не ответила", op, who)
+            logger.exception("Мини-апп: действие %s чата %s — база не ответила", op, log_id(who))
             return refused("walk.app.err.unavailable", lang, 503)
