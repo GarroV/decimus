@@ -21,6 +21,7 @@ import re
 from dataclasses import dataclass
 
 from src.db.errors import DbError, EmailTakenError
+from src.domain.log_ids import log_id
 
 from . import accounts
 
@@ -77,10 +78,10 @@ def change_role(
         return Outcome("edit.missing", 200)
     logger.info(
         "люди: роль сменена; правил %s/%s, кому %s/%s, было %s, стало %s",
-        actor_tenant,
-        actor_login,
-        tenant,
-        login.strip().lower(),
+        log_id(actor_tenant),
+        log_id(actor_login),
+        log_id(tenant),
+        log_id(login.strip().lower()),
         прежняя,
         role,
     )
@@ -113,9 +114,9 @@ def change_email(
     logger.info(
         "люди: почта входа через Google %s; правил %s/%s, кому %s/%s",
         "задана" if почта else "снята",
-        actor_tenant,
-        actor_login,
-        tenant,
-        login.strip().lower(),
+        log_id(actor_tenant),
+        log_id(actor_login),
+        log_id(tenant),
+        log_id(login.strip().lower()),
     )
     return Outcome("email.ok" if почта else "email.removed", 200)

@@ -24,6 +24,7 @@ from src.bot.propose import Offer, propose
 from src.bot.zones import allowed_zones, zone_from_words
 from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.models import Candidate
 
@@ -130,7 +131,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             # полем `zone`.
             hint_key = "zone_hint" if body.get("zone_hint") else "zone"
             zone = _code(body, hint_key) if body.get(hint_key) else None
-            frames = _frames(_refs(body.get("photos")))
+            frames = _frames(_refs(body.get("photos"), who, inspection))
             offer = propose(
                 words,
                 frames,
@@ -145,10 +146,10 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         except ModelUnavailable as exc:
             # Модель недоступна — обход не встаёт: аудитор выбирает пункт
             # вручную, как в боте. Сырой текст исключения — в журнал.
-            logger.warning("Обход: модель недоступна для чата %s: %s", who, exc)
+            logger.warning("Обход: модель недоступна для чата %s: %s", log_id(who), exc)
             return refused("walk.err.recognize", lang, 503)
         except (RecognizeError, DomainError) as exc:
-            logger.warning("Обход: поиск пункта для чата %s не удался: %s", who, exc)
+            logger.warning("Обход: поиск пункта для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.recognize", lang, 503)
         finally:
             with guard:
@@ -169,7 +170,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         )
         logger.info(
             "Обход: чат %s — поиск пункта %s, предложений %s",
-            who,
+            log_id(who),
             offer.via,
             len(offer.candidates),
         )
