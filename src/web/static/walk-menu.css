@@ -177,3 +177,9 @@
 .walk-ctx__pill:focus-visible,
 .walk-found__card:focus-visible,
 .walk-menu__close:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* «пункт · зона» одной строкой и «Где?» пилюлями (D445) */
+.walk-found__line { display: flex; flex-wrap: wrap; align-items: center; column-gap: 4px; row-gap: 6px; }
+.walk-where { display: grid; gap: 8px; margin-top: 12px; }
+.walk-where__label { font-size: 15px; font-weight: 600; }
+.walk-where__pills { display: flex; flex-wrap: wrap; gap: 8px; }

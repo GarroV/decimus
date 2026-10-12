@@ -231,8 +231,20 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0055_maps_ratings_index.sql": (
         "sql1:501361f432c626368e2244b6b4f02715281a15ad7fb644651144bba27b9c5dbe"
     ),
+    # Режим «Завершить» в мини-аппе за Telegram ID (D449). Ещё не на проде.
+    "0056_finish_modes.sql": (
+        "sql1:2d8ac7a95ee79af6f7f11955dc70dcf92d06539d4839936c9db82f0c480cd8cc"
+    ),
+    # Язык чек-листа, выбранный на старте проверки, за Telegram ID (D451). Ещё не на проде.
+    "0057_checklist_langs.sql": (
+        "sql1:ce70bb09dfbf79c53076dad9b0d5f4de5f41bdd738cf49125c335087da4f9603"
+    ),
+    # Перевод комментариев на язык отчёта, выбор аудитора, за Telegram ID (D443). Не на проде.
+    "0058_translate_modes.sql": (
+        "sql1:2d25456431e1a5ba485bda6ccfd66f8b1d6332faeb40f71515113007a585129f"
+    ),
     # Роли УК по D440: бизнес-девелопер и гость; аудиторы УК → девелоперы.
-    "0056_d440_roles.sql": (
+    "0059_d440_roles.sql": (
         "sql1:cb9c791e7ceaa33e5e237dc7024d3901e4ac1ce4fe802904e0594c12cd763552"
     ),
 }
