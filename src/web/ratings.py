@@ -15,8 +15,9 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from datetime import date
+from urllib.parse import urlencode
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, redirect, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
@@ -449,7 +450,7 @@ def install(app: Flask, conf: Settings) -> None:
             logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
             outcome = "db_down"
         args = {**request.args.to_dict(), "agg": outcome}
-        return redirect(url_for("ratings", **args), code=303)
+        return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
 
     @app.post(f"{путь}/layout")
     def ratings_layout() -> tuple[str, int]:
