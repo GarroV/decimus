@@ -891,8 +891,8 @@ def slice_summary(
 _COUNTRY_SUMMARY_SQL = """
 with точки as (
     select u.id, u.country from units u
-    where u.tenant_code = 'HQ' and u.country is not null and u.country <> ''
-      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+    where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and u.country is not null and u.country <> ''
 ),
 срез as (
     select u.country, i.unit_id, i.pct, i.grade

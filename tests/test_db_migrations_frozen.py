@@ -181,17 +181,33 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:47c04207c4e497800c915e85679e06630363fdd0fb703f84eaf198fb681cbeec"
     ),
     # Два режима загрузки: текущая (import) и историческая (legacy), D332/D334.
-    # Заведена вместе с файлом, нигде не применена.
+    # На проде применена (сверено 12.10.2026).
     "0042_import_modes.sql": (
         "sql1:62a7dcd535fddeab514a696d0a7b3a82438d9abb1b195f5d1c669741f4d1ab30"
     ),
-    # Сервисные токены внешнего API и журнал обращений (D356, D388). Заведена вместе
-    # с файлом, нигде не применена.
+    # 0043–0048 вписаны 12.10.2026 по `schema_migrations` прода: отпечатки там
+    # совпали с файлами.
+    "0043_ratings_layout.sql": (
+        "sql1:d3036c7bbeaf2906eb0449bbcffdc885f3583c520951323f5991d531360cf272"
+    ),
+    "0044_maps.sql": ("sql1:d7145e534c2037ec4843c39e990903eb5a5288fc00c893349fd6607d499d1c8e"),
+    "0045_maps_link.sql": ("sql1:18ee3c24a242d496165e5d3b39f6edffce5a781b648d4b646ca05fc33e8cfb74"),
+    "0046_unit_profiles.sql": (
+        "sql1:62168bcff56597f0ec7b5d4bd45e6fe1ced36fca46cc975f6e3cb613ae0f2d31"
+    ),
+    "0047_maps_excluded.sql": (
+        "sql1:ecf1e1ce3db413ab91245c3c778bc89fb85425316e32192a361b077e6693e39a"
+    ),
+    "0048_ratings_clusters.sql": (
+        "sql1:44054079eab62f6cac0bbaf1edc9676c4d60dcaf5d2c8e354eb4cea3eeed3031"
+    ),
+    # Сервисные токены внешнего API и журнал обращений (D356, D388). На проде применена
+    # (сверено 12.10.2026).
     "0049_api_tokens.sql": (
         "sql1:eee1e66a7944c3b719d87bcb70ca4e10691fcbaf28eb70e10e369f8cbf237ab9"
     ),
     # Оценки в агрегаторах доставки: точки, снимки, журнал сбора (#638, D389).
-    # Заведена вместе с файлом, нигде не применена.
+    # На проде применена (сверено 12.10.2026).
     "0050_aggregators.sql": (
         "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
     ),

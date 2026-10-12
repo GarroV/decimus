@@ -113,10 +113,14 @@ def test_чужой_источник_запроса_отказ(уК: FlaskClient
 
 
 def test_вход_на_экране_страны_только_у_уК(monkeypatch: pytest.MonkeyPatch, заведено: Any) -> None:
-    for tenant, виден in (("HQ", True), ("GE", False)):
-        for client in стенд(monkeypatch, tenant=tenant, role="admin"):
-            страница = открыть(client, monkeypatch, данные(), "/country/GE")
-            assert ("/country/GE/units/new" in страница) is виден, tenant
+    # Список стран шапки — справочник базы, как в `test_web_country`.
+    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 1),))
+    for client in стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = открыть(client, monkeypatch, данные(), "/country/GE")
+        assert "/country/GE/units/new" in страница
+    # Партнёру «Страна» закрыта целиком (D370): ни экрана, ни входа на нём.
+    for client in стенд(monkeypatch, tenant="GE", role="admin"):
+        assert client.get("/country/GE").status_code == 404
 
 
 # --- что уходит в базу -------------------------------------------------------
