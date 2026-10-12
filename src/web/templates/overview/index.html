@@ -1,11 +1,15 @@
 {#
-  «Главная» (D378, D398, D399) — в первую очередь про проверки: «Требует внимания»
-  (доска + «куда смотреть» в одной карточке), итог периода, «Где нужно проверить» |
-  «Последние проверки», «Топ нарушений» | потери по зонам, пиццерии с колонками
-  последней оценки РС / РКО, страны (если их больше одной).
+  «Главная» (D378, D398, D399, D418) — в первую очередь про проверки. Шапка: заголовок
+  и срез в одной строке — календарь периода и выпадающий список стран (если их
+  больше одной). Блоки — компактной сеткой, шире остальных только «Пиццерии»:
+  «Требует внимания» (доска + «куда смотреть» в одной карточке), итог периода,
+  «Рейтинги» (РС, РКО и карты: CEE и остальные страны), «Последние проверки»,
+  «Топ нарушений», потери по зонам, пиццерии с колонками последней оценки РС / РКО.
+  «Где нужно проверить» живёт в «Проверках», таблицы «Страны» нет.
   Сборка данных — `src/web/home_page.py`;
   в шаблоне ни одного вычисления: проценты и буквы записал движок, средние
-  рейтингов посчитал `home_ratings` по D353.
+  рейтингов посчитал `home_ratings` по D353, блок «Рейтинги» — `home_ratings_block`
+  теми же функциями, что страница «Рейтинги».
 
   Пустой вспомогательный блок не показывается: «всё сделано» экрану ни о чём не
   говорит. Отказ данных — наоборот, строка с ошибкой, а не тишина.
@@ -36,22 +40,19 @@
 {%- endmacro %}
 
 {% block body %}
-  <header class="shead">
+  {# Шапка (D418): заголовок и срез в одной строке — календарь периода и страна. На
+     телефоне срез переносится под заголовок. Всё — ссылками, срез живёт в адресе. #}
+  <header class="shead hm-head">
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.overview.title') }}</h1>
-      <p class="shead__sub">{{ tenant }} · {{ period_title }}</p>
+    </div>
+    <div class="hm-slice">
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
+      {% if country_pick %}{{ pick(country_pick) }}{% endif %}
+      {# Вход на экран страны — только у УК и только при выбранной стране. #}
+      {% if only_country and country_url %}<a class="hm-more" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
     </div>
   </header>
-
-  {# ── Срез: один период на экран и страна. Всё — ссылками, срез живёт в адресе. #}
-  <div class="sbar hm-pbar">
-    {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
-    {% if only_country %}
-      <a class="hm-only" href="{{ clear_country }}" aria-label="{{ t('home.only.clear') }}">{{ t('home.only', country=country_title(only_country)) }} <span aria-hidden="true">×</span></a>
-      {# Вход на экран страны: таблица стран при одной стране скрыта (D398). #}
-      {% if country_url %}<a class="hm-more" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
-    {% endif %}
-  </div>
 
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
@@ -60,7 +61,7 @@
           одна карточка; нечего показать — карточки нет, «всё сделано» не пишем.
           Отказ доски — строка с ошибкой: тишина читалась бы как «всё в порядке». #}
     {% if board_failed or stickers or data.attention %}
-      <section class="hm-card hm-card--wide hm-board">
+      <section class="hm-card hm-board">
         <header class="hm-card__head">
           <h2 class="hm-label">{{ t('home.attention.title') }}</h2>
           {% if data.attention %}<span class="hm-meta">{{ t('overview.attention.hint') }}</span>{% endif %}
@@ -97,7 +98,7 @@
     {% endif %}
 
     {# ── 2. Проверки за период ──────────────────────────────────────────── #}
-    <section class="hm-card hm-card--wide">
+    <section class="hm-card">
       <header class="hm-card__head">
         <h2 class="hm-label">{{ t('home.inspections.title') }}</h2>
         <span class="hm-meta">{{ period_title }}</span>
@@ -114,7 +115,7 @@
              времени» и у периода без проверок до него дельты нет. #}
           <span class="hm-big__note">{{ t('home.inspections.average' if data.average_delta is not none else 'home.inspections.average_only') }}</span>
         </div>
-        <div class="hm-plaques hm-plaques--4">
+        <div class="hm-plaques">
           <div class="hm-plaque"><span class="hm-plaque__label">{{ t('overview.tile.inspections') }}</span><span class="hm-plaque__value">{{ data.inspections_total }}</span></div>
           <div class="hm-plaque"><span class="hm-plaque__label">{{ t('home.inspections.checked') }}</span><span class="hm-plaque__value">{{ data.units_checked }}<small>/{{ data.units_total }}</small></span></div>
           <div class="hm-plaque{% if data.unchecked %} is-warn{% endif %}"><span class="hm-plaque__label">{{ t('overview.tile.unchecked') }}</span><span class="hm-plaque__value">{{ data.unchecked }}</span></div>
@@ -130,31 +131,48 @@
       {% endif %}
     </section>
 
-    {# ── 3. Где нужно проверить | Последние проверки (D399). Пустое скрыто. #}
-    {% set has_check = data.to_check|length > 0 %}
-    {% set has_latest = data.inspections|length > 0 %}
-    {% if has_check %}
-      <section class="hm-card{% if not has_latest %} hm-card--wide{% endif %}">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.tocheck.title') }}</h2>
-          <span class="hm-meta">{{ t('home.tocheck.hint') }} · {{ data.to_check|length + data.to_check_more }}</span>
-        </header>
-        <ul class="hm-rows">
-          {% for item in data.to_check %}
-            <li>
-              <a class="hm-row" href="{{ unit_href(item.unit_id, item.country, url(registry_path) ~ '?lang=' ~ lang) }}">
-                <span class="hm-dot hm-dot--warn"></span>
-                <span class="hm-row__main">{{ item.unit }}<span class="hm-row__meta">{{ city_title(item.city) or '' }}</span></span>
-                <span class="hm-row__num mono">{% if item.last %}{{ t('home.tocheck.last', date=item.last) }}{% else %}{{ t('home.tocheck.never') }}{% endif %}</span>
-              </a>
-            </li>
+    {# ── 3. Рейтинги (D418): РС, РКО и карты — CEE и остальные страны. Числа берёт
+          та же функция, что у страницы «Рейтингов», ссылка ведёт туда же. Отказ — строка. #}
+    <section class="hm-card hm-ratings">
+      <header class="hm-card__head">
+        <h2 class="hm-label"><a class="hm-label__link" href="{{ ratings_block_href }}" title="{{ t('home.ratings.open') }}">{{ t('home.rb.title') }}</a></h2>
+        {% if ratings_block.maps_failed %}<span class="hm-meta">{{ t('home.rb.maps_failed') }}</span>{% endif %}
+        <a class="hm-more" href="{{ ratings_block_href }}">{{ t('home.rb.more') }} →</a>
+      </header>
+      {% if ratings_block.failed %}
+        {{ empty(t('home.rb.failed')) }}
+      {% elif not ratings_block.columns %}
+        {{ empty(t('home.rb.none')) }}
+      {% else %}
+        <div class="hm-rb" style="--hm-rb-cols: {{ ratings_block.columns|length }}">
+          <span class="hm-rb__corner"></span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__col">{{ t('ratings.cluster.' ~ col.key) if col.is_cluster else country_title(col.key) }}</span>
           {% endfor %}
-        </ul>
-        {% if data.to_check_more %}<p class="hm-meta">{{ t('home.tocheck.more', count=data.to_check_more) }}</p>{% endif %}
-      </section>
-    {% endif %}
+          <span class="hm-rb__label">{{ t('home.rb.rs') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rs is none else '%.1f'|format(col.rs) }} {{ delta(col.rs_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label">{{ t('home.rb.rko') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell">{{ '—' if col.rko is none else '%.1f'|format(col.rko) }} {{ delta(col.rko_delta) }}</span>
+          {% endfor %}
+          <span class="hm-rb__label is-last">{{ t('home.rb.maps') }}</span>
+          {% for col in ratings_block.columns %}
+            <span class="hm-rb__cell hm-rb__cell--maps is-last">
+              {% for m in col.maps %}
+                <span class="hm-rb__map"><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>
+              {% else %}—{% endfor %}
+            </span>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </section>
+
+    {# ── 4. Последние проверки (D399). Пустое скрыто. #}
+    {% set has_latest = data.inspections|length > 0 %}
     {% if has_latest %}
-      <section class="hm-card{% if not has_check %} hm-card--wide{% endif %}">
+      <section class="hm-card">
         <header class="hm-card__head">
           <h2 class="hm-label">{{ t('home.latest.title') }}</h2>
           <a class="hm-more" href="{{ url(registry_path) }}?lang={{ lang }}{% for k, v in period.params().items() if v %}&amp;{{ k }}={{ v }}{% endfor %}{% if only_country %}&amp;country={{ only_country }}{% endif %}">{{ t('home.latest.all') }} →</a>
@@ -175,7 +193,7 @@
 
     {# ── 4. Топ нарушений | Потери по зонам; пустое скрыто, пусты оба — ряда нет. #}
     {% if data.systemic %}
-      <section class="hm-card{% if not data.zone_losses %} hm-card--wide{% endif %}">
+      <section class="hm-card">
         <header class="hm-card__head">
           <h2 class="hm-label">{{ t('home.top.title') }}</h2>
           <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
@@ -194,7 +212,7 @@
       </section>
     {% endif %}
     {% if data.zone_losses %}
-      <section class="hm-card{% if not data.systemic %} hm-card--wide{% endif %}">
+      <section class="hm-card">
         <header class="hm-card__head">
           <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
           <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
@@ -255,29 +273,5 @@
         {{ empty(t('home.units.empty')) }}
       {% endif %}
     </section>
-
-    {# ── 6. Страны: только тому, у кого их больше одной ── #}
-    {% if countries|length > 1 %}
-      <section class="hm-card hm-card--wide">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.countries.title') }}</h2>
-          <span class="hm-meta">{{ t('home.countries.hint') }}</span>
-        </header>
-        <div class="hm-table hm-table--countries">
-          <div class="hm-table__head">
-            <span>{{ t('home.countries.country') }}</span>
-            <span class="is-num">{{ t('home.countries.units') }}</span>
-            <span class="is-num">{{ t('home.countries.average') }}</span>
-          </div>
-          {% for row in countries %}
-            <a class="hm-table__row" href="{{ row.href }}">
-              <span class="hm-cell__name">{{ country_title(row.code) }}</span>
-              <span class="is-num">{{ row.checked }}<small>/{{ row.units }}</small></span>
-              <span class="is-num is-strong">{{ '—' if row.average is none else '%.1f'|format(row.average) }}</span>
-            </a>
-          {% endfor %}
-        </div>
-      </section>
-    {% endif %}
   </div>
 {% endblock %}

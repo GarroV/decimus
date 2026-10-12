@@ -130,13 +130,8 @@ def _maps(
     """Оценки на картах по группам сводки (кластеры или срез) на конец периода и
     изменение к концу прошлого. База не ответила — `None` и след в журнале:
     блок скажет «нет данных», страница живёт."""
-    countries = tuple(c for _, members in groups for c in members)
     try:
-        now = rmaps.summarize_groups(maps_store.latest(countries, until=until), groups)
-        if before is None:
-            return now
-        was = rmaps.summarize_groups(maps_store.latest(countries, until=before), groups)
-        return rmaps.with_delta(now, was)
+        return rmaps.compare(groups, until=until, before=before)
     except RatingsError:
         logger.warning("Оценки карт не прочитались", exc_info=True)
         return None

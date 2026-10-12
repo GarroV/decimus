@@ -12,6 +12,10 @@
   мелкая, — вид проверки и аудитор. Процент и буква печатаются такими, какими
   лежат в базе, — на экран приходит уже подготовленная строка (`view.py`).
 
+  «Где нужно проверить» (D418, раньше стояло на «Главной») — над списком: точки
+  охвата без проверок за выбранный период (`to_inspect.py`), с отбором страны и
+  города реестра. Пусто — блока нет; отказ базы — строка с ошибкой.
+
   Период — «с — по» по дате обхода со стрелками ← →, по умолчанию текущий
   месяц (`registry_period.py`). Ждущие приёмки (D199) — отдельной группой
   сверху и мимо отбора: их мало, и ни одна не должна потеряться за выбранным
@@ -84,6 +88,32 @@
       </form>
       {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
+
+    {# «Где нужно проверить» (D418): точки без проверок за период; пусто — блока нет. #}
+    {% if to_check.shown %}
+      <div class="slist slist--tocheck">
+        <div class="slist__group">
+          <span>{{ t('registry.tocheck.title') }}</span>{% if not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
+        </div>
+        {% if to_check.failed %}
+          <p class="slist__note">{{ t('registry.tocheck.failed') }}</p>
+        {% else %}
+          <p class="slist__note">{{ t('registry.tocheck.hint') }}</p>
+          <ul class="slist__rows">
+            {% for item in to_check.units %}
+              <li>
+                <a class="srow" href="{{ unit_href(item) }}">
+                  <span class="srow__dot" aria-hidden="true"></span>
+                  <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
+                  <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
+                </a>
+              </li>
+            {% endfor %}
+          </ul>
+          {% if to_check.more %}<p class="slist__note">{{ t('registry.tocheck.more', count=to_check.more) }}</p>{% endif %}
+        {% endif %}
+      </div>
+    {% endif %}
 
     {% if registry.review %}
       <div class="slist slist--registry">
