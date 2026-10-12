@@ -43,7 +43,15 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_access, walk_settings, walk_start, walk_suggest, walk_translate, walk_write
+from . import (
+    walk_access,
+    walk_rate,
+    walk_settings,
+    walk_start,
+    walk_suggest,
+    walk_translate,
+    walk_write,
+)
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -291,14 +299,15 @@ def init_data_of() -> str:
 
 
 def identify(
-    conf: WalkSettings, ui_lang: str, *, header_only: bool = False
+    conf: WalkSettings, ui_lang: str, *, header_only: bool = False, kind: str = walk_rate.OTHER
 ) -> int | tuple[Response, int]:
     """Чей это запрос — номер чата или готовый отказ.
 
     Одна дверь на чтение и запись: подпись, затем доступ бота (D372). Запись
     (`header_only`) берёт подпись только из заголовка. Доступ сверяется
     только при живом токене — на стенде без бота его не с чем сверить. База
-    молчит — 503, а не «пускаю вслепую».
+    молчит — 503, а не «пускаю вслепую». Чаще предела `walk_rate` (`kind` —
+    кадр или прочее) — 429 до всякого обращения к базе (#529, #710).
     """
     if not conf.enabled:
         return jsonify({"error": "disabled"}), 404
@@ -311,6 +320,10 @@ def identify(
     except WalkAccessError as exc:
         logger.info("Обход: отказ в опознании — %s", exc)
         return jsonify({"error": "unauthorized"}), 401
+    if not walk_rate.CHAT_RATE.allow(chat_id, kind):
+        logger.warning("Обход: чат %s превысил предел частоты (%s) — отказ", chat_id, kind)
+        message = WALK_TEXTS["walk.err.too_fast"]
+        return jsonify({"error": "refused", "message": message.get(ui_lang) or message["en"]}), 429
     if not walk_open_to(conf.users, chat_id):
         # Пробный запуск на боевом боте: кнопки у человека нет, а адрес мог
         # прийти пересланным — страница пускает ровно тех же, что и кнопка.
