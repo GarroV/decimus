@@ -42,7 +42,7 @@ class База:
         #: Telegram ID → (пространство, роль) живой привязки к учётке.
         self.учётки: dict[int, tuple[str, str]] = {
             АУДИТОР: ("HQ", "admin"),
-            КОЛЛЕГА: ("HQ", "auditor"),
+            КОЛЛЕГА: ("HQ", "developer"),
             ПАРТНЁР: ("GE", "auditor"),
             КОНТРОЛЬ: ("HQ", "control"),
         }

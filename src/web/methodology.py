@@ -34,7 +34,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
-from src.domain.tenants import is_admin_role
+from src.domain.permissions import role_may
 from src.mcp import checklist_tools as door
 from src.mcp import checklists as lists_door
 from src.mcp.checklist import Store, current_version, tip_version
@@ -800,7 +800,7 @@ def store_for(
             else "methodology.foreign_readonly"
         )
         raise MethodologyRefused(t(ключ, lang))
-    if write and not is_admin_role(role):
+    if write and not role_may(role, tenant, "checklist.master"):
         причина = lists_door.protection_of(найдено)
         if причина is not None:
             raise MethodologyRefused(t(f"methodology.{причина}_readonly", lang))
@@ -997,7 +997,7 @@ def apply_checklist(
     применялся (D440): бизнес-девелопер, применив свой, сдвинул бы с прода
     главный для всех — обход защиты главного.
     """
-    if not is_admin_role(role):
+    if not role_may(role, tenant, "checklist.apply"):
         raise MethodologyRefused(t("methodology.apply_admins_only", lang))
     try:
         return lists_door.apply_to_production(
@@ -1032,7 +1032,7 @@ def set_checklist_master(
 ) -> Any:
     """Поставить или снять метку «главный». Только админы (D440): метка и решает,
     кто правит чек-лист, поэтому ставить её себе бизнес-девелопер не вправе."""
-    if not is_admin_role(role):
+    if not role_may(role, tenant, "checklist.master"):
         raise MethodologyRefused(t("methodology.master_toggle_admins_only", lang))
     # Чек-лист ищется, а не правится: метка снимается и с главного, а `write=True`
     # без роли админа главному отказал бы, но здесь админ уже проверен.

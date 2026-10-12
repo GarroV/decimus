@@ -57,7 +57,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> It
 
 @pytest.fixture
 def уК(monkeypatch: pytest.MonkeyPatch, заведено: Any) -> Iterator[FlaskClient]:
-    yield from стенд(monkeypatch, tenant="HQ", role="auditor")
+    yield from стенд(monkeypatch, tenant="HQ", role="developer")
 
 
 @pytest.fixture

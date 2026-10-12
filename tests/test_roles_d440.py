@@ -378,7 +378,9 @@ def test_гость_не_пишет_ни_одним_адресом(
             if соответствие[0] in открыты or путь in СВОИ_ДЕЛА_ГОСТЯ or путь == "/login":
                 continue
             ответ = client.open(путь, method=метод, data={"a": "b"}, headers=ЗАГОЛОВКИ)
-            if ответ.status_code != 403:
+            # Скрытый экран ключей API 404 отвечает всем, кроме суперадмина.
+            ждём = 404 if путь.startswith("/users/connections") else 403
+            if ответ.status_code != ждём:
                 пропущено.append(f"{метод} {путь} -> {ответ.status_code}")
     assert not пропущено, "гостю открыта запись: " + "; ".join(пропущено)
     assert all(не_звали == [] for не_звали in зовы.values())

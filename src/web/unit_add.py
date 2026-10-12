@@ -3,7 +3,7 @@
 Раньше точку заводили бот («Новая пиццерия?», D233) и `tools/units.py add` по
 ssh. Правила те же, что у бота, и живут они не здесь:
 
-- кто вправе — `domain.tenants.may_add_units`: только пространство УК (D234),
+- кто вправе — матрица (`unit.create`, `src/domain/permissions.py`): только УК (D234),
   партнёр справочник не пополняет (D284), и для него адреса нет вовсе (404, как
   у разделов УК, D264);
 - какое имя — `domain.unit_new.plan_new_unit`: «Город-N» по-английски
@@ -31,7 +31,7 @@ from src.domain.geo import COUNTRIES
 from src.domain.tenants import HQ_TENANT, may_add_units
 from src.domain.unit_new import OTHER_COUNTRY, NewUnit, NewUnitRefused, plan_new_unit
 
-from . import auth
+from . import auth, guard
 from . import country as country_data
 from .config import Settings
 from .geo_names import country_title
@@ -55,7 +55,12 @@ def may_add_in(tenant: str, reach: Reach, code: str) -> bool:
 
 def can_add_here(code: str) -> bool:
     """Показывать ли вход «Добавить пиццерию» на экране страны `code`."""
-    return bool(code) and may_add_in(auth.current_tenant(), auth.current_reach(), code)
+    # Роль — по матрице (`unit.create`): гость и контроль формы не видят.
+    return (
+        bool(code)
+        and guard.may("unit.create")
+        and may_add_in(auth.current_tenant(), auth.current_reach(), code)
+    )
 
 
 def _gate(raw_code: str) -> str:
@@ -118,6 +123,7 @@ def install(app: Flask, conf: Settings) -> None:
         return _render(_gate(code), _lang(conf))
 
     @app.post(путь, endpoint="unit_create")
+    @guard.action("unit.create")
     def unit_create(code: str) -> Response | str | tuple[str, int]:
         страна = _gate(code)
         refuse_foreign_origin()

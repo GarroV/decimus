@@ -133,8 +133,9 @@ def test_у_админа_чужой_проверки_кнопок_действи
     assert t("card.act.move", "ru") not in страница
 
 
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
 @pytest.mark.parametrize("адрес", ПОВЕРХНОСТИ)
-def test_у_аудитора_отклонения_и_переноса_нет(
+def test_у_гостя_отклонения_и_переноса_нет(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, адрес: str
 ) -> None:
     страница = _открыть(стенд, monkeypatch, адрес)

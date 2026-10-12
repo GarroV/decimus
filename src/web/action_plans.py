@@ -31,7 +31,7 @@ from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import auth
+from . import auth, guard
 from .config import Settings
 from .origin import refuse_foreign_origin
 from .sections import section
@@ -217,6 +217,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _render_request(request_id, conf=conf, notice=None, failure=None)
 
     @app.post(f"{путь}/requests/<request_id>/review")
+    @guard.action("plan.manage")
     def actions_review(request_id: str) -> str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -237,6 +238,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _render_request(request_id, conf=conf, notice=t(notice, lang), failure=None)
 
     @app.post(f"{путь}/requests/<request_id>/due")
+    @guard.action("plan.manage")
     def actions_due(request_id: str) -> str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -253,6 +255,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _render_request(request_id, conf=conf, notice=t("plans.due_set", lang), failure=None)
 
     @app.post(f"{путь}/request")
+    @guard.action("plan.manage")
     def actions_new() -> Response | str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -303,6 +306,7 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         return _render_partner(conf, max_bytes=max_bytes, notice=None, failure=None)
 
     @app.post(f"{путь}/<request_id>/upload")
+    @guard.action("plan.submit")
     def plans_upload(request_id: str) -> str | tuple[str, int]:
         if is_hq():
             return render_template("users/forbidden.html"), 403

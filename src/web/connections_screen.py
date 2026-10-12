@@ -30,7 +30,7 @@ from src.db import api_access
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
 
-from . import access_policy, auth, connections_form
+from . import access_policy, auth, connections_form, guard
 from .connections_form import Draft, Refusal
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
@@ -251,6 +251,7 @@ def install(app: Flask) -> None:
     base = f"{section('users').path}/connections"
 
     @app.post(f"{base}/issue")
+    @guard.action("api.manage", hidden=True)
     def connections_issue() -> FlaskResponse:
         """Выдать ключ. Ключ — на странице ответа, один раз."""
         автор = _boss()
@@ -281,6 +282,7 @@ def install(app: Flask) -> None:
         return _page(issued=issued, picked_id=issued.id)
 
     @app.post(f"{base}/<int:token_id>/update")
+    @guard.action("api.manage", hidden=True)
     def connections_update(token_id: int) -> FlaskResponse:
         """Поправить права, название, контакт, страны и срок живого ключа."""
         _boss()
@@ -321,6 +323,7 @@ def install(app: Flask) -> None:
         return _page(flash=Flash("connections.ok.saved", True, {}), picked_id=token_id)
 
     @app.post(f"{base}/<int:token_id>/reissue")
+    @guard.action("api.manage", hidden=True)
     def connections_reissue(token_id: int) -> FlaskResponse:
         """Новый ключ с теми же правами; старый отозван той же транзакцией."""
         автор = _boss()
@@ -335,6 +338,7 @@ def install(app: Flask) -> None:
         return _page(issued=issued, reissued=True, picked_id=issued.id)
 
     @app.post(f"{base}/<int:token_id>/revoke")
+    @guard.action("api.manage", hidden=True)
     def connections_revoke(token_id: int) -> FlaskResponse:
         """Отозвать ключ: пускать перестаёт сразу, строка остаётся со следом."""
         автор = _boss()

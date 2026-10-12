@@ -1,185 +1,163 @@
-"""Заслон прав веба: пишущий маршрут объявляет код и спрашивает can."""
+"""Заслон прав веба: каждый пишущий маршрут — через матрицу, разделы — по `view.*`.
+
+Полнота — главное: пишущий маршрут без кода действия не должен существовать
+молча. Он закрыт запретом по умолчанию (403), а этот набор называет его по имени.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import replace
 
 import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
+from src.domain.permissions import ACTION_CODES
 from src.web import guard
 
-
-def _стенд(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) -> Flask:
-    подменить_двери(monkeypatch, tenant=tenant, role=role)
-    app = собрать(tenant="HQ")
-    # `собрать` ставит TESTING=True, и Flask пробрасывает исключение вида и
-    # `after_request` в тестовый клиент. Здесь проверяется ответ продукта — 500,
-    # каким его увидит человек, — поэтому проброс выключен.
-    app.config["PROPAGATE_EXCEPTIONS"] = False
-
-    @app.post("/_t/own")
-    @guard.action("checklist.edit")
-    def _own() -> str:
-        return "ok"
-
-    @app.post("/_t/object/<tenant>/<author>")
-    @guard.action("inspection.retract", object_in_route=True)
-    def _object(tenant: str, author: str) -> str | tuple[str, int]:
-        автор = None if author == "none" else author
-        отказ = guard.permit("inspection.retract", tenant, object_author=автор)
-        return отказ if отказ is not None else "ok"
-
-    @app.post("/_t/no-author")
-    @guard.action("inspection.retract", object_in_route=True)
-    def _no_author() -> str | tuple[str, int]:
-        отказ = guard.permit("inspection.retract", "HQ")
-        return отказ if отказ is not None else "ok"
-
-    @app.post("/_t/forgot")
-    @guard.action("inspection.retract", object_in_route=True)
-    def _forgot() -> str:
-        return "записал без границы"
-
-    @app.post("/_t/ignores")
-    @guard.action("inspection.retract", object_in_route=True)
-    def _ignores() -> str:
-        guard.permit("inspection.retract", "HQ", object_author="u-other")
-        return "записал вопреки отказу"
-
-    @app.post("/_t/undeclared")
-    @guard.action("checklist.edit")
-    def _undeclared() -> str | tuple[str, int]:
-        отказ = guard.permit("inspection.retract", "HQ", object_author=None)
-        return отказ if отказ is not None else "ok"
-
-    @app.post("/_t/mine")
-    @guard.action("inspection.retract", object_in_route=True)
-    def _mine() -> str:
-        guard.mark_own()
-        return "ok"
-
-    @app.get("/_t/read")
-    @guard.action("checklist.edit")
-    def _read() -> str:
-        return "ok"
-
-    @app.post("/_t/bare")
-    def _bare() -> str:
-        return "без кода"
-
-    return app
+ПУБЛИЧНЫЕ = {"admin_public_url": СВОЙ, "mcp_public_url": "https://mcp.example.test"}
 
 
 @pytest.fixture
-def вошедший(
-    monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest
+def app() -> Flask:
+    # С публичными адресами ставится и OAuth (D417): его маршруты тоже в счёт.
+    return собрать(tenant="HQ", **ПУБЛИЧНЫЕ)
+
+
+def _клиент(
+    monkeypatch: pytest.MonkeyPatch, app: Flask, *, tenant: str, role: str
 ) -> Iterator[FlaskClient]:
-    tenant, role = request.param
-    with _стенд(monkeypatch, tenant=tenant, role=role).test_client() as client:
-        assert войти(client).status_code == 302
+    подменить_двери(monkeypatch, tenant=tenant, role=role)
+    with app.test_client() as client:
+        войти(client)
         yield client
 
 
-def _post(client: FlaskClient, путь: str) -> int:
-    return client.post(путь, headers={"Origin": СВОЙ}).status_code
+def test_каждый_пишущий_маршрут_объявил_действие(app: Flask) -> None:
+    assert guard.uncovered(app) == []
 
 
-МОЙ = "22222222-2222-2222-2222-222222222222"
+def test_объявленные_коды_все_из_каталога(app: Flask) -> None:
+    for правило in app.url_map.iter_rules():
+        коды = getattr(app.view_functions[правило.endpoint], guard.ACTIONS_ATTR, ())
+        assert set(коды) <= ACTION_CODES, правило.endpoint
 
 
-@pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
-def test_сотрудник_страны_не_правит_методику(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/own") == 403
+def test_исключения_существуют_в_приложении(app: Flask) -> None:
+    """Исключение без маршрута — мёртвая строка, за которой может спрятаться новый."""
+    есть = {п.endpoint for п in app.url_map.iter_rules()}
+    assert set(guard.EXEMPT_ENDPOINTS) <= есть
+    assert set(guard.ENDPOINT_VIEWS) <= есть
 
 
-@pytest.mark.parametrize("вошедший", [("GE", "admin")], indirect=True)
-def test_админ_страны_правит_свою_методику(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/own") == 200
+def test_полнота_ловит_маршрут_без_кода() -> None:
+    """Прогон на сломанном приложении: новый POST без `action` обязан всплыть."""
+    app = собрать(tenant="HQ")
+
+    @app.post("/inspections/<inspection_id>/telepathy")
+    def telepathy(inspection_id: str) -> str:
+        return inspection_id
+
+    assert guard.uncovered(app) == ["telepathy (/inspections/<inspection_id>/telepathy)"]
 
 
-@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
-def test_уК_действует_над_объектом_партнёра(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/object/GE/none") == 200
+def test_маршрут_без_кода_закрыт_запретом_по_умолчанию(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = собрать(tenant="HQ")
+    зовы: list[str] = []
+
+    @app.post("/inspections/<inspection_id>/telepathy")
+    def telepathy(inspection_id: str) -> str:
+        зовы.append(inspection_id)
+        return "ok"
+
+    for client in _клиент(monkeypatch, app, tenant="HQ", role="superadmin"):
+        ответ = client.post("/inspections/x/telepathy", headers={"Origin": СВОЙ})
+    assert ответ.status_code == 403
+    assert зовы == []
 
 
-@pytest.mark.parametrize("вошедший", [("GE", "admin")], indirect=True)
-def test_страна_не_действует_над_объектом_уК(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, f"/_t/object/HQ/{МОЙ}") == 403
+def test_маршрут_с_объектом_обязан_спросить_матрицу(monkeypatch: pytest.MonkeyPatch) -> None:
+    app = собрать(tenant="HQ")
+
+    @app.post("/inspections/<inspection_id>/forgot")
+    @guard.action("inspection.accept", object_in_route=True)
+    def forgot(inspection_id: str) -> str:
+        return "записано без границы"
+
+    app.config.update(PROPAGATE_EXCEPTIONS=True)
+    for client in _клиент(monkeypatch, app, tenant="HQ", role="admin"):
+        with pytest.raises(RuntimeError, match="не спросил матрицу"):
+            client.post("/inspections/x/forgot", headers={"Origin": СВОЙ})
 
 
-@pytest.mark.parametrize("вошедший", [("HQ", "auditor")], indirect=True)
-def test_сотрудник_уК_действует_только_над_своим(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, f"/_t/object/HQ/{МОЙ}") == 200
-    assert _post(вошедший, "/_t/object/HQ/u-other") == 403
-    assert _post(вошедший, "/_t/object/HQ/none") == 403
-
-
-@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
-def test_маршрут_с_объектом_без_permit_падает_500(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/forgot") == 500
-
-
-@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
-def test_действие_над_проверкой_без_автора_падает_500(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/no-author") == 500
-
-
-def test_незнакомый_код_падает_на_объявлении() -> None:
-    with pytest.raises(ValueError, match=r"inspection\.delete"):
-        guard.action("inspection.delete")
-
-
-def test_действие_над_проверкой_требует_объекта_в_маршруте() -> None:
+def test_объявление_без_кода_и_с_чужим_кодом_ошибка_сборки() -> None:
+    with pytest.raises(ValueError, match="без кода"):
+        guard.action()
     with pytest.raises(ValueError, match="object_in_route"):
-        guard.action("inspection.move")
+        guard.action("checklist.edit", "checklist.master")
+    with pytest.raises(Exception, match=r"inspection\.telepathy"):
+        guard.action("inspection.telepathy")
 
 
-def test_полнота_называет_маршрут_без_кода(monkeypatch: pytest.MonkeyPatch) -> None:
-    app = _стенд(monkeypatch, tenant="HQ", role="admin")
-    assert "_bare (/_t/bare)" in guard.uncovered(app)
-    assert not any(строка.startswith("_own ") for строка in guard.uncovered(app))
+@pytest.mark.parametrize(
+    ("tenant", "role", "путь", "код"),
+    [
+        ("HQ", "control", "/inspections", 404),  # D420: проверок у контроля нет
+        ("HQ", "control", "/ratings", 200),
+        ("HQ", "guest", "/admin", 404),  # гостю методики нет (D440)
+        ("HQ", "guest", "/inspections", 200),
+        ("HQ", "control", "/units/u1", 404),  # карточка пиццерии — история проверок
+    ],
+)
+def test_разделы_по_матрице(
+    monkeypatch: pytest.MonkeyPatch,
+    app: Flask,
+    tenant: str,
+    role: str,
+    путь: str,
+    код: int,
+) -> None:
+    from src.web import inspections as data
+    from src.web import ratings as ratings_screen
+
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
+    for client in _клиент(monkeypatch, app, tenant=tenant, role=role):
+        ответ = client.get(путь)
+    assert ответ.status_code == код, ответ.get_data(as_text=True)[:300]
 
 
-def test_учётка_без_id_получает_отказ_а_не_500(monkeypatch: pytest.MonkeyPatch) -> None:
-    from src.web import auth
-
-    with _стенд(monkeypatch, tenant="HQ", role="admin").test_client() as client:
-        assert войти(client).status_code == 302
-        настоящий = auth.current_actor
-
-        def без_id() -> object:
-            return replace(настоящий(), user_id=None)
-
-        monkeypatch.setattr(auth, "current_actor", без_id)
-        assert _post(client, "/_t/own") == 403
-        assert _post(client, "/_t/object/GE/none") == 403
-
-
-@pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
-def test_отказ_без_разбора_результата_не_пропускает_запись(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/ignores") == 500
-
-
-@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
-def test_код_не_из_объявленных_падает_500(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/undeclared") == 500
+@pytest.mark.parametrize(
+    ("role", "путь"),
+    [
+        ("guest", "/users/add"),
+        ("guest", "/admin/items"),
+        ("guest", "/inspections/x/retract"),
+        ("control", "/admin/items"),
+        ("control", "/users/role"),
+        ("developer", "/users/add"),
+        ("developer", "/admin/checklists/hq/apply"),
+    ],
+)
+def test_запись_без_клетки_403_до_маршрута(
+    monkeypatch: pytest.MonkeyPatch, app: Flask, role: str, путь: str
+) -> None:
+    for client in _клиент(monkeypatch, app, tenant="HQ", role=role):
+        ответ = client.post(путь, headers={"Origin": СВОЙ})
+    assert ответ.status_code == 403
 
 
-@pytest.mark.parametrize("вошедший", [("HQ", "admin")], indirect=True)
-def test_mark_own_снимает_требование_спросить(вошедший: FlaskClient) -> None:
-    assert _post(вошедший, "/_t/mine") == 200
+def test_свои_дела_открыты_гостю(monkeypatch: pytest.MonkeyPatch, app: Flask) -> None:
+    """Свой пароль — не запись в сеть: гость меняет его сам (ответ формы, не 403)."""
+    for client in _клиент(monkeypatch, app, tenant="HQ", role="guest"):
+        ответ = client.post("/users/password", data={}, headers={"Origin": СВОЙ})
+    assert ответ.status_code != 403
 
 
-@pytest.mark.parametrize("вошедший", [("GE", "auditor")], indirect=True)
-def test_чтение_маршрута_с_кодом_без_права_отказано(вошедший: FlaskClient) -> None:
-    assert вошедший.get("/_t/read").status_code == 403
-
-
-def test_без_сессии_маршрут_с_объектом_ведёт_на_вход(monkeypatch: pytest.MonkeyPatch) -> None:
-    with _стенд(monkeypatch, tenant="HQ", role="admin").test_client() as client:
-        ответ = client.post(f"/_t/object/HQ/{МОЙ}", headers={"Origin": СВОЙ})
-        assert ответ.status_code == 302
+@pytest.mark.parametrize("role", ["admin", "control", "guest"])
+def test_скрытый_экран_отвечает_404(monkeypatch: pytest.MonkeyPatch, app: Flask, role: str) -> None:
+    """Ключи API — экран главного админа: остальным его снаружи нет вовсе (404)."""
+    for client in _клиент(monkeypatch, app, tenant="HQ", role=role):
+        ответ = client.post("/users/connections/issue", headers={"Origin": СВОЙ})
+    assert ответ.status_code == 404

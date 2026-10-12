@@ -22,13 +22,8 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from src.domain.tenants import (
-    CONTROL_ROLE,
-    GUEST_ROLE,
-    HQ_TENANT,
-    canonical_tenant,
-    is_admin_role,
-)
+from src.domain.permissions import role_may, view_code
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .errors import SectionRegistryError
 
@@ -163,19 +158,9 @@ def current_section(path: str) -> str | None:
     return max(подходят, key=lambda item: len(item.path)).key if подходят else None
 
 
-#: Разделы контролинга (D358, D420): рейтинги и «Пользователи» — там свой пароль
-#: и бот. Ни «Главной», ни «Проверок»: проверок контролинг не касается никак, даже
-#: на чтение (D420 отменяет чтение по D366).
-CONTROL_SECTIONS = frozenset({"ratings", "users"})
-
-#: Куда контролинг попадает после входа: «Главной» у него нет (D420), поэтому
-#: не на неё, как все (D378), а в «Рейтинги».
+#: Куда попадает тот, кому «Главная» закрыта матрицей (контролинг, D420): не на
+#: неё, как все (D378), а в «Рейтинги».
 CONTROL_HOME = "ratings"
-
-
-#: Разделы гостя УК (D440): вся сеть на чтение — обзор, проверки и отчёты, страна,
-#: рейтинги; «Пользователи» — своя карточка. Методики и действий УК у него нет.
-GUEST_SECTIONS = frozenset({"overview", "registry", "country", "ratings", "users"})
 
 
 def visible_sections(account: object | None) -> tuple[Section, ...]:
@@ -186,19 +171,17 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     не звать человека туда, куда его не пустят.
     """
     роль = getattr(account, "role", None)
-    if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
-        return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
-    if роль == GUEST_ROLE:  # гость — вся сеть на чтение (D440)
-        return tuple(item for item in SECTIONS if item.key in GUEST_SECTIONS)
-    админ = is_admin_role(роль)
-    уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
+    пространство = str(getattr(account, "tenant", "") or "")
+    if not canonical_tenant(пространство):
+        return ()
+    уК = canonical_tenant(пространство) == HQ_TENANT
+    # Что роли открыто, решает матрица (`view.<раздел>`, D420, D440); флаги
+    # раздела решают только навигацию: УК не зовут в разделы партнёра, а
+    # непостроенное партнёру не показывают.
     return tuple(
         item
         for item in SECTIONS
-        if (админ or not item.admin_only)
-        and (уК or not item.hq_only)
-        # Партнёру заглушки «в разработке» не показываем (D371): его меню —
-        # только то, чем он работает.
+        if role_may(роль, пространство, view_code(item.key))
         and (уК or item.built)
         and not (уК and item.partner_only)
     )

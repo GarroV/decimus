@@ -34,8 +34,8 @@ _WEB_OPEN = "    def {name}:\n        if False:\n"
 cases = [
     (
         "src/domain/tenants.py",
-        "    return canonical_tenant(tenant) == HQ_TENANT and role in RATINGS_MANAGER_ROLES\n",
-        "    return role in RATINGS_MANAGER_ROLES\n",
+        '    return _may(role, tenant, "ratings.manage")\n',
+        "    return True\n",
         "tests/test_ratings_access.py",
     ),
     (
@@ -45,9 +45,9 @@ cases = [
         "tests/test_db_web_access_control.py::test_контроль_у_партнёра_отказ_кодом",
     ),
     (
-        "src/web/app.py",
-        "        if not _control_may_write(\n",
-        "        if False and not _control_may_write(\n",
+        "src/web/guard.py",
+        "        return permit(коды[0])\n",
+        "        return None\n",
         "tests/test_web_users_access.py::test_контроль_вне_рейтингов_не_пишет",
     ),
     (

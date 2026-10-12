@@ -1,157 +1,115 @@
-"""Ядро прав: граница пространств и охват «свои/все» (спека «Администрирование», D304, D306, D311).
-
-Ядро (права доступа) — тестами вперёд. Граница не настраивается: никакое
-право не даёт стране тронуть объект УК, чужую страну или действие «только УК».
-«Свои» — только проверка, которую занесла учётка этого человека.
-"""
+"""`can` — граница пространств (слой 1) и короткие вопросы к матрице."""
 
 from __future__ import annotations
 
 import pytest
 
-from src.domain.permissions import (
-    ACTION_CODES,
-    HQ_ONLY_ACTIONS,
-    INSPECTION_OBJECT_ACTIONS,
-    REACH_ALL,
-    REACH_OWN,
-    RULE_FOREIGN_SPACE,
-    RULE_HQ_OBJECT,
-    RULE_HQ_ONLY,
-    RULE_MATRIX,
-    RULE_NOT_AUTHOR,
-    RULE_OK,
-    Actor,
-    UnknownAction,
-    can,
-    require_action,
-)
+from src.domain import permissions as perm
+from src.domain.permissions import Actor, can
 
-ВСЁ = {код: REACH_ALL for код in ACTION_CODES}
+АДМИН_УК = Actor(tenant="HQ", role="admin")
+ДЕВЕЛОПЕР = Actor(tenant="HQ", role="developer")
+АДМИН_RS = Actor(tenant="RS", role="admin")
+СОТРУДНИК_RS = Actor(tenant="RS", role="auditor")
 
 
-def уК(grants: dict[str, str] = ВСЁ, tenant: str = "HQ") -> Actor:
-    return Actor(tenant=tenant, role="hq_admin", grants=grants, user_id="u-hq")
+def _правило(кто: Actor, код: str, чьё: str | None = None) -> tuple[bool, str]:
+    решение = can(кто, код, чьё)
+    return решение.allowed, решение.rule
 
 
-def страна(tenant: str = "GE", grants: dict[str, str] = ВСЁ) -> Actor:
-    return Actor(tenant=tenant, role="country_admin", grants=grants, user_id="u-ge")
+def test_УК_действует_у_партнёра_если_действие_не_только_своё() -> None:
+    assert _правило(АДМИН_УК, "checklist.edit", "RS") == (True, perm.RULE_OK)
 
 
-def test_каталог_ровно_по_спеке_и_два_кода_расхождений() -> None:
-    assert ACTION_CODES == {
-        "inspection.conduct",
-        "inspection.retract",
-        "inspection.move",
+def test_проверки_и_письма_УК_только_в_своём_пространстве() -> None:
+    """D283, D341: правка, снятие, перенос, приёмка и письмо — по своей проверке.
+
+    Открыть УК запись в проверки партнёров (D406) — отдельный шаг вместе с
+    журналом действий; пока граница держит своё пространство и у УК.
+    """
+    for код in (
         "inspection.accept",
         "inspection.revise",
-        "inspection.letter",
-        "prescription.manage",
-        "prescription.reply",
-        "plan.manage",
-        "plan.submit",
-        "checklist.edit",
-        "checklist.publish",
-        "checklist.manage",
-        "phrases.manage",
-        "people.manage",
-        "mcp.connect",
-        "unit.create",
-        "space.manage",
-        "roles.manage",
-    }
-
-
-def test_только_уК_ровно_три_действия() -> None:
-    assert HQ_ONLY_ACTIONS == {"unit.create", "space.manage", "roles.manage"}
-
-
-def test_действия_над_проверкой_ровно_пять() -> None:
-    assert INSPECTION_OBJECT_ACTIONS == {
         "inspection.retract",
         "inspection.move",
-        "inspection.accept",
-        "inspection.revise",
         "inspection.letter",
-    }
+    ):
+        assert _правило(ДЕВЕЛОПЕР, код, "RS") == (False, perm.RULE_FOREIGN_SPACE), код
+        assert _правило(ДЕВЕЛОПЕР, код, "HQ") == (True, perm.RULE_OK), код
 
 
-def test_уК_действует_в_пространстве_партнёра() -> None:
-    решение = can(уК(), "inspection.retract", "GE", object_author=None)
-    assert решение.allowed and решение.rule == RULE_OK
+def test_партнёр_не_трогает_объект_УК_и_чужую_страну() -> None:
+    assert _правило(АДМИН_RS, "checklist.edit", "HQ") == (False, perm.RULE_HQ_OBJECT)
+    assert _правило(АДМИН_RS, "checklist.edit", "GE") == (False, perm.RULE_FOREIGN_SPACE)
+    assert _правило(АДМИН_RS, "checklist.edit", "RS") == (True, perm.RULE_OK)
 
 
-def test_страна_не_трогает_объект_уК_даже_с_правом() -> None:
-    решение = can(страна(), "checklist.edit", "HQ")
-    assert not решение.allowed and решение.rule == RULE_HQ_OBJECT
+def test_только_УК_и_только_партнёр() -> None:
+    assert _правило(АДМИН_RS, "unit.create") == (False, perm.RULE_HQ_ONLY)
+    assert _правило(АДМИН_УК, "plan.submit") == (False, perm.RULE_PARTNER_ONLY)
+    assert _правило(СОТРУДНИК_RS, "plan.submit") == (True, perm.RULE_OK)
 
 
-def test_страна_не_трогает_чужую_страну() -> None:
-    решение = can(страна("GE"), "inspection.retract", "AM", object_author="u-ge")
-    assert not решение.allowed and решение.rule == RULE_FOREIGN_SPACE
+def test_незнакомая_роль_и_роль_не_своей_стороны_закрыты() -> None:
+    assert _правило(Actor(tenant="HQ", role="auditor"), "inspection.read") == (
+        False,
+        perm.RULE_UNKNOWN_ROLE,
+    )
+    assert _правило(Actor(tenant="RS", role="developer"), "inspection.read") == (
+        False,
+        perm.RULE_UNKNOWN_ROLE,
+    )
+    assert _правило(Actor(tenant="HQ", role=None), "inspection.read") == (
+        False,
+        perm.RULE_UNKNOWN_ROLE,
+    )
 
 
-@pytest.mark.parametrize("код", sorted(HQ_ONLY_ACTIONS))
-def test_действие_только_уК_стране_не_даёт_никакое_право(код: str) -> None:
-    решение = can(страна(), код, "GE")
-    assert not решение.allowed and решение.rule == RULE_HQ_ONLY
+def test_старый_код_УК_переводится() -> None:
+    assert can(Actor(tenant="default", role="admin"), "unit.create").allowed
 
 
-def test_без_права_отказ_матрицы_и_у_уК() -> None:
-    решение = can(уК(grants={}), "inspection.retract", "HQ", object_author="u-hq")
-    assert not решение.allowed and решение.rule == RULE_MATRIX
-
-
-@pytest.mark.parametrize(
-    ("автор", "можно", "правило"),
-    [("u-hq", True, RULE_OK), ("u-other", False, RULE_NOT_AUTHOR), (None, False, RULE_NOT_AUTHOR)],
-)
-def test_охват_свои_только_для_своей_проверки(автор: str | None, можно: bool, правило: str) -> None:
-    человек = уК(grants={"inspection.retract": REACH_OWN})
-    решение = can(человек, "inspection.retract", "HQ", object_author=автор)
-    assert (решение.allowed, решение.rule) == (можно, правило)
-
-
-def test_свои_без_учётки_не_совпадают_с_пустым_автором() -> None:
-    человек = Actor(tenant="HQ", role="hq_staff", grants={"inspection.move": REACH_OWN})
-    assert not can(человек, "inspection.move", "HQ", object_author="")
-
-
-def test_пустая_учётка_не_совпадает_с_пустым_автором() -> None:
-    человек = Actor(tenant="HQ", role="hq_staff", grants={"inspection.move": REACH_OWN}, user_id="")
-    assert not can(человек, "inspection.move", "HQ", object_author="")
-
-
-def test_действие_над_проверкой_без_автора_это_ошибка_кода() -> None:
-    with pytest.raises(ValueError, match="автор"):
-        can(уК(), "inspection.retract", "HQ")
-
-
-def test_неизвестный_охват_это_отказ_матрицы() -> None:
-    решение = can(уК(grants={"checklist.edit": "some"}), "checklist.edit", "HQ")
-    assert not решение.allowed and решение.rule == RULE_MATRIX
-
-
-def test_старый_код_уК_приводится() -> None:
-    assert can(уК(tenant="default"), "unit.create", "HQ").allowed
-
-
-def test_неизвестное_действие_это_ошибка_кода() -> None:
-    with pytest.raises(UnknownAction, match=r"inspection\.delete"):
-        can(уК(), "inspection.delete", "HQ")
-
-
-def test_действие_каталога_находится_по_коду() -> None:
-    assert require_action("inspection.move").on_inspection
-    assert require_action("unit.create").hq_only
-    with pytest.raises(UnknownAction, match=r"inspection\.delete"):
-        require_action("inspection.delete")
-
-
-def test_пустое_пространство_объекта_это_ошибка_кода() -> None:
+def test_незнакомое_действие_и_пустое_пространство_ошибка_кода() -> None:
+    with pytest.raises(perm.UnknownAction, match=r"inspection\.telepathy"):
+        can(АДМИН_УК, "inspection.telepathy")
     with pytest.raises(ValueError, match="пространство"):
-        can(уК(), "checklist.edit", "  ")
+        can(Actor(tenant="", role="admin"), "inspection.read")
+    with pytest.raises(ValueError, match="пространство"):
+        can(АДМИН_УК, "inspection.read", " ")
 
 
-def test_отказ_ложен_в_условии() -> None:
-    assert not can(страна(), "checklist.edit", "HQ")
+def test_role_may_без_пространства_отказ() -> None:
+    assert perm.role_may("admin", None, "inspection.read") is False
+    with pytest.raises(perm.UnknownAction):
+        perm.role_may("admin", None, "nope.nope")
+
+
+def test_claude_снятие_закрыто_всем_методика_партнёру() -> None:
+    """D341, D417: снятия в Claude нет ни у кого; партнёр в Claude методику не видит."""
+    assert perm.role_may("superadmin", "HQ", "inspection.retract")
+    assert not perm.claude_may("superadmin", "HQ", "inspection.retract")
+    assert perm.role_may("admin", "RS", "checklist.edit")
+    assert not perm.claude_may("admin", "RS", "checklist.edit")
+    assert not perm.claude_may("auditor", "RS", "checklist.read")
+    assert perm.claude_may("developer", "HQ", "checklist.edit")
+    assert perm.claude_may("auditor", "RS", "inspection.read")
+
+
+def test_только_чтение_у_гостя() -> None:
+    assert perm.is_read_only("guest", "HQ")
+    assert not perm.is_read_only("control", "HQ")
+    assert not perm.is_read_only("auditor", "RS")
+    assert perm.is_read_only("nobody", "HQ")
+    assert perm.is_read_only("admin", None)
+
+
+def test_граница_без_роли() -> None:
+    assert perm.open_to_space("unit.create", "HQ")
+    assert not perm.open_to_space("unit.create", "RS")
+
+
+def test_код_раздела() -> None:
+    assert perm.view_code("registry") == "view.registry"
+    with pytest.raises(perm.UnknownAction):
+        perm.view_code("nowhere")
