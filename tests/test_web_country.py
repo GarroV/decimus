@@ -145,9 +145,10 @@ def test_смена_языка_оставляет_страну_и_раскрыт
     вид = с_точкой(данные())
     вид = replace(вид, unit_id="u-1", unit_name="Батуми-1", history=вид.snapshot.inspections)
     страница = открыть(стенд, monkeypatch, вид, "/country/GE?unit=u-1&period=d90")
-    assert 'action="/country/GE"' in страница
-    assert '<input type="hidden" name="unit" value="u-1">' in страница
-    assert '<input type="hidden" name="period" value="d90">' in страница
+    # У вошедшего язык сохраняется в профиль (D447): пилюля шлёт POST и
+    # возвращает на эту же страницу со страной, точкой и периодом.
+    assert 'action="/settings/lang"' in страница
+    assert 'name="next" value="/country/GE?unit=u-1&amp;period=d90"' in страница
 
 
 def test_на_экране_страны_слева_колонка_всех_стран_и_выбранная_отмечена(

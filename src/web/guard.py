@@ -52,6 +52,11 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "settings_claude_token": "личный токен Claude себе выпускает любая роль (D448)",
     "settings_claude_token_revoke": "свой токен Claude гасит сам (D448)",
     "settings_claude_revoke": "своё подключение Claude отзывает сам (D417)",
+    "settings_lang": "язык сайта своей учётки (D447)",
+    "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
+    "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
+    "reauth_confirm_password": "подтверждение своего входа паролем перед выдачей доступа",
+    "reauth_confirm_google": "подтверждение своего входа через Google перед выдачей доступа",
     "oauth_authorize": "согласие на подключение своего Claude (D417)",
 }
 
