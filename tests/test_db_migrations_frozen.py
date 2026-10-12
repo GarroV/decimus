@@ -235,6 +235,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0056_finish_modes.sql": (
         "sql1:2d8ac7a95ee79af6f7f11955dc70dcf92d06539d4839936c9db82f0c480cd8cc"
     ),
+    # Язык чек-листа, выбранный на старте проверки, за Telegram ID (D451). Ещё не на проде.
+    "0057_checklist_langs.sql": (
+        "sql1:ce70bb09dfbf79c53076dad9b0d5f4de5f41bdd738cf49125c335087da4f9603"
+    ),
 }
 
 
