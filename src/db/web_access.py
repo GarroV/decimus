@@ -192,6 +192,14 @@ _REVOKE_USER_OAUTH_SQL = """
      where user_id = %s and revoked_at is null
 """
 
+#: И ещё не обменянные коды: выданный до смены код иначе обменялся бы после
+#: неё на новое подключение.
+_EXPIRE_USER_OAUTH_CODES_SQL = """
+    update oauth_codes
+       set expires_at = now()
+     where user_id = %s and used_at is null and expires_at > now()
+"""
+
 #: Прежняя почта читается той же командой, что пишет новую (строка заперта):
 #: сессии закрываются, только если почта на деле сменилась.
 _SET_EMAIL_SQL = """
@@ -674,6 +682,7 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
             return False
         cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
         cur.execute(_REVOKE_USER_OAUTH_SQL, (строка[0],))
+        cur.execute(_EXPIRE_USER_OAUTH_CODES_SQL, (строка[0],))
         return True
 
 

@@ -60,6 +60,9 @@ def test_смена_пароля_командой_отзывает_подклю�
     assert отзыв, f"смена пароля не отозвала подключения Claude: {журнал}"
     assert "revoked_reason = 'password'" in отзыв[0]
     assert "where user_id = %s and revoked_at is null" in отзыв[0]
+    коды = [sql for sql in журнал if sql.startswith("update oauth_codes")]
+    assert коды, f"смена пароля не погасила необменянные коды: {журнал}"
+    assert "set expires_at = now() where user_id = %s and used_at is null" in коды[0]
 
 
 def _последнее_определение(функция: str) -> str:
@@ -79,3 +82,7 @@ def test_смена_своего_пароля_отзывает_подключе�
         тело
     )
     assert "where user_id = чей and revoked_at is null" in тело
+    assert (
+        "update public.oauth_codes set expires_at = now() where user_id = чей and used_at is null"
+        in тело
+    )

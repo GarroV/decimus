@@ -231,6 +231,8 @@ def test_отзыв_своего_подключения(клиент: Client, у
     assert revoke_connection(подключение.id, user_id=учётка) is True
 
     assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
+    with pytest.raises(OAuthGrantError, match="отозвано"):
+        refresh_tokens(пара.refresh_token, client_id=клиент.client_id)
     assert list_connections(учётка) == ()
     assert revoke_connection(подключение.id, user_id=учётка) is False
 
@@ -298,7 +300,8 @@ def test_чистка_убирает_только_отжившее(база: str
     assert клиенты == {клиент.client_id}
     assert брошенный.client_id not in клиенты
     assert токены == [("refresh",)]
-    assert refresh_tokens(пара.refresh_token, client_id=клиент.client_id) is not None
+    свежая = refresh_tokens(пара.refresh_token, client_id=клиент.client_id)
+    assert resolve_access_token(свежая.access_token, resource=РЕСУРС) is not None
 
 
 def test_роль_приложения_не_удаляет_клиентов_напрямую(db_env: str, клиент: Client) -> None:
@@ -349,4 +352,39 @@ def test_смена_своего_пароля_отзывает_подключе�
     )
 
     assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
+    with pytest.raises(OAuthGrantError):
+        refresh_tokens(пара.refresh_token, client_id=клиент.client_id)
     assert list_connections(учётка) == ()
+
+
+def test_смена_пароля_гасит_необменянный_код(клиент: Client, учётка: str) -> None:
+    """Код, выданный до смены, после неё на новое подключение не обменивается."""
+    код = _код(клиент, учётка)
+
+    assert change_password("anna", tenant=ТЕНАНТ, password="новый-пароль-учётки-anna")
+
+    with pytest.raises(OAuthGrantError, match="Срок"):
+        _обмен(код, клиент)
+    assert list_connections(учётка) == ()
+
+
+def test_чистка_не_оставляет_токенов_без_подключения(
+    база: str, клиент: Client, учётка: str
+) -> None:
+    """Клиента с подключением чистка не трогает; токенов без живой ссылки не бывает."""
+    _обмен(_код(клиент, учётка), клиент)
+    with psycopg.connect(база) as conn:
+        conn.execute("update oauth_clients set created_at = now() - interval '2 days'")
+
+    purge_stale()
+
+    with psycopg.connect(база) as conn:
+        сироты = conn.execute(
+            "select count(*) from oauth_tokens t"
+            " left join oauth_grants g on g.id = t.grant_id"
+            " left join oauth_clients c on c.id = g.client_id"
+            " where c.id is null"
+        ).fetchone()
+        клиенты = conn.execute("select count(*) from oauth_clients").fetchone()
+    assert сироты == (0,)
+    assert клиенты == (1,)

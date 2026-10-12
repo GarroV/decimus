@@ -57,6 +57,8 @@ create table oauth_grants (
 alter table oauth_grants add constraint oauth_grants_revocation_is_named
     check ((revoked_at is null) = (revoked_reason is null));
 create index oauth_grants_user_idx on oauth_grants (user_id);
+-- Чистка ищет клиентов без подключений и без кодов (`oauth_purge`).
+create index oauth_grants_client_idx on oauth_grants (client_id);
 comment on table oauth_grants is
     'Подключения Claude (D417): учётка сайта × OAuth-клиент. Отзыв гасит все '
     'токены подключения на следующем же вызове.';
@@ -100,6 +102,9 @@ create table oauth_tokens (
 create index oauth_tokens_grant_idx on oauth_tokens (grant_id);
 create index oauth_tokens_expires_idx on oauth_tokens (expires_at);
 create index oauth_codes_expires_idx on oauth_codes (expires_at);
+create index oauth_codes_client_idx on oauth_codes (client_id);
+-- Смена пароля гасит невыменянные коды человека (`change_own_password` ниже).
+create index oauth_codes_user_idx on oauth_codes (user_id);
 comment on table oauth_tokens is
     'Access- и refresh-токены OAuth (D417): только отпечаток SHA-256. Живы, пока '
     'не истекли и живо подключение (oauth_grants.revoked_at is null).';
@@ -158,10 +163,13 @@ grant usage on sequence oauth_tokens_id_seq to dodo_audit_app;
 -- подключения учётки, чей пароль она меняет командой (`web_access.change_password`).
 grant select on oauth_clients, oauth_grants, oauth_codes, oauth_tokens to dodo_audit_admin;
 grant update (revoked_at, revoked_reason) on oauth_grants to dodo_audit_admin;
+grant update (expires_at) on oauth_codes to dodo_audit_admin;
 
 -- Смена пароля отзывает и подключения Claude. Пароль меняют в ответ на «его
 -- кто-то узнал»; вошедший по старому паролю мог успеть разрешить Claude доступ,
 -- и подключение пережило бы смену, как пережила бы её незакрытая сессия.
+-- Гаснут и ещё не обменянные коды (срок — сейчас): иначе код, выданный до
+-- смены, обменялся бы после неё на новое подключение.
 -- Смена с экрана идёт функцией `change_own_password` (`0032`, путь поиска —
 -- `0033`); тело то же, добавлен отзыв в той же транзакции. Смена командой —
 -- `web_access.change_password`, отзывает сама.
@@ -199,6 +207,12 @@ begin
        set revoked_at = now(), revoked_reason = 'password'
      where user_id = чей
        and revoked_at is null;
+
+    update public.oauth_codes
+       set expires_at = now()
+     where user_id = чей
+       and used_at is null
+       and expires_at > now();
     return true;
 end;
 $$;
