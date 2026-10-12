@@ -24,7 +24,7 @@
 from __future__ import annotations
 
 import pytest
-from bot_harness import AUDITOR_ID, CHAT_ID, callback_query, feed, make_bot, text_message
+from bot_harness import AUDITOR_ID, CHAT_ID, feed, make_bot, press_build, text_message
 
 from src.bot.app import announce_commands, build_dispatcher
 from src.bot.config import BotSettings
@@ -136,7 +136,7 @@ async def test_справка_не_становится_ответом_в_инф
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     await feed(dp, bot, text_message("/finish"))
-    await feed(dp, bot, callback_query("fin:build"))
+    await press_build(dp, bot)
 
     await feed(dp, bot, text_message(COMMAND))
 

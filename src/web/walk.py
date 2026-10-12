@@ -185,6 +185,8 @@ def build_walk(
         "state": "active",
         "lang": lang,
         "report_lang": inspection.report_lang,
+        # Язык кнопки «Перевести на …» (D394, D415): другой язык платформы, не язык чек-листа.
+        "translate_lang": walk_translate.translate_target(inspection),
         "unit": inspection.unit,
         "date": str(inspection.date),
         "key": mark_key(inspection),

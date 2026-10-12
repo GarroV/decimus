@@ -93,7 +93,6 @@ async def test_мастер_после_команды_ждёт_название_
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     state = get_state(CHAT_ID)
     assert state is not None and state.unit == "Belgrade-2", (

@@ -90,7 +90,6 @@ async def test_несколько_открытых_кнопки_и_провер�
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     проверка = get_state(CHAT_ID)
     assert проверка is not None and проверка.checklist_code == "rnd"
