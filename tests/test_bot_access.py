@@ -23,6 +23,7 @@ from src.bot.access import (
     is_allowed,
 )
 from src.bot.roster import Roster
+from src.bot.texts import t
 from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.db.errors import AccessError
 from src.domain.tenants import HQ_TENANT
@@ -42,9 +43,14 @@ def _msg(user_id: int, text: str = "привет") -> tuple[Message, RecordingSe
     return message, session
 
 
-def _привязка(tg: int, tenant: str) -> Binding:
+def _привязка(tg: int, tenant: str, role: str = "auditor") -> Binding:
     return Binding(
-        telegram_id=tg, user_id="u", login="anna", tenant=tenant, bound_at=datetime.now(UTC)
+        telegram_id=tg,
+        user_id="u",
+        login="anna",
+        tenant=tenant,
+        bound_at=datetime.now(UTC),
+        role=role,
     )
 
 
@@ -84,6 +90,31 @@ async def test_no_user_is_rejected() -> None:
 async def test_привязанный_работает_в_пространстве_учётки() -> None:
     mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "GE")}), None)
     assert await _пустить(mw, _msg(501)[0]) == "GE"
+
+
+async def test_контроль_с_привязкой_в_бот_не_пускается_и_слышит_почему() -> None:
+    """F-024, D420: контроль проверок не касается — ни ботом, ни по списку окружения.
+
+    До фикса привязка пускала любую живую учётку пространства, и контроль УК
+    становился полноценным аудитором УК.
+    """
+    mw = AccessMiddleware(frozenset({501}), _кэш({501: _привязка(501, "HQ", role="control")}), None)
+    message, session = _msg(501, "/start")
+
+    assert await _пустить(mw, message) is None, "контроль дошёл до обработчика"
+    assert _ответы(session) == [t("access.role_closed", "ru")], "отказ без объяснения"
+
+
+@pytest.mark.parametrize("роль", ["auditor", "admin", "superadmin"])
+async def test_полевые_роли_бот_пускает(роль: str) -> None:
+    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "HQ", role=роль)}), None)
+    assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
+
+
+async def test_незнакомая_роль_закрыта() -> None:
+    """Новая роль, не внесённая в `FIELD_ROLES` (например, будущий «гость», D429), — отказ."""
+    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "HQ", role="guest")}), None)
+    assert await _пустить(mw, _msg(501)[0]) is None
 
 
 async def test_незнакомому_бот_молчит() -> None:

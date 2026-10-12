@@ -112,7 +112,13 @@ def test_подпись_личного_токена_по_телеграму(
 ) -> None:
     # Arrange — личный токен, выпущенный ботом (T253): владелец из базы.
     настройки = load_settings(_env(tmp_path))
-    monkeypatch.setattr(config, "_owner_from_store", lambda _токен: ("HQ", 4242))
+    monkeypatch.setattr(
+        config,
+        "_owner_from_store",
+        lambda _токен: config.Access(
+            tenant="HQ", may_retract=False, actor="mcp:tg:4242", role="admin"
+        ),
+    )
 
     # Act
     доступ = resolve_access(настройки, "Bearer personal-" + "z" * 30)

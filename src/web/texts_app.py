@@ -138,45 +138,44 @@ APP_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Прежний токен отозван — старая настройка больше не работает.",
         "en": "The previous token is revoked — the old setup no longer works.",
     },
+    "walk.app.claude.expires": {
+        "ru": "Токен действует до {date}. Потом получите новую команду здесь же.",
+        "en": "The token is valid until {date}. After that, get a new command here.",
+    },
+    "walk.app.err.unbound_self": {
+        "ru": (
+            "Токен Claude выпускается на учётку decimus: привяжите бота к своей учётке "
+            "в настройках на сайте — или выпустите токен прямо там."
+        ),
+        "en": (
+            "The Claude token is issued to a decimus account: link the bot to your "
+            "account in the settings on the website — or issue the token right there."
+        ),
+    },
     "walk.app.claude.restart": {
         "ru": "После команды полностью перезапустите Claude (Cmd+Q).",
         "en": "After the command, fully restart Claude (Cmd+Q).",
     },
-    # ── круг доступа ─────────────────────────────────────────────────────
-    "walk.app.access": {"ru": "Доступ к Claude", "en": "Claude access"},
-    "walk.app.access.add": {"ru": "Выдать доступ", "en": "Grant access"},
-    "walk.app.access.id": {"ru": "Telegram ID", "en": "Telegram ID"},
-    "walk.app.access.revoke": {"ru": "Отозвать", "en": "Revoke"},
-    "walk.app.access.founder": {"ru": "основатель", "en": "founder"},
-    "walk.app.access.token": {"ru": "токен выпущен", "en": "token issued"},
-    "walk.app.access.no_token": {"ru": "без токена", "en": "no token"},
-    "walk.app.access.revoked": {"ru": "отозван", "en": "revoked"},
-    "walk.app.access.empty": {"ru": "В круге никого нет.", "en": "Nobody is in the circle."},
-    "walk.app.stops": {"ru": "Отказы мастера", "en": "Wizard refusals"},
-    "walk.app.stops.period": {"ru": "За {days} дн.", "en": "Last {days} days"},
-    "walk.app.stops.empty": {"ru": "Отказов не было.", "en": "No refusals."},
-    "walk.app.stops.line": {
-        "ru": "{times} раз · людей: {people}",
-        "en": "{times} times · people: {people}",
-    },
     # ── отказы ───────────────────────────────────────────────────────────
-    "walk.app.err.id": {"ru": "Нужен Telegram ID — число.", "en": "A Telegram ID is a number."},
-    "walk.app.err.not_allowed": {
-        "ru": "Этого человека бот не пускает — сначала дайте ему доступ к боту.",
-        "en": "The bot does not let this person in — give them bot access first.",
+    # Выпуск токена — только по свежему открытию мини-аппа (F-032).
+    "walk.app.err.stale": {
+        "ru": "Мини-апп открыт давно. Закройте его и откройте снова, затем повторите.",
+        "en": "The mini-app was opened a while ago. Close it, open it again and retry.",
     },
-    "walk.app.err.founder": {
-        "ru": "Основателя круга отозвать нельзя.",
-        "en": "The founder of the circle cannot be revoked.",
+    # Учётка жива, но её роли проверки закрыты (контроль, D420, F-024).
+    "walk.err.role": {
+        "ru": (
+            "Ваша роль в decimus не проводит проверок, поэтому мини-апп обхода вам "
+            "закрыт. Рейтинги и подключение Claude — в админке на сайте."
+        ),
+        "en": (
+            "Your decimus role does not run inspections, so the walk mini-app is closed "
+            "to you. Ratings and connecting Claude are in the web admin."
+        ),
     },
-    "walk.app.err.days": {"ru": "Период — от 1 до 90 дней.", "en": "The period is 1 to 90 days."},
     "walk.app.err.lang": {"ru": "Такого языка нет.", "en": "No such language."},
     "walk.app.err.finish_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
     "walk.app.err.translate_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
-    "walk.app.err.not_circle": {
-        "ru": "Это доступно только кругу доступа к Claude.",
-        "en": "Only the Claude access circle can do this.",
-    },
     "walk.app.err.unavailable": {
         "ru": "Сейчас не получилось — повторите позже.",
         "en": "That did not work right now — try again later.",

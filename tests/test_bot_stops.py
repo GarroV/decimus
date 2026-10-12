@@ -26,6 +26,7 @@ from bot_harness import (
     text_message,
 )
 from conftest import requires_db
+from db_harness import привязать_бота
 
 from src import db
 from src.bot import stops
@@ -40,12 +41,11 @@ pytestmark = pytest.mark.asyncio
 ИМЯ = "Владимир Гарро"
 
 
-def settings(owner: int | None = None) -> BotSettings:
+def settings() -> BotSettings:
     return BotSettings(
         token="unused-in-tests",
         allowed_ids=frozenset({AUDITOR_ID}),
         mode="polling",
-        mcp_owner_id=owner,
     )
 
 
@@ -162,12 +162,15 @@ async def test_счётчик_считает_людей_и_отрезает_пе
 
 
 @requires_db
-async def test_stops_показывает_счётчик_админу(domain_env: Path, db_env: str) -> None:
-    """Владелец открывает счётчик сам: `/stops` — строка на шаг, раз и люди."""
+async def test_stops_показывает_счётчик_админу(
+    domain_env: Path, db_env: str, pg_dsn: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Админ открывает счётчик сам: `/stops` — строка на шаг, раз и люди."""
+    привязать_бота(pg_dsn, monkeypatch, AUDITOR_ID, role="admin")
     stops.note_stop(1, step="start.unit", reason="start.unit_need_number")
     stops.note_stop(2, step="start.unit", reason="start.unit_need_number")
     bot, session = make_bot()
-    dp = build_dispatcher(settings(owner=AUDITOR_ID))
+    dp = build_dispatcher(settings())
 
     await feed(dp, bot, text_message("/stops"))
 
@@ -179,13 +182,34 @@ async def test_stops_показывает_счётчик_админу(domain_env
     )
 
 
-async def test_stops_без_настроенного_круга_не_показывает_счётчик(domain_env: Path) -> None:
-    """Круг админов не настроен — счётчик никому, ответ тот же, что у `/mcp`."""
+@requires_db
+@pytest.mark.parametrize("роль", ["auditor", None])
+async def test_stops_не_админу_отказ_словами(
+    domain_env: Path,
+    db_env: str,
+    pg_dsn: str,
+    monkeypatch: pytest.MonkeyPatch,
+    роль: str | None,
+) -> None:
+    """Аудитор с учёткой и сотрудник без учётки (`None`) счётчика не видят (D448)."""
+    if роль is not None:
+        привязать_бота(pg_dsn, monkeypatch, AUDITOR_ID, role=роль)
     stops.note_stop(1, step="start.unit", reason="start.unit_need_number")
     bot, session = make_bot()
-    dp = build_dispatcher(settings(owner=None))
+    dp = build_dispatcher(settings())
 
     await feed(dp, bot, text_message("/stops"))
 
-    assert session.last_text == t("mcp.circle_unset", "ru")
+    assert session.last_text == t("stops.not_admin", "ru")
+
+
+async def test_stops_без_базы_не_показывает_счётчик(domain_env: Path) -> None:
+    """Роль не прочиталась — счётчика нет, ответ словами, а не молчание."""
+    stops.note_stop(1, step="start.unit", reason="start.unit_need_number")
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+
+    await feed(dp, bot, text_message("/stops"))
+
+    assert session.last_text == t("stops.unreadable", "ru")
     assert "start.unit" not in session.last_text

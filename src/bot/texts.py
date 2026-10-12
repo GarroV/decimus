@@ -93,6 +93,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ссылка недействительна. Получите новую на странице «Пользователи» в админке.",
         "en": "This link is not valid. Get a new one on the Users page of the admin.",
     },
+    # Учётка привязана и жива, но её роли проверки закрыты (контроль, D420).
+    "access.role_closed": {
+        "ru": (
+            "Ваша роль в decimus не проводит проверок, поэтому бот и мини-апп обхода "
+            "вам закрыты. Рейтинги — в админке на сайте; Claude подключается там же, "
+            "кнопкой «Подключить Claude»."
+        ),
+        "en": (
+            "Your decimus role does not run inspections, so the bot and the walk mini-app "
+            "are closed to you. Ratings are in the web admin; Claude is connected there "
+            "too, with the “Connect Claude” button."
+        ),
+    },
     "access.foreign_space": {
         "ru": (
             "Эта проверка ведётся в другом пространстве. "
@@ -1680,22 +1693,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "works. Run the command above to replace it."
         ),
     },
-    # --- круг доступа: кто внутри и кто кого приводит (T253, решение D099) ---
-    "cmd.mcp_add": {"ru": "Дать доступ к MCP", "en": "Grant MCP access"},
-    "cmd.mcp_revoke": {"ru": "Отозвать доступ к MCP", "en": "Revoke MCP access"},
-    "cmd.mcp_who": {"ru": "У кого доступ к MCP", "en": "Who has MCP access"},
-    "cmd.stops": {"ru": "Отказы мастера за период", "en": "Wizard refusals over a period"},
-    # Отказ тому, кто в круг не входит. Короткий и без подробностей: человек
-    # здесь свой (мидлварь доступа его пустила), поэтому молчать невежливо, но
-    # и рассказывать ему, кто в круге и как туда попасть, незачем — за этим он
-    # идёт к человеку, а не к боту.
-    "mcp.not_yours": {
-        "ru": "Подключение к MCP настраивают те, кому этот доступ выдан. Обратитесь к ним.",
-        "en": "MCP setup is done by those who have been granted this access. Ask them.",
-    },
-    # Круг не назначен вовсе: стенд поднялся без основателя. Отдельный текст, а
-    # не тот же отказ, — потому что чинится это в другом месте и другим
-    # человеком: не «попроси доступ», а «на стенде не задана переменная».
     # --- счётчик отказов мастера, `/stops` (#436) ---
     #
     # Шаг и причина печатаются кодами: коды не переводятся и не правятся, и
@@ -1720,111 +1717,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Счётчик отказов не прочитался. Подробности — в журнале стенда.",
         "en": "The refusal counter could not be read. Details are in the server log.",
     },
-    "mcp.circle_unset": {
+    # Счётчик — админам (роль учётки, к которой привязан бот). Человек здесь
+    # свой, поэтому отказ словами, а не молчание.
+    "stops.not_admin": {
+        "ru": "Счётчик отказов мастера открыт только админам.",
+        "en": "The wizard refusal counter is open to admins only.",
+    },
+    "mcp.unbound_self": {
         "ru": (
-            "Круг доступа к MCP на этом стенде не назначен, поэтому подключение не "
-            "настраивает никто. Это настройка развёртывания, а не разговора."
+            "Токен Claude выпускается на учётку decimus: привяжите бота к своей учётке "
+            "в настройках веба и повторите — или выпустите токен прямо там."
         ),
         "en": (
-            "The MCP access circle is not configured on this deployment, so nobody can set "
-            "up the connection. This is a deployment setting, not a conversation one."
+            "The Claude token is issued to a decimus account: link the bot to your account "
+            "in the web settings and try again — or issue the token right there."
         ),
     },
-    "mcp.add_usage": {
-        "ru": "Кому дать доступ? Пришлите: /mcp_add <Telegram ID>",
-        "en": "Grant access to whom? Send: /mcp_add <Telegram ID>",
-    },
-    "mcp.revoke_usage": {
-        "ru": "У кого отозвать доступ? Пришлите: /mcp_revoke <Telegram ID>",
-        "en": "Revoke access from whom? Send: /mcp_revoke <Telegram ID>",
-    },
-    "mcp.id_not_a_number": {
-        "ru": "«{given}» — не Telegram ID. Нужно одно число.",
-        "en": "“{given}” is not a Telegram ID. A single number is needed.",
-    },
-    # Приводимый обязан быть среди разрешённых ID — иначе доступ выдан тому,
-    # кого мидлварь до бота не пускает. Сказано словами, потому что чинится это
-    # не здесь, а в настройке стенда.
-    "mcp.add_not_allowed": {
+    "mcp.expires": {
         "ru": (
-            "ID {who} не в списке разрешённых — до бота он не доходит, и доступ ему "
-            "выдавать не из чего. Сначала добавьте его на стенде."
+            "Токен действует до {date}. Потом пункт /mcp выдаст новую команду. "
+            "Смена роли или отключение учётки гасят токен сразу."
         ),
         "en": (
-            "ID {who} is not on the allowed list — it never reaches the bot, so there is "
-            "nothing to grant access to. Add it on the deployment first."
+            "The token is valid until {date}. After that, /mcp gives a new command. "
+            "A role change or a disabled account ends the token at once."
         ),
-    },
-    "mcp.added": {
-        "ru": (
-            "Доступ выдан: {who}. Теперь у него в меню появился пункт настройки — токен "
-            "он выпустит себе сам, вы его не увидите."
-        ),
-        "en": (
-            "Access granted: {who}. The setup item has appeared in their menu — they will "
-            "issue the token themselves, and you will not see it."
-        ),
-    },
-    "mcp.already_in": {
-        "ru": "У {who} доступ уже есть. Ничего не изменилось.",
-        "en": "{who} already has access. Nothing changed.",
-    },
-    "mcp.revoked": {
-        "ru": (
-            "Доступ отозван: {who}. Пункт настройки у него пропал, живых токенов "
-            "погашено: {tokens}. Отзыв действует сразу, перезапуск не нужен."
-        ),
-        "en": (
-            "Access revoked: {who}. The setup item is gone for them, live tokens "
-            "revoked: {tokens}. The revocation takes effect at once, no restart needed."
-        ),
-    },
-    "mcp.revoke_nobody": {
-        "ru": "У {who} доступа и не было. Ничего не изменилось.",
-        "en": "{who} did not have access anyway. Nothing changed.",
-    },
-    # Основателя круга отозвать нельзя: его называет настройка стенда, и
-    # отозванный он вернулся бы в круг при следующем подъёме бота. Отказ здесь
-    # честнее сделанной и молча отменённой работы.
-    "mcp.revoke_founder": {
-        "ru": (
-            "{who} — основатель круга, он назначен настройкой стенда. Отзыв в чате его "
-            "не уберёт: при следующем подъёме бот вернёт его обратно. Это правится на "
-            "стенде."
-        ),
-        "en": (
-            "{who} founded the circle and is named by a deployment setting. Revoking here "
-            "would not remove them: the bot restores them on the next start. This is "
-            "changed on the deployment."
-        ),
-    },
-    "mcp.who_header": {
-        "ru": "Доступ к MCP:",
-        "en": "MCP access:",
-    },
-    # Строка следа. Кодами и датами, без формулировок: отвечает на вопрос,
-    # у тех ли доступ, кого назначил владелец (D098), а проверяется это по
-    # идентификаторам.
-    "mcp.who_line": {
-        "ru": "{who} — привёл: {by}, {at}{token}",
-        "en": "{who} — added by: {by}, {at}{token}",
-    },
-    "mcp.who_line_revoked": {
-        "ru": "{who} — отозван: {by}, {at}",
-        "en": "{who} — revoked by: {by}, {at}",
-    },
-    "mcp.who_founder": {"ru": "настройка стенда", "en": "deployment setting"},
-    "mcp.who_has_token": {"ru": ", токен выпущен", "en": ", token issued"},
-    "mcp.who_no_token": {"ru": ", токен не выпускался", "en": ", no token issued"},
-    "mcp.who_empty": {
-        "ru": "Доступ к MCP не выдан никому.",
-        "en": "MCP access has not been granted to anyone.",
     },
     # База не ответила. Значения токена в этом тексте нет и быть не может —
     # разбор ушёл в журнал, человеку остаётся то, что он может сделать.
     "mcp.unavailable": {
-        "ru": "Не удалось обратиться к списку доступа. Повторите позже.",
-        "en": "The access list could not be reached. Try again later.",
+        "ru": "Токен не выпущен: база не ответила. Повторите позже.",
+        "en": "The token was not issued: the database did not answer. Try again later.",
     },
     # Стенд адреса не назвал. Заглушка ЗАГЛАВНЫМИ и на языке интерфейса — по
     # тому же правилу, что и остальные подставляемые слова: молча подставить

@@ -88,8 +88,8 @@ MCP_RETRACTION_TOKENS_VAR = "MCP_RETRACTION_TOKENS"
 #: кадры, подтверждение. Пусто — загрузка закрыта всем, и это её выключатель
 #: (D335: «законсервировать»); уже загруженное при этом не трогается. По
 #: пространству, а не по токену, как и методика: загружает сторона, а кто
-#: именно загрузил и подтвердил — пишется подписью `mcp:tg:<id>` личного токена
-#: (`Access.actor`), а у стороннего токена — `mcp:<сторона>`.
+#: именно загрузил и подтвердил — пишется подписью `web:<логин>` учётки (личный
+#: токен и вход через OAuth, `Access.actor`), а у стороннего токена — `mcp:<сторона>`.
 #:
 #: Единственное допустимое значение — `HQ` (D335): загрузка задним числом только
 #: у УК, партнёрам — никогда. Держит это код (`_parse_import`), а не настройка:
@@ -515,7 +515,7 @@ def _check_any_door(tokens: Mapping[str, str], src: Mapping[str, str]) -> None:
         f"Ни одной двери: {MCP_TOKENS_VAR} пуста и {DATABASE_URL_VAR} не задана. Без карты "
         f"«арендатор=токен» и без базы личных токенов сервер поднялся бы открытым — за дверью "
         f"история проверок партнёра. Достаточно любой из двух: пример карты — в .env.example, "
-        f"личные токены выдаёт бот пунктом «Установка MCP»"
+        f"личный токен человек выпускает себе сам в настройках веба"
     )
 
 
@@ -571,22 +571,31 @@ class Access:
     tenant: str
     #: Открыто ли этому токену снятие проверок из истории (T211, D086/D089).
     may_retract: bool
-    #: Кто пришёл — подписью для журнала действий, а не секретом: `mcp:tg:<id>`
-    #: у личного токена (владелец по телеграму, T253), `mcp:<арендатор>` у
+    #: Кто пришёл — подписью для журнала действий, а не секретом: `web:<логин>`
+    #: у личного токена и входа через OAuth (учётка сайта, D448), `mcp:<арендатор>` у
     #: стороннего из карты `.env`. Нужна подтверждению загруженной проверки
     #: (D308): принятая подписывается тем, кто её принял (D199).
     actor: str = ""
-    #: Роль учётки сайта — только у входа через OAuth (D417): права тогда
-    #: решает матрица `policy.py`. У дверей бота и `.env` роли нет (`None`),
-    #: и для них всё как раньше.
+    #: Роль учётки сайта — у личного токена и у входа через OAuth (D417, аудит
+    #: 12.10): права тогда решает матрица `policy.py`. Роли нет (`None`) только
+    #: у служебного токена из карты `MCP_TOKENS` — его заводит владелец стенда
+    #: руками, и открывает он всё пространство.
     role: str | None = None
 
 
-def _owner_from_store(token: str) -> tuple[str, int] | None:
-    """Арендатор и владелец ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
+def _owner_from_store(token: str) -> Access | None:
+    """Доступ ЛИЧНОГО токена учётки (T253, D098, D448).
 
-    Вторая дверь рядом с картой из `.env`, а не вместо неё. Личные токены
-    выпускает бот, хранит отпечатками и отзывает поимённо
+    С аудита 12.10 (F-017, F-022, F-023, F-035) личный токен выпущен на учётку
+    сайта: хранилище на каждый вызов сверяет её отключение, роль, пространство
+    и срок токена (`mcp_access.resolve_token`). Подпись — логин учётки, как у
+    входа через OAuth: человек один, какой дверью бы ни пришёл (D448). Роль уходит
+    в `Access.role`, и права решает та же матрица, что у входа через сайт
+    (`policy.py`). Снятие проверок личным токеном не выдаётся.
+
+    Вторая дверь рядом с картой из `.env`, а не вместо неё. Личный токен
+    человек выпускает себе сам (настройки веба, бот, мини-апп); хранится он
+    отпечатком
     (`src/db/mcp_access.py`); сверяются они здесь, потому что предъявляются
     сюда — блоки `bot` и `mcp` пиры и друг друга не импортируют, общее место у
     них одно, ярусом ниже.
@@ -620,7 +629,14 @@ def _owner_from_store(token: str) -> tuple[str, int] | None:
             exc_info=True,
         )
         return None
-    return None if владелец is None else (владелец.tenant, владелец.telegram_id)
+    if владелец is None:
+        return None
+    return Access(
+        tenant=canonical_tenant(владелец.tenant),
+        may_retract=False,
+        actor=f"web:{владелец.login}",
+        role=владелец.role,
+    )
 
 
 def _owner_from_oauth(token: str, resource: str) -> Access | None:
@@ -707,16 +723,13 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
             "«Authorization: Bearer <токен>». Доступ к проверкам закрыт личным токеном"
         )
     tenant = settings.tenant_for(token)
-    actor = f"mcp:{tenant}"
-    if tenant is None:
-        владелец = _owner_from_store(token)
-        if владелец is not None:
-            tenant, telegram_id = владелец
-            actor = f"mcp:tg:{telegram_id}"
-    if tenant is None and settings.oauth_enabled and settings.mcp_public_url:
+    if tenant is not None:
+        return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=f"mcp:{tenant}")
+    личный = _owner_from_store(token)
+    if личный is not None:
+        return личный
+    if settings.oauth_enabled and settings.mcp_public_url:
         через_сайт = _owner_from_oauth(token, settings.mcp_public_url)
         if через_сайт is not None:
             return через_сайт
-    if tenant is None:
-        raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
-    return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=actor)
+    raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")

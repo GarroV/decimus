@@ -143,24 +143,19 @@ cases = [
         "    if False:\n        # Отвязан",
         "tests/test_web_walk.py::test_снятый_доступ_не_открывает_даже_свою_проверку",
     ),
-    # D373: команда с токеном ко всей истории — только кругу доступа к MCP.
+    # F-032: выпуск токена Claude — только по свежей подписи (5 минут).
     (
         "src/web/walk_settings.py",
-        "            if bot is None or not in_circle(who, bot):",
-        "            if bot is None:",
-        "tests/test_web_walk_app.py::test_токен_только_кругу",
+        "            _fresh(who, conf)\n",
+        "",
+        "tests/test_web_walk_app.py::test_старая_подпись_не_выпускает_токен",
     ),
+    # D448: токен — только себе; кому выпускать, решает подпись, не поле запроса.
     (
         "src/web/walk_settings.py",
-        "        if кому not in bot.allowed_ids:",
-        "        if False:",
-        "tests/test_web_walk_app.py::test_привести_можно_только_того_кого_пускает_бот",
-    ),
-    (
-        "src/web/walk_settings.py",
-        "        if у_кого == bot.mcp_owner_id:",
-        "        if False:",
-        "tests/test_web_walk_app.py::test_основателя_не_отозвать",
+        "        выпущен = mcp_access.issue_token(who)",
+        "        выпущен = mcp_access.issue_token(int(request.get_json().get('id', who)))",
+        "tests/test_web_walk_app.py::test_выпуск_не_принимает_чужой_id",
     ),
 ]
 bad = 0

@@ -23,14 +23,12 @@ psycopg = pytest.importorskip("psycopg")
 
 from src.db.directory import upsert_unit  # noqa: E402
 from src.db.errors import AccessError, PushError, SynonymError  # noqa: E402
-from src.db.mcp_access import add_admin, issue_token  # noqa: E402
 from src.db.synonyms import remember_phrase  # noqa: E402
 from src.db.web_access import create_account  # noqa: E402
 
 pytestmark = requires_db
 
 ОПЕЧАТКА = "HQQ"
-ОСНОВАТЕЛЬ = 100500
 
 
 def _пространства(dsn: str) -> set[str]:
@@ -41,11 +39,6 @@ def _пространства(dsn: str) -> set[str]:
 
 def _учётка(_: str) -> Any:
     return create_account("director", tenant=ОПЕЧАТКА, password="верный-пароль-учётки")
-
-
-def _токен(_: str) -> Any:
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    return issue_token(ОСНОВАТЕЛЬ, tenant=ОПЕЧАТКА)
 
 
 def _синоним(_: str) -> Any:
@@ -60,11 +53,12 @@ def _точка(_: str) -> Any:
     ("дверь", "отказ"),
     [
         (_учётка, AccessError),
-        (_токен, AccessError),
         (_синоним, SynonymError),
         (_точка, PushError),
     ],
-    ids=["web_access", "mcp_access", "synonyms", "directory"],
+    # `mcp_access` выбыл (аудит 12.10): личный токен берёт пространство из учётки
+    # сайта, а не из аргумента, — назвать опечатку ему больше нечем.
+    ids=["web_access", "synonyms", "directory"],
 )
 def test_опечатка_в_пространстве_это_отказ_а_не_новое_пространство(
     pg_dsn: str,

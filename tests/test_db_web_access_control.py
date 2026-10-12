@@ -59,7 +59,7 @@ def test_роли_пространства_контроль_только_в_уК
 
 @pytest.mark.parametrize("роль", ["developer", "guest"])
 def test_девелопер_и_гость_у_партнёра_отказ_схемой(обе_роли: str, роль: str) -> None:
-    """D440 (`0059`): обе роли бывают только в УК — держит схема, а не форма."""
+    """D440 (`0060`): обе роли бывают только в УК — держит схема, а не форма."""
     web_access.create_account("aud", tenant="GE", password=ПАРОЛЬ)
 
     with psycopg.connect(обе_роли) as conn, pytest.raises(psycopg.errors.CheckViolation):
@@ -67,7 +67,7 @@ def test_девелопер_и_гость_у_партнёра_отказ_схе�
 
 
 def test_аудитора_в_уК_схема_не_даёт(обе_роли: str) -> None:
-    """D440 (`0059`): аудитор УК стал девелопером, и новый в УК не заводится."""
+    """D440 (`0060`): аудитор УК стал девелопером, и новый в УК не заводится."""
     web_access.create_account("dev", tenant="HQ", password=ПАРОЛЬ, role="developer")
 
     with psycopg.connect(обе_роли) as conn, pytest.raises(psycopg.errors.CheckViolation):

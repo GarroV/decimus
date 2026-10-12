@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 
-from src.bot.access import space_from
+from src.bot.access import role_closed, space_from
 from src.bot.errors import BotConfigError
 from src.bot.roster import Roster
 from src.db import bot_links
@@ -42,3 +42,13 @@ def space_of(chat_id: int, conf: WalkSettings) -> str | None:
     """
     положение = bot_links.standing(chat_id)
     return space_from(chat_id, положение, allowed_ids=conf.allowed_ids, roster=_roster())
+
+
+def role_is_closed(chat_id: int) -> bool:
+    """Учётка человека жива, но её роли поле закрыто (контроль, D420, аудит 12.10 F-024).
+
+    Отдельный вопрос, а не ещё одно значение `space_of`: отказ по роли
+    объясняется человеку словами, а отказ постороннему — нет. Правило то же,
+    что у бота (`bot.access.role_closed`). База молчит — `DbError` наверх.
+    """
+    return role_closed(bot_links.standing(chat_id))
