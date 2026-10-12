@@ -71,6 +71,7 @@ from . import (
     settings_screen,
     swarm_api,
     to_inspect,
+    ui_lang,
     unit_add,
     users_screen,
     users_view,
@@ -99,7 +100,7 @@ from .sections import (
     section,
     visible_sections,
 )
-from .texts import UI_LANGS, lang_or_default, t
+from .texts import UI_LANGS, t
 
 logger = logging.getLogger(__name__)
 
@@ -207,14 +208,14 @@ def create_app(settings: Settings | None = None) -> Flask:
 
 
 def _lang(conf: Settings) -> str:
-    """Язык этого запроса: `?lang=` поверх языка стенда.
+    """Язык этого запроса: `?lang=` поверх языка профиля, затем стенда (`ui_lang`).
 
     Язык — параметр, а не константа (`CLAUDE.md`), и переключатель в шапке
     делает это видимым, а не только объявленным. Непонятное значение в адресе
     страницу не роняет: это ввод снаружи, и на границе он приводится к
     допустимому.
     """
-    return lang_or_default(request.args.get("lang"), fallback=conf.ui_lang)
+    return ui_lang.request_lang(conf.ui_lang)
 
 
 def _register_context(app: Flask, conf: Settings) -> None:
