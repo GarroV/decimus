@@ -209,6 +209,8 @@ scp seed.json contabo:/tmp/ && ssh contabo 'docker cp /tmp/seed.json decimus-bot
 любой агрегатор; у Migros — подсказка разбудить сервер). Причина сбоя пишется
 словами и без адреса ретранслятора: «Migros ответил HTTP 403 (через домашний
 сервер)» или «домашний сервер не отвечает». Цепочку держит `tests/test_migros_relay.py`.
+Если первые три точки подряд не ответили (`collect.GIVE_UP_AFTER`), остальные не
+опрашиваются: источник лежит, а каждая точка с повторами ждёт до двух с половиной минут.
 
 Обновить ретранслятор: скопировать `deploy/migros-relay/` и `migros_relay.py` в
 `C:\projects\decimus-migros-relay` с теми же путями и выполнить там `docker compose -f deploy/migros-relay/compose.yaml up -d --build`.

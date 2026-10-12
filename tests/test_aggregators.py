@@ -423,3 +423,41 @@ def test_glovo_после_известных_точек_ищет_новые_и_�
     assert (итог.ok, итог.points, итог.ratings) == (True, 2, 2)
     assert [p.point_key for p in записано[0][0]] == ["1", "2"]
     assert монтаж == [([unit], frozenset({"1"}))]  # закрытые в поиск не идут
+
+
+def test_источник_лежит_сбор_бросается_после_трёх(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Первые три точки не ответили — остальные не спрашиваются, сбор не ждёт час."""
+    зовы: list[str] = []
+
+    def лежит(_: object, точка: PointRow) -> object:
+        зовы.append(точка.point_key)
+        raise AggregatorError("домашний сервер не отвечает (URLError)")
+
+    точки = [_точка("migros_yemek", f"p{n}") for n in range(28)]
+    monkeypatch.setattr(agg_store, "known_points", lambda _: точки)
+    monkeypatch.setattr(migros, "refresh", лежит)
+    points, ratings, errors, attempts, first = collect._known_one(migros, [], ДЕНЬ)
+    assert зовы == ["p0", "p1", "p2"]
+    assert (points, ratings, errors, attempts) == ([], [], 3, 28)
+    assert first is not None and "домашний сервер не отвечает" in first
+    assert collect.verdict(0, errors, attempts, 28) is not None  # итог — СБОЙ
+
+
+def test_удачная_точка_дальше_не_бросает(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Источник жив, сбоят отдельные точки — опрашиваются все."""
+    зовы: list[str] = []
+
+    def через_раз(_: object, точка: PointRow) -> object:
+        зовы.append(точка.point_key)
+        if точка.point_key != "p0":
+            raise AggregatorError("HTTP 404")
+        return migros.parse(
+            {"storeDTO": {"title": "Dodo Pizza, X", "rating": {"score": "4,5", "commentCount": 1}}},
+            точка,
+        )
+
+    точки = [_точка("migros_yemek", f"p{n}") for n in range(6)]
+    monkeypatch.setattr(agg_store, "known_points", lambda _: точки)
+    monkeypatch.setattr(migros, "refresh", через_раз)
+    collect._known_one(migros, [], ДЕНЬ)
+    assert len(зовы) == 6
