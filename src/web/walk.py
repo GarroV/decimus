@@ -291,7 +291,7 @@ def walk_payload(
     app = walk_settings.app_block(chat_id, lang, bot)
     out = {**payload, "texts": texts_for(lang), "app": app}
     if app["finish_mode"] == finish_modes.REPORT:
-        # Языки отчёта нужны только режиму «Сразу отчёт» (D429): подтверждение
+        # Языки отчёта нужны только режиму «Сразу отчёт» (D439): подтверждение
         # в приложении предлагает их пилюлями. Остальным справочник не читаем.
         out["report_langs"] = [
             {"code": code, "label": LANG_LABELS.get(code, code)}

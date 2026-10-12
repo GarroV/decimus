@@ -21,6 +21,7 @@ import psycopg
 
 from .config import load_retraction_settings
 from .errors import MoveError
+from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 from .reach import Reach, require_reach
 from .reading import reading as _reading
@@ -111,7 +112,7 @@ def move_inspection(
         raise MoveError("Пиццерия не выбрана или указана неверно") from None
     settings = load_retraction_settings()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             изменено = _apply(conn, ident, tenant_code, new_date, new_unit_id, причина, автор)
             conn.commit()
             return изменено

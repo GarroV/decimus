@@ -10,6 +10,11 @@
 пиццерии рядом тоже записывается (без кода пиццерии) — так видно, что на
 витрине есть то, чего нет в публичном API, — но в оценки не входит.
 
+**Реестр пиццерий.** Каждый сбор читает публичный API Dodo по всем странам IMF и
+кладёт пиццерии в `agg.units` (D424): новая появляется сама, по реестру строится
+экран «Пиццерии на площадках». Сбой записи реестра сбор не останавливает. Glovo
+после обновления известных точек сам ищет точки новым пиццериям (`glovo_link`).
+
 **Страж.** Агрегатор вернул 0 точек, а прошлый удачный сбор принёс больше, или
 не ответил ни на один запрос — это сбой (`failed` в журнале), а не «Додо
 пропал»: снимок дня не пишется, на странице остаются прошлые оценки с датой.
@@ -26,10 +31,23 @@ from types import ModuleType
 
 from src.db import agg_store
 from src.db.agg_store import PointRow, RatingRow
+from src.db.errors import RatingsError
 from src.ratings import maps_link
 from src.ratings.maps_link import DodoUnit
 
-from . import base, bolt, chowdeck, glovo, pyszne, trendyol, wolt, yandex_eda, yemeksepeti
+from . import (
+    base,
+    bolt,
+    chowdeck,
+    glovo,
+    glovo_link,
+    migros,
+    pyszne,
+    trendyol,
+    wolt,
+    yandex_eda,
+    yemeksepeti,
+)
 from .base import AggregatorError, Found
 
 logger = logging.getLogger(__name__)
@@ -39,7 +57,8 @@ SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
 #: 429, затем 401 на поиске (#670); владелец 11.10.2026: «у яндекса в целом беда
 #: сейчас, так что давай пока его пропустим» (D397). Вернуть — перенести в SEARCHERS.
 PAUSED: tuple[ModuleType, ...] = (yandex_eda,)
-KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck)
+#: Migros Yemek — через ретранслятор на домашнем сервере (D434, `migros.py`).
+KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
 MAX_LINK_M = 400
 
 
@@ -142,15 +161,29 @@ def _search_one(
     return points, ratings, errors, len(mine), first_error
 
 
+#: Сколько первых точек «по известной точке» подряд могут не ответить, прежде
+#: чем сбор агрегатора прекращается: источник лежит (уснул домашний сервер у
+#: Migros), а каждая точка с повторами ждёт минуты — 28 точек тянулись бы час.
+GIVE_UP_AFTER = 3
+
+
 def _known_one(
-    module: ModuleType, today: date
+    module: ModuleType, units: Sequence[DodoUnit], today: date
 ) -> tuple[list[PointRow], list[RatingRow], int, int, str | None]:
     """Снять оценки точек агрегатора из справочника."""
     http = base.Http(module.GAP_SEC)
     known = agg_store.known_points(module.KEY)
-    points, ratings = [], []
+    points: list[PointRow] = []
+    ratings: list[RatingRow] = []
     errors, first_error = 0, None
     for row in known:
+        if errors >= GIVE_UP_AFTER and not points:
+            logger.warning(
+                "%s: первые %d точек не ответили — источник лежит, остальные не спрашиваем",
+                module.KEY,
+                errors,
+            )
+            break
         try:
             found = module.refresh(http, row)
         except AggregatorError as exc:
@@ -176,6 +209,16 @@ def _known_one(
         rating = _rating(module.KEY, found, today)
         if rating:
             ratings.append(rating)
+    if module is glovo:
+        new_points, new_ratings = glovo_link.discover(
+            base.Http(module.GAP_SEC),
+            [u for u in units if u.working],
+            known,
+            agg_store.point_keys(module.KEY),
+            today,
+        )
+        points.extend(new_points)
+        ratings.extend(new_ratings)
     return points, ratings, errors, len(known), first_error
 
 
@@ -183,7 +226,7 @@ def run_one(module: ModuleType, units: Sequence[DodoUnit], today: date) -> Outco
     """Один агрегатор: собрать, проверить стражем, записать снимок и журнал."""
     try:
         if module in KNOWN:
-            points, ratings, errors, attempts, first = _known_one(module, today)
+            points, ratings, errors, attempts, first = _known_one(module, units, today)
         else:
             points, ratings, errors, attempts, first = _search_one(module, units, today)
         failure = verdict(len(points), errors, attempts, agg_store.last_ok_points(module.KEY))
@@ -220,6 +263,25 @@ def countries(modules: Sequence[ModuleType] = SEARCHERS) -> frozenset[str]:
     return frozenset().union(*(m.COUNTRIES for m in modules if m in SEARCHERS + PAUSED))
 
 
+def _save_registry(units: Sequence[DodoUnit], today: date) -> None:
+    """Реестр пиццерий в базу. Отказ — в журнал: сбор оценок из-за него не встаёт."""
+    try:
+        agg_store.save_units(units, today)
+    except RatingsError:
+        logger.exception("Реестр пиццерий не записался — сбор идёт дальше")
+
+
+def _registry_countries(searching: Sequence[ModuleType]) -> frozenset[str]:
+    """Страны для чтения публичного API: все IMF плюс страны сборщиков. База не
+    ответила — только страны сборщиков, с записью в журнал."""
+    try:
+        imf = frozenset(agg_store.imf_countries())
+    except RatingsError:
+        logger.exception("Страны IMF не прочитались — берём страны сборщиков")
+        imf = frozenset()
+    return imf | countries(searching)
+
+
 def run_all(
     today: date,
     *,
@@ -239,6 +301,7 @@ def run_all(
     if not modules:
         return ()
     searching = [m for m in modules if m in SEARCHERS + PAUSED]
-    units = fetch_units(countries(searching)) if searching else ()
+    units = fetch_units(_registry_countries(searching))
+    _save_registry(units, today)
     with ThreadPoolExecutor(max_workers=len(modules), thread_name_prefix="agg") as pool:
         return tuple(pool.map(lambda m: run_one(m, units, today), modules))

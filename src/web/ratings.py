@@ -15,18 +15,22 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from datetime import date
+from urllib.parse import urlencode
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.wrappers import Response
 
 from src.db import agg_store, maps_store
 from src.db import ratings_read as read
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import may_manage_ratings
+from src.ratings import coverage, pointer, report
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
-from src.ratings import report
+from src.ratings.aggregators import collect, glovo_link
+from src.ratings.aggregators import queue as agg_queue
 from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
@@ -172,6 +176,24 @@ def _agg_failures() -> tuple[agg_store.LoadState, ...]:
         return ()
 
 
+def _agg_pending() -> agg_store.UpdateRequest | None:
+    """Заявка на обновление, которую бот ещё не выполнил. Не прочиталась — `None`
+    и след в журнале: кнопка остаётся, а «уже в очереди» ответит сама заявка."""
+    try:
+        return agg_store.open_request()
+    except RatingsError:
+        logger.warning("Заявки на обновление агрегаторов не прочитались", exc_info=True)
+        return None
+
+
+#: Что сказать после кнопки «Обновить сейчас»: ключ в адресе → ключ текста.
+_AGG_UPDATE_NOTICES = {
+    "queued": "ratings.agg.update.queued",
+    "already": "ratings.agg.update.already",
+    "db_down": "ratings.agg.update.db_down",
+}
+
+
 def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
     """Оценка Google по пиццериям, связанным с филиалами карт; сбой — пусто."""
     try:
@@ -245,6 +267,8 @@ def render_summary(conf: Settings) -> str:
         agg_failures=agg_failures,
         agg_failed_names=", ".join(agg_names.get(f.aggregator, f.aggregator) for f in agg_failures),
         agg_names=agg_names,
+        agg_pending=_agg_pending() if may_manage() else None,
+        agg_update_notice=_AGG_UPDATE_NOTICES.get(request.args.get("agg", "")),
         unit_maps=_unit_maps(min(selection.period.end, date.today())),
         chart=_chart(summary, names_of_groups, lang),
         clusters=report.CLUSTERS,
@@ -283,6 +307,84 @@ def render_imports(conf: Settings, *, notice: str | None = None, failure: str | 
         country_name=lambda code: names.get(code) or country_title(code, lang),
         at_format=_AT,
     )
+
+
+def _agg_countries() -> dict[str, frozenset[str]]:
+    """Где агрегатор ожидается: поисковый — в странах сборщика, известной точки
+    (Glovo, Chowdeck) — там, где у него есть точки; на паузе — только где точки
+    остались (D397)."""
+    expected = {m.KEY: frozenset(m.COUNTRIES) for m in collect.SEARCHERS}
+    for module in collect.KNOWN + collect.PAUSED:
+        has = agg_store.point_countries(module.KEY)
+        expected[module.KEY] = has if module in collect.KNOWN else has & frozenset(module.COUNTRIES)
+    return expected
+
+
+def render_coverage(
+    conf: Settings, *, notice: str | None = None, failure: str | None = None
+) -> str:
+    """«Пиццерии на площадках»: реестр пиццерий и их охват картами и агрегаторами.
+    База не ответила — пустой экран с причиной, страница живёт."""
+    lang = _lang(conf)
+    today = date.today()
+    wanted = (request.values.get("country") or "").strip().upper() or None
+    units: tuple[agg_store.UnitRow, ...] = ()
+    result = coverage.build((), (), (), {}, today)
+    names: dict[str, str] = {}
+    try:
+        names = _country_names(read.countries(), lang)
+        units = agg_store.units()
+        maps = [
+            (str(p), maps_store.unit_latest(p))
+            for p in (pointer.GOOGLE, pointer.YANDEX)  # порядок колонок: Google, Яндекс
+        ]
+        result = coverage.build(
+            units, maps, agg_store.coverage(), _agg_countries(), today, country=wanted
+        )
+    except RatingsError:
+        logger.warning("Охват площадок не прочитался", exc_info=True)
+        failure = failure or t("ratings.coverage.db_down", lang)
+    present = sorted({u.country for u in units if u.working})
+    return render_template(
+        "ratings/coverage.html",
+        coverage=result,
+        notice=notice,
+        failure=failure,
+        registry_empty=not units,
+        country=wanted,
+        country_codes=present,
+        country_name=lambda code: names.get(code) or country_title(code, lang),
+        agg_names=_agg_names(lang),
+        may_manage=may_manage(),
+        stale_days=coverage.STALE_DAYS,
+        new_days=coverage.NEW_DAYS,
+        ratings_path=section("ratings").path,
+        at_format=_AT,
+        today=today,
+    )
+
+
+def _link_glovo(conf: Settings) -> tuple[str, int]:
+    """Привязать пиццерию к Glovo по ссылке на страницу магазина. Итог — одной
+    строкой над таблицей; никому ничего не отправляется."""
+    lang = _lang(conf)
+    unit_id = (request.form.get("dodo_id") or "").strip().lower()
+    today = date.today()
+    try:
+        unit = next((u for u in agg_store.units() if u.dodo_id == unit_id), None)
+        result, point, rating = glovo_link.link_by_url(
+            unit, request.form.get("url") or "", agg_store.point_keys("glovo"), today
+        )
+        if point is not None:
+            agg_store.save([point], [rating] if rating else [])
+    except RatingsError:
+        logger.warning("рейтинги: привязка Glovo не легла", exc_info=True)
+        return render_coverage(conf, failure=t("ratings.coverage.db_down", lang)), 503
+    if result.code == glovo_link.OK and unit is not None:
+        notice = t("ratings.coverage.link.ok", lang, name=unit.name)
+        return render_coverage(conf, notice=notice), 200
+    reason = _coded("ratings.coverage.link", result.code, {}, lang, "ratings.coverage.link.failed")
+    return render_coverage(conf, failure=reason), 400
 
 
 def _loaded_notice(итог: ImportReport, lang: str) -> str:
@@ -368,6 +470,17 @@ def install(app: Flask, conf: Settings) -> None:
     def ratings_index() -> str:
         return render_summary(conf)
 
+    @app.get(f"{путь}/coverage", endpoint="ratings_coverage")
+    def ratings_coverage() -> str:
+        return render_coverage(conf)
+
+    @app.post(f"{путь}/coverage/link")
+    def ratings_coverage_link() -> tuple[str, int]:
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        return _link_glovo(conf)
+
     @app.get(f"{путь}/imports", endpoint="ratings_imports")
     def ratings_imports() -> str | tuple[str, int]:
         if not may_manage():
@@ -412,6 +525,22 @@ def install(app: Flask, conf: Settings) -> None:
             return _forbidden()
         refuse_foreign_origin()
         return _saved(conf, lambda: read.remove_hard_rule(rule_id))
+
+    @app.post(f"{путь}/aggregators/update")
+    def ratings_agg_update() -> Response | tuple[str, int]:
+        """Кнопка «Обновить сейчас» (D420): та же заявка, что у Claude; собирает бот.
+        Назад — на ту же сводку (период и срез из адреса), с пометкой исхода."""
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        try:
+            asked = agg_queue.ask(None, by=_actor())
+            outcome = "queued" if asked.created else "already"
+        except RatingsError:
+            logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
+            outcome = "db_down"
+        args = {**request.args.to_dict(), "agg": outcome}
+        return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
 
     @app.post(f"{путь}/layout")
     def ratings_layout() -> tuple[str, int]:

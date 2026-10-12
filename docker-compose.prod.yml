@@ -33,14 +33,19 @@
 
 name: decimus
 
+# Бюджет соединений к базе (`docs/08-deploy.md`, «Пул соединений»): `DB_POOL_MAX`
+# задан на каждую службу явно, чтобы сумма не зависела от умолчания пула.
 services:
   bot:
+    environment:
+      DB_POOL_MAX: "3"
     depends_on:
       db:
         condition: service_healthy
 
   mcp:
     environment:
+      DB_POOL_MAX: "4"
       MCP_HOST: 0.0.0.0
       MCP_LISTEN_NETWORK: "1"
     ports: !override
@@ -52,6 +57,7 @@ services:
   web:
     profiles: !reset []
     environment:
+      DB_POOL_MAX: "4"
       WEB_HOST: 0.0.0.0
       WEB_LISTEN_NETWORK: "1"
     ports: !override
@@ -64,6 +70,8 @@ services:
   # Слушает сеть контейнера уже в общей сборке, порт на хост не публикуется.
   walk:
     profiles: !reset []
+    environment:
+      DB_POOL_MAX: "2"
     depends_on: !override
       db:
         condition: service_healthy

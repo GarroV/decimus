@@ -11,12 +11,15 @@ from datetime import date
 
 import pytest
 
+from src.db import agg_store
 from src.db.agg_store import LatestRating, PointRow
+from src.db.errors import RatingsError
 from src.ratings.aggregators import (
     bolt,
     chowdeck,
     collect,
     glovo,
+    migros,
     pyszne,
     summary,
     trendyol,
@@ -27,6 +30,13 @@ from src.ratings.aggregators import (
 from src.ratings.aggregators.base import AggregatorError, is_dodo, votes_of
 
 ДЕНЬ = date(2026, 10, 11)
+
+
+@pytest.fixture(autouse=True)
+def _без_базы_реестра(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Реестр пиццерий и страны IMF в базе — здесь подставные: сбор их не требует."""
+    monkeypatch.setattr(agg_store, "imf_countries", lambda: ())
+    monkeypatch.setattr(agg_store, "save_units", lambda units, today: len(units))
 
 
 def test_додо_узнаётся_по_названию_сети_а_двойники_нет() -> None:
@@ -233,6 +243,24 @@ def test_chowdeck_оценка_строкой_и_не_додо_это_сбой()
         chowdeck.parse({"data": {"name": "Pizza Hut"}}, точка)
 
 
+def test_migros_оценка_с_запятой_и_не_додо_это_сбой() -> None:
+    точка = _точка("migros_yemek", "dodo-pizza-buca-vali-rahmi-bey-mah-st-1")
+    ответ = {
+        "storeDTO": {
+            "id": 23000000183206,
+            "title": "Dodo Pizza, Buca (Vali Rahmi Bey Mah.)",
+            "rating": {"score": "4,7", "commentCount": 612},
+            "commentCount": "100+",
+            "cityId": 35,
+        }
+    }
+    найдено = migros.parse(ответ, точка)
+    assert (найдено.score, найдено.scale, найдено.votes, найдено.votes_exact) == (4.7, 5, 612, True)
+    assert найдено.url == "https://www.migros.com.tr/yemek/dodo-pizza-buca-vali-rahmi-bey-mah-st-1"
+    with pytest.raises(AggregatorError):
+        migros.parse({"storeDTO": {"title": "Dodo Burger, Buca (Hürriyet Mah.)"}}, точка)
+
+
 def test_привязка_ближайшая_и_одна_к_одной() -> None:
     # Точка «a» в 10 м от пиццерии 1 и в 50 м от 2; точка «b» в 30 м от 1 и в
     # 60 м от 2 — пиццерия 1 достаётся «a», «b» идёт к 2. Дальше 400 м — не пара.
@@ -313,3 +341,123 @@ def test_агрегатор_на_паузе_бот_не_зовёт_а_рукам
     assert "yandex_eda" not in бот and "wolt" in бот
     assert руками == ["yandex_eda"]
     assert "BY" not in страны[0] and страны[1] == yandex_eda.COUNTRIES
+
+
+def test_сбор_читает_пиццерии_всех_стран_imf_и_пишет_реестр(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """D424: реестр — по всем странам IMF, не только по странам сборщиков."""
+    monkeypatch.setattr(agg_store, "imf_countries", lambda: ("RS", "ZZ"))
+    монтаж: list[object] = []
+    monkeypatch.setattr(agg_store, "save_units", lambda units, today: монтаж.append(units) or 1)
+    monkeypatch.setattr(
+        collect, "run_one", lambda m, u, d: collect.Outcome(m.KEY, True, 0, 0, None)
+    )
+    страны: list[frozenset[str]] = []
+
+    def пиццерии(codes: frozenset[str]) -> tuple[str, ...]:
+        страны.append(codes)
+        return ("пиццерия",)
+
+    collect.run_all(ДЕНЬ, only=["glovo"], fetch_units=пиццерии)  # type: ignore[arg-type]
+
+    assert "ZZ" in страны[0] and "RS" in страны[0]  # IMF — даже когда идёт один Glovo
+    assert монтаж == [("пиццерия",)]
+
+
+def test_сбой_записи_реестра_и_стран_не_останавливает_сбор(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def упало(*_: object) -> None:
+        raise RatingsError("база отказала")
+
+    monkeypatch.setattr(agg_store, "imf_countries", упало)
+    monkeypatch.setattr(agg_store, "save_units", упало)
+    monkeypatch.setattr(
+        collect, "run_one", lambda m, u, d: collect.Outcome(m.KEY, True, 0, 0, None)
+    )
+    страны: list[frozenset[str]] = []
+    пиццерии = lambda codes: страны.append(codes) or ()  # noqa: E731
+
+    итог = collect.run_all(ДЕНЬ, fetch_units=пиццерии)  # type: ignore[arg-type]
+
+    assert [o.aggregator for o in итог] == [m.KEY for m in collect.SEARCHERS + collect.KNOWN]
+    assert страны[0] == collect.countries()  # без базы — страны сборщиков
+
+
+def test_glovo_после_известных_точек_ищет_новые_и_пишет_их_вместе(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Автопоиск (D424) встроен в сбор Glovo: найденное ложится тем же снимком."""
+    from src.db.agg_store import RatingRow
+    from src.ratings.aggregators import base, glovo_link
+    from src.ratings.maps_link import DodoUnit
+
+    известная, новая = _точка("glovo", "1"), _точка("glovo", "2")
+    записано: list[tuple[list[PointRow], list[RatingRow]]] = []
+    monkeypatch.setattr(agg_store, "known_points", lambda key: (известная,))
+    monkeypatch.setattr(agg_store, "point_keys", lambda key: frozenset({"1"}))
+    monkeypatch.setattr(agg_store, "last_ok_points", lambda key: 1)
+    monkeypatch.setattr(agg_store, "log_load", lambda *a, **k: None)
+    monkeypatch.setattr(
+        agg_store, "save", lambda p, r: (записано.append((list(p), list(r))), (len(p), len(r)))[1]
+    )
+    monkeypatch.setattr(
+        glovo,
+        "refresh",
+        lambda http, row: base.Found("1", "Dodo", None, None, None, 90.0, 100, 5, True, True),
+    )
+    рейтинг = RatingRow("glovo", "2", ДЕНЬ, 95.0, 100, 7, True, True)
+    монтаж: list[object] = []
+
+    def поиск(http: object, units: object, known: object, taken: object, today: date) -> object:
+        монтаж.append((list(units), taken))  # type: ignore[call-overload]
+        return [новая], [рейтинг]
+
+    monkeypatch.setattr(glovo_link, "discover", поиск)
+    unit = DodoUnit("b" * 32, "Новая", 44.4, 26.1, "RO")
+    закрытая = DodoUnit("c" * 32, "Закрыта", 44.4, 26.1, "RO", working=False)
+
+    итог = collect.run_one(glovo, [unit, закрытая], ДЕНЬ)
+
+    assert (итог.ok, итог.points, итог.ratings) == (True, 2, 2)
+    assert [p.point_key for p in записано[0][0]] == ["1", "2"]
+    assert монтаж == [([unit], frozenset({"1"}))]  # закрытые в поиск не идут
+
+
+def test_источник_лежит_сбор_бросается_после_трёх(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Первые три точки не ответили — остальные не спрашиваются, сбор не ждёт час."""
+    зовы: list[str] = []
+
+    def лежит(_: object, точка: PointRow) -> object:
+        зовы.append(точка.point_key)
+        raise AggregatorError("домашний сервер не отвечает (URLError)")
+
+    точки = [_точка("migros_yemek", f"p{n}") for n in range(28)]
+    monkeypatch.setattr(agg_store, "known_points", lambda _: точки)
+    monkeypatch.setattr(migros, "refresh", лежит)
+    points, ratings, errors, attempts, first = collect._known_one(migros, [], ДЕНЬ)
+    assert зовы == ["p0", "p1", "p2"]
+    assert (points, ratings, errors, attempts) == ([], [], 3, 28)
+    assert first is not None and "домашний сервер не отвечает" in first
+    assert collect.verdict(0, errors, attempts, 28) is not None  # итог — СБОЙ
+
+
+def test_удачная_точка_дальше_не_бросает(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Источник жив, сбоят отдельные точки — опрашиваются все."""
+    зовы: list[str] = []
+
+    def через_раз(_: object, точка: PointRow) -> object:
+        зовы.append(точка.point_key)
+        if точка.point_key != "p0":
+            raise AggregatorError("HTTP 404")
+        return migros.parse(
+            {"storeDTO": {"title": "Dodo Pizza, X", "rating": {"score": "4,5", "commentCount": 1}}},
+            точка,
+        )
+
+    точки = [_точка("migros_yemek", f"p{n}") for n in range(6)]
+    monkeypatch.setattr(agg_store, "known_points", lambda _: точки)
+    monkeypatch.setattr(migros, "refresh", через_раз)
+    collect._known_one(migros, [], ДЕНЬ)
+    assert len(зовы) == 6

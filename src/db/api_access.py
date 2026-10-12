@@ -6,8 +6,9 @@
 
 - **значение токена не хранится** — только SHA-256 (миграция `0049`); почему
   SHA-256 без соли, а не медленная функция, сказано в заголовке `mcp_access`;
-- **права** — закрытый перечень (`SCOPES`), маршрут пускает только токен с
-  нужным правом;
+- **права** — по методам API, закрытый перечень (`SCOPES`, D425, миграция
+  `0052`): маршрут пускает только токен с правом своего метода;
+- **срок** — по желанию; просроченный не пускает, как отозванный;
 - **отзыв** — пометкой со следом, строка остаётся;
 - **журнал** — каждое обращение, включая отказы; по нему же считается лимит
   частоты на токен.
@@ -26,7 +27,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 
 import psycopg
@@ -35,11 +36,28 @@ from .config import check_environment
 from .database_target import managing_dsn
 from .errors import AccessError
 from .mcp_access import new_token, token_fingerprint
+from .pool import connection
 
-SCOPE_RATINGS_READ = "ratings:read"
-SCOPE_INSPECTIONS_READ = "inspections:read"
-#: Закрытый перечень прав. Тот же список держит ограничение схемы (`0049`).
-SCOPES = (SCOPE_RATINGS_READ, SCOPE_INSPECTIONS_READ)
+SCOPE_RATING_SCORES = "ratings:scores"
+SCOPE_RATING_CHECKUPS = "ratings:checkups"
+SCOPE_RATING_VIOLATIONS = "ratings:violations"
+SCOPE_MAPS = "maps:ratings"
+SCOPE_AGGREGATORS = "aggregators:ratings"
+SCOPE_INSPECTION_LIST = "inspections:list"
+SCOPE_INSPECTION_DETAIL = "inspections:detail"
+SCOPE_INSPECTION_VIOLATIONS = "inspections:violations"
+#: Закрытый перечень прав — по праву на метод API (D425). Тот же список держит
+#: ограничение схемы (`0052`); порядок — порядок переключателей на «Подключениях».
+SCOPES = (
+    SCOPE_RATING_SCORES,
+    SCOPE_RATING_CHECKUPS,
+    SCOPE_RATING_VIOLATIONS,
+    SCOPE_MAPS,
+    SCOPE_AGGREGATORS,
+    SCOPE_INSPECTION_LIST,
+    SCOPE_INSPECTION_DETAIL,
+    SCOPE_INSPECTION_VIOLATIONS,
+)
 
 #: Сколько хранится журнал. Старше — удаляется попутно с записью.
 LOG_RETENTION = timedelta(days=90)
@@ -47,8 +65,9 @@ LOG_RETENTION = timedelta(days=90)
 LOG_PURGE_BATCH = 100
 
 _RESOLVE_SQL = """
-select id, consumer, scopes from api.tokens
+select id, consumer, scopes, countries from api.tokens
 where fingerprint = %s and revoked_at is null
+  and (expires_at is null or expires_at > now())
 """
 
 _RECENT_SQL = """
@@ -65,9 +84,24 @@ where id in (select id from api.access_log where at < now() - %s::interval limit
 """
 
 _ISSUE_SQL = """
-insert into api.tokens (consumer, fingerprint, scopes, issued_by)
-values (%s, %s, %s, %s)
+insert into api.tokens
+    (consumer, fingerprint, scopes, issued_by, title, contact, expires_at, countries)
+values (%s, %s, %s, %s, %s, %s, %s, %s)
 returning id
+"""
+_UPDATE_SQL = """
+update api.tokens
+set scopes = %s, title = %s, contact = %s, expires_at = %s, countries = %s
+where id = %s and revoked_at is null
+"""
+_USAGE_SQL = """
+select at::date, count(*), count(*) filter (where status >= 400)
+from api.access_log
+where token_id = %s and at > now() - %s::interval
+group by 1 order by 1 desc
+"""
+_RECENT_LOG_SQL = """
+select at, path, status from api.access_log where token_id = %s order by at desc limit %s
 """
 
 _REVOKE_SQL = """
@@ -76,8 +110,14 @@ where id = %s and revoked_at is null
 """
 
 _LIST_SQL = """
-select id, consumer, scopes, issued_at, issued_by, revoked_at, revoked_by
-from api.tokens order by id
+select t.id, t.consumer, t.scopes, t.issued_at, t.issued_by, t.revoked_at, t.revoked_by,
+       t.title, t.contact, t.expires_at, t.countries,
+       (select max(l.at) from api.access_log l where l.token_id = t.id),
+       (select count(*) from api.access_log l
+         where l.token_id = t.id and l.at > now() - interval '7 days'),
+       (select count(*) from api.access_log l
+         where l.token_id = t.id and l.at > now() - interval '7 days' and l.status >= 400)
+from api.tokens t order by t.id
 """
 
 
@@ -88,6 +128,8 @@ class ApiToken:
     id: int
     consumer: str
     scopes: tuple[str, ...]
+    #: Страны, которые токен видит; `None` — вся сеть.
+    countries: tuple[str, ...] | None = None
 
     def allows(self, scope: str) -> bool:
         return scope in self.scopes
@@ -114,6 +156,35 @@ class TokenRow:
     issued_by: str
     revoked_at: datetime | None
     revoked_by: str | None
+    title: str | None = None
+    contact: str | None = None
+    expires_at: datetime | None = None
+    countries: tuple[str, ...] | None = None
+    last_used_at: datetime | None = None
+    calls_week: int = 0
+    errors_week: int = 0
+
+    @property
+    def name(self) -> str:
+        """Как назвать сервис человеку: имя, а без него — код."""
+        return self.title or self.consumer
+
+    def is_live(self, now: datetime) -> bool:
+        return self.revoked_at is None and (self.expires_at is None or self.expires_at > now)
+
+
+@dataclass(frozen=True)
+class DayUsage:
+    day: date
+    calls: int
+    errors: int
+
+
+@dataclass(frozen=True)
+class LogLine:
+    at: datetime
+    path: str
+    status: int
 
 
 @contextmanager
@@ -121,7 +192,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Роль приложения; наружу — тип исключения драйвера, а не его текст (DSN)."""
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
@@ -149,7 +220,12 @@ def resolve(token: str) -> ApiToken | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return ApiToken(id=int(row[0]), consumer=str(row[1]), scopes=_scopes(row[2]))
+    return ApiToken(
+        id=int(row[0]),
+        consumer=str(row[1]),
+        scopes=_scopes(row[2]),
+        countries=None if row[3] is None else _scopes(row[3]),
+    )
 
 
 def recent_requests(token_id: int, window: timedelta) -> int:
@@ -176,16 +252,125 @@ def _checked_scopes(scopes: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(scopes))
 
 
-def issue(consumer: str, scopes: tuple[str, ...], *, by: str) -> IssuedApiToken:
+def _issue(
+    cur: psycopg.Cursor[Any],
+    consumer: str,
+    права: tuple[str, ...],
+    by: str,
+    *,
+    title: str | None,
+    contact: str | None,
+    expires_at: datetime | None,
+    countries: tuple[str, ...] | None,
+) -> IssuedApiToken:
+    token = new_token()
+    cur.execute(
+        _ISSUE_SQL,
+        (
+            consumer,
+            token_fingerprint(token),
+            list(права),
+            by,
+            title,
+            contact,
+            expires_at,
+            None if countries is None else list(countries),
+        ),
+    )
+    row = cur.fetchone()
+    if row is None:
+        raise AccessError("База не вернула строку после выпуска токена API")
+    return IssuedApiToken(id=int(row[0]), consumer=consumer, scopes=права, value=token)
+
+
+def issue(
+    consumer: str,
+    scopes: tuple[str, ...],
+    *,
+    by: str,
+    title: str | None = None,
+    contact: str | None = None,
+    expires_at: datetime | None = None,
+    countries: tuple[str, ...] | None = None,
+) -> IssuedApiToken:
     """Выпустить токен. Значение возвращается один раз — в базе только отпечаток."""
     права = _checked_scopes(scopes)
-    token = new_token()
     with _managing("выпустить токен API") as conn, conn.cursor() as cur:
-        cur.execute(_ISSUE_SQL, (consumer, token_fingerprint(token), list(права), by))
-        row = cur.fetchone()
-        if row is None:
-            raise AccessError("База не вернула строку после выпуска токена API")
-    return IssuedApiToken(id=int(row[0]), consumer=consumer, scopes=права, value=token)
+        return _issue(
+            cur,
+            consumer,
+            права,
+            by,
+            title=title,
+            contact=contact,
+            expires_at=expires_at,
+            countries=countries,
+        )
+
+
+def update(
+    token_id: int,
+    scopes: tuple[str, ...],
+    *,
+    title: str | None,
+    contact: str | None,
+    expires_at: datetime | None,
+    countries: tuple[str, ...] | None,
+) -> bool:
+    """Поменять живому токену права, имя, контакт, срок, страны — без нового
+    ключа. `False` — живого токена с таким номером нет."""
+    права = _checked_scopes(scopes)
+    with _managing("поменять токен API") as conn, conn.cursor() as cur:
+        cur.execute(
+            _UPDATE_SQL,
+            (
+                list(права),
+                title,
+                contact,
+                expires_at,
+                None if countries is None else list(countries),
+                token_id,
+            ),
+        )
+        return cur.rowcount > 0
+
+
+def reissue(token_id: int, *, by: str) -> IssuedApiToken | None:
+    """Новый ключ с теми же правами вместо старого — одной транзакцией: старый
+    отозван ровно тогда, когда выпущен новый. `None` — живого токена нет."""
+    живой = next((t for t in list_tokens() if t.id == token_id and t.revoked_at is None), None)
+    if живой is None:
+        return None
+    with _managing("перевыпустить токен API") as conn, conn.cursor() as cur:
+        cur.execute(_REVOKE_SQL, (by, token_id))
+        if cur.rowcount == 0:
+            return None
+        return _issue(
+            cur,
+            живой.consumer,
+            живой.scopes,
+            by,
+            title=живой.title,
+            contact=живой.contact,
+            expires_at=живой.expires_at,
+            countries=живой.countries,
+        )
+
+
+def usage(token_id: int, *, days: int) -> list[DayUsage]:
+    """Обращения токеном по дням за последние `days` дней, свежие первыми."""
+    with _managing("посчитать обращения токена API") as conn, conn.cursor() as cur:
+        cur.execute(_USAGE_SQL, (token_id, timedelta(days=days)))
+        rows = cur.fetchall()
+    return [DayUsage(r[0], int(r[1]), int(r[2])) for r in rows]
+
+
+def recent_log(token_id: int, *, limit: int) -> list[LogLine]:
+    """Последние обращения токеном: когда, куда, с каким ответом."""
+    with _managing("прочитать журнал токена API") as conn, conn.cursor() as cur:
+        cur.execute(_RECENT_LOG_SQL, (token_id, limit))
+        rows = cur.fetchall()
+    return [LogLine(r[0], str(r[1]), int(r[2])) for r in rows]
 
 
 def revoke(token_id: int, *, by: str) -> bool:
@@ -209,6 +394,13 @@ def list_tokens() -> list[TokenRow]:
             issued_by=str(r[4]),
             revoked_at=r[5],
             revoked_by=None if r[6] is None else str(r[6]),
+            title=r[7],
+            contact=r[8],
+            expires_at=r[9],
+            countries=None if r[10] is None else _scopes(r[10]),
+            last_used_at=r[11],
+            calls_week=int(r[12]),
+            errors_week=int(r[13]),
         )
         for r in rows
     ]
