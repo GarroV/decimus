@@ -49,7 +49,7 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
-from src.domain.tenants import canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import oauth, swarm_api, walk_auth
 from .config import Settings
@@ -60,7 +60,9 @@ from .google_auth import (
     authorization_url,
     exchange_code,
     for_request,
+    hq_domain_ok,
     load_google_settings,
+    load_hq_domains,
     new_state,
 )
 from .origin import over_https, refuse_foreign_origin
@@ -302,6 +304,11 @@ def install(app: Flask, conf: Settings) -> None:
         ответ.headers["Retry-After"] = str(приговор.retry_after_seconds)
         return ответ
 
+    # Реквизиты Google читаются один раз: от них зависят и вход через Google, и
+    # то, закрыт ли пароль учёткам с привязанной почтой.
+    google = load_google_settings()
+    hq_domains = load_hq_domains()
+
     @app.route(LOGIN_PATH, methods=("GET", "POST"), endpoint="login")
     def login() -> str | Response | tuple[str, int]:
         if request.method != "POST":
@@ -323,6 +330,19 @@ def install(app: Flask, conf: Settings) -> None:
         if not попытка.admitted:
             return заперто(попытка.verdict)
         account = authenticate(имя, request.form.get("password") or "")
+        if account is not None and google is not None and account.email:
+            # Учётка с привязанной почтой Google паролем не входит: пароль по
+            # дороге проходит через фронт и прокси, Google — нет. Отказ стоит
+            # ПОСЛЕ сверки пароля: до неё он рассказал бы любому, у кого какой
+            # вход. Аварийный путь — снять привязку командой обслуживания
+            # (`tools/web_user.py email <логин>`, docs/12-web-admin.md).
+            return render_template(
+                "login.html",
+                failed=False,
+                use_google=True,
+                locked_minutes=None,
+                next_path=safe_next(request.form.get("next")),
+            ), 403
         if account is None:
             if попытка.verdict.locked:
                 return заперто(попытка.verdict)
@@ -342,7 +362,6 @@ def install(app: Flask, conf: Settings) -> None:
         session = open_session(account)
         return remember(after_login(request.form.get("next")), session)
 
-    google = load_google_settings()
     state_signer = URLSafeTimedSerializer(
         conf.secret_key, salt=GOOGLE_STATE_SALT, signer_kwargs={"digest_method": hashlib.sha256}
     )
@@ -447,6 +466,18 @@ def install(app: Flask, conf: Settings) -> None:
         # иначе круг допущенных задавал бы Google, а не владелец.
         account = find_by_email(кто.email)
         if account is None:
+            return отказано
+        # Учётка УК — только из домена компании (D430, F-028): совпавшая почта
+        # без `hd` компании — это аккаунт, заведённый на чужой адрес, а не
+        # сотрудник. Партнёров проверка не касается: они входят по почтам из
+        # списка своего пространства, без домена.
+        if canonical_tenant(account.tenant) == HQ_TENANT and not hq_domain_ok(кто, hq_domains):
+            # В журнал — пришедший домен организации, не почта: по нему видно,
+            # что дописать в GOOGLE_HQ_DOMAINS, если отказали своему.
+            current_app.logger.warning(
+                "вход через Google: домен организации %r не в GOOGLE_HQ_DOMAINS",
+                кто.hosted_domain,
+            )
             return отказано
 
         note_success(

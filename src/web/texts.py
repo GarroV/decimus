@@ -300,6 +300,18 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",
     },
+    # Учётка с привязанной почтой Google паролем не входит (аудит 12.10):
+    # пароль идёт через фронт и прокси, вход Google — нет.
+    "auth.use_google": {
+        "ru": "К этой учётке привязана почта Google — входите кнопкой «Войти через Google». "
+        "Пароль для неё не принимается.",
+        "en": "This account has a Google address linked — use “Sign in with Google”. "
+        "Password sign-in is turned off for it.",
+    },
+    "auth.google_hint": {
+        "ru": "Если к учётке привязана почта Google, вход — только через Google.",
+        "en": "If your account has a Google address linked, sign in with Google only.",
+    },
     "auth.aside": {
         "ru": (
             "Забыли пароль или нужна учётка — обратитесь к команде проекта: "
@@ -993,6 +1005,14 @@ TEXTS: dict[str, dict[str, str]] = {
             "Mail is not configured on this stand — there is nowhere to put a draft. "
             "The letter is saved."
         ),
+    },
+    "letter.gmail.wrong_account": {
+        "ru": "Черновик не создан: доступ к почте выдал не тот аккаунт Google. Черновик кладётся "
+        "только в почту, которой вы входите через Google, — выберите в окне Google её. Письмо "
+        "сохранено.",
+        "en": "The draft was not created: mail access came from a different Google account. "
+        "Drafts go only to the mailbox you sign in with through Google — pick that one in the "
+        "Google window. The letter is saved.",
     },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
     "letter.draft.shown": {

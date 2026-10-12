@@ -45,6 +45,7 @@ from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.inspections import load_registry as настоящий_реестр
 from src.web.inspections import retraction_available as настоящая_проверка_истории
 from src.web.sections import SECTIONS
+from src.web.texts import t
 
 ТЕНАНТ = "default"
 
@@ -570,9 +571,12 @@ def test_недоступная_база_показана_страницей_а_
     # Act
     ответ = стенд.get("/inspections")
 
-    # Assert
+    # Assert — страница, а не 500; текст отказа базы на экран не идёт (F-012
+    # аудита 12.10): он пишется оператору и бывает с хостом и ролью.
+    страница = ответ.get_data(as_text=True)
     assert ответ.status_code == 503
-    assert "связь с базой не установлена" in ответ.get_data(as_text=True)
+    assert t("error.db.title", "ru") in страница
+    assert "связь с базой не установлена" not in страница
 
 
 @pytest.mark.parametrize("причина", [psycopg.errors.UndefinedColumn, psycopg.errors.UndefinedTable])

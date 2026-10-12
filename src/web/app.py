@@ -97,7 +97,7 @@ from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
 from .sections import (
-    CONTROL_READ_ONLY,
+    CONTROL_HOME,
     SECTIONS,
     check_registry,
     current_section,
@@ -660,6 +660,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     # Вход тоже ведёт сюда (через `home`), чтобы выбор жил в одном месте.
     @app.get("/")
     def home() -> Response:
+        вошедший = auth.current_account()
+        if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
+            # «Главной» у контролинга нет (D420) — его стартовый экран «Рейтинги».
+            return redirect(url_for(CONTROL_HOME))
         return redirect(url_for("overview"))  # при входе все — на «Главной» (D378)
 
     @app.get(section("registry").path)
@@ -1161,7 +1165,7 @@ def _install_methodology_gate(app: Flask) -> None:
 
 
 def _install_control_gate(app: Flask) -> None:
-    """Роль «контроль»: правит только рейтинги и своих людей, читает обзор и проверки (D358, D366).
+    """Роль «контроль»: только рейтинги и свои люди, проверок не касается никак (D358, D420).
 
     Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
     для контроля с момента появления, и закрывать его не придётся помнить.
@@ -1176,9 +1180,6 @@ def _install_control_gate(app: Flask) -> None:
             return
         вошедший = auth.current_account()
         if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
-            return
-        # Обзор и проверки — на чтение (D366); запись в них закрыта, как везде.
-        if request.method in _READ_METHODS and current_section(request.path) in CONTROL_READ_ONLY:
             return
         if not _control_may_enter(
             request.path,

@@ -32,9 +32,15 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 from waitress import serve  # noqa: E402 -- окружение читается до импорта конфигурации
 
 from .app import create_app  # noqa: E402
-from .config import WEB_SECRET_KEY_VAR, load_settings  # noqa: E402
+from .config import (  # noqa: E402
+    ANY_PEER,
+    WEB_SECRET_KEY_VAR,
+    WEB_TRUSTED_PROXY_ADDR_VAR,
+    load_settings,
+    require_signing_key,
+)
 from .errors import WebError  # noqa: E402
-from .proxy import _proxy_options  # noqa: E402
+from .proxy import guard_forwarded, serve_options, untrusted_network  # noqa: E402
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +51,7 @@ def main() -> int:
     )
     try:
         settings = load_settings()
+        require_signing_key(settings)
         app = create_app(settings)
     except WebError as exc:
         print(f"Веб-админка не поднялась: {exc}", file=sys.stderr)
@@ -72,12 +79,28 @@ def main() -> int:
         settings.tenant,
         settings.ui_lang,
     )
+    if untrusted_network(settings):
+        # Звенья обещаны, а адрес звена не назван: заголовкам звена не верим
+        # (F-038). Счётчик перебора — один на всех, формы за HTTPS-прокси
+        # получат 403 заслона происхождения. Сказать это обязан запуск.
+        logger.warning(
+            "%s не задан: заголовкам X-Forwarded-* не верим ни от кого. Назовите адрес "
+            "или подсеть своего прокси (docs/08-deploy.md, §8.1)",
+            WEB_TRUSTED_PROXY_ADDR_VAR,
+        )
+    if settings.trusted_proxies > 0 and ANY_PEER in settings.trusted_proxy_addrs:
+        logger.warning(
+            "%s=%s: заголовкам X-Forwarded-* верим от ЛЮБОГО соседа. Сузьте до подсети "
+            "своего прокси (docs/08-deploy.md, §8.1)",
+            WEB_TRUSTED_PROXY_ADDR_VAR,
+            ANY_PEER,
+        )
     serve(
-        app,
+        guard_forwarded(app, settings),
         host=settings.host,
         port=settings.port,
         ident="decimus",
-        **_proxy_options(settings),
+        **serve_options(settings),
     )
     return 0
 

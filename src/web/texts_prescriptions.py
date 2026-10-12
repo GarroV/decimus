@@ -145,6 +145,14 @@ PRESCRIPTION_TEXTS: dict[str, dict[str, str]] = {
         "en": "The draft reached your mailbox but the notice was not marked as sent. Delete "
         "that draft without sending it and try again.",
     },
+    "rx.gmail.wrong_account": {
+        "ru": "Доступ к почте выдал не тот аккаунт Google — предписание осталось черновиком. "
+        "Черновик кладётся только в почту, которой вы входите через Google: выберите её в окне "
+        "Google.",
+        "en": "Mail access came from a different Google account, so the notice is still a draft. "
+        "Drafts go only to the mailbox you sign in with through Google: pick it in the Google "
+        "window.",
+    },
     "rx.not_found.title": {"ru": "Предписание не найдено", "en": "Notice not found"},
     "rx.not_found.text": {
         "ru": "Такого предписания нет или оно вам недоступно.",
