@@ -292,7 +292,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -300,6 +300,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
 | `src/db/directory.py` | T092: справочник точек и карта синонимов |
 | `src/db/fingerprint.py` | Отпечаток содержимого завершённой проверки |
+| `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D447): чтение и запись |
 | `src/db/imports.py` | Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334) |
 | `src/db/imports_legacy.py` | Записи исторической проверки (`origin = 'legacy'`, D332): без движка |
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
