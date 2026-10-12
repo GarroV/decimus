@@ -11,7 +11,7 @@
 
 Запуск (из корня репозитория):
 
-    .venv/bin/python tools/api_token.py issue swarm --scope ratings:read,inspections:read
+    .venv/bin/python tools/api_token.py issue swarm --scope ratings:scores,maps:ratings
     .venv/bin/python tools/api_token.py list
     .venv/bin/python tools/api_token.py revoke 3
 """

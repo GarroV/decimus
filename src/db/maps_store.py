@@ -233,3 +233,24 @@ def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]
             f"Оценки пиццерий на картах не прочитались ({exc.__class__.__name__})"
         ) from exc
     return {str(r[0]): (float(r[1]), int(r[2])) for r in rows}
+
+
+def unit_latest(provider_id: int) -> dict[str, tuple[float, date]]:
+    """Последняя оценка каждой связанной пиццерии на карте и её дата:
+    код → (оценка, дата). Без ограничения по дате — для экрана охвата."""
+    sql = """
+        select distinct on (c.dodo_id) c.dodo_id, r.avg_rating, r.on_date
+        from maps.ratings r
+        join maps.companies c on c.uuid = r.company_uuid
+        where c.dodo_id is not null and r.provider_id = %s
+          and c.excluded_reason is null and r.ratings_count > 0
+        order by c.dodo_id, r.on_date desc
+    """
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            rows = conn.execute(sql, (provider_id,)).fetchall()
+    except psycopg.Error as exc:
+        raise RatingsError(
+            f"Оценки пиццерий на картах не прочитались ({exc.__class__.__name__})"
+        ) from exc
+    return {str(r[0]): (float(r[1]), r[2]) for r in rows}

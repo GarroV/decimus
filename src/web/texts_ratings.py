@@ -283,6 +283,88 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.agg.name.trendyol_go": {"ru": "Trendyol Go", "en": "Trendyol Go"},
     "ratings.agg.name.pyszne_pl": {"ru": "Pyszne.pl", "en": "Pyszne.pl"},
     "ratings.agg.name.chowdeck": {"ru": "Chowdeck", "en": "Chowdeck"},
+    "ratings.coverage.title": {"ru": "Пиццерии на площадках", "en": "Pizzerias on platforms"},
+    "ratings.coverage.open": {"ru": "по пиццериям →", "en": "by pizzeria →"},
+    "ratings.coverage.hint": {
+        "ru": "На каких картах и агрегаторах есть каждая пиццерия и свежие ли там данные",
+        "en": "Which maps and delivery apps list each pizzeria, and whether the data is fresh",
+    },
+    "ratings.coverage.counters": {
+        "ru": "пиццерий {n} · новых за {days} дней {new} · без точки на площадках {gap}",
+        "en": "pizzerias {n} · new in {days} days {new} · missing on a platform {gap}",
+    },
+    "ratings.coverage.gap_hint": {
+        "ru": "Работающие пиццерии, у которых нет точки хотя бы на одном агрегаторе страны",
+        "en": "Working pizzerias with no listing on at least one delivery app of their country",
+    },
+    "ratings.coverage.new": {"ru": "новая", "en": "new"},
+    "ratings.coverage.new_title": {
+        "ru": "Появилась в публичном API Dodo за последние {days} дней",
+        "en": "Appeared in the Dodo public API in the last {days} days",
+    },
+    "ratings.coverage.stale": {
+        "ru": "Данные от {date}, новые не приходят",
+        "en": "Data from {date}, no newer data is arriving",
+    },
+    "ratings.coverage.missing": {"ru": "Нет на площадке", "en": "Not on the platform"},
+    "ratings.coverage.unrated": {"ru": "Оценок пока нет", "en": "No ratings yet"},
+    "ratings.coverage.empty": {
+        "ru": "Реестр пиццерий пока пуст: он наполнится при ближайшем ежедневном сборе.",
+        "en": "The pizzeria registry is empty: it fills at the next daily collection.",
+    },
+    "ratings.coverage.none": {
+        "ru": "В этой стране нет работающих пиццерий.",
+        "en": "No working pizzerias in this country.",
+    },
+    "ratings.coverage.db_down": {
+        "ru": "База не ответила: охват площадок сейчас не показать.",
+        "en": "The database did not respond: platform coverage cannot be shown now.",
+    },
+    "ratings.coverage.link.summary": {"ru": "привязать", "en": "link"},
+    "ratings.coverage.link.label": {
+        "ru": "Страница магазина на glovoapp.com",
+        "en": "Store page on glovoapp.com",
+    },
+    "ratings.coverage.link.submit": {"ru": "Привязать", "en": "Link"},
+    "ratings.coverage.link.ok": {
+        "ru": "Привязано к Glovo: {name}.",
+        "en": "Linked to Glovo: {name}.",
+    },
+    "ratings.coverage.link.failed": {"ru": "Не привязано.", "en": "Not linked."},
+    "ratings.coverage.link.bad_url": {
+        "ru": (
+            "Не привязано: нужна ссылка вида https://glovoapp.com/en/ro/bucharest/stores/"
+            "название-магазина."
+        ),
+        "en": (
+            "Not linked: expected a link like https://glovoapp.com/en/ro/bucharest/stores/"
+            "store-name."
+        ),
+    },
+    "ratings.coverage.link.unknown_unit": {
+        "ru": "Не привязано: пиццерии нет в реестре.",
+        "en": "Not linked: the pizzeria is not in the registry.",
+    },
+    "ratings.coverage.link.country_mismatch": {
+        "ru": "Не привязано: страна в ссылке не совпадает со страной пиццерии.",
+        "en": "Not linked: the country in the link differs from the pizzeria's country.",
+    },
+    "ratings.coverage.link.page_failed": {
+        "ru": "Не привязано: страница Glovo не открылась, попробуйте позже.",
+        "en": "Not linked: the Glovo page did not open, try again later.",
+    },
+    "ratings.coverage.link.no_store": {
+        "ru": "Не привязано: на странице не нашлись данные магазина.",
+        "en": "Not linked: no store data found on the page.",
+    },
+    "ratings.coverage.link.glovo_failed": {
+        "ru": "Не привязано: Glovo не отдал точку для координат пиццерии.",
+        "en": "Not linked: Glovo returned no point for the pizzeria's coordinates.",
+    },
+    "ratings.coverage.link.taken": {
+        "ru": "Не привязано: эта точка Glovo уже привязана к другой пиццерии.",
+        "en": "Not linked: this Glovo point is already linked to another pizzeria.",
+    },
     "ratings.layout.up": {"ru": "{name} — выше", "en": "Move {name} up"},
     "ratings.layout.down": {"ru": "{name} — ниже", "en": "Move {name} down"},
     "ratings.layout.save": {"ru": "Сохранить компоновку", "en": "Save layout"},

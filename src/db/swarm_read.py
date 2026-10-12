@@ -329,3 +329,65 @@ def map_units(*, countries: Sequence[str], on: date) -> list[MapUnitRow]:
         MapUnitRow(str(r[0]), str(r[1]), str(r[2]), r[3], int(r[4]), float(r[5]), int(r[6]))
         for r in _rows("оценки пиццерий на картах", _MAP_UNITS_SQL, params)
     ]
+
+
+# Топ нарушений по нашим проверкам (D426): записи принятых проверок в датах и
+# странах запроса, по коду пункта — сколько раз записан и в скольких проверках.
+# Коды, а не формулировки (конституция): подписи — из методики той версии,
+# по которой считалась самая свежая проверка охвата (`checklist_version`).
+_FINDING_COUNTS_SQL = """
+select u.country, f.code, count(*), count(distinct i.id)
+from findings f
+join inspections i on i.id = f.inspection_id
+join units u on u.id = i.unit_id
+where i.status = 'finalized'
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+group by u.country, f.code
+"""
+_INSPECTION_COUNTS_SQL = """
+select u.country, count(*),
+       (array_agg(i.checklist_version order by i.inspection_date desc, i.pushed_at desc))[1]
+from inspections i
+join units u on u.id = i.unit_id
+where i.status = 'finalized'
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+group by u.country
+"""
+
+
+@dataclass(frozen=True)
+class FindingCount:
+    country: str
+    code: str
+    findings: int
+    inspections: int
+
+
+@dataclass(frozen=True)
+class CountryInspections:
+    country: str
+    inspections: int
+    checklist_version: str
+
+
+def finding_counts(
+    *, reach: Reach, date_from: date | None, date_to: date | None
+) -> tuple[list[FindingCount], list[CountryInspections]]:
+    """Сколько раз записан каждый пункт по странам и сколько проверок в стране."""
+    охват = _require_reach(reach)
+    params = {**охват.params(), "date_from": date_from, "date_to": date_to}
+    counts = [
+        FindingCount(str(r[0]), str(r[1]), int(r[2]), int(r[3]))
+        for r in _rows("нарушения проверок для Swarm", _FINDING_COUNTS_SQL, params)
+    ]
+    totals = [
+        CountryInspections(str(r[0]), int(r[1]), str(r[2] or ""))
+        for r in _rows("число проверок для Swarm", _INSPECTION_COUNTS_SQL, params)
+    ]
+    return counts, totals

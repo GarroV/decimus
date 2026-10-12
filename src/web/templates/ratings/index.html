@@ -255,7 +255,7 @@
   {% set map_rows = maps if maps and (maps|selectattr('as_of')|list) else () %}
   <section class="rt-sec" aria-labelledby="rt-maps">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-maps">{{ t('ratings.block.maps') }}</h2>
-      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }}</span></div>
+      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }} · <a href="{{ url(ratings_path ~ '/coverage') }}?lang={{ lang }}">{{ t('ratings.coverage.open') }}</a></span></div>
     {% if not map_rows and not agg_cols %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
     {% else %}<div class="rt-card rt-scroll"><table class="rt-maps rt-src">
       <thead><tr><th scope="col" rowspan="2"></th>
