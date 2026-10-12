@@ -194,19 +194,25 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Вид проверки?",
         "en": "Inspection type?",
     },
-    # Вопрос один, а языков в проверке три (`docs/06-mvp-bot.md`). Ответ
-    # ложится во все три, и сказать об этом надо здесь: аудитор выбирает не
-    # только язык документа для партнёра, но и язык, на котором с ним говорят.
+    # Языков в проверке три (`docs/06-mvp-bot.md`), и в мастере спрашиваются два
+    # из них — раздельно (D393): язык проверки (на нём аудитор говорит и пишет) и
+    # язык отчёта (на нём PDF и письмо партнёру). Третий, интерфейс, — выбор
+    # человека (`/lang`, D303), мастер о нём не спрашивает.
+    "start.ask_speech_lang": {
+        "ru": "На каком языке будете проводить проверку (говорить и писать)?",
+        "en": "In which language will you conduct the inspection (speak and write)?",
+    },
     "start.ask_lang": {
-        "ru": "Язык проверки? На нём будут и отчёт, и наш разговор.",
-        "en": "Inspection language? Both the report and this chat will use it.",
+        "ru": "На каком языке отчёт для партнёра?",
+        "en": "In which language is the report for the partner?",
     },
     "start.started": {
         "ru": (
             "Проверка начата.\n"
             "Пиццерия: {unit}\n"
             "Вид: {kind}\n"
-            "Язык отчёта: {lang}\n"
+            "Язык проверки: {speech_lang}\n"
+            "Язык отчёта: {report_lang}\n"
             "Проверяющий: {auditor}\n"
             "{auditor_note}"
             # Хвоста «Присылайте фотографии с комментариями» здесь больше нет:
@@ -219,7 +225,8 @@ TEXTS: dict[str, dict[str, str]] = {
             "Inspection started.\n"
             "Pizzeria: {unit}\n"
             "Type: {kind}\n"
-            "Report language: {lang}\n"
+            "Inspection language: {speech_lang}\n"
+            "Report language: {report_lang}\n"
             "Auditor: {auditor}\n"
             "{auditor_note}"
             "Date: {date}"
@@ -265,34 +272,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "Auditor: {auditor}\n"
             "Records: {findings}\n\n"
             "Continue it or start a new one? A new one erases this."
-        ),
-    },
-    # Та же развилка, но по сданной проверке (T153). Прежняя фраза утверждала
-    # о ней две неправды разом: что она незавершённая и что новая её сотрёт.
-    # Признака «завершена» у движка нет, и выдумывать его бот не вправе — зато
-    # он помнит, что сам собрал и отдал отчёт, и говорит ровно это.
-    "start.resume_handed_over": {
-        "ru": (
-            "Проверка в этом чате уже сдана: отчёт по ней собран и отправлен.\n"
-            "Пиццерия: {unit}\n"
-            "Дата: {date}\n"
-            "Проверяющий: {auditor}\n"
-            "Записей: {findings}\n\n"
-            "Дописать в неё нельзя: отчёт уже у получателя и в истории точки, "
-            "а дописанное в него не попадёт. Начните новую проверку — или "
-            "уберите эту из чата, если она тут больше не нужна."
-        ),
-        "en": (
-            "The inspection in this chat is already handed over: its report was built "
-            "and sent.\n"
-            "Pizzeria: {unit}\n"
-            "Date: {date}\n"
-            "Auditor: {auditor}\n"
-            "Records: {findings}\n\n"
-            "It can no longer be added to: the report is already with its recipient "
-            "and in the unit’s history, and anything added now would not reach it. "
-            "Start a new inspection — or remove this one from the chat if you no "
-            "longer need it here."
         ),
     },
     # Отказ на любую попытку изменить сданную проверку (T201, D080). Один текст
@@ -922,6 +901,16 @@ TEXTS: dict[str, dict[str, str]] = {
     "edit.ask_level": {
         "ru": "Новый класс для записи #{n}?",
         "en": "New class for record #{n}?",
+    },
+    "edit.level_advice": {
+        "ru": (
+            "Запись #{n} — рекомендация, класса у неё нет. Если это нарушение — "
+            "удалите запись и запишите нарушение заново."
+        ),
+        "en": (
+            "Record #{n} is a recommendation and has no class. If it is a violation, "
+            "delete the record and record the violation again."
+        ),
     },
     "edit.ask_text": {
         "ru": "Пришлите новую формулировку для записи #{n} одним сообщением.",
@@ -1884,6 +1873,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— Сданную проверку править нельзя.\n"
             "— Сбой — /start. /version — версия сборки.\n"
             "— /lang — язык бота.\n"
+            "— «Приложение» у поля ввода — обход по зонам, настройки, подключение Claude.\n"
         ),
         "en": (
             "How to work with the bot\n"
@@ -1924,6 +1914,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— A handed-over inspection cannot be edited.\n"
             "— Something broke — /start. /version tells the build.\n"
             "— /lang — the bot language.\n"
+            "— “App” next to the message field — the walk by zone, settings, connecting Claude.\n"
         ),
     },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
@@ -1957,6 +1948,10 @@ TEXTS: dict[str, dict[str, str]] = {
     # в `keyboards.py` — единственные строки интерфейса мимо каталога, и потому
     # единственные, которые язык стенда не мог перекрасить.
     "btn.new_inspection": {"ru": "Новая проверка", "en": "New inspection"},
+    # Мини-апп обхода (#418): что не осмотрено и что было здесь в прошлый раз.
+    "btn.walk": {"ru": "Обход точки", "en": "Walk-through"},
+    # Кнопка у поля ввода (D372): открывает приложение целиком, не только обход.
+    "btn.app": {"ru": "Приложение", "en": "App"},
     "btn.resume_continue": {"ru": "Продолжить", "en": "Continue"},
     "btn.sealed_drop": {"ru": "Убрать из чата", "en": "Remove from chat"},
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},

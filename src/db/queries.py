@@ -37,6 +37,8 @@ from .models import (
     InspectionDetail,
     InspectionRow,
     ItemUsage,
+    PreviousFinding,
+    PreviousFindings,
     PreviousInspection,
 )
 from .reach import Reach
@@ -82,7 +84,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by,
+    -- Происхождение (0042, D334) — в конец по той же причине.
+    i.origin
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -114,7 +118,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     -- Этап приёмки (D199, 0034) — тоже в конец и по той же причине.
-    i.status, i.accepted_at, i.accepted_by
+    i.status, i.accepted_at, i.accepted_by,
+    -- Происхождение (0042, D334) — в конец по той же причине.
+    i.origin
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -156,7 +162,9 @@ select
     -- между колонками сдвинула бы всё правее неё молча.
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
-    i.deductions, i.counts, i.by_zone
+    i.origin,
+    i.deductions, i.counts, i.by_zone,
+    i.reported_status, i.legacy_method
 from inspections i
 join units u on u.id = i.unit_id
 where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -305,6 +313,8 @@ def _row_to_inspection(row: Any) -> InspectionRow:
         on_review=row[19] == "draft",
         accepted_at=row[20].isoformat() if row[20] is not None else "",
         accepted_by=str(row[21] or ""),
+        # Происхождение (0042, D334): колонка `not null default 'field'`.
+        origin=str(row[22]),
     )
 
 
@@ -583,6 +593,8 @@ def _read_detail(
         by_zone=by_zone,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
+        reported_status=str(row[колонки["reported_status"]] or ""),
+        legacy_method=str(row[колонки["legacy_method"]] or ""),
     )
 
 
@@ -691,6 +703,15 @@ with записи as (
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
       and (%(countries)s::text[] is null or u.country = any(%(countries)s))
       and i.status = 'finalized'
+      and f.level not in ('D0', 'R')
+      -- Маркеры исторической записи (`models.LEGACY_CODE`, `models.NO_CLASS`,
+      -- 0042): «пункт не назван» и «без класса» — не пункт и не класс, и в
+      -- систему одинаковых нарушений сети не складываются (D332).
+      and f.code <> 'LEGACY' and f.level <> 'NC'
+      -- Записи исторической вовсе не идут в системные нарушения: код пункта из
+      -- старой методики значит там другое, чем в нынешнем чек-листе. Её ОЦЕНКА
+      -- при этом в средних остаётся (D352) — исключается только статистика пунктов.
+      and i.origin <> 'legacy'
       and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
       and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and (%(city)s::text is null or u.city = %(city)s)
@@ -720,11 +741,11 @@ limit %(limit)s
 # Сводка среза для плиток (#503): сколько проверок, сколько точек, буквы и
 # сумма процентов — по ВСЕМУ срезу, а не по прочитанному ряду с пределом. Числа
 # движка складываются, но не выводятся: процент и буква взяты такими, какими он
-# их записал. Разбивка по изданию нужна, чтобы потребитель решил, законно ли
-# усреднять срез (T349): разные цены не усредняются.
+# их записал. Проверки разных методик складываются вместе: оценка каждой верна
+# по своей методике (D352).
 _SLICE_SUMMARY_SQL = """
 with срез as (
-    select i.unit_id, i.checklist_code, i.checklist_version, i.grade, i.pct
+    select i.unit_id, i.grade, i.pct
     from inspections i
          join units u on u.id = i.unit_id
     where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
@@ -737,11 +758,11 @@ with срез as (
   and (%(grade)s::text is null or i.grade = %(grade)s)
 )
 select
-    coalesce(checklist_code, ''), checklist_version, grade, count(*), sum(pct),
+    grade, count(*), sum(pct),
     (select count(distinct unit_id) from срез)
 from срез
-group by 1, 2, 3
-order by 1, 2, 3
+group by 1
+order by 1
 """
 
 _UNITS_TOTAL_SQL = """
@@ -842,8 +863,8 @@ def slice_summary(
     city: str = "",
     country: str = "",
     grade: str = "",
-) -> tuple[int, list[tuple[str, str, str, int, float]]]:
-    """Сводка среза без предела: `(точек, [(код чек-листа, издание, буква, проверок, сумма %)])`.
+) -> tuple[int, list[tuple[str, int, float]]]:
+    """Сводка среза без предела: `(точек, [(буква, проверок, сумма %)])`.
 
     Ряд проверок экрана ограничен пределом, а плитки (средняя, буквы, число
     проверок и точек) обязаны говорить о том же множестве, что потери по зонам
@@ -863,11 +884,58 @@ def slice_summary(
             },
         )
         строки = cur.fetchall()
-    точек = int(строки[0][5]) if строки else 0
-    return точек, [
-        (str(code), str(version), str(буква), int(n), float(сумма))
-        for code, version, буква, n, сумма, _ in строки
-    ]
+    точек = int(строки[0][3]) if строки else 0
+    return точек, [(str(буква or ""), int(n), float(сумма)) for буква, n, сумма, _ in строки]
+
+
+_COUNTRY_SUMMARY_SQL = """
+with точки as (
+    select u.id, u.country from units u
+    where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and u.country is not null and u.country <> ''
+),
+срез as (
+    select u.country, i.unit_id, i.pct, i.grade
+    from inspections i
+         join units u on u.id = i.unit_id
+    where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+      and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+      and i.status = 'finalized'
+      and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+      and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+),
+по_срезу as (
+    select country, count(distinct unit_id) as checked, count(*) as n, sum(pct) as total,
+           count(*) filter (where grade = 'D') as d
+    from срез group by 1
+),
+по_точкам as (select country, count(*) as units from точки group by 1)
+select coalesce(т.country, с.country), coalesce(т.units, 0), coalesce(с.checked, 0),
+       coalesce(с.n, 0), coalesce(с.total, 0), coalesce(с.d, 0)
+from по_точкам т full join по_срезу с on с.country = т.country
+order by 1
+"""
+
+
+def country_summary(
+    *, reach: Reach, date_from: date | None = None, date_to: date | None = None
+) -> list[tuple[str, int, int, int, float, int]]:
+    """Сводка по странам охвата: `(страна, точек, проверено точек, проверок, сумма %, с буквой D)`.
+
+    Знаменатель — точки справочника страны, как у плитки «Пиццерий» (#503):
+    «проверено 3 из 12» говорит о стране, «проверено 3» — нет. Страна, где
+    точек в справочнике нет, а проверки есть, не пропадает (full join).
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("сводка по странам") as conn, conn.cursor() as cur:
+        cur.execute(
+            _COUNTRY_SUMMARY_SQL, {**охват.params(), "date_from": date_from, "date_to": date_to}
+        )
+        return [
+            (str(c), int(u), int(ch), int(n), float(total), int(d))
+            for c, u, ch, n, total, d in cur.fetchall()
+        ]
 
 
 def units_total(*, reach: Reach) -> int:
@@ -965,12 +1033,15 @@ with прошлая as (
     where i.tenant_code = %(tenant)s
       and u.name = %(unit)s
       and i.retracted_at is null
+      -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
+      -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
+      and i.origin <> 'legacy'
     order by i.inspection_date desc, i.pushed_at desc
     limit 1
 )
 select прошлая.inspection_date, f.code
 from прошлая
-left join findings f on f.inspection_id = прошлая.id and f.level <> 'D0'
+left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
 """
 
 
@@ -986,7 +1057,7 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
     Предыдущая — одна, последняя по дате обхода: правило говорит про
     предыдущую проверку, а не «когда-нибудь за год». Снятые проверки в счёт не
     идут: снятая проверка не является показанием о точке. Информационные
-    записи (`D0`) нарушениями не считаются и в коды не попадают.
+    записи (`D0`) и рекомендации (`R`) нарушениями не считаются и в коды не попадают.
 
     `None` — прошлых проверок нет либо точка чужая. Для вопроса это одно и то
     же: спрашивать не о чем.
@@ -999,6 +1070,59 @@ def previous_inspection(*, tenant: str, unit: str) -> PreviousInspection | None:
         return None
     return PreviousInspection(
         date=rows[0][0], codes=frozenset(str(код) for _, код in rows if код is not None)
+    )
+
+
+# Прошлая проверка с формулировками (#418) — тот же выбор «прошлой», что у
+# `_PREVIOUS_INSPECTION_SQL`: одна последняя неснятая проверка точки. Выбор
+# повторён намеренно, а не склеен из общего куска строки: каждый запрос
+# читается целиком, и расхождение между ними видно глазом.
+_PREVIOUS_FINDINGS_SQL = """
+with прошлая as (
+    select i.id, i.inspection_date, i.speech_lang
+    from inspections i
+    join units u on u.id = i.unit_id
+    where i.tenant_code = %(tenant)s
+      and u.name = %(unit)s
+      and i.retracted_at is null
+      -- Историческая (0042, D332) — проверка по прежней методике: её пункты не
+      -- пункты нынешнего чек-листа, и повтор по ней не спрашивается.
+      and i.origin <> 'legacy'
+    order by i.inspection_date desc, i.pushed_at desc
+    limit 1
+)
+select прошлая.inspection_date, f.code, f.level, f.zone,
+    (select t.text from translations t
+      where t.entity_type = 'finding' and t.entity_id = f.id
+        and t.field = 'text' and t.lang = прошлая.speech_lang)
+from прошлая
+left join findings f on f.inspection_id = прошлая.id and f.level not in ('D0', 'R')
+order by f.n
+"""
+
+
+def previous_findings(*, tenant: str, unit: str) -> PreviousFindings | None:
+    """Прошлая проверка точки с её нарушениями — подсказка «здесь было» (#418).
+
+    Отдаёт факт, как и `previous_inspection`: что записали в прошлый раз, где и
+    каким классом. Исправлено ли это сегодня, решает аудитор на месте.
+    Информационные записи (`D0`) и рекомендации (`R`) нарушениями не являются и не отдаются.
+
+    `None` — прошлых проверок у точки нет (или точка чужая).
+    """
+    tenant_code = _require_tenant(tenant)
+    with _reading("прошлые нарушения точки") as conn, conn.cursor() as cur:
+        cur.execute(_PREVIOUS_FINDINGS_SQL, {"tenant": tenant_code, "unit": _require_unit(unit)})
+        rows = cur.fetchall()
+    if not rows:
+        return None
+    return PreviousFindings(
+        date=rows[0][0],
+        findings=tuple(
+            PreviousFinding(code=str(код), level=str(класс), zone=str(зона), text=текст)
+            for _, код, класс, зона, текст in rows
+            if код is not None
+        ),
     )
 
 
@@ -1033,6 +1157,49 @@ def unit_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
             str(name): (str(country or ""), str(city or ""))
             for name, country, city in cur.fetchall()
         }
+
+
+_UNIT_LAST_INSPECTIONS_SQL = """
+select
+    u.name,
+    u.code,
+    max(i.inspection_date) as last_date,
+    count(i.id) filter (
+        where i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+          and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+    ) as in_period
+from units u
+     left join inspections i
+            on i.unit_id = u.id
+           and i.status = 'finalized'
+           and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+           and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+where u.tenant_code = 'HQ' and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+group by u.id, u.name, u.code
+"""
+
+
+def unit_last_inspections(
+    *, reach: Reach, date_from: date | None = None, date_to: date | None = None
+) -> list[tuple[str, str, date | None, int]]:
+    """Точки справочника охвата: `(название, код Dodo, последняя проверка, проверок за период)`.
+
+    «Где нужно проверить» строится от справочника, а не от проверок: точка без
+    единой проверки в ряду проверок не появится вовсе. Последняя проверка —
+    за всё время (`None` — не проверяли ни разу), счётчик — внутри периода.
+    Проверки читаются в охвате вошедшего, точки — по его странам: партнёр
+    чужих точек не получает.
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("последние проверки точек") as conn, conn.cursor() as cur:
+        cur.execute(
+            _UNIT_LAST_INSPECTIONS_SQL,
+            {**охват.params(), "date_from": date_from, "date_to": date_to},
+        )
+        return [
+            (str(name), str(code or ""), last, int(n)) for name, code, last, n in cur.fetchall()
+        ]
 
 
 _WORST_ZONES_SQL = """
@@ -1114,6 +1281,8 @@ _ITEM_RECORDS = """
       and i.checklist_code = %(checklist)s
       and i.status = 'finalized'
       and i.retracted_at is null
+      -- Историческая: код пункта старой методики — не этот пункт (D332, D352).
+      and i.origin <> 'legacy'
 """
 
 _ITEM_SUMMARY_SQL = (

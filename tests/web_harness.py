@@ -26,10 +26,10 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import bot_links, web_throttle
+from src.db import bot_links, queries, web_throttle
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.web import auth
+from src.web import auth, home_board, home_ratings
 from src.web.app import create_app
 from src.web.config import Settings
 
@@ -187,6 +187,11 @@ def подменить_двери(
     # умолчанию бот не привязан ни у кого. Наборы про привязку подменяют сами.
     monkeypatch.setattr(bot_links, "binding_of", lambda _user_id: None)
     monkeypatch.setattr(bot_links, "live_bindings", lambda: {})
+    # «Главная» (D378) читает сводку по странам, рейтинги и счётчики доски —
+    # по умолчанию пусто. Наборы про эти блоки подменяют сами.
+    monkeypatch.setattr(queries, "country_summary", lambda **_: [])
+    monkeypatch.setattr(home_ratings, "load_latest", lambda *_, **__: {})
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.

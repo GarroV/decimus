@@ -25,11 +25,9 @@ from aiogram.types import CallbackQuery, Message
 from src import domain
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
-from src.domain.bot_checklists import BotChecklist, available
-from src.domain.config import check_environment
 from src.domain.errors import DomainError
-from src.domain.geo import COUNTRIES
-from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT, UNIT_NAME_LIMIT, UnitName, canonical_unit
+from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT as UNIT_NAME_BYTE_LIMIT
+from src.domain.unit_name import UNIT_NAME_LIMIT, UnitName, check_unit_name
 
 from .. import sealed, sidecar, stops
 from ..auditor import auditor_name, auditor_name_was_shortened
@@ -45,6 +43,7 @@ from ..keyboards import (
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    SPEECH_LANG_PREFIX,
     UNIT_NEW_PREFIX,
     UNIT_NEW_YES,
     checklist_keyboard,
@@ -53,15 +52,24 @@ from ..keyboards import (
     lang_keyboard,
     new_inspection_keyboard,
     resume_keyboard,
-    sealed_keyboard,
+    speech_lang_keyboard,
     unit_new_keyboard,
+    walk_keyboard,
 )
 from ..lang import chat_ui_lang, person_ui_lang
 from ..material import MaterialStore
 from ..pending import PendingStore
+from ..start_options import open_checklists
 from ..states import StartFlow
 from ..texts import t, ui_lang_or_default, with_photo_rule
-from ..unit_pick import match_unit, may_add_units
+from ..unit_pick import (
+    UNIT_KNOWN,
+    UNIT_PARTNER_REFUSED,
+    match_unit,
+    may_add_units,
+    resolve_unit,
+    where_suffix,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,33 +78,27 @@ logger = logging.getLogger(__name__)
 
 
 async def _offer_resume(message: Message, inspection: domain.Inspection, lang: str) -> None:
-    """Показать оставшуюся в чате проверку и дать выбор, какой у неё есть.
+    """Показать оставшуюся в чате НЕсданную проверку и дать выбор: продолжить или начать новую.
 
-    Развилок две, и разница между ними не косметическая (T153, T201). Проверке
-    в работе правда, что она незавершённая и что новая её сотрёт. Проверке, по
-    которой отчёт уже собран и отдан, — неправда и то и другое.
-
-    У сданной проверки выбор другой и меньше: дописать в неё нельзя вовсе
-    (решение владельца D080, `src/bot/sealed.py`), поэтому кнопки «Продолжить»
-    здесь нет. Остаются двери, названные владельцем: начать новую или убрать
-    сданную из чата. До T201 бот сам предлагал «Продолжить её — можно дописать
-    и собрать отчёт заново» — из-за этого тот же обход и вставал в историю
-    точки второй строкой.
+    Сюда доходит только проверка в работе (T052, T153): сданная аудитора не
+    спрашивает вовсе — её копия молча убирается, и мастер начинается сразу
+    (`_drop_sealed_copy`, решение владельца D400). Старая версия говорила о
+    сданной «уже сдана… начните новую или уберите из чата» и держала аудитора
+    на вопросе о проверке, которая была давно.
 
     Признака «завершена» у движка нет, и бот его не выдумывает: он опирается на
     то, что сделал сам, — отдал ли он по этой проверке отчёт (`sidecar`).
     """
-    сдана = sealed.is_sealed(message.chat.id)
     await message.answer(
         t(
-            "start.resume_handed_over" if сдана else "start.resume_found",
+            "start.resume_found",
             lang,
             unit=inspection.unit,
             date=inspection.date,
             auditor=inspection.auditor or "—",
             findings=len(inspection.findings),
         ),
-        reply_markup=sealed_keyboard(lang) if сдана else resume_keyboard(lang),
+        reply_markup=resume_keyboard(lang),
     )
 
 
@@ -107,26 +109,9 @@ async def _unit_chosen(message: Message, state: FSMContext, lang: str, unit: str
     await message.answer(t("start.ask_kind", lang), reply_markup=kind_keyboard(lang))
 
 
-def _where(имя: UnitName, lang: str) -> str:
-    """Страна точки словом для вопроса «Новая пиццерия?»; незнакомая — пусто."""
-    if имя.country is None:
-        return ""
-    names = COUNTRIES.get(имя.country, {})
-    return f" ({names.get(lang) or names.get('en') or имя.country})"
-
-
 async def _ask_unit(message: Message, state: FSMContext, lang: str) -> None:
     await state.set_state(StartFlow.waiting_unit)
     await message.answer(t("start.ask_unit", lang))
-
-
-def _open_checklists(space: str) -> list[BotChecklist] | None:
-    """Открытые в боте чек-листы пространства аудитора — или `None`, если их не прочитать."""
-    try:
-        return available(check_environment(), tenant=space)
-    except (DomainError, OSError, ValueError):
-        logger.exception("список чек-листов для бота не прочитался")
-        return None
 
 
 async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: str) -> None:
@@ -136,7 +121,7 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
     названиями на языке интерфейса. Ни одного — прямо говорим, что начать не
     по чему и кто это чинит, и мастер дальше не идёт.
     """
-    открыты = _open_checklists(space)
+    открыты = open_checklists(space)
     if открыты is None:
         await state.clear()
         await stops.refuse(message, lang, step="start.checklist", key="start.failed")
@@ -154,6 +139,42 @@ async def _ask_checklist(message: Message, state: FSMContext, lang: str, space: 
         t("start.ask_checklist", lang),
         reply_markup=checklist_keyboard([(c.code, c.name(lang)) for c in открыты]),
     )
+
+
+def _forget_chat_notes(
+    chat_id: int, pending: PendingStore | None, store: MaterialStore | None
+) -> None:
+    """Заметки уходят вместе с проверкой: кадры, зона и карта сообщений — её, а не чата."""
+    sidecar.reset(chat_id)
+    if pending is not None:
+        pending.forget(chat_id)
+    if store is not None:
+        # Проверки в чате больше нет вовсе — ждать её кадрам и словам не для чего (T249).
+        store.forget(chat_id)
+
+
+async def _drop_sealed_copy(
+    chat_id: int, pending: PendingStore | None, store: MaterialStore | None
+) -> bool:
+    """Тихо убрать из чата сданную проверку (D400). Истина — убрана; ложь — убирать не вышло.
+
+    Убирается копия в чате — и только она: отданный отчёт и строка в истории
+    точки остаются (D080). Проверяет сданность сам, поэтому незавершённую не
+    тронет ни при каком вызове: потерять обход одним нажатием — ровно то
+    затирание, от которого защищает T052.
+    """
+    if not sealed.is_sealed(chat_id):
+        return False
+    try:
+        убрана = await asyncio.to_thread(domain.drop_inspection, chat_id)
+    except DomainError:
+        logger.exception("сданная проверка чата %s не убралась", chat_id)
+        return False
+    if not убрана:
+        logger.error("сданная проверка чата %s не убралась: drop_inspection вернул ложь", chat_id)
+        return False
+    _forget_chat_notes(chat_id, pending, store)
+    return True
 
 
 def build_start_router(
@@ -176,7 +197,7 @@ def build_start_router(
     router = Router(name="start")
 
     @router.message(Command("start"))
-    async def on_start(message: Message, state: FSMContext) -> None:
+    async def on_start(message: Message, state: FSMContext, space: str) -> None:
         """`/start` обязан работать всегда — это единственный выход из тупика.
 
         Испорченное состояние роняло здесь всё: аудитор не мог ни продолжить
@@ -200,6 +221,14 @@ def build_start_router(
             )
             return
         if inspection is not None:
+            if sealed.is_sealed(message.chat.id):
+                # Сданная проверка аудитора не спрашивает (D400): убирается молча,
+                # и сразу идёт мастер новой.
+                if not await _drop_sealed_copy(message.chat.id, pending, store):
+                    await stops.refuse(message, lang, step="start", key="start.failed")
+                    return
+                await _ask_checklist(message, state, lang, space)
+                return
             await _offer_resume(message, inspection, lang)
             return
         await message.answer(t("start.greeting", lang), reply_markup=new_inspection_keyboard(lang))
@@ -221,6 +250,12 @@ def build_start_router(
             await _ask_checklist(message, state, lang, space)
             return
         if inspection is not None:
+            if sealed.is_sealed(message.chat.id):
+                if not await _drop_sealed_copy(message.chat.id, pending, store):
+                    await stops.refuse(message, lang, step="start", key="start.failed")
+                    return
+                await _ask_checklist(message, state, lang, space)
+                return
             await _offer_resume(message, inspection, lang)
             return
         await _ask_checklist(message, state, lang, space)
@@ -255,7 +290,8 @@ def build_start_router(
                     findings=len(inspection.findings),
                 ),
                 lang,
-            )
+            ),
+            reply_markup=walk_keyboard(lang, settings.walk_url_for(message.chat.id)),
         )
 
     @router.callback_query(F.data == RESUME_NEW_CALLBACK)
@@ -305,69 +341,39 @@ def build_start_router(
         if not убрана:
             await stops.refuse(message, lang, step="start.drop", key="sealed.drop_gone")
             return
-        # Заметки уходят вместе с проверкой: список кадров, последняя зона и
-        # карта сообщений относятся к ней, а не к чату.
-        sidecar.reset(chat_id)
-        if pending is not None:
-            pending.forget(chat_id)
-        if store is not None:
-            # Проверки в чате больше нет вовсе — ждать её кадрам и словам не
-            # для чего (T249).
-            store.forget(chat_id)
+        _forget_chat_notes(chat_id, pending, store)
         await message.answer(t("sealed.dropped", lang), reply_markup=new_inspection_keyboard(lang))
 
     @router.message(StateFilter(StartFlow.waiting_unit), F.text, ~F.text.startswith("/"))
     async def on_unit(message: Message, state: FSMContext, space: str) -> None:
         lang = chat_ui_lang(message.chat.id)
         unit = (message.text or "").strip()
-        if not unit:
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_empty")
-            return
-        if len(unit) > UNIT_NAME_LIMIT:
-            # Отказ здесь, а не отказом сборки отчёта в конце проверки: там
-            # аудитор уже уехал с точки, и переименовать пиццерию ему нечем.
+        # Пределы и каноничность — одна проверка на бота и мини-апп (D392).
+        проверка = check_unit_name(unit)
+        if проверка.name is None:
             await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
+                message,
+                lang,
+                step="start.unit",
+                key=f"start.{проверка.problem}",
+                limit=UNIT_NAME_LIMIT,
+                typed=unit,
             )
             return
-        if len(unit.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
-            # Предел в знаках это не ловит: 60 эмодзи проходят его же знаками,
-            # а по байтам уже почти весь бюджет имени файла разом (T128).
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
-            return
-        # Имя точки — город по-английски и номер, как бы его ни написали (D233).
-        имя = canonical_unit(unit)
-        if имя is None:
-            await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_need_number", typed=unit
-            )
-            return
-        if len(имя.name) > UNIT_NAME_LIMIT:
-            # Латиница бывает длиннее написанного («Щ» → «shch»): предел имени
-            # файла отчёта сверяется с тем, что ляжет в шапку, а не с вводом.
-            await stops.refuse(
-                message, lang, step="start.unit", key="start.unit_too_long", limit=UNIT_NAME_LIMIT
-            )
-            return
-        if len(имя.name.encode("utf-8")) > UNIT_NAME_BYTE_LIMIT:
-            # «щ» → «shch» добавляет байты, а нелатинский незнакомый город
-            # остаётся многобайтным: ввод прошёл предел, сведённое имя — нет.
-            await stops.refuse(message, lang, step="start.unit", key="start.unit_too_long_bytes")
-            return
+        имя = проверка.name
         сверка = await asyncio.to_thread(match_unit, имя.name, tenant=space)
-        if сверка.name is not None or not сверка.checked:
-            # Совпало со справочником — или справочник недоступен, и тогда не
-            # повод держать аудитора на точке: имя уже каноническое.
-            await _unit_chosen(message, state, lang, сверка.name or имя.name)
+        решение = resolve_unit(имя, сверка, space)
+        if решение.status == UNIT_KNOWN:
+            await _unit_chosen(message, state, lang, решение.name)
             return
-        if not may_add_units(space):
+        if решение.status == UNIT_PARTNER_REFUSED:
             await stops.refuse(
                 message, lang, step="start.unit", key="start.unit_new_partner", name=имя.name
             )
             return
         await state.update_data(unit_new=asdict(имя), unit_typed=unit)
         await message.answer(
-            t("start.unit_new_ask", lang, name=имя.name, where=_where(имя, lang)),
+            t("start.unit_new_ask", lang, name=имя.name, where=where_suffix(имя, lang)),
             reply_markup=unit_new_keyboard(lang),
         )
 
@@ -416,7 +422,7 @@ def build_start_router(
             logger.warning("новая пиццерия %s не записана в справочник: %s", имя.name, exc)
         else:
             await message.answer(
-                t("start.unit_added", lang, name=имя.name, where=_where(имя, lang))
+                t("start.unit_added", lang, name=имя.name, where=where_suffix(имя, lang))
             )
         await _unit_chosen(message, state, lang, имя.name)
 
@@ -472,7 +478,7 @@ def build_start_router(
             return
         lang = chat_ui_lang(message.chat.id)
         code = (callback.data or "").removeprefix(CHECKLIST_PREFIX)
-        открыты = _open_checklists(space) or []
+        открыты = open_checklists(space) or []
         if code not in {c.code for c in открыты}:
             # Методист закрыл чек-лист, пока аудитор смотрел на кнопки: не
             # подменяем соседним молча, а показываем свежий список.
@@ -492,6 +498,24 @@ def build_start_router(
         if code not in KIND_TITLES:
             return
         await state.update_data(kind=code)
+        await state.set_state(StartFlow.waiting_speech_lang)
+        await message.answer(
+            t("start.ask_speech_lang", chat_ui_lang(message.chat.id)),
+            reply_markup=speech_lang_keyboard(),
+        )
+
+    @router.callback_query(
+        StateFilter(StartFlow.waiting_speech_lang), F.data.startswith(SPEECH_LANG_PREFIX)
+    )
+    async def on_speech_lang(callback: CallbackQuery, state: FSMContext) -> None:
+        await callback.answer()
+        message = callback.message
+        if not isinstance(message, Message):
+            return
+        speech_lang = (callback.data or "").removeprefix(SPEECH_LANG_PREFIX)
+        if speech_lang not in LANG_LABELS:
+            return
+        await state.update_data(speech_lang=speech_lang)
         await state.set_state(StartFlow.waiting_lang)
         await message.answer(
             t("start.ask_lang", chat_ui_lang(message.chat.id)), reply_markup=lang_keyboard()
@@ -510,7 +534,8 @@ def build_start_router(
         data = await state.get_data()
         unit = str(data.get("unit", "")).strip()
         kind_code = str(data.get("kind", ""))
-        if not unit or kind_code not in KIND_TITLES:
+        speech_lang = str(data.get("speech_lang", ""))
+        if not unit or kind_code not in KIND_TITLES or speech_lang not in LANG_LABELS:
             # Мастер потерял ответы прошлых шагов (перезапуск, старая кнопка) и
             # начинается заново — для человека это тот же отказ, и он посчитан.
             await state.clear()
@@ -547,13 +572,12 @@ def build_start_router(
                 # партнёру в документ он уезжает на языке отчёта.
                 kind=kind_code,
                 report_lang=report_lang,
-                # Языка в проверке три (T025). Интерфейс — язык ЧЕЛОВЕКА
-                # (D303): его выбор `/lang`, иначе язык стенда; отчёт к нему
-                # больше не привязан — до D303 английский отчёт заодно
-                # переключал и разговор. Речь по-прежнему идёт за отчётом:
-                # отдельного вопроса о ней в мастере нет.
+                # Языка в проверке три (T025), и друг от друга они не зависят.
+                # Интерфейс — язык ЧЕЛОВЕКА (D303): его выбор `/lang`, иначе
+                # язык стенда. Речь и отчёт — два отдельных вопроса мастера
+                # (D393): русская речь с английским отчётом — обычный случай.
                 ui_lang=person_ui_lang(),
-                speech_lang=report_lang,
+                speech_lang=speech_lang,
                 auditor=auditor,
                 # Пространство того, кто начал (волна 1, #340): в нём проверка
                 # сливается в базу и в нём ищет прошлые проверки точки.
@@ -606,13 +630,17 @@ def build_start_router(
                     # тут язык начатой проверки, а не язык кнопки: сообщение о
                     # старте читает он же, но уже внутри проверки.
                     kind=kind_title(inspection.kind, started_lang),
-                    lang=LANG_LABELS[report_lang],
+                    speech_lang=LANG_LABELS[speech_lang],
+                    report_lang=LANG_LABELS[report_lang],
                     auditor=inspection.auditor,
                     auditor_note=auditor_note,
                     date=inspection.date,
                 ),
                 started_lang,
-            )
+            ),
+            # Обход (#418) — тут же, под стартом: первое, что аудитор видит
+            # после начала, и самое естественное место найти, что осматривать.
+            reply_markup=walk_keyboard(started_lang, settings.walk_url_for(message.chat.id)),
         )
 
     return router

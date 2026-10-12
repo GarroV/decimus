@@ -56,6 +56,38 @@ class GoogleMailError(Exception):
     """Черновик не завёлся. Текст показывается человеку и объясняет, что делать."""
 
 
+def _google_reason(сбой: BaseException) -> str:
+    """Код причины из тела ошибки Google (`SERVICE_DISABLED`, `invalid_grant`…).
+
+    Только машинные коды, без текста целиком: в теле бывает адрес почты.
+    Нет тела или не JSON — пустая строка, а не новый сбой поверх старого.
+    """
+    читать = getattr(сбой, "read", None)
+    if читать is None:
+        return ""
+    try:
+        тело = json.loads(читать() or b"{}")
+    except Exception:  # разбор причины не должен ронять обработку сбоя
+        return ""
+    if not isinstance(тело, dict):
+        return ""
+    ошибка = тело.get("error")
+    коды: list[str] = []
+    if isinstance(ошибка, str):
+        коды.append(ошибка)
+    elif isinstance(ошибка, dict):
+        if isinstance(ошибка.get("status"), str):
+            коды.append(ошибка["status"])
+        for деталь in ошибка.get("details") or []:
+            if isinstance(деталь, dict) and isinstance(деталь.get("reason"), str):
+                коды.append(деталь["reason"])
+        for пункт in ошибка.get("errors") or []:
+            if isinstance(пункт, dict) and isinstance(пункт.get("reason"), str):
+                коды.append(пункт["reason"])
+    чистые = [к for к in dict.fromkeys(коды) if к.replace("_", "").isalnum() and len(к) <= 64]
+    return f", {'/'.join(чистые)}" if чистые else ""
+
+
 def consent_url(settings: GoogleSettings, *, state: str, login_hint: str) -> str:
     """Адрес, где человек разрешает нам класть черновик в свою почту."""
     параметры = {
@@ -101,7 +133,10 @@ def exchange_code_for_token(settings: GoogleSettings, *, code: str) -> str:
         with urllib.request.urlopen(запрос, timeout=NETWORK_TIMEOUT_SECONDS) as ответ:  # noqa: S310
             тело = json.loads(ответ.read())
     except Exception as сбой:
-        raise GoogleMailError(f"обмен кода не удался: {type(сбой).__name__}") from сбой
+        raise GoogleMailError(
+            f"обмен кода не удался: {type(сбой).__name__} "
+            f"{getattr(сбой, 'code', '') or ''}{_google_reason(сбой)}"
+        ) from сбой
 
     токен = тело.get("access_token")
     if not isinstance(токен, str) or not токен:
@@ -191,12 +226,18 @@ def create_draft(
     except Exception as сбой:
         код = getattr(сбой, "code", None)
         if код == 403:
+            # Причина из ответа Google обязательна: 403 даёт и отозванное
+            # согласие, и выключенный в проекте Gmail API (SERVICE_DISABLED), а
+            # чинятся они в разных местах (11.10.2026 кнопка молча не работала).
             raise GoogleMailError(
-                "Google не дал положить черновик: согласие на доступ к почте не выдано или отозвано"
+                "Google не дал положить черновик (403"
+                f"{_google_reason(сбой)}): согласие не выдано или Gmail API выключен в проекте"
             ) from сбой
         if код == 401:
             raise GoogleMailError("доступ к почте истёк — потребуется согласие заново") from сбой
-        raise GoogleMailError(f"черновик не создан: {type(сбой).__name__}") from сбой
+        raise GoogleMailError(
+            f"черновик не создан: {type(сбой).__name__} {код or ''}{_google_reason(сбой)}"
+        ) from сбой
 
     номер = тело.get("id") if isinstance(тело, dict) else None
     if not isinstance(номер, str) or not номер:

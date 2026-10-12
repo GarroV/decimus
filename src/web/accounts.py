@@ -22,14 +22,18 @@ from src.db.web_access import (
     MIN_PASSWORD_LENGTH,
     ROLE_ADMIN,
     ROLE_AUDITOR,
+    ROLE_CONTROL,
+    ROLE_SUPERADMIN,
     ROLES,
     AccountRow,
+    LastSuperadminError,
     change_own_password,
     create_account,
     disable_account,
     list_accounts,
     list_spaces,
     reassign_role,
+    roles_for,
     set_email,
 )
 
@@ -39,13 +43,17 @@ __all__ = [
     "ROLES",
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
+    "ROLE_CONTROL",
+    "ROLE_SUPERADMIN",
     "AccountRow",
     "Added",
+    "LastSuperadminError",
     "add",
     "change_own_password",
     "disable",
     "everyone",
     "reassign_role",
+    "roles_for",
     "set_email",
     "spaces",
 ]
@@ -86,6 +94,6 @@ def spaces() -> tuple[str, ...]:
     return list_spaces()
 
 
-def disable(login: str, *, tenant: str) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет."""
-    return disable_account(login, tenant=tenant)
+def disable(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Отключить учётку. `False` — такой живой учётки нет или её роль вне `only_roles`."""
+    return disable_account(login, tenant=tenant, only_roles=only_roles)

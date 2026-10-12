@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from src.domain import INSPECTION_KINDS
@@ -59,6 +59,9 @@ CHECKLIST_PREFIX = "start:cl:"
 #: Кнопки вопроса «Новая пиццерия?» (D233).
 UNIT_NEW_PREFIX = "start:unit-new:"
 UNIT_NEW_YES = "yes"
+#: Язык проверки (речи аудитора) и язык отчёта — два отдельных вопроса мастера
+#: (D393) с разными префиксами: старая кнопка одного не принимается за ответ на другой.
+SPEECH_LANG_PREFIX = "start:speech:"
 LANG_PREFIX = "start:lang:"
 RESUME_CONTINUE_CALLBACK = "start:resume:continue"
 RESUME_NEW_CALLBACK = "start:resume:new"
@@ -100,6 +103,18 @@ def new_inspection_keyboard(lang: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def walk_keyboard(lang: str, url: str | None) -> InlineKeyboardMarkup | None:
+    """«Обход точки» — мини-апп с зонами и прошлой проверкой (#418).
+
+    Без адреса — `None`: сообщение уходит без кнопки, как до мини-аппа.
+    """
+    if url is None:
+        return None
+    builder = InlineKeyboardBuilder()
+    builder.add(InlineKeyboardButton(text=t("btn.walk", lang), web_app=WebAppInfo(url=url)))
+    return builder.as_markup()
+
+
 def unit_new_keyboard(lang: str) -> InlineKeyboardMarkup:
     """«Новая пиццерия?» — да или ввести название заново (D233)."""
     builder = InlineKeyboardBuilder()
@@ -134,13 +149,22 @@ def kind_keyboard(lang: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def lang_keyboard() -> InlineKeyboardMarkup:
-    """Язык отчёта — коды методики (`domain.models.TEXT_LANGS`), не что-либо ещё."""
+def _langs_keyboard(prefix: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for code, label in LANG_LABELS.items():
-        builder.button(text=label, callback_data=f"{LANG_PREFIX}{code}")
+        builder.button(text=label, callback_data=f"{prefix}{code}")
     builder.adjust(1)
     return builder.as_markup()
+
+
+def speech_lang_keyboard() -> InlineKeyboardMarkup:
+    """Язык проверки (речи аудитора) — коды методики (`domain.models.TEXT_LANGS`)."""
+    return _langs_keyboard(SPEECH_LANG_PREFIX)
+
+
+def lang_keyboard() -> InlineKeyboardMarkup:
+    """Язык отчёта — коды методики (`domain.models.TEXT_LANGS`), не что-либо ещё."""
+    return _langs_keyboard(LANG_PREFIX)
 
 
 #: Выбор языка БОТА (D303, `/lang`) — не путать с `LANG_PREFIX`, языком отчёта.

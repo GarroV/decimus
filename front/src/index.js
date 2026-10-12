@@ -14,6 +14,12 @@
 //     попытки по адресу.
 //  3. Location с адресом сервера переписывается на адрес фронта, чтобы
 //     переход не уводил человека обратно на заблокированный домен.
+//
+// До сервера Worker идёт туннелем (привязка EDGE — Workers VPC, D304): запрос
+// попадает прямо в Caddy на VPS, и имя sslip.io в пути больше не участвует —
+// ни его DNS, ни его доступность. Имя остаётся только SNI и Host, по которым
+// Caddy выбирает сайт. Если туннель лёг, тот же запрос уходит прежним путём
+// через интернет: два независимых пути вместо одной точки отказа.
 
 const FRONT_KEY_HEADER = "X-Decimus-Front-Key";
 const CLIENT_IP_HEADER = "X-Decimus-Client-IP";
@@ -49,12 +55,25 @@ export default {
     headers.delete("Host");
 
     const hasBody = !["GET", "HEAD"].includes(request.method);
-    const response = await fetch(upstream, {
-      method: request.method,
-      headers,
-      body: hasBody ? request.body : undefined,
-      redirect: "manual",
-    });
+    const fallback = env.EDGE && hasBody ? request.clone() : request;
+    const send = (via, from) =>
+      via(upstream, {
+        method: request.method,
+        headers,
+        body: hasBody ? from.body : undefined,
+        redirect: "manual",
+      });
+    let response;
+    if (env.EDGE) {
+      try {
+        response = await send((u, init) => env.EDGE.fetch(u, init), request);
+      } catch (error) {
+        console.error("tunnel failed, falling back to public path", String(error));
+      }
+    }
+    if (!response) {
+      response = await send(fetch, fallback);
+    }
 
     const location = response.headers.get("Location");
     if (!location || !location.startsWith(origin)) {

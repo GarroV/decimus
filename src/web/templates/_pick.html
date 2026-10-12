@@ -18,7 +18,7 @@
 {% macro pick(chip) %}
   <details class="pick" name="pick">
     <summary class="ov-chip{% if chip.current %} is-on{% endif %}">
-      <span>{{ chip.label }}: {{ chip.current_title }}</span>
+      <span>{% if chip.label %}{{ chip.label }}: {% endif %}{{ chip.current_title }}</span>
       <span class="pick__caret" aria-hidden="true">▾</span>
     </summary>
     <div class="pick__menu" role="menu">

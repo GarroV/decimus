@@ -22,6 +22,7 @@ from types import ModuleType
 from src.db import (
     action_plans,
     directory,
+    imports,
     move,
     prescriptions,
     prescriptions_write,
@@ -30,6 +31,7 @@ from src.db import (
     queries,
     reports,
     revise,
+    swarm_read,
 )
 from src.db.prescriptions import PRESCRIPTION_REACH_SQL
 from src.db.reach import REACH_SQL, UNIT_REACH_SQL
@@ -39,6 +41,11 @@ from src.db.reach import REACH_SQL, UNIT_REACH_SQL
     "queries._PREVIOUS_INSPECTION_SQL": (
         "повтор ×2 (D255) считается по проверкам своего пространства, "
         "и зовёт его бот пишущего тенанта, а не читающий охват"
+    ),
+    "queries._PREVIOUS_FINDINGS_SQL": (
+        "подсказка «здесь было» мини-аппа обхода (#418) — та же прошлая проверка, "
+        "что у повтора ×2: тенант идущей проверки аудитора, а не читающий охват; "
+        "разойдись выборки — две подсказки смотрели бы в разные обходы"
     ),
     "action_plans._INSPECTION_FOR_REQUEST_SQL": (
         "запись, а не чтение: запрос экшн-плана заводит УК по проверке своего "
@@ -75,7 +82,7 @@ def _запросы(*модули: ModuleType) -> dict[str, str]:
 
 def test_каждое_чтение_проверок_стоит_на_охвате() -> None:
     """Запрос по проверкам без `REACH_SQL` — дыра границы, видимая только чтением."""
-    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions)
+    запросы = _запросы(queries, reports, previews, move, action_plans, prescriptions, swarm_read)
     сверено = [имя for имя, текст in запросы.items() if _ПРОВЕРКИ.search(текст)]
     assert len(сверено) >= 12, f"сверка не нашла запросов — регулярное выражение сломано: {сверено}"
     дыры = [имя for имя in сверено if имя not in ВНЕ_ОХВАТА and REACH_SQL not in запросы[имя]]
@@ -199,7 +206,13 @@ def test_находки_по_идентификатору_читаются_то�
 #: Кто вправе звать `_read_detail` — и чем он перед этим ограничил проверку.
 #: `get_inspection` передаёт охват читающего; `revise._apply` — после замка
 #: строки своего пространства (`_LOCK_SQL` с `tenant_code`).
-_ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {("db/queries.py", "get_inspection"), ("db/revise.py", "_apply")}
+#: `imports._locked_detail` — после замка загруженного черновика своего
+#: пространства (D305, D334, `imports._LOCK_SQL` с `tenant_code` и `origin`).
+_ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {
+    ("db/queries.py", "get_inspection"),
+    ("db/revise.py", "_apply"),
+    ("db/imports.py", "_locked_detail"),
+}
 
 
 def _зовущие_функции(дерево: ast.AST, имя: str) -> list[tuple[ast.FunctionDef, int]]:
@@ -251,6 +264,18 @@ def test_проверку_целиком_читают_только_после_о
     чтение = вызовы[("db/revise.py", "_apply")]
     assert замок and min(замок) < чтение, "правка читает проверку до замка своего пространства"
     assert отказ and min(отказ) < чтение, "нет выхода без замка до чтения проверки"
+
+    # Загрузка: тот же порядок, и замок берёт только загруженный черновик своего.
+    assert "tenant_code = %(tenant)s" in imports._LOCK_SQL
+    assert "origin in ('import', 'legacy')" in imports._LOCK_SQL
+    assert "for update" in imports._LOCK_SQL
+    загрузка = next(
+        у
+        for у in ast.walk(ast.parse(inspect.getsource(imports)))
+        if isinstance(у, ast.FunctionDef) and у.name == "_locked_detail"
+    )
+    замок = [строка for строка, запрос in _вызовы_execute(загрузка) if запрос == "_LOCK_SQL"]
+    assert замок and min(замок) < вызовы[("db/imports.py", "_locked_detail")]
 
 
 def test_слив_не_заводит_пространство() -> None:
