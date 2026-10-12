@@ -217,6 +217,21 @@
   color: var(--ink-inverse);
 }
 
+/* Пилюля на всю ширину: режим «Завершить» (D428) и язык отчёта в подтверждении. */
+.walk-app__lang--wide { display: flex; width: 100%; }
+
+.walk-app__lang--wide .walk-app__lang-opt { flex: 1; min-width: 0; }
+
+/* Строка настроек в столбик: подпись, под ней пилюля и пояснение. */
+.walk-app__row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.walk-app__row--stack .walk-app__note { margin: 0; }
+
 /* Подпись поля и «?» к ней в одну строку (D414). */
 .walk-app__label-row {
   display: flex;

@@ -9,8 +9,11 @@
 - `mcp_who`, `mcp_add`, `mcp_revoke` — круг доступа к MCP (D099), только тем,
   кто в нём;
 - `stops` — отказы мастера за период (#436), тоже только кругу;
-- `finish` — «Завершить проверку» (D422): итог в чат, как `/finish`, за флагом
-  `WALK_APP_FINISH` (`walk_finish.py`). Любому аудитору, не только кругу.
+- `finish_mode` — режим «Завершить» человека (D428): `summary` или `report`,
+  хранится за Telegram ID (`db.finish_modes`);
+- `finish` — «Завершить проверку» (D422, D428): в режиме `summary` итог в чат,
+  как `/finish`; в `report` — отчёт сразу (`walk_finish.py`). Оба — любому
+  аудитору, не только кругу.
 
 Правила те же, что у бота, и функции те же (`db.mcp_access`, `bot.stops`):
 мини-апп — второй вход в одно и то же, а не вторая реализация. Отличие одно:
@@ -34,15 +37,15 @@ from src.bot.errors import BotConfigError
 from src.bot.mcp_setup import MCP_URL_VAR, setup_command
 from src.bot.texts import t
 from src.bot.version import build_version
-from src.db import bot_langs, mcp_access
+from src.db import bot_langs, finish_modes, mcp_access
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 
+from . import walk_finish
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_access import space_of
 from .walk_auth import APP_ENDPOINT, APP_PATH, WalkSettings
-from .walk_finish import FAILED, NO_INSPECTION, send_summary
 from .walk_write import Identify, Respond
 
 logger = logging.getLogger(__name__)
@@ -55,10 +58,12 @@ STOPS_MAX_DAYS = stops.STOPS_RETENTION_DAYS
 class Refused(Exception):
     """Отказ словами экрана: ключ каталога и код ответа."""
 
-    def __init__(self, key: str, status: int = 422) -> None:
+    def __init__(self, key: str, status: int = 422, **extra: Any) -> None:
+        """`extra` — число для текста (`{count}`) и поля ответа рядом с `message`."""
         super().__init__(key)
         self.key = key
         self.status = status
+        self.extra = extra
 
 
 def bot_settings() -> BotSettings | None:
@@ -78,6 +83,16 @@ def chosen_lang(chat_id: int) -> str | None:
         logger.warning("Мини-апп: выбор языка %s не прочитался", chat_id, exc_info=True)
         return None
     return lang if lang in UI_LANGS else None
+
+
+def finish_mode_of(chat_id: int) -> str:
+    """Режим «Завершить» человека (D428). Не выбирал или база молчит — сначала сводка."""
+    try:
+        mode = finish_modes.chosen_finish_mode(chat_id)
+    except DbError:
+        logger.warning("Мини-апп: режим завершения %s не прочитался", chat_id, exc_info=True)
+        return finish_modes.DEFAULT_MODE
+    return mode if mode in finish_modes.MODES else finish_modes.DEFAULT_MODE
 
 
 def in_circle(chat_id: int, bot: BotSettings | None, *, restore: bool = True) -> bool:
@@ -106,6 +121,7 @@ def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any
         "me": chat_id,
         "lang": lang,
         "langs": [{"code": code, "label": t("lang.self_name", code)} for code in UI_LANGS],
+        "finish_mode": finish_mode_of(chat_id),
         "version": build_version(),
         "mcp": bot is not None and bot.mcp_owner_id is not None,
         "circle": circle,
@@ -174,16 +190,42 @@ def _issue(who: int, conf: WalkSettings, lang: str) -> dict[str, Any]:
     }
 
 
-def _finish(who: int, conf: WalkSettings) -> tuple[Response, int]:
-    """«Завершить проверку» (D422). Выключено — сообщения нет, экран просит `/finish`."""
-    if not conf.app_finish or conf.bot_token is None:
-        return jsonify({"sent": False}), 200
-    outcome = send_summary(conf.bot_token, who)
-    if outcome == NO_INSPECTION:
-        raise Refused("walk.finish.err.none", 409)
-    if outcome == FAILED:
+def _finish(who: int, conf: WalkSettings, body: dict[str, Any], lang: str) -> tuple[Response, int]:
+    """«Завершить проверку» (D422, D428). Сообщение уходит только в чат подписавшего."""
+    if conf.bot_token is None:
         raise Refused("walk.finish.err.failed", 503)
-    return jsonify({"sent": True}), 200
+    mode = finish_mode_of(who)
+    if mode == finish_modes.REPORT:
+        return _finish_report(who, conf.bot_token, body, lang)
+    outcome = walk_finish.send_summary(conf.bot_token, who)
+    if outcome == walk_finish.NO_INSPECTION:
+        raise Refused("walk.finish.err.none", 409)
+    if outcome == walk_finish.FAILED:
+        raise Refused("walk.finish.err.failed", 503)
+    return jsonify({"sent": True, "mode": mode}), 200
+
+
+_REPORT_REFUSALS = {
+    walk_finish.NO_INSPECTION: ("walk.finish.err.none", 409),
+    walk_finish.LANG_GONE: ("walk.finish.err.lang", 409),
+    walk_finish.INFO_MISSING: ("walk.finish.err.info", 409),
+    walk_finish.BUSY: ("walk.finish.err.busy", 409),
+    walk_finish.FAILED: ("walk.finish.err.failed", 503),
+}
+
+
+def _finish_report(who: int, token: str, body: dict[str, Any], lang: str) -> tuple[Response, int]:
+    """Отчёт сразу: язык из перечня страны, сведения заполнены, сборка в фоне."""
+    report_lang = body.get("report_lang")
+    if report_lang is not None and not isinstance(report_lang, str):
+        raise Refused("walk.finish.err.lang", 409)
+    started = walk_finish.start_report(token, who, report_lang, lang)
+    if started.status != walk_finish.STARTED:
+        key, status = _REPORT_REFUSALS[started.status]
+        if started.status == walk_finish.INFO_MISSING:
+            raise Refused(key, status, count=started.missing, reason="info")
+        raise Refused(key, status)
+    return jsonify({"sent": True, "mode": finish_modes.REPORT}), 200
 
 
 def install(
@@ -197,9 +239,15 @@ def install(
 ) -> None:
     """Повесить `POST /tg/walk/app`. Опознание — то же, что у записи."""
 
-    def refused(key: str, lang: str, status: int) -> tuple[Response, int]:
+    def refused(
+        key: str, lang: str, status: int, extra: dict[str, Any] | None = None
+    ) -> tuple[Response, int]:
         entry = WALK_TEXTS[key]
-        return jsonify({"error": "refused", "message": entry.get(lang) or entry[ui_lang]}), status
+        text = entry.get(lang) or entry[ui_lang]
+        fields = extra or {}
+        if "count" in fields:
+            text = text.format(count=fields["count"])
+        return jsonify({"error": "refused", "message": text, **fields}), status
 
     @app.after_request
     def no_store(response: Response) -> Response:
@@ -225,8 +273,14 @@ def install(
                     raise Refused("walk.app.err.lang")
                 bot_langs.choose_lang(who, str(code))
                 return respond(who, ui_lang)
+            if op == "finish_mode":
+                mode = body.get("mode")
+                if mode not in finish_modes.MODES:
+                    raise Refused("walk.app.err.finish_mode")
+                finish_modes.choose_finish_mode(who, str(mode))
+                return respond(who, ui_lang)
             if op == "finish":
-                return _finish(who, conf)
+                return _finish(who, conf, body, lang)
             if op not in ("mcp_issue", "mcp_who", "mcp_add", "mcp_revoke", "stops"):
                 raise Refused("walk.err.bad_request", 400)
             if bot is None or not in_circle(who, bot):
@@ -237,7 +291,7 @@ def install(
                 return jsonify(_issue(who, conf, lang)), 200
             return jsonify(_circle_op(op, body, who, bot)), 200
         except Refused as exc:
-            return refused(exc.key, lang, exc.status)
+            return refused(exc.key, lang, exc.status, exc.extra)
         except DbError:
             logger.exception("Мини-апп: действие %s чата %s — база не ответила", op, who)
             return refused("walk.app.err.unavailable", lang, 503)
