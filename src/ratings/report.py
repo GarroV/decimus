@@ -314,8 +314,8 @@ def build(selection: Selection) -> Summary:
     rko_cluster, rko_by = _blocks(rko_facts, rko_counts, codes)
     rs_cluster, rs_by = _blocks(rs_facts, rs_counts, codes)
     top = limits["top_threshold"]
-    rs_top, rs_bottom = top_bottom(current, RS, threshold=top)
-    rko_top, rko_bottom = top_bottom(current, RKO, threshold=top)
+    rs_top, rs_bottom = top_bottom(current, RS, threshold=top, previous=previous)
+    rko_top, rko_bottom = top_bottom(current, RKO, threshold=top, previous=previous)
     risk, risk_short = _risk(codes, period, limits)
     return Summary(
         selection=selection,
