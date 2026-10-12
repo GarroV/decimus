@@ -24,9 +24,11 @@
 /* Сетка компактных блоков (D418): колонки фиксированной ширины, а не одна
    строка на всю ширину; на телефоне — одна колонка. «Пиццерии» — на всю строку:
    ей нужны колонки таблицы. */
-.hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(340px, 100%), 1fr)); align-items: start;
-  gap: 12px; margin-top: var(--space-4); }
-.hm-card--wide { grid-column: 1 / -1; }
+/* Колонками, а не сеткой рядов: блоки разной высоты в сетке оставляли рядом с
+   низким блоком пустую дыру во всю строку. В колонках блок встаёт под соседом. */
+.hm-grid { columns: 340px auto; column-gap: 12px; margin-top: var(--space-4); }
+.hm-grid > .hm-card { break-inside: avoid; margin-bottom: 12px; }
+.hm-card--wide { column-span: all; }
 
 /* Блок — карточка, как `.card` ядра: поверхность, рамка `--line-strong` (у `--line`
    в светлой теме контраст с холстом почти нулевой, цифры «висели в воздухе»),

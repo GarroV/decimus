@@ -20,7 +20,8 @@
 /* ── список: буква | пиццерия + мета | итог | дата ──────────────────── */
 .slist--registry { --slist-cols: 30px minmax(0, 1fr) 64px 92px; }
 .slist--registry + .slist--registry { border-top: 1px solid var(--line); }
-.slist--tocheck { --slist-cols: 12px minmax(0, 1fr) auto; }
+/* Компактный блок, а не полоса во всю ширину: дата стоит рядом с названием. */
+.slist--tocheck { --slist-cols: 12px minmax(0, max-content) minmax(0, 1fr); max-width: 560px; }
 .slist--tocheck + .slist { border-top: 1px solid var(--line); }
 .srow__dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warn-mark); }
 .slist__group { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--space-7); background: var(--surface-2); border-bottom: 1px solid var(--line);
