@@ -45,6 +45,7 @@ from aiogram.types import CallbackQuery, Chat, Message, TelegramObject
 from src.db import bot_links
 from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
+from src.db.space import acting_space
 from src.domain.errors import DomainError
 from src.domain.tenants import HQ_TENANT, canonical_tenant, may_do_field_work
 
@@ -169,7 +170,11 @@ class AccessMiddleware(BaseMiddleware):
             logger.warning("отклонено обновление от постороннего Telegram ID %s", user_id)
             return None
         data[SPACE_KEY] = space
-        return await handler(event, data)
+        # Пространство человека — и базе (F-037): всё, что обработчик сделает
+        # в базе (и в потоках `asyncio.to_thread`, они копируют контекст), идёт
+        # от его имени.
+        with acting_space(space):
+            return await handler(event, data)
 
     async def _link(self, event: TelegramObject, метка: str, user_id: int) -> None:
         """Погасить ссылку привязки и ответить в тот же чат — и только."""

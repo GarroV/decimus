@@ -12,6 +12,9 @@
 
 Семантика та же: чистый выход — `commit`, исключение — `rollback`.
 
+Пространство обращения (`src/db/space.py`) соединение получает здесь же, на
+выдаче: политики роли приложения без него не отдают ни строки (F-037).
+
 **Что не должно утечь между пользователями.** Соединение живёт дольше запроса,
 поэтому всё, что запрос оставил на сессии, увидел бы следующий — а у проекта
 роли и построчные политики (миграция `0010` и др.). На возврате в пул
@@ -53,6 +56,7 @@ import psycopg
 from psycopg_pool import ConnectionPool, PoolTimeout
 
 from .errors import DbError
+from .space import apply_space
 
 log = logging.getLogger(__name__)
 
@@ -191,11 +195,13 @@ def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
     max_size = cfg.max_size
     if max_size == 0:
         with psycopg.connect(dsn) as conn:
+            apply_space(conn)
             yield conn
         return
     timeout = cfg.timeout_s
     try:
         with _pool_for(dsn, max_size).connection(timeout=timeout) as conn:
+            apply_space(conn)
             yield conn
     except PoolTimeout as exc:
         # Тип, а не текст драйвера: в тексте бывает адрес базы.

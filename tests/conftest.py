@@ -478,6 +478,12 @@ def db_env(pg_dsn: str, monkeypatch: pytest.MonkeyPatch) -> str:
     """
     dsn = app_role_dsn(pg_dsn)
     monkeypatch.setenv(DATABASE_URL_VAR, dsn)
+    # Функции базы здесь зовут напрямую, мимо дверей, которые ставят пространство
+    # (F-037): без двери — от имени служебной работы. Двери в тех же тестах
+    # ставят своё поверх; изоляцию проверяет `test_db_space_isolation.py`.
+    from src.db import space
+
+    monkeypatch.setattr(space, "_FALLBACK", space.SYSTEM_SPACE)
     return dsn
 
 

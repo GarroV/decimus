@@ -18,6 +18,7 @@ from datetime import UTC, datetime
 
 from src.db import maps_store
 from src.db.errors import RatingsError
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.ratings import maps
 from src.ratings.pointer import PointerError
 
@@ -33,6 +34,16 @@ def _due() -> bool:
 
 
 async def load_forever() -> None:
+    """Задача бота: держит снимок оценок карт не старше суток.
+
+    Служебная работа без человека: в базу — от имени служебного пространства
+    (F-037, `src/db/space.py`).
+    """
+    with acting_space(SYSTEM_SPACE):
+        await _load_forever()
+
+
+async def _load_forever() -> None:
     """Задача бота: держит снимок оценок карт не старше суток."""
     if not os.environ.get(maps.KEY_ENV, "").strip():
         logger.info("Оценки карт: %s не задан — загрузка выключена", maps.KEY_ENV)
