@@ -37,8 +37,8 @@ from . import country as country_data
 from .action_plans import FORM_OVERHEAD_BYTES, is_hq
 from .config import Settings
 from .geo_names import country_title
-from .google_mail import GoogleMailError, create_draft
-from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, MailReturn
+from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
+from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, OUTCOME_WRONG_ACCOUNT, MailReturn
 from .letter_markup import from_plain
 from .origin import refuse_foreign_origin
 from .sections import section
@@ -56,7 +56,7 @@ QUEUE_DRAFTS = "drafts"
 QUEUES = (QUEUE_OVERDUE, QUEUE_REPLIED, QUEUE_DRAFTS)
 
 #: Исходы похода в Gmail, которые экран умеет назвать словами.
-GMAIL_OUTCOMES = ("ok", "failed", "denied", "unavailable", "lost")
+GMAIL_OUTCOMES = ("ok", "failed", "denied", "unavailable", "lost", OUTCOME_WRONG_ACCOUNT)
 
 #: Тон метки состояния — классы `tag` из `forma`.
 STATE_TONES = {
@@ -305,6 +305,10 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
         abort(404)
     try:
         доступ = token()
+    except MailAccountMismatchError as exc:
+        # Чужой аккаунт Google (D176): черновика нет, предписание не отмечается.
+        logger.warning("предписание %s: %s", ident, exc)
+        return _back_from_gmail(ident, lang, OUTCOME_WRONG_ACCOUNT)
     except GoogleMailError as exc:
         logger.warning("предписание %s: доступ к почте не получен: %s", ident, exc)
         return _back_from_gmail(ident, lang, "failed")

@@ -1186,6 +1186,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Собираю отчёт…",
         "en": "Building the report…",
     },
+    "finish.autotranslate_failed": {
+        "ru": (
+            "⚠ Автоперевод комментариев не сработал для записей: {count}. Они напечатаны "
+            "как написаны. Отчёт менять не нужно — переведите их в вычитке на сайте."
+        ),
+        "en": (
+            "⚠ Automatic translation failed for {count} comment(s). They are printed as "
+            "written. No need to redo the report: translate them during proofreading on the site."
+        ),
+    },
     "finish.letter": {
         "ru": "Письмо партнёру:\n\n{letter}",
         "en": "Letter to the partner:\n\n{letter}",

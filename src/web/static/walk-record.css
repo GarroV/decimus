@@ -313,6 +313,7 @@
 .walk-strip__cell .walk-thumb { width: 88px; height: 88px; }
 
 .walk-strip__cell.is-uploading .walk-thumb__img,
+.walk-strip__cell.is-waiting .walk-thumb__img,
 .walk-strip__cell.is-failed .walk-thumb__img { opacity: .45; }
 
 .walk-strip__state,
@@ -331,6 +332,8 @@
   line-height: 14px;
   text-align: center;
 }
+
+.walk-strip__state--wait { background: var(--warn); }
 
 .walk-strip__retry { background: var(--err); cursor: pointer; }
 

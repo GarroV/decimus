@@ -260,6 +260,7 @@
 | `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
 | `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
+| `GOOGLE_HQ_DOMAINS` | `src/web/google_auth.py` | да |
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
@@ -303,6 +304,7 @@
 | `WEB_SECRET_KEY` | `src/web/config.py` | да |
 | `WEB_TENANT` | `src/web/config.py` | да |
 | `WEB_TRUSTED_PROXIES` | `src/web/config.py` | да |
+| `WEB_TRUSTED_PROXY_ADDR` | `src/web/config.py` | да |
 | `WEB_UI_LANG` | `src/web/texts.py` | да |
 | `WEB_URL_PREFIX` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
 | `WEB_USER_PASSWORD` | `tools/web_user.py` | да |
@@ -371,7 +373,9 @@
 | `0054_oauth.sql` | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_tokens` |
 | `0055_maps_ratings_index.sql` | — |
 | `0056_finish_modes.sql` | `finish_modes` |
-| `0057_mcp_token_identity.sql` | — |
+| `0057_checklist_langs.sql` | `checklist_langs` |
+| `0058_translate_modes.sql` | `translate_modes` |
+| `0059_mcp_token_identity.sql` | — |
 <!-- map:end -->
 
 ## Makefile

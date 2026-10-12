@@ -41,8 +41,22 @@ HINT_TEXTS: dict[str, dict[str, str]] = {
     ),
     **_hint(
         "settings",
-        ("Настройки", "Как завершать проверку и показывать ли подсказки."),
-        ("Settings", "How to finish an inspection, and whether to show hints."),
+        ("Настройки", "Как завершать проверку, переводить комментарии и показывать ли подсказки."),
+        ("Settings", "How to finish an inspection, translate comments, and whether to show hints."),
+    ),
+    **_hint(
+        "translate_mode",
+        (
+            "Перевод комментариев",
+            "Автоматически — комментарии переведутся на язык отчёта при его сборке. "
+            "По кнопке — переводите сами, под полем или в вычитке на сайте.",
+        ),
+        (
+            "Translating comments",
+            "Automatically: comments are translated into the report language when the "
+            "report is built. On button: translate them yourself, under the field or "
+            "during proofreading on the site.",
+        ),
     ),
     # ── обход: шаги обучения 4–9 ─────────────────────────────────────────
     **_hint(

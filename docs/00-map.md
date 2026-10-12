@@ -31,7 +31,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | УК | Управляющая компания: владелец методики, видит всю сеть, принимает проверки партнёров. Её пространство — `HQ` | `src/domain/tenants.py` (`HQ_TENANT`), `docs/18-access-map.md` |
 | Партнёр | Организация, чьи пиццерии проверяют; видит и правит только своё пространство и свои страны | `docs/18-access-map.md`, `src/db/reach.py` |
 | Роль | Одна из шести: в пространстве УК — главный админ (`superadmin`), админ (`admin`), контроль (`control`), аудитор (`auditor`); у партнёра — админ и аудитор | `src/domain/tenants.py`, `src/web/access_policy.py`, `src/mcp/policy.py` |
-| Контроль, контролинг | Роль УК и люди, которые ведут рейтинги: видят «Главную» и «Проверки» без записи, загружают и правят рейтинги, проверок не касаются | `docs/12-web-admin.md` (роль «контроль»), `src/mcp/policy.py` |
+| Контроль, контролинг | Роль УК и люди, которые ведут рейтинги: загружают и правят рейтинги, ведут своих людей; проверок не касаются никак — ни «Главной», ни «Проверок» даже на чтение (D420), после входа попадают в «Рейтинги» | `docs/12-web-admin.md` (роль «контроль»), `src/web/sections.py` (`CONTROL_SECTIONS`), `src/mcp/policy.py` |
 | Методика | Что и как проверяется: чек-лист, зоны, критерии классов, ставки вычетов, порядок обхода. Данные управляющей компании, вне git; версионируется изданиями | `docs/02-domain.md`, `src/domain/checklist.py`, `src/domain/version.py`, `src/domain/edition.py` |
 | Чек-лист | Перечень пунктов методики с кодами, зонами и допустимыми классами. Правится одной дверью — через хранилище версий | `engine/manage.py`, `src/mcp/checklist.py`, `src/web/methodology.py` |
 | Зона | Участок точки, на который делится оценка (десять зон, у каждой своя доля). Код зоны — сущность, название — перевод | `docs/02-domain.md`, `src/domain/checklist.py`, `src/bot/zones.py` (зона из слов аудитора) |
@@ -99,7 +99,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/app.py` | Веб-админка управляющей компании: маршруты и сборка приложения |
 | `src/web/assets.py` | Статика админки: отпечаток в адресе и долгий кеш |
 | `src/web/config.py` | Окружение веб-админки: адрес, порт, тенант, язык интерфейса, ключ подписи |
-| `src/web/db_refusal.py` | Отказ базы словами для вошедшего — без устройства стенда (#515) |
+| `src/web/db_refusal.py` | Отказ базы словами для вошедшего — без устройства стенда (#515, F-012 аудита 12.10) |
 | `src/web/errors.py` | Отказы блока `web` |
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
@@ -163,7 +163,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
-| `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами |
+| `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/users_claude.py` | Блок «Подключить Claude» на своей карточке (D417): адрес MCP и подключения через сайт |
@@ -257,7 +257,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 42 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+34) |
+| `src/web/static/` | 43 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+35) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -294,12 +294,13 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
 | `src/db/bot_langs.py` | Язык бота, выбранный человеком (D303, #411): чтение и запись |
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
+| `src/db/checklist_langs.py` | Язык чек-листа, выбранный аудитором при старте проверки (D451): чтение и запись |
 | `src/db/directory.py` | T092: справочник точек и карта синонимов |
 | `src/db/fingerprint.py` | Отпечаток содержимого завершённой проверки |
 | `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
@@ -316,6 +317,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
 | `src/db/synonyms.py` | T284: карта синонимов формулировок — где живёт выученное (D119) |
+| `src/db/translate_modes.py` | Перевод комментариев на язык отчёта, выбранный аудитором (D443): чтение и запись |
 | `src/db/unit_profiles.py` | Справочник сведений о пиццериях (`unit_profiles`, миграция 0046): запись и чтение |
 | `src/db/units.py` | Нормализация названия точки для сопоставления повторного ввода |
 <!-- map:end -->
@@ -404,7 +406,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0054_oauth.sql` | Подключение Claude к decimus входом через сайт (D417): OAuth 2.1 с PKCE |
 | `0055_maps_ratings_index.sql` | Индекс под выборки «последняя оценка филиала на карте» (`maps_store.latest`) и «оценка пиццерии на карте на дату» (`maps_store.unit_scores`) |
 | `0056_finish_modes.sql` | D449: «Завершить» в мини-аппе работает в одном из двух режимов, и каждый аудитор выбирает свой в настройках приложения: `summary` — сначала сводка в чат, `report` … |
-| `0057_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
+| `0057_checklist_langs.sql` | D451: язык чек-листа, выбранный аудитором на старте проверки в мини-аппе, запоминается за ЧЕЛОВЕКОМ — на следующем старте экран подставляет его же |
+| `0058_translate_modes.sql` | D443: перевод комментариев на язык отчёта — автоматически или по кнопке, и каждый аудитор выбирает свой в настройках мини-аппа: `button` — переводит сам по кнопке под… |
+| `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -469,6 +473,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/bot/errors.py` | Отказы блока `bot` |
+| `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
 | `src/bot/info.py` | Информационная часть проверки: какие поля спрашиваются и чем они разные (T158) |
 | `src/bot/inspection.py` | Чтение проверки так, чтобы бот не онемел ни на одной форме порчи (T126) |

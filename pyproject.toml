@@ -105,6 +105,8 @@ dev = [
     # мало — deptry прав, импорт явный и версия должна быть объявлена (T037).
     "coverage==7.15.4",
     "pytest-asyncio==1.4.0",
+    # Параллельный прогон в CI (`pytest -n auto`): набор без базы идёт ~2 мин вместо ~6.
+    "pytest-xdist==3.8.0",
     "vulture==2.14",
     "deptry==0.23.1",
     "import-linter==2.3",
@@ -210,6 +212,7 @@ DEP002 = [
     "pytest-cov",
     # Плагин pytest: подключается самим pytest по entry point, в коде не импортируется.
     "pytest-asyncio",
+    "pytest-xdist",
     "vulture",
     "deptry",
     "import-linter",

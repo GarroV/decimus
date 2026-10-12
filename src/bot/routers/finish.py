@@ -46,6 +46,7 @@ from src.report import PhotoMissing, ReportError, build_letter, build_pdf
 
 from .. import sidecar, stops, view
 from ..errors import BotNotesError
+from ..finish_translate import translate_comments
 from ..inspection import read_inspection
 from ..keyboards import (
     FINISH_BUILD_CALLBACK,
@@ -350,6 +351,10 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
         await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
         return
     await message.answer(t("finish.building", lang))
+    # Автоперевод комментариев (D443): до сборки, чтобы в отчёт легли переведённые.
+    translate_failed = await asyncio.to_thread(translate_comments, chat_id, inspection)
+    if translate_failed:
+        await message.answer(t("finish.autotranslate_failed", lang, count=translate_failed))
     # Кадры записей и кадры информационной части (T179) — одним списком: карту
     # «ссылка → файл» блок `report` строит по обоим, и кадр поля, не скачанный
     # здесь, напечатался бы партнёру красной отметкой «фотография не приложена».

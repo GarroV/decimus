@@ -78,6 +78,24 @@ APP_TEXTS: dict[str, dict[str, str]] = {
         "ru": "«Завершить» пришлёт в чат сводку — отчёт после неё, или сразу отчёт.",
         "en": "“Finish” sends a summary to the chat first, or builds the report right away.",
     },
+    "walk.app.translate_mode": {
+        "ru": "Перевод комментариев на язык отчёта",
+        "en": "Translating comments into the report language",
+    },
+    "walk.app.translate_mode.button": {"ru": "По кнопке", "en": "On button"},
+    "walk.app.translate_mode.auto": {"ru": "Автоматически", "en": "Automatically"},
+    "walk.app.translate_mode.hint": {
+        "ru": (
+            "Автоматически — комментарии переведутся при сборке отчёта, если язык отчёта "
+            "не совпал с языком чек-листа. По кнопке — переводите сами под полем "
+            "или в вычитке на сайте."
+        ),
+        "en": (
+            "Automatically: comments are translated when the report is built, if the report "
+            "language differs from the checklist language. On button: translate them yourself "
+            "under the field or during proofreading on the site."
+        ),
+    },
     "walk.app.help": {"ru": "Справка", "en": "Help"},
     "walk.app.help.text": {
         "ru": (
@@ -157,6 +175,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.app.err.lang": {"ru": "Такого языка нет.", "en": "No such language."},
     "walk.app.err.finish_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
+    "walk.app.err.translate_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
     "walk.app.err.unavailable": {
         "ru": "Сейчас не получилось — повторите позже.",
         "en": "That did not work right now — try again later.",
