@@ -424,6 +424,7 @@ ratings_rule_add
 ratings_rule_remove
 ratings_settings
 ratings_layout
+ratings_agg_update
 
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
@@ -467,3 +468,15 @@ on_speech_lang
 # крюк `@app.after_request`; оба регистрирует декоратор, по имени не зовёт никто.
 no_store
 walk_app
+# Выбор языка отчёта кнопкой в конце проверки (D415): `on_report_lang` —
+# обработчик `@router.callback_query`, его регистрирует декоратор.
+on_report_lang
+# Пиццерии на площадках (D424): маршруты `@app.get`/`@app.post` регистрирует
+# декоратор; `redirect_request` — переопределение метода urllib, его зовёт
+# библиотека; `_без_базы_реестра` — автофикстура pytest.
+ratings_coverage
+ratings_coverage_link
+redirect_request
+_без_базы_реестра
+# Заслон происхождения на всю админку (#709): крюк `@app.before_request`.
+_запись_только_со_своей_страницы

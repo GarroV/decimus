@@ -180,6 +180,14 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 - `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
 - Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
 
+### Оценки в агрегаторах доставки (миграции `0050`, `0051`, `0053`)
+
+Отдельная схема `agg`; продуктовое описание — `docs/17-aggregators.md`. Пишет роль приложения, читают все.
+
+- `0050_aggregators.sql` — `agg.points` (справочник точек агрегатора с привязкой к пиццерии), `agg.ratings` (снимок дня `(aggregator, point_key, on_date)`, шкала хранится при оценке), `agg.loads` (журнал сбора: исход, точки, ошибка); новый блок `aggregators` в `ratings.layout`.
+- `0053_agg_requests.sql` — `agg.requests`: заявка на обновление вне суточного расписания (D420). Кто просил (`requested_by`), какие агрегаторы (`aggregators`, `null` — все), исход (`done_at`, `outcome` ok/failed, `error`). Незакрытая заявка одна: частичный уникальный индекс `requests_one_open_idx` (`where done_at is null`) — повторная просьба получает «уже в очереди». Роли приложения: `select, insert` и колоночный `update (done_at, outcome, error)`; принимают веб и MCP, закрывает бот.
+- Дверь: `src/db/agg_store.py` — `save`, `log_load`, `last_run`, `last_ok_points`, `known_points`, `latest`, `load_states`; заявки — `UpdateRequest`, `request_update`, `open_request`, `finish_request`.
+
 ### Экран доступа: главный админ и пространства с экрана (миграция `0041`, #585)
 
 - `0041_superadmin.sql` — роль веб-учётки `superadmin` (главный админ, D364), только в пространстве УК (ограничение `web_users_superadmin_only_hq`); триггер `web_users_keep_last_superadmin` → функция `keep_last_superadmin()`: отключение, смена роли или удаление последнего действующего главного — отказ `SQLSTATE DC001`, гонку закрывает `pg_advisory_xact_lock`; роли `dodo_audit_admin` выданы `select, insert on tenants` и `insert on space_countries` — экран «Пользователи» заводит пространство партнёра со странами. Никого не назначает: первого главного — `tools/web_user.py role <логин> superadmin --tenant HQ` (`docs/08-deploy.md`).
