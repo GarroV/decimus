@@ -49,9 +49,10 @@ create table oauth_grants (
     -- MCP, не чаще раза в минуту на подключение.
     last_used_at timestamptz,
     -- Отзыв — пометка со следом, строка остаётся. Причина: `user` — человек
-    -- нажал «Отключить», `reuse` — предъявлен уже обменянный refresh или код.
+    -- нажал «Отключить», `reuse` — предъявлен уже обменянный refresh или код,
+    -- `password` — пароль учётки сменён (с экрана или командой).
     revoked_at timestamptz,
-    revoked_reason text check (revoked_reason in ('user', 'reuse'))
+    revoked_reason text check (revoked_reason in ('user', 'reuse', 'password'))
 );
 alter table oauth_grants add constraint oauth_grants_revocation_is_named
     check ((revoked_at is null) = (revoked_reason is null));
@@ -153,5 +154,58 @@ grant select, insert on oauth_tokens to dodo_audit_app;
 grant update (used_at) on oauth_tokens to dodo_audit_app;
 grant usage on sequence oauth_tokens_id_seq to dodo_audit_app;
 
--- Роль администратора истории: посмотреть, кто и чем подключён.
+-- Роль администратора истории: посмотреть, кто и чем подключён, и отозвать
+-- подключения учётки, чей пароль она меняет командой (`web_access.change_password`).
 grant select on oauth_clients, oauth_grants, oauth_codes, oauth_tokens to dodo_audit_admin;
+grant update (revoked_at, revoked_reason) on oauth_grants to dodo_audit_admin;
+
+-- Смена пароля отзывает и подключения Claude. Пароль меняют в ответ на «его
+-- кто-то узнал»; вошедший по старому паролю мог успеть разрешить Claude доступ,
+-- и подключение пережило бы смену, как пережила бы её незакрытая сессия.
+-- Смена с экрана идёт функцией `change_own_password` (`0032`, путь поиска —
+-- `0033`); тело то же, добавлен отзыв в той же транзакции. Смена командой —
+-- `web_access.change_password`, отзывает сама.
+create or replace function change_own_password(p_token text, p_old_hash text, p_new_hash text)
+    returns boolean
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+    отпечаток text := encode(sha256(convert_to(p_token, 'UTF8')), 'hex');
+    чей uuid;
+begin
+    select u.id into чей
+      from public.web_sessions s
+      join public.web_users u on u.id = s.user_id
+     where s.fingerprint = отпечаток
+       and s.closed_at is null
+       and s.expires_at > now()
+       and u.disabled_at is null
+       and u.password_hash = p_old_hash;
+    if чей is null then
+        return false;
+    end if;
+
+    update public.web_users set password_hash = p_new_hash where id = чей;
+
+    update public.web_sessions
+       set closed_at = now()
+     where user_id = чей
+       and closed_at is null
+       and fingerprint <> отпечаток;
+
+    update public.oauth_grants
+       set revoked_at = now(), revoked_reason = 'password'
+     where user_id = чей
+       and revoked_at is null;
+    return true;
+end;
+$$;
+
+comment on function change_own_password(text, text, text) is
+    'Смена СВОЕГО пароля с экрана (#324): строку выбирает живая сессия, чей токен предъявлен; '
+    'прежний хеш обязан быть на месте; остальные сессии человека закрываются, своя — нет, '
+    'подключения Claude отзываются (0051). '
+    'Сужает поверхность (у приложения нет прямой записи хеша), но от пробитого приложения '
+    'не защищает: оно читает хеши и открывает сессии само (0033).';

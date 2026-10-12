@@ -31,7 +31,16 @@ from src.db.oauth_store import (  # noqa: E402
     resolve_access_token,
     revoke_connection,
 )
-from src.db.web_access import ROLE_ADMIN, create_account, disable_account, set_role  # noqa: E402
+from src.db.web_access import (  # noqa: E402
+    ROLE_ADMIN,
+    authenticate,
+    change_own_password,
+    change_password,
+    create_account,
+    disable_account,
+    open_session,
+    set_role,
+)
 
 pytestmark = requires_db
 
@@ -294,3 +303,27 @@ def test_refresh_наследует_ресурс(клиент: Client, учёт�
     вторая = refresh_tokens(первая.refresh_token, client_id=клиент.client_id, resource=РЕСУРС)
 
     assert resolve_access_token(вторая.access_token, resource=РЕСУРС) is not None
+
+
+def test_смена_пароля_командой_отзывает_подключения(клиент: Client, учётка: str) -> None:
+    пара = _обмен(_код(клиент, учётка), клиент)
+
+    assert change_password("anna", tenant=ТЕНАНТ, password="новый-пароль-учётки-anna")
+
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
+    with pytest.raises(OAuthGrantError):
+        refresh_tokens(пара.refresh_token, client_id=клиент.client_id)
+
+
+def test_смена_своего_пароля_отзывает_подключения(клиент: Client, учётка: str) -> None:
+    пара = _обмен(_код(клиент, учётка), клиент)
+    кто = authenticate("anna", "пароль-учётки-anna")
+    assert кто is not None
+    сессия = open_session(кто)
+
+    assert change_own_password(
+        сессия.token, current="пароль-учётки-anna", new="новый-пароль-учётки-anna"
+    )
+
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
+    assert list_connections(учётка) == ()

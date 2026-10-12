@@ -24,6 +24,7 @@ pytestmark = requires_db
 #: список нужен, чтобы пустой каталог не прошёл молча.
 ИЗВЕСТНЫЕ = {
     "change_own_password",
+    "oauth_purge",
     "inspection_unit_of_space",
     "log_inspection_move",
     "unit_space_frozen",
