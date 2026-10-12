@@ -238,6 +238,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
     "walk.photo.uploading": {"ru": "Загружаю…", "en": "Uploading…"},
     "walk.photo.failed": {"ru": "Не загрузилось — повторить", "en": "Failed — retry"},
+    "walk.photo.waiting": {"ru": "Ждёт связи", "en": "Waiting for signal"},
     "walk.photo.remove": {"ru": "Убрать фото", "en": "Remove photo"},
     "walk.photo.chat": {"ru": "фото из чата", "en": "photo from chat"},
     "walk.photo.last": {
@@ -289,6 +290,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.add_photos": {"ru": "Добавить фото к записи", "en": "Add photos to the record"},
     "walk.sheet.need_photo": {"ru": "Нужно фото", "en": "A photo is needed"},
     "walk.sheet.need_upload": {"ru": "Дождитесь загрузки фото", "en": "Wait for the photo upload"},
+    "walk.sheet.need_online": {
+        "ru": "Кадры ждут связи — сохранить можно, когда они загрузятся",
+        "en": "Photos are waiting for a connection — you can save once they are uploaded",
+    },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
     "walk.sheet.need_zone": {"ru": "Выберите зону", "en": "Choose a zone"},
@@ -401,6 +406,34 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not save. Try again in a minute.",
     },
     "walk.err.bad_date": {"ru": "Дата не разобрана.", "en": "The date was not understood."},
+    "walk.offline.parked": {
+        "ru": "Нет связи. Кадр сохранён на телефоне и уйдёт сам, когда сеть вернётся.",
+        "en": "No connection. The photo is kept on the phone and will upload by itself when "
+        "the network is back.",
+    },
+    "walk.offline.sent": {
+        "ru": "Кадры, снятые без связи, загружены: {n}. Они в черновике записи.",
+        "en": "Photos taken offline are uploaded: {n}. They are in the record draft.",
+    },
+    "walk.offline.full": {
+        "ru": "Память для кадров без связи заполнена — этот кадр не сохранён. "
+        "Дождитесь сети и снимите снова.",
+        "en": "The offline photo storage is full — this photo was not kept. "
+        "Wait for the network and take it again.",
+    },
+    "walk.offline.nostore": {
+        "ru": "Телефон не даёт сохранить кадр без связи. Дождитесь сети и снимите снова.",
+        "en": "The phone would not keep the photo offline. Wait for the network and take it again.",
+    },
+    "walk.offline.dropped": {
+        "ru": "Не удалось отправить кадров: {n}. Они удалены с телефона — снимите заново.",
+        "en": "Photos that could not be sent: {n}. They were removed from the phone — "
+        "take them again.",
+    },
+    "walk.offline.expired": {
+        "ru": "Кадры без связи старше {days} дней удалены: {n}. Снимите заново.",
+        "en": "Offline photos older than {days} days were removed: {n}. Take them again.",
+    },
     "walk.err.network": {
         "ru": "Нет связи с сервером. Черновик сохранён на телефоне — повторите, когда "
         "появится сеть.",

@@ -102,6 +102,9 @@
 
   function uploading() { return f.photos.some(function (p) { return p.state === "uploading"; }); }
 
+  /** Кадры, которым не хватило связи: ждут на телефоне (D442). */
+  function waitingPhotos() { return f.photos.filter(function (p) { return p.state === "waiting"; }); }
+
   function readyPhotos() { return f.photos.filter(function (p) { return p.state === "done"; }); }
 
   /** Новое нарушение без выбранного пункта: пункт ищет система (D330). */
@@ -109,15 +112,23 @@
 
   /** Что мешает спросить систему: без кадра нарушение не разбирается (D078). */
   function findBlocker() {
-    if (!readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
+    if (!readyPhotos().length) return missingPhoto();
     if (uploading()) return "walk.sheet.need_upload";
     return null;
   }
 
+  /** Готовых кадров нет: загружаются, ждут связи или не снято вовсе. */
+  function missingPhoto() {
+    if (uploading()) return "walk.sheet.need_upload";
+    return waitingPhotos().length ? "walk.sheet.need_online" : "walk.sheet.need_photo";
+  }
+
   function blocker() {
     // Рекомендации кадр не обязателен: «крышка открывается туго» не снять.
-    if (!isAdvice() && !readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
+    if (!isAdvice() && !readyPhotos().length) return missingPhoto();
     if (uploading()) return "walk.sheet.need_upload";
+    // Кадр, ждущий связи, нельзя бросить за порогом записи: она ушла бы без него.
+    if (waitingPhotos().length) return "walk.sheet.need_online";
     if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
@@ -154,8 +165,11 @@
   /* ── кадры ────────────────────────────────────────────────────────── */
 
   function addFiles(files) {
+    // Кадр новой записи при обрыве связи переживёт закрытие формы: он привязан к черновику.
+    var key = f.n ? null : draftKey();
+    var mode = f.mode;
     files.forEach(function (file) {
-      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file) };
+      var p = { id: ++seq, state: "uploading", fresh: true, own: true, url: URL.createObjectURL(file), draftKey: key, mode: mode };
       f.photos.push(p);
       send(p, file);
     });
@@ -167,6 +181,7 @@
     var blob = p.blob ? Promise.resolve(p.blob) : W.photo.compress(file);
     blob.then(function (b) {
       p.blob = b;
+      if (navigator.onLine === false) throw W.photo.offline();
       return W.photo.upload(b);
     }).then(function (ref) {
       if (!f || f.photos.indexOf(p) === -1) return;
@@ -176,11 +191,92 @@
       changed();
       redraw("photos", "item", "footer");
     }, function (err) {
+      if (err && err.retryable && p.blob) { park(p, file); return; }
       if (!f || f.photos.indexOf(p) === -1) return;
       p.state = "failed";
       p.error = err && err.message;
       p.file = file;
       redraw("photos", "item", "footer");
+    });
+  }
+
+  /** Не дошло из-за сети: кадр ждёт связи. Новой записи — в хранилище телефона, иначе в памяти формы. */
+  function park(p, file) {
+    var shown = function () { return !!f && f.photos.indexOf(p) !== -1; };
+    var failed = function (reason) {
+      W.toast(tx(reason === "full" ? "walk.offline.full" : "walk.offline.nostore"), "warn");
+      if (!shown()) return;
+      p.state = "failed";
+      p.file = file;
+      redraw("photos", "item", "footer");
+    };
+    if (!p.draftKey || p.entryId) {
+      // Правка записи — кадр ждёт в памяти формы; уже лежащий в хранилище — только перерисовать.
+      if (shown()) {
+        p.state = "waiting";
+        p.file = file;
+        redraw("photos", "item", "footer");
+      }
+      W.offline.watch();
+      return;
+    }
+    W.offline.put(p.draftKey, p.mode, p.blob).then(function (entry) {
+      p.entryId = entry.id;
+      if (shown()) {
+        p.state = "waiting";
+        redraw("photos", "item", "footer");
+      }
+      W.toast(tx("walk.offline.parked"), "warn");
+      W.offline.watch();
+    }, function (err) { failed(err && err.reason); });
+  }
+
+  /** Фон отправил кадр из хранилища. Форма на том же черновике открыта — кадр становится готовым в ней. */
+  function adopt(entry, ref) {
+    if (!f || f.n || draftKey() !== entry.key) return false;
+    if (f.gone.indexOf(entry.id) !== -1) return true;
+    var p = f.photos.filter(function (x) { return x.entryId === entry.id; })[0];
+    if (!p) {
+      p = { id: ++seq, fresh: true, own: true, draftKey: entry.key, mode: entry.mode, url: URL.createObjectURL(entry.blob) };
+      f.photos.push(p);
+    }
+    p.ref = ref;
+    p.state = "done";
+    p.entryId = null;
+    W.photo.remember(ref, p.url);
+    changed();
+    redraw("photos", "item", "footer");
+    return true;
+  }
+
+  /** Раз в попытку: кадры, ждущие в памяти формы (правка записи), пробуем снова. */
+  function retryInMemory() {
+    if (!f) return 0;
+    var list = waitingPhotos().filter(function (p) { return !p.entryId && p.file; });
+    list.forEach(function (p) { send(p, p.file); });
+    return list.length;
+  }
+
+  /** Форма открылась: кадры этого черновика, дожидавшиеся связи, возвращаются в неё. */
+  function restoreWaiting() {
+    if (f.n || !W.offline.available()) return;
+    var mine = f;
+    W.offline.list(draftKey()).then(function (entries) {
+      if (f !== mine) return;
+      var added = false;
+      entries.forEach(function (e) {
+        if (e.mode !== f.mode || f.gone.indexOf(e.id) !== -1) return;
+        if (f.photos.some(function (x) { return x.entryId === e.id; })) return;
+        f.photos.push({
+          id: ++seq, state: "waiting", fresh: true, own: true, entryId: e.id, draftKey: e.key,
+          mode: e.mode, blob: e.blob, url: URL.createObjectURL(e.blob),
+        });
+        added = true;
+      });
+      if (!added) return;
+      changed();
+      redraw("photos", "item", "footer");
+      W.offline.kick();
     });
   }
 
@@ -191,6 +287,7 @@
       return;
     }
     if (!p.fresh && p.ref) f.removed.push(p.ref);
+    if (p.entryId) { f.gone.push(p.entryId); W.offline.remove(p.entryId); }
     f.photos = left;
     changed();
     redraw("photos", "item", "footer");
@@ -627,6 +724,7 @@
         var row = el("div", "walk-row");
         row.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.sheet.discard_yes"), function () {
           if (!f.n) W.local.drop(draftKey());
+          waitingPhotos().forEach(function (p) { if (p.entryId) W.offline.remove(p.entryId); });
           close(true);
         }));
         row.appendChild(W.button("walk-btn", tx("walk.sheet.cancel"), function () {
@@ -829,6 +927,7 @@
       repeat: !!opts.repeat,
       photos: [],
       removed: [],
+      gone: [],
       words: "",
       found: null,
       preset: opts.code || null,
@@ -856,9 +955,14 @@
         f.repeat = !!draft.repeat;
         f.photos = (draft.photos || []).map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
         f.restored = true;
+      } else if (draft && draft.mode === f.mode && (draft.queued || []).length) {
+        // Пункт задан явно — черновик не трогаем, но кадры, дошедшие без связи, возвращаем.
+        f.photos = draft.queued.map(function (ref) { return { id: ++seq, ref: ref, own: true, state: "done", fresh: true }; });
+        f.restored = true;
       }
     }
     build();
+    restoreWaiting();
   }
 
   function build() {
@@ -891,6 +995,9 @@
     }
     changed();
   }
+
+  W.offline.onUploaded = adopt;
+  W.offline.onTick = retryInMemory;
 
   W.sheet = { open: open, close: close, isOpen: function () { return !!f; } };
 })();
