@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import socket
 import threading
+import time
 from collections.abc import Iterator
 from dataclasses import replace
 from typing import Any
@@ -91,13 +92,17 @@ def поднятый_сервер() -> Iterator[Any]:
     yield поднять
 
 
-def _дождаться_порта(хост: str, порт: int, попыток: int = 50) -> None:
-    for _ in range(попыток):
+def _дождаться_порта(хост: str, порт: int, секунд: float = 10.0) -> None:
+    # Ждём по часам, а не по числу попыток: отказ в соединении приходит сразу, и
+    # цикл без паузы выгорал за миллисекунды — на загруженном раннере поток
+    # сервера не успевал подняться (красный main 12.10.2026, параллельный прогон).
+    конец = time.monotonic() + секунд
+    while time.monotonic() < конец:
         try:
             with socket.create_connection((хост, порт), timeout=0.1):
                 return
         except OSError:
-            continue
+            time.sleep(0.05)
     raise AssertionError(f"сервер не поднялся на {хост}:{порт}")
 
 
