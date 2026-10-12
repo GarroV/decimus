@@ -2296,12 +2296,14 @@ def _render_methodology(
     # (`method.store_for`), поэтому кнопки не расходятся с отказом.
     админ = is_admin_role(_role())
     главный = method.is_master(склад)
+    закрыт_по = method.protection_of(склад)
     return render_template(
         "methodology/index.html",
         composition=состав,
         is_admin=админ,
         master_here=главный,
-        can_edit_checklist=админ or not главный,
+        can_edit_checklist=админ or закрыт_по is None,
+        protected_by=закрыт_по,
         checklists=перечень,
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.

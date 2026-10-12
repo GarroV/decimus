@@ -283,8 +283,8 @@
 
   {% if not can_edit_checklist %}
     <div class="note note--info" role="status">
-      <div><div class="note__title">{{ t('methodology.master.readonly.title') }}</div>
-        <div class="note__text">{{ t('methodology.master_readonly') }}</div></div>
+      <div><div class="note__title">{{ t('methodology.' ~ protected_by ~ '.readonly.title') }}</div>
+        <div class="note__text">{{ t('methodology.' ~ protected_by ~ '_readonly') }}</div></div>
     </div>
   {% endif %}
   {% if can_edit_checklist and not composition.is_latest %}
