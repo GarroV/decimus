@@ -90,8 +90,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The bot is linked to the account {login}. You can start an inspection: /start",
     },
     "access.link_invalid": {
-        "ru": "Ссылка недействительна. Получите новую на странице «Пользователи» в админке.",
-        "en": "This link is not valid. Get a new one on the Users page of the admin.",
+        "ru": "Ссылка недействительна. Получите новую в «Настройках» в админке.",
+        "en": "This link is not valid. Get a new one in Settings in the admin.",
     },
     # Учётка привязана и жива, но её роли проверки закрыты (контроль, D420).
     "access.role_closed": {
