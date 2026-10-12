@@ -41,7 +41,6 @@ from . import (
     chowdeck,
     glovo,
     glovo_link,
-    migros,
     pyszne,
     trendyol,
     wolt,
@@ -57,7 +56,10 @@ SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
 #: 429, затем 401 на поиске (#670); владелец 11.10.2026: «у яндекса в целом беда
 #: сейчас, так что давай пока его пропустим» (D397). Вернуть — перенести в SEARCHERS.
 PAUSED: tuple[ModuleType, ...] = (yandex_eda,)
-KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
+#: Migros Yemek (`migros`) не в сборе: сайт отвечает 403 адресу сервера целиком,
+#: включая главную, — защита по адресу, её не обходим (D427). Модуль и
+#: справочник точек (28) целы; вернуть — импортировать `migros` и дописать сюда.
+KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck)
 MAX_LINK_M = 400
 
 
