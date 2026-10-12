@@ -40,7 +40,7 @@ from .catalogue import (
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
-from .checklists import is_master
+from .checklists import PROTECTED_APPLIED, protection_of
 from .errors import McpError, ToolError
 from .policy import permits
 
@@ -218,6 +218,12 @@ PROD_POINTER_ADMINS_ONLY = (
     "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть, "
     "и применённый чек-лист заменил бы главный для всех. Свой чек-лист можно вести и "
     "публиковать, а применяет его админ"
+)
+
+APPLIED_READONLY = (
+    "Этот чек-лист применён к проду, и по нему идут проверки всей сети, поэтому его правят "
+    "только админы. Его можно читать; свои чек-листы, не применённые к проду и не главные, "
+    "правятся как обычно"
 )
 
 ROLE_CLOSED = (
@@ -415,13 +421,13 @@ def _call_tool(
             and spec.writes
             and role is not None
             and role not in ADMIN_ROLES
-            and is_master(прочее["store"])
+            and (причина := protection_of(прочее["store"])) is not None
         ):
             # Главный чек-лист (D440): правка только админам. Роль без права на
             # вид закрыта выше, здесь — роль с правом на вид, но не на главный.
             # Проверка по ПОДСТАВЛЕННОМУ хранилищу, а не по названному коду: код
             # может быть не назван вовсе, и правка ушла бы в применённый к проду.
-            raise ToolError(MASTER_READONLY)
+            raise ToolError(APPLIED_READONLY if причина == PROTECTED_APPLIED else MASTER_READONLY)
         if spec.kind == KIND_IMPORT:
             # Хранилище версий — для поиска версии методики черновика (D307),
             # подпись — для подтверждения (D308). Обе приходят от транспорта,

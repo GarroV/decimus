@@ -560,6 +560,26 @@ def is_master(store: Store) -> bool:
     return master_of(read_meta(store), store.space, store.code)
 
 
+#: Причины, по которым чек-лист закрыт от правки не-админам (D440).
+PROTECTED_MASTER = "master"
+PROTECTED_APPLIED = "applied"
+
+
+def protection_of(store: Store) -> str | None:
+    """Почему чек-лист закрыт от правки не-админам, или `None`, если не закрыт (D440).
+
+    Закрыт главный (метка) И применённый к проду: указатель прода один на всю
+    сеть и от метки не зависит, поэтому применённый неглавный чек-лист, который
+    правил бы бизнес-девелопер, менял бы методику всей сети. Главный называется
+    первым: он закрыт и тогда, когда применён.
+    """
+    if is_master(store):
+        return PROTECTED_MASTER
+    if applied(store.root) == (store.space, store.code):
+        return PROTECTED_APPLIED
+    return None
+
+
 def set_master(store: Store, *, tenant: str, on: bool, by: str | None = None) -> Overview:
     """Поставить или снять метку «главный» (D440).
 
@@ -597,6 +617,8 @@ def set_master(store: Store, *, tenant: str, on: bool, by: str | None = None) ->
 
 __all__ = [
     "BLANK_DIR",
+    "PROTECTED_APPLIED",
+    "PROTECTED_MASTER",
     "Overview",
     "Summary",
     "apply_to_production",
@@ -604,6 +626,7 @@ __all__ = [
     "difference",
     "is_master",
     "overview",
+    "protection_of",
     "rename",
     "set_master",
     "set_state",

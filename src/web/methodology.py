@@ -800,8 +800,10 @@ def store_for(
             else "methodology.foreign_readonly"
         )
         raise MethodologyRefused(t(ключ, lang))
-    if write and not is_admin_role(role) and lists_door.is_master(найдено):
-        raise MethodologyRefused(t("methodology.master_readonly", lang))
+    if write and not is_admin_role(role):
+        причина = lists_door.protection_of(найдено)
+        if причина is not None:
+            raise MethodologyRefused(t(f"methodology.{причина}_readonly", lang))
     return найдено
 
 
@@ -1005,6 +1007,11 @@ def apply_checklist(
         )
     except McpError as отказ:
         raise _refusal(отказ) from None
+
+
+def protection_of(store: Store) -> str | None:
+    """Почему чек-лист закрыт от правки не-админам: `master`, `applied` или `None` (D440)."""
+    return lists_door.protection_of(store)
 
 
 def is_master(store: Store) -> bool:

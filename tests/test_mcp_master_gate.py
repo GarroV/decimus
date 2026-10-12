@@ -14,15 +14,16 @@ import pytest
 from mcp_checklist_harness import build_methodology
 
 from src.mcp.checklist import Store, current_version
-from src.mcp.checklist_layout import for_code
+from src.mcp.checklist_layout import for_code, point_prod_at
 from src.mcp.checklists import set_master
-from src.mcp.rpc import MASTER_READONLY, PROD_POINTER_ADMINS_ONLY, handle
+from src.mcp.rpc import APPLIED_READONLY, MASTER_READONLY, PROD_POINTER_ADMINS_ONLY, handle
 
 ГЛАВНЫЙ = "bizdev"
 СВОЙ = "rnd"
 НОВЫЙ = {"checklist": СВОЙ, "name_ru": "Аудит РНД", "name_en": "RnD audit"}
 #: Начало отказа: по нему отказ главного отличают от любого другого отказа двери.
 ОТКАЗ = MASTER_READONLY[:40]
+ОТКАЗ_ПРИМЕНЁН = APPLIED_READONLY[:40]
 #: Отказ указателя прода — он один на всю сеть.
 ОТКАЗ_УКАЗАТЕЛЯ = PROD_POINTER_ADMINS_ONLY[:40]
 #: Пишущий инструмент без обязательных пунктов: закрыть чек-лист в боте.
@@ -128,3 +129,26 @@ def test_читать_главный_девелоперу_можно(храни�
     )
 
     assert not ошибка, текст
+
+
+def test_применённый_к_проду_неглавный_чек_лист_девелопер_не_правит_и_причина_названа(
+    хранилище: Store,
+) -> None:
+    """Метка и указатель прода независимы: применённый X правил бы всю сеть."""
+    _вызвать("create_checklist", НОВЫЙ, store=хранилище, роль="developer")
+    аргументы = {**ЗАКРЫТЬ_В_БОТЕ, "checklist": СВОЙ}
+    _, пока_не_применён = _вызвать(
+        "set_checklist_bot_access", аргументы, store=хранилище, роль="developer"
+    )
+    assert ОТКАЗ_ПРИМЕНЁН not in пока_не_применён
+    point_prod_at(for_code(хранилище, СВОЙ))
+
+    ошибка, текст = _вызвать(
+        "set_checklist_bot_access", аргументы, store=хранилище, роль="developer"
+    )
+
+    assert ошибка
+    assert ОТКАЗ_ПРИМЕНЁН in текст
+    assert ОТКАЗ not in текст, "причина «применён» названа главным"
+    _, у_админа = _вызвать("set_checklist_bot_access", аргументы, store=хранилище, роль="admin")
+    assert ОТКАЗ_ПРИМЕНЁН not in у_админа

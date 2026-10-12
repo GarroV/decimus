@@ -218,13 +218,19 @@ def test_админ_отметил_чек_лист_главным_девелоп
     assert _версия(СВОЙ_ЧЕКЛИСТ) == до
 
 
-def test_админ_снял_метку_с_первого_девелопер_правит_его(как: Вход) -> None:
+def test_админ_снял_метку_с_первого_но_он_применён_к_проду_и_закрыт_по_этой_причине(
+    как: Вход,
+) -> None:
+    """Метку снять можно, указатель прода от неё не зависит: правка остаётся закрытой."""
     как("admin").post(f"/admin/checklists/{ГЛАВНЫЙ}/master", data={"on": "0"}, headers=ЗАГОЛОВКИ)
     до = _версия(ГЛАВНЫЙ)
 
-    как("developer").post(f"/admin/items/CLN01?checklist={ГЛАВНЫЙ}", data=ПРАВКА, headers=ЗАГОЛОВКИ)
+    ответ = как("developer").post(
+        f"/admin/items/CLN01?checklist={ГЛАВНЫЙ}", data=ПРАВКА, headers=ЗАГОЛОВКИ
+    )
 
-    assert _версия(ГЛАВНЫЙ) != до
+    assert "Чек-лист применён к проду" in ответ.get_data(as_text=True)
+    assert _версия(ГЛАВНЫЙ) == до
 
 
 # --- метка и указатель прода — только админы -----------------------------------
@@ -312,3 +318,30 @@ def test_без_правок_индикатора_нет(как: Вход) -> No
     страница = как("admin").get("/admin").get_data(as_text=True)
 
     assert "Есть неопубликованные правки" not in страница
+
+
+def test_применённый_к_проду_неглавный_девелопер_не_правит_и_причина_названа(как: Вход) -> None:
+    """Указатель прода от метки не зависит: применённый X правил бы всю сеть."""
+    from src.mcp.checklist_layout import for_code, point_prod_at
+
+    клиент = как("developer")
+    _завести(клиент)
+    состояние = method.load_store()
+    assert состояние.store is not None
+    point_prod_at(for_code(состояние.store, СВОЙ_ЧЕКЛИСТ))
+    до = _версия(СВОЙ_ЧЕКЛИСТ)
+
+    ответ = как("developer").post(
+        f"/admin/items?checklist={СВОЙ_ЧЕКЛИСТ}", data=НОВЫЙ_ПУНКТ, headers=ЗАГОЛОВКИ
+    )
+
+    текст = ответ.get_data(as_text=True)
+    assert "Чек-лист применён к проду" in текст
+    assert ОТКАЗ not in текст
+    assert _версия(СВОЙ_ЧЕКЛИСТ) == до
+    страница = как("developer").get(f"/admin?checklist={СВОЙ_ЧЕКЛИСТ}").get_data(as_text=True)
+    assert "Применён к проду: только чтение" in страница
+    принято = как("admin").post(
+        f"/admin/items?checklist={СВОЙ_ЧЕКЛИСТ}", data=НОВЫЙ_ПУНКТ, headers=ЗАГОЛОВКИ
+    )
+    assert "Чек-лист применён к проду, по нему" not in принято.get_data(as_text=True)
