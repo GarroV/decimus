@@ -472,6 +472,12 @@ def install(app: Flask, conf: Settings) -> None:
         # сотрудник. Партнёров проверка не касается: они входят по почтам из
         # списка своего пространства, без домена.
         if canonical_tenant(account.tenant) == HQ_TENANT and not hq_domain_ok(кто, hq_domains):
+            # В журнал — пришедший домен организации, не почта: по нему видно,
+            # что дописать в GOOGLE_HQ_DOMAINS, если отказали своему.
+            current_app.logger.warning(
+                "вход через Google: домен организации %r не в GOOGLE_HQ_DOMAINS",
+                кто.hosted_domain,
+            )
             return отказано
 
         note_success(
