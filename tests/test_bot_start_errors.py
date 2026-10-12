@@ -29,9 +29,9 @@ from src.bot.config import BotSettings
 from src.bot.keyboards import (
     KIND_PREFIX,
     KIND_TITLES,
-    LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
+    SPEECH_LANG_PREFIX,
 )
 from src.bot.states import StartFlow
 from src.bot.texts import t
@@ -45,12 +45,11 @@ def settings() -> BotSettings:
 
 
 async def walk_to_language_step(dp: object, bot: object, unit: str = "Белград 2") -> None:
-    """Пройти мастер до кнопок языка отчёта, не нажимая последнюю."""
+    """Пройти мастер до кнопок языка чек-листа, не нажимая их: это последний вопрос (D415)."""
     await feed(dp, bot, text_message("/start"))
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:speech:ru"))
 
 
 async def test_domain_failure_is_reported_and_creates_no_inspection(
@@ -67,7 +66,6 @@ async def test_domain_failure_is_reported_and_creates_no_inspection(
     dp = build_dispatcher(settings())
     await walk_to_language_step(dp, bot)
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     assert session.last_text == t("start.failed", "ru", reason="методика неполна")
     assert domain.get_state(CHAT_ID) is None
@@ -87,7 +85,6 @@ async def test_after_domain_failure_plain_text_is_no_longer_taken_as_unit_name(
     dp = build_dispatcher(settings())
     await walk_to_language_step(dp, bot)
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     await feed(dp, bot, text_message("Белград 3"))
 
@@ -141,14 +138,14 @@ async def test_unknown_kind_code_does_not_advance_the_wizard(domain_env: object)
 
 
 async def test_unknown_lang_code_creates_no_inspection(domain_env: object) -> None:
-    """Кнопка языка отчёта с неизвестным кодом не создаёт проверку — движок не вызывается."""
+    """Кнопка языка чек-листа с неизвестным кодом не создаёт проверку — движок не вызывается."""
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await walk_to_language_step(dp, bot, unit="Белград 6")
-    lang_codes = {"start:lang:ru", "start:lang:en"}
+    lang_codes = {"start:speech:ru", "start:speech:en"}
     assert set(session.keyboard_data()) == lang_codes
 
-    await feed(dp, bot, callback_query(LANG_PREFIX + "нет-такого"))
+    await feed(dp, bot, callback_query(SPEECH_LANG_PREFIX + "нет-такого"))
 
     assert set(session.keyboard_data()) == lang_codes
     assert domain.get_state(CHAT_ID) is None
@@ -165,11 +162,9 @@ async def test_lang_pressed_with_no_wizard_data_falls_back_to_greeting(
     # пройденных шагов unit/kind — данные FSM пусты, а состояние осталось.
     key = StorageKey(bot_id=bot.id, chat_id=CHAT_ID, user_id=AUDITOR_ID)
     state = FSMContext(storage=dp.storage, key=key)
-    await state.set_state(StartFlow.waiting_lang)
+    await state.set_state(StartFlow.waiting_speech_lang)
 
     await feed(dp, bot, callback_query("start:speech:ru"))
-
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     assert session.last_text == t("start.greeting", "ru")
     assert NEW_INSPECTION_CALLBACK in session.keyboard_data()

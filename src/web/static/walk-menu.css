@@ -11,21 +11,22 @@
 
 .walk-sheet__head { justify-content: flex-start; }
 
+/* Только текст, как «назад» в шапке Swarm. */
 .walk-sheet__back {
   flex: none;
-  min-height: 44px;
-  padding: 0 12px 0 8px;
+  min-height: 36px;
+  padding: 0 10px 0 4px;
   border: 0;
-  border-radius: 22px;
-  background: var(--surface-2);
+  border-radius: 18px;
+  background: none;
   color: var(--accent);
   font: inherit;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
 
-.walk-sheet__head .walk-sheet__title { min-width: 0; font-size: 17px; }
+.walk-sheet__head .walk-sheet__title { min-width: 0; font-size: 16px; }
 
 /* ── где и что: зона и вид записи ─────────────────────────────────────── */
 
@@ -35,14 +36,14 @@
 
 .walk-ctx__pill {
   max-width: 100%;
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--line-control);
-  border-radius: 20px;
+  border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
   font: inherit;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
@@ -58,24 +59,13 @@
 .walk-pick--hero {
   flex-direction: column;
   gap: 4px;
-  min-height: 168px;
+  min-height: 120px;
   border: 2px dashed var(--accent-line);
-  border-radius: 16px;
+  border-radius: 12px;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 600;
-}
-
-.walk-pick__sub { font-size: 13px; font-weight: 400; color: var(--ink-2); }
-
-.walk-pick--link {
-  min-height: 44px;
-  margin-top: 4px;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 15px;
 }
 
 .walk-area--words { font-size: 17px; line-height: 24px; }

@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378, D398): «Требует внимания», проверки, колонки РС / РКО, «Страны».
+"""Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны.
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -8,8 +8,7 @@
 from __future__ import annotations
 
 HOME_TEXTS: dict[str, dict[str, str]] = {
-    "home.only": {"ru": "Только {country}", "en": "Only {country}"},
-    "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
+    "home.country.all": {"ru": "Все страны", "en": "All countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D398) ─────────────
@@ -64,12 +63,7 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "За период проверок нет.",
         "en": "No inspections in the period.",
     },
-    # ── Где нужно проверить, последние проверки (D399) ──────────────────
-    "home.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
-    "home.tocheck.hint": {"ru": "нет проверок за период", "en": "no inspection in the period"},
-    "home.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
-    "home.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
-    "home.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    # ── Последние проверки (D399) ───────────────────────────────────────
     "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
     "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
     "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
@@ -84,15 +78,24 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Оценки рейтинга не загрузились: в колонках РС и РКО прочерки.",
         "en": "Rating scores did not load: the RS and CX columns show dashes.",
     },
-    # ── Страны ───────────────────────────────────────────────────────────
-    "home.countries.title": {"ru": "Страны", "en": "Countries"},
-    "home.countries.hint": {
-        "ru": "Щелчок по стране сужает всю главную",
-        "en": "Click a country to narrow the whole page",
+    # ── Блок «Рейтинги» (D418) ──────────────────────────────────────────
+    "home.rb.title": {"ru": "Рейтинги", "en": "Ratings"},
+    "home.rb.more": {"ru": "Все рейтинги", "en": "All ratings"},
+    "home.rb.rs": {"ru": "Стандарты · РС", "en": "Standards · RS"},
+    "home.rb.rko": {"ru": "Клиентский опыт · РКО", "en": "Customer experience · CX"},
+    "home.rb.maps": {"ru": "Карты", "en": "Maps"},
+    "home.rb.none": {
+        "ru": "Для выбранной страны рейтингов нет.",
+        "en": "No ratings for the selected country.",
     },
-    "home.countries.country": {"ru": "Страна", "en": "Country"},
-    "home.countries.units": {"ru": "Проверено", "en": "Inspected"},
-    "home.countries.average": {"ru": "Средняя", "en": "Average"},
+    "home.rb.failed": {
+        "ru": "Рейтинги не загрузились: база не ответила. Обновите страницу.",
+        "en": "Ratings did not load: the database did not answer. Reload the page.",
+    },
+    "home.rb.maps_failed": {
+        "ru": "Оценки карт не загрузились.",
+        "en": "Map ratings did not load.",
+    },
     # ── Пиццерии ────────────────────────────────────────────────────────
     "home.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "home.units.empty": {

@@ -1,8 +1,8 @@
 /* Мини-апп обхода: кадры (D312) — сжать на телефоне, отправить, показать.
  *
  * Камера в WebView телеграма открывается только полем выбора файла:
- * getUserMedia там не работает. `capture="environment"` сразу открывает
- * заднюю камеру, поле без него — выбор из галереи, сразу несколько кадров.
+ * getUserMedia там не работает. Поле одно и без `capture` (D422): телефон
+ * сам предлагает «Сделать снимок / Медиатека / Выбрать файлы», сразу несколько кадров.
  *
  * Снимок сжимается здесь же, до 1600 px по длинной стороне: кадр с телефона —
  * 3–8 МБ, на мобильной связи в подвале пиццерии это минуты, а для отчёта
@@ -79,14 +79,14 @@
   /** Запомнить уже показанный локально кадр, чтобы не тянуть его с сервера. */
   function remember(ref, url) { views[ref] = Promise.resolve(url); }
 
-  /** Кнопка выбора кадров: камера или галерея. `onFiles` получает список File. */
-  function picker(label, camera, onFiles) {
-    var wrap = W.el("label", "walk-pick" + (camera ? " walk-pick--camera" : ""));
+  /** Кнопка выбора кадров. Поле без `capture`: телефон сам предлагает «Снять / Медиатека / Файлы»
+   *  (D422). `onFiles` получает список File. */
+  function picker(label, onFiles) {
+    var wrap = W.el("label", "walk-pick walk-pick--camera");
     var input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    if (camera) input.setAttribute("capture", "environment");
-    else input.multiple = true;
+    input.multiple = true;
     input.className = "walk-pick__input";
     input.addEventListener("change", function () {
       var files = Array.prototype.slice.call(input.files || []);
@@ -94,6 +94,7 @@
       if (files.length) onFiles(files);
     });
     wrap.appendChild(input);
+    wrap.appendChild(W.icon("camera", "walk-pick__icon"));
     wrap.appendChild(W.el("span", "walk-pick__label", label));
     return wrap;
   }
@@ -122,9 +123,8 @@
   }
 
   /**
-   * Кадры записи с их состоянием и кнопки «снять / из галереи».
-   * `hero` — кадров ещё нет и снимок — первое действие формы (D330): крупная
-   * плитка камеры и ссылка на галерею вместо двух равных кнопок.
+   * Кадры записи с их состоянием и одна кнопка «Фото нарушения».
+   * `hero` — кадров ещё нет и снимок — первое действие формы (D330): крупная плитка.
    */
   function block(photos, on) {
     var tx = W.tx;
@@ -145,20 +145,9 @@
       });
       box.appendChild(strip);
     }
-    if (on.hero) {
-      var big = picker(tx("walk.photo.hero"), true, on.onFiles);
-      big.classList.add("walk-pick--hero");
-      big.appendChild(W.el("span", "walk-pick__sub", tx("walk.photo.hero_hint")));
-      box.appendChild(big);
-      var gal = picker(tx("walk.photo.gallery_link"), false, on.onFiles);
-      gal.classList.add("walk-pick--link");
-      box.appendChild(gal);
-      return box;
-    }
-    var row = W.el("div", "walk-pickrow");
-    row.appendChild(picker(photos.length ? tx("walk.photo.more") : tx("walk.photo.camera"), true, on.onFiles));
-    row.appendChild(picker(tx("walk.photo.gallery"), false, on.onFiles));
-    box.appendChild(row);
+    var one = picker(photos.length ? tx("walk.photo.more") : tx("walk.photo.hero"), on.onFiles);
+    if (on.hero) one.classList.add("walk-pick--hero");
+    box.appendChild(one);
     return box;
   }
 

@@ -96,4 +96,20 @@ _PANEL: dict[str, dict[str, str]] = {
     },
 }
 
-REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL}
+# «Где нужно проверить» над списком (D399, перенесено с «Главной» в D418).
+_TOCHECK: dict[str, dict[str, str]] = {
+    "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "registry.tocheck.hint": {
+        "ru": "Нет проверок за период: ни разу не проверенные — первыми, затем ждущие дольше.",
+        "en": "No inspections in the period: never inspected first, then waiting longest.",
+    },
+    "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
+    "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
+    "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "registry.tocheck.failed": {
+        "ru": "Список не загрузился: база не ответила. Обновите страницу.",
+        "en": "The list did not load: the database did not answer. Reload the page.",
+    },
+}
+
+REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL, **_TOCHECK}

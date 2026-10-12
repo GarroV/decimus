@@ -476,7 +476,6 @@
         }));
         return box;
       }
-      box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.comment_hint")));
       var area = el("textarea", "walk-area walk-area--comment");
       area.rows = 3;
       area.maxLength = 1000;
@@ -590,7 +589,6 @@
       again.appendChild(W.button("walk-link", tx("walk.sheet.find_again"), find));
       box.appendChild(again);
     }
-    if (!f.found && !f.code) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.find_hint")));
     box.appendChild(W.button("walk-link", tx("walk.sheet.pick_manual"), itemMenu));
     var t = taken();
     if (t) box.appendChild(el("p", "walk-form__note walk-form__note--info", tx("walk.sheet.taken", { n: t.n })));

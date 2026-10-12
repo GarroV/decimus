@@ -50,7 +50,7 @@ def settings(names: dict[int, str] | None = None) -> BotSettings:
 
 
 async def walk_through_wizard(unit: str = "Белград 2") -> tuple[object, object]:
-    """Пройти мастер целиком: /start → «Новая проверка» → название → вид → язык."""
+    """Пройти мастер целиком: /start → «Новая проверка» → название → вид → язык чек-листа."""
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await feed(dp, bot, text_message("/start"))
@@ -58,7 +58,6 @@ async def walk_through_wizard(unit: str = "Белград 2") -> tuple[object, o
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
     return bot, session
 
 
@@ -81,7 +80,7 @@ async def test_start_offers_new_inspection_button(domain_env: object) -> None:
     assert NEW_INSPECTION_CALLBACK in session.keyboard_data()
 
 
-async def test_wizard_asks_unit_then_kind_then_two_languages(domain_env: object) -> None:
+async def test_wizard_asks_unit_then_kind_then_one_language(domain_env: object) -> None:
     bot, session = make_bot()
     dp = build_dispatcher(settings())
 
@@ -93,26 +92,23 @@ async def test_wizard_asks_unit_then_kind_then_two_languages(domain_env: object)
     assert set(session.keyboard_data()) == {f"start:kind:{code}" for code in KIND_TITLES}
 
     await feed(dp, bot, callback_query("start:kind:planned"))
-    # D393: сперва язык проверки (речь), и только потом язык отчёта — отдельными
-    # вопросами и отдельными кнопками.
+    # D414/D415: единственный языковой вопрос мастера — язык чек-листа. Язык
+    # отчёта спросят в конце проверки, и вопроса о нём здесь нет.
     assert session.last_text == t("start.ask_speech_lang", "ru")
     assert session.keyboard_data() == ["start:speech:ru", "start:speech:en"]
 
     await feed(dp, bot, callback_query("start:speech:ru"))
-    assert session.last_text == t("start.ask_lang", "ru")
-    assert session.keyboard_data() == ["start:lang:ru", "start:lang:en"]
+    assert get_state(CHAT_ID) is not None, "после языка чек-листа проверка должна начаться"
+    assert not any(data.startswith("start:lang:") for data in session.keyboard_data())
 
 
-@pytest.mark.parametrize(
-    ("speech", "report"), [("ru", "en"), ("en", "ru"), ("ru", "ru"), ("en", "en")]
-)
-async def test_inspection_gets_speech_and_report_languages_as_chosen(
-    domain_env: object, speech: str, report: str
+@pytest.mark.parametrize("speech", ["ru", "en"])
+async def test_report_language_starts_equal_to_checklist_language(
+    domain_env: object, speech: str
 ) -> None:
-    """D393, ядро: язык проверки и язык отчёта ложатся в проверку ровно как выбраны.
+    """D415, ядро: на старте язык отчёта равен языку чек-листа, а строки «Язык отчёта» нет.
 
-    Русская речь с английским отчётом (и наоборот) — обычный случай, а не
-    ошибка: до D393 речь молча брала язык отчёта.
+    Отчёт на другом языке выбирается в конце проверки (`finish`), а не на старте.
     """
     bot, session = make_bot()
     dp = build_dispatcher(settings())
@@ -121,15 +117,15 @@ async def test_inspection_gets_speech_and_report_languages_as_chosen(
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query(f"start:speech:{speech}"))
-    await feed(dp, bot, callback_query(f"start:lang:{report}"))
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
     assert inspection.speech_lang == speech
-    assert inspection.report_lang == report
+    assert inspection.report_lang == speech
     started = session.last_text
-    assert LANG_LABELS[speech] in started.split("Язык проверки:")[1].splitlines()[0]
-    assert LANG_LABELS[report] in started.split("Язык отчёта:")[1].splitlines()[0]
+    assert LANG_LABELS[speech] in started.split("Язык чек-листа:")[1].splitlines()[0]
+    assert "Язык отчёта" not in started
+    assert "Report language" not in started
 
 
 async def test_report_button_does_not_answer_the_speech_question(domain_env: object) -> None:
@@ -147,7 +143,7 @@ async def test_report_button_does_not_answer_the_speech_question(domain_env: obj
 
     # Мастер при этом жив: правильная кнопка шага по-прежнему принимается.
     await feed(dp, bot, callback_query("start:speech:ru"))
-    assert session.last_text == t("start.ask_lang", "ru")
+    assert get_state(CHAT_ID) is not None
 
 
 async def test_wizard_creates_inspection_with_typed_unit(domain_env: object) -> None:
@@ -173,7 +169,6 @@ async def test_auditor_comes_from_telegram_id_and_is_never_asked(domain_env: obj
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
@@ -260,7 +255,6 @@ async def test_start_new_asks_unit_and_replaces_only_after_full_wizard(
     await feed(dp, bot, text_message("Белград 3"))
     await feed(dp, bot, callback_query("start:kind:repeat"))
     await feed(dp, bot, callback_query("start:speech:en"))
-    await feed(dp, bot, callback_query("start:lang:en"))
 
     replaced = get_state(CHAT_ID)
     assert replaced is not None
@@ -299,7 +293,6 @@ async def _до_названия(
 async def _до_конца(bot: object, dp: object) -> None:
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
 
 async def test_знакомая_пиццерия_на_любом_языке_берётся_из_справочника(
