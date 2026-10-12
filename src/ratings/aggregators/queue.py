@@ -42,6 +42,13 @@ def known_keys() -> tuple[str, ...]:
     return tuple(m.KEY for m in collect.SEARCHERS + collect.KNOWN)
 
 
+def listing() -> tuple[tuple[str, int, bool], ...]:
+    """Все известные агрегаторы: (ключ, шкала оценки, собирает ли его бот сам).
+    Шкала — родная агрегатора: 10, 100 (% довольных) или 5."""
+    every = collect.SEARCHERS + collect.KNOWN + collect.PAUSED
+    return tuple((m.KEY, m.SCALE, m not in collect.PAUSED) for m in every)
+
+
 def ask(aggregators: Sequence[str] | None, *, by: str) -> Asked:
     """Поставить заявку. `None` или пусто — все агрегаторы. Незнакомое имя —
     `UnknownAggregator`; база не ответила — `RatingsError`."""

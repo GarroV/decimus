@@ -32,6 +32,7 @@ from src.mcp.catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_RATINGS,
+    KIND_RATINGS_READ,
     KIND_RETRACTION,
     TOOLS,
 )
@@ -366,6 +367,12 @@ def test_перечень_инструментов_отдаётся_целико
         "repoint_learned_phrase",
         # загрузка рейтингов РС/РКО (D320), только токен УК
         "import_ratings",
+        # заявка на обновление агрегаторов (D420), только токен УК
+        "request_aggregators_update",
+        # чтение рейтингов (D420), любой токен, с охватом
+        "ratings_summary",
+        "ratings_units",
+        "aggregators_status",
     }
     assert all("inputSchema" in инструмент for инструмент in ответ["result"]["tools"])
 
@@ -483,6 +490,9 @@ def test_содержимое_проверки_остаётся_нетронут
             continue
         if spec.kind == KIND_RATINGS:
             assert spec.handler.__module__ == "src.mcp.ratings_tools", spec.name
+            continue
+        if spec.kind == KIND_RATINGS_READ:
+            assert spec.handler.__module__ == "src.mcp.ratings_read", spec.name
             continue
         assert spec.handler.__module__ == "src.mcp.tools", spec.name
         for запрещённое in ("create", "update", "delete", "insert", "push", "set_", "edit"):
