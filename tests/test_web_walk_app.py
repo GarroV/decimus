@@ -58,6 +58,7 @@ class База:
             raise OutOfScopeError("не ваше")
         if bound and space is None:
             raise UnboundError("нет привязки")
+        self.режим: dict[int, str] = {}
 
     def is_admin(self, who: int) -> bool:
         return who in self.круг
@@ -120,6 +121,14 @@ def база(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> База:
     monkeypatch.setattr(walk_settings.bot_langs, "chosen_lang", lambda who: б.язык.get(who))
     monkeypatch.setattr(
         walk_settings.bot_langs, "choose_lang", lambda who, lang: б.язык.__setitem__(who, lang)
+    )
+    monkeypatch.setattr(
+        walk_settings.finish_modes, "chosen_finish_mode", lambda who: б.режим.get(who)
+    )
+    monkeypatch.setattr(
+        walk_settings.finish_modes,
+        "choose_finish_mode",
+        lambda who, mode: б.режим.__setitem__(who, mode),
     )
     monkeypatch.setattr(walk_access.bot_links, "standing", б.standing)
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
