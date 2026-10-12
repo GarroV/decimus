@@ -185,6 +185,6 @@ def test_заход_без_заявки_расписание_идёт_по_ча�
 def test_миграция_держит_одну_открытую_заявку_индексом() -> None:
     """Повтор «уже в очереди» держится на базе, а не на проверке в коде: две просьбы
     одновременно (веб и Claude) иначе обе увидели бы пустую очередь."""
-    sql = (MIGRATIONS_DIR / "0052_agg_requests.sql").read_text(encoding="utf-8")
+    sql = (MIGRATIONS_DIR / "0053_agg_requests.sql").read_text(encoding="utf-8")
     assert "create unique index requests_one_open_idx" in sql
     assert "where done_at is null" in sql
