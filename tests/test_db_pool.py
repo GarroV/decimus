@@ -135,3 +135,19 @@ def test_пул_выключен_каждое_обращение_своё(db_env
         второй = _pid(conn)
 
     assert первый != второй
+
+
+def test_недоступная_база_отказывает_сразу_а_не_по_таймауту_пула(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Пул молча пересоединяется в фоне; без пробы первого соединения отказ ждал бы 10 с."""
+    import time
+
+    monkeypatch.setenv(pool.POOL_TIMEOUT_VAR, "30")
+    начало = time.monotonic()
+
+    with pytest.raises(psycopg.OperationalError), pool.connection("host=127.0.0.1 port=1 dbname=x"):
+        pytest.fail("соединение выдано с недоступной базой")
+
+    assert time.monotonic() - начало < 5
+    assert not pool._pools, "пул на недоступную базу остался в таблице"
