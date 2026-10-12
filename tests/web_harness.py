@@ -46,10 +46,19 @@ from src.web.config import Settings
 class Учётка:
     """То немногое, что страницам нужно знать о вошедшем."""
 
-    def __init__(self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor") -> None:
+    def __init__(
+        self,
+        login: str = ЛОГИН,
+        tenant: str = "default",
+        role: str = "auditor",
+        email: str | None = None,
+    ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
         self.tenant = tenant
+        # Почта входа через Google (`web_users.email`): по умолчанию не
+        # привязана — иначе вход паролем, которым входит оснастка, закрыт.
+        self.email = email
         # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
         # прятал бы отказ раздела людей во всех тестах разом.
         self.role = role
@@ -145,7 +154,11 @@ def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Сч
 
 
 def подменить_двери(
-    monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str = "auditor"
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tenant: str,
+    role: str = "auditor",
+    email: str | None = None,
 ) -> dict[str, list[Any]]:
     """Двери опознания, подменённые на границе модуля. Пишут, кого звали.
 
@@ -160,7 +173,7 @@ def подменить_двери(
     def _authenticate(login: str, password: str) -> Учётка | None:
         зовы["authenticate"].append((login, password))
         if login == ЛОГИН and password == ПАРОЛЬ:
-            return Учётка(tenant=tenant, role=role)
+            return Учётка(tenant=tenant, role=role, email=email)
         return None
 
     def _open(account: Учётка) -> Сессия:
@@ -169,7 +182,7 @@ def подменить_двери(
 
     def _resolve(token: str) -> Учётка | None:
         зовы["resolve"].append((token,))
-        return Учётка(tenant=tenant, role=role) if token == ТОКЕН else None
+        return Учётка(tenant=tenant, role=role, email=email) if token == ТОКЕН else None
 
     def _close(token: str) -> bool:
         зовы["close"].append(token)
