@@ -187,6 +187,9 @@
     window.scrollTo(0, 0);
   }
 
+  /** Перейти к зоне из чужого модуля — ссылка «Перейти» в уведомлении о записи (D435). */
+  W.goZone = function (code) { if (zoneIndex(code) !== -1) go(code); };
+
   function infoCount() {
     var all = S.data.info || [];
     return { done: all.filter(function (f) { return !!f.value; }).length, total: all.length };
@@ -595,8 +598,9 @@
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
     var add = W.hinted(W.button("walk-mark walk-dock__add", null, function () {
-      // На остановке «Оборудование» зоны нет — её выберут в форме.
-      W.sheet.open({ mode: "violation", zone: zone.equipment ? null : zone.code });
+      // Нарушение не привязано к зоне на экране (D435): зона — мягкая подсказка,
+      // запись встанет в зону пункта и слов. На «Оборудовании» подсказки нет.
+      W.sheet.open({ mode: "violation", hint: zone.equipment ? null : zone.code });
     }), "add");
     add.appendChild(W.icon("camera"));
     add.appendChild(el("span", null, "+ " + tx("walk.add.short")));
