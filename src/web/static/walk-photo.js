@@ -82,7 +82,7 @@
   /** Кнопка выбора кадров. Поле без `capture`: телефон сам предлагает «Снять / Медиатека / Файлы»
    *  (D422). `onFiles` получает список File. */
   function picker(label, onFiles) {
-    var wrap = W.el("label", "walk-pick walk-pick--camera");
+    var wrap = W.hinted(W.el("label", "walk-pick walk-pick--camera"), "photo");
     var input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";

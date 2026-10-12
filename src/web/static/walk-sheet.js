@@ -347,11 +347,11 @@
       var row = el("div", "walk-ctx");
       if (!f.n && !isMeasure()) {
         var kind = KINDS.filter(function (pair) { return pair[0] === f.mode; })[0];
-        row.appendChild(W.button("walk-ctx__pill", tx(kind[1]), kindMenu));
+        row.appendChild(W.hinted(W.button("walk-ctx__pill", tx(kind[1]), kindMenu), "kind"));
       }
       var z = zoneOf(f.zone);
-      var zb = W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
-        (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu);
+      var zb = W.hinted(W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
+        (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
       zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
       row.appendChild(zb);
       var box = el("div", "walk-ctx__box");
@@ -399,7 +399,7 @@
       var box = section(isMeasure() ? tx("walk.sheet.item_measure") : isAdvice() ? tx("walk.sheet.item_advice") : tx("walk.sheet.item"));
       var chosen = item(f.code);
       if (!chosen) {
-        box.appendChild(W.button("walk-btn walk-btn--pick", tx("walk.sheet.pick_item"), itemMenu));
+        box.appendChild(W.hinted(W.button("walk-btn walk-btn--pick", tx("walk.sheet.pick_item"), itemMenu), "pickitem"));
         return box;
       }
       var card = el("div", "walk-choice");
@@ -425,7 +425,7 @@
         box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.level_only", { level: it.levels[0] })));
         return box;
       }
-      var seg = el("div", "walk-seg");
+      var seg = W.hinted(el("div", "walk-seg"), "level");
       it.levels.forEach(function (lv) {
         var on = f.level === lv;
         var b = W.button("walk-seg__opt walk-seg__opt--" + lv.toLowerCase() + (on ? " is-on" : ""), lv, function () {
@@ -551,7 +551,7 @@
       if (f.error) box.appendChild(el("p", "walk-form__error", f.error));
       if (recognizing() && !f.code) {
         var blocked = findBlocker();
-        var go = W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find);
+        var go = W.hinted(W.button("walk-mark walk-mark--find", f.finding ? tx("walk.sheet.finding_short") : tx("walk.sheet.find"), find), "find");
         go.disabled = !!blocked || !!f.finding;
         box.appendChild(go);
         if (blocked) box.appendChild(el("p", "walk-sheet__why", tx(blocked)));
@@ -559,7 +559,7 @@
       }
       var why = blocker();
       var label = f.saving ? tx("walk.sheet.saving") : taken() ? tx("walk.sheet.add_photos") : tx("walk.sheet.save");
-      var save = W.button("walk-mark", label, save_);
+      var save = W.hinted(W.button("walk-mark", label, save_), "save");
       save.disabled = !!why || f.saving;
       box.appendChild(save);
       if (why && !f.saving) box.appendChild(el("p", "walk-sheet__why", tx(why)));
