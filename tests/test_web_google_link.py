@@ -126,9 +126,7 @@ def _стенд(
         monkeypatch.setattr(
             auth,
             "resolve_session",
-            lambda token: (
-                Учётка(tenant=tenant, role=role, email=email) if token == ТОКЕН else None
-            ),
+            lambda token: Учётка(tenant=tenant, role=role, email=email) if token == ТОКЕН else None,
         )
         yield client
 
@@ -283,9 +281,7 @@ def test_возврат_в_чужой_сессии_ничего_не_привя�
         assert база.привязано == {}
 
 
-def test_возврат_без_сессии_уводит_на_вход(
-    ук: FlaskClient, база: База, обмен: Обмен
-) -> None:
+def test_возврат_без_сессии_уводит_на_вход(ук: FlaskClient, база: База, обмен: Обмен) -> None:
     метка = начать(ук, обмен)
     ук.post(auth.LOGOUT_PATH, headers=ЗАГОЛОВКИ)
 
@@ -381,9 +377,7 @@ def test_снять_почту_можно_только_с_паролем(
         assert пусто.status_code == 400
         assert "без него отвязать нельзя" in пусто.get_data(as_text=True)
 
-        мимо = client.post(
-            "/settings/google-unlink", data={"current": "не-тот"}, headers=ЗАГОЛОВКИ
-        )
+        мимо = client.post("/settings/google-unlink", data={"current": "не-тот"}, headers=ЗАГОЛОВКИ)
         assert мимо.status_code == 400
         assert "привязка осталась" in мимо.get_data(as_text=True)
 
@@ -395,9 +389,7 @@ def test_снять_почту_можно_только_с_паролем(
         assert ПОЧТА_УК not in caplog.text
 
 
-def test_снятие_со_чужой_страницы_не_проходит(
-    monkeypatch: pytest.MonkeyPatch, база: База
-) -> None:
+def test_снятие_со_чужой_страницы_не_проходит(monkeypatch: pytest.MonkeyPatch, база: База) -> None:
     for client in _стенд(monkeypatch, email=ПОЧТА_УК):
         ответ = client.post(
             "/settings/google-unlink",
