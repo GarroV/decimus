@@ -450,7 +450,7 @@ APP_ROLE = "dodo_audit_app"
 APP_PASSWORD_VAR = "DATABASE_APP_PASSWORD"
 
 
-def app_role_dsn(admin_dsn: str) -> str:
+def app_role_dsn(admin_dsn: str, *, space: str | None = None) -> str:
     """Та же база, но под ролью приложения.
 
     Пароль привилегированной роли отбрасывается намеренно: он от другой роли, и
@@ -461,6 +461,9 @@ def app_role_dsn(admin_dsn: str) -> str:
 
     params = {k: v for k, v in conninfo_to_dict(admin_dsn).items() if k != "password"}
     params["user"] = APP_ROLE
+    if space is not None:
+        # Пространство соединения по умолчанию (`src/db/space.py`).
+        params["options"] = f"-c decimus.space={space}"
     password = os.environ.get(APP_PASSWORD_VAR)
     if password:
         params["password"] = password
@@ -476,14 +479,13 @@ def db_env(pg_dsn: str, monkeypatch: pytest.MonkeyPatch) -> str:
     тестов блока заодно становится проверкой того, что выданных этой роли прав
     хватает на настоящую работу — слив, справочник, выгрузку кадров.
     """
-    dsn = app_role_dsn(pg_dsn)
+    # Функции базы и сами тесты ходят здесь напрямую, мимо дверей, которые ставят
+    # пространство (F-037): соединение этой строки по умолчанию — служебное
+    # пространство. Двери в тех же тестах ставят своё поверх (`set_config`);
+    # изоляцию и «без пространства — отказ» проверяет `test_db_space_isolation.py`
+    # на строке без этой настройки.
+    dsn = app_role_dsn(pg_dsn, space="*")
     monkeypatch.setenv(DATABASE_URL_VAR, dsn)
-    # Функции базы здесь зовут напрямую, мимо дверей, которые ставят пространство
-    # (F-037): без двери — от имени служебной работы. Двери в тех же тестах
-    # ставят своё поверх; изоляцию проверяет `test_db_space_isolation.py`.
-    from src.db import space
-
-    monkeypatch.setattr(space, "_FALLBACK", space.SYSTEM_SPACE)
     return dsn
 
 

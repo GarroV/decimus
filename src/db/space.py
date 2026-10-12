@@ -2,7 +2,7 @@
 
 Охват в тексте запроса (`src/db/reach.py`) — первая линия: каждый запрос сам
 говорит, чьё читает. Вторая линия — сама база. Построчные политики роли
-приложения (миграция `0061_space_isolation`) сверяют строку с настройкой
+приложения (миграция `0062_space_isolation`) сверяют строку с настройкой
 `decimus.space` соединения, и запрос, в котором условия охвата нет, всё равно
 не отдаёт чужого.
 
@@ -46,20 +46,13 @@ from src.domain.tenants import canonical_tenant
 
 from .errors import DbError
 
-#: Имя настройки соединения, которую читают политики (`decimus_space()` в `0061`).
+#: Имя настройки соединения, которую читают политики (`decimus_space()` в `0062`).
 SPACE_SETTING = "decimus.space"
 
 #: Служебное обращение без человека: читает и пишет всё. Ставится только явно.
 SYSTEM_SPACE = "*"
 
 _SPACE: ContextVar[str | None] = ContextVar("decimus_space", default=None)
-
-#: Пространство, когда дверь его не поставила. В продукте — всегда `None`: забытая
-#: дверь обязана упасть ошибкой базы. Подменяет его только оснастка тестов
-#: (`tests/conftest.py: db_env`), где функции базы зовут напрямую, мимо дверей;
-#: двери в тех же тестах ставят своё пространство поверх него. Код продукта это
-#: имя не трогает — держит `tests/test_db_space_isolation.py`.
-_FALLBACK: str | None = None
 
 _SET_SQL = "select set_config('decimus.space', %s, false)"
 
@@ -79,8 +72,7 @@ def _checked(space: str) -> str:
 
 def current_space() -> str | None:
     """Пространство этого обращения или `None`, если дверь его не поставила."""
-    space = _SPACE.get()
-    return space if space is not None else _FALLBACK
+    return _SPACE.get()
 
 
 @contextmanager
@@ -127,7 +119,7 @@ def apply_space(conn: psycopg.Connection[Any]) -> None:
     настройку. Пространства нет — настройка не трогается: у свежего или
     сброшенного пулом соединения она пустая, и политики не отдадут ничего.
     """
-    space = current_space()
+    space = _SPACE.get()
     if space is None:
         return
     autocommit = conn.autocommit
