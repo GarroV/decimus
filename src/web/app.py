@@ -34,7 +34,7 @@ from flask import (
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import directory, unit_profiles
+from src.db import directory, request_memo, unit_profiles
 from src.db.errors import (
     AcceptError,
     DatabaseTargetError,
@@ -59,6 +59,7 @@ from . import (
     home_page,
     letter_draft,
     letter_markup,
+    oauth,
     prescriptions,
     ratings,
     registry_period,
@@ -72,6 +73,7 @@ from . import (
     users_screen,
     users_view,
     view,
+    walk_auth,
     walk_proxy,
 )
 from . import country as country_data
@@ -130,6 +132,32 @@ SCREENS = (
 )
 
 
+_MEMO_ENVIRON_KEY = "decimus.db_memo_token"
+
+
+def _open_memo() -> None:
+    # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
+        enabled=request.method in ("GET", "HEAD")
+    )
+
+
+def _close_memo(_exc: BaseException | None) -> None:
+    token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
+    if token is not None:
+        request_memo.end(token)
+
+
+def _install_request_memo(app: Flask) -> None:
+    """Справочные чтения за один GET-запрос — один раз, а не по разу на блок (`request_memo`).
+
+    Только `GET`/`HEAD`: запрос, который пишет, читает как раньше, и прочитанное
+    до записи не может дожить до чтения после неё.
+    """
+    app.before_request(_open_memo)
+    app.teardown_request(_close_memo)
+
+
 def create_app(settings: Settings | None = None) -> Flask:
     """Собрать приложение. Отказ окружения — `WebConfigError` до первого запроса."""
     conf = settings or load_settings()
@@ -138,11 +166,13 @@ def create_app(settings: Settings | None = None) -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
     assets.install(app)
+    _install_request_memo(app)
     _register_context(app, conf)
     # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    _install_origin_gate(app)
     _install_hq_gate(app)
     _install_control_gate(app)
     _install_methodology_gate(app)
@@ -159,6 +189,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
     swarm_api.install(app, conf)
+    # Подключение Claude входом через сайт (D417): только при публичных адресах.
+    oauth.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1053,8 +1085,39 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/add",
         f"{users_path}/email",
         f"{users_path}/disable",
+        # Подключение Claude (D417): согласие и отзыв своего подключения —
+        # дела самого человека; права в MCP контролю решает его роль.
+        oauth.AUTHORIZE_PATH,
+        f"{users_path}/claude-revoke",
     )
-    return path in own
+    # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
+    # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.
+    return path in own or path.startswith(f"{users_path}/connections/")
+
+
+def _install_origin_gate(app: Flask) -> None:
+    """Любая запись в админку — только со своей же страницы (`refuse_foreign_origin`).
+
+    Заслоном на всё приложение, а не вызовом в каждом маршруте: до 12.10.2026
+    заслон держался на том, что каждый POST зовёт его сам, и новый маршрут без
+    вызова остался бы открытым для чужой страницы молча (аудит доступа, п.6).
+    Вызовы в маршрутах остаются — второй слой. Мимо заслона идут только мини-апп
+    обхода (опознание подписью Telegram в заголовке, куки админки до него не
+    доезжают), API для сервисов (ключ в заголовке, только чтение) и машинные
+    адреса OAuth — регистрация клиента и обмен кода (D417): их зовёт сервер
+    Claude без `Origin`, куки входа там не участвуют. Согласие (`/oauth/authorize`)
+    — форма человека и идёт под заслоном.
+    """
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS
+
+    @app.before_request
+    def _запись_только_со_своей_страницы() -> None:
+        # Маршрут не нашёлся (404, 405) — записи не будет и так, ответ даст Flask.
+        if request.routing_exception is not None:
+            return
+        if request.method in _READ_METHODS or request.endpoint in мимо:
+            return
+        refuse_foreign_origin()
 
 
 def _install_methodology_gate(app: Flask) -> None:

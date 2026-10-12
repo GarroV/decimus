@@ -266,3 +266,24 @@ def test_через_фронт_google_получает_адрес_фронта_�
 
         прямо = client.get(auth.GOOGLE_START_PATH).headers["Location"]
         assert parse_qs(urlsplit(прямо).query)["redirect_uri"] == [РЕКВИЗИТЫ.redirect_uri]
+
+
+def test_вход_через_google_возвращает_на_согласие_oauth(клиент: FlaskClient, обмен: Обмен) -> None:
+    """D417: путь возврата едет через Google в подписанной куке и только на согласие."""
+    вернуться = "/oauth/authorize?client_id=c&state=s"
+    ответ = клиент.get(auth.GOOGLE_START_PATH, query_string={"next": вернуться})
+    метка = ответ.headers["Location"].split("state=")[1].split("&")[0]
+
+    после = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert после.status_code == 302
+    assert после.headers["Location"].endswith(вернуться)
+
+
+def test_вход_через_google_не_уводит_на_чужой_next(клиент: FlaskClient, обмен: Обмен) -> None:
+    ответ = клиент.get(auth.GOOGLE_START_PATH, query_string={"next": "https://evil.com/x"})
+    метка = ответ.headers["Location"].split("state=")[1].split("&")[0]
+
+    после = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert "evil.com" not in после.headers["Location"]

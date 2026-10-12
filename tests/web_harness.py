@@ -208,8 +208,16 @@ def охват_без_базы(tenant: str) -> Reach:
     return Reach(код, None, (код,))
 
 
-def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None = None) -> Flask:
-    """Приложение с настройками стенда набора."""
+def собрать(
+    *,
+    tenant: str,
+    ui_lang: str = "ru",
+    bot_username: str | None = None,
+    admin_public_url: str | None = None,
+    mcp_public_url: str | None = None,
+    trusted_proxies: int | None = None,
+) -> Flask:
+    """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
         Settings(
             host="127.0.0.1",
@@ -218,6 +226,9 @@ def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None
             ui_lang=ui_lang,
             secret_key=СЕКРЕТ,
             bot_username=bot_username,
+            admin_public_url=admin_public_url,
+            mcp_public_url=mcp_public_url,
+            **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )
     app.config.update(TESTING=True)

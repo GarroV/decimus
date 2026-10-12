@@ -34,7 +34,8 @@ from typing import Any
 from flask import Flask, Response, jsonify, render_template, request
 
 from src.bot.config import BotSettings
-from src.db import queries
+from src.bot.keyboards import LANG_LABELS
+from src.db import finish_modes, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
@@ -43,7 +44,15 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_access, walk_settings, walk_start, walk_suggest, walk_translate, walk_write
+from . import (
+    walk_access,
+    walk_finish,
+    walk_settings,
+    walk_start,
+    walk_suggest,
+    walk_translate,
+    walk_write,
+)
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -279,7 +288,16 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
-    return {**payload, "texts": texts_for(lang), "app": walk_settings.app_block(chat_id, lang, bot)}
+    app = walk_settings.app_block(chat_id, lang, bot)
+    out = {**payload, "texts": texts_for(lang), "app": app}
+    if app["finish_mode"] == finish_modes.REPORT:
+        # Языки отчёта нужны только режиму «Сразу отчёт» (D439): подтверждение
+        # в приложении предлагает их пилюлями. Остальным справочник не читаем.
+        out["report_langs"] = [
+            {"code": code, "label": LANG_LABELS.get(code, code)}
+            for code in walk_finish.offered_report_langs(chat_id)
+        ]
+    return out
 
 
 def init_data_of() -> str:

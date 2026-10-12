@@ -187,7 +187,7 @@
     window.scrollTo(0, 0);
   }
 
-  /** Перейти к зоне из чужого модуля — ссылка «Перейти» в уведомлении о записи (D435). */
+  /** Перейти к зоне из чужого модуля — ссылка «Перейти» в уведомлении о записи (D445). */
   W.goZone = function (code) { if (zoneIndex(code) !== -1) go(code); };
 
   function infoCount() {
@@ -598,7 +598,7 @@
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
     var add = W.hinted(W.button("walk-mark walk-dock__add", null, function () {
-      // Нарушение не привязано к зоне на экране (D435): зона — мягкая подсказка,
+      // Нарушение не привязано к зоне на экране (D445): зона — мягкая подсказка,
       // запись встанет в зону пункта и слов. На «Оборудовании» подсказки нет.
       W.sheet.open({ mode: "violation", hint: zone.equipment ? null : zone.code });
     }), "add");
@@ -784,6 +784,7 @@
   }
 
   W.render = render;
+  W.openInfo = openInfo;
 
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {

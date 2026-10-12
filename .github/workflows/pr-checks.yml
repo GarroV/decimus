@@ -1,0 +1,78 @@
+# Проверки каждого PR в main (решение владельца 12.10.2026: в репозиторий
+# приходит второй разработчик, а `main` раскатывается на прод).
+#
+# Гоняет то, что не требует базы: формат, линт, типы и тесты без базы. Тесты,
+# которым нужна база, здесь пропускаются — они идут на тестовой базе
+# MUSPELHEIM (`make test`), и зелёный прогон здесь НЕ означает, что они
+# прошли. Поэтому шаг тестов печатает число пропущенных в итог прогона.
+#
+# Расход: репозиторий публичный, минуты Actions бесплатны.
+name: Проверки PR
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      # Те же системные пакеты, что в Dockerfile: рендерер PDF и ffmpeg.
+      - name: Системные пакеты
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libpango-1.0-0 libpangoft2-1.0-0 libharfbuzz-subset0 \
+            fonts-dejavu-core ffmpeg
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Зависимости
+        run: pip install -e ".[dev]"
+
+      - name: Формат
+        run: ruff format --check .
+
+      - name: Линт
+        run: ruff check .
+
+      - name: Типы
+        run: mypy
+
+      - name: Тесты без базы
+        run: |
+          pytest -q -p no:cacheprovider 2>&1 | tee pytest.log
+          status=${PIPESTATUS[0]}
+          echo "### Тесты без базы" >> "$GITHUB_STEP_SUMMARY"
+          tail -n 2 pytest.log >> "$GITHUB_STEP_SUMMARY"
+          echo "Тесты с базой здесь пропущены — они идут на MUSPELHEIM (make test)." >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+  # Установщик MCP для Mac вызывает `plutil`, которого нет на Linux: там его тест
+  # пропускается с причиной, а гоняется здесь — иначе пропуск выглядел бы проверкой.
+  mac-installer:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Зависимости
+        run: pip install -e ".[dev]"
+      - name: Установщик MCP на macOS
+        run: pytest -q -p no:cacheprovider tests/test_mcp_install_endpoint.py

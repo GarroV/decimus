@@ -1,0 +1,176 @@
+{#
+  Панель «Подключений»: карточка сервиса, форма «Подключить сервис» (она же
+  правка) и страница ключа. Права рисуются переключателями с человеческой
+  подписью и строкой «что открывает»; маршрут сверяет то же ещё раз, разметка
+  здесь — подсказка, а не заслон.
+#}
+{% from "_split_ui.html" import confirm %}
+
+{% macro flash() %}
+  {% if show_flash %}
+    <div class="note {{ 'note--ok' if show_flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show_flash.key, **show_flash.params) }}</div></div>
+  {% endif %}
+{% endmacro %}
+
+{% macro service_form(s, values) %}
+  {% set правка = s is not none %}
+  <form method="post" action="{{ users_url }}/connections/{{ (s.id ~ '/update') if правка else 'issue' }}?lang={{ lang }}" class="sform">
+    <label><span class="sform__label">{{ t('connections.form.name') }}</span>
+      <input class="sinput" name="title" value="{{ values.title }}" required maxlength="{{ max_name }}" autocomplete="off"{% if not правка %} autofocus{% endif %}>
+      <small class="sform__hint">{{ t('connections.form.name_hint', max=max_name) }}</small></label>
+    {% if not правка %}
+      <label><span class="sform__label">{{ t('connections.form.code') }}</span>
+        <input class="sinput mono" name="code" value="{{ values.code }}" required pattern="[a-z0-9][a-z0-9\-]{1,31}" maxlength="32" autocomplete="off" spellcheck="false" placeholder="swarm">
+        <small class="sform__hint">{{ t('connections.form.code_hint') }}</small></label>
+    {% endif %}
+    <label><span class="sform__label">{{ t('connections.form.contact') }}</span>
+      <input class="sinput" name="contact" value="{{ values.contact }}" maxlength="{{ max_contact }}" autocomplete="off">
+      <small class="sform__hint">{{ t('connections.form.contact_hint') }}</small></label>
+    <fieldset class="sfield">
+      <legend class="sform__label">{{ t('connections.form.scopes') }}</legend>
+      <div class="sroles">
+        {% for код in scopes %}
+          <label class="srole">
+            <input type="checkbox" name="scope" value="{{ код }}"{% if код in values.scopes %} checked{% endif %}>
+            <span><b>{{ t('connections.scope.name.' ~ код) }}</b><small>{{ t('connections.scope.hint.' ~ код) }}</small></span>
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <label><span class="sform__label">{{ t('connections.form.countries') }}</span>
+      <input class="sinput mono" name="countries" value="{{ values.countries }}" autocomplete="off" spellcheck="false" placeholder="GE AM">
+      <small class="sform__hint">{{ t('connections.form.countries_hint') }}</small></label>
+    <label><span class="sform__label">{{ t('connections.form.expires') }}</span>
+      <input class="sinput" type="date" name="expires" value="{{ values.expires }}">
+      <small class="sform__hint">{{ t('connections.form.expires_hint') }}</small></label>
+    <div class="sactions">
+      <button class="sbtn sbtn--primary" type="submit">{{ t('connections.form.save' if правка else 'connections.form.submit') }}</button>
+      {% if not правка %}<a class="sbtn sbtn--ghost" href="{{ split_back }}">{{ t('users.panel.close') }}</a>{% endif %}
+    </div>
+  </form>
+{% endmacro %}
+
+{% macro add_card(values) %}
+  <article class="sdetail" aria-labelledby="add-title">
+    <header class="sdetail__head">
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="add-title">{{ t('connections.drawer.add') }}</h2>
+      </div>
+    </header>
+    {{ flash() }}
+    {{ service_form(none, values) }}
+  </article>
+{% endmacro %}
+
+{% macro service_card(s) %}
+  {% set состояние = status_of(s) %}
+  {% set живой = состояние == 'live' %}
+  <article class="sdetail" aria-labelledby="service-title">
+    <header class="sdetail__head">
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="service-title">{{ s.name }}</h2>
+        <p class="sdetail__hint"><span class="mono">{{ s.consumer }}</span> · <span class="sdot{% if живой %} sdot--ok{% endif %}"></span>{{ t('connections.status.' ~ состояние) }}</p>
+      </div>
+    </header>
+    {{ flash() }}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('connections.card.about') }}</h3>
+      <dl class="sprops">
+        <div><dt>{{ t('connections.form.contact') }}</dt><dd>{% if s.contact %}{{ s.contact }}{% else %}<span class="srow__none">{{ t('connections.card.contact_none') }}</span>{% endif %}</dd></div>
+        <div><dt>{{ t('connections.card.issued') }}</dt><dd>{{ t('connections.card.issued_by', by=s.issued_by, date=day(s.issued_at)) }}</dd></div>
+        {% if s.revoked_at %}<div><dt>{{ t('connections.card.revoked') }}</dt><dd>{{ t('connections.card.issued_by', by=s.revoked_by or '—', date=day(s.revoked_at)) }}</dd></div>{% endif %}
+        <div><dt>{{ t('connections.col.countries') }}</dt><dd class="mono">{{ s.countries|join(' ') if s.countries else t('connections.all_network') }}</dd></div>
+        <div><dt>{{ t('connections.col.expires') }}</dt><dd>{{ day(s.expires_at) or t('connections.no_expiry') }}</dd></div>
+        <div><dt>{{ t('connections.col.last') }}</dt><dd>{{ stamp(s.last_used_at) or t('connections.never') }}</dd></div>
+        <div><dt>{{ t('connections.col.week') }}</dt><dd>{{ t('connections.week', calls=s.calls_week, errors=s.errors_week) }}</dd></div>
+      </dl>
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('connections.usage.title') }}</h3>
+      {% if days is none %}
+        <p class="ssec__note">{{ t('connections.usage.unknown') }}</p>
+      {% elif not days|selectattr('calls')|list %}
+        <p class="ssec__note">{{ t('connections.usage.none') }}</p>
+      {% else %}
+        {% set пик = days|map(attribute='calls')|max %}
+        <table class="sconn-days">
+          <thead><tr><th scope="col">{{ t('connections.usage.day') }}</th><th scope="col">{{ t('connections.usage.calls') }}</th><th scope="col" class="is-num">{{ t('connections.usage.errors') }}</th></tr></thead>
+          <tbody>
+            {% for d in days %}
+              <tr>
+                <td class="mono">{{ d.day.isoformat() }}</td>
+                <td><span class="sconn-days__bar"><meter min="0" max="{{ пик }}" value="{{ d.calls }}">{{ d.calls }}</meter><span class="is-num">{{ d.calls }}</span></span></td>
+                <td class="is-num{% if d.errors %} sconn-days__err{% endif %}">{{ d.errors }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('connections.log.title') }}</h3>
+      {% if log is none %}
+        <p class="ssec__note">{{ t('connections.usage.unknown') }}</p>
+      {% elif not log %}
+        <p class="ssec__note">{{ t('connections.log.none') }}</p>
+      {% else %}
+        <table class="sconn-days sconn-log">
+          <thead><tr><th scope="col">{{ t('connections.log.time') }}</th><th scope="col">{{ t('connections.log.path') }}</th><th scope="col" class="is-num">{{ t('connections.log.status') }}</th></tr></thead>
+          <tbody>
+            {% for l in log %}
+              <tr>
+                <td class="mono">{{ stamp(l.at) }}</td>
+                <td class="mono sconn-log__path">{{ l.path }}</td>
+                <td class="is-num{% if l.status >= 400 %} sconn-days__err{% endif %}">{{ l.status }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    </section>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('connections.card.edit') }}</h3>
+      {% if живой %}
+        {{ service_form(s, values) }}
+      {% else %}
+        <p class="ssec__note">{{ t('connections.card.edit_off') }}</p>
+      {% endif %}
+    </section>
+
+    {% if s.revoked_at is none %}
+      <section class="ssec ssec--danger">
+        <h3 class="ssec__title">{{ t('connections.danger.title') }}</h3>
+        {{ confirm('rk-' ~ s.id, t('connections.reissue.open'), t('connections.reissue.confirm'), t('connections.reissue.yes'),
+                   users_url ~ '/connections/' ~ s.id ~ '/reissue?lang=' ~ lang, []) }}
+        {{ confirm('rv-' ~ s.id, t('connections.revoke.open'), t('connections.revoke.confirm'), t('connections.revoke.yes'),
+                   users_url ~ '/connections/' ~ s.id ~ '/revoke?lang=' ~ lang, []) }}
+      </section>
+    {% endif %}
+  </article>
+{% endmacro %}
+
+{% macro key_card(k, again) %}
+  <article class="sdetail" aria-labelledby="key-title">
+    <header class="sdetail__head">
+      <div class="sdetail__who">
+        <h2 class="sdetail__title" id="key-title">{{ t('connections.key.reissued' if again else 'connections.key.issued', name=picked.name if picked else k.consumer) }}</h2>
+        <p class="sdetail__hint"><span class="mono">{{ k.consumer }}</span></p>
+      </div>
+    </header>
+    <div class="note note--warn"><div class="note__text">{{ t('connections.key.warn') }}</div></div>
+    {% if again %}<p class="ssec__note">{{ t('connections.key.reissued_note') }}</p>{% endif %}
+    <section class="ssec">
+      <div class="ssecret">
+        <code id="service-key">{{ k.value }}</code>
+        <button class="sbtn" type="button" data-copy="#service-key" data-copied="{{ t('connections.key.copied') }}" hidden>{{ t('connections.key.copy') }}</button>
+      </div>
+      <div class="sactions">
+        <a class="sbtn sbtn--primary" href="{{ link(tab='connections', service=k.id|string) }}">{{ t('connections.key.done') }}</a>
+      </div>
+    </section>
+  </article>
+{% endmacro %}

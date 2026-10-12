@@ -33,7 +33,7 @@ from __future__ import annotations
 
 from flask import Flask, Response, request
 
-from . import walk_auth
+from . import oauth, walk_auth
 
 #: Политика источников. Всё своё; исключения названы и объяснены выше.
 CONTENT_SECURITY_POLICY = "; ".join(
@@ -49,6 +49,17 @@ CONTENT_SECURITY_POLICY = "; ".join(
         "form-action 'self' https://accounts.google.com https://*.google.com",
         "frame-ancestors 'none'",
     )
+)
+
+#: Согласие OAuth (D417): после «Разрешить» форма уходит редиректом на адрес
+#: возврата Claude, а `form-action` браузер проверяет и на редиректах формы.
+#: Поэтому на ответах согласия к своим источникам добавлены ровно адреса
+#: возврата Claude (`oauth_store.redirect_uri_allowed`), и только там.
+OAUTH_FORM_ACTION = "https://claude.ai https://claude.com http://localhost:* http://127.0.0.1:*"
+
+OAUTH_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
+    "form-action 'self' https://accounts.google.com https://*.google.com",
+    f"form-action 'self' https://accounts.google.com https://*.google.com {OAUTH_FORM_ACTION}",
 )
 
 #: Камера, микрофон и место админке не нужны: экраны их не просят, и
@@ -119,7 +130,12 @@ def install(app: Flask, *, hsts: bool) -> None:
             response.headers.update(обход)
         else:
             response.headers.update(заголовки)
+        if request.endpoint == oauth.AUTHORIZE_ENDPOINT:
+            response.headers["Content-Security-Policy"] = OAUTH_CONTENT_SECURITY_POLICY
         путь = request.path
         if путь == NO_STORE_PREFIX or путь.startswith(f"{NO_STORE_PREFIX}/"):
-            response.headers["Cache-Control"] = "no-store"
+            # Свой заголовок маршрута с `no-store` не затирается: страница ключа
+            # «Подключений» отдаёт `private, no-store` (D425).
+            if "no-store" not in response.headers.get("Cache-Control", ""):
+                response.headers["Cache-Control"] = "no-store"
         return response

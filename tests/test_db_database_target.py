@@ -124,13 +124,13 @@ def test_учётки_при_одной_базе_идут_ролью_истор�
 def test_пространства_при_расхождении_баз_не_подключаются(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Подключение владельца схемы сверяется так же: накат в чужую базу — отказ."""
+    """Подключение учёток и пространств сверяется со всеми заданными, и с владельцем тоже."""
     env = окружение(ИСТОРИЯ_ТА_ЖЕ)
     env["DATABASE_ADMIN_URL"] = f"postgresql://postgres:{ПАРОЛЬ}@db.example:5432/shared_test"
     _выставить(monkeypatch, env)
     _подменить_подключение(monkeypatch)
 
-    with pytest.raises(AccessError) as отказ, web_access._owned("перечислить пространства"):
+    with pytest.raises(AccessError) as отказ, web_access._managing("перечислить пространства"):
         pass
 
     assert "разные базы" in str(отказ.value)

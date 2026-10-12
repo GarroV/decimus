@@ -170,10 +170,32 @@
     return pill;
   }
 
+  /** Режим «Завершить» (D439): подпись, пилюля на всю ширину и строка пояснения. */
+  function finishModeRow() {
+    var box = el("div", "walk-app__row walk-app__row--stack");
+    box.appendChild(el("span", "walk-app__row-label", tx("walk.app.finish_mode")));
+    var pill = el("div", "walk-app__lang walk-app__lang--wide");
+    pill.setAttribute("role", "group");
+    pill.setAttribute("aria-label", tx("walk.app.finish_mode"));
+    ["summary", "report"].forEach(function (mode) {
+      var on = (app().finish_mode || "summary") === mode;
+      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), tx("walk.app.finish_mode." + mode), function () {
+        if (on) return;
+        act({ op: "finish_mode", mode: mode }).then(function (body) { if (body) W.apply(body); });
+      });
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      pill.appendChild(b);
+    });
+    box.appendChild(pill);
+    box.appendChild(el("p", "walk-app__note", tx("walk.app.finish_mode.hint")));
+    return box;
+  }
+
   function settings(root) {
     root.appendChild(head(tx("walk.app.settings")));
     var list = el("section", "walk-app__list");
     list.appendChild(langRow());
+    list.appendChild(finishModeRow());
     W.hints.settingsRows(list);
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
     if (app().circle) {
