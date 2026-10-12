@@ -1403,6 +1403,11 @@ curl -s -o /dev/null -w '%{http_code}\n' "http://127.0.0.1:${WEB_HOST_PORT:-8268
 миграций нет, право — уже выданное `ratings:read`.
 Детали проверки и прошлая проверка в списке (`/api/v1/inspections/<uuid>`,
 D391) — так же: миграций нет, право — уже выданное `inspections:read`.
+**Права по методам, страны и срок токена, два новых адреса** (D425, D426) —
+миграция `0052_api_methods.sql`: накатывается обычным `prod-update.sh`, живой
+токен Swarm переводится на права по методам без перерыва (`ratings:read` и
+`inspections:read` больше не существуют). Смоук после наката — п.4 на
+`/api/v1/aggregators/ratings` и `/api/v1/inspections/violations`.
 
 1. **Миграция `0049_api_tokens.sql`** — схема `api`: `api.tokens` (отпечатки,
    права, отзыв) и `api.access_log` (журнал обращений). Данных не трогает.
@@ -1412,7 +1417,7 @@ D391) — так же: миграций нет, право — уже выдан
    учётки):
 
    ```bash
-   dc exec web python tools/api_token.py issue swarm --scope ratings:read,inspections:read
+   dc exec web python tools/api_token.py issue swarm --scope ratings:scores,ratings:checkups,ratings:violations,maps:ratings,aggregators:ratings,inspections:list,inspections:detail,inspections:violations
    ```
 
    Токен печатается ОДИН раз — сразу в секреты Swarm (п.3), никуда больше.

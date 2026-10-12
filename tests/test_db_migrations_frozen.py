@@ -215,6 +215,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0051_units_registry.sql": (
         "sql1:aad883b7a6962860d1a4c371a84fa2f4cf32b61eccb5f7d22304cd097f62e734"
     ),
+    # Права сервисного токена по методам API, срок, страны, имя и контакт (D425).
+    "0052_api_methods.sql": (
+        "sql1:0ea00e7d63ea04edf8f84d033b2cc93e62dc9cd27a088e7496f465a8c17e2b4a"
+    ),
 }
 
 
