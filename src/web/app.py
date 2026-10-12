@@ -1063,7 +1063,9 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         oauth.AUTHORIZE_PATH,
         f"{users_path}/claude-revoke",
     )
-    return path in own
+    # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
+    # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.
+    return path in own or path.startswith(f"{users_path}/connections/")
 
 
 def _install_origin_gate(app: Flask) -> None:

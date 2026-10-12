@@ -302,6 +302,7 @@ def _space_context(
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
+        "has_connections_tab": круг is not None and круг.kind == access_policy.SUPER,
         "space_pick": _space_pick(show, пространства),
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),
