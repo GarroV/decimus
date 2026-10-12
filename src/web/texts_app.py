@@ -119,6 +119,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "What is recorded in one place shows in the other."
         ),
     },
+    "walk.app.web_settings": {"ru": "Все настройки на сайте", "en": "All settings on the website"},
     "walk.app.version": {"ru": "Версия", "en": "Version"},
     # ── подключение Claude ───────────────────────────────────────────────
     "walk.app.claude": {"ru": "Подключить Claude", "en": "Connect Claude"},

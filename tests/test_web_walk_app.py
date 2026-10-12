@@ -232,3 +232,28 @@ def test_без_подписи_ничего(база: База, monkeypatch: pyt
     assert client.post(APP_PATH, json={"op": "mcp_issue"}).status_code == 401
     assert _действие(client, ПОСТОРОННИЙ, op="mcp_issue").status_code == 401
     assert база.выпущено == []
+
+
+def test_ссылка_на_настройки_сайта_из_внешнего_адреса_админки(
+    база: База, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D447: мини-апп ведёт в «Настройки» сайта, адрес берёт из `ADMIN_PUBLIC_URL`."""
+    monkeypatch.setenv("ADMIN_PUBLIC_URL", "https://admin.example/")
+    client = _клиент(monkeypatch)
+
+    приложение = client.post(
+        walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain"
+    ).get_json()["app"]
+
+    assert приложение["settings_url"] == "https://admin.example/settings"
+
+
+def test_без_адреса_админки_ссылки_нет(база: База, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("ADMIN_PUBLIC_URL", raising=False)
+    client = _клиент(monkeypatch)
+
+    приложение = client.post(
+        walk.DATA_PATH, data=подписать(АУДИТОР), content_type="text/plain"
+    ).get_json()["app"]
+
+    assert приложение["settings_url"] is None
