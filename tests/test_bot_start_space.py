@@ -28,7 +28,7 @@ def _партнёр() -> BindingCache:
     def standing(tg: int) -> Standing:
         if tg != AUDITOR_ID:
             return NEVER_BOUND
-        return Standing.live(Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC)))
+        return Standing.live(Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC), "auditor"))
 
     return BindingCache(standing=standing)
 

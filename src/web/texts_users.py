@@ -435,53 +435,58 @@ _PROFILE: dict[str, dict[str, str]] = {
     },
 }
 
+#: Личный токен Claude на своей карточке (D447, D448): человек выпускает и
+#: отзывает его сам, никто никому доступ не выдаёт.
 _MCP: dict[str, dict[str, str]] = {
-    "users.mcp.title": {"ru": "Claude (MCP)", "en": "Claude (MCP)"},
-    "users.mcp.on": {"ru": "Доступ есть", "en": "Has access"},
-    "users.mcp.token": {"ru": "токен выпущен", "en": "token issued"},
-    "users.mcp.no_token": {"ru": "токен ещё не выпущен", "en": "no token yet"},
-    "users.mcp.off": {"ru": "Доступа нет", "en": "No access"},
-    "users.mcp.was": {"ru": "Доступ снят", "en": "Access removed"},
-    "users.mcp.need_bot": {
-        "ru": "Доступ к Claude выдаётся на Telegram: сначала нужна привязка бота.",
-        "en": "Claude access is tied to Telegram: the bot has to be linked first.",
+    "users.mcp.title": {
+        "ru": "Claude Desktop (личный токен)",
+        "en": "Claude Desktop (personal token)",
     },
+    "users.mcp.live": {
+        "ru": "Токен действует до {date}.",
+        "en": "The token is valid until {date}.",
+    },
+    "users.mcp.none": {"ru": "Токена нет.", "en": "No token."},
     "users.mcp.unknown": {
-        "ru": "Не удалось узнать, есть ли доступ: база не ответила.",
-        "en": "Could not check the access: the database did not answer.",
+        "ru": "Не удалось узнать, есть ли токен: база не ответила.",
+        "en": "Could not check the token: the database did not answer.",
     },
-    "users.mcp.grant": {"ru": "Дать доступ", "en": "Grant access"},
-    "users.mcp.revoke": {"ru": "Снять доступ", "en": "Remove access"},
-    "users.mcp.revoke_confirm": {
-        "ru": "Снятие сразу гасит токены человека: его Claude перестанет получать данные.",
-        "en": "Removing ends the person's tokens at once: their Claude stops getting data.",
+    "users.mcp.how": {
+        "ru": "Команда настраивает Claude Desktop на Mac одной строкой в терминале. Что "
+        "доступно в Claude, решает ваша роль; отключение учётки или смена роли гасят "
+        "токен сразу.",
+        "en": "The command sets up Claude Desktop on a Mac with one line in a terminal. "
+        "What you can do in Claude depends on your role; a disabled account or a role "
+        "change ends the token at once.",
     },
-    "users.mcp.revoke_yes": {"ru": "Да, снять", "en": "Yes, remove"},
-    "users.mcp.founder_note": {
-        "ru": "Основатель круга: его доступ задан настройкой стенда и с экрана не снимается.",
-        "en": "Circle founder: the access comes from the server settings and stays.",
+    "users.mcp.issue": {"ru": "Получить команду", "en": "Get the command"},
+    "users.mcp.again": {"ru": "Выпустить новый токен", "en": "Issue a new token"},
+    "users.mcp.again_note": {
+        "ru": "Новый токен гасит прежний: старая настройка перестанет работать.",
+        "en": "A new token cancels the old one: the previous setup stops working.",
     },
-    "users.mcp.who_can": {
-        "ru": "Давать и снимать доступ может тот, у кого он уже есть.",
-        "en": "Only someone who already has access can grant or remove it.",
+    "users.mcp.revoke": {"ru": "Отозвать токен", "en": "Revoke the token"},
+    "users.mcp.command": {
+        "ru": "Выполните в терминале на Mac с Claude Desktop. Команда видна один раз — "
+        "не пересылайте её никому:",
+        "en": "Run it in a terminal on the Mac with Claude Desktop. The command is shown "
+        "once — do not forward it to anyone:",
     },
-    "users.mcp.setup_bot": {
-        "ru": "Подключить Claude Desktop — в боте командой /mcp: бот выпустит личный токен "
-        "и пришлёт команду настройки. Новый токен гасит прежний.",
-        "en": "Connect Claude Desktop in the bot with /mcp: it issues a personal token "
-        "and sends the setup command. A new token cancels the previous one.",
+    "users.mcp.restart": {
+        "ru": "Затем полностью перезапустите Claude (Cmd+Q).",
+        "en": "Then fully restart Claude (Cmd+Q).",
     },
-    "users.mcp.granted": {
-        "ru": "Доступ к Claude дан. Подключиться человек может в боте командой /mcp.",
-        "en": "Claude access granted. The person connects in the bot with /mcp.",
+    "users.mcp.replaced": {
+        "ru": "Прежний токен отозван — старая настройка больше не работает.",
+        "en": "The previous token is revoked — the old setup no longer works.",
     },
     "users.mcp.revoked": {
-        "ru": "Доступ к Claude снят. Погашено токенов: {tokens}.",
-        "en": "Claude access removed. Tokens ended: {tokens}.",
+        "ru": "Токен отозван. Claude Desktop с ним больше не получает данные.",
+        "en": "The token is revoked. Claude Desktop no longer gets data with it.",
     },
-    "users.mcp.founder": {
-        "ru": "Основателя круга снять нельзя: его называет настройка стенда.",
-        "en": "The circle founder cannot be removed: the server settings name them.",
+    "users.mcp.nothing": {
+        "ru": "Живого токена не было — отзывать нечего.",
+        "en": "There was no live token — nothing to revoke.",
     },
     "users.mcp.failed": {
         "ru": "Не вышло — база не ответила. Ничего не изменено.",

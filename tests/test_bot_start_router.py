@@ -365,7 +365,9 @@ async def test_партнёр_новую_пиццерию_не_заводит(
     # Arrange — бот проверяющего привязан к учётке партнёра (D286).
     заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
     партнёр = BindingCache(
-        standing=lambda tg: Standing.live(Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC)))
+        standing=lambda tg: Standing.live(
+            Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC), "auditor")
+        )
     )
 
     # Act
