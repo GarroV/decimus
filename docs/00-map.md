@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,route_audience,security_headers,settings_screen,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,google_link,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,route_audience,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -158,6 +158,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
+| `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/guest_gate.py` | Гость УК (D440): вся сеть только на чтение — один заслон на всё приложение |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -165,10 +166,12 @@ Flask-приложение управляющей компании и партн
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
+| `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
 | `src/web/route_audience.py` | Аудитория каждого маршрута веба: по умолчанию партнёру закрыто (аудит 12.10, F-004) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
+| `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
 | `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
@@ -255,7 +258,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 1 | index.html |
+| `src/web/templates/settings/` | 2 | confirm.html, index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -331,7 +334,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,web_access,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -344,6 +347,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
+| `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
 | `src/db/web_unlock.py` | Снятие запрета на вход: дверь роли администратора истории (T328, D158) |
 <!-- map:end -->
@@ -403,7 +407,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0044_maps.sql` | Оценки пиццерий на картах (Google, Яндекс и др.) из Pointer API (docs/09-pointer-api.md) |
 | `0045_maps_link.sql` | Связь филиала Pointer с пиццерией Dodo (docs/09-pointer-api.md) |
 | `0046_unit_profiles.sql` | Справочные сведения о пиццерии из «Свода пиццерий» девелопмента (D374–D376): адрес, партнёр и его почта, статус, даты запуска ресторана и доставки, закрытие, помещение |
-| `0047_maps_excluded.sql` | Филиал на картах, который не пиццерия (тестовая карточка, учебный центр), — исключается из оценок стран и пиццерий (D377) |
+| `0047_maps_excluded.sql` | Филиал на картах, который не пиццерия (тестовая карточка, учебный центр), — исключается из оценок стран и пиццерий (D453) |
 | `0048_ratings_clusters.sql` | Кластер страны IMF для сводки рейтингов (D383, D384): CEE — вся Европа, остальные — OTHER (Other countries) |
 | `0049_api_tokens.sql` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `0050_aggregators.sql` | Оценки пиццерий в агрегаторах доставки — Wolt, Glovo, Bolt Food, Яндекс Еда, Yemeksepeti и другие (#638, D389, docs/17-aggregators.md) |
@@ -417,6 +421,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0058_translate_modes.sql` | D443: перевод комментариев на язык отчёта — автоматически или по кнопке, и каждый аудитор выбирает свой в настройках мини-аппа: `button` — переводит сам по кнопке под… |
 | `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
+| `0061_web_own_google_lang.sql` | «Настройки» (D447): человек сам привязывает и снимает свою почту Google и хранит язык сайта в профиле |
 | `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
 <!-- map:end -->
 

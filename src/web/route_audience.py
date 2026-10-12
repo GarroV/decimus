@@ -95,6 +95,13 @@ ALL_SPACES: frozenset[str] = frozenset(
         "settings_claude_token",
         "settings_claude_token_revoke",
         "settings_claude_revoke",
+        "settings_google_link",
+        "settings_google_unlink",
+        "settings_lang",
+        # Повторное подтверждение себя перед чувствительным делом своей учётки.
+        "reauth_confirm",
+        "reauth_confirm_google",
+        "reauth_confirm_password",
         "claude_revoke",
         "connections_issue",
         "connections_reissue",
