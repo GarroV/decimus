@@ -60,6 +60,28 @@
     return b;
   };
 
+  /** Значок-контур 24×24 (штрих, цвет — от текста). Декоративный: смысл несёт подпись рядом. */
+  var ICONS = {
+    camera: ["M4 8h3l1.6-2.4h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z",
+      "M12 16.4a3.4 3.4 0 1 0 0-6.8 3.4 3.4 0 0 0 0 6.8z"],
+    check: ["M5 12.5l4.5 4.5L19 7.5"]
+  };
+
+  W.icon = function (name, cls) {
+    var ns = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(ns, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("class", "walk-icon" + (cls ? " " + cls : ""));
+    svg.setAttribute("aria-hidden", "true");
+    svg.setAttribute("focusable", "false");
+    ICONS[name].forEach(function (d) {
+      var path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      svg.appendChild(path);
+    });
+    return svg;
+  };
+
   W.level = function (code) {
     return W.el("span", "walk-level walk-level--" + String(code).toLowerCase(), code);
   };

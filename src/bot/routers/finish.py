@@ -53,17 +53,20 @@ from ..keyboards import (
     FINISH_EDIT_CALLBACK,
     FINISH_PICK_PREFIX,
     FINISH_RESUME_CALLBACK,
+    REPORT_LANG_PREFIX,
     VERSION_KEEP_CALLBACK,
     VERSION_SYNC_CALLBACK,
     edit_keyboard,
     finish_keyboard,
     pick_record_keyboard,
+    report_lang_keyboard,
     version_mismatch_keyboard,
     without_photos_keyboard,
 )
 from ..lang import chat_ui_lang
 from ..material import MaterialStore
 from ..photos import download_all
+from ..report_lang import offered_langs
 from ..texts import t
 from .records import show_records
 
@@ -539,15 +542,8 @@ def build_finish_router(store: MaterialStore) -> Router:
             reply_markup=edit_keyboard(finding.n, lang),
         )
 
-    @router.callback_query(F.data == FINISH_BUILD_CALLBACK)
-    async def on_build(callback: CallbackQuery, state: FSMContext) -> None:
-        """«Собрать отчёт» открывает информационную часть, а не собирает отчёт.
-
-        Порядок задан решениями D069 и D070 (задача T158): «Завершить» →
-        подтверждение → информационная часть → PDF и письмо. Собранный раньше
-        документ ответов на эти вопросы не содержит, и заметил бы это партнёр,
-        а не аудитор. Сама сборка стоит за последним вопросом — `deliver`
-        зовётся оттуда.
+    async def open_info(message: Message, state: FSMContext, chat_id: int, lang: str) -> None:
+        """Язык отчёта назначен — дальше как раньше: информационная часть, потом `deliver`.
 
         Импорт местный и намеренно: информационная часть зовёт `deliver` из
         этого же модуля, и на верхнем уровне два модуля ссылались бы друг на
@@ -557,12 +553,84 @@ def build_finish_router(store: MaterialStore) -> Router:
         """
         from .info import start_info
 
+        await start_info(message, state, chat_id, lang)
+
+    async def apply_report_lang(
+        message: Message, state: FSMContext, chat_id: int, lang: str, report_lang: str
+    ) -> None:
+        """Назначить язык отчёта и открыть информационную часть.
+
+        Язык задаётся ДО неё: значения полей («да», «нет», слова даты) пишутся
+        словами на языке отчёта, и сменить язык после значило бы получить в
+        одном отчёте два языка.
+        """
+        try:
+            await asyncio.to_thread(domain.set_report_lang, chat_id, report_lang)
+        except DomainError:
+            logger.exception("язык отчёта %s не задан в чате %s", report_lang, chat_id)
+            await stops.refuse(
+                message, lang, step="finish.report_lang", key="finish.report_lang_failed"
+            )
+            return
+        await open_info(message, state, chat_id, lang)
+
+    @router.callback_query(F.data == FINISH_BUILD_CALLBACK)
+    async def on_build(callback: CallbackQuery, state: FSMContext) -> None:
+        """«Сформировать предварительный отчёт»: язык отчёта, затем информационная часть.
+
+        Порядок задан решениями D069 и D070 (задача T158): «Завершить» →
+        подтверждение → информационная часть → PDF и письмо. Собранный раньше
+        документ ответов на эти вопросы не содержит, и заметил бы это партнёр,
+        а не аудитор. Сама сборка стоит за последним вопросом — `deliver`
+        зовётся оттуда.
+
+        С D415 перед информационной частью стоит язык отчёта: на старте его не
+        спрашивают. Языков у страны пиццерии больше одного — спрашиваем кнопками;
+        ровно один — берём молча.
+        """
         await callback.answer()
         here = chat_of(callback)
         if here is None:
             return
         message, chat_id, lang = here
-        await start_info(message, state, chat_id, lang)
+        inspection = read_inspection(chat_id)
+        if inspection is None:
+            await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
+            return
+        langs = await offered_langs(inspection)
+        if len(langs) == 1:
+            await apply_report_lang(message, state, chat_id, lang, langs[0])
+            return
+        await message.answer(
+            t("finish.ask_report_lang", lang), reply_markup=report_lang_keyboard(langs)
+        )
+
+    @router.callback_query(F.data.startswith(REPORT_LANG_PREFIX))
+    async def on_report_lang(callback: CallbackQuery, state: FSMContext) -> None:
+        """Язык отчёта выбран кнопкой. Берётся только из перечня страны пиццерии.
+
+        Перечень считается заново, а не читается из данных кнопки: кнопка могла
+        остаться от прошлой проверки, и подставить с неё язык, которого у этой
+        пиццерии нет, значило бы напечатать партнёру не тот отчёт.
+        """
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        inspection = read_inspection(chat_id)
+        if inspection is None:
+            await stops.refuse(
+                message, lang, step="finish.report_lang", key="material.no_inspection"
+            )
+            return
+        chosen = (callback.data or "").removeprefix(REPORT_LANG_PREFIX)
+        if chosen not in await offered_langs(inspection):
+            await stops.refuse(
+                message, lang, step="finish.report_lang", key="finish.report_lang_gone"
+            )
+            return
+        await apply_report_lang(message, state, chat_id, lang, chosen)
 
     @router.callback_query(F.data == FINISH_BUILD_NO_PHOTOS_CALLBACK)
     async def on_build_without_photos(callback: CallbackQuery) -> None:

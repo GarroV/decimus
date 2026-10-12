@@ -628,6 +628,46 @@ def start_inspection(
     return started
 
 
+def set_report_lang(chat_id: int, lang: str) -> Inspection:
+    """Назначить язык отчёта начатой проверки (D415). Единственный способ его сменить.
+
+    Язык отчёта не спрашивается на старте: до конца обхода он равен языку
+    проверки, и аудитор работает на нём. Когда проверка готова и он согласился
+    формировать отчёт, бот спрашивает язык отчёта и вызывает это. Хранится он
+    по-прежнему в шапке движка (`meta.lang`) — оттуда его берёт сборка отчёта, —
+    а правит его сам движок (`meta --lang`), блок второй копии не заводит.
+
+    Свободный текст проверки при этом не переводится (D416): формулировки
+    остаются на языке чек-листа, а на это в отчёте есть пометка.
+
+    Язык вне `TEXT_LANGS` — отказ ДО движка, по той же причине, что и на старте:
+    без слова на этом языке шапку не заполнить.
+    """
+    code = lang.strip().lower()
+    if code not in TEXT_LANGS:
+        raise ValidationError(
+            f"Язык отчёта «{lang}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}"
+        )
+    settings = check_environment()
+    current = read_state(chat_id, settings)
+    if current is None:
+        raise InspectionNotStarted(
+            f"В этом чате проверка не начата — нет {state_file(chat_id, settings)}. "
+            f"Язык отчёта назначать некому"
+        )
+    # Вид проверки печатается на языке отчёта по коду: без перевода на новый
+    # язык отказ придёт при сборке, а не здесь, где человек ещё выбирает.
+    if current.kind:
+        kind_title(current.kind, code)
+    run_audit(["meta", option("lang", code)], chat_id=chat_id, settings=settings_for(chat_id))
+    updated = read_state(chat_id, settings)
+    if updated is None:
+        raise DomainError(
+            f"Движок отчитался об успехе, но состояния нет: {state_file(chat_id, settings)}"
+        )
+    return updated
+
+
 def run_id(chat_id: int) -> str:
     """Личность проверки чата (`Inspection.run_id`) без разбора всего состояния.
 

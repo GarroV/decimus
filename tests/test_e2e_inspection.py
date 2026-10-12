@@ -35,7 +35,6 @@ from src.bot.config import BotSettings
 from src.bot.keyboards import (
     FINISH_BUILD_NO_PHOTOS_CALLBACK,
     KIND_PREFIX,
-    LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
     PICK_PREFIX,
     SPEECH_LANG_PREFIX,
@@ -67,7 +66,6 @@ async def test_проверка_проходится_целиком_и_оцен�
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
     await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}ru"))
-    await feed(dp, bot, callback(f"{LANG_PREFIX}ru"))
 
     начатая = get_state(CHAT_ID)
     assert начатая is not None, "после мастера проверки нет"
@@ -133,7 +131,6 @@ async def test_прерванная_проверка_продолжается(
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
     await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}ru"))
-    await feed(dp, bot, callback(f"{LANG_PREFIX}ru"))
     stub_classify(
         monkeypatch,
         suggestion(candidate("CLN05", "D1", "hot_kitchen", "Нагар на подине печи")),

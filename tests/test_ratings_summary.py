@@ -294,3 +294,18 @@ def test_девелопер_общая_строка_и_по_стране() -> No
     assert [(g.level, g.key, g.rs) for g in строки] == [
         ("slice", None, 80.0), ("country", "RS", 90.0), ("country", "SI", 70.0),
     ]  # fmt: skip
+
+
+def test_у_пиццерии_top_bottom_изменение_к_прошлому_периоду() -> None:
+    """Треугольник у пиццерии (11.10.2026): средняя пиццерии за период минус её
+    средняя за прошлый; не было в прошлом — изменения нет, а не «+всё»."""
+    прошлый = [*ПРОШЛЫЙ, f("a", "SI", 70, kind="rko")]
+    top, bottom = top_bottom(ТЕКУЩИЙ, "rs", threshold=85, previous=прошлый)
+    by = {u.unit: u.delta for u in top + bottom}
+    assert by == {"c": 0.0, "b": -10.0, "a": 5.0}
+    _, rko = top_bottom(ТЕКУЩИЙ, "rko", threshold=95, previous=прошлый)
+    assert [(u.unit, u.delta) for u in rko] == [("a", 23.0)]  # РКО сравнивается с РКО
+    новые, _ = top_bottom([f("d", "SI", 99)], "rs", threshold=85, previous=прошлый)
+    assert новые[0].delta is None
+    без_прошлого, _ = top_bottom(ТЕКУЩИЙ, "rs", threshold=85)
+    assert без_прошлого[0].delta is None

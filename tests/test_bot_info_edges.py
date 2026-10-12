@@ -19,6 +19,7 @@ from bot_harness import (
     feed,
     make_bot,
     photo_message,
+    press_build,
     stub_transcribe,
     text_message,
     voice_message,
@@ -46,7 +47,7 @@ def начать() -> None:
 
 async def дойти(dp: object, bot: object) -> None:
     await feed(dp, bot, text_message("/finish"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback("fin:build"))  # type: ignore[arg-type]
+    await press_build(dp, bot)
 
 
 # --- разбор даты ---------------------------------------------------------------
@@ -182,7 +183,7 @@ async def test_без_начатой_проверки_часть_не_начин
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
-    await feed(dp, bot, callback("fin:build"))
+    await press_build(dp, bot)
 
     assert session.last_text == t("material.no_inspection", "ru")
     assert session.documents == []
