@@ -206,3 +206,64 @@ def test_привязка_glovo_по_ссылке_только_управляю�
     assert rows[("glovo", ПЕРВЫЙ)].score == 90.0
     (точка,) = [p for p in agg_store.known_points("glovo") if p.point_key == "777"]
     assert (точка.extra["store_id"], точка.extra["city_code"]) == ("555", "BUC")
+
+
+def test_привязка_migros_по_ссылке_с_экрана(db_env: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.db import agg_store
+    from src.db.agg_store import PointRow
+    from src.ratings.aggregators import migros, migros_link
+    from src.web import ratings as screen
+
+    agg_store.save_units(
+        [_unit(ВТОРОЙ, country="TR", name="Adana-1"), _unit(ТРЕТИЙ, country="TR", name="Adana-9")],
+        СЕГОДНЯ,
+    )
+    # Колонка Migros есть, когда в стране есть его точки справочника (как на проде).
+    известная = PointRow(
+        migros.KEY, "dodo-pizza-x", "TR", "Dodo", None, None, None, ВТОРОЙ, "x", None, {}
+    )
+    agg_store.save([известная], [])
+    monkeypatch.setenv(migros.RELAY_VAR, "http://100.64.1.2:9021")
+    настоящая = migros_link.link_by_url
+    карточка = {"storeDTO": {"title": "Dodo Pizza, Çukurova", "rating": {"score": "4,6"}}}
+
+    class Migros:
+        def get(self, url: str, headers: Any = None) -> object:
+            return карточка
+
+    def без_сети(unit: Any, url: str, taken: Any, today: date, **kw: Any) -> Any:
+        return настоящая(unit, url, taken, today, http=Migros())
+
+    monkeypatch.setattr(screen.migros_link, "link_by_url", без_сети)
+    slug = "dodo-pizza-cukurova-st-2e099"
+    форма = {
+        "dodo_id": ТРЕТИЙ,
+        "aggregator": "migros_yemek",
+        "url": f"https://www.migros.com.tr/yemek/{slug}",
+    }
+
+    подменить_двери(monkeypatch, tenant="HQ", role="control")
+    with собрать(tenant="HQ").test_client() as client:
+        assert войти(client).status_code == 302
+        экран = _страница(client, "/ratings/coverage?country=TR")
+        плохая = client.post(
+            "/ratings/coverage/link",
+            data={**форма, "url": "https://glovoapp.com/x"},
+            headers=ORIGIN,
+        )
+        чужая_площадка = client.post(
+            "/ratings/coverage/link", data={**форма, "aggregator": "wolt"}, headers=ORIGIN
+        )
+        хорошая = client.post("/ratings/coverage/link", data=форма, headers=ORIGIN)
+
+    assert 'name="aggregator" value="migros_yemek"' in экран
+    assert "migros.com.tr/yemek" in экран
+    assert плохая.status_code == 400
+    assert "https://www.migros.com.tr/yemek/dodo-pizza-" in плохая.get_data(as_text=True)
+    assert чужая_площадка.status_code == 400
+    assert хорошая.status_code == 200
+    assert "Привязано к Migros Yemek: Adana-9." in хорошая.get_data(as_text=True)
+    (точка,) = [p for p in agg_store.known_points(migros.KEY) if p.point_key == slug]
+    assert точка.dodo_id == ТРЕТИЙ
+    rows = {(r.aggregator, r.dodo_id): r for r in agg_store.coverage()}
+    assert rows[(migros.KEY, ТРЕТИЙ)].score == 4.6
