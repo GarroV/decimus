@@ -1023,6 +1023,11 @@ cd /srv/decimus
 DECIMUS_OVERLAYS=/srv/decimus/compose.edge.yaml scripts/prod-update.sh
 ```
 
+Выкатка идёт одна за раз (#729): скрипт берёт замок `.git/prod-update.lock`
+(`flock`), вторая ждёт первую до `DEPLOY_LOCK_WAIT_S` секунд (по умолчанию 900)
+и иначе отказывает. Накат миграций вдобавок держит `pg_advisory_lock` — два
+наката разом не повторят одну миграцию, откуда бы их ни запустили.
+
 [`scripts/prod-update.sh`](../scripts/prod-update.sh) делает по порядку:
 `git pull --ff-only` → сборка с `BUILD_SHA` (вместе с профилем `backup`) →
 база и MinIO с ожиданием здоровья → корзина (`run --rm storage-init`) →
