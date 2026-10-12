@@ -24,7 +24,7 @@ from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
-from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.tenants import ADMIN_ROLES, HQ_TENANT, canonical_tenant
 
 from .catalogue import (
     KIND_CHECKLIST,
@@ -40,6 +40,7 @@ from .catalogue import (
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
+from .checklists import is_master
 from .errors import McpError, ToolError
 from .policy import permits
 
@@ -203,6 +204,11 @@ RETRACTION_CLOSED = (
 #: Отказ по роли учётки сайта (D417): вход через OAuth, и роль этого не открывает.
 #: Текст называет роль, а не перечисляет, кому открыто: агент перескажет его
 #: человеку, и тот поймёт, что дело в правах его учётки, а не в сбое.
+MASTER_READONLY = (
+    "Главный чек-лист правят только админы. Его можно читать и проводить по нему "
+    "проверки, но не менять; свои чек-листы, не отмеченные главными, правятся как обычно"
+)
+
 ROLE_CLOSED = (
     "Этот инструмент не открыт роли «{роль}» вашей учётки decimus. Права в Claude, "
     "подключённом через сайт, решает роль учётки: что ей открыто, видно в списке инструментов"
@@ -391,6 +397,18 @@ def _call_tool(
         прочее: dict[str, Any] = (
             {} if база is None else {"store": _aimed(spec, база, tenant=tenant, код=код)}
         )
+        if (
+            spec.kind == KIND_CHECKLIST
+            and spec.writes
+            and role is not None
+            and role not in ADMIN_ROLES
+            and is_master(прочее["store"])
+        ):
+            # Главный чек-лист (D440): правка только админам. Роль без права на
+            # вид закрыта выше, здесь — роль с правом на вид, но не на главный.
+            # Проверка по ПОДСТАВЛЕННОМУ хранилищу, а не по названному коду: код
+            # может быть не назван вовсе, и правка ушла бы в применённый к проду.
+            raise ToolError(MASTER_READONLY)
         if spec.kind == KIND_IMPORT:
             # Хранилище версий — для поиска версии методики черновика (D307),
             # подпись — для подтверждения (D308). Обе приходят от транспорта,
