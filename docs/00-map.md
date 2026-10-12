@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -158,7 +158,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
-| `src/web/guest_gate.py` | Гость УК (D440): вся сеть только на чтение — один заслон на всё приложение |
+| `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
@@ -444,7 +444,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/mcp/methodologies.py` | Какими методиками оценены проверки ряда — справка, а не запрет (D352) |
 | `src/mcp/photo_cues.py` | Карта слов: правка через агента, версиями (T144, issue #115) |
 | `src/mcp/phrases.py` | Карта синонимов формулировок глазами управляющей компании (T294) |
-| `src/mcp/policy.py` | Права MCP по роли учётки сайта (D417): матрица «роль × вид инструментов» |
+| `src/mcp/policy.py` | Права MCP по роли учётки сайта — по той же матрице, что веб и бот (D408, D417) |
 | `src/mcp/ratings_read.py` | Чтение рейтингов через Claude (D420): сводка, пиццерии, состояние агрегаторов |
 | `src/mcp/ratings_tools.py` | Управление рейтингами через Claude: загрузка (D320) и заявка на обновление агрегаторов (D420) |
 | `src/mcp/retraction.py` | Инструмент «отклонить проверку из истории» (T211, решения D086 и D089) |
@@ -615,6 +615,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
+| `src/domain/permissions.py` | Матрица «роль × действие» и проверка `can` — единственное место, где решается, что роли можно (D408; роли — D440, D420, D429; партнёр — D341, D346, D367) |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
@@ -716,6 +717,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/mcp_outside.py` | Смоук доступа к MCP-серверу С ЧУЖОЙ МАШИНЫ (задача T256, #211) |
 | `tools/mcp_watch.py` | Сторож доступности MCP снаружи (#243) |
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
+| `tools/porcha_permissions.py` | Порча матрицы прав (D408): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_ratings.py` | Порча защит рейтингов: каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_walk.py` | Порча защит мини-аппа обхода (D312): каждая сломанная защита обязана уронить свой тест |
 | `tools/pre-push-guard.sh` | Сторож пуша: не пускает наружу значения из приватного списка |
@@ -775,11 +777,11 @@ Telegram, ни HTTP, ни SQL.
 | Поправить текст экрана админки | `src/web/texts.py` или `texts_<раздел>.py`: ключ `TEXTS[ключ] = {"ru": …, "en": …}`; оба языка обязательны, `tests/test_web_texts.py` это проверяет |
 | Поправить текст бота | `src/bot/texts.py` — тот же каталог по ключам; `tests/test_bot_texts.py` |
 | Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/web/letter_markup.py` |
-| Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py` и `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) |
+| Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py`, `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) и `view.<раздел>` в матрице `src/domain/permissions.py`. Пишущий маршрут объявляет действие `@guard.action(...)` — без него он закрыт (403) и роняет `tests/test_web_guard.py` |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
-| Ограничить раздел по роли или пространству | Заслоны в `src/web/app.py` (`_install_hq_gate`, `_install_control_gate`, `_install_methodology_gate`), правило «кто кем управляет» — `src/web/access_policy.py`, охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` |
-| Роль и права MCP | Матрица «роль × вид инструментов» — `src/mcp/policy.py` (`kinds_for`) |
-| Добавить инструмент MCP | Описание и схема — запись `ToolSpec` в `TOOLS` (`src/mcp/catalogue.py`), обработчик — рядом с похожими (`tools.py`, `checklist_tools.py`, `ratings_tools.py`); вид (`kind`) решает, какой роли он открыт (`policy.py`); перечень — `docs/inventory.md` (`make map`), контракт — `docs/furca/blocks/mcp.md` |
+| Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Раздел «только УК» для партнёра — `_install_hq_gate` в `src/web/app.py`; «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |
+| Роль и права MCP | Инструмент → действие матрицы: `src/mcp/policy.py` (`action_of`, `TOOL_ACTIONS`); закрытое в Claude сверх матрицы — `CLAUDE_CLOSED` в `src/domain/permissions.py` |
+| Добавить инструмент MCP | Описание и схема — запись `ToolSpec` в `TOOLS` (`src/mcp/catalogue.py`), обработчик — рядом с похожими (`tools.py`, `checklist_tools.py`, `ratings_tools.py`); какой роли он открыт, решает действие матрицы (`policy.action_of`: по виду или `TOOL_ACTIONS`); перечень — `docs/inventory.md` (`make map`), контракт — `docs/furca/blocks/mcp.md` |
 | Новая миграция | Файл `src/db/migrations/NNNN_<смысл>.sql` со следующим номером, заголовок-комментарий «зачем» (первая фраза уйдёт в эту карту); накат — `make migrate`; применённый файл не править. Тест с базой — по образцу `tests/test_db_*.py` (`tests/db_harness.py`) |
 | Изменить расчёт оценки, ставки, пороги букв | Расчёт — `engine/audit.py` (`score`); ставки и пороги — `scoring.json` методики, в коде не дублируются; разбор ответа движка — `src/domain/scoring.py`. После правки — `make regress` |
 | Добавить или изменить пункт чек-листа, зону, критерий | Данные методики вне git; правка одной дверью — `engine/manage.py` / MCP (`src/mcp/checklist.py`) / экран «Методика» (`src/web/methodology.py`). Версии и издания — `src/domain/version.py`, `src/domain/edition.py` |
