@@ -48,12 +48,40 @@ def is_admin_role(role: str | None) -> bool:
     return role in ADMIN_ROLES
 
 
+#: Бизнес-девелопер (D440): пользуется сервисом полностью (проверки, приёмка,
+#: письма, предписания, экшн-планы, рейтинги на чтение), но людей, страны и
+#: ключи не трогает. Только УК (`0060`); заменил аудитора УК.
+DEVELOPER_ROLE = "developer"
+
+#: Гость (D440): вся сеть только на чтение; ничего не меняет и не отправляет.
+#: Только УК (`0060`).
+GUEST_ROLE = "guest"
+
+#: Кто в УК работает с проверками: правит, принимает, снимает, переносит, пишет письма.
+HQ_WORKER_ROLES = (*ADMIN_ROLES, DEVELOPER_ROLE)
+
+
+def is_hq_guest(role: str | None, tenant: str | None) -> bool:
+    """Гость УК: читает всю сеть и не пишет ничего (D440)."""
+    return role == GUEST_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
+
+
+def is_hq_developer(role: str | None, tenant: str | None) -> bool:
+    """Бизнес-девелопер УК (D440)."""
+    return role == DEVELOPER_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
+
+
+def is_hq_worker(role: str | None, tenant: str | None) -> bool:
+    """Работающий в УК с проверками: главный админ, админ, бизнес-девелопер (D440)."""
+    return role in HQ_WORKER_ROLES and canonical_tenant(tenant or "") == HQ_TENANT
+
+
 #: Роли, которым открыта работа в поле — бот и мини-апп обхода: проверка,
-#: кадры, записи, круг доступа к Claude (аудит 12.10, F-024). Аудитор и админы
-#: в любом пространстве; контроля здесь нет — проверок он не касается никак
+#: кадры, записи, круг доступа к Claude (аудит 12.10, F-024). Аудитор, бизнес-девелопер
+#: (D440) и админы в любом пространстве; контроля здесь нет — проверок он не касается никак
 #: (D420, D344). Незнакомая роль закрыта: новая роль, не внесённая сюда,
 #: получает отказ, а не тихий доступ.
-FIELD_ROLES = frozenset({"auditor", *ADMIN_ROLES})
+FIELD_ROLES = frozenset({"auditor", DEVELOPER_ROLE, *ADMIN_ROLES})
 
 
 def may_do_field_work(role: str | None) -> bool:

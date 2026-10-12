@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 114 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 115 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -42,6 +42,7 @@
 | `/admin/checklists` | POST | `checklists_create` | `src/web/app.py` |
 | `/admin/checklists/<code>/apply` | GET | `checklists_apply_preview` | `src/web/app.py` |
 | `/admin/checklists/<code>/apply` | POST | `checklists_apply` | `src/web/app.py` |
+| `/admin/checklists/<code>/master` | POST | `checklists_master` | `src/web/app.py` |
 | `/admin/checklists/<code>/state` | POST | `checklists_state` | `src/web/app.py` |
 | `/admin/items` | POST | `methodology_add` | `src/web/app.py` |
 | `/admin/items/<code>` | GET | `methodology_item` | `src/web/app.py` |
@@ -376,6 +377,7 @@
 | `0057_checklist_langs.sql` | `checklist_langs` |
 | `0058_translate_modes.sql` | `translate_modes` |
 | `0059_mcp_token_identity.sql` | — |
+| `0060_d440_roles.sql` | — |
 <!-- map:end -->
 
 ## Makefile

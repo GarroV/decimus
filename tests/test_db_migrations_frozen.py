@@ -248,6 +248,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0059_mcp_token_identity.sql": (
         "sql1:4635b4dcd913fa4c8ad528f8831ff2d972c44d7e80f9c9f889793db1d08538f1"
     ),
+    # Роли УК по D440: бизнес-девелопер и гость; аудиторы УК → девелоперы.
+    "0060_d440_roles.sql": (
+        "sql1:cb9c791e7ceaa33e5e237dc7024d3901e4ac1ce4fe802904e0594c12cd763552"
+    ),
 }
 
 

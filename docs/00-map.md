@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -158,6 +158,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
+| `src/web/guest_gate.py` | Гость УК (D440): вся сеть только на чтение — один заслон на всё приложение |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
@@ -195,6 +196,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны |
+| `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок на карточке |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
@@ -409,6 +411,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0057_checklist_langs.sql` | D451: язык чек-листа, выбранный аудитором на старте проверки в мини-аппе, запоминается за ЧЕЛОВЕКОМ — на следующем старте экран подставляет его же |
 | `0058_translate_modes.sql` | D443: перевод комментариев на язык отчёта — автоматически или по кнопке, и каждый аудитор выбирает свой в настройках мини-аппа: `button` — переводит сам по кнопке под… |
 | `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
+| `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

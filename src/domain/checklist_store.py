@@ -136,6 +136,11 @@ class Meta:
     #: нет: так выглядит каждая карточка до волны 3, и тогда «в боте» тот, на
     #: кого смотрит верхний указатель `current` (`in_bot_of`).
     in_bot: bool | None = None
+    #: Метка «главный» (D440): такой чек-лист правят только админы, бизнес-
+    #: девелопер его видит и проводит по нему проверки. `None` — ключа в
+    #: карточке нет, и тогда главный тот, что был единственным до множественности
+    #: (`master_of`): прод не нужно мигрировать, хранилище лежит на сервере.
+    master: bool | None = None
 
 
 def check_slug(value: str, *, что: str) -> str:
@@ -202,6 +207,7 @@ def read_meta(store: Store) -> Meta | None:
         name_en=str(тело.get("name_en") or ""),
         state=str(тело.get("state") or ACTIVE),
         in_bot=тело["in_bot"] if isinstance(тело.get("in_bot"), bool) else None,
+        master=тело["master"] if isinstance(тело.get("master"), bool) else None,
     )
 
 
@@ -232,6 +238,19 @@ def in_bot_of(карточка: Meta, space: str, code: str, в_проде: tupl
     if карточка.in_bot is not None:
         return карточка.in_bot
     return в_проде == (space, code)
+
+
+def master_of(карточка: Meta | None, space: str, code: str) -> bool:
+    """Главный ли чек-лист (D440).
+
+    Метка записана в карточке — решает она (админ может снять её и с первого
+    чек-листа, и поставить на другой). Ключа нет — главный тот, что был
+    единственным до множественности: `hq/bizdev`. Так метка держится на проде
+    без миграции и без ручного шага: хранилище живёт на сервере, а не в git.
+    """
+    if карточка is not None and карточка.master is not None:
+        return карточка.master
+    return (space, code) == (DEFAULT_SPACE, DEFAULT_CODE)
 
 
 def prod_link(root: Path) -> Path:
