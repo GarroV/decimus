@@ -62,6 +62,39 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tap an item to record a finding against it.",
     },
     "walk.cl.was": {"ru": "было", "en": "last time"},
+    "walk.cl.more": {"ru": "Показать ещё {count}", "en": "Show {count} more"},
+    "walk.zone.ic.todo": {"ru": "не осмотрена", "en": "not checked yet"},
+    "walk.zone.ic.started": {"ru": "в работе", "en": "in progress"},
+    "walk.zone.ic.clean": {"ru": "осмотрена, нарушений нет", "en": "checked, no issues"},
+    "walk.zone.ic.found_done": {
+        "ru": "осмотрена, нарушений: {count}",
+        "en": "checked, issues: {count}",
+    },
+    "walk.zone.ic.found_open": {
+        "ru": "в работе, нарушений: {count}",
+        "en": "in progress, issues: {count}",
+    },
+    "walk.finish.title": {"ru": "Завершить проверку", "en": "Finish the inspection"},
+    # Короткая подпись для нижней кнопки: полная не влезает в строку на 390px.
+    "walk.finish.dock": {"ru": "Завершить", "en": "Finish"},
+    "walk.finish.ask": {
+        "ru": "Дальше — итог и отчёт в чате.",
+        "en": "Next come the summary and the report in the chat.",
+    },
+    "walk.finish.sent": {"ru": "Итог отправлен в чат", "en": "The summary is in the chat"},
+    "walk.finish.yes": {"ru": "Завершить", "en": "Finish"},
+    "walk.finish.manual": {
+        "ru": "Завершите проверку командой /finish в чате",
+        "en": "Finish the inspection with the /finish command in the chat",
+    },
+    "walk.finish.err.none": {
+        "ru": "Проверки нет — завершать нечего.",
+        "en": "There is no inspection to finish.",
+    },
+    "walk.finish.err.failed": {
+        "ru": "Итог не отправился. Завершите проверку командой /finish в чате.",
+        "en": "The summary was not sent. Finish with the /finish command in the chat.",
+    },
     "walk.zone.clean_done": {
         "ru": "Зона осмотрена, нарушений нет.",
         "en": "Zone checked, nothing found.",
@@ -69,7 +102,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.zone.done_toast": {"ru": "{zone}: осмотрено", "en": "{zone}: checked"},
     "walk.next.mark": {"ru": "Осмотрено →", "en": "Checked →"},
     "walk.next.go": {"ru": "Следующая →", "en": "Next →"},
-    "walk.next.info": {"ru": "Сведения о визите", "en": "Visit details"},
     "walk.info.open": {"ru": "Сведения", "en": "Details"},
     "walk.zone.unmark": {"ru": "Вернуть в неосмотренные", "en": "Mark as not checked"},
     "walk.zone.now": {"ru": "Записано сейчас", "en": "Recorded now"},
@@ -161,9 +193,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.kind.violation_hint": {"ru": "с вычетом", "en": "deducted"},
     "walk.kind.advice_hint": {"ru": "совет", "en": "advice"},
     "walk.sheet.pick_zone": {"ru": "Выбрать зону", "en": "Choose area"},
-    "walk.photo.hero": {"ru": "Снять нарушение", "en": "Shoot the issue"},
-    "walk.photo.gallery_link": {"ru": "или выбрать из галереи", "en": "or pick from gallery"},
-    "walk.photo.more": {"ru": "Ещё кадр", "en": "Another shot"},
+    "walk.photo.hero": {"ru": "Фото нарушения", "en": "Photo of the issue"},
+    "walk.photo.more": {"ru": "Ещё фото", "en": "Another photo"},
     "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
     "walk.sheet.words_hint": {
         "ru": "Пара слов: «нагар на крышке линии», «просрочка на сыре»",
@@ -185,8 +216,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.pick_manual": {"ru": "Выбрать пункт вручную", "en": "Pick the item yourself"},
     "walk.sheet.pick_item": {"ru": "Выбрать пункт", "en": "Choose item"},
     "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
-    "walk.photo.camera": {"ru": "Снять", "en": "Take photo"},
-    "walk.photo.gallery": {"ru": "Из галереи", "en": "From gallery"},
     "walk.photo.uploading": {"ru": "Загружаю…", "en": "Uploading…"},
     "walk.photo.failed": {"ru": "Не загрузилось — повторить", "en": "Failed — retry"},
     "walk.photo.remove": {"ru": "Убрать фото", "en": "Remove photo"},

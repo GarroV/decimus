@@ -68,15 +68,6 @@
   font-weight: 600;
 }
 
-.walk-pick--link {
-  min-height: 44px;
-  margin-top: 4px;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font-size: 15px;
-}
-
 .walk-area--words { font-size: 17px; line-height: 24px; }
 
 /* ── что нашла система ────────────────────────────────────────────────── */

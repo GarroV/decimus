@@ -198,21 +198,6 @@
   cursor: pointer;
 }
 
-.walk-switch__check {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--line-control-2);
-  border-radius: 50%;
-  color: var(--ink-inverse);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.walk-switch__check.is-done { border-color: var(--ok); background: var(--ok); }
-
 .walk-switch__name {
   flex: 1;
   min-width: 0;
@@ -229,13 +214,7 @@
 
 .walk-switch__state { font-size: 12px; line-height: 16px; color: var(--ink-3); }
 
-/* Три состояния зоны: пусто — не были; полкруга — в работе (есть записи,
-   но «Осмотрено» не нажато); галка — осмотрена. */
-.walk-switch__check.is-started,
-.walk-tile__check.is-started {
-  border-color: var(--accent);
-  background: linear-gradient(90deg, var(--accent) 50%, transparent 50%);
-}
+/* Значок состояния зоны — `walk-ux.css` (.walk-zic). */
 
 .walk-progress__seg.is-started { background: var(--accent-line); }
 
@@ -333,9 +312,7 @@
   font-weight: 500;
 }
 
-.walk-tile__check { flex: none; width: 12px; color: var(--ok); font-weight: 700; }
-
-.walk-tile__meta { padding-left: 18px; font-size: 12px; color: var(--ink-3); }
+.walk-tile__meta { padding-left: 26px; font-size: 12px; color: var(--ink-3); }
 
 .walk-tile.is-done { background: var(--surface-2); }
 .walk-tile.is-done .walk-tile__name { color: var(--ink-2); }
