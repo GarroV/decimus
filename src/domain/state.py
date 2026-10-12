@@ -30,6 +30,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.domain.log_ids import log_id
+
 from . import edition
 from .checklist import checklist_version
 from .config import DEFAULT_LANG, Settings, check_environment
@@ -812,7 +814,10 @@ def sync_checklist_version(chat_id: int) -> Inspection:
             raw[DOMAIN_KEY] = block
             _write_atomic(path, raw)
             logger.warning(
-                "проверка чата %s переведена с методики %s на %s", chat_id, recorded or "—", current
+                "проверка чата %s переведена с методики %s на %s",
+                log_id(chat_id),
+                recorded or "—",
+                current,
             )
     state = read_state(chat_id, settings)
     if state is None:
@@ -843,5 +848,5 @@ def drop_inspection(chat_id: int) -> bool:
         if not path.is_file():
             return False
         path.unlink()
-    logger.info("проверка чата %s убрана из состояния", chat_id)
+    logger.info("проверка чата %s убрана из состояния", log_id(chat_id))
     return True

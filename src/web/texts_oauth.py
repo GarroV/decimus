@@ -1,4 +1,4 @@
-"""Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок на карточке.
+"""Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках».
 
 Отдельным модулем, как тексты экрана людей: `texts.py` длиннее предела файла.
 Сливаются в общий каталог (`texts.TEXTS`).
@@ -26,9 +26,9 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
     "oauth.consent.role": {"ru": "Ваша роль: {role}.", "en": "Your role: {role}."},
     "oauth.consent.rights": {
         "ru": "Claude получит права вашей роли — не больше. Отключить подключение можно в "
-        "любой момент на своей карточке в разделе «Пользователи».",
+        "любой момент в разделе «Настройки».",
         "en": "Claude gets the rights of your role, no more. You can disconnect it at any "
-        "time on your own card under “Users”.",
+        "time under “Settings”.",
     },
     "oauth.consent.host": {
         "ru": "После решения вы вернётесь на {host}.",
@@ -58,7 +58,7 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Войдите в decimus и начните подключение заново.",
         "en": "Sign in to decimus and start the connection again.",
     },
-    # --- блок «Подключить Claude» на своей карточке --------------------------
+    # --- блок «Подключить Claude» в «Настройках» -----------------------------
     "users.claude.title": {"ru": "Подключить Claude", "en": "Connect Claude"},
     "users.claude.address": {
         "ru": "Адрес decimus для Claude:",

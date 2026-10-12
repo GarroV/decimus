@@ -228,3 +228,62 @@ def test_новая_таблица_данных_без_политики_прос
     assert без_политики == [], (
         f"Таблицы с tenant_code без политики пространства (decimus_space*): {без_политики}"
     )
+
+
+def _jpeg(цвет: tuple[int, int, int]) -> bytes:
+    import io
+
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (16, 16), цвет).save(buffer, format="JPEG")
+    return buffer.getvalue()
+
+
+def test_уборка_кадров_не_удаляет_кадр_другого_пространства(
+    domain_env: Path, db_env: str, pg_dsn: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Уборка мини-аппа (F-033) видит ссылки ВСЕЙ сети, а не одного пространства.
+
+    Кадр сданной проверки партнёра Б лежит только в папке состояния; уборка,
+    увидевшая лишь чьё-то одно пространство, сочла бы его брошенным и удалила.
+    """
+    import os
+    import shutil
+    import time
+
+    from src.bot import upload_sweeper
+    from src.db import space
+    from src.db.push import push_inspection
+    from src.domain import add_finding, check_environment, start_inspection
+    from src.domain.engine import chat_dir
+    from src.domain.upload_sweep import UNATTACHED_TTL_SEC
+    from src.domain.uploads import save_upload, upload_file
+
+    привязать_пространства(pg_dsn, Б)
+    точка_пространства("Ереван-1", tenant=Б)
+    settings = check_environment()
+    чат = 4343
+    кадр_б = save_upload(_jpeg((10, 20, 30)), settings, owner=чат)
+    брошенный = save_upload(_jpeg((40, 50, 60)), settings, owner=чат)
+    start_inspection(чат, unit="Ереван-1", kind="planned", report_lang="ru", tenant=Б)
+    add_finding(чат, code="CLN05", level="D1", zone="hot_kitchen", text="нагар", photos=[кадр_б])
+    push_inspection(чат)
+    shutil.rmtree(chat_dir(чат, settings))
+    давно = time.time() - UNATTACHED_TTL_SEC - 60
+    for ref in (кадр_б, брошенный):
+        путь = upload_file(ref, settings)  # type: ignore[arg-type]
+        assert путь is not None
+        os.utime(путь, (давно, давно))
+
+    # Как на проде: запасного пространства нет, дверь его не поставила.
+    monkeypatch.setattr(space, "_FALLBACK", None)
+    with acting_space(А):
+        assert upload_sweeper.sweep_once() is None, (
+            "Уборка внутри двери партнёра обязана пропустить проход, а не убирать"
+        )
+    assert upload_file(кадр_б, settings) is not None
+    итог = upload_sweeper.sweep_once()
+    assert итог is not None and итог.frames == 1
+    assert upload_file(кадр_б, settings) is not None, "кадр пространства Б удалён уборкой"
+    assert upload_file(брошенный, settings) is None, "брошенный кадр не убран"

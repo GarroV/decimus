@@ -29,6 +29,7 @@ from src import domain
 from src.db import translate_modes
 from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
 
@@ -45,7 +46,7 @@ def mode_of(chat_id: int) -> str:
     try:
         mode = translate_modes.chosen_translate_mode(chat_id)
     except DbError:
-        logger.warning("Режим перевода чата %s не прочитался", chat_id, exc_info=True)
+        logger.warning("Режим перевода чата %s не прочитался", log_id(chat_id), exc_info=True)
         return translate_modes.DEFAULT_MODE
     return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
 
@@ -77,14 +78,16 @@ def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
                 logger.warning(
                     "Автоперевод: запись #%s чата %s не переведена",
                     finding.n,
-                    chat_id,
+                    log_id(chat_id),
                     exc_info=True,
                 )
                 failed += 1
                 continue
             if len(translated) > MAX_TEXT:
                 logger.warning(
-                    "Автоперевод: запись #%s чата %s — перевод слишком длинный", finding.n, chat_id
+                    "Автоперевод: запись #%s чата %s — перевод слишком длинный",
+                    finding.n,
+                    log_id(chat_id),
                 )
                 failed += 1
             elif translated != source:
@@ -96,7 +99,7 @@ def translate_comments(chat_id: int, inspection: domain.Inspection) -> int:
                 logger.warning(
                     "Автоперевод: запись #%s чата %s не сохранилась",
                     finding.n,
-                    chat_id,
+                    log_id(chat_id),
                     exc_info=True,
                 )
                 failed += len(done)

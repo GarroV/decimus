@@ -208,6 +208,12 @@
     return box;
   }
 
+  function openWeb(url) {
+    var tg = window.Telegram && window.Telegram.WebApp;
+    if (tg && tg.openLink) tg.openLink(url);
+    else window.open(url, "_blank", "noopener");
+  }
+
   function settings(root) {
     root.appendChild(head(tx("walk.app.settings")));
     var list = el("section", "walk-app__list");
@@ -218,6 +224,8 @@
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
     // Подключить Claude — каждому (D448): токен выпускается на свою учётку.
     if (app().mcp) list.appendChild(row(tx("walk.app.claude"), null, function () { A.go("claude"); }));
+    // Остальное подключение — на сайте, в «Настройках» (D447): пароль, Google, бот.
+    if (app().settings_url) list.appendChild(row(tx("walk.app.web_settings"), null, function () { openWeb(app().settings_url); }));
     list.appendChild(row(tx("walk.app.version"), app().version || "—"));
     root.appendChild(list);
   }

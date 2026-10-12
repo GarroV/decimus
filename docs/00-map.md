@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,route_audience,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,route_audience,security_headers,settings_screen,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -168,8 +168,9 @@ Flask-приложение управляющей компании и партн
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
 | `src/web/route_audience.py` | Аудитория каждого маршрута веба: по умолчанию партнёру закрыто (аудит 12.10, F-004) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
-| `src/web/users_claude.py` | Блок «Подключить Claude» на своей карточке (D417): адрес MCP и подключения через сайт |
-| `src/web/users_mcp.py` | Личный токен Claude на своей карточке: выпустить себе и отозвать (D447, D448) |
+| `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
+| `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
+| `src/web/users_mcp.py` | Личный токен Claude в «Настройках»: выпустить себе и отозвать (D447, D448) |
 | `src/web/users_page.py` | Сборка страницы «Пользователи»: список слева, карточка выбранного справа |
 | `src/web/users_screen.py` | Экран «Пользователи» (`/users`): один экран доступа для всех, охват по роли (#585) |
 | `src/web/users_view.py` | Вид экрана «Пользователи»: названия ролей, фильтры, выбор человека, адреса |
@@ -198,12 +199,13 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
-| `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок на карточке |
+| `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
+| `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
 | `src/web/texts_walk.py` | Тексты мини-аппа обхода (#418) — сливаются в общий каталог `texts.TEXTS` |
@@ -253,6 +255,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
+| `src/web/templates/settings/` | 1 | index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -260,7 +263,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 43 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+35) |
+| `src/web/static/` | 44 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+36) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -510,6 +513,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/stops.py` | Отказы, которые останавливают мастер проверки: журнал и счётчик (#436) |
 | `src/bot/texts.py` | Тексты интерфейса бота: каталог по ключам, язык — параметр |
 | `src/bot/unit_pick.py` | Пиццерия проверки — из справочника, а не из написанного (D196) |
+| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) |
 | `src/bot/version.py` | Версия сборки: чем именно отвечает этот процесс (T246, #201) |
 | `src/bot/view.py` | Из чего складываются строки, которые аудитор читает в чате |
 | `src/bot/zones.py` | Зона из слов аудитора (задача T124, решения D047 и D048, правило 6) |
@@ -617,6 +621,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
+| `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
 | `src/domain/public_urls.py` | Публичные адреса админки и MCP — для подключения Claude через OAuth (D417) |
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
@@ -629,6 +634,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/uncovered.py` | Накопитель непокрытых формулировок — случай, когда записи не появилось |
 | `src/domain/unit_name.py` | Имя пиццерии «Город-N» по-английски — из написанного как угодно (D233) |
 | `src/domain/unit_new.py` | Новая пиццерия справочника из веб-админки: что заводится и почему нет (#437) |
+| `src/domain/upload_sweep.py` | Уборка кадров мини-аппа, не попавших ни в одну проверку (F-033, #531) |
 | `src/domain/uploads.py` | Кадры, снятые в мини-аппе обхода (D312): где лежат и как на них сослаться |
 | `src/domain/version.py` | Идентификатор версии методики: имя набора, дата публикации, отпечаток данных |
 | `src/domain/walk_users.py` | Кому открыт мини-апп обхода (#418): все проверяющие или только тестеры |
