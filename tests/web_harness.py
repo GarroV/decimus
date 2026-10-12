@@ -52,6 +52,7 @@ class Учётка:
         tenant: str = "default",
         role: str = "auditor",
         email: str | None = None,
+        web_lang: str | None = None,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
@@ -59,6 +60,9 @@ class Учётка:
         # Почта входа через Google (`web_users.email`): по умолчанию не
         # привязана — иначе вход паролем, которым входит оснастка, закрыт.
         self.email = email
+        # Язык сайта из профиля (`web_users.web_lang`, 0061): по умолчанию не
+        # выбран — страницы говорят языком стенда.
+        self.web_lang = web_lang
         # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
         # прятал бы отказ раздела людей во всех тестах разом.
         self.role = role

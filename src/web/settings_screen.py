@@ -31,13 +31,17 @@ from typing import Any
 
 from flask import Flask, current_app, make_response, render_template, request
 from flask import Response as FlaskResponse
+from werkzeug.wrappers import Response
 
-from src.db import bot_links, mcp_access, oauth_store
+from src.db import bot_links, mcp_access, oauth_store, web_own_profile
 from src.db.errors import DbError
+from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import accounts, auth, profile, users_claude, users_mcp
+from . import accounts, auth, google_link, profile, ui_lang, users_claude, users_mcp
 from .config import WEB_BOT_USERNAME_VAR, Settings
 from .db_refusal import note_target_mismatch
+from .google_auth import load_hq_domains
 from .origin import refuse_foreign_origin
 from .remote import client_address
 from .sections import section
@@ -67,6 +71,9 @@ def own_post_paths() -> frozenset[str]:
             f"{base}/claude-token",
             f"{base}/claude-token-revoke",
             f"{base}/claude-revoke",
+            f"{base}/google-link",
+            f"{base}/google-unlink",
+            f"{base}/lang",
         }
     )
 
@@ -109,9 +116,15 @@ def _own_binding() -> tuple[Any, bool]:
         return None, False
 
 
+def _google_result() -> Flash | None:
+    """Исход возврата от Google (`?google=`) — только из закрытого списка."""
+    ключ = google_link.RESULTS.get(request.args.get(google_link.RESULT_PARAM) or "")
+    return None if ключ is None else Flash(ключ[0], ключ[1])
+
+
 def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     """Страница целиком — для GET и для ответа на любую отправку экрана."""
-    show = show or Show()
+    show = show or Show(flash=_google_result())
     вошедший = auth.current_account()
     user_id = getattr(вошедший, "id", None)
     привязка, известна = _own_binding()
@@ -131,6 +144,8 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             ),
             min_password=accounts.MIN_PASSWORD_LENGTH,
             max_password=accounts.MAX_PASSWORD_LENGTH,
+            hq_account=вошедший is not None and canonical_tenant(вошедший.tenant) == HQ_TENANT,
+            hq_domains=", ".join(sorted(load_hq_domains())),
         ),
         code,
     )
@@ -177,6 +192,8 @@ def install(app: Flask, conf: Settings) -> None:
         return ответ
 
     _install_bot(app, base, conf)
+    _install_google(app, base, conf)
+    ui_lang.install(app, f"{base}/lang")
     _install_claude_token(app, base)
     if conf.oauth_enabled:
         _install_claude_connection(app, base)
@@ -222,6 +239,72 @@ def _install_bot(app: Flask, base: str, conf: Settings) -> None:
             return render(Show(flash=_flash("users.bot.unlink_failed", ok=False)), 503)
         исход = "users.bot.unlinked" if отвязано else "users.bot.unlink_missing"
         return render(Show(flash=_flash(исход, ok=отвязано)))
+
+
+def _install_google(app: Flask, base: str, conf: Settings) -> None:
+    """Своя почта Google: привязать (D447) и снять — только зная пароль (D450)."""
+
+    @app.post(f"{base}/google-link")
+    def settings_google_link() -> Response:
+        """Увести к Google. Только POST со своей страницы: чужая не начнёт привязку."""
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is not None and вошедший.email:
+            return google_link.back_to_settings("already")
+        return auth.begin_google_link()
+
+    @app.post(f"{base}/google-unlink")
+    def settings_google_unlink() -> Response | FlaskResponse | tuple[str, int]:
+        """Снять свою почту: после снятия вход — паролем, поэтому пароль обязателен.
+
+        Попытки считаются тем же счётчиком, что у входа (как смена пароля): иначе
+        форма стала бы вторым входом для подбора пароля из чужой открытой вкладки.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("снятие почты без вошедшего: маршрут прошёл мимо заслона")
+        текущий = request.form.get("current") or ""
+        if not текущий:
+            return render(Show(flash=_flash("settings.google.unlink.empty", ok=False)), 400)
+        адрес = client_address(trusted_proxies=conf.trusted_proxies)
+        попытка = admit_attempt(tenant=auth.throttle_tenant(), address=адрес, login=вошедший.login)
+        if not попытка.admitted:
+            return _unlink_locked(попытка.verdict)
+        try:
+            итог = web_own_profile.unlink_google(auth.current_session_token(), current=текущий)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(flash=_flash("settings.google.done.db", ok=False)), 503)
+        if итог == "denied":
+            if попытка.verdict.locked:
+                return _unlink_locked(попытка.verdict)
+            return render(Show(flash=_flash("settings.google.unlink.wrong", ok=False)), 400)
+        note_success(tenant=auth.throttle_tenant(), address=адрес, login=вошедший.login)
+        if итог == "none":
+            return google_link.back_to_settings()
+        logger.info(
+            "Google: %s/%s снял почту %s",
+            canonical_tenant(вошедший.tenant),
+            вошедший.login,
+            google_link.mask_email(вошедший.email or ""),
+        )
+        return google_link.back_to_settings("unlinked")
+
+
+def _unlink_locked(приговор: Verdict) -> FlaskResponse:
+    """Запертому — срок словами и `Retry-After` тем же числом, как у входа."""
+    страница, код = render(
+        Show(
+            flash=_flash(
+                "settings.google.unlink.locked", ok=False, minutes=приговор.retry_after_minutes
+            )
+        ),
+        429,
+    )
+    ответ = make_response(страница, код)
+    ответ.headers["Retry-After"] = str(приговор.retry_after_seconds)
+    return ответ
 
 
 def _install_claude_token(app: Flask, base: str) -> None:

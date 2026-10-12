@@ -39,7 +39,7 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, ratings_calendar
+from . import auth, ratings_calendar, ui_lang
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -47,7 +47,7 @@ from .errors import WebTextError
 from .geo_names import country_title
 from .origin import refuse_foreign_origin
 from .sections import section
-from .texts import TEXTS, lang_or_default, t
+from .texts import TEXTS, t
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _forbidden() -> tuple[str, int]:
 
 
 def _lang(conf: Settings) -> str:
-    return lang_or_default(request.args.get("lang"), fallback=conf.ui_lang)
+    return ui_lang.request_lang(conf.ui_lang)
 
 
 def _actor() -> str:

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 117 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 120 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -113,6 +113,9 @@
 | `/settings/claude-revoke` | POST | `settings_claude_revoke` | `src/web/settings_screen.py` |
 | `/settings/claude-token` | POST | `settings_claude_token` | `src/web/settings_screen.py` |
 | `/settings/claude-token-revoke` | POST | `settings_claude_token_revoke` | `src/web/settings_screen.py` |
+| `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
+| `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
+| `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
@@ -380,6 +383,7 @@
 | `0058_translate_modes.sql` | `translate_modes` |
 | `0059_mcp_token_identity.sql` | — |
 | `0060_d440_roles.sql` | — |
+| `0061_web_own_google_lang.sql` | `web_google_link_states` |
 <!-- map:end -->
 
 ## Makefile

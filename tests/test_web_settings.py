@@ -159,7 +159,7 @@ def test_с_почтой_и_google_пароль_закрыт_и_так_сказ�
         страница = client.get("/settings").get_data(as_text=True)
 
         assert ПОЧТА in страница
-        assert 'name="current"' not in страница, "форма смены пароля при закрытом входе паролем"
+        assert 'id="password-form"' not in страница, "форма смены пароля при закрытом входе паролем"
         assert "Вход паролем для этой учётки закрыт" in страница
 
 
@@ -167,7 +167,7 @@ def test_с_почтой_без_google_пароль_остаётся(monkeypatch
     for client in _с_почтой(monkeypatch, google=False):
         страница = client.get("/settings").get_data(as_text=True)
 
-        assert ПОЧТА in страница and 'name="current"' in страница
+        assert ПОЧТА in страница and 'id="password-form"' in страница
 
 
 def test_без_почты_так_и_сказано(monkeypatch: pytest.MonkeyPatch) -> None:
