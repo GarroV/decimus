@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import socket
 import threading
 import urllib.error
 from collections.abc import Iterator
@@ -247,3 +248,26 @@ def test_http_только_в_сеть_tailscale(адрес: str) -> None:
 
 def test_http_в_сеть_tailscale_можно() -> None:
     assert base._https("http://100.64.1.2:9021/stores/a") == "http://100.64.1.2:9021/stores/a"
+
+
+def test_обрыв_соединения_тоже_домашний_сервер(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Tailscale принимает соединение, а ретранслятор лежит: соединение рвётся."""
+    приёмник = socket.socket()
+    приёмник.bind(("127.0.0.1", 0))
+    приёмник.listen()
+
+    def рвать() -> None:
+        for _ in range(base.RETRIES):
+            связь, _ = приёмник.accept()
+            связь.setsockopt(
+                socket.SOL_SOCKET, socket.SO_LINGER, b"\x01\x00\x00\x00\x00\x00\x00\x00"
+            )
+            связь.close()
+
+    threading.Thread(target=рвать, daemon=True).start()
+    адрес = f"http://127.0.0.1:{приёмник.getsockname()[1]}"
+    try:
+        with pytest.raises(AggregatorError, match=r"^домашний сервер не отвечает"):
+            migros.refresh(_сборщик(monkeypatch, адрес), ТОЧКА)
+    finally:
+        приёмник.close()
