@@ -170,7 +170,7 @@
     return pill;
   }
 
-  /** Режим «Завершить» (D447): подпись, пилюля на всю ширину и строка пояснения. */
+  /** Режим «Завершить» (D449): подпись, пилюля на всю ширину и строка пояснения. */
   function finishModeRow() {
     var box = el("div", "walk-app__row walk-app__row--stack");
     box.appendChild(el("span", "walk-app__row-label", tx("walk.app.finish_mode")));

@@ -83,7 +83,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.finish.sent": {"ru": "Итог отправлен в чат", "en": "The summary is in the chat"},
     "walk.finish.yes": {"ru": "Завершить", "en": "Finish"},
-    # Режим «Сразу отчёт» (D447).
+    # Режим «Сразу отчёт» (D449).
     "walk.finish.ask_report": {
         "ru": "Сформировать отчёт и прислать в чат?",
         "en": "Build the report and send it to the chat?",
