@@ -1,0 +1,10 @@
+/* «Настройки» (D447): одна колонка поверх каркаса `decimus-split.css`
+   (`.sdetail`, `.ssec`, `.sform`, `.sbtn`) — своих компонентов у экрана нет. */
+
+.page--settings .ssettings { max-width: 720px; padding-left: 0; padding-right: 0; }
+.page--settings .ssec__sub { margin: var(--space-6) 0 var(--space-3); font-size: 13px; line-height: 18px;
+  font-weight: var(--w-semibold); color: var(--ink); }
+.page--settings .ssec__sub:first-child { margin-top: 0; }
+.page--settings .ssecret { max-width: 100%; }
+.page--settings .ssecret code { overflow-wrap: anywhere; word-break: break-all; }
+.page--settings #claude-connect { margin-top: var(--space-7); }

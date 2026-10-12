@@ -56,6 +56,7 @@ from aiogram.types import InlineKeyboardMarkup, Message
 
 from src.domain import check_environment
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 
 from .texts import t
 
@@ -94,7 +95,9 @@ def _now() -> datetime:
 
 def note_stop(telegram_id: int, *, step: str, reason: str) -> None:
     """Записать отказ: строка в журнал контейнера и строка в счётчик."""
-    logger.warning("отказ мастера: шаг=%s причина=%s telegram_id=%s", step, reason, telegram_id)
+    logger.warning(
+        "отказ мастера: шаг=%s причина=%s telegram_id=%s", step, reason, log_id(telegram_id)
+    )
     line = {
         "at": _now().isoformat(),
         "step": step,

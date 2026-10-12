@@ -86,10 +86,15 @@ ALL_SPACES: frozenset[str] = frozenset(
         # своего пространства — кого вести, решает `access_policy`.
         "users",
         "add_user",
-        "bot_link",
         "bot_unlink",
-        "claude_token",
-        "claude_token_revoke",
+        # «Настройки» (D447, D448): свой профиль — пароль, бот, токен Claude.
+        "settings_page",
+        "settings_own_password",
+        "settings_bot_link",
+        "settings_bot_unlink",
+        "settings_claude_token",
+        "settings_claude_token_revoke",
+        "settings_claude_revoke",
         "claude_revoke",
         "connections_issue",
         "connections_reissue",
@@ -97,7 +102,6 @@ ALL_SPACES: frozenset[str] = frozenset(
         "connections_update",
         "disable_user",
         "user_email",
-        "own_password",
         "user_role",
         "add_space",
         "space_countries",
@@ -160,7 +164,9 @@ OWN_DOOR: frozenset[str] = frozenset(auth.OPEN_ENDPOINTS)
 
 #: Отмеченные, но вешаемые только при публичных адресах (подключение Claude,
 #: D417): на стенде без них эндпоинта нет, и это не мусор в реестре.
-WHEN_CONFIGURED: frozenset[str] = frozenset({"claude_revoke", "oauth_authorize"})
+WHEN_CONFIGURED: frozenset[str] = frozenset(
+    {"claude_revoke", "oauth_authorize", "settings_claude_revoke"}
+)
 
 
 def audience_of(endpoint: str | None) -> Audience | None:

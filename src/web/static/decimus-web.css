@@ -802,6 +802,8 @@ a.ov-table__row:focus-visible, a.ov-row:focus-visible, a.ins-row:focus-visible, 
   }
   .mbar__brand { display: inline-flex; align-items: center; gap: var(--space-4); color: var(--ink); }
   .mbar__brand:hover { color: var(--ink); text-decoration: none; }
+  .mbar__me { display: inline-flex; align-items: center; padding: var(--space-2); color: var(--ink); }
+  .mbar__me:hover { text-decoration: none; }
   /* Ядро ставит тему столбиком при свёрнутой панели (<1100px); в полосе
      телефона места вдоль строки хватает. */
   .mbar .sidenav__theme { flex-direction: row; margin: 0; padding: 0; }

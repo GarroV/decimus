@@ -87,6 +87,10 @@
       <span class="topbar__spacer"></span>
       {{ theme_pick() }}
       {% include "_langpick.html" %}
+      {# На телефоне левой панели нет — в «Настройки» ведёт аватар, как в панели. #}
+      <a class="mbar__me" href="{{ settings_url }}" title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}">
+        <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
+      </a>
     </header>
   {% endif %}
 
@@ -143,9 +147,9 @@
         </div>
 
         <div class="sidenav__user">
-          {# Меню учётки ведёт в свою карточку на «Пользователях»: там роль,
-             пароль, бот и доступ к Claude — всё своё в одном месте. #}
-          <a class="sidenav__me" href="{{ my_card_url }}" title="{{ t('profile.open') }}">
+          {# Меню учётки ведёт в «Настройки» (D447): Claude, бот, Google, язык,
+             пароль — всё своё в одном месте. #}
+          <a class="sidenav__me" href="{{ settings_url }}" title="{{ t('section.settings.title') }}">
             <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
             <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t(role_key(account.role, account.tenant)) }}</small></span>
           </a>

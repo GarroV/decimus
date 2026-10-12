@@ -75,6 +75,7 @@ from . import (
     review,
     revision,
     security_headers,
+    settings_screen,
     swarm_api,
     to_inspect,
     unit_add,
@@ -135,6 +136,7 @@ SCREENS = (
     "ratings",
     "admin",
     "users",
+    "settings",
     "actions",
     "plans",
     "orders",
@@ -195,6 +197,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
+    settings_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
@@ -270,8 +273,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Роль словами — как должность; у партнёра свои названия (D346).
             "role_key": users_view.role_key,
             "hint_key": users_view.hint_key,
-            # Своя карточка — на экране «Пользователи», меню учётки ведёт туда.
-            "my_card_url": f"{request.script_root}{section('users').path}?person=me&lang={lang}",
+            # Меню учётки ведёт в «Настройки»: подключения, вход, язык (D447).
+            "settings_url": f"{request.script_root}{section('settings').path}?lang={lang}",
         }
 
 
@@ -1095,21 +1098,23 @@ def _install_hq_gate(app: Flask) -> None:
             abort(404)
 
 
-def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
+def _control_may_enter(
+    path: str, *, ratings_path: str, users_path: str, settings_path: str, logout_path: str
+) -> bool:
     """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D358).
 
-    Свои дела — экран «Пользователи» (там свой пароль и бот), выход, смена
-    пароля, привязка бота. Адреса разделов — из реестра, а не строками здесь.
+    Свои дела — «Настройки» целиком (пароль, бот, Claude, язык: D447) и экран
+    «Пользователи» для своих людей, выход. Адреса разделов — из реестра, а не
+    строками здесь.
     """
     if path == ratings_path or path.startswith(f"{ratings_path}/"):
+        return True
+    if path == settings_path or path.startswith(f"{settings_path}/"):
         return True
     own = (
         "/",
         users_path,
         logout_path,
-        f"{users_path}/password",
-        f"{users_path}/bot-link",
-        f"{users_path}/bot-unlink",
         # Люди контролинга (D360): заведение, почта, отключение. Смены роли
         # (`/role`) здесь нет намеренно; кого можно трогать, решает маршрут.
         f"{users_path}/add",
@@ -1118,10 +1123,6 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         # Подключение Claude (D417): согласие и отзыв своего подключения —
         # дела самого человека; права в MCP контролю решает его роль.
         oauth.AUTHORIZE_PATH,
-        f"{users_path}/claude-revoke",
-        # Личный токен Claude Desktop себе (D448): тоже дело самого человека.
-        f"{users_path}/claude-token",
-        f"{users_path}/claude-token-revoke",
     )
     # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
     # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.
@@ -1189,6 +1190,7 @@ def _install_control_gate(app: Flask) -> None:
     Чужой раздел на чтение — 404, как закрытый раздел партнёру; запись — 403.
     """
     users_path = section("users").path
+    settings_path = section("settings").path
     ratings_path = section("ratings").path
 
     @app.before_request
@@ -1202,6 +1204,7 @@ def _install_control_gate(app: Flask) -> None:
             request.path,
             ratings_path=ratings_path,
             users_path=users_path,
+            settings_path=settings_path,
             logout_path=auth.LOGOUT_PATH,
         ):
             abort(404 if request.method in _READ_METHODS else 403)

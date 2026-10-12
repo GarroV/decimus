@@ -28,6 +28,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 
 from src.db import bot_langs
+from src.domain.log_ids import log_id
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +107,9 @@ class LangChoices:
         except Exception:
             # Широко намеренно, как в `lang.py`: у выбора языка есть честное
             # умолчание, а немота бота из-за него — та самая поломка T126.
-            logger.exception("выбор языка человека %s не прочитался — как без выбора", telegram_id)
+            logger.exception(
+                "выбор языка человека %s не прочитался — как без выбора", log_id(telegram_id)
+            )
             self._failed[telegram_id] = self._now()
             return
         self._failed.pop(telegram_id, None)
