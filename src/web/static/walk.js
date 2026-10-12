@@ -779,6 +779,7 @@
   }
 
   W.render = render;
+  W.openInfo = openInfo;
 
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
