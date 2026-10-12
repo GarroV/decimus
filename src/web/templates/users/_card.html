@@ -24,7 +24,7 @@
   {% set роль = row.role if row else me.role %}
   {% set варианты = role_choices(row) if row and not свой else () %}
   {% set привязка = own_binding if свой else (bindings.get(row.id) if row else none) %}
-  {% set видит_бота = свой or show_bindings %}
+  {% set видит_бота = (свой and may("inspection.conduct")) or show_bindings %}
   <article class="sdetail" aria-labelledby="card-title">
     <header class="sdetail__head">
       <span class="avatar avatar--lg" aria-hidden="true">{{ логин[:2]|upper }}</span>

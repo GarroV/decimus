@@ -39,7 +39,7 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, ratings_calendar
+from . import auth, guard, ratings_calendar
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -497,6 +497,7 @@ def install(app: Flask, conf: Settings) -> None:
         return render_coverage(conf)
 
     @app.post(f"{путь}/coverage/link")
+    @guard.action("ratings.manage")
     def ratings_coverage_link() -> tuple[str, int]:
         if not may_manage():
             return _forbidden()
@@ -510,6 +511,7 @@ def install(app: Flask, conf: Settings) -> None:
         return render_imports(conf)
 
     @app.post(f"{путь}/import")
+    @guard.action("ratings.manage")
     def ratings_upload() -> tuple[str, int]:
         if not may_manage():
             return _forbidden()
@@ -517,6 +519,7 @@ def install(app: Flask, conf: Settings) -> None:
         return _upload(conf)
 
     @app.post(f"{путь}/countries")
+    @guard.action("ratings.manage")
     def ratings_developer() -> tuple[str, int]:
         if not may_manage():
             return _forbidden()
@@ -526,6 +529,7 @@ def install(app: Flask, conf: Settings) -> None:
         return _saved(conf, lambda: read.set_developer(code, developer, actor=_actor()))
 
     @app.post(f"{путь}/hard-rules")
+    @guard.action("ratings.manage")
     def ratings_rule_add() -> tuple[str, int]:
         if not may_manage():
             return _forbidden()
@@ -542,6 +546,7 @@ def install(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/hard-rules/<int:rule_id>/delete")
+    @guard.action("ratings.manage")
     def ratings_rule_remove(rule_id: int) -> tuple[str, int]:
         if not may_manage():
             return _forbidden()
@@ -549,6 +554,7 @@ def install(app: Flask, conf: Settings) -> None:
         return _saved(conf, lambda: read.remove_hard_rule(rule_id))
 
     @app.post(f"{путь}/aggregators/update")
+    @guard.action("ratings.manage")
     def ratings_agg_update() -> Response | tuple[str, int]:
         """Кнопка «Обновить сейчас» (D420): та же заявка, что у Claude; собирает бот.
         Назад — на ту же сводку (период и срез из адреса), с пометкой исхода."""
@@ -565,6 +571,7 @@ def install(app: Flask, conf: Settings) -> None:
         return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
 
     @app.post(f"{путь}/layout")
+    @guard.action("ratings.manage")
     def ratings_layout() -> tuple[str, int]:
         """Компоновка страницы (D368, D370) — тот же круг, что ведёт рейтинги."""
         if not may_manage():
@@ -577,6 +584,7 @@ def install(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/settings")
+    @guard.action("ratings.manage")
     def ratings_settings() -> tuple[str, int]:
         if not may_manage():
             return _forbidden()

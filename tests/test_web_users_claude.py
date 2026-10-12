@@ -73,7 +73,7 @@ def _стенд(
 
 
 РОЛИ = [
-    ("HQ", "auditor"),
+    ("HQ", "developer"),
     ("HQ", "admin"),
     ("HQ", "control"),
     ("HQ", "superadmin"),
@@ -147,7 +147,7 @@ def test_чужое_подключение_не_отключается(
 def test_отключение_без_origin_отвергается(
     monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth
 ) -> None:
-    for client in _стенд(monkeypatch, tenant="HQ", role="auditor"):
+    for client in _стенд(monkeypatch, tenant="HQ", role="developer"):
         ответ = client.post("/users/claude-revoke", data={"connection_id": "мое-подключение"})
 
         assert ответ.status_code == 403

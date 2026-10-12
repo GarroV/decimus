@@ -30,8 +30,13 @@ def _клиент(monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str) ->
 
 
 @pytest.fixture
-def аудитор_ук(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    yield from _клиент(monkeypatch, tenant="HQ", role="auditor")
+def гость_ук(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    yield from _клиент(monkeypatch, tenant="HQ", role="guest")
+
+
+@pytest.fixture
+def девелопер_ук(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
+    yield from _клиент(monkeypatch, tenant="HQ", role="developer")
 
 
 @pytest.fixture
@@ -45,10 +50,11 @@ def админ_ук(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
 
 
 @pytest.mark.parametrize(("путь", "форма"), ПРАВКИ)
-def test_аудитор_ук_не_правит_методику(
-    аудитор_ук: FlaskClient, путь: str, форма: dict[str, str]
+def test_гость_ук_не_правит_методику(
+    гость_ук: FlaskClient, путь: str, форма: dict[str, str]
 ) -> None:
-    assert аудитор_ук.post(путь, data=форма, headers=ЗАГОЛОВКИ).status_code == 403
+    """Аудитора УК больше нет (D440): неглавные листы правит девелопер, гость — ничего."""
+    assert гость_ук.post(путь, data=форма, headers=ЗАГОЛОВКИ).status_code == 403
 
 
 @pytest.mark.parametrize(("путь", "форма"), ПРАВКИ)
@@ -58,8 +64,8 @@ def test_сотрудник_партнёра_не_правит_методику(
     assert сотрудник_партнёра.post(путь, data=форма, headers=ЗАГОЛОВКИ).status_code == 403
 
 
-def test_аудитор_методику_читает(аудитор_ук: FlaskClient) -> None:
-    assert аудитор_ук.get("/admin").status_code == 200
+def test_девелопер_методику_читает(девелопер_ук: FlaskClient) -> None:
+    assert девелопер_ук.get("/admin").status_code == 200
 
 
 @pytest.mark.parametrize(("путь", "форма"), ПРАВКИ)

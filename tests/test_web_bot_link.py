@@ -77,12 +77,13 @@ def test_привязанный_видит_свой_telegram_и_может_от�
         bound_at=datetime(2026, 10, 1, 9, 30, tzinfo=UTC),
     )
     отвязано: list[str] = []
+    # Свою привязку снимает и аудитор партнёра — без people.manage (own_object).
     подменить_двери(monkeypatch, tenant="GE")
     monkeypatch.setattr(bot_links, "binding_of", lambda _u: привязка)
     monkeypatch.setattr(bot_links, "unbind", lambda u: отвязано.append(u) or True)
     with собрать(tenant="HQ", bot_username=БОТ).test_client() as client:
         войти(client)
-        страница = client.get("/users").get_data(as_text=True)
+        страница = client.get("/users?person=me").get_data(as_text=True)
         ответ = client.post("/users/bot-unlink", headers=ЗАГОЛОВКИ)
     assert "501" in страница and "2026-10-01 09:30" in страница
     assert ответ.status_code == 200 and отвязано == [Учётка().id]

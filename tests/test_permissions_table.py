@@ -1,252 +1,169 @@
-# tests/test_permissions_table.py
-"""Таблица «роль × действие × пространство человека × пространство объекта × автор → да/нет».
+"""Таблица «роль × действие → да/нет» — переписана руками из решений, а не из кода.
 
-Таблица ролей переписана здесь руками из спеки с поправками D310 и D311, а не
-взята из кода: иначе тест сверял бы `DEFAULT_MATRIX` с самим собой. Проверка
-таблицы прогоняется и на заведомо сломанной матрице, и на заведомо сломанном
-`can` — она обязана покраснеть и назвать нарушенное правило (`testing.md`).
+Оракул `ОЖИДАНИЕ` собран по решениям владельца (D341, D346, D367, D420, D429,
+D440, D448), а не скопирован из `MATRIX`: иначе тест сверял бы матрицу с ней
+самой. Расхождение — дефект одного из двух, и тест называет клетку.
 
-Оракул `ожидание()` — копия правил спеки, а не кода: его сходство с
-`permissions._boundary` ожидаемо, а расхождение — дефект одного из двух.
+Ядро прав — тестами вперёд (`testing.md`): прогон на заведомо сломанной матрице
+обязан покраснеть (`tools/porcha_permissions.py`).
 """
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
-
 import pytest
 
-from src.domain.permissions import (
-    DEFAULT_MATRIX,
-    ROLE_SCOPES,
-    RULE_MATRIX,
-    RULE_OK,
-    Actor,
-    Decision,
-    can,
-    canonical_role,
-    validate_matrix,
-)
+from src.domain import permissions as perm
+from src.domain.permissions import ACTION_CODES, MATRIX, SIDE_HQ, SIDE_PARTNER, validate_matrix
+from src.web.sections import SECTIONS
 
-ВСЕ = frozenset(
-    {
-        "inspection.conduct",
-        "inspection.retract",
-        "inspection.move",
+ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS}
+ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.country", "view.actions"}
+
+РАБОТА_УК = {
+    "inspection.read",
+    "inspection.conduct",
+    "inspection.accept",
+    "inspection.revise",
+    "inspection.retract",
+    "inspection.move",
+    "inspection.letter",
+    "prescription.manage",
+    "plan.manage",
+    "ratings.read",
+    "unit.create",
+    "checklist.read",
+    "checklist.edit",
+    "checklist.publish",
+    "checklist.manage",
+    "phrases.manage",
+}
+АДМИН_УК = (
+    РАБОТА_УК
+    | ВИДЫ_ВСЕ
+    | {
+        "checklist.master",
+        "checklist.apply",
+        "inspection.import",
+        "ratings.manage",
+        "people.manage",
+        "people.role",
+        "space.manage",
+        "refusals.read",
+    }
+)
+СОТРУДНИК_ПАРТНЁРА = ВИДЫ_ПАРТНЁРА | {
+    "inspection.read",
+    "inspection.conduct",
+    "inspection.letter",
+    "prescription.reply",
+    "plan.submit",
+    "checklist.read",
+    "ratings.read",
+}
+
+ОЖИДАНИЕ: dict[tuple[str, str], set[str]] = {
+    # Главный админ = админ + ключи API (D440).
+    (SIDE_HQ, "superadmin"): АДМИН_УК | {"api.manage"},
+    (SIDE_HQ, "admin"): АДМИН_УК,
+    # Бизнес-девелопер: всё в работе, без главного чек-листа, прода, стран, людей,
+    # ключей и загрузок рейтингов и истории (D440, D335).
+    (SIDE_HQ, "developer"): РАБОТА_УК | ВИДЫ_ВСЕ,
+    # Контроль: рейтинги и свои люди, роли не меняет (D420, D360).
+    (SIDE_HQ, "control"): {
+        "ratings.read",
+        "ratings.manage",
+        "people.manage",
+        "view.ratings",
+        "view.users",
+    },
+    # Гость: вся сеть на чтение (D429, D440).
+    (SIDE_HQ, "guest"): {
+        "inspection.read",
+        "ratings.read",
+        "view.overview",
+        "view.registry",
+        "view.country",
+        "view.ratings",
+        "view.users",
+    },
+    # Админ партнёра: сотрудник + люди, свои чек-листы, вычитка свежих (D346, D367).
+    (SIDE_PARTNER, "admin"): СОТРУДНИК_ПАРТНЁРА
+    | {
         "inspection.accept",
         "inspection.revise",
-        "inspection.letter",
-        "prescription.manage",
-        "prescription.reply",
-        "plan.manage",
-        "plan.submit",
         "checklist.edit",
         "checklist.publish",
         "checklist.manage",
+        "checklist.master",
+        "checklist.apply",
         "phrases.manage",
         "people.manage",
-        "mcp.connect",
-        "unit.create",
-        "space.manage",
-        "roles.manage",
-    }
-)
-ТОЛЬКО_УК = frozenset({"unit.create", "space.manage", "roles.manage"})
-НАД_ПРОВЕРКОЙ = frozenset(
-    {
-        "inspection.retract",
-        "inspection.move",
-        "inspection.accept",
-        "inspection.revise",
-        "inspection.letter",
-    }
-)
-
-
-def _все(коды: frozenset[str]) -> dict[str, str]:
-    return {код: "all" for код in коды}
-
-
-СВОИ = {код: "own" for код in НАД_ПРОВЕРКОЙ}
-СПЕКА: dict[str, dict[str, str]] = {
-    "hq_admin": _все(ВСЕ),
-    # D310: unit.create у сотрудника УК остаётся; D311: над проверкой — свои.
-    "hq_staff": {**_все(ВСЕ - {"people.manage", "space.manage", "roles.manage"}), **СВОИ},
-    "country_admin": _все(ВСЕ - ТОЛЬКО_УК),
-    "country_staff": {
-        **_все(
-            frozenset({"inspection.conduct", "prescription.reply", "plan.submit", "mcp.connect"})
-        ),
-        **СВОИ,
+        "people.role",
+        "refusals.read",
     },
+    (SIDE_PARTNER, "auditor"): СОТРУДНИК_ПАРТНЁРА,
 }
-ПРОСТРАНСТВО = {"hq_admin": "HQ", "hq_staff": "HQ", "country_admin": "GE", "country_staff": "GE"}
-ОБЪЕКТЫ = ("HQ", "GE", "AM")
-АВТОРЫ = ("я", "другой", "неизвестен")
 
-Решатель = Callable[..., Decision]
+ПРОСТРАНСТВО = {SIDE_HQ: "HQ", SIDE_PARTNER: "RS"}
 
 
-def _учётка(роль: str) -> str:
-    return f"u-{роль}"
+def test_роли_матрицы_совпадают_с_оракулом() -> None:
+    assert set(MATRIX) == set(ОЖИДАНИЕ)
 
 
-def _автор(роль: str, кто: str) -> str | None:
-    return {"я": _учётка(роль), "другой": "u-other", "неизвестен": None}[кто]
+@pytest.mark.parametrize("клетка", sorted(ОЖИДАНИЕ), ids=lambda k: f"{k[0]}-{k[1]}")
+def test_каждая_клетка_матрицы(клетка: tuple[str, str]) -> None:
+    сторона, роль = клетка
+    лишнее = sorted(set(MATRIX[клетка]) - ОЖИДАНИЕ[клетка])
+    нехватает = sorted(ОЖИДАНИЕ[клетка] - set(MATRIX[клетка]))
+    assert not лишнее and not нехватает, f"{сторона}/{роль}: лишнее {лишнее}, нет {нехватает}"
 
 
-def ожидание(роль: str, действие: str, объект: str, автор: str) -> tuple[bool, str]:
-    кто = ПРОСТРАНСТВО[роль]
-    if кто != "HQ":
-        if действие in ТОЛЬКО_УК:
-            return False, "hq_only"
-        if объект == "HQ":
-            return False, "hq_object"
-        if объект != кто:
-            return False, "foreign_space"
-    охват = СПЕКА[роль].get(действие)
-    if охват is None:
-        return False, "matrix"
-    if охват == "own" and автор != "я":
-        return False, "not_author"
-    return True, "ok"
+@pytest.mark.parametrize("клетка", sorted(ОЖИДАНИЕ), ids=lambda k: f"{k[0]}-{k[1]}")
+def test_can_в_своём_пространстве_повторяет_оракул(клетка: tuple[str, str]) -> None:
+    сторона, роль = клетка
+    кто = perm.Actor(tenant=ПРОСТРАНСТВО[сторона], role=роль)
+    for код in sorted(ACTION_CODES):
+        assert perm.can(кто, код).allowed is (код in ОЖИДАНИЕ[клетка]), f"{сторона}/{роль}: {код}"
 
 
-def _строки(действие: str) -> tuple[str, ...]:
-    return АВТОРЫ if действие in НАД_ПРОВЕРКОЙ else ("—",)
+def test_оракул_не_выдумывает_действий() -> None:
+    for клетка, коды in ОЖИДАНИЕ.items():
+        assert коды <= ACTION_CODES, (клетка, sorted(коды - ACTION_CODES))
 
 
-def сверить(решать: Решатель, матрица: Mapping[str, Mapping[str, str]]) -> list[str]:
-    нарушения: list[str] = []
-    for роль, кто in ПРОСТРАНСТВО.items():
-        человек = Actor(tenant=кто, role=роль, grants=матрица[роль], user_id=_учётка(роль))
-        for действие in sorted(ВСЕ):
-            for объект in ОБЪЕКТЫ:
-                for автор in _строки(действие):
-                    можно, правило = ожидание(роль, действие, объект, автор)
-                    if действие in НАД_ПРОВЕРКОЙ:
-                        вышло = решать(человек, действие, объект, object_author=_автор(роль, автор))
-                    else:
-                        вышло = решать(человек, действие, объект)
-                    if вышло.allowed != можно:
-                        нарушения.append(
-                            f"{роль} × {действие} × {объект} × {автор}: ожидалось "
-                            f"{'да' if можно else 'нет'} ({правило}), вышло "
-                            f"{'да' if вышло.allowed else 'нет'} ({вышло.rule})"
-                        )
-    return нарушения
+def test_разделы_веба_все_в_каталоге() -> None:
+    """Новый раздел без `view.<ключ>` в каталоге — закрыт всем: тест называет его."""
+    assert ВИДЫ_ВСЕ <= ACTION_CODES
+    assert {c for c in ACTION_CODES if c.startswith("view.")} == ВИДЫ_ВСЕ
 
 
-def _сломать(роль: str, **права: str) -> dict[str, Mapping[str, str]]:
-    return {**DEFAULT_MATRIX, роль: {**DEFAULT_MATRIX[роль], **права}}
+def test_матрица_проходит_свою_сверку() -> None:
+    assert validate_matrix() == []
 
 
-def test_матрица_по_умолчанию_равна_таблице_спеки() -> None:
-    assert {р: dict(п) for р, п in DEFAULT_MATRIX.items()} == СПЕКА
-    assert dict(ROLE_SCOPES) == {
-        "hq_admin": "hq",
-        "hq_staff": "hq",
-        "country_admin": "country",
-        "country_staff": "country",
-    }
-
-
-def test_таблица_прав_ролей_по_умолчанию() -> None:
-    assert сверить(can, DEFAULT_MATRIX) == []
-
-
-def test_сломанная_матрица_не_пробивает_границу() -> None:
-    сломанная = _сломать("country_staff", **{"checklist.edit": "all"})
-    assert сверить(can, сломанная) == [
-        "country_staff × checklist.edit × GE × —: ожидалось нет (matrix), вышло да (ok)"
+def test_сверка_ловит_только_УК_у_партнёра() -> None:
+    сломанная = {**MATRIX, (SIDE_PARTNER, "auditor"): {"unit.create", "inspection.read"}}
+    assert validate_matrix(сломанная) == [
+        "partner/auditor: unit.create — действие только УК (hq_only)"
     ]
 
 
-def test_сломанный_охват_свои_называет_каждую_чужую_проверку() -> None:
-    сломанная = _сломать("hq_staff", **{"inspection.retract": "all"})
-    assert сверить(can, сломанная) == [
-        f"hq_staff × inspection.retract × {объект} × {автор}: ожидалось нет (not_author), "
-        f"вышло да (ok)"
-        for объект in ОБЪЕКТЫ
-        for автор in ("другой", "неизвестен")
+def test_сверка_ловит_незнакомый_код_и_только_партнёра_у_УК() -> None:
+    сломанная = {(SIDE_HQ, "guest"): {"plan.submit", "inspection.telepathy"}}
+    assert validate_matrix(сломанная) == [
+        "hq/guest: inspection.telepathy — нет в каталоге действий",
+        "hq/guest: plan.submit — действие только партнёра (partner_only)",
     ]
 
 
-def test_проверка_таблицы_ловит_can_без_автора() -> None:
-    def автор_всегда_свой(человек: Actor, действие: str, объект: str, **_: object) -> Decision:
-        return can(человек, действие, объект, object_author=человек.user_id)
-
-    нарушения = сверить(автор_всегда_свой, DEFAULT_MATRIX)
-    assert (
-        "country_staff × inspection.move × GE × неизвестен: ожидалось нет (not_author), "
-        "вышло да (ok)" in нарушения
-    )
-
-
-def test_проверка_таблицы_ловит_снятую_границу() -> None:
-    def без_границы(человек: Actor, действие: str, _объект: str, **_: object) -> Decision:
-        if действие in человек.grants:
-            return Decision(True, RULE_OK)
-        return Decision(False, RULE_MATRIX)
-
-    нарушения = сверить(без_границы, _сломать("country_staff", **{"checklist.edit": "all"}))
-    assert (
-        "country_staff × checklist.edit × HQ × —: ожидалось нет (hq_object), вышло да (ok)"
-        in нарушения
-    )
-    assert any("(foreign_space)" in н for н in нарушения)
-
-
-def test_матрица_по_умолчанию_годна() -> None:
-    assert validate_matrix(DEFAULT_MATRIX, ROLE_SCOPES) == []
-
-
-def test_проверка_матрицы_называет_только_уК_у_роли_страны() -> None:
-    assert validate_matrix(_сломать("country_admin", **{"unit.create": "all"}), ROLE_SCOPES) == [
-        "country_admin: unit.create — действие только УК (hq_only)"
-    ]
-
-
-def test_проверка_матрицы_называет_свои_не_над_проверкой() -> None:
-    assert validate_matrix(_сломать("hq_staff", **{"checklist.edit": "own"}), ROLE_SCOPES) == [
-        "hq_staff: checklist.edit — охват «own» только у действий над проверкой"
-    ]
-
-
-def test_проверка_матрицы_называет_незнакомый_охват() -> None:
-    assert validate_matrix(_сломать("hq_staff", **{"mcp.connect": "some"}), ROLE_SCOPES) == [
-        "hq_staff: mcp.connect — охват «some» не из own/all"
-    ]
-
-
-def test_проверка_матрицы_называет_код_не_из_каталога() -> None:
-    assert validate_matrix(_сломать("hq_staff", **{"inspection.delete": "all"}), ROLE_SCOPES) == [
-        "hq_staff: inspection.delete — нет в каталоге действий"
-    ]
-
-
-def test_проверка_матрицы_называет_роль_без_охвата() -> None:
-    assert validate_matrix({"ghost": {}}, ROLE_SCOPES) == ["ghost: у роли нет охвата"]
-
-
-@pytest.mark.parametrize(
-    ("старая", "пространство", "новая"),
-    [
-        ("admin", "HQ", "hq_admin"),
-        ("auditor", "HQ", "hq_staff"),
-        ("auditor", "default", "hq_staff"),
-        ("admin", "GE", "country_admin"),
-        ("auditor", "GE", "country_staff"),
-        ("hq_staff", "HQ", "hq_staff"),
-        ("country_auditor_plus", "GE", "country_auditor_plus"),
-    ],
-)
-def test_старая_роль_переводится_по_пространству(
-    старая: str, пространство: str, новая: str
-) -> None:
-    assert canonical_role(старая, пространство) == новая
-
-
-def test_пустая_роль_это_ошибка_кода() -> None:
-    with pytest.raises(ValueError, match="роль"):
-        canonical_role(" ", "HQ")
+def test_граница_держит_даже_сломанную_матрицу(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Галочка «только УК» у партнёра не открывает действие: слой 1 сильнее слоя 2."""
+    сломанная = {**MATRIX, (SIDE_PARTNER, "admin"): frozenset(ACTION_CODES)}
+    monkeypatch.setattr(perm, "MATRIX", сломанная)
+    админ_партнёра = perm.Actor(tenant="RS", role="admin")
+    for код in ("unit.create", "space.manage", "inspection.retract", "api.manage"):
+        решение = perm.can(админ_партнёра, код)
+        assert (решение.allowed, решение.rule) == (False, perm.RULE_HQ_ONLY), код
+    решение = perm.can(админ_партнёра, "checklist.edit", "HQ")
+    assert (решение.allowed, решение.rule) == (False, perm.RULE_HQ_OBJECT)

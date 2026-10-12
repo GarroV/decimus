@@ -48,7 +48,7 @@ def _стенд(
 
 @pytest.mark.parametrize(
     ("tenant", "role"),
-    [("GE", "admin"), ("GE", "auditor"), ("HQ", "auditor"), ("HQ", "control"), ("HQ", "admin")],
+    [("GE", "admin"), ("GE", "auditor"), ("HQ", "developer"), ("HQ", "control"), ("HQ", "admin")],
 )
 def test_сводку_видят_все(
     monkeypatch: pytest.MonkeyPatch, зовы: Any, tenant: str, role: str
@@ -75,7 +75,7 @@ def test_сводку_видят_все(
 
 
 @pytest.mark.parametrize(
-    ("tenant", "role"), [("GE", "admin"), ("GE", "auditor"), ("HQ", "auditor")]
+    ("tenant", "role"), [("GE", "admin"), ("GE", "auditor"), ("HQ", "developer")]
 )
 @pytest.mark.parametrize(("method", "path", "form"), ПРАВЯЩИЕ)
 def test_загрузка_и_справочники_закрыты(

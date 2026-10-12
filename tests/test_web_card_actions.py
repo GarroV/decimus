@@ -49,10 +49,8 @@ def test_админ_уК_видит_весь_ряд_и_форм_внизу_не�
     assert "Исправить дату или пиццерию" not in страница
 
 
-@pytest.mark.parametrize("стенд", ["auditor"], indirect=True)
-def test_аудитору_управляющих_кнопок_нет(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гостю_управляющих_кнопок_нет(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Act
     страница = _открыть(стенд, monkeypatch, уК=False)
 

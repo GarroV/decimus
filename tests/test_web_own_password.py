@@ -47,7 +47,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> list[tuple[str, str, str]]:
 
 @pytest.fixture
 def стенд(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="auditor")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="developer")
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -196,7 +196,7 @@ def test_чужая_страница_пароль_не_меняет(
 
 
 def test_тексты_есть_по_английски(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> None:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="auditor")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="developer")
     with собрать(tenant=ТЕНАНТ, ui_lang="en").test_client() as client:
         войти(client)
         страница = client.get("/users?lang=en").get_data(as_text=True)

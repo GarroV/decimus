@@ -75,6 +75,7 @@ def test_уК_открывает_чек_лист_партнёра(склад: St
 
 
 def test_партнёр_видит_эталон(склад: Store, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Аудитор партнёра чек-лист не правит: экран — только чтение, без падения.
     подменить_двери(monkeypatch, tenant="AM")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)

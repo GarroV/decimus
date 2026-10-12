@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -285,6 +285,11 @@ def test_выдача_передаёт_базе_проверенное_и_лог
     assert kw["expires_at"] == datetime(2099, 1, 1, 23, 59, 59, tzinfo=UTC)
 
 
+#: Экран считает «сегодня» по UTC; `date.today()` в первые часы суток по местному
+#: времени даёт вчерашнюю для UTC дату, и тест ждал отказа там, где срок законен.
+СЕГОДНЯ_UTC = datetime.now(UTC).date()
+
+
 @pytest.mark.parametrize(
     ("поля", "текст"),
     [
@@ -292,8 +297,8 @@ def test_выдача_передаёт_базе_проверенное_и_лог
         ({"scope": ["ratings:write"]}, "Такого права нет"),
         ({"code": "Bad Code"}, "Код: латиница"),
         ({"countries": "GE ZZ"}, "Неизвестная страна: ZZ"),
-        ({"expires": str(date.today() - timedelta(days=1))}, "Срок не раньше завтрашнего дня"),
-        ({"expires": date.today().isoformat()}, "Срок не раньше завтрашнего дня"),
+        ({"expires": str(СЕГОДНЯ_UTC - timedelta(days=1))}, "Срок не раньше завтрашнего дня"),
+        ({"expires": СЕГОДНЯ_UTC.isoformat()}, "Срок не раньше завтрашнего дня"),
         ({"title": "  "}, "Назовите сервис"),
     ],
 )
