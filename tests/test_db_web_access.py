@@ -501,6 +501,27 @@ def test_почта_опознаёт_живую_учётку(обе_роли: st
     assert учётка.tenant == ТЕНАНТ
 
 
+def test_учётка_несёт_привязанную_почту_на_каждой_двери(обе_роли: str) -> None:
+    """Пароль закрыт учётке с почтой Google, черновик ложится в её почту (D176).
+
+    Обе проверки читают `Account.email`, поэтому почта обязана приезжать со
+    всех трёх дверей опознания: паролем, сессией и почтой.
+    """
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    без_почты = authenticate("director", ПАРОЛЬ)
+    assert без_почты is not None and без_почты.email is None
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    паролем = authenticate("director", ПАРОЛЬ)
+    по_почте = find_by_email(ПОЧТА)
+    assert паролем is not None and по_почте is not None
+    сессией = resolve_session(open_session(паролем).token)
+
+    assert сессией is not None
+    assert (паролем.email, по_почте.email, сессией.email) == (ПОЧТА, ПОЧТА, ПОЧТА)
+    assert (паролем.role, по_почте.role, сессией.role) == (ROLE_AUDITOR,) * 3
+
+
 def test_почта_находит_учётку_чужого_пространства(обе_роли: str) -> None:
     """Симметрично логину (D282, ревью Task 4 круг 1, Minor 1а): почта ищется
     по всей базе, а не в тенанте того, кто спрашивает, — и находит ровно одну

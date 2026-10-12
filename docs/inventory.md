@@ -262,6 +262,7 @@
 | `GOOGLE_CLIENT_ID` | `src/web/google_auth.py` | да |
 | `GOOGLE_CLIENT_SECRET` | `src/web/google_auth.py` | да |
 | `GOOGLE_FRONT_REDIRECT_URI` | `src/web/google_auth.py` | да |
+| `GOOGLE_HQ_DOMAINS` | `src/web/google_auth.py` | да |
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
@@ -304,6 +305,7 @@
 | `WEB_SECRET_KEY` | `src/web/config.py` | да |
 | `WEB_TENANT` | `src/web/config.py` | да |
 | `WEB_TRUSTED_PROXIES` | `src/web/config.py` | да |
+| `WEB_TRUSTED_PROXY_ADDR` | `src/web/config.py` | да |
 | `WEB_UI_LANG` | `src/web/texts.py` | да |
 | `WEB_URL_PREFIX` | `src/web/config.py`, `tools/walk_healthcheck.py` | да |
 | `WEB_USER_PASSWORD` | `tools/web_user.py` | да |
