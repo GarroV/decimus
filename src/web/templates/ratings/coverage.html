@@ -51,13 +51,14 @@
             <b>{{ score(c) }}</b>{% if c.stale %} <span class="rt-stale" role="img" title="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}" aria-label="{{ t('ratings.coverage.stale', date=c.on_date.strftime('%d.%m.%Y')) }}">△</span>{% endif %}
           {%- elif c.state == 'unrated' -%}<span class="is-empty" title="{{ t('ratings.coverage.unrated') }}">—</span>
           {%- elif c.state == 'missing' -%}<span class="is-empty" title="{{ t('ratings.coverage.missing') }}">—</span>
-            {%- if may_manage and p.key == 'glovo' %}
+            {%- if may_manage and p.key in link_platforms %}
             <details class="rt-link"><summary>{{ t('ratings.coverage.link.summary') }}</summary>
               <form method="post" action="{{ url(ratings_path ~ '/coverage/link') }}?lang={{ lang }}">
                 <input type="hidden" name="dodo_id" value="{{ row.unit.dodo_id }}">
                 <input type="hidden" name="country" value="{{ country or '' }}">
-                <label class="rt-field__label" for="rt-link-{{ row.unit.dodo_id }}">{{ t('ratings.coverage.link.label') }}</label>
-                <input class="input input--sm" id="rt-link-{{ row.unit.dodo_id }}" type="url" name="url" required placeholder="https://glovoapp.com/…/stores/…">
+                <input type="hidden" name="aggregator" value="{{ p.key }}">
+                <label class="rt-field__label" for="rt-link-{{ p.key }}-{{ row.unit.dodo_id }}">{{ t('ratings.coverage.link.label.' ~ p.key) }}</label>
+                <input class="input input--sm" id="rt-link-{{ p.key }}-{{ row.unit.dodo_id }}" type="url" name="url" required placeholder="{{ link_platforms[p.key] }}">
                 <button class="btn btn--sm" type="submit">{{ t('ratings.coverage.link.submit') }}</button>
               </form></details>
             {%- endif -%}
