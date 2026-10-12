@@ -621,7 +621,9 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
 | `src/db/api_access.py` | сервисные токены внешнего API (D388): сверка по отпечатку, права, счёт обращений за окно (лимит частоты), журнал с попутной чисткой старше 90 дней, выпуск/перечень/отзыв для `tools/api_token.py`; отпечаток и генерация токена — из `mcp_access` |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
+| `src/db/database_target.py` | куда ведёт строка подключения (хост, порт, база, роль — без пароля) и сверка, что все заданные `DATABASE_*_URL` ведут в одну базу; расхождение — `DatabaseTargetError` (#487, #515) |
+| `src/db/target_refusal.py` | узнать расхождение баз в цепочке причин отказа и записать подробности в журнал на уровне ERROR — одно правило для веба (`src/web/db_refusal.py`) и MCP (`src/mcp/db_target.py`), #521 |
 | `src/db/models.py` | `InspectionRow` (с `origin`, `is_legacy`, `is_uploaded`), `FindingRow`, `InfoRow`, `InspectionDetail` (с `reported_status`, `legacy_method` исторической); происхождения `ORIGIN_*`, маркеры исторической записи `LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`, `LEGACY_VERSION_PREFIX` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
