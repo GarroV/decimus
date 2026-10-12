@@ -13,7 +13,7 @@ requires-python = ">=3.12"
 dependencies = [
     # Движок: сборка PDF (D009 — рендерер зафиксирован на WeasyPrint 69.x),
     # сжатие фотографий в отчёте и импорт чек-листа из xlsx в manage.py.
-    "weasyprint==69.0",
+    "weasyprint==70.0",
     "pillow==12.3.0",
     "openpyxl==3.1.5",
     # recognize: единственный провайдер LLM — OpenAI (решение D010). Один
@@ -79,7 +79,7 @@ dependencies = [
     # `werkzeug.wrappers.Response` (его отдаёт `flask.redirect`), и тип в
     # подписи обязан приходить оттуда, откуда приходит значение. Версия та
     # же, что тянет Flask этого выпуска.
-    "werkzeug==3.1.8",
+    "werkzeug==3.1.9",
     # Та же причина, что у werkzeug выше: вход (T323) подписывает сессионную
     # куку `URLSafeTimedSerializer` напрямую, а не через `flask.session`.
     # Через `flask.session` было бы нельзя: флаг `Secure` там задаётся один
