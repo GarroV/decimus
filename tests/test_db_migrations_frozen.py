@@ -211,6 +211,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0050_aggregators.sql": (
         "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
     ),
+    # Реестр пиццерий из публичного API Dodo (D424). Ещё не на проде.
+    "0051_units_registry.sql": (
+        "sql1:aad883b7a6962860d1a4c371a84fa2f4cf32b61eccb5f7d22304cd097f62e734"
+    ),
 }
 
 
