@@ -75,6 +75,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "in progress, issues: {count}",
     },
     "walk.finish.title": {"ru": "Завершить проверку", "en": "Finish the inspection"},
+    # Короткая подпись для нижней кнопки: полная не влезает в строку на 390px.
+    "walk.finish.dock": {"ru": "Завершить", "en": "Finish"},
     "walk.finish.ask": {
         "ru": "Дальше — итог и отчёт в чате.",
         "en": "Next come the summary and the report in the chat.",
