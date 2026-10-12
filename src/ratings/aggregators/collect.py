@@ -41,6 +41,7 @@ from . import (
     chowdeck,
     glovo,
     glovo_link,
+    migros,
     pyszne,
     trendyol,
     wolt,
@@ -56,7 +57,7 @@ SEARCHERS: tuple[ModuleType, ...] = (wolt, bolt, yemeksepeti, trendyol, pyszne)
 #: 429, затем 401 на поиске (#670); владелец 11.10.2026: «у яндекса в целом беда
 #: сейчас, так что давай пока его пропустим» (D397). Вернуть — перенести в SEARCHERS.
 PAUSED: tuple[ModuleType, ...] = (yandex_eda,)
-KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck)
+KNOWN: tuple[ModuleType, ...] = (glovo, chowdeck, migros)
 MAX_LINK_M = 400
 
 
