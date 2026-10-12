@@ -478,3 +478,5 @@ ratings_coverage
 ratings_coverage_link
 redirect_request
 _без_базы_реестра
+# Заслон происхождения на всю админку (#709): крюк `@app.before_request`.
+_запись_только_со_своей_страницы
