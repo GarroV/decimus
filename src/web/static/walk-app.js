@@ -308,7 +308,7 @@
   function wizardFresh() {
     return {
       opts: null, loading: false, error: "", field: "",
-      form: { checklist: "", unit: "", kind: "", speech: "", report: "" },
+      form: { checklist: "", unit: "", kind: "", speech: "" },
       suggestions: [], ask: null, confirm: false, replaceOk: false, busy: false,
       timer: null, seq: 0, box: null,
     };
@@ -338,7 +338,6 @@
       // Вид и языки предзаполнены — на экране остаётся то, что нельзя угадать.
       wz.form.kind = res.body.kinds.length ? res.body.kinds[0].code : "";
       wz.form.speech = res.body.default_lang;
-      wz.form.report = res.body.default_lang;
       if (res.body.checklists.length === 1) wz.form.checklist = res.body.checklists[0].code;
       W.render();
     }).catch(function () {
@@ -413,13 +412,13 @@
   function complete(wz) {
     var f = wz.form;
     var needList = wz.opts.checklists.length > 1;
-    return !!f.unit.trim() && !!f.kind && !!f.speech && !!f.report && (!needList || !!f.checklist);
+    return !!f.unit.trim() && !!f.kind && !!f.speech && (!needList || !!f.checklist);
   }
 
   function submit(wz, extra) {
     if (wz.busy) return;
     var f = wz.form;
-    var body = { op: "start", checklist: f.checklist, unit: f.unit.trim(), kind: f.kind, speech_lang: f.speech, report_lang: f.report };
+    var body = { op: "start", checklist: f.checklist, unit: f.unit.trim(), kind: f.kind, speech_lang: f.speech };
     if (wz.replaceOk) body.replace = true;
     if (extra && extra.add_unit) body.add_unit = true;
     wz.busy = true;
@@ -582,9 +581,6 @@
     if (wz.hint) speech.appendChild(el("p", "walk-form__note", tx("walk.start.speech_hint")));
     speech.appendChild(choice(wz, "speech", langs, false));
     form.appendChild(speech);
-    var report = field(tx("walk.start.report"));
-    report.appendChild(choice(wz, "report", langs, false));
-    form.appendChild(report);
     if (wz.error && wz.field !== "unit") form.appendChild(el("p", "walk-form__error", wz.error));
     var go = W.button("walk-mark walk-app__go", tx(wz.busy ? "walk.start.going" : "walk.start.go"));
     go.type = "submit";

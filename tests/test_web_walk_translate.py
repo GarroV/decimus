@@ -57,11 +57,19 @@ def модель(monkeypatch: pytest.MonkeyPatch) -> Модель:
 
 @pytest.fixture
 def завести(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[..., Клиент]:
-    """Проверка с заданными языками интерфейса и отчёта и клиент с подписью Telegram."""
+    """Проверка с заданными языками интерфейса и чек-листа и клиент с подписью Telegram.
 
-    def _завести(*, ui_lang: str, report_lang: str) -> Клиент:
+    Язык отчёта до конца обхода равен языку чек-листа (D415).
+    """
+
+    def _завести(*, ui_lang: str, speech_lang: str) -> Клиент:
         start_inspection(
-            АУДИТОР, unit="Белград-1", kind="planned", report_lang=report_lang, ui_lang=ui_lang
+            АУДИТОР,
+            unit="Белград-1",
+            kind="planned",
+            report_lang=speech_lang,
+            ui_lang=ui_lang,
+            speech_lang=speech_lang,
         )
         monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
         monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
@@ -87,7 +95,7 @@ def _перевести(клиент: Клиент, *, подпись: bool = Tr
 def test_перевод_отдаётся_и_ничего_не_записывает(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = _перевести(клиент, text="Нагар на поду печи.")
 
@@ -99,23 +107,23 @@ def test_перевод_отдаётся_и_ничего_не_записывае
     assert проверка is not None and проверка.findings == [], "модель предлагает, фиксирует человек"
 
 
-def test_язык_перевода_это_язык_отчёта_а_не_интерфейса(
+def test_язык_перевода_это_другой_язык_а_не_язык_чек_листа_и_не_интерфейса(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = _перевести(клиент, text="Нагар на поду печи.")
 
     assert ответ.get_json()["lang"] == "en"
     assert "into English" in модель.звали[0]["instructions"], (
-        "интерфейс русский, отчёт английский: переводить надо на английский"
+        "интерфейс и чек-лист русские: переводить надо на другой язык платформы, английский"
     )
 
 
-def test_отчёт_русский_интерфейс_английский_переводит_на_русский(
+def test_чек_лист_английский_переводит_на_русский(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="en", report_lang="ru")
+    клиент = завести(ui_lang="en", speech_lang="en")
 
     ответ = _перевести(клиент, text="Burnt-on grease.")
 
@@ -124,7 +132,7 @@ def test_отчёт_русский_интерфейс_английский_пе�
 
 
 def test_перевод_без_подписи_не_работает(завести: Callable[..., Клиент], модель: Модель) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = _перевести(клиент, подпись=False, text="нагар")
 
@@ -134,7 +142,7 @@ def test_перевод_без_подписи_не_работает(завест
 def test_модель_недоступна_отказ_словами_экрана(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
     модель.падает = True
 
     ответ = _перевести(клиент, text="нагар")
@@ -148,7 +156,7 @@ def test_модель_недоступна_отказ_словами_экран�
 def test_слишком_длинный_текст_отклоняется_до_модели(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = _перевести(клиент, text="а" * (walk_write.MAX_TEXT + 1))
 
@@ -156,7 +164,7 @@ def test_слишком_длинный_текст_отклоняется_до_м
 
 
 def test_пустой_текст_отклоняется_до_модели(завести: Callable[..., Клиент], модель: Модель) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = _перевести(клиент, text="   ")
 
@@ -166,7 +174,7 @@ def test_пустой_текст_отклоняется_до_модели(зав
 def test_слишком_длинный_перевод_отклоняется(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
     модель.ответ = {"text": "a" * (walk_write.MAX_TEXT + 1)}
 
     ответ = _перевести(клиент, text="нагар")
@@ -177,7 +185,7 @@ def test_слишком_длинный_перевод_отклоняется(
 def test_пустой_ответ_модели_это_отказ_а_не_пустое_поле(
     завести: Callable[..., Клиент], модель: Модель
 ) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+    клиент = завести(ui_lang="ru", speech_lang="ru")
     модель.ответ = {"text": "  "}
 
     ответ = _перевести(клиент, text="нагар")
@@ -200,9 +208,11 @@ def test_без_проверки_переводить_некуда(
     assert ответ.status_code == 409 and модель.звали == []
 
 
-def test_данные_экрана_несут_язык_отчёта(завести: Callable[..., Клиент]) -> None:
-    клиент = завести(ui_lang="ru", report_lang="en")
+def test_данные_экрана_несут_язык_кнопки_перевода(завести: Callable[..., Клиент]) -> None:
+    клиент = завести(ui_lang="ru", speech_lang="ru")
 
     ответ = клиент.c.post(walk.DATA_PATH, headers={"X-Telegram-Init-Data": клиент.init})
 
-    assert ответ.get_json()["report_lang"] == "en", "кнопка называет язык по этому полю"
+    данные = ответ.get_json()
+    assert данные["translate_lang"] == "en", "кнопка называет язык по этому полю"
+    assert данные["report_lang"] == "ru", "до конца обхода язык отчёта равен языку чек-листа"

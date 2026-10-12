@@ -45,6 +45,7 @@ from bot_harness import (
     feed,
     make_bot,
     photo_message,
+    press_build,
     stub_transcribe,
     text_message,
     voice_message,
@@ -89,7 +90,7 @@ def записано() -> dict[str, str]:
 async def дойти_до_информационной_части(dp: object, bot: object) -> None:
     """«Завершить» и подтверждение — то, после чего начинаются вопросы."""
     await feed(dp, bot, text_message("/finish"))  # type: ignore[arg-type]
-    await feed(dp, bot, callback("fin:build"))  # type: ignore[arg-type]
+    await press_build(dp, bot)
 
 
 # --- порядок: отчёт собирается ПОСЛЕ вопросов, а не до -----------------------
