@@ -96,6 +96,7 @@ from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
+from .route_audience import check_audiences, partner_may_reach
 from .sections import (
     CONTROL_HOME,
     SECTIONS,
@@ -205,6 +206,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
     # адреса обхода передаются отдельному сервису со своим томом на запись.
     walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
+    # Все маршруты уже на месте: у каждого обязана быть отметка аудитории.
+    check_audiences(app)
     _register_errors(app, conf)
     security_headers.install(app, hsts=conf.hsts)
     return app
@@ -1068,15 +1071,26 @@ def _refuse_unless_own(inspection_id: str) -> FlaskResponse | None:
 def _install_hq_gate(app: Flask) -> None:
     """Раздел только для УК отвечает партнёру тем же 404, что несуществующий адрес (D264).
 
-    Заслон на раздел целиком, а не на каждую кнопку внутри: так доступы проще
-    держать — это и был довод владельца. Стоит после заслона входа: без
-    вошедшего туда не доходит ни один закрытый адрес.
+    Решает по отметке аудитории эндпоинта (`route_audience`), по умолчанию — закрыто;
+    префикс раздела (`sections.refused_for`) — второй слой. Заслон на раздел
+    целиком, а не на каждую кнопку внутри: так доступы проще держать — это и
+    был довод владельца. Стоит после заслона входа: без вошедшего туда не
+    доходит ни один закрытый адрес.
     """
 
     @app.before_request
     def _только_уК() -> None:
-        if request.endpoint in auth.OPEN_ENDPOINTS or auth.current_account() is None:
+        # Маршрут не нашёлся (`endpoint is None`) — 404/405 даст сам Flask.
+        if request.endpoint is None or request.endpoint in auth.OPEN_ENDPOINTS:
             return
+        if auth.current_account() is None:
+            return
+        # Умолчание — закрыто (аудит 12.10, F-004): партнёр идёт только к
+        # эндпоинту с отметкой аудитории (`route_audience`), а не «куда не
+        # запретили по префиксу». Префиксный заслон остаётся вторым слоем.
+        партнёр = canonical_tenant(auth.current_tenant()) != HQ_TENANT
+        if партнёр and not partner_may_reach(request.endpoint):
+            abort(404)
         if refused_for(request.path, auth.current_tenant()):
             abort(404)
 
