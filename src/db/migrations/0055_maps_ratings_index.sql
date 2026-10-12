@@ -1,4 +1,4 @@
--- 0053_maps_ratings_index.sql
+-- 0055_maps_ratings_index.sql
 --
 -- Индекс под выборки «последняя оценка филиала на карте» (`maps_store.latest`)
 -- и «оценка пиццерии на карте на дату» (`maps_store.unit_scores`).
