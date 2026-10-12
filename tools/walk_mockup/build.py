@@ -214,6 +214,7 @@ def main() -> None:
             "walk-menu.css",
             "walk-app.css",
             "walk-ux.css",
+            "walk-hints.css",
         ]
     )
     scripts = "\n".join(
@@ -226,6 +227,7 @@ def main() -> None:
             "walk-sheet.js",
             "walk-app.js",
             "walk-finish.js",
+            "walk-hints.js",
             "walk.js",
         ]
     )

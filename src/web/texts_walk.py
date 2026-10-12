@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from .texts_app import APP_TEXTS
+from .texts_hints import HINT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.progress": {
@@ -305,6 +306,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Your unsaved draft is back.",
     },
     "walk.sheet.saved": {"ru": "Записано", "en": "Recorded"},
+    "walk.sheet.saved_in": {"ru": "Записано: {zone}", "en": "Recorded: {zone}"},
+    "walk.sheet.saved_go": {"ru": "Перейти", "en": "Go there"},
+    "walk.sheet.where": {"ru": "Где?", "en": "Where?"},
+    "walk.sheet.zone_other": {"ru": "Другая зона…", "en": "Another zone…"},
+    "walk.sheet.need_where": {
+        "ru": "Укажите, где нарушение",
+        "en": "Say where the issue is",
+    },
     "walk.sheet.unusual": {
         "ru": "Зона не из списка пункта — запись пометится для перепроверки.",
         "en": "The zone is not on the item's list — the record will be flagged for review.",
@@ -405,3 +414,4 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
 
 # Главная и настройки приложения (D373) — тем же каталогом, одним ответом.
 WALK_TEXTS.update(APP_TEXTS)
+WALK_TEXTS.update(HINT_TEXTS)
