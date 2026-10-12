@@ -48,4 +48,53 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Войдите в decimus и начните подключение заново.",
         "en": "Sign in to decimus and start the connection again.",
     },
+    # --- блок «Подключить Claude» на своей карточке --------------------------
+    "users.claude.title": {"ru": "Подключить Claude", "en": "Connect Claude"},
+    "users.claude.address": {
+        "ru": "Адрес decimus для Claude:",
+        "en": "The decimus address for Claude:",
+    },
+    "users.claude.copy": {"ru": "Скопировать", "en": "Copy"},
+    "users.claude.copied": {"ru": "Скопировано", "en": "Copied"},
+    "users.claude.step_add": {
+        "ru": "claude.ai, Claude Desktop или телефон: Настройки → Коннекторы → Добавить свой "
+        "коннектор → вставьте адрес.",
+        "en": "claude.ai, Claude Desktop or phone: Settings → Connectors → Add custom "
+        "connector → paste the address.",
+    },
+    "users.claude.step_login": {
+        "ru": "Claude откроет вход decimus: войдите своей учёткой и нажмите «Разрешить». Права "
+        "в Claude — как у вашей роли.",
+        "en": "Claude opens the decimus sign-in: sign in with your account and press “Allow”. "
+        "Claude gets the rights of your role.",
+    },
+    "users.claude.code": {
+        "ru": "Claude Code — команда в терминале:",
+        "en": "Claude Code — run in a terminal:",
+    },
+    "users.claude.connections": {"ru": "Подключения", "en": "Connections"},
+    "users.claude.none": {"ru": "Подключений пока нет.", "en": "No connections yet."},
+    "users.claude.unknown": {
+        "ru": "Список подключений сейчас недоступен: база не ответила.",
+        "en": "The list of connections is unavailable right now: the database did not answer.",
+    },
+    "users.claude.row": {
+        "ru": "{client} · подключено {created}",
+        "en": "{client} · connected {created}",
+    },
+    "users.claude.used": {"ru": "последний вызов {used}", "en": "last call {used}"},
+    "users.claude.unused": {"ru": "вызовов ещё не было", "en": "no calls yet"},
+    "users.claude.revoke": {"ru": "Отключить", "en": "Disconnect"},
+    "users.claude.revoked": {
+        "ru": "Подключение отключено: Claude потеряет доступ на следующем же вызове.",
+        "en": "Disconnected: Claude loses access on its very next call.",
+    },
+    "users.claude.revoke_missing": {
+        "ru": "Такого подключения у вас нет — возможно, оно уже отключено.",
+        "en": "You have no such connection; it may already be disconnected.",
+    },
+    "users.claude.failed": {
+        "ru": "Не удалось отключить: база не ответила. Попробуйте ещё раз.",
+        "en": "Could not disconnect: the database did not answer. Try again.",
+    },
 }
