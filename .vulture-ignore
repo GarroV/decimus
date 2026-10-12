@@ -468,3 +468,6 @@ on_speech_lang
 # крюк `@app.after_request`; оба регистрирует декоратор, по имени не зовёт никто.
 no_store
 walk_app
+# Выбор языка отчёта кнопкой в конце проверки (D415): `on_report_lang` —
+# обработчик `@router.callback_query`, его регистрирует декоратор.
+on_report_lang
