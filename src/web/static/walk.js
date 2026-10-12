@@ -789,6 +789,7 @@
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
+    if (first && W.offline) W.offline.start();
     S.data = body;
     S.data = withEquipment(body);
     document.documentElement.lang = body.lang;
@@ -803,6 +804,8 @@
     // Пока открыта форма, данные под ней не меняются: перерисовка унесла бы
     // выбранный пункт из-под пальца. Свежие придут ответом на сохранение.
     if (W.sheet.isOpen() || S.info) return;
+    // Без сети экран не затираем ошибкой: данные на нём свежие, кадры ждут связи (D442).
+    if (navigator.onLine === false && S.data && S.data.zones) return;
     W.post(W.urls.data, (tg && tg.initData) || "", "text/plain")
       .then(function (res) {
         if (!res.ok) {
