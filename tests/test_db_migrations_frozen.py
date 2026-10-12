@@ -211,6 +211,9 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0050_aggregators.sql": (
         "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
     ),
+    # Подключение Claude входом через сайт: OAuth-клиенты, коды, подключения, токены
+    # (D417). Заведена вместе с файлом, нигде не применена.
+    "0051_oauth.sql": ("sql1:4dc5917d394d51e023afafe7f9f3a91c93277abf2a5d74a79a6271bdb4b13bd9"),
 }
 
 
