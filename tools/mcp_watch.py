@@ -31,6 +31,10 @@ EXPECTED_RPC_STATUS = 401
 
 #: Путь установщика — единственная публичная поверхность сервера.
 INSTALL_PATH = "/setup"
+#: Своя подпись клиента: на стандартную `Python-urllib/…` край Cloudflare сам
+#: отвечает 403 (проверка браузера), и сторож краснел на исправной двери
+#: (#442, 12.10.2026). Клиенты MCP так не подписываются, отказ им не грозит.
+USER_AGENT = "decimus-mcp-watch/1"
 
 
 class WatchError(RuntimeError):
@@ -41,7 +45,7 @@ def _status(адрес: str, *, тело: bytes | None = None) -> int:
     запрос = urllib.request.Request(  # noqa: S310
         адрес,
         data=тело,
-        headers={"Content-Type": "application/json"} if тело else {},
+        headers={"User-Agent": USER_AGENT} | ({"Content-Type": "application/json"} if тело else {}),
     )
     try:
         with urllib.request.urlopen(запрос, timeout=TIMEOUT_SEC) as ответ:  # noqa: S310
