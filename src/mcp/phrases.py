@@ -43,6 +43,7 @@ from ..db.errors import ConfigError as DbConfigError
 from ..db.errors import SynonymError
 from . import checklist as store_api
 from .checklist import Store
+from .db_target import config_refusal
 from .errors import ToolError
 
 #: Сколько строк карты показываем, если предел не назван. Карта растёт сама, на
@@ -96,11 +97,13 @@ def _карта(*, правка: bool) -> Iterator[None]:
 
     Отказы по существу написаны блоком `db` целиком и приходят человеку его
     словами: пересказ здесь разошёлся бы с ними при первой же правке.
+    Расхождение подключений (наследник `ConfigError`) — свой код `db_target`,
+    а не «не настроено» (`db_target.py`, #521).
     """
     try:
         yield
-    except DbConfigError:
-        raise ToolError(CURATION_NOT_CONNECTED if правка else NOT_CONNECTED) from None
+    except DbConfigError as отказ:
+        raise config_refusal(отказ, CURATION_NOT_CONNECTED if правка else NOT_CONNECTED) from None
     except SynonymError as отказ:
         if отказ.__cause__ is not None:
             raise ToolError(FOREIGN_FAILURE.format(вид=type(отказ.__cause__).__name__)) from None
