@@ -25,12 +25,14 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import (
     KIND_TITLES,
+    LANG_LABELS,
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     UNIT_NEW_PREFIX,
     UNIT_NEW_YES,
 )
+from src.bot.texts import t
 from src.bot.unit_pick import UnitMatch
 from src.db.bot_links import Binding, Standing
 from src.domain import get_state, start_inspection
@@ -48,14 +50,14 @@ def settings(names: dict[int, str] | None = None) -> BotSettings:
 
 
 async def walk_through_wizard(unit: str = "Белград 2") -> tuple[object, object]:
-    """Пройти мастер целиком: /start → «Новая проверка» → название → вид → язык."""
+    """Пройти мастер целиком: /start → «Новая проверка» → название → вид → язык чек-листа."""
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await feed(dp, bot, text_message("/start"))
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     return bot, session
 
 
@@ -78,7 +80,7 @@ async def test_start_offers_new_inspection_button(domain_env: object) -> None:
     assert NEW_INSPECTION_CALLBACK in session.keyboard_data()
 
 
-async def test_wizard_asks_unit_then_kind_then_language(domain_env: object) -> None:
+async def test_wizard_asks_unit_then_kind_then_one_language(domain_env: object) -> None:
     bot, session = make_bot()
     dp = build_dispatcher(settings())
 
@@ -90,7 +92,58 @@ async def test_wizard_asks_unit_then_kind_then_language(domain_env: object) -> N
     assert set(session.keyboard_data()) == {f"start:kind:{code}" for code in KIND_TITLES}
 
     await feed(dp, bot, callback_query("start:kind:planned"))
-    assert session.keyboard_data() == ["start:lang:ru", "start:lang:en"]
+    # D414/D415: единственный языковой вопрос мастера — язык чек-листа. Язык
+    # отчёта спросят в конце проверки, и вопроса о нём здесь нет.
+    assert session.last_text == t("start.ask_speech_lang", "ru")
+    assert session.keyboard_data() == ["start:speech:ru", "start:speech:en"]
+
+    await feed(dp, bot, callback_query("start:speech:ru"))
+    assert get_state(CHAT_ID) is not None, "после языка чек-листа проверка должна начаться"
+    assert not any(data.startswith("start:lang:") for data in session.keyboard_data())
+
+
+@pytest.mark.parametrize("speech", ["ru", "en"])
+async def test_report_language_starts_equal_to_checklist_language(
+    domain_env: object, speech: str
+) -> None:
+    """D415, ядро: на старте язык отчёта равен языку чек-листа, а строки «Язык отчёта» нет.
+
+    Отчёт на другом языке выбирается в конце проверки (`finish`), а не на старте.
+    """
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message("Белград 2"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query(f"start:speech:{speech}"))
+
+    inspection = get_state(CHAT_ID)
+    assert inspection is not None
+    assert inspection.speech_lang == speech
+    assert inspection.report_lang == speech
+    started = session.last_text
+    assert LANG_LABELS[speech] in started.split("Язык чек-листа:")[1].splitlines()[0]
+    assert "Язык отчёта" not in started
+    assert "Report language" not in started
+
+
+async def test_report_button_does_not_answer_the_speech_question(domain_env: object) -> None:
+    """Кнопка языка отчёта на шаге языка проверки не принимается: префиксы разные."""
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message("Белград 2"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:en"))
+
+    assert get_state(CHAT_ID) is None
+    assert session.last_text == t("error.button_gone", "ru")
+
+    # Мастер при этом жив: правильная кнопка шага по-прежнему принимается.
+    await feed(dp, bot, callback_query("start:speech:ru"))
+    assert get_state(CHAT_ID) is not None
 
 
 async def test_wizard_creates_inspection_with_typed_unit(domain_env: object) -> None:
@@ -115,7 +168,7 @@ async def test_auditor_comes_from_telegram_id_and_is_never_asked(domain_env: obj
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
@@ -201,7 +254,7 @@ async def test_start_new_asks_unit_and_replaces_only_after_full_wizard(
 
     await feed(dp, bot, text_message("Белград 3"))
     await feed(dp, bot, callback_query("start:kind:repeat"))
-    await feed(dp, bot, callback_query("start:lang:en"))
+    await feed(dp, bot, callback_query("start:speech:en"))
 
     replaced = get_state(CHAT_ID)
     assert replaced is not None
@@ -239,7 +292,7 @@ async def _до_названия(
 
 async def _до_конца(bot: object, dp: object) -> None:
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
 
 
 async def test_знакомая_пиццерия_на_любом_языке_берётся_из_справочника(
@@ -312,7 +365,9 @@ async def test_партнёр_новую_пиццерию_не_заводит(
     # Arrange — бот проверяющего привязан к учётке партнёра (D286).
     заведено = _справочник(monkeypatch, UnitMatch(name=None, suggestions=(), checked=True))
     партнёр = BindingCache(
-        standing=lambda tg: Standing.live(Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC)))
+        standing=lambda tg: Standing.live(
+            Binding(tg, "u", "me-auditor", "ME", datetime.now(UTC), "auditor")
+        )
     )
 
     # Act

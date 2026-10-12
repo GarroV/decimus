@@ -44,7 +44,7 @@ echo "версия кода: $sha"
 # расписания. Профиль здесь только включает сервис в СБОРКУ; поднимать его
 # `up -d` ниже по-прежнему не будет, профиля в `.env` площадки нет.
 step "сборка образа с версией $sha"
-remote "\$env:BUILD_SHA='$sha'; docker compose --profile backup build" | tail -2 || exit 1
+remote "\$env:BUILD_SHA='$sha'; docker compose --profile backup --profile migrate build" | tail -2 || exit 1
 
 step "подъём"
 remote 'docker compose up -d' | tail -2 || exit 1

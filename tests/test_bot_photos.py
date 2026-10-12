@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import time
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any, BinaryIO
@@ -233,15 +232,12 @@ async def test_кадры_качаются_одновременно(tmp_path: Pa
     bot = Bot(token=FAKE_TOKEN, session=session)
     ids = [f"file-{i}" for i in range(10)]
 
-    started = time.perf_counter()
     found = await download_all(bot, ids, tmp_path)
-    took = time.perf_counter() - started
 
+    # Одновременность — счётчиком одновременно идущих загрузок, а не временем:
+    # порог по стенным часам мигал на общем раннере CI (#741).
     assert len(found) == 10, f"скачались не все кадры: {len(found)}"
     assert session.peak > 1, "кадры качались строго по одному — параллельности нет"
-    assert took < 0.05 * 10 * 0.7, (
-        f"десять кадров заняли {took:.2f} с — это близко к последовательной выкачке"
-    )
 
 
 async def test_одновременность_ограничена(tmp_path: Path) -> None:

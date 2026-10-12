@@ -32,13 +32,13 @@ from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
 from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
 
-from . import auth, guard
+from . import auth
 from . import country as country_data
 from .action_plans import FORM_OVERHEAD_BYTES, is_hq
 from .config import Settings
 from .geo_names import country_title
-from .google_mail import GoogleMailError, create_draft
-from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, MailReturn
+from .google_mail import GoogleMailError, MailAccountMismatchError, create_draft
+from .letter_draft import MAIL_CONSENT_KEY, MAIL_RETURNS_KEY, OUTCOME_WRONG_ACCOUNT, MailReturn
 from .letter_markup import from_plain
 from .origin import refuse_foreign_origin
 from .sections import section
@@ -56,7 +56,7 @@ QUEUE_DRAFTS = "drafts"
 QUEUES = (QUEUE_OVERDUE, QUEUE_REPLIED, QUEUE_DRAFTS)
 
 #: Исходы похода в Gmail, которые экран умеет назвать словами.
-GMAIL_OUTCOMES = ("ok", "failed", "denied", "unavailable", "lost")
+GMAIL_OUTCOMES = ("ok", "failed", "denied", "unavailable", "lost", OUTCOME_WRONG_ACCOUNT)
 
 #: Тон метки состояния — классы `tag` из `forma`.
 STATE_TONES = {
@@ -177,12 +177,24 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         _require_hq()
         lang = _lang(conf)
         страна = country_data.normalize_code(request.args.get("country") or "")
+        # «Предписание» с карточки проверки (решение владельца 11.10.2026): проверка уже выбрана
+        # основанием, страна берётся с её точки. Проверка вне охвата, чужая или
+        # не принятая — форма открывается пустой, без молчаливого чужого основания.
+        основание = _basis_from_card()
+        значения = _defaults(страна, lang)
+        if основание is not None:
+            страна = основание[0]
+            значения = {**_defaults(страна, lang), "inspections": (основание[1].id,)}
         return _render_form(
-            lang=lang, country=страна, current=None, values=_defaults(страна, lang), failure=None
+            lang=lang,
+            country=страна,
+            current=None,
+            values=значения,
+            failure=None,
+            extra_bases=(основание[1],) if основание is not None else (),
         )
 
     @app.post(путь, endpoint="rx_create")
-    @guard.action("prescription.manage")
     def rx_create() -> Response | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -223,7 +235,6 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<prescription_id>/edit", endpoint="rx_update")
-    @guard.action("prescription.manage")
     def rx_update(prescription_id: str) -> Response | str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -244,7 +255,6 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _after_save(текущее.id, lang)
 
     @app.post(f"{путь}/<prescription_id>/send", endpoint="rx_send")
-    @guard.action("prescription.manage")
     def rx_send(prescription_id: str) -> Response | str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -254,7 +264,6 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _go_to_gmail(текущее.id, _lang(conf))
 
     @app.post(f"{путь}/<prescription_id>/close", endpoint="rx_close")
-    @guard.action("prescription.manage")
     def rx_close(prescription_id: str) -> str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -296,6 +305,10 @@ def _finish_gmail(ident: str, lang: str, token: Callable[[], str]) -> Response:
         abort(404)
     try:
         доступ = token()
+    except MailAccountMismatchError as exc:
+        # Чужой аккаунт Google (D176): черновика нет, предписание не отмечается.
+        logger.warning("предписание %s: %s", ident, exc)
+        return _back_from_gmail(ident, lang, OUTCOME_WRONG_ACCOUNT)
     except GoogleMailError as exc:
         logger.warning("предписание %s: доступ к почте не получен: %s", ident, exc)
         return _back_from_gmail(ident, lang, "failed")
@@ -340,6 +353,17 @@ def _defaults(country: str, lang: str) -> dict[str, Any]:
     }
 
 
+def _basis_from_card() -> tuple[str, rx.Choice] | None:
+    ident = (request.args.get("inspection") or "").strip()
+    if not ident:
+        return None
+    try:
+        return rx.inspection_basis(ident, reach=auth.current_reach())
+    except PrescriptionError as exc:
+        logger.warning("основание предписания %s не прочитано: %s", ident, exc)
+        return None
+
+
 def _form_values() -> dict[str, Any]:
     return {
         "recipients": request.form.get("recipients") or "",
@@ -369,11 +393,16 @@ def _render_form(
     current: rx.Prescription | None,
     values: Mapping[str, Any],
     failure: str | None,
+    extra_bases: tuple[rx.Choice, ...] = (),
 ) -> str:
     точки: tuple[rx.Choice, ...] = ()
     основания: tuple[rx.Choice, ...] = ()
     if country:
         точки, основания = rx.choices(country, reach=auth.current_reach())
+    # Основание с карточки старше последних проверок страны в выбор не попадает —
+    # без этой строки его нечем было бы отметить.
+    есть_с_карточки = {c.id for c in основания}
+    основания = основания + tuple(c for c in extra_bases if c.id not in есть_с_карточки)
     if current is not None:
         # Основание черновика старше последних проверок страны в выбор не
         # попадает — без этого сохранение молча сняло бы его с предписания.
@@ -493,7 +522,6 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         )
 
     @app.post(f"{путь}/<prescription_id>/reply", endpoint="order_reply")
-    @guard.action("prescription.reply")
     def order_reply(prescription_id: str) -> str | tuple[str, int]:
         if is_hq():
             return render_template("users/forbidden.html"), 403

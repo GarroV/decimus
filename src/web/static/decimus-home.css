@@ -1,0 +1,141 @@
+/* «Главная» (D378) — по образцу новой главной Swarm Brain, путь — miniapp/src:
+     сетка — components/roy/home/HomeGrid.tsx:130 (у decimus с D418 — колонки
+       фиксированной ширины `auto-fill`, «вся строка» — только у таблицы);
+     карточка rounded 12, рамка, фон surface, p-4;
+     заголовок виджета моно-капсом с серой припиской — HomeLabel;
+     главная цифра 46px моно, «/100», дельта ▲▼, IMF рядом — QualityWidgets.tsx:58–73;
+     плашки: рамка, подпись 11px, число 18px моно — QualityWidgets.tsx:48–56;
+     доска стикеров — MiscWidgets.tsx:57–93: бумажки 200×190 с лёгким наклоном,
+       лента с прокруткой и привязкой, фон доски — косая штриховка;
+     пустые состояния — пунктирная рамка, текст по центру — HomeGrid.tsx:189.
+   Цвета — только токены ядра (dodo-ds.css), поэтому тёмная тема работает сама. */
+
+.page--home { max-width: 110rem; }
+
+/* Шапка (D418): заголовок и срез (период, страна) в одной строке, ниже и плотнее
+   общей `.shead`; на телефоне срез уходит под заголовок. */
+.page--home .shead { align-items: center; gap: var(--space-3) var(--space-6); }
+.page--home .shead__main { flex: 0 0 auto; min-width: 0; }
+.hm-slice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: auto; }
+.hm-slice .hm-more { margin-left: 0; }
+/* Список страны стоит у правого края шапки: меню раскрывается влево, а не за экран. */
+.hm-slice > .pick:not(.speriod__pick) .pick__menu { left: auto; right: 0; }
+
+/* Сетка компактных блоков (D418): колонки фиксированной ширины, а не одна
+   строка на всю ширину; на телефоне — одна колонка. «Пиццерии» — на всю строку:
+   ей нужны колонки таблицы. */
+/* Колонками, а не сеткой рядов: блоки разной высоты в сетке оставляли рядом с
+   низким блоком пустую дыру во всю строку. В колонках блок встаёт под соседом. */
+.hm-grid { columns: 340px auto; column-gap: 12px; margin-top: var(--space-4); }
+.hm-grid > .hm-card { break-inside: avoid; margin-bottom: 12px; }
+.hm-card--wide { column-span: all; }
+
+/* Блок — карточка, как `.card` ядра: поверхность, рамка `--line-strong` (у `--line`
+   в светлой теме контраст с холстом почти нулевой, цифры «висели в воздухе»),
+   скругление и лёгкая тень. Холст под ними — `--canvas`. */
+.hm-card { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 14px; border: 1px solid var(--line-strong);
+  border-radius: var(--r-block); background: var(--surface); box-shadow: var(--sh-card); }
+.hm-card__head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.hm-card__tools { margin-left: auto; }
+.hm-label { margin: 0; font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-semibold);
+  letter-spacing: .06em; text-transform: uppercase; color: var(--ink); }
+.hm-meta { font-size: 12px; color: var(--ink-3); }
+.hm-more { margin-left: auto; font-size: 12.5px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+.hm-more:hover { text-decoration: underline; }
+
+.hm-empty { display: flex; align-items: center; justify-content: center; min-height: 96px; padding: 16px;
+  border: 1px dashed var(--line-control); border-radius: 10px; font-size: 12.5px; color: var(--ink-3); text-align: center; }
+
+/* ── главная цифра и плашки ─────────────────────────────────────────── */
+.hm-big { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; }
+.hm-big__value { font-family: var(--font-mono); font-size: 46px; line-height: 1; font-weight: var(--w-semibold);
+  letter-spacing: -.02em; color: var(--ink); }
+.hm-big__of { margin-left: -6px; font-family: var(--font-mono); font-size: 14px; color: var(--ink-3); }
+.hm-big__note { font-size: 12.5px; color: var(--ink-2); }
+.hm-delta { font-family: var(--font-mono); font-size: 13px; font-weight: var(--w-semibold); color: var(--ink-2); }
+.hm-delta.is-up { color: var(--ok); }
+.hm-delta.is-down { color: var(--err); }
+
+.hm-plaques { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.hm-plaque { display: flex; flex-direction: column; gap: 2px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.hm-plaque__label { font-size: 11px; color: var(--ink-3); }
+.hm-plaque__value { font-family: var(--font-mono); font-size: 18px; font-weight: var(--w-semibold); color: var(--ink); }
+.hm-plaque__value small { font-size: 12px; font-weight: var(--w-regular, 400); color: var(--ink-3); }
+.hm-plaque.is-err { border-color: var(--err-line); background: var(--err-soft); }
+.hm-plaque.is-err .hm-plaque__value { color: var(--err); }
+.hm-plaque.is-warn { border-color: var(--warn-line); background: var(--warn-soft); }
+.hm-plaque.is-warn .hm-plaque__value { color: var(--warn); }
+
+.hm-grades { display: flex; flex-wrap: wrap; gap: 6px 14px; font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); }
+.hm-grades__item { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ── блок «Рейтинги» (D418): строки РС / РКО / карты × колонки CEE / остальные ── */
+.hm-label__link { color: inherit; text-decoration: none; }
+.hm-label__link:hover { color: var(--accent); text-decoration: underline; }
+.hm-rb { display: grid; grid-template-columns: minmax(6.5rem, 1.1fr) repeat(var(--hm-rb-cols, 2), minmax(0, 1fr));
+  align-items: baseline; gap: 0 10px; font-size: 13px; }
+.hm-rb > * { padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+.hm-rb .is-last { border-bottom: 0; }
+.hm-rb__col { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); text-align: right; }
+.hm-rb__label { color: var(--ink-2); font-size: 12.5px; }
+.hm-rb__cell { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 2px 6px; text-align: right;
+  font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--ink); }
+.hm-rb__cell--maps { flex-direction: column; align-items: flex-end; gap: 2px; font-weight: var(--w-regular, 400); }
+.hm-rb__map small { font-family: inherit; font-size: 11px; color: var(--ink-3); }
+
+/* ── строки и таблицы ───────────────────────────────────────────────── */
+.hm-rows { display: flex; flex-direction: column; margin: 0; padding: 0; list-style: none; }
+.hm-row { display: flex; align-items: center; gap: 10px; min-height: 36px; padding: 6px 4px; border-bottom: 1px solid var(--line);
+  color: var(--ink); text-decoration: none; font-size: 13px; }
+.hm-rows > li:last-child .hm-row, .hm-rows > .hm-row:last-child { border-bottom: 0; }
+a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
+.hm-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.hm-row__meta { font-size: 11.5px; color: var(--ink-3); }
+.hm-row__num { font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.hm-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--ink-3); }
+.hm-dot--err { background: var(--err); }
+.hm-dot--warn { background: var(--warn-mark); }
+.hm-bar { flex: 0 0 30%; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.hm-bar__fill { display: block; height: 100%; background: var(--err); }
+
+.hm-table { display: flex; flex-direction: column; font-size: 13px; overflow-x: auto; }
+.hm-table__head, .hm-table__row { display: grid; align-items: center; gap: 10px; min-width: 0; }
+.hm-table__head { height: 32px; border-bottom: 1px solid var(--line); font-size: 10.5px; letter-spacing: .05em;
+  text-transform: uppercase; color: var(--ink-3); }
+.hm-table__row { min-height: 36px; border-bottom: 1px solid var(--line); color: var(--ink); text-decoration: none; }
+.hm-table__row:last-child { border-bottom: 0; }
+.hm-table__row:hover { background: var(--surface-2); text-decoration: none; }
+.hm-table .is-num { text-align: right; font-family: var(--font-mono); font-size: 12.5px; }
+.hm-table .is-strong { font-weight: var(--w-semibold); }
+.hm-table .is-err { color: var(--err); }
+.hm-table__head a { color: inherit; text-decoration: underline dotted; }
+.hm-table small { color: var(--ink-3); }
+.hm-cell__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: var(--w-medium); }
+.hm-cell__muted { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink-2); }
+.hm-table--units .hm-table__head, .hm-table--units .hm-table__row { grid-template-columns: minmax(8rem, 1.4fr) minmax(5rem, 1fr) 3rem 4rem 4rem minmax(6rem, 1fr) 6rem 3.5rem 3.5rem; min-width: 51rem; }
+
+/* ── доска стикеров ─────────────────────────────────────────────────── */
+.hm-board { background-color: var(--surface);
+  background-image: repeating-linear-gradient(-45deg, transparent 0 9px, color-mix(in srgb, var(--line) 55%, transparent) 9px 10px); }
+.hm-stickers { display: flex; gap: 16px; padding: 4px 4px 10px; overflow-x: auto; scroll-snap-type: x mandatory; }
+.hm-sticker { position: relative; display: flex; flex-direction: column; gap: 8px; flex: 0 0 200px; min-height: 170px; padding: 18px 14px 14px;
+  border-radius: 4px; box-shadow: 0 1px 2px rgba(10, 13, 17, .08), 0 6px 14px rgba(10, 13, 17, .08);
+  color: var(--ink); text-decoration: none; scroll-snap-align: start; transform: rotate(-1.2deg); transition: transform .12s ease; }
+.hm-sticker:nth-child(even) { transform: rotate(1.2deg); }
+.hm-sticker:hover { transform: rotate(0) translateY(-2px); text-decoration: none; }
+.hm-sticker::before { content: ""; position: absolute; top: -7px; left: 50%; width: 54px; height: 14px; margin-left: -27px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent); border: 1px solid var(--line); transform: rotate(-2deg); }
+.hm-sticker--0 { background: var(--warn-soft); }
+.hm-sticker--1 { background: var(--accent-soft); }
+.hm-sticker--2 { background: var(--ok-soft); }
+.hm-sticker--3 { background: var(--err-soft); }
+.hm-sticker__kind { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); }
+.hm-sticker__title { font-size: 19px; line-height: 1.2; font-weight: var(--w-semibold); letter-spacing: -.01em; }
+.hm-sticker__urgent { font-size: 12px; font-weight: var(--w-semibold); color: var(--err); }
+.hm-sticker__cta { margin-top: auto; font-size: 12.5px; font-weight: var(--w-semibold); color: var(--accent); }
+
+@media (max-width: 719px) {
+  .hm-big__value { font-size: 38px; }
+  .hm-card { padding: 14px 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .hm-sticker { transition: none; } }

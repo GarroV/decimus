@@ -28,9 +28,8 @@ from flask.testing import FlaskClient
 
 from src.db import bot_links, web_throttle
 from src.db.reach import Reach
-from src.domain.permissions import DEFAULT_MATRIX, canonical_role
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.web import auth
+from src.web import auth, home_board, home_ratings, home_ratings_block, to_inspect
 from src.web.app import create_app
 from src.web.config import Settings
 
@@ -43,23 +42,26 @@ from src.web.config import Settings
 ТОКЕН = "сессионный-токен"
 СВОЙ = "http://localhost"
 
-#: Учётка двойника — её же тесты ставят автором проверки (D311).
-УЧЁТКА = "22222222-2222-2222-2222-222222222222"
-
 
 class Учётка:
     """То немногое, что страницам нужно знать о вошедшем."""
 
-    def __init__(self, login: str = ЛОГИН, tenant: str = "default", role: str = "auditor") -> None:
-        self.id = УЧЁТКА
+    def __init__(
+        self,
+        login: str = ЛОГИН,
+        tenant: str = "default",
+        role: str = "auditor",
+        email: str | None = None,
+    ) -> None:
+        self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
         self.tenant = tenant
-        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Старое имя роли
-        # переводится по пространству так же, как его переводит миграция `0038`.
-        self.role = canonical_role(role, tenant)
-        self.grants = dict(DEFAULT_MATRIX.get(self.role, {}))
-        self.role_name_ru = self.role
-        self.role_name_en = self.role
+        # Почта входа через Google (`web_users.email`): по умолчанию не
+        # привязана — иначе вход паролем, которым входит оснастка, закрыт.
+        self.email = email
+        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
+        # прятал бы отказ раздела людей во всех тестах разом.
+        self.role = role
 
 
 class Сессия:
@@ -152,7 +154,11 @@ def подменить_счётчики(monkeypatch: pytest.MonkeyPatch) -> Сч
 
 
 def подменить_двери(
-    monkeypatch: pytest.MonkeyPatch, *, tenant: str, role: str = "auditor"
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tenant: str,
+    role: str = "auditor",
+    email: str | None = None,
 ) -> dict[str, list[Any]]:
     """Двери опознания, подменённые на границе модуля. Пишут, кого звали.
 
@@ -167,7 +173,7 @@ def подменить_двери(
     def _authenticate(login: str, password: str) -> Учётка | None:
         зовы["authenticate"].append((login, password))
         if login == ЛОГИН and password == ПАРОЛЬ:
-            return Учётка(tenant=tenant, role=role)
+            return Учётка(tenant=tenant, role=role, email=email)
         return None
 
     def _open(account: Учётка) -> Сессия:
@@ -176,7 +182,7 @@ def подменить_двери(
 
     def _resolve(token: str) -> Учётка | None:
         зовы["resolve"].append((token,))
-        return Учётка(tenant=tenant, role=role) if token == ТОКЕН else None
+        return Учётка(tenant=tenant, role=role, email=email) if token == ТОКЕН else None
 
     def _close(token: str) -> bool:
         зовы["close"].append(token)
@@ -194,6 +200,12 @@ def подменить_двери(
     # умолчанию бот не привязан ни у кого. Наборы про привязку подменяют сами.
     monkeypatch.setattr(bot_links, "binding_of", lambda _user_id: None)
     monkeypatch.setattr(bot_links, "live_bindings", lambda: {})
+    # «Главная» (D378) читает рейтинги и счётчики доски, «Проверки» — «Где нужно
+    # проверить» (D418): по умолчанию пусто. Наборы про эти блоки подменяют сами.
+    monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block())
+    monkeypatch.setattr(home_ratings, "load_latest", lambda *_, **__: {})
+    monkeypatch.setattr(home_ratings_block, "load", lambda **_: home_ratings_block.Block())
+    monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts())
     # Ограничитель перебора (T325) стоит на том же пути, что и вход, и без
     # хранилища пошёл бы в настоящую базу на КАЖДОЙ отправке формы — то есть
     # уронил бы все экранные наборы разом.
@@ -209,8 +221,16 @@ def охват_без_базы(tenant: str) -> Reach:
     return Reach(код, None, (код,))
 
 
-def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None = None) -> Flask:
-    """Приложение с настройками стенда набора."""
+def собрать(
+    *,
+    tenant: str,
+    ui_lang: str = "ru",
+    bot_username: str | None = None,
+    admin_public_url: str | None = None,
+    mcp_public_url: str | None = None,
+    trusted_proxies: int | None = None,
+) -> Flask:
+    """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
         Settings(
             host="127.0.0.1",
@@ -219,6 +239,9 @@ def собрать(*, tenant: str, ui_lang: str = "ru", bot_username: str | None
             ui_lang=ui_lang,
             secret_key=СЕКРЕТ,
             bot_username=bot_username,
+            admin_public_url=admin_public_url,
+            mcp_public_url=mcp_public_url,
+            **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )
     app.config.update(TESTING=True)

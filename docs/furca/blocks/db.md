@@ -23,6 +23,13 @@ pending_photo_uploads(*, min_age_sec: int, max_age_sec: int | None = None,
 # S3PhotoStorage(settings, *, fail_fast=False): fail_fast=True — 5 с на
 # соединение и одна попытка, только для upload_photos и upload_report (сдача и
 # дозагрузка); остальные — умолчания botocore с повторами. ping() — head_bucket
+# подключение — src/db/pool.py: `with connection(dsn) as conn:` вместо
+#   `with psycopg.connect(dsn) as conn:` (те же commit/rollback на выходе).
+#   Пул на каждый DSN, лениво; `DB_POOL_MAX` (8; 0 — без пула),
+#   `DB_POOL_TIMEOUT_S` (10). На возврате: откат + RESET ALL / RESET SESSION
+#   AUTHORIZATION / снятие advisory-замков / DISCARD TEMP — настройки сессии
+#   не доходят до следующего. Нет соединения за срок — PoolBusyError (DbError
+#   и psycopg.Error). Тест: tests/test_db_pool.py
 # охват чтения (волна 1, #340; D283, D284, D289) — src/db/reach.py
 # Reach(tenant, tenants, countries): кто читает; чьи проверки (None — всех);
 #   пиццерии каких стран (None — всех, () — ничего). Reach.params() — массивы
@@ -66,35 +73,6 @@ list_units(*, reach: Reach, country: str | None = None) -> list[Unit]   # спр
 
 # логин единый на систему (0028, D282): уникальные login и email во всей базе;
 #   накат отказывает на двойниках и называет запрос, которым их найти
-
-# роли и права ролей (0038, спека «Администрирование», D310, D311) — roles, role_permissions
-#   roles(code, scope ∈ {hq, country}, name_ru, name_en): роль относится к УК или к стране
-#   role_permissions(role_code, action_code, reach ∈ {own, all}): право роли на действие;
-#   own — только проверки, занесённые учёткой человека, и только у пяти действий над
-#   проверкой (role_permissions_own_on_inspection); нет строки — нет права
-#   коды — каталог src/domain/permissions.py (ACTIONS); граница пространств — в can
-#   web_users.role → roles.code; роль УК только у людей HQ, роль страны только у людей
-#   страны (триггер web_users_role_scope, check_violation)
-#   засев — DEFAULT_MATRIX, перенос admin/auditor × HQ/страна → 4 роли
-
-# двери ролей — src/db/roles.py (роль приложения): list_roles() -> tuple[Role, ...],
-#   grants_of(role_code) -> Grants (незаведённая — пусто); grants_column(role_expr) —
-#   единственный подзапрос «права роли колонкой jsonb», grants_from_row — его разбор
-# опознание (authenticate, find_by_email, resolve_session) отдаёт Account с role,
-#   role_name_ru/en и grants — одним запросом на каждый запрос страницы;
-#   create_account/reassign_role: роль чужого охвата → AccessError «не для пространства»,
-#   незаведённая → «не заведена» (отказ схемы, не перечень в коде)
-
-# журнал действий УК у партнёра (0039) — src/db/cross_space.py
-#   entry_for(actor, *, object_tenant, action, object_ref) -> Entry | None (своё — None)
-#   record(conn, entry): пишет на подключении ДВЕРИ ДЕЙСТВИЯ до её коммита и только
-#   если действие состоялось (холостое — без строки); своего
-#   подключения нет — иначе журнал коммитился бы отдельно от действия
-#   cross_space_actions: actor_tenant = 'HQ', object_tenant <> 'HQ'; только select+insert
-
-# автор проверки (0040, D311): inspections.created_by → web_users(id), null — неизвестен
-#   пишется сливом из состояния (Inspection.author_user_id, ставит бот при старте по
-#   привязке); в отпечаток не входит; InspectionRow.created_by ("" — неизвестен)
 
 # пространства и страны (волна 1, #340) — src/db/spaces.py, роль владельца схемы
 SpaceRow(code, name, countries: tuple[str, ...], people: int)
@@ -188,7 +166,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 с той строкой, которая лежит в базе, а решение — переспросить аудитора или
 оставить как есть — принимает потребитель.
 
-**Круг и личные токены доступа к MCP — не часть этого контракта, но модуль блока** (`src/db/mcp_access.py`, миграция `0011`, задача T253, решения D098/D099). Наружу он не идёт через `__init__.py`: связь «этот человек — этот токен» нужна ровно двум блокам, `bot` (выпуск, привод в круг, отзыв) и `mcp` (сверка предъявленного токена), — и оба импортируют модуль напрямую, минуя пакет, потому что `bot` и `mcp` пиры и друг друга не импортируют (`pyproject.toml`). Общее у них место одно, ярусом ниже, и это оно.
+**Личные токены доступа к MCP — не часть этого контракта, но модуль блока** (`src/db/mcp_access.py`, миграции `0011` и `0059`, задача T253, решения D098, D448). Круга доступа больше нет: токен выпускается на учётку сайта самим человеком. Наружу модуль не идёт через `__init__.py`: связь «эта учётка — этот токен» нужна блокам `bot` и `web` (выпуск себе, отзыв своего) и `mcp` (сверка предъявленного токена), — и оба импортируют модуль напрямую, минуя пакет, потому что `bot` и `mcp` пиры и друг друга не импортируют (`pyproject.toml`). Общее у них место одно, ярусом ниже, и это оно.
 
 `upload_photos` реализован (T094) и новой миграции не потребовал: `photos.storage_path`/`uploaded_at` были заложены формой ещё в `0001`.
 
@@ -200,6 +178,27 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 а не тихая выдача без снятых: «снятых нет» и «вам их не видно» разные ответы.
 Не путать с `DATABASE_ADMIN_URL`: та про накат схемы, и роль там обычно
 привилегированная — то есть RLS не подчиняется вовсе.
+
+### Рейтинги РС и РКО (миграции `0039`, `0040`)
+
+Отдельная схема `ratings` (D321); продуктовое описание — `docs/15-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
+
+- `0039_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
+- `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
+- Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
+
+### Оценки в агрегаторах доставки (миграции `0050`, `0051`, `0053`)
+
+Отдельная схема `agg`; продуктовое описание — `docs/17-aggregators.md`. Пишет роль приложения, читают все.
+
+- `0050_aggregators.sql` — `agg.points` (справочник точек агрегатора с привязкой к пиццерии), `agg.ratings` (снимок дня `(aggregator, point_key, on_date)`, шкала хранится при оценке), `agg.loads` (журнал сбора: исход, точки, ошибка); новый блок `aggregators` в `ratings.layout`.
+- `0053_agg_requests.sql` — `agg.requests`: заявка на обновление вне суточного расписания (D420). Кто просил (`requested_by`), какие агрегаторы (`aggregators`, `null` — все), исход (`done_at`, `outcome` ok/failed, `error`). Незакрытая заявка одна: частичный уникальный индекс `requests_one_open_idx` (`where done_at is null`) — повторная просьба получает «уже в очереди». Роли приложения: `select, insert` и колоночный `update (done_at, outcome, error)`; принимают веб и MCP, закрывает бот.
+- Дверь: `src/db/agg_store.py` — `save`, `log_load`, `last_run`, `last_ok_points`, `known_points`, `latest`, `load_states`; заявки — `UpdateRequest`, `request_update`, `open_request`, `finish_request`.
+
+### Экран доступа: главный админ и пространства с экрана (миграция `0041`, #585)
+
+- `0041_superadmin.sql` — роль веб-учётки `superadmin` (главный админ, D364), только в пространстве УК (ограничение `web_users_superadmin_only_hq`); триггер `web_users_keep_last_superadmin` → функция `keep_last_superadmin()`: отключение, смена роли или удаление последнего действующего главного — отказ `SQLSTATE DC001`, гонку закрывает `pg_advisory_xact_lock`; роли `dodo_audit_admin` выданы `select, insert on tenants` и `insert on space_countries` — экран «Пользователи» заводит пространство партнёра со странами. Никого не назначает: первого главного — `tools/web_user.py role <логин> superadmin --tenant HQ` (`docs/08-deploy.md`).
+- Двери: `src/db/web_access.py` — `ROLE_SUPERADMIN`, `LastSuperadminError`, `only_roles` у `reassign_role`, `set_email`, `disable_account` (охват по роли цели условием в запросе); `src/db/spaces.py` — `create_partner_space`, `add_countries` (роль `_managing`, всё или ничего), `overview` (роль приложения).
 
 ## Зависимости
 
@@ -222,7 +221,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 
 ## Технические заметки
 
-- **Драйвер — `psycopg[binary]==3.2.13` (синхронный), не SQLAlchemy/Alembic.** Черновое исследование стека (`docs/furca/research-report.md`) называло SQLAlchemy 2.x + asyncpg + Alembic для сценария «Postgres с первого дня под состояние проверки» — сценарий, от которого в итоге отказались (D007: состояние осталось файлом). Здесь другая задача: редкий синхронный слив по готовому срезу данных, без ORM и без async-контекста — весь остальной код блоков синхронный (`OpenAI`, не `AsyncOpenAI`, в `src/recognize/client.py`). Миграции — пронумерованные `.sql`-файлы и раннер на полсотни строк (`src/db/migrate.py`) с таблицей `schema_migrations` и проверкой отпечатка вместо Alembic: рассматривался `yoyo-migrations`, но его postgres-экстра тянет `psycopg2` — второй драйвер Postgres рядом с уже выбранным `psycopg3` ради экономии полусотни строк не оправдан.
+- **Драйвер — `psycopg[binary,pool]==3.2.13` (синхронный) и `psycopg-pool==3.2.8`, не SQLAlchemy/Alembic.** Черновое исследование стека (`docs/furca/research-report.md`) называло SQLAlchemy 2.x + asyncpg + Alembic для сценария «Postgres с первого дня под состояние проверки» — сценарий, от которого в итоге отказались (D007: состояние осталось файлом). Здесь другая задача: редкий синхронный слив по готовому срезу данных, без ORM и без async-контекста — весь остальной код блоков синхронный (`OpenAI`, не `AsyncOpenAI`, в `src/recognize/client.py`). Миграции — пронумерованные `.sql`-файлы и раннер на полсотни строк (`src/db/migrate.py`) с таблицей `schema_migrations` и проверкой отпечатка вместо Alembic: рассматривался `yoyo-migrations`, но его postgres-экстра тянет `psycopg2` — второй драйвер Postgres рядом с уже выбранным `psycopg3` ради экономии полусотни строк не оправдан.
 - **`src/db/__init__.py` не импортирует `push_inspection`/`list_inspections` заранее** — они лениво подгружаются через `__getattr__` (PEP 562) при первом обращении. Иначе любой импорт из блока (даже `src.db.units`, чистая функция без Postgres) требовал бы установленного `psycopg` — проверено: без этого приёма сбор тестов падает целиком в окружении, где зависимость ещё не поставлена.
 - **Точка сопоставляется через справочник и карту синонимов** (T092): сперва
   каноничное название, потом синоним, оба по одному правилу нормализации
@@ -599,7 +598,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 ## Как устроен блок
 
 Наружу торчат слив, чтение и справочник точек (`src/db/__init__.py`, лениво
-через `__getattr__`), а также круг и личные токены доступа к MCP
+через `__getattr__`), а также личные токены доступа к MCP
 (`src/db/mcp_access.py`, импортируется блоками `bot` и `mcp` напрямую, минуя
 пакет) — остальное внутренности:
 
@@ -609,6 +608,8 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/queries.py` | `list_inspections`, `get_inspection`, `findings_by_unit` — только чтение |
 | `src/db/photos.py` | `upload_photos` — выгрузка кадров, отметка ссылки в базе; `pending_photo_uploads` — что ждёт дозагрузки (#459) |
 | `src/db/retract.py` | `retract_inspection` — снятие проверки пометкой и уборка её кадров из хранилища (T210, T233) |
+| `src/db/imports.py` | черновик проверки, загруженной задним числом (D305–D310, D334): `create_draft` (текущая — с оценкой движка, историческая — с оценкой отчёта, `apply_score=None`), `add_finding`/`edit_finding`/`remove_finding` текущей (запись проверяет движок, итог пишется той же транзакцией под замком строки, `mode=ORIGIN_IMPORT` — историческую не пускает), `add_photo`, `discard_draft`, `list_drafts`, `import_head`; пределы ресурсов — `MAX_FINDINGS`, `MAX_PHOTOS_PER_*`, `MAX_DRAFTS`, длины полей |
+| `src/db/imports_legacy.py` | записи исторической проверки (`origin = 'legacy'`, D332) без движка: `add_legacy_finding`/`edit_legacy_finding`/`remove_legacy_finding`; не названное отчётом — маркеры `models.LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`; `counts` — счёт записей по классам одним запросом, не оценка |
 | `src/db/storage.py` | `PhotoStorage` (узкий интерфейс) и драйвер S3 |
 | `src/db/fingerprint.py` | `compute_fingerprint` — чистая функция, без базы; `previous_fingerprints` — те же данные по прежним рецептам, чтобы смена рецепта не задваивала слитое (T193) |
 | `src/db/recipe_audit.py` | `audit_legacy_recipes` — можно ли снимать прежние рецепты отпечатка на ЭТОЙ базе (T203): счёт проверок ВКЛЮЧАЯ снятые, отдельно — слитые до наката информационной части; связь, которой снятое не видно, отказывает. Запуск: `python -m src.db.recipe_audit` |
@@ -629,16 +630,29 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0012_phrase_aliases.sql` | карта синонимов формулировок: таблица `phrase_aliases` (ключ «арендатор + язык + нормализованная формулировка» → код пункта), закрытый список источников записи, роли приложения выданы только `select` и `insert` — переписать или удалить заведённый синоним ей нечем (T284, D119; правка — под ролью администратора, `0013`) |
 | `src/db/migrations/0013_phrase_alias_curation.sql` | правка карты синонимов: пометка снятия с обязательной причиной и след правки (куда строка вела раньше, зачем переправили), `select` и `update` шести колонок роли `dodo_audit_admin` — ключ карты, сказанное человеком и происхождение записи неприкосновенны; роли приложения права не расширены (T292) |
 | `src/db/migrations/0026_photo_previews.sql` | `photos.preview_path` — сжатая копия кадра для показа в админке (D219): пишется той же выгрузкой (`upload_photos`, `src/db/previews.py`), хранится навсегда, убирается только снятием проверки. С D250/D253 оригинал не хранится: выгрузка кладёт один сжатый объект (1600 px, JPEG q75), `storage_path` и `preview_path` указывают на него; нечитаемый Pillow кадр ложится как пришёл, `preview_path` у него пуст. Кадры до D253 — два объекта, оригиналы старой выгрузки остаются в хранилище, пока владелец не решит иначе |
-| `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
+| `src/db/migrations/0038_inspection_import.sql` | происхождение проверки `origin` (`field`/`import`) и сверка со старым отчётом (`reported_pct`, `reported_grade`, `source_ref`); у загрузки `chat_id = 0`; триггер `inspections_origin_fixed` — происхождение не переписывается; частичный индекс черновиков загрузки (D305–D310) |
+| `src/db/migrations/0042_import_modes.sql` | два режима загрузки (D332, D334): `origin` + `legacy` (историческая, оценка отчёта как есть), `import` = текущая; колонки `reported_status`, `legacy_method` (только у `legacy`); «нет чата» — у обоих загруженных; `inspections_legacy_score_as_is` — у `legacy` `pct = reported_pct`; индекс черновиков — по обоим. |
+| `src/db/migrations/0049_api_tokens.sql` | сервисные токены внешнего API (D356, D388): схема `api`, `api.tokens` (только отпечаток SHA-256, права `ratings:read`/`inspections:read`, отзыв пометкой) и журнал обращений `api.access_log`; выпуск и отзыв — роль администратора истории, у приложения только чтение токенов и журнал |
+| `src/db/migrations/0054_oauth.sql` | подключение Claude входом через сайт (D417): `oauth_clients` (DCR, без секретов, адреса возврата массивом), `oauth_codes` (одноразовые, 10 минут, только отпечаток, `code_challenge` S256, `resource` — адрес MCP, `used_at`+`grant_id` вместе), `oauth_grants` (подключение «учётка × клиент», `last_used_at`, отзыв пометкой `revoked_at`+`revoked_reason` `user`/`reuse`/`password`/`email`; ротация refresh держит строку подключения `for update`, отзыв гасит коды раньше подключений — гонки с обменом и ротацией нет), `oauth_tokens` (access/refresh, только отпечаток SHA-256, `resource` — для какого MCP выдан, RFC 8707, `used_at` у обменянного refresh); `oauth_clients.registered_from` — адрес регистрации для предела на адрес; функция `oauth_purge()` (security definer) убирает коды и токены, истёкшие больше суток назад, и клиентов старше суток без подключений и кодов; роль приложения — `select`/`insert`, правка только пометок и `execute` на `oauth_purge`, прямого удаления нет; администратор истории — чтение и отзыв подключений (смена пароля командой); `change_own_password` переопределена — смена своего пароля отзывает и подключения Claude и гасит необменянные коды |
+| `src/db/migrations/0060_d440_roles.sql` | роли `developer` и `guest` в проверке `web_users.role`, оба только в `HQ` (`web_users_developer_guest_only_hq`); прежние `auditor` в `HQ` переводятся в `developer`, затем `web_users_no_hq_auditor` закрывает роль в УК. Права не менялись |
+| `src/db/migrations/0055_maps_ratings_index.sql` | индекс `ratings_provider_company_date_idx` на `maps.ratings (provider_id, company_uuid, on_date desc)`: под `maps_store.latest` и `unit_scores` («по одной последней записи на пару филиал–карта», `lateral ... limit 1`; 130–170 → 4–6 мс и 135–155 → 1,5 мс на 115 тыс. строк). Номера 0053 и 0054 заняты другими ветками |
+| `src/db/migrations/0059_mcp_token_identity.sql` | личный токен MCP на учётку сайта (аудит 12.10, D448): `mcp_tokens.user_id`, `role`, `expires_at`; `telegram_id` необязателен (выпуск из веба); один живой токен на учётку; триггер `web_users_access_change_revokes_mcp_tokens` гасит токены при смене роли, пространства или отключении; прежние живые токены связаны через привязку бота или погашены; круг `mcp_admins` удалён |
+| `src/db/request_memo.py` | память одного GET-запроса веб-админки для справочных чтений, которые просят несколько блоков страницы (`ratings.countries`, `rs_periods`, `unit_geography`): один поход в базу на запрос; ключ — все параметры, включая охват читающего; вне запроса и на POST — без памяти (`tests/test_db_request_memo.py`) |
+| `src/db/pool.py` | пул соединений на каждый DSN: `connection(dsn)` вместо `psycopg.connect(dsn)`, сброс сессии на возврате, `PoolBusyError`; `DB_POOL_MAX`, `DB_POOL_TIMEOUT_S` (`docs/08-deploy.md`) |
+| `src/db/mcp_access.py` | личные токены доступа к MCP на учётку сайта (T253, D448): выпуск себе (`issue_for_account`; бот и мини-апп — `issue_token` по привязке), сверка предъявленного токена по отпечатку, отзыв своего, срок (`MCP_TOKEN_TTL_DAYS`) |
+| `src/db/api_access.py` | сервисные токены внешнего API (D388): сверка по отпечатку, права, счёт обращений за окно (лимит частоты), журнал с попутной чисткой старше 90 дней, выпуск/перечень/отзыв для `tools/api_token.py`; отпечаток и генерация токена — из `mcp_access` |
+| `src/db/oauth_store.py` | хранилище OAuth для Claude (D417), общее для `src.web` и `src.mcp`: правила адреса возврата и PKCE S256, чистые решения об обмене кода и refresh (`judge_code`, `judge_refresh` — повтор отзывает подключение), регистрация клиента, выдача кода, обмен, ротация refresh, сверка access-токена в учётку с СВЕЖЕЙ ролью — только для названного ресурса (`disabled_at is null`, подключение не отозвано, отметка последнего вызова раз в минуту), свои подключения и их отзыв, пределы регистраций (с адреса и всего; счёт и запись — одна транзакция под advisory-замком), чистка отжившего (`purge_stale`) |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `OAuthGrantError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
 | `src/db/database_target.py` | куда ведёт строка подключения (хост, порт, база, роль — без пароля) и сверка, что все заданные `DATABASE_*_URL` ведут в одну базу; расхождение — `DatabaseTargetError` (#487, #515) |
 | `src/db/target_refusal.py` | узнать расхождение баз в цепочке причин отказа и записать подробности в журнал на уровне ERROR — одно правило для веба (`src/web/db_refusal.py`) и MCP (`src/mcp/db_target.py`), #521 |
-| `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
+| `src/db/models.py` | `InspectionRow` (с `origin`, `is_legacy`, `is_uploaded`), `FindingRow`, `InfoRow`, `InspectionDetail` (с `reported_status`, `legacy_method` исторической); происхождения `ORIGIN_*`, маркеры исторической записи `LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`, `LEGACY_VERSION_PREFIX` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
 `domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`
-без единой операции над числами.
+без единой операции над числами. Черновик загрузки (`imports.py`) так же
+кладёт итог движка (`report.rescore.apply_command`), пересчитанный после
+каждой записи, а не свой.
 
 ## Журнал работы
 

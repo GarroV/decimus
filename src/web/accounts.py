@@ -18,36 +18,46 @@ import secrets
 from dataclasses import dataclass
 
 from src.db.web_access import (
-    LEGACY_ROLES,
     MAX_PASSWORD_LENGTH,
     MIN_PASSWORD_LENGTH,
     ROLE_ADMIN,
     ROLE_AUDITOR,
+    ROLE_CONTROL,
+    ROLE_DEVELOPER,
+    ROLE_GUEST,
+    ROLE_SUPERADMIN,
     ROLES,
     AccountRow,
+    LastSuperadminError,
     change_own_password,
     create_account,
     disable_account,
     list_accounts,
     list_spaces,
     reassign_role,
+    roles_for,
     set_email,
 )
 
 __all__ = [
-    "LEGACY_ROLES",
     "MAX_PASSWORD_LENGTH",
     "MIN_PASSWORD_LENGTH",
     "ROLES",
     "ROLE_ADMIN",
     "ROLE_AUDITOR",
+    "ROLE_CONTROL",
+    "ROLE_DEVELOPER",
+    "ROLE_GUEST",
+    "ROLE_SUPERADMIN",
     "AccountRow",
     "Added",
+    "LastSuperadminError",
     "add",
     "change_own_password",
     "disable",
     "everyone",
     "reassign_role",
+    "roles_for",
     "set_email",
     "spaces",
 ]
@@ -76,7 +86,7 @@ def everyone(*, tenant: str | None) -> tuple[AccountRow, ...]:
     return list_accounts(tenant=tenant)
 
 
-def add(login: str, *, tenant: str, role: str = ROLE_AUDITOR) -> Added:
+def add(login: str, *, tenant: str, role: str | None = None) -> Added:
     """Завести человека и вернуть его пароль — единственный раз, когда он виден."""
     пароль = secrets.token_urlsafe(_PASSWORD_BYTES)
     заведённая = create_account(login, tenant=tenant, password=пароль, role=role)
@@ -88,6 +98,6 @@ def spaces() -> tuple[str, ...]:
     return list_spaces()
 
 
-def disable(login: str, *, tenant: str) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет."""
-    return disable_account(login, tenant=tenant)
+def disable(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Отключить учётку. `False` — такой живой учётки нет или её роль вне `only_roles`."""
+    return disable_account(login, tenant=tenant, only_roles=only_roles)

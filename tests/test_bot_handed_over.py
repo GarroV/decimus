@@ -79,36 +79,26 @@ async def test_сданная_проверка_не_называется_нез�
 
     await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))
 
-    сказанное = session.last_text
+    сказанное = " ".join(session.texts)
     assert "незавершённая" not in сказанное, "сданная проверка названа незавершённой"
     assert "сотрёт" not in сказанное, "боту неизвестно, что стирается что-то нужное"
-    assert сказанное == t(
-        "start.resume_handed_over",
-        "ru",
-        unit="Белград 2",
-        date="2026-08-21",
-        auditor="Владимир Гарро",
-        findings=1,
-    )
+    assert "сдана" not in сказанное, "бот напомнил о сданной проверке (D400)"
 
 
 @pytest.mark.asyncio
-async def test_за_аудитора_бот_ничего_не_решает(domain_env: Path) -> None:
-    """Сданная — не повод действовать самому: показаны двери, нажимает человек.
+async def test_за_аудитора_бот_не_решает_про_несданную(domain_env: Path) -> None:
+    """Проверку в работе бот сам не трогает: двери показаны, нажимает человек (T052).
 
-    Дверей с T201 две, а не три: дописать в сданную проверку нельзя (D080,
-    `tests/test_bot_sealed.py`). Но ни одну из оставшихся бот не открывает сам —
-    ни новую проверку не заводит, ни сданную не убирает.
+    Сданную с D400 бот убирает молча (`tests/test_bot_sealed.py`), но несданную —
+    никогда.
     """
     начать()
     записать()
     bot, session = make_bot()
-    await сдать(bot, session)
-    session.clear()
 
     await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))
 
-    assert session.keyboard_data() == ["start:resume:new", "start:sealed:drop"]
+    assert session.keyboard_data() == ["start:resume:continue", "start:resume:new"]
     state = get_state(CHAT_ID)
     assert state is not None and len(state.findings) == 1, "бот распорядился проверкой сам"
 
@@ -154,7 +144,9 @@ async def test_число_записей_запечатанность_не_от�
 
     await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))
 
-    assert "уже сдана" in session.last_text, "лишняя запись расколдовала сданную проверку"
+    # Сданная осталась сданной (иначе бот спросил бы «продолжить?»): копия убрана,
+    # мастер начат (D400).
+    assert get_state(CHAT_ID) is None, "лишняя запись расколдовала сданную проверку"
     assert "start:resume:continue" not in session.keyboard_data()
 
 
@@ -199,7 +191,7 @@ async def test_новая_проверка_признак_обнуляет(domai
     await feed(dp, bot, callback("start:resume:new"))
     await feed(dp, bot, text_message("Белград 1"))
     await feed(dp, bot, callback("start:kind:planned"))
-    await feed(dp, bot, callback("start:lang:ru"))
+    await feed(dp, bot, callback("start:speech:ru"))
     session.clear()
 
     await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))

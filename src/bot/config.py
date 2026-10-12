@@ -12,6 +12,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
+from src.domain.walk_users import parse_walk_users, walk_open_to
+
 from .errors import BotConfigError, BotTextError
 from .texts import DEFAULT_UI_LANG, UI_LANG_VAR, default_ui_lang
 
@@ -25,15 +27,10 @@ MODE_VAR = "BOT_MODE"
 #: Переменная необязательна: без неё имя берётся из профиля Telegram.
 AUDITOR_NAMES_VAR = "AUDITOR_NAMES"
 
-#: ОСНОВАТЕЛЬ круга доступа к MCP (T253, решение D099). Единственный человек,
-#: попадающий в круг настройкой стенда, а не чужой рукой; всех остальных
-#: приводят те, кто уже внутри.
-#:
-#: Переменная необязательна: стенд, на котором подключением к MCP никто не
-#: пользуется, обязан подниматься без неё. Тогда круг пуст, и настройка не
-#: доступна никому — о чём бот говорит вслух первой строкой журнала, а не
-#: оставляет выяснять по молчащему пункту меню.
-MCP_OWNER_ID_VAR = "BOT_MCP_OWNER_ID"
+#: Адрес мини-аппа обхода (#418) — страница `/tg/walk` веб-сервиса. Пусто —
+#: кнопки «Обход точки» нет, и бот ведёт себя как до мини-аппа. Telegram
+#: открывает мини-апп только по https, поэтому иной адрес — отказ на старте.
+WALK_URL_VAR = "BOT_WALK_URL"
 
 #: Язык интерфейса до начала проверки (T131). Имя и разбор живут в `texts.py`,
 #: рядом с самим каталогом языков, — здесь только проверка на старте.
@@ -59,11 +56,15 @@ class BotSettings:
     #: Telegram ID → имя проверяющего, как оно должно стоять в отчёте партнёру.
     #: Пустая карта — законное состояние: имена возьмутся из профилей Telegram.
     auditor_names: Mapping[int, str] = field(default_factory=dict)
-    #: Основатель круга доступа к MCP (T253). `None` — круг не назначен, и
-    #: настройка подключения не доступна никому: пустой круг закрыт, а не
-    #: открыт. Умолчание «пускать всех» здесь было бы худшим из возможных —
-    #: забытая переменная раздавала бы историю проверок партнёров.
-    mcp_owner_id: int | None = None
+    walk_url: str | None = None
+    #: Круг тестеров мини-аппа (`WALK_USERS`). `None` — кнопка всем с доступом.
+    walk_users: frozenset[int] | None = None
+
+    def walk_url_for(self, user_id: int) -> str | None:
+        """Адрес мини-аппа для этого человека; `None` — кнопки ему нет."""
+        if self.walk_url is None or not walk_open_to(self.walk_users, user_id):
+            return None
+        return self.walk_url
 
 
 def _required(env: Mapping[str, str], name: str) -> str:
@@ -75,7 +76,7 @@ def _required(env: Mapping[str, str], name: str) -> str:
     return raw
 
 
-def _parse_allowed_ids(raw: str) -> frozenset[int]:
+def parse_allowed_ids(raw: str) -> frozenset[int]:
     ids: set[int] = set()
     for chunk in raw.split(","):
         piece = chunk.strip()
@@ -129,35 +130,6 @@ def _parse_auditor_names(raw: str) -> dict[int, str]:
     return names
 
 
-def _parse_mcp_owner_id(raw: str, allowed_ids: frozenset[int]) -> int | None:
-    """Основатель круга доступа к MCP — или `None`, если круг не назначен (T253).
-
-    Пусто — законно и означает «круг не назначен»: настройка подключения тогда
-    не доступна никому. Именно так, а не наоборот: круг, открытый по умолчанию,
-    раздавал бы историю проверок партнёров всякому стенду, где переменную
-    забыли, — а забытую переменную замечают позже всего.
-
-    **Основатель обязан входить в список разрешённых ID.** По той же причине,
-    по которой это проверяется у имён проверяющих (`_parse_auditor_names`), и
-    здесь она весомее: до хендлера человека не пускает мидлварь доступа, значит
-    основатель круга, которого нет в списке, до настройки не доберётся никогда.
-    Круг остался бы пустым навсегда, а выглядела бы такая настройка работающей.
-    """
-    piece = raw.strip()
-    if not piece:
-        return None
-    if not piece.lstrip("-").isdigit():
-        raise BotConfigError(f"{MCP_OWNER_ID_VAR}: «{piece}» — не Telegram ID. Нужно одно число")
-    owner = int(piece)
-    if owner not in allowed_ids:
-        raise BotConfigError(
-            f"{MCP_OWNER_ID_VAR}: ID {owner} не входит в {ALLOWED_IDS_VAR}. До настройки "
-            f"он не доберётся — мидлварь доступа не пустит его дальше, и круг остался бы "
-            f"пустым навсегда"
-        )
-    return owner
-
-
 def _parse_ui_lang(env: Mapping[str, str]) -> str:
     """Язык интерфейса стенда — или отказ на старте (T131).
 
@@ -172,11 +144,29 @@ def _parse_ui_lang(env: Mapping[str, str]) -> str:
         raise BotConfigError(f"{UI_LANG_VAR}: {exc}") from exc
 
 
+def _parse_walk_url(raw: str) -> str | None:
+    url = raw.strip()
+    if not url:
+        return None
+    if not url.startswith("https://"):
+        raise BotConfigError(
+            f"{WALK_URL_VAR} — «{url}»: Telegram открывает мини-апп только по https://"
+        )
+    return url
+
+
+def _parse_walk_users(env: Mapping[str, str]) -> frozenset[int] | None:
+    try:
+        return parse_walk_users(env)
+    except ValueError as exc:
+        raise BotConfigError(str(exc)) from exc
+
+
 def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
     """Прочитать и проверить окружение бота. Отказ — `BotConfigError`."""
     src = os.environ if env is None else env
     token = _required(src, TOKEN_VAR)
-    allowed_ids = _parse_allowed_ids(_required(src, ALLOWED_IDS_VAR))
+    allowed_ids = parse_allowed_ids(_required(src, ALLOWED_IDS_VAR))
     mode = (src.get(MODE_VAR) or DEFAULT_MODE).strip().lower()
     if mode not in KNOWN_MODES:
         raise BotConfigError(
@@ -189,5 +179,6 @@ def load_bot_settings(env: Mapping[str, str] | None = None) -> BotSettings:
         mode=mode,
         ui_lang=_parse_ui_lang(src),
         auditor_names=names,
-        mcp_owner_id=_parse_mcp_owner_id(src.get(MCP_OWNER_ID_VAR) or "", allowed_ids),
+        walk_url=_parse_walk_url(src.get(WALK_URL_VAR) or ""),
+        walk_users=_parse_walk_users(src),
     )

@@ -117,6 +117,12 @@ _бот_без_базы_не_знает_привязок
 # Две проверки по разным ставкам (#428): тестам признака несопоставимости
 # нужна только подмена чтения, значение фикстуры им ни к чему.
 ряд_из_двух_цен
+# API Swarm (#567): синтетика рейтингов грузится в тестовую базу, значение
+# фикстуры тестам не нужно — они читают её через API.
+рейтинги
+# То же для оценок на картах (D390): филиалы и оценки кладутся в базу, тесты
+# читают их через API.
+карты
 
 # Фикстура pytest с `autouse=True` (T171): её подключает сам pytest каждому
 # тесту файла, по имени её никто не зовёт. Убирает DATABASE_URL из окружения,
@@ -270,6 +276,10 @@ _запомнить_пространство_вошедшего
 # `_только_уК` — заслон разделов «только УК» (D264): крюк Flask
 # `@app.before_request`, его регистрирует декоратор, по имени не зовёт никто.
 _только_уК
+# `_контроль_только_рейтинги` — заслон роли «контроль» (D319, D358): крюк Flask `@app.before_request`.
+_контроль_только_рейтинги
+# `_гость_только_читает` — заслон роли «гость» (D440): крюк Flask `@app.before_request`.
+_гость_только_читает
 # Привязка бота (D286): `bot_unlink` — маршрут Flask, его регистрирует
 # декоратор; `bound_at` привязки читает шаблон вкладки «Пользователи».
 bot_unlink
@@ -283,6 +293,10 @@ country_index
 users
 add_user
 disable_user
+connections_issue
+connections_update
+connections_reissue
+connections_revoke
 do_move
 methodology_zone_add
 methodology_zone_shares
@@ -298,6 +312,12 @@ checklists_apply
 google_start
 google_callback
 google_mail_callback
+walk_page
+walk_data
+walk_photo
+walk_photo_view
+walk_finding
+walk_info
 # Хуки Flask: `@app.context_processor`, `@app.url_defaults` и подмена метода
 # приложения `get_send_file_max_age` — их вызывает фреймворк, не код.
 _вход_через_google_доступен
@@ -391,3 +411,106 @@ closed_at
 # Заведение пиццерии из веб-админки (#437): маршрут Flask — вызывает
 # диспетчер по адресу, регистрирует декоратор, по имени его не зовёт никто.
 unit_create
+
+# Сводка рейтингов (`src/ratings/report.py`, T10): блоки по странам и
+# хард-нарушения читает только шаблон раздела «Рейтинги» (T11), а Jinja
+# статически не видна.
+rko_by_country
+rs_by_country
+rs_hard
+rko_hard
+
+# Раздел «Рейтинги» (`src/web/ratings.py`, T11): маршруты Flask — вызывает
+# диспетчер по адресу, регистрирует декоратор, по имени их не зовёт никто.
+ratings_index
+ratings_imports
+ratings_upload
+ratings_developer
+ratings_rule_add
+ratings_rule_remove
+ratings_settings
+ratings_layout
+ratings_agg_update
+
+# Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
+# а `paths` vulture его не охватывает.
+CHANNEL_SEED
+# Календарь рейтингов (D357): отметку текущей ячейки читает шаблон, vulture его не видит.
+is_current
+
+# Пространства партнёров на экране «Пользователи» (#585, D364): маршруты Flask
+# (`src/web/users_screen.py`) — регистрирует декоратор, по имени их не зовёт никто.
+add_space
+space_countries
+# `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
+_методику_правят_админы
+
+# Экран «Пользователи» слева список, справа карточка (переделка экрана, 09.10.2026).
+# Маршруты Flask (`src/web/users_screen.py`) — регистрирует декоратор:
+bot_link
+mcp_grant
+mcp_revoke
+# Поля, которые читает только шаблон карточки (`users/_card.html`, `users/index.html`):
+# исход действия (`Show.flash`, `added_email_failed`, ссылка привязки и её срок),
+# подпись пункта фильтра ролей и «вошедший в круге Claude».
+flash
+added_email_failed
+bot_link_until
+label_key
+actor_in_circle
+# Поля свечей сводки рейтингов (D384) читает только шаблон `ratings/index.html`.
+rs_candles
+rko_candles
+wick_top
+wick_bottom
+body_top
+body_height
+trend
+in_period
+threshold_y
+# Обработчик выбора языка речи регистрирует декоратор `router.callback_query` (D393).
+on_speech_lang
+# Мини-апп настроек обхода (#633): `walk_app` — маршрут `@app.post`, `no_store` —
+# крюк `@app.after_request`; оба регистрирует декоратор, по имени не зовёт никто.
+no_store
+walk_app
+# Подключение Claude через сайт (D417): маршруты OAuth и отзыв подключения
+# регистрирует декоратор `@app.*`, по имени не зовёт никто; `connections` блока
+# читает шаблон карточки (`users/_card.html`), а не питон.
+oauth_metadata
+oauth_register
+oauth_authorize
+oauth_token
+claude_revoke
+connections
+# Выбор языка отчёта кнопкой в конце проверки (D415): `on_report_lang` —
+# обработчик `@router.callback_query`, его регистрирует декоратор.
+on_report_lang
+# Пиццерии на площадках (D424): маршруты `@app.get`/`@app.post` регистрирует
+# декоратор; `redirect_request` — переопределение метода urllib, его зовёт
+# библиотека; `_без_базы_реестра` — автофикстура pytest.
+ratings_coverage
+ratings_coverage_link
+redirect_request
+_без_базы_реестра
+# Заслон происхождения на всю админку (#709): крюк `@app.before_request`.
+_запись_только_со_своей_страницы
+
+# Автоиспользуемая фикстура `tests/test_db_pool.py`: pytest вызывает её сам, по имени её не зовёт никто.
+_свежая_настройка
+
+# Маршрут отметки «Главный» (D440): зовётся из шаблона методики через action('checklists_master').
+checklists_master
+# Свойство читает шаблон методики: индикатор неопубликованных правок (D440).
+pending_changes
+
+# Аудит 12.10: личный токен MCP выпускается только на учётку сайта. Фикстура
+# pytest с `autouse=True` (`tests/test_bot_mcp_setup.py`) заводит учётки и
+# привязки бота своим людям стенда до каждого теста с базой.
+_учётки
+
+# Автоиспользуемые фикстуры, пришедшие с main без строки здесь (#529/#710 и
+# #717): pytest вызывает их сам. `tests/conftest.py` — свой предел частоты
+# обхода у каждого теста; `tests/test_migros_link.py` — подмена ретранслятора.
+_предел_обхода_свой_у_теста
+_ретранслятор

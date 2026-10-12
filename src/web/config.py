@@ -23,7 +23,9 @@ import re
 import secrets
 from collections.abc import Mapping
 from dataclasses import dataclass
+from urllib.parse import urlsplit
 
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import canonical_tenant
 
 from .errors import WebConfigError
@@ -34,6 +36,9 @@ WEB_PORT_VAR = "WEB_PORT"
 WEB_TENANT_VAR = "WEB_TENANT"
 WEB_SECRET_KEY_VAR = "WEB_SECRET_KEY"  # noqa: S105 — это ИМЯ переменной, а не значение
 WEB_TRUSTED_PROXIES_VAR = "WEB_TRUSTED_PROXIES"
+#: Адреса своих звеньев (адрес или подсеть, через запятую; `*` — любой сосед):
+#: только от них верим `X-Forwarded-*` (F-038 аудита 12.10, `src/web/proxy.py`).
+WEB_TRUSTED_PROXY_ADDR_VAR = "WEB_TRUSTED_PROXY_ADDR"
 WEB_URL_PREFIX_VAR = "WEB_URL_PREFIX"
 WEB_LISTEN_NETWORK_VAR = "WEB_LISTEN_NETWORK"
 #: Имя бота в Telegram без «@» — для ссылки привязки `t.me/<бот>?start=...`
@@ -44,6 +49,11 @@ WEB_BOT_USERNAME_VAR = "WEB_BOT_USERNAME"
 #: снаружи открывается ИСКЛЮЧИТЕЛЬНО по HTTPS: заголовок браузер помнит год, и
 #: включённый на стенде без сертификата он закрыл бы стенд на этот год.
 WEB_HSTS_VAR = "WEB_HSTS"
+#: Где живёт сервис мини-аппа обхода (`python -m src.web.walk_main`), которому
+#: админка передаёт адреса `/tg/walk*`. Админка состояние проверок только
+#: читает; пишет в него этот сервис, отдельным контейнером со своим томом на
+#: запись. Пусто — адресов обхода у админки нет.
+WEB_WALK_UPSTREAM_VAR = "WEB_WALK_UPSTREAM"
 
 #: Сколько СВОИХ звеньев стоит перед сервером, когда переменная не задана.
 #: Ноль — не верить `X-Forwarded-For` вовсе: заголовок ставит кто угодно, и
@@ -64,6 +74,10 @@ MIN_SECRET_KEY_LENGTH = 32
 
 #: Сколько байт случайности берёт временный ключ, когда переменная не задана.
 SECRET_KEY_BYTES = 32
+
+#: «Любой сосед» в `WEB_TRUSTED_PROXY_ADDR`. Только явно: пустая переменная
+#: значит «никому», а не «всем».
+ANY_PEER = "*"
 
 DEFAULT_HOST = "127.0.0.1"
 #: Следующий свободный за MCP: 8265 занимает сам сервер, 8266 — звено до него
@@ -96,6 +110,9 @@ class Settings:
     #: От этого зависит, чей адрес считает ограничитель перебора: ноль —
     #: адрес соединения, больше — соответствующее звено `X-Forwarded-For`.
     trusted_proxies: int = DEFAULT_TRUSTED_PROXIES
+    #: Адреса и подсети своих звеньев (`WEB_TRUSTED_PROXY_ADDR`): заголовкам
+    #: `X-Forwarded-*` верим только от них. Пусто — звено не названо.
+    trusted_proxy_addrs: tuple[str, ...] = ()
     #: Путь, на котором админка живёт снаружи, когда общий вход площадки отдан
     #: не ей. Пусто — своё имя целиком, и это умолчание. Непустой префикс
     #: уходит в `SCRIPT_NAME`, поэтому ссылки страницы собираются вместе с ним:
@@ -105,6 +122,26 @@ class Settings:
     bot_username: str | None = None
     #: Слать `Strict-Transport-Security` (`WEB_HSTS=1`). По умолчанию нет.
     hsts: bool = False
+    #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
+    #: `None` — адреса обхода админкой не отдаются.
+    walk_upstream: str | None = None
+    #: Внешний адрес админки (`ADMIN_PUBLIC_URL`, D417): издатель OAuth.
+    admin_public_url: str | None = None
+    #: Внешний адрес MCP (`MCP_PUBLIC_URL`, D417): ресурс, к которому выдаются токены.
+    mcp_public_url: str | None = None
+
+    @property
+    def oauth_enabled(self) -> bool:
+        """Подключение Claude входом через сайт включено: оба адреса заданы (D417)."""
+        return self.admin_public_url is not None and self.mcp_public_url is not None
+
+
+def _parse_public(src: Mapping[str, str], var: str) -> str | None:
+    """Внешний адрес из окружения; кривой — отказ запуска, а не тихо выключенный OAuth."""
+    try:
+        return parse_public_url(src.get(var) or "", var=var)
+    except ValueError as отказ:
+        raise WebConfigError(str(отказ)) from None
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -140,6 +177,38 @@ def _parse_url_prefix(raw: str) -> str:
     if not путь:
         return ""
     return f"/{путь}"
+
+
+def _parse_walk_upstream(raw: str) -> str | None:
+    """Адрес сервиса обхода: ровно `http://хост:порт`, без пути и учётных данных.
+
+    Сервис живёт во внутренней сети стенда, поэтому только `http`. Путь не
+    принимается: к нему приклеивается путь запроса, и лишний сегмент увёл бы
+    каждый запрос мимо адресов обхода молча.
+    """
+    value = raw.strip()
+    if not value:
+        return None
+    refusal = WebConfigError(
+        f"{WEB_WALK_UPSTREAM_VAR}={value} не понят: ожидается http://хост:порт сервиса "
+        f"обхода, без пути, например http://walk:8269"
+    )
+    try:
+        parts = urlsplit(value)
+        port = parts.port
+    except ValueError:
+        raise refusal from None
+    if (
+        parts.scheme != "http"
+        or not parts.hostname
+        or port is None
+        or parts.username is not None
+        or parts.path not in ("", "/")
+        or parts.query
+        or parts.fragment
+    ):
+        raise refusal
+    return f"http://{parts.hostname}:{port}"
 
 
 def _parse_listen_network(raw: str) -> bool:
@@ -223,6 +292,47 @@ def _parse_tenant(raw: str) -> str:
     return tenant
 
 
+def _parse_trusted_proxy_addrs(raw: str) -> tuple[str, ...]:
+    """Адреса своих звеньев: адрес или подсеть через запятую, `*` — любой сосед.
+
+    Кривая запись — отказ запуска: опечатка в адресе звена тихо означала бы
+    «не верить никому», а в проде это 403 на каждую отправку формы.
+    """
+    части = tuple(часть.strip() for часть in raw.split(",") if часть.strip())
+    for часть in части:
+        if часть == ANY_PEER:
+            continue
+        try:
+            ipaddress.ip_network(часть, strict=False)
+        except ValueError:
+            raise WebConfigError(
+                f"{WEB_TRUSTED_PROXY_ADDR_VAR}: «{часть}» не адрес и не подсеть. Ожидается "
+                f"адрес или подсеть своего звена через запятую, например 172.18.0.0/16"
+            ) from None
+    return части
+
+
+def require_signing_key(settings: Settings) -> None:
+    """Админка в сети контейнера без заданного ключа подписи — отказ запуска (F-008 аудита 12.10).
+
+    Сеть контейнера (`WEB_LISTEN_NETWORK=1`, хост не петля) у админки — это прод
+    за общим прокси; там временный ключ означает, что каждая выкатка молча
+    выбрасывает всех и рвёт уход за согласием Google на полпути. На петле
+    (разработка, стенд одной командой) временный ключ остаётся законным.
+
+    Отдельной функцией, а не внутри `load_settings`: те же настройки читает
+    сервис обхода, который слушает сеть на любом стенде, а ключом не подписывает
+    ничего.
+    """
+    на_петле = settings.host == "localhost" or ipaddress.ip_address(settings.host).is_loopback
+    if settings.secret_key_is_ephemeral and not на_петле:
+        raise WebConfigError(
+            f"Не задан {WEB_SECRET_KEY_VAR}, а админка слушает сеть контейнера "
+            f"({WEB_LISTEN_NETWORK_VAR}=1). Временный ключ здесь — выход всех при каждой "
+            f"выкатке. Взять ключ: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
+
+
 def _parse_secret_key(raw: str) -> tuple[str, bool]:
     """Ключ подписи сессионной куки: заданный или сделанный на этот запуск.
 
@@ -279,18 +389,20 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение админки. Отказ — `WebConfigError`."""
     src = os.environ if env is None else env
     secret_key, ephemeral = _parse_secret_key(src.get(WEB_SECRET_KEY_VAR) or "")
+    listen_network = _parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or "")
     return Settings(
-        host=_parse_host(
-            src.get(WEB_HOST_VAR) or "",
-            listen_network=_parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or ""),
-        ),
+        host=_parse_host(src.get(WEB_HOST_VAR) or "", listen_network=listen_network),
         port=_parse_port(src.get(WEB_PORT_VAR) or ""),
         tenant=_parse_tenant(src.get(WEB_TENANT_VAR) or ""),
         ui_lang=default_ui_lang(src),
         secret_key=secret_key,
         secret_key_is_ephemeral=ephemeral,
         trusted_proxies=_parse_trusted_proxies(src.get(WEB_TRUSTED_PROXIES_VAR) or ""),
+        trusted_proxy_addrs=_parse_trusted_proxy_addrs(src.get(WEB_TRUSTED_PROXY_ADDR_VAR) or ""),
         url_prefix=_parse_url_prefix(src.get(WEB_URL_PREFIX_VAR) or ""),
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
+        walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
+        admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
+        mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
     )

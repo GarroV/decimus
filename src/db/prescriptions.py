@@ -27,6 +27,7 @@ import re
 import unicodedata
 import uuid
 from collections.abc import Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -38,6 +39,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from .action_plans import FileReader
 from .config import check_environment, load_storage_settings
 from .errors import PrescriptionError, StorageError
+from .pool import connection
 from .reach import Reach, require_reach
 from .storage import S3PhotoStorage, key_of_uri
 
@@ -414,6 +416,19 @@ order by i.inspection_date desc, u.name
 limit %(limit)s
 """  # noqa: E501
 
+# Основание «с карточки»: страна и подпись одной принятой проверки УК по её коду.
+_BASIS_SQL = """
+select u.country, i.id, u.name, i.inspection_date, i.grade, i.pct
+from inspections i
+join units u on u.id = i.unit_id
+where i.id = %(id)s
+  and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s)) and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.tenant_code = 'HQ'
+  and i.status = 'finalized'
+  and i.retracted_at is null
+  and coalesce(u.country, '') <> ''
+"""  # noqa: E501
+
 # ── Чтение ──────────────────────────────────────────────────────────────────
 
 
@@ -431,8 +446,8 @@ def reach_params(reach: Reach) -> dict[str, Any]:
     return params
 
 
-def connect_read() -> psycopg.Connection[Any]:
-    return psycopg.connect(check_environment().dsn)
+def connect_read() -> AbstractContextManager[psycopg.Connection[Any]]:
+    return connection(check_environment().dsn)
 
 
 def read_with(
@@ -624,3 +639,32 @@ def choices(country: str, *, reach: Reach) -> tuple[tuple[Choice, ...], tuple[Ch
             for r in bases
         ),
     )
+
+
+def inspection_basis(inspection_id: str, *, reach: Reach) -> tuple[str, Choice] | None:
+    """Страна и строка выбора принятой проверки УК — для предписания «с карточки».
+
+    Чужая, снятая, ждущая приёмки, без страны у точки и несуществующая — одинаково
+    `None`: форма тогда открывается пустой, а не с чужим основанием.
+    """
+    try:
+        ident = str(uuid.UUID(inspection_id))
+    except ValueError:
+        return None
+    params = {**require_reach(reach).params(), "id": ident}
+    try:
+        with connect_read() as conn, conn.cursor() as cur:
+            cur.execute(_BASIS_SQL, params)
+            row = cur.fetchone()
+    except psycopg.Error as exc:
+        raise PrescriptionError(
+            f"Не удалось прочитать проверку-основание ({type(exc).__name__})"
+        ) from exc
+    if row is None:
+        return None
+    detail = " ".join(
+        part
+        for part in (str(row[4] or ""), "" if row[5] is None else f"{float(row[5]):.1f}%")
+        if part
+    )
+    return str(row[0]), Choice(id=str(row[1]), title=f"{row[2]} · {row[3]}", detail=detail)

@@ -47,7 +47,6 @@ from src.db.web_access import (  # noqa: E402
     set_email,
     set_role,
 )
-from src.domain.permissions import ROLE_COUNTRY_ADMIN, ROLE_COUNTRY_STAFF  # noqa: E402
 
 pytestmark = requires_db
 
@@ -95,8 +94,7 @@ def test_схема_не_принимает_пароль_вместо_хеша(�
         cur.execute("insert into tenants (code) values (%s) on conflict do nothing", (ТЕНАНТ,))
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
-                "insert into web_users (tenant_code, login, password_hash, role) "
-                "values (%s, %s, %s, 'country_staff')",
+                "insert into web_users (tenant_code, login, password_hash) values (%s, %s, %s)",
                 (ТЕНАНТ, "нехороший", ПАРОЛЬ),
             )
 
@@ -241,8 +239,7 @@ def test_схема_не_принимает_логин_не_в_приведён�
     with psycopg.connect(обе_роли) as conn, conn.cursor() as cur:
         with pytest.raises(psycopg.errors.CheckViolation):
             cur.execute(
-                "insert into web_users (tenant_code, login, password_hash, role) "
-                "values (%s, %s, %s, 'country_staff')",
+                "insert into web_users (tenant_code, login, password_hash) values (%s, %s, %s)",
                 (ТЕНАНТ, "Director", password_hash(ПАРОЛЬ)),
             )
 
@@ -255,8 +252,7 @@ def test_роль_приложения_не_заводит_учётки(обе_�
     with psycopg.connect(db_env) as conn, conn.cursor() as cur:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             cur.execute(
-                "insert into web_users (tenant_code, login, password_hash, role) "
-                "values (%s, %s, %s, 'country_staff')",
+                "insert into web_users (tenant_code, login, password_hash) values (%s, %s, %s)",
                 (ТЕНАНТ, "самозванец", password_hash(ПАРОЛЬ)),
             )
 
@@ -434,12 +430,12 @@ def test_заведённая_учётка_по_умолчанию_не_адми
     """
     заведённая = create_account("petr", tenant=ТЕНАНТ, password=ПАРОЛЬ)
 
-    assert заведённая.role == ROLE_COUNTRY_STAFF
+    assert заведённая.role == ROLE_AUDITOR
     опознанная = authenticate("petr", ПАРОЛЬ)
     assert опознанная is not None
     # Роль приезжает ВМЕСТЕ с опознанием: спрошенная отдельным запросом, она
     # успела бы устареть между двумя запросами.
-    assert опознанная.role == ROLE_COUNTRY_STAFF
+    assert опознанная.role == ROLE_AUDITOR
 
 
 def test_роль_назначается_и_видна_вошедшему(обе_роли: str) -> None:
@@ -448,22 +444,22 @@ def test_роль_назначается_и_видна_вошедшему(обе
     assert set_role("director", tenant=ТЕНАНТ, role=ROLE_ADMIN) is True
 
     опознанная = authenticate("director", ПАРОЛЬ)
-    assert опознанная is not None and опознанная.role == ROLE_COUNTRY_ADMIN
+    assert опознанная is not None and опознанная.role == ROLE_ADMIN
     # И в сессии тоже: страницы спрашивают роль у сессии, а не у формы входа.
     сессия = open_session(опознанная)
     из_сессии = resolve_session(сессия.token)
-    assert из_сессии is not None and из_сессии.role == ROLE_COUNTRY_ADMIN
+    assert из_сессии is not None and из_сессии.role == ROLE_ADMIN
 
 
 def test_смена_роли_называет_прежнюю(обе_роли: str) -> None:
     """Прежняя роль — для следа в журнале приложения: кто, кого, было → стало."""
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
 
-    assert reassign_role("Director", tenant=ТЕНАНТ, role=ROLE_ADMIN) == ROLE_COUNTRY_STAFF
-    assert reassign_role("director", tenant=ТЕНАНТ, role=ROLE_AUDITOR) == ROLE_COUNTRY_ADMIN
+    assert reassign_role("Director", tenant=ТЕНАНТ, role=ROLE_ADMIN) == ROLE_AUDITOR
+    assert reassign_role("director", tenant=ТЕНАНТ, role=ROLE_AUDITOR) == ROLE_ADMIN
     assert reassign_role("nobody", tenant=ТЕНАНТ, role=ROLE_ADMIN) is None
     опознанная = authenticate("director", ПАРОЛЬ)
-    assert опознанная is not None and опознанная.role == ROLE_COUNTRY_STAFF
+    assert опознанная is not None and опознанная.role == ROLE_AUDITOR
 
 
 def test_роль_чужого_тенанта_не_назначается(обе_роли: str) -> None:
@@ -472,7 +468,7 @@ def test_роль_чужого_тенанта_не_назначается(обе
     # Арендатор — граница доступа, и роль её не расширяет ни в какую сторону.
     assert set_role("director", tenant="xx", role=ROLE_ADMIN) is False
     опознанная = authenticate("director", ПАРОЛЬ)
-    assert опознанная is not None and опознанная.role == ROLE_COUNTRY_STAFF
+    assert опознанная is not None and опознанная.role == ROLE_AUDITOR
 
 
 def test_незаведённая_роль_отвергается_а_не_ложится_в_базу(обе_роли: str) -> None:
@@ -503,6 +499,27 @@ def test_почта_опознаёт_живую_учётку(обе_роли: st
     assert учётка is not None
     assert учётка.login == "director"
     assert учётка.tenant == ТЕНАНТ
+
+
+def test_учётка_несёт_привязанную_почту_на_каждой_двери(обе_роли: str) -> None:
+    """Пароль закрыт учётке с почтой Google, черновик ложится в её почту (D176).
+
+    Обе проверки читают `Account.email`, поэтому почта обязана приезжать со
+    всех трёх дверей опознания: паролем, сессией и почтой.
+    """
+    create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    без_почты = authenticate("director", ПАРОЛЬ)
+    assert без_почты is not None and без_почты.email is None
+    set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
+
+    паролем = authenticate("director", ПАРОЛЬ)
+    по_почте = find_by_email(ПОЧТА)
+    assert паролем is not None and по_почте is not None
+    сессией = resolve_session(open_session(паролем).token)
+
+    assert сессией is not None
+    assert (паролем.email, по_почте.email, сессией.email) == (ПОЧТА, ПОЧТА, ПОЧТА)
+    assert (паролем.role, по_почте.role, сессией.role) == (ROLE_AUDITOR,) * 3
 
 
 def test_почта_находит_учётку_чужого_пространства(обе_роли: str) -> None:

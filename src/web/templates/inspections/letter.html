@@ -103,6 +103,7 @@
         'ok': ('ok', t('letter.gmail.ok')), 'denied': ('warn', t('letter.gmail.denied')),
         'unavailable': ('warn', t('letter.gmail.unavailable')), 'failed': ('warn', t('letter.gmail.failed')),
         'on_review': ('warn', t('letter.on_review')),
+        'wrong_account': ('warn', t('letter.gmail.wrong_account')),
       }.get(gmail_outcome) %}
       {% if outcome or save_outcome or not letter.ready or show_draft %}
         <div class="lt__notes">

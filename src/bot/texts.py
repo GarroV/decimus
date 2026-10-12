@@ -93,6 +93,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ссылка недействительна. Получите новую на странице «Пользователи» в админке.",
         "en": "This link is not valid. Get a new one on the Users page of the admin.",
     },
+    # Учётка привязана и жива, но её роли проверки закрыты (контроль, D420).
+    "access.role_closed": {
+        "ru": (
+            "Ваша роль в decimus не проводит проверок, поэтому бот и мини-апп обхода "
+            "вам закрыты. Рейтинги — в админке на сайте; Claude подключается там же, "
+            "кнопкой «Подключить Claude»."
+        ),
+        "en": (
+            "Your decimus role does not run inspections, so the bot and the walk mini-app "
+            "are closed to you. Ratings are in the web admin; Claude is connected there "
+            "too, with the “Connect Claude” button."
+        ),
+    },
     "access.foreign_space": {
         "ru": (
             "Эта проверка ведётся в другом пространстве. "
@@ -194,19 +207,21 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Вид проверки?",
         "en": "Inspection type?",
     },
-    # Вопрос один, а языков в проверке три (`docs/06-mvp-bot.md`). Ответ
-    # ложится во все три, и сказать об этом надо здесь: аудитор выбирает не
-    # только язык документа для партнёра, но и язык, на котором с ним говорят.
-    "start.ask_lang": {
-        "ru": "Язык проверки? На нём будут и отчёт, и наш разговор.",
-        "en": "Inspection language? Both the report and this chat will use it.",
+    # Языков в проверке три (`docs/06-mvp-bot.md`), а мастер спрашивает один —
+    # язык чек-листа (D414): на нём аудитор говорит и пишет. Язык отчёта на
+    # старте не спрашивается (D415): его задают, когда проверка готова и человек
+    # согласился формировать отчёт (`finish.ask_report_lang`). Интерфейс —
+    # выбор человека (`/lang`, D303), мастер о нём не спрашивает.
+    "start.ask_speech_lang": {
+        "ru": "На каком языке чек-лист (на нём вы говорите и пишете)?",
+        "en": "In which language is the checklist (you speak and write in it)?",
     },
     "start.started": {
         "ru": (
             "Проверка начата.\n"
             "Пиццерия: {unit}\n"
             "Вид: {kind}\n"
-            "Язык отчёта: {lang}\n"
+            "Язык чек-листа: {speech_lang}\n"
             "Проверяющий: {auditor}\n"
             "{auditor_note}"
             # Хвоста «Присылайте фотографии с комментариями» здесь больше нет:
@@ -219,7 +234,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Inspection started.\n"
             "Pizzeria: {unit}\n"
             "Type: {kind}\n"
-            "Report language: {lang}\n"
+            "Checklist language: {speech_lang}\n"
             "Auditor: {auditor}\n"
             "{auditor_note}"
             "Date: {date}"
@@ -265,34 +280,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "Auditor: {auditor}\n"
             "Records: {findings}\n\n"
             "Continue it or start a new one? A new one erases this."
-        ),
-    },
-    # Та же развилка, но по сданной проверке (T153). Прежняя фраза утверждала
-    # о ней две неправды разом: что она незавершённая и что новая её сотрёт.
-    # Признака «завершена» у движка нет, и выдумывать его бот не вправе — зато
-    # он помнит, что сам собрал и отдал отчёт, и говорит ровно это.
-    "start.resume_handed_over": {
-        "ru": (
-            "Проверка в этом чате уже сдана: отчёт по ней собран и отправлен.\n"
-            "Пиццерия: {unit}\n"
-            "Дата: {date}\n"
-            "Проверяющий: {auditor}\n"
-            "Записей: {findings}\n\n"
-            "Дописать в неё нельзя: отчёт уже у получателя и в истории точки, "
-            "а дописанное в него не попадёт. Начните новую проверку — или "
-            "уберите эту из чата, если она тут больше не нужна."
-        ),
-        "en": (
-            "The inspection in this chat is already handed over: its report was built "
-            "and sent.\n"
-            "Pizzeria: {unit}\n"
-            "Date: {date}\n"
-            "Auditor: {auditor}\n"
-            "Records: {findings}\n\n"
-            "It can no longer be added to: the report is already with its recipient "
-            "and in the unit’s history, and anything added now would not reach it. "
-            "Start a new inspection — or remove this one from the chat if you no "
-            "longer need it here."
         ),
     },
     # Отказ на любую попытку изменить сданную проверку (T201, D080). Один текст
@@ -923,6 +910,16 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Новый класс для записи #{n}?",
         "en": "New class for record #{n}?",
     },
+    "edit.level_advice": {
+        "ru": (
+            "Запись #{n} — рекомендация, класса у неё нет. Если это нарушение — "
+            "удалите запись и запишите нарушение заново."
+        ),
+        "en": (
+            "Record #{n} is a recommendation and has no class. If it is a violation, "
+            "delete the record and record the violation again."
+        ),
+    },
     "edit.ask_text": {
         "ru": "Пришлите новую формулировку для записи #{n} одним сообщением.",
         "en": "Send the new wording for record #{n} in one message.",
@@ -1163,8 +1160,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "they are still in the chat above.",
     },
     "finish.ask": {
-        "ru": "Поправить запись или собирать отчёт?",
-        "en": "Edit a record, or build the report?",
+        "ru": "Проверка готова. Сформировать предварительный отчёт?",
+        "en": "The inspection is done. Build the preliminary report?",
+    },
+    # Язык отчёта спрашивается здесь, после «да» (D415), а не на старте. Список
+    # языков зависит от страны пиццерии (`domain/report_langs.py`); если он из
+    # одного языка, вопроса нет вовсе.
+    "finish.ask_report_lang": {
+        "ru": "На каком языке отчёт?",
+        "en": "In which language is the report?",
+    },
+    "finish.report_lang_gone": {
+        "ru": "Этого языка для отчёта нет. Нажмите «Сформировать предварительный отчёт» ещё раз.",
+        "en": "That report language is not available. Tap “Build preliminary report” again.",
+    },
+    "finish.report_lang_failed": {
+        "ru": "Не смог задать язык отчёта: сбой на моей стороне, подробности в журнале.",
+        "en": "Could not set the report language: something broke on my side, see the log.",
     },
     "finish.pick_edit": {
         "ru": "Какую запись поправить?",
@@ -1173,6 +1185,16 @@ TEXTS: dict[str, dict[str, str]] = {
     "finish.building": {
         "ru": "Собираю отчёт…",
         "en": "Building the report…",
+    },
+    "finish.autotranslate_failed": {
+        "ru": (
+            "⚠ Автоперевод комментариев не сработал для записей: {count}. Они напечатаны "
+            "как написаны. Отчёт менять не нужно — переведите их в вычитке на сайте."
+        ),
+        "en": (
+            "⚠ Automatic translation failed for {count} comment(s). They are printed as "
+            "written. No need to redo the report: translate them during proofreading on the site."
+        ),
     },
     "finish.letter": {
         "ru": "Письмо партнёру:\n\n{letter}",
@@ -1671,22 +1693,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "works. Run the command above to replace it."
         ),
     },
-    # --- круг доступа: кто внутри и кто кого приводит (T253, решение D099) ---
-    "cmd.mcp_add": {"ru": "Дать доступ к MCP", "en": "Grant MCP access"},
-    "cmd.mcp_revoke": {"ru": "Отозвать доступ к MCP", "en": "Revoke MCP access"},
-    "cmd.mcp_who": {"ru": "У кого доступ к MCP", "en": "Who has MCP access"},
-    "cmd.stops": {"ru": "Отказы мастера за период", "en": "Wizard refusals over a period"},
-    # Отказ тому, кто в круг не входит. Короткий и без подробностей: человек
-    # здесь свой (мидлварь доступа его пустила), поэтому молчать невежливо, но
-    # и рассказывать ему, кто в круге и как туда попасть, незачем — за этим он
-    # идёт к человеку, а не к боту.
-    "mcp.not_yours": {
-        "ru": "Подключение к MCP настраивают те, кому этот доступ выдан. Обратитесь к ним.",
-        "en": "MCP setup is done by those who have been granted this access. Ask them.",
-    },
-    # Круг не назначен вовсе: стенд поднялся без основателя. Отдельный текст, а
-    # не тот же отказ, — потому что чинится это в другом месте и другим
-    # человеком: не «попроси доступ», а «на стенде не задана переменная».
     # --- счётчик отказов мастера, `/stops` (#436) ---
     #
     # Шаг и причина печатаются кодами: коды не переводятся и не правятся, и
@@ -1711,111 +1717,37 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Счётчик отказов не прочитался. Подробности — в журнале стенда.",
         "en": "The refusal counter could not be read. Details are in the server log.",
     },
-    "mcp.circle_unset": {
+    # Счётчик — админам (роль учётки, к которой привязан бот). Человек здесь
+    # свой, поэтому отказ словами, а не молчание.
+    "stops.not_admin": {
+        "ru": "Счётчик отказов мастера открыт только админам.",
+        "en": "The wizard refusal counter is open to admins only.",
+    },
+    "mcp.unbound_self": {
         "ru": (
-            "Круг доступа к MCP на этом стенде не назначен, поэтому подключение не "
-            "настраивает никто. Это настройка развёртывания, а не разговора."
+            "Токен Claude выпускается на учётку decimus: привяжите бота к своей учётке "
+            "в настройках веба и повторите — или выпустите токен прямо там."
         ),
         "en": (
-            "The MCP access circle is not configured on this deployment, so nobody can set "
-            "up the connection. This is a deployment setting, not a conversation one."
+            "The Claude token is issued to a decimus account: link the bot to your account "
+            "in the web settings and try again — or issue the token right there."
         ),
     },
-    "mcp.add_usage": {
-        "ru": "Кому дать доступ? Пришлите: /mcp_add <Telegram ID>",
-        "en": "Grant access to whom? Send: /mcp_add <Telegram ID>",
-    },
-    "mcp.revoke_usage": {
-        "ru": "У кого отозвать доступ? Пришлите: /mcp_revoke <Telegram ID>",
-        "en": "Revoke access from whom? Send: /mcp_revoke <Telegram ID>",
-    },
-    "mcp.id_not_a_number": {
-        "ru": "«{given}» — не Telegram ID. Нужно одно число.",
-        "en": "“{given}” is not a Telegram ID. A single number is needed.",
-    },
-    # Приводимый обязан быть среди разрешённых ID — иначе доступ выдан тому,
-    # кого мидлварь до бота не пускает. Сказано словами, потому что чинится это
-    # не здесь, а в настройке стенда.
-    "mcp.add_not_allowed": {
+    "mcp.expires": {
         "ru": (
-            "ID {who} не в списке разрешённых — до бота он не доходит, и доступ ему "
-            "выдавать не из чего. Сначала добавьте его на стенде."
+            "Токен действует до {date}. Потом пункт /mcp выдаст новую команду. "
+            "Смена роли или отключение учётки гасят токен сразу."
         ),
         "en": (
-            "ID {who} is not on the allowed list — it never reaches the bot, so there is "
-            "nothing to grant access to. Add it on the deployment first."
+            "The token is valid until {date}. After that, /mcp gives a new command. "
+            "A role change or a disabled account ends the token at once."
         ),
-    },
-    "mcp.added": {
-        "ru": (
-            "Доступ выдан: {who}. Теперь у него в меню появился пункт настройки — токен "
-            "он выпустит себе сам, вы его не увидите."
-        ),
-        "en": (
-            "Access granted: {who}. The setup item has appeared in their menu — they will "
-            "issue the token themselves, and you will not see it."
-        ),
-    },
-    "mcp.already_in": {
-        "ru": "У {who} доступ уже есть. Ничего не изменилось.",
-        "en": "{who} already has access. Nothing changed.",
-    },
-    "mcp.revoked": {
-        "ru": (
-            "Доступ отозван: {who}. Пункт настройки у него пропал, живых токенов "
-            "погашено: {tokens}. Отзыв действует сразу, перезапуск не нужен."
-        ),
-        "en": (
-            "Access revoked: {who}. The setup item is gone for them, live tokens "
-            "revoked: {tokens}. The revocation takes effect at once, no restart needed."
-        ),
-    },
-    "mcp.revoke_nobody": {
-        "ru": "У {who} доступа и не было. Ничего не изменилось.",
-        "en": "{who} did not have access anyway. Nothing changed.",
-    },
-    # Основателя круга отозвать нельзя: его называет настройка стенда, и
-    # отозванный он вернулся бы в круг при следующем подъёме бота. Отказ здесь
-    # честнее сделанной и молча отменённой работы.
-    "mcp.revoke_founder": {
-        "ru": (
-            "{who} — основатель круга, он назначен настройкой стенда. Отзыв в чате его "
-            "не уберёт: при следующем подъёме бот вернёт его обратно. Это правится на "
-            "стенде."
-        ),
-        "en": (
-            "{who} founded the circle and is named by a deployment setting. Revoking here "
-            "would not remove them: the bot restores them on the next start. This is "
-            "changed on the deployment."
-        ),
-    },
-    "mcp.who_header": {
-        "ru": "Доступ к MCP:",
-        "en": "MCP access:",
-    },
-    # Строка следа. Кодами и датами, без формулировок: отвечает на вопрос,
-    # у тех ли доступ, кого назначил владелец (D098), а проверяется это по
-    # идентификаторам.
-    "mcp.who_line": {
-        "ru": "{who} — привёл: {by}, {at}{token}",
-        "en": "{who} — added by: {by}, {at}{token}",
-    },
-    "mcp.who_line_revoked": {
-        "ru": "{who} — отозван: {by}, {at}",
-        "en": "{who} — revoked by: {by}, {at}",
-    },
-    "mcp.who_founder": {"ru": "настройка стенда", "en": "deployment setting"},
-    "mcp.who_has_token": {"ru": ", токен выпущен", "en": ", token issued"},
-    "mcp.who_no_token": {"ru": ", токен не выпускался", "en": ", no token issued"},
-    "mcp.who_empty": {
-        "ru": "Доступ к MCP не выдан никому.",
-        "en": "MCP access has not been granted to anyone.",
     },
     # База не ответила. Значения токена в этом тексте нет и быть не может —
     # разбор ушёл в журнал, человеку остаётся то, что он может сделать.
     "mcp.unavailable": {
-        "ru": "Не удалось обратиться к списку доступа. Повторите позже.",
-        "en": "The access list could not be reached. Try again later.",
+        "ru": "Токен не выпущен: база не ответила. Повторите позже.",
+        "en": "The token was not issued: the database did not answer. Try again later.",
     },
     # Стенд адреса не назвал. Заглушка ЗАГЛАВНЫМИ и на языке интерфейса — по
     # тому же правилу, что и остальные подставляемые слова: молча подставить
@@ -1884,6 +1816,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— Сданную проверку править нельзя.\n"
             "— Сбой — /start. /version — версия сборки.\n"
             "— /lang — язык бота.\n"
+            "— «Приложение» у поля ввода — обход по зонам, настройки, подключение Claude.\n"
         ),
         "en": (
             "How to work with the bot\n"
@@ -1924,6 +1857,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "— A handed-over inspection cannot be edited.\n"
             "— Something broke — /start. /version tells the build.\n"
             "— /lang — the bot language.\n"
+            "— “App” next to the message field — the walk by zone, settings, connecting Claude.\n"
         ),
     },
     "cmd.version": {"ru": "Версия сборки", "en": "Build version"},
@@ -1957,6 +1891,10 @@ TEXTS: dict[str, dict[str, str]] = {
     # в `keyboards.py` — единственные строки интерфейса мимо каталога, и потому
     # единственные, которые язык стенда не мог перекрасить.
     "btn.new_inspection": {"ru": "Новая проверка", "en": "New inspection"},
+    # Мини-апп обхода (#418): что не осмотрено и что было здесь в прошлый раз.
+    "btn.walk": {"ru": "Обход точки", "en": "Walk-through"},
+    # Кнопка у поля ввода (D372): открывает приложение целиком, не только обход.
+    "btn.app": {"ru": "Приложение", "en": "App"},
     "btn.resume_continue": {"ru": "Продолжить", "en": "Continue"},
     "btn.sealed_drop": {"ru": "Убрать из чата", "en": "Remove from chat"},
     "btn.resume_new": {"ru": "Начать новую", "en": "Start a new one"},
@@ -1969,7 +1907,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.info_skip": {"ru": "Пропустить", "en": "Skip"},
     "btn.info_done": {"ru": "Дальше к отчёту", "en": "On to the report"},
     "btn.info_save": {"ru": "Записать так", "en": "Record as is"},
-    "btn.build": {"ru": "Собрать отчёт", "en": "Build the report"},
+    "btn.build": {
+        "ru": "Сформировать предварительный отчёт",
+        "en": "Build preliminary report",
+    },
     "btn.build_without_photos": {"ru": "Собрать без кадров", "en": "Build without photos"},
     "btn.edit": {"ru": "Поправить запись", "en": "Edit a record"},
     "btn.resume": {"ru": "Продолжить проверку", "en": "Continue the inspection"},

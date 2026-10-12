@@ -40,9 +40,9 @@ from psycopg.types.json import Json
 
 from ..domain.models import Score
 from .config import check_environment
-from .cross_space import Entry, record
 from .errors import ReviseError
-from .models import InspectionDetail
+from .models import ORIGIN_LEGACY, InspectionDetail
+from .pool import connection
 from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
@@ -64,7 +64,7 @@ class Revision:
 # политика заморозки от правки прячет: поэтому замок берётся только у ждущей,
 # а почему его не дали, объясняет второй, обычный запрос ниже.
 _LOCK_SQL = """
-select i.speech_lang
+select i.speech_lang, i.origin
 from inspections i
 where i.id = %(id)s and i.tenant_code = %(tenant)s
   and i.status = 'draft' and i.retracted_at is null
@@ -80,6 +80,7 @@ where i.id = %(id)s and i.tenant_code = %(tenant)s
 _PAIR_TAKEN_SQL = """
 select n from findings
 where inspection_id = %(id)s and code = %(code)s and zone = %(zone)s and id <> %(finding)s
+  and level not in ('D0', 'R')
 """
 
 _UPDATE_FINDING_SQL = """
@@ -88,11 +89,14 @@ set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_u
 where id = %(finding)s and inspection_id = %(id)s
 """
 
+# `origin <> 'legacy'`: оценку исторической движок не пишет никогда (D332).
+# Заслон здесь второй — первый стоит в `_apply` до движка, третий в базе
+# (`inspections_legacy_score_as_is`, 0042).
 _UPDATE_SCORE_SQL = """
 update inspections
 set pct = %(pct)s, grade = %(grade)s, deductions = %(deductions)s,
     counts = %(counts)s, by_zone = %(by_zone)s
-where id = %(id)s and tenant_code = %(tenant)s and status = 'draft'
+where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and origin <> 'legacy'
 """
 
 
@@ -103,7 +107,6 @@ def revise_finding(
     tenant: str,
     revision: Revision,
     score_of: Callable[[InspectionDetail], Score],
-    journal: Entry | None = None,
 ) -> None:
     """Исправить запись ждущей проверки и положить оценку, посчитанную после замка.
 
@@ -119,9 +122,8 @@ def revise_finding(
     if not revision.text.strip():
         raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             _apply(conn, ident, запись, tenant_code, revision, score_of)
-            record(conn, journal)  # той же транзакцией, что правка и оценка
             conn.commit()
     except ReviseError:
         raise
@@ -178,7 +180,16 @@ def _apply(
         замок = cur.fetchone()
         if замок is None:
             raise _refuse_lock(cur, ident, tenant)
-        (язык_речи,) = замок
+        язык_речи, происхождение = замок
+        if происхождение == ORIGIN_LEGACY:
+            # Историческая (D332): оценка из старого отчёта, движок её не
+            # пересчитывает — значит, и правки с пересчётом у неё нет. Отказ
+            # ДО движка: `score_of` не зовётся.
+            raise ReviseError(
+                "Проверка историческая: оценка перенесена из старого отчёта как есть и "
+                "движком не пересчитывается (D332). Её записи правят инструментами "
+                "загрузки (import_edit_finding) до подтверждения"
+            )
         # Всё ниже — после замка: соседняя правка этой проверки уже записана
         # целиком или ещё не началась.
         detail = _read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)

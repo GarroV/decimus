@@ -66,7 +66,7 @@ async def walk_wizard(dp: Any, bot: Any, *, report_lang: str = "ru") -> None:
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query(f"start:lang:{report_lang}"))
+    await feed(dp, bot, callback_query(f"start:speech:{report_lang}"))
 
 
 async def test_первое_сообщение_проверки_называет_правило_фотофиксации(

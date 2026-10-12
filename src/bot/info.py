@@ -32,8 +32,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from src import domain
 from src.domain.errors import DomainError
 
@@ -41,36 +39,19 @@ from src.domain.errors import DomainError
 # и тесты знают его по этому имени, и переносить их за ним незачем.
 from .dates import DATE_FORMAT, parse_date
 
-__all__ = ["DATE_FORMAT", "FIELDS", "InfoField", "fields_to_ask", "parse_date", "question"]
+__all__ = [
+    "DATE_FORMAT",
+    "FIELDS",
+    "KIND_DATE",
+    "KIND_TEXT",
+    "KIND_YES_NO",
+    "InfoField",
+    "fields_to_ask",
+    "parse_date",
+    "question",
+]
 
-#: Свободный текст: пишется, наговаривается или приходит подписью к кадру.
-KIND_TEXT = "text"
-#: Да или нет — кнопками.
-KIND_YES_NO = "yes_no"
-#: Дата (у `INF05` — с временем): текстом или голосом, с разбором.
-KIND_DATE = "date"
-
-
-@dataclass(frozen=True)
-class InfoField:
-    """Одно поле информационной части: код пункта и способ ввода."""
-
-    code: str
-    kind: str
-
-
-#: Порядок — порядок чек-листа, и он же порядок в отчёте: движок печатает поля
-#: в том порядке, в каком их записали. Спрашивать вразнобой значило бы получить
-#: вразнобой и в документе партнёру.
-FIELDS: tuple[InfoField, ...] = (
-    InfoField("INF01", KIND_TEXT),
-    InfoField("INF03", KIND_YES_NO),
-    InfoField("INF04", KIND_YES_NO),
-    InfoField("INF05", KIND_DATE),
-    InfoField("INF06", KIND_TEXT),
-    InfoField("INF07", KIND_DATE),
-    InfoField("INF08", KIND_TEXT),
-)
+from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO, InfoField
 
 
 def question(field: InfoField, lang: str, *, chat_id: int) -> str | None:
@@ -94,9 +75,17 @@ def fields_to_ask(lang: str, *, chat_id: int) -> tuple[tuple[InfoField, str], ..
     Методика здесь — издание ТОЙ проверки (T169, T225): состав информационной
     части задаёт управляющая компания, и переиздание посреди выезда меняло бы
     набор вопросов на середине.
+
+    Уже заполненное поле не спрашивается (D312): аудитор мог ответить на него по
+    ходу обхода в мини-аппе, и тот же вопрос в конце читался бы как «не
+    сохранилось». Поправить ответ можно там же, где его дали.
     """
+    inspection = domain.get_state(chat_id)
+    answered = set(inspection.info) if inspection is not None else set()
     asked = []
     for field in FIELDS:
+        if field.code in answered:
+            continue
         text = question(field, lang, chat_id=chat_id)
         if text:
             asked.append((field, text))

@@ -89,7 +89,7 @@ async def test_несколько_открытых_кнопки_и_провер�
     assert "пиццерии" in session.last_text.lower()  # type: ignore[attr-defined]
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
 
     проверка = get_state(CHAT_ID)
     assert проверка is not None and проверка.checklist_code == "rnd"

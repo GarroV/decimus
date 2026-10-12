@@ -12,10 +12,18 @@ Google для этого и держит инкрементальное согл
 неконфиденциальных скоупах (`src/web/google_auth.py`), а почтовый добирается
 в тот момент, когда человек впервые уводит письмо в черновики.
 
-**Токен живёт в сессии и нигде больше.** `refresh_token` мы не просим и не
-храним: это долговременный доступ к чужой почте в нашей базе, и он был бы
-нужен только фоновой отправке, которой нет. Черновик создаётся синхронно,
-пока человек здесь, — часового `access_token` на это хватает с запасом.
+**Токен нигде не хранится** — ни в сессии, ни в базе, ни в куке: он живёт
+внутри одного возврата от Google (канон — `src/web/letter_draft.py`).
+`refresh_token` мы не просим: это долговременный доступ к чужой почте, и он
+был бы нужен только фоновой отправке, которой нет. Черновик создаётся
+синхронно, пока человек здесь, — часового `access_token` на это хватает.
+
+**Черновик ложится только в почту вошедшего (D176, F-018/F-029 аудита 12.10).**
+Подсказка аккаунта (`login_hint`) для Google — только подсказка: в окне выбора
+человек может взять любой аккаунт браузера. Поэтому вместе с почтовым правом
+спрашиваются `openid email`, из ответа на обмен кода читается, КАКОЙ аккаунт
+выдал доступ, и чужой аккаунт получает отказ до создания черновика
+(`MailAccountMismatchError`).
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ import json
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
+from dataclasses import dataclass
 from email.message import EmailMessage
 from typing import Any
 
@@ -32,7 +41,9 @@ from src.web.google_auth import (
     AUTHORIZATION_ENDPOINT,
     NETWORK_TIMEOUT_SECONDS,
     TOKEN_ENDPOINT,
+    GoogleAuthError,
     GoogleSettings,
+    identity_from_id_token,
 )
 from src.web.letter_markup import to_email_html, to_plain
 
@@ -40,6 +51,11 @@ from src.web.letter_markup import to_email_html, to_plain
 #: `gmail.modify` и `https://mail.google.com/` тоже подошли бы — и оба дают
 #: доступ к переписке человека, который нам не нужен ни для чего.
 DRAFT_SCOPE = "https://www.googleapis.com/auth/gmail.compose"
+
+#: Что спрашивается у Google на уходе за черновиком: почтовое право и «кто это».
+#: `openid email` — неконфиденциальные скоупы, те же, что на входе; без них
+#: ответ на обмен кода не говорит, какой аккаунт выдал доступ (F-018).
+CONSENT_SCOPES = ("openid", "email", DRAFT_SCOPE)
 
 DRAFTS_ENDPOINT = "https://gmail.googleapis.com/gmail/v1/users/me/drafts"
 
@@ -56,13 +72,61 @@ class GoogleMailError(Exception):
     """Черновик не завёлся. Текст показывается человеку и объясняет, что делать."""
 
 
+class MailAccountMismatchError(GoogleMailError):
+    """Доступ к почте выдал не тот аккаунт Google, которым человек вошёл (D176).
+
+    Своим классом, а не общим «не вышло»: экран говорит человеку, что выбрать
+    в окне Google, а предписание остаётся черновиком.
+    """
+
+
+@dataclass(frozen=True)
+class MailGrant:
+    """Доступ к почте и чей он: токен на один возврат и почта выдавшего аккаунта."""
+
+    access_token: str
+    email: str
+
+
+def _google_reason(сбой: BaseException) -> str:
+    """Код причины из тела ошибки Google (`SERVICE_DISABLED`, `invalid_grant`…).
+
+    Только машинные коды, без текста целиком: в теле бывает адрес почты.
+    Нет тела или не JSON — пустая строка, а не новый сбой поверх старого.
+    """
+    читать = getattr(сбой, "read", None)
+    if читать is None:
+        return ""
+    try:
+        тело = json.loads(читать() or b"{}")
+    except Exception:  # разбор причины не должен ронять обработку сбоя
+        return ""
+    if not isinstance(тело, dict):
+        return ""
+    ошибка = тело.get("error")
+    коды: list[str] = []
+    if isinstance(ошибка, str):
+        коды.append(ошибка)
+    elif isinstance(ошибка, dict):
+        if isinstance(ошибка.get("status"), str):
+            коды.append(ошибка["status"])
+        for деталь in ошибка.get("details") or []:
+            if isinstance(деталь, dict) and isinstance(деталь.get("reason"), str):
+                коды.append(деталь["reason"])
+        for пункт in ошибка.get("errors") or []:
+            if isinstance(пункт, dict) and isinstance(пункт.get("reason"), str):
+                коды.append(пункт["reason"])
+    чистые = [к for к in dict.fromkeys(коды) if к.replace("_", "").isalnum() and len(к) <= 64]
+    return f", {'/'.join(чистые)}" if чистые else ""
+
+
 def consent_url(settings: GoogleSettings, *, state: str, login_hint: str) -> str:
     """Адрес, где человек разрешает нам класть черновик в свою почту."""
     параметры = {
         "client_id": settings.client_id,
         "redirect_uri": settings.redirect_uri,
         "response_type": "code",
-        "scope": DRAFT_SCOPE,
+        "scope": " ".join(CONSENT_SCOPES),
         "state": state,
         # Без этого Google выдаёт токен ТОЛЬКО на почтовый скоуп, забыв про
         # выданные на входе, — и следующий вход снова просит согласия.
@@ -73,6 +137,7 @@ def consent_url(settings: GoogleSettings, *, state: str, login_hint: str) -> str
         # месте, и человек перестаёт читать то, что подтверждает.
         # Аккаунтов в браузере бывает несколько, а черновик обязан лечь в
         # почту ТОГО, кто вошёл (D176), а не того, кто первый в списке.
+        # Подсказка только ведёт; решает сверка на возврате (`verified_token`).
         "login_hint": login_hint,
         # `refresh_token` не просим (см. модуль): online-доступ и есть отказ
         # от долговременного ключа к чужой почте.
@@ -81,8 +146,14 @@ def consent_url(settings: GoogleSettings, *, state: str, login_hint: str) -> str
     return f"{AUTHORIZATION_ENDPOINT}?{urllib.parse.urlencode(параметры)}"
 
 
-def exchange_code_for_token(settings: GoogleSettings, *, code: str) -> str:
-    """Код возврата → `access_token` на почтовый скоуп."""
+def exchange_code_for_grant(settings: GoogleSettings, *, code: str) -> MailGrant:
+    """Код возврата → доступ к почте и почта аккаунта, который его выдал.
+
+    Почта берётся из `id_token` того же ответа и проверяется так же, как на
+    входе (`identity_from_id_token`: издатель, наше приложение, срок,
+    подтверждённость). Нет `id_token` — отказ: не зная, чей доступ, черновик
+    класть некуда.
+    """
     запрос = urllib.request.Request(  # noqa: S310 — адрес постоянный, схема не из данных
         TOKEN_ENDPOINT,
         data=urllib.parse.urlencode(
@@ -101,12 +172,37 @@ def exchange_code_for_token(settings: GoogleSettings, *, code: str) -> str:
         with urllib.request.urlopen(запрос, timeout=NETWORK_TIMEOUT_SECONDS) as ответ:  # noqa: S310
             тело = json.loads(ответ.read())
     except Exception as сбой:
-        raise GoogleMailError(f"обмен кода не удался: {type(сбой).__name__}") from сбой
+        raise GoogleMailError(
+            f"обмен кода не удался: {type(сбой).__name__} "
+            f"{getattr(сбой, 'code', '') or ''}{_google_reason(сбой)}"
+        ) from сбой
 
     токен = тело.get("access_token")
     if not isinstance(токен, str) or not токен:
         raise GoogleMailError("Google не выдал доступ к почте")
-    return токен
+    id_token = тело.get("id_token")
+    if not isinstance(id_token, str) or not id_token:
+        raise GoogleMailError("Google не сказал, чей это доступ к почте (нет id_token)")
+    try:
+        кто = identity_from_id_token(id_token, client_id=settings.client_id)
+    except GoogleAuthError as сбой:
+        raise GoogleMailError(f"чей доступ к почте — не подтверждено: {сбой}") from сбой
+    return MailGrant(access_token=токен, email=кто.email)
+
+
+def verified_token(grant: MailGrant, *, expected_email: str | None) -> str:
+    """Токен — только если доступ выдал аккаунт вошедшего. Иначе отказ до черновика.
+
+    `expected_email` — почта входа через Google, привязанная к учётке
+    (`web_users.email`). Не привязана — черновик класть не в кого: почта
+    вошедшего неизвестна, и любой выбранный аккаунт был бы догадкой.
+    """
+    своя = (expected_email or "").strip().lower()
+    if not своя or grant.email.strip().lower() != своя:
+        raise MailAccountMismatchError(
+            "доступ к почте выдал не тот аккаунт Google, которым вы вошли"
+        )
+    return grant.access_token
 
 
 def draft_subject(*, city: str, date: str, lang: str) -> str:
@@ -191,12 +287,18 @@ def create_draft(
     except Exception as сбой:
         код = getattr(сбой, "code", None)
         if код == 403:
+            # Причина из ответа Google обязательна: 403 даёт и отозванное
+            # согласие, и выключенный в проекте Gmail API (SERVICE_DISABLED), а
+            # чинятся они в разных местах (11.10.2026 кнопка молча не работала).
             raise GoogleMailError(
-                "Google не дал положить черновик: согласие на доступ к почте не выдано или отозвано"
+                "Google не дал положить черновик (403"
+                f"{_google_reason(сбой)}): согласие не выдано или Gmail API выключен в проекте"
             ) from сбой
         if код == 401:
             raise GoogleMailError("доступ к почте истёк — потребуется согласие заново") from сбой
-        raise GoogleMailError(f"черновик не создан: {type(сбой).__name__}") from сбой
+        raise GoogleMailError(
+            f"черновик не создан: {type(сбой).__name__} {код or ''}{_google_reason(сбой)}"
+        ) from сбой
 
     номер = тело.get("id") if isinstance(тело, dict) else None
     if not isinstance(номер, str) or not номер:

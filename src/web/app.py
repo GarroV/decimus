@@ -18,14 +18,13 @@ import logging
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass, replace
-from datetime import datetime
+from datetime import date
 from typing import Any
 
 import psycopg
 from flask import (
     Flask,
     abort,
-    make_response,
     redirect,
     render_template,
     request,
@@ -35,20 +34,27 @@ from flask import (
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import bot_links, directory
-from src.db.errors import AcceptError, DbError, MoveError, RetractionError, ReviseError
+from src.db import directory, request_memo, unit_profiles
+from src.db.errors import (
+    AcceptError,
+    DatabaseTargetError,
+    DbError,
+    MoveError,
+    RetractionError,
+    ReviseError,
+)
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.permissions import (
-    ROLE_COUNTRY_ADMIN,
-    ROLE_HQ_ADMIN,
-    ROLE_SCOPES,
-    canonical_role,
-    scope_of_tenant,
+from src.domain.tenants import (
+    HQ_TENANT,
+    canonical_tenant,
+    is_admin_role,
+    is_hq_developer,
+    is_hq_guest,
+    is_hq_worker,
 )
-from src.domain.tenants import canonical_tenant
 from src.report.info_titles import FOUND
 
 from . import (
@@ -56,18 +62,27 @@ from . import (
     action_plans,
     assets,
     auth,
-    guard,
+    edition,
+    guest_gate,
+    home_page,
     letter_draft,
     letter_markup,
-    people,
+    oauth,
     prescriptions,
-    pricing,
-    profile,
+    ratings,
+    registry_period,
+    registry_view,
     review,
     revision,
     security_headers,
+    swarm_api,
+    to_inspect,
     unit_add,
+    users_screen,
+    users_view,
     view,
+    walk_auth,
+    walk_proxy,
 )
 from . import country as country_data
 from . import inspections as data
@@ -75,14 +90,14 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import overview as overview_data
 from . import unit_card as unit_data
-from .config import WEB_BOT_USERNAME_VAR, Settings, load_settings
-from .db_refusal import note_target_mismatch, public_reason
+from .config import Settings, load_settings
+from .db_refusal import public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
-from .remote import client_address
 from .sections import (
+    CONTROL_HOME,
     SECTIONS,
     check_registry,
     current_section,
@@ -112,7 +127,43 @@ MAX_BODY_BYTES = 256 * 1024
 
 #: Разделы, под которые в этом модуле зарегистрированы настоящие экраны.
 #: Список сверяется с реестром при сборке — расхождение роняет приложение.
-SCREENS = ("overview", "registry", "country", "admin", "users", "actions", "plans", "orders")
+SCREENS = (
+    "overview",
+    "registry",
+    "country",
+    "ratings",
+    "admin",
+    "users",
+    "actions",
+    "plans",
+    "orders",
+)
+
+
+_MEMO_ENVIRON_KEY = "decimus.db_memo_token"
+
+
+def _open_memo() -> None:
+    # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
+        enabled=request.method in ("GET", "HEAD")
+    )
+
+
+def _close_memo(_exc: BaseException | None) -> None:
+    token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
+    if token is not None:
+        request_memo.end(token)
+
+
+def _install_request_memo(app: Flask) -> None:
+    """Справочные чтения за один GET-запрос — один раз, а не по разу на блок (`request_memo`).
+
+    Только `GET`/`HEAD`: запрос, который пишет, читает как раньше, и прочитанное
+    до записи не может дожить до чтения после неё.
+    """
+    app.before_request(_open_memo)
+    app.teardown_request(_close_memo)
 
 
 def create_app(settings: Settings | None = None) -> Flask:
@@ -123,13 +174,17 @@ def create_app(settings: Settings | None = None) -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
     assets.install(app)
+    _install_request_memo(app)
     _register_context(app, conf)
     # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    _install_origin_gate(app)
     _install_hq_gate(app)
-    guard.install(app)
+    _install_control_gate(app)
+    guest_gate.install(app)
+    _install_methodology_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -138,9 +193,18 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_registry(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
+    users_screen.install(app, conf)
     prescriptions.install(app, conf)
+    ratings.install(app, conf)
+    # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
+    swarm_api.install(app, conf)
+    # Подключение Claude входом через сайт (D417): только при публичных адресах.
+    oauth.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
+    # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
+    # адреса обхода передаются отдельному сервису со своим томом на запись.
+    walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
     _register_errors(app, conf)
     security_headers.install(app, hsts=conf.hsts)
     return app
@@ -196,7 +260,15 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Кто вошёл — берётся из того же ответа, что пропустил запрос
             # через заслон, а не спрашивается у базы второй раз.
             "account": account,
+            # Гость УК (D440) только читает: кнопки действий разметка не рисует
+            # вовсе, а запись ему закрывает заслон `guest_gate`.
+            "read_only": account is not None and is_hq_guest(account.role, account.tenant),
             "logout_path": auth.LOGOUT_PATH,
+            # Роль словами — как должность; у партнёра свои названия (D346).
+            "role_key": users_view.role_key,
+            "hint_key": users_view.hint_key,
+            # Своя карточка — на экране «Пользователи», меню учётки ведёт туда.
+            "my_card_url": f"{request.script_root}{section('users').path}?person=me&lang={lang}",
         }
 
 
@@ -332,217 +404,16 @@ def _item_titles(conf: Settings, lang: str) -> dict[str, str]:
 
 
 def _register_overview(app: Flask, conf: Settings) -> None:
-    """Раздел «Обзор»: сеть целиком одним экраном.
-
-    Плитки собираются здесь, а не в шаблоне: у каждой есть адрес перехода, и
-    адрес — это решение приложения, а не оформление. Цифра, из которой нельзя
-    провалиться в список, на вопрос экрана не отвечает (бриф на визуал).
-    """
+    """Раздел «Главная» (D378, адрес прежний — `/overview`): сборка в `home_page`."""
 
     @app.get(section("overview").path)
     def overview() -> str:
-        # Выборка приходит адресом, а не состоянием сессии: ссылку на срез
-        # («Белград, буква D, за 30 дней») человек отправляет коллеге, и тот
-        # обязан увидеть ровно тот же экран. Значения — коды; непонятное
-        # значение сужает выборку в пустоту, но страницу не роняет.
-        selection = overview_data.Selection(
-            country=request.args.get("country", "").strip().upper()[:2],
-            city=request.args.get("city", "").strip()[:80],
-            grade=request.args.get("grade", "").strip().upper()[:1],
-            period=request.args.get("period", "all").strip()[:8],
-            sort=request.args.get("sort", "score").strip()[:8],
-        )
-        snapshot = overview_data.load(
-            reach=auth.current_reach(), limit=REGISTRY_LIMIT, selection=selection
-        )
-        registry_path = section("registry").path
-
-        def отбор(**изменения: str) -> str:
-            """Адрес того же экрана с изменённым срезом.
-
-            Собирается здесь, а не склейкой в шаблоне: пустое значение обязано
-            ИСЧЕЗАТЬ из адреса, иначе «сбросить город» оставляет в ссылке
-            `city=` и срез выглядит суженным, хотя он полный.
-            """
-            параметры = {
-                "country": selection.country,
-                "city": selection.city,
-                "grade": selection.grade,
-                "period": selection.period,
-                "sort": selection.sort,
-                "lang": _lang(conf),
-                **изменения,
-            }
-            # Умолчания из адреса ВЫПАДАЮТ: иначе «сбросить город» оставляет
-            # в ссылке `city=`, а `sort=score` висит в каждом адресе и срез
-            # выглядит настроенным, хотя он обычный.
-            умолчания = {"period": "all", "sort": "score"}
-            живые: dict[str, Any] = {
-                ключ: значение
-                for ключ, значение in параметры.items()
-                if значение and умолчания.get(ключ) != значение
-            }
-            return _url("overview", **живые)
-
-        def в_реестр(city: str | None = None) -> str:
-            """Проверки этого среза в разделе «Проверки».
-
-            С 30.09.2026 клик по городу ведёт в страну (D260, `в_страну`);
-            сюда — только город без страны в справочнике: экрана страны с
-            пустым кодом не бывает. Период в реестр не уходит: там его отбора нет.
-            """
-            параметры = {
-                "country": selection.country,
-                "city": city or "",
-                "grade": selection.grade,
-                "lang": _lang(conf),
-            }
-            return _url("registry", **{к: з for к, з in параметры.items() if з})
-
-        def в_страну(country: str, **параметры: str) -> str:
-            """Экран страны с этим срезом (D260). Период уезжает вместе с человеком.
-
-            Буква не уезжает: строка точки и город уже названы, и отбор буквой
-            на экране страны спрятал бы соседние пиццерии без объяснения.
-            """
-            живые = {
-                "period": selection.period if selection.period != "all" else "",
-                "lang": _lang(conf),
-                **параметры,
-            }
-            return _url("country", code=country, **{к: з for к, з in живые.items() if з})
-
-        # По всему срезу, как остальные плитки (#503), а не по списку поводов:
-        # тот обрезан рядом с пределом и `TOP`.
-        критических = snapshot.critical_total
-        if snapshot.average is None:
-            среднее = t("overview.tile.note.average_none", _lang(conf))
-        elif not snapshot.comparable:
-            среднее = t("overview.tile.note.average_mixed", _lang(conf))
-        else:
-            среднее = t("overview.tile.note.average", _lang(conf))
-        # Плиток пять, и они РАЗНЫЕ на вид: бриф прямо запрещает полосу
-        # одинаковых плиток, и различие здесь несёт смысл, а не украшает —
-        # цветом помечено только то, что требует действия.
-        tiles = (
-            overview_data.Tile(
-                key="units",
-                value=str(snapshot.units_total),
-                note=t(
-                    "overview.tile.note.units",
-                    _lang(conf),
-                    checked=snapshot.units_checked,
-                ),
-                href=registry_path,
-            ),
-            overview_data.Tile(
-                key="unchecked",
-                value=str(snapshot.unchecked),
-                note=t("overview.tile.note.unchecked", _lang(conf)),
-                href=registry_path,
-                tone="warn" if snapshot.unchecked else "plain",
-            ),
-            overview_data.Tile(
-                key="inspections",
-                value=str(snapshot.inspections_total),
-                note=t("overview.tile.note.inspections", _lang(conf)),
-                href=registry_path,
-            ),
-            overview_data.Tile(
-                key="average",
-                value="—"
-                if snapshot.average is None or not snapshot.comparable
-                else f"{snapshot.average:.1f}",
-                note=среднее,
-                href=registry_path,
-                # Движение показывается только там, где его есть с чем
-                # сравнить И где сравнение законно: ряд одного издания
-                # методики против такого же ряда прошлого периода (T349).
-                delta="" if snapshot.average_delta is None else f"{snapshot.average_delta:+.1f}",
-                tone="err" if (snapshot.average_delta or 0) < 0 else "plain",
-            ),
-            overview_data.Tile(
-                key="critical",
-                value=str(критических),
-                note=t("overview.tile.note.critical", _lang(conf)),
-                href=registry_path,
-                tone="err" if критических else "ok",
-            ),
-        )
         язык = _lang(conf)
-        чипы = []
-        if snapshot.countries:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.country", язык),
-                    empty_title=t("overview.filter.all_countries", язык),
-                    current=selection.country,
-                    values=snapshot.countries,
-                    # Смена страны сбрасывает город: город другой страны в
-                    # отборе дал бы пустую выборку без единого объяснения.
-                    href=lambda значение: отбор(country=значение, city=""),
-                    title=lambda код: country_title(код, язык),
-                )
-            )
-        if snapshot.cities:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.city", язык),
-                    empty_title=t("overview.filter.all_cities", язык),
-                    current=selection.city,
-                    values=snapshot.cities,
-                    href=lambda значение: отбор(city=значение),
-                    title=lambda код: city_title(код, язык),
-                )
-            )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.grade", язык),
-                empty_title=t("overview.filter.all_grades", язык),
-                current=selection.grade,
-                values=snapshot.grades,
-                href=lambda значение: отбор(grade=значение),
-            )
-        )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.period", язык),
-                empty_title=t("overview.period.all", язык),
-                current="" if selection.period == "all" else selection.period,
-                values=tuple((код, None) for код in overview_data.PERIODS if код != "all"),
-                href=lambda значение: отбор(period=значение or "all"),
-                title=lambda код: t("overview.period." + код, язык),
-            )
-        )
-        порядок = _pick(
-            label=t("overview.sort", язык),
-            empty_title=t("overview.sort.score", язык),
-            current="" if selection.sort == "score" else selection.sort,
-            values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),
-            href=lambda значение: отбор(sort=значение or "score"),
-            title=lambda код: t("overview.sort." + код, язык),
-        )
-        return render_template(
-            "overview/index.html",
-            data=snapshot,
-            tiles=tiles,
-            picks=tuple(чипы),
-            sort_pick=порядок,
-            registry_path=registry_path,
-            grade_tone=view.grade_tone,
-            level_tone=view.level_tone,
-            lang=_lang(conf),
-            selection=selection,
-            select_url=отбор,
-            registry_url=в_реестр,
-            country_url=в_страну,
-            periods=tuple(overview_data.PERIODS),
-            item_titles=_item_titles(conf, _lang(conf)),
-            # Идентификаторы точек нужны таблице, чтобы строка вела в карточку
-            # точки, а не в последний отчёт: по прототипу владельца клик по
-            # точке открывает точку. Связь идёт идентификатором справочника —
-            # название в ссылке сломалось бы на первой же правке названия.
-            unit_ids=snapshot.unit_ids,
+        return home_page.render(
+            lang=язык,
+            limit=REGISTRY_LIMIT,
+            pick=_pick,
+            item_titles=_item_titles(conf, язык),
         )
 
 
@@ -660,9 +531,41 @@ def _register_country(app: Flask, conf: Settings) -> None:
             level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
             can_add_units=unit_add.can_add_here(код),
+            **_country_units(код),
             **_country_plans(код),
             **prescriptions.country_block(код),
         )
+
+
+STAGE_ORDER = {"open": 0, "paused": 1, "pipeline": 2, "closed": 3}
+
+
+def _country_units(код: str) -> dict[str, Any]:
+    """Пиццерии страны по своду (D376): строки, счёт по стадиям, ссылки в карточки.
+    Блок справочный: сбой чтения гасит только его, а не экран страны."""
+    try:
+        строки = unit_profiles.by_country(код) if код else ()
+        ссылки = (
+            {
+                u.code: u.id
+                for u in directory.list_units(reach=auth.current_reach(), country=код)
+                if u.code
+            }
+            if строки
+            else {}
+        )
+    except DbError:
+        logger.warning("Сведения о пиццериях страны не прочитались", exc_info=True)
+        строки, ссылки = (), {}
+    счёт = {
+        стадия: sum(1 for p in строки if p.stage == стадия)
+        for стадия in ("open", "pipeline", "closed")
+    }
+    return {
+        "units_profiles": sorted(строки, key=lambda p: (STAGE_ORDER.get(p.stage, 9), p.name)),
+        "units_count": счёт,
+        "units_links": ссылки,
+    }
 
 
 def _country_plans(код: str) -> dict[str, Any]:
@@ -680,6 +583,17 @@ def _country_plans(код: str) -> dict[str, Any]:
         "plans_act_country": уК,
         "state_tones": action_plans.STATE_TONES,
     }
+
+
+def _unit_profile(code: str | None) -> unit_profiles.Profile | None:
+    """Строка свода пиццерий по коду Dodo точки (D374); сбой чтения — блок пуст."""
+    if not code:
+        return None
+    try:
+        return unit_profiles.by_code(code)
+    except DbError:
+        logger.warning("Сведения о пиццерии не прочитались", exc_info=True)
+        return None
 
 
 def _register_units(app: Flask, conf: Settings) -> None:
@@ -713,6 +627,8 @@ def _register_units(app: Flask, conf: Settings) -> None:
         return render_template(
             "units/card.html",
             data=снимок,
+            profile=_unit_profile(точка.code),
+            show_email=auth.current_tenant() == HQ_TENANT,
             added=request.args.get("added") == "1",
             alias_taken=request.args.get("alias_taken") == "1",
             lang=lang,
@@ -726,6 +642,17 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
+def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
+    """Куда ведёт точка из «Где нужно проверить»: карточка в «Стране» (УК) или в «Пиццериях»."""
+    if item.unit_id and item.country and hq:
+        return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
+            f"#unit-{item.unit_id}"
+        )
+    if item.unit_id:
+        return _url("unit", unit_id=item.unit_id, lang=lang)
+    return _url("registry", lang=lang)
+
+
 def _register_registry(app: Flask, conf: Settings) -> None:
     """Раздел «Проверки»: реестр, карточка, снятие."""
 
@@ -733,141 +660,94 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     # Вход тоже ведёт сюда (через `home`), чтобы выбор жил в одном месте.
     @app.get("/")
     def home() -> Response:
-        return redirect(url_for("overview"))
+        вошедший = auth.current_account()
+        if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
+            # «Главной» у контролинга нет (D420) — его стартовый экран «Рейтинги».
+            return redirect(url_for(CONTROL_HOME))
+        return redirect(url_for("overview"))  # при входе все — на «Главной» (D378)
 
     @app.get(section("registry").path)
     def registry() -> str:
-        registry_data = data.load_registry(reach=auth.current_reach(), limit=REGISTRY_LIMIT)
         # Отбор реестра живёт в адресе ровно по той же причине, что и на
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        буква = request.args.get("grade", "").strip().upper()[:1]
-        вид = request.args.get("kind", "").strip()[:20]
-        # Страна и город — по справочнику точек, кодами: сюда приводит клик по
-        # городу на «Обзоре», и реестр обязан показать ровно эти проверки.
-        страна = request.args.get("country", "").strip().upper()[:2]
-        город = request.args.get("city", "").strip()[:80]
-        # Поиск из левой панели: часть названия пиццерии, без учёта регистра.
-        искомое = request.args.get("q", "").strip()[:80]
+        период = registry_period.read(request.args, today=date.today(), default_all=True)
+        registry_data = data.load_registry(
+            reach=auth.current_reach(),
+            limit=REGISTRY_LIMIT,
+            date_from=период.start,
+            date_to=период.end,
+        )
+        отбор_в = registry_view.Filter(
+            grade=request.args.get("grade", "").strip().upper()[:1],
+            kind=request.args.get("kind", "").strip()[:20],
+            # Страна и город — по справочнику точек, кодами: сюда приводит
+            # клик по городу на «Обзоре», и реестр обязан показать ровно эти.
+            country=request.args.get("country", "").strip().upper()[:2],
+            city=request.args.get("city", "").strip()[:80],
+            # Поиск: часть названия пиццерии, без учёта регистра.
+            q=request.args.get("q", "").strip()[:80],
+        )
         гео = data.load_geography(reach=auth.current_reach())
 
         def место(row: InspectionRow) -> tuple[str, str]:
             страна_точки, город_точки = гео.get(row.unit_name, ("", ""))
             return страна_точки or "", город_точки or ""
 
-        строки = tuple(
-            row
-            for row in registry_data.rows
-            if (not буква or row.grade == буква)
-            and (not вид or row.kind == вид)
-            and (not страна or место(row)[0] == страна)
-            and (not город or место(row)[1] == город)
-            and (not искомое or искомое.casefold() in row.unit_name.casefold())
-        )
+        строки = tuple(row for row in registry_data.rows if отбор_в.keeps(row, место(row)))
+        язык = _lang(conf)
 
         def отбор(**изменения: str) -> str:
-            параметры = {
-                "q": искомое,
-                "country": страна,
-                "city": город,
-                "grade": буква,
-                "kind": вид,
-                "lang": _lang(conf),
-                **изменения,
-            }
-            живые = {ключ: значение for ключ, значение in параметры.items() if значение}
-            return _url("registry", **живые)
+            параметры = {**отбор_в.params(), **период.params(), "lang": язык, **изменения}
+            return _url("registry", **{к: з for к, з in параметры.items() if з})
 
-        язык = _lang(conf)
-        # Буквы — шкалой со счётом по выборке: сколько проверок за каждой.
-        буквы = tuple(
-            (значение, sum(1 for row in registry_data.rows if row.grade == значение))
-            for значение in ("A", "B", "C", "D")
-        )
-        виды = tuple(
-            (код, sum(1 for row in registry_data.rows if row.kind == код))
-            for код in dict.fromkeys(row.kind for row in registry_data.rows)
-        )
-        чипы = []
-        страны = tuple(
-            (код, sum(1 for row in registry_data.rows if место(row)[0] == код))
-            for код in sorted({место(row)[0] for row in registry_data.rows} - {""})
-        )
-        # Города — только выбранной страны, как и на «Обзоре».
-        города = tuple(
-            (код, sum(1 for row in registry_data.rows if место(row)[1] == код))
-            for код in sorted(
-                {
-                    место(row)[1]
-                    for row in registry_data.rows
-                    if not страна or место(row)[0] == страна
-                }
-                - {""}
+        выбрано = request.args.get("inspection", "").strip()[:64]
+        панель = _registry_panel(выбрано, conf=conf)
+        # «Где нужно проверить» (D418): у точек без проверок нет ни буквы, ни вида,
+        # поэтому при отборе по ним блок не показывается — он противоречил бы отбору.
+        ждут = (
+            to_inspect.Block()
+            if отбор_в.grade or отбор_в.kind
+            else to_inspect.load(
+                reach=auth.current_reach(),
+                date_from=период.start,
+                date_to=период.end,
+                country=отбор_в.country,
+                city=отбор_в.city,
+                query=отбор_в.q,
             )
         )
-        if страны:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.country", язык),
-                    empty_title=t("overview.filter.all_countries", язык),
-                    current=страна,
-                    values=страны,
-                    href=lambda значение: отбор(country=значение, city=""),
-                    title=lambda код: country_title(код, язык),
-                )
-            )
-        if города:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.city", язык),
-                    empty_title=t("overview.filter.all_cities", язык),
-                    current=город,
-                    values=города,
-                    href=lambda значение: отбор(city=значение),
-                    title=lambda код: city_title(код, язык),
-                )
-            )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.grade", язык),
-                empty_title=t("overview.filter.all_grades", язык),
-                current=буква,
-                values=буквы,
-                href=lambda значение: отбор(grade=значение),
-            )
-        )
-        if виды:
-            чипы.append(
-                _pick(
-                    label=t("registry.col.kind", язык),
-                    empty_title=t("registry.all_kinds", язык),
-                    current=вид,
-                    values=виды,
-                    href=lambda значение: отбор(kind=значение),
-                    title=lambda код: _kind_title(код, язык),
-                )
-            )
+        hq = auth.current_tenant() == HQ_TENANT
         return render_template(
             "inspections/list.html",
             registry=registry_data,
+            to_check=ждут,
+            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
             rows=строки,
-            picks=tuple(чипы),
+            picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
-            # одного: иначе это одно и то же слово в каждой строке. Издание
-            # (хэш) в строку не идёт — оно на карточке проверки.
+            # одного: иначе это одно и то же слово в каждой строке.
             checklist_names=(
                 _checklist_names(язык) if len({row.checklist_code for row in строки}) > 1 else None
             ),
-            # Буквы — шкалой, а не по частоте: полоса отбора не должна менять
-            # порядок от выборки к выборке (то же правило, что на обзоре).
-            grades=("A", "B", "C", "D"),
-            kinds=tuple(dict.fromkeys(row.kind for row in registry_data.rows)),
-            grade=буква,
-            kind=вид,
+            filters=отбор_в,
+            period=период,
+            period_title=registry_view.period_title(период, язык),
+            period_prev=registry_view.period_link(период, -1, отбор),
+            period_next=registry_view.period_link(период, 1, отбор),
+            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
             select_url=отбор,
+            reset_url=отбор(grade="", kind="", country="", city="", q=""),
+            picked=панель.picked,
+            card=панель.context,
+            card_missing=панель.missing,
+            card_failed=панель.failed,
+            split_open=панель.explicit,
+            split_back=отбор(),
         )
 
     @app.get(f"{section('registry').path}/<inspection_id>")
@@ -935,6 +815,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
+        if detail.inspection.is_uploaded:
+            # Заведённая задним числом: письма нет (D310), а историческую сверка
+            # письма пересчитала бы движком (D332). Отказ до сборки.
+            return _card_refusal(
+                inspection_id, conf=conf, text=t("letter.uploaded", lang), status=409
+            )
         # Язык ПИСЬМА — третий язык продукта, и он свой: партнёру пишут на его
         # языке, а не на языке того, кто открыл админку. По умолчанию это язык
         # отчёта проверки; переключатель нужен там, где письмо уходит партнёру
@@ -982,7 +868,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
-            own=_own(detail),
+            own=_own(detail) and not _is_guest(),
             save_outcome=request.args.get("saved"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
@@ -1007,6 +893,10 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             return render_template("inspections/not_found.html"), 404
         if not _own(detail):
             return render_template("users/forbidden.html"), 403
+        if detail.inspection.is_uploaded:
+            return _card_refusal(
+                inspection_id, conf=conf, text=t("letter.uploaded", _lang(conf)), status=409
+            )
 
         текст = request.form.get("text") or ""
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
@@ -1046,262 +936,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             code=303,
         )
 
-    # --- учётки админки (T338, #322) ---------------------------------------
-    # Заведение переехало из командной строки на экран, и заслон стоит ЗДЕСЬ, а
-    # не в навигации: адрес известен, набрать его руками может кто угодно.
-    users_path = section("users").path
-
-    def _страница_учёток(
-        *,
-        added: accounts.Added | None = None,
-        outcome: str | None = None,
-        code: int = 200,
-        bot_link: str | None = None,
-        bot_link_until: datetime | None = None,
-        password: profile.Outcome | None = None,
-        edit: people.Outcome | None = None,
-    ) -> tuple[str, int]:
-        # Перечень людей и форма заведения — только админу УК (D288). Остальные
-        # видят свою строку: вкладка открыта всем ради привязки бота (D286).
-        управляет = _hq_admin_only() is None
-        люди: tuple[accounts.AccountRow, ...] = ()
-        пространства: tuple[str, ...] = ()
-        перечень_известен = True
-        привязки: dict[str, bot_links.Binding] = {}
-        if управляет:
-            try:
-                люди = accounts.everyone(tenant=None)
-                пространства = accounts.spaces()
-                привязки = bot_links.live_bindings()
-            except DbError as exc:
-                note_target_mismatch(exc)
-                # Отказ базы НЕ выдаётся за «никого нет»: это разные вещи, и
-                # вторая была бы молчаливой ложью на экране, где считают людей
-                # с доступом.
-                перечень_известен = False
-        вошедший = auth.current_account()
-        своя_привязка: bot_links.Binding | None = None
-        привязка_известна = True
-        try:
-            своя_привязка = bot_links.binding_of(вошедший.id) if вошедший else None
-        except DbError:
-            # «Не привязан» и «не смогли узнать» — разные ответы: второй не
-            # предлагает привязать заново то, что, может быть, привязано.
-            привязка_известна = False
-        return (
-            render_template(
-                "users/index.html",
-                manage=управляет,
-                people=люди,
-                people_known=перечень_известен,
-                spaces=пространства,
-                added=added,
-                outcome=outcome,
-                # Мост ролей (до Task 10–11): форма заведения предлагает старые имена
-                # (сотрудник первым, перевод по пространству делает дверь базы), а
-                # перечень людей — роли охвата самого человека, сотрудник первым.
-                roles=accounts.LEGACY_ROLES,
-                roles_by_tenant={
-                    человек.tenant: _roles_of_space(человек.tenant) for человек in люди
-                },
-                users_path=users_path,
-                bindings=привязки,
-                own_binding=своя_привязка,
-                own_binding_known=привязка_известна,
-                bot_username=conf.bot_username,
-                bot_link=bot_link,
-                bot_link_until=bot_link_until,
-                bot_var=WEB_BOT_USERNAME_VAR,
-                password=password,
-                min_password=accounts.MIN_PASSWORD_LENGTH,
-                max_password=accounts.MAX_PASSWORD_LENGTH,
-                edit=edit,
-            ),
-            code,
-        )
-
-    def _пространство_из_формы() -> str | None:
-        """Пространство из формы — только из заведённых; незнакомое — `None`."""
-        выбрано = canonical_tenant((request.form.get("tenant") or "").strip())
-        return выбрано if выбрано and выбрано in accounts.spaces() else None
-
-    @app.get(users_path)
-    def users() -> FlaskResponse | tuple[str, int]:
-        return _страница_учёток()
-
-    @app.post(f"{users_path}/bot-link")
-    def bot_link() -> FlaskResponse | tuple[str, int]:
-        """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
-
-        Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
-        Telegram к выбранному человеку. Ссылка показывается на странице ответа,
-        а не в адресе: адрес оседает в истории браузера и журнале прокси — тот
-        же довод, что у пароля новой учётки.
-        """
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("выпуск ссылки привязки без вошедшего: маршрут прошёл мимо заслона")
-        if not conf.bot_username:
-            return _страница_учёток(outcome="bot_unset", code=503)
-        try:
-            ссылка = bot_links.issue_link(вошедший.id)
-        except DbError:
-            return _страница_учёток(outcome="bot_link_failed", code=503)
-        return _страница_учёток(
-            bot_link=link_url(conf.bot_username, ссылка.token),
-            bot_link_until=ссылка.expires_at,
-        )
-
-    @app.post(f"{users_path}/bot-unlink")
-    def bot_unlink() -> FlaskResponse | tuple[str, int]:
-        """Отвязать бота: свою привязку — каждый, чужую — только админ УК (D288)."""
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("отвязка бота без вошедшего: маршрут прошёл мимо заслона")
-        чей = (request.form.get("user_id") or "").strip() or вошедший.id
-        if чей != вошедший.id:
-            отказ = _hq_admin_only()
-            if отказ is not None:
-                return отказ
-        try:
-            отвязано = bot_links.unbind(чей)
-        except DbError:
-            return _страница_учёток(outcome="bot_unlink_failed", code=503)
-        return _страница_учёток(outcome="bot_unlinked" if отвязано else "bot_unlink_missing")
-
-    @app.post(f"{users_path}/password")
-    def own_password() -> FlaskResponse | tuple[str, int]:
-        """Сменить СВОЙ пароль (#324). Чей — решает сессия этого запроса, не форма.
-
-        Страница, а не перенаправление: исход показывается на месте, а
-        введённое обратно в разметку не возвращается — среди него пароли.
-        """
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("смена пароля без вошедшего: маршрут прошёл мимо заслона")
-        исход = profile.change_own(
-            current=request.form.get("current") or "",
-            new=request.form.get("new") or "",
-            repeat=request.form.get("repeat") or "",
-            token=auth.current_session_token(),
-            login=вошедший.login,
-            stand=auth.throttle_tenant(),
-            address=client_address(trusted_proxies=conf.trusted_proxies),
-        )
-        страница, код = _страница_учёток(password=исход, code=исход.status)
-        if исход.retry_after_seconds is None:
-            return страница, код
-        ответ = make_response(страница, код)
-        ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
-        return ответ
-
-    def _правка_человека(
-        действие: Callable[[str, str], people.Outcome],
-    ) -> FlaskResponse | tuple[str, int]:
-        """Общее у правки роли и почты: заслон, происхождение, пространство из формы.
-
-        Пространство — из строки учётки в перечне, сверенное с заведёнными:
-        человека правят там, где он живёт, а не в пространстве админа.
-        """
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        try:
-            пространство = _пространство_из_формы()
-        except DbError:
-            return _страница_учёток(edit=people.Outcome("edit.failed", 503), code=503)
-        if пространство is None or not логин:
-            return _страница_учёток(edit=people.Outcome("edit.space", 400), code=400)
-        исход = действие(логин, пространство)
-        return _страница_учёток(edit=исход, code=исход.status)
-
-    @app.post(f"{users_path}/role")
-    def user_role() -> FlaskResponse | tuple[str, int]:
-        """Назначить роль человеку (#399). Только админ УК; свою — нельзя."""
-        вошедший = auth.current_account()
-        роль = (request.form.get("role") or "").strip()
-        return _правка_человека(
-            lambda логин, пространство: people.change_role(
-                login=логин,
-                tenant=пространство,
-                role=роль,
-                actor_login=вошедший.login if вошедший else "",
-                actor_tenant=вошедший.tenant if вошедший else "",
-            )
-        )
-
-    @app.post(f"{users_path}/email")
-    def user_email() -> FlaskResponse | tuple[str, int]:
-        """Почта входа через Google (#399): задать или снять (пустое поле). Только админ УК."""
-        вошедший = auth.current_account()
-        почта = request.form.get("email") or ""
-        return _правка_человека(
-            lambda логин, пространство: people.change_email(
-                login=логин,
-                tenant=пространство,
-                email=почта,
-                actor_login=вошедший.login if вошедший else "",
-                actor_tenant=вошедший.tenant if вошедший else "",
-            )
-        )
-
-    @app.post(f"{users_path}/add")
-    def add_user() -> FlaskResponse | tuple[str, int]:
-        """Завести человека. Пароль показывается ОДИН раз — на этой же странице.
-
-        Страница, а не перенаправление: пароль в адресе остался бы в истории
-        браузера и в журнале обратного прокси, то есть перестал бы быть
-        паролем ровно в момент показа.
-        """
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        роль = request.form.get("role") or accounts.ROLE_AUDITOR
-        try:
-            пространство = _пространство_из_формы()
-            if пространство is None:
-                return _страница_учёток(outcome="add_space_unknown", code=400)
-            заведённый = accounts.add(логин, tenant=пространство, role=роль)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return _страница_учёток(outcome="add_failed", code=400)
-        return _страница_учёток(added=заведённый, outcome="added")
-
-    @app.post(f"{users_path}/disable")
-    def disable_user() -> FlaskResponse | tuple[str, int]:
-        отказ = _hq_admin_only()
-        if отказ is not None:
-            return отказ
-        refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
-        вошедший = auth.current_account()
-        if вошедший is not None and логин == вошедший.login:
-            # Отключить себя — это выйти и не вернуться, а на стенде с одним
-            # администратором ещё и закрыть экран учёток навсегда: снять
-            # пометку изнутри продукта нечем.
-            return _страница_учёток(outcome="disable_self", code=400)
-        try:
-            # Пространство — из строки учётки в перечне, сверенное с заведёнными:
-            # учётку отключают там, где она живёт, а не в пространстве админа.
-            пространство = _пространство_из_формы()
-            if пространство is None:
-                return _страница_учёток(outcome="disable_missing", code=400)
-            отключено = accounts.disable(логин, tenant=пространство)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return _страница_учёток(outcome="disable_failed", code=400)
-        return _страница_учёток(outcome="disabled" if отключено else "disable_missing")
-
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        отказ = _admin_only()
+        отказ = _hq_worker_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1321,8 +958,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/accept")
     def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Подтвердить проверку на приёмке (D199). Админ своего пространства (D283)."""
-        отказ = _admin_only()
+        """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341),
+        админ партнёра — свежую проверку своих сотрудников (D367)."""
+        отказ = _reviewer_only(inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1346,8 +984,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Исправить запись ждущей проверки с пересчётом (D200). Админ своего пространства."""
-        отказ = _admin_only()
+        """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341),
+        админ партнёра — в свежей проверке своих сотрудников (D367)."""
+        отказ = _reviewer_only(inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1375,8 +1014,8 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Перенести проверку по дате и пиццерии (D195). Только администратор."""
-        отказ = _admin_only()
+        """Перенести проверку по дате и пиццерии (D195). Только админ УК (D341)."""
+        отказ = _hq_worker_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1442,64 +1081,330 @@ def _install_hq_gate(app: Flask) -> None:
             abort(404)
 
 
-def link_url(bot_username: str, token: str) -> str:
-    """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
-    return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
+def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_path: str) -> bool:
+    """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D358).
 
-
-def _roles_of_space(tenant: str) -> tuple[str, ...]:
-    """Роли охвата пространства, сотрудник первым (мост до Task 11)."""
-    охват = scope_of_tenant(tenant)
-    коды = [код for код, роль_охват in ROLE_SCOPES.items() if роль_охват == охват]
-    return tuple(sorted(коды, key=lambda код: код.endswith("_admin")))
-
-
-def _is_admin(account: Any) -> bool:
-    """Мост ролей (до Task 10): админ УК или админ страны — по коду или старому имени."""
-    return canonical_role(account.role, account.tenant) in (ROLE_HQ_ADMIN, ROLE_COUNTRY_ADMIN)
-
-
-def _is_hq_admin(account: Any) -> bool:
-    """Мост ролей (до Task 11): админ УК — по коду или старому имени."""
-    return canonical_role(account.role, account.tenant) == ROLE_HQ_ADMIN
-
-
-def _hq_admin_only() -> FlaskResponse | None:
-    """Управлять людьми может только админ УК (D286, D288): 403 всем остальным.
-
-    Админ партнёра на вкладке «Пользователи» не управляет никем: его права не
-    построены (D288 открыт), и роль `admin` у учётки партнёра здесь ничего не
-    открывает.
+    Свои дела — экран «Пользователи» (там свой пароль и бот), выход, смена
+    пароля, привязка бота. Адреса разделов — из реестра, а не строками здесь.
     """
-    вошедший = auth.current_account()
-    if вошедший is not None and _is_hq_admin(вошедший):
-        return None
-    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    if path == ratings_path or path.startswith(f"{ratings_path}/"):
+        return True
+    own = (
+        "/",
+        users_path,
+        logout_path,
+        f"{users_path}/password",
+        f"{users_path}/bot-link",
+        f"{users_path}/bot-unlink",
+        # Люди контролинга (D360): заведение, почта, отключение. Смены роли
+        # (`/role`) здесь нет намеренно; кого можно трогать, решает маршрут.
+        f"{users_path}/add",
+        f"{users_path}/email",
+        f"{users_path}/disable",
+        # Подключение Claude (D417): согласие и отзыв своего подключения —
+        # дела самого человека; права в MCP контролю решает его роль.
+        oauth.AUTHORIZE_PATH,
+        f"{users_path}/claude-revoke",
+        # Личный токен Claude Desktop себе (D448): тоже дело самого человека.
+        f"{users_path}/claude-token",
+        f"{users_path}/claude-token-revoke",
+    )
+    # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
+    # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.
+    return path in own or path.startswith(f"{users_path}/connections/")
 
 
-def _admin_only() -> FlaskResponse | None:
-    """Отказ 403 всем, кроме администратора; `None` — можно.
+def _install_origin_gate(app: Flask) -> None:
+    """Любая запись в админку — только со своей же страницы (`refuse_foreign_origin`).
+
+    Заслоном на всё приложение, а не вызовом в каждом маршруте: до 12.10.2026
+    заслон держался на том, что каждый POST зовёт его сам, и новый маршрут без
+    вызова остался бы открытым для чужой страницы молча (аудит доступа, п.6).
+    Вызовы в маршрутах остаются — второй слой. Мимо заслона идут только мини-апп
+    обхода (опознание подписью Telegram в заголовке, куки админки до него не
+    доезжают), API для сервисов (ключ в заголовке, только чтение) и машинные
+    адреса OAuth — регистрация клиента и обмен кода (D417): их зовёт сервер
+    Claude без `Origin`, куки входа там не участвуют. Согласие (`/oauth/authorize`)
+    — форма человека и идёт под заслоном.
+    """
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS
+
+    @app.before_request
+    def _запись_только_со_своей_страницы() -> None:
+        # Маршрут не нашёлся (404, 405) — записи не будет и так, ответ даст Flask.
+        if request.routing_exception is not None:
+            return
+        if request.method in _READ_METHODS or request.endpoint in мимо:
+            return
+        refuse_foreign_origin()
+
+
+def _install_methodology_gate(app: Flask) -> None:
+    """Методику правят админы (D344) и — только неглавные чек-листы — бизнес-девелопер (D440).
+
+    Любая запись в разделе «Методика» не от них — 403.
+
+    Заслон `before_request`, а не проверка в каждом маршруте: у правящих
+    маршрутов `/admin/*` своей проверки роли нет, и новый закрыт с момента
+    появления. Читать методику по-прежнему могут все, кому открыт раздел.
+    """
+    methodology_path = section("admin").path
+
+    @app.before_request
+    def _методику_правят_админы() -> None:
+        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
+            return
+        путь = request.path
+        if путь != methodology_path and not путь.startswith(f"{methodology_path}/"):
+            return
+        вошедший = auth.current_account()
+        if вошедший is None:
+            return
+        # Бизнес-девелопер (D440) заводит чек-листы и правит неглавные: какой
+        # чек-лист главный, решает дверь методики (`method.store_for`), а метку
+        # и указатель прода она отдаёт одним админам. Остальные — 403, как были.
+        if not (is_admin_role(вошедший.role) or is_hq_developer(вошедший.role, вошедший.tenant)):
+            abort(403)
+
+
+def _install_control_gate(app: Flask) -> None:
+    """Роль «контроль»: только рейтинги и свои люди, проверок не касается никак (D358, D420).
+
+    Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
+    для контроля с момента появления, и закрывать его не придётся помнить.
+    Чужой раздел на чтение — 404, как закрытый раздел партнёру; запись — 403.
+    """
+    users_path = section("users").path
+    ratings_path = section("ratings").path
+
+    @app.before_request
+    def _контроль_только_рейтинги() -> None:
+        if request.endpoint in auth.OPEN_ENDPOINTS:
+            return
+        вошедший = auth.current_account()
+        if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
+            return
+        if not _control_may_enter(
+            request.path,
+            ratings_path=ratings_path,
+            users_path=users_path,
+            logout_path=auth.LOGOUT_PATH,
+        ):
+            abort(404 if request.method in _READ_METHODS else 403)
+
+
+#: Безопасные методы: чужой раздел на чтение — 404, на запись — 403.
+_READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
+
+
+def _role() -> str | None:
+    """Роль вошедшего — для проверок, которые решает дверь методики (D440)."""
+    вошёл = auth.current_account()
+    return None if вошёл is None else вошёл.role
+
+
+def _is_guest() -> bool:
+    """Вошёл гость УК (D440): читает всё, кнопок действий не видит."""
+    вошёл = auth.current_account()
+    return вошёл is not None and is_hq_guest(вошёл.role, вошёл.tenant)
+
+
+def _hq_worker_only() -> FlaskResponse | None:
+    """Отказ 403 всем, кроме работающих в УК — главного админа, админа и
+    бизнес-девелопера (D440); `None` — можно.
+
+    Снятие, приёмка, правка записи и перенос проверки — только УК: партнёр
+    задним числом не меняет ничего, даже админ своего пространства (D341).
+    Гость, контроль и сотрудник партнёра сюда не проходят.
 
     Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
     руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
     её с выносом кадров мог любой аудитор.
     """
     вошедший = auth.current_account()
-    if вошедший is not None and _is_admin(вошедший):
+    if вошедший is not None and is_hq_worker(вошедший.role, вошедший.tenant):
         return None
     # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
     # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
     return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
+def _partner_may_review(detail: Any) -> bool:
+    """Свежая проверка сотрудников партнёра — её вычитывает сам партнёр (D367).
+
+    Своя (пространство партнёра, а это значит — проведена его людьми; проверки УК
+    и сторонних проверяющих лежат в пространстве УК), из обхода, ещё на приёмке.
+    Страну держит охват: карточка вне стран партнёра ему не загрузится.
+    """
+    проверка = detail.inspection
+    return (
+        _own(detail)
+        and проверка.origin == "field"
+        and проверка.on_review
+        and not проверка.retracted
+    )
+
+
+def _reviewer_only(inspection_id: str) -> FlaskResponse | None:
+    """Заслон вычитки: админ УК — как раньше (D341); админ партнёра — только
+    свежая проверка своих сотрудников (D367). Снятие и перенос сюда не ходят."""
+    if _hq_worker_only() is None:
+        return None
+    вошедший = auth.current_account()
+    if вошедший is None or not is_admin_role(вошедший.role):
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    detail = data.load_card(inspection_id, reach=auth.current_reach())
+    if detail is None:
+        return render_template("inspections/not_found.html"), 404  # type: ignore[return-value]
+    if not _partner_may_review(detail):
+        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    return None
+
+
+@dataclass(frozen=True)
+class _RegistryPanel:
+    """Правая колонка реестра: какая проверка открыта и что о ней известно."""
+
+    picked: str
+    context: dict[str, Any] | None
+    #: Выбор по адресу есть, а проверки в охвате нет (или её не видно).
+    missing: bool
+    #: Выбор сделан явно (`?inspection=`): панель справа открыта.
+    explicit: bool
+    #: Карточка не прочиталась (база ответила отказом) — список при этом жив.
+    failed: bool = False
+
+
+def _registry_panel(chosen: str, *, conf: Settings) -> _RegistryPanel:
+    """Карточка в панели справа — только по явному выбору адресом (`?inspection=`).
+
+    Права и данные — та же `_card_context`, что у отдельной карточки. Отказ
+    базы на карточке не роняет список: реестр уже прочитан, и панель честно
+    говорит, что карточка не открылась. Стенд, смотрящий не в ту базу
+    (`DatabaseTargetError`), — не частичный сбой: он уходит наверх и
+    показывается страницей с названными базами.
+    """
+    if not chosen:
+        return _RegistryPanel("", None, False, False)
+    try:
+        контекст = _card_context(chosen, conf=conf, notice=None, failure=None, compact=True)
+    except DatabaseTargetError:
+        raise
+    except DbError as exc:
+        logger.warning("карточка проверки %s в реестре не прочиталась: %s", chosen, exc)
+        return _RegistryPanel(chosen, None, False, True, failed=True)
+    return _RegistryPanel(chosen, контекст, контекст is None, True)
+
+
+def _registry_picks(
+    rows: tuple[InspectionRow, ...],
+    current: registry_view.Filter,
+    place: Callable[[InspectionRow], tuple[str, str]],
+    select: Callable[..., str],
+    lang: str,
+) -> tuple[Pick, ...]:
+    """Чипы отбора реестра — страна, город, буква, вид — со счётом по периоду."""
+    чипы = []
+    страны = tuple(
+        (код, sum(1 for row in rows if place(row)[0] == код))
+        for код in sorted({place(row)[0] for row in rows} - {""})
+    )
+    # Города — только выбранной страны, как и на «Обзоре».
+    города = tuple(
+        (код, sum(1 for row in rows if place(row)[1] == код))
+        for код in sorted(
+            {
+                place(row)[1]
+                for row in rows
+                if not current.country or place(row)[0] == current.country
+            }
+            - {""}
+        )
+    )
+    if страны:
+        чипы.append(
+            _pick(
+                label=t("overview.filter.country", lang),
+                empty_title=t("overview.filter.all_countries", lang),
+                current=current.country,
+                values=страны,
+                href=lambda значение: select(country=значение, city=""),
+                title=lambda код: country_title(код, lang),
+            )
+        )
+    if города:
+        чипы.append(
+            _pick(
+                label=t("overview.filter.city", lang),
+                empty_title=t("overview.filter.all_cities", lang),
+                current=current.city,
+                values=города,
+                href=lambda значение: select(city=значение),
+                title=lambda код: city_title(код, lang),
+            )
+        )
+    # Буквы — шкалой, а не по частоте: полоса отбора не должна менять порядок
+    # от выборки к выборке (то же правило, что на обзоре).
+    чипы.append(
+        _pick(
+            label=t("overview.filter.grade", lang),
+            empty_title=t("overview.filter.all_grades", lang),
+            current=current.grade,
+            values=tuple((буква, sum(1 for row in rows if row.grade == буква)) for буква in "ABCD"),
+            href=lambda значение: select(grade=значение),
+        )
+    )
+    виды = tuple(
+        (код, sum(1 for row in rows if row.kind == код))
+        for код in dict.fromkeys(row.kind for row in rows)
+    )
+    if виды:
+        чипы.append(
+            _pick(
+                label=t("registry.col.kind", lang),
+                empty_title=t("registry.all_kinds", lang),
+                current=current.kind,
+                values=виды,
+                href=lambda значение: select(kind=значение),
+                title=lambda код: _kind_title(код, lang),
+            )
+        )
+    return tuple(чипы)
+
+
 def _render_card(
     inspection_id: str, *, conf: Settings, notice: str | None, failure: str | None
 ) -> str | tuple[str, int]:
+    контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
+    if контекст is None:
+        return render_template("inspections/not_found.html"), 404
+    return render_template("inspections/card.html", c=контекст, **контекст)
+
+
+def _card_context(
+    inspection_id: str,
+    *,
+    conf: Settings,
+    notice: str | None,
+    failure: str | None,
+    compact: bool = False,
+) -> dict[str, Any] | None:
+    """Всё, что карточка проверки знает и разрешает; `None` — проверки нет в охвате.
+
+    Одна функция на две поверхности: отдельную страницу карточки и правую
+    колонку реестра (`?inspection=`). Права (`may_*`) считаются здесь и только
+    здесь — у панели не может оказаться кнопки, которой нет у карточки.
+
+    `compact` — для панели: лист вычитки, кадры, информационная часть и
+    список точек для переноса не читаются. Панель их не показывает, а ведёт
+    в полную карточку, и платить за них на каждом щелчке по строке незачем.
+    """
     detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
-        return render_template("inspections/not_found.html"), 404
+        return None
     lang = _lang(conf)
-    админ = _admin_only() is None
+    админ = _hq_worker_only() is None
+    гость = _is_guest()
     try:
         переносы = data.load_moves(inspection_id, reach=auth.current_reach())
         история_известна = True
@@ -1518,10 +1423,14 @@ def _render_card(
         and not detail.inspection.on_review
     )
     # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
-    # админ своего пространства (D283), и ровно до подтверждения (D199, D200).
+    # админ УК по своей проверке (D283, D341), и ровно до подтверждения (D199, D200).
     # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
+    вошедший = auth.current_account()
+    админ_партнёра = (
+        вошедший is not None and is_admin_role(вошедший.role) and _partner_may_review(detail)
+    )
     можно_подтвердить = (
-        админ
+        (админ or админ_партнёра)
         and своя
         and data.retraction_available()
         and detail.inspection.on_review
@@ -1531,7 +1440,7 @@ def _render_card(
     # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
     лист = (
         review.load_sheet(detail.inspection, detail.findings, lang=lang)
-        if detail.inspection.on_review
+        if detail.inspection.on_review and not compact
         else None
     )
     # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
@@ -1543,30 +1452,34 @@ def _render_card(
     except DbError:
         отчёт = None
         отчёт_известен = False
-    поля, методика_полей = data.load_info(detail, lang=lang)
+    поля, методика_полей = ((), "") if compact else data.load_info(detail, lang=lang)
     # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
     # роняет, записи показываются без кадров, и это сказано словами.
-    try:
-        кадры = data.load_previews(inspection_id, reach=auth.current_reach())
-        кадры_известны = True
-    except DbError:
-        кадры = {}
-        кадры_известны = False
+    кадры: dict[str, Any] = {}
+    кадры_известны = True
+    if not compact:
+        try:
+            кадры = data.load_previews(inspection_id, reach=auth.current_reach())
+        except DbError:
+            кадры_известны = False
+    zone_lines = view.zone_lines(detail.by_zone, lang)
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
     план_нужен = (
         action_plans.is_hq()
+        and not гость
         and своя
         and план is None
         and план_известен
         and not detail.inspection.on_review
         and not detail.inspection.retracted
+        # Заведённая задним числом плана не требует и запроса не открывает (D310).
+        and not detail.inspection.is_uploaded
         and action_plans.needs_plan(detail.counts)
     )
     без_страны = план_нужен and action_plans.unit_without_country(inspection_id)
-    return render_template(
-        "inspections/card.html",
+    return dict(
         plan=план,
         plan_known=план_известен,
         plan_link=(
@@ -1582,6 +1495,17 @@ def _render_card(
         # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
         may_request_plan=(
             action_plans.is_hq()
+            and not гость
+            and своя
+            and not detail.inspection.on_review
+            and not detail.inspection.retracted
+            and not detail.inspection.is_uploaded
+        ),
+        # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
+        # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
+        may_prescribe=(
+            action_plans.is_hq()
+            and not гость
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
@@ -1599,10 +1523,13 @@ def _render_card(
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
-        units=data.load_units(reach=auth.current_reach()) if можно_переносить else (),
+        units=data.load_units(reach=auth.current_reach())
+        if можно_переносить and not compact
+        else (),
         detail=detail,
         head=detail.inspection,
-        zones=view.zone_lines(detail.by_zone, lang),
+        zones=zone_lines,
+        loss_zones=view.loss_zones(zone_lines),
         counts=view.count_lines(detail.counts),
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
@@ -1610,9 +1537,15 @@ def _render_card(
         checklist_name=_checklist_names(lang).get(
             detail.inspection.checklist_code, detail.inspection.checklist_code
         ),
-        build_since=pricing.edition_day(detail.inspection.checklist_version)
-        or data.load_edition_since(
-            reach=auth.current_reach(), version=detail.inspection.checklist_version
+        # У исторической издания нет — вместо даты сборки карточка показывает
+        # метку прежней методики (D332).
+        build_since=None
+        if detail.inspection.is_legacy
+        else (
+            edition.edition_day(detail.inspection.checklist_version)
+            or data.load_edition_since(
+                reach=auth.current_reach(), version=detail.inspection.checklist_version
+            )
         ),
         # Ждущую приёмки не снимают: снятие — для принятой (retract.py), а
         # ошибку на приёмке чинят правкой записи (D200).
@@ -1667,7 +1600,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return redirect(_url("methodology", **request.args.to_dict(), item=code))
 
     @app.post(f"{путь}/items")
-    @guard.action("checklist.edit")
     def methodology_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1694,7 +1626,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
     @app.post(f"{путь}/items/<code>")
-    @guard.action("checklist.edit")
     def methodology_edit(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1720,7 +1651,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/disable")
-    @guard.action("checklist.edit")
     def methodology_disable(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1737,7 +1667,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/restore")
-    @guard.action("checklist.edit")
     def methodology_restore(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1754,7 +1683,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/zones")
-    @guard.action("checklist.edit")
     def methodology_zone_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1776,7 +1704,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/shares")
-    @guard.action("checklist.edit")
     def methodology_zone_shares() -> str:
         refuse_foreign_origin()
         # Доли приезжают полями `share_<код>` и отправляются ВСЕ разом: сумма
@@ -1801,7 +1728,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/rename")
-    @guard.action("checklist.edit")
     def methodology_zone_rename(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1821,7 +1747,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/remove")
-    @guard.action("checklist.edit")
     def methodology_zone_remove(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1840,7 +1765,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/route")
-    @guard.action("checklist.edit")
     def methodology_route() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1860,7 +1784,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/scoring")
-    @guard.action("checklist.edit")
     def methodology_scoring() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1881,7 +1804,6 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/publish")
-    @guard.action("checklist.publish")
     def methodology_publish() -> str:
         refuse_foreign_origin()
         version = (request.form.get("version") or "").strip()
@@ -1897,6 +1819,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 write=True,
                 lang=_lang(conf),
+                role=_role(),
             )
             опубликована = method.publish_version(
                 склад, tenant=auth.current_tenant(), version=version
@@ -1933,7 +1856,6 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         return _render_checklists(conf, notice=None, failure=None)
 
     @app.post(путь)
-    @guard.action("checklist.manage")
     def checklists_create() -> str | Response:
         refuse_foreign_origin()
         form = request.form
@@ -1942,9 +1864,13 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         state = method.load_store()
         if state.store is None:
             return _render_checklists(conf, notice=None, failure=None)
-        # Пространство — вошедшего (D311): админ страны заводит свои чек-листы у себя;
-        # чужое пространство дверь не принимает (`space_of(tenant)`), право —
-        # `checklist.manage` в заслоне.
+        if auth.current_tenant() != HQ_TENANT:
+            # Чек-листы заводит УК (D283): у партнёра заведения нет — он
+            # работает по эталону и читает его.
+            отказ_заведения = t("methodology.etalon_readonly", _lang(conf))
+            if с_методики:
+                return _render_methodology(conf, notice=None, failure=отказ_заведения, panel="new")
+            return _render_checklists(conf, notice=None, failure=отказ_заведения)
         try:
             заведён = method.create_checklist(
                 state.store,
@@ -1972,7 +1898,6 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/state")
-    @guard.action("checklist.manage")
     def checklists_state(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()
@@ -1987,6 +1912,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 lang=_lang(conf),
                 state=(request.form.get("state") or "").strip(),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -1998,8 +1924,39 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             failure=None,
         )
 
+    @app.post(f"{путь}/<code>/master")
+    def checklists_master(code: str) -> str | Response:
+        """Метка «главный» (D440): ставят и снимают только админы. Отказ — словами."""
+        refuse_foreign_origin()
+        state = method.load_store()
+        if state.store is None:
+            return _render_methodology(conf, notice=None, failure=None)
+        пространство = _которое_пространство(request)
+        try:
+            method.set_checklist_master(
+                state.store,
+                tenant=auth.current_tenant(),
+                author=_author(conf),
+                code=code,
+                space=пространство,
+                lang=_lang(conf),
+                on=request.form.get("on") == "1",
+                role=_role(),
+            )
+        except MethodologyRefused as отказ:
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
+        return redirect(
+            _url(
+                "methodology",
+                checklist=code,
+                lang=_lang(conf),
+                **({"space": пространство} if пространство else {}),
+            )
+        )
+
     @app.post(f"{section('admin').path}/bot/<code>")
-    @guard.action("checklist.manage")
     def methodology_bot(code: str) -> str | Response:
         """Переключатель панели «Бот»: открыть чек-лист в боте или закрыть (волна 3)."""
         refuse_foreign_origin()
@@ -2015,6 +1972,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 lang=_lang(conf),
                 on=request.form.get("on") == "1",
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_methodology(
@@ -2045,6 +2003,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 write=False,
                 lang=_lang(conf),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -2058,7 +2017,6 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/apply")
-    @guard.action("checklist.manage")
     def checklists_apply(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()
@@ -2072,6 +2030,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 code=code,
                 space=_которое_пространство(request),
                 lang=_lang(conf),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -2166,6 +2125,7 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
             space=_которое_пространство(request),
             write=True,
             lang=_lang(conf),
+            role=_role(),
         )
         правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
@@ -2226,6 +2186,7 @@ def _render_methodology(
             space=_которое_пространство(request),
             write=False,
             lang=lang,
+            role=_role(),
         )
     except MethodologyRefused as отказ:
         # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
@@ -2334,9 +2295,19 @@ def _render_methodology(
         else None
     )
     раньше, позже = mview.neighbours(видимые, выбран or "")
+    # Правка чек-листа (D440): главный правят только админы, остальные — и
+    # бизнес-девелопер. Решает та же дверь, что отказывает на записи
+    # (`method.store_for`), поэтому кнопки не расходятся с отказом.
+    админ = is_admin_role(_role())
+    главный = method.is_master(склад)
+    закрыт_по = method.protection_of(склад)
     return render_template(
         "methodology/index.html",
         composition=состав,
+        is_admin=админ,
+        master_here=главный,
+        can_edit_checklist=админ or закрыт_по is None,
+        protected_by=закрыт_по,
         checklists=перечень,
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.

@@ -76,6 +76,12 @@ def polling(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> PollingSpy:
         return True
 
     monkeypatch.setattr(Bot, "set_my_commands", remember_commands)
+
+    async def no_menu_button(self: Bot, *args: Any, **kwargs: Any) -> bool:
+        # Кнопка у поля ввода (D372) — тоже без сети.
+        return True
+
+    monkeypatch.setattr(Bot, "set_chat_menu_button", no_menu_button)
     return spy
 
 

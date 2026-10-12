@@ -16,11 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-import psycopg
-
 from .config import check_environment
-from .cross_space import Entry, record
 from .errors import PushError
+from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 
 # Письмо ложится только к проверке пространства, которое его фиксирует: сверка
@@ -55,13 +53,7 @@ class SavedLetter:
 
 
 def save_letter(
-    inspection_id: str,
-    *,
-    tenant: str,
-    body: str,
-    lang: str,
-    saved_by: str,
-    journal: Entry | None = None,
+    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
 ) -> SavedLetter:
     """Зафиксировать письмо партнёру в том виде, в каком его подтвердил человек.
 
@@ -86,7 +78,7 @@ def save_letter(
         raise PushError("Письмо не сохранено: не названо, кто его зафиксировал")
 
     settings = check_environment()
-    with psycopg.connect(settings.dsn) as conn:
+    with connection(settings.dsn) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 _INSERT_LETTER_SQL,
@@ -103,7 +95,6 @@ def save_letter(
                 raise PushError(
                     f"Проверки {ident} нет в истории пространства — письму не к чему лечь"
                 )
-        record(conn, journal)  # той же транзакцией, что письмо
         conn.commit()
 
     return SavedLetter(id=str(row[0]), body=body, lang=lang, saved_by=saved_by, created_at=row[1])
@@ -124,7 +115,7 @@ def latest_letter(inspection_id: str, *, lang: str | None = None) -> SavedLetter
     русское под видом сербского.
     """
     settings = check_environment()
-    with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+    with connection(settings.dsn) as conn, conn.cursor() as cur:
         cur.execute(_SELECT_LATEST_SQL, (inspection_id, lang, lang))
         row = cur.fetchone()
 

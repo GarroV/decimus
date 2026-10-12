@@ -36,13 +36,16 @@ class Обмен:
         self.почта = почта
         self.срывается = срывается
         self.подтверждена = True
+        self.домен = "dodobrands.io"
         self.звали = 0
 
     def __call__(self, settings: GoogleSettings, *, code: str) -> GoogleIdentity:
         self.звали += 1
         if self.срывается:
             raise GoogleAuthError("двойник: Google отказал")
-        return GoogleIdentity(email=self.почта, email_verified=self.подтверждена)
+        return GoogleIdentity(
+            email=self.почта, email_verified=self.подтверждена, hosted_domain=self.домен
+        )
 
 
 @pytest.fixture
@@ -266,3 +269,123 @@ def test_через_фронт_google_получает_адрес_фронта_�
 
         прямо = client.get(auth.GOOGLE_START_PATH).headers["Location"]
         assert parse_qs(urlsplit(прямо).query)["redirect_uri"] == [РЕКВИЗИТЫ.redirect_uri]
+
+
+def test_вход_через_google_возвращает_на_согласие_oauth(клиент: FlaskClient, обмен: Обмен) -> None:
+    """D417: путь возврата едет через Google в подписанной куке и только на согласие."""
+    вернуться = "/oauth/authorize?client_id=c&state=s"
+    ответ = клиент.get(auth.GOOGLE_START_PATH, query_string={"next": вернуться})
+    метка = ответ.headers["Location"].split("state=")[1].split("&")[0]
+
+    после = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert после.status_code == 302
+    assert после.headers["Location"].endswith(вернуться)
+
+
+def test_вход_через_google_не_уводит_на_чужой_next(клиент: FlaskClient, обмен: Обмен) -> None:
+    ответ = клиент.get(auth.GOOGLE_START_PATH, query_string={"next": "https://evil.com/x"})
+    метка = ответ.headers["Location"].split("state=")[1].split("&")[0]
+
+    после = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert "evil.com" not in после.headers["Location"]
+
+
+# --- домен компании для учёток УК (D430, F-028 аудита 12.10) ---------------
+
+
+def _учётка_уК(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        auth,
+        "find_by_email",
+        lambda email: Учётка(tenant="HQ") if email == ПОЧТА_СВОЯ else None,
+    )
+
+
+@pytest.mark.parametrize(("домен", "пускает"), [("dodobrands.io", True), ("", False)])
+def test_учётку_уК_пускает_только_аккаунт_домена_компании(
+    клиент: FlaskClient,
+    обмен: Обмен,
+    monkeypatch: pytest.MonkeyPatch,
+    домен: str,
+    пускает: bool,
+) -> None:
+    """Совпала почта, но аккаунт не из Workspace компании (`hd`) — отказ."""
+    _учётка_уК(monkeypatch)
+    обмен.домен = домен
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert (ответ.status_code == 302) is пускает
+    assert (auth.COOKIE_NAME in ответ.headers.get("Set-Cookie", "")) is пускает
+
+
+def test_домены_компании_задаются_окружением(monkeypatch: pytest.MonkeyPatch, обмен: Обмен) -> None:
+    monkeypatch.setenv("GOOGLE_HQ_DOMAINS", "example.org")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    _учётка_уК(monkeypatch)
+    monkeypatch.setattr(auth, "open_session", lambda account: Сессия())
+    обмен.домен = "dodobrands.io"
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        метка = метка_захода(client)
+        ответ = client.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+    assert ответ.status_code == 401
+
+
+def test_учётку_партнёра_домен_не_касается(клиент: FlaskClient, обмен: Обмен) -> None:
+    """D430: партнёры входят по почтам из списка пространства, без домена."""
+    обмен.домен = ""
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+
+
+# --- пароль закрыт учёткам с привязанной почтой Google ---------------------
+
+
+def _войти_паролем(client: FlaskClient) -> Response:
+    from web_harness import ЛОГИН, ПАРОЛЬ, СВОЙ
+
+    return client.post(  # type: ignore[return-value]
+        "/login",
+        data={"login": ЛОГИН, "password": ПАРОЛЬ},
+        headers={"Origin": СВОЙ},
+    )
+
+
+def test_учётка_с_почтой_google_паролем_не_входит(monkeypatch: pytest.MonkeyPatch) -> None:
+    зовы = подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА_СВОЯ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        ответ = _войти_паролем(client)
+
+    assert ответ.status_code == 403
+    assert зовы["open"] == [], "сессия открылась паролем"
+    assert "Войти через Google" in ответ.get_data(as_text=True)
+    assert auth.COOKIE_NAME not in ответ.headers.get("Set-Cookie", "")
+
+
+def test_без_реквизитов_google_пароль_остаётся(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Стенд без Google: закрыть пароль значило бы закрыть вход совсем."""
+    зовы = подменить_двери(monkeypatch, tenant=ТЕНАНТ, email=ПОЧТА_СВОЯ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: None)
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        ответ = _войти_паролем(client)
+
+    assert ответ.status_code == 302
+    assert зовы["open"]
+
+
+def test_учётка_без_почты_google_входит_паролем(monkeypatch: pytest.MonkeyPatch) -> None:
+    зовы = подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    monkeypatch.setattr(auth, "load_google_settings", lambda *_, **__: РЕКВИЗИТЫ)
+    with собрать(tenant=ТЕНАНТ).test_client() as client:
+        ответ = _войти_паролем(client)
+
+    assert ответ.status_code == 302
+    assert зовы["open"]

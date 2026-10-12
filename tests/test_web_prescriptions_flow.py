@@ -31,11 +31,15 @@ from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.accept import accept_inspection
 from src.db.reach import reach_of
+from src.web.google_mail import MailGrant
 
 pytestmark = requires_db
 
 ORIGIN = {"Origin": "http://localhost"}
 СРОК = (datetime.now(UTC).date() + timedelta(days=10)).isoformat()
+#: Почта входа через Google у вошедшего: черновик ложится только в неё (D176).
+ПОЧТА = "lead@example.com"
+ГРАНТ = MailGrant("токен", ПОЧТА)
 
 
 class Хранилище:
@@ -70,7 +74,7 @@ def почта(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     }.items():
         monkeypatch.setenv(имя, значение)
     черновики: list[dict[str, Any]] = []
-    monkeypatch.setattr(letter_draft, "exchange_code_for_token", lambda _s, *, code: "токен")
+    monkeypatch.setattr(letter_draft, "exchange_code_for_grant", lambda _s, *, code: ГРАНТ)
 
     def положить(token: str, *, to: str, subject: str, body: str, **_: Any) -> str:
         черновики.append({"token": token, "to": to, "subject": subject, "body": body})
@@ -95,10 +99,14 @@ def как(pg_dsn: str, db_env: str, domain_env: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(rx, "load_storage_settings", lambda: None)
 
     def войти_как(tenant: str) -> FlaskClient:
+        # Входит оснастка паролем, а учётке с почтой Google пароль закрыт:
+        # почта появляется у сессии после входа — как у вошедшего через Google.
         подменить_двери(monkeypatch, tenant=tenant, role="admin")
         monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         client = собрать(tenant=tenant).test_client()
         assert войти(client).status_code == 302
+        подменить_двери(monkeypatch, tenant=tenant, role="admin", email=ПОЧТА)
+        monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         return client
 
     return войти_как
@@ -176,7 +184,8 @@ def test_путь_предписания(как: Вход, почта: list[dict
     assert армения.get(f"/prescriptions/files/{файл.replies[0].id}").status_code == 404
     assert армения.get("/actions/prescriptions").status_code == 404
     assert армения.get(f"/actions/prescriptions/{п.id}").status_code == 404
-    assert "Предписание · Грузия" not in армения.get("/country/AM?lang=ru").get_data(as_text=True)
+    # «Страна» партнёру закрыта целиком (D371): не пустая, а 404.
+    assert армения.get("/country/AM?lang=ru").status_code == 404
 
     # УК видит ответ, скачивает файл и закрывает с комментарием.
     уК = как("HQ")
@@ -191,11 +200,13 @@ def test_путь_предписания(как: Вход, почта: list[dict
     )
     assert "Предписание закрыто." in закрыто.get_data(as_text=True)
 
-    # На экране страны — предписание и «Закрыто»; партнёру тоже.
+    # На экране страны — предписание и «Закрыто». Партнёр видит «Закрыто» на
+    # карточке предписания в своём разделе: «Страна» у него закрыта (D371).
     страна = уК.get("/country/GE?lang=ru").get_data(as_text=True)
     assert "Предписание · Грузия" in страна and "Закрыто" in страна
     грузия = как("GE")
-    assert "Предписание · Грузия" in грузия.get("/country/GE?lang=ru").get_data(as_text=True)
+    своё = грузия.get(f"/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    assert "Закрыто" in своё
     итог = rx.get_prescription(п.id, reach=reach_of("HQ"))
     assert итог is not None
     assert [e.action for e in итог.events] == ["created", "issued", "replied", "closed"]
@@ -220,4 +231,3 @@ def test_черновик_партнёр_не_видит_нигде(как: Вх
     грузия = как("GE")
     assert "Черновая тема" not in грузия.get("/prescriptions?lang=ru").get_data(as_text=True)
     assert грузия.get(f"/prescriptions/{ident}").status_code == 404
-    assert "Черновая тема" not in грузия.get("/country/GE?lang=ru").get_data(as_text=True)

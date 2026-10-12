@@ -1,0 +1,286 @@
+{#
+  Раздел «Рейтинги» (спека 2026-10-08, D324): сводка как в Apps Script контроля.
+  Ни одного вычисления: всё приходит из `src.ratings.report`. Видят все (D327).
+  Вид — по стенду главной Swarm (D354): отбор — одна компактная панель над
+  сводкой (срез, его значение, период; один на экран), блоки — заголовок
+  капителью и карточки. Стили — `static/decimus-rt.css`, только этого раздела.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.ratings.title') }}{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-rt.css') }}">
+<script src="{{ url_for('static', filename='decimus-rt.js') }}" defer></script>{% endblock %}
+
+{% macro thr(x) %}{{ '%.1f'|format(x) }}{% endmacro %}
+{% macro num(x) %}{% if x is none %}<span class="is-empty">—</span>{% else %}{{ '%.1f'|format(x) }}{% endif %}{% endmacro %}
+{#- Знак и цвет — по уже округлённой дельте: −0.04 показывается и красится как +0.0 (P17). -#}
+{% macro dlt(x, digits=1) %}{% if x is none %}<span class="rt-delta is-empty">—</span>{% else %}{% set r = (x|round(digits)) + 0.0 %}<span class="rt-delta {{ 'rt-delta--up' if r >= 0 else 'rt-delta--down' }}"><span class="rt-delta__arrow" aria-hidden="true">{{ '▲' if r >= 0 else '▼' }}</span>{{ ('%+.' ~ digits ~ 'f')|format(r) }}</span>{% endif %}{% endmacro %}
+{% macro unit_link(unit, name, kind) %}<a href="{{ unit_url(unit, kind) }}" target="_blank" rel="noopener noreferrer">{{ name }}</a>{% endmacro %}
+{#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
+    данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
+{% macro vblock(block, kind, title, level) %}
+  {% set has = block.checkups != 0 and block.total != 0 %}
+  <div class="rt-viol__head"><h{{ level }} class="rt-card__title">{{ title }}</h{{ level }}>
+    {% if has %}<span class="rt-stats">
+      <span class="rt-stat">{{ t('ratings.violations.total', n='') }}<b>{{ block.total }}</b></span>
+      <span class="rt-stat">{{ t('ratings.violations.per', x='') }}<b>{{ ('%.2f'|format(block.per_checkup)) if block.per_checkup is not none else '—' }}</b></span>
+    </span>{% endif %}</div>
+  {% if block.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+  {% elif block.total == 0 %}<div class="rt-empty">{{ t('ratings.empty.violations') }}</div>
+  {% else %}
+  {% set most = block.top|map(attribute='count')|max %}
+  <ol class="rt-bars">{% for line in block.top %}<li>
+    <span class="rt-bars__text">{{ line.text }}</span>
+    <span class="rt-bars__track" aria-hidden="true"><b style="width: {{ (line.count / most * 100)|round(1) if most else 0 }}%"></b></span>
+    <span class="rt-bars__n">{{ line.count }}</span>
+  </li>{% endfor %}</ol>
+  {% endif %}
+{% endmacro %}
+{% macro href(group, value=none, period=selection.period.key) -%}
+  {{ url(ratings_path) }}?group={{ group }}{% if value %}&amp;value={{ value|urlencode }}{% endif %}&amp;period={{ period|urlencode }}&amp;lang={{ lang }}
+{%- endmacro %}
+{% macro rank_item(u, kind) %}<li>
+    {% set m = unit_maps.get(u.unit) %}
+    <span class="rt-rank__name">{{ unit_link(u.unit, u.unit_name, kind) }}<small>{{ country_name(u.country) }}{% if m %} · <span class="rt-rank__map" title="{{ t('ratings.maps.unit_title', n=m[1]) }}">Google {{ '%.1f'|format(m[0]) }}</span>{% endif %}</small></span>
+    {#- Без изменения — серый ноль без треугольника: «▲+0.0» зеленью читалось как рост. -#}
+    <span class="rt-rank__d">{% if u.delta is not none %}{% if (u.delta|round(1)) == 0 %}<span class="rt-delta">0.0</span>{% else %}{{ dlt(u.delta) }}{% endif %}{% endif %}</span>
+    <span class="rt-rank__score">{{ num(u.score) }}</span>
+  </li>
+{% endmacro %}
+{#- Фильтр по странам блока (п. 7 interface-logic: действует только на свой блок,
+    стоит в нём). Без скрипта спрятан — видны все строки. -#}
+{% macro cfilter(codes) %}{% set uniq = codes|unique|sort|list %}{% if uniq|length > 1 %}
+  <div class="rt-filter" role="group" aria-label="{{ t('ratings.filter.country') }}" hidden>
+    <button type="button" aria-pressed="true" data-country="">{{ t('ratings.filter.all') }} <small>{{ codes|length }}</small></button>
+    {% for c in uniq %}<button type="button" aria-pressed="false" data-country="{{ c }}">{{ country_name(c) }} <small>{{ codes|select('equalto', c)|list|length }}</small></button>{% endfor %}
+  </div>{% endif %}
+{% endmacro %}
+
+{% block body %}
+<div class="rt">
+  <header class="rt-head">
+    <div class="rt-head__main">
+      <div class="rt-head__kicker">{{ t('ratings.kicker') }}</div>
+      <h1 class="rt-head__title">{{ t('ratings.title') }}</h1>
+      <div class="rt-head__meta">
+        {% if summary.last_loaded %}<b>{{ t('ratings.loaded.title') }}:</b> {% for fmt, at in summary.last_loaded|dictsort %}{{ t('ratings.loaded', fmt=t('ratings.format.' ~ fmt), at=at.strftime(at_format)) }}{% if not loop.last %} · {% endif %}{% endfor %}{% else %}{{ t('ratings.loaded.none') }}{% endif %}
+      </div>
+    </div>
+    {% if may_manage %}<a class="btn btn--sm" href="{{ url(ratings_path ~ '/imports') }}?lang={{ lang }}">{{ t('ratings.manage') }}</a>{% endif %}
+  </header>
+
+  <form class="rt-bar" data-rt-auto method="get" action="{{ url(ratings_path) }}" aria-label="{{ t('ratings.group') }}">
+    <input type="hidden" name="group" value="{{ selection.group }}">
+    <input type="hidden" name="lang" value="{{ lang }}">
+    <div class="rt-field">
+      <span class="rt-field__label">{{ t('ratings.group') }}</span>
+      <nav class="rt-seg" aria-label="{{ t('ratings.group') }}">
+        {% for g in ('imf', 'cluster', 'developer', 'country') %}
+        <a href="{{ href(g) }}"{% if selection.group == g %} aria-current="page"{% endif %}>{{ t('ratings.group.' ~ g) }}</a>
+        {% endfor %}
+      </nav>
+    </div>
+    {% if selection.group == 'cluster' %}
+    <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.cluster') }}</span>
+      <select class="input input--sm" name="value">
+        {% for c in clusters %}<option value="{{ c }}"{% if c == selection.value %} selected{% endif %}>{{ t('ratings.cluster.' ~ c) }}</option>{% endfor %}
+      </select>
+    </label>
+    {% elif selection.group == 'developer' %}
+    <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.developer') }}</span>
+      {% if choices.developers %}<select class="input input--sm" name="value">
+        {% for d in choices.developers %}<option value="{{ d }}"{% if d == selection.value %} selected{% endif %}>{{ d }}</option>{% endfor %}
+      </select>{% else %}<span class="rt-head__meta">{{ t('ratings.empty.countries') }}</span>{% endif %}
+    </label>
+    {% elif selection.group == 'country' %}
+    <label class="rt-field rt-field--grow"><span class="rt-field__label">{{ t('ratings.group.country') }}</span>
+      <select class="input input--sm" name="value">
+        {% for c in choices.countries %}<option value="{{ c.code }}"{% if c.code == selection.value %} selected{% endif %}>{{ country_name(c.code) }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <div class="rt-field">
+      <span class="rt-field__label">{{ t('ratings.period') }}</span>
+      <div class="rt-cal">
+        {% if calendar.prev %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.prev) }}" aria-label="{{ t('ratings.cal.prev') }}">‹</a>
+        {% else %}<span class="rt-cal__arrow" aria-disabled="true">‹</span>{% endif %}
+        {#- Один календарь «с — по» (interface-logic п. 3): совпал с месяцем, кварталом
+            или периодом РС — сводка узнаёт его сама (`periods.range_period`). -#}
+        <details class="rt-cal__pick pick">
+          <summary class="rt-cal__title">{{ calendar.title }}</summary>
+          <div class="rt-cal__pop">
+            <div class="rt-cal__dates">
+              <label><span class="rt-field__label">{{ t('ratings.cal.from') }}</span>
+                <input class="input" type="date" name="from" value="{{ calendar.begin.isoformat() }}"></label>
+              <label><span class="rt-field__label">{{ t('ratings.cal.to') }}</span>
+                <input class="input" type="date" name="to" value="{{ calendar.end.isoformat() }}"></label>
+            </div>
+            <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button>
+          </div>
+        </details>
+        {% if calendar.next %}<a class="rt-cal__arrow" href="{{ href(selection.group, selection.value, calendar.next) }}" aria-label="{{ t('ratings.cal.next') }}">›</a>
+        {% else %}<span class="rt-cal__arrow" aria-disabled="true">›</span>{% endif %}
+      </div>
+    </div>
+    <noscript><button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.show') }}</button></noscript>
+  </form>
+
+  {% if not summary.countries %}
+    <div class="rt-empty">{{ t('ratings.empty.countries') }}</div>
+  {% else %}
+  {% set prev = previous_title or '—' %}
+  {#- Порядок и видимость блоков — компоновка контролинга (D368, D370). -#}
+  {% for block in blocks %}
+  {% if block == 'scores' %}
+  {#- Сводка по группам (D383, D384): в срезе IMF — кластеры, иначе сам срез;
+      подробности по странам — фильтром, а не стеной строк. Точка — период рейтинга (D396). -#}
+  <section class="rt-sec" aria-labelledby="rt-scores">
+    <div class="rt-sec__head">
+      <h2 class="rt-sec__title" id="rt-scores">{{ t('ratings.block.scores') }}</h2>
+      {% if selection.group == 'imf' %}<span class="rt-sec__meta">{{ t('ratings.group.imf') }}: {{ t('ratings.rs') }} <b class="num">{{ num(summary.total.rs) }}</b> {{ dlt(summary.total.rs_delta) }} · {{ t('ratings.rko') }} <b class="num">{{ num(summary.total.rko) }}</b> {{ dlt(summary.total.rko_delta) }}</span>{% endif %}
+    </div>
+    <div class="rt-cl" role="table" aria-labelledby="rt-scores">
+      <span class="rt-cl__head" role="columnheader"></span>
+      {% for kind in ('rs', 'rko') %}<span class="rt-cl__head" role="columnheader">{{ t('ratings.' ~ kind) }} · {{ t('ratings.col.delta', prev=prev) }}</span>{% endfor %}
+      {% for g in summary.groups %}{% set i = loop.index0 %}
+      <span class="rt-cl__name{% if g.level == 'country' %} is-sub{% endif %}" role="rowheader">{{ chart.names[i] }}{% if g.level != 'country' %}<small>{{ t('ratings.countries.n', n=g.countries|length) }}</small>{% endif %}</span>
+      {% for kind in ('rs', 'rko') %}{% set k = chart.kinds[kind] %}{% set sc = k.scales[i] %}
+      <div role="cell">
+        <div class="rt-cl__kpi"><span class="rt-cl__k">{{ t('ratings.' ~ kind) }}</span><b>{{ num(g[kind]) }}</b>{{ dlt(g[kind ~ '_delta']) }}</div>
+        {% set ln = k.rows[i] %}
+        {% if ln.dots %}<div class="rt-cl__plot"><span class="rt-cl__y" aria-hidden="true"><i>{{ sc.high|int }}</i><i>{{ sc.low|int }}</i></span>
+        <div class="rt-line">
+          <svg class="rt-line__svg" viewBox="0 0 {{ chart.width }} {{ chart.height }}" preserveAspectRatio="none" role="img" aria-label="{{ t('ratings.line.aria', name=chart.names[i], kind=t('ratings.' ~ kind)) }}">
+            {% if sc.threshold_y is not none %}<line class="rt-line__thr" x1="0" x2="{{ chart.width }}" y1="{{ sc.threshold_y }}" y2="{{ sc.threshold_y }}" vector-effect="non-scaling-stroke"/>{% endif %}
+            <polyline class="rt-line__path" points="{{ ln.path }}" vector-effect="non-scaling-stroke"/>
+          </svg>
+          {% for d in ln.dots %}<span class="rt-line__dot" style="left: {{ d.left }}%; top: {{ d.top }}%" data-tip="{{ d.title }}" title="{{ d.title }}" tabindex="0"></span>{% endfor %}
+        </div>
+        <span></span><div class="rt-line__axis" aria-hidden="true">{% for left, label in ln.labels %}<span style="left: {{ left }}%">{{ label }}</span>{% endfor %}</div></div>
+        {% else %}<div class="rt-line__empty">{{ t('ratings.line.empty') }}</div>{% endif %}
+      </div>
+      {% endfor %}
+      {% endfor %}
+    </div>
+    <p class="rt-cl__note">{{ t('ratings.line.hint', x=thr(summary.thresholds.top_threshold)) }}</p>
+    <div class="rt-tip" role="tooltip" hidden></div>
+  </section>
+  {% elif block == 'violations' %}
+  <div class="rt-pair">
+  {% for kind, cluster, by in (('rko', summary.rko_cluster, summary.rko_by_country), ('rs', summary.rs_cluster, summary.rs_by_country)) %}
+  <section class="rt-sec" aria-labelledby="rt-{{ kind }}-viol">
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-viol">{{ t('ratings.block.' ~ kind ~ '_violations') }}</h2></div>
+    {% if cluster.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>{% else %}
+    <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
+      {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
+    </div></div>{% endif %}
+    {% if selection.group == 'developer' and summary.countries|length > 1 and cluster.checkups != 0 %}
+    <div class="rt-viol">
+      {% for code in summary.countries %}
+      <div class="rt-card"><div class="rt-card__body">
+        {{ vblock(by[code], kind, country_name(code), 4) }}
+      </div></div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+  {% endfor %}
+
+  </div>
+  {% elif block == 'top' %}
+  {#- Top-10 и Bottom-10 — одна секция (11.10.2026): РС и РКО рядом, все десять
+      строк сразу; у пиццерии — изменение к своей средней за прошлый период. -#}
+  <section class="rt-sec" aria-labelledby="rt-top">
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-top">{{ t('ratings.block.top') }}</h2>
+      <span class="rt-sec__meta">{{ t('ratings.col.delta', prev=prev) }}</span></div>
+    <div class="rt-pair rt-tb">
+    {% for side in ('top', 'bottom') %}{% for kind in ('rs', 'rko') %}
+      {% set units = summary[kind ~ '_' ~ side] %}
+      <div class="rt-card"><div class="rt-card__body">
+        <h3 class="rt-card__title"><span class="rt-dot rt-dot--{{ 'ok' if side == 'top' else 'err' }}" aria-hidden="true"></span> {{ t('ratings.' ~ kind) }} · {{ t('ratings.' ~ side, x=thr(summary.thresholds.top_threshold)) }}</h3>
+        {% if summary[kind ~ '_cluster'].checkups == 0 and not summary[kind ~ '_top'] and not summary[kind ~ '_bottom'] %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+        {% elif units %}<ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}{{ rank_item(u, kind) }}{% endfor %}</ol>
+        {% else %}<div class="rt-empty">{{ t('ratings.empty.' ~ side) }}</div>{% endif %}
+      </div></div>
+    {% endfor %}{% endfor %}
+    </div>
+  </section>
+  {% elif block == 'hard' %}
+  {#- Хард-нарушения РС и РКО — одна таблица с фильтром по странам (11.10.2026).
+      Без проверок за период — «нет данных», а не «чисто» (P16, P37). -#}
+  {% set hard_rows = [] %}{% for v in summary.rs_hard %}{% set _ = hard_rows.append(('rs', v)) %}{% endfor %}{% for v in summary.rko_hard %}{% set _ = hard_rows.append(('rko', v)) %}{% endfor %}
+  {% set no_data = [] %}{% for kind in ('rs', 'rko') %}{% if summary[kind ~ '_cluster'].checkups == 0 %}{% set _ = no_data.append(kind) %}{% endif %}{% endfor %}
+  <section class="rt-sec" aria-labelledby="rt-hard" data-rt-filtered>
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-hard">{{ t('ratings.block.hard') }}</h2>{% if hard_rows %}<span class="rt-sec__meta num">{{ hard_rows|length }}</span>{% endif %}</div>
+    {% if no_data|length == 2 %}<div class="rt-empty">{{ t('ratings.empty.rs_rko') }}</div>
+    {% else %}
+    {% if hard_rows %}{{ cfilter(hard_rows|map(attribute='1.country')|list) }}
+    <div class="rt-card rt-alert rt-scroll"><table class="rt-maps rt-list">
+      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col">{{ t('ratings.col.violation') }}</th><th scope="col" class="num">{{ t('ratings.col.amount') }}</th></tr></thead>
+      <tbody>{% for kind, v in hard_rows %}<tr data-country="{{ v.country }}">
+        <th scope="row">{{ unit_link(v.unit, v.unit_name, kind) }}<small>{{ country_name(v.country) }} · <span class="rt-kind">{{ t('ratings.' ~ kind) }}</span></small></th>
+        <td class="rt-list__text">{{ v.text }}</td>
+        <td class="num is-bad">{{ v.amount }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% else %}<div class="rt-empty">{{ t('ratings.empty.hard') }}</div>{% endif %}
+    {% for kind in no_data %}<div class="rt-note">{{ t('ratings.empty.' ~ kind) }}</div>{% endfor %}
+    {% endif %}
+  </section>
+  {% elif block == 'risk' %}
+  {#- Зона риска — таблица с фильтром по странам (11.10.2026; было облако имён):
+      пиццерия, тип и оценки последних периодов подряд, старые первыми. -#}
+  <section class="rt-sec" aria-labelledby="rt-risk" data-rt-filtered>
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-risk">{{ t('ratings.block.risk') }}</h2>
+      {% if summary.risk %}<span class="rt-sec__meta num">{{ summary.risk|length }}</span>{% endif %}
+      <span class="rt-sec__meta">{{ t('ratings.risk.hint', n=summary.thresholds.risk_periods|int, x=thr(summary.thresholds.risk_threshold)) }}</span></div>
+    {% if summary.risk %}{{ cfilter(summary.risk|map(attribute='country')|list) }}
+    <div class="rt-card rt-alert rt-alert--warn rt-scroll"><table class="rt-maps rt-list">
+      <thead><tr><th scope="col">{{ t('ratings.col.unit') }}</th><th scope="col" class="num">{{ t('ratings.col.scores') }}</th></tr></thead>
+      <tbody>{% for u in summary.risk %}<tr data-country="{{ u.country }}">
+        <th scope="row">{{ unit_link(u.unit, u.unit_name, u.rating_type) }}<small>{{ country_name(u.country) }} · <span class="rt-kind">{{ t('ratings.' ~ u.rating_type) }}</span></small></th>
+        <td class="num rt-list__scores">{% for s in u.scores %}{% if loop.last %}<b>{{ '%.1f'|format(s) }}</b>{% else %}{{ '%.1f'|format(s) }} → {% endif %}{% endfor %}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% if summary.risk_short %}<div class="rt-note">{{ t('ratings.risk.short', types=risk_short_names) }}</div>{% endif %}
+    {#- Неполное окно — тип не судили; «никого» только когда судили все (P37). -#}
+    {% elif summary.risk_short %}<div class="rt-empty">{{ t('ratings.risk.short', types=risk_short_names) }}</div>
+    {% else %}<div class="rt-empty">{{ t('ratings.empty.risk') }}</div>{% endif %}
+  </section>
+  {% elif block == 'maps' %}
+  {#- Оценки на картах (Pointer) и в агрегаторах доставки (#638, D389) — одна
+      таблица (11.10.2026): строка — группа сводки, колонки — площадки. Карты —
+      средняя по всем отзывам на конец периода; агрегаторы — по всем оценкам, в
+      шкале агрегатора. Сбой сбора агрегатора виден строкой, а не тишиной. -#}
+  {% set agg_cols, agg_rows, agg_later = aggs if aggs else ((), (), false) %}
+  {% set agg_dates = agg_rows|selectattr('as_of')|map(attribute='as_of')|list %}
+  {% set map_rows = maps if maps and (maps|selectattr('as_of')|list) else () %}
+  <section class="rt-sec" aria-labelledby="rt-maps">
+    <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-maps">{{ t('ratings.block.maps') }}</h2>
+      <span class="rt-sec__meta">{{ t('ratings.maps.hint') }} · <a href="{{ url(ratings_path ~ '/coverage') }}?lang={{ lang }}">{{ t('ratings.coverage.open') }}</a></span></div>
+    {% if not map_rows and not agg_cols %}<div class="rt-empty">{{ t('ratings.empty.maps') }}</div>
+    {% else %}<div class="rt-card rt-scroll"><table class="rt-maps rt-src">
+      <thead><tr><th scope="col" rowspan="2"></th>
+        {% if map_rows %}<th scope="colgroup" colspan="{{ map_providers|length }}" class="rt-src__grp">{{ t('ratings.maps.title') }} <small>{{ t('ratings.col.delta', prev=prev) }}</small></th>{% endif %}
+        {% if agg_cols %}<th scope="colgroup" colspan="{{ agg_cols|length }}" class="rt-src__grp">{{ t('ratings.agg.title') }}{% if agg_dates %} <small>{{ t('ratings.agg.as_of', date=(agg_dates|max).strftime('%d.%m.%Y')) }}</small>{% endif %}</th>{% endif %}</tr>
+        <tr>{% if map_rows %}{% for p in map_providers %}<th scope="col" class="num">{{ t('ratings.maps.provider.' ~ p) }}</th>{% endfor %}{% endif %}
+        {% for a in agg_cols %}<th scope="col" class="num">{{ agg_names.get(a, a) }}</th>{% endfor %}</tr></thead>
+      <tbody>{% for name in chart.names %}{% set i = loop.index0 %}{% set mr = map_rows[i] if map_rows else none %}{% set ar = agg_rows[i] if agg_cols else none %}<tr>
+        <th scope="row">{{ name }}{% if mr %}<small>{{ t('ratings.maps.branches_n', n=mr.scores.values()|map(attribute='branches')|max) }}</small>{% endif %}</th>
+        {% if map_rows %}{% for p in map_providers %}{% set s = mr.scores[p] %}<td class="num">{% if s.avg is none %}<span class="is-empty">—</span>{% else %}<b>{{ '%.2f'|format(s.avg) }}</b>{% if s.delta is not none %} {{ dlt(s.delta, 2) }}{% endif %}<small>{{ t('ratings.maps.reviews', n=s.reviews) }}</small>{% endif %}</td>{% endfor %}{% endif %}
+        {% for a in agg_cols %}{% set s = ar.scores.get(a) %}<td class="num">{% if not s %}<span class="is-empty">—</span>{% else %}<b title="{{ t('ratings.agg.votes', n=s.votes) }}">{% if s.scale == 100 %}{{ '%.1f'|format(s.avg) }}%{% elif s.scale == 10 %}{{ '%.1f'|format(s.avg) }}<span class="rt-src__scale">/10</span>{% else %}{{ '%.2f'|format(s.avg) }}{% endif %}</b><small>{{ t('ratings.agg.points', n=s.points) }}</small>{% endif %}</td>{% endfor %}
+      </tr>{% endfor %}</tbody>
+    </table></div>{% endif %}
+    {% if agg_later and agg_dates %}<div class="rt-note">{{ t('ratings.agg.later', date=(agg_dates|max).strftime('%d.%m.%Y')) }}</div>{% endif %}
+    {% if map_rows and not agg_cols %}<div class="rt-note">{{ t('ratings.empty.aggregators') }}</div>{% endif %}
+    {% if agg_update_notice %}<div class="rt-note" role="status">{{ t(agg_update_notice) }}</div>{% endif %}
+    {% if may_manage %}<div class="rt-note">
+      {% if agg_pending %}{{ t('ratings.agg.update.pending', at=agg_pending.requested_at.strftime(at_format), by=agg_pending.requested_by) }}
+      {% else %}<form method="post" action="{{ url(ratings_path ~ '/aggregators/update') }}?{{ request.query_string.decode() }}" class="rt-form">
+        <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>{% endif %}
+    {% if agg_failures %}<div class="rt-note">{{ t('ratings.agg.failed', names=agg_failed_names) }}
+      {% if may_manage %}<ul>{% for f in agg_failures %}<li title="{{ f.error or '' }}">{{ t('ratings.agg.failed_one', name=agg_names.get(f.aggregator, f.aggregator), at=f.at.strftime(at_format), ok=(t('ratings.agg.last_ok', at=f.last_ok.strftime(at_format)) if f.last_ok else t('ratings.agg.never_ok'))) }}{% if f.error %} — {{ f.error }}{% endif %}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
+  </section>
+  {% endif %}
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

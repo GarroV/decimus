@@ -26,7 +26,6 @@ from datetime import date
 from src.db import accept, move, previews, queries, reports, retract
 from src.db import letters as letters_store
 from src.db.config import load_retraction_settings
-from src.db.cross_space import Entry
 from src.db.errors import DatabaseTargetError, DbError, MoveError
 from src.db.models import InspectionDetail, InspectionRow, ItemUsage
 from src.db.reach import Reach
@@ -81,20 +80,32 @@ def retraction_available() -> bool:
     return True
 
 
-def load_registry(*, reach: Reach, limit: int) -> Registry:
+def load_registry(
+    *, reach: Reach, limit: int, date_from: date | None = None, date_to: date | None = None
+) -> Registry:
     """Проверки в охвате, свежие по дате обхода — первыми, и отдельно — ждущие приёмки.
 
     Очередь приёмки идёт по тому же охвату, что история (D283, D289): УК видит
     ждущие партнёра, но подтверждать их не может — это решает карточка.
+
+    Период (`date_from`/`date_to`, по дате обхода) сужает только историю:
+    очередь приёмки показывается целиком — ждущая не должна потеряться за
+    выбранным месяцем.
     """
     review = tuple(queries.list_inspections(reach=reach, limit=limit, on_review=True))
     if retraction_available():
         try:
-            rows = queries.list_inspections(reach=reach, limit=limit, include_retracted=True)
+            rows = queries.list_inspections(
+                reach=reach,
+                limit=limit,
+                include_retracted=True,
+                date_from=date_from,
+                date_to=date_to,
+            )
             return Registry(rows=tuple(rows), retracted_visible=True, review=review)
         except DbError as exc:
             _log_admin_read_failed("реестр", exc)
-    rows = queries.list_inspections(reach=reach, limit=limit)
+    rows = queries.list_inspections(reach=reach, limit=limit, date_from=date_from, date_to=date_to)
     return Registry(rows=tuple(rows), retracted_visible=False, review=review)
 
 
@@ -226,27 +237,23 @@ def load_letter(detail: InspectionDetail, *, lang: str | None = None) -> Letter:
     )
 
 
-def accept_card(
-    inspection_id: str, *, tenant: str, actor: str, journal: Entry | None = None
-) -> None:
+def accept_card(inspection_id: str, *, tenant: str, actor: str) -> None:
     """Подтвердить проверку своего пространства на приёмке (D199).
 
     Отказ — `AcceptError` блока `db`; проверка чужого пространства отвечает
     им же, тем же «нет», что несуществующая.
     """
-    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor, journal=journal)
+    accept.accept_inspection(inspection_id, tenant=tenant, actor=actor)
 
 
-def retract_card(
-    inspection_id: str, *, tenant: str, reason: str, journal: Entry | None = None
-) -> retract.Retraction:
+def retract_card(inspection_id: str, *, tenant: str, reason: str) -> retract.Retraction:
     """Снять проверку из истории. Отказ — `RetractionError` блока `db`.
 
     Своей проверки причины здесь нет: обязательность причины — правило снятия
     (D089), и живёт оно в `src/db/retract.py`. Продублированное здесь, оно
     разошлось бы с оригиналом при первой же правке.
     """
-    return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason, journal=journal)
+    return retract.retract_inspection(inspection_id, tenant=tenant, reason=reason)
 
 
 def load_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
@@ -288,14 +295,7 @@ def load_edition_since(*, reach: Reach, version: str) -> date | None:
 
 
 def move_card(
-    inspection_id: str,
-    *,
-    tenant: str,
-    new_date: str,
-    new_unit_id: str,
-    reason: str,
-    actor: str,
-    journal: Entry | None = None,
+    inspection_id: str, *, tenant: str, new_date: str, new_unit_id: str, reason: str, actor: str
 ) -> bool:
     """Перенести проверку по дате и пиццерии (D195). Отказ — `MoveError`.
 
@@ -314,7 +314,6 @@ def move_card(
         new_unit_id=new_unit_id,
         reason=reason,
         actor=actor,
-        journal=journal,
     )
 
 
@@ -351,13 +350,7 @@ def saved_letter(
 
 
 def remember_letter(
-    inspection_id: str,
-    *,
-    tenant: str,
-    body: str,
-    lang: str,
-    saved_by: str,
-    journal: Entry | None = None,
+    inspection_id: str, *, tenant: str, body: str, lang: str, saved_by: str
 ) -> letters_store.SavedLetter:
     """Зафиксировать письмо так, как его подтвердил человек.
 
@@ -365,7 +358,7 @@ def remember_letter(
     же, где запись. Вторая копия правил разошлась бы с первой молча.
 
     Разметка письма чистится здесь, при сохранении (`letter_markup`): через эту
-    функцию идут и «Сохранить», и «В черновики Google». Письмо из одной
+    функцию идут и «Сохранить», и «Сохранить черновик на почте». Письмо из одной
     разметки без слов уходит в запись пустым — и запись отказывает своим
     правилом «в нём нет текста», а не лежит в истории «отправленным».
     """
@@ -373,7 +366,7 @@ def remember_letter(
     if not letter_markup.to_plain(чистое).strip():
         чистое = ""
     return letters_store.save_letter(
-        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by, journal=journal
+        inspection_id, tenant=tenant, body=чистое, lang=lang, saved_by=saved_by
     )
 
 

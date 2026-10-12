@@ -19,7 +19,6 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 from src.db.directory import CreatedUnit
 from src.db.errors import PushError, UnitExistsError
 from src.db.reach import Reach
-from src.domain.permissions import DEFAULT_MATRIX, Actor
 from src.web import app as app_mod
 from src.web import auth, unit_add
 
@@ -100,13 +99,11 @@ def test_страна_вне_словаря_как_несуществующий_
 
 
 def test_страна_вне_охвата_закрыта() -> None:
-    уК = Actor(tenant="HQ", role="hq_staff", grants=DEFAULT_MATRIX["hq_staff"])
-    страна = Actor(tenant="RS", role="country_admin", grants=DEFAULT_MATRIX["country_admin"])
     узкий = Reach("HQ", None, ("GE",))
-    assert unit_add.may_add_in(уК, узкий, "GE")
-    assert not unit_add.may_add_in(уК, узкий, "RS")
-    assert unit_add.may_add_in(уК, Reach("HQ", None, None), "RS")
-    assert not unit_add.may_add_in(страна, Reach("RS", None, None), "RS")
+    assert unit_add.may_add_in("HQ", узкий, "GE")
+    assert not unit_add.may_add_in("HQ", узкий, "RS")
+    assert unit_add.may_add_in("HQ", Reach("HQ", None, None), "RS")
+    assert not unit_add.may_add_in("RS", Reach("RS", None, None), "RS")
 
 
 def test_чужой_источник_запроса_отказ(уК: FlaskClient, заведено: list[dict[str, Any]]) -> None:
@@ -116,10 +113,14 @@ def test_чужой_источник_запроса_отказ(уК: FlaskClient
 
 
 def test_вход_на_экране_страны_только_у_уК(monkeypatch: pytest.MonkeyPatch, заведено: Any) -> None:
-    for tenant, виден in (("HQ", True), ("GE", False)):
-        for client in стенд(monkeypatch, tenant=tenant, role="admin"):
-            страница = открыть(client, monkeypatch, данные(), "/country/GE")
-            assert ("/country/GE/units/new" in страница) is виден, tenant
+    # Список стран шапки — справочник базы, как в `test_web_country`.
+    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 1),))
+    for client in стенд(monkeypatch, tenant="HQ", role="admin"):
+        страница = открыть(client, monkeypatch, данные(), "/country/GE")
+        assert "/country/GE/units/new" in страница
+    # Партнёру «Страна» закрыта целиком (D370): ни экрана, ни входа на нём.
+    for client in стенд(monkeypatch, tenant="GE", role="admin"):
+        assert client.get("/country/GE").status_code == 404
 
 
 # --- что уходит в базу -------------------------------------------------------

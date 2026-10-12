@@ -1,0 +1,24 @@
+{#- Сведения о пиццерии из «Свода пиццерий» девелопмента (D374). Почта
+    партнёра — только УК (D375: под будущие письма, личные данные). Нет строки
+    в своде — блок так и говорит, а не исчезает. -#}
+<div class="ov-card">
+  <div class="ov-card__head">
+    <div class="ov-card__title">{{ t('unit.profile') }}</div>
+    <div class="ov-card__hint">{{ t('unit.profile.hint') }}</div>
+  </div>
+  {% if profile %}
+    <dl class="kv">
+      <div><dt class="muted">{{ t('unit.profile.status') }}</dt><dd>{{ t('unit.stage.' ~ profile.stage) }}{% if profile.status %} <span class="muted">({{ profile.status }})</span>{% endif %}</dd></div>
+      {% if profile.address %}<div><dt class="muted">{{ t('unit.profile.address') }}</dt><dd>{{ profile.address }}</dd></div>{% endif %}
+      {% if profile.partner %}<div><dt class="muted">{{ t('unit.profile.partner') }}</dt><dd>{{ profile.partner }}</dd></div>{% endif %}
+      {% if show_email and profile.partner_email %}<div><dt class="muted">{{ t('unit.profile.email') }}</dt><dd>{{ profile.partner_email }}</dd></div>{% endif %}
+      <div><dt class="muted">{{ t('unit.profile.restaurant') }}</dt><dd>{{ profile.restaurant_on or '—' }}</dd></div>
+      <div><dt class="muted">{{ t('unit.profile.delivery') }}</dt><dd>{{ profile.delivery_on or '—' }}</dd></div>
+      {% if profile.closed_on %}<div><dt class="muted">{{ t('unit.profile.closed') }}</dt><dd>{{ profile.closed_on }}</dd></div>{% endif %}
+      {% if profile.total_area %}<div><dt class="muted">{{ t('unit.profile.area') }}</dt><dd>{{ profile.total_area|round(0)|int }} m²</dd></div>{% endif %}
+      {% if profile.seats %}<div><dt class="muted">{{ t('unit.profile.seats') }}</dt><dd>{{ profile.seats }}</dd></div>{% endif %}
+    </dl>
+  {% else %}
+    <div class="ov-card__empty">{{ t('unit.profile.empty') }}</div>
+  {% endif %}
+</div>

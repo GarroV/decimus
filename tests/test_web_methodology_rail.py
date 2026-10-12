@@ -40,6 +40,7 @@ def test_колонка_в_работе_раньше_черновиков_сня
         space=None,
         lang="ru",
         state=method.RETIRED,
+        role="admin",
     )
 
     # Act

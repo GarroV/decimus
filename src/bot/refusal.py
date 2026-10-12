@@ -61,8 +61,8 @@ def item_title(code: str, lang: str, *, chat_id: int) -> str:
 
 
 def _holds_pair(finding: domain.Finding) -> bool:
-    """Занимает ли запись пару «пункт + зона». D0 не занимает (#444): вычета нет."""
-    return finding.level != "D0"
+    """Занимает ли запись пару «пункт + зона». D0 и R не занимают (#444, D201): вычета нет."""
+    return finding.level not in domain.NON_DEDUCTING
 
 
 def occupied_by(
