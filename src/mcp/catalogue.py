@@ -86,6 +86,12 @@ KIND_IMPORT = "import"
 #: (`rpc._call_tool`), обработчик живёт своим модулем `src.mcp.ratings_tools`.
 KIND_RATINGS = "ratings"
 
+#: Чтение рейтингов (D420). Седьмой вид: ничего не пишет, открыт и тем, кому
+#: управление рейтингами (`KIND_RATINGS`) закрыто, — аудитору УК и партнёру.
+#: Объявлен раньше инструментов: роль решает по виду (`policy.py`), и вид,
+#: которого матрица не знает, был бы закрыт всем молча.
+KIND_RATINGS_READ = "ratings_read"
+
 
 @dataclass(frozen=True)
 class ToolSpec:

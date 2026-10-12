@@ -29,6 +29,7 @@ from .catalogue import (
     KIND_IMPORT,
     KIND_INSPECTIONS,
     KIND_RATINGS,
+    KIND_RATINGS_READ,
 )
 
 #: Аудитор УК — роль учётки сайта, которой открыта проверка, но не методика.
@@ -39,18 +40,26 @@ KNOWN_ROLES = frozenset({AUDITOR_ROLE, CONTROL_ROLE, *ADMIN_ROLES})
 
 #: УК: админ и главный админ — всё, кроме снятия (D335, D344).
 _HQ_ADMIN = frozenset(
-    {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_IMPORT, KIND_RATINGS}
+    {
+        KIND_INSPECTIONS,
+        KIND_CHECKLIST_SOURCE,
+        KIND_CHECKLIST,
+        KIND_IMPORT,
+        KIND_RATINGS_READ,
+        KIND_RATINGS,
+    }
 )
 
-#: УК: аудитор читает проверки и эталон, методику не правит (D344).
-_HQ_AUDITOR = frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE})
+#: УК: аудитор читает проверки, эталон и рейтинги; методику не правит (D344).
+_HQ_AUDITOR = frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ})
 
-#: УК: контролинг — только рейтинги (D344, D358). Загрузка истории поверх
-#: роли (D350) не решена — до решения её нет.
-_HQ_CONTROL = frozenset({KIND_RATINGS})
+#: УК: контролинг — только рейтинги, чтение и управление; проверок не касается
+#: никак (D420, отменяет D350; D344, D358).
+_HQ_CONTROL = frozenset({KIND_RATINGS_READ, KIND_RATINGS})
 
-#: Партнёр, любая роль: чтение своих проверок (D335 — загрузки нет никогда).
-_PARTNER = frozenset({KIND_INSPECTIONS})
+#: Партнёр, любая роль: чтение своих проверок и рейтингов (D335 — загрузки нет
+#: никогда).
+_PARTNER = frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ})
 
 #: Снятие проверки (`KIND_RETRACTION`) не открыто ни одной строке намеренно:
 #: через OAuth его нет ни у кого (спека D417, «Безопасность»).
