@@ -46,6 +46,7 @@ from src.db import bot_links
 from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant, may_do_field_work
 
 from .inspection import read_inspection
@@ -115,11 +116,13 @@ class BindingCache:
         except DbError:
             if было is not None and сейчас - было[0] < self._stale_max:
                 logger.warning(
-                    "привязки не прочитались, Telegram ID %s — по последнему ответу", telegram_id
+                    "привязки не прочитались, Telegram ID %s — по последнему ответу",
+                    log_id(telegram_id),
                 )
                 return было[1]
             logger.warning(
-                "привязки не прочитались, Telegram ID %s — годного ответа нет, отказ", telegram_id
+                "привязки не прочитались, Telegram ID %s — годного ответа нет, отказ",
+                log_id(telegram_id),
             )
             return None
         self._known[telegram_id] = (сейчас, ответ)
@@ -161,12 +164,12 @@ class AccessMiddleware(BaseMiddleware):
             return None
         положение = await asyncio.to_thread(self._standing_of, user_id)
         if role_closed(положение):
-            logger.info("Telegram ID %s: роли учётки поле закрыто — отказ", user_id)
+            logger.info("Telegram ID %s: роли учётки поле закрыто — отказ", log_id(user_id))
             await _refuse_role(event)
             return None
         space = space_from(user_id, положение, allowed_ids=self._allowed_ids, roster=self._roster)
         if space is None:
-            logger.warning("отклонено обновление от постороннего Telegram ID %s", user_id)
+            logger.warning("отклонено обновление от постороннего Telegram ID %s", log_id(user_id))
             return None
         data[SPACE_KEY] = space
         return await handler(event, data)
@@ -177,10 +180,10 @@ class AccessMiddleware(BaseMiddleware):
         if self._bindings is not None:
             self._bindings.forget(user_id)
         if привязка is None:
-            logger.warning("негодная ссылка привязки от Telegram ID %s", user_id)
+            logger.warning("негодная ссылка привязки от Telegram ID %s", log_id(user_id))
             await _answer(event, "access.link_invalid")
             return
-        logger.info("Telegram ID %s привязан к учётке %s", user_id, привязка.login)
+        logger.info("Telegram ID %s привязан к учётке %s", log_id(user_id), log_id(привязка.login))
         await _answer(event, "access.linked", login=привязка.login)
 
     def _standing_of(self, user_id: int) -> Standing | None:
@@ -231,7 +234,7 @@ def space_from(
     откуда = _compat_source(user_id, allowed_ids, roster)
     if откуда is None:
         return None
-    logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", user_id, откуда)
+    logger.warning("путь совместимости: Telegram ID %s пущен как УК (%s)", log_id(user_id), откуда)
     return HQ_TENANT
 
 
@@ -311,7 +314,10 @@ class ChatSpaceMiddleware(BaseMiddleware):
         if чья is None or canonical_tenant(чья) == space:
             return await handler(event, data)
         logger.warning(
-            "апдейт из пространства %s к проверке пространства %s в чате %s", space, чья, chat.id
+            "апдейт из пространства %s к проверке пространства %s в чате %s",
+            log_id(space),
+            log_id(чья),
+            log_id(chat.id),
         )
         текст = t("access.foreign_space", chat_ui_lang(chat.id))
         if isinstance(event, CallbackQuery):

@@ -6,19 +6,19 @@
 спрашивается у того же правила (`role_choices`) — кнопка, которой нет в
 правиле, не рисуется.
 
-Карточка бывает четырёх видов: своя (`me` — логин, роль, пароль, бот), чужая
-(человек из перечня), форма «Добавить человека» и пустая подсказка. Своя
-открыта каждому вошедшему, даже тому, кто людьми не управляет: там его бот и
-пароль (D286, #324).
+Карточка бывает четырёх видов: своя (`me` — логин, роль и ссылка на
+«Настройки»), чужая (человек из перечня), форма «Добавить человека» и пустая
+подсказка. Своя открыта каждому вошедшему, даже тому, кто людьми не управляет.
+Пароль, бот и Claude — в «Настройках» (`settings_screen.py`, D447): там они
+одним набором, а не копией на каждой карточке.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
-from datetime import datetime
 from typing import Any
 
-from flask import current_app, render_template, request
+from flask import render_template, request
 
 from src.db import bot_links
 from src.db.errors import DbError
@@ -30,12 +30,8 @@ from . import (
     auth,
     partner_spaces,
     people,
-    profile,
-    users_claude,
-    users_mcp,
 )
 from .access_policy import Scope
-from .config import WEB_BOT_USERNAME_VAR
 from .db_refusal import note_target_mismatch
 from .sections import section
 from .users_view import (
@@ -54,9 +50,6 @@ SEES_BINDINGS = frozenset({access_policy.SUPER, access_policy.HQ_ADMIN})
 
 #: Ключ своей карточки в адресе: `?person=me`.
 ME = "me"
-
-#: Где приложение держит имя бота для ссылки привязки (`WEB_BOT_USERNAME`).
-BOT_USERNAME_KEY = "DECIMUS_BOT_USERNAME"
 
 
 @dataclass(frozen=True)
@@ -79,15 +72,9 @@ class Show:
     flash: Flash | None = None
     added: accounts.Added | None = None
     added_email_failed: bool = False
-    password: profile.Outcome | None = None
-    bot_link: str | None = None
-    bot_link_until: datetime | None = None
     add_space: bool = False
     #: Показать отключённых: после отключения человек не пропадает из виду.
     show_off: bool = False
-    #: Только что выпущенная команда Claude Desktop с личным токеном (D448):
-    #: показывается этим ответом и больше нигде не хранится.
-    token: users_mcp.Issued | None = None
 
 
 def people_scope() -> Scope | None:
@@ -165,16 +152,6 @@ def role_choices(круг: Scope | None, строка: Any) -> tuple[str, ...]:
     return access_policy.grantable_roles(круг, строка.tenant)
 
 
-def _own_binding() -> tuple[Any, bool]:
-    вошедший = auth.current_account()
-    if вошедший is None:
-        return None, True
-    try:
-        return bot_links.binding_of(вошедший.id), True
-    except DbError:
-        return None, False
-
-
 def _pick(
     show: Show, люди: tuple[Any, ...], список: tuple[Any, ...], manage: bool
 ) -> tuple[str, Any, bool]:
@@ -215,7 +192,6 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     if вкладка != TAB_SPACES or not есть_вкладка:
         вкладка = TAB_PEOPLE
     вид, строка, явно = _pick(show, люди, список, manage)
-    своя_привязка, своя_известна = _own_binding()
     привязки = _bindings(круг, люди)
     адрес = f"{request.script_root}{section('users').path}"
     язык = request.args.get("lang") or ""
@@ -239,13 +215,6 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             role_choices=lambda r: role_choices(круг, r),
             add_spaces=access_policy.spaces_for_add(круг, _all_spaces()) if круг else (),
             grantable=lambda s: access_policy.grantable_roles(круг, s) if круг else (),
-            own_binding=своя_привязка,
-            own_binding_known=своя_известна,
-            claude=users_claude.claude_connect(
-                getattr(auth.current_account(), "id", None),
-                current_app.config.get(users_claude.MCP_URL_KEY),
-            ),
-            mcp=users_mcp.own_status(getattr(auth.current_account(), "id", None)),
             show=show,
             me=auth.current_account(),
             manage=manage,
@@ -256,10 +225,6 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             # своя карточка стоит на странице, а не в панели (закрывать некуда).
             split_open=выбрано_пространство if вкладка == TAB_SPACES else явно and manage,
             split_back=link(tab=вкладка if вкладка == TAB_SPACES else ""),
-            bot_username=current_app.config.get(BOT_USERNAME_KEY),
-            bot_var=WEB_BOT_USERNAME_VAR,
-            min_password=accounts.MIN_PASSWORD_LENGTH,
-            max_password=accounts.MAX_PASSWORD_LENGTH,
         ),
         code,
     )

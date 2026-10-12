@@ -157,6 +157,34 @@ cases = [
         "        выпущен = mcp_access.issue_token(int(request.get_json().get('id', who)))",
         "tests/test_web_walk_app.py::test_выпуск_не_принимает_чужой_id",
     ),
+    # F-034: приложить можно только свой кадр.
+    (
+        "src/domain/uploads.py",
+        "    if path is None or not _mark_path(ref, owner, settings).is_file():",
+        "    if path is None:",
+        "tests/test_web_walk_uploads.py::test_чужой_кадр_по_ссылке_не_прикладывается_и_не_показывается",
+    ),
+    # F-033: квота кадров на чат за сутки.
+    (
+        "src/domain/uploads.py",
+        "        _check_quota(owner, len(raw), settings)\n",
+        "",
+        "tests/test_web_walk_uploads.py::test_квота_кадров_за_сутки_отказывает_словами",
+    ),
+    # F-033: уборка не трогает кадр, на который ссылается база.
+    (
+        "src/domain/upload_sweep.py",
+        "    attached = _digests(keep) | referenced_in_state(settings.state_dir)",
+        "    attached = referenced_in_state(settings.state_dir)",
+        "tests/test_web_walk_uploads.py::test_уборка_снимает_брошенный_и_не_трогает_привязанные",
+    ),
+    # F-033: без базы уборка не идёт.
+    (
+        "src/bot/upload_sweeper.py",
+        "        return None\n    return sweep_uploads",
+        "        keep = set()\n    return sweep_uploads",
+        "tests/test_web_walk_uploads.py::test_без_базы_уборка_не_удаляет_ничего",
+    ),
 ]
 bad = 0
 for path, old, new, test in cases:

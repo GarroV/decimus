@@ -35,7 +35,7 @@ from aiogram.types import (
 
 from src import domain
 
-from . import agg_loader, frame_copies, maps_loader, photo_backfill
+from . import agg_loader, frame_copies, maps_loader, photo_backfill, upload_sweeper
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import BotSettings, load_bot_settings
@@ -381,6 +381,8 @@ async def start_polling() -> None:
     # на MUSPELHEIM засыпает, и вернуть кадры потом может только бот — байты
     # есть у телеграма, а токен у него одного.
     backfill = asyncio.create_task(photo_backfill.backfill_forever(bot))
+    # Брошенные кадры мини-аппа старше недели (F-033, #531): без базы не убирает.
+    uploads = asyncio.create_task(upload_sweeper.sweep_forever())
     # Оценки пиццерий на картах из Pointer — раз в сутки (docs/09-pointer-api.md).
     map_ratings = asyncio.create_task(maps_loader.load_forever())
     # Оценки пиццерий в агрегаторах доставки — раз в сутки (D389, docs/17-aggregators.md).
@@ -390,6 +392,7 @@ async def start_polling() -> None:
     finally:
         sweeper.cancel()
         backfill.cancel()
+        uploads.cancel()
         map_ratings.cancel()
         agg_ratings.cancel()
         await bot.session.close()

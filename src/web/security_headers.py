@@ -111,8 +111,9 @@ WALK_HEADERS: dict[str, str] = {
 }
 
 
-#: Страницы, которые браузер не кэширует: экран людей показывает новый пароль один раз.
-NO_STORE_PREFIX = "/users"
+#: Страницы, которые браузер не кэширует: экран людей показывает новый пароль один
+#: раз, «Настройки» — токен Claude и ссылку привязки бота (D447).
+NO_STORE_PREFIXES = ("/users", "/settings")
 
 
 def install(app: Flask, *, hsts: bool) -> None:
@@ -133,7 +134,7 @@ def install(app: Flask, *, hsts: bool) -> None:
         if request.endpoint == oauth.AUTHORIZE_ENDPOINT:
             response.headers["Content-Security-Policy"] = OAUTH_CONTENT_SECURITY_POLICY
         путь = request.path
-        if путь == NO_STORE_PREFIX or путь.startswith(f"{NO_STORE_PREFIX}/"):
+        if any(путь == p or путь.startswith(f"{p}/") for p in NO_STORE_PREFIXES):
             # Свой заголовок маршрута с `no-store` не затирается: страница ключа
             # «Подключений» отдаёт `private, no-store` (D425).
             if "no-store" not in response.headers.get("Cache-Control", ""):

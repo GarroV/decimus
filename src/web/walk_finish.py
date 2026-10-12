@@ -44,6 +44,7 @@ from typing import TYPE_CHECKING
 
 from src.domain import get_state, set_report_lang
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -79,7 +80,7 @@ def has_inspection(chat_id: int) -> bool:
     try:
         return get_state(chat_id) is not None
     except DomainError:
-        logger.exception("Завершение из приложения: состояние чата %s не читается", chat_id)
+        logger.exception("Завершение из приложения: состояние чата %s не читается", log_id(chat_id))
         return True
 
 
@@ -117,9 +118,9 @@ def send_summary(token: str, chat_id: int) -> str:
     try:
         asyncio.run(_send_summary(token, chat_id))
     except Exception:  # — сеть, Bot API, расчёт: любой сбой — отказ словами экрана
-        logger.exception("Завершение из приложения: итог в чат %s не ушёл", chat_id)
+        logger.exception("Завершение из приложения: итог в чат %s не ушёл", log_id(chat_id))
         return FAILED
-    logger.info("Завершение из приложения: итог ушёл в чат %s", chat_id)
+    logger.info("Завершение из приложения: итог ушёл в чат %s", log_id(chat_id))
     return SENT
 
 
@@ -136,7 +137,7 @@ async def _deliver_report(token: str, chat_id: int) -> None:
         try:
             await deliver(_stub_message(bot, chat_id), chat_id, lang, allow_missing=False)
         except Exception:  # — человек уже вышел из приложения: молчать нельзя
-            logger.exception("Завершение из приложения: отчёт чата %s не собрался", chat_id)
+            logger.exception("Завершение из приложения: отчёт чата %s не собрался", log_id(chat_id))
             await bot.send_message(chat_id, t("finish.pdf_failed", lang))
     finally:
         await bot.session.close()
@@ -145,9 +146,11 @@ async def _deliver_report(token: str, chat_id: int) -> None:
 def _run_report(token: str, chat_id: int) -> None:
     try:
         asyncio.run(_deliver_report(token, chat_id))
-        logger.info("Завершение из приложения: сборка отчёта чата %s закончена", chat_id)
+        logger.info("Завершение из приложения: сборка отчёта чата %s закончена", log_id(chat_id))
     except Exception:  # — даже письмо об отказе не ушло: остаётся журнал
-        logger.exception("Завершение из приложения: отчёт чата %s — сбой без ответа в чат", chat_id)
+        logger.exception(
+            "Завершение из приложения: отчёт чата %s — сбой без ответа в чат", log_id(chat_id)
+        )
     finally:
         with _building_lock:
             _building.discard(chat_id)
@@ -166,7 +169,9 @@ def offered_report_langs(chat_id: int) -> list[str]:
     try:
         return _offered(chat_id) or []
     except DomainError:
-        logger.warning("Завершение из приложения: языки отчёта чата %s", chat_id, exc_info=True)
+        logger.warning(
+            "Завершение из приложения: языки отчёта чата %s", log_id(chat_id), exc_info=True
+        )
         return []
 
 
@@ -200,7 +205,9 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
                 return ReportStart(BUSY)
             _building.add(chat_id)
     except DomainError:
-        logger.exception("Завершение из приложения: чат %s — состояние не читается", chat_id)
+        logger.exception(
+            "Завершение из приложения: чат %s — состояние не читается", log_id(chat_id)
+        )
         return ReportStart(FAILED)
     try:
         set_report_lang(chat_id, chosen)
@@ -208,9 +215,9 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
             target=_run_report, args=(token, chat_id), name=f"walk-report-{chat_id}", daemon=True
         ).start()
     except Exception:  # — до запуска потока: освободить чат, иначе он заперт навсегда
-        logger.exception("Завершение из приложения: отчёт чата %s не запущен", chat_id)
+        logger.exception("Завершение из приложения: отчёт чата %s не запущен", log_id(chat_id))
         with _building_lock:
             _building.discard(chat_id)
         return ReportStart(FAILED)
-    logger.info("Завершение из приложения: сборка отчёта чата %s запущена", chat_id)
+    logger.info("Завершение из приложения: сборка отчёта чата %s запущена", log_id(chat_id))
     return ReportStart(STARTED)

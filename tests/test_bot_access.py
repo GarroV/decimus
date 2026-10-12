@@ -26,6 +26,7 @@ from src.bot.roster import Roster
 from src.bot.texts import t
 from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.db.errors import AccessError
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT
 
 pytestmark = pytest.mark.asyncio
@@ -269,4 +270,8 @@ async def test_каждый_пуск_по_совместимости_пишет�
         assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
         assert await _пустить(mw, _msg(111)[0]) == HQ_TENANT
     строки = [r.getMessage() for r in caplog.records if "совместимости" in r.getMessage()]
-    assert строки == ["путь совместимости: Telegram ID 111 пущен как УК (ALLOWED_TELEGRAM_IDS)"] * 2
+    assert (
+        строки
+        == [f"путь совместимости: Telegram ID {log_id(111)} пущен как УК (ALLOWED_TELEGRAM_IDS)"]
+        * 2
+    )

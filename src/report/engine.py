@@ -43,6 +43,7 @@ from src.domain.engine import (
     state_file,
 )
 from src.domain.errors import InspectionNotStarted
+from src.domain.log_ids import log_id
 from src.domain.state import settings_for
 
 from .errors import ReportError
@@ -145,7 +146,7 @@ def _refuse_no_verdict(args: Sequence[str], *, output: str, attempt: int, chat_i
     started = "старт не состоялся" if RUNTIME_BEFORE_SCRIPT in output else "умер после старта"
     logger.warning(
         "интерпретатор сборщика отчёта умер в чате %s (%s, попытка %s, %s): %s",
-        chat_id,
+        log_id(chat_id),
         started,
         attempt,
         "повторяем" if again else "больше не повторяем",

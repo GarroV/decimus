@@ -364,6 +364,12 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Фото не принято: нужен снимок JPEG не больше 10 МБ.",
         "en": "The photo was not accepted: a JPEG up to 10 MB is needed.",
     },
+    "walk.err.photo_quota": {
+        "ru": "Лимит фото на сегодня исчерпан — новые кадры примутся через сутки. "
+        "Если это живая проверка, напишите администратору.",
+        "en": "Today's photo limit is used up — new photos will be accepted within a day. "
+        "If this is a live inspection, contact the administrator.",
+    },
     "walk.err.empty_answer": {
         "ru": "Пустой ответ не сохраняется — просто оставьте поле незаполненным.",
         "en": "An empty answer is not saved — just leave the field blank.",

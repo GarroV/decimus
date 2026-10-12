@@ -123,8 +123,10 @@ _SCREEN: dict[str, dict[str, str]] = {
     },
     "users.self.title": {"ru": "Людей добавляет админ", "en": "An admin adds people"},
     "users.self.text": {
-        "ru": "Список людей вам не открыт. Здесь ваша учётка: роль, пароль, бот.",
-        "en": "The list of people is not open to you. Here is your account: role, password, bot.",
+        "ru": "Список людей вам не открыт. Здесь ваша учётка: роль и вход; пароль, бот и "
+        "Claude — в «Настройках».",
+        "en": "The list of people is not open to you. Here is your account: role and sign-in; "
+        "password, bot and Claude are in “Settings”.",
     },
     "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
     "users.forbidden.note": {
@@ -538,8 +540,8 @@ _CARD: dict[str, dict[str, str]] = {
         "en": "A password cannot be reset from the screen yet — the maintenance command does it.",
     },
     "users.panel.bot_self_only": {
-        "ru": "Привязать бота человек может сам в своей карточке.",
-        "en": "The person links the bot in their own card.",
+        "ru": "Привязать бота человек может сам в своих «Настройках».",
+        "en": "The person links the bot in their own “Settings”.",
     },
     "users.panel.access_title": {"ru": "Доступ к учётке", "en": "Account access"},
     "users.panel.active": {

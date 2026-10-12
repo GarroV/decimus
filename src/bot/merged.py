@@ -36,6 +36,7 @@ from aiogram.types import Message
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.recognize.config import DEFAULT_LANG
 from src.recognize.errors import RecognizeError
 from src.recognize.merge import merge_wording
@@ -76,7 +77,7 @@ async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang:
         logger.warning(
             "комментарий записи #%s в чате %s не сведён моделью — остался прежним",
             taken.n,
-            chat_id,
+            log_id(chat_id),
             exc_info=True,
         )
         return taken.text
@@ -88,7 +89,7 @@ async def _rewrite(chat_id: int, taken: domain.Finding, words: str, report_lang:
         logger.exception(
             "сведённый комментарий записи #%s в чате %s движок не принял — остался прежним",
             taken.n,
-            chat_id,
+            log_id(chat_id),
         )
         return taken.text
     return text

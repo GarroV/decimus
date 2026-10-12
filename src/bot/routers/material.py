@@ -36,6 +36,8 @@ from collections.abc import Awaitable, Callable
 from aiogram import F, Router
 from aiogram.types import Message
 
+from src.domain.log_ids import log_id
+
 from .. import frame_copies, sealed, sidecar
 from ..albums import ALBUM_WINDOW_SECONDS, AlbumBuffer, Frame
 from ..inspection import read_inspection
@@ -148,7 +150,7 @@ def build_material_router(
         except Exception:
             # Задача фоновая: без явного журнала её отказ не увидит никто, а
             # аудитор останется без ответа на присланный альбом.
-            logger.exception("не удалось закрыть альбом %s в чате %s", group_key, chat_id)
+            logger.exception("не удалось закрыть альбом %s в чате %s", group_key, log_id(chat_id))
 
     def schedule_close(message: Message, chat_id: int, group_key: str) -> None:
         task = asyncio.create_task(close_after_window(message, chat_id, group_key))
