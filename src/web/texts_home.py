@@ -8,8 +8,7 @@
 from __future__ import annotations
 
 HOME_TEXTS: dict[str, dict[str, str]] = {
-    "home.only": {"ru": "Только {country}", "en": "Only {country}"},
-    "home.only.clear": {"ru": "Показать все страны", "en": "Show all countries"},
+    "home.country.all": {"ru": "Все страны", "en": "All countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D398) ─────────────
@@ -84,15 +83,6 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Оценки рейтинга не загрузились: в колонках РС и РКО прочерки.",
         "en": "Rating scores did not load: the RS and CX columns show dashes.",
     },
-    # ── Страны ───────────────────────────────────────────────────────────
-    "home.countries.title": {"ru": "Страны", "en": "Countries"},
-    "home.countries.hint": {
-        "ru": "Щелчок по стране сужает всю главную",
-        "en": "Click a country to narrow the whole page",
-    },
-    "home.countries.country": {"ru": "Страна", "en": "Country"},
-    "home.countries.units": {"ru": "Проверено", "en": "Inspected"},
-    "home.countries.average": {"ru": "Средняя", "en": "Average"},
     # ── Пиццерии ────────────────────────────────────────────────────────
     "home.units.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "home.units.empty": {
