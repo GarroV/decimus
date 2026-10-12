@@ -472,7 +472,7 @@ async def start_polling() -> None:
     # Оценки пиццерий на картах из Pointer — раз в сутки (docs/09-pointer-api.md).
     map_ratings = asyncio.create_task(maps_loader.load_forever())
     # Оценки пиццерий в агрегаторах доставки — раз в сутки (D389, docs/17-aggregators.md).
-    agg_ratings = asyncio.create_task(agg_loader.load_forever(bot))
+    agg_ratings = asyncio.create_task(agg_loader.load_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
