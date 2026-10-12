@@ -74,7 +74,7 @@ x-stand: &stand
 # в `environment` КАЖДОГО сервиса с `<<: *no-owner` (слияние YAML поверхностное,
 # якорь `stand` свой `environment` у сервиса не передаёт). Владельца получает
 # один сервис — `migrate` ниже, одноразовый, и именно поэтому в нём этого
-# слияния нет. Держит это `tests/test_compose_no_owner_dsn.py`.
+# слияния нет. Держит это `tests/test_no_owner_dsn_in_services.py`.
 x-no-owner: &no-owner
   DATABASE_ADMIN_URL: ""
   POSTGRES_PASSWORD: ""
