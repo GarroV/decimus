@@ -60,7 +60,8 @@ list_items(zone: str | None = None) -> list[ChecklistItem]   # ChecklistItem: co
 list_zones() -> list[Zone]                                    # Zone: code, title_ru, title_en, share_pct
 allowed_levels(code: str) -> list[str]                        # какие классы допустимы для пункта
 get_state(chat_id: int) -> Inspection | None                  # None, если проверки нет
-start_inspection(chat_id: int, unit: str, kind: str, report_lang: str) -> Inspection
+start_inspection(chat_id: int, unit: str, kind: str, report_lang: str, *, speech_lang=..., ...) -> Inspection   # на старте report_lang = язык чек-листа (D415)
+set_report_lang(chat_id: int, lang: str) -> Inspection        # язык отчёта в конце проверки (D415); единственный способ его сменить
 add_finding(chat_id: int, code: str, level: str, zone: str, text: str) -> Finding   # отказ, если пара «код+зона» уже есть
 edit_finding(chat_id: int, n: int, **fields) -> Finding
 drop_finding(chat_id: int, n: int) -> None

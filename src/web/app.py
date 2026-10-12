@@ -67,6 +67,7 @@ from . import (
     revision,
     security_headers,
     swarm_api,
+    to_inspect,
     unit_add,
     users_screen,
     users_view,
@@ -597,6 +598,17 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
+def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
+    """Куда ведёт точка из «Где нужно проверить»: карточка в «Стране» (УК) или в «Пиццериях»."""
+    if item.unit_id and item.country and hq:
+        return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
+            f"#unit-{item.unit_id}"
+        )
+    if item.unit_id:
+        return _url("unit", unit_id=item.unit_id, lang=lang)
+    return _url("registry", lang=lang)
+
+
 def _register_registry(app: Flask, conf: Settings) -> None:
     """Раздел «Проверки»: реестр, карточка, снятие."""
 
@@ -644,9 +656,26 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         выбрано = request.args.get("inspection", "").strip()[:64]
         панель = _registry_panel(выбрано, conf=conf)
+        # «Где нужно проверить» (D418): у точек без проверок нет ни буквы, ни вида,
+        # поэтому при отборе по ним блок не показывается — он противоречил бы отбору.
+        ждут = (
+            to_inspect.Block()
+            if отбор_в.grade or отбор_в.kind
+            else to_inspect.load(
+                reach=auth.current_reach(),
+                date_from=период.start,
+                date_to=период.end,
+                country=отбор_в.country,
+                city=отбор_в.city,
+                query=отбор_в.q,
+            )
+        )
+        hq = auth.current_tenant() == HQ_TENANT
         return render_template(
             "inspections/list.html",
             registry=registry_data,
+            to_check=ждут,
+            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
             rows=строки,
             picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
             grade_tone=view.grade_tone,

@@ -70,6 +70,39 @@
 
   function zoneStarted(zone) { return !zoneDone(zone) && zone.recorded.length > 0; }
 
+  /** Сколько нарушений записано в зоне: замеры (D0), рекомендации и заметки — не нарушения. */
+  function violationCount(zone) {
+    return zone.recorded.filter(function (r) { return /^D[1-9]/.test(r.level); }).length;
+  }
+
+  /** Значок состояния зоны (D422): пунктир — не осмотрена; полкруга — в работе;
+   *  галка — осмотрена, чисто; число — записано нарушений. Название — в aria-label и title. */
+  function zoneIcon(zone) {
+    var done = zoneDone(zone);
+    var n = violationCount(zone);
+    var node;
+    var key;
+    if (n) {
+      node = el("span", "walk-zic is-found" + (done ? " is-done" : ""), String(n));
+      key = done ? "found_done" : "found_open";
+    } else if (done) {
+      node = el("span", "walk-zic is-clean");
+      node.appendChild(W.icon("check"));
+      key = "clean";
+    } else if (zone.recorded.length) {
+      node = el("span", "walk-zic is-started");
+      key = "started";
+    } else {
+      node = el("span", "walk-zic");
+      key = "todo";
+    }
+    var label = tx("walk.zone.ic." + key, { count: n });
+    node.setAttribute("role", "img");
+    node.setAttribute("aria-label", label);
+    node.title = label;
+    return node;
+  }
+
   function stateClass(zone) { return zoneDone(zone) ? " is-done" : zoneStarted(zone) ? " is-started" : ""; }
 
   var ADVICE_LEVEL = "R";
@@ -258,7 +291,7 @@
       var tile = W.button("walk-tile" + stateClass(z) + (openPrevious(z) ? " has-attention" : "") +
         (z.code === zone.code ? " is-here" : ""), null, function () { go(z.code); });
       var name = el("span", "walk-tile__name");
-      name.appendChild(el("span", "walk-tile__check" + stateClass(z), zoneDone(z) ? "✓" : ""));
+      name.appendChild(zoneIcon(z));
       name.appendChild(el("span", null, z.title));
       tile.appendChild(name);
       tile.appendChild(el("span", "walk-tile__meta", tileMeta(z)));
@@ -279,7 +312,7 @@
     var main = W.button("walk-switch__main", null, function () { setPanel(!S.panel); });
     main.setAttribute("aria-expanded", S.panel ? "true" : "false");
     main.setAttribute("aria-label", zone.title + ". " + tx("walk.switch.all"));
-    main.appendChild(el("span", "walk-switch__check" + stateClass(zone), zoneDone(zone) ? "✓" : ""));
+    main.appendChild(zoneIcon(zone));
     var label = el("span", "walk-switch__label");
     label.appendChild(el("span", "walk-switch__name", zone.title));
     label.appendChild(el("span", "walk-switch__state",
@@ -386,6 +419,9 @@
     });
   }
 
+  /** Сколько пунктов чек-листа видно сразу; остальное — по «Показать ещё» (D422). */
+  var CL_LIMIT = 15;
+
   /** Чек-лист зоны: что здесь смотреть. Пункт — вход в запись по нему. */
   function renderChecklist(zone) {
     var items = zoneItems(zone);
@@ -414,7 +450,8 @@
     var inner = el("div", "walk-cl__inner");
     if (writable()) inner.appendChild(el("p", "walk-cl__hint", tx("walk.cl.hint")));
     var list = el("ul", "walk-cl__list");
-    items.forEach(function (i) {
+    var rest = S.clAll === zone.code ? 0 : Math.max(0, items.length - CL_LIMIT);
+    items.slice(0, items.length - rest).forEach(function (i) {
       var li = el("li");
       var done = rec[i.code];
       var b = W.button("walk-cl__item" + (done ? " is-recorded" : ""), null, function () {
@@ -429,6 +466,12 @@
       list.appendChild(li);
     });
     inner.appendChild(list);
+    if (rest) {
+      inner.appendChild(W.button("walk-cl__more", tx("walk.cl.more", { count: rest }), function () {
+        S.clAll = zone.code;
+        render();
+      }));
+    }
     wrap.appendChild(inner);
     box.appendChild(wrap);
     return box;
@@ -470,6 +513,7 @@
     if (zone.equipment) {
       stage.appendChild(renderEquipment(zone));
       if (zoneDone(zone)) stage.appendChild(unmarkRow(zone));
+      if (writable() && !allDone()) stage.appendChild(finishLink());
       return stage;
     }
     if (zone.previous.length) {
@@ -485,7 +529,7 @@
       own.forEach(function (r) { now.appendChild(renderRecord(r, zone)); });
       stage.appendChild(now);
     } else if (!zone.previous.length && writable()) {
-      stage.appendChild(el("p", "walk-stage__note", zoneDone(zone) ? tx("walk.zone.clean_done") : tx("walk.zone.empty_hint")));
+      if (zoneDone(zone)) stage.appendChild(el("p", "walk-stage__note", tx("walk.zone.clean_done")));
     }
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);
@@ -497,6 +541,7 @@
       }));
     }
     if (zoneDone(zone)) extra.appendChild(unmarkButton(zone));
+    if (writable() && !allDone()) extra.appendChild(finishLink());
     if (extra.childNodes.length) stage.appendChild(extra);
     return stage;
   }
@@ -539,16 +584,27 @@
     else render();
   }
 
+  function allDone() { return S.data.zones.every(zoneDone); }
+
+  /** Тихая ссылка «Завершить проверку» в конце зоны: вход виден, пока не все зоны осмотрены. */
+  function finishLink() {
+    return W.button("walk-link walk-link--quiet", tx("walk.finish.title"), W.finish.ask);
+  }
+
   function renderDock(zone) {
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
-    row.appendChild(W.button("walk-mark walk-dock__add", "+ " + tx("walk.add.short"), function () {
+    var add = W.button("walk-mark walk-dock__add", null, function () {
       // На остановке «Оборудование» зоны нет — её выберут в форме.
       W.sheet.open({ mode: "violation", zone: zone.equipment ? null : zone.code });
-    }));
+    });
+    add.appendChild(W.icon("camera"));
+    add.appendChild(el("span", null, "+ " + tx("walk.add.short")));
+    row.appendChild(add);
     var next = nextOpen(zone.code);
     var label;
     var act;
+    var finish = allDone();
     if (!zoneDone(zone)) {
       label = tx("walk.next.mark");
       act = function () { markAndNext(zone); };
@@ -556,10 +612,11 @@
       label = tx("walk.next.go");
       act = function () { go(next.code, 1); };
     } else {
-      label = tx("walk.next.info");
-      act = openInfo;
+      // Все зоны осмотрены: главное действие — завершить (D422).
+      label = tx("walk.finish.dock");
+      act = W.finish.ask;
     }
-    row.appendChild(W.button("walk-dock__next", label, act));
+    row.appendChild(W.button("walk-dock__next" + (finish ? " is-finish" : ""), label, act));
     dock.appendChild(row);
     return dock;
   }
@@ -775,20 +832,35 @@
     // Аудитор вернулся из чата, где мог записать нарушение, — данные свежие.
     tg.onEvent("activated", load);
   }
-  // Свайп по зоне влево-вправо — соседняя зона, как листают страницы.
-  // Только явно горизонтальный жест: вертикальная прокрутка его не задевает.
+  // Свайп влево-вправо по всему экрану — соседняя зона, как стрелки ‹ › (D422). Только явно
+  // горизонтальный жест. Не считается, если начат в полосе, которая листается
+  // вбок («Осталось»), в поле ввода, в открытом листе или меню.
+  var SWIPE_MIN_PX = 60;
+  var SWIPE_RATIO = 1.5;
+  var SWIPE_SKIP = ".walk-hints, .walk-strip, input, textarea, select, [contenteditable], " +
+    ".walk-sheet, .walk-zsheet, .walk-confirm";
+
+  function scrollsSideways(node) {
+    for (var n = node; n && n !== document.body && n !== document.documentElement; n = n.parentElement) {
+      if (n.scrollWidth > n.clientWidth + 1 && /(auto|scroll)/.test(window.getComputedStyle(n).overflowX)) return true;
+    }
+    return false;
+  }
+
   var touch = null;
-  root.addEventListener("touchstart", function (e) {
+  document.addEventListener("touchstart", function (e) {
     var t = e.touches[0];
-    touch = e.target.closest(".walk-stage") && e.touches.length === 1 ? { x: t.clientX, y: t.clientY } : null;
+    var ok = e.touches.length === 1 && !e.target.closest(SWIPE_SKIP) && !scrollsSideways(e.target);
+    touch = ok ? { x: t.clientX, y: t.clientY } : null;
   }, { passive: true });
-  root.addEventListener("touchend", function (e) {
-    if (!touch || !S.data || !S.data.zones || W.sheet.isOpen() || S.info || S.panel) return;
+  document.addEventListener("touchcancel", function () { touch = null; }, { passive: true });
+  document.addEventListener("touchend", function (e) {
+    if (!touch || !S.data || !S.data.zones || !W.app.showsWalk() || W.sheet.isOpen() || S.info || S.panel) return;
     var t = e.changedTouches[0];
     var dx = t.clientX - touch.x;
     var dy = t.clientY - touch.y;
     touch = null;
-    if (Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * 0.6) return;
+    if (Math.abs(dx) < SWIPE_MIN_PX || Math.abs(dx) <= Math.abs(dy) * SWIPE_RATIO) return;
     var zones = S.data.zones;
     var at = zoneIndex(S.open);
     var n = zones.length;

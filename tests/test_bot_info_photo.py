@@ -46,6 +46,7 @@ from bot_harness import (
     feed,
     make_bot,
     photo_message,
+    press_build,
     text_message,
 )
 from bot_harness import callback_query as callback
@@ -88,7 +89,7 @@ def поле(code: str = ПЕРВОЕ) -> dict[str, Any]:
 
 async def дойти_до_информационной_части(dp: Any, bot: Any) -> None:
     await feed(dp, bot, text_message("/finish"))
-    await feed(dp, bot, callback("fin:build"))
+    await press_build(dp, bot)
 
 
 class _ФотоСессия(RecordingSession):

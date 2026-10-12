@@ -7,14 +7,14 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from src.bot.errors import BotTextError
 from src.bot.keyboards import (
     KIND_PREFIX,
-    LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
+    REPORT_LANG_PREFIX,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     kind_keyboard,
     kind_title,
-    lang_keyboard,
     new_inspection_keyboard,
+    report_lang_keyboard,
     resume_keyboard,
 )
 
@@ -66,11 +66,14 @@ def test_kind_title_refuses_a_language_it_has_no_word_for() -> None:
         raise AssertionError("незаведённый язык вида проверки прошёл молча")
 
 
-def test_lang_keyboard_callback_codes_match_report_lang_values() -> None:
-    """Код кнопки языка — это и есть значение report_lang (`ru`/`en`), без второй таблицы."""
-    buttons = _flat_buttons(lang_keyboard())  # язык называют на нём самом
-    codes = {button.callback_data.removeprefix(LANG_PREFIX) for button in buttons}
-    assert codes == {"ru", "en"}
+def test_report_lang_keyboard_offers_only_the_given_languages_in_order() -> None:
+    """Код кнопки — значение report_lang; предлагаются только языки страны, в её порядке."""
+    buttons = _flat_buttons(report_lang_keyboard(["en", "ru"]))
+    assert [b.callback_data for b in buttons] == [
+        f"{REPORT_LANG_PREFIX}en",
+        f"{REPORT_LANG_PREFIX}ru",
+    ]
+    assert all(len(b.callback_data.encode()) <= 64 for b in buttons)
 
 
 def test_resume_keyboard_has_continue_and_new_buttons() -> None:

@@ -49,7 +49,6 @@ _SCREEN: dict[str, dict[str, str]] = {
         "en": "Average standards and customer experience",
     },
     "ratings.group.cluster": {"ru": "Кластер", "en": "Cluster"},
-    "ratings.more": {"ru": "ещё {n}", "en": "{n} more"},
     "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
     "ratings.cluster.OTHER": {"ru": "Другие страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
@@ -78,20 +77,50 @@ _SCREEN: dict[str, dict[str, str]] = {
     "ratings.cluster": {"ru": "Топ-5", "en": "Top 5"},
     "ratings.violations.total": {"ru": "Всего: {n}", "en": "Total: {n}"},
     "ratings.violations.per": {"ru": "На проверку: {x}", "en": "Per check: {x}"},
-    "ratings.block.rs_top": {
-        "ru": "По проверкам РС: Top-10 и Bottom-10",
-        "en": "Standards: top 10 and bottom 10",
-    },
-    "ratings.block.rko_top": {
-        "ru": "По проверкам РКО: Top-10 и Bottom-10",
-        "en": "Customer experience: top 10 and bottom 10",
-    },
     "ratings.top": {"ru": "Выше {x}", "en": "Above {x}"},
     "ratings.bottom": {"ru": "{x} и ниже", "en": "{x} and below"},
-    "ratings.block.rs_hard": {"ru": "Хард-нарушения РС", "en": "Standards: hard violations"},
-    "ratings.block.rko_hard": {
-        "ru": "Хард-нарушения РКО",
-        "en": "Customer experience: hard violations",
+    "ratings.block.top": {"ru": "Top-10 и Bottom-10", "en": "Top 10 and bottom 10"},
+    "ratings.block.hard": {"ru": "Хард-нарушения РС и РКО", "en": "Hard violations"},
+    "ratings.empty.rs_rko": {
+        "ru": "За период нет данных РС и РКО.",
+        "en": "No standards or customer experience data for this period.",
+    },
+    "ratings.empty.hard": {"ru": "Хард-нарушений не найдено.", "en": "No hard violations found."},
+    "ratings.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "ratings.col.violation": {"ru": "Нарушение", "en": "Violation"},
+    "ratings.col.amount": {"ru": "Раз", "en": "Times"},
+    "ratings.col.scores": {"ru": "Оценки по периодам", "en": "Scores by period"},
+    "ratings.filter.country": {"ru": "Страна", "en": "Country"},
+    "ratings.filter.all": {"ru": "Все", "en": "All"},
+    "ratings.block.maps": {
+        "ru": "Оценки на картах и в агрегаторах",
+        "en": "Ratings on maps and in delivery apps",
+    },
+    "ratings.layout.maps": {
+        "ru": "Оценки на картах и в агрегаторах",
+        "en": "Map and delivery app ratings",
+    },
+    "ratings.maps.hint": {
+        "ru": "Средняя по всем отзывам и оценкам пиццерий группы",
+        "en": "Average over all reviews and ratings of the group's pizzerias",
+    },
+    "ratings.maps.reviews": {"ru": "{n} отз.", "en": "{n} reviews"},
+    "ratings.agg.points": {"ru": "пиццерий: {n}", "en": "pizzerias: {n}"},
+    "ratings.maps.title": {"ru": "Карты, Pointer", "en": "Maps, Pointer"},
+    "ratings.agg.title": {
+        "ru": "Агрегаторы доставки, шкала агрегатора",
+        "en": "Delivery apps, app's own scale",
+    },
+    "ratings.maps.branches_n": {"ru": "филиалов: {n}", "en": "branches: {n}"},
+    "ratings.agg.later": {
+        "ru": (
+            "Агрегаторы собираются с 11.10.2026, раз в сутки: за выбранный период "
+            "оценок нет, показаны данные на {date}."
+        ),
+        "en": (
+            "Delivery apps are collected daily since 11.10.2026: no ratings for the "
+            "selected period, showing data as of {date}."
+        ),
     },
     "ratings.block.risk": {"ru": "Стабильно ниже порога", "en": "Consistently below threshold"},
     "ratings.risk.hint": {
@@ -217,40 +246,19 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.layout.top": {"ru": "Top и Bottom", "en": "Top and bottom"},
     "ratings.layout.hard": {"ru": "Хард-нарушения", "en": "Hard violations"},
     "ratings.layout.risk": {"ru": "Пиццерии в зоне риска", "en": "Pizzerias at risk"},
-    "ratings.layout.maps": {"ru": "Оценки на картах", "en": "Map ratings"},
-    "ratings.block.maps": {"ru": "Оценки на картах", "en": "Ratings on maps"},
-    "ratings.maps.hint": {
-        "ru": "Средняя по всем отзывам страны на конец периода, данные Pointer",
-        "en": "Average over all reviews in the country at the end of the period, from Pointer",
-    },
     "ratings.maps.provider.2": {"ru": "Google", "en": "Google"},
     "ratings.maps.provider.1": {"ru": "Яндекс", "en": "Yandex"},
-    "ratings.maps.branches": {"ru": "Филиалов", "en": "Branches"},
     "ratings.maps.unit_title": {
         "ru": "Оценка в Google Картах, отзывов: {n}",
         "en": "Google Maps rating, reviews: {n}",
     },
-    "ratings.maps.reviews": {"ru": "· {n} отз.", "en": "· {n} reviews"},
     "ratings.empty.maps": {
         "ru": "Оценок с карт по этим странам ещё нет.",
         "en": "No map ratings for these countries yet.",
     },
-    "ratings.layout.aggregators": {"ru": "Оценки в агрегаторах", "en": "Delivery app ratings"},
-    "ratings.block.aggregators": {
-        "ru": "Оценки в агрегаторах доставки",
-        "en": "Ratings in delivery apps",
-    },
-    "ratings.agg.hint": {
-        "ru": "Средняя по всем оценкам пиццерий на витрине, в шкале агрегатора; сбор раз в сутки",
-        "en": (
-            "Average over all ratings of the pizzerias in the app, on the app's own scale; "
-            "collected daily"
-        ),
-    },
     "ratings.agg.scale.5": {"ru": "из 5", "en": "of 5"},
     "ratings.agg.scale.10": {"ru": "из 10", "en": "of 10"},
     "ratings.agg.scale.100": {"ru": "% довольных", "en": "% positive"},
-    "ratings.agg.points": {"ru": "· пиццерий: {n}", "en": "· pizzerias: {n}"},
     "ratings.agg.votes": {"ru": "оценок: {n}", "en": "ratings: {n}"},
     "ratings.agg.as_of": {"ru": "Данные на {date}", "en": "As of {date}"},
     "ratings.agg.failed": {

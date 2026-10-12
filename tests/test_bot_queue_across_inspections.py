@@ -84,7 +84,6 @@ async def start_new_inspection(dp: Dispatcher, bot: Bot, unit: str) -> None:
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
 
 def findings_count() -> int:
@@ -221,7 +220,6 @@ async def test_убрать_из_чата_очередь_забывает(
     await feed(dp, bot, text_message("Вторая точка-2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
     await feed(dp, bot, callback_query("start:speech:ru"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
     calls.clear()
     session.clear()
 

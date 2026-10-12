@@ -121,12 +121,6 @@
 .rt-line__empty { font-size: var(--fs-meta); color: var(--ink-3); padding: var(--space-4) 0; }
 .rt-cl__note { font-size: var(--fs-meta); color: var(--ink-3); margin: var(--space-2) 0 0; }
 
-/* ── Зона риска — отдельной строкой-сигналом (D384): имена чипами, без таблицы. */
-.rt-risk { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-4) var(--space-5); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--r-block); background: var(--surface); }
-.rt-risk__n { font-family: var(--font-mono); font-weight: var(--w-semibold); color: var(--warn); margin-right: var(--space-2); }
-.rt-risk a { display: inline-flex; gap: 6px; align-items: baseline; padding: 1px var(--space-3); border-radius: var(--r-pill); background: var(--surface-2); color: var(--ink); font-size: var(--fs-meta); }
-.rt-risk a small { color: var(--ink-3); }
-
 /* Пары РС | РКО: блоки нижней части встают рядом, а не лентой */
 .rt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-6) var(--space-7); align-items: start; }
 .rt-pair .rt-two { grid-template-columns: 1fr; }
@@ -179,7 +173,7 @@
 .rt-rank { list-style: none; margin: 0; padding: 0; counter-reset: rt-rank; }
 .rt-rank li {
   counter-increment: rt-rank;
-  display: grid; grid-template-columns: 1.5em minmax(0, 1fr) auto; gap: var(--space-4); align-items: baseline;
+  display: grid; grid-template-columns: 1.5em minmax(0, 1fr) auto auto; gap: var(--space-4); align-items: baseline;
   padding: var(--space-2) 0; border-top: 1px solid var(--line); font-size: var(--fs-dense); line-height: var(--lh-dense);
 }
 .rt-rank li:first-child { border-top: 0; }
@@ -297,6 +291,35 @@
 .rt-maps .num { text-align: right; white-space: nowrap; }
 .rt-maps tbody tr:last-child > * { border-bottom: 0; }
 .rt-maps__n { color: var(--ink-3); font-size: .85em; }
+.rt-maps th small, .rt-maps td small { display: block; color: var(--ink-3); font-size: var(--fs-meta); font-weight: var(--w-regular); }
+.rt-maps thead th { font-size: var(--fs-meta); color: var(--ink-2); font-weight: var(--w-semibold); }
+
+/* Карты и агрегаторы одной таблицей: группа колонок подписана сверху. */
+.rt-src__grp { text-align: center !important; border-left: 1px solid var(--line); }
+.rt-src__grp small { display: inline !important; margin-left: var(--space-2); }
+.rt-src__scale { color: var(--ink-3); font-weight: var(--w-regular); font-size: .85em; }
+
+/* Списки с пиццерией в строке: зона риска, хард-нарушения. */
+.rt-list th[scope="row"] { white-space: nowrap; width: 1%; }
+.rt-list th[scope="row"] a { font-weight: var(--w-semibold); }
+.rt-src tbody th { white-space: nowrap; }
+.rt-list__text { font-size: var(--fs-dense); color: var(--ink-2); overflow-wrap: anywhere; min-width: 10rem; }
+.rt-list__scores { font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink-3); }
+.rt-list__scores b { color: var(--warn); }
+.rt-list .is-bad { color: var(--err); font-family: var(--font-mono); font-weight: var(--w-semibold); }
+.rt-kind { color: var(--ink-2); font-weight: var(--w-semibold); }
+.rt-list tr[hidden] { display: none; }
+
+/* Фильтр по странам — внутри своего блока (interface-logic п. 7). */
+.rt-filter { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-3); }
+.rt-filter[hidden] { display: none; }
+.rt-filter button { font: inherit; font-size: var(--fs-meta); min-height: 32px; padding: 0 var(--space-4); border: 1px solid var(--line); border-radius: var(--r-pill); background: var(--surface); color: var(--ink-2); cursor: pointer; }
+.rt-filter button small { color: var(--ink-3); margin-left: 2px; }
+.rt-filter button:hover { color: var(--accent); border-color: var(--accent-line); }
+.rt-filter button[aria-pressed="true"] { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-line); }
+
+/* Top-10 и Bottom-10: изменение пиццерии к прошлому периоду. */
+.rt-rank__d { font-size: var(--fs-meta); white-space: nowrap; text-align: right; min-width: 4.5em; }
 
 /* Компоновка страницы на «Загрузках» (D368). */
 .rt-layout { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); }

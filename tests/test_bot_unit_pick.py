@@ -78,3 +78,33 @@ def test_кириллица_находит_точку_базы_записанн�
     assert match_in("Тбилиси-1", справочник).name == "Tbilisi-1"
     assert match_in("тбилиси -1", справочник).name == "Tbilisi-1"
     assert match_in("Батуми-1", справочник).name == "Batumi-1"
+
+
+def test_справочник_подсказок_для_клиента_несёт_ключи_сверки(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Arrange — мини-апп ищет вхождение сам (D414), ключи обязаны быть серверными.
+    точки = [
+        unit_pick.directory.Unit(id="1", name="Tbilisi-1", code=None, aliases=("Тбилиси -1",)),
+        unit_pick.directory.Unit(id="2", name="Batumi-1", code=None, aliases=()),
+    ]
+    monkeypatch.setattr(unit_pick.directory, "list_units", lambda **_: точки)
+
+    # Act
+    ix = unit_pick.suggest_index(tenant="HQ")
+
+    # Assert
+    assert ix["units"][0] == {"name": "Tbilisi-1", "keys": ["tbilisi1"]}
+    assert ix["limit"] == unit_pick.SUGGESTIONS_LIMIT
+    assert ix["translit"]["щ"] == unit_pick._key("щ")
+
+
+def test_справочник_подсказок_без_базы_пуст_и_не_падает(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def лежит(**_: object) -> list[object]:
+        raise ConfigError("DATABASE_URL не задан")
+
+    monkeypatch.setattr(unit_pick.directory, "list_units", лежит)
+
+    assert unit_pick.suggest_index(tenant="HQ")["units"] == []

@@ -8,7 +8,9 @@
   показывается один раз и гасит прежний, как кнопка `/mcp` (D098);
 - `mcp_who`, `mcp_add`, `mcp_revoke` — круг доступа к MCP (D099), только тем,
   кто в нём;
-- `stops` — отказы мастера за период (#436), тоже только кругу.
+- `stops` — отказы мастера за период (#436), тоже только кругу;
+- `finish` — «Завершить проверку» (D422): итог в чат, как `/finish`, за флагом
+  `WALK_APP_FINISH` (`walk_finish.py`). Любому аудитору, не только кругу.
 
 Правила те же, что у бота, и функции те же (`db.mcp_access`, `bot.stops`):
 мини-апп — второй вход в одно и то же, а не вторая реализация. Отличие одно:
@@ -40,6 +42,7 @@ from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_access import space_of
 from .walk_auth import APP_ENDPOINT, APP_PATH, WalkSettings
+from .walk_finish import FAILED, NO_INSPECTION, send_summary
 from .walk_write import Identify, Respond
 
 logger = logging.getLogger(__name__)
@@ -171,6 +174,18 @@ def _issue(who: int, conf: WalkSettings, lang: str) -> dict[str, Any]:
     }
 
 
+def _finish(who: int, conf: WalkSettings) -> tuple[Response, int]:
+    """«Завершить проверку» (D422). Выключено — сообщения нет, экран просит `/finish`."""
+    if not conf.app_finish or conf.bot_token is None:
+        return jsonify({"sent": False}), 200
+    outcome = send_summary(conf.bot_token, who)
+    if outcome == NO_INSPECTION:
+        raise Refused("walk.finish.err.none", 409)
+    if outcome == FAILED:
+        raise Refused("walk.finish.err.failed", 503)
+    return jsonify({"sent": True}), 200
+
+
 def install(
     app: Flask,
     *,
@@ -210,6 +225,8 @@ def install(
                     raise Refused("walk.app.err.lang")
                 bot_langs.choose_lang(who, str(code))
                 return respond(who, ui_lang)
+            if op == "finish":
+                return _finish(who, conf)
             if op not in ("mcp_issue", "mcp_who", "mcp_add", "mcp_revoke", "stops"):
                 raise Refused("walk.err.bad_request", 400)
             if bot is None or not in_circle(who, bot):
