@@ -38,6 +38,7 @@ pytestmark = requires_db
 ТЕНАНТ = "HQ"
 ВОЗВРАТ = "https://claude.ai/api/mcp/auth_callback"
 АДРЕС = "203.0.113.5"
+РЕСУРС = "https://mcp.example/mcp"
 VERIFIER = "x" * 64
 CHALLENGE = (
     base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=").decode()
@@ -63,7 +64,7 @@ def клиент(база: str) -> Client:
 
 def _код(клиент: Client, учётка: str) -> str:
     return issue_code(
-        клиент, user_id=учётка, redirect_uri=ВОЗВРАТ, code_challenge=CHALLENGE, resource=None
+        клиент, user_id=учётка, redirect_uri=ВОЗВРАТ, code_challenge=CHALLENGE, resource=РЕСУРС
     )
 
 
@@ -76,10 +77,12 @@ def _обмен(код: str, клиент: Client, **иное: str):  # type: ig
 def test_полный_путь_код_токен_сверка(клиент: Client, учётка: str) -> None:
     пара = _обмен(_код(клиент, учётка), клиент)
 
-    кто = resolve_access_token(пара.access_token)
+    кто = resolve_access_token(пара.access_token, resource=РЕСУРС)
     assert кто is not None
     assert (кто.login, кто.tenant, кто.role) == ("anna", ТЕНАНТ, "auditor")
-    assert resolve_access_token(пара.refresh_token) is None, "refresh не годится как access"
+    assert resolve_access_token(пара.refresh_token, resource=РЕСУРС) is None, (
+        "refresh не годится как access"
+    )
 
 
 def test_в_базе_нет_значений(база: str, клиент: Client, учётка: str) -> None:
@@ -103,7 +106,7 @@ def test_код_одноразовый_и_повтор_отзывает_подк
         _обмен(код, клиент)
 
     assert отказ.value.error == "invalid_grant"
-    assert resolve_access_token(пара.access_token) is None
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
 
 
 def test_просроченный_код_отвергается(база: str, клиент: Client, учётка: str) -> None:
@@ -143,7 +146,7 @@ def test_код_на_незарегистрированный_адрес_не_в
             user_id=учётка,
             redirect_uri="http://localhost:8080/callback",
             code_challenge=CHALLENGE,
-            resource=None,
+            resource=РЕСУРС,
         )
 
 
@@ -157,7 +160,7 @@ def test_refresh_ротируется(клиент: Client, учётка: str) -
 
     вторая = refresh_tokens(первая.refresh_token, client_id=клиент.client_id)
 
-    assert resolve_access_token(вторая.access_token) is not None
+    assert resolve_access_token(вторая.access_token, resource=РЕСУРС) is not None
     assert вторая.refresh_token != первая.refresh_token
 
 
@@ -168,7 +171,7 @@ def test_повтор_refresh_отзывает_подключение(клиен
     with pytest.raises(OAuthGrantError, match="отозвано"):
         refresh_tokens(первая.refresh_token, client_id=клиент.client_id)
 
-    assert resolve_access_token(вторая.access_token) is None
+    assert resolve_access_token(вторая.access_token, resource=РЕСУРС) is None
     with pytest.raises(OAuthGrantError):
         refresh_tokens(вторая.refresh_token, client_id=клиент.client_id)
     assert list_connections(учётка) == ()
@@ -187,7 +190,7 @@ def test_отключённая_учётка_не_опознаётся(клие�
 
     disable_account("anna", tenant=ТЕНАНТ)
 
-    assert resolve_access_token(пара.access_token) is None
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
     with pytest.raises(OAuthGrantError):
         refresh_tokens(пара.refresh_token, client_id=клиент.client_id)
 
@@ -197,7 +200,7 @@ def test_роль_читается_свежей(клиент: Client, учётк
 
     set_role("anna", tenant=ТЕНАНТ, role=ROLE_ADMIN)
 
-    кто = resolve_access_token(пара.access_token)
+    кто = resolve_access_token(пара.access_token, resource=РЕСУРС)
     assert кто is not None and кто.role == ROLE_ADMIN
 
 
@@ -205,7 +208,7 @@ def test_последний_вызов_отмечается(клиент: Client
     пара = _обмен(_код(клиент, учётка), клиент)
     assert list_connections(учётка)[0].last_used_at is None
 
-    resolve_access_token(пара.access_token)
+    resolve_access_token(пара.access_token, resource=РЕСУРС)
 
     assert list_connections(учётка)[0].last_used_at is not None
 
@@ -216,7 +219,7 @@ def test_отзыв_своего_подключения(клиент: Client, у
 
     assert revoke_connection(подключение.id, user_id=учётка) is True
 
-    assert resolve_access_token(пара.access_token) is None
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
     assert list_connections(учётка) == ()
     assert revoke_connection(подключение.id, user_id=учётка) is False
 
@@ -229,7 +232,7 @@ def test_чужое_подключение_не_отзывается(клиен�
     assert revoke_connection(подключение.id, user_id=чужой) is False
     assert revoke_connection("не-номер", user_id=учётка) is False
 
-    assert resolve_access_token(пара.access_token) is not None
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is not None
 
 
 def test_роль_приложения_не_удаляет_подключения(db_env: str, клиент: Client) -> None:
@@ -269,3 +272,25 @@ def test_чистка_убирает_только_отжившее(база: str
 def test_роль_приложения_не_удаляет_клиентов_напрямую(db_env: str, клиент: Client) -> None:
     with psycopg.connect(db_env) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
         conn.execute("delete from oauth_clients")
+
+
+def test_токен_годен_только_для_своего_ресурса(клиент: Client, учётка: str) -> None:
+    пара = _обмен(_код(клиент, учётка), клиент)
+
+    assert resolve_access_token(пара.access_token, resource=РЕСУРС) is not None
+    assert resolve_access_token(пара.access_token, resource="https://other.example/mcp") is None
+
+
+def test_обмен_с_чужим_ресурсом_отвергается(клиент: Client, учётка: str) -> None:
+    with pytest.raises(OAuthGrantError) as отказ:
+        _обмен(_код(клиент, учётка), клиент, resource="https://other.example/mcp")
+
+    assert отказ.value.error == "invalid_target"
+
+
+def test_refresh_наследует_ресурс(клиент: Client, учётка: str) -> None:
+    первая = _обмен(_код(клиент, учётка), клиент)
+
+    вторая = refresh_tokens(первая.refresh_token, client_id=клиент.client_id, resource=РЕСУРС)
+
+    assert resolve_access_token(вторая.access_token, resource=РЕСУРС) is not None

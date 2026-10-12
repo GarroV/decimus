@@ -220,7 +220,7 @@ values (%s, %s, %s, %s, %s, %s, %s, now() + %s)
 #: выпустят двух подключений — второй дождётся первого и увидит `used_at`.
 _LOCK_CODE_SQL = """
 select k.id, c.client_id, k.redirect_uri, k.code_challenge, k.used_at,
-       k.grant_id, k.expires_at > now(), u.disabled_at is null
+       k.grant_id, k.expires_at > now(), u.disabled_at is null, k.resource
   from oauth_codes k
   join oauth_clients c on c.id = k.client_id
   join web_users u on u.id = k.user_id
@@ -237,8 +237,8 @@ returning id
 _USE_CODE_SQL = "update oauth_codes set used_at = now(), grant_id = %s where id = %s"
 
 _INSERT_ISSUED_SQL = """
-insert into oauth_tokens (grant_id, kind, fingerprint, expires_at)
-values (%s, %s, %s, now() + %s)
+insert into oauth_tokens (grant_id, kind, fingerprint, resource, expires_at)
+values (%s, %s, %s, %s, now() + %s)
 """
 
 #: Отзыв подключения при повторе обменянного кода или refresh (RFC 6749 §4.1.2,
@@ -250,7 +250,7 @@ update oauth_grants set revoked_at = now(), revoked_reason = 'reuse'
 
 _LOCK_REFRESH_SQL = """
 select t.id, t.grant_id, c.client_id, t.used_at, t.expires_at > now(),
-       g.revoked_at is null, u.disabled_at is null
+       g.revoked_at is null, u.disabled_at is null, t.resource
   from oauth_tokens t
   join oauth_grants g on g.id = t.grant_id
   join oauth_clients c on c.id = g.client_id
@@ -261,8 +261,9 @@ select t.id, t.grant_id, c.client_id, t.used_at, t.expires_at > now(),
 
 _USE_REFRESH_SQL = "update oauth_tokens set used_at = now() where id = %s"
 
-#: Сверка access-токена: только живой токен живого подключения живой учётки.
-#: Отозванное и отключённое не «находится и отклоняется», а не находится вовсе.
+#: Сверка access-токена: только живой токен живого подключения живой учётки,
+#: выданный для этого сервера MCP (RFC 8707, `resource`). Отозванное, отключённое
+#: и чужое не «находится и отклоняется», а не находится вовсе.
 _RESOLVE_ACCESS_SQL = """
 select u.id, u.login, u.tenant_code, u.role, g.id,
        g.last_used_at is null or g.last_used_at < now() - %s
@@ -271,6 +272,7 @@ select u.id, u.login, u.tenant_code, u.role, g.id,
   join web_users u on u.id = g.user_id
  where t.fingerprint = %s
    and t.kind = 'access'
+   and t.resource = %s
    and t.expires_at > now()
    and g.revoked_at is null
    and u.disabled_at is null
@@ -307,10 +309,6 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
-
-
-def _invalid_grant(описание: str) -> OAuthGrantError:
-    return OAuthGrantError("invalid_grant", описание)
 
 
 # --- клиенты ----------------------------------------------------------------
@@ -388,13 +386,19 @@ def issue_code(
     user_id: str,
     redirect_uri: str,
     code_challenge: str,
-    resource: str | None,
+    resource: str,
 ) -> str:
-    """Выдать код после «Разрешить». Значение возвращается один раз — в редирект."""
+    """Выдать код после «Разрешить». Значение возвращается один раз — в редирект.
+
+    `resource` — адрес MCP (RFC 8707), уже сверенный вызывающим; токены этого
+    кода будут годны только для него.
+    """
     if redirect_uri not in client.redirect_uris or not redirect_uri_allowed(redirect_uri):
         raise OAuthGrantError("invalid_request", "Адрес возврата не зарегистрирован у клиента")
     if not challenge_valid(code_challenge):
         raise OAuthGrantError("invalid_request", "code_challenge не годится для S256")
+    if not resource:
+        raise OAuthGrantError("invalid_target", "Код выдаётся только для названного ресурса")
     код = new_secret()
     with _connected("выдать код авторизации") as conn, conn.cursor() as cur:
         cur.execute(
@@ -413,10 +417,12 @@ def issue_code(
     return код
 
 
-def _issue_pair(cur: Any, grant_id: str) -> TokenPair:
+def _issue_pair(cur: Any, grant_id: str, resource: str) -> TokenPair:
     access, refresh = new_secret(), new_secret()
-    cur.execute(_INSERT_ISSUED_SQL, (grant_id, "access", fingerprint(access), ACCESS_TTL))
-    cur.execute(_INSERT_ISSUED_SQL, (grant_id, "refresh", fingerprint(refresh), REFRESH_TTL))
+    cur.execute(_INSERT_ISSUED_SQL, (grant_id, "access", fingerprint(access), resource, ACCESS_TTL))
+    cur.execute(
+        _INSERT_ISSUED_SQL, (grant_id, "refresh", fingerprint(refresh), resource, REFRESH_TTL)
+    )
     return TokenPair(
         access_token=access,
         refresh_token=refresh,
@@ -434,6 +440,7 @@ class CodeState:
     used: bool
     alive: bool
     account_alive: bool
+    resource: str
 
 
 @dataclass(frozen=True)
@@ -445,18 +452,34 @@ class RefreshState:
     alive: bool
     grant_alive: bool
     account_alive: bool
+    resource: str
 
 
 @dataclass(frozen=True)
 class Judgement:
-    """Решение об обмене: отказ (или `None` — выпускать) и отзывать ли подключение."""
+    """Решение об обмене: отказ (или `None` — выпускать), его код RFC и отзывать ли подключение."""
 
     refusal: str | None
     revoke: bool = False
+    error: str = "invalid_grant"
+
+
+def resource_matches(requested: str | None, issued: str) -> bool:
+    """RFC 8707: не названный в запросе ресурс — тот, что у кода; названный — обязан совпасть."""
+    return requested is None or requested.rstrip("/") == issued
+
+
+def _wrong_target(что: str) -> Judgement:
+    return Judgement(f"resource не совпадает с ресурсом {что}", error="invalid_target")
 
 
 def judge_code(
-    state: CodeState | None, *, client_id: str, redirect_uri: str, verifier: str
+    state: CodeState | None,
+    *,
+    client_id: str,
+    redirect_uri: str,
+    verifier: str,
+    resource: str | None = None,
 ) -> Judgement:
     """Можно ли обменять код. Чистая функция: правила обмена отдельно от SQL.
 
@@ -475,6 +498,8 @@ def judge_code(
         return Judgement("Срок кода авторизации истёк")
     if state.redirect_uri != redirect_uri:
         return Judgement("redirect_uri не совпадает с адресом из запроса кода")
+    if not resource_matches(resource, state.resource):
+        return _wrong_target("кода")
     if not pkce_matches(verifier, state.code_challenge):
         return Judgement("code_verifier не подходит к code_challenge")
     if not state.account_alive:
@@ -482,7 +507,9 @@ def judge_code(
     return Judgement(None)
 
 
-def judge_refresh(state: RefreshState | None, *, client_id: str) -> Judgement:
+def judge_refresh(
+    state: RefreshState | None, *, client_id: str, resource: str | None = None
+) -> Judgement:
     """Можно ли обновить пару по refresh. Чистая функция, как `judge_code`.
 
     Повтор уже обменянного refresh отзывает подключение: настоящий клиент
@@ -498,12 +525,16 @@ def judge_refresh(state: RefreshState | None, *, client_id: str) -> Judgement:
         return Judgement("Refresh-токен уже обменян; подключение отозвано", revoke=True)
     if not state.alive:
         return Judgement("Срок refresh-токена истёк")
+    if not resource_matches(resource, state.resource):
+        return _wrong_target("refresh-токена")
     if not state.account_alive:
         return Judgement("Учётка отключена")
     return Judgement(None)
 
 
-def exchange_code(code: str, *, client_id: str, redirect_uri: str, verifier: str) -> TokenPair:
+def exchange_code(
+    code: str, *, client_id: str, redirect_uri: str, verifier: str, resource: str | None = None
+) -> TokenPair:
     """Код + PKCE → первая пара токенов и новое подключение. Иначе `OAuthGrantError`.
 
     Решает `judge_code`, здесь — только чтение под замком и запись. Отзыв при
@@ -525,10 +556,15 @@ def exchange_code(code: str, *, client_id: str, redirect_uri: str, verifier: str
                 used=row[4] is not None,
                 alive=bool(row[6]),
                 account_alive=bool(row[7]),
+                resource=str(row[8]),
             )
         )
         решение = judge_code(
-            состояние, client_id=client_id, redirect_uri=redirect_uri, verifier=verifier
+            состояние,
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            verifier=verifier,
+            resource=resource,
         )
         if row is not None and решение.revoke:
             cur.execute(_REVOKE_REUSED_SQL, (row[5],))
@@ -539,15 +575,15 @@ def exchange_code(code: str, *, client_id: str, redirect_uri: str, verifier: str
                 raise AccessError("Не удалось завести подключение (insert без строки)")
             grant_id = str(grant[0])
             cur.execute(_USE_CODE_SQL, (grant_id, row[0]))
-            пара = _issue_pair(cur, grant_id)
+            пара = _issue_pair(cur, grant_id, str(row[8]))
     if решение.refusal is not None:
-        raise _invalid_grant(решение.refusal)
+        raise OAuthGrantError(решение.error, решение.refusal)
     if пара is None:
         raise AccessError("Обмен кода не выпустил токенов")
     return пара
 
 
-def refresh_tokens(refresh_token: str, *, client_id: str) -> TokenPair:
+def refresh_tokens(refresh_token: str, *, client_id: str, resource: str | None = None) -> TokenPair:
     """Refresh → новая пара; старый refresh больше не действует (ротация).
 
     Решает `judge_refresh`; отзыв при повторе фиксируется до отказа, как у кода.
@@ -566,16 +602,17 @@ def refresh_tokens(refresh_token: str, *, client_id: str) -> TokenPair:
                 alive=bool(row[4]),
                 grant_alive=bool(row[5]),
                 account_alive=bool(row[6]),
+                resource=str(row[7]),
             )
         )
-        решение = judge_refresh(состояние, client_id=client_id)
+        решение = judge_refresh(состояние, client_id=client_id, resource=resource)
         if row is not None and решение.revoke:
             cur.execute(_REVOKE_REUSED_SQL, (row[1],))
         if row is not None and решение.refusal is None:
             cur.execute(_USE_REFRESH_SQL, (row[0],))
-            пара = _issue_pair(cur, str(row[1]))
+            пара = _issue_pair(cur, str(row[1]), str(row[7]))
     if решение.refusal is not None:
-        raise _invalid_grant(решение.refusal)
+        raise OAuthGrantError(решение.error, решение.refusal)
     if пара is None:
         raise AccessError("Обновление не выпустило токенов")
     return пара
@@ -584,14 +621,17 @@ def refresh_tokens(refresh_token: str, *, client_id: str) -> TokenPair:
 # --- сверка и подключения ---------------------------------------------------
 
 
-def resolve_access_token(token: str) -> OAuthOwner | None:
+def resolve_access_token(token: str, *, resource: str) -> OAuthOwner | None:
     """Access-токен → учётка, пространство, роль. Незнакомый, истёкший, отозванный — `None`.
+
+    `resource` — адрес этого сервера MCP: токен, выданный для другого ресурса,
+    тоже `None` (RFC 8707, аудитория токена).
 
     Спрашивается сервером MCP на каждый вызов. Отказ базы — `AccessError`, а не
     `None`: «не смогли посмотреть» не выдаётся за «токен незнакомый».
     """
     with _connected("сверить OAuth-токен") as conn, conn.cursor() as cur:
-        cur.execute(_RESOLVE_ACCESS_SQL, (LAST_USED_STEP, fingerprint(token)))
+        cur.execute(_RESOLVE_ACCESS_SQL, (LAST_USED_STEP, fingerprint(token), resource))
         row = cur.fetchone()
         if row is None:
             return None

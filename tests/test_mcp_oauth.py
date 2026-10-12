@@ -32,13 +32,19 @@ MCP = "https://mcp.example/mcp"
 #: токен — отозванное подключение или отключённая учётка.
 ВЫДАННЫЕ: dict[str, OAuthOwner] = {}
 
+#: Токены, выданные для ДРУГОГО ресурса (RFC 8707); остальные — для `MCP`.
+ЧУЖОЙ_РЕСУРС = {"tok-other": "https://other.example/mcp"}
+
 
 @pytest.fixture(autouse=True)
 def _сверка_без_базы(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]:
     зовы: list[str] = []
 
-    def _resolve(token: str) -> OAuthOwner | None:
+    def _resolve(token: str, *, resource: str) -> OAuthOwner | None:
+        """Как запрос базы: токен находится, только если выдан для этого ресурса."""
         зовы.append(token)
+        if ЧУЖОЙ_РЕСУРС.get(token, MCP) != resource:
+            return None
         return ВЫДАННЫЕ.get(token)
 
     monkeypatch.setattr(oauth_store, "resolve_access_token", _resolve)
@@ -49,6 +55,7 @@ def _сверка_без_базы(monkeypatch: pytest.MonkeyPatch) -> Iterator[l
             "tok-admin": OAuthOwner("u2", "anna", "HQ", "admin"),
             "tok-auditor": OAuthOwner("u3", "ivan", "HQ", "auditor"),
             "tok-partner": OAuthOwner("u4", "petar", "RS", "admin"),
+            "tok-other": OAuthOwner("u2", "anna", "HQ", "admin"),
         }
     )
     yield зовы
@@ -120,6 +127,16 @@ def _вызов(адрес: str, токен: str, имя: str) -> tuple[int, dic
     }
     код, _, тело = _http(адрес + "/", тело=сообщение, токен=токен)
     return код, json.loads(тело) if тело else {}
+
+
+def test_токен_чужого_ресурса_не_опознаётся(сервер: str) -> None:
+    """RFC 8707: токен, выданный для другого сервера, сюда не годится."""
+    код, _, _ = _http(
+        сервер + "/", тело={"jsonrpc": "2.0", "id": 1, "method": "tools/list"}, токен="tok-other"
+    )
+
+    assert код == 401
+    assert _инструменты(сервер, "tok-admin")
 
 
 # --- обнаружение -------------------------------------------------------------

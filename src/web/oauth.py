@@ -109,7 +109,8 @@ class Ask:
     redirect_uri: str
     state: str | None
     code_challenge: str
-    resource: str | None
+    #: Адрес MCP (RFC 8707): названный клиентом и сверенный или подставленный.
+    resource: str
 
 
 def _json_error(status: int, error: str, description: str, retry_after: int = 0) -> Response:
@@ -222,8 +223,8 @@ def install(app: Flask, conf: Settings) -> None:
             challenge
         ):
             return назад("invalid_request")
-        resource = params.get("resource") or None
-        if resource is not None and resource.rstrip("/") != mcp_url:
+        resource = (params.get("resource") or mcp_url).rstrip("/")
+        if resource != mcp_url:
             return назад("invalid_target")
         return Ask(
             client=client,
@@ -328,6 +329,7 @@ def install(app: Flask, conf: Settings) -> None:
         адрес = client_address(trusted_proxies=conf.trusted_proxies)
         форма = request.form
         grant_type = форма.get("grant_type") or ""
+        resource = форма.get("resource") or None
         client_id = _client_id_of_request()
         if grant_type not in GRANT_TYPES:
             return _json_error(400, "unsupported_grant_type", "authorization_code or refresh_token")
@@ -343,13 +345,17 @@ def install(app: Flask, conf: Settings) -> None:
                         400, "invalid_request", "code, code_verifier and redirect_uri required"
                     )
                 пара = oauth_store.exchange_code(
-                    code, client_id=client_id, redirect_uri=redirect_uri, verifier=verifier
+                    code,
+                    client_id=client_id,
+                    redirect_uri=redirect_uri,
+                    verifier=verifier,
+                    resource=resource,
                 )
             else:
                 refresh = форма.get("refresh_token") or ""
                 if not refresh:
                     return _json_error(400, "invalid_request", "refresh_token required")
-                пара = oauth_store.refresh_tokens(refresh, client_id=client_id)
+                пара = oauth_store.refresh_tokens(refresh, client_id=client_id, resource=resource)
         except OAuthGrantError as отказ:
             return _counted_failure(адрес, 400, отказ.error, str(отказ))
         except AccessError:
