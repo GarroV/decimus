@@ -63,7 +63,7 @@ def _проверить_отзыв(журнал: list[tuple[str, Any]], прич
     коды = [i for i, sql in enumerate(запросы) if sql.startswith("update oauth_codes")]
     отзыв = [i for i, sql in enumerate(запросы) if sql.startswith("update oauth_grants")]
     assert коды and отзыв, f"смена не отозвала подключения Claude: {запросы}"
-    assert коды[0] < отзыв[0], "коды обязаны гаснуть ДО отзыва подключений (0051)"
+    assert коды[0] < отзыв[0], "коды обязаны гаснуть ДО отзыва подключений (0054)"
     assert "set expires_at = now() where user_id = %s and used_at is null" in запросы[коды[0]]
     assert "where user_id = %s and revoked_at is null" in запросы[отзыв[0]]
     assert журнал[отзыв[0]][1][0] == причина

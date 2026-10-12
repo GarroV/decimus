@@ -52,7 +52,7 @@ OAuth. Права MCP решаются по пространству токен�
 
 | Где | Что |
 |---|---|
-| `src/db/migrations/0051_oauth.sql` | `oauth_clients`, `oauth_codes`, `oauth_grants` (подключение: учётка × клиент), `oauth_tokens` (access/refresh, только SHA-256) |
+| `src/db/migrations/0054_oauth.sql` | `oauth_clients`, `oauth_codes`, `oauth_grants` (подключение: учётка × клиент), `oauth_tokens` (access/refresh, только SHA-256) |
 | `src/db/oauth_store.py` | регистрация клиента, выдача/обмен кода, выпуск/ротация/отзыв токенов, разрешение access-токена в `OAuthOwner(user_id, login, tenant, role)` с `disabled_at is null` и неотозванным подключением, список и отзыв подключений человека. Общий для `src.web` и `src.mcp` (они пиры) |
 | `src/web/oauth.py` | метаданные AS, `/oauth/register`, `/oauth/authorize` (GET/POST), `/oauth/token`; открытые endpoint'ы — в `OPEN_ENDPOINTS`, кроме authorize (он требует входа) |
 | `src/web/auth.py` | безопасный возврат после входа: `next` только на `/oauth/authorize?…` своего сайта, для пароля и для Google (в подписанной куке state) |

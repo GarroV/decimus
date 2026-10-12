@@ -19,7 +19,7 @@ import pytest
 
 from src.db import oauth_store
 from src.db.oauth_store import OAuthOwner
-from src.mcp.catalogue import KIND_RATINGS, TOOLS
+from src.mcp.catalogue import KIND_RATINGS, KIND_RATINGS_READ, TOOLS
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings, resolve_access
 from src.mcp.server import build_server
 
@@ -180,7 +180,7 @@ def test_без_oauth_документа_нет(сервер_без_oauth: str) 
 def test_контроль_видит_только_рейтинги(сервер: str) -> None:
     имена = _инструменты(сервер, "tok-control")
 
-    assert имена == {spec.name for spec in TOOLS if spec.kind == KIND_RATINGS}
+    assert имена == {spec.name for spec in TOOLS if spec.kind in (KIND_RATINGS, KIND_RATINGS_READ)}
 
 
 def test_контроль_не_читает_проверки(сервер: str) -> None:
