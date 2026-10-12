@@ -59,10 +59,9 @@ CHECKLIST_PREFIX = "start:cl:"
 #: Кнопки вопроса «Новая пиццерия?» (D233).
 UNIT_NEW_PREFIX = "start:unit-new:"
 UNIT_NEW_YES = "yes"
-#: Язык проверки (речи аудитора) и язык отчёта — два отдельных вопроса мастера
-#: (D393) с разными префиксами: старая кнопка одного не принимается за ответ на другой.
+#: Язык чек-листа (речи аудитора) — единственный языковой вопрос мастера (D414,
+#: D415). Язык отчёта спрашивается в конце: `REPORT_LANG_PREFIX`.
 SPEECH_LANG_PREFIX = "start:speech:"
-LANG_PREFIX = "start:lang:"
 RESUME_CONTINUE_CALLBACK = "start:resume:continue"
 RESUME_NEW_CALLBACK = "start:resume:new"
 #: «Убрать сданную проверку из чата» (T201, D080). Своё нажатие, а не «Начать
@@ -162,12 +161,18 @@ def speech_lang_keyboard() -> InlineKeyboardMarkup:
     return _langs_keyboard(SPEECH_LANG_PREFIX)
 
 
-def lang_keyboard() -> InlineKeyboardMarkup:
-    """Язык отчёта — коды методики (`domain.models.TEXT_LANGS`), не что-либо ещё."""
-    return _langs_keyboard(LANG_PREFIX)
+def report_lang_keyboard(codes: Sequence[str]) -> InlineKeyboardMarkup:
+    """Язык отчёта (D415): только те, что назвала страна пиццерии, в её порядке."""
+    builder = InlineKeyboardBuilder()
+    for code in codes:
+        builder.button(
+            text=LANG_LABELS.get(code, code), callback_data=f"{REPORT_LANG_PREFIX}{code}"
+        )
+    builder.adjust(1)
+    return builder.as_markup()
 
 
-#: Выбор языка БОТА (D303, `/lang`) — не путать с `LANG_PREFIX`, языком отчёта.
+#: Выбор языка БОТА (D303, `/lang`) — не путать с `REPORT_LANG_PREFIX`, языком отчёта.
 UI_LANG_PREFIX = "lang:ui:"
 
 
@@ -278,6 +283,8 @@ FINISH_BUILD_NO_PHOTOS_CALLBACK = "fin:nophoto"
 FINISH_EDIT_CALLBACK = "fin:edit"
 FINISH_RESUME_CALLBACK = "fin:resume"
 FINISH_PICK_PREFIX = "fin:pick:"
+#: Язык отчёта, выбранный после «Сформировать предварительный отчёт» (D415).
+REPORT_LANG_PREFIX = "fin:rlang:"
 #: Расхождение версии методики (T167). Две кнопки, потому что выходов два и оба
 #: за человеком: молча выбрать любой из них бот права не имеет.
 VERSION_SYNC_CALLBACK = "fin:ver:sync"

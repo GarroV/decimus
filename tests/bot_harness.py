@@ -296,15 +296,31 @@ async def feed(dp: Dispatcher, bot: Bot, event: Message | CallbackQuery) -> None
         await dp.feed_update(bot, Update(update_id=update_id, callback_query=event))
 
 
-async def build_report(dp: Dispatcher, bot: Bot) -> None:
+async def press_build(dp: Dispatcher, bot: Bot, lang: str | None = None) -> None:
+    """Нажать «Сформировать предварительный отчёт» и ответить на вопрос о языке отчёта.
+
+    С D415 язык отчёта спрашивается после нажатия (у пиццерии без правил страны
+    это `ru` и `en`). Тесты, которые проверяют не выбор языка, отвечают тем
+    языком, что уже стоит в проверке, — отчёт остаётся на нём, как до D415.
+    `lang` — когда нужен другой.
+    """
+    from src.domain import get_state
+
+    await feed(dp, bot, callback_query("fin:build"))
+    inspection = get_state(CHAT_ID)
+    chosen = lang or (inspection.report_lang if inspection is not None else "ru")
+    await feed(dp, bot, callback_query(f"fin:rlang:{chosen}"))
+
+
+async def build_report(dp: Dispatcher, bot: Bot, lang: str | None = None) -> None:
     """Собрать отчёт так, как это делает аудитор.
 
-    Между кнопкой «Собрать отчёт» и документом с T158 стоит информационная
-    часть (D069): нажатие открывает вопросы, а сборка идёт за последним из них.
-    «Дальше к отчёту» проходит их насквозь — тестам, которые проверяют сам
-    отчёт, отвечать на них нечего.
+    Между кнопкой «Сформировать предварительный отчёт» и документом с T158
+    стоит язык отчёта (D415), а за ним информационная часть (D069): сборка идёт
+    за последним вопросом. «Дальше к отчёту» проходит их насквозь — тестам,
+    которые проверяют сам отчёт, отвечать на них нечего.
     """
-    await feed(dp, bot, callback_query("fin:build"))
+    await press_build(dp, bot, lang)
     await feed(dp, bot, callback_query("info:done"))
 
 

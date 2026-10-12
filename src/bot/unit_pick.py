@@ -19,6 +19,7 @@ import difflib
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 from src.db import directory
 from src.db.errors import DbError
@@ -181,6 +182,31 @@ def where_suffix(имя: UnitName, lang: str) -> str:
         return ""
     names = COUNTRIES.get(имя.country, {})
     return f" ({names.get(lang) or names.get('en') or имя.country})"
+
+
+def suggest_index(*, tenant: str) -> dict[str, Any]:
+    """Справочник для подсказок на стороне клиента (мини-апп, D414).
+
+    Подсказки по вхождению считаются в телефоне без запроса на каждую букву:
+    точки приходят один раз вместе с формой, с уже готовыми ключами `_key`, а
+    `dashes` и `translit` позволяют клиенту привести набранное к тому же ключу.
+    Ближайшие по написанию (`match_in`) остаются на сервере — их клиент
+    спрашивает, только когда вхождений нет. База молчит — точек нет, и клиент
+    спрашивает сервер, как раньше.
+    """
+    try:
+        units = directory.list_units(reach=reach_of(tenant))
+    except DbError:
+        logger.warning("справочник точек недоступен, подсказки с сервера", exc_info=True)
+        units = []
+    return {
+        "units": [
+            {"name": u.name, "keys": sorted({_key(n) for n in (u.name, *u.aliases)})} for u in units
+        ],
+        "limit": SUGGESTIONS_LIMIT,
+        "dashes": _DASHES.pattern,
+        "translit": {chr(code): value for code, value in _TRANSLIT.items()},
+    }
 
 
 def suggest_units(typed: str, *, tenant: str) -> list[str]:
