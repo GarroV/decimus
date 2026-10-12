@@ -40,6 +40,7 @@ from __future__ import annotations
 from datetime import date
 
 from ..db.models import InspectionRow
+from .db_target import config_refusal
 from .errors import ToolError
 from .tools import _parse_date, _require_inspection_id
 
@@ -123,8 +124,8 @@ def _detail(ident: str, *, tenant: str) -> InspectionRow | None:
 
     try:
         подробно = get_inspection(ident, reach=own_reach(tenant), include_retracted=True)
-    except DbConfigError:
-        raise ToolError(NOT_CONNECTED) from None
+    except DbConfigError as отказ:
+        raise config_refusal(отказ, NOT_CONNECTED) from None
     return None if подробно is None else подробно.inspection
 
 
@@ -170,8 +171,8 @@ def _retract(ident: str, *, tenant: str, reason: str) -> tuple[str, str, int]:
 
     try:
         снятие = retract_inspection(ident, tenant=tenant, reason=reason)
-    except DbConfigError:
-        raise ToolError(NOT_CONNECTED) from None
+    except DbConfigError as отказ:
+        raise config_refusal(отказ, NOT_CONNECTED) from None
     except RetractionError as отказ:
         if отказ.__cause__ is not None:
             raise ToolError(
