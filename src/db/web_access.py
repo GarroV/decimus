@@ -184,16 +184,17 @@ _CLOSE_USER_SESSIONS_SQL = """
      where user_id = %s and closed_at is null
 """
 
-#: Смена пароля отзывает и подключения Claude (`0051`): вошедший по старому
-#: паролю мог успеть разрешить доступ, и подключение пережило бы смену.
+#: Смена пароля или почты отзывает и подключения Claude (`0051`): вошедший по
+#: старому паролю или почте мог успеть разрешить доступ, и подключение пережило
+#: бы смену. Причина — `password` или `email`.
 _REVOKE_USER_OAUTH_SQL = """
     update oauth_grants
-       set revoked_at = now(), revoked_reason = 'password'
+       set revoked_at = now(), revoked_reason = %s
      where user_id = %s and revoked_at is null
 """
 
 #: И ещё не обменянные коды: выданный до смены код иначе обменялся бы после
-#: неё на новое подключение.
+#: неё на новое подключение. Гасятся ДО отзыва подключений — см. `_revoke_oauth`.
 _EXPIRE_USER_OAUTH_CODES_SQL = """
     update oauth_codes
        set expires_at = now()
@@ -660,6 +661,17 @@ def reassign_role(
     return None if строка is None else str(строка[0])
 
 
+def _revoke_oauth(cur: Any, user_id: object, *, reason: str) -> None:
+    """Отозвать подключения Claude человека в транзакции вызывающего.
+
+    Сперва гасятся необменянные коды, затем отзываются подключения: обмен кода
+    держит строку кода до конца своей транзакции, и отзыв, идущий вторым,
+    видит подключение, которое этот обмен успел выпустить (`0051`).
+    """
+    cur.execute(_EXPIRE_USER_OAUTH_CODES_SQL, (user_id,))
+    cur.execute(_REVOKE_USER_OAUTH_SQL, (reason, user_id))
+
+
 def change_password(login: str, *, tenant: str, password: str) -> bool:
     """Сменить пароль живой учётке. `False` — такой живой учётки нет.
 
@@ -681,8 +693,7 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
         if строка is None:
             return False
         cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
-        cur.execute(_REVOKE_USER_OAUTH_SQL, (строка[0],))
-        cur.execute(_EXPIRE_USER_OAUTH_CODES_SQL, (строка[0],))
+        _revoke_oauth(cur, строка[0], reason="password")
         return True
 
 
@@ -758,7 +769,8 @@ def set_email(
     **Сменилась почта — открытые сессии человека закрываются тем же движением**,
     как при смене пароля командой (`change_password`), и теми же правами
     роли (`0022`). Почту меняют в ответ на «к ней получили доступ чужие», и
-    вошедший через Google по прежней почте не должен пережить смену. Та же
+    вошедший через Google по прежней почте не должен пережить смену — ни
+    сессией, ни подключением Claude (оно отзывается тем же движением). Та же
     почта, сохранённая повторно, — не смена, сессии остаются.
     """
     значение = None if email is None else normalize_email(email)
@@ -783,6 +795,7 @@ def set_email(
             return False
         if строка[1]:
             cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+            _revoke_oauth(cur, строка[0], reason="email")
         return True
 
 

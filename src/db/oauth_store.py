@@ -262,6 +262,11 @@ update oauth_grants set revoked_at = now(), revoked_reason = 'reuse'
  where id = %s and revoked_at is null
 """
 
+#: Замок и на строке подключения: отзыв (`revoke_connection`, смена пароля)
+#: пишет ту же строку, поэтому ротация либо закончится до отзыва — и её токены
+#: погаснут вместе с подключением, — либо увидит `revoked_at` под замком и
+#: ничего не выпустит. Порядок замков: refresh, затем подключение; отзыв берёт
+#: только подключение — круга нет.
 _LOCK_REFRESH_SQL = """
 select t.id, t.grant_id, c.client_id, t.used_at, t.expires_at > now(),
        g.revoked_at is null, u.disabled_at is null, t.resource
@@ -270,7 +275,7 @@ select t.id, t.grant_id, c.client_id, t.used_at, t.expires_at > now(),
   join oauth_clients c on c.id = g.client_id
   join web_users u on u.id = g.user_id
  where t.fingerprint = %s and t.kind = 'refresh'
-   for update of t
+   for update of t, g
 """
 
 _USE_REFRESH_SQL = "update oauth_tokens set used_at = now() where id = %s"

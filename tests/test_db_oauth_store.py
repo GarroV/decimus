@@ -388,3 +388,34 @@ def test_чистка_не_оставляет_токенов_без_подклю
         клиенты = conn.execute("select count(*) from oauth_clients").fetchone()
     assert сироты == (0,)
     assert клиенты == (1,)
+
+
+def test_ротация_refresh_ждёт_отзыва_и_не_выпускает_токенов(
+    база: str, клиент: Client, учётка: str
+) -> None:
+    """Гонка ротации и отзыва: ротация держит строку подключения и видит отзыв под замком.
+
+    Отзыв начат первым и держит строку подключения; ротация того же подключения
+    ждёт его и после фиксации отзыва не выпускает ничего.
+    """
+    пара = _обмен(_код(клиент, учётка), клиент)
+    (подключение,) = list_connections(учётка)
+
+    with ThreadPoolExecutor(max_workers=1) as пул, psycopg.connect(база) as отзыв:
+        отзыв.execute(
+            "update oauth_grants set revoked_at = now(), revoked_reason = 'user' where id = %s",
+            (подключение.id,),
+        )
+        ротация = пул.submit(refresh_tokens, пара.refresh_token, client_id=клиент.client_id)
+        with pytest.raises(TimeoutError):
+            ротация.result(timeout=1)  # ждёт замка строки подключения
+        отзыв.commit()
+
+        with pytest.raises(OAuthGrantError, match="отозвано"):
+            ротация.result(timeout=10)
+
+    with psycopg.connect(база) as conn:
+        токены = conn.execute(
+            "select count(*) from oauth_tokens where grant_id = %s", (подключение.id,)
+        ).fetchone()
+    assert токены == (2,), "после отзыва выпущены новые токены"
