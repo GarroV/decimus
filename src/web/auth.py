@@ -37,6 +37,8 @@ from flask import Flask, current_app, g, make_response, redirect, render_templat
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
+from src.db import web_own_profile
+from src.db.errors import DbError
 from src.db.reach import Reach, reach_of
 from src.db.web_access import (
     SESSION_TTL,
@@ -51,11 +53,12 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import oauth, swarm_api, walk_auth
+from . import google_link, oauth, reauth, swarm_api, walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
     GoogleAuthError,
+    GoogleIdentity,
     GoogleSettings,
     authorization_url,
     exchange_code,
@@ -81,6 +84,9 @@ GOOGLE_CALLBACK_PATH = "/auth/google/callback"
 GOOGLE_STATE_COOKIE = "dodo_audit_google_state"
 GOOGLE_STATE_SALT = "google-state"
 GOOGLE_STATE_TTL_SECONDS = 600
+
+#: Где в `app.extensions` лежит начало привязки почты Google из «Настроек».
+GOOGLE_LINK_KEY = "decimus_google_link"
 
 #: Имя куки. Своё, а не `session`: рядом на той же машине живут другие стенды,
 #: и одноимённая кука соседа затирала бы нашу на общем хосте.
@@ -191,6 +197,16 @@ def current_session_token() -> str:
 
 #: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
 REACH = "reach"
+
+
+def begin_google_link() -> Response:
+    """Увести вошедшего к Google привязать почту к СВОЕЙ учётке (D447).
+
+    Само начало живёт в `install` — рядом с подписью метки и реквизитами
+    Google, которыми пользуется и вход: метка, кука и адрес возврата у двух
+    заходов одни, различает их вид метки (`google_link.LINK_KIND`).
+    """
+    return current_app.extensions[GOOGLE_LINK_KEY]()  # type: ignore[no-any-return]
 
 
 def current_tenant() -> str:
@@ -438,6 +454,15 @@ def install(app: Flask, conf: Settings) -> None:
         if not hmac.compare_digest(str(ожидаемая).encode(), пришедшая.encode()):
             return отказано
 
+        # Заход «привязать почту» из «Настроек» (D447): тот же клиент и тот же
+        # адрес возврата, своя ветка. Метка уже сверена выше — общим кодом.
+        if isinstance(содержимое, dict) and содержимое.get("kind") == google_link.LINK_KIND:
+            return очистить_метку(_вернуть_привязку(google, str(ожидаемая)))
+        # Подтверждение входа перед действием, создающим долгоживущий доступ.
+        if isinstance(содержимое, dict) and содержимое.get("kind") == reauth.REAUTH_KIND:
+            назад = reauth.safe_back(str(содержимое.get("next") or ""))
+            return очистить_метку(_вернуть_подтверждение(google, str(ожидаемая), назад))
+
         # `error=access_denied` приходит, когда человек сам отказался в окне
         # согласия. Это не поломка: возвращаем на форму без красного.
         if request.args.get("error"):
@@ -487,6 +512,125 @@ def install(app: Flask, conf: Settings) -> None:
         )
         session = open_session(account)
         return очистить_метку(remember(after_login(вернуться), session))
+
+    def _начать_привязку() -> Response:
+        """Метка за сессией в базе и в куке, затем увод к Google с `nonce`.
+
+        Только по POST со своей страницы (маршрут в `settings_screen`), поэтому
+        чужая страница не начнёт привязку в браузере человека. Метка пишется в
+        базу за ЭТОЙ сессией: возврат в другой сессии её не погасит.
+        """
+        if google is None:
+            return redirect(url_for("settings_page"))
+        метка = new_state()
+        try:
+            записана = web_own_profile.begin_google_link(
+                current_session_token(), state=метка, ttl_seconds=GOOGLE_STATE_TTL_SECONDS
+            )
+        except DbError:
+            current_app.logger.exception("привязка Google: метку записать не удалось")
+            записана = False
+        if not записана:
+            return google_link.back_to_settings("db")
+        ответ = redirect(
+            authorization_url(_google_here(google), state=метка, nonce=google_link.nonce_for(метка))
+        )
+        ответ.set_cookie(
+            GOOGLE_STATE_COOKIE,
+            state_signer.dumps({"state": метка, "kind": google_link.LINK_KIND}),
+            max_age=GOOGLE_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    app.extensions[GOOGLE_LINK_KEY] = _начать_привязку
+
+    def _обновить_сессию(account: Account, назад: str) -> Response:
+        """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
+        прежний = token_of_request()
+        новая = open_session(account)
+        if прежний:
+            close_session(прежний)
+        return remember(redirect(f"{request.script_root}{назад}"), новая)
+
+    def _начать_подтверждение(назад: str) -> Response:
+        """Увод к Google подтвердить вход; метка и путь возврата — в подписанной куке."""
+        if google is None:
+            return redirect(url_for(reauth.CONFIRM_ENDPOINT, next=назад))
+        метка = new_state()
+        ответ = redirect(
+            authorization_url(_google_here(google), state=метка, nonce=google_link.nonce_for(метка))
+        )
+        ответ.set_cookie(
+            GOOGLE_STATE_COOKIE,
+            state_signer.dumps({"state": метка, "kind": reauth.REAUTH_KIND, "next": назад}),
+            max_age=GOOGLE_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    def _вернуть_подтверждение(реквизиты: GoogleSettings, метка: str, назад: str) -> Response:
+        """Возврат подтверждения: Google обязан назвать почту ЭТОЙ учётки."""
+        token = token_of_request()
+        account = resolve_session(token) if token else None
+        if account is None or token is None:
+            return redirect(url_for("login"))
+        мимо = redirect(url_for(reauth.CONFIRM_ENDPOINT, next=назад, failed="1"))
+        код = request.args.get("code") or ""
+        if request.args.get("error") or not код:
+            return мимо
+        try:
+            кто = exchange_code(_google_here(реквизиты), code=код)
+        except GoogleAuthError:
+            return мимо
+        if not reauth.google_confirms(account, кто, state=метка, hq_domains=hq_domains):
+            return мимо
+        return _обновить_сессию(account, назад)
+
+    reauth.install(
+        app,
+        stand=рубеж,
+        trusted_proxies=conf.trusted_proxies,
+        google_enabled=google is not None,
+        rotate=_обновить_сессию,
+        begin_google=_начать_подтверждение,
+        # Имя ищется в момент вызова: так сверка идёт ровно той дверью, что у входа.
+        verify=lambda login, password: authenticate(login, password),
+    )
+
+    def _вернуть_привязку(реквизиты: GoogleSettings, метка: str) -> Response:
+        """Возврат привязки: учётка — из сессии этого браузера, исход — в «Настройки»."""
+        token = token_of_request()
+        account = resolve_session(token) if token else None
+        if account is None or token is None:
+            return redirect(url_for("login"))
+        итог = _исход_привязки(реквизиты, token, account, метка)
+        return google_link.back_to_settings(итог)
+
+    def _исход_привязки(реквизиты: GoogleSettings, token: str, account: Account, метка: str) -> str:
+        if request.args.get("error"):
+            return "cancelled"
+        код = request.args.get("code") or ""
+        if not код:
+            return "failed"
+        try:
+            кто: GoogleIdentity = exchange_code(_google_here(реквизиты), code=код)
+        except GoogleAuthError:
+            return "failed"
+        return google_link.finish(
+            token=token,
+            login=account.login,
+            tenant=account.tenant,
+            state=метка,
+            identity=кто,
+            hq_domains=hq_domains,
+        )
 
     def отказ_входа() -> tuple[str, int]:
         """Один и тот же отказ на все осечки возврата.
