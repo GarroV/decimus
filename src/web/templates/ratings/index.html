@@ -271,6 +271,11 @@
     </table></div>{% endif %}
     {% if agg_later and agg_dates %}<div class="rt-note">{{ t('ratings.agg.later', date=(agg_dates|max).strftime('%d.%m.%Y')) }}</div>{% endif %}
     {% if map_rows and not agg_cols %}<div class="rt-note">{{ t('ratings.empty.aggregators') }}</div>{% endif %}
+    {% if agg_update_notice %}<div class="rt-note" role="status">{{ t(agg_update_notice) }}</div>{% endif %}
+    {% if may_manage %}<div class="rt-note">
+      {% if agg_pending %}{{ t('ratings.agg.update.pending', at=agg_pending.requested_at.strftime(at_format), by=agg_pending.requested_by) }}
+      {% else %}<form method="post" action="{{ url(ratings_path ~ '/aggregators/update') }}?{{ request.query_string.decode() }}" class="rt-form">
+        <button class="btn btn--sm" type="submit">{{ t('ratings.agg.update') }}</button> <span class="rt-maps__n">{{ t('ratings.agg.update.hint') }}</span></form>{% endif %}</div>{% endif %}
     {% if agg_failures %}<div class="rt-note">{{ t('ratings.agg.failed', names=agg_failed_names) }}
       {% if may_manage %}<ul>{% for f in agg_failures %}<li title="{{ f.error or '' }}">{{ t('ratings.agg.failed_one', name=agg_names.get(f.aggregator, f.aggregator), at=f.at.strftime(at_format), ok=(t('ratings.agg.last_ok', at=f.last_ok.strftime(at_format)) if f.last_ok else t('ratings.agg.never_ok'))) }}{% if f.error %} — {{ f.error }}{% endif %}</li>{% endfor %}</ul>{% endif %}</div>{% endif %}
   </section>
