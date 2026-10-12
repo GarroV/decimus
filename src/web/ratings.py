@@ -15,6 +15,7 @@ import logging
 import math
 from collections.abc import Callable, Mapping
 from datetime import date
+from types import ModuleType
 from urllib.parse import urlencode
 
 from flask import Flask, redirect, render_template, request
@@ -29,7 +30,7 @@ from src.domain.tenants import may_manage_ratings
 from src.ratings import coverage, pointer, report
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
-from src.ratings.aggregators import collect, glovo_link
+from src.ratings.aggregators import collect, glovo_link, migros_link
 from src.ratings.aggregators import queue as agg_queue
 from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
@@ -357,6 +358,7 @@ def render_coverage(
         agg_names=_agg_names(lang),
         may_manage=may_manage(),
         stale_days=coverage.STALE_DAYS,
+        link_platforms=LINK_PLACEHOLDERS,
         new_days=coverage.NEW_DAYS,
         ratings_path=section("ratings").path,
         at_format=_AT,
@@ -364,26 +366,46 @@ def render_coverage(
     )
 
 
-def _link_glovo(conf: Settings) -> tuple[str, int]:
-    """Привязать пиццерию к Glovo по ссылке на страницу магазина. Итог — одной
-    строкой над таблицей; никому ничего не отправляется."""
+#: Площадки, к которым пиццерия привязывается ссылкой: модуль с `link_by_url` и ключ
+#: текста «плохая ссылка» у этой площадки (#717).
+_LINKERS: dict[str, tuple[ModuleType, str]] = {
+    "glovo": (glovo_link, "bad_url"),
+    "migros_yemek": (migros_link, "bad_url_migros"),
+}
+#: Подсказка в поле ссылки — для шаблона экрана.
+LINK_PLACEHOLDERS = {
+    "glovo": "https://glovoapp.com/…/stores/…",
+    "migros_yemek": "https://www.migros.com.tr/yemek/…",
+}
+
+
+def _link_point(conf: Settings) -> tuple[str, int]:
+    """Привязать пиццерию к площадке по ссылке на страницу магазина (Glovo,
+    Migros Yemek — #717). Итог — одной строкой над таблицей; никому ничего не
+    отправляется."""
     lang = _lang(conf)
+    aggregator = (request.form.get("aggregator") or "glovo").strip()
+    if aggregator not in _LINKERS:
+        return render_coverage(conf, failure=t("ratings.coverage.link.failed", lang)), 400
+    linker, bad_url = _LINKERS[aggregator]
     unit_id = (request.form.get("dodo_id") or "").strip().lower()
     today = date.today()
     try:
         unit = next((u for u in agg_store.units() if u.dodo_id == unit_id), None)
-        result, point, rating = glovo_link.link_by_url(
-            unit, request.form.get("url") or "", agg_store.point_keys("glovo"), today
+        result, point, rating = linker.link_by_url(
+            unit, request.form.get("url") or "", agg_store.point_keys(aggregator), today
         )
         if point is not None:
             agg_store.save([point], [rating] if rating else [])
     except RatingsError:
-        logger.warning("рейтинги: привязка Glovo не легла", exc_info=True)
+        logger.warning("рейтинги: привязка %s не легла", aggregator, exc_info=True)
         return render_coverage(conf, failure=t("ratings.coverage.db_down", lang)), 503
+    platform = _agg_names(lang).get(aggregator, aggregator)
     if result.code == glovo_link.OK and unit is not None:
-        notice = t("ratings.coverage.link.ok", lang, name=unit.name)
+        notice = t("ratings.coverage.link.ok", lang, platform=platform, name=unit.name)
         return render_coverage(conf, notice=notice), 200
-    reason = _coded("ratings.coverage.link", result.code, {}, lang, "ratings.coverage.link.failed")
+    code = bad_url if result.code == glovo_link.BAD_URL else result.code
+    reason = _coded("ratings.coverage.link", code, {}, lang, "ratings.coverage.link.failed")
     return render_coverage(conf, failure=reason), 400
 
 
@@ -479,7 +501,7 @@ def install(app: Flask, conf: Settings) -> None:
         if not may_manage():
             return _forbidden()
         refuse_foreign_origin()
-        return _link_glovo(conf)
+        return _link_point(conf)
 
     @app.get(f"{путь}/imports", endpoint="ratings_imports")
     def ratings_imports() -> str | tuple[str, int]:
