@@ -9,9 +9,9 @@
 - `mcp_who`, `mcp_add`, `mcp_revoke` — круг доступа к MCP (D099), только тем,
   кто в нём;
 - `stops` — отказы мастера за период (#436), тоже только кругу;
-- `finish_mode` — режим «Завершить» человека (D439): `summary` или `report`,
+- `finish_mode` — режим «Завершить» человека (D447): `summary` или `report`,
   хранится за Telegram ID (`db.finish_modes`);
-- `finish` — «Завершить проверку» (D422, D439): в режиме `summary` итог в чат,
+- `finish` — «Завершить проверку» (D422, D447): в режиме `summary` итог в чат,
   как `/finish`; в `report` — отчёт сразу (`walk_finish.py`). Оба — любому
   аудитору, не только кругу.
 
@@ -86,7 +86,7 @@ def chosen_lang(chat_id: int) -> str | None:
 
 
 def finish_mode_of(chat_id: int) -> str:
-    """Режим «Завершить» человека (D439). Не выбирал или база молчит — сначала сводка."""
+    """Режим «Завершить» человека (D447). Не выбирал или база молчит — сначала сводка."""
     try:
         mode = finish_modes.chosen_finish_mode(chat_id)
     except DbError:
@@ -191,7 +191,7 @@ def _issue(who: int, conf: WalkSettings, lang: str) -> dict[str, Any]:
 
 
 def _finish(who: int, conf: WalkSettings, body: dict[str, Any], lang: str) -> tuple[Response, int]:
-    """«Завершить проверку» (D422, D439). Сообщение уходит только в чат подписавшего."""
+    """«Завершить проверку» (D422, D447). Сообщение уходит только в чат подписавшего."""
     if conf.bot_token is None:
         raise Refused("walk.finish.err.failed", 503)
     mode = finish_mode_of(who)
