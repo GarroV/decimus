@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -50,6 +51,9 @@ MAIL_CALLBACK_PATH = "/auth/google/mail"
 
 MAIL_STATE_COOKIE = "dodo_audit_mail_state"
 MAIL_STATE_SALT = "google-mail-state"
+
+logger = logging.getLogger(__name__)
+
 #: Десять минут на согласие. Больше — окно, в котором чужая страница может
 #: подсунуть свой возврат; меньше — человек не успевает прочитать экран Google.
 MAIL_STATE_TTL_SECONDS = 600
@@ -170,8 +174,10 @@ def install(app: Flask, conf: Settings) -> None:
             return render_template("users/forbidden.html"), 403
 
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
-        if detail.inspection.on_review:
+        if detail.inspection.on_review or detail.inspection.is_uploaded:
             # Непринятая проверка (D199) — письмо не фиксируется и в почту не уходит.
+            # Заведённая задним числом — письма нет вовсе (D310): экран письма
+            # скажет это словами.
             return к_письму(inspection_id, lang=письмо_на, исход="on_review")
         текст = request.form.get("text") or ""
         вошедший = auth.current_account()
@@ -271,7 +277,7 @@ def install(app: Flask, conf: Settings) -> None:
             # Черновик письма — запись от имени пространства: по проверке,
             # которую вошедший только читает (D283), — отказ.
             return render_template("users/forbidden.html"), 403
-        if detail.inspection.on_review:
+        if detail.inspection.on_review or detail.inspection.is_uploaded:
             # Возврат от Google — второй вход в ту же запись, его можно позвать
             # и руками: непринятая проверка (D199) черновика не получает и здесь.
             return к_письму(inspection_id, lang=письмо_на, исход="on_review")
@@ -298,7 +304,10 @@ def install(app: Flask, conf: Settings) -> None:
                 ),
                 body=записанное.body,
             )
-        except GoogleMailError:
+        except GoogleMailError as сбой:
+            # Без записи кнопка «не работала» молча: человек видел «не вышло»,
+            # а в журнале не было ничего (11.10.2026).
+            logger.warning("черновик письма в Gmail не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
 
         ответ = к_письму(inspection_id, lang=письмо_на, исход="ok")

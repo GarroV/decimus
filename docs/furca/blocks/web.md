@@ -34,10 +34,19 @@
 Действия записи на чужой проверке — `_refuse_unless_own` (404 вне охвата,
 403 на чужое пространство). Методика — по пространству (`?space=`, эталон и
 чужое только на чтение). Разделы `hq_only` (`sections.py`) у партнёра — 404
-до маршрута. «Пользователи» видят все; управление людьми — админ УК; привязка
+до маршрута. «Пользователи» видят все; кто кого ведёт — охват по роли
+(`src/web/access_policy.py`, #585: главный админ, админ УК, контроль, админ
+партнёра), маршруты — `src/web/users_screen.py`: `POST /users/add`,
+`/users/disable`, `/users/role`, `/users/email`, `/users/spaces/add`,
+`/users/spaces/countries`, свой пароль `POST /users/password`; привязка
 бота — `POST /users/bot-link`, `POST /users/bot-unlink` (`src/db/bot_links.py`).
+Таблица охватов — `docs/12-web-admin.md`, «Экран доступа».
 Сверка, что `conf.tenant` больше не решает данных, —
 `tests/test_web_tenant_source.py`. Продуктовое описание — `docs/12-web-admin.md`.
+
+### Рейтинги (`ratings`)
+
+Раздел `ratings` (`/ratings`) читают все. Подраздел «Загрузки» (`/ratings/imports`) и формы записи (`POST /ratings/import|countries|hard-rules|settings`, `…/hard-rules/<id>/delete`) закрыты заслоном `may_manage_ratings` (`src/domain/tenants.py`): контроль и админ УК, остальным 403. Маршруты — `src/web/ratings.py`, сводка — `src/ratings/report.py`, тексты — `src/web/texts_ratings.py`. Продуктовое описание — `docs/15-ratings.md`.
 
 ### Признак «построен / не построен»
 

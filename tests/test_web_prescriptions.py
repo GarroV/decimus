@@ -216,6 +216,47 @@ def test_форма_подставляет_адресатов_страны(уК:
     assert 'value="ops@ge.example.com"' in страница
 
 
+ПРОВЕРКА = "33333333-3333-3333-3333-333333333333"
+
+
+def test_форма_с_карточки_отмечает_проверку_основанием(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — страны в адресе нет: она берётся с точки проверки (решение владельца 11.10.2026).
+    monkeypatch.setattr(
+        rx,
+        "inspection_basis",
+        lambda _i, **_k: ("GE", rx.Choice(id=ПРОВЕРКА, title="Batumi-1 · 2026-10-01")),
+    )
+
+    # Act
+    страница = уК.get(f"/actions/prescriptions/new?inspection={ПРОВЕРКА}&lang=ru").get_data(
+        as_text=True
+    )
+
+    # Assert
+    assert f'value="{ПРОВЕРКА}" checked' in страница, "проверка не отмечена основанием"
+    assert "Batumi-1 · 2026-10-01" in страница
+
+
+def test_форма_с_чужой_проверкой_открывается_без_основания(
+    уК: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — вне охвата, снятая и не принятая база отдаёт `None`.
+    monkeypatch.setattr(rx, "inspection_basis", lambda _i, **_k: None)
+
+    # Act
+    ответ = уК.get(f"/actions/prescriptions/new?inspection={ПРОВЕРКА}&lang=ru")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert f'value="{ПРОВЕРКА}" checked' not in ответ.get_data(as_text=True)
+
+
+def test_партнёру_форма_с_карточки_закрыта(партнёр: FlaskClient) -> None:
+    assert партнёр.get(f"/actions/prescriptions/new?inspection={ПРОВЕРКА}").status_code == 404
+
+
 def test_сохранить_черновик_ведёт_на_карточку(уК: FlaskClient, зовы: dict[str, list[Any]]) -> None:
     ответ = уК.post(
         "/actions/prescriptions?lang=ru", data={**ФОРМА, "then": "save"}, headers=ORIGIN

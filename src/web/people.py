@@ -4,10 +4,10 @@
 тоже. Экран зовёт те же двери базы (`reassign_role`, `set_email`) под той же ролью
 повышенных полномочий, что заведение и отключение.
 
-Здесь — только проверка ввода и перевод исхода в код ответа. Кому можно
-править, решает маршрут (`_hq_admin_only` в `app.py`): админ УК, в любом
-пространстве — как заведение и отключение. Админ партнёра людьми не управляет,
-его права не решены (D288).
+Здесь — проверка ввода, перевод исхода в код ответа и круг людей «контроля».
+Кому можно править, решает правило охвата (`access_policy.py`, #585, D364), а
+сверяет маршрут; сюда приходит уже разрешённая цель и `only_roles` — охват по
+роли цели, который дверь базы держит условием в самом запросе.
 
 «Доверенные почты» (список адресов или правило домена) — открытый вопрос
 владельца и здесь не строятся: почта привязывается к уже заведённому человеку
@@ -54,15 +54,23 @@ def is_self(*, login: str, tenant: str, actor_login: str, actor_tenant: str) -> 
 
 
 def change_role(
-    *, login: str, tenant: str, role: str, actor_login: str, actor_tenant: str
+    *,
+    login: str,
+    tenant: str,
+    role: str,
+    actor_login: str,
+    actor_tenant: str,
+    only_roles: tuple[str, ...] | None = None,
 ) -> Outcome:
     """Назначить роль. Свою — нельзя: снять с себя админа значит закрыть экран людей."""
-    if role not in accounts.ROLES:
+    if role not in accounts.roles_for(tenant):
         return Outcome("role.unknown", 400)
     if is_self(login=login, tenant=tenant, actor_login=actor_login, actor_tenant=actor_tenant):
         return Outcome("role.self", 400)
     try:
-        прежняя = accounts.reassign_role(login, tenant=tenant, role=role)
+        прежняя = accounts.reassign_role(login, tenant=tenant, role=role, only_roles=only_roles)
+    except accounts.LastSuperadminError:
+        return Outcome("role.last_super", 409)
     except DbError:
         return Outcome("role.failed", 503)
     if прежняя is None:
@@ -80,14 +88,22 @@ def change_role(
 
 
 def change_email(
-    *, login: str, tenant: str, email: str, actor_login: str, actor_tenant: str
+    *,
+    login: str,
+    tenant: str,
+    email: str,
+    actor_login: str,
+    actor_tenant: str,
+    only_roles: tuple[str, ...] | None = None,
 ) -> Outcome:
     """Привязать почту входа через Google; пустая — снять (пароль и учётка остаются)."""
     почта = email.strip()
     if почта and not EMAIL_SHAPE.match(почта):
         return Outcome("email.shape", 400)
     try:
-        сделано = accounts.set_email(login, tenant=tenant, email=почта or None)
+        сделано = accounts.set_email(
+            login, tenant=tenant, email=почта or None, only_roles=only_roles
+        )
     except EmailTakenError:
         return Outcome("email.taken", 409)
     except DbError:

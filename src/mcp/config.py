@@ -37,7 +37,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.domain.tenants import canonical_tenant
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .errors import AuthError, McpConfigError
 
@@ -78,6 +78,21 @@ MCP_CHECKLIST_TENANTS_VAR = "MCP_CHECKLIST_TENANTS"
 #: отказ на старте, то есть смена токена в одном месте и забытая в другом
 #: роняет сервер, а не отбирает право тихо.
 MCP_RETRACTION_TOKENS_VAR = "MCP_RETRACTION_TOKENS"
+
+#: Открыта ли загрузка проверок задним числом (D305, D334): черновик, записи,
+#: кадры, подтверждение. Пусто — загрузка закрыта всем, и это её выключатель
+#: (D335: «законсервировать»); уже загруженное при этом не трогается. По
+#: пространству, а не по токену, как и методика: загружает сторона, а кто
+#: именно загрузил и подтвердил — пишется подписью `mcp:tg:<id>` личного токена
+#: (`Access.actor`), а у стороннего токена — `mcp:<сторона>`.
+#:
+#: Единственное допустимое значение — `HQ` (D335): загрузка задним числом только
+#: у УК, партнёрам — никогда. Держит это код (`_parse_import`), а не настройка:
+#: любое другое пространство в переменной — отказ на старте сервиса.
+#:
+#: Открыть загрузку без хранилища версий методики нельзя: текущую проверку
+#: считает движок по действующей версии, а версии лежат там.
+MCP_IMPORT_TENANTS_VAR = "MCP_IMPORT_TENANTS"
 
 #: Каталог боевой методики — тот же, из которого читает движок. Своей
 #: переменной блок не заводит: второй путь к одной методике разошёлся бы с
@@ -143,6 +158,21 @@ class Settings:
     #: никому. `repr=False` по той же причине, что и карта токенов выше: это
     #: значения секретов, а `repr` настроек уезжает в трейсбек и дальше в лог.
     retraction_tokens: tuple[str, ...] = field(default=(), repr=False)
+    #: Арендаторы, которым открыта загрузка исторических проверок (D305).
+    import_tenants: tuple[str, ...] = ()
+
+    def may_import(self, tenant: str) -> bool:
+        """Открыта ли ЭТОМУ арендатору загрузка исторических проверок (D305).
+
+        Как и правка методики, спрашивается по коду арендатора из токена — на
+        той же двери, что граница арендаторов. Без хранилища версий и боевой
+        методики загрузка закрыта: оценку считать не по чему.
+        """
+        return (
+            self.checklist_store is not None
+            and self.data_dir is not None
+            and canonical_tenant(tenant) in self.import_tenants
+        )
 
     def may_retract(self, token: str) -> bool:
         """Открыто ли снятие проверок ЭТОМУ токену (T211, D086/D089).
@@ -171,7 +201,9 @@ class Settings:
         больше, — то есть право на правку методики держится на той же двери,
         что и граница арендаторов, и отдельного способа его получить нет.
         """
-        return self.checklist_store is not None and tenant in self.checklist_tenants
+        return (
+            self.checklist_store is not None and canonical_tenant(tenant) in self.checklist_tenants
+        )
 
     def may_read_checklist(self, tenant: str) -> bool:
         """Открыт ли ЭТОМУ арендатору ИСХОДНИК эталона — чтение, не правка.
@@ -323,9 +355,11 @@ def _parse_checklist(
     включённой, а инструменты молча отказывают всем — и разбираться он идёт в
     код, а не в `.env`.
 
-    Арендатор, которому открыта методика, обязан существовать среди токенов:
-    опечатка в коде иначе означала бы доступ, выданный никому, — и выглядела бы
-    ровно как работающая настройка.
+    Присутствие арендатора среди `MCP_TOKENS` НЕ требуется (08.10.2026, D311):
+    методику правят и по ЛИЧНЫМ токенам, выпущенным ботом (T253), а их
+    арендаторы живут в базе и на старте неизвестны. Требование уронило прод:
+    `MCP_CHECKLIST_TENANTS=HQ` при личных токенах `HQ` и без токена стороны
+    `HQ` — сервер не поднялся. Тот же довод, что у загрузки (`_parse_import`).
     """
     store_raw = (src.get(MCP_CHECKLIST_STORE_VAR) or "").strip()
     сказано = _SEPARATORS.split(src.get(MCP_CHECKLIST_TENANTS_VAR) or "")
@@ -344,13 +378,6 @@ def _parse_checklist(
             f"методика открыта ({MCP_CHECKLIST_TENANTS_VAR}). Инструменты методики отказывали бы "
             f"всем, а выглядело бы это как включённая правка"
         )
-    чужие = [code for code in named if code not in tenants]
-    if чужие:
-        raise McpConfigError(
-            f"В {MCP_CHECKLIST_TENANTS_VAR} названы арендаторы, которых нет среди токенов: "
-            f"{', '.join(чужие)}. Опечатка в коде означала бы доступ, выданный никому, — и "
-            f"выглядела бы как работающая настройка"
-        )
     data_raw = (src.get(DATA_DIR_VAR) or "").strip()
     if not data_raw:
         raise McpConfigError(
@@ -363,6 +390,48 @@ def _parse_checklist(
         named,
         Path(os.path.abspath(os.path.expanduser(data_raw))),
     )
+
+
+def _parse_import(raw: str, *, store: Path | None, data_dir: Path | None) -> tuple[str, ...]:
+    """Открыта ли загрузка проверок задним числом. Пусто — закрыта всем (D305, D335).
+
+    Открывается только УК: любое пространство кроме `HQ` (после перевода старого
+    кода, `canonical_tenant`) — отказ на старте сервиса (D335). Партнёр не
+    получает загрузку задним числом никакой переменной: опечатка или «временно
+    дадим» в `.env` роняет сервис, а не открывает дверь молча.
+
+    Названная без хранилища версий методики, она означала бы инструменты,
+    отказывающие всем на первом же черновике, — и выглядело бы это как
+    работающая настройка. Поэтому отказ на старте, тем же приёмом, что у
+    методики (`_parse_checklist`).
+
+    Присутствие арендатора среди `MCP_TOKENS` НЕ требуется — в отличие от
+    методики. Загружает коллега по ЛИЧНОМУ токену, выпущенному ботом (T253), а
+    арендаторы личных токенов живут в базе и на старте неизвестны: требование
+    закрыло бы загрузку ровно тому, кому она нужна.
+    """
+    названные = tuple(
+        sorted({canonical_tenant(x) for x in _SEPARATORS.split(raw or "") if x.strip()})
+    )
+    if not названные:
+        return ()
+    чужие = [x for x in названные if x != HQ_TENANT]
+    if чужие:
+        raise McpConfigError(
+            f"Загрузка проверок задним числом открывается только УК ({HQ_TENANT}), а в "
+            f"{MCP_IMPORT_TENANTS_VAR} названы и другие пространства: {', '.join(чужие)}. "
+            f"Партнёрам загрузка задним числом не открывается никогда (D335). Оставьте "
+            f"{MCP_IMPORT_TENANTS_VAR}={HQ_TENANT} или пустым — пустая переменная закрывает "
+            f"загрузку всем"
+        )
+    if store is None or data_dir is None:
+        raise McpConfigError(
+            f"Загрузка исторических проверок открыта ({MCP_IMPORT_TENANTS_VAR}), но хранилище "
+            f"версий методики не настроено ({MCP_CHECKLIST_STORE_VAR}, "
+            f"{MCP_CHECKLIST_TENANTS_VAR}, {DATA_DIR_VAR}). Оценку загруженной проверки "
+            f"считает движок по её версии методики, а версии лежат там"
+        )
+    return названные
 
 
 def _parse_retraction(raw: str, tokens: Mapping[str, str]) -> tuple[str, ...]:
@@ -411,7 +480,7 @@ def _check_any_door(tokens: Mapping[str, str], src: Mapping[str, str]) -> None:
     До T253 дверь была одна — карта «арендатор=токен» из `.env`, и пустая
     карта означала ровно «доступ никем не закрыт». Теперь доступ выдаёт бот:
     токен личный, живёт отпечатком в базе и сверяется здесь же
-    (`_tenant_from_store`). Пустая карта при живой базе означает не «открыт», а
+    (`_owner_from_store`). Пустая карта при живой базе означает не «открыт», а
     «сторонних токенов нет, ходят только по личным» — законная настройка
     площадки, и требовать ради старта сторонний токен значило бы держать
     открытой ровно ту дверь, которую личные токены заводились заменить (#214).
@@ -455,6 +524,9 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         checklist_tenants=checklist_tenants,
         data_dir=data_dir,
         retraction_tokens=_parse_retraction(src.get(MCP_RETRACTION_TOKENS_VAR) or "", tokens),
+        import_tenants=_parse_import(
+            src.get(MCP_IMPORT_TENANTS_VAR) or "", store=store, data_dir=data_dir
+        ),
     )
 
 
@@ -475,10 +547,15 @@ class Access:
     tenant: str
     #: Открыто ли этому токену снятие проверок из истории (T211, D086/D089).
     may_retract: bool
+    #: Кто пришёл — подписью для журнала действий, а не секретом: `mcp:tg:<id>`
+    #: у личного токена (владелец по телеграму, T253), `mcp:<арендатор>` у
+    #: стороннего из карты `.env`. Нужна подтверждению загруженной проверки
+    #: (D308): принятая подписывается тем, кто её принял (D199).
+    actor: str = ""
 
 
-def _tenant_from_store(token: str) -> str | None:
-    """Арендатор ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
+def _owner_from_store(token: str) -> tuple[str, int] | None:
+    """Арендатор и владелец ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
 
     Вторая дверь рядом с картой из `.env`, а не вместо неё. Личные токены
     выпускает бот, хранит отпечатками и отзывает поимённо
@@ -515,7 +592,7 @@ def _tenant_from_store(token: str) -> str | None:
             exc_info=True,
         )
         return None
-    return None if владелец is None else владелец.tenant
+    return None if владелец is None else (владелец.tenant, владелец.telegram_id)
 
 
 def resolve_access(settings: Settings, header: str | None) -> Access:
@@ -563,8 +640,12 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
             "«Authorization: Bearer <токен>». Доступ к проверкам закрыт личным токеном"
         )
     tenant = settings.tenant_for(token)
+    actor = f"mcp:{tenant}"
     if tenant is None:
-        tenant = _tenant_from_store(token)
+        владелец = _owner_from_store(token)
+        if владелец is not None:
+            tenant, telegram_id = владелец
+            actor = f"mcp:tg:{telegram_id}"
     if tenant is None:
         raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
-    return Access(tenant=tenant, may_retract=settings.may_retract(token))
+    return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=actor)

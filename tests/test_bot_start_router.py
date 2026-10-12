@@ -25,12 +25,14 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import (
     KIND_TITLES,
+    LANG_LABELS,
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     UNIT_NEW_PREFIX,
     UNIT_NEW_YES,
 )
+from src.bot.texts import t
 from src.bot.unit_pick import UnitMatch
 from src.db.bot_links import Binding, Standing
 from src.domain import get_state, start_inspection
@@ -55,6 +57,7 @@ async def walk_through_wizard(unit: str = "Белград 2") -> tuple[object, o
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
     return bot, session
 
@@ -78,7 +81,7 @@ async def test_start_offers_new_inspection_button(domain_env: object) -> None:
     assert NEW_INSPECTION_CALLBACK in session.keyboard_data()
 
 
-async def test_wizard_asks_unit_then_kind_then_language(domain_env: object) -> None:
+async def test_wizard_asks_unit_then_kind_then_two_languages(domain_env: object) -> None:
     bot, session = make_bot()
     dp = build_dispatcher(settings())
 
@@ -90,7 +93,61 @@ async def test_wizard_asks_unit_then_kind_then_language(domain_env: object) -> N
     assert set(session.keyboard_data()) == {f"start:kind:{code}" for code in KIND_TITLES}
 
     await feed(dp, bot, callback_query("start:kind:planned"))
+    # D393: сперва язык проверки (речь), и только потом язык отчёта — отдельными
+    # вопросами и отдельными кнопками.
+    assert session.last_text == t("start.ask_speech_lang", "ru")
+    assert session.keyboard_data() == ["start:speech:ru", "start:speech:en"]
+
+    await feed(dp, bot, callback_query("start:speech:ru"))
+    assert session.last_text == t("start.ask_lang", "ru")
     assert session.keyboard_data() == ["start:lang:ru", "start:lang:en"]
+
+
+@pytest.mark.parametrize(
+    ("speech", "report"), [("ru", "en"), ("en", "ru"), ("ru", "ru"), ("en", "en")]
+)
+async def test_inspection_gets_speech_and_report_languages_as_chosen(
+    domain_env: object, speech: str, report: str
+) -> None:
+    """D393, ядро: язык проверки и язык отчёта ложатся в проверку ровно как выбраны.
+
+    Русская речь с английским отчётом (и наоборот) — обычный случай, а не
+    ошибка: до D393 речь молча брала язык отчёта.
+    """
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message("Белград 2"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query(f"start:speech:{speech}"))
+    await feed(dp, bot, callback_query(f"start:lang:{report}"))
+
+    inspection = get_state(CHAT_ID)
+    assert inspection is not None
+    assert inspection.speech_lang == speech
+    assert inspection.report_lang == report
+    started = session.last_text
+    assert LANG_LABELS[speech] in started.split("Язык проверки:")[1].splitlines()[0]
+    assert LANG_LABELS[report] in started.split("Язык отчёта:")[1].splitlines()[0]
+
+
+async def test_report_button_does_not_answer_the_speech_question(domain_env: object) -> None:
+    """Кнопка языка отчёта на шаге языка проверки не принимается: префиксы разные."""
+    bot, session = make_bot()
+    dp = build_dispatcher(settings())
+    await feed(dp, bot, text_message("/start"))
+    await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
+    await feed(dp, bot, text_message("Белград 2"))
+    await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:lang:en"))
+
+    assert get_state(CHAT_ID) is None
+    assert session.last_text == t("error.button_gone", "ru")
+
+    # Мастер при этом жив: правильная кнопка шага по-прежнему принимается.
+    await feed(dp, bot, callback_query("start:speech:ru"))
+    assert session.last_text == t("start.ask_lang", "ru")
 
 
 async def test_wizard_creates_inspection_with_typed_unit(domain_env: object) -> None:
@@ -115,6 +172,7 @@ async def test_auditor_comes_from_telegram_id_and_is_never_asked(domain_env: obj
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Белград 2"))
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
 
     inspection = get_state(CHAT_ID)
@@ -201,6 +259,7 @@ async def test_start_new_asks_unit_and_replaces_only_after_full_wizard(
 
     await feed(dp, bot, text_message("Белград 3"))
     await feed(dp, bot, callback_query("start:kind:repeat"))
+    await feed(dp, bot, callback_query("start:speech:en"))
     await feed(dp, bot, callback_query("start:lang:en"))
 
     replaced = get_state(CHAT_ID)
@@ -239,6 +298,7 @@ async def _до_названия(
 
 async def _до_конца(bot: object, dp: object) -> None:
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
 
 

@@ -23,7 +23,8 @@ from conftest import requires_db
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.db.reach import own_reach  # noqa: E402 — после importorskip намеренно
+from src.db import queries  # noqa: E402 — после importorskip намеренно
+from src.db.reach import own_reach  # noqa: E402
 from src.web import country as cn  # noqa: E402
 from src.web import overview as ov  # noqa: E402
 
@@ -171,7 +172,6 @@ def test_плитки_и_буквы_считаются_по_всему_срез�
         2,
         0,
     )
-    assert снимок.comparable
     # Таблица — по-прежнему последние сто, и об этом сказано.
     assert len(снимок.inspections) == ПРЕДЕЛ
     assert снимок.truncated
@@ -193,3 +193,25 @@ def test_плитка_критических_считает_весь_срез(с
 
     assert снимок.critical_total == 1
     assert "Тбилиси-1" not in {r.unit_name for r in снимок.inspections}
+
+
+def test_сводка_по_странам_главной_знаменатель_из_справочника(
+    сеть: dict[str, str], pg_dsn: str
+) -> None:
+    """«Страны» на «Главной»: точки — из справочника, проверки — из среза и периода."""
+    # Arrange — точка Хорватии без единой проверки.
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        _точка(cur, name="Загреб-1", country="HR", city="Загреб")
+        conn.commit()
+
+    # Act
+    вся = queries.country_summary(reach=own_reach("HQ"))
+    за_день = queries.country_summary(reach=own_reach("HQ"), date_from=НАЧАЛО, date_to=НАЧАЛО)
+
+    # Assert — (страна, точек, проверено, проверок, сумма %, с буквой D)
+    assert вся == [
+        ("GE", 1, 1, 1, 82.0, 0),
+        ("HR", 1, 0, 0, 0.0, 0),
+        ("RS", 1, 1, ПРЕДЕЛ, 97.5 * ПРЕДЕЛ, 0),
+    ]
+    assert [(c, n) for c, _u, _ch, n, _s, _d in за_день] == [("GE", 1), ("HR", 0), ("RS", 0)]

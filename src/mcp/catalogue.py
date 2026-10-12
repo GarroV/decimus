@@ -29,7 +29,18 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
+from src.ratings.snapshot import MCP_CHUNK_BYTES
+
+from . import (
+    checklist_source,
+    checklist_tools,
+    checklists_tools,
+    phrases,
+    ratings_tools,
+    retraction,
+    tools,
+)
+from .import_catalogue import IMPORT_TOOLS
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -60,6 +71,20 @@ KIND_RETRACTION = "retraction"
 #: нет вовсе: обработчики живут отдельным модулем `src.mcp.checklist_source`, и
 #: это проверяется снаружи (`tests/test_mcp_catalogue.py`).
 KIND_CHECKLIST_SOURCE = "checklist_source"
+
+#: Загрузка исторических проверок поштучно (D305–D310). Пятый вид, и второе
+#: названное исключение из правила «запись только у методики»: инструменты
+#: этого вида заводят, правят и удаляют загруженные ЧЕРНОВИКИ и подтверждают
+#: их. Право — по арендатору (`MCP_IMPORT_TENANTS`), спрашивается на входе
+#: (`rpc._call_tool`); обработчики — только в `src.mcp.imports`, а заслон
+#: «только загруженный черновик своего пространства» стоит в замке строки
+#: (`src/db/imports.py`). Описания — в `import_catalogue.py`.
+KIND_IMPORT = "import"
+
+#: Загрузка рейтингов РС/РКО (D320). Шестой вид: пишет, но не в проверки и не в
+#: методику, а в схему `ratings`. Открыт только токену УК — заслон на входе
+#: (`rpc._call_tool`), обработчик живёт своим модулем `src.mcp.ratings_tools`.
+KIND_RATINGS = "ratings"
 
 
 @dataclass(frozen=True)
@@ -296,6 +321,17 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
 }
 
 
+#: Одна фраза о поле `methodologies` на три инструмента ряда (D352): справка,
+#: а не запрет — оценка каждой проверки верна по своей методике.
+_METHODOLOGIES_NOTE = (
+    "The `methodologies` field is reference information: it groups the "
+    "inspections by the checklist and scoring rules they were scored "
+    "under. Each score is correct under its own methodology and is taken "
+    "as recorded, so averaging, ranking and comparing across groups is "
+    "valid."
+)
+
+
 TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="list_inspections",
@@ -305,12 +341,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "and finding count exactly as they were recorded when that "
             "inspection was completed — nothing is recalculated here. "
             "Optionally filter by unit name and by the date range the "
-            "inspections took place in. "
-            "Every answer carries a `comparability` field: inspections scored "
-            "under different checklists, or under editions whose scoring rules "
-            "changed, do not belong in one series — averaging or ranking "
-            "across them is meaningless, and the field says where the series "
-            "breaks."
+            "inspections took place in. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -337,10 +368,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "recent inspection first — a series of percentages and letter "
             "grades exactly as recorded at the time of each inspection. No "
             "trend, average, or difference between entries is computed here; "
-            "the caller compares the series itself. Before comparing, read the "
-            "`comparability` field: a series whose scoring rules changed "
-            "between editions is not a trend, and the field says where it "
-            "breaks."
+            "the caller compares the series itself. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -361,11 +389,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "many inspections and units, total findings, the distribution of "
             "recorded letter grades, and the best- and worst-scoring recorded "
             "inspections. No average score is computed — that number was "
-            "never recorded by the audit engine, so it is not invented here. "
-            "The `comparability` field says whether the summarized inspections "
-            "were scored the same way at all: different checklists, or "
-            "editions whose scoring rules changed, make the grade distribution "
-            "a mix of incomparable series."
+            "never recorded by the audit engine, so it is not invented here. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -1864,6 +1888,57 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler=checklists_tools.apply_checklist,
         kind=KIND_CHECKLIST,
     ),
+    ToolSpec(
+        name="import_ratings",
+        description=(
+            "Upload a ratings file into Decimus (standards and customer-experience "
+            "ratings, IMF only). kind: rko-violations | rko-evaluations | rs-checkups "
+            "(Dodo IS CSV exports), sheet-scores (the 'quality by pizzeria' sheet as "
+            "CSV), snapshot (rating snapshot JSON, see docs/15-ratings.md). "
+            "content: the file text as is. A snapshot goes in self-contained chunks of up to "
+            f"{MCP_CHUNK_BYTES} bytes; send each chunk with its own call (the answer carries "
+            "chunk_index and chunk_of). Re-sending the same content is safe: the answer says "
+            "'duplicate' with loaded_at and nothing changes. HQ token only."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "rko-violations",
+                        "rko-evaluations",
+                        "rs-checkups",
+                        "sheet-scores",
+                        "snapshot",
+                    ],
+                },
+                "content": {"type": "string", "description": "File content (UTF-8 text)."},
+                "file_name": {
+                    "type": "string",
+                    "description": "Original file name, for the upload log.",
+                },
+            },
+            "required": ["kind", "content"],
+            "additionalProperties": False,
+        },
+        handler=ratings_tools.import_ratings,
+        kind=KIND_RATINGS,
+    ),
+)
+
+#: Инструменты загрузки (D305) — своим видом и одним местом: вид ставится здесь,
+#: а не в файле описаний, чтобы инструмент оттуда не мог попасть в каталог мимо
+#: права `MCP_IMPORT_TENANTS`.
+TOOLS = TOOLS + tuple(
+    ToolSpec(
+        name=t.name,
+        description=t.description,
+        input_schema=t.input_schema,
+        handler=t.handler,
+        kind=KIND_IMPORT,
+    )
+    for t in IMPORT_TOOLS
 )
 
 #: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним

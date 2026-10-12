@@ -50,6 +50,7 @@ async def walk_to_language_step(dp: object, bot: object, unit: str = "Белгр
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message(unit))
     await feed(dp, bot, callback_query("start:kind:planned"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
 
 
 async def test_domain_failure_is_reported_and_creates_no_inspection(
@@ -65,6 +66,7 @@ async def test_domain_failure_is_reported_and_creates_no_inspection(
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await walk_to_language_step(dp, bot)
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
 
     assert session.last_text == t("start.failed", "ru", reason="методика неполна")
@@ -84,6 +86,7 @@ async def test_after_domain_failure_plain_text_is_no_longer_taken_as_unit_name(
     bot, session = make_bot()
     dp = build_dispatcher(settings())
     await walk_to_language_step(dp, bot)
+    await feed(dp, bot, callback_query("start:speech:ru"))
     await feed(dp, bot, callback_query("start:lang:ru"))
 
     await feed(dp, bot, text_message("Белград 3"))
@@ -163,6 +166,8 @@ async def test_lang_pressed_with_no_wizard_data_falls_back_to_greeting(
     key = StorageKey(bot_id=bot.id, chat_id=CHAT_ID, user_id=AUDITOR_ID)
     state = FSMContext(storage=dp.storage, key=key)
     await state.set_state(StartFlow.waiting_lang)
+
+    await feed(dp, bot, callback_query("start:speech:ru"))
 
     await feed(dp, bot, callback_query("start:lang:ru"))
 

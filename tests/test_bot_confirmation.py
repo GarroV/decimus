@@ -140,3 +140,19 @@ async def test_album_timer_failure_is_logged_and_does_not_kill_the_bot(
     session.clear()
     await feed(dp, bot, text_message("комментарий без кадра"))
     assert session.last_text == with_photo_rule(t("material.waiting_photo", "ru"), "ru")
+
+
+async def test_voice_is_transcribed_in_the_speech_language_not_the_report_one(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D393, #538: расшифровке уходит язык РЕЧИ проверки; отчёт на другом языке его не меняет."""
+    start_inspection(CHAT_ID, "Белград 2", "planned", "en", speech_lang="ru")
+    heard = stub_transcribe(monkeypatch, "пол в горячем цеху грязный")
+    stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
+    bot, _session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, photo_message("voice-lang"))
+    await feed(dp, bot, voice_message("voice-file"))
+
+    assert [lang for _audio, lang in heard] == ["ru"]

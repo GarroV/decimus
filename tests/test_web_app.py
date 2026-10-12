@@ -40,6 +40,7 @@ from src.web import action_plans
 from src.web import country as country_data
 from src.web import inspections as data
 from src.web import overview as overview_data
+from src.web import ratings as ratings_screen
 from src.web.assets import FONT_MAX_AGE, IMMUTABLE_MAX_AGE
 from src.web.inspections import load_registry as настоящий_реестр
 from src.web.inspections import retraction_available as настоящая_проверка_истории
@@ -55,7 +56,6 @@ from src.web.sections import SECTIONS
     inspections=(),
     grades=(),
     average=None,
-    comparable=True,
     zone_losses=(),
     systemic=(),
     attention=(),
@@ -139,6 +139,8 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
     # Раздел действий УК (волна 2) читает запросы экшн-плана из базы.
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
+    # Сводка рейтингов читает базу; её путь на настоящей базе — test_web_ratings_flow.
+    monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
     роль = getattr(request, "param", "auditor")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
@@ -171,7 +173,8 @@ def test_непостроенный_раздел_говорит_что_он_в_�
     непостроенные = [раздел for раздел in SECTIONS if not раздел.built]
 
     # Act / Assert — не на том разделе, куда посмотрели, а на всех сразу.
-    assert len(непостроенные) == 3
+    # «Проект» (`/tenants`) снят в #585: пространства — на «Пользователях».
+    assert len(непостроенные) == 1
     for раздел in непостроенные:
         страница = стенд.get(раздел.path).get_data(as_text=True)
         assert "ещё в разработке" in страница, раздел.key
@@ -196,7 +199,7 @@ def test_построенный_раздел_ленты_не_несёт(стен
 
 def test_навигация_показывает_карту_продукта_целиком(стенд: FlaskClient) -> None:
     # Act — карту видно с любого экрана, а не только с главного.
-    страница = стенд.get("/calendar").get_data(as_text=True)
+    страница = стенд.get("/users").get_data(as_text=True)
 
     # Assert — непостроенный раздел в карте есть и помечен, но ПРИГЛУШЕНИЕМ,
     # а не цветной лентой: лент было семь на один экран, и бриф на визуал
@@ -254,8 +257,10 @@ def test_карточка_печатает_разбивку_записанной
     # Act
     страница = стенд.get(f"/inspections/{деталь.inspection.id}").get_data(as_text=True)
 
-    # Assert — каждое число из базы стоит на экране как есть.
-    for число in ("42.0", "8.0", "20.0", "1.0", "19.0"):
+    # Assert — каждое число из базы стоит на экране как есть. Доля и остаток зоны
+    # с D401 не печатаются (карточка показывает только потерю), а потому и
+    # пересчитывать их негде: ни 20.0, ни 19.0 на экране быть не должно.
+    for число in ("42.0", "8.0", "1.0"):
         assert число in страница, число
     # Хвосты `?v=<хэш>` у статики выкидываются: хэш меняется от любой правки
     # стилей и однажды уже содержал «92», из-за чего проверка упала не по делу.
@@ -691,6 +696,17 @@ def test_адрес_без_отпечатка_перепроверяется(с�
     assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
 
 
+def test_чужой_отпечаток_на_год_не_кешируется(стенд: FlaskClient) -> None:
+    # Act — отпечаток не от этого содержимого: страница новой версии, а файл
+    # отдала старая копия во время выкладки. Закешированный на год, такой ответ
+    # навсегда подменил бы стили под новым адресом.
+    ответ = стенд.get("/static/decimus-web.css?v=000000000000")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert "max-age=31536000" not in ответ.headers.get("Cache-Control", "")
+
+
 def test_шрифт_кешируется_на_неделю_без_отпечатка(стенд: FlaskClient) -> None:
     # Act
     ответ = стенд.get("/static/fonts/golos-text-cyrillic.woff2")
@@ -775,6 +791,26 @@ def test_аудитор_не_отклоняет_проверку(стенд: Fla
     # Assert — отказ, и формы ему не показывают.
     assert ответ.status_code == 403
     assert "/retract" not in карточка_аудитора
+
+
+@pytest.mark.parametrize("стенд", ["control"], indirect=True)
+def test_контроль_не_отклоняет_проверку(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange — «контроль» (D319) вне рейтингов только читает.
+    def отклонить(*_a: Any, **_k: Any) -> Retraction:
+        raise AssertionError("до базы дойти не должно")
+
+    monkeypatch.setattr(data, "retract_card", отклонить)
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
+
+    # Act
+    ответ = стенд.post(
+        "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
+    )
+
+    # Assert
+    assert ответ.status_code == 403
 
 
 # --- перенос по дате и пиццерии (D195) ---------------------------------------

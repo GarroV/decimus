@@ -172,6 +172,19 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 Не путать с `DATABASE_ADMIN_URL`: та про накат схемы, и роль там обычно
 привилегированная — то есть RLS не подчиняется вовсе.
 
+### Рейтинги РС и РКО (миграции `0039`, `0040`)
+
+Отдельная схема `ratings` (D321); продуктовое описание — `docs/15-ratings.md`. Политик пространств нет: читают все, пишет роль приложения.
+
+- `0039_ratings.sql` — таблицы `countries`, `imports`, `import_issues`, `units`, `periods`, `scores`, `checkups`, `violations`, `hard_rules`, `settings`; стартовые пороги и хард-правила. Журнал `imports`: роли приложения даны `insert` и колоночный `update (accepted, updated, skipped, unmatched)`, удаления нет; `outcome` — `loaded` (sha256 уникален среди них), `duplicate`, `failed`; `import_issues.reason` — `unit_unmatched`, `country_unknown`, `bad_row`, `developer_conflict`.
+- `0040_control_role.sql` — роль веб-учётки `control`, только в пространстве УК.
+- Двери: `src/db/ratings.py` (запись загрузки: журнал, пиццерии, периоды, оценки, проверки, нарушения), `src/db/ratings_read.py` (чтение сводки и справочников, правка справочников, `RatingsEditError`), `RatingsError` — в `src/db/errors.py`.
+
+### Экран доступа: главный админ и пространства с экрана (миграция `0041`, #585)
+
+- `0041_superadmin.sql` — роль веб-учётки `superadmin` (главный админ, D364), только в пространстве УК (ограничение `web_users_superadmin_only_hq`); триггер `web_users_keep_last_superadmin` → функция `keep_last_superadmin()`: отключение, смена роли или удаление последнего действующего главного — отказ `SQLSTATE DC001`, гонку закрывает `pg_advisory_xact_lock`; роли `dodo_audit_admin` выданы `select, insert on tenants` и `insert on space_countries` — экран «Пользователи» заводит пространство партнёра со странами. Никого не назначает: первого главного — `tools/web_user.py role <логин> superadmin --tenant HQ` (`docs/08-deploy.md`).
+- Двери: `src/db/web_access.py` — `ROLE_SUPERADMIN`, `LastSuperadminError`, `only_roles` у `reassign_role`, `set_email`, `disable_account` (охват по роли цели условием в запросе); `src/db/spaces.py` — `create_partner_space`, `add_countries` (роль `_managing`, всё или ничего), `overview` (роль приложения).
+
 ## Зависимости
 
 `domain`.
@@ -580,6 +593,8 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/queries.py` | `list_inspections`, `get_inspection`, `findings_by_unit` — только чтение |
 | `src/db/photos.py` | `upload_photos` — выгрузка кадров, отметка ссылки в базе; `pending_photo_uploads` — что ждёт дозагрузки (#459) |
 | `src/db/retract.py` | `retract_inspection` — снятие проверки пометкой и уборка её кадров из хранилища (T210, T233) |
+| `src/db/imports.py` | черновик проверки, загруженной задним числом (D305–D310, D334): `create_draft` (текущая — с оценкой движка, историческая — с оценкой отчёта, `apply_score=None`), `add_finding`/`edit_finding`/`remove_finding` текущей (запись проверяет движок, итог пишется той же транзакцией под замком строки, `mode=ORIGIN_IMPORT` — историческую не пускает), `add_photo`, `discard_draft`, `list_drafts`, `import_head`; пределы ресурсов — `MAX_FINDINGS`, `MAX_PHOTOS_PER_*`, `MAX_DRAFTS`, длины полей |
+| `src/db/imports_legacy.py` | записи исторической проверки (`origin = 'legacy'`, D332) без движка: `add_legacy_finding`/`edit_legacy_finding`/`remove_legacy_finding`; не названное отчётом — маркеры `models.LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`; `counts` — счёт записей по классам одним запросом, не оценка |
 | `src/db/storage.py` | `PhotoStorage` (узкий интерфейс) и драйвер S3 |
 | `src/db/fingerprint.py` | `compute_fingerprint` — чистая функция, без базы; `previous_fingerprints` — те же данные по прежним рецептам, чтобы смена рецепта не задваивала слитое (T193) |
 | `src/db/recipe_audit.py` | `audit_legacy_recipes` — можно ли снимать прежние рецепты отпечатка на ЭТОЙ базе (T203): счёт проверок ВКЛЮЧАЯ снятые, отдельно — слитые до наката информационной части; связь, которой снятое не видно, отказывает. Запуск: `python -m src.db.recipe_audit` |
@@ -600,16 +615,22 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/migrations/0012_phrase_aliases.sql` | карта синонимов формулировок: таблица `phrase_aliases` (ключ «арендатор + язык + нормализованная формулировка» → код пункта), закрытый список источников записи, роли приложения выданы только `select` и `insert` — переписать или удалить заведённый синоним ей нечем (T284, D119; правка — под ролью администратора, `0013`) |
 | `src/db/migrations/0013_phrase_alias_curation.sql` | правка карты синонимов: пометка снятия с обязательной причиной и след правки (куда строка вела раньше, зачем переправили), `select` и `update` шести колонок роли `dodo_audit_admin` — ключ карты, сказанное человеком и происхождение записи неприкосновенны; роли приложения права не расширены (T292) |
 | `src/db/migrations/0026_photo_previews.sql` | `photos.preview_path` — сжатая копия кадра для показа в админке (D219): пишется той же выгрузкой (`upload_photos`, `src/db/previews.py`), хранится навсегда, убирается только снятием проверки. С D250/D253 оригинал не хранится: выгрузка кладёт один сжатый объект (1600 px, JPEG q75), `storage_path` и `preview_path` указывают на него; нечитаемый Pillow кадр ложится как пришёл, `preview_path` у него пуст. Кадры до D253 — два объекта, оригиналы старой выгрузки остаются в хранилище, пока владелец не решит иначе |
+| `src/db/migrations/0038_inspection_import.sql` | происхождение проверки `origin` (`field`/`import`) и сверка со старым отчётом (`reported_pct`, `reported_grade`, `source_ref`); у загрузки `chat_id = 0`; триггер `inspections_origin_fixed` — происхождение не переписывается; частичный индекс черновиков загрузки (D305–D310) |
+| `src/db/migrations/0042_import_modes.sql` | два режима загрузки (D332, D334): `origin` + `legacy` (историческая, оценка отчёта как есть), `import` = текущая; колонки `reported_status`, `legacy_method` (только у `legacy`); «нет чата» — у обоих загруженных; `inspections_legacy_score_as_is` — у `legacy` `pct = reported_pct`; индекс черновиков — по обоим. |
+| `src/db/migrations/0049_api_tokens.sql` | сервисные токены внешнего API (D356, D388): схема `api`, `api.tokens` (только отпечаток SHA-256, права `ratings:read`/`inspections:read`, отзыв пометкой) и журнал обращений `api.access_log`; выпуск и отзыв — роль администратора истории, у приложения только чтение токенов и журнал |
 | `src/db/mcp_access.py` | круг и личные токены доступа к MCP: выпуск, сверка предъявленного токена по отпечатку, отзыв поимённый и немедленный — и круга, и живых токенов разом (T253) |
+| `src/db/api_access.py` | сервисные токены внешнего API (D388): сверка по отпечатку, права, счёт обращений за окно (лимит частоты), журнал с попутной чисткой старше 90 дней, выпуск/перечень/отзыв для `tools/api_token.py`; отпечаток и генерация токена — из `mcp_access` |
 | `src/db/config.py` | `DATABASE_URL` → `Settings`, `DATABASE_RETRACTION_URL` → подключение администратора (снятые проверки и правка карты синонимов), `S3_*` → `StorageSettings` |
-| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError` |
+| `src/db/errors.py` | `DbError`, `ConfigError`, `DatabaseTargetError`, `PushError`, `VersionMismatchError`, `StorageError`, `AccessError`, `RetractionError`, `SynonymError`, `HistoryImportError`, `RatingsError` |
 | `src/db/database_target.py` | куда ведёт строка подключения (хост, порт, база, роль — без пароля) и сверка, что все заданные `DATABASE_*_URL` ведут в одну базу; расхождение — `DatabaseTargetError` (#487, #515) |
 | `src/db/target_refusal.py` | узнать расхождение баз в цепочке причин отказа и записать подробности в журнал на уровне ERROR — одно правило для веба (`src/web/db_refusal.py`) и MCP (`src/mcp/db_target.py`), #521 |
-| `src/db/models.py` | `InspectionRow`, `FindingRow`, `InfoRow`, `InspectionDetail` |
+| `src/db/models.py` | `InspectionRow` (с `origin`, `is_legacy`, `is_uploaded`), `FindingRow`, `InfoRow`, `InspectionDetail` (с `reported_status`, `legacy_method` исторической); происхождения `ORIGIN_*`, маркеры исторической записи `LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`, `LEGACY_VERSION_PREFIX` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
 `domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`
-без единой операции над числами.
+без единой операции над числами. Черновик загрузки (`imports.py`) так же
+кладёт итог движка (`report.rescore.apply_command`), пересчитанный после
+каждой записи, а не свой.
 
 ## Журнал работы
 

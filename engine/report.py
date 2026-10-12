@@ -36,7 +36,7 @@ T = {
         "zones": "Разбивка по зонам", "zone": "Зона", "share": "Доля", "lost": "Потеряно",
         "left": "Осталось", "findings": "Зафиксированные нарушения", "no_findings":
         "Нарушений не зафиксировано.", "deadline": "Устранить до", "immediately": "немедленно",
-        "comment": "Комментарий", "process": "Процесс", "info": "Дополнительно",
+        "comment": "Рекомендация", "process": "Процесс", "info": "Дополнительно",
         "appendix": "Приложение. Информационные записи",
         "appendix_note": "Раздел носит справочный характер: перечисленные ниже записи "
                          "не являются нарушениями и не влияют на оценку.",
@@ -44,6 +44,8 @@ T = {
         "method": "Методика расчёта", "zeroed": "обнулена критическим нарушением D3",
         "not_counted": "учтено в обнулении зоны", "page": "стр.",
         "repeat": "повтор — вычет удвоен",
+        "advice": "Рекомендация", "notes": "Заметки проверяющего",
+        "notes_note": "Общие наблюдения без привязки к пункту чек-листа; на оценку не влияют.",
         "method_text": ("Старт — 100%. Каждое нарушение D1 снижает результат на {d1} п.п., "
                         "каждое D2 — на {d2} п.п. Нарушение D3 полностью сжигает долю той зоны, "
                         "в которой оно зафиксировано. Вопросы, по которым нарушений не зафиксировано, "
@@ -64,7 +66,7 @@ T = {
         "zones": "Breakdown by zone", "zone": "Zone", "share": "Share", "lost": "Lost",
         "left": "Remaining", "findings": "Recorded violations", "no_findings":
         "No violations recorded.", "deadline": "Fix by", "immediately": "immediately",
-        "comment": "Comment", "process": "Process", "info": "Additional information",
+        "comment": "Recommendation", "process": "Process", "info": "Additional information",
         "appendix": "Appendix. Informational records",
         "appendix_note": "This section is for reference only: the records below are not "
                          "violations and do not affect the score.",
@@ -72,6 +74,8 @@ T = {
         "method": "Scoring method", "zeroed": "zeroed by a critical D3 violation",
         "not_counted": "covered by the zone reset", "page": "p.",
         "repeat": "repeat — deduction doubled",
+        "advice": "Recommendation", "notes": "Auditor's notes",
+        "notes_note": "General observations not tied to a checklist item; they do not affect the score.",
         "method_text": ("Starting score is 100%. Each D1 violation deducts {d1} pp, each D2 "
                         "deducts {d2} pp. A D3 violation burns the entire share of the zone where "
                         "it was recorded. A violation repeating a record of the previous audit costs "
@@ -184,6 +188,17 @@ def clean_q(text):
     return t.strip()
 
 
+def advice_html(f, t, qk, src):
+    """Рекомендация к пункту: метка, пункт, что сделать, кадры — без процесса и срока."""
+    out = ['<div class="f">',
+           f'<div class="h"><span class="badge R">{esc(t["advice"])}</span> {esc(item_title(f, qk))}</div>',
+           f'<div class="c">{esc((f.get("evidence") or "").strip())}</div>']
+    if f.get("photos"):
+        out.extend(shots_html(f, t, src))
+    out.append("</div>")
+    return out
+
+
 def item_title(f, qk):
     """Название пункта стандарта на языке ПЕЧАТИ, без служебной пометки класса.
 
@@ -292,6 +307,7 @@ table.d td.n { text-align:right; white-space:nowrap; }
 tr.z0 td { background:#FCEFEF; }
 .badge { display:inline-block; padding:.4mm 2mm; border-radius:1.4mm; color:#fff; font-size:8.5pt; font-weight:bold; }
 .D1 { background:#8A8496; } .D2 { background:#C2700F; } .D3 { background:#A81E1E; }
+.R { background:#2F6B4F; }
 .f { margin:0 0 3mm 0; padding:2.2mm 0 0 0; border-top:.6pt solid #EDE9F3; page-break-inside:avoid; }
 .f .h { font-weight:600; }
 .f .m { color:#6F6880; font-size:9pt; margin-top:.8mm; }
@@ -397,19 +413,27 @@ def build_html(res, lang, photos, src=None):
 
     h.append(f"<h2 class=\"sec-findings\">{esc(t['findings'])}</h2>")
     VIOL = ("D1", "D2", "D3")
+    ADVICE, NOTE_QID = "R", "NOTE"
     fs = [f for f in res["findings"] if f["level"] in VIOL]
-    notes = [f for f in res["findings"] if f["level"] not in VIOL]
+    # Рекомендация к пункту (D201) — в разделе своей зоны после нарушений;
+    # общая заметка (D314) — своим разделом в конце отчёта.
+    advice = [f for f in res["findings"] if f["level"] == ADVICE and f["qid"] != NOTE_QID]
+    general = [f for f in res["findings"] if f["level"] == ADVICE and f["qid"] == NOTE_QID]
+    notes = [f for f in res["findings"] if f["level"] not in VIOL and f["level"] != ADVICE]
     if not fs:
         h.append(f"<p>{esc(t['no_findings'])}</p>")
     order = {"D3": 0, "D2": 1, "D1": 2}
     by_zone = {}
-    for f in fs:
+    for f in fs + advice:
         by_zone.setdefault(f[zk], []).append(f)
     for zname, lst in by_zone.items():
         zeroed = any(x["level"] == "D3" for x in lst)
         suffix = f" — {t['zeroed']}" if zeroed else ""
         h.append(f'<div class="zh">{esc(zname)}{esc(suffix)}</div>')
         for f in sorted(lst, key=lambda x: (order.get(x["level"], 9), x["n"])):
+            if f["level"] == ADVICE:
+                h.extend(advice_html(f, t, qk, src))
+                continue
             nc = "" if f["counted"] or f["level"] == "D3" else f' · {t["not_counted"]}'
             # Повтор назван у самой записи, а не только в разделе методики:
             # партнёр сверяет цену по строке, и вычет, выросший вдвое без
@@ -476,6 +500,17 @@ def build_html(res, lang, photos, src=None):
                     h.append(f'<div class="c">{esc(t["comment"])}: {esc(f["comment"])}</div>')
                 h.extend(shots_html(f, t, src))
                 h.append("</div>")
+
+    if general:
+        h.append(f'<h2 class="sec-findings">{esc(t["notes"])}</h2>')
+        h.append(f'<div class="note">{esc(t["notes_note"])}</div>')
+        for f in sorted(general, key=lambda x: x["n"]):
+            h.append('<div class="f">')
+            h.append(f'<div class="m">{esc(f[zk])}</div>')
+            h.append(f'<div class="c">{esc((f.get("evidence") or "").strip())}</div>')
+            if f.get("photos"):
+                h.extend(shots_html(f, t, src))
+            h.append("</div>")
 
     h.append(f'<div class="note"><b>{esc(t["method"])}.</b> '
              + esc(t["method_text"].format(d1=cfg["penalty"]["D1"], d2=cfg["penalty"]["D2"])) + "</div>")
