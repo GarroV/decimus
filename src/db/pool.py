@@ -132,6 +132,11 @@ def _pool_for(dsn: str, max_size: int) -> ConnectionPool[Any]:
     with _lock:
         pool = _pools.get(key)
         if pool is None:
+            # Первое соединение — своё и до пула: недоступная база, неверный пароль
+            # или адрес отказывают сразу и настоящей причиной, как до пула. Пул же
+            # про неудачу подключения молчит и пересоединяется в фоне, а ждущий
+            # увидел бы через `DB_POOL_TIMEOUT_S` лишь «нет соединения».
+            psycopg.connect(dsn, connect_timeout=CONNECT_TIMEOUT_S).close()
             pool = _make_pool(dsn, max_size)
             _pools[key] = pool
     return pool
