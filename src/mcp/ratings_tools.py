@@ -1,26 +1,36 @@
-"""Загрузка рейтингов через Claude (D320): MCP-инструмент `import_ratings`.
+"""Управление рейтингами через Claude: загрузка (D320) и заявка на обновление
+агрегаторов (D420).
 
-Тот же импортёр, что у веба (`src.ratings.importer`): одна транзакция на файл,
-повтор — `duplicate`. Открыт только токену пространства УК — заслон стоит на
-входе (`rpc._call_tool`, вид `KIND_RATINGS`) и ещё раз здесь. Свой вход в Dodo
-IS сервер не хранит: снимок Claude собирает в браузере сотрудника
-(`docs/15-ratings.md`).
+`import_ratings` — тот же импортёр, что у веба (`src.ratings.importer`): одна
+транзакция на файл, повтор — `duplicate`. `request_aggregators_update` ставит
+заявку в очередь, а собирает бот (`src.ratings.aggregators.queue`): MCP-процесс
+сам витрины не опрашивает. Оба открыты только токену пространства УК — заслон
+стоит на входе (`rpc._call_tool`, вид `KIND_RATINGS`) и ещё раз здесь. Свой вход
+в Dodo IS сервер не хранит: снимок Claude собирает в браузере сотрудника
+(`docs/15-ratings.md`). Чтение рейтингов — отдельный вид, `src.mcp.ratings_read`.
 """
 
 from __future__ import annotations
 
+from src.db.errors import ConfigError as DbConfigError
 from src.db.errors import RatingsError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.ratings.aggregators import queue
 from src.ratings.importer import CHANNEL_MCP, import_file
 from src.ratings.model import FORMATS, RatingsFormatError
 
+from .db_target import config_refusal
 from .errors import ToolError
 
 OUTCOME_DUPLICATE = "duplicate"
+REQUEST_NOT_CONNECTED = (
+    "Заявка не принята: на этом стенде не подключена база (не задана переменная окружения "
+    "DATABASE_URL). Это отказ настройки, а не отказ в просьбе"
+)
 
 
 def import_ratings(
-    *, tenant: str, kind: str, content: str, file_name: str | None = None
+    *, tenant: str, kind: str, content: str, file_name: str | None = None, actor: str = ""
 ) -> dict[str, object]:
     код = canonical_tenant(tenant)
     if код != HQ_TENANT:
@@ -32,7 +42,7 @@ def import_ratings(
             content.encode("utf-8"),
             kind=kind,
             channel=CHANNEL_MCP,
-            actor=f"mcp:{код}",
+            actor=actor or f"mcp:{код}",
             file_name=file_name,
         )
     except RatingsFormatError as exc:
@@ -57,3 +67,39 @@ def import_ratings(
     if итог.outcome == OUTCOME_DUPLICATE:
         ответ["message"] = f"Этот файл уже загружен {loaded_at or 'ранее'}; ничего не изменилось"
     return ответ
+
+
+#: Бот смотрит заявки раз в `POLL_EVERY_SEC`, сбор идёт минуты (самый долгий — Wolt).
+_COLLECT_ETA = "бот подхватит заявку в течение минуты, сбор займёт до ~10 минут"
+
+
+def request_aggregators_update(
+    *, tenant: str, actor: str = "", aggregators: list[str] | None = None
+) -> dict[str, object]:
+    код = canonical_tenant(tenant)
+    if код != HQ_TENANT:
+        raise ToolError("Просить обновить агрегаторы может только токен пространства УК")
+    if aggregators is not None and not all(isinstance(a, str) for a in aggregators):
+        raise ToolError("aggregators: список ключей агрегаторов строками")
+    try:
+        asked = queue.ask(aggregators, by=actor or f"mcp:{код}")
+    except queue.UnknownAggregator as exc:
+        raise ToolError(str(exc)) from exc
+    except DbConfigError as exc:
+        raise config_refusal(exc, REQUEST_NOT_CONNECTED) from None
+    except RatingsError as exc:
+        raise ToolError(f"Заявка не принята: {exc}") from exc
+    заявка = asked.request
+    return {
+        "status": "queued" if asked.created else "already_queued",
+        "request_id": заявка.id,
+        "requested_at": заявка.requested_at.isoformat(),
+        "requested_by": заявка.requested_by,
+        "aggregators": list(заявка.aggregators) or "all",
+        "message": (
+            f"Заявка принята: {_COLLECT_ETA}. Итог — в aggregators_status"
+            if asked.created
+            else "Обновление уже в очереди, вторую заявку не завожу: "
+            f"{_COLLECT_ETA}. Итог — в aggregators_status"
+        ),
+    }

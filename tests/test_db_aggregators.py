@@ -67,6 +67,23 @@ def test_справочник_сохраняет_координаты_и_доп�
     assert (точка.lat, точка.lng, точка.extra) == (44.8, 20.46, {"store_id": 1})
 
 
+def test_заявка_одна_открытая_и_закрывается_исходом(db_env: str) -> None:
+    """Частичный уникальный индекс держит «уже в очереди» на уровне базы (D420)."""
+    from src.db import agg_store
+
+    первая, создана = agg_store.request_update(["wolt"], by="mcp:HQ")
+    вторая, создана_ещё = agg_store.request_update([], by="anna")
+
+    assert создана and not создана_ещё and вторая.id == первая.id
+    assert первая.aggregators == ("wolt",) and первая.requested_by == "mcp:HQ"
+
+    agg_store.finish_request(первая.id, ok=False, error="wolt: HTTP 503")
+
+    assert agg_store.open_request() is None
+    новая, создана_после = agg_store.request_update([], by="anna")
+    assert создана_после and новая.id != первая.id and новая.aggregators == ()
+
+
 def test_блок_агрегаторов_на_странице_и_сбой_строкой(
     db_env: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
