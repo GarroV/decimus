@@ -21,6 +21,7 @@ import psycopg
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
+from .request_memo import memoized
 
 #: Коды отказа правки справочников: веб показывает по ним текст на языке
 #: интерфейса (P15), русский `str(exc)` остаётся журналу и MCP.
@@ -75,6 +76,10 @@ class CountryRow:
 
 
 def countries() -> tuple[CountryRow, ...]:
+    return memoized(("ratings.countries",), _read_countries)
+
+
+def _read_countries() -> tuple[CountryRow, ...]:
     return tuple(
         CountryRow(*r)
         for r in _rows(
@@ -86,6 +91,10 @@ def countries() -> tuple[CountryRow, ...]:
 
 def rs_periods() -> tuple[tuple[int, date, date, str, str], ...]:
     """Периоды РС, новые первыми: `(id, begin_on, end_on, title_ru, title_en)`."""
+    return memoized(("ratings.rs_periods",), _read_rs_periods)
+
+
+def _read_rs_periods() -> tuple[tuple[int, date, date, str, str], ...]:
     return tuple(
         (int(r[0]), r[1], r[2], r[3], r[4])
         for r in _rows(
