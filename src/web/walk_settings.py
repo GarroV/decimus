@@ -11,6 +11,9 @@
 - `stops` — отказы мастера за период (#436), тоже только кругу;
 - `finish_mode` — режим «Завершить» человека (D439): `summary` или `report`,
   хранится за Telegram ID (`db.finish_modes`);
+- `translate_mode` — перевод комментариев на язык отчёта (D443): `button` или
+  `auto`, хранится за Telegram ID (`db.translate_modes`); перевод идёт при
+  сборке отчёта (`bot.finish_translate`);
 - `finish` — «Завершить проверку» (D422, D439): в режиме `summary` итог в чат,
   как `/finish`; в `report` — отчёт сразу (`walk_finish.py`). Оба — любому
   аудитору, не только кругу.
@@ -37,7 +40,7 @@ from src.bot.errors import BotConfigError
 from src.bot.mcp_setup import MCP_URL_VAR, setup_command
 from src.bot.texts import t
 from src.bot.version import build_version
-from src.db import bot_langs, finish_modes, mcp_access
+from src.db import bot_langs, finish_modes, mcp_access, translate_modes
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 
@@ -95,6 +98,16 @@ def finish_mode_of(chat_id: int) -> str:
     return mode if mode in finish_modes.MODES else finish_modes.DEFAULT_MODE
 
 
+def translate_mode_of(chat_id: int) -> str:
+    """Перевод комментариев человека (D443). Не выбирал или база молчит — по кнопке."""
+    try:
+        mode = translate_modes.chosen_translate_mode(chat_id)
+    except DbError:
+        logger.warning("Мини-апп: режим перевода %s не прочитался", chat_id, exc_info=True)
+        return translate_modes.DEFAULT_MODE
+    return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
+
+
 def in_circle(chat_id: int, bot: BotSettings | None, *, restore: bool = True) -> bool:
     """В круге доступа к MCP ли человек. Основатель — по настройке, как у бота.
 
@@ -122,6 +135,7 @@ def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any
         "lang": lang,
         "langs": [{"code": code, "label": t("lang.self_name", code)} for code in UI_LANGS],
         "finish_mode": finish_mode_of(chat_id),
+        "translate_mode": translate_mode_of(chat_id),
         "version": build_version(),
         "mcp": bot is not None and bot.mcp_owner_id is not None,
         "circle": circle,
@@ -278,6 +292,12 @@ def install(
                 if mode not in finish_modes.MODES:
                     raise Refused("walk.app.err.finish_mode")
                 finish_modes.choose_finish_mode(who, str(mode))
+                return respond(who, ui_lang)
+            if op == "translate_mode":
+                mode = body.get("mode")
+                if mode not in translate_modes.MODES:
+                    raise Refused("walk.app.err.translate_mode")
+                translate_modes.choose_translate_mode(who, str(mode))
                 return respond(who, ui_lang)
             if op == "finish":
                 return _finish(who, conf, body, lang)

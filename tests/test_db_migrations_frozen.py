@@ -239,6 +239,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0057_checklist_langs.sql": (
         "sql1:ce70bb09dfbf79c53076dad9b0d5f4de5f41bdd738cf49125c335087da4f9603"
     ),
+    # Перевод комментариев на язык отчёта, выбор аудитора, за Telegram ID (D443). Не на проде.
+    "0058_translate_modes.sql": (
+        "sql1:2d25456431e1a5ba485bda6ccfd66f8b1d6332faeb40f71515113007a585129f"
+    ),
 }
 
 
