@@ -1,6 +1,6 @@
 """Изоляция пространств держит сама база (аудит 12.10, F-037, F-005).
 
-До миграции `0061` политики роли приложения на данных пространств были
+До миграции `0062` политики роли приложения на данных пространств были
 `using (true)`: запрос без условия охвата отдал бы чужое. Здесь проверяется не
 «фильтр в запросе работает» (это `test_db_queries_tenant.py`), а обратное:
 запрос БЕЗ условия охвата, под ролью приложения, от имени одного пространства
@@ -62,12 +62,22 @@ def мир(domain_env: Path, db_env: str, pg_dsn: str) -> dict[str, str]:
 
 @contextmanager
 def от_имени(dsn: str, space: str | None) -> Iterator[Any]:
-    """Своё соединение роли приложения; `space=None` — пространство не поставлено."""
-    with psycopg.connect(dsn) as conn:
+    """Своё соединение роли приложения; `space=None` — пространство не поставлено.
+
+    Служебное пространство по умолчанию, которое оснастка кладёт в строку
+    (`conftest.db_env`), здесь снимается: проверяется продуктовое поведение.
+    """
+    with psycopg.connect(_без_умолчания(dsn)) as conn:
         if space is not None:
             conn.execute("select set_config('decimus.space', %s, false)", (space,))
             conn.commit()
         yield conn
+
+
+def _без_умолчания(dsn: str) -> str:
+    from psycopg.conninfo import conninfo_to_dict, make_conninfo
+
+    return make_conninfo(**{k: v for k, v in conninfo_to_dict(dsn).items() if k != "options"})
 
 
 def _ids(conn: Any, sql: str) -> set[str]:
@@ -112,7 +122,7 @@ def test_без_пространства_база_отказывает_а_не_�
 
 @pytest.fixture
 def черновики(мир: dict[str, str]) -> dict[str, str]:
-    """Неподтверждённые проверки: подтверждённую запрещает править `0004`, а не `0061`."""
+    """Неподтверждённые проверки: подтверждённую запрещает править `0004`, а не `0062`."""
     return {
         "a": слить_проверку(unit="Тбилиси-1", tenant=А, accept=False),
         "hq_a": слить_проверку(unit="Батуми-1", tenant="HQ", accept=False),
@@ -198,26 +208,30 @@ def test_пространство_не_подменяется_внутри_дв�
         pass
 
 
-def test_запасное_пространство_только_у_оснастки_тестов() -> None:
-    """`_FALLBACK` — шов для тестов; код продукта его не трогает."""
+def test_пространство_по_умолчанию_только_у_оснастки_тестов() -> None:
+    """Служебное пространство строкой подключения ставит только оснастка тестов.
+
+    В продукте пространство ставит дверь; умолчание в строке подключения
+    открыло бы всё любому, кто забыл дверь.
+    """
     чужие = [
         str(путь.relative_to(ROOT))
         for каталог in ("src", "tools")
         for путь in (ROOT / каталог).rglob("*.py")
-        if путь.name != "space.py" and re.search(r"\b_FALLBACK\b", путь.read_text(encoding="utf-8"))
+        if re.search(r"decimus\.space\s*=", путь.read_text(encoding="utf-8"))
     ]
-    assert чужие == [], f"Запасное пространство трогает код продукта: {чужие}"
+    assert чужие == [], f"Пространство по умолчанию в строке подключения: {чужие}"
 
 
 def test_новая_таблица_данных_без_политики_пространства_не_проходит() -> None:
-    """Таблица с `tenant_code`, заведённая после `0061`, обязана получить политику пространства.
+    """Таблица с `tenant_code`, заведённая после `0062`, обязана получить политику пространства.
 
     Иначе следующая таблица данных снова держалась бы только на условии охвата.
     Таблицы учёток и входа (`web_users`, `mcp_tokens`, …) опознают человека ДО того,
     как известно его пространство, и перечислены здесь явно.
     """
     миграции = sorted((ROOT / "src" / "db" / "migrations").glob("*.sql"))
-    после = [м for м in миграции if м.name > "0061"]
+    после = [м for м in миграции if м.name > "0062"]
     без_политики = []
     for м in после:
         текст = м.read_text(encoding="utf-8").lower()
@@ -253,7 +267,6 @@ def test_уборка_кадров_не_удаляет_кадр_другого_�
     import time
 
     from src.bot import upload_sweeper
-    from src.db import space
     from src.db.push import push_inspection
     from src.domain import add_finding, check_environment, start_inspection
     from src.domain.engine import chat_dir
@@ -276,8 +289,11 @@ def test_уборка_кадров_не_удаляет_кадр_другого_�
         assert путь is not None
         os.utime(путь, (давно, давно))
 
-    # Как на проде: запасного пространства нет, дверь его не поставила.
-    monkeypatch.setattr(space, "_FALLBACK", None)
+    # Как на проде: у строки подключения нет пространства по умолчанию.
+    from src.db.pool import close_pools
+
+    close_pools()
+    monkeypatch.setenv("DATABASE_URL", _без_умолчания(db_env))
     with acting_space(А):
         assert upload_sweeper.sweep_once() is None, (
             "Уборка внутри двери партнёра обязана пропустить проход, а не убирать"
