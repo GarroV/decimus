@@ -64,7 +64,16 @@ def compose(*args: str) -> subprocess.CompletedProcess[str]:
     #
     # DECIMUS_ENV_FILE — пример окружения вместо настоящего: проверяется
     # устройство файла, а не чья-то площадка, и в свежей копии `.env` нет (#397).
-    окружение = {**os.environ, "COMPOSE_PROFILES": "", "DECIMUS_ENV_FILE": ".env.example"}
+    #
+    # WEB_TRUSTED_PROXY_ADDR прод-надстройка требует (`:?`, F-038 аудита 12.10):
+    # без неё она не собирается вовсе. Здесь — адрес из документационного
+    # диапазона, чтобы проверять устройство файла, а не площадку.
+    окружение = {
+        **os.environ,
+        "COMPOSE_PROFILES": "",
+        "DECIMUS_ENV_FILE": ".env.example",
+        "WEB_TRUSTED_PROXY_ADDR": "192.0.2.0/24",
+    }
     return subprocess.run(  # noqa: S603 — аргументы собираем сами, ввода извне нет
         ["docker", "compose", "-p", PROJECT, *args],  # noqa: S607 — docker из PATH
         cwd=str(ROOT),
