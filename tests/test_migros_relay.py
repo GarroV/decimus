@@ -7,12 +7,13 @@
 
 from __future__ import annotations
 
+import json
 import socket
 import threading
 import urllib.error
 from collections.abc import Iterator
 from datetime import date
-from http.server import HTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
 import pytest
@@ -170,51 +171,87 @@ def test_длинная_причина_обрезана() -> None:
     assert текст is not None and "x" * 200 not in текст and "…" in текст
 
 
-@pytest.mark.parametrize(("сырое", "id"), [("", None), (" ", None), ("abc", None), ("123", 123)])
-def test_адресат_из_переменной(сырое: str, id: int | None) -> None:
-    assert alert.chat_id(сырое) == id
+@pytest.mark.parametrize(
+    "env",
+    [
+        {},
+        {"FURCA_NOTIFY_URL": "http://ch:8090"},
+        {"FURCA_SECRET": "s"},
+        {"FURCA_NOTIFY_URL": "ch:8090", "FURCA_SECRET": "s"},
+        {"FURCA_NOTIFY_URL": " ", "FURCA_SECRET": "s"},
+    ],
+)
+def test_канал_не_задан_уведомление_выключено(env: dict[str, str]) -> None:
+    assert alert.channel(env) is None
 
 
-class _Бот:
-    def __init__(self, падать: bool = False) -> None:
-        self.отправлено: list[tuple[int, str]] = []
-        self.падать = падать
+def test_канал_задан() -> None:
+    env = {"FURCA_NOTIFY_URL": "http://ch:8090/", "FURCA_SECRET": "s"}
+    assert alert.channel(env) == ("http://ch:8090/notify", "s")
 
-    async def send_message(self, chat_id: int, text: str) -> None:
-        if self.падать:
-            raise RuntimeError("telegram down")
-        self.отправлено.append((chat_id, text))
+
+@pytest.fixture
+def канал(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[dict[str, Any]]]:
+    """Настоящий HTTP-приёмник вместо канала FURCA; адрес и ключ — в окружении."""
+    принято: list[dict[str, Any]] = []
+
+    class Приёмник(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            тело = self.rfile.read(int(self.headers["Content-Length"]))
+            принято.append(
+                {"path": self.path, "auth": self.headers["Authorization"], **json.loads(тело)}
+            )
+            self.send_response(200)
+            self.end_headers()
+
+        def log_message(self, *_: object) -> None:
+            pass
+
+    сервер = HTTPServer(("127.0.0.1", 0), Приёмник)
+    threading.Thread(target=сервер.serve_forever, daemon=True).start()
+    monkeypatch.setenv(alert.URL_VAR, f"http://127.0.0.1:{сервер.server_port}")
+    monkeypatch.setenv(alert.SECRET_VAR, "channel-key")
+    try:
+        yield принято
+    finally:
+        сервер.shutdown()
+        сервер.server_close()
 
 
 @pytest.mark.asyncio
-async def test_без_адресата_никому_не_пишет(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv(alert.CHAT_VAR, raising=False)
-    бот = _Бот()
-    assert await agg_loader.notify(бот, [СБОЙ]) is False  # type: ignore[arg-type]
-    assert бот.отправлено == []
+async def test_без_канала_никуда_не_уходит(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv(alert.URL_VAR, raising=False)
+    monkeypatch.delenv(alert.SECRET_VAR, raising=False)
+    отправки: list[object] = []
+    monkeypatch.setattr(alert, "send", lambda *a: отправки.append(a))
+    assert await agg_loader.notify([СБОЙ]) is False
+    assert отправки == []
 
 
 @pytest.mark.asyncio
-async def test_сбой_уходит_одному_адресату(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(alert.CHAT_VAR, "777")
-    бот = _Бот()
-    assert await agg_loader.notify(бот, [ОК, СБОЙ]) is True  # type: ignore[arg-type]
-    assert [чат for чат, _ in бот.отправлено] == [777]
-    assert "Migros Yemek" in бот.отправлено[0][1]
+async def test_сбой_уходит_тревогой_в_канал(канал: list[dict[str, Any]]) -> None:
+    assert await agg_loader.notify([ОК, СБОЙ]) is True
+    assert len(канал) == 1
+    тревога = канал[0]
+    assert (тревога["path"], тревога["auth"]) == ("/notify", "Bearer channel-key")
+    assert (тревога["project"], тревога["kind"]) == ("decimus", "alert")
+    assert "Migros Yemek" in тревога["text"] and "Wolt" not in тревога["text"]
 
 
 @pytest.mark.asyncio
-async def test_без_сбоя_молчит(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(alert.CHAT_VAR, "777")
-    бот = _Бот()
-    assert await agg_loader.notify(бот, [ОК]) is False  # type: ignore[arg-type]
-    assert бот.отправлено == []
+async def test_без_сбоя_молчит(канал: list[dict[str, Any]]) -> None:
+    assert await agg_loader.notify([ОК]) is False
+    assert канал == []
 
 
 @pytest.mark.asyncio
-async def test_сбой_отправки_не_роняет_сбор(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv(alert.CHAT_VAR, "777")
-    assert await agg_loader.notify(_Бот(падать=True), [СБОЙ]) is False  # type: ignore[arg-type]
+async def test_канал_лежит_сбор_не_падает(monkeypatch: pytest.MonkeyPatch) -> None:
+    сервер = HTTPServer(("127.0.0.1", 0), migros_relay.Handler)
+    порт = сервер.server_port
+    сервер.server_close()
+    monkeypatch.setenv(alert.URL_VAR, f"http://127.0.0.1:{порт}")
+    monkeypatch.setenv(alert.SECRET_VAR, "s")
+    assert await agg_loader.notify([СБОЙ]) is False
 
 
 def test_заявка_не_уведомляет(monkeypatch: pytest.MonkeyPatch) -> None:
