@@ -291,6 +291,10 @@ country_index
 users
 add_user
 disable_user
+connections_issue
+connections_update
+connections_reissue
+connections_revoke
 do_move
 methodology_zone_add
 methodology_zone_shares

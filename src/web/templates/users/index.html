@@ -16,6 +16,7 @@
 #}{% extends "_split_page.html" %}
 {% from "users/_card.html" import person_card, add_card with context %}
 {% from "users/_spaces.html" import spaces_list, space_card with context %}
+{% from "users/_tabs.html" import users_tabs with context %}
 {% block title %}{{ t('section.users.title') }}{% endblock %}
 {% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
 
@@ -35,12 +36,7 @@
     {# На телефоне левой панели нет — своя карточка открывается отсюда. #}
     {% if manage %}<a class="sbtn shead__me" href="{{ link(person='me') }}" data-drawer-open>{{ t('profile.open') }}</a>{% endif %}
   </header>
-  {% if has_spaces_tab %}
-    <nav class="stabs" aria-label="{{ t('section.users.title') }}">
-      <a class="stabs__item{% if tab == 'people' %} is-current{% endif %}" href="{{ link() }}"{% if tab == 'people' %} aria-current="page"{% endif %}>{{ t('users.tab.people') }}</a>
-      <a class="stabs__item{% if tab == 'spaces' %} is-current{% endif %}" href="{{ link(tab='spaces') }}"{% if tab == 'spaces' %} aria-current="page"{% endif %}>{{ t('users.spaces.title' if manages_spaces else 'users.spaces.own_title') }}</a>
-    </nav>
-  {% endif %}
+  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link) }}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show.flash and not split_open and tab == 'people' %}
     <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **show.flash.params) }}</div></div>
