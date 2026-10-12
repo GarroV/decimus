@@ -24,6 +24,11 @@
   сдача, пришедшая между ними, получает отказ, а не запись после себя.
 * **Кадр показывается только хозяину**: ссылка должна висеть на записи или
   сведении его проверки.
+* **Приложить можно только свой кадр** (F-034): присланный этим чатом
+  (`own_upload`) или уже висящий в его проверке. Чужой отвечает так же, как
+  пропавший, — ответ не выдаёт, присылал ли кто-то такой снимок.
+* **Квота кадров на чат за сутки** (F-033, `uploads.QUOTA_*`): отказ словами
+  экрана, а не «нет связи» — повтор через минуту не поможет.
 """
 
 from __future__ import annotations
@@ -57,8 +62,9 @@ from src.domain import (
 )
 from src.domain.errors import DomainError, EngineError, ValidationError
 from src.domain.info_fields import FIELDS, KIND_DATE, KIND_TEXT, KIND_YES_NO
+from src.domain.log_ids import log_id
 from src.domain.models import Inspection, Suggestion
-from src.domain.uploads import MAX_UPLOAD_BYTES
+from src.domain.uploads import MAX_UPLOAD_BYTES, UploadQuotaError, own_upload
 from src.recognize.models import UNKNOWN_ZONE
 
 from . import walk_rate
@@ -139,8 +145,13 @@ def _number(body: dict[str, Any]) -> int:
     return value
 
 
-def _refs(value: Any) -> list[str]:
-    """Кадры, к которым ссылается запрос: только снятые в мини-аппе и на месте."""
+def _refs(value: Any, chat_id: int, inspection: Inspection) -> list[str]:
+    """Кадры, к которым ссылается запрос: снятые в мини-аппе, на месте и свои.
+
+    Свой — присланный этим чатом или уже висящий в его проверке (ракурс с
+    одной записи прикладывают к другой). Чужой — «кадр пропал», как и
+    пропавший: отпечаток чужого снимка не пропуск к его байтам (F-034).
+    """
     if not isinstance(value, list) or not value:
         raise WalkRefused("walk.err.photo_required")
     settings = check_environment()
@@ -148,15 +159,17 @@ def _refs(value: Any) -> list[str]:
     for ref in value:
         if not isinstance(ref, str) or not is_upload_ref(ref):
             raise WalkRefused("walk.err.bad_request")
-        if upload_file(ref, settings) is None:
+        if own_upload(ref, chat_id, settings) is None and not (
+            _owns(inspection, ref) and upload_file(ref, settings) is not None
+        ):
             raise WalkRefused("walk.err.photo_lost")
         if ref not in refs:
             refs.append(ref)
     return refs
 
 
-def _ref(body: dict[str, Any]) -> str:
-    return _refs([body.get("ref")])[0]
+def _ref(body: dict[str, Any], chat_id: int, inspection: Inspection) -> str:
+    return _refs([body.get("ref")], chat_id, inspection)[0]
 
 
 def _default_text(chat_id: int, code: str, lang: str) -> str:
@@ -197,7 +210,9 @@ def _add(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> None:
     level = _code(body, "level", _LEVEL)
     zone = _code(body, "zone")
     advice = level == ADVICE_LEVEL
-    photos = [] if advice and not body.get("photos") else _refs(body.get("photos"))
+    photos = (
+        [] if advice and not body.get("photos") else _refs(body.get("photos"), chat_id, inspection)
+    )
     if advice:
         text = _text(body, "text", required=True)
     else:
@@ -268,7 +283,7 @@ def _finding_op(chat_id: int, inspection: Inspection, body: dict[str, Any]) -> N
     elif op == "drop":
         drop_finding(chat_id, _number(body))
     elif op == "attach":
-        attach_photo(chat_id, _number(body), _ref(body))
+        attach_photo(chat_id, _number(body), _ref(body, chat_id, inspection))
     elif op == "detach":
         ref = body.get("ref")
         if not isinstance(ref, str):
@@ -353,19 +368,19 @@ def install(
             with while_open(who):
                 op(who, inspection, body)
         except HandedOverError:
-            logger.info("Обход: чат %s сдал проверку во время записи — отказ", who)
+            logger.info("Обход: чат %s сдал проверку во время записи — отказ", log_id(who))
             return refused(said("walk.sealed", lang), 409)
         except WalkRefused as exc:
             return refused(said(str(exc), lang))
         except (ValidationError, EngineError) as exc:
             # Отказ движка или домена — его словами, как в чате: аудитор видит,
             # что именно не так (пара занята, класс не разрешён для пункта).
-            logger.info("Обход: запись чата %s отклонена — %s", who, type(exc).__name__)
+            logger.info("Обход: запись чата %s отклонена — %s", log_id(who), type(exc).__name__)
             return refused(str(exc))
         except DomainError:
             # Прочее (битые заметки, занятый замок) — внутренности сервера:
             # пути и подробности в журнал, аудитору — общее «не вышло».
-            logger.exception("Обход: запись чата %s не удалась", who)
+            logger.exception("Обход: запись чата %s не удалась", log_id(who))
             return refused(said("walk.err.server", lang), 500)
         return respond(who, ui_lang)
 
@@ -379,11 +394,14 @@ def install(
             inspection = writable(who)
             if not isinstance(inspection, Inspection):
                 return inspection
-            ref = save_upload(request.get_data(cache=False), check_environment())
+            ref = save_upload(request.get_data(cache=False), check_environment(), owner=who)
+        except UploadQuotaError as exc:
+            logger.warning("Обход: кадр чата %s не принят — %s", log_id(who), exc)
+            return refused(said("walk.err.photo_quota", ui_lang))
         except DomainError as exc:
-            logger.info("Обход: кадр чата %s не принят — %s", who, exc)
+            logger.info("Обход: кадр чата %s не принят — %s", log_id(who), exc)
             return refused(said("walk.err.photo_bad", ui_lang))
-        logger.info("Обход: чат %s прислал кадр %s", who, ref)
+        logger.info("Обход: чат %s прислал кадр %s", log_id(who), ref)
         return jsonify({"ref": ref}), 201
 
     @app.post(PHOTO_VIEW_PATH, endpoint=PHOTO_VIEW_ENDPOINT)

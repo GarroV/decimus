@@ -28,6 +28,8 @@ import time
 from collections.abc import Sequence
 from pathlib import Path
 
+from src.domain.log_ids import log_id
+
 from .config import Settings, assert_no_checklist_fork
 from .errors import EngineError, InspectionNotStarted
 
@@ -211,7 +213,7 @@ def _refuse_no_verdict(args: Sequence[str], *, output: str, attempt: int, chat_i
     started = "старт не состоялся" if RUNTIME_BEFORE_SCRIPT in output else "умер после старта"
     logger.warning(
         "интерпретатор движка умер в чате %s (%s, попытка %s, %s): %s",
-        chat_id,
+        log_id(chat_id),
         started,
         attempt,
         "повторяем" if again else "больше не повторяем",

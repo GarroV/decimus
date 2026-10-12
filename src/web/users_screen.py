@@ -27,6 +27,7 @@ from flask import Response as FlaskResponse
 
 from src.db import bot_links, mcp_access, oauth_store
 from src.db.errors import DbError
+from src.domain.log_ids import log_id
 from src.domain.tenants import canonical_tenant
 
 from . import (
@@ -416,7 +417,7 @@ def _install_mcp(app: Flask, users_path: str) -> None:
             note_target_mismatch(exc)
             return render(Show(person=ME, flash=_flash("users.mcp.failed", ok=False)), 503)
         # Значения токена в журнале нет: только факт выпуска.
-        logger.info("Веб: учётка %s выпустила себе токен MCP", чей)
+        logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
         return render(Show(person=ME, token=выпуск))
 
     @app.post(f"{users_path}/claude-token-revoke")
