@@ -185,8 +185,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Зафиксированное письмо тоже не переписывается (`0019`): из истории
     # нельзя вынуть отправленное, иначе она перестаёт быть историей.
     "partner_letters": {"SELECT", "INSERT"},
-    # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`).
-    "mcp_admins": {"SELECT", "INSERT"},
+    # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
+    # (`mcp_admins`) снят миграцией `0057` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
     # Карта синонимов формулировок только пополняется (`0012`, T284, D119):
     # UPDATE и DELETE не выданы намеренно. Синоним, который уже работает, не
@@ -264,7 +264,6 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "bot_bindings": {"UPDATE": {"unbound_at"}},
     "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
     "finish_modes": {"UPDATE": {"mode", "chosen_at"}},
-    "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
     # `expires_at` или переписать `fingerprint` на свой, то есть присвоить

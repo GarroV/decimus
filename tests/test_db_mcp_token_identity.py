@@ -1,12 +1,14 @@
-"""Личный токен MCP — на учётку сайта, со сроком и ролью (аудит 12.10, миграция `0056`).
+"""Личный токен MCP — на учётку сайта, со сроком и ролью (аудит 12.10, миграция `0057`).
 
 Ядро безопасности: до фикса токен знал только Telegram ID и пространство, и
-- отключённая учётка, сменённая роль или снятая привязка бота не гасили его (F-023, F-035);
+- отключённая учётка или сменённая роль не гасили его (F-023, F-035);
 - роль «контроль» получала через Claude проверки и методику (F-017, F-022; D420);
-- участник круга из пространства партнёра видел и отзывал людей УК (F-036).
+- доступ раздавал «круг» по Telegram ID, плоский на все пространства (F-036).
 
-Каждая проверка здесь проверяет то, что на прежнем коде проходило: токен
-работал, круг был плоским. Идёт под ролью приложения (`db_env`), как на площадке.
+D448: круга нет, токен человек выпускает себе сам — на свою учётку; права решает
+роль; доступ кончается отключением или сменой роли. Каждая проверка здесь
+проверяет то, что на прежнем коде проходило. Идёт под ролью приложения
+(`db_env`), как на площадке.
 """
 
 from __future__ import annotations
@@ -21,14 +23,14 @@ from db_harness import empty_database, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
-from src.db import bot_links  # noqa: E402
-from src.db.errors import OutOfScopeError, UnboundError  # noqa: E402
+from src.db import bot_links, mcp_access  # noqa: E402
+from src.db.errors import AccessError, UnboundError  # noqa: E402
 from src.db.mcp_access import (  # noqa: E402
-    add_admin,
+    issue_for_account,
     issue_token,
-    list_admins,
+    live_token_expiry,
     resolve_token,
-    revoke_access,
+    revoke_tokens,
 )
 from src.db.migrate import MIGRATIONS_DIR, apply_migrations  # noqa: E402
 from src.db.web_access import disable_account, password_hash, set_role  # noqa: E402
@@ -61,7 +63,7 @@ def учётки(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> d
 
 
 def _выдать(кто: int) -> str:
-    add_admin(кто, by=None, within=None)
+    """Выпуск себе из бота — без чьего-либо разрешения: круга нет (D448)."""
     return issue_token(кто).value
 
 
@@ -127,7 +129,6 @@ def test_срок_по_умолчанию_тридцать_дней(учётки
 
 def test_срок_задаётся_окружением(учётки: dict[int, str], monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("MCP_TOKEN_TTL_DAYS", "7")
-    add_admin(АДМИН_УК, by=None, within=None)
 
     выпуск = issue_token(АДМИН_УК)
 
@@ -136,20 +137,88 @@ def test_срок_задаётся_окружением(учётки: dict[int, 
     assert abs(выпуск.expires_at - (datetime.now(UTC) + timedelta(days=7))) < timedelta(hours=1)
 
 
-def test_отвязка_бота_гасит_токен(учётки: dict[int, str]) -> None:
+def test_без_учётки_токен_не_выпускается(учётки: dict[int, str]) -> None:
+    """Сотрудник по списку окружения без привязки бота — токена из чата нет."""
+    with pytest.raises(UnboundError):
+        issue_token(БЕЗ_УЧЁТКИ)
+
+
+def test_после_отвязки_бота_из_чата_не_выпустить(учётки: dict[int, str]) -> None:
+    """Отвязка закрывает дверь бота; выпущенный токен живёт — он на учётке, не на чате."""
     токен = _выдать(АДМИН_УК)
 
     assert bot_links.unbind(учётки[АДМИН_УК]) is True
 
-    assert resolve_token(токен) is None, "токен пережил отвязку бота"
-
-
-def test_без_учётки_токен_не_выпускается(учётки: dict[int, str]) -> None:
-    """Сотрудник по списку окружения без привязки — в круг его можно звать, токена нет."""
-    add_admin(БЕЗ_УЧЁТКИ, by=None, within=None)
-
     with pytest.raises(UnboundError):
-        issue_token(БЕЗ_УЧЁТКИ)
+        issue_token(АДМИН_УК)
+    assert resolve_token(токен) is not None
+
+
+# --- выпуск себе сам, на любой двери (D447, D448) --------------------------------
+
+
+@pytest.mark.parametrize("кто", [КОНТРОЛЬ_УК, СОТРУДНИК_ПАРТНЁРА, АДМИН_ПАРТНЁРА])
+def test_любая_роль_выпускает_себе_сама_без_чьей_либо_выдачи(
+    учётки: dict[int, str], кто: int
+) -> None:
+    """Никого не приводили и ничего не выдавали — учётки и её роли достаточно."""
+    выпуск = issue_for_account(учётки[кто])
+
+    владелец = resolve_token(выпуск.value)
+    assert владелец is not None and владелец.user_id == учётки[кто]
+
+
+def test_круга_в_модуле_нет() -> None:
+    """Дверей «выдать другому» и «отозвать у другого по Telegram ID» не осталось."""
+    for имя in ("add_admin", "revoke_access", "list_admins", "is_admin", "in_scope"):
+        assert not hasattr(mcp_access, имя), f"круг доступа вернулся: {имя}"
+
+
+def test_веб_и_бот_делят_один_живой_токен_учётки(учётки: dict[int, str], pg_dsn: str) -> None:
+    из_бота = _выдать(АДМИН_УК)
+
+    из_веба = issue_for_account(учётки[АДМИН_УК])
+
+    assert из_веба.replaced_previous is True
+    assert resolve_token(из_бота) is None, "токен из бота пережил выпуск в вебе"
+    assert resolve_token(из_веба.value) is not None
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "select telegram_id from mcp_tokens where user_id = %s and revoked_at is null",
+            (учётки[АДМИН_УК],),
+        )
+        assert cur.fetchall() == [(None,)], "веб записал Telegram, которого не знает"
+
+
+def test_свой_отзыв_гасит_сразу(учётки: dict[int, str]) -> None:
+    выпуск = issue_for_account(учётки[СОТРУДНИК_ПАРТНЁРА])
+    assert live_token_expiry(учётки[СОТРУДНИК_ПАРТНЁРА]) is not None
+
+    assert revoke_tokens(учётки[СОТРУДНИК_ПАРТНЁРА]) == 1
+
+    assert resolve_token(выпуск.value) is None
+    assert live_token_expiry(учётки[СОТРУДНИК_ПАРТНЁРА]) is None
+    assert revoke_tokens(учётки[СОТРУДНИК_ПАРТНЁРА]) == 0
+
+
+def test_отключённой_учётке_токен_не_выпускается(учётки: dict[int, str]) -> None:
+    assert disable_account(f"tg-{СОТРУДНИК_ПАРТНЁРА}", tenant="GE") is True
+
+    with pytest.raises(AccessError):
+        issue_for_account(учётки[СОТРУДНИК_ПАРТНЁРА])
+
+
+def test_возврат_прежней_роли_токен_не_оживляет(учётки: dict[int, str], pg_dsn: str) -> None:
+    """Смена роли гасит токен в базе (триггер `0057`), а не только не находит его."""
+    токен = _выдать(АДМИН_УК)
+
+    assert set_role(f"tg-{АДМИН_УК}", tenant="HQ", role="control") is True
+    assert set_role(f"tg-{АДМИН_УК}", tenant="HQ", role="admin") is True
+
+    assert resolve_token(токен) is None, "токен ожил с возвратом роли"
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("select revoked_by from mcp_tokens where user_id = %s", (учётки[АДМИН_УК],))
+        assert cur.fetchall() == [(0,)]
 
 
 # --- права в Claude решает роль (F-017, F-022; D420) -----------------------------
@@ -213,62 +282,12 @@ def test_смена_роли_сужает_инструменты(учётки: d
 def test_личный_токен_снятия_не_даёт(учётки: dict[int, str]) -> None:
     доступ = mcp_config._owner_from_store(_выдать(АДМИН_УК))
     assert доступ is not None and доступ.may_retract is False
-    assert доступ.actor == f"mcp:tg:{АДМИН_УК}"
+    assert доступ.actor == f"web:tg-{АДМИН_УК}", "подпись — логин учётки, как у входа OAuth"
 
 
-# --- круг поделён по пространствам (F-036) ----------------------------------------
+# --- миграция `0057`: прежние токены и снятый круг ---------------------------------
 
-
-@pytest.fixture
-def круг(учётки: dict[int, str]) -> dict[int, str]:
-    for кто in учётки:
-        add_admin(кто, by=None, within=None)
-    return учётки
-
-
-def test_партнёр_видит_только_свой_круг(круг: dict[int, str]) -> None:
-    видно = {строка.telegram_id for строка in list_admins(within="GE")}
-
-    assert видно == {АДМИН_ПАРТНЁРА, СОТРУДНИК_ПАРТНЁРА}, "партнёру видны Telegram ID людей УК"
-
-
-def test_уК_видит_весь_круг(круг: dict[int, str]) -> None:
-    assert {строка.telegram_id for строка in list_admins(within="HQ")} == set(круг)
-
-
-def test_партнёр_не_отзывает_людей_уК(круг: dict[int, str]) -> None:
-    токен = issue_token(АДМИН_УК).value
-
-    with pytest.raises(OutOfScopeError):
-        revoke_access(АДМИН_УК, by=АДМИН_ПАРТНЁРА, within="GE")
-
-    assert resolve_token(токен) is not None, "отказ всё же погасил токен человека УК"
-    assert any(с.telegram_id == АДМИН_УК and с.is_live for с in list_admins(within="HQ"))
-
-
-def test_партнёр_отзывает_своего(круг: dict[int, str]) -> None:
-    отзыв = revoke_access(СОТРУДНИК_ПАРТНЁРА, by=АДМИН_ПАРТНЁРА, within="GE")
-
-    assert отзыв.was_admin is True
-
-
-def test_партнёр_не_приводит_чужих_и_отказ_одинаков(круг: dict[int, str]) -> None:
-    """Человек УК и человек без привязки получают один и тот же отказ — по нему не узнать чужое."""
-    with pytest.raises(OutOfScopeError):
-        add_admin(КОНТРОЛЬ_УК, by=АДМИН_ПАРТНЁРА, within="GE")
-    with pytest.raises(OutOfScopeError):
-        add_admin(БЕЗ_УЧЁТКИ, by=АДМИН_ПАРТНЁРА, within="GE")
-
-
-def test_уК_приводит_только_человека_с_учёткой(круг: dict[int, str]) -> None:
-    with pytest.raises(UnboundError):
-        add_admin(БЕЗ_УЧЁТКИ, by=АДМИН_УК, within="HQ")
-    assert add_admin(СОТРУДНИК_ПАРТНЁРА, by=АДМИН_УК, within="HQ") is False  # уже в круге
-
-
-# --- миграция `0056`: прежние токены -------------------------------------------------
-
-МИГРАЦИЯ = "0056_mcp_token_identity.sql"
+МИГРАЦИЯ = "0057_mcp_token_identity.sql"
 
 
 def _каталог(tmp_path: Path, *, включая: bool) -> Path:
@@ -318,6 +337,8 @@ def test_миграция_связывает_привязанные_и_гаси�
             cur.execute(
                 "update mcp_tokens set revoked_at = now(), revoked_by = 7 where telegram_id = 5"
             )
+            # Круг с живым участником — как на проде: таблица уходит вместе со строкой.
+            cur.execute("insert into mcp_admins (telegram_id) values (1)")
 
         применено = apply_migrations(dsn, directory=_каталог(tmp_path, включая=True))
 
@@ -328,6 +349,9 @@ def test_миграция_связывает_привязанные_и_гаси�
                 "revoked_at is null, revoked_by from mcp_tokens order by telegram_id"
             )
             строки = cur.fetchall()
+            cur.execute("select to_regclass('mcp_admins')")
+            круг = cur.fetchone()
+        assert круг == (None,), "круг доступа (mcp_admins) пережил миграцию"
         assert строки == [
             (1, True, "admin", True, True, None),
             (2, False, None, None, False, 0),
