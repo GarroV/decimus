@@ -188,6 +188,52 @@ def test_база_молчит_режим_по_умолчанию_сводка(
     assert ответ.get_json() == {"sent": True, "mode": "summary"}
 
 
+# ── перевод комментариев (D443) ───────────────────────────────────────────
+
+
+def test_перевод_по_умолчанию_по_кнопке_и_хранится_за_человеком(
+    база: База,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _клиент(monkeypatch)
+
+    до = _действие(client, АУДИТОР, op="lang", lang="ru").get_json()["app"]["translate_mode"]
+    ответ = _действие(client, АУДИТОР, op="translate_mode", mode="auto")
+    у_коллеги = _действие(client, КОЛЛЕГА, op="lang", lang="ru").get_json()["app"]["translate_mode"]
+
+    assert (до, ответ.get_json()["app"]["translate_mode"], у_коллеги) == (
+        "button",
+        "auto",
+        "button",
+    )
+
+
+def test_чужой_режим_перевода_отказ_и_ничего_не_записано(
+    база: База,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _клиент(monkeypatch)
+
+    for режим in ("both", "", None, 1):
+        assert _действие(client, АУДИТОР, op="translate_mode", mode=режим).status_code == 422
+    assert база.перевод == {}
+
+
+def test_база_молчит_перевод_по_кнопке(
+    база: База,  # noqa: F811
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def молчит(_: int) -> None:
+        raise DbError("нет базы")
+
+    monkeypatch.setattr(walk_settings.translate_modes, "chosen_translate_mode", молчит)
+    client = _клиент(monkeypatch)
+
+    ответ = _действие(client, АУДИТОР, op="lang", lang="ru")
+
+    assert ответ.get_json()["app"]["translate_mode"] == "button"
+
+
 # ── «Сразу отчёт» ─────────────────────────────────────────────────────────
 
 

@@ -191,11 +191,32 @@
     return box;
   }
 
+  function translateModeRow() {
+    var box = el("div", "walk-app__row walk-app__row--stack");
+    box.appendChild(el("span", "walk-app__row-label", tx("walk.app.translate_mode")));
+    var pill = W.hinted(el("div", "walk-app__lang walk-app__lang--wide"), "translate_mode");
+    pill.setAttribute("role", "group");
+    pill.setAttribute("aria-label", tx("walk.app.translate_mode"));
+    ["button", "auto"].forEach(function (mode) {
+      var on = (app().translate_mode || "button") === mode;
+      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), tx("walk.app.translate_mode." + mode), function () {
+        if (on) return;
+        act({ op: "translate_mode", mode: mode }).then(function (body) { if (body) W.apply(body); });
+      });
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      pill.appendChild(b);
+    });
+    box.appendChild(pill);
+    box.appendChild(el("p", "walk-app__note", tx("walk.app.translate_mode.hint")));
+    return box;
+  }
+
   function settings(root) {
     root.appendChild(head(tx("walk.app.settings")));
     var list = el("section", "walk-app__list");
     list.appendChild(langRow());
     list.appendChild(finishModeRow());
+    list.appendChild(translateModeRow());
     W.hints.settingsRows(list);
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
     if (app().circle) {
