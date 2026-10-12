@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 import threading
 import urllib.error
@@ -137,6 +138,10 @@ def test_сборщик_и_дверь_отдают_одно_и_то_же(сер�
     assert тело == install_script()
 
 
+@pytest.mark.skipif(
+    shutil.which("plutil") is None,
+    reason="установщик для macOS: нужен plutil; на Linux не гоняется, его гоняет шаг macOS в «Проверки PR»",
+)
 def test_установщик_реально_отрабатывает_на_подставном_доме(сервер: str, tmp_path: Path) -> None:
     """Скрипт запускается по-настоящему, а не только разбирается.
 
