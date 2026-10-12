@@ -141,7 +141,15 @@ class Http:
                 last = f"HTTP {exc.code}"
                 if exc.code not in RETRY_CODES:
                     break
-            except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            # ConnectionError — обрыв соединения (в том числе `RemoteDisconnected`):
+            # так выглядит Tailscale, принявший соединение к уснувшему сервису.
+            except (
+                urllib.error.URLError,
+                TimeoutError,
+                ConnectionError,
+                json.JSONDecodeError,
+                ValueError,
+            ) as exc:
                 last = exc.__class__.__name__
         raise AggregatorError(f"{last} — {request.full_url.split('?')[0]}")
 
