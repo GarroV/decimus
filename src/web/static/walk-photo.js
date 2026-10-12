@@ -148,7 +148,6 @@
     if (on.hero) {
       var big = picker(tx("walk.photo.hero"), true, on.onFiles);
       big.classList.add("walk-pick--hero");
-      big.appendChild(W.el("span", "walk-pick__sub", tx("walk.photo.hero_hint")));
       box.appendChild(big);
       var gal = picker(tx("walk.photo.gallery_link"), false, on.onFiles);
       gal.classList.add("walk-pick--link");

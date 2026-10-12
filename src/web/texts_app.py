@@ -11,7 +11,6 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     # ── главная ──────────────────────────────────────────────────────────
     "walk.app.home": {"ru": "Главная", "en": "Home"},
     "walk.app.audit": {"ru": "Проверка пиццерии", "en": "Pizzeria inspection"},
-    "walk.app.audit.none": {"ru": "Проверка не начата", "en": "No inspection in progress"},
     "walk.app.audit.new": {"ru": "Начать проверку", "en": "Start inspection"},
     "walk.app.audit.new_other": {"ru": "Начать новую", "en": "Start a new one"},
     "walk.app.audit.records": {"ru": "Записей: {count}", "en": "Records: {count}"},
@@ -30,14 +29,8 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     "walk.start.speech": {"ru": "Язык чек-листа", "en": "Checklist language"},
     "walk.start.speech_hint_label": {"ru": "Что это значит", "en": "What this means"},
     "walk.start.speech_hint": {
-        "ru": (
-            "На этом языке вы проводите проверку и пишете записи. Итоговый отчёт "
-            "и проверку в вебе можно смотреть на любом языке платформы."
-        ),
-        "en": (
-            "You conduct the inspection and write records in this language. The final "
-            "report and the inspection on the web can be viewed in any platform language."
-        ),
+        "ru": "Отчёт и проверку в вебе можно смотреть на любом языке платформы.",
+        "en": "The report and the inspection on the web can be viewed in any platform language.",
     },
     "walk.start.go": {"ru": "Начать проверку", "en": "Start inspection"},
     "walk.start.going": {"ru": "Начинаем…", "en": "Starting…"},
@@ -81,42 +74,32 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     "walk.app.help": {"ru": "Справка", "en": "Help"},
     "walk.app.help.text": {
         "ru": (
-            "Главная — что сейчас идёт и куда дальше.\n\n"
-            "Обход: зона за зоной. «+ Нарушение» — снимите кадр и напишите пару слов, "
-            "пункт найдёт система; проверьте и сохраните. «Осмотрено →» засчитывает "
-            "зону и ведёт к следующей.\n\n"
-            "«Сведения» в шапке обхода — вопросы для отчёта; что заполнено здесь, бот в "
+            "Обход идёт зона за зоной. «+ Нарушение» — кадр и пара слов, пункт найдёт "
+            "система; проверьте и сохраните. «Осмотрено →» засчитывает зону.\n\n"
+            "«Сведения» в шапке обхода — вопросы для отчёта; заполненное здесь бот в "
             "конце не спросит.\n\n"
-            "Проверку можно начать здесь — «Начать проверку» на главной — или в чате "
-            "(/start); завершить (/finish) — в чате. Всё записанное в чате видно здесь, "
-            "и наоборот."
+            "Начать проверку можно здесь или в чате (/start), завершить (/finish) — в "
+            "чате. Записанное в одном месте видно в другом."
         ),
         "en": (
-            "Home shows what is going on and where to go next.\n\n"
-            "The walk goes zone by zone. “+ Violation” — take a photo and write a few "
-            "words, the system finds the item; check it and save. “Checked →” counts the "
-            "zone and moves to the next one.\n\n"
-            "“Details” in the walk header are the report questions; whatever is filled in "
-            "here the bot will not ask at the end.\n\n"
-            "You can start an inspection here — “Start inspection” on Home — or in the "
-            "chat (/start); finish it (/finish) in the chat. Everything recorded in the "
-            "chat shows here, and back."
+            "The walk goes zone by zone. “+ Violation” — a photo and a few words, the "
+            "system finds the item; check it and save. “Checked →” counts the zone.\n\n"
+            "“Details” in the walk header are the report questions; whatever is filled "
+            "in here the bot will not ask at the end.\n\n"
+            "Start an inspection here or in the chat (/start); finish it (/finish) in "
+            "the chat. What is recorded in one place shows in the other."
         ),
     },
     "walk.app.version": {"ru": "Версия", "en": "Version"},
     # ── подключение Claude ───────────────────────────────────────────────
     "walk.app.claude": {"ru": "Подключить Claude", "en": "Connect Claude"},
     "walk.app.claude.text": {
-        "ru": (
-            "Одна команда с вашим личным токеном: выполните её в терминале на Mac, "
-            "где стоит Claude. Токен показывается один раз; новая команда гасит "
-            "прежнюю настройку. Никому её не пересылайте."
-        ),
-        "en": (
-            "One command with your personal token: run it in a terminal on the Mac "
-            "where Claude is installed. The token is shown once; a new command "
-            "cancels the previous setup. Do not forward it to anyone."
-        ),
+        "ru": "Команда с вашим токеном: выполните её в терминале на Mac с Claude.",
+        "en": "A command with your token: run it in a terminal on the Mac with Claude.",
+    },
+    "walk.app.claude.safety": {
+        "ru": "Токен виден один раз, новая команда гасит прежнюю. Никому не пересылайте.",
+        "en": "The token is shown once; a new command cancels the old one. Do not forward it.",
     },
     "walk.app.claude.issue": {"ru": "Получить команду", "en": "Get the command"},
     "walk.app.claude.again": {"ru": "Получить новую", "en": "Get a new one"},
