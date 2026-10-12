@@ -810,7 +810,9 @@
       .then(function (res) {
         if (!res.ok) {
           S.data = { texts: (res.body && res.body.texts) || {} };
-          renderEmpty(tx(res.body && res.body.error === "closed" ? "walk.closed" : "walk.error"));
+          // Отказ по роли (D420) приходит с текстом сервера — его и показать.
+          renderEmpty((res.body && res.body.message) ||
+            tx(res.body && res.body.error === "closed" ? "walk.closed" : "walk.error"));
           return;
         }
         W.apply(res.body);

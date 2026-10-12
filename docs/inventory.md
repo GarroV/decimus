@@ -123,14 +123,14 @@
 | `/users/bot-link` | POST | `bot_link` | `src/web/users_screen.py` |
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
 | `/users/claude-revoke` | POST | `claude_revoke` | `src/web/users_screen.py` |
+| `/users/claude-token` | POST | `claude_token` | `src/web/users_screen.py` |
+| `/users/claude-token-revoke` | POST | `claude_token_revoke` | `src/web/users_screen.py` |
 | `/users/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
 | `/users/disable` | POST | `disable_user` | `src/web/users_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
-| `/users/mcp-grant` | POST | `mcp_grant` | `src/web/users_screen.py` |
-| `/users/mcp-revoke` | POST | `mcp_revoke` | `src/web/users_screen.py` |
 | `/users/password` | POST | `own_password` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
@@ -236,7 +236,6 @@
 | `AUDIT_DATA_DIR` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 6 | да |
 | `BACKUP_DIR` | `tools/state_backup.py` | да |
 | `BACKUP_KEEP_DAYS` | `tools/state_backup.py` | да |
-| `BOT_MCP_OWNER_ID` | `src/bot/config.py`, `src/web/users_mcp.py` | да |
 | `BOT_MCP_URL` | `src/bot/mcp_setup.py`, `tools/mcp_outside.py` | да |
 | `BOT_MODE` | `src/bot/config.py` | да |
 | `BOT_UI_LANG` | `src/bot/texts.py` | да |
@@ -275,6 +274,7 @@
 | `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/mcp_watch.py`, `tools/oauth_smoke.py` | да |
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
+| `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
 | `MIGROS_RELAY_URL` | `src/ratings/aggregators/migros.py` | да |
 | `OAUTH_SMOKE_PASSWORD` | `tools/oauth_smoke.py` | да |
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
@@ -375,6 +375,7 @@
 | `0056_finish_modes.sql` | `finish_modes` |
 | `0057_checklist_langs.sql` | `checklist_langs` |
 | `0058_translate_modes.sql` | `translate_modes` |
+| `0059_mcp_token_identity.sql` | — |
 <!-- map:end -->
 
 ## Makefile

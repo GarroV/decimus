@@ -341,6 +341,12 @@ def identify(
         logger.info("Обход: чат %s не в круге тестеров — отказ", chat_id)
         return jsonify({"error": "closed", "texts": texts_for(ui_lang)}), 403
     try:
+        if conf.bot_token is not None and walk_access.role_is_closed(chat_id):
+            # Учётка своя, но её роли поле закрыто (D420): объяснить словами.
+            logger.info("Обход: роли учётки чата %s поле закрыто — отказ", chat_id)
+            lang = walk_settings.chosen_lang(chat_id) or ui_lang
+            текст = WALK_TEXTS["walk.err.role"]
+            return jsonify({"error": "role", "message": текст.get(lang) or текст[ui_lang]}), 403
         if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:
             # Бот этого человека не пускает (не привязан, доступ снят) — и
             # мини-апп тоже, хоть подпись и настоящая (D372).

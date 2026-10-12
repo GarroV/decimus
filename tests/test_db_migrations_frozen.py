@@ -243,6 +243,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0058_translate_modes.sql": (
         "sql1:2d25456431e1a5ba485bda6ccfd66f8b1d6332faeb40f71515113007a585129f"
     ),
+    # Личный токен MCP на учётку сайта со сроком, круг доступа снят (аудит 12.10,
+    # D448). Ещё не на проде.
+    "0059_mcp_token_identity.sql": (
+        "sql1:4635b4dcd913fa4c8ad528f8831ff2d972c44d7e80f9c9f889793db1d08538f1"
+    ),
 }
 
 

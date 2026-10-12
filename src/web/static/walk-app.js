@@ -19,17 +19,14 @@
   var el = W.el;
   var tx = W.tx;
 
-  /** Куда ведёт «Назад» с каждого экрана. */
-  /** Период отказов мастера на экране доступа — неделя, как у `/stops`. */
-  var STOPS_DAYS = 7;
-
   /** Подсказки к названию пиццерии: с какого знака и после какой паузы спрашивать. */
   var SUGGEST_MIN = 2;
   var SUGGEST_DELAY_MS = 250;
 
-  var PARENT = { walk: "home", start: "home", settings: "home", help: "settings", claude: "settings", access: "settings" };
+  /** Куда ведёт «Назад» с каждого экрана. */
+  var PARENT = { walk: "home", start: "home", settings: "home", help: "settings", claude: "settings" };
 
-  var A = (W.app = { route: null, issued: null, circle: null, stops: null, busy: false, loading: false, wiz: null });
+  var A = (W.app = { route: null, issued: null, busy: false, wiz: null });
 
   function data() { return W.state.data || {}; }
   function app() { return data().app || {}; }
@@ -219,10 +216,8 @@
     list.appendChild(translateModeRow());
     W.hints.settingsRows(list);
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
-    if (app().circle) {
-      list.appendChild(row(tx("walk.app.claude"), null, function () { A.go("claude"); }));
-      list.appendChild(row(tx("walk.app.access"), null, function () { A.go("access"); }));
-    }
+    // Подключить Claude — каждому (D448): токен выпускается на свою учётку.
+    if (app().mcp) list.appendChild(row(tx("walk.app.claude"), null, function () { A.go("claude"); }));
     list.appendChild(row(tx("walk.app.version"), app().version || "—"));
     root.appendChild(list);
   }
@@ -262,6 +257,7 @@
       root.appendChild(W.button("walk-mark", tx("walk.app.claude.copy"), function () { copy(got.command); }));
       root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.safety")));
       root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.restart")));
+      if (got.expires) root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.expires", { date: got.expires })));
       if (got.replaced) root.appendChild(el("p", "walk-banner", tx("walk.app.claude.replaced")));
     }
     root.appendChild(W.button(got ? "walk-btn" : "walk-mark", tx(got ? "walk.app.claude.again" : "walk.app.claude.issue"), function () {
@@ -271,73 +267,6 @@
         W.render();
       });
     }));
-  }
-
-  /* ── доступ к Claude: круг и отказы мастера ────────────────────────── */
-
-  /** Круг, затем отказы — по очереди: `act` держит одно действие за раз. */
-  function loadAccess() {
-    A.loading = true;
-    act({ op: "mcp_who" }).then(function (body) {
-      A.circle = body ? body.circle : [];
-      return act({ op: "stops", days: STOPS_DAYS });
-    }).then(function (body) {
-      A.loading = false;
-      A.stops = body ? body.stops : null;
-      if (A.route === "access") W.render();
-    });
-  }
-
-  function person(p) {
-    var r = el("div", "walk-app__row");
-    var who = el("span", "walk-app__row-label", p.name ? p.name + " · " + p.id : String(p.id));
-    r.appendChild(who);
-    var state = p.founder ? tx("walk.app.access.founder") : !p.live ? tx("walk.app.access.revoked")
-      : tx(p.token ? "walk.app.access.token" : "walk.app.access.no_token");
-    r.appendChild(el("span", "walk-app__row-value", state));
-    if (p.live && !p.founder) {
-      r.appendChild(W.button("walk-btn walk-btn--small walk-btn--danger", tx("walk.app.access.revoke"), function () {
-        act({ op: "mcp_revoke", id: p.id }).then(function (body) { if (body) { A.circle = body.circle; W.render(); } });
-      }));
-    }
-    return r;
-  }
-
-  function addForm() {
-    var form = el("form", "walk-app__add");
-    var input = el("input", "walk-input");
-    input.inputMode = "numeric";
-    input.placeholder = tx("walk.app.access.id");
-    input.setAttribute("aria-label", tx("walk.app.access.id"));
-    form.appendChild(input);
-    form.appendChild(W.button("walk-btn", tx("walk.app.access.add")));
-    form.lastChild.type = "submit";
-    form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      act({ op: "mcp_add", id: input.value.trim() }).then(function (body) { if (body) { A.circle = body.circle; W.render(); } });
-    });
-    return form;
-  }
-
-  function access(root) {
-    root.appendChild(head(tx("walk.app.access")));
-    if (A.circle === null) {
-      root.appendChild(el("p", "walk__loading", "…"));
-      if (!A.loading) loadAccess();
-      return;
-    }
-    var list = el("section", "walk-app__list");
-    if (!A.circle.length) list.appendChild(el("p", "walk-app__note", tx("walk.app.access.empty")));
-    A.circle.forEach(function (p) { list.appendChild(person(p)); });
-    root.appendChild(list);
-    root.appendChild(addForm());
-    root.appendChild(el("h2", "walk-app__subtitle", tx("walk.app.stops") + " · " + tx("walk.app.stops.period", { days: STOPS_DAYS })));
-    var stops = el("section", "walk-app__list");
-    if (A.stops && !A.stops.length) stops.appendChild(el("p", "walk-app__note", tx("walk.app.stops.empty")));
-    (A.stops || []).forEach(function (s) {
-      stops.appendChild(row(s.step + " · " + s.reason, tx("walk.app.stops.line", { times: s.times, people: s.people })));
-    });
-    root.appendChild(stops);
   }
 
   /* ── начало проверки (D392): те же шаги, что у мастера бота, — полями ── */
@@ -626,10 +555,9 @@
     root.appendChild(form);
   }
 
-  var SCREENS = { home: home, start: startScreen, settings: settings, help: help, claude: claude, access: access };
+  var SCREENS = { home: home, start: startScreen, settings: settings, help: help, claude: claude };
 
   A.render = function (root) {
-    if (A.route !== "access") { A.circle = null; A.stops = null; }
     (SCREENS[A.route] || home)(root);
   };
 
