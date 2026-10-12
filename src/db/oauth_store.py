@@ -161,6 +161,15 @@ class Client:
 
 
 @dataclass(frozen=True)
+class RegistrationLimits:
+    """Пределы успешных регистраций за окно: с одного адреса и всего."""
+
+    window: timedelta
+    per_address: int
+    total: int
+
+
+@dataclass(frozen=True)
 class TokenPair:
     """Выпущенная пара — единственное место, где значения токенов вообще есть."""
 
@@ -197,10 +206,15 @@ values (%s, %s, %s, %s)
 returning id
 """
 
-_COUNT_RECENT_CLIENTS_SQL = "select count(*) from oauth_clients where created_at > now() - %s"
+#: Регистрации идут по одной: счёт и запись — под одним замком транзакции.
+#: Без него параллельные запросы видели бы один и тот же счёт и проходили
+#: предел все разом.
+_REGISTRATION_LOCK_SQL = "select pg_advisory_xact_lock(hashtext('oauth.register'))"
 
-_COUNT_RECENT_FROM_SQL = """
-select count(*) from oauth_clients where registered_from = %s and created_at > now() - %s
+_COUNT_RECENT_SQL = """
+select count(*) filter (where registered_from = %s), count(*)
+  from oauth_clients
+ where created_at > now() - %s
 """
 
 #: Чистка отжившего — функцией базы (`0051`): права DELETE у приложения нет.
@@ -314,10 +328,14 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 # --- клиенты ----------------------------------------------------------------
 
 
-def register_client(name: object, redirect_uris: Sequence[str], *, address: str) -> Client:
+def register_client(
+    name: object, redirect_uris: Sequence[str], *, address: str, limits: RegistrationLimits
+) -> Client:
     """Завести клиента (RFC 7591). Адреса возврата уже проверены вызывающим — и здесь снова.
 
-    `address` — откуда пришла регистрация: по нему считается предел на адрес.
+    `address` — откуда пришла регистрация. Пределы `limits` сверяются в той же
+    транзакции, что и запись, под замком: параллельные регистрации не проходят
+    предел разом. Выбран — `OAuthGrantError("temporarily_unavailable")`.
     """
     if not 0 < len(redirect_uris) <= MAX_REDIRECT_URIS or not all(
         redirect_uri_allowed(uri) for uri in redirect_uris
@@ -325,27 +343,21 @@ def register_client(name: object, redirect_uris: Sequence[str], *, address: str)
         raise OAuthGrantError("invalid_redirect_uri", "Адрес возврата не из разрешённых")
     client_id = secrets.token_urlsafe(CLIENT_ID_BYTES)
     имя = clean_client_name(name)
+    откуда = address[:MAX_ADDRESS]
     with _connected("завести OAuth-клиента") as conn, conn.cursor() as cur:
-        cur.execute(
-            _INSERT_CLIENT_SQL, (client_id, имя, list(redirect_uris), address[:MAX_ADDRESS])
-        )
+        cur.execute(_REGISTRATION_LOCK_SQL)
+        cur.execute(_COUNT_RECENT_SQL, (откуда, limits.window))
+        счёт = cur.fetchone()
+        с_адреса, всего = (0, 0) if счёт is None else (int(счёт[0]), int(счёт[1]))
+        if с_адреса >= limits.per_address or всего >= limits.total:
+            raise OAuthGrantError("temporarily_unavailable", "Предел регистраций выбран")
+        cur.execute(_INSERT_CLIENT_SQL, (client_id, имя, list(redirect_uris), откуда))
         row = cur.fetchone()
     if row is None:
         raise AccessError("Не удалось завести OAuth-клиента (insert без строки)")
     return Client(
         id=int(row[0]), client_id=client_id, client_name=имя, redirect_uris=tuple(redirect_uris)
     )
-
-
-def recent_clients(window: timedelta, *, address: str | None = None) -> int:
-    """Сколько клиентов заведено за окно: всего или с одного адреса — для пределов регистраций."""
-    with _connected("сосчитать OAuth-клиентов") as conn, conn.cursor() as cur:
-        if address is None:
-            cur.execute(_COUNT_RECENT_CLIENTS_SQL, (window,))
-        else:
-            cur.execute(_COUNT_RECENT_FROM_SQL, (address[:MAX_ADDRESS], window))
-        row = cur.fetchone()
-    return 0 if row is None else int(row[0])
 
 
 def purge_stale() -> int:

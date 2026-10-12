@@ -29,6 +29,11 @@ from src.db.oauth_store import (
     judge_refresh,
 )
 
+#: Для тестов, которые заводят клиента в двойник напрямую, мимо экрана.
+НЕТ_ПРЕДЕЛОВ = oauth_store.RegistrationLimits(
+    window=timedelta(hours=1), per_address=10**9, total=10**9
+)
+
 
 @dataclass
 class _Код:
@@ -79,9 +84,21 @@ class ПамятьOAuth:
     def _новый(self) -> str:
         return f"{next(self._номер):08d}-0000-4000-8000-000000000000"
 
-    def register_client(self, name: object, redirect_uris: list[str], *, address: str) -> Client:
+    def register_client(
+        self,
+        name: object,
+        redirect_uris: list[str],
+        *,
+        address: str,
+        limits: oauth_store.RegistrationLimits = НЕТ_ПРЕДЕЛОВ,
+    ) -> Client:
         if not redirect_uris or not all(map(oauth_store.redirect_uri_allowed, redirect_uris)):
             raise OAuthGrantError("invalid_redirect_uri", "двойник: адрес не из разрешённых")
+        if (
+            self._за_окно(limits.window, address=address) >= limits.per_address
+            or self._за_окно(limits.window) >= limits.total
+        ):
+            raise OAuthGrantError("temporarily_unavailable", "двойник: предел выбран")
         клиент = Client(
             id=len(self.clients) + 1,
             client_id=f"client-{len(self.clients) + 1:016d}",
@@ -92,7 +109,7 @@ class ПамятьOAuth:
         self.registered[клиент.client_id] = (address, datetime.now(UTC))
         return клиент
 
-    def recent_clients(self, window: timedelta, *, address: str | None = None) -> int:
+    def _за_окно(self, window: timedelta, *, address: str | None = None) -> int:
         с = datetime.now(UTC) - window
         return sum(
             1
@@ -241,7 +258,6 @@ class ПамятьOAuth:
 
 ДВЕРИ = (
     "register_client",
-    "recent_clients",
     "purge_stale",
     "find_client",
     "issue_code",
