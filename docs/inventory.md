@@ -371,6 +371,7 @@
 | `0054_oauth.sql` | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_tokens` |
 | `0055_maps_ratings_index.sql` | — |
 | `0056_finish_modes.sql` | `finish_modes` |
+| `0057_checklist_langs.sql` | `checklist_langs` |
 <!-- map:end -->
 
 ## Makefile
