@@ -45,6 +45,7 @@ from seed_web_demo import ADMIN_URL_VAR, _require_local_dsn  # noqa: E402
 from src import domain  # noqa: E402
 from src.db.config import check_environment  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
 from src.domain.engine import chat_dir  # noqa: E402
 
 METHODOLOGY = REPO_ROOT / "tests" / "methodology"
@@ -124,6 +125,7 @@ def _forget_past(dsn: str) -> int:
     """Снести прошлые проверки точки стенда — и только её."""
     _require_local_dsn(dsn)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        apply_space(conn)
         cur.execute(
             "delete from inspections i using units u "
             "where u.id = i.unit_id and u.name = %s and i.tenant_code = %s",
@@ -148,4 +150,5 @@ def seed() -> None:
 
 
 if __name__ == "__main__":
-    seed()
+    with acting_space(SYSTEM_SPACE):
+        seed()

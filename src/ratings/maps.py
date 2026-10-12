@@ -18,6 +18,7 @@ from datetime import date, timedelta
 
 from src.db import maps_store
 from src.db.maps_store import LatestRating
+from src.db.space import SYSTEM_SPACE, acting_space
 
 from . import maps_link, pointer
 
@@ -218,4 +219,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with acting_space(SYSTEM_SPACE):
+        main()

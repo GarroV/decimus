@@ -27,7 +27,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 
 | Термин | Что значит | Где живёт |
 |---|---|---|
-| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы, а не фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`; `docs/furca/blocks/spaces.md` |
+| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы по пространству, которое ставит дверь (`src/db/space.py`, миграция `0061`), а не только фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`, `src/db/space.py`; `docs/furca/blocks/spaces.md` |
 | УК | Управляющая компания: владелец методики, видит всю сеть, принимает проверки партнёров. Её пространство — `HQ` | `src/domain/tenants.py` (`HQ_TENANT`), `docs/18-access-map.md` |
 | Партнёр | Организация, чьи пиццерии проверяют; видит и правит только своё пространство и свои страны | `docs/18-access-map.md`, `src/db/reach.py` |
 | Роль | Одна из шести: в пространстве УК — главный админ (`superadmin`), админ (`admin`), контроль (`control`), аудитор (`auditor`); у партнёра — админ и аудитор | `src/domain/tenants.py`, `src/web/access_policy.py`, `src/mcp/policy.py` |
@@ -149,7 +149,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,guest_gate,oauth,origin,partner_spaces,people,profile,proxy,remote,route_audience,security_headers,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -166,6 +166,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
+| `src/web/route_audience.py` | Аудитория каждого маршрута веба: по умолчанию партнёру закрыто (аудит 12.10, F-004) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
 | `src/web/users_claude.py` | Блок «Подключить Claude» на своей карточке (D417): адрес MCP и подключения через сайт |
 | `src/web/users_mcp.py` | Личный токен Claude на своей карточке: выпустить себе и отозвать (D447, D448) |
@@ -272,7 +273,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space_guard,storage,storage_reconcile,target_refusal}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -288,6 +289,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/recipe_audit.py` | T203 (#170): можно ли снять прежний рецепт отпечатка на ЭТОЙ базе |
 | `src/db/reports.py` | T336 (#317): готовый отчёт проверки уезжает в хранилище |
 | `src/db/request_memo.py` | Память одного HTTP-запроса для чтений, которые страница просит из разных блоков |
+| `src/db/space.py` | Пространство, от имени которого идёт обращение к базе (аудит 12.10, F-037, F-005) |
 | `src/db/space_guard.py` | Пространство записи обязано быть заведено — опечатка в коде это отказ (#481) |
 | `src/db/storage.py` | Хранилище кадров за S3-совместимым интерфейсом (D004, D054) |
 | `src/db/storage_reconcile.py` | Сверка хранилища файлов с таблицами: экшн-планы и ответы на предписания (#496) |
@@ -412,6 +414,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0058_translate_modes.sql` | D443: перевод комментариев на язык отчёта — автоматически или по кнопке, и каждый аудитор выбирает свой в настройках мини-аппа: `button` — переводит сам по кнопке под… |
 | `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
+| `0061_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -777,7 +780,7 @@ Telegram, ни HTTP, ни SQL.
 | Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/web/letter_markup.py` |
 | Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py` и `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
-| Ограничить раздел по роли или пространству | Заслоны в `src/web/app.py` (`_install_hq_gate`, `_install_control_gate`, `_install_methodology_gate`), правило «кто кем управляет» — `src/web/access_policy.py`, охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` |
+| Ограничить раздел по роли или пространству | Аудитория каждого маршрута — `src/web/route_audience.py` (новый маршрут без отметки не собирается, партнёру по умолчанию закрыто); заслоны в `src/web/app.py` (`_install_hq_gate`, `_install_control_gate`, `_install_methodology_gate`), правило «кто кем управляет» — `src/web/access_policy.py`, охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` |
 | Роль и права MCP | Матрица «роль × вид инструментов» — `src/mcp/policy.py` (`kinds_for`) |
 | Добавить инструмент MCP | Описание и схема — запись `ToolSpec` в `TOOLS` (`src/mcp/catalogue.py`), обработчик — рядом с похожими (`tools.py`, `checklist_tools.py`, `ratings_tools.py`); вид (`kind`) решает, какой роли он открыт (`policy.py`); перечень — `docs/inventory.md` (`make map`), контракт — `docs/furca/blocks/mcp.md` |
 | Новая миграция | Файл `src/db/migrations/NNNN_<смысл>.sql` со следующим номером, заголовок-комментарий «зачем» (первая фраза уйдёт в эту карту); накат — `make migrate`; применённый файл не править. Тест с базой — по образцу `tests/test_db_*.py` (`tests/db_harness.py`) |

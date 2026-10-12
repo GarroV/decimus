@@ -378,6 +378,7 @@
 | `0058_translate_modes.sql` | `translate_modes` |
 | `0059_mcp_token_identity.sql` | — |
 | `0060_d440_roles.sql` | — |
+| `0061_space_isolation.sql` | — |
 <!-- map:end -->
 
 ## Makefile

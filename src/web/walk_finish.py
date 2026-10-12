@@ -36,6 +36,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import logging
 import threading
 from dataclasses import dataclass
@@ -204,8 +205,13 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         return ReportStart(FAILED)
     try:
         set_report_lang(chat_id, chosen)
+        # Поток не наследует контекст сам: без копии сборка ушла бы в базу без
+        # пространства человека и получила бы отказ (F-037, `src/db/space.py`).
         threading.Thread(
-            target=_run_report, args=(token, chat_id), name=f"walk-report-{chat_id}", daemon=True
+            target=contextvars.copy_context().run,
+            args=(_run_report, token, chat_id),
+            name=f"walk-report-{chat_id}",
+            daemon=True,
         ).start()
     except Exception:  # — до запуска потока: освободить чат, иначе он заперт навсегда
         logger.exception("Завершение из приложения: отчёт чата %s не запущен", chat_id)
