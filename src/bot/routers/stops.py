@@ -1,13 +1,14 @@
-"""`/stops` — счётчик отказов мастера за период, только для круга админов (#436).
+"""`/stops` — счётчик отказов мастера за период, только админам (#436).
 
 Владелец открывает его сам: сообщений о повторяющихся отказах бот никому не
 шлёт, такие отправки — только по явному «да» владельца на текст и адресатов.
 Здесь бот отвечает лишь тому, кто спросил.
 
-Кого пускать — решает тот же заслон, что у `/mcp` (`_guard`): круг админов,
-который основатель задаёт настройкой, а остальных база. Второго списка «кто
-админ» в боте не заводится: два списка разошлись бы молча. Команды нет в меню —
-меню видят все аудиторы, а им она отвечает отказом.
+Кого пускать — решает роль учётки, к которой привязан бот (`is_admin_role`:
+админ и главный админ). До D448 заслоном был круг доступа к MCP; круг снят, а
+второго списка «кто админ» в боте не заводится — он разошёлся бы с ролями
+учёток молча. Команды нет в меню — меню видят все аудиторы, а им она отвечает
+отказом.
 """
 
 from __future__ import annotations
@@ -20,13 +21,14 @@ from aiogram import Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import Message
 
+from src.db import bot_links
+from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.tenants import is_admin_role
 
 from .. import stops
-from ..config import BotSettings
 from ..lang import chat_ui_lang
 from ..texts import t
-from .mcp import _guard
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +50,31 @@ def _days(command: CommandObject) -> int | None:
     return days if 1 <= days <= MAX_DAYS else None
 
 
-def build_stops_router(settings: BotSettings) -> Router:
+async def _admin(message: Message, lang: str) -> bool:
+    """Админ ли спросивший — по роли его учётки прямо сейчас; иначе ответ отказом."""
+    user = message.from_user
+    if user is None:
+        return False
+    try:
+        положение = await asyncio.to_thread(bot_links.standing, user.id)
+    except DbError:
+        logger.exception("привязка %s не прочиталась для /stops", user.id)
+        await message.answer(t("stops.unreadable", lang))
+        return False
+    if положение.binding is None or not is_admin_role(положение.binding.role):
+        await message.answer(t("stops.not_admin", lang))
+        return False
+    return True
+
+
+def build_stops_router() -> Router:
     router = Router(name="stops")
 
     @router.message(Command(STOPS_COMMAND))
     async def on_stops(message: Message, command: CommandObject) -> None:
-        if await _guard(message, settings) is None:
-            return
         lang = chat_ui_lang(message.chat.id)
+        if not await _admin(message, lang):
+            return
         days = _days(command)
         if days is None:
             await message.answer(t("stops.bad_days", lang, limit=MAX_DAYS))

@@ -19,6 +19,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 
 from flask import Flask, make_response, render_template, request
@@ -56,6 +57,8 @@ from .users_page import (
     source,
 )
 from .users_view import TAB_CONNECTIONS, TAB_SPACES
+
+logger = logging.getLogger(__name__)
 
 
 def link_url(bot_username: str, token: str) -> str:
@@ -390,62 +393,44 @@ def _install_claude(app: Flask, users_path: str) -> None:
 
 
 def _install_mcp(app: Flask, users_path: str) -> None:
-    """Дать и снять доступ к Claude (MCP) из карточки человека (#583, правило круга D099)."""
+    """Личный токен Claude: выпустить себе и отозвать свой (D447, D448).
 
-    def _цель_круга() -> tuple[accounts.AccountRow, int, int] | None:
-        """(человек, его Telegram, Telegram вошедшего) — или `None` (отказ 403)."""
-        круг = people_scope()
+    Учётка — всегда вошедший, из формы не читается ничего: выдать или снять
+    токен другому человеку отсюда нельзя, и двери для этого нет вовсе.
+    """
+
+    def _вошедший_id() -> str:
         вошедший = auth.current_account()
-        if круг is None or круг.kind not in SEES_BINDINGS or вошедший is None:
-            return None
-        чей = (request.form.get("user_id") or "").strip()
-        цель = next((r for r in access_policy.visible(круг, source(круг)) if r.id == чей), None)
-        if цель is None or цель.id == вошедший.id:
-            return None
-        своя = bot_links.binding_of(вошедший.id)
-        его = bot_links.binding_of(чей)
-        if своя is None or его is None or not users_mcp.actor_may_edit(своя):
-            return None
-        return цель, int(его.telegram_id), int(своя.telegram_id)
+        if вошедший is None:
+            raise RuntimeError("личный токен без вошедшего: маршрут прошёл мимо заслона")
+        return str(вошедший.id)
 
-    @app.post(f"{users_path}/mcp-grant")
-    def mcp_grant() -> FlaskResponse | tuple[str, int]:
-        """Дать доступ к Claude: привести человека в круг, как `/mcp_add` в боте."""
+    @app.post(f"{users_path}/claude-token")
+    def claude_token() -> FlaskResponse | tuple[str, int]:
+        """Выпустить себе токен; команда показывается этим ответом один раз."""
         refuse_foreign_origin()
+        чей = _вошедший_id()
         try:
-            найдено = _цель_круга()
-            if найдено is None:
-                return forbidden()
-            цель, его, мой = найдено
-            mcp_access.add_admin(его, by=мой)
+            выпуск = users_mcp.issue_own(чей)
         except DbError as exc:
             note_target_mismatch(exc)
-            return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
-        return render(Show(person=цель.id, flash=_flash("users.mcp.granted", ok=True)))
+            return render(Show(person=ME, flash=_flash("users.mcp.failed", ok=False)), 503)
+        # Значения токена в журнале нет: только факт выпуска.
+        logger.info("Веб: учётка %s выпустила себе токен MCP", чей)
+        return render(Show(person=ME, token=выпуск))
 
-    @app.post(f"{users_path}/mcp-revoke")
-    def mcp_revoke() -> FlaskResponse | tuple[str, int]:
-        """Снять доступ к Claude и погасить живые токены, как `/mcp_revoke` в боте."""
+    @app.post(f"{users_path}/claude-token-revoke")
+    def claude_token_revoke() -> FlaskResponse | tuple[str, int]:
+        """Отозвать свой живой токен сразу."""
         refuse_foreign_origin()
+        чей = _вошедший_id()
         try:
-            найдено = _цель_круга()
-            if найдено is None:
-                return forbidden()
-            цель, его, мой = найдено
-            if его == users_mcp.founder_id():
-                return render(
-                    Show(person=цель.id, flash=_flash("users.mcp.founder", ok=False)), 400
-                )
-            отзыв = mcp_access.revoke_access(его, by=мой)
+            погашено = mcp_access.revoke_tokens(чей)
         except DbError as exc:
             note_target_mismatch(exc)
-            return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
-        return render(
-            Show(
-                person=цель.id,
-                flash=_flash("users.mcp.revoked", ok=True, tokens=отзыв.tokens_revoked),
-            )
-        )
+            return render(Show(person=ME, flash=_flash("users.mcp.failed", ok=False)), 503)
+        исход = "users.mcp.revoked" if погашено else "users.mcp.nothing"
+        return render(Show(person=ME, flash=_flash(исход, ok=bool(погашено))))
 
 
 def _install_spaces(app: Flask, users_path: str) -> None:

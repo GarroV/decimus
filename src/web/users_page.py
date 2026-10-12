@@ -85,6 +85,9 @@ class Show:
     add_space: bool = False
     #: Показать отключённых: после отключения человек не пропадает из виду.
     show_off: bool = False
+    #: Только что выпущенная команда Claude Desktop с личным токеном (D448):
+    #: показывается этим ответом и больше нигде не хранится.
+    token: users_mcp.Issued | None = None
 
 
 def people_scope() -> Scope | None:
@@ -242,11 +245,7 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
                 getattr(auth.current_account(), "id", None),
                 current_app.config.get(users_claude.MCP_URL_KEY),
             ),
-            mcp=users_mcp.card_status(
-                круг_видит=круг is not None and круг.kind in SEES_BINDINGS,
-                own=своя_привязка,
-                bindings=привязки,
-            ),
+            mcp=users_mcp.own_status(getattr(auth.current_account(), "id", None)),
             show=show,
             me=auth.current_account(),
             manage=manage,

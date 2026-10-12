@@ -12,7 +12,11 @@
    Это единственный ответ незнакомому: у него уже есть ссылка на бота, и
    молчание на просроченную ссылку выглядит как поломка. Ответ один на все
    причины отказа и не подсказывает, чем отказ вызван.
-2. Живая привязка — пространство УЧЁТКИ, к которой привязан Telegram ID.
+2. Живая привязка — пространство УЧЁТКИ, к которой привязан Telegram ID, если
+   роли учётки открыто поле (`may_do_field_work`: аудитор и админы, не контроль —
+   D420, аудит 12.10 F-024). Роль читается тем же запросом, что и привязка, —
+   смена роли в вебе действует не позже `BINDING_TTL`. Контролю бот отвечает
+   словами, почему не пускает: человек свой, и молчание выглядело бы поломкой.
 3. Совместимость до снятия (вопрос 2): `ALLOWED_TELEGRAM_IDS` и связки
    `roster.json`, собранные до D286, — сотрудник УК. Только если привязки НЕ
    БЫЛО НИКОГДА: привязанный к учётке партнёра работает как партнёр, даже если
@@ -42,7 +46,7 @@ from src.db import bot_links
 from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
 from src.domain.errors import DomainError
-from src.domain.tenants import HQ_TENANT, canonical_tenant, is_hq_guest
+from src.domain.tenants import HQ_TENANT, canonical_tenant, may_do_field_work
 
 from .inspection import read_inspection
 from .lang import chat_ui_lang
@@ -155,7 +159,12 @@ class AccessMiddleware(BaseMiddleware):
         if метка is not None:
             await self._link(event, метка, user_id)
             return None
-        space = await asyncio.to_thread(self._space_of, user_id)
+        положение = await asyncio.to_thread(self._standing_of, user_id)
+        if role_closed(положение):
+            logger.info("Telegram ID %s: роли учётки поле закрыто — отказ", user_id)
+            await _refuse_role(event)
+            return None
+        space = space_from(user_id, положение, allowed_ids=self._allowed_ids, roster=self._roster)
         if space is None:
             logger.warning("отклонено обновление от постороннего Telegram ID %s", user_id)
             return None
@@ -174,13 +183,21 @@ class AccessMiddleware(BaseMiddleware):
         logger.info("Telegram ID %s привязан к учётке %s", user_id, привязка.login)
         await _answer(event, "access.linked", login=привязка.login)
 
-    def _space_of(self, user_id: int) -> str | None:
-        return space_from(
-            user_id,
-            self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND,
-            allowed_ids=self._allowed_ids,
-            roster=self._roster,
-        )
+    def _standing_of(self, user_id: int) -> Standing | None:
+        return self._bindings.standing_of(user_id) if self._bindings is not None else NEVER_BOUND
+
+
+def role_closed(положение: Standing | None) -> bool:
+    """Привязан к живой учётке, но её роли поле закрыто (контроль, D420).
+
+    Одно правило на бота и мини-апп, как `space_from`: им нужен не только отказ,
+    но и его причина — человеку с учёткой объясняют словами, постороннему молчат.
+    """
+    return (
+        положение is not None
+        and положение.binding is not None
+        and not may_do_field_work(положение.binding.role)
+    )
 
 
 def space_from(
@@ -200,10 +217,9 @@ def space_from(
         # сверить нечем — совместимость тоже не применяется (п.6).
         return None
     if положение.binding is not None:
-        if is_hq_guest(положение.binding.role, положение.binding.tenant):
-            # Гость УК (D440) читает сеть в вебе и проверок не начинает: ни бот,
-            # ни мини-апп его не пускают, как постороннего.
-            logger.info("гость УК: бот и мини-апп закрыты, Telegram ID %s", user_id)
+        if role_closed(положение):
+            # Учётка жива, но роли поле закрыто (D420): контроль не проводит
+            # проверок ни ботом, ни мини-аппом.
             return None
         return canonical_tenant(положение.binding.tenant)
     if положение.ever_bound:
@@ -235,6 +251,18 @@ def _link_token(event: TelegramObject) -> str | None:
     if команда.split("@", 1)[0] != "/start" or not метка.startswith(LINK_PREFIX):
         return None
     return метка.removeprefix(LINK_PREFIX).strip() or None
+
+
+async def _refuse_role(event: TelegramObject) -> None:
+    """Объяснить человеку с учёткой, почему бот ему закрыт — на языке чата."""
+    chat = _chat_of(event)
+    if chat is None:
+        return
+    текст = t("access.role_closed", chat_ui_lang(chat.id))
+    if isinstance(event, CallbackQuery):
+        await event.answer(текст, show_alert=True)
+    elif isinstance(event, Message):
+        await event.answer(текст)
 
 
 async def _answer(event: TelegramObject, key: str, **params: object) -> None:

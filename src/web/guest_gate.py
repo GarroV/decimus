@@ -33,6 +33,10 @@ def own_paths() -> frozenset[str]:
             auth.LOGOUT_PATH,
             f"{users_path}/password",
             f"{users_path}/claude-revoke",
+            # Личный токен для Claude выпускает себе любая роль (D448): у гостя он
+            # читает проверки и рейтинги, писать им нечего.
+            f"{users_path}/claude-token",
+            f"{users_path}/claude-token-revoke",
             oauth.AUTHORIZE_PATH,
         }
     )

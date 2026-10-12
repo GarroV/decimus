@@ -343,6 +343,8 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/users/password",
     "/oauth/authorize",
     "/users/claude-revoke",
+    "/users/claude-token",
+    "/users/claude-token-revoke",
 }
 
 
@@ -493,7 +495,8 @@ def _сейчас() -> datetime:
         ("developer", "HQ", "HQ"),
         ("admin", "HQ", "HQ"),
         ("superadmin", "HQ", "HQ"),
-        ("control", "HQ", "HQ"),
+        # Поле закрыто контролю (D420) и гостю (D440): проверок они не проводят.
+        ("control", "HQ", None),
         ("guest", "HQ", None),
         ("auditor", "GE", "GE"),
         ("admin", "GE", "GE"),
