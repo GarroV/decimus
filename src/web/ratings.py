@@ -139,16 +139,21 @@ def _maps(
 
 def _aggs(
     groups: tuple[tuple[str, tuple[str, ...]], ...], until: date
-) -> tuple[tuple[str, ...], tuple[ragg.GroupAggs, ...]] | None:
-    """Оценки агрегаторов по группам сводки на конец периода: (колонки, строки).
-    База не ответила — `None` и след в журнале: блок скажет «нет данных»."""
+) -> tuple[tuple[str, ...], tuple[ragg.GroupAggs, ...], bool] | None:
+    """Оценки агрегаторов по группам сводки на конец периода: (колонки, строки,
+    взяты ли позже периода). Истории у агрегаторов нет дальше первого сбора
+    (11.10.2026): на прошлый период — последние собранные, и блок пишет, что
+    они позже периода, с датой. База не ответила — `None` и след в журнале."""
     countries = tuple(c for _, members in groups for c in members)
     try:
         rows = agg_store.latest(countries, until=until)
+        later = not rows and until < date.today()
+        if later:
+            rows = agg_store.latest(countries)
     except RatingsError:
         logger.warning("Оценки агрегаторов не прочитались", exc_info=True)
         return None
-    return ragg.aggregators_of(rows), ragg.summarize(rows, groups)
+    return ragg.aggregators_of(rows), ragg.summarize(rows, groups), later
 
 
 def _agg_names(lang: str) -> dict[str, str]:
