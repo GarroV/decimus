@@ -22,6 +22,7 @@ from src.mcp.catalogue import (
     KIND_IMPORT,
     KIND_INSPECTIONS,
     KIND_RATINGS,
+    KIND_RATINGS_READ,
     KIND_RETRACTION,
     TOOLS,
 )
@@ -33,6 +34,7 @@ from src.mcp.rpc import handle
     KIND_CHECKLIST_SOURCE,
     KIND_CHECKLIST,
     KIND_IMPORT,
+    KIND_RATINGS_READ,
     KIND_RATINGS,
     KIND_RETRACTION,
 )
@@ -40,18 +42,24 @@ from src.mcp.rpc import handle
 #: Матрица из спеки `docs/superpowers/specs/2026-10-12-claude-connect-design.md`,
 #: раздел «Права по роли». Клетка «да, если HQ в MCP_CHECKLIST_TENANTS» здесь
 #: «да»: условие настройки держит прежний заслон (`rpc._call_tool`), а роль
-#: решает только то, что решает роль.
+#: решает только то, что решает роль. Контроль — только рейтинги (D420).
+_ВСЁ_УК = frozenset(
+    {
+        KIND_INSPECTIONS,
+        KIND_CHECKLIST_SOURCE,
+        KIND_CHECKLIST,
+        KIND_IMPORT,
+        KIND_RATINGS_READ,
+        KIND_RATINGS,
+    }
+)
 МАТРИЦА: dict[tuple[str, str], frozenset[str]] = {
-    ("HQ", "superadmin"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_IMPORT, KIND_RATINGS}
-    ),
-    ("HQ", "admin"): frozenset(
-        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_IMPORT, KIND_RATINGS}
-    ),
-    ("HQ", "auditor"): frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE}),
-    ("HQ", "control"): frozenset({KIND_RATINGS}),
-    ("RS", "admin"): frozenset({KIND_INSPECTIONS}),
-    ("RS", "auditor"): frozenset({KIND_INSPECTIONS}),
+    ("HQ", "superadmin"): _ВСЁ_УК,
+    ("HQ", "admin"): _ВСЁ_УК,
+    ("HQ", "auditor"): frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ}),
+    ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
+    ("RS", "admin"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
+    ("RS", "auditor"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
 }
 
 
@@ -81,7 +89,7 @@ def test_роли_только_уk_у_партнёра_не_дают_больш�
     партнёра — это партнёр, и открыто ему ровно чтение своих проверок."""
     открыто = {вид for вид in ВСЕ_ВИДЫ if permits(роль, "RS", вид)}
 
-    assert открыто == {KIND_INSPECTIONS}
+    assert открыто == {KIND_INSPECTIONS, KIND_RATINGS_READ}
 
 
 @pytest.mark.parametrize("роль", ["", "owner", "ADMIN", "root"])
@@ -103,6 +111,12 @@ def _список(**доступ: Any) -> set[str]:
     return {t["name"] for t in ответ["result"]["tools"]}
 
 
+#: Виды, у которых в каталоге уже есть инструменты. Чтения рейтингов
+#: (`KIND_RATINGS_READ`) пока нет — инструменты придут отдельной веткой, и
+#: тогда списки и вызовы ниже проверят и их без правки этого файла.
+ВИДЫ_КАТАЛОГА = {spec.kind for spec in TOOLS}
+
+
 def _виды(имена: set[str]) -> set[str]:
     return {spec.kind for spec in TOOLS if spec.name in имена}
 
@@ -111,7 +125,7 @@ def _виды(имена: set[str]) -> set[str]:
 def test_tools_list_показывает_ровно_открытые_роли_виды(арендатор: str, роль: str) -> None:
     имена = _список(tenant=арендатор, role=роль)
 
-    assert _виды(имена) == set(МАТРИЦА[(арендатор, роль)])
+    assert _виды(имена) == set(МАТРИЦА[(арендатор, роль)]) & ВИДЫ_КАТАЛОГА
     assert имена == {spec.name for spec in TOOLS if spec.kind in МАТРИЦА[(арендатор, роль)]}
 
 
@@ -144,7 +158,7 @@ def _первый(вид: str) -> str:
     (арендатор, роль, вид)
     for (арендатор, роль), открыто in sorted(МАТРИЦА.items())
     for вид in ВСЕ_ВИДЫ
-    if вид not in открыто
+    if вид not in открыто and вид in ВИДЫ_КАТАЛОГА
 ]
 
 
