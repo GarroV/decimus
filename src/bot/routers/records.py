@@ -30,6 +30,8 @@ from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 from aiogram.types import Message
 
+from src.domain.log_ids import log_id
+
 from .. import sidecar, view
 from ..inspection import read_inspection
 from ..lang import chat_ui_lang
@@ -111,7 +113,7 @@ async def _show_unclaimed(
         except TelegramAPIError:
             failed += 1
             logger.warning(
-                "кадр %s без записи не показался в чате %s", frame.file_id, message.chat.id
+                "кадр %s без записи не показался в чате %s", frame.file_id, log_id(message.chat.id)
             )
     if failed:
         await message.answer(t("finish.unclaimed_failed", lang, failed=failed))
@@ -152,7 +154,7 @@ async def _show_held(message: Message, comments: tuple[Comment, ...], lang: str)
                 logger.warning(
                     "голосовое %s без кадра не показалось в чате %s",
                     comment.voice_file_id,
-                    message.chat.id,
+                    log_id(message.chat.id),
                 )
     if failed:
         await message.answer(t("finish.held_failed", lang, failed=failed))

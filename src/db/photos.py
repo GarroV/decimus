@@ -256,3 +256,28 @@ def upload_photos(
             f"upload_photos(..., allow_missing=True)"
         )
     return uploaded
+
+
+_SELECT_WALK_REFS_SQL = """
+select distinct telegram_file_id from photos where telegram_file_id like 'walk:%'
+"""
+
+
+def walk_photo_refs() -> set[str]:
+    """Ссылки на кадры мини-аппа, которые лежат в сданных проверках (F-033).
+
+    Уборке брошенных кадров (`domain.upload_sweep`) это список того, что
+    трогать нельзя: кадр, ещё не легший в хранилище, читается из папки
+    состояния. Отказ базы — `PushError`, а не пустое множество: пустое
+    разрешило бы удалить всё.
+    """
+    settings = check_environment()
+    try:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
+            cur.execute(_SELECT_WALK_REFS_SQL)
+            rows = cur.fetchall()
+    except psycopg.Error as exc:
+        raise PushError(
+            f"Ссылки на кадры мини-аппа не прочитаны ({type(exc).__name__}): {exc}"
+        ) from exc
+    return {str(row[0]) for row in rows}
