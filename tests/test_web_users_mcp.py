@@ -97,7 +97,7 @@ def test_любая_роль_выпускает_токен_себе_сама(
 ) -> None:
     """Никто не выдаёт: учётки и её роли достаточно (D448). Права в Claude решает роль."""
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
-        ответ = client.post("/users/claude-token", headers=ЗАГОЛОВКИ)
+        ответ = client.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
 
         assert ответ.status_code == 200
         assert токены["issued"] == [МОЙ_ID]
@@ -108,25 +108,25 @@ def test_любая_роль_выпускает_токен_себе_сама(
 
 def test_учётка_выпуска_только_из_сессии(админ_уК: FlaskClient, токены: dict[str, Any]) -> None:
     """Поле `user_id` в форме не читается: выпустить токен другому отсюда нечем."""
-    ответ = админ_уК.post("/users/claude-token", data={"user_id": "id-petr"}, headers=ЗАГОЛОВКИ)
+    ответ = админ_уК.post("/settings/claude-token", data={"user_id": "id-petr"}, headers=ЗАГОЛОВКИ)
 
     assert ответ.status_code == 200 and токены["issued"] == [МОЙ_ID]
 
 
 def test_команда_показана_один_раз(админ_уК: FlaskClient, токены: dict[str, Any]) -> None:
-    админ_уК.post("/users/claude-token", headers=ЗАГОЛОВКИ)
+    админ_уК.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
 
-    потом = админ_уК.get("/users?person=me").get_data(as_text=True)
+    потом = админ_уК.get("/settings").get_data(as_text=True)
 
     assert "tok-SECRET" not in потом, "команда с токеном осталась на странице"
     assert "2026-11-11" in потом, "срок живого токена не показан"
 
 
 def test_свой_отзыв_и_только_свой(админ_уК: FlaskClient, токены: dict[str, Any]) -> None:
-    админ_уК.post("/users/claude-token", headers=ЗАГОЛОВКИ)
+    админ_уК.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
 
     ответ = админ_уК.post(
-        "/users/claude-token-revoke", data={"user_id": "id-petr"}, headers=ЗАГОЛОВКИ
+        "/settings/claude-token-revoke", data={"user_id": "id-petr"}, headers=ЗАГОЛОВКИ
     )
 
     assert ответ.status_code == 200 and токены["revoked"] == [МОЙ_ID]
@@ -148,7 +148,7 @@ def test_чужая_карточка_без_блока_токена(админ_�
 
 
 def test_чужой_источник_не_выпускает(админ_уК: FlaskClient, токены: dict[str, Any]) -> None:
-    ответ = админ_уК.post("/users/claude-token", headers={"Origin": "https://evil.example"})
+    ответ = админ_уК.post("/settings/claude-token", headers={"Origin": "https://evil.example"})
 
     assert ответ.status_code in (400, 403) and токены["issued"] == []
 
@@ -161,7 +161,7 @@ def test_база_молчит_отказ_словами(
 
     monkeypatch.setattr(mcp_access, "issue_for_account", молчит)
 
-    ответ = админ_уК.post("/users/claude-token", headers=ЗАГОЛОВКИ)
+    ответ = админ_уК.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
 
     assert ответ.status_code == 503
     assert "curl" not in ответ.get_data(as_text=True), "без токена ушла полкоманды"

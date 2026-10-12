@@ -55,6 +55,7 @@ from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
 from src.db.errors import DbError, UnboundError
+from src.domain.log_ids import log_id
 
 from ..keyboards import MCP_SETUP_SEND, mcp_setup_keyboard
 from ..lang import chat_ui_lang
@@ -142,7 +143,7 @@ def build_mcp_router() -> Router:
         except DbError:
             # В журнал — разбор, человеку — что делать. Значения токена нет ни
             # там, ни там: выпуск до него не дошёл.
-            logger.exception("токен доступа к MCP не выпущен для %s", user.id)
+            logger.exception("токен доступа к MCP не выпущен для %s", log_id(user.id))
             await message.answer(t("mcp.unavailable", lang))
             return
         await message.answer(t("mcp.setup", lang))

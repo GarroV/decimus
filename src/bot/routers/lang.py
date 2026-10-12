@@ -18,6 +18,8 @@ from aiogram import F, Router
 from aiogram.filters import Command
 from aiogram.types import CallbackQuery, Message
 
+from src.domain.log_ids import log_id
+
 from .. import lang_choice
 from ..keyboards import UI_LANG_PREFIX, ui_lang_keyboard
 from ..lang import chat_ui_lang
@@ -57,7 +59,7 @@ def build_lang_router() -> Router:
             # Широко, как и всё вокруг выбора языка: человеку нужен ответ, а
             # разбор — в журнал целиком.
             logger.exception(
-                "выбор языка %s человека %s не сохранился", code, callback.from_user.id
+                "выбор языка %s человека %s не сохранился", code, log_id(callback.from_user.id)
             )
             await callback.answer()
             await message.answer(t("lang.save_failed", chat_ui_lang(message.chat.id)))
