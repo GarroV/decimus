@@ -213,7 +213,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Подключение Claude входом через сайт: OAuth-клиенты, коды, подключения, токены
     # (D417). Заведена вместе с файлом, нигде не применена.
-    "0051_oauth.sql": ("sql1:2a3ba9adca6666b7d10d1dfedcd41f45ea06c6c34790929a845b13c048851849"),
+    "0051_oauth.sql": ("sql1:f57dbb7fbed2af3fa23cd0daa54e9a8c8bb87e191e8cbcfbe0cc871faeb16511"),
 }
 
 
