@@ -50,6 +50,7 @@ from src.bot.unit_pick import (
     UNIT_PARTNER_REFUSED,
     match_unit,
     resolve_unit,
+    suggest_index,
     suggest_units,
     where_suffix,
 )
@@ -173,6 +174,7 @@ class _Wizard:
             "kinds": [{"code": code, "title": kind_title(code, self.lang)} for code in KIND_TITLES],
             "langs": [{"code": code, "label": label} for code, label in LANG_LABELS.items()],
             "default_lang": self.lang if self.lang in LANG_LABELS else next(iter(LANG_LABELS)),
+            "suggest": suggest_index(tenant=self.space),
         }
 
     def suggest(self, body: dict[str, Any]) -> dict[str, Any]:

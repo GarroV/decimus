@@ -63,6 +63,7 @@ def клиент(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> Клие�
     # Справочника точек нет: название принимается каноничным, как при его отказе.
     monkeypatch.setattr(walk_start, "match_unit", lambda *_a, **_k: НЕТ_СПРАВОЧНИКА)
     monkeypatch.setattr(walk_start, "suggest_units", lambda *_a, **_k: [])
+    monkeypatch.setattr(walk_start, "suggest_index", lambda **_k: {"units": []})
     монк = _приложение(monkeypatch, TELEGRAM_BOT_TOKEN=ТОКЕН, ALLOWED_TELEGRAM_IDS=f"{АУДИТОР},777")
     return Клиент(монк.test_client())
 

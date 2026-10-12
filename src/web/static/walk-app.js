@@ -77,6 +77,7 @@
     }
     top.appendChild(el("h1", "walk-app__title", title));
     if (gear) {
+      top.appendChild(langPill());
       var g = W.button("walk-app__gear", "⚙", function () { A.go("settings"); });
       g.setAttribute("aria-label", tx("walk.app.settings"));
       top.appendChild(g);
@@ -157,6 +158,24 @@
     });
     box.appendChild(seg);
     return box;
+  }
+
+  /** Язык интерфейса пилюлей в шапке главной (D414): тот же выбор, что в настройках. */
+  function langPill() {
+    var pill = el("div", "walk-app__lang");
+    pill.setAttribute("role", "group");
+    pill.setAttribute("aria-label", tx("walk.app.lang"));
+    (app().langs || []).forEach(function (l) {
+      var on = l.code === data().lang;
+      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), l.code.toUpperCase(), function () {
+        if (on) return;
+        act({ op: "lang", lang: l.code }).then(function (body) { if (body) W.apply(body); });
+      });
+      b.setAttribute("aria-label", l.label);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      pill.appendChild(b);
+    });
+    return pill;
   }
 
   function settings(root) {
@@ -327,6 +346,42 @@
     });
   }
 
+  /** Ключ сравнения, как `unit_pick._key` на сервере: без тире и пробелов, латиницей. */
+  function unitKey(ix, text) {
+    var dashes = new RegExp(ix.dashes, "g");
+    var flat = text.replace(dashes, "").replace(/\s+/g, "").toLowerCase();
+    var out = "";
+    for (var i = 0; i < flat.length; i += 1) {
+      var ch = flat.charAt(i);
+      out += Object.prototype.hasOwnProperty.call(ix.translit, ch) ? ix.translit[ch] : ch;
+    }
+    return out;
+  }
+
+  /** Подсказки по вхождению прямо в телефоне (D414): без запроса на каждую букву. */
+  function localSuggestions(wz, typed) {
+    var ix = wz.opts && wz.opts.suggest;
+    if (!ix || !ix.units || !ix.units.length) return null;
+    var key = unitKey(ix, typed);
+    if (!key) return null;
+    var found = ix.units.filter(function (u) {
+      return u.keys.some(function (k) { return k.indexOf(key) !== -1; });
+    }).map(function (u) { return u.name; });
+    if (!found.length) return null;
+    return found.sort().slice(0, ix.limit);
+  }
+
+  /** На каждую букву: сначала свой справочник, мгновенно; пусто — сервер с паузой. */
+  function onUnitTyped(wz) {
+    window.clearTimeout(wz.timer);
+    var typed = wz.form.unit.trim();
+    wz.seq += 1;
+    if (typed.length < SUGGEST_MIN) { wz.suggestions = []; paintSuggestions(wz); return; }
+    var local = localSuggestions(wz, typed);
+    if (local) { wz.suggestions = local; paintSuggestions(wz); return; }
+    wz.timer = window.setTimeout(function () { askSuggestions(wz); }, SUGGEST_DELAY_MS);
+  }
+
   function askSuggestions(wz) {
     var typed = wz.form.unit.trim();
     wz.seq += 1;
@@ -432,6 +487,18 @@
     return box;
   }
 
+  /** «?» у языка чек-листа (D414): пояснение раскрывается под подписью. */
+  function hintToggle(wz) {
+    var b = W.button("walk-app__hint" + (wz.hint ? " is-on" : ""), "?", function () {
+      wz.hint = !wz.hint;
+      W.render();
+    });
+    b.type = "button";
+    b.setAttribute("aria-label", tx("walk.start.speech_hint_label"));
+    b.setAttribute("aria-expanded", wz.hint ? "true" : "false");
+    return b;
+  }
+
   function unitField(wz) {
     var part = field(tx("walk.start.unit"));
     var input = el("input", "walk-input");
@@ -443,8 +510,7 @@
     input.addEventListener("input", function () {
       wz.form.unit = input.value;
       wz.ask = null;
-      window.clearTimeout(wz.timer);
-      wz.timer = window.setTimeout(function () { askSuggestions(wz); }, SUGGEST_DELAY_MS);
+      onUnitTyped(wz);
     });
     part.appendChild(input);
     wz.box = el("div", "walk-chips walk-app__suggest");
@@ -509,10 +575,15 @@
     form.appendChild(kind);
     var langs = o.langs.map(function (l) { return { code: l.code, label: l.label }; });
     var speech = field(tx("walk.start.speech"));
-    speech.appendChild(choice(wz, "speech", langs, true));
+    var labelRow = el("div", "walk-app__label-row");
+    labelRow.appendChild(speech.firstChild);
+    labelRow.appendChild(hintToggle(wz));
+    speech.appendChild(labelRow);
+    if (wz.hint) speech.appendChild(el("p", "walk-form__note", tx("walk.start.speech_hint")));
+    speech.appendChild(choice(wz, "speech", langs, false));
     form.appendChild(speech);
     var report = field(tx("walk.start.report"));
-    report.appendChild(choice(wz, "report", langs, true));
+    report.appendChild(choice(wz, "report", langs, false));
     form.appendChild(report);
     if (wz.error && wz.field !== "unit") form.appendChild(el("p", "walk-form__error", wz.error));
     var go = W.button("walk-mark walk-app__go", tx(wz.busy ? "walk.start.going" : "walk.start.go"));

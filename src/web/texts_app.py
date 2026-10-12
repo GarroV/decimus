@@ -25,7 +25,20 @@ APP_TEXTS: dict[str, dict[str, str]] = {
         "en": "City and number, e.g. Belgrade-1",
     },
     "walk.start.kind": {"ru": "Вид проверки", "en": "Inspection type"},
-    "walk.start.speech": {"ru": "Язык речи", "en": "Spoken language"},
+    # Язык, на котором ведут проверку и пишут записи (код `speech_lang`). Слово
+    # «речь» владелец отверг (D414): человек выбирает язык чек-листа.
+    "walk.start.speech": {"ru": "Язык чек-листа", "en": "Checklist language"},
+    "walk.start.speech_hint_label": {"ru": "Что это значит", "en": "What this means"},
+    "walk.start.speech_hint": {
+        "ru": (
+            "На этом языке вы проводите проверку и пишете записи. Итоговый отчёт "
+            "и проверку в вебе можно смотреть на любом языке платформы."
+        ),
+        "en": (
+            "You conduct the inspection and write records in this language. The final "
+            "report and the inspection on the web can be viewed in any platform language."
+        ),
+    },
     "walk.start.report": {"ru": "Язык отчёта", "en": "Report language"},
     "walk.start.go": {"ru": "Начать проверку", "en": "Start inspection"},
     "walk.start.going": {"ru": "Начинаем…", "en": "Starting…"},
