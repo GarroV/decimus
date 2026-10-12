@@ -20,6 +20,7 @@ from src.bot.material import Comment, MaterialStore
 from src.bot.pending import PendingStore, Proposal
 from src.bot.unit_pick import UnitMatch
 from src.db.bot_links import NEVER_BOUND
+from src.db.errors import AccessError
 from src.domain import get_state, handed_over, run_id, start_inspection
 from src.domain.bot_checklists import BotChecklist
 from src.domain.config import check_environment
@@ -292,3 +293,63 @@ def test_подсказки_отдаются_списком(клиент: Кли
     ответ = клиент.пост(op="suggest", name="Bel")
 
     assert ответ.status_code == 200 and ответ.get_json() == {"suggestions": ["Belgrade-1"]}
+
+
+# ── язык чек-листа запоминается (D440) ──────────────────────────────────
+
+
+@pytest.fixture
+def память(monkeypatch: pytest.MonkeyPatch) -> dict[int, str]:
+    """Хранилище выбора в словаре — вместо базы (её тесты — `test_db_checklist_langs.py`)."""
+    хранилище: dict[int, str] = {}
+    monkeypatch.setattr(walk_start.checklist_langs, "chosen_checklist_lang", хранилище.get)
+    monkeypatch.setattr(
+        walk_start.checklist_langs,
+        "choose_checklist_lang",
+        lambda who, lang: хранилище.__setitem__(who, lang),
+    )
+    return хранилище
+
+
+def test_после_старта_следующий_экран_предвыбирает_тот_же_язык(
+    клиент: Клиент, память: dict[int, str]
+) -> None:
+    assert клиент.пост(op="options").get_json()["default_lang"] == "ru", "выбора нет — язык интерфейса"
+
+    ответ = клиент.старт(speech_lang="en")
+
+    assert ответ.status_code == 200, ответ.get_json()
+    assert память == {АУДИТОР: "en"}
+    assert клиент.пост(op="options").get_json()["default_lang"] == "en"
+
+
+def test_отказанный_старт_язык_не_запоминает(клиент: Клиент, память: dict[int, str]) -> None:
+    ответ = клиент.старт(speech_lang="en", unit="")
+
+    assert ответ.status_code == 422
+    assert память == {}
+
+
+def test_запомненный_язык_вне_перечня_заменяется_умолчанием(
+    клиент: Клиент, память: dict[int, str]
+) -> None:
+    память[АУДИТОР] = "sr"
+
+    assert клиент.пост(op="options").get_json()["default_lang"] == "ru"
+
+
+def test_база_молчит_предвыбор_по_умолчанию_старт_не_падает(
+    клиент: Клиент, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def недоступна(*_a: Any) -> Any:
+        raise AccessError("база недоступна")
+
+    monkeypatch.setattr(walk_start.checklist_langs, "chosen_checklist_lang", недоступна)
+    monkeypatch.setattr(walk_start.checklist_langs, "choose_checklist_lang", недоступна)
+
+    опции = клиент.пост(op="options")
+    ответ = клиент.старт(speech_lang="en")
+
+    assert опции.status_code == 200 and опции.get_json()["default_lang"] == "ru"
+    assert ответ.status_code == 200, "проверка началась, запись выбора — не повод её отказывать"
+    assert get_state(АУДИТОР) is not None
