@@ -211,6 +211,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0050_aggregators.sql": (
         "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
     ),
+    # Индекс под «последнюю оценку на карте» и «оценку пиццерии на дату».
+    # Номера 0051 и 0052 заняты другими ветками.
+    "0053_maps_ratings_index.sql": (
+        "sql1:501361f432c626368e2244b6b4f02715281a15ad7fb644651144bba27b9c5dbe"
+    ),
 }
 
 
