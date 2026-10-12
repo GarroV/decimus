@@ -134,8 +134,10 @@ _MEMO_ENVIRON_KEY = "decimus.db_memo_token"
 
 
 def _open_memo() -> None:
-    if request.method in ("GET", "HEAD"):
-        request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin()
+    # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
+        enabled=request.method in ("GET", "HEAD")
+    )
 
 
 def _close_memo(_exc: BaseException | None) -> None:
