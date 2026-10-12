@@ -33,7 +33,7 @@ from src.web.google_mail import (
 НАСТРОЙКИ = GoogleSettings(
     client_id="639159857771-пример.apps.googleusercontent.com",
     client_secret="секрет-стенда",
-    redirect_uri="https://muspelheim.tail48dfee.ts.net/audit/auth/google/mail",
+    redirect_uri="https://<TAILNET_HOST>/audit/auth/google/mail",
 )
 
 

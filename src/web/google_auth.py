@@ -31,7 +31,7 @@ GOOGLE_CLIENT_ID_VAR = "GOOGLE_CLIENT_ID"
 GOOGLE_CLIENT_SECRET_VAR = "GOOGLE_CLIENT_SECRET"  # noqa: S105 — ИМЯ переменной
 GOOGLE_REDIRECT_URI_VAR = "GOOGLE_REDIRECT_URI"
 #: Адрес возврата для входа через временный фронт Cloudflare (D236, #424): в
-#: странах, где `sslip.io` заблокирован, возврат на основной адрес до человека
+#: странах, где служебный домен заблокирован, возврат на основной адрес до человека
 #: не доходит. Не задан — фронт входит только паролем.
 GOOGLE_FRONT_REDIRECT_URI_VAR = "GOOGLE_FRONT_REDIRECT_URI"
 #: Домены Google Workspace компании через запятую: учётка пространства УК входит

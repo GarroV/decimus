@@ -221,6 +221,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/walk_finish.py` | «Завершить проверку» из приложения (D422): тот же итог в чат, что даёт `/finish` |
 | `src/web/walk_main.py` | Точка входа сервиса мини-аппа обхода: `python -m src.web.walk_main` |
 | `src/web/walk_proxy.py` | Адреса мини-аппа обхода в админке — передача сервису обхода, без своей логики |
+| `src/web/walk_rate.py` | Предел частоты запросов мини-аппа обхода по чату (#529, #710) |
 | `src/web/walk_settings.py` | Мини-апп как приложение аудитора (D373): настройки и круг доступа к MCP |
 | `src/web/walk_start.py` | Начало проверки из мини-аппа (D392): те же шаги, что у мастера бота, — полями на одном экране |
 | `src/web/walk_suggest.py` | Мини-апп обхода: поиск пункта по кадру и словам (D330) — `POST /tg/walk/suggest` |
@@ -568,6 +569,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/aggregators/glovo.py` | Glovo: оценка известной точки по id магазина и координатам доставки |
 | `src/ratings/aggregators/glovo_link.py` | Glovo: новые точки находятся сами или привязываются по ссылке (D424, #648) |
 | `src/ratings/aggregators/migros.py` | Migros Yemek (Турция): оценка известной точки по адресу её страницы |
+| `src/ratings/aggregators/migros_link.py` | Привязка пиццерии к Migros Yemek по ссылке на страницу магазина (#717) |
 | `src/ratings/aggregators/migros_relay.py` | Ретранслятор Migros Yemek на домашнем сервере (D434) |
 | `src/ratings/aggregators/pyszne.py` | Pyszne.pl (Just Eat Takeaway, Польша): витрина у координат |
 | `src/ratings/aggregators/queue.py` | Заявка на обновление оценок агрегаторов вне расписания (D420) |
@@ -746,7 +748,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 2 | wrangler.admin.jsonc, wrangler.mcp.jsonc |
+| `front/` | 4 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 
