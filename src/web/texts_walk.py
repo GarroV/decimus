@@ -62,10 +62,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tap an item to record a finding against it.",
     },
     "walk.cl.was": {"ru": "было", "en": "last time"},
-    "walk.zone.empty_hint": {
-        "ru": "Нарушений нет — нажмите «Осмотрено».",
-        "en": "Nothing wrong here? Tap “Checked”.",
-    },
     "walk.zone.clean_done": {
         "ru": "Зона осмотрена, нарушений нет.",
         "en": "Zone checked, nothing found.",
@@ -109,24 +105,12 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.edit": {"ru": "Запись №{n}", "en": "Record #{n}"},
     "walk.sheet.edit_advice": {"ru": "Рекомендация №{n}", "en": "Recommendation #{n}"},
     "walk.sheet.advice_hint": {
-        "ru": (
-            "Не нарушение и без вычета: что команде стоит сделать. В отчёте — "
-            "рядом с пунктом. Не про пункт — «Общая заметка», она уйдёт в конец отчёта."
-        ),
-        "en": (
-            "Not a finding and no deduction: what the team should do. Printed next "
-            "to the item. Not about an item — use “General note”, it goes to the end of the report."
-        ),
+        "ru": "Без вычета: что команде стоит сделать. Не про пункт — «Общая заметка».",
+        "en": "No deduction: what the team should do. Not about an item — “General note”.",
     },
     "walk.sheet.measure_hint": {
-        "ru": (
-            "Показание без вычета: температура холодильника, настройки печи, "
-            "снимок готового изделия. В отчёте — приложением."
-        ),
-        "en": (
-            "A reading with no deduction: fridge temperature, oven settings, "
-            "finished product photo. Goes to the report appendix."
-        ),
+        "ru": "Показание без вычета: температура, настройки печи, снимок изделия.",
+        "en": "A reading, no deduction: temperature, oven settings, product photo.",
     },
     "walk.sheet.photos_measure": {
         "ru": "Снимок прибора, табло или изделия — обязателен.",
@@ -174,20 +158,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.close": {"ru": "Закрыть", "en": "Close"},
     "walk.sheet.back": {"ru": "Назад", "en": "Back"},
     "walk.sheet.kind": {"ru": "Что записываем", "en": "What are you recording"},
-    "walk.kind.violation_hint": {
-        "ru": "С вычетом и сроком устранения",
-        "en": "With a deduction and a fix-by date",
-    },
-    "walk.kind.advice_hint": {
-        "ru": "Совет команде, без вычета, или общая заметка в конец отчёта",
-        "en": "Advice for the team, no deduction, or a general note at the end",
-    },
+    "walk.kind.violation_hint": {"ru": "с вычетом", "en": "deducted"},
+    "walk.kind.advice_hint": {"ru": "совет", "en": "advice"},
     "walk.sheet.pick_zone": {"ru": "Выбрать зону", "en": "Choose area"},
     "walk.photo.hero": {"ru": "Снять нарушение", "en": "Shoot the issue"},
-    "walk.photo.hero_hint": {
-        "ru": "Несколько ракурсов — в одну запись",
-        "en": "Several angles go into one record",
-    },
     "walk.photo.gallery_link": {"ru": "или выбрать из галереи", "en": "or pick from gallery"},
     "walk.photo.more": {"ru": "Ещё кадр", "en": "Another shot"},
     "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
@@ -196,16 +170,6 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "A few words: “burnt residue on the lid”, “expired cheese”",
     },
     "walk.sheet.find": {"ru": "Найти пункт", "en": "Find the item"},
-    "walk.sheet.find_hint": {
-        "ru": (
-            "Пункт методики, класс и формулировку система найдёт по кадру и словам"
-            " — вы проверите и сохраните."
-        ),
-        "en": (
-            "The system finds the checklist item, class and wording from the photo and"
-            " words — you check and save."
-        ),
-    },
     "walk.sheet.finding": {"ru": "Система ищет пункт…", "en": "Looking for the item…"},
     "walk.sheet.finding_short": {"ru": "Ищу…", "en": "Searching…"},
     "walk.sheet.found": {"ru": "Система предлагает", "en": "Suggested"},
@@ -256,26 +220,20 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.sheet.text": {"ru": "Что видно", "en": "What you see"},
     "walk.sheet.text_hint": {
-        "ru": "Факт: что, где, сколько. Пусто — возьмём формулировку пункта.",
-        "en": "The fact: what, where, how many. Empty — the item wording is used.",
+        "ru": "Что, где, сколько. Пусто — формулировка пункта.",
+        "en": "What, where, how many. Empty — the item wording.",
     },
     "walk.sheet.text_measure": {"ru": "Показание", "en": "Reading"},
     "walk.sheet.text_measure_hint": {"ru": "Например: −18 °C", "en": "For example: −18 °C"},
     "walk.sheet.comment": {"ru": "Рекомендация партнёру", "en": "Recommendation to the partner"},
     "walk.sheet.comment_add": {"ru": "+ Добавить рекомендацию", "en": "+ Add a recommendation"},
-    "walk.sheet.comment_hint": {
-        "ru": "Попадёт в отчёт под этой записью.",
-        "en": "Goes into the report under this record.",
-    },
     "walk.sheet.repeat": {
         "ru": "Повтор прошлого нарушения — вычет ×2",
         "en": "Repeat of a previous issue — double deduction",
     },
     "walk.sheet.repeat_hint": {
-        "ru": "В прошлый раз здесь было это же. Решаете вы: исправили и снова сломалось — "
-        "не повтор.",
-        "en": "The same was found here last time. Your call: fixed and broken again is "
-        "not a repeat.",
+        "ru": "В прошлый раз здесь было это же. Исправили и снова сломалось — не повтор.",
+        "en": "Found here last time too. Fixed and broken again is not a repeat.",
     },
     "walk.sheet.save": {"ru": "Сохранить", "en": "Save"},
     "walk.sheet.saving": {"ru": "Сохраняю…", "en": "Saving…"},
