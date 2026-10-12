@@ -64,9 +64,7 @@ def findings() -> list[Finding]:
     return [] if state is None else list(state.findings)
 
 
-async def wait_for_album_close(
-    session: RecordingSession, deadline: float = 2.0, step: float = 0.05
-) -> None:
+async def wait_for_album_close(session: RecordingSession, deadline: float = 60.0) -> None:
     """Дождаться, пока фоновый таймер альбома доведёт материал до показанной записи.
 
     Раньше закрытие альбома лишь собирало кадры и показывало кнопку — работа
@@ -75,13 +73,16 @@ async def wait_for_album_close(
     отдельно от `domain.attach_photo`), и раньше, чем уйдёт сообщение — два
     подпроцесса движка (`add_finding`, `score`) ощутимо дольше окна альбома
     (`album_window=0.01`). Ждать нужно до последнего шага — отправки сообщения,
-    иначе проверка кадров ловит запись в промежуточном состоянии. Фиксированный
-    `asyncio.sleep` гонится с этим временем на глаз — опрос с потолком нет.
+    иначе проверка кадров ловит запись в промежуточном состоянии.
+
+    Ждём событие отправки, а не срок: время двух подпроцессов под нагрузкой
+    (`pytest -n auto`) не ограничено сверху, и опрос с коротким потолком падал
+    «альбом не дошёл до модели» (#753). `deadline` — только предохранитель от
+    вечного зависания, а не оценка времени работы.
     """
-    waited = 0.0
-    while not session.texts and waited < deadline:
-        await asyncio.sleep(step)
-        waited += step
+    if session.texts:
+        return
+    await asyncio.wait_for(session.message_sent.wait(), timeout=deadline)
 
 
 def assert_recorded_from_words(asked: Calls, session: RecordingSession, photos: list[str]) -> None:
