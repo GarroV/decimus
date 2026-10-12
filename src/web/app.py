@@ -1089,6 +1089,9 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         # дела самого человека; права в MCP контролю решает его роль.
         oauth.AUTHORIZE_PATH,
         f"{users_path}/claude-revoke",
+        # Личный токен Claude Desktop себе (D448): тоже дело самого человека.
+        f"{users_path}/claude-token",
+        f"{users_path}/claude-token-revoke",
     )
     # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
     # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.

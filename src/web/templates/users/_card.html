@@ -140,39 +140,37 @@
       </section>
     {% endif %}
 
-    {% if видит_бота %}
-      <section class="ssec">
+    {#
+      Личный токен Claude Desktop (D447, D448) — только на СВОЕЙ карточке, любой
+      роли: доступ к Claude никто никому не выдаёт, человек выпускает токен себе
+      сам. Команда с токеном видна одним ответом и нигде не хранится.
+    #}
+    {% if свой %}
+      <section class="ssec" id="claude-token">
         <h3 class="ssec__title">{{ t('users.mcp.title') }}</h3>
-        {% if not привязка %}
-          <p class="ssec__note">{{ t('users.mcp.need_bot') }}</p>
+        <p class="ssec__note">{{ t('users.mcp.how') }}</p>
+        {% if show.token %}
+          <p class="ssec__text">{{ t('users.mcp.command') }}</p>
+          <p class="ssecret"><code id="claude-token-command">{{ show.token.command }}</code></p>
+          <p class="ssec__note">{{ t('users.mcp.restart') }}</p>
+          {% if show.token.expires_at %}<p class="ssec__note">{{ t('users.mcp.live', date=show.token.expires_at.strftime('%Y-%m-%d')) }}</p>{% endif %}
+          {% if show.token.replaced %}<p class="ssec__note">{{ t('users.mcp.replaced') }}</p>{% endif %}
         {% elif not mcp.known %}
           <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
+        {% elif mcp.expires_at %}
+          <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }}</p>
+          <form method="post" action="{{ users_url }}/claude-token?lang={{ lang }}" class="sform">
+            <button class="sbtn" type="submit">{{ t('users.mcp.again') }}</button>
+          </form>
+          <p class="ssec__note">{{ t('users.mcp.again_note') }}</p>
+          <form method="post" action="{{ users_url }}/claude-token-revoke?lang={{ lang }}" class="sform">
+            <button class="sbtn" type="submit">{{ t('users.mcp.revoke') }}</button>
+          </form>
         {% else %}
-          {% set круг = mcp.of(привязка.telegram_id) %}
-          {% set основатель = mcp.founder is not none and привязка.telegram_id == mcp.founder %}
-          <p class="ssec__text">
-            {% if основатель or (круг and круг.is_live) %}
-              <span class="sdot sdot--ok"></span>{{ t('users.mcp.on') }} · {{ t('users.mcp.token') if круг and круг.has_live_token else t('users.mcp.no_token') }}
-            {% elif круг %}<span class="sdot"></span>{{ t('users.mcp.was') }}
-            {% else %}<span class="sdot"></span>{{ t('users.mcp.off') }}{% endif %}
-          </p>
-          {% if свой %}
-            {% if основатель or (круг and круг.is_live) %}<p class="ssec__note">{{ t('users.mcp.setup_bot') }}</p>{% endif %}
-          {% elif основатель %}
-            <p class="ssec__note">{{ t('users.mcp.founder_note') }}</p>
-          {% elif mcp.actor_in_circle %}
-            {% if круг and круг.is_live %}
-              {{ confirm('mcp-' ~ row.id, t('users.mcp.revoke'), t('users.mcp.revoke_confirm'), t('users.mcp.revoke_yes'),
-                         users_url ~ '/mcp-revoke?lang=' ~ lang, [('user_id', row.id)]) }}
-            {% else %}
-              <form method="post" action="{{ users_url }}/mcp-grant?lang={{ lang }}" class="sform">
-                <input type="hidden" name="user_id" value="{{ row.id }}">
-                <button class="sbtn" type="submit">{{ t('users.mcp.grant') }}</button>
-              </form>
-            {% endif %}
-          {% else %}
-            <p class="ssec__note">{{ t('users.mcp.who_can') }}</p>
-          {% endif %}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('users.mcp.none') }}</p>
+          <form method="post" action="{{ users_url }}/claude-token?lang={{ lang }}" class="sform">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('users.mcp.issue') }}</button>
+          </form>
         {% endif %}
       </section>
     {% endif %}
@@ -180,7 +178,7 @@
     {#
       Подключить Claude входом через сайт (D417) — только на СВОЕЙ карточке, любой
       роли: адрес MCP, шаги, строка для Claude Code и свои подключения с
-      «Отключить». Блок «Claude (MCP)» выше (бот и личные токены) не тронут.
+      «Отключить». Личный токен Claude Desktop — блоком выше.
     #}
     {% if свой and claude.enabled %}
       <section class="ssec" id="claude-connect">

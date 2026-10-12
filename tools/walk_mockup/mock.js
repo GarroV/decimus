@@ -86,24 +86,14 @@
       });
     });
     p.info.forEach(function (f) { f.value = S.info[f.code] || ""; });
-    // Приложение (D373): язык человека, круг доступа — макет показывает всё.
+    // Приложение (D373): язык человека и подключение Claude (D448 — каждому).
     p.lang = S.lang || "ru";
     if (p.lang === "en") p.texts = SEED.texts_en;
-    p.app = Object.assign({}, p.app, { lang: p.lang, circle: true, mcp: true, version: "demo" });
+    p.app = Object.assign({}, p.app, { lang: p.lang, mcp: true, version: "demo" });
     return p;
   }
 
-  /* ── приложение: настройки и круг доступа (D373) ─────────────────── */
-
-  function circle() {
-    if (!S.circle) {
-      S.circle = [
-        { id: 100001, name: "Основатель", live: true, founder: true, token: true, at: "2026-09-12" },
-        { id: 100002, name: "Аудитор УК", live: true, founder: false, token: false, at: "2026-10-01" },
-      ];
-    }
-    return S.circle;
-  }
+  /* ── приложение: настройки и подключение Claude (D373, D448) ─────── */
 
   function appOp(data) {
     if (data.op === "lang") {
@@ -117,18 +107,10 @@
         command: "/bin/bash -c \"$(curl -fsSL https://decimus.example/mcp/setup.sh)\" -- --token DEMO-" +
           S.issued + "-not-a-real-token",
         replaced: S.issued > 1,
+        expires: "2026-11-11",
       };
     }
-    if (data.op === "mcp_add") {
-      var id = parseInt(String(data.id || ""), 10);
-      if (!id) throw new Refused(said("walk.app.err.id"), 422);
-      circle().push({ id: id, name: "", live: true, founder: false, token: false, at: "2026-10-09" });
-    } else if (data.op === "mcp_revoke") {
-      circle().forEach(function (p) { if (p.id === data.id && !p.founder) p.live = false; });
-    } else if (data.op === "stops") {
-      return { stops: [{ step: "unit", reason: "not_found", times: 3, people: 2 }] };
-    }
-    return { circle: circle() };
+    return payload();
   }
 
   function said(key) { return SEED.payload.texts[key] || key; }

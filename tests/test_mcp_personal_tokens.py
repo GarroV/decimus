@@ -74,10 +74,9 @@ def _настройки(**env: str) -> Settings:
 
 
 def _выпустить(кому: int = ЧЕЛОВЕК) -> str:
-    """Привести человека в круг и выпустить ему токен — как это делает бот."""
-    from src.db.mcp_access import add_admin, issue_token
+    """Выпустить себе токен из бота — без чьей-либо выдачи (D448)."""
+    from src.db.mcp_access import issue_token
 
-    add_admin(кому, by=None, within=None)
     return issue_token(кому).value
 
 
@@ -119,10 +118,12 @@ def test_отозванный_личный_токен_не_опознаётся(
     отзыв жил только в боте, отозванный токен продолжал бы открывать историю
     проверок — то есть отзыв не отзывал бы ничего.
     """
-    from src.db.mcp_access import revoke_access
+    from src.db.mcp_access import resolve_token, revoke_tokens
 
     личный = _выпустить()
-    revoke_access(ЧЕЛОВЕК, by=ЧЕЛОВЕК, within=None)
+    владелец = resolve_token(личный)
+    assert владелец is not None
+    revoke_tokens(владелец.user_id)
 
     with pytest.raises(AuthError):
         resolve_access(_настройки(), f"Bearer {личный}")
