@@ -16,8 +16,9 @@ import math
 from collections.abc import Callable, Mapping
 from datetime import date
 
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, request, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
+from werkzeug.wrappers import Response
 
 from src.db import agg_store, maps_store
 from src.db import ratings_read as read
@@ -27,6 +28,7 @@ from src.domain.tenants import may_manage_ratings
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
 from src.ratings import report
+from src.ratings.aggregators import queue as agg_queue
 from src.ratings.aggregators import summary as ragg
 from src.ratings.importer import CHANNEL_WEB, OUTCOME_DUPLICATE, ImportReport, import_file
 from src.ratings.links import unit_rating_url
@@ -172,6 +174,24 @@ def _agg_failures() -> tuple[agg_store.LoadState, ...]:
         return ()
 
 
+def _agg_pending() -> agg_store.UpdateRequest | None:
+    """Заявка на обновление, которую бот ещё не выполнил. Не прочиталась — `None`
+    и след в журнале: кнопка остаётся, а «уже в очереди» ответит сама заявка."""
+    try:
+        return agg_store.open_request()
+    except RatingsError:
+        logger.warning("Заявки на обновление агрегаторов не прочитались", exc_info=True)
+        return None
+
+
+#: Что сказать после кнопки «Обновить сейчас»: ключ в адресе → ключ текста.
+_AGG_UPDATE_NOTICES = {
+    "queued": "ratings.agg.update.queued",
+    "already": "ratings.agg.update.already",
+    "db_down": "ratings.agg.update.db_down",
+}
+
+
 def _unit_maps(until: date) -> dict[str, tuple[float, int]]:
     """Оценка Google по пиццериям, связанным с филиалами карт; сбой — пусто."""
     try:
@@ -245,6 +265,8 @@ def render_summary(conf: Settings) -> str:
         agg_failures=agg_failures,
         agg_failed_names=", ".join(agg_names.get(f.aggregator, f.aggregator) for f in agg_failures),
         agg_names=agg_names,
+        agg_pending=_agg_pending() if may_manage() else None,
+        agg_update_notice=_AGG_UPDATE_NOTICES.get(request.args.get("agg", "")),
         unit_maps=_unit_maps(min(selection.period.end, date.today())),
         chart=_chart(summary, names_of_groups, lang),
         clusters=report.CLUSTERS,
@@ -412,6 +434,22 @@ def install(app: Flask, conf: Settings) -> None:
             return _forbidden()
         refuse_foreign_origin()
         return _saved(conf, lambda: read.remove_hard_rule(rule_id))
+
+    @app.post(f"{путь}/aggregators/update")
+    def ratings_agg_update() -> Response | tuple[str, int]:
+        """Кнопка «Обновить сейчас» (D420): та же заявка, что у Claude; собирает бот.
+        Назад — на ту же сводку (период и срез из адреса), с пометкой исхода."""
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        try:
+            asked = agg_queue.ask(None, by=_actor())
+            outcome = "queued" if asked.created else "already"
+        except RatingsError:
+            logger.warning("рейтинги: заявка на обновление агрегаторов не легла", exc_info=True)
+            outcome = "db_down"
+        args = {**request.args.to_dict(), "agg": outcome}
+        return redirect(url_for("ratings", **args), code=303)
 
     @app.post(f"{путь}/layout")
     def ratings_layout() -> tuple[str, int]:
