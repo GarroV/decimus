@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import logging
 import threading
+from dataclasses import dataclass
 from typing import Any
 
 from flask import Flask, Response, jsonify, request
 
 from src.bot import journal
 from src.bot.propose import Offer, propose
+from src.bot.zones import allowed_zones, zone_from_words
 from src.domain import check_environment, get_state, handed_over, upload_file
 from src.domain.errors import DomainError
 from src.recognize.errors import ModelUnavailable, RecognizeError
@@ -28,6 +30,7 @@ from src.recognize.models import Candidate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import SUGGEST_ENDPOINT, SUGGEST_PATH, WalkSettings
 from .walk_write import Identify, WalkRefused, _code, _refs, _text
+from .walk_zone import resolve_item_zone
 
 logger = logging.getLogger(__name__)
 
@@ -44,23 +47,47 @@ def _frames(refs: list[str]) -> list[bytes]:
     return frames
 
 
-def _card(c: Candidate) -> dict[str, Any]:
+def _card(c: Candidate, offer: Offer, ask: _Ask) -> dict[str, Any]:
+    # Зона записи — не зона экрана (D435): выводится по пункту и словам.
+    # Зону кандидата как «зону модели» берём только у модели: у быстрого пути
+    # и выученной фразы это эхо подсказки с экрана, а не её вывод.
+    options = allowed_zones(c.code, chat_id=ask.chat_id)
+    found = resolve_item_zone(
+        options,
+        spoken=ask.spoken,
+        model=c.zone if offer.via == "model" else None,
+        hint=ask.hint,
+    )
     return {
         "code": c.code,
         "level": c.level,
         "zone": c.zone,
         "wording": c.wording,
         "confidence": round(c.confidence, 2),
+        "resolution": {
+            "zone": found.zone,
+            "source": found.source,
+            "options": list(found.options),
+        },
     }
 
 
-def _answer(offer: Offer) -> dict[str, Any]:
+@dataclass(frozen=True)
+class _Ask:
+    """Что известно о запросе при выводе зоны: слова, подсказка, чат."""
+
+    chat_id: int
+    spoken: str | None
+    hint: str | None
+
+
+def _answer(offer: Offer, ask: _Ask) -> dict[str, Any]:
     # Увиденное на кадрах сверх сказанного (D208) — после найденного по
     # словам: у бота это отдельное предложение, здесь — нижние карточки.
     seen = [c for c in offer.also_seen if all(c.code != x.code for x in offer.candidates)]
     return {
         "via": offer.via,
-        "candidates": [_card(c) for c in (*offer.candidates, *seen)],
+        "candidates": [_card(c, offer, ask) for c in (*offer.candidates, *seen)],
         "question": offer.question,
     }
 
@@ -99,7 +126,10 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             busy.add(who)
         try:
             words = _text(body, "words")
-            zone = _code(body, "zone") if body.get("zone") else None
+            # Зона на экране — только подсказка (D435). Старый клиент слал её
+            # полем `zone`.
+            hint_key = "zone_hint" if body.get("zone_hint") else "zone"
+            zone = _code(body, hint_key) if body.get(hint_key) else None
             frames = _frames(_refs(body.get("photos")))
             offer = propose(
                 words,
@@ -143,4 +173,5 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             offer.via,
             len(offer.candidates),
         )
-        return jsonify(_answer(offer)), 200
+        ask = _Ask(chat_id=who, spoken=zone_from_words(words, chat_id=who), hint=zone)
+        return jsonify(_answer(offer, ask)), 200

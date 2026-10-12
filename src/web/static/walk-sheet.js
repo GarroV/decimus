@@ -3,8 +3,14 @@
  *
  * Нарушение (D330): кадр и пара слов → «Найти пункт» → система (та же, что у
  * бота, `/tg/walk/suggest`) предлагает карточки, верхняя выбрана → человек
- * проверяет и жмёт «Сохранить». Ручной поиск — запасной путь из меню. Зона и
- * вид записи — строкой над формой, выбор — меню снизу (`walk-menu.js`).
+ * проверяет и жмёт «Сохранить». Ручной поиск — запасной путь из меню. Вид записи
+ * (и зона — у правки, рекомендации, замера) — строкой над формой, выбор — меню
+ * снизу (`walk-menu.js`).
+ *
+ * Зона нарушения (D435) не берётся с экрана: после того как пункт найден, её
+ * выводит сервер (`resolution` у карточки) по пункту, словам и подсказке с
+ * экрана; не вывелась — форма спрашивает пилюлями «Где?» и не даёт сохранить.
+ * Результат — одна строка «пункт · зона», зона в ней — пилюля с меню.
  * Рекомендация (D201, класс R) и общая заметка (D314, код NOTE) — без вычета,
  * текст обязателен. Замер (D0) — со стоянки «Печь и холодильники» (D315).
  *
@@ -112,7 +118,7 @@
     // Рекомендации кадр не обязателен: «крышка открывается туго» не снять.
     if (!isAdvice() && !readyPhotos().length) return uploading() ? "walk.sheet.need_upload" : "walk.sheet.need_photo";
     if (uploading()) return "walk.sheet.need_upload";
-    if (!f.zone) return "walk.sheet.need_zone";
+    if (!f.zone) return recognizing() && f.code ? "walk.sheet.need_where" : "walk.sheet.need_zone";
     if (!f.code) return "walk.sheet.need_item";
     if (isAdvice()) return f.text.trim() ? null : "walk.sheet.need_advice";
     if (!taken() && !f.level) return "walk.sheet.need_level";
@@ -215,6 +221,9 @@
     }
     f.repeat = false;
     f.picked = null;
+    // Рекомендации и замеру зону показывает пилюля над формой — подсказка с
+    // экрана ложится в неё видимо, а не молча.
+    if (mode !== "violation" && !f.zone && f.hint) f.zone = f.hint;
     W.haptic();
     changed();
     node.querySelector(".walk-sheet__title").textContent = titleText();
@@ -229,17 +238,46 @@
 
   /* ── выбор из меню ─────────────────────────────────────────────────── */
 
-  function zoneMenu() {
+  function realZones() { return W.state.data.zones.filter(function (z) { return !z.equipment; }); }
+
+  /** Зоны пункта в порядке методики; пункт «во всех зонах» — все. */
+  function itemZones(code) {
+    var it = item(code);
+    var all = realZones();
+    if (!it || !it.zones.length || it.zones.indexOf("*") !== -1) return all;
+    return all.filter(function (z) { return it.zones.indexOf(z.code) !== -1; });
+  }
+
+  function setZone(code, source) {
+    f.zone = code;
+    f.zoneSource = source;
+    W.haptic();
+    changed();
+    redraw.apply(null, ORDER.concat(["footer"]));
+  }
+
+  function fullZoneMenu() {
     W.menu.open({
       title: tx("walk.sheet.zone"),
-      options: W.state.data.zones.filter(function (z) { return !z.equipment; }).map(function (z) {
-        return { label: z.title, value: z.code, on: z.code === f.zone };
-      }),
-      onPick: function (code) {
-        f.zone = code;
-        changed();
-        redraw.apply(null, ORDER.concat(["footer"]));
-      },
+      options: realZones().map(function (z) { return { label: z.title, value: z.code, on: z.code === f.zone }; }),
+      onPick: function (code) { setZone(code, "pick"); },
+    });
+  }
+
+  /**
+   * Меню зоны: сначала зоны пункта, дальше «Другая зона…» — выбор вне списка
+   * пункта остаётся возможным и помечается для перепроверки (`unusual`).
+   */
+  function zoneMenu() {
+    var own = f.code && !isAdvice() && !isMeasure() ? itemZones(f.code) : [];
+    if (!own.length || own.length === realZones().length) { fullZoneMenu(); return; }
+    var options = own.map(function (z) { return { label: z.title, value: z.code, on: z.code === f.zone }; });
+    var other = !!f.zone && !own.some(function (z) { return z.code === f.zone; });
+    options.push({ label: tx("walk.sheet.zone_other"), value: "__other", on: other, lead: true });
+    W.menu.open({
+      title: tx("walk.sheet.zone"),
+      options: options,
+      onPick: function (code) { if (code === "__other") fullZoneMenu(); else setZone(code, "pick"); },
     });
   }
 
@@ -270,6 +308,22 @@
   }
 
   /**
+   * Зона нового нарушения по найденному пункту (D435). Предложение системы
+   * несёт готовый вывод сервера; ручной выбор повторяет его без слов: одна зона
+   * пункта — она, иначе зона с экрана, если она у пункта есть, иначе спросить.
+   */
+  function applyResolution(i, cand) {
+    var r = cand && cand.resolution;
+    if (!r) {
+      var own = itemZones(i.code);
+      var hint = f.hint && own.some(function (z) { return z.code === f.hint; }) ? f.hint : null;
+      r = own.length === 1 ? { zone: own[0].code, source: "single" } : hint ? { zone: hint, source: "hint" } : { zone: null, source: "ask" };
+    }
+    f.zone = r.zone && zoneOf(r.zone) && !zoneOf(r.zone).equipment ? r.zone : null;
+    f.zoneSource = f.zone ? r.source : "ask";
+  }
+
+  /**
    * Выбрать пункт — предложенный системой (`cand`) или вручную.
    * Класс и формулировку предложения форма берёт как черновик: поправить их
    * можно ниже, а записывается всё только по «Сохранить».
@@ -279,7 +333,7 @@
     if (!i) return;
     f.code = code;
     f.picked = cand ? cand : null;
-    if (cand && cand.zone && zoneOf(cand.zone) && !zoneOf(cand.zone).equipment) f.zone = cand.zone;
+    if (recognizing()) applyResolution(i, cand);
     if (i.measure) f.level = "D0";
     else if (isAdvice() || i.note) f.level = ADVICE_LEVEL;
     else if (cand && i.levels.indexOf(cand.level) !== -1) f.level = cand.level;
@@ -301,7 +355,7 @@
     f.findError = null;
     redraw("item", "footer");
     var asked = { words: f.words.trim(), photos: readyPhotos().map(function (p) { return p.ref; }) };
-    W.post(W.urls.suggest, { zone: f.zone, words: asked.words, photos: asked.photos }).then(function (res) {
+    W.post(W.urls.suggest, { zone_hint: f.zone || f.hint || null, words: asked.words, photos: asked.photos }).then(function (res) {
       if (!f) return;
       if (!res.ok) throw new Error((res.body && res.body.message) || tx("walk.error"));
       f.finding = false;
@@ -328,16 +382,46 @@
   function proposal(cand) {
     var i = item(cand.code) || { q: cand.code };
     var on = f.code === cand.code && (!f.picked || f.picked === cand);
-    var b = W.button("walk-found__card" + (on ? " is-on" : ""), null, function () { pick(cand.code, cand); });
-    b.setAttribute("aria-pressed", on ? "true" : "false");
     var top = el("span", "walk-found__top");
     top.appendChild(el("span", "walk-option__code", cand.code));
     if (cand.level && cand.level !== ADVICE_LEVEL) top.appendChild(W.level(cand.level));
-    var z = zoneOf(cand.zone);
-    if (z && cand.zone !== f.zone) top.appendChild(el("span", "walk-found__zone", z.title));
+    if (on) {
+      // Выбранная карточка — результат «пункт · зона» (D435): зона — пилюля с
+      // меню. Не вывелась — пилюли нет, под карточкой строка «Где?».
+      var card = el("div", "walk-found__card is-on");
+      card.appendChild(top);
+      var line = W.hinted(el("span", "walk-found__q walk-found__line"), "itemzone");
+      line.appendChild(el("span", "walk-found__item", i.q));
+      var z = zoneOf(f.zone);
+      if (z) {
+        // Точка остаётся на конце названия: на узком экране пилюля уходит на
+        // вторую строку, а точка не оказывается в начале неё.
+        line.firstChild.textContent = i.q + " ·";
+        var pill = W.button("walk-ctx__pill walk-ctx__pill--zone", z.title, zoneMenu);
+        pill.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + z.title);
+        line.appendChild(pill);
+      }
+      card.appendChild(line);
+      return card;
+    }
+    var b = W.button("walk-found__card", null, function () { pick(cand.code, cand); });
+    b.setAttribute("aria-pressed", "false");
     b.appendChild(top);
     b.appendChild(el("span", "walk-found__q", i.q));
     return b;
+  }
+
+  /** «Где?»: зоны пункта пилюлями, пока зона не названа (D435). */
+  function whereRow() {
+    var row = el("div", "walk-where");
+    row.setAttribute("role", "group");
+    row.appendChild(el("span", "walk-where__label", tx("walk.sheet.where")));
+    var pills = el("div", "walk-where__pills");
+    itemZones(f.code).forEach(function (z) {
+      pills.appendChild(W.button("walk-ctx__pill walk-ctx__pill--zone", z.title, function () { setZone(z.code, "pick"); }));
+    });
+    row.appendChild(pills);
+    return row;
   }
 
   /* ── секции ───────────────────────────────────────────────────────── */
@@ -349,11 +433,15 @@
         var kind = KINDS.filter(function (pair) { return pair[0] === f.mode; })[0];
         row.appendChild(W.hinted(W.button("walk-ctx__pill", tx(kind[1]), kindMenu), "kind"));
       }
-      var z = zoneOf(f.zone);
-      var zb = W.hinted(W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
-        (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
-      zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
-      row.appendChild(zb);
+      // У нового нарушения зона — часть результата поиска «пункт · зона» (D435),
+      // отдельной пилюли над формой нет.
+      if (!recognizing()) {
+        var z = zoneOf(f.zone);
+        var zb = W.hinted(W.button("walk-ctx__pill walk-ctx__pill--zone" + (z ? "" : " is-empty"),
+          (z ? z.title : tx("walk.sheet.pick_zone")), zoneMenu), "zonepill");
+        zb.setAttribute("aria-label", tx("walk.sheet.zone") + ": " + (z ? z.title : tx("walk.sheet.pick_zone")));
+        row.appendChild(zb);
+      }
       var box = el("div", "walk-ctx__box");
       box.appendChild(row);
       if (isMeasure() && !f.n) box.appendChild(el("p", "walk-form__hint", tx("walk.sheet.measure_hint")));
@@ -581,6 +669,7 @@
     var fromList = (f.found || []).some(function (c) { return c.code === f.code; });
     if (manual && !fromList) list.appendChild(proposal({ code: f.code, level: f.level, zone: f.zone }));
     if (list.childNodes.length) box.appendChild(list);
+    if (f.code && !f.zone && item(f.code) && !isAdvice() && !isMeasure()) box.appendChild(whereRow());
     if (f.found && !f.found.length) box.appendChild(el("p", "walk-form__note", tx("walk.sheet.found_none")));
     if (f.question) box.appendChild(el("p", "walk-form__note walk-form__note--info", f.question));
     if (stale()) {
@@ -655,11 +744,21 @@
     submit(list);
   }
 
+  /** «Записано: <зона>»; зона не та, что на экране, — со ссылкой «Перейти» (D435). */
+  function savedToast(zoneCode) {
+    var z = zoneOf(zoneCode);
+    if (!z) { W.toast(tx("walk.sheet.saved"), "ok"); return; }
+    var text = tx("walk.sheet.saved_in", { zone: z.title });
+    if (zoneCode === W.state.open || !W.goZone) { W.toast(text, "ok"); return; }
+    W.toast(text, "ok", { label: tx("walk.sheet.saved_go"), run: function () { W.goZone(zoneCode); } });
+  }
+
   function submit(list) {
     f.saving = true;
     f.error = null;
     redraw("footer");
     var last = null;
+    var at = f.zone;
     var chain = list.reduce(function (p, body) {
       return p.then(function () {
         return W.post(W.urls.finding, body).then(function (res) {
@@ -671,7 +770,7 @@
     chain.then(function () {
       if (!f.n) W.local.drop(draftKey());
       W.haptic("success");
-      W.toast(tx("walk.sheet.saved"), "ok");
+      savedToast(at);
       close(true);
       if (last) W.apply(last);
     }, function (err) {
@@ -709,7 +808,9 @@
 
   /**
    * Открыть форму.
-   *   { mode: "violation" | "advice" | "measure", zone, code, level, repeat } — новая запись;
+   *   { mode: "violation" | "advice" | "measure", zone, code, level, repeat } — новая запись
+   *     (`zone` — только когда пункт и зона названы явно, как у пункта чек-листа;
+   *     иначе `hint` — зона на экране, мягкая подсказка, не зона записи);
    *   { record: <запись из данных>, zone } — правка.
    */
   function open(opts) {
@@ -719,6 +820,8 @@
       mode: opts.mode || "violation",
       n: rec ? rec.n : null,
       zone: opts.zone || null,
+      // Зона на экране — мягкая подсказка поиску, а не зона записи (D435).
+      hint: opts.hint || null,
       code: opts.code || null,
       level: opts.level || null,
       text: "",

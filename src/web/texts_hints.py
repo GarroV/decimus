@@ -49,26 +49,28 @@ HINT_TEXTS: dict[str, dict[str, str]] = {
         "zones",
         (
             "Зоны обхода",
-            "Значок у зоны: пунктир — не осмотрена, половина — в работе, "
-            "галка — чисто, число — столько нарушений.\n"
-            "Листайте влево-вправо — откроется соседняя зона.",
+            "Число — столько нарушений записано в зоне. Галка — осмотрена, чисто. "
+            "Пустой пунктирный кружок — ещё не смотрели.\n"
+            "Листайте влево-вправо — соседняя зона.",
         ),
         (
             "Walk zones",
-            "The zone icon: dashed — not checked, half — in progress, "
-            "tick — clean, number — that many findings.\n"
-            "Swipe left or right to open the neighbouring zone.",
+            "A number — that many issues recorded in the zone. A tick — checked, clean. "
+            "An empty dashed circle — not looked at yet.\n"
+            "Swipe left or right — the neighbouring zone.",
         ),
     ),
     **_hint(
         "add",
         (
             "+ Нарушение",
-            "Снимите кадр и скажите пару слов. Пункт найдёт система — вы проверите и сохраните.",
+            "Одна кнопка на всю проверку. Кадр и пара слов — система найдёт пункт и зону, "
+            "вы проверите и сохраните.",
         ),
         (
             "+ Issue",
-            "Take a photo and add a few words. The system finds the item — you check it and save.",
+            "One button for the whole inspection. A photo and a few words — the system finds "
+            "the item and the zone, you check and save.",
         ),
     ),
     **_hint(
@@ -131,6 +133,18 @@ HINT_TEXTS: dict[str, dict[str, str]] = {
         "zonepill",
         ("Зона", "Где это найдено. Зона уже выбрана — нажмите, чтобы сменить."),
         ("Zone", "Where it was found. It is already set — tap to change it."),
+    ),
+    **_hint(
+        "itemzone",
+        (
+            "Пункт и зона",
+            "Что нашла система и где это записать. Зона — кнопка: нажмите, чтобы сменить.",
+        ),
+        (
+            "Item and zone",
+            "What the system found and where it will be recorded. The zone is a button: "
+            "tap to change it.",
+        ),
     ),
     **_hint(
         "photo",
