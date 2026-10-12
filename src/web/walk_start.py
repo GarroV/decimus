@@ -67,6 +67,7 @@ from src.domain import (
     start_inspection,
 )
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT
 from src.domain.unit_name import UNIT_NAME_LIMIT, UnitName, check_unit_name
 
@@ -119,7 +120,7 @@ def _state_of(chat_id: int) -> str:
             return STATE_NONE
         return STATE_SEALED if handed_over(chat_id) else STATE_RUNNING
     except DomainError:
-        logger.exception("Старт из мини-аппа: состояние чата %s не читается", chat_id)
+        logger.exception("Старт из мини-аппа: состояние чата %s не читается", log_id(chat_id))
         return STATE_RUNNING
 
 
@@ -128,7 +129,9 @@ def _remembered_lang(who: int) -> str | None:
     try:
         lang = checklist_langs.chosen_checklist_lang(who)
     except DbError:
-        logger.warning("Старт из мини-аппа: язык чек-листа %s не прочитался", who, exc_info=True)
+        logger.warning(
+            "Старт из мини-аппа: язык чек-листа %s не прочитался", log_id(who), exc_info=True
+        )
         return None
     return lang if lang in LANG_LABELS else None
 
@@ -138,7 +141,9 @@ def _remember_lang(who: int, lang: str) -> None:
     try:
         checklist_langs.choose_checklist_lang(who, lang)
     except DbError:
-        logger.warning("Старт из мини-аппа: язык чек-листа %s не записался", who, exc_info=True)
+        logger.warning(
+            "Старт из мини-аппа: язык чек-листа %s не записался", log_id(who), exc_info=True
+        )
 
 
 def _text(body: dict[str, Any], name: str) -> str:
@@ -304,12 +309,14 @@ class _Wizard:
                 )
                 reset_notes(self.who)
         except DomainError as exc:
-            logger.exception("Старт из мини-аппа: проверка чата %s не началась", self.who)
+            logger.exception("Старт из мини-аппа: проверка чата %s не началась", log_id(self.who))
             raise Refused(self.say("walk.start.err.failed"), 500) from exc
         # Журнал разбора — спутник проверки (#367): прежний закрывается, новый с чистого листа.
         journal.close(self.who)
         _remember_lang(self.who, speech_lang)
-        logger.info("Старт из мини-аппа: чат %s начал проверку, чек-лист %s", self.who, checklist)
+        logger.info(
+            "Старт из мини-аппа: чат %s начал проверку, чек-лист %s", log_id(self.who), checklist
+        )
 
 
 def install(
@@ -355,7 +362,7 @@ def install(
         except WalkAccessError:
             return jsonify({"error": "unauthorized"}), 401
         except DbError:
-            logger.exception("Старт из мини-аппа: чат %s — база не ответила", who)
+            logger.exception("Старт из мини-аппа: чат %s — база не ответила", log_id(who))
             return _refused(_said("walk.app.err.unavailable", lang, ui_lang), 503)
 
 

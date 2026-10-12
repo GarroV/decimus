@@ -22,7 +22,8 @@
    почту под уникальным индексом.
 
 После привязки вход паролем для учётки закрыт (D450) — экран предупреждает об
-этом до ухода к Google. В журнал — исход и маска почты, не адрес.
+этом до ухода к Google. В журнал — метка учётки (`log_id`), исход и маска
+почты, не адрес.
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ from werkzeug.wrappers import Response
 
 from src.db import web_own_profile
 from src.db.errors import DbError
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .google_auth import GoogleIdentity, hq_domain_ok
@@ -91,7 +93,8 @@ def finish(
     hq_domains: frozenset[str],
 ) -> str:
     """Проверить пришедшее от Google и привязать почту. Ответ — ключ `RESULTS`."""
-    кто = f"{canonical_tenant(tenant)}/{login}"
+    # Учётка в журнале — меткой, не логином и не кодом пространства (F-015).
+    кто = log_id(login)
     if not identity.email_verified:
         logger.info("Google: привязка %s — почта не подтверждена", кто)
         return "unverified"

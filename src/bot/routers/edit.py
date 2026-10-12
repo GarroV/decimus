@@ -34,6 +34,7 @@ from aiogram.types import CallbackQuery, Message
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 
 from .. import journal, refusal, sealed, view
 from ..inspection import read_inspection
@@ -237,7 +238,7 @@ def build_edit_router() -> Router:
         except DomainError:
             # У удаления нет ни пункта, ни зоны, которые стоило бы назвать: не
             # удалилась запись, и это всё, что аудитору тут важно знать.
-            logger.exception("запись #%s в чате %s не удалилась", n, chat_id)
+            logger.exception("запись #%s в чате %s не удалилась", n, log_id(chat_id))
             await message.answer(t("edit.drop_failed", lang, n=n))
             return
         # Источник записи чистить не надо: он лежит в самой записи (T108), и

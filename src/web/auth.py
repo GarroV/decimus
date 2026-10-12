@@ -53,7 +53,7 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import google_link, oauth, swarm_api, walk_auth
+from . import google_link, oauth, reauth, swarm_api, walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -458,6 +458,10 @@ def install(app: Flask, conf: Settings) -> None:
         # адрес возврата, своя ветка. Метка уже сверена выше — общим кодом.
         if isinstance(содержимое, dict) and содержимое.get("kind") == google_link.LINK_KIND:
             return очистить_метку(_вернуть_привязку(google, str(ожидаемая)))
+        # Подтверждение входа перед действием, создающим долгоживущий доступ.
+        if isinstance(содержимое, dict) and содержимое.get("kind") == reauth.REAUTH_KIND:
+            назад = reauth.safe_back(str(содержимое.get("next") or ""))
+            return очистить_метку(_вернуть_подтверждение(google, str(ожидаемая), назад))
 
         # `error=access_denied` приходит, когда человек сам отказался в окне
         # согласия. Это не поломка: возвращаем на форму без красного.
@@ -543,6 +547,62 @@ def install(app: Flask, conf: Settings) -> None:
         return ответ
 
     app.extensions[GOOGLE_LINK_KEY] = _начать_привязку
+
+    def _обновить_сессию(account: Account, назад: str) -> Response:
+        """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
+        прежний = token_of_request()
+        новая = open_session(account)
+        if прежний:
+            close_session(прежний)
+        return remember(redirect(f"{request.script_root}{назад}"), новая)
+
+    def _начать_подтверждение(назад: str) -> Response:
+        """Увод к Google подтвердить вход; метка и путь возврата — в подписанной куке."""
+        if google is None:
+            return redirect(url_for(reauth.CONFIRM_ENDPOINT, next=назад))
+        метка = new_state()
+        ответ = redirect(
+            authorization_url(_google_here(google), state=метка, nonce=google_link.nonce_for(метка))
+        )
+        ответ.set_cookie(
+            GOOGLE_STATE_COOKIE,
+            state_signer.dumps({"state": метка, "kind": reauth.REAUTH_KIND, "next": назад}),
+            max_age=GOOGLE_STATE_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return ответ
+
+    def _вернуть_подтверждение(реквизиты: GoogleSettings, метка: str, назад: str) -> Response:
+        """Возврат подтверждения: Google обязан назвать почту ЭТОЙ учётки."""
+        token = token_of_request()
+        account = resolve_session(token) if token else None
+        if account is None or token is None:
+            return redirect(url_for("login"))
+        мимо = redirect(url_for(reauth.CONFIRM_ENDPOINT, next=назад, failed="1"))
+        код = request.args.get("code") or ""
+        if request.args.get("error") or not код:
+            return мимо
+        try:
+            кто = exchange_code(_google_here(реквизиты), code=код)
+        except GoogleAuthError:
+            return мимо
+        if not reauth.google_confirms(account, кто, state=метка, hq_domains=hq_domains):
+            return мимо
+        return _обновить_сессию(account, назад)
+
+    reauth.install(
+        app,
+        stand=рубеж,
+        trusted_proxies=conf.trusted_proxies,
+        google_enabled=google is not None,
+        rotate=_обновить_сессию,
+        begin_google=_начать_подтверждение,
+        # Имя ищется в момент вызова: так сверка идёт ровно той дверью, что у входа.
+        verify=lambda login, password: authenticate(login, password),
+    )
 
     def _вернуть_привязку(реквизиты: GoogleSettings, метка: str) -> Response:
         """Возврат привязки: учётка — из сессии этого браузера, исход — в «Настройки»."""
