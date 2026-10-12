@@ -271,6 +271,27 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.agg.last_ok": {"ru": ", последний удачный — {at}", "en": ", last successful — {at}"},
     "ratings.agg.never_ok": {"ru": ", удачных ещё не было", "en": ", never succeeded yet"},
+    "ratings.agg.update": {"ru": "Обновить сейчас", "en": "Update now"},
+    "ratings.agg.update.hint": {
+        "ru": "Не ждать суток: бот соберёт оценки по заявке в течение нескольких минут.",
+        "en": "Don't wait a day: the bot collects the ratings on request within a few minutes.",
+    },
+    "ratings.agg.update.queued": {
+        "ru": "Заявка принята: бот соберёт оценки агрегаторов в течение нескольких минут.",
+        "en": "Request accepted: the bot will collect the delivery app ratings within minutes.",
+    },
+    "ratings.agg.update.already": {
+        "ru": "Обновление уже в очереди — второй раз просить не нужно.",
+        "en": "An update is already queued, no need to ask again.",
+    },
+    "ratings.agg.update.db_down": {
+        "ru": "База не приняла заявку. Попробуйте позже.",
+        "en": "The database did not accept the request. Try again later.",
+    },
+    "ratings.agg.update.pending": {
+        "ru": "Обновление в очереди с {at} ({by}); собирает бот, страницу можно открыть позже.",
+        "en": "Update queued since {at} ({by}); the bot is collecting it, reload the page later.",
+    },
     "ratings.empty.aggregators": {
         "ru": "Оценок из агрегаторов по этим странам ещё нет.",
         "en": "No delivery app ratings for these countries yet.",

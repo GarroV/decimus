@@ -219,6 +219,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0052_api_methods.sql": (
         "sql1:0ea00e7d63ea04edf8f84d033b2cc93e62dc9cd27a088e7496f465a8c17e2b4a"
     ),
+    # Заявка на обновление оценок агрегаторов вне расписания (D420). Заведена вместе с
+    # файлом, нигде не применена.
+    "0053_agg_requests.sql": (
+        "sql1:eb20618d3e3a042249c7ab91fa77189fea6c682165ab830a08f8a5a9fb793736"
+    ),
 }
 
 
