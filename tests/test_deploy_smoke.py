@@ -42,8 +42,8 @@ ROOT = Path(__file__).resolve().parent.parent
     # Ручных копий звена здоровый стенд не держит: с #216 звено — сервис
     # стенда, и копия рядом означает, что кто-то поднял его руками поверх.
     "name=dodo-mcp-proxy": "",
-    "tailscale funnel status": "https://stand.example.ts.net:10000/\n|-- proxy http://127.0.0.1:8266",
-    "printenv BOT_MCP_URL": "https://stand.example.ts.net:10000/",
+    "tailscale funnel status": "https://stand.example.test:10000/\n|-- proxy http://127.0.0.1:8266",
+    "printenv BOT_MCP_URL": "https://stand.example.test:10000/",
 }
 
 
