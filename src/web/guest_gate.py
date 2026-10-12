@@ -18,8 +18,8 @@ from flask import Flask, abort, request
 
 from src.domain.tenants import is_hq_guest
 
-from . import auth, oauth
-from .sections import GUEST_SECTIONS, current_section, section
+from . import auth, oauth, settings_screen
+from .sections import GUEST_SECTIONS, current_section
 
 #: Безопасные методы: чужой раздел на чтение — 404, на запись — 403.
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
@@ -27,19 +27,10 @@ _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 def own_paths() -> frozenset[str]:
     """Дела самого человека, которые гость делает и без права писать в сеть."""
-    users_path = section("users").path
-    return frozenset(
-        {
-            auth.LOGOUT_PATH,
-            f"{users_path}/password",
-            f"{users_path}/claude-revoke",
-            # Личный токен для Claude выпускает себе любая роль (D448): у гостя он
-            # читает проверки и рейтинги, писать им нечего.
-            f"{users_path}/claude-token",
-            f"{users_path}/claude-token-revoke",
-            oauth.AUTHORIZE_PATH,
-        }
-    )
+    # Пароль, токен и подключение Claude — «Настройки» (D447). Личный токен для
+    # Claude выпускает себе любая роль (D448): у гостя он читает проверки и
+    # рейтинги, писать им нечего. Бота гость не привязывает — пути в перечне нет.
+    return frozenset({auth.LOGOUT_PATH, oauth.AUTHORIZE_PATH}) | settings_screen.own_post_paths()
 
 
 def install(app: Flask) -> None:

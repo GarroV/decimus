@@ -25,7 +25,7 @@ from src.web import accounts
 from src.web.app import MAX_BODY_BYTES
 
 ТЕНАНТ = "HQ"
-ПУТЬ = "/users/password"
+ПУТЬ = "/settings/password"
 НОВЫЙ = "новый-пароль-длиннее-порога"
 НЕ_ТОТ = "не-тот-текущий-пароль"
 
@@ -64,7 +64,7 @@ def сменить(
 
 
 def test_форма_смены_видна_каждому_вошедшему(стенд: FlaskClient) -> None:
-    страница = стенд.get("/users").get_data(as_text=True)
+    страница = стенд.get("/settings").get_data(as_text=True)
 
     assert f'action="{ПУТЬ}' in страница
     assert 'name="current"' in страница and 'name="repeat"' in страница
@@ -199,7 +199,7 @@ def test_тексты_есть_по_английски(monkeypatch: pytest.Monke
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="auditor")
     with собрать(tenant=ТЕНАНТ, ui_lang="en").test_client() as client:
         войти(client)
-        страница = client.get("/users?lang=en").get_data(as_text=True)
+        страница = client.get("/settings?lang=en").get_data(as_text=True)
         ответ = client.post(
             ПУТЬ + "?lang=en",
             data={"current": ПАРОЛЬ, "new": НОВЫЙ, "repeat": НОВЫЙ},

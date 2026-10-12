@@ -40,6 +40,7 @@ from src.bot.texts import t
 from src.bot.version import build_version
 from src.db import bot_langs, finish_modes, mcp_access, translate_modes
 from src.db.errors import DbError, UnboundError
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, parse_public_url
 
 from . import walk_finish
 from .texts import UI_LANGS
@@ -108,6 +109,22 @@ def translate_mode_of(chat_id: int) -> str:
     return mode if mode in translate_modes.MODES else translate_modes.DEFAULT_MODE
 
 
+def web_settings_url() -> str | None:
+    """Адрес «Настроек» на сайте (D447) — из внешнего адреса админки; не задан — `None`.
+
+    Мини-апп не повторяет настройки сайта, а ведёт в них: пароль, Google и
+    остальное подключение живут там одним набором. Кривой адрес — тоже «не
+    задан»: ссылка в никуда хуже отсутствующей.
+    """
+    try:
+        base = parse_public_url(
+            os.environ.get(ADMIN_PUBLIC_URL_VAR) or "", var=ADMIN_PUBLIC_URL_VAR
+        )
+    except ValueError:
+        return None
+    return f"{base}/settings" if base else None
+
+
 def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any]:
     """Что знает о человеке главная и настройки.
 
@@ -123,6 +140,7 @@ def app_block(chat_id: int, lang: str, bot: BotSettings | None) -> dict[str, Any
         "translate_mode": translate_mode_of(chat_id),
         "version": build_version(),
         "mcp": bot is not None,
+        "settings_url": web_settings_url(),
         "sections": ["audit"],
     }
 
