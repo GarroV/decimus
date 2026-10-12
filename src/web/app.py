@@ -72,6 +72,7 @@ from . import (
     users_screen,
     users_view,
     view,
+    walk_auth,
     walk_proxy,
 )
 from . import country as country_data
@@ -143,6 +144,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     # порядке регистрации, и опознание обязано случиться раньше всего, что
     # ходит в базу за данными арендатора.
     auth.install(app, conf)
+    _install_origin_gate(app)
     _install_hq_gate(app)
     _install_control_gate(app)
     _install_methodology_gate(app)
@@ -1055,6 +1057,28 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/disable",
     )
     return path in own
+
+
+def _install_origin_gate(app: Flask) -> None:
+    """Любая запись в админку — только со своей же страницы (`refuse_foreign_origin`).
+
+    Заслоном на всё приложение, а не вызовом в каждом маршруте: до 12.10.2026
+    заслон держался на том, что каждый POST зовёт его сам, и новый маршрут без
+    вызова остался бы открытым для чужой страницы молча (аудит доступа, п.6).
+    Вызовы в маршрутах остаются — второй слой. Мимо заслона идут только мини-апп
+    обхода (опознание подписью Telegram в заголовке, куки админки до него не
+    доезжают) и API для сервисов (ключ в заголовке, только чтение).
+    """
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS
+
+    @app.before_request
+    def _запись_только_со_своей_страницы() -> None:
+        # Маршрут не нашёлся (404, 405) — записи не будет и так, ответ даст Flask.
+        if request.routing_exception is not None:
+            return
+        if request.method in _READ_METHODS or request.endpoint in мимо:
+            return
+        refuse_foreign_origin()
 
 
 def _install_methodology_gate(app: Flask) -> None:
