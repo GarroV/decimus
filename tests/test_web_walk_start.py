@@ -314,7 +314,9 @@ def память(monkeypatch: pytest.MonkeyPatch) -> dict[int, str]:
 def test_после_старта_следующий_экран_предвыбирает_тот_же_язык(
     клиент: Клиент, память: dict[int, str]
 ) -> None:
-    assert клиент.пост(op="options").get_json()["default_lang"] == "ru", "выбора нет — язык интерфейса"
+    assert клиент.пост(op="options").get_json()["default_lang"] == "ru", (
+        "выбора нет — язык интерфейса"
+    )
 
     ответ = клиент.старт(speech_lang="en")
 
