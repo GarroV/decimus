@@ -170,14 +170,21 @@ class UnitScore:
     unit_name: str
     country: str
     score: float
+    delta: float | None = None  # к своей средней за прошлый период; не было — None
 
 
 def top_bottom(
-    facts: Sequence[Fact], rating_type: str, *, threshold: float, limit: int = TOP_LIMIT
+    facts: Sequence[Fact],
+    rating_type: str,
+    *,
+    threshold: float,
+    limit: int = TOP_LIMIT,
+    previous: Sequence[Fact] = (),
 ) -> tuple[tuple[UnitScore, ...], tuple[UnitScore, ...]]:
     names = {fact.unit: (fact.unit_name, fact.country) for fact in facts}
+    before = unit_averages(previous, rating_type)
     scored = [
-        UnitScore(unit, *names[unit], avg)
+        UnitScore(unit, *names[unit], avg, delta(avg, before.get(unit)))
         for unit, avg in unit_averages(facts, rating_type).items()
     ]
     top = sorted(
