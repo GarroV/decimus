@@ -82,7 +82,7 @@
 | `pyszne_pl` | PL | `jet-external … /restaurants/enriched` у координат | из 5 |
 | `glovo` | RO BG GE ME ES NG | по известной точке: `api.glovoapp.com/v3/stores/{id}` с координатами доставки в заголовках; точка — `addressId`; новые точки — автопоиск и привязка по ссылке (ниже) | % довольных |
 | `chowdeck` | NG | по известной точке: `api.chowdeck.com/customer/vendor/{id}` | из 5 |
-| `migros_yemek` | TR | по известной точке: `www.migros.com.tr/rest/food-bff/api/stores/{slug}` (адрес API — в открытом `env.js` сайта); `point_key` — slug из адреса страницы `migros.com.tr/yemek/<slug>`; координат карточка не отдаёт | из 5 |
+| `migros_yemek` | TR | **не собирается**: сайт отвечает 403 адресу сервера (ниже). Было бы — по известной точке: `www.migros.com.tr/rest/food-bff/api/stores/{slug}` (адрес API — в открытом `env.js` сайта); `point_key` — slug из адреса страницы `migros.com.tr/yemek/<slug>`; координат карточка не отдаёт | из 5 |
 
 Всё это — неофициальные интерфейсы сайтов: ответ может поменяться без предупреждения.
 Поэтому каждый запрос идёт с паузой (1,5–4 с, `GAP_SEC` модуля; Яндекс Еда — 4 с, на 1,5 с отбивала 429), на 429 и 5xx — повтор,
@@ -204,6 +204,7 @@ scp seed.json contabo:/tmp/ && ssh contabo 'docker cp /tmp/seed.json decimus-bot
 | MX | Rappi, DiDi Food | поиска без входа нет |
 | KG, TJ, MN | — | Додо на открытых площадках не найден |
 | HR | Wolt, Glovo | точки есть, пиццерии сейчас закрыты |
+| TR | Migros Yemek | с сервера площадки — 403 на весь сайт, включая главную (защита по адресу, 12.10.2026); с обычного адреса интерфейс открыт. Сборщик и справочник готовы, в сбор не включены |
 
 - **Яндекс Еда** — на паузе с 11.10.2026 (D397): сборщик цел (`PAUSED` в `collect.py`), вернуть — перенести в `SEARCHERS`.
 - **Talabat** — нет списка веток (#647).
