@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 115 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 117 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -107,6 +107,13 @@
 | `/ratings/imports` | GET | `ratings_imports` | `src/web/ratings.py` |
 | `/ratings/layout` | POST | `ratings_layout` | `src/web/ratings.py` |
 | `/ratings/settings` | POST | `ratings_settings` | `src/web/ratings.py` |
+| `/settings` | GET | `settings_page` | `src/web/settings_screen.py` |
+| `/settings/bot-link` | POST | `settings_bot_link` | `src/web/settings_screen.py` |
+| `/settings/bot-unlink` | POST | `settings_bot_unlink` | `src/web/settings_screen.py` |
+| `/settings/claude-revoke` | POST | `settings_claude_revoke` | `src/web/settings_screen.py` |
+| `/settings/claude-token` | POST | `settings_claude_token` | `src/web/settings_screen.py` |
+| `/settings/claude-token-revoke` | POST | `settings_claude_token_revoke` | `src/web/settings_screen.py` |
+| `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
@@ -121,18 +128,13 @@
 | `/units/<unit_id>` | GET | `unit` | `src/web/app.py` |
 | `/users` | GET | `users` | `src/web/users_screen.py` |
 | `/users/add` | POST | `add_user` | `src/web/users_screen.py` |
-| `/users/bot-link` | POST | `bot_link` | `src/web/users_screen.py` |
 | `/users/bot-unlink` | POST | `bot_unlink` | `src/web/users_screen.py` |
-| `/users/claude-revoke` | POST | `claude_revoke` | `src/web/users_screen.py` |
-| `/users/claude-token` | POST | `claude_token` | `src/web/users_screen.py` |
-| `/users/claude-token-revoke` | POST | `claude_token_revoke` | `src/web/users_screen.py` |
 | `/users/connections/<int:token_id>/reissue` | POST | `connections_reissue` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
 | `/users/disable` | POST | `disable_user` | `src/web/users_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
-| `/users/password` | POST | `own_password` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |

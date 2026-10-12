@@ -61,6 +61,9 @@ class Section:
     partner_only: bool = False
     #: Иконка пункта в левой панели — имя из набора линейки (`icons.py`).
     icon: str = "doc"
+    #: Стоит ли пункт в левой панели и нижней полосе. «Настройки» — нет: это
+    #: профиль человека, и ведёт в него меню учётки, а не раздел среди дел.
+    menu: bool = True
 
 
 #: Девять разделов прототипа в порядке прототипа. Построены два — «Проверки»
@@ -93,6 +96,10 @@ SECTIONS: tuple[Section, ...] = (
     # живут на этом же экране — отдельного раздела «Проект» (`/tenants`,
     # заглушка прототипа) больше нет: один вопрос «у кого какой доступ» — один экран.
     Section(key="users", path="/users", built=True, icon="team"),
+    # «Настройки» (D447): подключение всего и вся у человека — Claude, бот,
+    # Google, язык, пароль. Свой профиль, открыт каждому вошедшему, любой роли;
+    # входит в него меню учётки (аватар), поэтому в левой панели пункта нет.
+    Section(key="settings", path="/settings", built=True, icon="dots", menu=False),
     # «Мини-апп» (`/mini`) был заглушкой «ещё в разработке» без экрана: мини-апп
     # обхода живёт у аудитора в Telegram (`/tg/walk*`), веб-админу в нём нечего
     # делать. Пункт снят из меню (#656).
@@ -166,7 +173,7 @@ def current_section(path: str) -> str | None:
 #: Разделы контролинга (D358, D420): рейтинги и «Пользователи» — там свой пароль
 #: и бот. Ни «Главной», ни «Проверок»: проверок контролинг не касается никак, даже
 #: на чтение (D420 отменяет чтение по D366).
-CONTROL_SECTIONS = frozenset({"ratings", "users"})
+CONTROL_SECTIONS = frozenset({"ratings", "users", "settings"})
 
 #: Куда контролинг попадает после входа: «Главной» у него нет (D420), поэтому
 #: не на неё, как все (D378), а в «Рейтинги».
@@ -175,7 +182,7 @@ CONTROL_HOME = "ratings"
 
 #: Разделы гостя УК (D440): вся сеть на чтение — обзор, проверки и отчёты, страна,
 #: рейтинги; «Пользователи» — своя карточка. Методики и действий УК у него нет.
-GUEST_SECTIONS = frozenset({"overview", "registry", "country", "ratings", "users"})
+GUEST_SECTIONS = frozenset({"overview", "registry", "country", "ratings", "users", "settings"})
 
 
 def visible_sections(account: object | None) -> tuple[Section, ...]:
@@ -186,15 +193,16 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     не звать человека туда, куда его не пустят.
     """
     роль = getattr(account, "role", None)
+    menu = tuple(item for item in SECTIONS if item.menu)
     if роль == CONTROL_ROLE:  # контролинг — только рейтинги и свои дела (D358)
-        return tuple(item for item in SECTIONS if item.key in CONTROL_SECTIONS)
+        return tuple(item for item in menu if item.key in CONTROL_SECTIONS)
     if роль == GUEST_ROLE:  # гость — вся сеть на чтение (D440)
-        return tuple(item for item in SECTIONS if item.key in GUEST_SECTIONS)
+        return tuple(item for item in menu if item.key in GUEST_SECTIONS)
     админ = is_admin_role(роль)
     уК = canonical_tenant(str(getattr(account, "tenant", "") or "")) == HQ_TENANT
     return tuple(
         item
-        for item in SECTIONS
+        for item in menu
         if (админ or not item.admin_only)
         and (уК or not item.hq_only)
         # Партнёру заглушки «в разработке» не показываем (D371): его меню —
