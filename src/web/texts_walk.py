@@ -396,6 +396,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.translate.lang.ru": {"ru": "русский", "en": "Russian"},
     "walk.translate.lang.en": {"ru": "английский", "en": "English"},
+    "walk.err.too_fast": {
+        "ru": "Слишком много запросов подряд. Подождите минуту и повторите.",
+        "en": "Too many requests in a row. Wait a minute and try again.",
+    },
     "walk.err.server": {
         "ru": "Не получилось записать. Повторите через минуту.",
         "en": "Could not save. Try again in a minute.",
