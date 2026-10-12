@@ -20,6 +20,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 #: Коды отказа правки справочников: веб показывает по ним текст на языке
 #: интерфейса (P15), русский `str(exc)` остаётся журналу и MCP.
@@ -43,7 +44,7 @@ class RatingsEditError(RatingsError):
 
 def _rows(sql: str, params: Sequence[Any] = ()) -> list[tuple[Any, ...]]:
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             return conn.execute(sql, params).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(
@@ -53,7 +54,7 @@ def _rows(sql: str, params: Sequence[Any] = ()) -> list[tuple[Any, ...]]:
 
 def _write(sql: str, params: Sequence[Any], refusal: str, code: str) -> int:
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             return conn.execute(sql, params).rowcount
     except psycopg.errors.IntegrityError as exc:
         raise RatingsEditError(refusal, code) from exc
@@ -351,7 +352,7 @@ def layout_rows() -> tuple[tuple[str, int, bool], ...]:
 def save_layout(blocks: Sequence[tuple[str, bool]], *, actor: str) -> None:
     """Записать порядок и видимость одним заходом: половина порядка не ложится."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             for position, (block, visible) in enumerate(blocks):
                 conn.execute(
                     "update ratings.layout set position = %s, visible = %s, "

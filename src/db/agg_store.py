@@ -17,6 +17,7 @@ from psycopg.types.json import Jsonb
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 
 @dataclass(frozen=True)
@@ -74,7 +75,7 @@ def _fail(what: str, exc: psycopg.Error) -> RatingsError:
 def save(points: Sequence[PointRow], ratings: Sequence[RatingRow]) -> tuple[int, int]:
     """Записать точки и оценки; вернуть, сколько легло. Отказ базы — `RatingsError`."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             with conn.cursor() as cur:
                 cur.executemany(
                     _UPSERT_POINT,
@@ -121,7 +122,7 @@ def log_load(
 ) -> None:
     """След сбора агрегатора в журнале."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             conn.execute(
                 "insert into agg.loads (aggregator, outcome, points, ratings, error) "
                 "values (%s, %s, %s, %s, %s)",
@@ -142,7 +143,7 @@ def last_run() -> datetime | None:
     Неудачный агрегатор пробуется снова на следующие сутки, а не каждый час:
     иначе один сломанный агрегатор гонял бы весь сбор по кругу."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute("select max(at) from agg.loads").fetchone()
     except psycopg.Error as exc:
         raise _fail("Журнал сбора агрегаторов не прочитался", exc) from exc
@@ -152,7 +153,7 @@ def last_run() -> datetime | None:
 def last_ok_points(aggregator: str) -> int:
     """Сколько точек принёс последний удачный сбор агрегатора (0 — ни разу)."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute(
                 "select points from agg.loads where aggregator = %s and outcome = 'ok' "
                 "order by at desc limit 1",
@@ -172,7 +173,7 @@ def known_points(aggregator: str) -> tuple[PointRow, ...]:
         order by point_key
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (aggregator,)).fetchall()
     except psycopg.Error as exc:
         raise _fail("Точки агрегатора не прочитались", exc) from exc
@@ -220,7 +221,7 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
         order by r.aggregator, r.point_key, r.on_date desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (list(countries), until, until)).fetchall()
     except psycopg.Error as exc:
         raise _fail("Оценки агрегаторов не прочитались", exc) from exc
@@ -258,7 +259,7 @@ def load_states() -> tuple[LoadState, ...]:
         order by l.aggregator, l.at desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql).fetchall()
     except psycopg.Error as exc:
         raise _fail("Журнал сбора агрегаторов не прочитался", exc) from exc

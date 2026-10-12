@@ -15,6 +15,7 @@ import psycopg
 
 from .config import check_environment, load_retraction_settings
 from .errors import DbError
+from .pool import connection
 
 
 @contextmanager
@@ -32,7 +33,7 @@ def reading(что: str, *, as_admin: bool = False) -> Iterator[psycopg.Connecti
     """
     settings = load_retraction_settings() if as_admin else check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать {что} ({type(exc).__name__})") from exc

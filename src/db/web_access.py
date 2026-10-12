@@ -53,6 +53,7 @@ from .config import check_environment
 from .database_target import managing_dsn, same_database_or_deny
 from .errors import AccessError, EmailTakenError
 from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
+from .pool import connection
 from .reading import reading
 from .space_guard import require_space
 
@@ -402,7 +403,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

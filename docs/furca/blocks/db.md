@@ -23,6 +23,13 @@ pending_photo_uploads(*, min_age_sec: int, max_age_sec: int | None = None,
 # S3PhotoStorage(settings, *, fail_fast=False): fail_fast=True — 5 с на
 # соединение и одна попытка, только для upload_photos и upload_report (сдача и
 # дозагрузка); остальные — умолчания botocore с повторами. ping() — head_bucket
+# подключение — src/db/pool.py: `with connection(dsn) as conn:` вместо
+#   `with psycopg.connect(dsn) as conn:` (те же commit/rollback на выходе).
+#   Пул на каждый DSN, лениво; `DB_POOL_MAX` (8; 0 — без пула),
+#   `DB_POOL_TIMEOUT_S` (10). На возврате: откат + RESET ALL / RESET SESSION
+#   AUTHORIZATION / снятие advisory-замков / DISCARD TEMP — настройки сессии
+#   не доходят до следующего. Нет соединения за срок — PoolBusyError (DbError
+#   и psycopg.Error). Тест: tests/test_db_pool.py
 # охват чтения (волна 1, #340; D283, D284, D289) — src/db/reach.py
 # Reach(tenant, tenants, countries): кто читает; чьи проверки (None — всех);
 #   пиццерии каких стран (None — всех, () — ничего). Reach.params() — массивы
@@ -206,7 +213,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 
 ## Технические заметки
 
-- **Драйвер — `psycopg[binary]==3.2.13` (синхронный), не SQLAlchemy/Alembic.** Черновое исследование стека (`docs/furca/research-report.md`) называло SQLAlchemy 2.x + asyncpg + Alembic для сценария «Postgres с первого дня под состояние проверки» — сценарий, от которого в итоге отказались (D007: состояние осталось файлом). Здесь другая задача: редкий синхронный слив по готовому срезу данных, без ORM и без async-контекста — весь остальной код блоков синхронный (`OpenAI`, не `AsyncOpenAI`, в `src/recognize/client.py`). Миграции — пронумерованные `.sql`-файлы и раннер на полсотни строк (`src/db/migrate.py`) с таблицей `schema_migrations` и проверкой отпечатка вместо Alembic: рассматривался `yoyo-migrations`, но его postgres-экстра тянет `psycopg2` — второй драйвер Postgres рядом с уже выбранным `psycopg3` ради экономии полусотни строк не оправдан.
+- **Драйвер — `psycopg[binary,pool]==3.2.13` (синхронный) и `psycopg-pool==3.2.8`, не SQLAlchemy/Alembic.** Черновое исследование стека (`docs/furca/research-report.md`) называло SQLAlchemy 2.x + asyncpg + Alembic для сценария «Postgres с первого дня под состояние проверки» — сценарий, от которого в итоге отказались (D007: состояние осталось файлом). Здесь другая задача: редкий синхронный слив по готовому срезу данных, без ORM и без async-контекста — весь остальной код блоков синхронный (`OpenAI`, не `AsyncOpenAI`, в `src/recognize/client.py`). Миграции — пронумерованные `.sql`-файлы и раннер на полсотни строк (`src/db/migrate.py`) с таблицей `schema_migrations` и проверкой отпечатка вместо Alembic: рассматривался `yoyo-migrations`, но его postgres-экстра тянет `psycopg2` — второй драйвер Postgres рядом с уже выбранным `psycopg3` ради экономии полусотни строк не оправдан.
 - **`src/db/__init__.py` не импортирует `push_inspection`/`list_inspections` заранее** — они лениво подгружаются через `__getattr__` (PEP 562) при первом обращении. Иначе любой импорт из блока (даже `src.db.units`, чистая функция без Postgres) требовал бы установленного `psycopg` — проверено: без этого приёма сбор тестов падает целиком в окружении, где зависимость ещё не поставлена.
 - **Точка сопоставляется через справочник и карту синонимов** (T092): сперва
   каноничное название, потом синоним, оба по одному правилу нормализации

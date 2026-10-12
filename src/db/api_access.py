@@ -35,6 +35,7 @@ from .config import check_environment
 from .database_target import managing_dsn
 from .errors import AccessError
 from .mcp_access import new_token, token_fingerprint
+from .pool import connection
 
 SCOPE_RATINGS_READ = "ratings:read"
 SCOPE_INSPECTIONS_READ = "inspections:read"
@@ -121,7 +122,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """Роль приложения; наружу — тип исключения драйвера, а не его текст (DSN)."""
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

@@ -15,6 +15,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 _UPSERT_COMPANY = """
 insert into maps.companies (uuid, network_uuid, network_name, name, country_code, city,
@@ -41,7 +42,7 @@ def save(
 ) -> tuple[int, int]:
     """Записать филиалы и оценки; вернуть, сколько легло. Отказ базы — `RatingsError`."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             with conn.cursor() as cur:
                 cur.executemany(_UPSERT_COMPANY, companies)
                 cur.executemany(_UPSERT_RATING, ratings)
@@ -55,7 +56,7 @@ def save(
 def log_load(*, ok: bool, companies: int = 0, ratings: int = 0, error: str | None = None) -> None:
     """След загрузки в журнале. Сам отказ журнала — в лог, загрузку он не отменяет."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             conn.execute(
                 "insert into maps.loads (outcome, companies, ratings, error) "
                 "values (%s, %s, %s, %s)",
@@ -68,7 +69,7 @@ def log_load(*, ok: bool, companies: int = 0, ratings: int = 0, error: str | Non
 def last_ok_load() -> datetime | None:
     """Когда последний раз загрузка удалась (`None` — ни разу)."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute("select max(at) from maps.loads where outcome = 'ok'").fetchone()
     except psycopg.Error as exc:
         raise RatingsError(
@@ -101,7 +102,7 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
         order by r.company_uuid, r.provider_id, r.on_date desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (list(countries), until, until)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Оценки карт не прочитались ({exc.__class__.__name__})") from exc
@@ -111,7 +112,7 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
 def company_uuids() -> tuple[str, ...]:
     """Все известные филиалы — для дозагрузки истории."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute("select uuid::text from maps.companies order by uuid").fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Филиалы карт не прочитались ({exc.__class__.__name__})") from exc
@@ -122,7 +123,7 @@ def covered_days(company_uuid: str, start: date, end: date) -> int:
     """Сколько дней окна у филиала уже есть — чтобы повторная дозагрузка не
     тратила запросы на то, что уже легло."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute(
                 "select count(distinct on_date) from maps.ratings "
                 "where company_uuid = %s and on_date between %s and %s",
@@ -136,7 +137,7 @@ def covered_days(company_uuid: str, start: date, end: date) -> int:
 def points() -> tuple[tuple[str, float, float], ...]:
     """Филиалы с координатами: (uuid, широта, долгота)."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(
                 "select uuid::text, lat, lng from maps.companies "
                 "where lat is not null and lng is not null"
@@ -153,7 +154,7 @@ def link_countries() -> tuple[str, ...]:
         union select code from ratings.countries
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Страны карт не прочитались ({exc.__class__.__name__})") from exc
@@ -164,7 +165,7 @@ def save_links(links: Sequence[tuple[str, str, str, int]]) -> int:
     """Заменить связи целиком одним заходом: (филиал, код пиццерии, имя, метры).
     Филиал без связи в новом наборе связь теряет — пиццерия могла переехать."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             conn.execute(
                 "update maps.companies set dodo_id = null, dodo_name = null, "
                 "link_distance_m = null, linked_at = null where dodo_id is not null"
@@ -192,7 +193,7 @@ def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]
         order by c.dodo_id, r.on_date desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (provider_id, until)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(

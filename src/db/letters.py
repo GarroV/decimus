@@ -16,10 +16,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-import psycopg
-
 from .config import check_environment
 from .errors import PushError
+from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 
 # Письмо ложится только к проверке пространства, которое его фиксирует: сверка
@@ -79,7 +78,7 @@ def save_letter(
         raise PushError("Письмо не сохранено: не названо, кто его зафиксировал")
 
     settings = check_environment()
-    with psycopg.connect(settings.dsn) as conn:
+    with connection(settings.dsn) as conn:
         with conn.cursor() as cur:
             cur.execute(
                 _INSERT_LETTER_SQL,
@@ -116,7 +115,7 @@ def latest_letter(inspection_id: str, *, lang: str | None = None) -> SavedLetter
     русское под видом сербского.
     """
     settings = check_environment()
-    with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+    with connection(settings.dsn) as conn, conn.cursor() as cur:
         cur.execute(_SELECT_LATEST_SQL, (inspection_id, lang, lang))
         row = cur.fetchone()
 
