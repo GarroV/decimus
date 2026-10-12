@@ -2,23 +2,29 @@
 
 Migros ходит через домашний сервер, а тот засыпает и сам не просыпается, —
 сбой там ожидаем, и он не должен быть молча пустой колонкой. Поэтому после
-суточного сбора бот пишет одному человеку — тому, чей Telegram ID стоит в
-`AGG_ALERT_CHAT_ID`, — если хоть один агрегатор не собрался. Переменная пуста —
-никому ничего не уходит (правило: сообщение людям — только по «да» владельца на
-текст, адресата и условие). Сбор по заявке не уведомляет: его исход и так видит
+суточного сбора, если хоть один агрегатор не собрался, уходит одна тревога в
+канал FURCA (D438, D439): `POST {FURCA_NOTIFY_URL}/notify` с ключом
+`FURCA_SECRET`, проект `decimus`, вид `alert` — тем же путём, что тревоги
+бэкапов сервера. Канал доводит её до владельца в Telegram. Переменные не заданы —
+никуда ничего не уходит. Сбор по заявке не уведомляет: его исход и так видит
 тот, кто нажал кнопку.
 
-Здесь — только решение «писать ли и что»: чистая функция над итогами сбора.
+Решение «писать ли и что» — чистая функция `message`; отправка — `send`.
 """
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+import json
+import urllib.request
+from collections.abc import Mapping, Sequence
 
 from .collect import Outcome
 
-CHAT_VAR = "AGG_ALERT_CHAT_ID"
+URL_VAR = "FURCA_NOTIFY_URL"
+SECRET_VAR = "FURCA_SECRET"  # noqa: S105 — имя переменной, не значение
+PROJECT = "decimus"
 REASON_MAX = 160
+TIMEOUT_SEC = 15
 
 #: Подписи площадок в сообщении — как на странице рейтингов.
 _NAMES = {
@@ -41,10 +47,26 @@ _TEXT = {
 }
 
 
-def chat_id(raw: str | None) -> int | None:
-    """Telegram ID из переменной; пусто или не число — уведомление выключено."""
-    text = (raw or "").strip()
-    return int(text) if text.lstrip("-").isdigit() else None
+def channel(env: Mapping[str, str]) -> tuple[str, str] | None:
+    """Адрес `/notify` канала и ключ; чего-то нет — уведомление выключено."""
+    base = (env.get(URL_VAR) or "").strip().rstrip("/")
+    secret = (env.get(SECRET_VAR) or "").strip()
+    if not base.startswith(("http://", "https://")) or not secret:
+        return None
+    return f"{base}/notify", secret
+
+
+def send(target: tuple[str, str], text: str) -> None:
+    """Отправить тревогу в канал; ошибка сети или канала — исключение вызывающему."""
+    url, secret = target
+    request = urllib.request.Request(  # noqa: S310 — адрес из окружения площадки
+        url,
+        data=json.dumps({"project": PROJECT, "kind": "alert", "text": text}).encode(),
+        headers={"Authorization": f"Bearer {secret}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=TIMEOUT_SEC) as response:  # noqa: S310
+        response.read()
 
 
 def message(outcomes: Sequence[Outcome], lang: str = "ru") -> str | None:
