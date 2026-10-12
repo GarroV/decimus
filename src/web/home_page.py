@@ -5,21 +5,26 @@
 (D399). Партнёр видит свои пиццерии, УК — всю сеть: страница одна, различается
 охват. Сверху вниз:
 
+Блоки (D418) — компактной сеткой колонок, а не растянутыми по ширине; шире
+других только «Пиццерии»:
+
 1. «Требует внимания» — одна карточка: стикеры доски по живым счётчикам
    (`home_board`) и под ними пиццерии, куда смотреть. Нечего показать — карточки
    нет вовсе; отказ доски остаётся строкой с ошибкой, не тишиной;
 2. «Проверки за период» — итог; без проверок — одной строкой;
-3. «Где нужно проверить» (точки без проверок за период) | «Последние проверки»;
-4. «Топ нарушений» | «Потери по зонам», пустое скрыто;
-5. «Пиццерии» — на всю строку, с порядком на самом блоке и колонками последней
+3. «Последние проверки» — короткий список;
+4. «Топ нарушений», «Потери по зонам», пустое скрыто;
+5. «Рейтинги» — РС, РКО и карты: CEE и остальные страны (`home_ratings_block`);
+6. «Пиццерии» — на всю строку, с порядком на самом блоке и колонками последней
    оценки РС / РКО (`home_ratings.load_latest`; сбой — прочерки и строка в
-   шапке блока, экран остаётся);
-6. «Страны» — только тому, у кого стран больше одной.
+   шапке блока, экран остаётся).
 
-Период — один на экран: календарь «с — по» со стрелками, по умолчанию текущий
-месяц (D378, тот же `registry_period`, что у «Проверок»). Срез живёт в адресе,
-ссылкой делятся. «Город» и «Буква» с главной ушли: город — работа «Страны»
-(D260), буква видна в таблице пиццерий.
+Срез — в шапке одной строкой: период и страна. Период — календарь «с — по» со
+стрелками, по умолчанию текущий месяц (D378, тот же `registry_period`, что у
+«Проверок»). Страна — выпадающий список (только если стран больше одной), он
+сужает весь экран. Срез живёт в адресе, ссылкой делятся. «Город» и «Буква» с
+главной ушли: город — работа «Страны» (D260), буква видна в таблице пиццерий.
+«Где нужно проверить» живёт в «Проверках» (D418).
 
 Блок, чьи данные не прочитались, говорит об этом сам, а экран остаётся: доска и
 рейтинги — не повод не показать проверки. Пустой вспомогательный блок не
@@ -30,37 +35,24 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
 
 from flask import render_template, request, url_for
 
-from src.db import queries
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT
 
 from . import auth, home_board, home_ratings, registry_period, registry_view, view
 from . import overview as overview_data
+from .geo_names import country_title
 from .sections import section
 from .texts import t
 
 log = logging.getLogger(__name__)
 
 #: Сколько последних проверок показывает карточка «Последние проверки».
-LATEST_COUNT = 8
-
-
-@dataclass(frozen=True)
-class CountryRow:
-    """Строка блока «Страны»: проверки за период."""
-
-    code: str
-    units: int
-    checked: int
-    inspections: int
-    average: float | None
-    href: str
+LATEST_COUNT = 6
 
 
 def _url(endpoint: str, **params: Any) -> str:
@@ -156,23 +148,23 @@ def render(
     рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
     стикеры, доска_отказ = _board(reach)
 
-    страны = tuple(
-        CountryRow(
-            code=код,
-            units=точек,
-            checked=проверено,
-            inspections=проверок,
-            average=round(сумма / проверок, 1) if проверок else None,
-            href=select(country=код),
-        )
-        for код, точек, проверено, проверок, сумма, _d in queries.country_summary(
-            reach=reach, date_from=period.start, date_to=period.end
-        )
-        if not selection.country or код == selection.country
-    )
     # Заголовок колонки РС / РКО ведёт на «Рейтинги»; суженная страна — в её срез.
     ratings_href = _url(
         "ratings", lang=lang, **({"group": "country", "value": страна} if страна else {})
+    )
+    # Страна — выпадающим списком в шапке (D418): страны охвата вошедшего, пустое
+    # значение — все. Одна страна — выбирать нечего, списка нет.
+    выбор_страны = (
+        pick(
+            label="",
+            empty_title=t("home.country.all", lang),
+            current=selection.country,
+            values=snapshot.countries,
+            href=lambda значение: select(country=значение),
+            title=lambda код: country_title(код, lang),
+        )
+        if len(snapshot.countries) > 1
+        else None
     )
     порядок = pick(
         label=t("overview.sort", lang),
@@ -197,14 +189,13 @@ def render(
             if з and з != "score"
         },
         only_country=selection.country,
-        clear_country=select(country=""),
         stickers=стикеры,
         board_failed=доска_отказ,
         latest_count=LATEST_COUNT,
         ratings_href=ratings_href,
         unit_ratings=рейтинги,
         ratings_failed=рейтинги_отказ,
-        countries=страны,
+        country_pick=выбор_страны,
         sort_pick=порядок,
         registry_path=section("registry").path,
         grade_tone=view.grade_tone,

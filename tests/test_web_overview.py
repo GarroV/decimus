@@ -29,7 +29,7 @@ from src.db.errors import DbError
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
 from src.db.reach import Reach, own_reach
 from src.web import app as app_mod
-from src.web import home_board, home_page, home_ratings
+from src.web import home_board, home_ratings
 from src.web import overview as ov
 from src.web.texts import t as _t
 
@@ -185,7 +185,7 @@ def test_пустые_вспомогательные_блоки_не_показ�
     assert t_ru("home.top.title") not in страница
     assert t_ru("overview.zones.title") not in страница
     assert t_ru("overview.systemic.title") not in страница
-    assert t_ru("home.countries.title") not in страница
+    assert t_ru("home.country.all") not in страница
     assert t_ru("home.inspections.none") in страница
     assert "hm-plaques" not in страница
     assert t_ru("home.units.empty") in страница
@@ -790,16 +790,11 @@ def test_главная_собирает_доску_проверки_и_стра
 ) -> None:
     """Сквозной показ «Главной» (D399) со всеми блоками: шаблон не падает ни на одном."""
     # Arrange
-    monkeypatch.setattr(
-        home_page.queries,
-        "country_summary",
-        lambda **_: [("RS", 12, 3, 4, 360.0, 1), ("GE", 5, 2, 2, 190.0, 0)],
-    )
     monkeypatch.setattr(home_board, "kinds_for", lambda _who: (home_board.REVIEW,))
     monkeypatch.setattr(home_board, "load_counts", lambda *_, **__: home_board.Counts(review=2))
 
     # Act
-    страница = показать(стенд, monkeypatch, с_оценками())
+    страница = показать(стенд, monkeypatch, с_оценками(countries=(("RS", 12), ("GE", 5))))
 
     # Assert
     assert t_ru("home.attention.title") in страница
@@ -808,8 +803,8 @@ def test_главная_собирает_доску_проверки_и_стра
     assert (
         "Белград-1" in страница and "/inspections/11111111-2222-3333-4444-000000000001" in страница
     )
-    assert "Сербия" in страница and "3<small>/12</small>" in страница
-    assert 'href="/overview?country=RS' in страница
+    assert t_ru("home.country.all") in страница
+    assert "Сербия" in страница and 'href="/overview?country=RS' in страница
     assert "hm-chart" not in страница
 
 
@@ -893,20 +888,47 @@ def test_где_нужно_проверить_читается_в_охвате_�
     assert база.последние["date_from"] == date(2026, 9, 1)
 
 
-def test_мои_страны_только_когда_стран_больше_одной(
+def test_список_стран_только_когда_стран_больше_одной(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D398: таблица из одной страны повторяла бы итог — её нет."""
+    """D418: из одной страны выбирать нечего — списка нет; из двух — есть, и «Все страны» первым."""
+    # Act
+    одна = показать(стенд, monkeypatch, снимок(countries=(("RS", 12),)))
+    две = показать(стенд, monkeypatch, снимок(countries=(("RS", 12), ("GE", 5))))
+
+    # Assert
+    assert t_ru("home.country.all") not in одна
+    assert t_ru("home.country.all") in две
+    assert две.index(t_ru("home.country.all")) < две.index("Сербия") < две.index("Грузия")
+
+
+def test_таблицы_стран_внизу_главной_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D418: страна выбирается списком в шапке, а не таблицей в самом низу."""
+    # Act
+    страница = показать(стенд, monkeypatch, снимок(countries=(("RS", 12), ("GE", 5))))
+
+    # Assert
+    assert "hm-table--countries" not in страница
+
+
+def test_выбранная_страна_стоит_в_списке_и_ведёт_на_её_экран_у_ук(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Выбор страны живёт в адресе: подпись списка — выбранная страна, «Все страны» снимает."""
     # Arrange
     monkeypatch.setattr(
-        home_page.queries, "country_summary", lambda **_: [("RS", 12, 3, 4, 360.0, 1)]
+        app_mod.overview_data, "load", lambda **_: снимок(countries=(("RS", 12), ("GE", 5)))
     )
 
     # Act
-    страница = показать(стенд, monkeypatch, снимок())
+    страница = стенд.get("/overview?country=RS").get_data(as_text=True)
 
     # Assert
-    assert t_ru("home.countries.title") not in страница
+    assert "hm-only" not in страница
+    assert "<span>Сербия</span>" in страница
+    assert 'href="/overview"' in страница or 'href="/overview?lang=' in страница
 
 
 def test_страна_вне_охвата_из_адреса_главную_не_сужает(monkeypatch: pytest.MonkeyPatch) -> None:
