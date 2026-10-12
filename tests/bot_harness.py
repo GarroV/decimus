@@ -13,6 +13,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncGenerator
 from datetime import datetime, timezone
 from itertools import count
@@ -54,6 +55,10 @@ class RecordingSession(BaseSession):
         #: есть весь смысл задачи.
         self.sent_ids: list[int] = []
         self._ids = count(9000)
+        #: Взводится на каждом `SendMessage`. Тест, ждущий фоновую работу бота
+        #: (закрытие альбома и т. п.), ждёт это событие, а не гадает сроком:
+        #: время фоновой работы зависит от загрузки машины.
+        self.message_sent = asyncio.Event()
 
     async def close(self) -> None:
         return None
@@ -76,6 +81,8 @@ class RecordingSession(BaseSession):
         if name in {"SendMessage", "SendPhoto", "SendDocument", "EditMessageText"}:
             message_id = next(self._ids)
             self.sent_ids.append(message_id)
+            if name == "SendMessage":
+                self.message_sent.set()
             return Message(
                 message_id=message_id,
                 date=datetime.now(tz=timezone.utc),
