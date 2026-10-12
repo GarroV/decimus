@@ -78,7 +78,7 @@
     top.appendChild(el("h1", "walk-app__title", title));
     if (gear) {
       top.appendChild(langPill());
-      var g = W.button("walk-app__gear", "⚙", function () { A.go("settings"); });
+      var g = W.hinted(W.button("walk-app__gear", "⚙", function () { A.go("settings"); }), "settings");
       g.setAttribute("aria-label", tx("walk.app.settings"));
       top.appendChild(g);
     }
@@ -121,14 +121,14 @@
     if (d.state !== "active" || d.sealed) {
       // Начать проверку можно всегда, когда нет идущей (D392). Сданная для
       // аудитора — как отсутствующая (D400): прошлую карточку не показываем.
-      card.appendChild(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart));
+      card.appendChild(W.hinted(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart), "start"));
       return card;
     }
     var records = (d.zones || []).reduce(function (n, z) { return n + z.recorded.length; }, 0);
     card.appendChild(el("p", "walk-app__card-unit", d.unit));
     card.appendChild(el("p", "walk-app__card-text", W.day(d.date) + " · " + tx("walk.app.audit.records", { count: records })));
-    card.appendChild(W.button("walk-mark", tx("walk.app.audit.continue"), function () { A.go("walk"); }));
-    card.appendChild(W.button("walk-link", tx("walk.app.audit.new_other"), A.openStart));
+    card.appendChild(W.hinted(W.button("walk-mark", tx("walk.app.audit.continue"), function () { A.go("walk"); }), "continue"));
+    card.appendChild(W.hinted(W.button("walk-link", tx("walk.app.audit.new_other"), A.openStart), "start"));
     return card;
   }
 
@@ -154,7 +154,7 @@
 
   /** Язык интерфейса пилюлей в шапке главной (D414): тот же выбор, что в настройках. */
   function langPill() {
-    var pill = el("div", "walk-app__lang");
+    var pill = W.hinted(el("div", "walk-app__lang"), "lang");
     pill.setAttribute("role", "group");
     pill.setAttribute("aria-label", tx("walk.app.lang"));
     (app().langs || []).forEach(function (l) {
@@ -170,10 +170,54 @@
     return pill;
   }
 
+  /** Режим «Завершить» (D449): подпись, пилюля на всю ширину и строка пояснения. */
+  function finishModeRow() {
+    var box = el("div", "walk-app__row walk-app__row--stack");
+    box.appendChild(el("span", "walk-app__row-label", tx("walk.app.finish_mode")));
+    var pill = el("div", "walk-app__lang walk-app__lang--wide");
+    pill.setAttribute("role", "group");
+    pill.setAttribute("aria-label", tx("walk.app.finish_mode"));
+    ["summary", "report"].forEach(function (mode) {
+      var on = (app().finish_mode || "summary") === mode;
+      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), tx("walk.app.finish_mode." + mode), function () {
+        if (on) return;
+        act({ op: "finish_mode", mode: mode }).then(function (body) { if (body) W.apply(body); });
+      });
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      pill.appendChild(b);
+    });
+    box.appendChild(pill);
+    box.appendChild(el("p", "walk-app__note", tx("walk.app.finish_mode.hint")));
+    return box;
+  }
+
+  function translateModeRow() {
+    var box = el("div", "walk-app__row walk-app__row--stack");
+    box.appendChild(el("span", "walk-app__row-label", tx("walk.app.translate_mode")));
+    var pill = W.hinted(el("div", "walk-app__lang walk-app__lang--wide"), "translate_mode");
+    pill.setAttribute("role", "group");
+    pill.setAttribute("aria-label", tx("walk.app.translate_mode"));
+    ["button", "auto"].forEach(function (mode) {
+      var on = (app().translate_mode || "button") === mode;
+      var b = W.button("walk-app__lang-opt" + (on ? " is-on" : ""), tx("walk.app.translate_mode." + mode), function () {
+        if (on) return;
+        act({ op: "translate_mode", mode: mode }).then(function (body) { if (body) W.apply(body); });
+      });
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      pill.appendChild(b);
+    });
+    box.appendChild(pill);
+    box.appendChild(el("p", "walk-app__note", tx("walk.app.translate_mode.hint")));
+    return box;
+  }
+
   function settings(root) {
     root.appendChild(head(tx("walk.app.settings")));
     var list = el("section", "walk-app__list");
     list.appendChild(langRow());
+    list.appendChild(finishModeRow());
+    list.appendChild(translateModeRow());
+    W.hints.settingsRows(list);
     list.appendChild(row(tx("walk.app.help"), null, function () { A.go("help"); }));
     if (app().circle) {
       list.appendChild(row(tx("walk.app.claude"), null, function () { A.go("claude"); }));

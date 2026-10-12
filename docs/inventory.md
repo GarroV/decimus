@@ -294,7 +294,6 @@
 | `SEED_WEB_DEMO_FORCE` | `tools/seed_web_demo.py` | да |
 | `STATE_DIR` | `src/domain/config.py`, `src/report/letters.py`, `tools/state_backup.py` | да |
 | `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/web/walk_auth.py` | да |
-| `WALK_APP_FINISH` | `src/web/walk_auth.py` | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
@@ -373,6 +372,9 @@
 | `0053_agg_requests.sql` | `agg.requests` |
 | `0054_oauth.sql` | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_tokens` |
 | `0055_maps_ratings_index.sql` | — |
+| `0056_finish_modes.sql` | `finish_modes` |
+| `0057_checklist_langs.sql` | `checklist_langs` |
+| `0058_translate_modes.sql` | `translate_modes` |
 <!-- map:end -->
 
 ## Makefile
