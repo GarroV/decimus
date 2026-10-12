@@ -141,3 +141,15 @@ def test_post_память_не_открывает() -> None:
 
     assert ответ == "1,2"
     assert счёт.вызовов == 2
+
+
+def test_post_не_видит_чужую_память_оставшуюся_в_контексте() -> None:
+    """Закрытие прошлого запроса не дошло — память в контексте «протекла»: POST её не берёт."""
+    app = _приложение()[0]
+    token = request_memo._MEMO.set({"k": "чужое"})
+    try:
+        ответ = app.test_client().post("/read").get_data(as_text=True)
+    finally:
+        request_memo._MEMO.reset(token)
+
+    assert ответ == "1,2"

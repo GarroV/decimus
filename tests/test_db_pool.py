@@ -23,6 +23,14 @@ pytestmark = requires_db
 CUSTOM = "decimus.pool_probe"
 
 
+@pytest.fixture(autouse=True)
+def _свежая_настройка() -> object:
+    """Настройка пула читается один раз на процесс — каждому тесту нужна своя."""
+    pool.close_pools()
+    yield
+    pool.close_pools()
+
+
 @pytest.fixture
 def one_connection(db_env: str, monkeypatch: pytest.MonkeyPatch) -> str:
     """Пул на одно соединение: второе использование гарантированно то же самое."""
@@ -151,3 +159,30 @@ def test_недоступная_база_отказывает_сразу_а_не
 
     assert time.monotonic() - начало < 5
     assert not pool._pools, "пул на недоступную базу остался в таблице"
+
+
+@pytest.mark.parametrize("raw", ["abc", "-1", "2.5", "4 workers"])
+def test_негодный_потолок_даёт_сообщение_и_значение_по_умолчанию(
+    raw: str, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(pool.POOL_MAX_VAR, raw)
+
+    with caplog.at_level("ERROR", logger=pool.log.name):
+        настройка = pool._settings()
+
+    assert настройка.max_size == pool.DEFAULT_POOL_MAX
+    assert [r.getMessage() for r in caplog.records if pool.POOL_MAX_VAR in r.getMessage()]
+
+
+def test_нуль_выключает_пул_а_негодный_срок_берёт_умолчание(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    monkeypatch.setenv(pool.POOL_MAX_VAR, "0")
+    monkeypatch.setenv(pool.POOL_TIMEOUT_VAR, "скоро")
+
+    with caplog.at_level("ERROR", logger=pool.log.name):
+        настройка = pool._settings()
+
+    assert настройка.max_size == 0
+    assert настройка.timeout_s == pool.DEFAULT_POOL_TIMEOUT_S
+    assert any(pool.POOL_TIMEOUT_VAR in r.getMessage() for r in caplog.records)

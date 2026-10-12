@@ -33,9 +33,14 @@ T = TypeVar("T")
 _MEMO: ContextVar[dict[Hashable, Any] | None] = ContextVar("db_request_memo", default=None)
 
 
-def begin() -> Token[dict[Hashable, Any] | None]:
-    """Открыть память; вернуть метку, по которой `end` её закроет."""
-    return _MEMO.set({})
+def begin(*, enabled: bool = True) -> Token[dict[Hashable, Any] | None]:
+    """Начать запрос; вернуть метку, по которой `end` его закроет.
+
+    `enabled=False` — память явно выключена (`None`), а не просто не открыта:
+    запрос начинается в известном состоянии, даже если закрытие прошлого не
+    дошло и в контексте осталась чужая память.
+    """
+    return _MEMO.set({} if enabled else None)
 
 
 def end(token: Token[dict[Hashable, Any] | None]) -> None:

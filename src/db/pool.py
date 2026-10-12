@@ -16,7 +16,7 @@
 поэтому всё, что запрос оставил на сессии, увидел бы следующий — а у проекта
 роли и построчные политики (миграция `0010` и др.). На возврате в пул
 срабатывает `_reset`: `RESET ALL` (настройки сессии, включая `set_config(...,
-false)` и `decimus.*`), `RESET SESSION AUTHORIZATION` (роль), снятие
+false)` и `decimus.*`), `RESET ROLE` и `RESET SESSION AUTHORIZATION` (роль), снятие
 advisory-замков, `UNLISTEN *`, `CLOSE ALL`, `DISCARD TEMP`. Соединение в незавершённой или
 упавшей транзакции пул откатывает сам до `_reset`; если после сброса оно не
 чистое — выбрасывает. Все `set_config` и `SET` в коде и так транзакционно
@@ -46,6 +46,7 @@ import os
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import Any
 
 import psycopg
@@ -68,7 +69,7 @@ CONNECT_TIMEOUT_S = 10
 #: Что вернуть соединению перед следующим пользователем: настройки, роль,
 #: advisory-замки, подписки, курсоры, временные таблицы.
 RESET_SQL = (
-    "RESET ALL; RESET SESSION AUTHORIZATION; SELECT pg_advisory_unlock_all(); "
+    "RESET ALL; RESET ROLE; RESET SESSION AUTHORIZATION; SELECT pg_advisory_unlock_all(); "
     "UNLISTEN *; CLOSE ALL; DISCARD TEMP"
 )
 
@@ -91,16 +92,57 @@ def _reset(conn: psycopg.Connection[Any]) -> None:
         conn.set_autocommit(False)
 
 
-def _env_number(name: str, default: float) -> float:
-    raw = (os.environ.get(name) or "").strip()
-    if not raw:
-        return default
-    try:
-        value = float(raw)
-    except ValueError:
-        log.error("%s=%r не число, берём %s", name, raw, default)
-        return default
-    return value if value >= 0 else default
+@dataclass(frozen=True)
+class _Config:
+    max_size: int
+    timeout_s: float
+
+
+def _read_config() -> _Config:
+    """Прочитать и проверить `DB_POOL_MAX` и `DB_POOL_TIMEOUT_S`.
+
+    Негодное значение — одно внятное сообщение в журнал и значение по умолчанию:
+    опечатка в переменной не должна ронять каждую страницу.
+    """
+    max_size = DEFAULT_POOL_MAX
+    raw = (os.environ.get(POOL_MAX_VAR) or "").strip()
+    if raw:
+        if raw.isdecimal():
+            max_size = int(raw)
+        else:
+            log.error(
+                "%s=%r — нужно целое число не меньше 0; взято значение по умолчанию %s",
+                POOL_MAX_VAR,
+                raw,
+                DEFAULT_POOL_MAX,
+            )
+    timeout_s = DEFAULT_POOL_TIMEOUT_S
+    raw = (os.environ.get(POOL_TIMEOUT_VAR) or "").strip()
+    if raw:
+        try:
+            timeout_s = float(raw)
+            if not timeout_s > 0:
+                raise ValueError(raw)
+        except ValueError:
+            timeout_s = DEFAULT_POOL_TIMEOUT_S
+            log.error(
+                "%s=%r — нужно число секунд больше 0; взято значение по умолчанию %g",
+                POOL_TIMEOUT_VAR,
+                raw,
+                DEFAULT_POOL_TIMEOUT_S,
+            )
+    return _Config(max_size, timeout_s)
+
+
+_config: _Config | None = None
+
+
+def _settings() -> _Config:
+    """Настройка читается один раз на процесс (и заново после `close_pools`)."""
+    global _config
+    if _config is None:
+        _config = _read_config()
+    return _config
 
 
 _pools: dict[tuple[int, str], ConnectionPool[Any]] = {}
@@ -145,12 +187,13 @@ def _pool_for(dsn: str, max_size: int) -> ConnectionPool[Any]:
 @contextmanager
 def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
     """Соединение на время блока: из пула, а при `DB_POOL_MAX=0` — своё."""
-    max_size = int(_env_number(POOL_MAX_VAR, DEFAULT_POOL_MAX))
+    cfg = _settings()
+    max_size = cfg.max_size
     if max_size == 0:
         with psycopg.connect(dsn) as conn:
             yield conn
         return
-    timeout = _env_number(POOL_TIMEOUT_VAR, DEFAULT_POOL_TIMEOUT_S)
+    timeout = cfg.timeout_s
     try:
         with _pool_for(dsn, max_size).connection(timeout=timeout) as conn:
             yield conn
@@ -163,8 +206,10 @@ def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
 
 def close_pools() -> None:
     """Закрыть все пулы этого процесса. Для тестов и корректного выключения."""
+    global _config
     with _lock:
         pools = [p for (pid, _), p in _pools.items() if pid == os.getpid()]
         _pools.clear()
+        _config = None
     for pool in pools:
         pool.close()
