@@ -35,6 +35,7 @@ from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
 from .errors import AcceptError, ActionPlanError, ConfigError
 from .models import UPLOADED_ORIGINS
+from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 
 logger = logging.getLogger(__name__)
@@ -71,7 +72,7 @@ def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
         )
     settings = load_retraction_settings()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             происхождение = _apply(conn, ident, tenant_code, автор)
             # Загруженная задним числом проверка (текущая или историческая,
             # D334) запроса экшн-плана не открывает и никому ничего не шлёт

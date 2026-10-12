@@ -42,6 +42,7 @@ from ..domain.models import Score
 from .config import check_environment
 from .errors import ReviseError
 from .models import ORIGIN_LEGACY, InspectionDetail
+from .pool import connection
 from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
@@ -121,7 +122,7 @@ def revise_finding(
     if not revision.text.strip():
         raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             _apply(conn, ident, запись, tenant_code, revision, score_of)
             conn.commit()
     except ReviseError:

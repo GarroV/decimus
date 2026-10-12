@@ -39,6 +39,7 @@ from .config import (
 )
 from .errors import ActionPlanError, DbError, StorageError
 from .models import UPLOADED_ORIGINS
+from .pool import connection
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
@@ -384,14 +385,18 @@ def _uuid_or_none(value: str | None) -> str | None:
 
 def _read(sql: str, params: dict[str, Any]) -> tuple[PlanRequest, ...]:
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+        with connection(check_environment().dsn) as conn, conn.cursor() as cur:
             cur.execute(sql, params)
             heads = cur.fetchall()
             ids = [str(row[0]) for row in heads]
-            cur.execute(_FILES_SQL, {"ids": ids})
-            files = cur.fetchall()
-            cur.execute(_EVENTS_SQL, {"ids": ids})
-            events = cur.fetchall()
+            # Запросов нет — файлов и событий нет: два похода в базу «за пустым».
+            files: list[tuple[Any, ...]] = []
+            events: list[tuple[Any, ...]] = []
+            if ids:
+                cur.execute(_FILES_SQL, {"ids": ids})
+                files = cur.fetchall()
+                cur.execute(_EVENTS_SQL, {"ids": ids})
+                events = cur.fetchall()
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать экшн-планы ({type(exc).__name__})") from exc
     return tuple(_assemble(row, files, events) for row in heads)
@@ -489,7 +494,7 @@ def unit_country_missing(inspection_id: str, *, reach: Reach) -> bool:
     if ident is None:
         return False
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+        with connection(check_environment().dsn) as conn, conn.cursor() as cur:
             cur.execute(_UNIT_COUNTRY_MISSING_SQL, {"id": ident, **require_reach(reach).params()})
             row = cur.fetchone()
     except psycopg.Error as exc:
@@ -503,7 +508,7 @@ def file_for_download(file_id: str, *, reach: Reach) -> PlanFileRef | None:
     if ident is None:
         return None
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+        with connection(check_environment().dsn) as conn, conn.cursor() as cur:
             cur.execute(_FILE_SQL, {"id": ident, **require_reach(reach).params()})
             row = cur.fetchone()
     except psycopg.Error as exc:
@@ -795,7 +800,7 @@ def upload_version(
 
 def _record_version(ident: str, *, reach: Reach, row: dict[str, Any]) -> int:
     """Строка версии и перевод на приёмку — под замком строки запроса."""
-    with psycopg.connect(check_environment().dsn) as conn, conn.cursor() as cur:
+    with connection(check_environment().dsn) as conn, conn.cursor() as cur:
         cur.execute(_LOCK_FOR_UPLOAD_SQL, {"id": ident, **require_reach(reach).params()})
         head = cur.fetchone()
         if head is None:

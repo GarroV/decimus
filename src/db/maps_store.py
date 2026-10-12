@@ -15,6 +15,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 _UPSERT_COMPANY = """
 insert into maps.companies (uuid, network_uuid, network_name, name, country_code, city,
@@ -41,7 +42,7 @@ def save(
 ) -> tuple[int, int]:
     """Записать филиалы и оценки; вернуть, сколько легло. Отказ базы — `RatingsError`."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             with conn.cursor() as cur:
                 cur.executemany(_UPSERT_COMPANY, companies)
                 cur.executemany(_UPSERT_RATING, ratings)
@@ -55,7 +56,7 @@ def save(
 def log_load(*, ok: bool, companies: int = 0, ratings: int = 0, error: str | None = None) -> None:
     """След загрузки в журнале. Сам отказ журнала — в лог, загрузку он не отменяет."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             conn.execute(
                 "insert into maps.loads (outcome, companies, ratings, error) "
                 "values (%s, %s, %s, %s)",
@@ -68,7 +69,7 @@ def log_load(*, ok: bool, companies: int = 0, ratings: int = 0, error: str | Non
 def last_ok_load() -> datetime | None:
     """Когда последний раз загрузка удалась (`None` — ни разу)."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute("select max(at) from maps.loads where outcome = 'ok'").fetchone()
     except psycopg.Error as exc:
         raise RatingsError(
@@ -86,23 +87,43 @@ class LatestRating:
     on_date: date
 
 
+# Последняя оценка на каждую пару (филиал, карта): «пара за парой» через
+# `lateral ... limit 1`, а не `distinct on` по всей таблице (миграция 0055:
+# 130–170 мс → 4–6 мс). Перечень карт берётся прыжками по `provider_id`
+# (индекс `ratings_provider_company_date_idx`). Порядок строк прежний — по
+# филиалу и карте.
+_LATEST_SQL = """
+    with recursive prov(id) as (
+        (select r.provider_id from maps.ratings r order by r.provider_id limit 1)
+        union all
+        select (select r.provider_id from maps.ratings r
+                where r.provider_id > prov.id order by r.provider_id limit 1)
+        from prov where prov.id is not null
+    )
+    select c.country_code, last.provider_id, last.avg_rating, last.ratings_count, last.on_date
+    from maps.companies c
+    cross join (select id from prov where id is not null) p
+    cross join lateral (
+        select r.provider_id, r.avg_rating, r.ratings_count, r.on_date
+        from maps.ratings r
+        where r.company_uuid = c.uuid and r.provider_id = p.id
+          and (%s::date is null or r.on_date <= %s::date)
+        order by r.on_date desc
+        limit 1
+    ) last
+    where c.country_code = any(%s) and c.excluded_reason is null
+    order by c.uuid, p.id
+"""
+
+
 def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[LatestRating, ...]:
     """Последняя оценка каждого филиала на каждой карте по этим странам —
     на `until` включительно (не задан — на сегодня)."""
     if not countries:
         return ()
-    sql = """
-        select distinct on (r.company_uuid, r.provider_id)
-               c.country_code, r.provider_id, r.avg_rating, r.ratings_count, r.on_date
-        from maps.ratings r
-        join maps.companies c on c.uuid = r.company_uuid
-        where c.country_code = any(%s) and (%s::date is null or r.on_date <= %s::date)
-          and c.excluded_reason is null
-        order by r.company_uuid, r.provider_id, r.on_date desc
-    """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
-            rows = conn.execute(sql, (list(countries), until, until)).fetchall()
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(_LATEST_SQL, (until, until, list(countries))).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Оценки карт не прочитались ({exc.__class__.__name__})") from exc
     return tuple(LatestRating(str(r[0]), int(r[1]), float(r[2]), int(r[3]), r[4]) for r in rows)
@@ -111,7 +132,7 @@ def latest(countries: Sequence[str], *, until: date | None = None) -> tuple[Late
 def company_uuids() -> tuple[str, ...]:
     """Все известные филиалы — для дозагрузки истории."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute("select uuid::text from maps.companies order by uuid").fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Филиалы карт не прочитались ({exc.__class__.__name__})") from exc
@@ -122,7 +143,7 @@ def covered_days(company_uuid: str, start: date, end: date) -> int:
     """Сколько дней окна у филиала уже есть — чтобы повторная дозагрузка не
     тратила запросы на то, что уже легло."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             row = conn.execute(
                 "select count(distinct on_date) from maps.ratings "
                 "where company_uuid = %s and on_date between %s and %s",
@@ -136,7 +157,7 @@ def covered_days(company_uuid: str, start: date, end: date) -> int:
 def points() -> tuple[tuple[str, float, float], ...]:
     """Филиалы с координатами: (uuid, широта, долгота)."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(
                 "select uuid::text, lat, lng from maps.companies "
                 "where lat is not null and lng is not null"
@@ -153,7 +174,7 @@ def link_countries() -> tuple[str, ...]:
         union select code from ratings.countries
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(f"Страны карт не прочитались ({exc.__class__.__name__})") from exc
@@ -164,7 +185,7 @@ def save_links(links: Sequence[tuple[str, str, str, int]]) -> int:
     """Заменить связи целиком одним заходом: (филиал, код пиццерии, имя, метры).
     Филиал без связи в новом наборе связь теряет — пиццерия могла переехать."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             conn.execute(
                 "update maps.companies set dodo_id = null, dodo_name = null, "
                 "link_distance_m = null, linked_at = null where dodo_id is not null"
@@ -180,20 +201,33 @@ def save_links(links: Sequence[tuple[str, str, str, int]]) -> int:
     return len(links)
 
 
+# Оценка пиццерии на карте на дату: по каждому филиалу — последняя запись с
+# отзывами (`lateral ... limit 1` по первичному ключу), а среди филиалов одной
+# пиццерии — самая свежая. `distinct on` по всей таблице (прежний запрос)
+# читал её целиком и сортировал на диске: 135 мс → 1,5 мс (миграция 0055).
+# При равной дате у двух филиалов одной пиццерии берётся меньший `uuid` — раньше
+# выбор был случайным.
+_UNIT_SCORES_SQL = """
+    select distinct on (c.dodo_id) c.dodo_id, last.avg_rating, last.ratings_count
+    from maps.companies c
+    cross join lateral (
+        select r.avg_rating, r.ratings_count, r.on_date
+        from maps.ratings r
+        where r.company_uuid = c.uuid and r.provider_id = %s and r.on_date <= %s
+          and r.ratings_count > 0
+        order by r.on_date desc
+        limit 1
+    ) last
+    where c.dodo_id is not null and c.excluded_reason is null
+    order by c.dodo_id, last.on_date desc, c.uuid
+"""
+
+
 def unit_scores(provider_id: int, *, until: date) -> dict[str, tuple[float, int]]:
     """Оценка каждой связанной пиццерии на карте на дату: код → (оценка, отзывов)."""
-    sql = """
-        select distinct on (c.dodo_id) c.dodo_id, r.avg_rating, r.ratings_count
-        from maps.ratings r
-        join maps.companies c on c.uuid = r.company_uuid
-        where c.dodo_id is not null and r.provider_id = %s and r.on_date <= %s
-          and c.excluded_reason is null
-          and r.ratings_count > 0
-        order by c.dodo_id, r.on_date desc
-    """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
-            rows = conn.execute(sql, (provider_id, until)).fetchall()
+        with connection(check_environment().dsn) as conn:
+            rows = conn.execute(_UNIT_SCORES_SQL, (provider_id, until)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(
             f"Оценки пиццерий на картах не прочитались ({exc.__class__.__name__})"
@@ -213,7 +247,7 @@ def unit_latest(provider_id: int) -> dict[str, tuple[float, date]]:
         order by c.dodo_id, r.on_date desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (provider_id,)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(
