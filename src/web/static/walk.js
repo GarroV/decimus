@@ -485,7 +485,7 @@
       own.forEach(function (r) { now.appendChild(renderRecord(r, zone)); });
       stage.appendChild(now);
     } else if (!zone.previous.length && writable()) {
-      stage.appendChild(el("p", "walk-stage__note", zoneDone(zone) ? tx("walk.zone.clean_done") : tx("walk.zone.empty_hint")));
+      if (zoneDone(zone)) stage.appendChild(el("p", "walk-stage__note", tx("walk.zone.clean_done")));
     }
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);

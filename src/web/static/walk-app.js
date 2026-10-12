@@ -121,7 +121,6 @@
     if (d.state !== "active" || d.sealed) {
       // Начать проверку можно всегда, когда нет идущей (D392). Сданная для
       // аудитора — как отсутствующая (D400): прошлую карточку не показываем.
-      card.appendChild(el("p", "walk-app__card-text", tx("walk.app.audit.none")));
       card.appendChild(W.button("walk-mark", tx("walk.app.audit.new"), A.openStart));
       return card;
     }
@@ -145,18 +144,11 @@
 
   /* ── настройки ─────────────────────────────────────────────────────── */
 
+  /** Язык в настройках: подпись слева, пилюля справа — одной строкой. */
   function langRow() {
-    var box = el("div", "walk-app__row walk-app__row--stack");
+    var box = el("div", "walk-app__row");
     box.appendChild(el("span", "walk-app__row-label", tx("walk.app.lang")));
-    var seg = el("div", "walk-seg");
-    (app().langs || []).forEach(function (l) {
-      var on = l.code === data().lang;
-      seg.appendChild(W.button("walk-seg__opt" + (on ? " is-on" : ""), l.label, function () {
-        if (on) return;
-        act({ op: "lang", lang: l.code }).then(function (body) { if (body) W.apply(body); });
-      }));
-    });
-    box.appendChild(seg);
+    box.appendChild(langPill());
     return box;
   }
 
@@ -224,6 +216,7 @@
     if (got) {
       root.appendChild(el("pre", "walk-app__code", got.command));
       root.appendChild(W.button("walk-mark", tx("walk.app.claude.copy"), function () { copy(got.command); }));
+      root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.safety")));
       root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.restart")));
       if (got.replaced) root.appendChild(el("p", "walk-banner", tx("walk.app.claude.replaced")));
     }
@@ -532,8 +525,6 @@
   function replaceConfirm(root, wz) {
     var box = el("section", "walk-app__card");
     box.appendChild(el("h2", "walk-app__card-unit", tx("walk.start.replace_title")));
-    var cur = data();
-    box.appendChild(el("p", "walk-app__card-text", tx("walk.start.running", { unit: cur.unit || "—" })));
     box.appendChild(W.button("walk-btn walk-btn--danger", tx("walk.start.replace_yes"), function () {
       wz.replaceOk = true;
       wz.confirm = false;
@@ -556,11 +547,12 @@
       }
       return;
     }
-    if (wz.confirm) return replaceConfirm(root, wz);
     var o = wz.opts;
+    // «Идёт проверка…» — один раз: над формой и над подтверждением замены.
     if (o.state === "running") {
       root.appendChild(el("p", "walk-banner", tx("walk.start.running", { unit: data().unit || "—" })));
     }
+    if (wz.confirm) return replaceConfirm(root, wz);
     var form = el("form", "walk-app__form");
     form.noValidate = true;
     if (o.checklists.length > 1) {
@@ -578,8 +570,8 @@
     labelRow.appendChild(speech.firstChild);
     labelRow.appendChild(hintToggle(wz));
     speech.appendChild(labelRow);
-    if (wz.hint) speech.appendChild(el("p", "walk-form__note", tx("walk.start.speech_hint")));
-    speech.appendChild(choice(wz, "speech", langs, false));
+    if (wz.hint) speech.appendChild(el("p", "walk-app__tip", tx("walk.start.speech_hint")));
+    speech.appendChild(choice(wz, "speech", langs, true));
     form.appendChild(speech);
     if (wz.error && wz.field !== "unit") form.appendChild(el("p", "walk-form__error", wz.error));
     var go = W.button("walk-mark walk-app__go", tx(wz.busy ? "walk.start.going" : "walk.start.go"));
