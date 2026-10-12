@@ -1,5 +1,18 @@
 # Подъём на сервер
 
+**Содержание** (генерируется `make map`, руками не править):
+
+<!-- map:begin toc -->
+- [1. Что уезжает](#1-что-уезжает)
+- [2. Чего на сервере нет и не появится само](#2-чего-на-сервере-нет-и-не-появится-само)
+- [3. Площадка](#3-площадка)
+- [4. Порядок подъёма](#4-порядок-подъёма)
+- [5. Смоук на самом сервере](#5-смоук-на-самом-сервере)
+- [6. Откат](#6-откат)
+- [7. После подъёма](#7-после-подъёма)
+- [8. Прод на Linux (VPS) — переезд с MUSPELHEIM](#8-прод-на-linux-vps--переезд-с-muspelheim)
+<!-- map:end -->
+
 > **Прод с 26.09.2026 — VPS, §8.** Разделы 1–7 описывают площадку MUSPELHEIM,
 > **было до 26.09**: там остались стенд разработки (mac-stands) и приёмник
 > ночного бэкапа VPS, а старые боевые контейнеры держатся откатом до проверки
@@ -948,13 +961,13 @@ Remove-Item -Recurse -Force C:\projects\decimus
 
 | Что | Где |
 |---|---|
-| Админка | `https://decimus.95-111-249-216.sslip.io` → `web:8267` |
-| MCP | `https://mcp.decimus.95-111-249-216.sslip.io` → `mcp:8265` |
+| Админка | `https://<ORIGIN_HOST>` → `web:8267` |
+| MCP | `https://<MCP_ORIGIN_HOST>` → `mcp:8265` |
 | Каталог | `/srv/decimus` (клон репозитория, ветка `main`) |
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_state`, `decimus_frames`, `decimus_methodology` |
-| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://100.64.116.67:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
+| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
@@ -1141,7 +1154,7 @@ https://decimus.vasiliy-garro.workers.dev/auth/google/callback
 https://decimus.vasiliy-garro.workers.dev/auth/google/mail
 ```
 
-С 09.10.2026 адреса возврата — только на Worker'е (D304): sslip-адреса из
+С 09.10.2026 адреса возврата — только на Worker'е (D304): служебные адреса из
 клиента Google убраны, вход людей — только через фронт.
 
 В `.env` VPS: `GOOGLE_REDIRECT_URI` и `GOOGLE_MAIL_REDIRECT_URI` — те же строки,
@@ -1149,24 +1162,24 @@ https://decimus.vasiliy-garro.workers.dev/auth/google/mail
 `GOOGLE_CALLBACK_PATH` (`src/web/auth.py`), `MAIL_CALLBACK_PATH`
 (`src/web/letter_draft.py`). `BOT_MCP_URL` —
 `https://decimus-mcp.vasiliy-garro.workers.dev/` (D304): этот адрес бот
-вписывает в строку установки MCP, и он должен открываться там, где `sslip.io`
+вписывает в строку установки MCP, и он должен открываться там, где служебный домен
 заблокирован.
 
 ### 8.9. Вход через Cloudflare — постоянный (D236, D304, #424)
 
-В части стран `sslip.io` заблокирован по решению властей: провайдер отдаёт свою
+В части стран служебный домен заблокирован по решению властей: провайдер отдаёт свою
 заглушку и свой сертификат. Поэтому люди, бот и доки ходят на адреса
 Cloudflare Worker'ов. Это постоянный вход, своего домена не будет, пока
 владелец сам не решит (D304).
 
 | Что | Адрес для людей | Имя сайта в Caddy |
 |---|---|---|
-| Админка | `https://decimus.vasiliy-garro.workers.dev` | `decimus.95-111-249-216.sslip.io` |
-| MCP | `https://decimus-mcp.vasiliy-garro.workers.dev` | `mcp.decimus.95-111-249-216.sslip.io` |
+| Админка | `https://decimus.vasiliy-garro.workers.dev` | `<ORIGIN_HOST>` |
+| MCP | `https://decimus-mcp.vasiliy-garro.workers.dev` | `<MCP_ORIGIN_HOST>` |
 
 **Путь до сервера — туннель (Workers VPC).** Worker не ищет сервер по имени
-`sslip.io` в интернете: привязка `EDGE` (VPC-сервис `vps-edge-caddy`) ведёт
-запрос туннелем `vps-edge` прямо в Caddy на VPS. Имя `sslip.io` остаётся только
+служебный домен в интернете: привязка `EDGE` (VPC-сервис `vps-edge-caddy`) ведёт
+запрос туннелем `vps-edge` прямо в Caddy на VPS. Имя служебный домен остаётся только
 SNI и Host, по которым Caddy выбирает сайт, — его DNS и доступность в пути не
 участвуют. Туннель — контейнер `cloudflared` в `/srv/edge`
 (`GarroV/vps-infra: edge/compose.yml`), токен — `/srv/edge/tunnel.env` (600,
@@ -1178,11 +1191,32 @@ SNI и Host, по которым Caddy выбирает сайт, — его DNS
 
 | Что в Cloudflare | Имя | ID |
 |---|---|---|
-| Туннель | `vps-edge` | `6ec223e1-4c1b-46ac-98ed-ce36161a7b41` |
-| VPC-сервис | `vps-edge-caddy` (хост `caddy`, проверка сертификата выключена — участок туннель→Caddy внутри docker-сети) | `01a11a74-ba20-7ea3-a9c1-581681d0c341` |
+| Туннель | `vps-edge` | `<TUNNEL_ID>` |
+| VPC-сервис | `vps-edge-caddy` (хост `caddy`, проверка сертификата выключена — участок туннель→Caddy внутри docker-сети) | `<VPC_SERVICE_ID>` |
 
-Код — `front/src/index.js`, настройки — `front/wrangler.admin.jsonc` и
-`front/wrangler.mcp.jsonc`, выкладка `npx wrangler deploy -c <файл>` из `front/`.
+Код — `front/src/index.js`. Настройки — шаблоны `front/wrangler.admin.template.jsonc`
+и `front/wrangler.mcp.template.jsonc`: адреса инфраструктуры в репозиторий не
+кладутся (D431, `tests/test_no_infra_identifiers.py`), в шаблонах стоят заглушки
+`<VPC_SERVICE_ID>`, `<ORIGIN_HOST>`, `<MCP_ORIGIN_HOST>`. Wrangler подстановку
+переменных в конфиг не поддерживает, поэтому рабочий конфиг собирает
+`front/deploy.sh` из шаблона и неотслеживаемого `front/.deploy.env`
+(образец — `front/.deploy.env.example`; собранные `wrangler.*.jsonc` и
+`.deploy.env` в `.gitignore`).
+
+Выкладка, из `front/`:
+
+1. один раз: `cp .deploy.env.example .deploy.env` и вписать значения (ID
+   VPC-сервиса — в панели Cloudflare → Workers VPC; имена сайтов — как в
+   `/srv/edge/sites` на VPS);
+2. `./deploy.sh admin` и `./deploy.sh mcp` (лишние аргументы уходят в
+   `wrangler deploy`, например `--dry-run`).
+
+Секрет `FRONT_KEY` задаётся отдельно (`npx wrangler secret put FRONT_KEY -c
+wrangler.admin.jsonc`, после первого запуска `deploy.sh`) и выкладкой не
+затирается. Журналы Worker'ов выключены (`observability.enabled: false`): через
+них идут пароли, ключи и тела форм; код их тоже не пишет, в консоль уходит
+только строка про откат туннеля. Всё, что до D431 попало в историю git, считается
+раскрытым.
 
 **Адрес посетителя.** За Worker'ом все посетители пришли бы с адресов Cloudflare,
 а счётчик неудачных входов считает по адресу. Поэтому Worker передаёт адрес в
