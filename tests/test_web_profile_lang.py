@@ -108,9 +108,7 @@ def test_возврат_только_внутрь_приложения(
     monkeypatch: pytest.MonkeyPatch, языки: Языки, назад: str
 ) -> None:
     for client in _стенд(monkeypatch):
-        ответ = client.post(
-            "/settings/lang", data={"lang": "en", "next": назад}, headers=ЗАГОЛОВКИ
-        )
+        ответ = client.post("/settings/lang", data={"lang": "en", "next": назад}, headers=ЗАГОЛОВКИ)
 
         assert ответ.headers["Location"] == "/settings"
 
