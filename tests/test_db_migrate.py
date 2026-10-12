@@ -70,3 +70,25 @@ def test_изменённая_задним_числом_миграция_не_п
 
     with pytest.raises(ConfigError, match=r"0001_initial_schema\.sql"):
         apply_migrations(pg_dsn)
+
+
+def test_два_наката_одновременно_не_повторяют_миграцию(pg_dsn: str, tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """Две выкатки разом (#729): второй накат ждёт первый, а не повторяет его.
+
+    Миграция спит секунду до `create table`, поэтому без замка второй накат
+    успевает прочитать «ещё не применена» и падает на уже созданной таблице —
+    ровно так 12.10.2026 прод встал на повторном индексе.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    (tmp_path / "9990_race_probe.sql").write_text(
+        "select pg_sleep(1);\ncreate table race_probe (x int);\n", encoding="utf-8"
+    )
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            итоги = list(pool.map(lambda _: apply_migrations(pg_dsn, directory=tmp_path), range(2)))
+        assert sorted(итоги) == [[], ["9990_race_probe.sql"]]
+    finally:
+        with psycopg.connect(pg_dsn) as conn:
+            conn.execute("drop table if exists race_probe")
+            conn.execute("delete from schema_migrations where filename = '9990_race_probe.sql'")
