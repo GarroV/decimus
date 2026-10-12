@@ -23,7 +23,7 @@ pytest.importorskip("psycopg")
 import src.db.synonyms as synonyms_api
 from src.db.errors import ConfigError as DbConfigError
 from src.db.errors import DatabaseTargetError
-from src.mcp import phrases, retraction, tools
+from src.mcp import imports, phrases, retraction, tools
 from src.mcp.checklist import Store
 from src.mcp.db_target import DB_TARGET_MISMATCH
 from src.mcp.errors import ToolError
@@ -218,3 +218,25 @@ def test_текст_расхождения_не_называет_перемен�
     """Сторож самого текста: он один на все инструменты и уходит в модель."""
     _ответ_без_деталей(DB_TARGET_MISMATCH)
     assert "{" not in DB_TARGET_MISMATCH, "текст не шаблон: подставлять в него нечего"
+
+
+# --- импорты истории и приёмка (появились после #521, то же правило) ------------
+
+
+def test_импорт_на_расхождении_баз_отвечает_своим_кодом(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level("ERROR"), pytest.raises(ToolError) as пойман, imports._db():
+        _расхождение()
+
+    assert пойман.value.refusal == "db_target"
+    assert str(пойман.value) == DB_TARGET_MISMATCH
+    _журнал_с_деталями(caplog)
+
+
+def test_импорт_без_базы_по_прежнему_не_подключено() -> None:
+    with pytest.raises(ToolError) as пойман, imports._db(accept=True):
+        raise DbConfigError("не задана DATABASE_URL")
+
+    assert str(пойман.value) == imports.ACCEPT_NOT_CONNECTED
+    assert пойман.value.refusal is None

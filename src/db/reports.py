@@ -26,6 +26,7 @@ import psycopg
 
 from .config import check_environment, load_storage_settings
 from .errors import DbError, PushError, StorageError
+from .pool import connection
 from .reach import Reach, require_reach
 from .storage import PhotoStorage, S3PhotoStorage, key_of_uri
 
@@ -100,7 +101,7 @@ def upload_report(
     digest = hashlib.sha256(data).hexdigest()[:32]
     key = report_object_key(inspection_id, digest)
 
-    with psycopg.connect(settings.dsn) as conn:
+    with connection(settings.dsn) as conn:
         with conn.cursor() as cur:
             cur.execute(_SELECT_INSPECTION_SQL, (inspection_id,))
             if cur.fetchone() is None:
@@ -177,7 +178,7 @@ def latest_report(inspection_id: str, *, reach: Reach) -> ReportRef | None:
     """
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_LATEST_REPORT_SQL, {"id": inspection_id, **require_reach(reach).params()})
             row = cur.fetchone()
     except psycopg.Error as exc:

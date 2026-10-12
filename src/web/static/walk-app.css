@@ -1,0 +1,262 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DECIMUS · мини-апп как приложение аудитора (D373): главная и настройки.
+   Подключается после walk.css. Правило слоя то же: ни одного своего цвета.
+
+   Главная — карточки разделов (сейчас один: проверка пиццерии). Настройки —
+   список строк, как настройки телефона: подпись слева, значение справа, «›»
+   у того, что открывается дальше.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.walk-app__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin-bottom: 8px;
+}
+
+.walk-app__head .walk-sheet__back { flex: none; }
+
+.walk-app__title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
+  text-wrap: balance;
+}
+
+.walk-app__gear {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line-control);
+  border-radius: 19px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* ── главная: карточка раздела ─────────────────────────────────────────── */
+
+.walk-app__card {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+}
+
+.walk-app__card + .walk-app__card { margin-top: 8px; }
+
+.walk-app__card-title {
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.walk-app__card-unit { margin: 0; font-size: 17px; line-height: 24px; font-weight: 700; }
+
+.walk-app__card-text { margin: 0 0 2px; color: var(--ink-2); }
+
+/* ── настройки: строки ─────────────────────────────────────────────────── */
+
+.walk-app__list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.walk-app__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 14px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+}
+
+.walk-app__row + .walk-app__row { border-top: 1px solid var(--line); }
+
+.walk-app__row.is-link { width: 100%; cursor: pointer; }
+
+.walk-app__row.is-link:active { background: var(--surface-2); }
+
+.walk-app__row-label { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+
+.walk-app__row-value {
+  flex: none;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.walk-app__chev { flex: none; color: var(--ink-3); font-size: 20px; }
+
+.walk-app__subtitle {
+  margin: 16px 0 6px;
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.walk-app__prose {
+  margin: 0 0 16px;
+  max-width: 62ch;
+  color: var(--ink-2);
+  white-space: pre-line;
+}
+
+.walk-app__note { margin: 6px 0; color: var(--ink-3); font-size: 12px; line-height: 16px; }
+
+/* ── команда подключения: выделяется целиком, переносится внутри ─────── */
+
+.walk-app__code {
+  margin: 0 0 12px;
+  padding: 12px;
+  border: 1px solid var(--line-control);
+  border-radius: 12px;
+  background: var(--surface-2);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 18px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 40vh;
+  overflow: auto;
+  user-select: all;
+}
+
+.walk-app__add { display: flex; gap: 8px; margin-top: 12px; }
+
+.walk-app__add .walk-input { flex: 1; min-width: 0; }
+
+/* ── обход: «‹» к главной в шапке ──────────────────────────────────────── */
+
+.walk-top__home {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  margin-left: -8px;
+  border: 0;
+  border-radius: 18px;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-size: 26px;
+  cursor: pointer;
+}
+
+.walk-top__home:active { background: var(--surface-2); }
+
+.walk-app__card .walk-mark { margin-top: 4px; }
+
+/* ── начало проверки (D392): форма полями ─────────────────────────────── */
+
+.walk-app__card .walk-link { min-height: 44px; justify-self: start; }
+
+.walk-app__form { display: grid; gap: 0; }
+
+.walk-app__suggest { margin-top: 8px; }
+
+.walk-app__suggest:empty { display: none; }
+
+.walk-app__ask { margin-top: 8px; }
+
+.walk-app__go { margin-top: 16px; }
+
+/* Пояснение к «?»: одна приглушённая строка, не плашка. */
+.walk-app__tip { margin: 0 0 6px; color: var(--ink-3); font-size: 12px; line-height: 16px; }
+
+.walk-app__go:disabled { cursor: default; }
+
+.walk-app__card .walk-btn { width: 100%; }
+
+/* Язык интерфейса пилюлей в шапке главной (D414). */
+.walk-app__lang {
+  flex: none;
+  display: inline-flex;
+  padding: 2px;
+  border: 1px solid var(--line-control);
+  border-radius: 22px;
+  background: var(--surface);
+}
+
+.walk-app__lang-opt {
+  min-width: 40px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 16px;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.walk-app__lang-opt.is-on {
+  background: var(--accent);
+  color: var(--ink-inverse);
+}
+
+/* Пилюля на всю ширину: режим «Завершить» (D449) и язык отчёта в подтверждении. */
+.walk-app__lang--wide { display: flex; width: 100%; }
+
+.walk-app__lang--wide .walk-app__lang-opt { flex: 1; min-width: 0; }
+
+/* Строка настроек в столбик: подпись, под ней пилюля и пояснение. */
+.walk-app__row--stack {
+  flex-direction: column;
+  align-items: stretch;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.walk-app__row--stack .walk-app__note { margin: 0; }
+
+/* Подпись поля и «?» к ней в одну строку (D414). */
+.walk-app__label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.walk-app__label-row .walk-form__label { margin-bottom: 0; }
+
+.walk-app__hint {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-control);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.walk-app__hint.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+}

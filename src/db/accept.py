@@ -17,6 +17,11 @@
 Подтверждение берёт замок строки (`for update`) — тот же, что берёт правка
 записи (`revise.py`), поэтому правка и подтверждение одной проверки идут по
 очереди.
+
+Подтверждение обойдённой проверки с D2/D3 тем же движением открывает запрос
+экшн-плана (D272). Загруженная задним числом — текущая (`origin = 'import'`) и
+историческая (`'legacy'`, D334) — его не открывает (D310): решает строка базы, а
+не тот, кто подтверждает.
 """
 
 from __future__ import annotations
@@ -28,14 +33,15 @@ import psycopg
 
 from .action_plans import open_auto_request, today
 from .config import load_retraction_settings
-from .cross_space import Entry, record
 from .errors import AcceptError, ActionPlanError, ConfigError
+from .models import UPLOADED_ORIGINS
+from .pool import connection
 from .queries import _require_inspection_id, _require_tenant
 
 logger = logging.getLogger(__name__)
 
 _SELECT_HEAD_SQL = """
-select status, retracted_at
+select status, retracted_at, origin
 from inspections
 where id = %(id)s and tenant_code = %(tenant)s
 for update
@@ -50,15 +56,11 @@ where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and retracte
 """
 
 
-def accept_inspection(
-    inspection_id: str, *, tenant: str, actor: str, journal: Entry | None = None
-) -> None:
+def accept_inspection(inspection_id: str, *, tenant: str, actor: str) -> None:
     """Подтвердить проверку на приёмке.
 
     Отказ — `AcceptError` с объяснением: нет проверки, она уже принята,
     отклонена, не назван подтверждающий.
-
-    `journal` — строка журнала действий УК в чужом пространстве (пишется до коммита).
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -70,10 +72,17 @@ def accept_inspection(
         )
     settings = load_retraction_settings()
     try:
-        with psycopg.connect(settings.dsn) as conn:
-            _apply(conn, ident, tenant_code, автор)
-            _open_plan_request(conn, ident, автор)
-            record(conn, journal)  # той же транзакцией: откат подтверждения уносит строку
+        with connection(settings.dsn) as conn:
+            происхождение = _apply(conn, ident, tenant_code, автор)
+            # Загруженная задним числом проверка (текущая или историческая,
+            # D334) запроса экшн-плана не открывает и никому ничего не шлёт
+            # (D310): проверка трёхлетней давности не может требовать от
+            # партнёра план сегодня. Решает
+            # строка базы, а не вызывающий, поэтому подтверждение из веба
+            # («Ждут приёмки») и из MCP ведут себя одинаково, а переписать
+            # происхождение не даёт триггер `inspections_origin_fixed` (0038).
+            if происхождение not in UPLOADED_ORIGINS:
+                _open_plan_request(conn, ident, автор)
             conn.commit()
     except AcceptError:
         raise
@@ -86,13 +95,14 @@ def accept_inspection(
         ) from exc
 
 
-def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str) -> None:
+def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: str) -> str:
+    """Перевести ждущую в принятые; вернуть происхождение проверки (0038)."""
     with conn.cursor() as cur:
         cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
         шапка = cur.fetchone()
         if шапка is None:
             raise AcceptError(f"Проверки {ident} у арендатора {tenant} нет — подтверждать нечего")
-        статус, отклонена = шапка
+        статус, отклонена, происхождение = шапка
         if отклонена is not None:
             raise AcceptError(f"Проверка {ident} отклонена — отклонённую не подтверждают")
         if статус != "draft":
@@ -104,6 +114,7 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
                 f"ожидалась одна. Так выглядит отказ построчной политики: подключение "
                 f"обязано идти под ролью администратора истории"
             )
+    return str(происхождение)
 
 
 def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: str) -> None:

@@ -54,12 +54,12 @@ from typing import Any
 from src.domain import check_environment
 from src.domain.engine import chat_dir
 from src.domain.errors import DomainError
+from src.domain.handover import HANDED_OVER_KEY, NEVER_HANDED_OVER, NOTES_FILE_NAME
 from src.domain.state import state_lock
 
 from . import journal
 from .errors import BotNotesError
 
-NOTES_FILE_NAME = "bot.json"
 #: Четвёртое издание формата: добавлен `origins` — карта «сообщение АУДИТОРА →
 #: запись» (T205). Третье добавляло `records` — карту «сообщение бота → запись»
 #: (T204). Заметки прежних изданий читаются как прежде: отсутствующий ключ
@@ -70,11 +70,6 @@ NOTES_FILE_NAME = "bot.json"
 #: этих задач: ответ на их сообщения работает как раньше, связыванием
 #: комментария с кадром.
 SCHEMA = 4
-
-#: «Отчёт по этой проверке не отдавался». Не `0`: ноль записей — законная
-#: сданная проверка (чистая точка), и спутать эти два состояния значило бы
-#: снова назвать сданную проверку незавершённой.
-NEVER_HANDED_OVER = -1
 
 #: Почему кадр остался без записи (T269, #219). Пустая строка — четвёртое
 #: законное значение и означает «выбор по кадру не сделан»: до задачи это был
@@ -266,7 +261,7 @@ def _parse(raw: dict[str, Any], path: Path) -> Notes:
         records=_messages_from_raw(raw.get("records"), path, "Карта сообщений о записях"),
         origins=_messages_from_raw(raw.get("origins"), path, "Карта сообщений аудитора"),
         repeat_asks=_repeat_asks_from_raw(raw.get("repeat_asks"), path),
-        handed_over_findings=_handed_over_from_raw(raw.get("handed_over_findings"), path),
+        handed_over_findings=_handed_over_from_raw(raw.get(HANDED_OVER_KEY), path),
     )
 
 
@@ -315,7 +310,7 @@ def _write(chat_id: int, notes: Notes) -> None:
         "repeat_asks": [
             {"message_id": r.message_id, "n": r.n, "code": r.code} for r in notes.repeat_asks
         ],
-        "handed_over_findings": notes.handed_over_findings,
+        HANDED_OVER_KEY: notes.handed_over_findings,
     }
     fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=".bot-notes-", suffix=".tmp")
     try:

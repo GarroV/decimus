@@ -8,7 +8,7 @@
 `docs/furca/blocks/db.md`). Снаружи арендатор не принимается ни в каком виде —
 ни аргументом вызова, ни заголовком, ни по имени.
 
-**Откуда он берётся — двух видов, и оба задаёт не спрашивающий** (T253):
+**Откуда он берётся — трёх видов, и все задаёт не спрашивающий** (T253, D417):
 
 1. Карта «арендатор=токен» из `.env` (`MCP_TOKENS`): токен принадлежит
    СТОРОНЕ, открывает всю её историю проверок, разбирается один раз на старте.
@@ -16,6 +16,10 @@
    Живёт отпечатком в базе (`src/db/mcp_access.py`), отзывается поимённо и
    немедленно, а арендатор у него записан при выпуске — из настройки стенда,
    не из разговора.
+3. Access-токен OAuth (D417): человек подключил Claude входом на сайт
+   своей учёткой. Пространство и РОЛЬ берутся из учётки на каждом вызове, и
+   права тогда решает роль (`policy.py`), а не только пространство. Дверь
+   открыта только при заданных `ADMIN_PUBLIC_URL` и `MCP_PUBLIC_URL`.
 
 Проверяются они по очереди (`resolve_access`) и обе действуют одновременно.
 Карту из `.env` не отключили намеренно: на момент перехода это единственный
@@ -37,7 +41,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.domain.tenants import canonical_tenant
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .errors import AuthError, McpConfigError
 
@@ -78,6 +83,21 @@ MCP_CHECKLIST_TENANTS_VAR = "MCP_CHECKLIST_TENANTS"
 #: отказ на старте, то есть смена токена в одном месте и забытая в другом
 #: роняет сервер, а не отбирает право тихо.
 MCP_RETRACTION_TOKENS_VAR = "MCP_RETRACTION_TOKENS"
+
+#: Открыта ли загрузка проверок задним числом (D305, D334): черновик, записи,
+#: кадры, подтверждение. Пусто — загрузка закрыта всем, и это её выключатель
+#: (D335: «законсервировать»); уже загруженное при этом не трогается. По
+#: пространству, а не по токену, как и методика: загружает сторона, а кто
+#: именно загрузил и подтвердил — пишется подписью `web:<логин>` учётки (личный
+#: токен и вход через OAuth, `Access.actor`), а у стороннего токена — `mcp:<сторона>`.
+#:
+#: Единственное допустимое значение — `HQ` (D335): загрузка задним числом только
+#: у УК, партнёрам — никогда. Держит это код (`_parse_import`), а не настройка:
+#: любое другое пространство в переменной — отказ на старте сервиса.
+#:
+#: Открыть загрузку без хранилища версий методики нельзя: текущую проверку
+#: считает движок по действующей версии, а версии лежат там.
+MCP_IMPORT_TENANTS_VAR = "MCP_IMPORT_TENANTS"
 
 #: Каталог боевой методики — тот же, из которого читает движок. Своей
 #: переменной блок не заводит: второй путь к одной методике разошёлся бы с
@@ -143,6 +163,30 @@ class Settings:
     #: никому. `repr=False` по той же причине, что и карта токенов выше: это
     #: значения секретов, а `repr` настроек уезжает в трейсбек и дальше в лог.
     retraction_tokens: tuple[str, ...] = field(default=(), repr=False)
+    #: Арендаторы, которым открыта загрузка исторических проверок (D305).
+    import_tenants: tuple[str, ...] = ()
+    #: Внешний адрес админки — сервер авторизации OAuth (D417). `None` — OAuth выключен.
+    admin_public_url: str | None = None
+    #: Внешний адрес самого MCP — ресурс OAuth (D417). `None` — OAuth выключен.
+    mcp_public_url: str | None = None
+
+    @property
+    def oauth_enabled(self) -> bool:
+        """Третья дверь (OAuth, D417) открыта: оба внешних адреса заданы."""
+        return self.admin_public_url is not None and self.mcp_public_url is not None
+
+    def may_import(self, tenant: str) -> bool:
+        """Открыта ли ЭТОМУ арендатору загрузка исторических проверок (D305).
+
+        Как и правка методики, спрашивается по коду арендатора из токена — на
+        той же двери, что граница арендаторов. Без хранилища версий и боевой
+        методики загрузка закрыта: оценку считать не по чему.
+        """
+        return (
+            self.checklist_store is not None
+            and self.data_dir is not None
+            and canonical_tenant(tenant) in self.import_tenants
+        )
 
     def may_retract(self, token: str) -> bool:
         """Открыто ли снятие проверок ЭТОМУ токену (T211, D086/D089).
@@ -171,7 +215,9 @@ class Settings:
         больше, — то есть право на правку методики держится на той же двери,
         что и граница арендаторов, и отдельного способа его получить нет.
         """
-        return self.checklist_store is not None and tenant in self.checklist_tenants
+        return (
+            self.checklist_store is not None and canonical_tenant(tenant) in self.checklist_tenants
+        )
 
     def may_read_checklist(self, tenant: str) -> bool:
         """Открыт ли ЭТОМУ арендатору ИСХОДНИК эталона — чтение, не правка.
@@ -323,9 +369,11 @@ def _parse_checklist(
     включённой, а инструменты молча отказывают всем — и разбираться он идёт в
     код, а не в `.env`.
 
-    Арендатор, которому открыта методика, обязан существовать среди токенов:
-    опечатка в коде иначе означала бы доступ, выданный никому, — и выглядела бы
-    ровно как работающая настройка.
+    Присутствие арендатора среди `MCP_TOKENS` НЕ требуется (08.10.2026, D311):
+    методику правят и по ЛИЧНЫМ токенам, выпущенным ботом (T253), а их
+    арендаторы живут в базе и на старте неизвестны. Требование уронило прод:
+    `MCP_CHECKLIST_TENANTS=HQ` при личных токенах `HQ` и без токена стороны
+    `HQ` — сервер не поднялся. Тот же довод, что у загрузки (`_parse_import`).
     """
     store_raw = (src.get(MCP_CHECKLIST_STORE_VAR) or "").strip()
     сказано = _SEPARATORS.split(src.get(MCP_CHECKLIST_TENANTS_VAR) or "")
@@ -344,13 +392,6 @@ def _parse_checklist(
             f"методика открыта ({MCP_CHECKLIST_TENANTS_VAR}). Инструменты методики отказывали бы "
             f"всем, а выглядело бы это как включённая правка"
         )
-    чужие = [code for code in named if code not in tenants]
-    if чужие:
-        raise McpConfigError(
-            f"В {MCP_CHECKLIST_TENANTS_VAR} названы арендаторы, которых нет среди токенов: "
-            f"{', '.join(чужие)}. Опечатка в коде означала бы доступ, выданный никому, — и "
-            f"выглядела бы как работающая настройка"
-        )
     data_raw = (src.get(DATA_DIR_VAR) or "").strip()
     if not data_raw:
         raise McpConfigError(
@@ -363,6 +404,48 @@ def _parse_checklist(
         named,
         Path(os.path.abspath(os.path.expanduser(data_raw))),
     )
+
+
+def _parse_import(raw: str, *, store: Path | None, data_dir: Path | None) -> tuple[str, ...]:
+    """Открыта ли загрузка проверок задним числом. Пусто — закрыта всем (D305, D335).
+
+    Открывается только УК: любое пространство кроме `HQ` (после перевода старого
+    кода, `canonical_tenant`) — отказ на старте сервиса (D335). Партнёр не
+    получает загрузку задним числом никакой переменной: опечатка или «временно
+    дадим» в `.env` роняет сервис, а не открывает дверь молча.
+
+    Названная без хранилища версий методики, она означала бы инструменты,
+    отказывающие всем на первом же черновике, — и выглядело бы это как
+    работающая настройка. Поэтому отказ на старте, тем же приёмом, что у
+    методики (`_parse_checklist`).
+
+    Присутствие арендатора среди `MCP_TOKENS` НЕ требуется — в отличие от
+    методики. Загружает коллега по ЛИЧНОМУ токену, выпущенному ботом (T253), а
+    арендаторы личных токенов живут в базе и на старте неизвестны: требование
+    закрыло бы загрузку ровно тому, кому она нужна.
+    """
+    названные = tuple(
+        sorted({canonical_tenant(x) for x in _SEPARATORS.split(raw or "") if x.strip()})
+    )
+    if not названные:
+        return ()
+    чужие = [x for x in названные if x != HQ_TENANT]
+    if чужие:
+        raise McpConfigError(
+            f"Загрузка проверок задним числом открывается только УК ({HQ_TENANT}), а в "
+            f"{MCP_IMPORT_TENANTS_VAR} названы и другие пространства: {', '.join(чужие)}. "
+            f"Партнёрам загрузка задним числом не открывается никогда (D335). Оставьте "
+            f"{MCP_IMPORT_TENANTS_VAR}={HQ_TENANT} или пустым — пустая переменная закрывает "
+            f"загрузку всем"
+        )
+    if store is None or data_dir is None:
+        raise McpConfigError(
+            f"Загрузка исторических проверок открыта ({MCP_IMPORT_TENANTS_VAR}), но хранилище "
+            f"версий методики не настроено ({MCP_CHECKLIST_STORE_VAR}, "
+            f"{MCP_CHECKLIST_TENANTS_VAR}, {DATA_DIR_VAR}). Оценку загруженной проверки "
+            f"считает движок по её версии методики, а версии лежат там"
+        )
+    return названные
 
 
 def _parse_retraction(raw: str, tokens: Mapping[str, str]) -> tuple[str, ...]:
@@ -411,7 +494,7 @@ def _check_any_door(tokens: Mapping[str, str], src: Mapping[str, str]) -> None:
     До T253 дверь была одна — карта «арендатор=токен» из `.env`, и пустая
     карта означала ровно «доступ никем не закрыт». Теперь доступ выдаёт бот:
     токен личный, живёт отпечатком в базе и сверяется здесь же
-    (`_tenant_from_store`). Пустая карта при живой базе означает не «открыт», а
+    (`_owner_from_store`). Пустая карта при живой базе означает не «открыт», а
     «сторонних токенов нет, ходят только по личным» — законная настройка
     площадки, и требовать ради старта сторонний токен значило бы держать
     открытой ровно ту дверь, которую личные токены заводились заменить (#214).
@@ -432,8 +515,16 @@ def _check_any_door(tokens: Mapping[str, str], src: Mapping[str, str]) -> None:
         f"Ни одной двери: {MCP_TOKENS_VAR} пуста и {DATABASE_URL_VAR} не задана. Без карты "
         f"«арендатор=токен» и без базы личных токенов сервер поднялся бы открытым — за дверью "
         f"история проверок партнёра. Достаточно любой из двух: пример карты — в .env.example, "
-        f"личные токены выдаёт бот пунктом «Установка MCP»"
+        f"личный токен человек выпускает себе сам в настройках веба"
     )
+
+
+def _parse_public(src: Mapping[str, str], var: str) -> str | None:
+    """Внешний адрес для OAuth (D417); кривой — отказ запуска, а не тихо выключенный вход."""
+    try:
+        return parse_public_url(src.get(var) or "", var=var)
+    except ValueError as отказ:
+        raise McpConfigError(str(отказ)) from None
 
 
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
@@ -455,6 +546,11 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         checklist_tenants=checklist_tenants,
         data_dir=data_dir,
         retraction_tokens=_parse_retraction(src.get(MCP_RETRACTION_TOKENS_VAR) or "", tokens),
+        import_tenants=_parse_import(
+            src.get(MCP_IMPORT_TENANTS_VAR) or "", store=store, data_dir=data_dir
+        ),
+        admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
+        mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
     )
 
 
@@ -475,13 +571,31 @@ class Access:
     tenant: str
     #: Открыто ли этому токену снятие проверок из истории (T211, D086/D089).
     may_retract: bool
+    #: Кто пришёл — подписью для журнала действий, а не секретом: `web:<логин>`
+    #: у личного токена и входа через OAuth (учётка сайта, D448), `mcp:<арендатор>` у
+    #: стороннего из карты `.env`. Нужна подтверждению загруженной проверки
+    #: (D308): принятая подписывается тем, кто её принял (D199).
+    actor: str = ""
+    #: Роль учётки сайта — у личного токена и у входа через OAuth (D417, аудит
+    #: 12.10): права тогда решает матрица `policy.py`. Роли нет (`None`) только
+    #: у служебного токена из карты `MCP_TOKENS` — его заводит владелец стенда
+    #: руками, и открывает он всё пространство.
+    role: str | None = None
 
 
-def _tenant_from_store(token: str) -> str | None:
-    """Арендатор ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
+def _owner_from_store(token: str) -> Access | None:
+    """Доступ ЛИЧНОГО токена учётки (T253, D098, D448).
 
-    Вторая дверь рядом с картой из `.env`, а не вместо неё. Личные токены
-    выпускает бот, хранит отпечатками и отзывает поимённо
+    С аудита 12.10 (F-017, F-022, F-023, F-035) личный токен выпущен на учётку
+    сайта: хранилище на каждый вызов сверяет её отключение, роль, пространство
+    и срок токена (`mcp_access.resolve_token`). Подпись — логин учётки, как у
+    входа через OAuth: человек один, какой дверью бы ни пришёл (D448). Роль уходит
+    в `Access.role`, и права решает та же матрица, что у входа через сайт
+    (`policy.py`). Снятие проверок личным токеном не выдаётся.
+
+    Вторая дверь рядом с картой из `.env`, а не вместо неё. Личный токен
+    человек выпускает себе сам (настройки веба, бот, мини-апп); хранится он
+    отпечатком
     (`src/db/mcp_access.py`); сверяются они здесь, потому что предъявляются
     сюда — блоки `bot` и `mcp` пиры и друг друга не импортируют, общее место у
     них одно, ярусом ниже.
@@ -515,7 +629,51 @@ def _tenant_from_store(token: str) -> str | None:
             exc_info=True,
         )
         return None
-    return None if владелец is None else владелец.tenant
+    if владелец is None:
+        return None
+    return Access(
+        tenant=canonical_tenant(владелец.tenant),
+        may_retract=False,
+        actor=f"web:{владелец.login}",
+        role=владелец.role,
+    )
+
+
+def _owner_from_oauth(token: str, resource: str) -> Access | None:
+    """Третья дверь (D417): access-токен OAuth, выданный админкой после входа учёткой сайта.
+
+    Учётка, её пространство и роль читаются из базы на КАЖДЫЙ вызов, одним
+    запросом со сверкой токена (`oauth_store.resolve_access_token`):
+    отключённая учётка и отозванное подключение не находятся вовсе, смена роли
+    видна сразу. Токен, выданный для другого ресурса (RFC 8707), — не опознан:
+    годен только выданный для `MCP_PUBLIC_URL` этого сервера. Права решает роль
+    (`policy.py`), снятие проверок через OAuth не выдаётся никому.
+
+    Импорт ленивый и отказ базы громкий в журнал — по тем же причинам, что у
+    личных токенов (`_owner_from_store`).
+    """
+    try:
+        from ..db.oauth_store import resolve_access_token
+    except ImportError:
+        return None
+    try:
+        владелец = resolve_access_token(token, resource=resource)
+    except Exception:
+        logger.warning(
+            "токены OAuth не сверены — хранилище недоступно; карта %s и личные токены "
+            "этот токен уже не опознали",
+            MCP_TOKENS_VAR,
+            exc_info=True,
+        )
+        return None
+    if владелец is None:
+        return None
+    return Access(
+        tenant=canonical_tenant(владелец.tenant),
+        may_retract=False,
+        actor=f"web:{владелец.login}",
+        role=владелец.role,
+    )
 
 
 def resolve_access(settings: Settings, header: str | None) -> Access:
@@ -530,9 +688,11 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
     этом называет ожидаемый вид заголовка — иначе забытая схема неотличима от
     неверного токена, и человек чинит не то.
 
-    **Дверей две, и порядок между ними важен** (T253). Сперва карта из `.env`
+    **Дверей три, и порядок между ними важен** (T253, D417). Сперва карта из `.env`
     — она в памяти и стоит одного сравнения; затем личные токены из базы,
-    выпущенные ботом. Обратный порядок означал бы поход в базу на каждый
+    выпущенные ботом; третьей — access-токены OAuth, выданные админкой после
+    входа учёткой сайта (только при заданных `ADMIN_PUBLIC_URL` и
+    `MCP_PUBLIC_URL`). Обратный порядок означал бы поход в базу на каждый
     запрос стороны, у которой токен и так в карте.
 
     Карта из `.env` продолжает работать намеренно. На момент перехода это
@@ -563,8 +723,13 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
             "«Authorization: Bearer <токен>». Доступ к проверкам закрыт личным токеном"
         )
     tenant = settings.tenant_for(token)
-    if tenant is None:
-        tenant = _tenant_from_store(token)
-    if tenant is None:
-        raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
-    return Access(tenant=tenant, may_retract=settings.may_retract(token))
+    if tenant is not None:
+        return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=f"mcp:{tenant}")
+    личный = _owner_from_store(token)
+    if личный is not None:
+        return личный
+    if settings.oauth_enabled and settings.mcp_public_url:
+        через_сайт = _owner_from_oauth(token, settings.mcp_public_url)
+        if через_сайт is not None:
+            return через_сайт
+    raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")

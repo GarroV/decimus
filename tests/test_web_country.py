@@ -195,3 +195,51 @@ def test_обрезанный_срез_страны_экран_называет_
 
     assert "В срезе больше 1 проверок" in открыть(стенд, monkeypatch, обрезан, "/country/GE")
     assert "В срезе больше" not in открыть(стенд, monkeypatch, вид, "/country/GE")
+
+
+def test_страна_без_проверок_схлопывает_пустое_в_одну_строку(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    пустая = replace(
+        данные(),
+        snapshot=replace(
+            данные().snapshot,
+            inspections=(),
+            inspections_total=0,
+            zone_losses=(),
+            systemic=(),
+        ),
+    )
+    # Чтение планов и предписаний — база; здесь они «известны и пусты».
+    monkeypatch.setattr(
+        app_mod,
+        "_country_plans",
+        lambda _код: {
+            "plans": (), "plans_known": True, "plans_truncated": False, "plans_limit": 50,
+            "plans_today": None, "plans_path": "/plans", "plans_act_path": "/actions",
+            "plans_act_country": True, "state_tones": {},
+        },
+    )  # fmt: skip
+    monkeypatch.setattr(
+        app_mod.prescriptions,
+        "country_block",
+        lambda _код: {
+            "rx_rows": (), "rx_known": True, "rx_truncated": False, "rx_limit": 50,
+            "rx_hq_path": "/actions/prescriptions", "rx_partner_path": "/orders",
+            "rx_act_hq": True, "today_rx": None,
+        },
+    )  # fmt: skip
+    страница = открыть(стенд, monkeypatch, пустая, "/country/GE")
+    assert страница.count("cn-quiet") == 1
+    assert "Пока нет:" in страница
+    # Пустые рамки и отбор без проверок не рисуются.
+    assert "ov-filters" not in страница
+    assert "country.systemic.title" not in страница and "Где страна теряет" not in страница
+
+
+def test_шапка_страны_держит_кнопки_и_счётчики(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
+    шапка = страница.split('class="cn-actions"', 1)[1].split("</div>", 1)[0]
+    assert "cn-count" in шапка and "Экшн-планы" in шапка and "Предписания" in шапка

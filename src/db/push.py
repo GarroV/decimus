@@ -31,6 +31,7 @@ from .config import check_environment
 from .directory import resolve_unit_id
 from .errors import PushError, UnitRefusedError, VersionMismatchError
 from .fingerprint import compute_fingerprint, previous_fingerprints
+from .pool import connection
 from .units import normalize_unit_name
 
 #: Арендатор по умолчанию, пока в проверке своего не задано. Совпадает со
@@ -58,12 +59,12 @@ _INSERT_INSPECTION_SQL = """
 insert into inspections (
     tenant_code, unit_id, chat_id, kind, inspection_date, report_lang,
     ui_lang, speech_lang, checklist_version, checklist_code, auditor, city, partner, contact,
-    pct, grade, deductions, counts, by_zone, source_fingerprint, created_by, status
+    pct, grade, deductions, counts, by_zone, source_fingerprint, status
 ) values (
     %(tenant_code)s, %(unit_id)s, %(chat_id)s, %(kind)s, %(inspection_date)s,
     %(report_lang)s, %(ui_lang)s, %(speech_lang)s, %(checklist_version)s,
     %(checklist_code)s, %(auditor)s, %(city)s, %(partner)s, %(contact)s, %(pct)s, %(grade)s,
-    %(deductions)s, %(counts)s, %(by_zone)s, %(source_fingerprint)s, %(created_by)s, 'draft'
+    %(deductions)s, %(counts)s, %(by_zone)s, %(source_fingerprint)s, 'draft'
 )
 on conflict (source_fingerprint) where retracted_at is null do nothing
 returning id
@@ -388,8 +389,6 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     "counts": Json(dict(result.counts)),
                     "by_zone": Json(_by_zone_payload(result)),
                     "source_fingerprint": fingerprint,
-                    # Пустая строка — `null`, а не ошибка формата `uuid` (D311).
-                    "created_by": inspection.author_user_id or None,
                 },
             )
         except psycopg.errors.RaiseException as exc:
@@ -488,7 +487,7 @@ def push_inspection(chat_id: int, *, allow_unknown_version: bool = False) -> str
                 f"push_inspection(chat_id, allow_unknown_version=True)"
             )
         result = domain_score(chat_id)
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             return _push(conn, inspection, result)
     except PushError:
         raise

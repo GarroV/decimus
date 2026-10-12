@@ -113,6 +113,10 @@ def ask_model(
             instructions=instructions,
             input=[message],
             text=text_config,
+            # Кадры кухни (на них бывают лица) и записи не оставляем у OpenAI:
+            # без `store=False` Responses хранит запрос и ответ у себя. Цепочек
+            # ответов (`previous_response_id`) у нас нет, хранить незачем.
+            store=False,
         )
     except OpenAIError as exc:
         raise ModelUnavailable(f"Модель не ответила: {exc}") from exc

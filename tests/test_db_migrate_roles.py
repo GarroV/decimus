@@ -185,8 +185,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Зафиксированное письмо тоже не переписывается (`0019`): из истории
     # нельзя вынуть отправленное, иначе она перестаёт быть историей.
     "partner_letters": {"SELECT", "INSERT"},
-    # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`).
-    "mcp_admins": {"SELECT", "INSERT"},
+    # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
+    # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
     # Карта синонимов формулировок только пополняется (`0012`, T284, D119):
     # UPDATE и DELETE не выданы намеренно. Синоним, который уже работает, не
@@ -218,6 +218,12 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "bot_bindings": {"SELECT", "INSERT"},
     # Язык бота, выбранный человеком (D303, `0035`): удалять выбор не может никто.
     "bot_ui_langs": {"SELECT", "INSERT"},
+    # Режим «Завершить» в мини-аппе (D449, `0056`): как язык — удалять нельзя.
+    "finish_modes": {"SELECT", "INSERT"},
+    # Язык чек-листа, выбранный на старте (D451, `0057`): так же — удалять нельзя.
+    "checklist_langs": {"SELECT", "INSERT"},
+    # Перевод комментариев (D443, `0058`): так же — удалять нельзя.
+    "translate_modes": {"SELECT", "INSERT"},
     # Экшн-планы (`0036`): партнёр ролью приложения только кладёт версию файла
     # (и переводит запрос на приёмку — колонка ниже). Ни запроса, ни вердикта
     # она не заводит: INSERT на них появится — и бот положит «принятый» план
@@ -237,13 +243,16 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT", "INSERT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
-    # Роли и права ролей (`0038`): приложение их только читает — права роли
-    # приезжают вместе с опознанием. Пишет их экран админа УК (блок 2).
-    "roles": {"SELECT"},
-    "role_permissions": {"SELECT"},
-    # Журнал действий УК у партнёра (`0039`): приложение дописывает (правка
-    # на приёмке и письмо идут его ролью), но не правит и не стирает.
-    "cross_space_actions": {"SELECT", "INSERT"},
+    # Сведения о пиццерии из свода (`0046`): загрузка перезаписывает строку
+    # целиком и убирает пропавшие из свода, поэтому полный набор прав.
+    "unit_profiles": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    # Подключение Claude по OAuth (`0054`, D417): клиенты, коды, подключения и
+    # токены только заводятся. Правка — по колонкам (ниже), удаление отжившего —
+    # функцией `oauth_purge` с правами владельца, не ролью приложения.
+    "oauth_clients": {"SELECT", "INSERT"},
+    "oauth_codes": {"SELECT", "INSERT"},
+    "oauth_grants": {"SELECT", "INSERT"},
+    "oauth_tokens": {"SELECT", "INSERT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -258,7 +267,9 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
     "bot_bindings": {"UPDATE": {"unbound_at"}},
     "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
-    "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
+    "finish_modes": {"UPDATE": {"mode", "chosen_at"}},
+    "checklist_langs": {"UPDATE": {"lang", "chosen_at"}},
+    "translate_modes": {"UPDATE": {"mode", "chosen_at"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
     # `expires_at` или переписать `fingerprint` на свой, то есть присвоить
@@ -275,14 +286,34 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # срок, страна и проверка запроса партнёру не правятся. В какой статус
     # можно перевести, держит триггер `action_plan_requests_guarded`.
     "action_plan_requests": {"UPDATE": {"status"}},
+    # OAuth (`0054`): код гасится обменом, токен — ротацией, подключение —
+    # отзывом и отметкой последнего вызова. Хеши, клиент, учётка, ресурс и
+    # сроки не правятся: иначе подключение можно было бы перевесить на другую
+    # учётку или продлить токен.
+    "oauth_codes": {"UPDATE": {"used_at", "grant_id"}},
+    "oauth_tokens": {"UPDATE": {"used_at"}},
+    "oauth_grants": {"UPDATE": {"last_used_at", "revoked_at", "revoked_reason"}},
 }
 
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
 ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "units": {"SELECT"},
+    # Сведения о пиццерии из свода (`0046`) — только чтение.
+    "unit_profiles": {"SELECT"},
+    # OAuth (`0054`): смена пароля и почты идёт этой ролью и в той же
+    # транзакции отзывает подключения и гасит коды учётки — только чтение
+    # таблиц и правка отзыва и срока.
+    "oauth_clients": {"SELECT"},
+    "oauth_codes": {"SELECT"},
+    "oauth_grants": {"SELECT"},
+    "oauth_tokens": {"SELECT"},
     # Страны пространства (`0029`, #340): администратор пишет проверки в обход
     # продукта (снятие, перенос), и сторож точки проверки читает их его правами.
-    "space_countries": {"SELECT"},
+    # `0041` (#585, D364): экран «Пользователи» заводит пространство партнёра и
+    # привязывает страны этой ролью. Ни UPDATE, ни DELETE: код пространства не
+    # меняется, а снятая страна тихо сузила бы охват чтения партнёра.
+    "space_countries": {"SELECT", "INSERT"},
+    "tenants": {"SELECT", "INSERT"},
     "inspections": {"SELECT"},
     "findings": {"SELECT"},
     "photos": {"SELECT"},
@@ -320,12 +351,6 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "prescription_replies": {"SELECT"},
     "prescription_events": {"SELECT"},
     "country_recipients": {"SELECT"},
-    # Роли (`0038`): триггер охвата роли читает `roles` под ролью того, кто
-    # заводит учётку, — без чтения заведение отказало бы нехваткой прав.
-    "roles": {"SELECT"},
-    "role_permissions": {"SELECT"},
-    # Журнал (`0039`): снятие, перенос, приёмка и правка людей идут этой ролью.
-    "cross_space_actions": {"SELECT", "INSERT"},
 }
 
 #: А пишет администратор ровно три колонки, и это главный заслон снятия
@@ -409,6 +434,9 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "previous_item_code",
         }
     },
+    # OAuth (`0054`): отзыв подключений и гашение кодов при смене пароля и почты.
+    "oauth_grants": {"UPDATE": {"revoked_at", "revoked_reason"}},
+    "oauth_codes": {"UPDATE": {"expires_at"}},
 }
 
 

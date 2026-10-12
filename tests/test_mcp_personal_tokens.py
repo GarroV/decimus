@@ -27,7 +27,7 @@ import logging
 
 import pytest
 from conftest import requires_db
-from db_harness import завести_пространства
+from db_harness import привязать_бота
 
 from src.mcp.config import (
     MCP_RETRACTION_TOKENS_VAR,
@@ -58,19 +58,26 @@ def _пространства(request: pytest.FixtureRequest) -> None:
     базы её не получает.
     """
     if "db_env" in request.fixturenames:
-        завести_пространства(request.getfixturevalue("pg_dsn"), АРЕНДАТОР_ЧЕЛОВЕКА)
+        request.getfixturevalue("db_env")  # учётку заводит дверь базы: ей нужна база
+        # Токен выпускается только на учётку сайта с привязанным ботом (аудит 12.10).
+        привязать_бота(
+            request.getfixturevalue("pg_dsn"),
+            request.getfixturevalue("monkeypatch"),
+            ЧЕЛОВЕК,
+            tenant=АРЕНДАТОР_ЧЕЛОВЕКА,
+            role="auditor",
+        )
 
 
 def _настройки(**env: str) -> Settings:
     return load_settings({MCP_TOKENS_VAR: f"{АРЕНДАТОР_СТОРОНЫ}={ТОКЕН_СТОРОНЫ}", **env})
 
 
-def _выпустить(кому: int = ЧЕЛОВЕК, арендатор: str = АРЕНДАТОР_ЧЕЛОВЕКА) -> str:
-    """Привести человека в круг и выпустить ему токен — как это делает бот."""
-    from src.db.mcp_access import add_admin, issue_token
+def _выпустить(кому: int = ЧЕЛОВЕК) -> str:
+    """Выпустить себе токен из бота — без чьей-либо выдачи (D448)."""
+    from src.db.mcp_access import issue_token
 
-    add_admin(кому, by=None)
-    return issue_token(кому, tenant=арендатор).value
+    return issue_token(кому).value
 
 
 # --- вторая дверь ------------------------------------------------------------
@@ -111,10 +118,12 @@ def test_отозванный_личный_токен_не_опознаётся(
     отзыв жил только в боте, отозванный токен продолжал бы открывать историю
     проверок — то есть отзыв не отзывал бы ничего.
     """
-    from src.db.mcp_access import revoke_access
+    from src.db.mcp_access import resolve_token, revoke_tokens
 
     личный = _выпустить()
-    revoke_access(ЧЕЛОВЕК, by=ЧЕЛОВЕК)
+    владелец = resolve_token(личный)
+    assert владелец is not None
+    revoke_tokens(владелец.user_id)
 
     with pytest.raises(AuthError):
         resolve_access(_настройки(), f"Bearer {личный}")
@@ -209,3 +218,89 @@ def test_недоступная_база_не_выдаётся_за_незнак
     assert any(запись.levelno >= logging.WARNING for запись in caplog.records), (
         "о недоступном списке доступа сказано тише предупреждения"
     )
+
+
+# --- срок личного токена (аудит 12.10, F-035) ---------------------------------
+
+
+def test_срок_токена_по_умолчанию_и_из_окружения() -> None:
+    from src.db.mcp_access import TOKEN_TTL_DEFAULT_DAYS, TOKEN_TTL_VAR, token_ttl_days
+
+    assert token_ttl_days({}) == TOKEN_TTL_DEFAULT_DAYS == 30
+    assert token_ttl_days({TOKEN_TTL_VAR: " 7 "}) == 7
+
+
+@pytest.mark.parametrize("значение", ["0", "366", "abc", "-5", "1.5"])
+def test_негодный_срок_токена_это_отказ_а_не_умолчание(значение: str) -> None:
+    from src.db.errors import AccessError
+    from src.db.mcp_access import TOKEN_TTL_VAR, token_ttl_days
+
+    with pytest.raises(AccessError, match=TOKEN_TTL_VAR):
+        token_ttl_days({TOKEN_TTL_VAR: значение})
+
+
+# --- жизнь токена следует за учёткой на самой двери (аудит 12.10, F-023) -------
+#
+# Погасить токен при отключении и смене роли умеют две вещи: триггер базы
+# (`0059`) и сверка на каждый запрос (`mcp_access._LIVE_ISSUE_SQL` — роль и
+# отключение читаются из `web_users`, а не из строки токена). Здесь триггер
+# на время теста выключен: проверяется, что сверка держит одна, без него.
+
+_ТРИГГЕР = "web_users_access_change_revokes_mcp_tokens"
+
+
+@pytest.fixture
+def без_триггера(pg_dsn: str):  # type: ignore[no-untyped-def]
+    import psycopg
+
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute(f"alter table web_users disable trigger {_ТРИГГЕР}")
+    try:
+        yield
+    finally:
+        with psycopg.connect(pg_dsn, autocommit=True) as conn:
+            conn.execute(f"alter table web_users enable trigger {_ТРИГГЕР}")
+
+
+def _учётка_человека(pg_dsn: str) -> str:
+    import psycopg
+
+    with psycopg.connect(pg_dsn) as conn:
+        row = conn.execute(
+            "select u.login from bot_bindings b join web_users u on u.id = b.user_id"
+            " where b.telegram_id = %s and b.unbound_at is null",
+            (ЧЕЛОВЕК,),
+        ).fetchone()
+    assert row is not None
+    return str(row[0])
+
+
+@requires_db
+def test_отключение_учётки_закрывает_дверь_со_следующего_запроса(
+    db_env: str, pg_dsn: str, без_триггера: None
+) -> None:
+    from src.db.web_access import disable_account
+
+    личный = _выпустить()
+    assert resolve_access(_настройки(), f"Bearer {личный}").role == "auditor"
+
+    assert disable_account(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА) is True
+
+    with pytest.raises(AuthError):
+        resolve_access(_настройки(), f"Bearer {личный}")
+
+
+@requires_db
+def test_смена_роли_закрывает_дверь_со_следующего_запроса(
+    db_env: str, pg_dsn: str, без_триггера: None
+) -> None:
+    """Роль, записанная при выпуске, правом не служит: смена роли — токен не годен."""
+    from src.db.web_access import set_role
+
+    личный = _выпустить()
+    assert resolve_access(_настройки(), f"Bearer {личный}").role == "auditor"
+
+    assert set_role(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА, role="admin") is True
+
+    with pytest.raises(AuthError):
+        resolve_access(_настройки(), f"Bearer {личный}")

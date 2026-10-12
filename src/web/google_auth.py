@@ -31,9 +31,15 @@ GOOGLE_CLIENT_ID_VAR = "GOOGLE_CLIENT_ID"
 GOOGLE_CLIENT_SECRET_VAR = "GOOGLE_CLIENT_SECRET"  # noqa: S105 — ИМЯ переменной
 GOOGLE_REDIRECT_URI_VAR = "GOOGLE_REDIRECT_URI"
 #: Адрес возврата для входа через временный фронт Cloudflare (D236, #424): в
-#: странах, где `sslip.io` заблокирован, возврат на основной адрес до человека
+#: странах, где служебный домен заблокирован, возврат на основной адрес до человека
 #: не доходит. Не задан — фронт входит только паролем.
 GOOGLE_FRONT_REDIRECT_URI_VAR = "GOOGLE_FRONT_REDIRECT_URI"
+#: Домены Google Workspace компании через запятую: учётка пространства УК входит
+#: через Google, только если аккаунт из такого домена (D430, F-028 аудита 12.10).
+GOOGLE_HQ_DOMAINS_VAR = "GOOGLE_HQ_DOMAINS"
+
+#: Домены компании по умолчанию (D430). Переменная их заменяет, а не дополняет.
+DEFAULT_HQ_DOMAINS = ("dodobrands.io", "dodopizza.com")
 
 #: Метку ставит вход площадки (Caddy) только запросу, пришедшему через фронт с
 #: верным ключом; присланную снаружи он снимает. Подделка метки ничего не
@@ -93,6 +99,8 @@ class GoogleIdentity:
 
     email: str
     email_verified: bool
+    #: Домен Google Workspace аккаунта (`hd`); пусто — личный аккаунт, не Workspace.
+    hosted_domain: str = ""
 
 
 def load_google_settings(env: Mapping[str, str] | None = None) -> GoogleSettings | None:
@@ -200,7 +208,35 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
     if подтверждена is not True:
         raise GoogleAuthError("почта в аккаунте Google не подтверждена")
 
-    return GoogleIdentity(email=почта.strip().lower(), email_verified=True)
+    домен = нагрузка.get("hd")
+    return GoogleIdentity(
+        email=почта.strip().lower(),
+        email_verified=True,
+        hosted_domain=домен.strip().lower() if isinstance(домен, str) else "",
+    )
+
+
+def load_hq_domains(env: Mapping[str, str] | None = None) -> frozenset[str]:
+    """Домены компании для входа через Google в пространство УК (D430)."""
+    import os
+
+    src = os.environ if env is None else env
+    сырое = (src.get(GOOGLE_HQ_DOMAINS_VAR) or "").strip()
+    домены = [часть.strip().lower() for часть in сырое.split(",") if часть.strip()]
+    return frozenset(домены or DEFAULT_HQ_DOMAINS)
+
+
+def hq_domain_ok(identity: GoogleIdentity, domains: frozenset[str]) -> bool:
+    """Аккаунт Google из домена компании — по заявке `hd`, а не по хвосту почты.
+
+    `hd` выдаёт Google только аккаунтам Workspace этого домена; личный аккаунт,
+    заведённый на адрес с тем же хвостом, `hd` не несёт. Совпадение почты с
+    учёткой УК без домена компании — отказ: настройка экрана согласия в консоли
+    Google (Internal / External) не должна быть единственной границей (F-028).
+    Партнёрам домена не нужно (D430): они входят по почтам из списка своего
+    пространства, и эта проверка их не касается.
+    """
+    return identity.hosted_domain in domains
 
 
 def _payload(raw: str) -> dict[str, Any]:

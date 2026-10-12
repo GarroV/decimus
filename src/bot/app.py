@@ -24,14 +24,21 @@ from dataclasses import replace
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.types import BotCommand, BotCommandScopeChat, ErrorEvent, Message
+from aiogram.types import (
+    BotCommand,
+    ErrorEvent,
+    MenuButtonDefault,
+    MenuButtonWebApp,
+    Message,
+    WebAppInfo,
+)
 
 from src import domain
 
-from . import frame_copies, photo_backfill
+from . import agg_loader, frame_copies, maps_loader, photo_backfill
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
-from .config import MCP_OWNER_ID_VAR, BotSettings, load_bot_settings
+from .config import BotSettings, load_bot_settings
 from .lang import chat_ui_lang
 from .lang_choice import PersonMiddleware
 from .material import MaterialStore
@@ -57,16 +64,10 @@ from .routers import (
 from .routers.help import HELP_COMMAND
 from .routers.lang import LANG_COMMAND
 from .routers.material import MaterialHandler
-from .routers.mcp import (
-    MCP_ADD_COMMAND,
-    MCP_COMMAND,
-    MCP_REVOKE_COMMAND,
-    MCP_WHO_COMMAND,
-)
+from .routers.mcp import MCP_COMMAND
 from .routers.record import make_frame_handler, make_material_handler, make_waiting_handler
 from .routers.records import RECORDS_COMMAND
 from .routers.resend import RESEND_COMMAND
-from .routers.stops import STOPS_COMMAND
 from .routers.version import VERSION_COMMAND
 from .texts import DEFAULT_UI_LANG, default_ui_lang, t
 from .version import build_version
@@ -191,8 +192,10 @@ def build_dispatcher(
     dispatcher.message.outer_middleware(space_guard)
     dispatcher.callback_query.outer_middleware(space_guard)
 
-    store = MaterialStore()
-    pending = PendingStore()
+    # Память бота сверяется с личностью проверки на диске (D392): проверку
+    # может начать и мини-апп, а он до этой памяти не дотягивается.
+    store = MaterialStore(domain.run_id)
+    pending = PendingStore(domain.run_id)
 
     # Мастер получает оба хранилища в памяти (`pending`, `store`) не ради
     # работы, а ради забывания: начатая проверка обязана начинаться с чистого
@@ -204,11 +207,11 @@ def build_dispatcher(
     # собираются записи (T241): при завершении называются не только кадры без
     # записи, но и слова, кадра не дождавшиеся.
     dispatcher.include_router(build_records_router(store))
-    # Установка MCP с админкой круга (T209, T253) и версия сборки (T246) —
+    # Установка MCP (T209, T253, D448) и версия сборки (T246) —
     # рядом с остальными командами: своих состояний диалога у них нет, обычного
     # текста они не ждут, и на порядок разбора материала не влияют.
-    dispatcher.include_router(build_mcp_router(settings))
-    dispatcher.include_router(build_stops_router(settings))
+    dispatcher.include_router(build_mcp_router())
+    dispatcher.include_router(build_stops_router())
     dispatcher.include_router(build_help_router())
     dispatcher.include_router(build_lang_router())
     dispatcher.include_router(build_resend_router())
@@ -269,28 +272,11 @@ MENU_COMMANDS = (
     # Язык бота (D303) — рядом со справкой: тоже не шаг обхода, а настройка,
     # и подписан на обоих языках, чтобы его нашёл и тот, кто язык стенда не читает.
     (LANG_COMMAND, "cmd.lang"),
+    # Подключение Claude (D448): токен себе выпускает каждый, кого бот пускает,
+    # — круга, который видел пункт отдельно, больше нет.
+    (MCP_COMMAND, "cmd.mcp"),
     (RESEND_COMMAND, "cmd.resend"),
     (VERSION_COMMAND, "cmd.version"),
-)
-
-#: Пункты, которые видит ТОЛЬКО круг доступа к MCP (T253, решение D099).
-#:
-#: Отдельным списком, а не флагом внутри общего: телеграм объявляет меню на
-#: аккаунт, то есть «видно не всем» выражается двумя РАЗНЫМИ объявлениями, а не
-#: одним отфильтрованным. Установка стоит первой — за ней приходят, остальные
-#: три обслуживают сам круг.
-#:
-#: Меню — витрина, а не заслон: он стоит в самих обработчиках
-#: (`routers/mcp.py`, `_guard`), потому что команду можно набрать руками, не
-#: заглядывая в меню. Здесь решается только, кому её показывать.
-MCP_MENU_COMMANDS = (
-    (MCP_COMMAND, "cmd.mcp"),
-    (MCP_ADD_COMMAND, "cmd.mcp_add"),
-    (MCP_REVOKE_COMMAND, "cmd.mcp_revoke"),
-    (MCP_WHO_COMMAND, "cmd.mcp_who"),
-    # Счётчик отказов мастера (#436): владелец открывает его сам, бот о
-    # повторяющихся отказах никому не пишет. Тот же круг, тот же заслон.
-    (STOPS_COMMAND, "cmd.stops"),
 )
 
 
@@ -298,7 +284,7 @@ def _menu(commands: tuple[tuple[str, str], ...], lang: str) -> list[BotCommand]:
     return [BotCommand(command=name, description=t(key, lang)) for name, key in commands]
 
 
-async def announce_commands(bot: Bot, circle: tuple[int, ...] = ()) -> None:
+async def announce_commands(bot: Bot) -> None:
     """Объявить команды в меню телеграма (T139, T253).
 
     Без этого команда есть, но её не видно: аудитор на точке не набирает
@@ -306,54 +292,56 @@ async def announce_commands(bot: Bot, circle: tuple[int, ...] = ()) -> None:
     Ровно из-за этого показ записанного и был спрятан за «Завершить»: другого
     входа у него не было, а этот никто не показывал.
 
-    **Объявлений теперь два вида.** Общее меню видят все, кого пускает мидлварь
-    доступа; тем, кто в круге доступа к MCP, поверх общего объявляется своё, с
-    настройкой подключения (D099). Иначе это не выражается вовсе: телеграм
-    держит меню на аккаунт, а не на роль.
+    Меню одно на всех, кого пускает мидлварь доступа: личные меню круга
+    доступа к MCP сняты вместе с кругом (D448).
 
     Язык — язык стенда (`BOT_UI_LANG`, T131), а не проверки: меню телеграм
     спрашивает один раз при подъёме бота, когда никакой проверки ещё нет.
 
     Отказ телеграма сюда не пускается наружу: без меню бот работает, а не
     подняться из-за него — цена несоразмерная. В журнал он попадает целиком.
-    Круг при этом обходится по одному, и отказ на одном человеке не отменяет
-    объявления остальным: иначе один недоступный чат оставил бы без меню всех.
     """
     lang = default_ui_lang()
     try:
         await bot.set_my_commands(_menu(MENU_COMMANDS, lang))
     except Exception:
         logger.exception("команды в меню телеграма не объявились — бот работает без меню")
-    for user_id in circle:
-        try:
-            await announce_personal_menu(bot, user_id, in_circle=True)
-        except Exception:
-            logger.exception("меню круга доступа не объявилось человеку %s", user_id)
 
 
-async def announce_personal_menu(bot: Bot, user_id: int, *, in_circle: bool) -> None:
-    """Объявить или убрать личное меню круга у одного человека (T253).
+async def announce_app_button(bot: Bot, settings: BotSettings) -> None:
+    """Кнопка запуска мини-аппа у поля ввода вместо ☰ (D372).
 
-    Зовётся и при подъёме бота, и сразу после выдачи или отзыва доступа: пункт,
-    появляющийся только после перезапуска, — это не выданный доступ, а отзыв,
-    оставляющий пункт висеть, человек нажмёт, потому что тот у него был.
+    Постоянный вход: до D372 мини-апп открывался только кнопкой под
+    сообщением «проверка начата», и вне проверки его было не найти. Команды
+    при этом не пропадают — их список открывается набором «/».
 
-    Убирается именно УДАЛЕНИЕМ личного меню, а не объявлением общего под видом
-    личного: удалённое возвращает человека к общему меню, и оно потом
-    пополняется само собой. Объявленная копия общего меню осталась бы копией и
-    молча отстала бы от него при следующем пополнении.
-
-    Отказ телеграма отсюда наружу УХОДИТ — в отличие от `announce_commands`.
-    Разница по существу: там меню объявляется скопом при подъёме, и падать
-    из-за одного чата нельзя, а здесь зовущий (`routers/mcp.py`) сам решает,
-    что делать с отказом, и уже это делает — пишет в журнал и продолжает.
+    Адреса нет — возвращается ☰: очищенный `BOT_WALK_URL` снимает и кнопку.
+    Круг тестеров (`WALK_USERS`) — кнопка только им, остальным ☰. Кого бот не
+    пускает, кнопка не пустит тоже: мини-апп сверяет доступ тем же правилом
+    (`web.walk_access`). Отказ телеграма — в журнал: без кнопки бот работает.
     """
-    lang = default_ui_lang()
-    scope = BotCommandScopeChat(chat_id=user_id)
-    if in_circle:
-        await bot.set_my_commands(_menu(MENU_COMMANDS + MCP_MENU_COMMANDS, lang), scope=scope)
-    else:
-        await bot.delete_my_commands(scope=scope)
+    кнопка: MenuButtonDefault | MenuButtonWebApp = MenuButtonDefault()
+    if settings.walk_url is not None:
+        кнопка = MenuButtonWebApp(
+            text=t("btn.app", default_ui_lang()), web_app=WebAppInfo(url=settings.walk_url)
+        )
+    общая = кнопка if settings.walk_users is None else MenuButtonDefault()
+    await _menu_button(bot, None, общая)
+    # Каждому тестеру — отдельно и со своим отказом: не нажавший /start не
+    # должен оставить без кнопки остальных. Без адреса личные тоже снимаются.
+    # Выведенного из круга тут не знают — его кнопка остаётся, но мини-апп
+    # ему ответит 403 (`walk_open_to`).
+    for user_id in sorted(settings.walk_users or ()):
+        await _menu_button(bot, user_id, кнопка)
+
+
+async def _menu_button(
+    bot: Bot, chat_id: int | None, кнопка: MenuButtonDefault | MenuButtonWebApp
+) -> None:
+    try:
+        await bot.set_chat_menu_button(chat_id=chat_id, menu_button=кнопка)
+    except Exception:
+        logger.exception("кнопка у поля ввода не объявилась (%s) — бот работает без неё", chat_id)
 
 
 def log_startup(settings: BotSettings) -> None:
@@ -371,36 +359,6 @@ def log_startup(settings: BotSettings) -> None:
     )
 
 
-def circle_at_startup(settings: BotSettings) -> tuple[int, ...]:
-    """Кому объявлять меню круга при подъёме бота (T253).
-
-    Основатель приводится в круг здесь же: стенд, поднятый с пустой базой,
-    иначе остался бы без единого живого участника — попасть в круг можно
-    только из круга, и завести его было бы нечем.
-
-    **Отказ базы не мешает боту подняться.** Обход точки — работа аудитора, и
-    останавливать её из-за недоступного списка доступа к MCP несоразмерно:
-    круг тогда просто не объявляется в меню, а сама настройка всё равно
-    спрашивает базу на каждое обращение и откажет по месту. В журнал отказ
-    попадает целиком — молча это не проходит.
-    """
-    if settings.mcp_owner_id is None:
-        logger.warning(
-            "круг доступа к MCP не назначен (%s не задан) — настройка подключения "
-            "не доступна никому",
-            MCP_OWNER_ID_VAR,
-        )
-        return ()
-    try:
-        from src.db.mcp_access import add_admin, list_admins
-
-        add_admin(settings.mcp_owner_id, by=None)
-        return tuple(row.telegram_id for row in list_admins() if row.is_live)
-    except Exception:
-        logger.exception("круг доступа к MCP не прочитался — меню круга не объявлено")
-        return ()
-
-
 async def start_polling() -> None:
     """Поднять бота: проверить окружение, затем слушать Telegram."""
     settings = load_bot_settings()
@@ -412,7 +370,8 @@ async def start_polling() -> None:
     # проверен — раньше него читать нечего.
     roster = Roster.load(domain_settings.state_dir)
     bot = create_bot(settings)
-    await announce_commands(bot, circle_at_startup(settings))
+    await announce_commands(bot)
+    await announce_app_button(bot, settings)
     dispatcher = build_dispatcher(settings, roster=roster)
     log_startup(settings)
     # Уборка копий кадров старше недели (#367, D179). Ссылка держится до конца
@@ -422,11 +381,17 @@ async def start_polling() -> None:
     # на MUSPELHEIM засыпает, и вернуть кадры потом может только бот — байты
     # есть у телеграма, а токен у него одного.
     backfill = asyncio.create_task(photo_backfill.backfill_forever(bot))
+    # Оценки пиццерий на картах из Pointer — раз в сутки (docs/09-pointer-api.md).
+    map_ratings = asyncio.create_task(maps_loader.load_forever())
+    # Оценки пиццерий в агрегаторах доставки — раз в сутки (D389, docs/17-aggregators.md).
+    agg_ratings = asyncio.create_task(agg_loader.load_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
         sweeper.cancel()
         backfill.cancel()
+        map_ratings.cancel()
+        agg_ratings.cancel()
         await bot.session.close()
 
 

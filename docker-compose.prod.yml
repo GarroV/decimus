@@ -24,7 +24,8 @@
 #    `web:${WEB_PORT}` (8267) и `mcp:${MCP_PORT}` (8265). Звенья socat
 #    (`web-link`, `link`) и туннель (`tunnel`) здесь выключены.
 #
-# 3. **Постоянные сервисы без профилей.** База, бот, MCP и веб поднимаются всегда,
+# 3. **Постоянные сервисы без профилей.** База, бот, MCP, веб и мини-апп обхода
+#    (`walk`, D312) поднимаются всегда,
 #    а не по `COMPOSE_PROFILES`: забытый в окружении профиль тихо оставлял бы
 #    прод без базы или без админки. Демо (`demo`), мок хранилища (`storage`), бывшее хранилище
 #    кадров (`storage-live`, снято 30.09, D293) и бэкап состояния (`backup`, разовый запуск по расписанию) остаются в своих
@@ -32,14 +33,19 @@
 
 name: decimus
 
+# Бюджет соединений к базе (`docs/08-deploy.md`, «Пул соединений»): `DB_POOL_MAX`
+# задан на каждую службу явно, чтобы сумма не зависела от умолчания пула.
 services:
   bot:
+    environment:
+      DB_POOL_MAX: "3"
     depends_on:
       db:
         condition: service_healthy
 
   mcp:
     environment:
+      DB_POOL_MAX: "4"
       MCP_HOST: 0.0.0.0
       MCP_LISTEN_NETWORK: "1"
     ports: !override
@@ -51,10 +57,31 @@ services:
   web:
     profiles: !reset []
     environment:
+      DB_POOL_MAX: "4"
       WEB_HOST: 0.0.0.0
       WEB_LISTEN_NETWORK: "1"
+      # Перед админкой одно своё звено — Caddy (F-007 аудита 12.10): без этого
+      # счётчик перебора один на всех.
+      WEB_TRUSTED_PROXIES: ${WEB_TRUSTED_PROXIES:-1}
+      # Кому из соседей верить `X-Forwarded-*` (F-038): подсеть сети
+      # `edge-decimus`, откуда приходит Caddy, — в окружении площадки
+      # (docs/08-deploy.md, §8.1). Допускающего умолчания нет: «любой сосед»
+      # (`*`) отдавал выбор адреса и схемы каждому, кто дотянулся до порта, а
+      # пустое значение — 403 на каждую форму за HTTPS. Не задана — прод не
+      # собирается.
+      WEB_TRUSTED_PROXY_ADDR: ${WEB_TRUSTED_PROXY_ADDR:?задайте WEB_TRUSTED_PROXY_ADDR (подсеть сети edge-decimus), docs/08-deploy.md 8.1}
     ports: !override
       - "127.0.0.1:${WEB_HOST_PORT:-8268}:${WEB_PORT:-8267}"
+    depends_on: !override
+      db:
+        condition: service_healthy
+
+  # Мини-апп обхода — постоянный, как админка: она передаёт ему `/tg/walk*`.
+  # Слушает сеть контейнера уже в общей сборке, порт на хост не публикуется.
+  walk:
+    profiles: !reset []
+    environment:
+      DB_POOL_MAX: "2"
     depends_on: !override
       db:
         condition: service_healthy

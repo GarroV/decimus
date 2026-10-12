@@ -26,6 +26,21 @@ done
 
 step() { printf '\n== %s\n' "$1"; }
 
+# Одна выкатка за раз (#729). 12.10.2026 две сессии запустили выкатку с разницей
+# в минуту: второй накат повторил уже применённую миграцию, compose оставил бота
+# в `Created`, и бот стоял, пока выкатку не перезапустили. Замок держится на
+# дескрипторе 9 и переживает `exec` ниже; повторный запуск после `exec` замок не
+# берёт заново (иначе ждал бы сам себя). Вторая выкатка ждёт первую, а не
+# дождалась за DEPLOY_LOCK_WAIT_S — отказ с понятным текстом.
+if [ -z "${DECIMUS_DEPLOY_LOCKED:-}" ]; then
+    exec 9>"$(git rev-parse --git-dir)/prod-update.lock"
+    if ! flock -w "${DEPLOY_LOCK_WAIT_S:-900}" 9; then
+        echo "другая выкатка ещё идёт: замок не освободился за ${DEPLOY_LOCK_WAIT_S:-900} с" >&2
+        exit 1
+    fi
+    export DECIMUS_DEPLOY_LOCKED=1
+fi
+
 # После `git pull` скрипт перезапускает САМ СЕБЯ: bash читает файл по ходу
 # выполнения, и обновлённый под ним скрипт доигрывался бы старой версией —
 # так 28.09 новый шаг проверки хранилища (#404) в первой же раскатке не
@@ -41,8 +56,10 @@ echo "версия кода: $sha"
 
 # `--profile backup`: голая сборка пропускает выгрузку состояния, и ночная
 # задача бэкапа крутила бы образ прошлой версии (та же ловушка, что в deploy.sh).
+# `--profile migrate` — по той же причине: накат идёт собственным сервисом, и без
+# сборки он катил бы схему кодом прошлой версии.
 step "сборка образа с версией $sha"
-BUILD_SHA="$sha" "${compose[@]}" --profile backup build
+BUILD_SHA="$sha" "${compose[@]}" --profile backup --profile migrate build
 
 # Хранилище кадров живёт на MUSPELHEIM (D257, D259), корзина там уже заведена;
 # своего хранилища на VPS нет с 30.09 (D293).
@@ -52,7 +69,9 @@ step "база"
 # Накат до подъёма приложений: новый код на старой схеме — это отказ админки,
 # а не «доедет само». Накат идемпотентен, повторный запуск ничего не ломает.
 step "накат миграций"
-"${compose[@]}" run --rm --no-deps bot python -m src.db.migrate
+# Сервис `migrate` — единственный, кому `docker-compose.yml` отдаёт владельца
+# схемы (`DATABASE_ADMIN_URL`); у бота, админки, MCP и обхода его нет (F-002).
+"${compose[@]}" run --rm --no-deps migrate
 
 step "подъём"
 "${compose[@]}" up -d --wait --remove-orphans
@@ -83,4 +102,24 @@ if ! "${compose[@]}" exec -T web sh -c \
     exit 1
 fi
 echo "админка видит хранилище версий"
+# Мини-апп обхода пишет в идущие проверки своим сервисом `walk`, админка их
+# только читает (docs/08-deploy.md, §8.14). Проверяется пробной записью, а не
+# `test -w`, по той же причине, что выше. Страница обхода — через админку: она
+# передаёт `/tg/walk*` сервису, и 200 значит, что дошло до него.
+step "мини-апп обхода"
+if "${compose[@]}" exec -T web sh -c 'touch /app/state/.walk-probe 2>/dev/null'; then
+    "${compose[@]}" exec -T web sh -c 'rm -f /app/state/.walk-probe'
+    echo "админка пишет в состояние проверок — у сервиса web том state обязан быть :ro" >&2
+    exit 1
+fi
+if ! "${compose[@]}" exec -T walk sh -c 'touch /app/state/.walk-probe && rm -f /app/state/.walk-probe'; then
+    echo "сервис обхода не пишет в состояние проверок — см. docker-compose.yml, сервис walk" >&2
+    exit 1
+fi
+walk_code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$web_port/tg/walk")
+echo "обход /tg/walk через админку: $walk_code (ждём 200)"
+if [ "$walk_code" != "200" ]; then
+    echo "смоук обхода: провал — смотреть '${compose[*]} logs web walk'" >&2
+    exit 1
+fi
 echo "готово: $sha"

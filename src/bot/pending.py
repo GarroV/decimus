@@ -36,6 +36,8 @@ from src.recognize.fastpath import FastItem
 from src.recognize.manual import ManualCandidate
 from src.recognize.models import Candidate
 
+from .run_guard import RunGuard, RunOf
+
 
 @dataclass(frozen=True)
 class Offer:
@@ -174,11 +176,17 @@ class ChatPending:
 class PendingStore:
     """Ожидания по чатам, лениво создаются."""
 
-    def __init__(self) -> None:
+    def __init__(self, run_of: RunOf | None = None) -> None:
+        """`run_of` — личность проверки чата; сменилась (начал мини-апп) — память чата пуста."""
         self._chats: dict[int, ChatPending] = {}
         self._slots = count(1)
+        self._guard = RunGuard(run_of)
 
     def _chat(self, chat_id: int) -> ChatPending:
+        if self._guard.is_stale(chat_id):
+            # Проверку начали заново не здесь (D392): кнопки старой не должны
+            # выстрелить в новую.
+            self._chats.pop(chat_id, None)
         if chat_id not in self._chats:
             self._chats[chat_id] = ChatPending()
         return self._chats[chat_id]

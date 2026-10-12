@@ -24,9 +24,14 @@ from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from src.domain.tenants import ADMIN_ROLES, HQ_TENANT, canonical_tenant
+
 from .catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
+    KIND_IMPORT,
+    KIND_RATINGS,
+    KIND_RATINGS_READ,
     KIND_RETRACTION,
     ToolSpec,
     as_list,
@@ -35,7 +40,9 @@ from .catalogue import (
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
+from .checklists import PROTECTED_APPLIED, protection_of
 from .errors import McpError, ToolError
+from .policy import permits
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
 CODE_PARSE_ERROR = -32700
@@ -151,6 +158,13 @@ CHECKLIST_CLOSED = (
 )
 
 
+#: Отказ на загрузку рейтингов не-УК токеном (D320).
+RATINGS_CLOSED = (
+    "Загрузка рейтингов открыта только токену пространства УК. Рейтинги видны в "
+    "админке всем, а грузит их контроль УК"
+)
+
+
 #: Отказ на чтение исходника эталона. Случай тут ровно один — методика на
 #: сервере не настроена вовсе: право на чтение не выдаётся списком, его имеет
 #: всякий токен (T315, D132). Поэтому текст не про доступ, а про настройку, и
@@ -187,6 +201,44 @@ RETRACTION_CLOSED = (
 #: партнёра вместо названного молча — подменить чек-лист без единого слова об
 #: этом. Отказ называет причину, а не просто «аргумент обязателен»: спросивший
 #: не пропустил параметр, он забыл, что на этой двери он больше не опционален.
+#: Отказ по роли учётки сайта (D417): вход через OAuth, и роль этого не открывает.
+#: Текст называет роль, а не перечисляет, кому открыто: агент перескажет его
+#: человеку, и тот поймёт, что дело в правах его учётки, а не в сбое.
+MASTER_READONLY = (
+    "Главный чек-лист правят только админы. Его можно читать и проводить по нему "
+    "проверки, но не менять; свои чек-листы, не отмеченные главными, правятся как обычно"
+)
+
+#: Инструменты, двигающие указатель прода, — один на всю сеть (D440): применив
+#: свой чек-лист, бизнес-девелопер сдвинул бы с прода главный для всех. Отказ по
+#: имени инструмента, а не по хранилищу: указатель общий, чей бы чек-лист ни брался.
+PROD_POINTER_TOOLS = frozenset({"apply_checklist"})
+
+PROD_POINTER_ADMINS_ONLY = (
+    "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть, "
+    "и применённый чек-лист заменил бы главный для всех. Свой чек-лист можно вести и "
+    "публиковать, а применяет его админ"
+)
+
+APPLIED_READONLY = (
+    "Этот чек-лист применён к проду, и по нему идут проверки всей сети, поэтому его правят "
+    "только админы. Его можно читать; свои чек-листы, не применённые к проду и не главные, "
+    "правятся как обычно"
+)
+
+ROLE_CLOSED = (
+    "Этот инструмент не открыт роли «{роль}» вашей учётки decimus. Права в Claude "
+    "решает роль учётки: что ей открыто, видно в списке инструментов"
+)
+
+
+IMPORT_CLOSED = (
+    "Загрузка проверок задним числом для этого доступа не открыта. Она открывается только "
+    "УК (MCP_IMPORT_TENANTS=HQ, D335) и требует хранилища версий методики "
+    "(MCP_CHECKLIST_STORE). Проверки при этом читаются как обычно"
+)
+
+
 NAME_THE_CHECKLIST = (
     "Назовите чек-лист аргументом checklist: правка без кода в пространстве партнёра не "
     "наводится ни на какой чек-лист, перечень отдаёт checklists"
@@ -292,6 +344,9 @@ def _call_tool(
     checklist: Store | None,
     source: Store | None,
     may_retract: bool,
+    imports: Store | None = None,
+    actor: str = "",
+    role: str | None = None,
 ) -> dict[str, Any] | str:
     """Вызов инструмента. Строка в ответе — отказ протокола, словарь — результат.
 
@@ -304,6 +359,11 @@ def _call_tool(
     Заслон стоит здесь, у входа, рядом с границей арендаторов, а не в
     обработчиках: обработчик, забывший спросить о правах, был бы дырой,
     которую видно только чтением всех обработчиков подряд.
+
+    `role` — роль учётки сайта у личного токена и у входа через OAuth (D417,
+    аудит 12.10), `None` только у служебного токена `.env`. Заданная роль
+    спрашивается ПЕРВОЙ, раньше прежних заслонов: она только сужает, и отказ по
+    ней честнее отказа настройки.
     """
     name = params.get("name")
     if not isinstance(name, str) or not name:
@@ -314,12 +374,20 @@ def _call_tool(
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
         return f"Аргументы инструмента {name} ожидаются объектом"
+    if role is not None and not permits(role, tenant, spec.kind):
+        return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
+    if role is not None and role not in ADMIN_ROLES and spec.name in PROD_POINTER_TOOLS:
+        return _tool_text(PROD_POINTER_ADMINS_ONLY, failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
         return _tool_text(CHECKLIST_SOURCE_CLOSED, failed=True)
+    if spec.kind == KIND_RATINGS and canonical_tenant(tenant) != HQ_TENANT:
+        return _tool_text(RATINGS_CLOSED, failed=True)
     if spec.kind == KIND_RETRACTION and not may_retract:
         return _tool_text(RETRACTION_CLOSED, failed=True)
+    if spec.kind == KIND_IMPORT and (imports is None or not actor):
+        return _tool_text(IMPORT_CLOSED, failed=True)
     refusal = _check_arguments(spec, arguments)
     if refusal is not None:
         return refusal
@@ -349,6 +417,26 @@ def _call_tool(
         прочее: dict[str, Any] = (
             {} if база is None else {"store": _aimed(spec, база, tenant=tenant, код=код)}
         )
+        if (
+            spec.kind == KIND_CHECKLIST
+            and spec.writes
+            and role is not None
+            and role not in ADMIN_ROLES
+            and (причина := protection_of(прочее["store"])) is not None
+        ):
+            # Главный чек-лист (D440): правка только админам. Роль без права на
+            # вид закрыта выше, здесь — роль с правом на вид, но не на главный.
+            # Проверка по ПОДСТАВЛЕННОМУ хранилищу, а не по названному коду: код
+            # может быть не назван вовсе, и правка ушла бы в применённый к проду.
+            raise ToolError(APPLIED_READONLY if причина == PROTECTED_APPLIED else MASTER_READONLY)
+        if spec.kind == KIND_IMPORT:
+            # Хранилище версий — для поиска версии методики черновика (D307),
+            # подпись — для подтверждения (D308). Обе приходят от транспорта,
+            # из токена, а не от собеседника.
+            прочее = {"store": imports, "actor": actor}
+        if spec.kind == KIND_RATINGS:
+            # Кто просит — из токена, а не от собеседника: он ляжет автором заявки.
+            прочее = {"actor": actor}
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
         return _tool_text(str(отказ), failed=True)
@@ -383,6 +471,20 @@ def _call_tool(
                 "чтение эталона",
                 "Это отказ чтения, а не пустая методика",
             ),
+            KIND_IMPORT: (
+                "загрузку проверки",
+                "Это отказ базы, движка или хранилища, а не отказ в загрузке; черновик "
+                "виден import_get_inspection",
+            ),
+            KIND_RATINGS: (
+                "работу с рейтингами",
+                "Это отказ базы, а не отказ в просьбе; повтор безопасен: тот же файл "
+                "ответит «duplicate», а повторная заявка на обновление — «уже в очереди»",
+            ),
+            KIND_RATINGS_READ: (
+                "чтение рейтингов",
+                "Это отказ чтения, а не отсутствие рейтингов",
+            ),
             KIND_RETRACTION: (
                 "снятие проверки",
                 "Это отказ базы или хранилища, а не отказ в снятии; сняли или нет — "
@@ -403,6 +505,9 @@ def handle(
     checklist: Store | None = None,
     source: Store | None = None,
     may_retract: bool = False,
+    imports: Store | None = None,
+    actor: str = "",
+    role: str | None = None,
 ) -> dict[str, Any] | None:
     """Разобранное сообщение JSON-RPC → ответ. `None` — уведомление, ответа нет.
 
@@ -411,6 +516,11 @@ def handle(
     хранилище версий методики, только если она открыта этому арендатору, а
     `None` по умолчанию означает, что до задачи T098 сервер отвечал только на
     вопросы о проверках, и таким он и остаётся, пока методику не открыли явно.
+
+    `role` — роль учётки сайта у личного токена и у входа через OAuth (D417,
+    `policy.py`): при ней `tools/list` показывает только открытые роли
+    инструменты, а вызов закрытого получает отказ. `None` — служебный токен
+    `.env`, каталог целиком.
     """
     if not isinstance(message, dict):
         return _error(None, CODE_INVALID_REQUEST, "Ожидается объект JSON-RPC 2.0")
@@ -446,7 +556,8 @@ def handle(
     if method == "ping":
         return _result(request_id, {})
     if method == "tools/list":
-        return _result(request_id, {"tools": as_list()})
+        открыто = None if role is None else (lambda kind: permits(role, tenant, kind))
+        return _result(request_id, {"tools": as_list(открыто)})
     if method == "tools/call":
         outcome = _call_tool(
             params,
@@ -454,6 +565,9 @@ def handle(
             checklist=checklist,
             source=source,
             may_retract=may_retract,
+            imports=imports,
+            actor=actor,
+            role=role,
         )
         if isinstance(outcome, str):
             return _error(request_id, CODE_INVALID_PARAMS, outcome)

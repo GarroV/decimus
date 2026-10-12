@@ -38,6 +38,7 @@ import psycopg
 
 from .config import check_environment, load_storage_settings
 from .errors import PhotosDeferredError, PushError, StorageError
+from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
@@ -112,7 +113,7 @@ def pending_photo_uploads(
     settings = check_environment()
     params = {"min_age": min_age_sec, "max_age": max_age_sec, "limit": limit}
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_SELECT_ALL_PENDING_SQL, params)
             rows = cur.fetchall()
     except psycopg.Error as exc:
@@ -208,7 +209,7 @@ def upload_photos(
     uploaded = 0
     missing: list[str] = []
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             _require_inspection(conn, inspection_id)
             with conn.cursor() as cur:
                 cur.execute(_SELECT_PENDING_SQL, (inspection_id,))

@@ -29,7 +29,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from . import checklist_source, checklist_tools, checklists_tools, phrases, retraction, tools
+from src.ratings.snapshot import MCP_CHUNK_BYTES
+
+from . import (
+    checklist_source,
+    checklist_tools,
+    checklists_tools,
+    phrases,
+    ratings_read,
+    ratings_tools,
+    retraction,
+    tools,
+)
+from .import_catalogue import IMPORT_TOOLS
 
 #: Инструменты проверок: обработчику нужен только код арендатора.
 KIND_INSPECTIONS = "inspections"
@@ -60,6 +72,27 @@ KIND_RETRACTION = "retraction"
 #: нет вовсе: обработчики живут отдельным модулем `src.mcp.checklist_source`, и
 #: это проверяется снаружи (`tests/test_mcp_catalogue.py`).
 KIND_CHECKLIST_SOURCE = "checklist_source"
+
+#: Загрузка исторических проверок поштучно (D305–D310). Пятый вид, и второе
+#: названное исключение из правила «запись только у методики»: инструменты
+#: этого вида заводят, правят и удаляют загруженные ЧЕРНОВИКИ и подтверждают
+#: их. Право — по арендатору (`MCP_IMPORT_TENANTS`), спрашивается на входе
+#: (`rpc._call_tool`); обработчики — только в `src.mcp.imports`, а заслон
+#: «только загруженный черновик своего пространства» стоит в замке строки
+#: (`src/db/imports.py`). Описания — в `import_catalogue.py`.
+KIND_IMPORT = "import"
+
+#: Загрузка рейтингов РС/РКО (D320). Шестой вид: пишет, но не в проверки и не в
+#: методику, а в схему `ratings`. Открыт только токену УК — заслон на входе
+#: (`rpc._call_tool`), обработчик живёт своим модулем `src.mcp.ratings_tools`.
+KIND_RATINGS = "ratings"
+
+#: Чтение рейтингов РС/РКО, карт и агрегаторов (D420). Седьмой вид, и он открыт
+#: ВСЯКОМУ токену — рейтинги видят все (D327), — но с охватом: партнёр получает
+#: страны своего пространства, УК — все. Охват ставит обработчик
+#: (`src.mcp.ratings_read`), а не вход: заслон входа отличает токены, а охват
+#: решает, какие строки отдать. Записи в этом виде нет вовсе.
+KIND_RATINGS_READ = "ratings_read"
 
 
 @dataclass(frozen=True)
@@ -296,6 +329,17 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
 }
 
 
+#: Одна фраза о поле `methodologies` на три инструмента ряда (D352): справка,
+#: а не запрет — оценка каждой проверки верна по своей методике.
+_METHODOLOGIES_NOTE = (
+    "The `methodologies` field is reference information: it groups the "
+    "inspections by the checklist and scoring rules they were scored "
+    "under. Each score is correct under its own methodology and is taken "
+    "as recorded, so averaging, ranking and comparing across groups is "
+    "valid."
+)
+
+
 TOOLS: tuple[ToolSpec, ...] = (
     ToolSpec(
         name="list_inspections",
@@ -305,12 +349,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "and finding count exactly as they were recorded when that "
             "inspection was completed — nothing is recalculated here. "
             "Optionally filter by unit name and by the date range the "
-            "inspections took place in. "
-            "Every answer carries a `comparability` field: inspections scored "
-            "under different checklists, or under editions whose scoring rules "
-            "changed, do not belong in one series — averaging or ranking "
-            "across them is meaningless, and the field says where the series "
-            "breaks."
+            "inspections took place in. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -337,10 +376,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "recent inspection first — a series of percentages and letter "
             "grades exactly as recorded at the time of each inspection. No "
             "trend, average, or difference between entries is computed here; "
-            "the caller compares the series itself. Before comparing, read the "
-            "`comparability` field: a series whose scoring rules changed "
-            "between editions is not a trend, and the field says where it "
-            "breaks."
+            "the caller compares the series itself. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -361,11 +397,7 @@ TOOLS: tuple[ToolSpec, ...] = (
             "many inspections and units, total findings, the distribution of "
             "recorded letter grades, and the best- and worst-scoring recorded "
             "inspections. No average score is computed — that number was "
-            "never recorded by the audit engine, so it is not invented here. "
-            "The `comparability` field says whether the summarized inspections "
-            "were scored the same way at all: different checklists, or "
-            "editions whose scoring rules changed, make the grade distribution "
-            "a mix of incomparable series."
+            "never recorded by the audit engine, so it is not invented here. " + _METHODOLOGIES_NOTE
         ),
         input_schema={
             "type": "object",
@@ -1864,6 +1896,194 @@ TOOLS: tuple[ToolSpec, ...] = (
         handler=checklists_tools.apply_checklist,
         kind=KIND_CHECKLIST,
     ),
+    ToolSpec(
+        name="import_ratings",
+        description=(
+            "Upload a ratings file into Decimus (standards and customer-experience "
+            "ratings, IMF only). kind: rko-violations | rko-evaluations | rs-checkups "
+            "(Dodo IS CSV exports), sheet-scores (the 'quality by pizzeria' sheet as "
+            "CSV), snapshot (rating snapshot JSON, see docs/15-ratings.md). "
+            "content: the file text as is. A snapshot goes in self-contained chunks of up to "
+            f"{MCP_CHUNK_BYTES} bytes; send each chunk with its own call (the answer carries "
+            "chunk_index and chunk_of). Re-sending the same content is safe: the answer says "
+            "'duplicate' with loaded_at and nothing changes. HQ token only."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "rko-violations",
+                        "rko-evaluations",
+                        "rs-checkups",
+                        "sheet-scores",
+                        "snapshot",
+                    ],
+                },
+                "content": {"type": "string", "description": "File content (UTF-8 text)."},
+                "file_name": {
+                    "type": "string",
+                    "description": "Original file name, for the upload log.",
+                },
+            },
+            "required": ["kind", "content"],
+            "additionalProperties": False,
+        },
+        handler=ratings_tools.import_ratings,
+        kind=KIND_RATINGS,
+    ),
+    ToolSpec(
+        name="request_aggregators_update",
+        description=(
+            "Запросить внеочередное обновление оценок пиццерий в агрегаторах доставки "
+            "(Wolt, Glovo, Bolt Food, Yemeksepeti, Trendyol Go, Pyszne.pl, Chowdeck). "
+            "Звать, когда нужны свежие оценки сейчас, а не завтрашний суточный сбор, или "
+            "когда aggregators_status показал сбой и нужна повторная попытка. Сам инструмент "
+            "ничего не опрашивает: он ставит заявку, а собирает бот — подхватит в течение "
+            "минуты, сбор займёт до ~10 минут; итог смотреть в aggregators_status. "
+            "aggregators — какие собрать (ключи как в aggregators_status); не задано — все. "
+            "Пока предыдущая заявка не выполнена, вторая не заводится: ответ "
+            "'already_queued'. Только токен пространства УК."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "aggregators": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": (
+                        "Ключи агрегаторов: wolt, glovo, bolt_food, yemeksepeti, trendyol_go, "
+                        "pyszne_pl, chowdeck. Не задано — все."
+                    ),
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_tools.request_aggregators_update,
+        kind=KIND_RATINGS,
+    ),
+    ToolSpec(
+        name="ratings_summary",
+        description=(
+            "Сводка рейтингов РС (рейтинг стандартов) и РКО (рейтинг клиентского опыта) по "
+            "группам стран за период: средняя оценка группы и изменение к прошлому такому же "
+            "периоду — те же числа, что на экране «Рейтинги». Звать на вопросы «как дела с "
+            "рейтингами», «где просело», «как сравниваются кластеры или страны». group_by: "
+            "imf — две строки, кластеры CEE и «Другие страны»; cluster (value CEE или OTHER); "
+            "developer (value — имя бизнес-девелопера) — общая строка и строка на каждую "
+            "страну; country (value — код страны, например RS). Период: period — месяц "
+            "2026-09, квартал 2026-Q3, период РС rs:<номер> или отрезок "
+            "2026-09-01..2026-09-30; либо пара date_from и date_to (ГГГГ-ММ-ДД); не задано — "
+            "квартал последнего загруженного периода РС. В ответе всегда стоит фактически "
+            "выбранный период. "
+            "Баллы — 0–100, среднее группы считается по пиццериям. Партнёру показываются "
+            "только страны его пространства, УК — все страны IMF."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "group_by": {
+                    "type": "string",
+                    "enum": ["imf", "cluster", "developer", "country"],
+                    "description": "Срез. По умолчанию imf.",
+                },
+                "value": {
+                    "type": "string",
+                    "description": (
+                        "Значение среза: CEE или OTHER для cluster, имя девелопера для "
+                        "developer, код страны для country. Для imf не нужно."
+                    ),
+                },
+                "period": {
+                    "type": "string",
+                    "description": (
+                        "Период: 2026-09, 2026-Q3, rs:<номер> или 2026-09-01..2026-09-30."
+                    ),
+                },
+                "date_from": {"type": "string", "description": "Начало отрезка, ГГГГ-ММ-ДД."},
+                "date_to": {"type": "string", "description": "Конец отрезка, ГГГГ-ММ-ДД."},
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.ratings_summary,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="ratings_units",
+        description=(
+            "Оценки отдельных пиццерий за период: РС и РКО (среднее по периодам рейтинга), "
+            "оценка на картах Google (из 5, число отзывов) и оценки в агрегаторах доставки "
+            "(в родной шкале: Wolt из 10, Glovo — % довольных, остальные из 5), если "
+            "пиццерия там найдена. Звать, когда нужны конкретные пиццерии: «кто в Сербии "
+            "ниже всех», «что с Beograd-1». Отбор: country — код страны, city — часть "
+            "названия пиццерии (города отдельным полем в рейтингах нет, Dodo называет "
+            "пиццерию по городу), unit — часть названия или id пиццерии. Период — как в "
+            "ratings_summary. Список по стране и имени, не больше limit (по умолчанию 50); "
+            "'truncated' говорит, что есть ещё — сузить отбор. Партнёру показываются только "
+            "страны его пространства."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {
+                "country": {"type": "string", "description": "Код страны, например RS."},
+                "city": {"type": "string", "description": "Часть названия пиццерии (город)."},
+                "unit": {"type": "string", "description": "Часть названия или id пиццерии."},
+                "period": {
+                    "type": "string",
+                    "description": (
+                        "Период: 2026-09, 2026-Q3, rs:<номер> или 2026-09-01..2026-09-30."
+                    ),
+                },
+                "date_from": {"type": "string", "description": "Начало отрезка, ГГГГ-ММ-ДД."},
+                "date_to": {"type": "string", "description": "Конец отрезка, ГГГГ-ММ-ДД."},
+                "limit": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Сколько пиццерий вернуть, от 1 до 200; по умолчанию 50.",
+                },
+            },
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.ratings_units,
+        kind=KIND_RATINGS_READ,
+    ),
+    ToolSpec(
+        name="aggregators_status",
+        description=(
+            "Состояние сбора оценок в агрегаторах доставки: по каждому — когда был последний "
+            "сбор, чем кончился (ok, failed или never_run), сколько точек принёс, когда "
+            "последний раз удался, текст ошибки (виден токену УК) — и стоит ли в очереди "
+            "заявка на обновление. Звать перед request_aggregators_update, после него — "
+            "узнать итог, и на вопрос «почему нет оценок Wolt или Glovo». Шкалы: Wolt из 10, "
+            "Glovo — % довольных, остальные из 5. Бот собирает всё раз в сутки."
+        ),
+        input_schema={
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        },
+        handler=ratings_read.aggregators_status,
+        kind=KIND_RATINGS_READ,
+    ),
+)
+
+#: Инструменты загрузки (D305) — своим видом и одним местом: вид ставится здесь,
+#: а не в файле описаний, чтобы инструмент оттуда не мог попасть в каталог мимо
+#: права `MCP_IMPORT_TENANTS`.
+TOOLS = TOOLS + tuple(
+    ToolSpec(
+        name=t.name,
+        description=t.description,
+        input_schema=t.input_schema,
+        handler=t.handler,
+        kind=KIND_IMPORT,
+    )
+    for t in IMPORT_TOOLS
 )
 
 #: Каждому инструменту методики дописывается свойство «какой чек-лист» — одним
@@ -1887,9 +2107,14 @@ def find(name: str) -> ToolSpec | None:
     return _BY_NAME.get(name)
 
 
-def as_list() -> list[dict[str, object]]:
-    """Каталог в форме ответа MCP `tools/list`: ровно `name`/`description`/`inputSchema`."""
+def as_list(open_kind: Callable[[str], bool] | None = None) -> list[dict[str, object]]:
+    """Каталог в форме ответа MCP `tools/list`: ровно `name`/`description`/`inputSchema`.
+
+    `open_kind` — фильтр по виду (права роли, `policy.permits`, D417); без
+    него — каталог целиком, как у дверей бота и `.env`.
+    """
     return [
         {"name": spec.name, "description": spec.description, "inputSchema": spec.input_schema}
         for spec in TOOLS
+        if open_kind is None or open_kind(spec.kind)
     ]

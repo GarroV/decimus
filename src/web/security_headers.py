@@ -31,7 +31,9 @@
 
 from __future__ import annotations
 
-from flask import Flask, Response
+from flask import Flask, Response, request
+
+from . import oauth, walk_auth
 
 #: Политика источников. Всё своё; исключения названы и объяснены выше.
 CONTENT_SECURITY_POLICY = "; ".join(
@@ -49,6 +51,17 @@ CONTENT_SECURITY_POLICY = "; ".join(
     )
 )
 
+#: Согласие OAuth (D417): после «Разрешить» форма уходит редиректом на адрес
+#: возврата Claude, а `form-action` браузер проверяет и на редиректах формы.
+#: Поэтому на ответах согласия к своим источникам добавлены ровно адреса
+#: возврата Claude (`oauth_store.redirect_uri_allowed`), и только там.
+OAUTH_FORM_ACTION = "https://claude.ai https://claude.com http://localhost:* http://127.0.0.1:*"
+
+OAUTH_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
+    "form-action 'self' https://accounts.google.com https://*.google.com",
+    f"form-action 'self' https://accounts.google.com https://*.google.com {OAUTH_FORM_ACTION}",
+)
+
 #: Камера, микрофон и место админке не нужны: экраны их не просят, и
 #: внедрённый код не должен суметь попросить от её имени.
 PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
@@ -56,6 +69,31 @@ PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
 #: Год — срок, который браузеры и списки предзагрузки считают рабочим.
 #: Без `includeSubDomains`: стенд живёт на имени площадки, чьи соседние имена
 #: не наши.
+#: Мини-апп обхода (#418) — единственная страница, которую показывают в рамке:
+#: Telegram открывает её во встроенном окне, а веб-клиент Telegram — во
+#: `<iframe>` со своего домена. Поэтому у неё своя политика, а не дыра в общей:
+#: рамка разрешена только доменам Telegram, скрипт — только свой и
+#: `telegram-web-app.js` с telegram.org. `X-Frame-Options` у неё нет вовсе:
+#: значения «разрешить этим доменам» у заголовка не бывает, а `DENY` закрыл
+#: бы веб-клиент Telegram.
+WALK_ENDPOINTS = walk_auth.ENDPOINTS
+
+WALK_CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "script-src 'self' https://telegram.org",
+        "style-src 'self' 'unsafe-inline'",
+        # blob: — превью кадра, снятого на телефоне, до и после отправки (D312).
+        "img-src 'self' blob:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors https://web.telegram.org https://*.telegram.org",
+    )
+)
+
 HSTS_MAX_AGE = 31_536_000
 
 #: Заголовки, одинаковые для каждого ответа.
@@ -67,14 +105,37 @@ BASE_HEADERS: dict[str, str] = {
     "Permissions-Policy": PERMISSIONS_POLICY,
 }
 
+WALK_HEADERS: dict[str, str] = {
+    **{ключ: значение for ключ, значение in BASE_HEADERS.items() if ключ != "X-Frame-Options"},
+    "Content-Security-Policy": WALK_CONTENT_SECURITY_POLICY,
+}
+
+
+#: Страницы, которые браузер не кэширует: экран людей показывает новый пароль один раз.
+NO_STORE_PREFIX = "/users"
+
 
 def install(app: Flask, *, hsts: bool) -> None:
     """Повесить заголовки на каждый ответ приложения."""
     заголовки = dict(BASE_HEADERS)
+    обход = dict(WALK_HEADERS)
     if hsts:
         заголовки["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
+        обход["Strict-Transport-Security"] = f"max-age={HSTS_MAX_AGE}"
 
     @app.after_request
     def _security_headers(response: Response) -> Response:
-        response.headers.update(заголовки)
+        if request.endpoint in WALK_ENDPOINTS:
+            response.headers.pop("X-Frame-Options", None)
+            response.headers.update(обход)
+        else:
+            response.headers.update(заголовки)
+        if request.endpoint == oauth.AUTHORIZE_ENDPOINT:
+            response.headers["Content-Security-Policy"] = OAUTH_CONTENT_SECURITY_POLICY
+        путь = request.path
+        if путь == NO_STORE_PREFIX or путь.startswith(f"{NO_STORE_PREFIX}/"):
+            # Свой заголовок маршрута с `no-store` не затирается: страница ключа
+            # «Подключений» отдаёт `private, no-store` (D425).
+            if "no-store" not in response.headers.get("Cache-Control", ""):
+                response.headers["Cache-Control"] = "no-store"
         return response

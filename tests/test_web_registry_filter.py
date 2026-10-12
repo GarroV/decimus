@@ -56,7 +56,9 @@ def test_пустота_от_отбора_называется_иначе_чем
     # Act
     от_отбора = стенд.get("/inspections?grade=B").get_data(as_text=True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
-    пустой = стенд.get("/inspections").get_data(as_text=True)
+    # Пустой реестр — за всё время: без периода экран открывается текущим
+    # месяцем, и его пустота — третье состояние (тест ниже).
+    пустой = стенд.get("/inspections?period=all").get_data(as_text=True)
 
     # Assert — две разные причины пустого экрана названы разными словами.
     # Сравниваются сами заголовки пустого состояния, а не наличие слова на

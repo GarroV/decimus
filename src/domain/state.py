@@ -22,6 +22,7 @@ import os
 import re
 import tempfile
 import time
+import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import replace
@@ -504,9 +505,9 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         partner=str(meta.get("partner") or ""),
         contact=str(meta.get("contact") or ""),
         auditor=str(meta.get("auditor") or ""),
-        author_user_id=str(block.get("author_user_id") or ""),
         findings=[_finding(f, sources, suggestions, words) for f in (raw.get("findings") or [])],
         info=read_info(raw),
+        run_id=str(block.get("run_id") or ""),
     )
 
 
@@ -537,7 +538,6 @@ def start_inspection(
     auditor: str = "",
     tenant: str = DEFAULT_TENANT,
     checklist_code: str | None = None,
-    author_user_id: str = "",
 ) -> Inspection:
     """Начать проверку в чате.
 
@@ -612,9 +612,11 @@ def start_inspection(
         "kind": kind,
         "checklist_version": version,
         "checklist_code": выбран.code,
-        "author_user_id": author_user_id.strip(),
         "ui_lang": _clean_lang(ui_lang, "язык интерфейса"),
         "speech_lang": _clean_lang(speech_lang, "язык речи аудитора"),
+        # Личность проверки (D392): по ней память бота узнаёт, что проверку
+        # начали заново, и не отдаёт новой предложения и слова старой.
+        "run_id": uuid.uuid4().hex,
     }
     run_audit(args, chat_id=chat_id, settings=init_settings, create=True)
     patch_domain_block(state_file(chat_id, settings), block)
@@ -624,6 +626,63 @@ def start_inspection(
             f"Движок отчитался об успехе, но состояния нет: {state_file(chat_id, settings)}"
         )
     return started
+
+
+def set_report_lang(chat_id: int, lang: str) -> Inspection:
+    """Назначить язык отчёта начатой проверки (D415). Единственный способ его сменить.
+
+    Язык отчёта не спрашивается на старте: до конца обхода он равен языку
+    проверки, и аудитор работает на нём. Когда проверка готова и он согласился
+    формировать отчёт, бот спрашивает язык отчёта и вызывает это. Хранится он
+    по-прежнему в шапке движка (`meta.lang`) — оттуда его берёт сборка отчёта, —
+    а правит его сам движок (`meta --lang`), блок второй копии не заводит.
+
+    Свободный текст проверки при этом не переводится (D416): формулировки
+    остаются на языке чек-листа, а на это в отчёте есть пометка.
+
+    Язык вне `TEXT_LANGS` — отказ ДО движка, по той же причине, что и на старте:
+    без слова на этом языке шапку не заполнить.
+    """
+    code = lang.strip().lower()
+    if code not in TEXT_LANGS:
+        raise ValidationError(
+            f"Язык отчёта «{lang}» в методике не заведён. Доступны: {', '.join(TEXT_LANGS)}"
+        )
+    settings = check_environment()
+    current = read_state(chat_id, settings)
+    if current is None:
+        raise InspectionNotStarted(
+            f"В этом чате проверка не начата — нет {state_file(chat_id, settings)}. "
+            f"Язык отчёта назначать некому"
+        )
+    # Вид проверки печатается на языке отчёта по коду: без перевода на новый
+    # язык отказ придёт при сборке, а не здесь, где человек ещё выбирает.
+    if current.kind:
+        kind_title(current.kind, code)
+    run_audit(["meta", option("lang", code)], chat_id=chat_id, settings=settings_for(chat_id))
+    updated = read_state(chat_id, settings)
+    if updated is None:
+        raise DomainError(
+            f"Движок отчитался об успехе, но состояния нет: {state_file(chat_id, settings)}"
+        )
+    return updated
+
+
+def run_id(chat_id: int) -> str:
+    """Личность проверки чата (`Inspection.run_id`) без разбора всего состояния.
+
+    Пусто — проверки нет, она начата до D392 или файл не читается: для сверки
+    памяти бота это одно и то же «своей метки нет». Отказом не становится: её
+    зовут на каждом обращении к памяти бота, и падать там нельзя.
+    """
+    path = state_file(chat_id, check_environment())
+    if not path.is_file():
+        return ""
+    try:
+        raw = _read_raw(path)
+    except (DomainError, OSError):
+        return ""
+    return str((raw.get(DOMAIN_KEY) or {}).get("run_id") or "")
 
 
 def settings_for(chat_id: int) -> Settings:

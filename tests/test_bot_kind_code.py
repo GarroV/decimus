@@ -58,7 +58,7 @@ async def walk_wizard(dp: Any, bot: Any, *, report_lang: str) -> None:
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Demo Pizzeria #1"))
     await feed(dp, bot, callback_query(f"start:kind:{PLANNED}"))
-    await feed(dp, bot, callback_query(f"start:lang:{report_lang}"))
+    await feed(dp, bot, callback_query(f"start:speech:{report_lang}"))
 
 
 def meta_of() -> dict[str, Any]:

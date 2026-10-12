@@ -33,7 +33,6 @@ from typing import Any
 import psycopg
 
 from .config import load_retraction_settings
-from .cross_space import Entry, record
 from .errors import RetractionError, StorageError
 from .queries import _require_inspection_id, _require_tenant
 from .storage import PhotoStorage, S3PhotoStorage
@@ -143,12 +142,7 @@ def _refuse_if_referenced(cur: psycopg.Cursor[Any], inspection_id: str) -> None:
 
 
 def _mark_retracted(
-    conn: psycopg.Connection[Any],
-    inspection_id: str,
-    *,
-    tenant: str,
-    reason: str,
-    journal: Entry | None = None,
+    conn: psycopg.Connection[Any], inspection_id: str, *, tenant: str, reason: str
 ) -> tuple[str, str]:
     """Поставить пометку и вернуть записанную причину и время снятия.
 
@@ -190,10 +184,6 @@ def _mark_retracted(
                 f"политики: подключение обязано идти под ролью администратора "
                 f"истории, иначе отклонённая строка для записи просто не видна"
             )
-        # Журнал — в ТОЙ ЖЕ транзакции, что пометка, до её коммита ниже: откатилась
-        # пометка — откатилась строка. Повторный вызов на уже снятой выходит
-        # раньше и строки не дублирует.
-        record(conn, journal)
         cur.execute(_SELECT_RETRACTED_AT_SQL, (inspection_id,))
         отметка = cur.fetchone()
         if отметка is None or отметка[0] is None:
@@ -288,7 +278,6 @@ def retract_inspection(
     tenant: str,
     reason: str,
     storage: PhotoStorage | None = None,
-    journal: Entry | None = None,
 ) -> Retraction:
     """Снять сданную проверку из истории и убрать её кадры из хранилища.
 
@@ -306,9 +295,6 @@ def retract_inspection(
 
     `storage` подменяется только проверками; в работе драйвер собирается из
     окружения (`S3_*`), как и у выгрузки.
-
-    `journal` — строка журнала действий УК в чужом пространстве: пишется той же
-    транзакцией, что и пометка, и только если снятие состоялось.
     """
     ident = _require_inspection_id(inspection_id)
     tenant_code = _require_tenant(tenant)
@@ -318,7 +304,7 @@ def retract_inspection(
     try:
         with psycopg.connect(settings.dsn) as conn:
             причина, снята = _mark_retracted(
-                conn, ident, tenant=tenant_code, reason=записанная_причина, journal=journal
+                conn, ident, tenant=tenant_code, reason=записанная_причина
             )
             # Уборка идёт ПОСЛЕ пометки намеренно: снятие не должно упираться
             # в хранилище. Пометка — то, ради чего вызов сделан; уборка кадров

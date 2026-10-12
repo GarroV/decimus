@@ -272,7 +272,6 @@ def слить_проверку(
     text: str = "нагар на печи",
     date: str | None = None,
     accept: bool = True,
-    author_user_id: str = "",
 ) -> str:
     """Завершённая проверка через официальный контракт домена и слив; её `id`.
 
@@ -288,15 +287,7 @@ def слить_проверку(
     from src.domain import add_finding, start_inspection
 
     чат = next(_номер_чата) if chat_id is None else chat_id
-    start_inspection(
-        чат,
-        unit=unit,
-        kind="planned",
-        report_lang="ru",
-        tenant=tenant,
-        date=date,
-        author_user_id=author_user_id,
-    )
+    start_inspection(чат, unit=unit, kind="planned", report_lang="ru", tenant=tenant, date=date)
     add_finding(чат, code="CLN03", level="D1", zone="hot_kitchen", text=text)
     ident = push_inspection(чат)
     if accept:
@@ -346,3 +337,36 @@ def пространства_для_теста(request: pytest.FixtureRequest, *
     """
     if "db_env" in request.fixturenames:
         привязать_пространства(request.getfixturevalue("pg_dsn"), *tenants)
+
+
+def привязать_бота(
+    pg_dsn: str,
+    monkeypatch: pytest.MonkeyPatch,
+    telegram_id: int,
+    *,
+    tenant: str = "HQ",
+    role: str = "auditor",
+    login: str | None = None,
+) -> str:
+    """Завести учётку сайта и живую привязку бота к ней; вернуть `web_users.id`.
+
+    Личный токен MCP и место в круге выдаются только на учётку (аудит 12.10):
+    тесту, которому нужен токен, нужна и учётка с привязанным Telegram ID.
+    Учётку заводит `create_account` (роль владельца схемы), привязку — прямая
+    вставка под `pg_dsn`: одноразовая ссылка здесь не предмет проверки.
+    """
+    import psycopg
+
+    from src.db.web_access import create_account
+
+    monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    завести_пространства(pg_dsn, tenant)
+    учётка = create_account(
+        login or f"tg-{telegram_id}", tenant=tenant, password="пароль-учётки-теста", role=role
+    )
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "insert into bot_bindings (telegram_id, user_id) values (%s, %s)",
+            (telegram_id, учётка.id),
+        )
+    return учётка.id

@@ -7,12 +7,13 @@
 
 **ДВЕ РОЛИ, И ЭТО ГЛАВНОЕ.** Опознание и сессии работают под ролью приложения
 (`DATABASE_URL`) — той же, под которой живёт весь продукт. Заведение,
-отключение и перечисление учёток идут под ролью ВЛАДЕЛЬЦА СХЕМЫ
-(`DATABASE_ADMIN_URL`) — той же, что накатывает миграции. Разделение держит не
+отключение и перечисление учёток идут под узкой ролью администратора истории
+(`DATABASE_RETRACTION_URL`, права — `0020`, `0041`); владелец схемы
+(`DATABASE_ADMIN_URL`) сервисам не выдаётся (F-002) и остаётся только запасным
+подключением инструментов (`managing_dsn`). Разделение держит не
 код, а права в базе (миграция `0014`): роль приложения на `web_users` имеет
 только `select`, поэтому завести учётку или подменить чужой пароль она не
-может физически. Своей четвёртой роли здесь не заводится — владелец схемы уже
-существует, и заведение учётки это работа ровно его класса.
+может физически. Четвёртой роли здесь не заводится: администратор истории уже существует.
 
 **ОБРАТИМОГО ХРАНЕНИЯ НЕТ НИГДЕ.** От пароля остаётся scrypt с солью, от
 сессионного токена — отпечаток SHA-256, как у токенов MCP
@@ -43,25 +44,17 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from types import MappingProxyType
 from typing import Any
 
 import psycopg
 
-from src.domain.permissions import (
-    LEGACY_ROLE_ADMIN,
-    LEGACY_ROLE_AUDITOR,
-    ROLE_SCOPES,
-    Grants,
-    canonical_role,
-)
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
-from .database_target import managing_dsn, same_database_or_deny
+from .database_target import managing_dsn
 from .errors import AccessError, EmailTakenError
-from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
+from .pool import connection
 from .reading import reading
-from .roles import grants_column, grants_from_row
 from .space_guard import require_space
 
 #: Сколько живёт сессия. Рабочий день с запасом: короче — человек вводит пароль
@@ -118,14 +111,11 @@ _INSERT_USER_SQL = """
     returning id
 """
 
-_GRANTS_OF_USER = grants_column("u.role")
-
-_SELECT_USER_SQL = f"""
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER},
-           u.password_hash
-      from web_users u join roles r on r.code = u.role
-     where u.login = %s and u.disabled_at is null
-"""  # noqa: S608 — подзапрос собран из константы модуля
+_SELECT_USER_SQL = """
+    select id, login, tenant_code, password_hash, role, email
+      from web_users
+     where login = %s and disabled_at is null
+"""
 
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
@@ -138,10 +128,14 @@ _LIST_USERS_SQL = """
 
 _LIST_SPACES_SQL = "select code from tenants order by code"
 
+#: `roles` — охват правящего по роли ЦЕЛИ (#585): условие в самом запросе, а не
+#: только в маршруте. Цель, ставшая админом между чтением перечня и записью,
+#: не правится тем, кому админы вне охвата. `null` — без ограничения.
 _DISABLE_USER_SQL = """
     update web_users
        set disabled_at = now()
-     where tenant_code = %s and login = %s and disabled_at is null
+     where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+       and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
 """
 
 #: Прежняя роль читается той же командой, что пишет новую: строка запирается
@@ -150,11 +144,12 @@ _SET_ROLE_SQL = """
     with прежняя as (
         select id, role
           from web_users
-         where tenant_code = %s and login = %s and disabled_at is null
+         where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+           and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
            for update
     )
     update web_users u
-       set role = %s
+       set role = %(role)s
       from прежняя
      where u.id = прежняя.id
  returning прежняя.role
@@ -190,27 +185,45 @@ _CLOSE_USER_SESSIONS_SQL = """
      where user_id = %s and closed_at is null
 """
 
+#: Смена пароля или почты отзывает и подключения Claude (`0054`): вошедший по
+#: старому паролю или почте мог успеть разрешить доступ, и подключение пережило
+#: бы смену. Причина — `password` или `email`.
+_REVOKE_USER_OAUTH_SQL = """
+    update oauth_grants
+       set revoked_at = now(), revoked_reason = %s
+     where user_id = %s and revoked_at is null
+"""
+
+#: И ещё не обменянные коды: выданный до смены код иначе обменялся бы после
+#: неё на новое подключение. Гасятся ДО отзыва подключений — см. `_revoke_oauth`.
+_EXPIRE_USER_OAUTH_CODES_SQL = """
+    update oauth_codes
+       set expires_at = now()
+     where user_id = %s and used_at is null and expires_at > now()
+"""
+
 #: Прежняя почта читается той же командой, что пишет новую (строка заперта):
 #: сессии закрываются, только если почта на деле сменилась.
 _SET_EMAIL_SQL = """
     with прежняя as (
         select id, email
           from web_users
-         where tenant_code = %s and login = %s and disabled_at is null
+         where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
+           and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
            for update
     )
     update web_users u
-       set email = %s
+       set email = %(email)s
       from прежняя
      where u.id = прежняя.id
  returning u.id, прежняя.email is distinct from u.email
 """
 
-_SELECT_USER_BY_EMAIL_SQL = f"""
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER}
-      from web_users u join roles r on r.code = u.role
-     where u.email = %s and u.disabled_at is null
-"""  # noqa: S608 — подзапрос собран из константы модуля
+_SELECT_USER_BY_EMAIL_SQL = """
+    select id, login, tenant_code, role, email
+      from web_users
+     where email = %s and disabled_at is null
+"""
 
 _OPEN_SESSION_SQL = """
     insert into web_sessions (user_id, fingerprint, expires_at)
@@ -221,16 +234,15 @@ _OPEN_SESSION_SQL = """
 #: Учётка сверяется ВМЕСТЕ с сессией, одним запросом. Отдельной проверкой
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
-_RESOLVE_SESSION_SQL = f"""
-    select u.id, u.login, u.tenant_code, u.role, r.name_ru, r.name_en, {_GRANTS_OF_USER}
+_RESOLVE_SESSION_SQL = """
+    select u.id, u.login, u.tenant_code, u.role, u.email
       from web_sessions s
       join web_users u on u.id = s.user_id
-      join roles r on r.code = u.role
      where s.fingerprint = %s
        and s.closed_at is null
        and s.expires_at > now()
        and u.disabled_at is null
-"""  # noqa: S608 — подзапрос собран из константы модуля
+"""
 
 _CLOSE_SESSION_SQL = """
     update web_sessions
@@ -239,35 +251,78 @@ _CLOSE_SESSION_SQL = """
 """
 
 
-#: Старые имена ролей (`0020`) — псевдонимы: команды стендов, формы и тесты
-#: зовут `admin`/`auditor`, перевод по пространству — `canonical_role`.
-ROLE_AUDITOR = LEGACY_ROLE_AUDITOR
-ROLE_ADMIN = LEGACY_ROLE_ADMIN
-LEGACY_ROLES: tuple[str, ...] = (ROLE_AUDITOR, ROLE_ADMIN)
-#: Коды ролей по умолчанию (`0038`). Мост до Task 11: там выбор роли берётся
-#: из таблицы `roles`, а этот перечень уходит.
-ROLES: tuple[str, ...] = tuple(ROLE_SCOPES)
+#: Роли внутри админки. Перечислены здесь И ограничением схемы (`0020`):
+#: код без схемы пропустил бы опечатку в базу, схема без кода молчала бы о
+#: ней до первой записи.
+ROLE_AUDITOR = "auditor"
+ROLE_ADMIN = "admin"
+#: Контроль УК (D319): рейтинги — загрузка и справочники. Только в HQ (`0040`).
+ROLE_CONTROL = "control"
+#: Главный админ (D364): всё по проекту. Только в HQ; последнего действующего
+#: отключить или понизить не даёт база (`0041`, триггер на `web_users`).
+ROLE_SUPERADMIN = "superadmin"
+#: Бизнес-девелопер (D440): в УК вместо аудитора — пользуется сервисом полностью,
+#: методику и людей не трогает. Только в HQ (`0060`).
+ROLE_DEVELOPER = "developer"
+#: Гость (D440): вся сеть только на чтение. Только в HQ (`0060`).
+ROLE_GUEST = "guest"
+#: От самой узкой к самой широкой: в таком порядке роли идут в форме.
+ROLES = (
+    ROLE_AUDITOR,
+    ROLE_GUEST,
+    ROLE_DEVELOPER,
+    ROLE_CONTROL,
+    ROLE_ADMIN,
+    ROLE_SUPERADMIN,
+)
+#: Роли, которые бывают только в пространстве УК (`0040`, `0041`, `0060`).
+HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN, ROLE_DEVELOPER, ROLE_GUEST)
+#: Роль, которой в УК больше нет (D440, `0060`): аудиторы УК стали девелоперами.
+PARTNER_ONLY_ROLES = (ROLE_AUDITOR,)
 
 
-#: Ограничение охвата роли в схеме (`0038`): его имя различает «роль чужого
-#: охвата» и прочие отказы проверки.
-_ROLE_SCOPE_CONSTRAINT = "web_users_role_scope"
-_NO_GRANTS: Grants = MappingProxyType({})
+#: Код отказа триггера `keep_last_superadmin` (`0041`): последнего действующего
+#: главного админа отключить или понизить нельзя.
+LAST_SUPERADMIN_SQLSTATE = "DC001"
+
+
+class LastSuperadminError(AccessError):
+    """Отказ базы: правка сняла бы последнего действующего главного админа (D364).
+
+    Отдельным классом: это ответ по существу («назначьте сначала другого»), а
+    не сбой, и экран говорит его словами, а не «база недоступна».
+    """
+
+
+@contextmanager
+def _guarding_last_superadmin() -> Iterator[None]:
+    """Перевести отказ триггера `0041` в `LastSuperadminError`; остальное — как было."""
+    try:
+        yield
+    except psycopg.Error as exc:
+        if exc.sqlstate == LAST_SUPERADMIN_SQLSTATE:
+            raise LastSuperadminError(
+                "Это последний действующий главный админ: сначала назначьте другого"
+            ) from exc
+        raise
 
 
 @dataclass(frozen=True)
 class Account:
-    """Учётка так, как её видят страницы: кто вошёл, его роль и права роли."""
+    """Учётка так, как её видят страницы: кто вошёл и чью историю показывать."""
 
     id: str
     login: str
     tenant: str
-    #: Код роли (`roles.code`). Приезжает вместе с опознанием одним запросом.
-    role: str = ""
-    #: Права роли на момент запроса: код действия → охват (`own`/`all`).
-    grants: Grants = _NO_GRANTS
-    role_name_ru: str = ""
-    role_name_en: str = ""
+    #: Что человеку можно В АДМИНКЕ (`auditor` | `admin`), а не чью историю
+    #: ему видно: за историю отвечает арендатор, и роль его не расширяет.
+    #: Приезжает вместе с опознанием, одним запросом с ним: спрошенная
+    #: отдельно, она успела бы устареть между двумя запросами.
+    role: str = ROLE_AUDITOR
+    #: Почта входа через Google (`web_users.email`); `None` — не привязана.
+    #: Привязанная закрывает вход паролем и решает, в чью почту ложится
+    #: черновик письма (D176).
+    email: str | None = None
 
 
 @dataclass(frozen=True)
@@ -384,33 +439,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
-            yield conn
-    except psycopg.Error as exc:
-        raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
-
-
-@contextmanager
-def _owned(зачем: str) -> Iterator[psycopg.Connection[Any]]:
-    """Подключение ВЛАДЕЛЬЦА СХЕМЫ — то, чем заводят и отключают учётки.
-
-    Отдельно от `_connected`, потому что роль другая и отказывает по-другому:
-    «роль приложения не смогла прочитать учётку» чинится не там, где «на этой
-    машине не задано подключение владельца». Отсутствие настройки — отказ с
-    названной переменной, а не молчаливый откат на роль приложения: такой
-    откат выглядел бы работающим ровно до первой попытки записи и объяснил бы
-    её отказом прав вместо настоящей причины.
-    """
-    dsn = admin_dsn()
-    if not dsn:
-        raise AccessError(
-            f"Не удалось {зачем}: не задано DATABASE_ADMIN_URL. Учётки заводит роль "
-            f"владельца схемы — та же, что накатывает миграции; роль приложения "
-            f"этого права не имеет намеренно"
-        )
-    same_database_or_deny(DATABASE_ADMIN_URL_VAR, dsn, зачем)
-    try:
-        with psycopg.connect(dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
@@ -445,36 +474,26 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
 
 
-def _checked_role(role: str, tenant: str) -> str:
-    """Код роли: старое имя переводится по пространству. Заведена ли — решает схема (FK)."""
-    try:
-        return canonical_role(role, tenant)
-    except ValueError as exc:
-        raise AccessError("Роль не задана") from exc
+def roles_for(tenant: str) -> tuple[str, ...]:
+    """Роли, которые бывают в пространстве (D440).
+
+    УК: главный админ, админ, бизнес-девелопер, контроль, гость — аудитора там
+    больше нет. У партнёра две роли (D346): админ пространства (`admin`) и
+    сотрудник (`auditor`).
+    """
+    if canonical_tenant(tenant) == HQ_TENANT:
+        return tuple(role for role in ROLES if role not in PARTNER_ONLY_ROLES)
+    return tuple(role for role in ROLES if role not in HQ_ONLY_ROLES)
 
 
-def _role_refusal(exc: psycopg.Error, *, role: str, tenant: str) -> AccessError | None:
-    """Отказ схемы про роль — словами; прочие отказы — `None` (решает вызывающий)."""
-    if isinstance(exc, psycopg.errors.ForeignKeyViolation):
-        return AccessError(f"Роль «{role}» не заведена")
-    if isinstance(exc, psycopg.errors.CheckViolation) and (
-        exc.diag.constraint_name == _ROLE_SCOPE_CONSTRAINT
-    ):
-        return AccessError(f"Роль «{role}» не для пространства «{tenant}»")
-    return None
-
-
-def _account(row: tuple[Any, ...]) -> Account:
-    """Строка опознания → учётка. Первые семь колонок одинаковы у трёх запросов."""
-    return Account(
-        id=str(row[0]),
-        login=str(row[1]),
-        tenant=str(row[2]),
-        role=str(row[3]),
-        role_name_ru=str(row[4]),
-        role_name_en=str(row[5]),
-        grants=grants_from_row(row[6]),
-    )
+def _checked_role(role: str, *, tenant: str) -> str:
+    if role not in ROLES:
+        raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
+    if role not in roles_for(tenant):
+        if role in PARTNER_ONLY_ROLES:
+            raise AccessError(f"Роль «{role}» бывает только у партнёра: в УК её заменил девелопер")
+        raise AccessError(f"Роль «{role}» бывает только в пространстве УК (HQ)")
+    return role
 
 
 def _checked_password(password: str) -> str:
@@ -522,7 +541,7 @@ def _require_tenant(tenant: str) -> None:
         require_space(cur, tenant, error=AccessError)
 
 
-def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
+def create_account(login: str, *, tenant: str, password: str, role: str | None = None) -> Account:
     """Завести учётку. Роль владельца схемы, повтор логина — отказ.
 
     Пароль сюда приходит от человека, который учётку заводит, и в репозитории
@@ -530,10 +549,12 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     незачем, а напечатанное уезжает в историю команд.
     """
     имя = _checked_login(login)
-    # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
-    # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
-    # бы админов молча.
-    роль = _checked_role(role, tenant)
+    # Роль по умолчанию — САМАЯ УЗКАЯ: в УК гость (только чтение), у партнёра
+    # сотрудник. Заводящий человек думает про «завести Петра», а не про объём
+    # его прав, и умолчание, дающее больше, раздавало бы админов молча.
+    if role is None:
+        role = ROLE_GUEST if canonical_tenant(tenant) == HQ_TENANT else ROLE_AUDITOR
+    роль = _checked_role(role, tenant=tenant)
     хеш = password_hash(_checked_password(password))
     _require_tenant(tenant)
     with _managing("завести учётку") as conn, conn.cursor() as cur:
@@ -543,11 +564,6 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
             raise AccessError(
                 f"Логин «{имя}» уже занят — логины единые на всю систему. Возьмите другой"
             ) from exc
-        except (psycopg.errors.ForeignKeyViolation, psycopg.errors.CheckViolation) as exc:
-            отказ = _role_refusal(exc, role=role, tenant=tenant)
-            if отказ is None:
-                raise
-            raise отказ from exc
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
     return Account(id=str(row[0]), login=имя, tenant=tenant, role=роль)
@@ -583,14 +599,27 @@ def list_spaces() -> tuple[str, ...]:
         return tuple(str(r[0]) for r in cur.fetchall())
 
 
-def disable_account(login: str, *, tenant: str) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет. Роль владельца схемы.
+def _roles_param(only_roles: tuple[str, ...] | None) -> list[str] | None:
+    return None if only_roles is None else list(only_roles)
+
+
+def disable_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Отключить учётку. `False` — такой живой учётки нет (или её роль вне `only_roles`).
 
     Действует немедленно и на уже открытые сессии: опознание сверяет учётку
     вместе с сессией на каждом запросе, а не запоминает её при входе.
+    Последнего главного админа не отключает — `LastSuperadminError` (`0041`).
     """
     with _managing("отключить учётку") as conn, conn.cursor() as cur:
-        cur.execute(_DISABLE_USER_SQL, (tenant, login.strip().lower()))
+        with _guarding_last_superadmin():
+            cur.execute(
+                _DISABLE_USER_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "roles": _roles_param(only_roles),
+                },
+            )
         return cur.rowcount > 0
 
 
@@ -605,33 +634,52 @@ def set_role(login: str, *, tenant: str, role: str) -> bool:
     return reassign_role(login, tenant=tenant, role=role) is not None
 
 
-def reassign_role(login: str, *, tenant: str, role: str) -> str | None:
+def reassign_role(
+    login: str, *, tenant: str, role: str, only_roles: tuple[str, ...] | None = None
+) -> str | None:
     """Назначить роль живой учётке и вернуть ПРЕЖНЮЮ. `None` — такой живой учётки нет.
 
     Прежняя роль нужна следу в журнале приложения (кто, кого, было → стало):
     экран правит роли, а таблицы истории ролей нет и не заводится.
+    `only_roles` — нынешняя роль цели обязана быть из них (охват правящего);
+    иначе `None`. Последнего главного админа не понижает — `LastSuperadminError`.
     """
-    роль = _checked_role(role, tenant)
+    роль = _checked_role(role, tenant=tenant)
     with _managing("сменить роль учётки") as conn, conn.cursor() as cur:
-        try:
-            cur.execute(_SET_ROLE_SQL, (tenant, login.strip().lower(), роль))
-        except (psycopg.errors.ForeignKeyViolation, psycopg.errors.CheckViolation) as exc:
-            отказ = _role_refusal(exc, role=role, tenant=tenant)
-            if отказ is None:
-                raise
-            raise отказ from exc
+        with _guarding_last_superadmin():
+            cur.execute(
+                _SET_ROLE_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "role": роль,
+                    "roles": _roles_param(only_roles),
+                },
+            )
         строка = cur.fetchone()
     return None if строка is None else str(строка[0])
+
+
+def _revoke_oauth(cur: Any, user_id: object, *, reason: str) -> None:
+    """Отозвать подключения Claude человека в транзакции вызывающего.
+
+    Сперва гасятся необменянные коды, затем отзываются подключения: обмен кода
+    держит строку кода до конца своей транзакции, и отзыв, идущий вторым,
+    видит подключение, которое этот обмен успел выпустить (`0054`).
+    """
+    cur.execute(_EXPIRE_USER_OAUTH_CODES_SQL, (user_id,))
+    cur.execute(_REVOKE_USER_OAUTH_SQL, (reason, user_id))
 
 
 def change_password(login: str, *, tenant: str, password: str) -> bool:
     """Сменить пароль живой учётке. `False` — такой живой учётки нет.
 
-    **Открытые сессии закрываются тем же движением.** Пароль меняют в ответ на
-    «его кто-то узнал»: если вошедший по старому паролю продолжает работать,
-    смена не выгнала того, ради кого её делали. Закрытие идёт в той же
-    транзакции — иначе между записью хеша и закрытием остаётся окно, в котором
-    старая сессия ещё жива, а новый пароль уже роздан.
+    **Открытые сессии закрываются тем же движением**, и подключения Claude
+    отзываются (`0054`). Пароль меняют в ответ на «его кто-то узнал»: если
+    вошедший по старому паролю продолжает работать — сам или через Claude,
+    которому успел разрешить доступ, — смена не выгнала того, ради кого её
+    делали. Всё идёт в той же транзакции — иначе между записью хеша и закрытием
+    остаётся окно, в котором старая сессия ещё жива, а новый пароль уже роздан.
 
     Роль повышенных полномочий: пароль любой учётки меняет команда с машины
     («пароль забыт совсем»). Свой пароль с экрана меняет `change_own_password`
@@ -644,6 +692,7 @@ def change_password(login: str, *, tenant: str, password: str) -> bool:
         if строка is None:
             return False
         cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+        _revoke_oauth(cur, строка[0], reason="password")
         return True
 
 
@@ -660,7 +709,8 @@ def change_own_password(token: str, *, current: str, new: str) -> bool:
     Роль приложения: прямой записи хеша у неё нет (`0014`). Пишет функция
     базы `change_own_password` (`0032`, путь поиска — `0033`) — только строку
     той сессии, чей токен предъявлен, только если прежний хеш всё ещё на месте,
-    и тем же движением закрывает остальные сессии человека, оставляя эту.
+    и тем же движением закрывает остальные сессии человека, оставляя эту, и
+    отзывает его подключения Claude (`0054`).
 
     Это сужение поверхности, а НЕ защита от пробитого приложения: оно читает
     хеши и открывает сессии само, значит может пройти эту дверь за любого
@@ -704,7 +754,9 @@ def normalize_email(email: str) -> str:
     return приведённая
 
 
-def set_email(login: str, *, tenant: str, email: str | None) -> bool:
+def set_email(
+    login: str, *, tenant: str, email: str | None, only_roles: tuple[str, ...] | None = None
+) -> bool:
     """Привязать почту к живой учётке (или снять её, `None`). `False` — учётки нет.
 
     Снятие — не удаление учётки: человек остаётся и входит паролем. Это и есть
@@ -716,13 +768,22 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
     **Сменилась почта — открытые сессии человека закрываются тем же движением**,
     как при смене пароля командой (`change_password`), и теми же правами
     роли (`0022`). Почту меняют в ответ на «к ней получили доступ чужие», и
-    вошедший через Google по прежней почте не должен пережить смену. Та же
+    вошедший через Google по прежней почте не должен пережить смену — ни
+    сессией, ни подключением Claude (оно отзывается тем же движением). Та же
     почта, сохранённая повторно, — не смена, сессии остаются.
     """
     значение = None if email is None else normalize_email(email)
     with _managing("привязать почту к учётке") as conn, conn.cursor() as cur:
         try:
-            cur.execute(_SET_EMAIL_SQL, (tenant, login.strip().lower(), значение))
+            cur.execute(
+                _SET_EMAIL_SQL,
+                {
+                    "tenant": tenant,
+                    "login": login.strip().lower(),
+                    "email": значение,
+                    "roles": _roles_param(only_roles),
+                },
+            )
         except psycopg.errors.UniqueViolation as занято:
             # Не «сбой базы», а ответ по существу: почта уже у кого-то из своих.
             # Экрану «Люди» нужно сказать именно это, иначе админ ищет поломку
@@ -733,6 +794,7 @@ def set_email(login: str, *, tenant: str, email: str | None) -> bool:
             return False
         if строка[1]:
             cur.execute(_CLOSE_USER_SESSIONS_SQL, (строка[0],))
+            _revoke_oauth(cur, строка[0], reason="email")
         return True
 
 
@@ -760,7 +822,9 @@ def find_by_email(email: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return _account(row)
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
 
 
 def authenticate(login: str, password: str) -> Account | None:
@@ -790,9 +854,11 @@ def authenticate(login: str, password: str) -> Account | None:
     if row is None:
         password_hash(password)
         return None
-    if not password_matches(password, str(row[7])):
+    if not password_matches(password, str(row[3])):
         return None
-    return _account(row)
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[4]), email=row[5]
+    )
 
 
 def open_session(account: Account) -> OpenedSession:
@@ -826,7 +892,9 @@ def resolve_session(token: str) -> Account | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return _account(row)
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
 
 
 def close_session(token: str) -> bool:

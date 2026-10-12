@@ -33,7 +33,7 @@ from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.domain import SOURCE_PHOTO, add_finding, attach_photo, score, start_inspection
+from src.domain import SOURCE_PHOTO, add_finding, attach_photo, get_state, score, start_inspection
 from src.report.errors import PdfNotBuilt, ReportError
 
 pytestmark = pytest.mark.asyncio
@@ -365,3 +365,84 @@ async def test_failed_letter_is_reported_after_the_pdf_was_already_sent(
     assert "шаблон письма не прочитался" in caplog.text, "причина не записана в журнал"
     # Свой текст, а не «отчёт не собрался»: документ аудитор уже получил (T151).
     assert session.last_text == t("finish.letter_failed", "ru")
+
+
+# --- язык отчёта спрашивается в конце (D415) ---------------------------------
+
+
+async def test_finish_question_offers_the_preliminary_report(domain_env: object) -> None:
+    """Под итогом — вопрос «Сформировать предварительный отчёт?» и кнопка с тем же словом."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    bot, session = make_bot()
+
+    await feed(build_dispatcher(SETTINGS), bot, text_message("/finish"))
+
+    assert session.last_text == t("finish.ask", "ru")
+    assert "предварительный отчёт" in session.last_text
+    assert t("btn.build", "ru") in session.keyboard_texts()
+
+
+async def test_several_languages_are_asked_and_the_choice_is_stored(domain_env: object) -> None:
+    """У страны больше одного языка: спрашиваем, и до ответа язык отчёта не меняется."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+    await feed(dp, bot, text_message("/finish"))
+
+    await feed(dp, bot, callback("fin:build"))
+
+    assert session.last_text == t("finish.ask_report_lang", "ru")
+    assert session.keyboard_data() == ["fin:rlang:ru", "fin:rlang:en"]
+    unchanged = get_state(CHAT_ID)
+    assert unchanged is not None and unchanged.report_lang == "ru"
+
+    await feed(dp, bot, callback("fin:rlang:en"))
+
+    chosen = get_state(CHAT_ID)
+    assert chosen is not None and chosen.report_lang == "en"
+    assert session.last_text != t("finish.ask_report_lang", "ru"), "дальше — информационная часть"
+
+
+async def test_single_language_is_used_without_asking(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """У страны ровно один язык отчёта: вопроса нет, язык ставится сам."""
+    started()
+    add_finding(CHAT_ID, "CLN05", "D1", "hot_kitchen", "Нагар на подине печи")
+
+    async def один(_inspection: object) -> list[str]:
+        return ["en"]
+
+    monkeypatch.setattr("src.bot.routers.finish.offered_langs", один)
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+    await feed(dp, bot, text_message("/finish"))
+    session.clear()
+
+    await feed(dp, bot, callback("fin:build"))
+
+    assert t("finish.ask_report_lang", "ru") not in session.texts
+    chosen = get_state(CHAT_ID)
+    assert chosen is not None and chosen.report_lang == "en"
+
+
+async def test_language_outside_the_countrys_list_is_refused(
+    domain_env: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Кнопка с языком, которого нет в перечне страны, язык не меняет (старая кнопка)."""
+    started()
+
+    async def один(_inspection: object) -> list[str]:
+        return ["ru"]
+
+    monkeypatch.setattr("src.bot.routers.finish.offered_langs", один)
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await feed(dp, bot, callback("fin:rlang:en"))
+
+    assert session.last_text == t("finish.report_lang_gone", "ru")
+    unchanged = get_state(CHAT_ID)
+    assert unchanged is not None and unchanged.report_lang == "ru"

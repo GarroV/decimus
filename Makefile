@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest cov image regress web web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup
+.PHONY: bootstrap check test test-honest cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -10,7 +10,7 @@ DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
 # Последняя строка проверяет результат, а не отсутствие ошибки.
 PYTHON ?= python3.12
 
-bootstrap:
+bootstrap:  ## окружение прогона с нуля: `.venv` и зависимости (нужен Python 3.12)
 	$(PYTHON) -m venv .venv
 	$(VENV)/pip install -q --upgrade pip
 	$(VENV)/pip install -q -e '.[dev]'
@@ -27,15 +27,15 @@ bootstrap:
 # Отдельная цель `test` остаётся мягкой намеренно: гонять набор без базы по
 # ходу работы — законно, врать про полноту — нет.
 check: export AUDIT_REQUIRE_DATA = 1
-check: fmt lint types test dead bounds
+check: fmt lint types test dead bounds  ## все гейты качества разом: формат, линт, типы, тесты, мёртвый код, границы модулей; требует базы
 
-fmt:
+fmt:  ## проверка формата (`ruff format --check`)
 	$(VENV)/ruff format --check .
 
-lint:
+lint:  ## линт (`ruff check`)
 	$(VENV)/ruff check .
 
-types:
+types:  ## типы (`mypy`, строгий режим)
 	$(VENV)/mypy
 
 # Строка подключения для тестов блока db. Роль ОБЯЗАНА иметь право CREATEDB:
@@ -74,7 +74,7 @@ TEST_RETRACTION_PASSWORD ?= $(shell grep -m1 '^DATABASE_RETRACTION_PASSWORD=' .e
 test: export DATABASE_URL = $(TEST_DATABASE_URL)
 test: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
 test: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
-test:
+test:  ## тесты с покрытием и сторожем полноты прогона; часть `check`
 	$(VENV)/pytest
 	$(VENV)/python scripts/check_run_complete.py reports/junit.xml
 
@@ -94,7 +94,7 @@ cov: export DATABASE_URL = $(TEST_DATABASE_URL)
 cov: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
 cov: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 cov: export AUDIT_REQUIRE_DATA = 1
-cov:
+cov:  ## тесты с покрытием и обязательным наличием данных (`AUDIT_REQUIRE_DATA=1`)
 	$(VENV)/pytest --cov=src/domain --cov=src/report --cov-report=term-missing
 
 # Прогон с ЧЕСТНОЙ проверкой порчей. Отдельная цель, а не режим `test`, и это
@@ -120,16 +120,24 @@ test-honest: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
 # AUDIT_REQUIRE_DATA и сторож полноты прогона ровно в этом случае: вторая цель, которая
 # зеленеет легче первой, — это вторая правда, и зелёной она будет ровно тогда,
 # когда проверяет меньше (D129, #267).
-test-honest:
+test-honest:  ## прогон тестов без кеша байткода — для проверки тестов порчей (`ARGS=tests/<файл>.py`)
 	AUDIT_REQUIRE_DATA=$(if $(strip $(ARGS)),,1) PYTHONDONTWRITEBYTECODE=1 $(VENV)/pytest --no-cov $(ARGS)
 	@if [ -z "$(strip $(ARGS))" ]; then $(VENV)/python scripts/check_run_complete.py reports/junit.xml; fi
 
-dead:
+dead:  ## мёртвый код и неиспользуемые зависимости (`vulture`, `deptry`)
 	$(VENV)/vulture
 	$(VENV)/deptry .
 
-bounds:
+bounds:  ## границы модулей: обратный импорт между блоками запрещён (`lint-imports`)
 	$(VENV)/lint-imports
+
+# Карта кода и инвентарь (#731): таблицы между маркерами `<!-- map:begin … -->`
+# в docs/00-map.md, docs/inventory.md и оглавления длинных документов
+# пересобираются из кода. Правил код, файл, маршрут, инструмент MCP, переменную
+# окружения, миграцию или цель Makefile — запусти и закоммить результат вместе
+# с кодом: `tests/test_docs_map.py` краснеет, если таблицы отстали.
+map:  ## перегенерировать таблицы карты кода и инвентаря в docs/ (tools/gen_map.py)
+	$(VENV)/python tools/gen_map.py
 
 # Регрессионный якорь: цифры на боевых данных не должны меняться.
 # Ожидается: belgrade-1 → 97.5%, A, 5×D1 ; belgrade-2 → 97.0%, A, 6×D1
@@ -137,7 +145,7 @@ bounds:
 # основную копию репозитория, и относительный ../../engine/audit.py из worktree
 # приводил в движок ОСНОВНОЙ копии. Регресс при этом был зелёным, ничего не
 # проверяя. Проверено на себе 28.08.2026.
-regress:
+regress:  ## движок на эталонных данных: цифры не должны разойтись
 	@$(VENV)/python tools/regress_check.py
 
 # Демо-набор на английском (T074, T100): вымышленная точка, синтетический
@@ -147,7 +155,7 @@ regress:
 # Состояние ложится в demo/state (каталог в .gitignore) или в DEMO_STATE_DIR,
 # если он задан. Боевой STATE_DIR не трогается: сид его не читает намеренно —
 # иначе эта цель, запущенная на сервере, писала бы в настоящие проверки.
-demo:
+demo:  ## наполнить синтетический англоязычный демо-набор, боевых данных не касается
 	$(VENV)/python tools/seed_demo.py
 
 # Снос демо-стенда. Существует потому, что напрашивающаяся симметричная
@@ -159,26 +167,26 @@ demo:
 # Замер потолка нагрузки (T101, D058). Владелец назвал нагрузку главным риском,
 # но целевого числа не задал — поэтому сначала измеряем потолок, потом решаем.
 # Проверка способна упасть: со снятой блокировкой движка теряет записи альбома.
-loadcheck:
+loadcheck:  ## замер потолка нагрузки: параллельные проверки и альбом одновременных записей
 	STATE_DIR=$${STATE_DIR:-/tmp/loadcheck-state} $(VENV)/python tools/loadcheck.py
 
 # Живой замер (T101, D062): НАСТОЯЩИЕ вызовы модели, то есть платный прогон.
 # Без --yes ничего не вызывает, только показывает план и цену. Владелец
 # санкционировал: «нам надо реально понять ограничения системы».
-loadcheck-live:
+loadcheck-live:  ## тот же замер с настоящими вызовами модели; платный, без `--yes` показывает только план
 	$(VENV)/python tools/loadcheck_live.py $(ARGS)
 
 # Замер T113: доля однозначных срабатываний быстрого пути (recognize.fastpath)
 # на боевых данных examples/*/inspection.json. Детерминированно, без сети и
 # без денег — гонять после каждого пополнения карты слов data/photo-cues.md.
-fastpath:
+fastpath:  ## замер быстрого пути разбора: доля фиксаций без вызова модели; расход нулевой
 	STATE_DIR=$${STATE_DIR:-/tmp/fastpath-state} $(VENV)/python tools/fastpath_measure.py
 
 # Замер T272: покрытие словаря зон — сколько формулировок доходит до зоны
 # словами и картой кадров, и какие строки карты дописать следующими, чтобы
 # покрытие выросло. Отвечает на «много ли осталось» числом, а не ощущением.
 # Детерминированно, без сети и без денег.
-zonecov:
+zonecov:  ## замер покрытия словаря зон: что доходит до зоны и что дописать в карту слов
 	STATE_DIR=$${STATE_DIR:-/tmp/zonecov-state} $(VENV)/python tools/zone_coverage.py
 
 # Замер T166: сколько раз признак «<описание>, это <процесс>» срабатывает там,
@@ -186,7 +194,7 @@ zonecov:
 # что о нём можно узнать, — доля ложных срабатываний. Корпус, на котором она
 # считается по-настоящему (сырые слова аудитора, T183), копится в состоянии
 # проверок: пока он пуст, замер говорит это прямо. Без сети и без денег.
-processhint:
+processhint:  ## замер признака «<описание>, это <процесс>»: сколько раз он срабатывает зря
 	$(VENV)/python tools/process_hint_measure.py
 
 # Замер T242: узнаётся ли зона, названная НЕ в именительном падеже — так, как
@@ -196,10 +204,10 @@ processhint:
 #
 # Вывод несёт боевые названия зон — в репозиторий его не класть (репозиторий
 # публичный, `tests/test_methodology_leak.py`).
-zonewords:
+zonewords:  ## замер узнавания зоны, названной не в именительном падеже
 	STATE_DIR=$${STATE_DIR:-/tmp/zonewords-state} $(VENV)/python tools/zone_words_measure.py
 
-demo-down:
+demo-down:  ## снести только демо-стенд (не боевой бот и не том состояния)
 	docker compose --profile demo rm -sf demo demo-seed
 	-docker volume rm $$(docker compose --profile demo config --format json \
 	  | $(VENV)/python -c "import json,sys; print(json.load(sys.stdin)['name']+'_demo-state')")
@@ -208,7 +216,7 @@ demo-down:
 # (`src/db/migrate.py`, load_env_file) — держать её в оболочке не нужно.
 # Идемпотентно: на уже накатанной базе печатает «нечего накатывать» и ничего
 # не меняет.
-migrate:
+migrate:  ## накат SQL-миграций; на накатанной базе ничего не делает
 	$(VENV)/python -m src.db.migrate
 
 # Можно ли снять совместимость с прежним рецептом отпечатка НА ЭТОЙ базе.
@@ -217,7 +225,7 @@ migrate:
 # спрашивали одним и тем же способом: ответ, полученный разными запросами,
 # сравнивать нельзя. Ходит связью наката — роли приложения снятые проверки
 # не видны, и её «ноль» ничего не значил бы.
-recipe-check:
+recipe-check:  ## можно ли снять совместимость с прежним рецептом отпечатка проверки на этой базе
 	$(VENV)/python -m src.db.recipe_audit
 
 # Сборка образов бота и MCP-сервера с версией внутри (#229).
@@ -236,7 +244,7 @@ recipe-check:
 # владельца (docs/08-deploy.md).
 # state-backup собирается здесь же: compose именует образы по сервису, и без
 # него первый ночной прогон выгрузки полез бы собирать образ сам (#233).
-image:
+image:  ## сборка образов бота и MCP-сервера с номером сборки внутри
 	BUILD_SHA=$$(git rev-parse --short HEAD) docker compose build bot mcp state-backup
 
 # Стенд базы одной командой (T090): поднять Postgres рядом с ботом, дождаться
@@ -245,7 +253,7 @@ image:
 # с нуля. Идемпотентно: на поднятом стенде и накатанной схеме не делает ничего.
 # Строка подключения при этом берётся из .env и должна указывать на этот же
 # порт — см. POSTGRES_PORT и DATABASE_URL в .env.example.
-db-up:
+db-up:  ## поднять Postgres рядом с ботом, дождаться готовности и накатить схему
 	docker compose --profile db up -d --wait db
 	$(MAKE) migrate
 
@@ -254,18 +262,18 @@ db-up:
 # тома проекта, а не только тома профиля, — вместе с базой уносит `state`,
 # состояние всех идущих проверок. Поэтому поимённо и без -v; том с данными
 # базы остаётся и переживает пересоздание контейнера.
-db-down:
+db-down:  ## снести стенд базы
 	docker compose --profile db rm -sf db
 
 # Хранилище кадров для локального смоука (T094). Не боевое хранилище: тома у
 # него нет, данные не переживают пересоздание контейнера — боевое задаётся
 # переменными S3_* и живёт снаружи.
-storage-up:
+storage-up:  ## локальное S3-хранилище кадров для смоука
 	docker compose --profile storage up -d --wait storage
 
 # Снос стенда хранилища — поимённо и без -v, по той же причине, что db-down:
 # `--profile storage down -v` унёс бы том состояния идущих проверок.
-storage-down:
+storage-down:  ## снести локальное хранилище кадров
 	docker compose --profile storage rm -sf storage
 
 # Выгрузка тома состояния в бэкап (#233). В томе лежат папки идущих проверок и
@@ -284,13 +292,13 @@ storage-down:
 # `-T` (без терминала): выгрузку гоняет задача по расписанию, у которой
 # терминала нет вовсе. Пусть команда в доке и здесь будет одна и та же — иначе
 # «у меня работает» и «ночью не пошло» разойдутся по этой мелочи.
-state-backup:
+state-backup:  ## выгрузка тома состояния проверок в каталог бэкапа
 	docker compose run --rm -T state-backup
 
 # MCP-сервер поверх базы проверок (T095). Только чтение; доступ — личным
 # токеном из MCP_TOKENS (.env), слушает петлю и наружу не публикуется.
 # Строку подключения к базе и карту токенов читает сам из .env.
-mcp:
+mcp:  ## поднять MCP-сервер рядом с собой, вне стенда
 	$(VENV)/python -m src.mcp
 
 # Веб-админка на хосте (T318, T319). Существует потому, что из compose её не
@@ -305,8 +313,16 @@ mcp:
 # снятых ей не видно, а не покажет укороченный список молча.
 #
 #   WEB_TENANT=<код тенанта> make web
-web:
+web:  ## веб-админка на этой машине
 	$(VENV)/python -m src.web
+
+# Сервис мини-аппа обхода на хосте — пара к `make web` (docs/13-walk-mini-app.md).
+# Пишет в состояние проверок, админка только передаёт ему /tg/walk*:
+#
+#   make walk                                            # в одном окне
+#   WEB_WALK_UPSTREAM=http://127.0.0.1:8269 make web     # в другом
+walk:  ## сервис мини-аппа обхода на этой машине (пара к `make web`)
+	WEB_PORT=$${WEB_WALK_PORT:-8269} $(VENV)/python -m src.web.walk_main
 
 # Тенант веб-стенда. Демо — потому, что `make web-up` поднимает стенд ДЛЯ
 # ПОКАЗА и разработки поверхности; свой тенант передаётся в командной строке
@@ -326,7 +342,7 @@ WEB_STAND_TENANT ?= demo
 #   make web-up                      # демо-стенд: есть что смотреть сразу
 #   WEB_TENANT=<код> make web-up     # своя история вместо демонстрационной
 web-up: export WEB_TENANT = $(WEB_STAND_TENANT)
-web-up: db-up web-demo web-stand-user
+web-up: db-up web-demo web-stand-user  ## одной командой: база, схема, демо-история, учётка стенда, адрес админки
 	@echo ""
 	@echo "Демо-история лежит под тенантом demo и ничего другого не касается."
 	@echo "Остановить стенд — Ctrl-C; база остаётся поднятой (снести — make db-down)."
@@ -337,12 +353,14 @@ web-up: db-up web-demo web-stand-user
 # тот сид кладёт проверку в состояние бота, а веб состояния бота не видит
 # вовсе. Идемпотентно: повторный запуск возвращает те же строки, а не плодит
 # новые. В неместную базу писать отказывается (tools/seed_web_demo.py).
-web-demo:
+web-demo:  ## демо-история и демо-рейтинги в базе — то, что показывает админка
 	$(VENV)/python tools/seed_web_demo.py
+	$(VENV)/python tools/seed_ratings_demo.py
 
 # Учётки веб-админки (T323). Регистрации снаружи у админки нет — человек
 # появляется в круге тем, что команда проекта выполнила эту цель. Идёт под
-# ролью ВЛАДЕЛЬЦА СХЕМЫ (DATABASE_ADMIN_URL): роль приложения права заводить
+# ролью администратора истории (DATABASE_RETRACTION_URL), а не задана она —
+# под ВЛАДЕЛЬЦЕМ СХЕМЫ (DATABASE_ADMIN_URL): роль приложения права заводить
 # и править учётки не имеет вовсе, и это держит база, а не код.
 #
 # Пароль в аргументах не передаётся — он виден в `ps` и остаётся в истории
@@ -352,18 +370,19 @@ web-demo:
 #   make web-user ARGS="add director --tenant demo"
 #   make web-user ARGS="list --tenant demo"
 #   make web-user ARGS="disable director --tenant demo"
-web-user:
+web-user:  ## учётки веб-админки: завести, перечислить, отключить
 	$(VENV)/python tools/web_user.py $(ARGS)
 
 # Пространства и их страны (волна 1, #340, D284). Пространство — новый заказчик,
-# а не новый сотрудник: продукт его не заводит, только эта цель, под ролью
-# ВЛАДЕЛЬЦА СХЕМЫ (DATABASE_ADMIN_URL). Одна страна — один партнёр; у УК стран нет.
+# а не новый сотрудник: продукт его не заводит, только эта цель и экран
+# «Пользователи», под ролью администратора истории (DATABASE_RETRACTION_URL), а
+# не задана она — под ВЛАДЕЛЬЦЕМ СХЕМЫ (DATABASE_ADMIN_URL). Одна страна — один партнёр; у УК стран нет.
 # Учётку в незаведённом пространстве web-user не заводит — сначала эта цель.
 #
 #   make space ARGS="add GE --name 'Партнёр Грузия'"
 #   make space ARGS="countries GE GE"
 #   make space ARGS="list"
-space:
+space:  ## пространства и их страны: завести, привязать, перечислить
 	$(VENV)/python tools/space.py $(ARGS)
 
 # ЗАПРЕТ НА ВХОД: посмотреть и снять (T328, решение D158). Ограничитель перебора
@@ -375,7 +394,7 @@ space:
 #   make web-unlock ARGS="list --tenant demo"
 #   make web-unlock ARGS="unlock director --tenant demo"
 #   make web-unlock ARGS="unlock-address 203.0.113.7 --tenant demo"
-web-unlock:
+web-unlock:  ## запрет на вход после перебора: посмотреть запертых и снять
 	$(VENV)/python tools/web_unlock.py $(ARGS)
 
 # СПРАВОЧНИК ТОЧЕК СЕТИ: загрузка с сайтов стран и заведение руками (T335).
@@ -392,7 +411,7 @@ web-unlock:
 #   make units ARGS="sites --country GE --country RS"
 #   make units ARGS="add 'Тбилиси-4' --country GE --city Tbilisi"
 #   make units ARGS="list --country GE"
-units:
+units:  ## справочник пиццерий: загрузка с сайтов стран и заведение руками
 	$(VENV)/python tools/units.py $(ARGS)
 
 # Учётка ДЕМО-СТЕНДА, без которой `make web-up` перестал бы быть одной
@@ -401,7 +420,7 @@ units:
 # экран — постоянный пароль стенда лежал бы в репозитории, то есть был бы
 # известен всем. Повторный запуск учётку не трогает.
 web-stand-user: export WEB_TENANT = $(WEB_STAND_TENANT)
-web-stand-user:
+web-stand-user:  ## учётка стенда для входа в админку
 	$(VENV)/python tools/web_user.py ensure
 
 # Смоук доступа к MCP СНАРУЖИ (T256). Отвечает на «доступен ли сервер с чужой
@@ -413,10 +432,10 @@ web-stand-user:
 # которую бот раздаёт людям. Токен — DODO_MCP_TOKEN, тот же, что у моста.
 #
 #   DODO_MCP_URL=<адрес туннеля> DODO_MCP_TOKEN=<токен> make mcp-outside
-mcp-outside:
+mcp-outside:  ## смоук доступа к MCP с чужой машины
 	$(VENV)/python tools/mcp_outside.py $(ARGS)
 
-cov-engine:  ## покрытие движка, который вызывается подпроцессом (T037)
+cov-engine:  ## покрытие движка, который вызывается подпроцессом
 	@rm -f .coverage.engine*
 	@COVERAGE_PROCESS_START=$(CURDIR)/.coveragerc-engine \
 	 COVERAGE_FILE=$(CURDIR)/.coverage.engine \

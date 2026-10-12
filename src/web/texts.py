@@ -22,10 +22,18 @@ import os
 from collections.abc import Mapping
 
 from .errors import WebTextError
+from .texts_connections import CONNECTIONS_TEXTS
+from .texts_home import HOME_TEXTS
+from .texts_master import MASTER_TEXTS
+from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
+from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
+from .texts_registry import REGISTRY_TEXTS
 from .texts_units import UNIT_TEXTS
+from .texts_users import USERS_TEXTS
+from .texts_walk import WALK_TEXTS
 
 #: Языки интерфейса. Третий добавляется строками в каталоге, не кодом.
 UI_LANGS = ("ru", "en")
@@ -48,17 +56,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "nav.lang.ru": {"ru": "Русский", "en": "Русский"},
     "nav.lang.en": {"ru": "English", "en": "English"},
     "nav.sections": {"ru": "Разделы", "en": "Sections"},
+    "split.back": {"ru": "Назад", "en": "Back"},
+    "split.close": {"ru": "Закрыть", "en": "Close"},
     "nav.search": {"ru": "Поиск пиццерии", "en": "Find a pizzeria"},
     "nav.theme": {"ru": "Тема", "en": "Theme"},
     "nav.theme.system": {"ru": "Как в системе", "en": "System"},
     "nav.theme.light": {"ru": "Светлая", "en": "Light"},
     "nav.theme.dark": {"ru": "Тёмная", "en": "Dark"},
-    "nav.role.admin": {"ru": "Админ", "en": "Admin"},
-    "nav.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
-    "nav.role.hq_admin": {"ru": "Админ", "en": "Admin"},
-    "nav.role.hq_staff": {"ru": "Аудитор", "en": "Auditor"},
-    "nav.role.country_admin": {"ru": "Админ", "en": "Admin"},
-    "nav.role.country_staff": {"ru": "Аудитор", "en": "Auditor"},
     # ── Обзор: отбор выборки, разбивка, точки (канон прототипа) ─────────
     # Названия окон периода — подписи; сами окна живут кодами в
     # `overview.PERIODS`, потому что «30 дней» переводится, а 30 нет.
@@ -95,10 +99,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "За выбранный период проверок нет — разбивать нечего.",
         "en": "No inspections in the selected period — nothing to break down.",
     },
-    "overview.breakdown.incomparable": {
-        "ru": "разные издания методики",
-        "en": "different methodology editions",
-    },
     "overview.sort": {"ru": "Сортировка", "en": "Sort"},
     "overview.sort.score": {"ru": "худшие сверху", "en": "worst first"},
     "overview.sort.delta": {"ru": "по движению", "en": "by movement"},
@@ -121,8 +121,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "No inspected unit in this selection. Clear part of the filter.",
     },
     "overview.points.nodelta": {
-        "ru": "первая сравнимая проверка",
-        "en": "first comparable inspection",
+        "ru": "первая проверка точки в выборке",
+        "en": "the unit's first inspection in the selection",
     },
     # Названия разделов. Ключи (`registry`, `orders`, …) взяты из прототипа и
     # остаются кодами: переводится название, не ключ.
@@ -156,8 +156,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "units with no inspection in the period",
     },
     "overview.problem.critical": {
-        "ru": "сожжена зона: критических {count}",
-        "en": "a zone burned: {count} critical",
+        "ru": "критических нарушений: {count}, зона обнулена",
+        "en": "critical findings: {count}, zone zeroed",
     },
     "overview.problem.dropped": {
         "ru": "просела против прошлой проверки на {delta}",
@@ -165,8 +165,8 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "overview.problem.low_grade": {"ru": "оценка ниже порога", "en": "score below threshold"},
     "overview.units.hint2": {
-        "ru": "Сожжённые зоны, падение оценки, слабая буква",
-        "en": "Burned zones, dropped scores, weak grades",
+        "ru": "Критические нарушения, падение оценки, слабая буква",
+        "en": "Critical findings, dropped scores, weak grades",
     },
     "overview.tile.units": {"ru": "Точек в справочнике", "en": "Units on file"},
     "overview.tile.inspections": {"ru": "Проверок", "en": "Inspections"},
@@ -179,18 +179,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "over recorded percentages",
     },
     "overview.tile.note.average_none": {"ru": "считать нечего", "en": "nothing to average"},
-    # Средней нет, потому что в выборке разные чек-листы — другие пункты или
-    # веса (D218). Причина одной строкой в самой плитке, без плашки.
-    "overview.tile.note.average_mixed": {"ru": "разные чек-листы", "en": "different checklists"},
-    "overview.tile.note.critical": {"ru": "сожжена зона целиком", "en": "a whole zone burned"},
+    "overview.tile.note.critical": {"ru": "зона обнулена целиком", "en": "a whole zone zeroed"},
     "overview.attention.cta": {"ru": "Письмо партнёру", "en": "Letter to the partner"},
     # Число ПОКАЗАННЫХ поводов: список ограничен, и «поводов: 6» читалось бы как
     # «всего шесть» рядом с плиткой критических по всему срезу (#503).
     "overview.attention.count": {"ru": "показано: {count}", "en": "{count} shown"},
     "overview.attention.title": {"ru": "Требует решения сегодня", "en": "Needs a decision today"},
     "overview.attention.hint": {
-        "ru": "Сожжённые зоны и просевшие оценки, самое срочное сверху",
-        "en": "Burned zones and dropped scores, most urgent first",
+        "ru": "Критические нарушения и просевшие оценки, самое срочное сверху",
+        "en": "Critical findings and dropped scores, most urgent first",
     },
     "overview.attention.empty": {
         "ru": "Поводов нет: критических нарушений и оценок ниже порога в выборке не записано.",
@@ -213,10 +210,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
-    "overview.zones.empty": {
-        "ru": "Потерь не записано: в выборке нет проверок с разбивкой по зонам.",
-        "en": "No losses recorded: no inspection in this selection carries a zone breakdown.",
-    },
     "overview.systemic.title": {"ru": "Системные нарушения", "en": "Systemic findings"},
     "overview.systemic.hint": {
         "ru": "Один пункт на многих точках — кандидат на обучение или правку методики",
@@ -225,10 +218,6 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.systemic.spread": {
         "ru": "точек: {units} · записей: {records}",
         "en": "units: {units} · records: {records}",
-    },
-    "overview.systemic.empty": {
-        "ru": "Повторов нет: ни один пункт не нарушен больше чем на одной точке.",
-        "en": "No repeats: no item was breached at more than one unit.",
     },
     "overview.units.title": {"ru": "Проблемные точки", "en": "Units at risk"},
     "overview.units.hint": {
@@ -252,7 +241,7 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок: {inspections} · средняя: {average} · не проверено точек: {unchecked}",
         "en": "Inspections: {inspections} · average: {average} · units not inspected: {unchecked}",
     },
-    "country.units.title": {"ru": "Пиццерии страны", "en": "Pizzerias of the country"},
+    "country.units.title": {"ru": "Последние проверки", "en": "Latest inspections"},
     "country.units.hint": {
         "ru": "Последняя проверка каждой точки. Нажмите строку — откроется история проверок.",
         "en": "Latest inspection of each unit. Click a row to open its inspection history.",
@@ -281,17 +270,15 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Потерь по зонам за период нет.",
         "en": "No zone losses for the period.",
     },
-    "section.overview.title": {"ru": "Обзор", "en": "Overview"},
+    "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
     "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
     "section.country.title": {"ru": "Страна", "en": "Country"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
-    "section.tenants.title": {"ru": "Проект", "en": "Project"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
     "section.users.title": {"ru": "Пользователи", "en": "Users"},
-    "section.mini.title": {"ru": "Мини-апп", "en": "Mini app"},
     # --- вход, выход, отказ (T323) -----------------------------------------
     # Отказ ОДИН на все причины. Раздельные «нет такого логина» и «пароль не
     # тот» превращают форму в справочник заведённых людей: перебором по ней
@@ -312,6 +299,18 @@ TEXTS: dict[str, dict[str, str]] = {
     "auth.failed": {
         "ru": "Логин или пароль не подошли.",
         "en": "That login and password did not match.",
+    },
+    # Учётка с привязанной почтой Google паролем не входит (аудит 12.10):
+    # пароль идёт через фронт и прокси, вход Google — нет.
+    "auth.use_google": {
+        "ru": "К этой учётке привязана почта Google — входите кнопкой «Войти через Google». "
+        "Пароль для неё не принимается.",
+        "en": "This account has a Google address linked — use “Sign in with Google”. "
+        "Password sign-in is turned off for it.",
+    },
+    "auth.google_hint": {
+        "ru": "Если к учётке привязана почта Google, вход — только через Google.",
+        "en": "If your account has a Google address linked, sign in with Google only.",
     },
     "auth.aside": {
         "ru": (
@@ -372,6 +371,45 @@ TEXTS: dict[str, dict[str, str]] = {
     "unit.tile.score": {"ru": "Текущая оценка", "en": "Current score"},
     "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
     "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
+    "unit.profile": {"ru": "Сведения", "en": "Details"},
+    "country.register.title": {"ru": "Свод пиццерий", "en": "Pizzeria register"},
+    "country.register.hint": {
+        "ru": "работают {open}, открываются {pipeline}, закрыты {closed}",
+        "en": "open {open}, opening {pipeline}, closed {closed}",
+    },
+    "country.register.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "country.register.col.partner": {"ru": "Партнёр", "en": "Partner"},
+    "country.register.col.place": {"ru": "Город", "en": "City"},
+    "country.register.col.opened": {"ru": "Открыта", "en": "Opened"},
+    "country.register.col.status": {"ru": "Статус", "en": "Status"},
+    "country.none": {"ru": "Пока нет: {what}.", "en": "Nothing yet: {what}."},
+    "country.none.plans": {"ru": "экшн-планов", "en": "action plans"},
+    "country.none.rx": {"ru": "предписаний", "en": "notices"},
+    "country.none.systemic": {"ru": "системных нарушений", "en": "systemic issues"},
+    "country.none.zones": {"ru": "потерь по зонам", "en": "zone losses"},
+    "country.register.since": {"ru": "с {day}", "en": "since {day}"},
+    "country.register.empty": {
+        "ru": "Свод пиццерий по этой стране не загружен.",
+        "en": "The pizzeria register has nothing for this country yet.",
+    },
+    "unit.profile.hint": {"ru": "из свода пиццерий", "en": "from the pizzeria register"},
+    "unit.profile.empty": {
+        "ru": "В своде пиццерий строки для этой точки нет.",
+        "en": "The pizzeria register has no row for this unit.",
+    },
+    "unit.profile.status": {"ru": "Статус", "en": "Status"},
+    "unit.profile.address": {"ru": "Адрес", "en": "Address"},
+    "unit.profile.partner": {"ru": "Партнёр", "en": "Partner"},
+    "unit.profile.email": {"ru": "Почта партнёра", "en": "Partner email"},
+    "unit.profile.restaurant": {"ru": "Ресторан с", "en": "Restaurant since"},
+    "unit.profile.delivery": {"ru": "Доставка с", "en": "Delivery since"},
+    "unit.profile.closed": {"ru": "Закрыта", "en": "Closed on"},
+    "unit.profile.area": {"ru": "Площадь", "en": "Area"},
+    "unit.profile.seats": {"ru": "Посадочных мест", "en": "Seats"},
+    "unit.stage.open": {"ru": "Работает", "en": "Open"},
+    "unit.stage.paused": {"ru": "Временно закрыта", "en": "Temporarily closed"},
+    "unit.stage.pipeline": {"ru": "Открывается", "en": "Opening"},
+    "unit.stage.closed": {"ru": "Закрыта", "en": "Closed"},
     "unit.movement.hint": {
         "ru": "клик по столбику — открыть отчёт",
         "en": "click a bar to open the report",
@@ -540,6 +578,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Запись исправлена, оценка пересчитана.",
         "en": "The record is corrected and the score recalculated.",
     },
+    "revise.legacy": {
+        "ru": (
+            "это историческая проверка: оценка поставлена по методике того времени и "
+            "движком не пересчитывается, сверять запись с нынешним чек-листом не с чем. "
+            "Записи исторической правятся только через MCP"
+        ),
+        "en": (
+            "this is a historical inspection: its score was given under the methodology "
+            "of that time and is never recalculated by the engine, so there is no checklist "
+            "to check the record against. Records of a historical inspection are edited "
+            "only through MCP"
+        ),
+    },
     "revise.failed": {
         "ru": "Запись не исправлена: {reason}",
         "en": "The record was not corrected: {reason}",
@@ -564,10 +615,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Deducted {deductions} %",
     },
     "card.zones.title": {"ru": "Потери по зонам", "en": "Loss by zone"},
-    "card.zones.col.zone": {"ru": "Зона", "en": "Zone"},
-    "card.zones.col.share": {"ru": "Доля", "en": "Share"},
-    "card.zones.col.loss": {"ru": "Потеряно", "en": "Lost"},
-    "card.zones.col.left": {"ru": "Осталось", "en": "Left"},
+    "card.zones.none": {"ru": "Потерь по зонам нет", "en": "No loss in any zone"},
+    "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
+    "card.act.move": {"ru": "Исправить", "en": "Correct"},
+    "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},
@@ -577,6 +628,38 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.findings.col.text": {"ru": "Формулировка", "en": "Wording"},
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
+    "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
+    "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
+    # Историческая проверка (D332): записи старого отчёта без пункта, класса, зоны.
+    "card.findings.no_class": {"ru": "без класса", "en": "no class"},
+    "card.findings.no_item": {"ru": "пункт не назван", "en": "item not given"},
+    "card.findings.no_zone": {"ru": "зона не названа", "en": "zone not given"},
+    "card.legacy.title": {
+        "ru": "Историческая проверка, оценка по методике того времени",
+        "en": "Historical inspection, scored under the methodology of that time",
+    },
+    "card.legacy.text": {
+        "ru": (
+            "Оценка перенесена из старого отчёта как есть и не пересчитывается по "
+            "нынешнему чек-листу. Методика: {method}. Статус в отчёте: {status}."
+        ),
+        "en": (
+            "The score is transferred from the old report as is and is not recomputed "
+            "under today's checklist. Methodology: {method}. Status in the report: {status}."
+        ),
+    },
+    "card.legacy.method": {"ru": "Методика того времени", "en": "Methodology of that time"},
+    "card.legacy.unlabelled": {"ru": "не названа", "en": "not named"},
+    "letter.uploaded": {
+        "ru": (
+            "Проверка заведена задним числом через загрузку — письма партнёру по ней нет, "
+            "и никому ничего не отправляется."
+        ),
+        "en": (
+            "This inspection was entered after the fact through import — there is no "
+            "partner letter for it, and nothing is sent to anyone."
+        ),
+    },
     "card.findings.speech_lang": {"ru": "язык речи: {lang}", "en": "speech language: {lang}"},
     "card.findings.empty": {
         "ru": "Записей у проверки нет.",
@@ -903,7 +986,7 @@ TEXTS: dict[str, dict[str, str]] = {
     # Черновик в почте вошедшего (T352, D174, D176, #332). «В черновики», а не
     # «Отправить»: отправки из системы нет, и кнопка не обещает того, чего не
     # делает, — иначе человек закроет экран, считая письмо ушедшим.
-    "letter.gmail.submit": {"ru": "В черновики Google", "en": "Save to Google drafts"},
+    "letter.gmail.submit": {"ru": "Сохранить черновик на почте", "en": "Save draft to mail"},
     "letter.gmail.ok": {
         "ru": "Черновик лежит в вашей почте — отправьте его оттуда.",
         "en": "The draft is in your mailbox — send it from there.",
@@ -923,234 +1006,15 @@ TEXTS: dict[str, dict[str, str]] = {
             "The letter is saved."
         ),
     },
+    "letter.gmail.wrong_account": {
+        "ru": "Черновик не создан: доступ к почте выдал не тот аккаунт Google. Черновик кладётся "
+        "только в почту, которой вы входите через Google, — выберите в окне Google её. Письмо "
+        "сохранено.",
+        "en": "The draft was not created: mail access came from a different Google account. "
+        "Drafts go only to the mailbox you sign in with through Google — pick that one in the "
+        "Google window. The letter is saved.",
+    },
     "letter.draft.restore": {"ru": "Вернуть заготовку", "en": "Restore the draft"},
-    # --- люди проекта (T338, #322) -----------------------------------------
-    "users.count": {"ru": "{count} чел.", "en": "{count} people"},
-    "users.unknown": {
-        "ru": "Список сейчас недоступен — это не значит, что людей нет.",
-        "en": "The list is unavailable right now — that does not mean there is nobody.",
-    },
-    "users.add.title": {"ru": "Завести человека", "en": "Add a person"},
-    "users.add.login": {"ru": "Логин", "en": "Login"},
-    "users.add.role": {"ru": "Что можно", "en": "Access"},
-    "users.add.submit": {"ru": "Завести", "en": "Add"},
-    "users.add.hint": {
-        "ru": (
-            "Пароль придумает система и покажет один раз — записать его "
-            "нужно сразу. В базе от него остаётся только свёртка."
-        ),
-        "en": (
-            "The system makes the password and shows it once — write it down "
-            "right away. Only a hash of it is kept."
-        ),
-    },
-    "users.add.failed": {
-        "ru": "Завести не вышло. Логин уже занят или не годится по форме.",
-        "en": "Could not add. The login is taken or malformed.",
-    },
-    "users.added.title": {"ru": "Учётка «{login}» заведена", "en": "Account «{login}» created"},
-    "users.added.text": {
-        "ru": "Пароль показан один раз — передайте его человеку и закройте страницу.",
-        "en": "The password is shown once — pass it on and close this page.",
-    },
-    "users.role.auditor": {"ru": "Работа с проверками", "en": "Inspections only"},
-    "users.role.admin": {"ru": "И управление людьми", "en": "Also manages people"},
-    "users.role.hq_admin": {"ru": "И управление людьми", "en": "Also manages people"},
-    "users.role.hq_staff": {"ru": "Работа с проверками", "en": "Inspections only"},
-    "users.role.country_admin": {"ru": "И управление людьми", "en": "Also manages people"},
-    "users.role.country_staff": {"ru": "Работа с проверками", "en": "Inspections only"},
-    "users.col.login": {"ru": "Логин", "en": "Login"},
-    # Пространства (волна 1, #340): админ УК видит людей всех пространств и
-    # заводит человека в выбранное (D282, D286).
-    "users.col.space": {"ru": "Пространство", "en": "Space"},
-    "users.add.space": {"ru": "Пространство", "en": "Space"},
-    "users.add.space_unknown": {
-        "ru": "Такого пространства нет. Выберите из списка.",
-        "en": "There is no such space. Pick one from the list.",
-    },
-    # Привязка бота через веб (D286): одноразовая ссылка своей учётке.
-    "users.col.bot": {"ru": "Бот", "en": "Bot"},
-    "users.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
-    "users.bot.bound": {
-        "ru": "Бот привязан: Telegram ID {id}, с {date}.",
-        "en": "The bot is linked: Telegram ID {id}, since {date}.",
-    },
-    "users.bot.unbound": {
-        "ru": "Бот не привязан. Привяжите его, чтобы проводить проверки в Telegram.",
-        "en": "The bot is not linked. Link it to run inspections in Telegram.",
-    },
-    "users.bot.unknown": {
-        "ru": "Не удалось узнать, привязан ли бот. Это не значит, что не привязан.",
-        "en": "Could not check whether the bot is linked. That does not mean it is not.",
-    },
-    "users.bot.link_submit": {"ru": "Привязать бота", "en": "Link the bot"},
-    "users.bot.link": {
-        "ru": "Откройте эту ссылку в Telegram на своём телефоне — бот привяжется к вашей учётке:",
-        "en": "Open this link in Telegram on your phone — the bot will link to your account:",
-    },
-    "users.bot.until": {
-        "ru": "Ссылка одноразовая и действует 10 минут (до {time}). Новая ссылка отменяет прежнюю.",
-        "en": (
-            "The link works once and for 10 minutes (until {time}). A new link cancels the old one."
-        ),
-    },
-    "users.bot.unset": {
-        "ru": "Привязка бота на этом стенде не настроена: не задана переменная {var}.",
-        "en": "Bot linking is not set up on this server: the {var} variable is not set.",
-    },
-    "users.bot.link_failed": {
-        "ru": "Ссылку выпустить не вышло — база не ответила. Попробуйте ещё раз.",
-        "en": "Could not issue the link — the database did not respond. Try again.",
-    },
-    "users.bot.unlink": {"ru": "Отвязать", "en": "Unlink"},
-    "users.bot.unlinked": {
-        "ru": "Бот отвязан. Этот Telegram больше не проводит проверки от учётки.",
-        "en": "The bot is unlinked. This Telegram no longer runs inspections for the account.",
-    },
-    "users.bot.unlink_missing": {
-        "ru": "Привязки не было — отвязывать нечего.",
-        "en": "There was no link — nothing to unlink.",
-    },
-    "users.bot.unlink_failed": {
-        "ru": "Отвязать не вышло — база не ответила. Попробуйте ещё раз.",
-        "en": "Could not unlink — the database did not respond. Try again.",
-    },
-    "users.self.title": {"ru": "Ваша учётка", "en": "Your account"},
-    "users.col.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
-    "users.email.placeholder": {"ru": "не задана", "en": "not set"},
-    "users.email.submit": {"ru": "Сохранить", "en": "Save"},
-    "users.role.submit": {"ru": "Назначить", "en": "Assign"},
-    "users.edit.missing": {
-        "ru": "Учётка не найдена или отключена — ничего не изменено.",
-        "en": "Account not found or disabled — nothing changed.",
-    },
-    "users.edit.space": {
-        "ru": "Такого пространства нет — ничего не изменено.",
-        "en": "No such space — nothing changed.",
-    },
-    "users.edit.failed": {
-        "ru": "База не ответила — ничего не изменено. Попробуйте ещё раз.",
-        "en": "The database did not respond — nothing changed. Please try again.",
-    },
-    "users.role.ok": {"ru": "Роль изменена.", "en": "Role changed."},
-    "users.role.unknown": {
-        "ru": "Такой роли нет — ничего не изменено.",
-        "en": "No such role — nothing changed.",
-    },
-    "users.role.self": {
-        "ru": "Свою роль сменить нельзя: так можно закрыть себе экран людей.",
-        "en": "You cannot change your own role: it could lock you out of this screen.",
-    },
-    "users.role.failed": {
-        "ru": "Роль не изменена: база не ответила. Попробуйте ещё раз.",
-        "en": "Role not changed: the database did not respond. Please try again.",
-    },
-    "users.email.ok": {
-        "ru": "Почта сохранена: человек может входить через Google.",
-        "en": "Email saved: the person can sign in with Google.",
-    },
-    "users.email.removed": {
-        "ru": "Почта снята: вход через Google закрыт, пароль остался.",
-        "en": "Email removed: Google sign-in is closed, the password still works.",
-    },
-    "users.email.shape": {
-        "ru": "Это не похоже на почту — ничего не изменено.",
-        "en": "This does not look like an email address — nothing changed.",
-    },
-    "users.email.taken": {
-        "ru": "Эта почта уже привязана к другой учётке — ничего не изменено.",
-        "en": "This email is already linked to another account — nothing changed.",
-    },
-    "users.email.failed": {
-        "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
-        "en": "Email not saved: the database did not respond. Please try again.",
-    },
-    "users.password.title": {"ru": "Сменить пароль", "en": "Change password"},
-    "users.password.current": {"ru": "Текущий пароль", "en": "Current password"},
-    "users.password.new": {"ru": "Новый пароль", "en": "New password"},
-    "users.password.repeat": {"ru": "Повтор нового", "en": "Repeat new password"},
-    "users.password.submit": {"ru": "Сменить пароль", "en": "Change password"},
-    "users.password.hint": {
-        "ru": "Не короче {min} знаков. После смены все остальные ваши входы закрываются, "
-        "этот остаётся.",
-        "en": "At least {min} characters. After the change all your other sessions are "
-        "signed out; this one stays.",
-    },
-    "users.password.ok": {
-        "ru": "Пароль сменён. Остальные ваши входы закрыты.",
-        "en": "Password changed. Your other sessions have been signed out.",
-    },
-    "users.password.wrong": {
-        "ru": "Пароль не сменён: проверьте текущий пароль.",
-        "en": "Password not changed: check your current password.",
-    },
-    "users.password.mismatch": {
-        "ru": "Пароль не сменён: повтор не совпадает с новым.",
-        "en": "Password not changed: the repeat does not match the new password.",
-    },
-    "users.password.short": {
-        "ru": "Пароль не сменён: новый короче {min} знаков.",
-        "en": "Password not changed: the new password is shorter than {min} characters.",
-    },
-    "users.password.long": {
-        "ru": "Пароль не сменён: новый длиннее {max} знаков.",
-        "en": "Password not changed: the new password is longer than {max} characters.",
-    },
-    "users.password.empty": {
-        "ru": "Пароль не сменён: заполните текущий и новый пароль.",
-        "en": "Password not changed: fill in the current and the new password.",
-    },
-    "users.password.locked": {
-        "ru": "Слишком много неудачных попыток. Попробуйте через {minutes} мин.",
-        "en": "Too many failed attempts. Try again in {minutes} min.",
-    },
-    "users.password.failed": {
-        "ru": "Пароль не сменён: база не ответила. Попробуйте ещё раз.",
-        "en": "Password not changed: the database did not respond. Please try again.",
-    },
-    "users.self.text": {
-        "ru": "Людей заводит и отключает администратор УК.",
-        "en": "People are added and disabled by an HQ administrator.",
-    },
-    "users.col.role": {"ru": "Что можно", "en": "Access"},
-    "users.col.state": {"ru": "Состояние", "en": "State"},
-    "users.col.created": {"ru": "Заведён", "en": "Added"},
-    "users.state.active": {"ru": "работает", "en": "active"},
-    "users.state.disabled": {"ru": "отключён {date}", "en": "disabled {date}"},
-    "users.disable.submit": {"ru": "Отключить", "en": "Disable"},
-    "users.disable.ok": {
-        "ru": "Учётка отключена. Открытые по ней сессии перестали действовать.",
-        "en": "The account is disabled. Sessions opened with it stopped working.",
-    },
-    "users.disable.missing": {
-        "ru": "Такой живой учётки нет — возможно, её уже отключили.",
-        "en": "No such active account — it may already be disabled.",
-    },
-    "users.disable.self": {
-        "ru": (
-            "Себя отключить нельзя: это выход без возврата, а на стенде с "
-            "одним администратором — ещё и закрытый навсегда экран людей."
-        ),
-        "en": (
-            "You cannot disable yourself: that is a one-way exit, and on a "
-            "stand with a single admin it closes this screen for good."
-        ),
-    },
-    "users.disable.failed": {
-        "ru": "Отключить не вышло — база не ответила.",
-        "en": "Could not disable — the database did not answer.",
-    },
-    "users.forbidden.title": {"ru": "Этот раздел не для всех", "en": "This section is restricted"},
-    "users.forbidden.note": {
-        "ru": (
-            "Людей заводит администратор. Если он нужен вам — попросите того, "
-            "кто уже им является: роль назначается изнутри админки."
-        ),
-        "en": (
-            "Only an administrator manages people. If you need that, ask "
-            "someone who already is one — the role is granted from inside."
-        ),
-    },
     "letter.draft.shown": {
         "ru": (
             "В поле — заготовка, собранная сейчас. Зафиксированное письмо "
@@ -1506,10 +1370,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.version.in_effect": {"ru": "Действует", "en": "In effect"},
     "methodology.version.unnamed": {"ru": "набор без имени", "en": "unnamed set"},
-    "methodology.version.draft_bar": {
-        "ru": "Записаны правки, которые ещё не действуют",
-        "en": "Recorded edits are not in effect yet",
-    },
     "methodology.kind.violation": {"ru": "нарушение", "en": "violation"},
     "methodology.kind.info": {"ru": "сведения", "en": "information"},
     "methodology.kind.aggregate": {"ru": "итоговая строка", "en": "summary row"},
@@ -1761,8 +1621,22 @@ TEXTS: dict[str, dict[str, str]] = {
 
 # Экшн-планы (волна 2) живут своим модулем; ключи не пересекаются — это
 # сверяется здесь же, а не доверяется глазу.
-# Предписания (волна 3), отказы «Методики» (#475) и заведение пиццерии (#437) — так же.
-_ЧАСТИ = (TEXTS, PLAN_TEXTS, PRESCRIPTION_TEXTS, REFUSAL_TEXTS, UNIT_TEXTS)
+# Предписания (волна 3), отказы «Методики» (#475), заведение пиццерии (#437) и
+# рейтинги (спека 2026-10-08) — так же.
+_ЧАСТИ = (
+    TEXTS,
+    OAUTH_TEXTS,
+    CONNECTIONS_TEXTS,
+    MASTER_TEXTS,
+    PLAN_TEXTS,
+    PRESCRIPTION_TEXTS,
+    RATINGS_TEXTS,
+    REFUSAL_TEXTS,
+    REGISTRY_TEXTS,
+    UNIT_TEXTS,
+    USERS_TEXTS,
+    WALK_TEXTS,
+)
 _ПЕРЕСЕЧЕНИЕ = {
     ключ
     for номер, часть in enumerate(_ЧАСТИ)
@@ -1771,7 +1645,21 @@ _ПЕРЕСЕЧЕНИЕ = {
 }
 if _ПЕРЕСЕЧЕНИЕ:
     raise WebTextError(f"Ключи текстов заведены дважды: {', '.join(sorted(_ПЕРЕСЕЧЕНИЕ))}")
-TEXTS = {**TEXTS, **PLAN_TEXTS, **PRESCRIPTION_TEXTS, **REFUSAL_TEXTS, **UNIT_TEXTS}
+TEXTS = {
+    **TEXTS,
+    **CONNECTIONS_TEXTS,
+    **HOME_TEXTS,
+    **MASTER_TEXTS,
+    **OAUTH_TEXTS,
+    **PLAN_TEXTS,
+    **PRESCRIPTION_TEXTS,
+    **RATINGS_TEXTS,
+    **REFUSAL_TEXTS,
+    **REGISTRY_TEXTS,
+    **UNIT_TEXTS,
+    **USERS_TEXTS,
+    **WALK_TEXTS,
+}
 
 
 def t(key: str, lang: str, /, **params: object) -> str:

@@ -20,16 +20,20 @@ from src.web.google_auth import GoogleSettings
 from src.web.google_mail import (
     DRAFT_SCOPE,
     GoogleMailError,
+    MailAccountMismatchError,
+    MailGrant,
     consent_url,
     create_draft,
     draft_subject,
+    exchange_code_for_grant,
     mime_message,
+    verified_token,
 )
 
 НАСТРОЙКИ = GoogleSettings(
     client_id="639159857771-пример.apps.googleusercontent.com",
     client_secret="секрет-стенда",
-    redirect_uri="https://muspelheim.tail48dfee.ts.net/audit/auth/google/mail",
+    redirect_uri="https://<TAILNET_HOST>/audit/auth/google/mail",
 )
 
 
@@ -58,7 +62,9 @@ class ОтветЗаглушка:
 
 def test_согласие_просит_именно_почтовый_скоуп() -> None:
     поля = параметры(consent_url(НАСТРОЙКИ, state="метка", login_hint="a@dodoteam.io"))
-    assert поля["scope"] == DRAFT_SCOPE
+    # Почтовое право и «кто это» (D176): `openid email` — чтобы на возврате
+    # узнать, какой аккаунт выдал доступ.
+    assert поля["scope"].split() == ["openid", "email", DRAFT_SCOPE]
     assert поля["state"] == "метка"
     assert поля["redirect_uri"] == НАСТРОЙКИ.redirect_uri
 
@@ -219,6 +225,38 @@ def test_отказ_прав_объясняется_словами_а_не_об�
     assert "согласие" in str(сбой.value).lower()
 
 
+def test_403_несёт_машинную_причину_google_без_текста_ответа() -> None:
+    """403 даёт и отозванное согласие, и выключенный Gmail API — чинятся по-разному.
+
+    Причина из тела (`SERVICE_DISABLED`) попадает в сообщение и в журнал;
+    человекочитаемый текст Google — нет: в нём бывает адрес почты.
+    """
+    тело = {
+        "error": {
+            "code": 403,
+            "message": "Gmail API has not been used in project 1 by me@example.com",
+            "status": "PERMISSION_DENIED",
+            "details": [{"reason": "SERVICE_DISABLED"}],
+        }
+    }
+
+    class Отказ(Exception):
+        code = 403
+
+        def read(self) -> bytes:
+            return json.dumps(тело).encode()
+
+    def открыватель(запрос: object, timeout: float) -> ОтветЗаглушка:
+        raise Отказ("forbidden")
+
+    with pytest.raises(GoogleMailError) as сбой:
+        create_draft("токен", to="p@example.com", subject="Тема", body="Текст", opener=открыватель)
+    текст = str(сбой.value)
+    assert "SERVICE_DISABLED" in текст
+    assert "PERMISSION_DENIED" in текст
+    assert "example.com" not in текст
+
+
 def test_ответ_без_номера_черновика_не_выдаётся_за_успех() -> None:
     def открыватель(запрос: object, timeout: float) -> ОтветЗаглушка:
         return ОтветЗаглушка(json.dumps({"message": {"id": "m-1"}}).encode())
@@ -239,3 +277,56 @@ def test_перевод_строки_в_заголовке_отказ_слова
     """CR/LF в теме или адресате — не 500 из почтовой сборки, а внятный отказ."""
     with pytest.raises(GoogleMailError):
         mime_message(to=кому, subject=тема, body="Текст")
+
+
+# --- чей доступ к почте (D176, F-018/F-029 аудита 12.10) ---------------------
+
+
+def _id_token(**нагрузка: object) -> str:
+    полная = {
+        "iss": "https://accounts.google.com",
+        "aud": НАСТРОЙКИ.client_id,
+        "exp": 4_000_000_000,
+        "email": "lead@example.com",
+        "email_verified": True,
+        **нагрузка,
+    }
+    середина = base64.urlsafe_b64encode(json.dumps(полная).encode()).decode().rstrip("=")
+    return f"заголовок.{середина}.подпись"
+
+
+def _обмен(monkeypatch: pytest.MonkeyPatch, тело: dict[str, object]) -> None:
+    monkeypatch.setattr(
+        "urllib.request.urlopen",
+        lambda *_a, **_k: ОтветЗаглушка(json.dumps(тело).encode()),
+    )
+
+
+def test_обмен_кода_говорит_чей_доступ(monkeypatch: pytest.MonkeyPatch) -> None:
+    _обмен(monkeypatch, {"access_token": "т", "id_token": _id_token(email="Lead@Example.com")})
+    доступ = exchange_code_for_grant(НАСТРОЙКИ, code="к")
+    assert доступ == MailGrant(access_token="т", email="lead@example.com")
+
+
+def test_обмен_без_id_token_не_выдаёт_доступ(monkeypatch: pytest.MonkeyPatch) -> None:
+    _обмен(monkeypatch, {"access_token": "т"})
+    with pytest.raises(GoogleMailError, match="id_token"):
+        exchange_code_for_grant(НАСТРОЙКИ, code="к")
+
+
+def test_доступ_чужого_приложения_отвергается(monkeypatch: pytest.MonkeyPatch) -> None:
+    _обмен(monkeypatch, {"access_token": "т", "id_token": _id_token(aud="чужое")})
+    with pytest.raises(GoogleMailError):
+        exchange_code_for_grant(НАСТРОЙКИ, code="к")
+
+
+@pytest.mark.parametrize("своя", ["other@example.com", "", None])
+def test_чужой_аккаунт_или_неизвестная_почта_отказ(своя: str | None) -> None:
+    with pytest.raises(MailAccountMismatchError):
+        verified_token(MailGrant("т", "lead@example.com"), expected_email=своя)
+
+
+def test_свой_аккаунт_отдаёт_токен() -> None:
+    assert (
+        verified_token(MailGrant("т", "lead@example.com"), expected_email="Lead@example.com") == "т"
+    )

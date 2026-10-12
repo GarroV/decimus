@@ -28,7 +28,7 @@ def _партнёр() -> BindingCache:
     def standing(tg: int) -> Standing:
         if tg != AUDITOR_ID:
             return NEVER_BOUND
-        return Standing.live(Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC)))
+        return Standing.live(Binding(tg, "u", "ge-auditor", "GE", datetime.now(UTC), "auditor"))
 
     return BindingCache(standing=standing)
 
@@ -89,7 +89,7 @@ async def test_проверка_партнёра_начинается_в_его_
     await feed(dp, bot, callback_query(NEW_INSPECTION_CALLBACK))
     await feed(dp, bot, text_message("Батуми 1"))
     await feed(dp, bot, callback_query("start:kind:planned"))
-    await feed(dp, bot, callback_query("start:lang:ru"))
+    await feed(dp, bot, callback_query("start:speech:ru"))
     состояние = get_state(CHAT_ID)
     assert состояние is not None and состояние.tenant == "GE"
 

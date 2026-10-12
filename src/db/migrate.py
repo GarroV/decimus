@@ -192,6 +192,10 @@ def reseal_migration(dsn: str, filename: str, *, directory: Path = MIGRATIONS_DI
     return migration.checksum
 
 
+#: Ключ замка наката (`pg_advisory_lock`), общий для всех копий кода.
+MIGRATE_LOCK_KEY = "decimus:migrate"
+
+
 def apply_migrations(dsn: str, *, directory: Path = MIGRATIONS_DIR) -> list[str]:
     """Накатить все миграции, которых ещё нет в базе. Вернуть имена применённых.
 
@@ -205,6 +209,10 @@ def apply_migrations(dsn: str, *, directory: Path = MIGRATIONS_DIR) -> list[str]
     applied: list[str] = []
     with psycopg.connect(dsn) as conn:
         with conn.cursor() as cur:
+            # Один накат за раз (#729): второй ждёт первый и только потом читает,
+            # что уже применено, — иначе повторил бы только что накатанное.
+            # Замок сессионный и уходит вместе с соединением.
+            cur.execute("select pg_advisory_lock(hashtext(%s))", (MIGRATE_LOCK_KEY,))
             cur.execute(_TRACKING_TABLE_SQL)
             cur.execute("select filename, checksum from schema_migrations")
             known: dict[str, str] = dict(cur.fetchall())

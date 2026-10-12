@@ -1,0 +1,115 @@
+"""Тексты раздела «Проверки» в раскладке «список слева, карточка справа».
+
+Отдельным модулем, а не строками в `texts.py`: тот длиннее предела файла.
+Сливаются в общий каталог (`texts.TEXTS`). Здесь только то, что появилось с
+правой колонкой и периодом; тексты карточки проверки — в `texts.py` (`card.*`,
+`accept.*`, `retract.*`, `move.*`), панель берёт их оттуда же.
+"""
+
+from __future__ import annotations
+
+_MONTHS: dict[str, dict[str, str]] = {
+    "registry.month.1": {"ru": "Январь", "en": "January"},
+    "registry.month.2": {"ru": "Февраль", "en": "February"},
+    "registry.month.3": {"ru": "Март", "en": "March"},
+    "registry.month.4": {"ru": "Апрель", "en": "April"},
+    "registry.month.5": {"ru": "Май", "en": "May"},
+    "registry.month.6": {"ru": "Июнь", "en": "June"},
+    "registry.month.7": {"ru": "Июль", "en": "July"},
+    "registry.month.8": {"ru": "Август", "en": "August"},
+    "registry.month.9": {"ru": "Сентябрь", "en": "September"},
+    "registry.month.10": {"ru": "Октябрь", "en": "October"},
+    "registry.month.11": {"ru": "Ноябрь", "en": "November"},
+    "registry.month.12": {"ru": "Декабрь", "en": "December"},
+}
+
+_PERIOD: dict[str, dict[str, str]] = {
+    "registry.period.label": {"ru": "Период", "en": "Period"},
+    "registry.period.all": {"ru": "Всё время", "en": "All time"},
+    "registry.period.this_month": {"ru": "Этот месяц", "en": "This month"},
+    "registry.period.last_month": {"ru": "Прошлый месяц", "en": "Last month"},
+    "registry.period.pick_end": {
+        "ru": "Выберите конец периода",
+        "en": "Pick the end of the period",
+    },
+    "registry.period.pick_start": {
+        "ru": "Выберите начало периода",
+        "en": "Pick the start of the period",
+    },
+    "registry.period.prev_month": {"ru": "Предыдущий месяц", "en": "Previous month"},
+    "registry.period.next_month": {"ru": "Следующий месяц", "en": "Next month"},
+    "registry.weekdays": {"ru": "Пн Вт Ср Чт Пт Сб Вс", "en": "Mo Tu We Th Fr Sa Su"},
+    "registry.period.from": {"ru": "С", "en": "From"},
+    "registry.period.to": {"ru": "По", "en": "To"},
+    "registry.period.apply": {"ru": "Применить", "en": "Apply"},
+    "registry.period.prev": {"ru": "Предыдущий период", "en": "Previous period"},
+    "registry.period.next": {"ru": "Следующий период", "en": "Next period"},
+    "registry.period.empty.title": {
+        "ru": "За этот период проверок нет",
+        "en": "No inspections in this period",
+    },
+    "registry.period.empty.text": {
+        "ru": "Листните стрелкой назад или откройте всё время.",
+        "en": "Step back with the arrow or show all time.",
+    },
+}
+
+_BAR: dict[str, dict[str, str]] = {
+    "registry.search": {"ru": "Пиццерия", "en": "Pizzeria"},
+    "registry.search.apply": {"ru": "Найти", "en": "Search"},
+    "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
+    "registry.history": {"ru": "История", "en": "History"},
+}
+
+_PANEL: dict[str, dict[str, str]] = {
+    "registry.drawer.title": {"ru": "Проверка", "en": "Inspection"},
+    "registry.panel.open": {"ru": "Открыть полностью", "en": "Open in full"},
+    "registry.panel.pick_title": {"ru": "Выберите проверку", "en": "Pick an inspection"},
+    "registry.panel.pick_text": {
+        "ru": "Карточка откроется здесь: оценка, потери по блокам, записи и действия.",
+        "en": "The card opens here: score, losses by block, findings and actions.",
+    },
+    "registry.panel.missing.title": {
+        "ru": "Такой проверки нет",
+        "en": "No such inspection",
+    },
+    "registry.panel.missing.text": {
+        "ru": "Её нет в вашем охвате или ссылка устарела. Выберите проверку в списке.",
+        "en": "It is outside your reach or the link is out of date. Pick one from the list.",
+    },
+    "registry.panel.failed.title": {
+        "ru": "Карточка сейчас не открылась",
+        "en": "The card did not open just now",
+    },
+    "registry.panel.failed.text": {
+        "ru": "База не ответила на запрос карточки. Список жив; откройте проверку полностью.",
+        "en": "The database did not answer for the card. The list works; open it in full.",
+    },
+    "registry.panel.score": {"ru": "Итог", "en": "Total"},
+    "registry.panel.facts": {"ru": "Проверка", "en": "Inspection"},
+    "registry.panel.date": {"ru": "Дата обхода", "en": "Visit date"},
+    "registry.panel.kind": {"ru": "Вид", "en": "Kind"},
+    "registry.panel.checklist": {"ru": "Чек-лист", "en": "Checklist"},
+    "registry.panel.findings_more": {
+        "ru": "Ещё {n} — в полной карточке",
+        "en": "{n} more in the full card",
+    },
+}
+
+# «Где нужно проверить» над списком (D399, перенесено с «Главной» в D418).
+_TOCHECK: dict[str, dict[str, str]] = {
+    "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "registry.tocheck.hint": {
+        "ru": "Нет проверок за период: ни разу не проверенные — первыми, затем ждущие дольше.",
+        "en": "No inspections in the period: never inspected first, then waiting longest.",
+    },
+    "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
+    "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
+    "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "registry.tocheck.failed": {
+        "ru": "Список не загрузился: база не ответила. Обновите страницу.",
+        "en": "The list did not load: the database did not answer. Reload the page.",
+    },
+}
+
+REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL, **_TOCHECK}

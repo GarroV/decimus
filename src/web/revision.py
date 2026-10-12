@@ -25,7 +25,6 @@ import logging
 from collections.abc import Mapping
 
 from src.db import queries, revise
-from src.db.cross_space import Entry
 from src.db.errors import ReviseError
 from src.db.reach import reach_of
 from src.domain.tenants import canonical_tenant
@@ -35,6 +34,7 @@ from src.report.rescore import rescore
 
 from .errors import MethodologyRefused
 from .review import VIOLATION, checklist_of
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,6 @@ def revise_card(
     level: str,
     zone: str,
     text: str,
-    journal: Entry | None = None,
 ) -> None:
     """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`."""
     detail = queries.get_inspection(inspection_id, reach=reach_of(tenant), include_on_review=True)
@@ -75,6 +74,11 @@ def revise_card(
             "Проверка уже принята — записи принятой не исправляются (D200). "
             "Поправить можно только шапку, под журналом"
         )
+    if detail.inspection.is_legacy:
+        # Историческая (D332): чек-листа её методики в хранилище нет и не
+        # будет, а оценку движок не пересчитывает никогда — сверять запись не
+        # с чем, и это не поломка, а свойство проверки.
+        raise ReviseError(t("revise.legacy", lang))
     прежняя = next((f for f in detail.findings if f.id == finding_id), None)
     if прежняя is None:
         raise ReviseError("Такой записи в этой проверке нет")
@@ -116,7 +120,6 @@ def revise_card(
             # Движок считает ВНУТРИ транзакции правки, после замка проверки:
             # соседняя правка той же проверки уже учтена (`src/db/revise.py`).
             score_of=lambda current: rescore(current, papers=бумаги),
-            journal=journal,
         )
     except LetterError as exc:
         raise ReviseError(f"Пересчитать проверку не удалось, запись не тронута: {exc}") from exc
