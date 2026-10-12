@@ -60,6 +60,14 @@ services:
       DB_POOL_MAX: "4"
       WEB_HOST: 0.0.0.0
       WEB_LISTEN_NETWORK: "1"
+      # Перед админкой одно своё звено — Caddy (F-007 аудита 12.10): без этого
+      # счётчик перебора один на всех.
+      WEB_TRUSTED_PROXIES: ${WEB_TRUSTED_PROXIES:-1}
+      # Кому из соседей верить `X-Forwarded-*` (F-038): адрес или подсеть Caddy
+      # в сети `edge-decimus`, задаётся в `.env` площадки. Умолчание `*` —
+      # прежнее поведение «любой сосед», чтобы выкатка не сломала вход; сузить
+      # до подсети прокси — docs/08-deploy.md, §8.1.
+      WEB_TRUSTED_PROXY_ADDR: ${WEB_TRUSTED_PROXY_ADDR:-*}
     ports: !override
       - "127.0.0.1:${WEB_HOST_PORT:-8268}:${WEB_PORT:-8267}"
     depends_on: !override

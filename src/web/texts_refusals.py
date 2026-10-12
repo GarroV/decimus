@@ -354,6 +354,11 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "en": "Repeat multiplier is “{value}”, which is not a number.",
     },
     # --- стенд: подключения к базе разошлись (#515; код MCP `db_target`, #521) -
+    "refusal.db_generic": {
+        "ru": "база не ответила. Попробуйте позже; если повторяется — обратитесь к администратору.",
+        "en": "the database did not respond. Please try again later; if it keeps happening, "
+        "contact the administrator.",
+    },
     "refusal.db_target": {
         "ru": "Подключения этой установки ведут в разные базы, поэтому действие остановлено — "
         "иначе данные ушли бы не туда. Обратитесь к администратору.",

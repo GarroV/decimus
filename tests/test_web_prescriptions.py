@@ -19,10 +19,14 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.web import prescriptions as web_rx
+from src.web.google_mail import MailGrant
 
 ORIGIN = {"Origin": "http://localhost"}
 ИД = "11111111-1111-1111-1111-111111111111"
 ОТВЕТ = "22222222-2222-2222-2222-222222222222"
+#: Почта входа через Google у вошедшего: черновик ложится только в неё (D176).
+ПОЧТА = "lead@example.com"
+ГРАНТ = MailGrant("токен", ПОЧТА)
 
 
 def предписание(*, status: str = "issued") -> rx.Prescription:
@@ -78,7 +82,7 @@ def зовы(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[dict[str, Any]]]
 
 
 def _стенд(monkeypatch: pytest.MonkeyPatch, tenant: str) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=tenant, role="admin")
+    подменить_двери(monkeypatch, tenant=tenant, role="admin", email=ПОЧТА)
     with собрать(tenant=tenant).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -305,7 +309,7 @@ def _кука_похода(клиент: FlaskClient, monkeypatch: pytest.Monkey
         "GOOGLE_MAIL_REDIRECT_URI": "https://стенд/auth/google/mail",
     }.items():
         monkeypatch.setenv(имя, значение)
-    monkeypatch.setattr(letter_draft, "exchange_code_for_token", lambda _s, *, code: "токен")
+    monkeypatch.setattr(letter_draft, "exchange_code_for_grant", lambda _s, *, code: ГРАНТ)
     подписант = URLSafeTimedSerializer(
         СЕКРЕТ,
         salt=letter_draft.MAIL_STATE_SALT,
@@ -361,6 +365,26 @@ def test_кука_похода_снимается_на_любом_исходе(
     assert ответ.status_code in (302, 303)
     assert зовы["issue"] == []
     assert _кука_снята(ответ, кука), "кука похода пережила исход без отправки"
+
+
+def test_доступ_чужого_аккаунта_google_предписание_не_выдаёт(
+    уК: FlaskClient, зовы: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D176: черновик в чужой почте — не «отправлено»; предписание остаётся черновиком."""
+    from src.web import letter_draft
+
+    кука = _кука_похода(уК, monkeypatch)
+    monkeypatch.setattr(
+        letter_draft,
+        "exchange_code_for_grant",
+        lambda _s, *, code: MailGrant("токен", "someone-else@example.com"),
+    )
+
+    ответ = уК.get("/auth/google/mail?state=м&code=к")
+
+    assert "gmail=wrong_account" in ответ.headers["Location"]
+    assert зовы["issue"] == []
+    assert _кука_снята(ответ, кука)
 
 
 def test_форма_говорит_сколько_проверок_показано(
