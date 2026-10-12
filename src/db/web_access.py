@@ -7,12 +7,13 @@
 
 **ДВЕ РОЛИ, И ЭТО ГЛАВНОЕ.** Опознание и сессии работают под ролью приложения
 (`DATABASE_URL`) — той же, под которой живёт весь продукт. Заведение,
-отключение и перечисление учёток идут под ролью ВЛАДЕЛЬЦА СХЕМЫ
-(`DATABASE_ADMIN_URL`) — той же, что накатывает миграции. Разделение держит не
+отключение и перечисление учёток идут под узкой ролью администратора истории
+(`DATABASE_RETRACTION_URL`, права — `0020`, `0041`); владелец схемы
+(`DATABASE_ADMIN_URL`) сервисам не выдаётся (F-002) и остаётся только запасным
+подключением инструментов (`managing_dsn`). Разделение держит не
 код, а права в базе (миграция `0014`): роль приложения на `web_users` имеет
 только `select`, поэтому завести учётку или подменить чужой пароль она не
-может физически. Своей четвёртой роли здесь не заводится — владелец схемы уже
-существует, и заведение учётки это работа ровно его класса.
+может физически. Четвёртой роли здесь не заводится: администратор истории уже существует.
 
 **ОБРАТИМОГО ХРАНЕНИЯ НЕТ НИГДЕ.** От пароля остаётся scrypt с солью, от
 сессионного токена — отпечаток SHA-256, как у токенов MCP
@@ -50,9 +51,8 @@ import psycopg
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
-from .database_target import managing_dsn, same_database_or_deny
+from .database_target import managing_dsn
 from .errors import AccessError, EmailTakenError
-from .migrate import DATABASE_ADMIN_URL_VAR, admin_dsn
 from .reading import reading
 from .space_guard import require_space
 
@@ -403,32 +403,6 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     settings = check_environment()
     try:
         with psycopg.connect(settings.dsn) as conn:
-            yield conn
-    except psycopg.Error as exc:
-        raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc
-
-
-@contextmanager
-def _owned(зачем: str) -> Iterator[psycopg.Connection[Any]]:
-    """Подключение ВЛАДЕЛЬЦА СХЕМЫ — то, чем заводят и отключают учётки.
-
-    Отдельно от `_connected`, потому что роль другая и отказывает по-другому:
-    «роль приложения не смогла прочитать учётку» чинится не там, где «на этой
-    машине не задано подключение владельца». Отсутствие настройки — отказ с
-    названной переменной, а не молчаливый откат на роль приложения: такой
-    откат выглядел бы работающим ровно до первой попытки записи и объяснил бы
-    её отказом прав вместо настоящей причины.
-    """
-    dsn = admin_dsn()
-    if not dsn:
-        raise AccessError(
-            f"Не удалось {зачем}: не задано DATABASE_ADMIN_URL. Учётки заводит роль "
-            f"владельца схемы — та же, что накатывает миграции; роль приложения "
-            f"этого права не имеет намеренно"
-        )
-    same_database_or_deny(DATABASE_ADMIN_URL_VAR, dsn, зачем)
-    try:
-        with psycopg.connect(dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

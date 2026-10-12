@@ -61,9 +61,28 @@ x-stand: &stand
   env_file:
     - ${DECIMUS_ENV_FILE:-.env}
 
+# Владелец схемы НЕ ВЫДАЁТСЯ сервисам (F-002, аудит 12.10). `env_file` выше
+# отдаёт контейнеру весь `.env`, а в нём — `DATABASE_ADMIN_URL` (роль наката, на
+# проде суперпользователь Postgres с обходом построчных политик) и
+# `POSTGRES_PASSWORD` (пароль той же роли). Любая уязвимость исполнения кода в
+# контейнере, смотрящем в интернет, отдала бы тогда всю базу. Сервисы ходят
+# ролью приложения (`DATABASE_URL`) и администратора истории
+# (`DATABASE_RETRACTION_URL`, в том числе учётки и пространства — `0041`).
+#
+# `environment` перекрывает `env_file`, а пустая строка — значение, а не
+# «взять из оболочки»: `admin_dsn()` читает её как «не задано». Якорь вливается
+# в `environment` КАЖДОГО сервиса с `<<: *no-owner` (слияние YAML поверхностное,
+# якорь `stand` свой `environment` у сервиса не передаёт). Владельца получает
+# один сервис — `migrate` ниже, одноразовый, и именно поэтому в нём этого
+# слияния нет. Держит это `tests/test_compose_no_owner_dsn.py`.
+x-no-owner: &no-owner
+  DATABASE_ADMIN_URL: ""
+  POSTGRES_PASSWORD: ""
+
 # Окружение демо целиком: один якорь на оба демо-сервиса (сид и бот), чтобы
 # они не могли разъехаться между собой.
 x-demo-env: &demo-env
+  <<: *no-owner
   # Демо считается по своему чек-листу и никогда по боевому.
   AUDIT_DATA_DIR: /app/demo/data
   # Демо говорит по-английски целиком (задача T131). Сама демо-проверка
@@ -105,6 +124,7 @@ services:
     # монтирования: .env хранит host-путь для разработки без Docker, а не
     # путь внутри образа.
     environment:
+      <<: *no-owner
       AUDIT_DATA_DIR: /app/data
       STATE_DIR: /app/state
       # Копии кадров для разбора, 7 дней (#367, D179). Свой том, а не папка
@@ -162,6 +182,7 @@ services:
         required: false
 
     environment:
+      <<: *no-owner
       # Точки монтирования внутри контейнера, как у бота: в .env лежат
       # host-пути для работы без Docker.
       AUDIT_DATA_DIR: /app/data
@@ -262,6 +283,7 @@ services:
         required: false
 
     environment:
+      <<: *no-owner
       TZ: ${TZ:-UTC}
       # Точки монтирования внутри контейнера, как у бота и MCP: снаружи лежат
       # host-пути для работы без Docker.
@@ -383,6 +405,7 @@ services:
         required: false
 
     environment:
+      <<: *no-owner
       TZ: ${TZ:-UTC}
       AUDIT_DATA_DIR: /app/data
       STATE_DIR: /app/state
@@ -728,6 +751,25 @@ services:
       - "mc mb --ignore-existing own/${S3_BUCKET:-inspection-frames} && mc ls own"
 
 
+  # --- накат схемы (профиль `migrate`, F-002) -----------------------------------
+  #
+  # ЕДИНСТВЕННЫЙ сервис, который получает владельца схемы: `DATABASE_ADMIN_URL`
+  # приезжает из `env_file` как есть, слияния `*no-owner` здесь нет намеренно.
+  # Одноразовый — делает накат и выходит, ничего не слушает и в интернет не
+  # смотрит. Запускать только так:
+  #
+  #   docker compose run --rm --no-deps migrate
+  #
+  # Не `exec bot ...`: у бота владельца нет, и накат под ним откатился бы на
+  # `DATABASE_URL` с предупреждением, то есть выглядел бы работающим.
+  migrate:
+    <<: *stand
+    profiles: ["migrate"]
+    restart: "no"
+    command: ["python", "-m", "src.db.migrate"]
+    environment:
+      TZ: ${TZ:-UTC}
+
   # --- выгрузка состояния в бэкап (профиль `backup`, задача #233) ------------
   #
   # Бэкап площадки умеет только дампы Postgres: задача по расписанию обходит
@@ -753,6 +795,7 @@ services:
     command: ["python", "tools/state_backup.py"]
 
     environment:
+      <<: *no-owner
       # Точки монтирования ВНУТРИ контейнера, как у бота: в .env лежат
       # host-пути. `BACKUP_DIR` в .env — это каталог бэкапа на площадке
       # (`C:\backups`), а процессу внутри нужен путь контейнера, и он всегда
