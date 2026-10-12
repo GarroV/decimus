@@ -186,7 +186,7 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # нельзя вынуть отправленное, иначе она перестаёт быть историей.
     "partner_letters": {"SELECT", "INSERT"},
     # Личный доступ к MCP живёт пометками, поэтому DELETE нет (`0011`). Круг
-    # (`mcp_admins`) снят миграцией `0057` (D448).
+    # (`mcp_admins`) снят миграцией `0059` (D448).
     "mcp_tokens": {"SELECT", "INSERT"},
     # Карта синонимов формулировок только пополняется (`0012`, T284, D119):
     # UPDATE и DELETE не выданы намеренно. Синоним, который уже работает, не
@@ -220,6 +220,10 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "bot_ui_langs": {"SELECT", "INSERT"},
     # Режим «Завершить» в мини-аппе (D449, `0056`): как язык — удалять нельзя.
     "finish_modes": {"SELECT", "INSERT"},
+    # Язык чек-листа, выбранный на старте (D451, `0057`): так же — удалять нельзя.
+    "checklist_langs": {"SELECT", "INSERT"},
+    # Перевод комментариев (D443, `0058`): так же — удалять нельзя.
+    "translate_modes": {"SELECT", "INSERT"},
     # Экшн-планы (`0036`): партнёр ролью приложения только кладёт версию файла
     # (и переводит запрос на приёмку — колонка ниже). Ни запроса, ни вердикта
     # она не заводит: INSERT на них появится — и бот положит «принятый» план
@@ -264,6 +268,8 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "bot_bindings": {"UPDATE": {"unbound_at"}},
     "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
     "finish_modes": {"UPDATE": {"mode", "chosen_at"}},
+    "checklist_langs": {"UPDATE": {"lang", "chosen_at"}},
+    "translate_modes": {"UPDATE": {"mode", "chosen_at"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой
     # `expires_at` или переписать `fingerprint` на свой, то есть присвоить

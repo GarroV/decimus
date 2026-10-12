@@ -20,10 +20,12 @@ from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
-from web_harness import ЛОГИН, СВОЙ, войти, подменить_двери, собрать
+from web_harness import ЛОГИН, СВОЙ, Учётка, войти, подменить_двери, собрать
 
 from src.db.errors import EmailTakenError
+from src.domain.tenants import HQ_TENANT
 from src.web import accounts
+from src.web.sections import visible_sections
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 
@@ -457,14 +459,20 @@ def test_контроль_вне_рейтингов_не_пишет(
 
 @pytest.mark.parametrize("путь", ["/country", "/admin", "/actions", "/calendar", "/tenants"])
 def test_контроль_не_видит_разделов_кроме_своих(контроль: FlaskClient, путь: str) -> None:
-    """D358, D366: кроме обзора, проверок, рейтингов и своих людей — не открывается."""
+    """D358, D420: кроме рейтингов и своих людей — не открывается."""
     assert контроль.get(путь).status_code == 404
 
 
-@pytest.mark.parametrize("путь", ["/overview", "/inspections"])
-def test_контроль_читает_обзор_и_проверки(контроль: FlaskClient, путь: str) -> None:
-    """D366: контролинг видит обзор и все проверки — заслон пропускает (без базы стенда — 503)."""
-    assert контроль.get(путь).status_code not in (403, 404)
+@pytest.mark.parametrize(
+    "путь",
+    ["/overview", "/inspections", "/inspections/x", "/inspections/x/letter", "/units/u1"],
+)
+def test_контроль_не_читает_главную_и_проверки(контроль: FlaskClient, путь: str) -> None:
+    """D420: проверок контролинг не касается никак — ни «Главной», ни карточек, ни реестра.
+
+    404 отвечает заслон, а не маршрут: без базы стенда маршрут ответил бы 503.
+    """
+    assert контроль.get(путь).status_code == 404
 
 
 @pytest.mark.parametrize("путь", ["/inspections/x/retract", "/inspections/x/letter/save"])
@@ -474,17 +482,23 @@ def test_контроль_в_проверках_не_пишет(контроль
 
 def test_контроль_видит_рейтинги_и_свои_дела(контроль: FlaskClient) -> None:
     assert контроль.get("/users").status_code == 200
-    # При входе все — на «Главной» (D378, было: контролинг — сразу в рейтинги).
+    # «Главной» у контролинга нет (D420), поэтому после входа — в «Рейтинги»,
+    # а не на «Главную», как все (D378).
     вход = контроль.get("/")
-    assert вход.status_code == 302 and вход.headers["Location"].endswith("/overview")
+    assert вход.status_code == 302 and вход.headers["Location"].endswith("/ratings")
 
 
 def test_контроль_в_навигации_только_свои_разделы(контроль: FlaskClient) -> None:
     страница = контроль.get("/users").get_data(as_text=True)
-    for свой in ("/overview", "/inspections", "/ratings"):
-        assert f'href="{свой}?lang=' in страница, свой
-    for чужой in ("/admin", "/actions", "/country"):
+    assert 'href="/ratings?lang=' in страница
+    for чужой in ("/overview", "/inspections", "/admin", "/actions", "/country"):
         assert f'href="{чужой}?lang=' not in страница, чужой
+
+
+def test_контроль_в_реестре_разделов_только_рейтинги_и_люди() -> None:
+    """D420: набор разделов контроля — рейтинги и «Пользователи», и ничего больше."""
+    ключи = {item.key for item in visible_sections(Учётка(tenant=HQ_TENANT, role="control"))}
+    assert ключи == {"ratings", "users"}
 
 
 def test_контроль_выходит_сам(контроль: FlaskClient) -> None:

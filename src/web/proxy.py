@@ -1,38 +1,48 @@
-"""Что сказать `waitress` про звенья перед нами.
+"""Что сказать `waitress` про звенья перед нами — и кому из соседей верить.
 
 Отдельный модуль, а не часть точки входа, по одной причине: точка входа
 подставляет `.env` в окружение процесса на уровне модуля — то есть при первом
 же импорте. Тесту, которому нужна только эта функция, приезжали бы вместе с
 ней боевые подключения, токены и ключи площадки; на прогоне это уже стоило
 39 падений и записи в базу стенда вместо одноразовой (#356).
+
+**Своё звено называется адресом, а не «любой сосед» (F-038 аудита 12.10).** В
+проде сервер слушает сеть контейнера (`WEB_LISTEN_NETWORK`, D211), и общий
+прокси приходит с адреса docker-сети. До 12.10 доверие здесь было `*`: любой,
+кто дотянулся до порта контейнера (процесс на машине через опубликованный на
+петле порт, соседний контейнер), сам выбирал себе адрес в `X-Forwarded-For`,
+схему и хост — и с ним ключ счётчика перебора. Теперь адреса своих звеньев
+(адрес или подсеть, через запятую) называет `WEB_TRUSTED_PROXY_ADDR`; заголовки
+остальных вырезаются.
 """
 
 from __future__ import annotations
 
 import ipaddress
+import logging
+from collections.abc import Callable, Iterable
 from typing import Any
 
-from .config import Settings
+from waitress.proxy_headers import proxy_headers_middleware
+
+from .config import ANY_PEER, Settings
+
+logger = logging.getLogger(__name__)
+
+#: Заголовки звена, которым верим от своего звена. Всё, что не названо,
+#: вырезается — именно этого мы и хотим от постороннего, который решит
+#: представиться сам.
+TRUSTED_HEADERS = frozenset({"x-forwarded-for", "x-forwarded-proto", "x-forwarded-host"})
+
+WsgiApp = Callable[[dict[str, Any], Callable[..., Any]], Iterable[bytes]]
 
 
-def _адрес_звена(host: str) -> str:
-    """С какого адреса приходит своё звено.
-
-    На петле звено — сама петля: сервер принимает только её. В проде сервер
-    слушает сеть контейнера (`WEB_LISTEN_NETWORK`, D211), и общий прокси
-    приходит с адреса docker-сети, который заранее не известен и меняется при
-    пересоздании. Назвать звеном `0.0.0.0` значило бы не доверять никому:
-    `waitress` сравнивает адрес соединения, а с `0.0.0.0` никто не приходит, —
-    и заслон происхождения снова отвечал бы 403 на каждый вход (27.09.2026,
-    первый вход после переезда на VPS). Поэтому в сети доверяется любой сосед:
-    порт наружу не опубликован, и до сервера доходят только контейнеры своего
-    проекта и прокси по сети `edge-decimus`.
-    """
-    return host if ipaddress.ip_address(host).is_loopback or host == "localhost" else "*"
+def _на_петле(host: str) -> bool:
+    return host == "localhost" or ipaddress.ip_address(host).is_loopback
 
 
 def _proxy_options(settings: Settings) -> dict[str, Any]:
-    """Что сказать `waitress` про звенья перед нами.
+    """Что сказать `waitress` про звенья перед нами, когда приложение не обёрнуто.
 
     Без этого настройка `WEB_TRUSTED_PROXIES` не работала ВОВСЕ, хотя и
     читалась: `waitress` по умолчанию (`clear_untrusted_proxy_headers`) режет
@@ -44,11 +54,12 @@ def _proxy_options(settings: Settings) -> dict[str, Any]:
     Счётчик неудачных входов (`remote.client_address`) видел один адрес на всех
     пришедших снаружи, то есть запирал вход всем сразу.
 
-    Доверие называется адресом звена, а не «включено»: `trusted_proxy` — это
-    петля, потому что сервер принимает только её (`config._parse_host`), и
-    добраться до него может лишь тот, кто уже на машине. Набор заголовков
-    перечислен явно: всё, что не названо, `waitress` вырежет — а именно этого
-    мы и хотим от постороннего, который решит представиться сам.
+    Звено на петле — сама петля: добраться до неё может лишь тот, кто уже на
+    машине. В сети контейнера доверия здесь нет никому: «любой сосед» (`*`) до
+    12.10 отдавал выбор адреса и схемы каждому, кто дотянулся до порта. Кому
+    верить в сети, решает `guard_forwarded` по названному адресу звена — так
+    поднимается админка (`serve_options`); сервису обхода заголовки звена не
+    нужны вовсе, и он получает просто «никому».
     """
     опции: dict[str, Any] = {}
     # Префикс уходит в `SCRIPT_NAME`, и от этого зависят ВСЕ ссылки страницы:
@@ -57,12 +68,76 @@ def _proxy_options(settings: Settings) -> dict[str, Any]:
     # человека в корень — то есть в чужой продукт, который там стоит.
     if settings.url_prefix:
         опции["url_prefix"] = settings.url_prefix
-    if settings.trusted_proxies > 0:
-        опции["trusted_proxy"] = _адрес_звена(settings.host)
+    if settings.trusted_proxies > 0 and _на_петле(settings.host):
+        опции["trusted_proxy"] = settings.host
         опции["trusted_proxy_count"] = settings.trusted_proxies
-        опции["trusted_proxy_headers"] = {
-            "x-forwarded-for",
-            "x-forwarded-proto",
-            "x-forwarded-host",
-        }
+        опции["trusted_proxy_headers"] = set(TRUSTED_HEADERS)
     return опции
+
+
+def serve_options(settings: Settings) -> dict[str, Any]:
+    """Опции `waitress` для приложения, обёрнутого `guard_forwarded`.
+
+    Адрес звена назван — заголовки доезжают до обёртки сырыми: `waitress`
+    сравнивает звено с одним адресом и подсети не понимает, поэтому решает
+    обёртка, по адресу соединения. Не назван — как `_proxy_options`.
+    """
+    опции = _proxy_options(settings)
+    if settings.trusted_proxies <= 0 or not settings.trusted_proxy_addrs:
+        return опции
+    return {
+        **{ключ: значение for ключ, значение in опции.items() if not ключ.startswith("trusted_")},
+        "clear_untrusted_proxy_headers": False,
+    }
+
+
+def untrusted_network(settings: Settings) -> bool:
+    """Звенья обещаны, сервер слушает сеть, а адреса звена не названы.
+
+    Тогда заголовкам не верим вовсе: счётчик перебора видит адрес прокси (один
+    на всех — строже, чем нужно), а заслон происхождения — HTTP. Это осторожный
+    конец развилки; точка входа говорит о нём в журнал при старте.
+    """
+    return (
+        settings.trusted_proxies > 0
+        and not settings.trusted_proxy_addrs
+        and not _на_петле(settings.host)
+    )
+
+
+def peer_trusted(peer: str, addrs: tuple[str, ...]) -> bool:
+    """Соединение пришло от своего звена: адрес совпал с названным или лежит в его подсети."""
+    if ANY_PEER in addrs:
+        return True
+    try:
+        адрес = ipaddress.ip_address(peer)
+    except ValueError:
+        return False
+    return any(адрес in ipaddress.ip_network(сеть, strict=False) for сеть in addrs)
+
+
+def guard_forwarded(app: WsgiApp, settings: Settings) -> WsgiApp:
+    """Обернуть приложение: заголовки звена — только от своего звена по адресу.
+
+    Разбор заголовков — тот же, что у самого `waitress` (`proxy_headers_middleware`),
+    чтобы правило «сколько звеньев своих» не жило в двух реализациях. Звена нет в
+    настройке — обёртки нет: заголовки режет `waitress` (`_proxy_options`).
+    """
+    if settings.trusted_proxies <= 0 or not settings.trusted_proxy_addrs:
+        return app
+    addrs = settings.trusted_proxy_addrs
+    доверяя = proxy_headers_middleware(
+        app,
+        trusted_proxy=ANY_PEER,
+        trusted_proxy_count=settings.trusted_proxies,
+        trusted_proxy_headers=set(TRUSTED_HEADERS),
+        clear_untrusted=True,
+    )
+    не_доверяя = proxy_headers_middleware(app, trusted_proxy=None, clear_untrusted=True)
+
+    def пропустить(запрос: dict[str, Any], start_response: Callable[..., Any]) -> Iterable[bytes]:
+        if peer_trusted(str(запрос.get("REMOTE_ADDR") or ""), addrs):
+            return доверяя(запрос, start_response)
+        return не_доверяя(запрос, start_response)
+
+    return пропустить

@@ -37,6 +37,10 @@
       <div class="note note--error login__note" role="alert">
         <div><div class="note__title">{{ t('auth.locked', minutes=locked_minutes) }}</div></div>
       </div>
+    {% elif use_google %}
+      <div class="note note--warn login__note" role="alert">
+        <div><div class="note__title">{{ t('auth.use_google') }}</div></div>
+      </div>
     {% elif failed %}
       <div class="note note--error login__note" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>
@@ -54,6 +58,7 @@
             </svg>
           {{ t('auth.google') }}
         </a>
+        <p class="login__aside">{{ t('auth.google_hint') }}</p>
       </div>
       <div class="login__or" aria-hidden="true"><span>{{ t('auth.or') }}</span></div>
     {% endif %}
