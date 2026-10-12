@@ -19,6 +19,7 @@ from src.ratings.aggregators import (
     chowdeck,
     collect,
     glovo,
+    migros,
     pyszne,
     summary,
     trendyol,
@@ -240,6 +241,24 @@ def test_chowdeck_оценка_строкой_и_не_додо_это_сбой()
     assert (найдено.score, найдено.votes, найдено.lat, найдено.lng) == (4.17, 1065, 6.61, 3.36)
     with pytest.raises(AggregatorError):
         chowdeck.parse({"data": {"name": "Pizza Hut"}}, точка)
+
+
+def test_migros_оценка_с_запятой_и_не_додо_это_сбой() -> None:
+    точка = _точка("migros_yemek", "dodo-pizza-buca-vali-rahmi-bey-mah-st-1")
+    ответ = {
+        "storeDTO": {
+            "id": 23000000183206,
+            "title": "Dodo Pizza, Buca (Vali Rahmi Bey Mah.)",
+            "rating": {"score": "4,7", "commentCount": 612},
+            "commentCount": "100+",
+            "cityId": 35,
+        }
+    }
+    найдено = migros.parse(ответ, точка)
+    assert (найдено.score, найдено.scale, найдено.votes, найдено.votes_exact) == (4.7, 5, 612, True)
+    assert найдено.url == "https://www.migros.com.tr/yemek/dodo-pizza-buca-vali-rahmi-bey-mah-st-1"
+    with pytest.raises(AggregatorError):
+        migros.parse({"storeDTO": {"title": "Dodo Burger, Buca (Hürriyet Mah.)"}}, точка)
 
 
 def test_привязка_ближайшая_и_одна_к_одной() -> None:
