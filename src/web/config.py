@@ -25,6 +25,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import canonical_tenant
 
 from .errors import WebConfigError
@@ -114,6 +115,23 @@ class Settings:
     #: Адрес сервиса мини-аппа обхода (`WEB_WALK_UPSTREAM`): `http://хост:порт`.
     #: `None` — адреса обхода админкой не отдаются.
     walk_upstream: str | None = None
+    #: Внешний адрес админки (`ADMIN_PUBLIC_URL`, D417): издатель OAuth.
+    admin_public_url: str | None = None
+    #: Внешний адрес MCP (`MCP_PUBLIC_URL`, D417): ресурс, к которому выдаются токены.
+    mcp_public_url: str | None = None
+
+    @property
+    def oauth_enabled(self) -> bool:
+        """Подключение Claude входом через сайт включено: оба адреса заданы (D417)."""
+        return self.admin_public_url is not None and self.mcp_public_url is not None
+
+
+def _parse_public(src: Mapping[str, str], var: str) -> str | None:
+    """Внешний адрес из окружения; кривой — отказ запуска, а не тихо выключенный OAuth."""
+    try:
+        return parse_public_url(src.get(var) or "", var=var)
+    except ValueError as отказ:
+        raise WebConfigError(str(отказ)) from None
 
 
 #: Имя бота Telegram: 5–32 знака латиницы, цифр и `_` (правило Telegram).
@@ -335,4 +353,6 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
         walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
+        admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
+        mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
     )

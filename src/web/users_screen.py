@@ -24,11 +24,20 @@ from collections.abc import Callable
 from flask import Flask, make_response, render_template, request
 from flask import Response as FlaskResponse
 
-from src.db import bot_links, mcp_access
+from src.db import bot_links, mcp_access, oauth_store
 from src.db.errors import DbError
 from src.domain.tenants import canonical_tenant
 
-from . import access_policy, accounts, auth, partner_spaces, people, profile, users_mcp
+from . import (
+    access_policy,
+    accounts,
+    auth,
+    partner_spaces,
+    people,
+    profile,
+    users_claude,
+    users_mcp,
+)
 from .access_policy import Scope
 from .config import WEB_BOT_USERNAME_VAR, Settings
 from .db_refusal import note_target_mismatch
@@ -84,6 +93,7 @@ def install(app: Flask, conf: Settings) -> None:
     """Маршруты экрана «Пользователи»: люди, своя карточка, пространства партнёров."""
     users_path = section("users").path
     app.config[BOT_USERNAME_KEY] = conf.bot_username
+    app.config[users_claude.MCP_URL_KEY] = conf.mcp_public_url if conf.oauth_enabled else None
 
     @app.get(users_path)
     def users() -> tuple[str, int]:
@@ -173,6 +183,8 @@ def install(app: Flask, conf: Settings) -> None:
     _install_edits(app, users_path)
     _install_add_disable(app, users_path)
     _install_mcp(app, users_path)
+    if conf.oauth_enabled:
+        _install_claude(app, users_path)
     _install_spaces(app, users_path)
 
 
@@ -345,6 +357,32 @@ def _install_add_disable(app: Flask, users_path: str) -> None:
             return render(Show(flash=_flash("users.disable.failed", ok=False)), 400)
         исход = "users.disable.ok" if отключено else "users.disable.missing"
         return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=отключено)))
+
+
+def _install_claude(app: Flask, users_path: str) -> None:
+    """Отключить своё подключение Claude через сайт (D417). Чужое — не найдётся."""
+
+    @app.post(f"{users_path}/claude-revoke")
+    def claude_revoke() -> FlaskResponse | tuple[str, int]:
+        """Отозвать подключение. Номер — из формы, владелец — всегда вошедший.
+
+        Учётка из формы не читается вовсе: `user_id` в запросе отзыва — это
+        вошедший, и номер чужого подключения просто не найдётся.
+        """
+        refuse_foreign_origin()
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError(
+                "отзыв подключения Claude без вошедшего: маршрут прошёл мимо заслона"
+            )
+        номер = (request.form.get("connection_id") or "").strip()
+        try:
+            отозвано = oauth_store.revoke_connection(номер, user_id=вошедший.id)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(person=ME, flash=_flash("users.claude.failed", ok=False)), 503)
+        исход = "users.claude.revoked" if отозвано else "users.claude.revoke_missing"
+        return render(Show(person=ME, flash=_flash(исход, ok=отозвано)))
 
 
 def _install_mcp(app: Flask, users_path: str) -> None:
