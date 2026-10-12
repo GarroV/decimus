@@ -37,6 +37,7 @@ def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
         "admin",
         "actions",
         "users",
+        "settings",
     ]
 
 
@@ -51,9 +52,17 @@ def test_built_keys_are_the_built_screens() -> None:
             "ratings",
             "admin",
             "users",
+            "settings",
             "actions",
         }
     )
+
+
+def test_settings_is_not_in_the_menu_of_any_role() -> None:
+    """«Настройки» — профиль, в него ведёт аватар, а не пункт левой панели (D447)."""
+    for tenant, role in (("HQ", "superadmin"), ("HQ", "control"), ("HQ", "guest"), ("GE", "admin")):
+        меню = {s.key for s in visible_sections(_Кто(tenant, role))}
+        assert "settings" not in меню, (tenant, role)
 
 
 def test_keys_and_paths_are_unique_and_paths_are_absolute() -> None:
@@ -84,6 +93,7 @@ def test_check_registry_accepts_exactly_the_built_sections() -> None:
             "ratings",
             "admin",
             "users",
+            "settings",
             "actions",
         )
     )
@@ -107,6 +117,7 @@ def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
                 "ratings",
                 "admin",
                 "users",
+                "settings",
                 "calendar",
             )
         )
@@ -114,7 +125,7 @@ def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
 
 def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
     with pytest.raises(SectionRegistryError, match="выдумка"):
-        check_registry(("overview", "registry", "country", "admin", "users", "выдумка"))
+        check_registry(("overview", "registry", "country", "admin", "users", "settings", "выдумка"))
 
 
 # --- разделы «только УК» (D264, волна 1 #340) -------------------------------
