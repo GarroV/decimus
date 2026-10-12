@@ -161,15 +161,29 @@ def _search_one(
     return points, ratings, errors, len(mine), first_error
 
 
+#: Сколько первых точек «по известной точке» подряд могут не ответить, прежде
+#: чем сбор агрегатора прекращается: источник лежит (уснул домашний сервер у
+#: Migros), а каждая точка с повторами ждёт минуты — 28 точек тянулись бы час.
+GIVE_UP_AFTER = 3
+
+
 def _known_one(
     module: ModuleType, units: Sequence[DodoUnit], today: date
 ) -> tuple[list[PointRow], list[RatingRow], int, int, str | None]:
     """Снять оценки точек агрегатора из справочника."""
     http = base.Http(module.GAP_SEC)
     known = agg_store.known_points(module.KEY)
-    points, ratings = [], []
+    points: list[PointRow] = []
+    ratings: list[RatingRow] = []
     errors, first_error = 0, None
     for row in known:
+        if errors >= GIVE_UP_AFTER and not points:
+            logger.warning(
+                "%s: первые %d точек не ответили — источник лежит, остальные не спрашиваем",
+                module.KEY,
+                errors,
+            )
+            break
         try:
             found = module.refresh(http, row)
         except AggregatorError as exc:
