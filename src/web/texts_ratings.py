@@ -343,14 +343,18 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "en": "The database did not respond: platform coverage cannot be shown now.",
     },
     "ratings.coverage.link.summary": {"ru": "привязать", "en": "link"},
-    "ratings.coverage.link.label": {
+    "ratings.coverage.link.label.glovo": {
         "ru": "Страница магазина на glovoapp.com",
         "en": "Store page on glovoapp.com",
     },
+    "ratings.coverage.link.label.migros_yemek": {
+        "ru": "Страница магазина на migros.com.tr/yemek",
+        "en": "Store page on migros.com.tr/yemek",
+    },
     "ratings.coverage.link.submit": {"ru": "Привязать", "en": "Link"},
     "ratings.coverage.link.ok": {
-        "ru": "Привязано к Glovo: {name}.",
-        "en": "Linked to Glovo: {name}.",
+        "ru": "Привязано к {platform}: {name}.",
+        "en": "Linked to {platform}: {name}.",
     },
     "ratings.coverage.link.failed": {"ru": "Не привязано.", "en": "Not linked."},
     "ratings.coverage.link.bad_url": {
@@ -361,6 +365,20 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "en": (
             "Not linked: expected a link like https://glovoapp.com/en/ro/bucharest/stores/"
             "store-name."
+        ),
+    },
+    "ratings.coverage.link.bad_url_migros": {
+        "ru": "Не привязано: нужна ссылка вида https://www.migros.com.tr/yemek/dodo-pizza-….",
+        "en": "Not linked: expected a link like https://www.migros.com.tr/yemek/dodo-pizza-….",
+    },
+    "ratings.coverage.link.migros_failed": {
+        "ru": (
+            "Не привязано: Migros не ответил через домашний сервер — проверьте, не спит ли "
+            "он, и повторите."
+        ),
+        "en": (
+            "Not linked: Migros did not answer through the home server — check that it is "
+            "awake and try again."
         ),
     },
     "ratings.coverage.link.unknown_unit": {
@@ -376,16 +394,16 @@ _IMPORTS: dict[str, dict[str, str]] = {
         "en": "Not linked: the Glovo page did not open, try again later.",
     },
     "ratings.coverage.link.no_store": {
-        "ru": "Не привязано: на странице не нашлись данные магазина.",
-        "en": "Not linked: no store data found on the page.",
+        "ru": "Не привязано: на странице не нашлись данные магазина Dodo Pizza.",
+        "en": "Not linked: no Dodo Pizza store data found on the page.",
     },
     "ratings.coverage.link.glovo_failed": {
         "ru": "Не привязано: Glovo не отдал точку для координат пиццерии.",
         "en": "Not linked: Glovo returned no point for the pizzeria's coordinates.",
     },
     "ratings.coverage.link.taken": {
-        "ru": "Не привязано: эта точка Glovo уже привязана к другой пиццерии.",
-        "en": "Not linked: this Glovo point is already linked to another pizzeria.",
+        "ru": "Не привязано: эта точка площадки уже привязана к другой пиццерии.",
+        "en": "Not linked: this platform point is already linked to another pizzeria.",
     },
     "ratings.layout.up": {"ru": "{name} — выше", "en": "Move {name} up"},
     "ratings.layout.down": {"ru": "{name} — ниже", "en": "Move {name} down"},

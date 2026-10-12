@@ -569,6 +569,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/aggregators/glovo.py` | Glovo: оценка известной точки по id магазина и координатам доставки |
 | `src/ratings/aggregators/glovo_link.py` | Glovo: новые точки находятся сами или привязываются по ссылке (D424, #648) |
 | `src/ratings/aggregators/migros.py` | Migros Yemek (Турция): оценка известной точки по адресу её страницы |
+| `src/ratings/aggregators/migros_link.py` | Привязка пиццерии к Migros Yemek по ссылке на страницу магазина (#717) |
 | `src/ratings/aggregators/migros_relay.py` | Ретранслятор Migros Yemek на домашнем сервере (D434) |
 | `src/ratings/aggregators/pyszne.py` | Pyszne.pl (Just Eat Takeaway, Польша): витрина у координат |
 | `src/ratings/aggregators/queue.py` | Заявка на обновление оценок агрегаторов вне расписания (D420) |
