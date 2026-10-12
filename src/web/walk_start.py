@@ -3,7 +3,8 @@
 `POST /tg/walk/start` — одно действие за запрос (`op`):
 
 - `options` — что показать в мастере: открытые чек-листы пространства человека,
-  виды проверки, языки и состояние текущей проверки (нет / идёт / сдана);
+  виды проверки, языки (предвыбран прошлый выбор человека, D451) и состояние
+  текущей проверки (нет / идёт / сдана);
 - `suggest` — подсказки к полю названия по мере набора;
 - `start` — начать проверку.
 
@@ -54,6 +55,7 @@ from src.bot.unit_pick import (
     suggest_units,
     where_suffix,
 )
+from src.db import checklist_langs
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
 from src.domain import (
@@ -121,6 +123,24 @@ def _state_of(chat_id: int) -> str:
         return STATE_RUNNING
 
 
+def _remembered_lang(who: int) -> str | None:
+    """Язык чек-листа с прошлого старта человека (D451). Нет выбора или база молчит — `None`."""
+    try:
+        lang = checklist_langs.chosen_checklist_lang(who)
+    except DbError:
+        logger.warning("Старт из мини-аппа: язык чек-листа %s не прочитался", who, exc_info=True)
+        return None
+    return lang if lang in LANG_LABELS else None
+
+
+def _remember_lang(who: int, lang: str) -> None:
+    """Запомнить выбор после удачного старта. Не записалось — проверка уже идёт, это не отказ."""
+    try:
+        checklist_langs.choose_checklist_lang(who, lang)
+    except DbError:
+        logger.warning("Старт из мини-аппа: язык чек-листа %s не записался", who, exc_info=True)
+
+
 def _text(body: dict[str, Any], name: str) -> str:
     value = body.get(name, "")
     if not isinstance(value, str):
@@ -173,9 +193,16 @@ class _Wizard:
             "checklists": [{"code": c.code, "name": c.name(self.lang)} for c in открыты],
             "kinds": [{"code": code, "title": kind_title(code, self.lang)} for code in KIND_TITLES],
             "langs": [{"code": code, "label": label} for code, label in LANG_LABELS.items()],
-            "default_lang": self.lang if self.lang in LANG_LABELS else next(iter(LANG_LABELS)),
+            "default_lang": self.default_lang(),
             "suggest": suggest_index(tenant=self.space),
         }
+
+    def default_lang(self) -> str:
+        """Язык чек-листа для предвыбора: прошлый выбор человека (D451), иначе язык интерфейса."""
+        remembered = _remembered_lang(self.who)
+        if remembered is not None:
+            return remembered
+        return self.lang if self.lang in LANG_LABELS else next(iter(LANG_LABELS))
 
     def suggest(self, body: dict[str, Any]) -> dict[str, Any]:
         typed = _text(body, "name")[:MAX_TYPED]
@@ -281,6 +308,7 @@ class _Wizard:
             raise Refused(self.say("walk.start.err.failed"), 500) from exc
         # Журнал разбора — спутник проверки (#367): прежний закрывается, новый с чистого листа.
         journal.close(self.who)
+        _remember_lang(self.who, speech_lang)
         logger.info("Старт из мини-аппа: чат %s начал проверку, чек-лист %s", self.who, checklist)
 
 
