@@ -177,6 +177,8 @@ def test_model_из_аргумента_перекрывает_настройки
 
     # Assert
     assert fake_responses.calls[0]["model"] == "gpt-4o-mini"
+    # Кадры и записи у OpenAI не хранятся: без этого Responses держит их у себя.
+    assert fake_responses.calls[0]["store"] is False
 
 
 def test_отказ_провайдера_это_ModelUnavailable(monkeypatch: pytest.MonkeyPatch) -> None:
