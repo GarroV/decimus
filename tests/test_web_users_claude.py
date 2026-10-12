@@ -41,7 +41,9 @@ def _строка(user_id: str, login: str, tenant: str, role: str) -> Any:
 @pytest.fixture
 def память(monkeypatch: pytest.MonkeyPatch) -> ПамятьOAuth:
     память = подменить_oauth(monkeypatch)
-    клиент = память.register_client("Claude", ["https://claude.ai/api/mcp/auth_callback"])
+    клиент = память.register_client(
+        "Claude", ["https://claude.ai/api/mcp/auth_callback"], address="203.0.113.5"
+    )
     сейчас = datetime.now(UTC)
     память.grants["мое-подключение"] = _Подключение(МОЙ, клиент, сейчас)
     память.grants["чужое-подключение"] = _Подключение(ЧУЖОЙ, клиент, сейчас)

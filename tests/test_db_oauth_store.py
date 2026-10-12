@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from datetime import timedelta
 
 import pytest
 from conftest import requires_db
@@ -23,6 +24,8 @@ from src.db.oauth_store import (  # noqa: E402
     exchange_code,
     issue_code,
     list_connections,
+    purge_stale,
+    recent_clients,
     refresh_tokens,
     register_client,
     resolve_access_token,
@@ -34,6 +37,7 @@ pytestmark = requires_db
 
 ТЕНАНТ = "HQ"
 ВОЗВРАТ = "https://claude.ai/api/mcp/auth_callback"
+АДРЕС = "203.0.113.5"
 VERIFIER = "x" * 64
 CHALLENGE = (
     base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=").decode()
@@ -54,7 +58,7 @@ def учётка(база: str) -> str:
 
 @pytest.fixture
 def клиент(база: str) -> Client:
-    return register_client("Claude", [ВОЗВРАТ])
+    return register_client("Claude", [ВОЗВРАТ], address=АДРЕС)
 
 
 def _код(клиент: Client, учётка: str) -> str:
@@ -145,7 +149,7 @@ def test_код_на_незарегистрированный_адрес_не_в
 
 def test_регистрация_с_чужим_адресом_отвергается(база: str) -> None:
     with pytest.raises(OAuthGrantError):
-        register_client("x", ["https://evil.com/cb"])
+        register_client("x", ["https://evil.com/cb"], address=АДРЕС)
 
 
 def test_refresh_ротируется(клиент: Client, учётка: str) -> None:
@@ -172,7 +176,7 @@ def test_повтор_refresh_отзывает_подключение(клиен
 
 def test_refresh_чужим_клиентом_отвергается(клиент: Client, учётка: str) -> None:
     пара = _обмен(_код(клиент, учётка), клиент)
-    другой = register_client("Другой", [ВОЗВРАТ])
+    другой = register_client("Другой", [ВОЗВРАТ], address=АДРЕС)
 
     with pytest.raises(OAuthGrantError):
         refresh_tokens(пара.refresh_token, client_id=другой.client_id)
@@ -231,3 +235,37 @@ def test_чужое_подключение_не_отзывается(клиен�
 def test_роль_приложения_не_удаляет_подключения(db_env: str, клиент: Client) -> None:
     with psycopg.connect(db_env) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
         conn.execute("delete from oauth_grants")
+
+
+def test_регистрации_считаются_по_адресу(клиент: Client) -> None:
+    register_client("Ещё", [ВОЗВРАТ], address="198.51.100.7")
+
+    assert recent_clients(timedelta(hours=1), address=АДРЕС) == 1
+    assert recent_clients(timedelta(hours=1), address="198.51.100.7") == 1
+    assert recent_clients(timedelta(hours=1)) == 2
+
+
+def test_чистка_убирает_только_отжившее(база: str, клиент: Client, учётка: str) -> None:
+    брошенный = register_client("Брошенный", [ВОЗВРАТ], address=АДРЕС)
+    пара = _обмен(_код(клиент, учётка), клиент)
+    with psycopg.connect(база) as conn:
+        conn.execute("update oauth_clients set created_at = now() - interval '2 days'")
+        conn.execute(
+            "update oauth_tokens set expires_at = now() - interval '2 days' where kind = 'access'"
+        )
+
+    убрано = purge_stale()
+
+    with psycopg.connect(база) as conn:
+        клиенты = {r[0] for r in conn.execute("select client_id from oauth_clients")}
+        токены = conn.execute("select kind from oauth_tokens").fetchall()
+    assert убрано == 2
+    assert клиенты == {клиент.client_id}
+    assert брошенный.client_id not in клиенты
+    assert токены == [("refresh",)]
+    assert refresh_tokens(пара.refresh_token, client_id=клиент.client_id) is not None
+
+
+def test_роль_приложения_не_удаляет_клиентов_напрямую(db_env: str, клиент: Client) -> None:
+    with psycopg.connect(db_env) as conn, pytest.raises(psycopg.errors.InsufficientPrivilege):
+        conn.execute("delete from oauth_clients")

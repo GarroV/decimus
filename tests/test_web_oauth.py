@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import hashlib
 from collections.abc import Iterator
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
@@ -154,6 +155,49 @@ def test_регистрация_чужого_адреса_отвергается
     assert ответ.status_code == 400
     assert ответ.get_json()["error"] == "invalid_redirect_uri"
     assert not память.clients
+
+
+def _регистрация_с(client: FlaskClient, адрес: str) -> Any:
+    return client.post(
+        oauth.REGISTER_PATH,
+        json={"client_name": "Claude", "redirect_uris": [ВОЗВРАТ]},
+        environ_base={"REMOTE_ADDR": адрес},
+    )
+
+
+def test_предел_регистраций_на_адрес(клиент: FlaskClient, память: ПамятьOAuth) -> None:
+    """Перебирающий с одного адреса упирается в свой предел, а не выбирает общий за всех."""
+    for _ in range(oauth.REGISTRATIONS_PER_ADDRESS):
+        assert _регистрация_с(клиент, "198.51.100.7").status_code == 201
+
+    лишняя = _регистрация_с(клиент, "198.51.100.7")
+    сосед = _регистрация_с(клиент, "198.51.100.8")
+
+    assert лишняя.status_code == 429
+    assert лишняя.headers["Retry-After"] == str(int(oauth.REGISTRATION_WINDOW.total_seconds()))
+    assert len(память.clients) == oauth.REGISTRATIONS_PER_ADDRESS + 1
+    assert сосед.status_code == 201
+
+
+def test_общий_предел_регистраций(клиент: FlaskClient, память: ПамятьOAuth) -> None:
+    сейчас = datetime.now(UTC)
+    for номер in range(oauth.REGISTRATIONS_PER_WINDOW):
+        память.registered[f"c{номер}"] = (f"адрес-{номер}", сейчас)
+
+    ответ = _регистрация_с(клиент, "198.51.100.9")
+
+    assert ответ.status_code == 429
+    assert oauth.REGISTRATIONS_PER_ADDRESS < oauth.REGISTRATIONS_PER_WINDOW
+
+
+def test_чистка_на_регистрации_и_на_выдаче(клиент: FlaskClient, память: ПамятьOAuth) -> None:
+    client_id = _клиент_claude(клиент)
+    после_регистрации = память.purges
+
+    _обмен(клиент, client_id, _код(клиент, client_id))
+
+    assert после_регистрации == 1
+    assert память.purges == 2
 
 
 # --- согласие ----------------------------------------------------------------

@@ -68,12 +68,16 @@ class ПамятьOAuth:
     #: Учётки: id → (логин, пространство, роль). Отключённые — в `disabled`.
     accounts: dict[str, tuple[str, str, str]] = field(default_factory=dict)
     disabled: set[str] = field(default_factory=set)
+    #: Откуда и когда заведён каждый клиент — для пределов регистрации.
+    registered: dict[str, tuple[str, datetime]] = field(default_factory=dict)
+    #: Сколько раз звали чистку.
+    purges: int = 0
     _номер: itertools.count[int] = field(default_factory=lambda: itertools.count(1))
 
     def _новый(self) -> str:
         return f"{next(self._номер):08d}-0000-4000-8000-000000000000"
 
-    def register_client(self, name: object, redirect_uris: list[str]) -> Client:
+    def register_client(self, name: object, redirect_uris: list[str], *, address: str) -> Client:
         if not redirect_uris or not all(map(oauth_store.redirect_uri_allowed, redirect_uris)):
             raise OAuthGrantError("invalid_redirect_uri", "двойник: адрес не из разрешённых")
         клиент = Client(
@@ -83,10 +87,20 @@ class ПамятьOAuth:
             redirect_uris=tuple(redirect_uris),
         )
         self.clients[клиент.client_id] = клиент
+        self.registered[клиент.client_id] = (address, datetime.now(UTC))
         return клиент
 
-    def recent_clients(self, window: timedelta) -> int:
-        return len(self.clients)
+    def recent_clients(self, window: timedelta, *, address: str | None = None) -> int:
+        с = datetime.now(UTC) - window
+        return sum(
+            1
+            for откуда, когда in self.registered.values()
+            if когда > с and (address is None or откуда == address)
+        )
+
+    def purge_stale(self) -> int:
+        self.purges += 1
+        return 0
 
     def find_client(self, client_id: str) -> Client | None:
         return self.clients.get(client_id)
@@ -207,6 +221,7 @@ class ПамятьOAuth:
 ДВЕРИ = (
     "register_client",
     "recent_clients",
+    "purge_stale",
     "find_client",
     "issue_code",
     "exchange_code",

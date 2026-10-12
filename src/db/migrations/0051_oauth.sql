@@ -30,8 +30,12 @@ create table oauth_clients (
     -- Разрешённые адреса возврата. Какие вообще допустимы, решает продукт
     -- (`oauth_store.redirect_uri_allowed`), схема держит только «не пусто».
     redirect_uris text[] not null check (cardinality(redirect_uris) between 1 and 10),
+    -- Адрес, с которого клиента завели: предел регистраций считается по нему
+    -- (`src/web/oauth.py`), иначе один перебирающий выбрал бы общий предел за всех.
+    registered_from text not null check (char_length(registered_from) between 1 and 100),
     created_at timestamptz not null default now()
 );
+create index oauth_clients_from_idx on oauth_clients (registered_from, created_at);
 comment on table oauth_clients is
     'OAuth-клиенты, заведённые динамической регистрацией (D417). Секретов нет: '
     'клиент публичный, обмен кода держит PKCE.';
@@ -88,12 +92,51 @@ create table oauth_tokens (
     used_at timestamptz
 );
 create index oauth_tokens_grant_idx on oauth_tokens (grant_id);
+create index oauth_tokens_expires_idx on oauth_tokens (expires_at);
+create index oauth_codes_expires_idx on oauth_codes (expires_at);
 comment on table oauth_tokens is
     'Access- и refresh-токены OAuth (D417): только отпечаток SHA-256. Живы, пока '
     'не истекли и живо подключение (oauth_grants.revoked_at is null).';
 
+-- Чистка (`oauth_store.purge_stale`). Регистрация открыта без входа, и клиенты,
+-- заведённые перебором, коды и истёкшие токены копились бы бесконечно. Права
+-- DELETE у приложения нет: удаляет только эта функция и только отжившее —
+-- коды и токены, истёкшие больше суток назад, и клиентов старше суток без
+-- единого подключения и без кода. Сутки запаса держат обнаружение повтора:
+-- обменянный refresh удаляется не раньше, чем истёк бы сам.
+create function oauth_purge()
+    returns integer
+    language plpgsql
+    security definer
+    set search_path = pg_catalog, public, pg_temp
+as $$
+declare
+    коды integer;
+    токены integer;
+    клиенты integer;
+begin
+    delete from public.oauth_codes where expires_at < now() - interval '1 day';
+    get diagnostics коды = row_count;
+    delete from public.oauth_tokens where expires_at < now() - interval '1 day';
+    get diagnostics токены = row_count;
+    delete from public.oauth_clients c
+     where c.created_at < now() - interval '1 day'
+       and not exists (select 1 from public.oauth_grants g where g.client_id = c.id)
+       and not exists (select 1 from public.oauth_codes k where k.client_id = c.id);
+    get diagnostics клиенты = row_count;
+    return коды + токены + клиенты;
+end;
+$$;
+
+comment on function oauth_purge() is
+    'Чистка OAuth (D417): коды и токены, истёкшие больше суток назад; клиенты старше суток '
+    'без подключений и кодов. Права DELETE у приложения нет — только эта функция.';
+
+revoke all on function oauth_purge() from public;
+grant execute on function oauth_purge() to dodo_audit_app;
+
 -- Роль приложения: под ней ходят и веб (выдача), и сервер MCP (сверка и отметка
--- последнего вызова). Удаления нет вовсе, правка — только пометок.
+-- последнего вызова). Удаления напрямую нет, правка — только пометок.
 grant select, insert on oauth_clients to dodo_audit_app;
 grant usage on sequence oauth_clients_id_seq to dodo_audit_app;
 grant select, insert on oauth_grants to dodo_audit_app;
