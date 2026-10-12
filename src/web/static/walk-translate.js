@@ -39,7 +39,7 @@
     var el = W.el;
     var bar = el("div", "walk-translate");
     var row = el("div", "walk-translate__row");
-    var go = W.button("walk-link walk-translate__go", W.tx("walk.translate.btn", { lang: langName(lang) }));
+    var go = W.hinted(W.button("walk-link walk-translate__go", W.tx("walk.translate.btn", { lang: langName(lang) })), "translate");
     var undo = W.button("walk-link walk-link--quiet walk-translate__undo", W.tx("walk.translate.undo"));
     var note = el("p", "walk-form__hint walk-translate__note", W.tx("walk.translate.hint"));
     var error = el("p", "walk-form__error walk-translate__error");

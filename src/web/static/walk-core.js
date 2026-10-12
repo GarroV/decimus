@@ -53,6 +53,12 @@
     return node;
   };
 
+  /** Пометить элемент подсказкой: долгое нажатие покажет `walk.hint.<ключ>` (`walk-hints.js`). */
+  W.hinted = function (node, key) {
+    node.setAttribute("data-hint", key);
+    return node;
+  };
+
   W.button = function (cls, text, onClick) {
     var b = W.el("button", cls, text);
     b.type = "button";

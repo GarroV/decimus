@@ -1,0 +1,87 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   DECIMUS · мини-апп: подсказки по долгому нажатию и обучение (D434).
+   Подключается после walk-menu.css: лист — те же `.walk-menu*` (тень, панель,
+   анимация), здесь только то, чего в меню нет. Своих цветов нет — только var(--…).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Долгое нажатие не должно выделять текст и звать системное меню. */
+[data-hint] {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.walk-hintsheet__text { display: grid; gap: 8px; }
+
+.walk-hintsheet__text p {
+  margin: 0;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 21px;
+  text-wrap: pretty;
+}
+
+.walk-hintsheet__actions { display: grid; gap: 4px; margin-top: 4px; }
+.walk-hintsheet__actions .walk-link { min-height: 44px; }
+
+/* ── обучение: затемнение с окном вокруг элемента ─────────────────────── */
+
+.walk-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+}
+
+/* Окно: тень вокруг него и затемняет всё остальное; кольцо — первой тенью. */
+.walk-tour__spot {
+  position: absolute;
+  box-sizing: border-box;
+  box-shadow:
+    0 0 0 3px var(--accent-line),
+    0 0 0 8px var(--accent-soft),
+    0 0 0 100vmax color-mix(in srgb, var(--ink) 48%, transparent);
+  pointer-events: none;
+  transition: left .28s ease, top .28s ease, width .28s ease, height .28s ease, border-radius .28s ease;
+}
+
+.walk-tour__spot.is-none {
+  box-shadow: 0 0 0 100vmax color-mix(in srgb, var(--ink) 48%, transparent);
+}
+
+.walk-tour__dock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Цель внизу экрана — лист сверху, той же формы, зеркально. */
+.walk-tour__dock.is-top { top: 0; bottom: auto; }
+
+.walk-tour__dock.is-top .walk-menu__panel {
+  padding: calc(16px + env(safe-area-inset-top)) 16px 12px;
+  border-radius: 0 0 16px 16px;
+  animation-name: walk-hints-in-top;
+}
+
+@keyframes walk-hints-in-top {
+  from { opacity: 0; transform: translateY(-16px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.walk-tour__row { display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+
+.walk-tour__count { flex: 1; color: var(--ink-3); font-size: 13px; }
+
+.walk-tour__skip { min-height: 44px; }
+
+.walk-tour__next { width: auto; min-width: 112px; padding: 0 20px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .walk-tour__spot { transition: none; }
+}
+
+/* ── настройки: «Пройти обучение заново» — тихая строка ──────────────── */
+
+.walk-app__row--quiet .walk-app__row-label { color: var(--accent); }
