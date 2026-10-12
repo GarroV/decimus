@@ -61,6 +61,7 @@ from src.domain.models import Inspection, Suggestion
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.recognize.models import UNKNOWN_ZONE
 
+from . import walk_rate
 from .texts_walk import WALK_TEXTS
 from .walk_auth import (
     FINDING_ENDPOINT,
@@ -371,7 +372,7 @@ def install(
     @app.post(PHOTO_PATH, endpoint=PHOTO_ENDPOINT)
     def walk_photo() -> tuple[Response, int]:
         request.max_content_length = MAX_UPLOAD_BYTES
-        who = identify(conf, ui_lang, header_only=True)
+        who = identify(conf, ui_lang, header_only=True, kind=walk_rate.PHOTO)
         if not isinstance(who, int):
             return who
         try:
