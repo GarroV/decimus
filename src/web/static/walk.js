@@ -613,7 +613,7 @@
       act = function () { go(next.code, 1); };
     } else {
       // Все зоны осмотрены: главное действие — завершить (D422).
-      label = tx("walk.finish.title");
+      label = tx("walk.finish.dock");
       act = W.finish.ask;
     }
     row.appendChild(W.button("walk-dock__next" + (finish ? " is-finish" : ""), label, act));
