@@ -34,6 +34,7 @@ from src.db.oauth_store import (  # noqa: E402
 )
 from src.db.web_access import (  # noqa: E402
     ROLE_ADMIN,
+    ROLE_GUEST,
     authenticate,
     change_own_password,
     change_password,
@@ -90,7 +91,7 @@ def test_полный_путь_код_токен_сверка(клиент: Clie
 
     кто = resolve_access_token(пара.access_token, resource=РЕСУРС)
     assert кто is not None
-    assert (кто.login, кто.tenant, кто.role) == ("anna", ТЕНАНТ, "auditor")
+    assert (кто.login, кто.tenant, кто.role) == ("anna", ТЕНАНТ, ROLE_GUEST)
     assert resolve_access_token(пара.refresh_token, resource=РЕСУРС) is None, (
         "refresh не годится как access"
     )
