@@ -349,11 +349,6 @@
   cursor: pointer;
 }
 
-.walk-pickrow {
-  display: flex;
-  gap: 8px;
-}
-
 .walk-pick {
   position: relative;
   display: flex;
