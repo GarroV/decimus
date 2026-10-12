@@ -237,3 +237,70 @@ def test_негодный_срок_токена_это_отказ_а_не_умо
 
     with pytest.raises(AccessError, match=TOKEN_TTL_VAR):
         token_ttl_days({TOKEN_TTL_VAR: значение})
+
+
+# --- жизнь токена следует за учёткой на самой двери (аудит 12.10, F-023) -------
+#
+# Погасить токен при отключении и смене роли умеют две вещи: триггер базы
+# (`0059`) и сверка на каждый запрос (`mcp_access._LIVE_ISSUE_SQL` — роль и
+# отключение читаются из `web_users`, а не из строки токена). Здесь триггер
+# на время теста выключен: проверяется, что сверка держит одна, без него.
+
+_ТРИГГЕР = "web_users_access_change_revokes_mcp_tokens"
+
+
+@pytest.fixture
+def без_триггера(pg_dsn: str):  # type: ignore[no-untyped-def]
+    import psycopg
+
+    with psycopg.connect(pg_dsn, autocommit=True) as conn:
+        conn.execute(f"alter table web_users disable trigger {_ТРИГГЕР}")
+    try:
+        yield
+    finally:
+        with psycopg.connect(pg_dsn, autocommit=True) as conn:
+            conn.execute(f"alter table web_users enable trigger {_ТРИГГЕР}")
+
+
+def _учётка_человека(pg_dsn: str) -> str:
+    import psycopg
+
+    with psycopg.connect(pg_dsn) as conn:
+        row = conn.execute(
+            "select u.login from bot_bindings b join web_users u on u.id = b.user_id"
+            " where b.telegram_id = %s and b.unbound_at is null",
+            (ЧЕЛОВЕК,),
+        ).fetchone()
+    assert row is not None
+    return str(row[0])
+
+
+@requires_db
+def test_отключение_учётки_закрывает_дверь_со_следующего_запроса(
+    db_env: str, pg_dsn: str, без_триггера: None
+) -> None:
+    from src.db.web_access import disable_account
+
+    личный = _выпустить()
+    assert resolve_access(_настройки(), f"Bearer {личный}").role == "auditor"
+
+    assert disable_account(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА) is True
+
+    with pytest.raises(AuthError):
+        resolve_access(_настройки(), f"Bearer {личный}")
+
+
+@requires_db
+def test_смена_роли_закрывает_дверь_со_следующего_запроса(
+    db_env: str, pg_dsn: str, без_триггера: None
+) -> None:
+    """Роль, записанная при выпуске, правом не служит: смена роли — токен не годен."""
+    from src.db.web_access import set_role
+
+    личный = _выпустить()
+    assert resolve_access(_настройки(), f"Bearer {личный}").role == "auditor"
+
+    assert set_role(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА, role="admin") is True
+
+    with pytest.raises(AuthError):
+        resolve_access(_настройки(), f"Bearer {личный}")
