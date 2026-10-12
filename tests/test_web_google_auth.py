@@ -131,3 +131,13 @@ def test_полные_реквизиты_читаются() -> None:
 
     assert настройки is not None
     assert настройки.client_id == "cid"
+
+
+def test_домен_workspace_читается_из_токена() -> None:
+    """`hd` — домен Google Workspace (F-028): по нему решается вход в пространство УК."""
+    кто = identity_from_id_token(токен(hd="DodoBrands.io"), client_id=НАШ_КЛИЕНТ)
+    assert кто.hosted_domain == "dodobrands.io"
+
+
+def test_личный_аккаунт_домена_не_несёт() -> None:
+    assert identity_from_id_token(токен(), client_id=НАШ_КЛИЕНТ).hosted_domain == ""

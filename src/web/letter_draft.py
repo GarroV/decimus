@@ -25,7 +25,7 @@ import logging
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from flask import Flask, redirect, render_template, request, url_for
+from flask import Flask, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.exceptions import HTTPException
 from werkzeug.wrappers import Response
@@ -39,10 +39,12 @@ from .google_auth import GoogleSettings, load_google_settings, new_state
 from .google_mail import (
     GOOGLE_MAIL_REDIRECT_URI_VAR,
     GoogleMailError,
+    MailAccountMismatchError,
     consent_url,
     create_draft,
     draft_subject,
-    exchange_code_for_token,
+    exchange_code_for_grant,
+    verified_token,
 )
 from .origin import over_https, refuse_foreign_origin
 from .sections import section
@@ -78,10 +80,27 @@ class MailReturn:
     finish: Callable[[str, str, Callable[[], str]], Response]
 
 
+#: Исход похода, когда доступ к почте выдал не тот аккаунт Google (D176).
+OUTCOME_WRONG_ACCOUNT = "wrong_account"
+
+
 def _почта_вошедшего(вошедший: object | None) -> str:
-    """Логин как почта — или пусто. Выдумывать адрес нельзя ничем."""
-    логин = str(getattr(вошедший, "login", "") or "")
-    return логин if "@" in логин else ""
+    """Почта входа через Google, привязанная к учётке, — или пусто.
+
+    Именно привязанная (`web_users.email`), а не логин: логин бывает похож на
+    почту и при этом не быть ею, а сверка на возврате идёт с привязанной.
+    """
+    return str(getattr(вошедший, "email", "") or "").strip().lower()
+
+
+def _токен_вошедшего(реквизиты: GoogleSettings, код: str) -> str:
+    """Обменять код и отдать токен, только если доступ выдал аккаунт вошедшего.
+
+    Одна дверь на оба вида письма: по проверке и предписание. Чужой аккаунт —
+    `MailAccountMismatchError` до создания черновика.
+    """
+    доступ = exchange_code_for_grant(реквизиты, code=код)
+    return verified_token(доступ, expected_email=_почта_вошедшего(auth.current_account()))
 
 
 def install(app: Flask, conf: Settings) -> None:
@@ -126,11 +145,9 @@ def install(app: Flask, conf: Settings) -> None:
             consent_url(
                 реквизиты,
                 state=метка,
-                # Подсказка, в какой аккаунт вести: своей почты у учётки
-                # админки пока нет (D173, #334 — человек ещё не одна
-                # сущность), поэтому годится логин, если он и есть почта.
+                # Подсказка, в какой аккаунт вести, — привязанная почта входа.
                 # Пустая подсказка — не поломка: Google просто спросит, каким
-                # аккаунтом входить.
+                # аккаунтом входить, а чужой аккаунт отсечёт сверка на возврате.
                 login_hint=_почта_вошедшего(auth.current_account()),
             )
         )
@@ -206,20 +223,8 @@ def install(app: Flask, conf: Settings) -> None:
 
         return уйти_за_согласием(KIND_LETTER, inspection_id, письмо_на, реквизиты)
 
-    def _вернуть_другое(вид: str, ident: str, lang: str, метка: str) -> Response:
-        """Возврат похода не за письмом по проверке: та же сверка, исход — у вида.
-
-        Метка одноразовая на ЛЮБОМ исходе — отказ, несовпадение, сбой, отказ в
-        доступе (404) или успех: кука похода снимается всегда.
-        """
-        try:
-            ответ = _исход_другого(вид, ident, lang, метка)
-        except HTTPException as exc:
-            ответ = exc.get_response()
-        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
-        return ответ
-
     def _исход_другого(вид: str, ident: str, lang: str, метка: str) -> Response:
+        """Возврат похода не за письмом по проверке: та же сверка, исход — у вида."""
         возвраты: dict[str, MailReturn] = app.extensions.get(MAIL_RETURNS_KEY, {})
         возврат = возвраты.get(вид)
         if возврат is None:
@@ -233,11 +238,28 @@ def install(app: Flask, conf: Settings) -> None:
         реквизиты = почтовые_реквизиты()
         if not код or реквизиты is None:
             return возврат.back(ident, lang, "failed")
-        return возврат.finish(ident, lang, lambda: exchange_code_for_token(реквизиты, code=код))
+        return возврат.finish(ident, lang, lambda: _токен_вошедшего(реквизиты, код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
     def google_mail_callback() -> Response | tuple[str, int]:
-        """Возврат от Google: сверить метку, обменять код, положить черновик."""
+        """Возврат от Google: сверить метку, обменять код, положить черновик.
+
+        **Метка одноразовая на ЛЮБОМ исходе** — успех, отказ в окне согласия,
+        несовпадение, сбой, отказ в доступе (404/403), чужой аккаунт: кука похода
+        снимается здесь, в одном месте, а не на каждом выходе. До 12.10 письмо по
+        проверке снимало её только на успехе, и после отказа та же метка
+        принимала второй возврат следующие десять минут (F-019).
+        """
+        try:
+            ответ = _возврат_похода()
+        except HTTPException as exc:
+            ответ = exc.get_response()
+        if isinstance(ответ, tuple):
+            ответ = make_response(*ответ)
+        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
+        return ответ
+
+    def _возврат_похода() -> Response | tuple[str, int]:
         подписанная = request.cookies.get(MAIL_STATE_COOKIE)
         if not подписанная:
             return redirect(url_for("registry"), code=303)
@@ -252,7 +274,7 @@ def install(app: Flask, conf: Settings) -> None:
             return redirect(url_for("registry"), code=303)
         вид = str(поход.get("kind") or KIND_LETTER)
         if вид != KIND_LETTER:
-            return _вернуть_другое(вид, inspection_id, письмо_на, str(поход.get("state") or ""))
+            return _исход_другого(вид, inspection_id, письмо_на, str(поход.get("state") or ""))
 
         пришедшая = request.args.get("state") or ""
         # В БАЙТАХ, а не в строках: `compare_digest` на не-ASCII падает
@@ -293,7 +315,7 @@ def install(app: Flask, conf: Settings) -> None:
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
 
         try:
-            токен = exchange_code_for_token(реквизиты, code=код)
+            токен = _токен_вошедшего(реквизиты, код)
             create_draft(
                 токен,
                 to=detail.inspection.contact,
@@ -304,14 +326,13 @@ def install(app: Flask, conf: Settings) -> None:
                 ),
                 body=записанное.body,
             )
+        except MailAccountMismatchError as сбой:
+            logger.warning("черновик письма не создан: %s", сбой)
+            return к_письму(inspection_id, lang=письмо_на, исход=OUTCOME_WRONG_ACCOUNT)
         except GoogleMailError as сбой:
             # Без записи кнопка «не работала» молча: человек видел «не вышло»,
             # а в журнале не было ничего (11.10.2026).
             logger.warning("черновик письма в Gmail не создан: %s", сбой)
             return к_письму(inspection_id, lang=письмо_на, исход="failed")
 
-        ответ = к_письму(inspection_id, lang=письмо_на, исход="ok")
-        # Метка одноразовая: оставленная в браузере, она отвечала бы «да» на
-        # чужой возврат следующие десять минут.
-        ответ.delete_cookie(MAIL_STATE_COOKIE, path="/")
-        return ответ
+        return к_письму(inspection_id, lang=письмо_на, исход="ok")

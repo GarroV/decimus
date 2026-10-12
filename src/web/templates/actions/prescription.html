@@ -20,7 +20,7 @@
   </div>
 
   {% if gmail %}
-    <div class="note {{ 'note--ok' if gmail == 'ok' else ('note--warn' if gmail in ('denied', 'unavailable') else 'note--error') }} mt-gap"><div><div class="note__title">{{ t('rx.gmail.' ~ gmail) }}</div></div></div>
+    <div class="note {{ 'note--ok' if gmail == 'ok' else ('note--warn' if gmail in ('denied', 'unavailable', 'wrong_account') else 'note--error') }} mt-gap"><div><div class="note__title">{{ t('rx.gmail.' ~ gmail) }}</div></div></div>
   {% endif %}
   {% if notice %}<div class="note note--ok mt-gap"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error mt-gap"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}

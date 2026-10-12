@@ -31,11 +31,15 @@ from src.db import prescriptions as rx
 from src.db import prescriptions_write as rxw
 from src.db.accept import accept_inspection
 from src.db.reach import reach_of
+from src.web.google_mail import MailGrant
 
 pytestmark = requires_db
 
 ORIGIN = {"Origin": "http://localhost"}
 СРОК = (datetime.now(UTC).date() + timedelta(days=10)).isoformat()
+#: Почта входа через Google у вошедшего: черновик ложится только в неё (D176).
+ПОЧТА = "lead@example.com"
+ГРАНТ = MailGrant("токен", ПОЧТА)
 
 
 class Хранилище:
@@ -70,7 +74,7 @@ def почта(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
     }.items():
         monkeypatch.setenv(имя, значение)
     черновики: list[dict[str, Any]] = []
-    monkeypatch.setattr(letter_draft, "exchange_code_for_token", lambda _s, *, code: "токен")
+    monkeypatch.setattr(letter_draft, "exchange_code_for_grant", lambda _s, *, code: ГРАНТ)
 
     def положить(token: str, *, to: str, subject: str, body: str, **_: Any) -> str:
         черновики.append({"token": token, "to": to, "subject": subject, "body": body})
@@ -95,10 +99,14 @@ def как(pg_dsn: str, db_env: str, domain_env: Path, monkeypatch: pytest.Monke
     monkeypatch.setattr(rx, "load_storage_settings", lambda: None)
 
     def войти_как(tenant: str) -> FlaskClient:
+        # Входит оснастка паролем, а учётке с почтой Google пароль закрыт:
+        # почта появляется у сессии после входа — как у вошедшего через Google.
         подменить_двери(monkeypatch, tenant=tenant, role="admin")
         monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         client = собрать(tenant=tenant).test_client()
         assert войти(client).status_code == 302
+        подменить_двери(monkeypatch, tenant=tenant, role="admin", email=ПОЧТА)
+        monkeypatch.setattr("src.web.auth.reach_of", reach_of)
         return client
 
     return войти_как
