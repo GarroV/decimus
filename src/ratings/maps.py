@@ -93,6 +93,22 @@ def with_delta(
     return tuple(result)
 
 
+def compare(
+    groups: Sequence[tuple[str, Sequence[str]]], *, until: date, before: date | None
+) -> tuple[CountryMaps, ...]:
+    """Оценки карт по группам стран на конец периода и изменение к концу прошлого.
+
+    Один путь для страницы «Рейтинги» и для «Главной»: числа не расходятся. База
+    не ответила — `RatingsError` наверх, решает экран.
+    """
+    countries = tuple(c for _, members in groups for c in members)
+    now = summarize_groups(maps_store.latest(countries, until=until), groups)
+    if before is None:
+        return now
+    was = summarize_groups(maps_store.latest(countries, until=before), groups)
+    return with_delta(now, was)
+
+
 def _key_fetch() -> pointer.Fetch:
     key = os.environ.get(KEY_ENV, "").strip()
     if not key:
