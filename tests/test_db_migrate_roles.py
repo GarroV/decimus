@@ -222,6 +222,8 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     "finish_modes": {"SELECT", "INSERT"},
     # Язык чек-листа, выбранный на старте (D451, `0057`): так же — удалять нельзя.
     "checklist_langs": {"SELECT", "INSERT"},
+    # Перевод комментариев (D443, `0058`): так же — удалять нельзя.
+    "translate_modes": {"SELECT", "INSERT"},
     # Экшн-планы (`0036`): партнёр ролью приложения только кладёт версию файла
     # (и переводит запрос на приёмку — колонка ниже). Ни запроса, ни вердикта
     # она не заводит: INSERT на них появится — и бот положит «принятый» план
@@ -267,6 +269,7 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "bot_ui_langs": {"UPDATE": {"ui_lang", "chosen_at"}},
     "finish_modes": {"UPDATE": {"mode", "chosen_at"}},
     "checklist_langs": {"UPDATE": {"lang", "chosen_at"}},
+    "translate_modes": {"UPDATE": {"mode", "chosen_at"}},
     "mcp_admins": {"UPDATE": {"added_by", "added_at", "revoked_at", "revoked_by"}},
     # Выход помечает сессию закрытой — и больше ничего (`0014`). Станет этот
     # грант табличным, и роль сможет продлить чужую сессию правкой

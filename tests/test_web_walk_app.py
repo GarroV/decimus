@@ -34,6 +34,7 @@ class База:
         self.отозвано: list[int] = []
         self.язык: dict[int, str] = {}
         self.режим: dict[int, str] = {}
+        self.перевод: dict[int, str] = {}
 
     def is_admin(self, who: int) -> bool:
         return who in self.круг
@@ -82,6 +83,14 @@ def база(domain_env: Path, monkeypatch: pytest.MonkeyPatch) -> База:
         walk_settings.finish_modes,
         "choose_finish_mode",
         lambda who, mode: б.режим.__setitem__(who, mode),
+    )
+    monkeypatch.setattr(
+        walk_settings.translate_modes, "chosen_translate_mode", lambda who: б.перевод.get(who)
+    )
+    monkeypatch.setattr(
+        walk_settings.translate_modes,
+        "choose_translate_mode",
+        lambda who, mode: б.перевод.__setitem__(who, mode),
     )
     monkeypatch.setattr(walk_access.bot_links, "standing", lambda _: NEVER_BOUND)
     monkeypatch.setattr(walk.queries, "previous_findings", lambda **_: None)
