@@ -552,7 +552,7 @@ def html_to_pdf(html, out):
         try:
             from weasyprint import HTML
         except Exception as e:
-            sys.exit(f"Рендерер PDF недоступен: {e}. Нужен WeasyPrint 69.x и системные "
+            sys.exit(f"Рендерер PDF недоступен: {e}. Нужен WeasyPrint 70.x и системные "
                      f"библиотеки Pango. HTML сохранён: {hf.name}")
         try:
             HTML(filename=hf.name).write_pdf(tmp)
