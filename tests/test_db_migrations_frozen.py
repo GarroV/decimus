@@ -231,6 +231,11 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0055_maps_ratings_index.sql": (
         "sql1:501361f432c626368e2244b6b4f02715281a15ad7fb644651144bba27b9c5dbe"
     ),
+    # Личный токен MCP привязан к учётке сайта, с ролью и сроком (аудит 12.10).
+    # Заведена вместе с файлом, нигде не применена.
+    "0056_mcp_token_identity.sql": (
+        "sql1:030287841d0898c67e9eb81d92a5d5afbe2cb0fa5a4667ef5282ff6c05c5b72f"
+    ),
 }
 
 

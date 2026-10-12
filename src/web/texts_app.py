@@ -109,6 +109,20 @@ APP_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Прежний токен отозван — старая настройка больше не работает.",
         "en": "The previous token is revoked — the old setup no longer works.",
     },
+    "walk.app.claude.expires": {
+        "ru": "Токен действует до {date}. Потом получите новую команду здесь же.",
+        "en": "The token is valid until {date}. After that, get a new command here.",
+    },
+    "walk.app.err.unbound_self": {
+        "ru": (
+            "Доступ к Claude выдаётся только на учётку decimus: привяжите бота к своей "
+            "учётке на странице «Пользователи» в админке."
+        ),
+        "en": (
+            "Claude access is issued only to a decimus account: link the bot to your "
+            "account on the Users page of the admin."
+        ),
+    },
     "walk.app.claude.restart": {
         "ru": "После команды полностью перезапустите Claude (Cmd+Q).",
         "en": "After the command, fully restart Claude (Cmd+Q).",
@@ -133,8 +147,35 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     # ── отказы ───────────────────────────────────────────────────────────
     "walk.app.err.id": {"ru": "Нужен Telegram ID — число.", "en": "A Telegram ID is a number."},
     "walk.app.err.not_allowed": {
-        "ru": "Этого человека бот не пускает — сначала дайте ему доступ к боту.",
-        "en": "The bot does not let this person in — give them bot access first.",
+        "ru": (
+            "У этого человека нет бота, привязанного к учётке, — доступ к Claude "
+            "выдаётся только на учётку. Пусть привяжет бота на странице «Пользователи»."
+        ),
+        "en": (
+            "This person has no bot linked to an account — Claude access is granted "
+            "only to an account. Ask them to link the bot on the Users page."
+        ),
+    },
+    # Круг делится по пространствам (аудит 12.10, F-036): чужих не видно и не трогаем.
+    "walk.app.err.scope": {
+        "ru": "Этот человек не из вашего пространства.",
+        "en": "This person is not in your space.",
+    },
+    # Выпуск токена и правка круга — только по свежему открытию мини-аппа (F-032).
+    "walk.app.err.stale": {
+        "ru": "Мини-апп открыт давно. Закройте его и откройте снова, затем повторите.",
+        "en": "The mini-app was opened a while ago. Close it, open it again and retry.",
+    },
+    # Учётка жива, но её роли проверки закрыты (контроль, D420, F-024).
+    "walk.err.role": {
+        "ru": (
+            "Ваша роль в decimus не проводит проверок, поэтому мини-апп обхода вам "
+            "закрыт. Рейтинги и подключение Claude — в админке на сайте."
+        ),
+        "en": (
+            "Your decimus role does not run inspections, so the walk mini-app is closed "
+            "to you. Ratings and connecting Claude are in the web admin."
+        ),
     },
     "walk.app.err.founder": {
         "ru": "Основателя круга отозвать нельзя.",

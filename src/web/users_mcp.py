@@ -73,7 +73,7 @@ def card_status(*, круг_видит: bool, own: Any, bindings: dict[str, Any]
     if own is None and not (круг_видит and bindings):
         return Status(known=True, actor_in_circle=False, founder=основатель)
     try:
-        строки = {r.telegram_id: r for r in mcp_access.list_admins()}
+        строки = {r.telegram_id: r for r in mcp_access.list_admins(within=None)}
     except DbError as exc:
         note_target_mismatch(exc)
         return Status(known=False, actor_in_circle=False, founder=основатель)

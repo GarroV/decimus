@@ -440,8 +440,8 @@ def circle_at_startup(settings: BotSettings) -> tuple[int, ...]:
     try:
         from src.db.mcp_access import add_admin, list_admins
 
-        add_admin(settings.mcp_owner_id, by=None)
-        return tuple(row.telegram_id for row in list_admins() if row.is_live)
+        add_admin(settings.mcp_owner_id, by=None, within=None)
+        return tuple(row.telegram_id for row in list_admins(within=None) if row.is_live)
     except Exception:
         logger.exception("круг доступа к MCP не прочитался — меню круга не объявлено")
         return ()

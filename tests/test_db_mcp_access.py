@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import завести_пространства
+from db_harness import завести_пространства, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
@@ -40,21 +40,37 @@ from src.db.mcp_access import (  # noqa: E402
 pytestmark = requires_db
 
 
-@pytest.fixture(autouse=True)
-def _пространства(request: pytest.FixtureRequest) -> None:
-    """Пространство, на которое выпускаются токены тестов набора.
-
-    Двери базы пространств сами не заводят (#481). Фикстура с условием: тест без
-    базы её не получает.
-    """
-    if "db_env" in request.fixturenames:
-        завести_пространства(request.getfixturevalue("pg_dsn"), "belgrade")
-
-
 #: Роли в круге для тестов — не настоящие telegram_id, просто различимые числа.
 ОСНОВАТЕЛЬ = 100
 ПРИВЕДЁННЫЙ = 200
 ПОСТОРОННИЙ = 999
+
+
+@pytest.fixture(autouse=True)
+def _пространства(request: pytest.FixtureRequest) -> None:
+    """Пространство и учётки, на которые выпускаются токены тестов набора.
+
+    Двери базы пространств сами не заводят (#481); токен выпускается только на
+    учётку сайта с привязанным ботом (аудит 12.10). Фикстура с условием: тест
+    без базы её не получает.
+    """
+    if "db_env" in request.fixturenames:
+        request.getfixturevalue("db_env")  # учётку заводит дверь базы: ей нужна база
+        pg_dsn = request.getfixturevalue("pg_dsn")
+        monkeypatch = request.getfixturevalue("monkeypatch")
+        завести_пространства(pg_dsn, "belgrade")
+        for кто in (ОСНОВАТЕЛЬ, ПРИВЕДЁННЫЙ):
+            привязать_бота(pg_dsn, monkeypatch, кто, tenant="belgrade", role="admin")
+
+
+#: Вставка живого токена в обход двери — с учёткой, ролью и сроком, как требует
+#: `0056`; учётка — та, к которой привязан Telegram ID (параметр третий).
+_ВСТАВКА_С_УЧЁТКОЙ = (
+    "insert into mcp_tokens (telegram_id, tenant_code, fingerprint, user_id, role, expires_at) "
+    "select %s, u.tenant_code, %s, u.id, u.role, now() + interval '1 day' "
+    "from bot_bindings b join web_users u on u.id = b.user_id "
+    "where b.telegram_id = %s and b.unbound_at is null"
+)
 
 
 def _строка(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> tuple[Any, ...] | None:
@@ -77,7 +93,7 @@ def _выполнить(dsn: str, sql: str, params: tuple[Any, ...] = ()) -> int
 
 def test_приведённый_в_круг_опознаётся_а_посторонний_нет(db_env: str) -> None:
     """`is_admin` — единственный вопрос, на который отвечает круг (D099)."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
 
     assert is_admin(ОСНОВАТЕЛЬ) is True
     assert is_admin(ПОСТОРОННИЙ) is False
@@ -87,25 +103,25 @@ def test_повторный_привод_живого_участника_нич�
     db_env: str,
 ) -> None:
     """Повторный привод не ошибка, но и не повод переписать, кто и когда привёл."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    первый_привод = add_admin(ПРИВЕДЁННЫЙ, by=ОСНОВАТЕЛЬ)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    первый_привод = add_admin(ПРИВЕДЁННЫЙ, by=ОСНОВАТЕЛЬ, within=None)
     assert первый_привод is True
-    до = {строка.telegram_id: строка for строка in list_admins()}[ПРИВЕДЁННЫЙ]
+    до = {строка.telegram_id: строка for строка in list_admins(within=None)}[ПРИВЕДЁННЫЙ]
 
-    повторный_привод = add_admin(ПРИВЕДЁННЫЙ, by=ПОСТОРОННИЙ)
+    повторный_привод = add_admin(ПРИВЕДЁННЫЙ, by=ПОСТОРОННИЙ, within=None)
 
     assert повторный_привод is False, "повторный привод живого участника — не изменение"
-    после = {строка.telegram_id: строка for строка in list_admins()}[ПРИВЕДЁННЫЙ]
+    после = {строка.telegram_id: строка for строка in list_admins(within=None)}[ПРИВЕДЁННЫЙ]
     assert после.added_by == до.added_by == ОСНОВАТЕЛЬ, "след о первом приводе переписался"
     assert после.added_at == до.added_at, "время первого привода переписалось"
 
 
 def test_у_основателя_added_by_none_а_у_приведённого_id_приводившего(db_env: str) -> None:
     """`added_by` — это ИМЕННО след привода, а не всегда заполненное поле."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    add_admin(ПРИВЕДЁННЫЙ, by=ОСНОВАТЕЛЬ)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    add_admin(ПРИВЕДЁННЫЙ, by=ОСНОВАТЕЛЬ, within=None)
 
-    строки = {строка.telegram_id: строка for строка in list_admins()}
+    строки = {строка.telegram_id: строка for строка in list_admins(within=None)}
 
     assert строки[ОСНОВАТЕЛЬ].added_by is None
     assert строки[ПРИВЕДЁННЫЙ].added_by == ОСНОВАТЕЛЬ
@@ -116,9 +132,9 @@ def test_у_основателя_added_by_none_а_у_приведённого_id
 
 def test_выпущенный_токен_сверяется_и_отдаёт_того_человека_и_арендатора(db_env: str) -> None:
     """`resolve_token` — то же самое, что спрашивает сервер MCP на каждый запрос."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
 
-    выпуск = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    выпуск = issue_token(ОСНОВАТЕЛЬ)
 
     assert выпуск.tenant == "belgrade"
     assert выпуск.replaced_previous is False
@@ -126,14 +142,16 @@ def test_выпущенный_токен_сверяется_и_отдаёт_то
     assert владелец is not None
     assert владелец.telegram_id == ОСНОВАТЕЛЬ
     assert владелец.tenant == "belgrade"
+    assert владелец.role == "admin", "токен несёт роль учётки, а не только пространство"
+    assert выпуск.role == "admin"
 
 
 def test_повторный_выпуск_гасит_прежний_токен_и_ставит_replaced_previous(db_env: str) -> None:
     """У человека живым может быть только один токен — повторный выпуск это держит."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    первый = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    первый = issue_token(ОСНОВАТЕЛЬ)
 
-    второй = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    второй = issue_token(ОСНОВАТЕЛЬ)
 
     assert второй.replaced_previous is True
     assert второй.value != первый.value
@@ -151,10 +169,10 @@ def test_незнакомый_токен_отвечает_ничем(db_env: str
 
 def test_отзыв_гасит_и_круг_и_живой_токен(db_env: str) -> None:
     """Отзыв — одно движение на обе таблицы, иначе отозванный просто выпустил бы новый."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    токен = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    токен = issue_token(ОСНОВАТЕЛЬ)
 
-    отзыв = revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ)
+    отзыв = revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ, within=None)
 
     assert отзыв.was_admin is True
     assert отзыв.tokens_revoked == 1
@@ -163,30 +181,30 @@ def test_отзыв_гасит_и_круг_и_живой_токен(db_env: str)
 
 
 def test_отозванный_не_может_выпустить_себе_новый_токен(db_env: str) -> None:
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ, within=None)
 
     with pytest.raises(AccessError):
-        issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+        issue_token(ОСНОВАТЕЛЬ)
 
 
 def test_отозванного_можно_привести_обратно_и_тогда_он_снова_выпускает_токен(
     db_env: str,
 ) -> None:
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    revoke_access(ОСНОВАТЕЛЬ, by=ПОСТОРОННИЙ, within=None)
 
-    возврат = add_admin(ОСНОВАТЕЛЬ, by=ПРИВЕДЁННЫЙ)
+    возврат = add_admin(ОСНОВАТЕЛЬ, by=ПРИВЕДЁННЫЙ, within=None)
 
     assert возврат is True, "возвращение отозванного — изменение, а не молчаливое ничего"
     assert is_admin(ОСНОВАТЕЛЬ) is True
-    выпуск = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    выпуск = issue_token(ОСНОВАТЕЛЬ)
     assert resolve_token(выпуск.value) is not None
 
 
 def test_отзыв_того_кого_не_было_в_круге_не_отказ(db_env: str) -> None:
     """Идемпотентность отзыва: «его там и не было» — честный ответ, а не ошибка."""
-    отзыв = revoke_access(ПОСТОРОННИЙ, by=ОСНОВАТЕЛЬ)
+    отзыв = revoke_access(ПОСТОРОННИЙ, by=ОСНОВАТЕЛЬ, within=None)
 
     assert отзыв.was_admin is False
     assert отзыв.tokens_revoked == 0
@@ -194,10 +212,10 @@ def test_отзыв_того_кого_не_было_в_круге_не_отка�
 
 def test_след_отзыва_остаётся_в_списке_а_не_стирается(db_env: str) -> None:
     """`list_admins` обязан показать отозванного КАК ОТОЗВАННОГО, а не забыть про него."""
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    revoke_access(ОСНОВАТЕЛЬ, by=ПРИВЕДЁННЫЙ)
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    revoke_access(ОСНОВАТЕЛЬ, by=ПРИВЕДЁННЫЙ, within=None)
 
-    строки = {строка.telegram_id: строка for строка in list_admins()}
+    строки = {строка.telegram_id: строка for строка in list_admins(within=None)}
 
     assert ОСНОВАТЕЛЬ in строки, "отозванный пропал из круга целиком, а не только из is_admin"
     строка = строки[ОСНОВАТЕЛЬ]
@@ -216,8 +234,8 @@ def test_значения_токена_в_базе_нет(db_env: str) -> None:
     отпечаток, а не сырое значение, и сырого значения не должно найтись ни
     в одном столбце строки.
     """
-    add_admin(ОСНОВАТЕЛЬ, by=None)
-    выпуск = issue_token(ОСНОВАТЕЛЬ, tenant="belgrade")
+    add_admin(ОСНОВАТЕЛЬ, by=None, within=None)
+    выпуск = issue_token(ОСНОВАТЕЛЬ)
 
     строка = _строка(
         db_env,
@@ -234,18 +252,10 @@ def test_значения_токена_в_базе_нет(db_env: str) -> None:
 
 def test_сырой_токен_в_колонку_отпечатка_не_записывается(db_env: str) -> None:
     """Заслон — ограничение схемы (миграция `0011`), а не аккуратность кода модуля."""
-    _выполнить(
-        db_env, "insert into tenants (code) values ('mcp-schema-guard') on conflict do nothing"
-    )
     похожий_на_сырой_токен = new_token()  # 43 знака, есть - и _ — не 64 hex-знака
 
-    with pytest.raises(psycopg.errors.CheckViolation):
-        _выполнить(
-            db_env,
-            "insert into mcp_tokens (telegram_id, tenant_code, fingerprint) "
-            "values (%s, 'mcp-schema-guard', %s)",
-            (ПОСТОРОННИЙ, похожий_на_сырой_токен),
-        )
+    with pytest.raises(psycopg.errors.CheckViolation, match="fingerprint"):
+        _выполнить(db_env, _ВСТАВКА_С_УЧЁТКОЙ, (ОСНОВАТЕЛЬ, похожий_на_сырой_токен, ОСНОВАТЕЛЬ))
 
 
 def test_у_человека_не_бывает_двух_живых_токенов_одновременно(db_env: str) -> None:
@@ -255,19 +265,25 @@ def test_у_человека_не_бывает_двух_живых_токено�
     живой на человека», а не о совпадении самого отпечатка.
     """
     _выполнить(
-        db_env, "insert into tenants (code) values ('mcp-schema-guard') on conflict do nothing"
-    )
-    _выполнить(
         db_env,
-        "insert into mcp_tokens (telegram_id, tenant_code, fingerprint) "
-        "values (%s, 'mcp-schema-guard', %s)",
-        (ПОСТОРОННИЙ, token_fingerprint("первый-фиктивный-токен-теста")),
+        _ВСТАВКА_С_УЧЁТКОЙ,
+        (ОСНОВАТЕЛЬ, token_fingerprint("первый-фиктивный-токен-теста"), ОСНОВАТЕЛЬ),
     )
 
     with pytest.raises(psycopg.errors.UniqueViolation):
         _выполнить(
             db_env,
+            _ВСТАВКА_С_УЧЁТКОЙ,
+            (ОСНОВАТЕЛЬ, token_fingerprint("второй-фиктивный-токен-теста"), ОСНОВАТЕЛЬ),
+        )
+
+
+def test_живой_токен_без_учётки_и_срока_схема_не_принимает(db_env: str) -> None:
+    """Заслон `mcp_tokens_live_has_identity` (`0056`): вечный ничей токен — отказ записи."""
+    with pytest.raises(psycopg.errors.CheckViolation, match="live_has_identity"):
+        _выполнить(
+            db_env,
             "insert into mcp_tokens (telegram_id, tenant_code, fingerprint) "
-            "values (%s, 'mcp-schema-guard', %s)",
-            (ПОСТОРОННИЙ, token_fingerprint("второй-фиктивный-токен-теста")),
+            "values (%s, 'belgrade', %s)",
+            (ОСНОВАТЕЛЬ, token_fingerprint("ничей-фиктивный-токен-теста")),
         )

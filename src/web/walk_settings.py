@@ -7,7 +7,8 @@
 - `mcp_issue` — готовая команда подключения Claude с личным токеном. Токен
   показывается один раз и гасит прежний, как кнопка `/mcp` (D098);
 - `mcp_who`, `mcp_add`, `mcp_revoke` — круг доступа к MCP (D099), только тем,
-  кто в нём;
+  кто в нём, и только в охвате своего пространства (аудит 12.10, F-036:
+  партнёр видит и трогает только своих, УК — всех);
 - `stops` — отказы мастера за период (#436), тоже только кругу;
 - `finish` — «Завершить проверку» (D422): итог в чат, как `/finish`, за флагом
   `WALK_APP_FINISH` (`walk_finish.py`). Любому аудитору, не только кругу.
@@ -17,6 +18,11 @@
 меню бота у приведённого и отозванного не пересобирается отсюда — пункты
 MCP в чате появятся или пропадут после перезапуска бота; главный вход в
 настройку теперь мини-апп.
+
+**Выпуск токена и правка круга — только по свежей подписи** (аудит 12.10,
+F-032): подпись Telegram для них годна `MINT_MAX_AGE_SECONDS` (5 минут), а не
+шесть часов, как у записи проверки. Строка, утёкшая из журнала или с экрана,
+иначе шесть часов выпускала бы токены на чужое имя.
 """
 
 from __future__ import annotations
@@ -35,13 +41,21 @@ from src.bot.mcp_setup import MCP_URL_VAR, setup_command
 from src.bot.texts import t
 from src.bot.version import build_version
 from src.db import bot_langs, mcp_access
-from src.db.errors import DbError
+from src.db.errors import DbError, OutOfScopeError, UnboundError
 from src.domain.errors import DomainError
 
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
 from .walk_access import space_of
-from .walk_auth import APP_ENDPOINT, APP_PATH, WalkSettings
+from .walk_auth import (
+    APP_ENDPOINT,
+    APP_PATH,
+    INIT_DATA_HEADER,
+    MINT_MAX_AGE_SECONDS,
+    WalkAccessError,
+    WalkSettings,
+    chat_of,
+)
 from .walk_finish import FAILED, NO_INSPECTION, send_summary
 from .walk_write import Identify, Respond
 
@@ -50,6 +64,8 @@ logger = logging.getLogger(__name__)
 #: Период счётчика отказов по умолчанию и предел — как у `/stops`.
 STOPS_DEFAULT_DAYS = 7
 STOPS_MAX_DAYS = stops.STOPS_RETENTION_DAYS
+#: Действия, которые выдают или меняют доступ: им нужна свежая подпись (F-032).
+ACCESS_OPS = frozenset({"mcp_issue", "mcp_add", "mcp_revoke"})
 
 
 class Refused(Exception):
@@ -90,7 +106,7 @@ def in_circle(chat_id: int, bot: BotSettings | None, *, restore: bool = True) ->
         return False
     if chat_id == bot.mcp_owner_id:
         if restore:
-            mcp_access.add_admin(chat_id, by=None)
+            mcp_access.add_admin(chat_id, by=None, within=None)
         return True
     return mcp_access.is_admin(chat_id)
 
@@ -131,21 +147,25 @@ def _target(body: dict[str, Any]) -> int:
     return int(raw)
 
 
-def _circle_op(op: str, body: dict[str, Any], who: int, bot: BotSettings) -> dict[str, Any]:
-    """Действия круга. Заслон — здесь: кнопку можно нажать и без меню."""
-    if op == "mcp_add":
-        кому = _target(body)
-        if кому not in bot.allowed_ids:
-            raise Refused("walk.app.err.not_allowed")
-        mcp_access.add_admin(кому, by=who)
-    elif op == "mcp_revoke":
-        у_кого = _target(body)
-        if у_кого == bot.mcp_owner_id:
-            raise Refused("walk.app.err.founder")
-        mcp_access.revoke_access(у_кого, by=who)
-    elif op == "stops":
-        return {"stops": _stops(body)}
-    return {"circle": [_who(row, bot) for row in mcp_access.list_admins()]}
+def _circle_op(
+    op: str, body: dict[str, Any], who: int, bot: BotSettings, space: str
+) -> dict[str, Any]:
+    """Действия круга в охвате `space`. Заслон — здесь: кнопку можно нажать и без меню."""
+    try:
+        if op == "mcp_add":
+            mcp_access.add_admin(_target(body), by=who, within=space)
+        elif op == "mcp_revoke":
+            у_кого = _target(body)
+            if у_кого == bot.mcp_owner_id:
+                raise Refused("walk.app.err.founder")
+            mcp_access.revoke_access(у_кого, by=who, within=space)
+        elif op == "stops":
+            return {"stops": _stops(body)}
+    except UnboundError as exc:
+        raise Refused("walk.app.err.not_allowed") from exc
+    except OutOfScopeError as exc:
+        raise Refused("walk.app.err.scope", 403) from exc
+    return {"circle": [_who(row, bot) for row in mcp_access.list_admins(within=space)]}
 
 
 def _stops(body: dict[str, Any]) -> list[dict[str, Any]]:
@@ -162,15 +182,35 @@ def _stops(body: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _issue(who: int, conf: WalkSettings, lang: str) -> dict[str, Any]:
-    space = space_of(who, conf)
-    if space is None:
-        raise Refused("walk.app.err.unavailable", 503)
-    выпущен = mcp_access.issue_token(who, tenant=space)
+def _fresh(who: int, conf: WalkSettings) -> None:
+    """Подпись не старше `MINT_MAX_AGE_SECONDS` — для выдачи и правки доступа (F-032).
+
+    Просмотр без подписи (стенд без бота) свежестью не меряется: подписи нет,
+    а на проде он не включается (`walk_auth.load_walk_settings`).
+    """
+    if conf.bot_token is None:
+        return
+    try:
+        свежий = chat_of(
+            request.headers.get(INIT_DATA_HEADER, ""), conf, max_age=MINT_MAX_AGE_SECONDS
+        )
+    except WalkAccessError as exc:
+        raise Refused("walk.app.err.stale", 401) from exc
+    if свежий != who:
+        raise Refused("walk.app.err.stale", 401)
+
+
+def _issue(who: int, lang: str) -> dict[str, Any]:
+    try:
+        выпущен = mcp_access.issue_token(who)
+    except UnboundError as exc:
+        raise Refused("walk.app.err.unbound_self") from exc
     url = (os.environ.get(MCP_URL_VAR) or "").strip() or t("mcp.url_unknown", lang)
     return {
         "command": setup_command(url=url, token=выпущен.value),
         "replaced": выпущен.replaced_previous,
+        # Срок токена (`MCP_TOKEN_TTL_DAYS`): после него команду берут заново.
+        "expires": выпущен.expires_at.date().isoformat(),
     }
 
 
@@ -231,11 +271,16 @@ def install(
                 raise Refused("walk.err.bad_request", 400)
             if bot is None or not in_circle(who, bot):
                 raise Refused("walk.app.err.not_circle", 403)
+            if op in ACCESS_OPS:
+                _fresh(who, conf)
+            space = space_of(who, conf)
+            if space is None:
+                raise Refused("walk.app.err.unavailable", 503)
             if op == "mcp_issue":
                 # Значения токена в журнале нет: только факт выпуска.
                 logger.info("Мини-апп: чат %s выпустил токен MCP", who)
-                return jsonify(_issue(who, conf, lang)), 200
-            return jsonify(_circle_op(op, body, who, bot)), 200
+                return jsonify(_issue(who, lang)), 200
+            return jsonify(_circle_op(op, body, who, bot, space)), 200
         except Refused as exc:
             return refused(exc.key, lang, exc.status)
         except DbError:

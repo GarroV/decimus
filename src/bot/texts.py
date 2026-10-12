@@ -93,6 +93,19 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Ссылка недействительна. Получите новую на странице «Пользователи» в админке.",
         "en": "This link is not valid. Get a new one on the Users page of the admin.",
     },
+    # Учётка привязана и жива, но её роли проверки закрыты (контроль, D420).
+    "access.role_closed": {
+        "ru": (
+            "Ваша роль в decimus не проводит проверок, поэтому бот и мини-апп обхода "
+            "вам закрыты. Рейтинги — в админке на сайте; Claude подключается там же, "
+            "кнопкой «Подключить Claude»."
+        ),
+        "en": (
+            "Your decimus role does not run inspections, so the bot and the walk mini-app "
+            "are closed to you. Ratings are in the web admin; Claude is connected there "
+            "too, with the “Connect Claude” button."
+        ),
+    },
     "access.foreign_space": {
         "ru": (
             "Эта проверка ведётся в другом пространстве. "
@@ -1732,17 +1745,42 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "«{given}» — не Telegram ID. Нужно одно число.",
         "en": "“{given}” is not a Telegram ID. A single number is needed.",
     },
-    # Приводимый обязан быть среди разрешённых ID — иначе доступ выдан тому,
-    # кого мидлварь до бота не пускает. Сказано словами, потому что чинится это
-    # не здесь, а в настройке стенда.
+    # Приводимый обязан иметь бота, привязанного к учётке: токен выпускается на
+    # учётку, и без неё доступ — запись в базе и ничего больше (аудит 12.10).
     "mcp.add_not_allowed": {
         "ru": (
-            "ID {who} не в списке разрешённых — до бота он не доходит, и доступ ему "
-            "выдавать не из чего. Сначала добавьте его на стенде."
+            "У {who} нет бота, привязанного к учётке decimus, — доступ к Claude выдаётся "
+            "только на учётку. Пусть привяжет бота на странице «Пользователи» в админке."
         ),
         "en": (
-            "ID {who} is not on the allowed list — it never reaches the bot, so there is "
-            "nothing to grant access to. Add it on the deployment first."
+            "{who} has no bot linked to a decimus account — Claude access is granted only "
+            "to an account. Ask them to link the bot on the Users page of the admin."
+        ),
+    },
+    # Круг поделён по пространствам (аудит 12.10, F-036). Пространство цели не
+    # называется: партнёр не должен узнавать по отказу, где числится чужой ID.
+    "mcp.not_in_space": {
+        "ru": "{who} не из вашего пространства — его доступом вы не управляете.",
+        "en": "{who} is not in your space — you do not manage their access.",
+    },
+    "mcp.unbound_self": {
+        "ru": (
+            "Доступ к Claude выдаётся только на учётку decimus: привяжите бота к своей "
+            "учётке на странице «Пользователи» в админке, затем повторите."
+        ),
+        "en": (
+            "Claude access is issued only to a decimus account: link the bot to your "
+            "account on the Users page of the admin, then try again."
+        ),
+    },
+    "mcp.expires": {
+        "ru": (
+            "Токен действует до {date}. Потом пункт /mcp выдаст новую команду. "
+            "Смена роли или отключение учётки гасят токен сразу."
+        ),
+        "en": (
+            "The token is valid until {date}. After that, /mcp gives a new command. "
+            "A role change or a disabled account ends the token at once."
         ),
     },
     "mcp.added": {

@@ -218,6 +218,7 @@
       root.appendChild(W.button("walk-mark", tx("walk.app.claude.copy"), function () { copy(got.command); }));
       root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.safety")));
       root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.restart")));
+      if (got.expires) root.appendChild(el("p", "walk-app__note", tx("walk.app.claude.expires", { date: got.expires })));
       if (got.replaced) root.appendChild(el("p", "walk-banner", tx("walk.app.claude.replaced")));
     }
     root.appendChild(W.button(got ? "walk-btn" : "walk-mark", tx(got ? "walk.app.claude.again" : "walk.app.claude.issue"), function () {

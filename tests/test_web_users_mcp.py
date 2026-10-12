@@ -39,7 +39,7 @@ def строка(login: str, *, tenant: str = "HQ", role: str = "auditor") -> An
 
 
 def привязка(user_id: str, tg: int) -> bot_links.Binding:
-    return bot_links.Binding(tg, user_id, "x", "HQ", datetime(2026, 9, 1, tzinfo=UTC))
+    return bot_links.Binding(tg, user_id, "x", "HQ", datetime(2026, 9, 1, tzinfo=UTC), "auditor")
 
 
 @pytest.fixture
@@ -50,12 +50,14 @@ def круг(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
     monkeypatch.setattr(bot_links, "binding_of", lambda uid: привязки.get(uid))
     monkeypatch.setattr(bot_links, "live_bindings", lambda: привязки)
     monkeypatch.setattr(mcp_access, "is_admin", lambda tg: tg in сост["live"])
-    monkeypatch.setattr(mcp_access, "list_admins", lambda: [])
+    monkeypatch.setattr(mcp_access, "list_admins", lambda *, within: [])
     monkeypatch.setattr(
-        mcp_access, "add_admin", lambda tg, *, by: сост["add"].append((tg, by)) or True
+        mcp_access,
+        "add_admin",
+        lambda tg, *, by, within: сост["add"].append((tg, by)) or True,
     )
 
-    def _снять(tg: int, *, by: int) -> mcp_access.Revocation:
+    def _снять(tg: int, *, by: int, within: str | None) -> mcp_access.Revocation:
         сост["revoke"].append((tg, by))
         return mcp_access.Revocation(tg, was_admin=True, tokens_revoked=1)
 

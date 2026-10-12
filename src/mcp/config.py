@@ -576,14 +576,21 @@ class Access:
     #: стороннего из карты `.env`. Нужна подтверждению загруженной проверки
     #: (D308): принятая подписывается тем, кто её принял (D199).
     actor: str = ""
-    #: Роль учётки сайта — только у входа через OAuth (D417): права тогда
-    #: решает матрица `policy.py`. У дверей бота и `.env` роли нет (`None`),
-    #: и для них всё как раньше.
+    #: Роль учётки сайта — у личного токена и у входа через OAuth (D417, аудит
+    #: 12.10): права тогда решает матрица `policy.py`. Роли нет (`None`) только
+    #: у служебного токена из карты `MCP_TOKENS` — его заводит владелец стенда
+    #: руками, и открывает он всё пространство.
     role: str | None = None
 
 
-def _owner_from_store(token: str) -> tuple[str, int] | None:
-    """Арендатор и владелец ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
+def _owner_from_store(token: str) -> Access | None:
+    """Доступ ЛИЧНОГО токена, выпущенного ботом (T253, решение D098).
+
+    С аудита 12.10 (F-017, F-022, F-023, F-035) личный токен выпущен на учётку
+    сайта: хранилище на каждый вызов сверяет её отключение, роль, пространство,
+    срок токена и живость привязки бота (`mcp_access.resolve_token`). Роль уходит
+    в `Access.role`, и права решает та же матрица, что у входа через сайт
+    (`policy.py`). Снятие проверок личным токеном не выдаётся.
 
     Вторая дверь рядом с картой из `.env`, а не вместо неё. Личные токены
     выпускает бот, хранит отпечатками и отзывает поимённо
@@ -620,7 +627,14 @@ def _owner_from_store(token: str) -> tuple[str, int] | None:
             exc_info=True,
         )
         return None
-    return None if владелец is None else (владелец.tenant, владелец.telegram_id)
+    if владелец is None:
+        return None
+    return Access(
+        tenant=canonical_tenant(владелец.tenant),
+        may_retract=False,
+        actor=f"mcp:tg:{владелец.telegram_id}",
+        role=владелец.role,
+    )
 
 
 def _owner_from_oauth(token: str, resource: str) -> Access | None:
@@ -707,16 +721,13 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
             "«Authorization: Bearer <токен>». Доступ к проверкам закрыт личным токеном"
         )
     tenant = settings.tenant_for(token)
-    actor = f"mcp:{tenant}"
-    if tenant is None:
-        владелец = _owner_from_store(token)
-        if владелец is not None:
-            tenant, telegram_id = владелец
-            actor = f"mcp:tg:{telegram_id}"
-    if tenant is None and settings.oauth_enabled and settings.mcp_public_url:
+    if tenant is not None:
+        return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=f"mcp:{tenant}")
+    личный = _owner_from_store(token)
+    if личный is not None:
+        return личный
+    if settings.oauth_enabled and settings.mcp_public_url:
         через_сайт = _owner_from_oauth(token, settings.mcp_public_url)
         if через_сайт is not None:
             return через_сайт
-    if tenant is None:
-        raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
-    return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=actor)
+    raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
