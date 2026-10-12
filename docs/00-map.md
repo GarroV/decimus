@@ -294,12 +294,13 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
 | `src/db/bot_langs.py` | Язык бота, выбранный человеком (D303, #411): чтение и запись |
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
+| `src/db/checklist_langs.py` | Язык чек-листа, выбранный аудитором при старте проверки (D451): чтение и запись |
 | `src/db/directory.py` | T092: справочник точек и карта синонимов |
 | `src/db/fingerprint.py` | Отпечаток содержимого завершённой проверки |
 | `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
@@ -404,6 +405,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0054_oauth.sql` | Подключение Claude к decimus входом через сайт (D417): OAuth 2.1 с PKCE |
 | `0055_maps_ratings_index.sql` | Индекс под выборки «последняя оценка филиала на карте» (`maps_store.latest`) и «оценка пиццерии на карте на дату» (`maps_store.unit_scores`) |
 | `0056_finish_modes.sql` | D449: «Завершить» в мини-аппе работает в одном из двух режимов, и каждый аудитор выбирает свой в настройках приложения: `summary` — сначала сводка в чат, `report` … |
+| `0057_checklist_langs.sql` | D451: язык чек-листа, выбранный аудитором на старте проверки в мини-аппе, запоминается за ЧЕЛОВЕКОМ — на следующем старте экран подставляет его же |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
