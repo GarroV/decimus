@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 
@@ -115,9 +115,13 @@ class Summary:
     last_loaded: dict[str, datetime]
 
 
-def choices() -> Choices:
-    """Что можно выбрать: только страны охвата IMF (D318) и их девелоперы."""
-    imf = tuple(row for row in read.countries() if row.is_imf)
+def choices(only: Collection[str] | None = None) -> Choices:
+    """Что можно выбрать: только страны охвата IMF (D318) и их девелоперы.
+    `only` — сузить до этих стран (охват партнёра в MCP); `None` — без сужения,
+    как на экране: рейтинги видят все (D327)."""
+    imf = tuple(
+        row for row in read.countries() if row.is_imf and (only is None or row.code in only)
+    )
     developers = tuple(sorted({row.developer for row in imf if row.developer}))
     return Choices(developers, imf, tuple(RatingPeriod(*p) for p in read.rs_periods()))
 
@@ -137,9 +141,11 @@ def _value(group: str, wanted: str | None, found: Choices) -> str | None:
     return None
 
 
-def select(args: Mapping[str, str], *, today: date) -> tuple[Selection, Choices]:
+def select(
+    args: Mapping[str, str], *, today: date, only: Collection[str] | None = None
+) -> tuple[Selection, Choices]:
     """Отбор из адреса страницы; незнакомое значение заменяется первым допустимым."""
-    found = choices()
+    found = choices(only)
     group = args.get("group", "")
     group = group if group in GROUPS else GROUP_IMF
     value = _value(group, args.get("value") or None, found)
@@ -257,15 +263,40 @@ def group_lines(
     return tuple(out)
 
 
+def period_scores(selection: Selection, codes: Sequence[str]) -> list[Fact]:
+    """Оценки пиццерий этих стран за периоды рейтинга, задевшие выбранный период."""
+    period = selection.period
+    return _facts(read.score_facts(countries=codes, begin=period.begin, end=period.end))
+
+
+def period_facts(
+    selection: Selection, found: Choices, codes: Sequence[str]
+) -> tuple[ReportPeriod | None, list[Fact], list[Fact]]:
+    """Оценки пиццерий за выбранный период и за прошлый такой же: (прошлый период,
+    факты текущего, факты прошлого). Одни и те же факты у экрана и у MCP."""
+    prev = previous_period(selection.period, rs_periods=found.rs_periods)
+    current = period_scores(selection, codes)
+    previous = (
+        _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
+    )
+    return prev, current, previous
+
+
+def build_groups(
+    selection: Selection, found: Choices
+) -> tuple[tuple[GroupLine, ...], ReportPeriod | None]:
+    """Только строки сводки по группам и прошлый период — без нарушений, Top/Bottom
+    и зоны риска. Считает тем же `group_lines`, что и `build`."""
+    codes = group_countries(selection, found.countries)
+    prev, current, previous = period_facts(selection, found, codes)
+    return group_lines(selection, found, codes, (current, previous)), prev
+
+
 def build(selection: Selection) -> Summary:
     found = choices()
     codes = group_countries(selection, found.countries)
     period = selection.period
-    prev = previous_period(period, rs_periods=found.rs_periods)
-    current = _facts(read.score_facts(countries=codes, begin=period.begin, end=period.end))
-    previous = (
-        _facts(read.score_facts(countries=codes, begin=prev.begin, end=prev.end)) if prev else []
-    )
+    prev, current, previous = period_facts(selection, found, codes)
     lines, total = score_lines(current, previous, codes)
     groups = group_lines(selection, found, codes, (current, previous))
     limits = read.settings()
