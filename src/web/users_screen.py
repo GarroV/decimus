@@ -32,6 +32,7 @@ from . import (
     access_policy,
     accounts,
     auth,
+    connections_screen,
     partner_spaces,
     people,
     profile,
@@ -54,7 +55,7 @@ from .users_page import (
     render,
     source,
 )
-from .users_view import TAB_SPACES
+from .users_view import TAB_CONNECTIONS, TAB_SPACES
 
 
 def link_url(bot_username: str, token: str) -> str:
@@ -96,7 +97,9 @@ def install(app: Flask, conf: Settings) -> None:
     app.config[users_claude.MCP_URL_KEY] = conf.mcp_public_url if conf.oauth_enabled else None
 
     @app.get(users_path)
-    def users() -> tuple[str, int]:
+    def users() -> FlaskResponse | tuple[str, int]:
+        if request.args.get("tab") == TAB_CONNECTIONS:
+            return connections_screen.show()
         return render()
 
     @app.post(f"{users_path}/bot-link")
@@ -186,6 +189,7 @@ def install(app: Flask, conf: Settings) -> None:
     if conf.oauth_enabled:
         _install_claude(app, users_path)
     _install_spaces(app, users_path)
+    connections_screen.install(app)
 
 
 def _install_edits(app: Flask, users_path: str) -> None:

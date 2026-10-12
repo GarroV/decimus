@@ -134,5 +134,8 @@ def install(app: Flask, *, hsts: bool) -> None:
             response.headers["Content-Security-Policy"] = OAUTH_CONTENT_SECURITY_POLICY
         путь = request.path
         if путь == NO_STORE_PREFIX or путь.startswith(f"{NO_STORE_PREFIX}/"):
-            response.headers["Cache-Control"] = "no-store"
+            # Свой заголовок маршрута с `no-store` не затирается: страница ключа
+            # «Подключений» отдаёт `private, no-store` (D425).
+            if "no-store" not in response.headers.get("Cache-Control", ""):
+                response.headers["Cache-Control"] = "no-store"
         return response
