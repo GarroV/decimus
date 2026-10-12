@@ -53,7 +53,7 @@ def _сверка_без_базы(monkeypatch: pytest.MonkeyPatch) -> Iterator[l
         {
             "tok-control": OAuthOwner("u1", "kontrol", "HQ", "control"),
             "tok-admin": OAuthOwner("u2", "anna", "HQ", "admin"),
-            "tok-auditor": OAuthOwner("u3", "ivan", "HQ", "auditor"),
+            "tok-auditor": OAuthOwner("u3", "ivan", "HQ", "developer"),
             "tok-partner": OAuthOwner("u4", "petar", "RS", "admin"),
             "tok-other": OAuthOwner("u2", "anna", "HQ", "admin"),
         }

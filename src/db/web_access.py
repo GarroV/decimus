@@ -261,9 +261,24 @@ ROLE_CONTROL = "control"
 #: Главный админ (D364): всё по проекту. Только в HQ; последнего действующего
 #: отключить или понизить не даёт база (`0041`, триггер на `web_users`).
 ROLE_SUPERADMIN = "superadmin"
-ROLES = (ROLE_AUDITOR, ROLE_ADMIN, ROLE_CONTROL, ROLE_SUPERADMIN)
-#: Роли, которые бывают только в пространстве УК (`0040`, `0041`).
-HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN)
+#: Бизнес-девелопер (D440): в УК вместо аудитора — пользуется сервисом полностью,
+#: методику и людей не трогает. Только в HQ (`0060`).
+ROLE_DEVELOPER = "developer"
+#: Гость (D440): вся сеть только на чтение. Только в HQ (`0060`).
+ROLE_GUEST = "guest"
+#: От самой узкой к самой широкой: в таком порядке роли идут в форме.
+ROLES = (
+    ROLE_AUDITOR,
+    ROLE_GUEST,
+    ROLE_DEVELOPER,
+    ROLE_CONTROL,
+    ROLE_ADMIN,
+    ROLE_SUPERADMIN,
+)
+#: Роли, которые бывают только в пространстве УК (`0040`, `0041`, `0060`).
+HQ_ONLY_ROLES = (ROLE_CONTROL, ROLE_SUPERADMIN, ROLE_DEVELOPER, ROLE_GUEST)
+#: Роль, которой в УК больше нет (D440, `0060`): аудиторы УК стали девелоперами.
+PARTNER_ONLY_ROLES = (ROLE_AUDITOR,)
 
 
 #: Код отказа триггера `keep_last_superadmin` (`0041`): последнего действующего
@@ -460,13 +475,14 @@ def _managing(зачем: str) -> Iterator[psycopg.Connection[Any]]:
 
 
 def roles_for(tenant: str) -> tuple[str, ...]:
-    """Роли, которые бывают в пространстве: «контроль» и главный админ — только в УК.
+    """Роли, которые бывают в пространстве (D440).
 
-    У партнёра две роли (D346): админ пространства (`admin`) и сотрудник
-    (`auditor`).
+    УК: главный админ, админ, бизнес-девелопер, контроль, гость — аудитора там
+    больше нет. У партнёра две роли (D346): админ пространства (`admin`) и
+    сотрудник (`auditor`).
     """
     if canonical_tenant(tenant) == HQ_TENANT:
-        return ROLES
+        return tuple(role for role in ROLES if role not in PARTNER_ONLY_ROLES)
     return tuple(role for role in ROLES if role not in HQ_ONLY_ROLES)
 
 
@@ -474,6 +490,8 @@ def _checked_role(role: str, *, tenant: str) -> str:
     if role not in ROLES:
         raise AccessError(f"Роль «{role}» не заведена. Есть: {', '.join(ROLES)}")
     if role not in roles_for(tenant):
+        if role in PARTNER_ONLY_ROLES:
+            raise AccessError(f"Роль «{role}» бывает только у партнёра: в УК её заменил девелопер")
         raise AccessError(f"Роль «{role}» бывает только в пространстве УК (HQ)")
     return role
 
@@ -523,7 +541,7 @@ def _require_tenant(tenant: str) -> None:
         require_space(cur, tenant, error=AccessError)
 
 
-def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_AUDITOR) -> Account:
+def create_account(login: str, *, tenant: str, password: str, role: str | None = None) -> Account:
     """Завести учётку. Роль владельца схемы, повтор логина — отказ.
 
     Пароль сюда приходит от человека, который учётку заводит, и в репозитории
@@ -531,9 +549,11 @@ def create_account(login: str, *, tenant: str, password: str, role: str = ROLE_A
     незачем, а напечатанное уезжает в историю команд.
     """
     имя = _checked_login(login)
-    # Роль по умолчанию — САМАЯ УЗКАЯ. Заводящий человек думает про «завести
-    # Петра», а не про объём его прав, и умолчание, дающее больше, раздавало
-    # бы админов молча.
+    # Роль по умолчанию — САМАЯ УЗКАЯ: в УК гость (только чтение), у партнёра
+    # сотрудник. Заводящий человек думает про «завести Петра», а не про объём
+    # его прав, и умолчание, дающее больше, раздавало бы админов молча.
+    if role is None:
+        role = ROLE_GUEST if canonical_tenant(tenant) == HQ_TENANT else ROLE_AUDITOR
     роль = _checked_role(role, tenant=tenant)
     хеш = password_hash(_checked_password(password))
     _require_tenant(tenant)

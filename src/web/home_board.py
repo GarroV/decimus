@@ -20,7 +20,14 @@ from src.db import action_plans, prescriptions, queries
 from src.db import ratings_read as ratings
 from src.db.models import ORIGIN_FIELD
 from src.db.reach import Reach
-from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, SUPERADMIN_ROLE, is_admin_role
+from src.domain.tenants import (
+    CONTROL_ROLE,
+    DEVELOPER_ROLE,
+    GUEST_ROLE,
+    HQ_TENANT,
+    SUPERADMIN_ROLE,
+    is_admin_role,
+)
 
 #: Через сколько дней без загрузки РС / РКО контролингу напоминают о ней.
 #: РКО приходит неделями, поэтому две недели — уже пропуск, а не пауза.
@@ -83,11 +90,15 @@ def kinds_for(who: Who) -> tuple[str, ...]:
     """
     if who.role == CONTROL_ROLE:
         return (RATINGS_STALE,)
+    if who.role == GUEST_ROLE:
+        return ()  # гость только читает (D440): делать ему на доске нечего
     out: list[str] = []
-    if is_admin_role(who.role):
+    # Бизнес-девелопер работает с проверками и очередями наравне с админом (D440).
+    работает = is_admin_role(who.role) or who.role == DEVELOPER_ROLE
+    if работает:
         out.append(REVIEW)
     if who.hq:
-        if is_admin_role(who.role):
+        if работает:
             out += [PLANS_REVIEW, ORDERS_DUE]
         if who.role == SUPERADMIN_ROLE:
             out.append(RATINGS_STALE)

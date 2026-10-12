@@ -47,7 +47,14 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.tenants import HQ_TENANT, canonical_tenant, is_admin_role
+from src.domain.tenants import (
+    HQ_TENANT,
+    canonical_tenant,
+    is_admin_role,
+    is_hq_developer,
+    is_hq_guest,
+    is_hq_worker,
+)
 from src.report.info_titles import FOUND
 
 from . import (
@@ -56,6 +63,7 @@ from . import (
     assets,
     auth,
     edition,
+    guest_gate,
     home_page,
     letter_draft,
     letter_markup,
@@ -175,6 +183,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _install_origin_gate(app)
     _install_hq_gate(app)
     _install_control_gate(app)
+    guest_gate.install(app)
     _install_methodology_gate(app)
     _register_sections(app)
     _register_overview(app, conf)
@@ -251,6 +260,9 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Кто вошёл — берётся из того же ответа, что пропустил запрос
             # через заслон, а не спрашивается у базы второй раз.
             "account": account,
+            # Гость УК (D440) только читает: кнопки действий разметка не рисует
+            # вовсе, а запись ему закрывает заслон `guest_gate`.
+            "read_only": account is not None and is_hq_guest(account.role, account.tenant),
             "logout_path": auth.LOGOUT_PATH,
             # Роль словами — как должность; у партнёра свои названия (D346).
             "role_key": users_view.role_key,
@@ -856,7 +868,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
-            own=_own(detail),
+            own=_own(detail) and not _is_guest(),
             save_outcome=request.args.get("saved"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
@@ -926,7 +938,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
     def do_retract(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        отказ = _admin_only()
+        отказ = _hq_worker_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1003,7 +1015,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.post(f"{section('registry').path}/<inspection_id>/move")
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Перенести проверку по дате и пиццерии (D195). Только админ УК (D341)."""
-        отказ = _admin_only()
+        отказ = _hq_worker_only()
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
@@ -1128,7 +1140,9 @@ def _install_origin_gate(app: Flask) -> None:
 
 
 def _install_methodology_gate(app: Flask) -> None:
-    """Методику правят только админы (D344): любая запись в разделе «Методика» — 403.
+    """Методику правят админы (D344) и — только неглавные чек-листы — бизнес-девелопер (D440).
+
+    Любая запись в разделе «Методика» не от них — 403.
 
     Заслон `before_request`, а не проверка в каждом маршруте: у правящих
     маршрутов `/admin/*` своей проверки роли нет, и новый закрыт с момента
@@ -1144,7 +1158,12 @@ def _install_methodology_gate(app: Flask) -> None:
         if путь != methodology_path and not путь.startswith(f"{methodology_path}/"):
             return
         вошедший = auth.current_account()
-        if вошедший is not None and not is_admin_role(вошедший.role):
+        if вошедший is None:
+            return
+        # Бизнес-девелопер (D440) заводит чек-листы и правит неглавные: какой
+        # чек-лист главный, решает дверь методики (`method.store_for`), а метку
+        # и указатель прода она отдаёт одним админам. Остальные — 403, как были.
+        if not (is_admin_role(вошедший.role) or is_hq_developer(вошедший.role, вошедший.tenant)):
             abort(403)
 
 
@@ -1178,22 +1197,32 @@ def _install_control_gate(app: Flask) -> None:
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
 
-def _admin_only() -> FlaskResponse | None:
-    """Отказ 403 всем, кроме админа и главного админа УК; `None` — можно.
+def _role() -> str | None:
+    """Роль вошедшего — для проверок, которые решает дверь методики (D440)."""
+    вошёл = auth.current_account()
+    return None if вошёл is None else вошёл.role
+
+
+def _is_guest() -> bool:
+    """Вошёл гость УК (D440): читает всё, кнопок действий не видит."""
+    вошёл = auth.current_account()
+    return вошёл is not None and is_hq_guest(вошёл.role, вошёл.tenant)
+
+
+def _hq_worker_only() -> FlaskResponse | None:
+    """Отказ 403 всем, кроме работающих в УК — главного админа, админа и
+    бизнес-девелопера (D440); `None` — можно.
 
     Снятие, приёмка, правка записи и перенос проверки — только УК: партнёр
     задним числом не меняет ничего, даже админ своего пространства (D341).
+    Гость, контроль и сотрудник партнёра сюда не проходят.
 
     Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
     руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
     её с выносом кадров мог любой аудитор.
     """
     вошедший = auth.current_account()
-    if (
-        вошедший is not None
-        and is_admin_role(вошедший.role)
-        and canonical_tenant(вошедший.tenant or "") == HQ_TENANT
-    ):
+    if вошедший is not None and is_hq_worker(вошедший.role, вошедший.tenant):
         return None
     # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
     # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
@@ -1219,7 +1248,7 @@ def _partner_may_review(detail: Any) -> bool:
 def _reviewer_only(inspection_id: str) -> FlaskResponse | None:
     """Заслон вычитки: админ УК — как раньше (D341); админ партнёра — только
     свежая проверка своих сотрудников (D367). Снятие и перенос сюда не ходят."""
-    if _admin_only() is None:
+    if _hq_worker_only() is None:
         return None
     вошедший = auth.current_account()
     if вошедший is None or not is_admin_role(вошедший.role):
@@ -1374,7 +1403,8 @@ def _card_context(
     if detail is None:
         return None
     lang = _lang(conf)
-    админ = _admin_only() is None
+    админ = _hq_worker_only() is None
+    гость = _is_guest()
     try:
         переносы = data.load_moves(inspection_id, reach=auth.current_reach())
         история_известна = True
@@ -1438,6 +1468,7 @@ def _card_context(
     # запросить, либо у точки нет страны — тогда только видимая отметка.
     план_нужен = (
         action_plans.is_hq()
+        and not гость
         and своя
         and план is None
         and план_известен
@@ -1464,6 +1495,7 @@ def _card_context(
         # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
         may_request_plan=(
             action_plans.is_hq()
+            and not гость
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
@@ -1473,6 +1505,7 @@ def _card_context(
         # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
         may_prescribe=(
             action_plans.is_hq()
+            and not гость
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
@@ -1786,6 +1819,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 write=True,
                 lang=_lang(conf),
+                role=_role(),
             )
             опубликована = method.publish_version(
                 склад, tenant=auth.current_tenant(), version=version
@@ -1878,6 +1912,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 lang=_lang(conf),
                 state=(request.form.get("state") or "").strip(),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -1887,6 +1922,38 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
             conf,
             notice=t("checklists.state.set", _lang(conf), checklist=стало.code, state=стало.state),
             failure=None,
+        )
+
+    @app.post(f"{путь}/<code>/master")
+    def checklists_master(code: str) -> str | Response:
+        """Метка «главный» (D440): ставят и снимают только админы. Отказ — словами."""
+        refuse_foreign_origin()
+        state = method.load_store()
+        if state.store is None:
+            return _render_methodology(conf, notice=None, failure=None)
+        пространство = _которое_пространство(request)
+        try:
+            method.set_checklist_master(
+                state.store,
+                tenant=auth.current_tenant(),
+                author=_author(conf),
+                code=code,
+                space=пространство,
+                lang=_lang(conf),
+                on=request.form.get("on") == "1",
+                role=_role(),
+            )
+        except MethodologyRefused as отказ:
+            return _render_methodology(
+                conf, notice=None, failure=method.refusal_text(отказ, _lang(conf))
+            )
+        return redirect(
+            _url(
+                "methodology",
+                checklist=code,
+                lang=_lang(conf),
+                **({"space": пространство} if пространство else {}),
+            )
         )
 
     @app.post(f"{section('admin').path}/bot/<code>")
@@ -1905,6 +1972,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 lang=_lang(conf),
                 on=request.form.get("on") == "1",
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_methodology(
@@ -1935,6 +2003,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 space=_которое_пространство(request),
                 write=False,
                 lang=_lang(conf),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -1961,6 +2030,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
                 code=code,
                 space=_которое_пространство(request),
                 lang=_lang(conf),
+                role=_role(),
             )
         except MethodologyRefused as отказ:
             return _render_checklists(
@@ -2055,6 +2125,7 @@ def _apply(conf: Settings, действие: Any) -> _Итог:
             space=_которое_пространство(request),
             write=True,
             lang=_lang(conf),
+            role=_role(),
         )
         правка = действие(склад, _author(conf))
     except MethodologyRefused as отказ:
@@ -2115,6 +2186,7 @@ def _render_methodology(
             space=_которое_пространство(request),
             write=False,
             lang=lang,
+            role=_role(),
         )
     except MethodologyRefused as отказ:
         # Чужой или несуществующий чек-лист — отказ словами поверх эталона,
@@ -2223,9 +2295,19 @@ def _render_methodology(
         else None
     )
     раньше, позже = mview.neighbours(видимые, выбран or "")
+    # Правка чек-листа (D440): главный правят только админы, остальные — и
+    # бизнес-девелопер. Решает та же дверь, что отказывает на записи
+    # (`method.store_for`), поэтому кнопки не расходятся с отказом.
+    админ = is_admin_role(_role())
+    главный = method.is_master(склад)
+    закрыт_по = method.protection_of(склад)
     return render_template(
         "methodology/index.html",
         composition=состав,
+        is_admin=админ,
+        master_here=главный,
+        can_edit_checklist=админ or закрыт_по is None,
+        protected_by=закрыт_по,
         checklists=перечень,
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.

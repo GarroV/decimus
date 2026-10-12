@@ -99,6 +99,9 @@ from ..domain.checklist_store import (
     known as known,
 )
 from ..domain.checklist_store import (
+    master_of as master_of,
+)
+from ..domain.checklist_store import (
     prod_link as prod_link,
 )
 from ..domain.checklist_store import (
@@ -270,6 +273,10 @@ def write_meta(store: Store, meta: Meta) -> None:
     # бы с бота чек-лист, по которому сегодня идут проверки.
     if meta.in_bot is not None:
         поля["in_bot"] = meta.in_bot
+    # Так же и метка «главный»: нет решения — нет ключа, и действует умолчание
+    # `master_of`, а не «не главный».
+    if meta.master is not None:
+        поля["master"] = meta.master
     тело = json.dumps(
         поля,
         ensure_ascii=False,

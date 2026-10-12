@@ -26,7 +26,7 @@ from src.web import accounts
 СРОК = datetime(2026, 11, 11, tzinfo=UTC)
 
 
-def строка(login: str, *, tenant: str = "HQ", role: str = "auditor") -> Any:
+def строка(login: str, *, tenant: str = "HQ", role: str = "developer") -> Any:
     return SimpleNamespace(
         login=login,
         role=role,
@@ -83,7 +83,14 @@ def админ_уК(monkeypatch: pytest.MonkeyPatch, токены: dict[str, Any
 
 @pytest.mark.parametrize(
     ("tenant", "role"),
-    [("HQ", "auditor"), ("HQ", "control"), ("GE", "auditor"), ("GE", "admin"), ("HQ", "admin")],
+    [
+        ("HQ", "developer"),
+        ("HQ", "guest"),
+        ("HQ", "control"),
+        ("GE", "auditor"),
+        ("GE", "admin"),
+        ("HQ", "admin"),
+    ],
 )
 def test_любая_роль_выпускает_токен_себе_сама(
     monkeypatch: pytest.MonkeyPatch, токены: dict[str, Any], tenant: str, role: str

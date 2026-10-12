@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_home import HOME_TEXTS
+from .texts_master import MASTER_TEXTS
 from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -1369,10 +1370,6 @@ TEXTS: dict[str, dict[str, str]] = {
     },
     "methodology.version.in_effect": {"ru": "Действует", "en": "In effect"},
     "methodology.version.unnamed": {"ru": "набор без имени", "en": "unnamed set"},
-    "methodology.version.draft_bar": {
-        "ru": "Записаны правки, которые ещё не действуют",
-        "en": "Recorded edits are not in effect yet",
-    },
     "methodology.kind.violation": {"ru": "нарушение", "en": "violation"},
     "methodology.kind.info": {"ru": "сведения", "en": "information"},
     "methodology.kind.aggregate": {"ru": "итоговая строка", "en": "summary row"},
@@ -1630,6 +1627,7 @@ _ЧАСТИ = (
     TEXTS,
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
+    MASTER_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     RATINGS_TEXTS,
@@ -1651,6 +1649,7 @@ TEXTS = {
     **TEXTS,
     **CONNECTIONS_TEXTS,
     **HOME_TEXTS,
+    **MASTER_TEXTS,
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,

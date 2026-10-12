@@ -47,6 +47,9 @@ COPY src ./src
 # монтируется снаружи, как и боевая методика, — тогда правка данных в `main`
 # доезжает до демо без пересборки образа (задача T102).
 COPY tools ./tools
+# Бланк нового чек-листа (`src/mcp/checklists.py: BLANK_DIR`) — без него
+# «Новый чек-лист» в контейнере отказывает «бланк неполный» (#758).
+COPY checklist-blank ./checklist-blank
 
 # Editable-установка, а не обычная: обычный `pip install .` копирует пакет в
 # site-packages, и `Path(__file__).resolve().parents[2]` из site-packages
