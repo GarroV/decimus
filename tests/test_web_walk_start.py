@@ -51,7 +51,6 @@ class Клиент:
             "unit": "Белград 1",
             "kind": "repeat",
             "speech_lang": "en",
-            "report_lang": "ru",
         } | сверх
         return self.пост(**тело)
 
@@ -111,7 +110,7 @@ def test_того_кого_бот_не_пускает_мастер_не_пуск
 
 
 def test_старт_кладёт_ровно_выбранное(клиент: Клиент) -> None:
-    ответ = клиент.старт(kind="unscheduled", speech_lang="en", report_lang="ru")
+    ответ = клиент.старт(kind="unscheduled", speech_lang="en")
 
     assert ответ.status_code == 200, ответ.get_json()
     проверка = get_state(АУДИТОР)
@@ -120,8 +119,8 @@ def test_старт_кладёт_ровно_выбранное(клиент: К�
     assert (проверка.kind, проверка.speech_lang, проверка.report_lang) == (
         "unscheduled",
         "en",
-        "ru",
-    ), "речь и отчёт — два независимых выбора (D393)"
+        "en",
+    ), "язык отчёта на старте равен языку чек-листа и меняется в конце (D415)"
     assert проверка.ui_lang == "ru"
     assert проверка.auditor == "Аудитор", "имя — из профиля Telegram, как у бота"
     assert проверка.checklist_code == "bizdev" and проверка.tenant
@@ -129,13 +128,14 @@ def test_старт_кладёт_ровно_выбранное(клиент: К�
     assert проверка.run_id, "у начатой проверки есть личность (память бота сверяется по ней)"
 
 
-def test_языки_меняются_местами_независимо(клиент: Клиент) -> None:
+def test_приходящий_язык_отчёта_игнорируется(клиент: Клиент) -> None:
+    """Старый клиент ещё шлёт `report_lang`: он принимается и не влияет (D415)."""
     клиент.старт(speech_lang="ru", report_lang="en")
 
     проверка = get_state(АУДИТОР)
 
     assert проверка is not None
-    assert (проверка.speech_lang, проверка.report_lang) == ("ru", "en")
+    assert (проверка.speech_lang, проверка.report_lang) == ("ru", "ru")
 
 
 def test_чек_лист_из_нескольких_выбирается_и_закрытый_отказ(
@@ -169,7 +169,6 @@ def test_чек_листов_нет_старт_отказывает(клиент
     [
         pytest.param({"kind": "weekly"}, id="вид-вне-перечня"),
         pytest.param({"speech_lang": "sr"}, id="речь-вне-перечня"),
-        pytest.param({"report_lang": ""}, id="отчёт-пустой"),
     ],
 )
 def test_вид_и_языки_только_из_перечня(клиент: Клиент, поле: dict[str, str]) -> None:

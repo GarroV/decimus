@@ -38,7 +38,6 @@ from ..keyboards import (
     KIND_PREFIX,
     KIND_TITLES,
     LANG_LABELS,
-    LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
@@ -49,7 +48,6 @@ from ..keyboards import (
     checklist_keyboard,
     kind_keyboard,
     kind_title,
-    lang_keyboard,
     new_inspection_keyboard,
     resume_keyboard,
     speech_lang_keyboard,
@@ -507,7 +505,7 @@ def build_start_router(
     @router.callback_query(
         StateFilter(StartFlow.waiting_speech_lang), F.data.startswith(SPEECH_LANG_PREFIX)
     )
-    async def on_speech_lang(callback: CallbackQuery, state: FSMContext) -> None:
+    async def on_speech_lang(callback: CallbackQuery, state: FSMContext, space: str) -> None:
         await callback.answer()
         message = callback.message
         if not isinstance(message, Message):
@@ -515,34 +513,22 @@ def build_start_router(
         speech_lang = (callback.data or "").removeprefix(SPEECH_LANG_PREFIX)
         if speech_lang not in LANG_LABELS:
             return
-        await state.update_data(speech_lang=speech_lang)
-        await state.set_state(StartFlow.waiting_lang)
-        await message.answer(
-            t("start.ask_lang", chat_ui_lang(message.chat.id)), reply_markup=lang_keyboard()
-        )
-
-    @router.callback_query(StateFilter(StartFlow.waiting_lang), F.data.startswith(LANG_PREFIX))
-    async def on_lang(callback: CallbackQuery, state: FSMContext, space: str) -> None:
-        await callback.answer()
-        message = callback.message
-        if not isinstance(message, Message):
-            return
-        report_lang = (callback.data or "").removeprefix(LANG_PREFIX)
-        if report_lang not in LANG_LABELS:
-            return
+        # Язык отчёта на старте не спрашивается (D415): до конца обхода он равен
+        # языку чек-листа, и аудитор работает на нём. Спросят его, когда проверка
+        # готова, — `routers/finish.py`.
+        report_lang = speech_lang
         lang = chat_ui_lang(message.chat.id)
         data = await state.get_data()
         unit = str(data.get("unit", "")).strip()
         kind_code = str(data.get("kind", ""))
-        speech_lang = str(data.get("speech_lang", ""))
-        if not unit or kind_code not in KIND_TITLES or speech_lang not in LANG_LABELS:
+        if not unit or kind_code not in KIND_TITLES:
             # Мастер потерял ответы прошлых шагов (перезапуск, старая кнопка) и
             # начинается заново — для человека это тот же отказ, и он посчитан.
             await state.clear()
             await stops.refuse(
                 message,
                 lang,
-                step="start.lang",
+                step="start.speech_lang",
                 key="start.greeting",
                 reply_markup=new_inspection_keyboard(lang),
             )
@@ -574,8 +560,9 @@ def build_start_router(
                 report_lang=report_lang,
                 # Языка в проверке три (T025), и друг от друга они не зависят.
                 # Интерфейс — язык ЧЕЛОВЕКА (D303): его выбор `/lang`, иначе
-                # язык стенда. Речь и отчёт — два отдельных вопроса мастера
-                # (D393): русская речь с английским отчётом — обычный случай.
+                # язык стенда. Язык отчёта на старте равен языку чек-листа и
+                # меняется в конце (D415): русская речь с английским отчётом —
+                # обычный случай, но решается он, когда проверка готова.
                 ui_lang=person_ui_lang(),
                 speech_lang=speech_lang,
                 auditor=auditor,
@@ -591,7 +578,7 @@ def build_start_router(
             # тому, кто зовёт движок из командной строки. В журнал целиком, в
             # чат — что делать (T151, тот же принцип, что у T127).
             logger.exception("не удалось начать проверку в чате %s", message.chat.id)
-            await stops.refuse(message, lang, step="start.lang", key="start.failed")
+            await stops.refuse(message, lang, step="start.speech_lang", key="start.failed")
             return
         finally:
             await state.clear()
@@ -631,7 +618,6 @@ def build_start_router(
                     # старте читает он же, но уже внутри проверки.
                     kind=kind_title(inspection.kind, started_lang),
                     speech_lang=LANG_LABELS[speech_lang],
-                    report_lang=LANG_LABELS[report_lang],
                     auditor=inspection.auditor,
                     auditor_note=auditor_note,
                     date=inspection.date,

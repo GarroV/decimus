@@ -1,14 +1,16 @@
-"""Мини-апп обхода: перевод свободного текста на язык отчёта (D394) — `POST /tg/walk/translate`.
+"""Мини-апп обхода: перевод свободного текста на другой язык (D394) — `POST /tg/walk/translate`.
 
 Аудитор пишет «что видно», рекомендацию партнёру, общую заметку и сведения о
-визите на своём языке, а отчёт может быть на другом. Кнопка у поля просит
+визите на языке чек-листа, а читать их может человек на другом. Кнопка у поля просит
 перевод, модель его предлагает (`recognize.translate`), аудитор видит результат
 в самом поле до сохранения и может поправить — в отчёт идёт только то, что он
 сохранил обычной записью (модель предлагает, фиксирует человек). Адрес сам
 ничего не пишет.
 
-Язык перевода — язык ОТЧЁТА проверки, а не язык интерфейса: аудитор может
-работать в русском интерфейсе над английским отчётом. Опознание то же, что у
+Язык перевода — другой язык платформы, не язык чек-листа проверки
+(`translate_target`): язык отчёта до конца обхода равен языку чек-листа (D415),
+и переводить на него бессмысленно. Это и не язык интерфейса: аудитор может
+работать в русском интерфейсе над английским чек-листом. Опознание то же, что у
 записи: подпись Telegram в заголовке. Сданная проверка не мешает: адрес ничего
 не меняет, а проверка нужна лишь затем, чтобы знать язык отчёта.
 
@@ -24,6 +26,7 @@ import threading
 from flask import Flask, Response, jsonify, request
 
 from src.domain import get_state
+from src.domain.models import TEXT_LANGS, Inspection
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
 
@@ -32,6 +35,16 @@ from .walk_auth import TRANSLATE_ENDPOINT, TRANSLATE_PATH, WalkSettings
 from .walk_write import MAX_TEXT, Identify, WalkRefused, _text
 
 logger = logging.getLogger(__name__)
+
+
+def translate_target(inspection: Inspection) -> str | None:
+    """Язык перевода: первый язык платформы, не равный языку чек-листа проверки.
+
+    Свободный текст пишется на языке чек-листа и сам не переводится (D416);
+    кнопка у поля даёт перевод на ДРУГОЙ язык платформы. `None` — другого языка
+    нет (платформа одноязычна), кнопки не будет.
+    """
+    return next((code for code in TEXT_LANGS if code != inspection.speech_lang), None)
 
 
 def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify) -> None:
@@ -65,7 +78,9 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             if who in busy:
                 return refused("walk.err.translate_busy", lang, 429)
             busy.add(who)
-        target = inspection.report_lang
+        target = translate_target(inspection)
+        if target is None:
+            return refused("walk.err.bad_request", lang, 409)
         try:
             translated = translate_text(text, lang=target)
         except RecognizeError as exc:

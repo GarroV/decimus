@@ -42,7 +42,6 @@ from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.keyboards import (
     KIND_PREFIX,
-    LANG_PREFIX,
     NEW_INSPECTION_CALLBACK,
     SPEECH_LANG_PREFIX,
 )
@@ -182,7 +181,6 @@ async def test_демо_доходит_до_записи_без_модели(
     await feed(dp, bot, text_message("Demo Pizzeria #1"))
     await feed(dp, bot, callback(f"{KIND_PREFIX}planned"))
     await feed(dp, bot, callback(f"{SPEECH_LANG_PREFIX}en"))
-    await feed(dp, bot, callback(f"{LANG_PREFIX}en"))
     await feed(dp, bot, photo_message("demo-frame-1", caption=DEMO_NOTE))
 
     _состояние_на_диске(demo_env)

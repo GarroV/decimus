@@ -194,25 +194,21 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Вид проверки?",
         "en": "Inspection type?",
     },
-    # Языков в проверке три (`docs/06-mvp-bot.md`), и в мастере спрашиваются два
-    # из них — раздельно (D393): язык проверки (на нём аудитор говорит и пишет) и
-    # язык отчёта (на нём PDF и письмо партнёру). Третий, интерфейс, — выбор
-    # человека (`/lang`, D303), мастер о нём не спрашивает.
+    # Языков в проверке три (`docs/06-mvp-bot.md`), а мастер спрашивает один —
+    # язык чек-листа (D414): на нём аудитор говорит и пишет. Язык отчёта на
+    # старте не спрашивается (D415): его задают, когда проверка готова и человек
+    # согласился формировать отчёт (`finish.ask_report_lang`). Интерфейс —
+    # выбор человека (`/lang`, D303), мастер о нём не спрашивает.
     "start.ask_speech_lang": {
-        "ru": "На каком языке будете проводить проверку (говорить и писать)?",
-        "en": "In which language will you conduct the inspection (speak and write)?",
-    },
-    "start.ask_lang": {
-        "ru": "На каком языке отчёт для партнёра?",
-        "en": "In which language is the report for the partner?",
+        "ru": "На каком языке чек-лист (на нём вы говорите и пишете)?",
+        "en": "In which language is the checklist (you speak and write in it)?",
     },
     "start.started": {
         "ru": (
             "Проверка начата.\n"
             "Пиццерия: {unit}\n"
             "Вид: {kind}\n"
-            "Язык проверки: {speech_lang}\n"
-            "Язык отчёта: {report_lang}\n"
+            "Язык чек-листа: {speech_lang}\n"
             "Проверяющий: {auditor}\n"
             "{auditor_note}"
             # Хвоста «Присылайте фотографии с комментариями» здесь больше нет:
@@ -225,8 +221,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Inspection started.\n"
             "Pizzeria: {unit}\n"
             "Type: {kind}\n"
-            "Inspection language: {speech_lang}\n"
-            "Report language: {report_lang}\n"
+            "Checklist language: {speech_lang}\n"
             "Auditor: {auditor}\n"
             "{auditor_note}"
             "Date: {date}"
@@ -1152,8 +1147,23 @@ TEXTS: dict[str, dict[str, str]] = {
         "they are still in the chat above.",
     },
     "finish.ask": {
-        "ru": "Поправить запись или собирать отчёт?",
-        "en": "Edit a record, or build the report?",
+        "ru": "Проверка готова. Сформировать предварительный отчёт?",
+        "en": "The inspection is done. Build the preliminary report?",
+    },
+    # Язык отчёта спрашивается здесь, после «да» (D415), а не на старте. Список
+    # языков зависит от страны пиццерии (`domain/report_langs.py`); если он из
+    # одного языка, вопроса нет вовсе.
+    "finish.ask_report_lang": {
+        "ru": "На каком языке отчёт?",
+        "en": "In which language is the report?",
+    },
+    "finish.report_lang_gone": {
+        "ru": "Этого языка для отчёта нет. Нажмите «Сформировать предварительный отчёт» ещё раз.",
+        "en": "That report language is not available. Tap “Build preliminary report” again.",
+    },
+    "finish.report_lang_failed": {
+        "ru": "Не смог задать язык отчёта: сбой на моей стороне, подробности в журнале.",
+        "en": "Could not set the report language: something broke on my side, see the log.",
     },
     "finish.pick_edit": {
         "ru": "Какую запись поправить?",
@@ -1964,7 +1974,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.info_skip": {"ru": "Пропустить", "en": "Skip"},
     "btn.info_done": {"ru": "Дальше к отчёту", "en": "On to the report"},
     "btn.info_save": {"ru": "Записать так", "en": "Record as is"},
-    "btn.build": {"ru": "Собрать отчёт", "en": "Build the report"},
+    "btn.build": {
+        "ru": "Сформировать предварительный отчёт",
+        "en": "Build preliminary report",
+    },
     "btn.build_without_photos": {"ru": "Собрать без кадров", "en": "Build without photos"},
     "btn.edit": {"ru": "Поправить запись", "en": "Edit a record"},
     "btn.resume": {"ru": "Продолжить проверку", "en": "Continue the inspection"},

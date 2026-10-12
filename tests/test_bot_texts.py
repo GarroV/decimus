@@ -85,14 +85,16 @@ def test_missing_parameter_is_refused_not_printed_as_brace() -> None:
 
 
 def test_parameter_named_lang_does_not_collide_with_interface_language() -> None:
-    """У подтверждения старта есть параметр «язык отчёта» — он не должен спорить с языком текста."""
+    """У подтверждения старта есть параметр «язык чек-листа» — он не должен спорить с языком текста.
+
+    Строки «Язык отчёта» в подтверждении нет (D415): язык отчёта спрашивают в конце.
+    """
     text = t(
         "start.started",
         "ru",
         unit="Белград 2",
         kind="Плановая",
-        speech_lang="Русский",
-        report_lang="English",
+        speech_lang="English",
         auditor="Владимир Гарро",
         # Строка про обрезку имени (T128): пустая, когда обрезки не было, — но
         # параметр обязателен, потому что `t()` отказывает на недостающем.
@@ -100,4 +102,5 @@ def test_parameter_named_lang_does_not_collide_with_interface_language() -> None
         date="2026-09-02",
     )
     assert "English" in text
+    assert "Язык отчёта" not in text
     assert "Плановая" in text

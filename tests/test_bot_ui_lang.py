@@ -152,7 +152,7 @@ async def test_whole_start_wizard_speaks_the_deployment_language(
     assert session.last_text == t("start.ask_speech_lang", "en")
 
     await feed(dp, bot, callback_query("start:speech:en"))
-    assert session.last_text == t("start.ask_lang", "en")
+    assert get_state(CHAT_ID) is not None, "язык чек-листа — последний вопрос мастера (D415)"
 
 
 @pytest.mark.asyncio
@@ -170,7 +170,6 @@ async def test_resume_buttons_speak_the_language_of_the_inspection(
     dp = build_dispatcher(settings())
     await walk_wizard_to_language(dp, bot)
     await feed(dp, bot, callback_query("start:speech:en"))
-    await feed(dp, bot, callback_query("start:lang:en"))
 
     await feed(dp, bot, text_message("/start"))
 
@@ -198,8 +197,6 @@ async def test_started_inspection_outranks_the_deployment_language(
     await walk_wizard_to_language(dp, bot)
 
     await feed(dp, bot, callback_query("start:speech:ru"))
-
-    await feed(dp, bot, callback_query("start:lang:ru"))
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
@@ -246,8 +243,6 @@ async def test_kind_of_inspection_follows_the_report_language_not_the_interface(
 
     await feed(dp, bot, callback_query("start:speech:ru"))
 
-    await feed(dp, bot, callback_query("start:lang:ru"))
-
     inspection = get_state(CHAT_ID)
     assert inspection is not None
     assert inspection.kind == "planned"
@@ -264,8 +259,6 @@ async def test_english_report_gets_an_english_kind_in_its_header(
     await walk_wizard_to_language(dp, bot)
 
     await feed(dp, bot, callback_query("start:speech:en"))
-
-    await feed(dp, bot, callback_query("start:lang:en"))
 
     inspection = get_state(CHAT_ID)
     assert inspection is not None
