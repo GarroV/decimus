@@ -58,8 +58,11 @@ _HQ_ADMIN = frozenset(
 )
 
 #: УК: бизнес-девелопер (D440, заменил аудитора УК) читает проверки, эталон и
-#: рейтинги; методику через MCP не правит.
-_HQ_DEVELOPER = frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ})
+#: рейтинги и ведёт методику; правка ГЛАВНОГО чек-листа ему закрыта не здесь, а
+#: словами в `rpc._call_tool` (вид один, а главный — свойство чек-листа).
+_HQ_DEVELOPER = frozenset(
+    {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+)
 
 #: УК: гость — только чтение проверок и рейтингов (D440).
 _HQ_GUEST = frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ})
