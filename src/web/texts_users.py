@@ -17,6 +17,8 @@ _ROLES: dict[str, dict[str, str]] = {
     "users.role.superadmin": {"ru": "Главный админ", "en": "Super admin"},
     "users.role.admin": {"ru": "Админ", "en": "Admin"},
     "users.role.control": {"ru": "Контролинг", "en": "Controller"},
+    "users.role.developer": {"ru": "Бизнес-девелопер", "en": "Business developer"},
+    "users.role.guest": {"ru": "Гость", "en": "Guest"},
     "users.role.auditor": {"ru": "Аудитор", "en": "Auditor"},
     "users.role.partner.admin": {"ru": "Админ", "en": "Admin"},
     "users.role.partner.auditor": {"ru": "Сотрудник", "en": "Staff"},
@@ -26,8 +28,34 @@ _ROLES: dict[str, dict[str, str]] = {
         "en": "Everything in the project: people of any space, other super admins, partners.",
     },
     "users.hint.admin": {
-        "ru": "Правит методику, ведёт аудиторов, контролинг и партнёров с их людьми.",
-        "en": "Edits the methodology, manages auditors, controllers, partners and their people.",
+        "ru": (
+            "Работает сам и отвечает за систему: главный чек-лист и методика, "
+            "новые страны и партнёры, люди и другие админы (кроме главного)."
+        ),
+        "en": (
+            "Works and is responsible for the system: master checklist and methodology, "
+            "new countries and partners, people and other admins (not the super admin)."
+        ),
+    },
+    "users.hint.developer": {
+        "ru": (
+            "Пользуется сервисом полностью: проверки, приёмка, письма, предписания, "
+            "экшн-планы, рейтинги на чтение. Методику и людей не ведёт."
+        ),
+        "en": (
+            "Uses the whole service: inspections, review, letters, prescriptions, "
+            "action plans, ratings read-only. Does not manage methodology or people."
+        ),
+    },
+    "users.hint.guest": {
+        "ru": (
+            "Видит всю сеть только на чтение: обзор, проверки и отчёты, страны, "
+            "рейтинги. Ничего не меняет."
+        ),
+        "en": (
+            "Sees the whole network read-only: overview, inspections and reports, "
+            "countries, ratings. Changes nothing."
+        ),
     },
     "users.hint.control": {
         "ru": "Только рейтинги: загрузка и справочники. Ведёт людей контролинга.",
@@ -53,8 +81,8 @@ _SCREEN: dict[str, dict[str, str]] = {
     # Охват — одна строка под заголовком (#585, D364).
     "users.scope.super": {"ru": "Все пространства.", "en": "Every space."},
     "users.scope.hq_admin": {
-        "ru": "Люди УК, кроме админов, и люди партнёров.",
-        "en": "HQ people except admins, and partner people.",
+        "ru": "Люди УК, кроме главного админа, и люди партнёров.",
+        "en": "HQ people except the super admin, and partner people.",
     },
     "users.scope.control": {"ru": "Люди контролинга.", "en": "Controller accounts."},
     "users.scope.partner_admin": {"ru": "Люди вашего пространства.", "en": "People of your space."},
@@ -178,8 +206,14 @@ _ADD: dict[str, dict[str, str]] = {
         "en": "Not added: the login is taken or malformed.",
     },
     "users.add.role_space": {
-        "ru": "Главный админ и контролинг бывают только в пространстве УК (HQ). Не добавлено.",
-        "en": "Super admin and controller exist only in the HQ space. Nothing was added.",
+        "ru": (
+            "Главный админ, бизнес-девелопер, контролинг и гость бывают только в "
+            "пространстве УК (HQ). Не добавлено."
+        ),
+        "en": (
+            "Super admin, business developer, controller and guest exist only in the "
+            "HQ space. Nothing was added."
+        ),
     },
     "users.add.space_unknown": {
         "ru": "Такого пространства нет. Выберите из списка.",

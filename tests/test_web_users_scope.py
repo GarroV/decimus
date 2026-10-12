@@ -44,7 +44,7 @@ def строка(login: str, tenant: str, role: str) -> Any:
     строка("boss2", "HQ", "superadmin"),
     строка("kostya", "HQ", "admin"),
     строка("vika", "HQ", "control"),
-    строка("petr", "HQ", "auditor"),
+    строка("petr", "HQ", "developer"),
     строка("nino", "GE", "admin"),
     строка("gia", "GE", "auditor"),
     строка("anahit", "AM", "admin"),
@@ -183,7 +183,7 @@ def test_главный_админ_назначает_другого_главн�
 
     assert ответ.status_code == 200
     assert база["role"] == [
-        ("kostya", "HQ", "superadmin", ("auditor", "admin", "control", "superadmin"))
+        ("kostya", "HQ", "superadmin", ("guest", "developer", "control", "admin", "superadmin"))
     ]
 
 
@@ -231,12 +231,12 @@ def test_свою_роль_не_меняет_и_главный(главный: F
 # --- админ УК -----------------------------------------------------------------
 
 
-def test_админ_уК_видит_без_админов_уК(админ_уК: FlaskClient) -> None:
+def test_админ_уК_видит_всех_кроме_главного_админа(админ_уК: FlaskClient) -> None:
     страница = админ_уК.get("/users").get_data(as_text=True)
 
-    for свой in ("vika", "petr", "nino", "gia", "anahit", "aramayis"):
+    for свой in ("kostya", "vika", "petr", "nino", "gia", "anahit", "aramayis"):
         assert свой in страница and f"{свой}@mail.example" in страница, свой
-    for чужое in ("boss2", "boss2@mail.example", "kostya@mail.example"):
+    for чужое in ("boss2", "boss2@mail.example"):
         assert чужое not in страница, чужое
     форма = добавление(админ_уК)
     assert 'value="superadmin"' not in форма
@@ -245,25 +245,36 @@ def test_админ_уК_видит_без_админов_уК(админ_уК: 
 @pytest.mark.parametrize(
     ("путь", "форма"),
     [
-        ("/users/add", {"login": "x", "tenant": "HQ", "role": "admin"}),
         ("/users/add", {"login": "x", "tenant": "HQ", "role": "superadmin"}),
-        ("/users/role", {"login": "petr", "tenant": "HQ", "role": "admin"}),
         ("/users/role", {"login": "petr", "tenant": "HQ", "role": "superadmin"}),
-        ("/users/role", {"login": "kostya", "tenant": "HQ", "role": "auditor"}),
-        ("/users/role", {"login": "boss2", "tenant": "HQ", "role": "auditor"}),
-        ("/users/disable", {"login": "kostya", "tenant": "HQ"}),
+        ("/users/role", {"login": "boss2", "tenant": "HQ", "role": "developer"}),
         ("/users/disable", {"login": "boss2", "tenant": "HQ"}),
-        ("/users/email", {"login": "kostya", "tenant": "HQ", "email": "me@evil.example"}),
         ("/users/email", {"login": "boss2", "tenant": "HQ", "email": "me@evil.example"}),
     ],
 )
-def test_админ_уК_не_трогает_админов_и_не_выдаёт_их(
+def test_админ_уК_не_трогает_главного_админа_и_не_выдаёт_его(
     админ_уК: FlaskClient, база: dict[str, list[Any]], путь: str, форма: dict[str, str]
 ) -> None:
     ответ = админ_уК.post(путь, data=форма, headers=ЗАГОЛОВКИ)
 
     assert ответ.status_code == 403
     assert _записи(база) == НИЧЕГО
+
+
+def test_админ_уК_заводит_админа_и_ведёт_других_админов(
+    админ_уК: FlaskClient, база: dict[str, list[Any]]
+) -> None:
+    """D440 («Admin too»): админа заводит и админ; главного — нет (см. выше)."""
+    добавлен = админ_уК.post(
+        "/users/add", data={"login": "newadm", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
+    )
+    отключён = админ_уК.post(
+        "/users/disable", data={"login": "kostya", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+    )
+
+    assert добавлен.status_code == 200 and отключён.status_code == 200
+    assert база["add"] == [("newadm", "HQ", "admin")]
+    assert [x[0] for x in база["disable"]] == ["kostya"]
 
 
 def test_админ_уК_свою_роль_не_меняет(админ_уК: FlaskClient, база: dict[str, list[Any]]) -> None:

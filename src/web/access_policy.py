@@ -4,14 +4,14 @@
 
 * **главный админ** (`superadmin`, только УК) — все люди всех пространств с любой
   ролью, включая других главных админов; пространства партнёров и их страны;
-* **админ УК** (`admin` в УК) — люди УК, кроме админов и главных админов
-  (аудиторы и контроль), и все люди партнёров; пространства партнёров и их
-  страны. Админа УК и главного админа он не заводит, не повышает до них и не
+* **админ УК** (`admin` в УК) — люди УК, кроме главных админов (D440: другие
+  админы, бизнес-девелоперы, контроль, гости), и все люди партнёров; пространства
+  партнёров и их страны. Главного админа он не заводит, не повышает до него и не
   трогает;
 * **контроль** (`control`, D360) — только люди контролинга в УК;
 * **админ партнёра** (`admin` в пространстве партнёра, D346) — люди своего
   пространства: админы и сотрудники (`auditor`). Свои страны видит на чтение;
-* остальные (аудитор УК, сотрудник партнёра) — никого, только себя.
+* остальные (бизнес-девелопер, гость, сотрудник партнёра) — никого, только себя.
 
 Правило здесь, а не в маршрутах и не в разметке, потому что вопрос «можно ли» у
 списка, у формы и у каждого POST один: видимое = трогаемое, и разойтись они не
@@ -29,7 +29,14 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
-from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, SUPERADMIN_ROLE, canonical_tenant
+from src.domain.tenants import (
+    CONTROL_ROLE,
+    DEVELOPER_ROLE,
+    GUEST_ROLE,
+    HQ_TENANT,
+    SUPERADMIN_ROLE,
+    canonical_tenant,
+)
 
 from .accounts import ROLE_ADMIN, ROLE_AUDITOR, roles_for
 
@@ -39,8 +46,9 @@ HQ_ADMIN = "hq_admin"
 CONTROL = "control"
 PARTNER_ADMIN = "partner_admin"
 
-#: Роли людей УК, которых ведёт админ УК: всё, кроме админов (D364).
-_HQ_ADMIN_TOUCHES_IN_HQ = frozenset({ROLE_AUDITOR, CONTROL_ROLE})
+#: Роли людей УК, которых ведёт админ УК: всё, кроме главного админа (D364);
+#: другие админы — тоже его люди (D440, «Admin too»).
+_HQ_ADMIN_TOUCHES_IN_HQ = frozenset({ROLE_ADMIN, DEVELOPER_ROLE, CONTROL_ROLE, GUEST_ROLE})
 #: Роли людей партнёра (D346): админ пространства и сотрудник.
 _PARTNER_ROLES = frozenset({ROLE_ADMIN, ROLE_AUDITOR})
 

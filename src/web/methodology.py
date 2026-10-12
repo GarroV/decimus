@@ -34,6 +34,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
+from src.domain.tenants import is_admin_role
 from src.mcp import checklist_tools as door
 from src.mcp import checklists as lists_door
 from src.mcp.checklist import Store, current_version, tip_version
@@ -108,6 +109,22 @@ class Composition:
     def unpublished(self) -> bool:
         """Есть ли записанная, но не опубликованная версия."""
         return self.latest != self.current
+
+    @property
+    def pending_changes(self) -> bool:
+        """Отличается ли записанная версия от действующей ПО СОДЕРЖАНИЮ.
+
+        Версия названа отпечатком содержимого, поэтому равные отпечатки — те же
+        файлы методики под другим именем или датой: публиковать там нечего, и
+        показывать «есть неопубликованные правки» значило бы тревожить зря.
+        Отпечаток не нашёлся — считаем, что отличается: лишняя метка лучше
+        спрятанной правки.
+        """
+        if not self.unpublished:
+            return False
+        отпечатки = {str(v.get("version")): v.get("fingerprint") for v in self.versions}
+        было, стало = отпечатки.get(self.current), отпечатки.get(self.latest)
+        return not (было and стало and было == стало)
 
 
 @dataclass(frozen=True)
@@ -747,7 +764,14 @@ class Difference:
 
 
 def store_for(
-    store: Store, code: str | None, *, tenant: str, space: str | None, write: bool, lang: str
+    store: Store,
+    code: str | None,
+    *,
+    tenant: str,
+    space: str | None,
+    write: bool,
+    lang: str,
+    role: str | None,
 ) -> Store:
     """Хранилище чек-листа с экрана — видимого этому пространству, иначе отказ (#340).
 
@@ -756,6 +780,12 @@ def store_for(
     агент. Чужой и несуществующий — одним текстом: иначе ответ подтверждал бы,
     что чужое есть. Правка чужого — отказ ДО двери: дверь на чтении заводит
     нетронутое хранилище, а на правке пишет журнал (D283).
+
+    **Главный чек-лист правят только админы (D440).** Правка — это `write=True`,
+    и это единственная дверь веба на запись в чек-лист, поэтому проверка роли
+    стоит здесь, а не в каждом маршруте: новый правящий маршрут закрыт от
+    бизнес-девелопера с момента появления. Отказ — словами, а не пустой 403:
+    человек видит, что чек-лист главный и почему он не правится.
     """
     try:
         найдено = locate(store, tenant=tenant, code=code, space=space)
@@ -770,6 +800,8 @@ def store_for(
             else "methodology.foreign_readonly"
         )
         raise MethodologyRefused(t(ключ, lang))
+    if write and not is_admin_role(role) and lists_door.is_master(найдено):
+        raise MethodologyRefused(t("methodology.master_readonly", lang))
     return найдено
 
 
@@ -822,6 +854,8 @@ class RailRow:
     #: другого пространства несёт его в адресе (`?space=`), а переключатель
     #: бота есть только у своего (эталон у партнёра — чтение, D283).
     space: str = DEFAULT_SPACE
+    #: Метка «главный» (D440): правят только админы.
+    master: bool = False
 
 
 def _rail_key(row: RailRow) -> tuple[int, str]:
@@ -867,6 +901,7 @@ def checklist_rail(
                 bot_block=нельзя,
                 wants_bot=c.in_bot,
                 space=c.space,
+                master=c.master,
             )
         )
     return tuple(sorted(строки, key=_rail_key))
@@ -911,9 +946,10 @@ def rename_checklist(
     lang: str,
     name_ru: str,
     name_en: str,
+    role: str | None,
 ) -> Any:
     """Поменять названия. Код не меняется ничем и никогда."""
-    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang)
+    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang, role=role)
     try:
         return lists_door.rename(
             целевое, tenant=tenant, name_ru=name_ru, name_en=name_en, by=author
@@ -923,10 +959,18 @@ def rename_checklist(
 
 
 def set_checklist_state(
-    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str, state: str
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    space: str | None,
+    lang: str,
+    state: str,
+    role: str | None,
 ) -> Any:
     """Черновик / в работе / снят."""
-    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang)
+    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang, role=role)
     try:
         return lists_door.set_state(целевое, tenant=tenant, state=state, by=author)
     except McpError as отказ:
@@ -934,16 +978,27 @@ def set_checklist_state(
 
 
 def apply_checklist(
-    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    space: str | None,
+    lang: str,
+    role: str | None,
 ) -> dict[str, object]:
     """Применить чек-лист к проду: по нему пойдут проверки.
 
     Заслоны — в двери: пустой, снятый и без опубликованного издания к проду не
-    идут. Экран их не повторяет, он их показывает.
+    идут. Экран их не повторяет, он их показывает. Указатель прода — дело
+    админов, чей бы чек-лист ни применялся (D440): он решает, по какой методике
+    считает продукт.
     """
+    if not is_admin_role(role):
+        raise MethodologyRefused(t("methodology.apply_admins_only", lang))
     try:
         return lists_door.apply_to_production(
-            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang),
+            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang, role=role),
             tenant=tenant,
             by=author,
         )
@@ -951,8 +1006,45 @@ def apply_checklist(
         raise _refusal(отказ) from None
 
 
+def is_master(store: Store) -> bool:
+    """Главный ли чек-лист (D440): его правят только админы."""
+    return lists_door.is_master(store)
+
+
+def set_checklist_master(
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    space: str | None,
+    lang: str,
+    on: bool,
+    role: str | None,
+) -> Any:
+    """Поставить или снять метку «главный». Только админы (D440): метка и решает,
+    кто правит чек-лист, поэтому ставить её себе бизнес-девелопер не вправе."""
+    if not is_admin_role(role):
+        raise MethodologyRefused(t("methodology.master_toggle_admins_only", lang))
+    # Чек-лист ищется, а не правится: метка снимается и с главного, а `write=True`
+    # без роли админа главному отказал бы, но здесь админ уже проверен.
+    целевое = store_for(store, code, tenant=tenant, space=space, write=True, lang=lang, role=role)
+    try:
+        return lists_door.set_master(целевое, tenant=tenant, on=on, by=author)
+    except McpError as отказ:
+        raise _refusal(отказ) from None
+
+
 def set_bot_access(
-    store: Store, *, tenant: str, author: str, code: str, space: str | None, lang: str, on: bool
+    store: Store,
+    *,
+    tenant: str,
+    author: str,
+    code: str,
+    space: str | None,
+    lang: str,
+    on: bool,
+    role: str | None,
 ) -> object:
     """Открыть чек-лист аудиторам в боте или закрыть (волна 3).
 
@@ -961,7 +1053,7 @@ def set_bot_access(
     """
     try:
         return lists_door.set_bot_access(
-            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang),
+            store_for(store, code, tenant=tenant, space=space, write=True, lang=lang, role=role),
             tenant=tenant,
             on=on,
             by=author,

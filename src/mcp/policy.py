@@ -21,7 +21,14 @@
 
 from __future__ import annotations
 
-from src.domain.tenants import ADMIN_ROLES, CONTROL_ROLE, HQ_TENANT, canonical_tenant
+from src.domain.tenants import (
+    ADMIN_ROLES,
+    CONTROL_ROLE,
+    DEVELOPER_ROLE,
+    GUEST_ROLE,
+    HQ_TENANT,
+    canonical_tenant,
+)
 
 from .catalogue import (
     KIND_CHECKLIST,
@@ -32,11 +39,11 @@ from .catalogue import (
     KIND_RATINGS_READ,
 )
 
-#: Аудитор УК — роль учётки сайта, которой открыта проверка, но не методика.
+#: Аудитор — роль сотрудника партнёра; в УК её больше нет (D440, `0056`).
 AUDITOR_ROLE = "auditor"
 
 #: Роли сайта, известные матрице. Остальные — ничего.
-KNOWN_ROLES = frozenset({AUDITOR_ROLE, CONTROL_ROLE, *ADMIN_ROLES})
+KNOWN_ROLES = frozenset({AUDITOR_ROLE, CONTROL_ROLE, DEVELOPER_ROLE, GUEST_ROLE, *ADMIN_ROLES})
 
 #: УК: админ и главный админ — всё, кроме снятия (D335, D344).
 _HQ_ADMIN = frozenset(
@@ -50,8 +57,12 @@ _HQ_ADMIN = frozenset(
     }
 )
 
-#: УК: аудитор читает проверки, эталон и рейтинги; методику не правит (D344).
-_HQ_AUDITOR = frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ})
+#: УК: бизнес-девелопер (D440, заменил аудитора УК) читает проверки, эталон и
+#: рейтинги; методику через MCP не правит.
+_HQ_DEVELOPER = frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ})
+
+#: УК: гость — только чтение проверок и рейтингов (D440).
+_HQ_GUEST = frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ})
 
 #: УК: контролинг — только рейтинги, чтение и управление; проверок не касается
 #: никак (D420, отменяет D350; D344, D358).
@@ -75,7 +86,12 @@ def kinds_for(role: str, tenant: str) -> frozenset[str]:
         return _HQ_ADMIN
     if role == CONTROL_ROLE:
         return _HQ_CONTROL
-    return _HQ_AUDITOR
+    if role == DEVELOPER_ROLE:
+        return _HQ_DEVELOPER
+    if role == GUEST_ROLE:
+        return _HQ_GUEST
+    # Аудитора в УК больше нет (D440): незнакомая в УК роль закрыта.
+    return frozenset()
 
 
 def permits(role: str, tenant: str, kind: str) -> bool:

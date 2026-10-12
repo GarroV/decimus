@@ -25,7 +25,7 @@
 {% block title %}{{ t('section.admin.title') }}{% endblock %}
 {% block page_class %} page--wide{% endblock %}
 
-{% set editable = composition.is_latest %}
+{% set editable = composition.is_latest and can_edit_checklist %}
 {% set drawer_open = card or adding or changes is not none or zone_card or panel %}
 
 {% macro level_tags(item) %}
@@ -214,12 +214,13 @@
   <div class="mx-top" data-mx-top>
   <div class="mx-bar">
     <div class="mx-bar__title">
-      <h1 class="section__title">{{ t('section.admin.title') }}</h1>
+      <h1 class="section__title">{{ t('section.admin.title') }}<span class="mx-bar__dot" aria-hidden="true">·</span></h1>
       {% set here = checklists | selectattr('code', 'equalto', checklist_code) | first %}
       <details class="pick mx-switch" name="pick">
         <summary class="mx-switch__btn" aria-label="{{ t('methodology.bar.switch') }}">
           <span>{{ (here.name_ru if lang == 'ru' else (here.name_en or here.name_ru)) if here else (checklist_code or '—') }}</span>
           {% if here and here.in_bot %}<span class="tag tag--ok tag--micro">{{ t('methodology.bot.on') }}</span>{% endif %}
+          {% if master_here %}<span class="tag tag--accent tag--micro" title="{{ t('methodology.master.hint') }}">{{ t('methodology.master.badge') }}</span>{% endif %}
           <span class="pick__caret" aria-hidden="true">▾</span>
         </summary>
         <div class="pick__menu" role="menu">
@@ -228,6 +229,7 @@
                href="{{ url_for('methodology', checklist=c.code, space=(c.space if c.space != own_space else None), lang=lang) }}">
               <span class="pick__label">{{ c.name_ru if lang == 'ru' else (c.name_en or c.name_ru) }}
                 <span class="mx-muted mono">{{ c.code }} · {{ t('checklists.state.' ~ c.state) }}</span></span>
+              {% if c.master %}<span class="tag tag--accent tag--micro">{{ t('methodology.master.badge') }}</span>{% endif %}
               {% if c.code == checklist_code %}<span class="pick__mark" aria-hidden="true">✓</span>{% endif %}
             </a>
           {% endfor %}
@@ -239,6 +241,33 @@
       <span class="section__num">{{ t('methodology.count', count=composition.items|length) }}</span>
     </div>
     <div class="mx-bar__actions">
+      {% if composition.pending_changes %}
+        {# Неопубликованные правки — маленький признак, а не плашка на всю ширину.
+           Публикация — отдельный шаг: правка успевает полежать проверенной,
+           прежде чем по ней начнут считать партнёров. Нет отличий по содержанию
+           (`pending_changes`) — признака нет вовсе. #}
+        <details class="pick mx-pending" name="pending">
+          <summary class="mx-pending__btn"><span class="mx-pending__dot" aria-hidden="true"></span>{{ t('methodology.pending.label') }}</summary>
+          <div class="pick__menu mx-pending__menu" role="group">
+            <p class="mx-pending__text">{{ t('methodology.draft.text') }}</p>
+            <div class="mx-pending__row">
+              <a class="btn btn--sm" href="{{ href(diff='1', item='', new='') }}" data-mx-open>{{ t('methodology.diff.open') }}</a>
+              {% if can_edit_checklist %}
+                <form method="post" action="{{ action('methodology_publish') }}">
+                  <input type="hidden" name="version" value="{{ composition.latest }}">
+                  <button class="btn btn--sm btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
+                </form>
+              {% endif %}
+            </div>
+          </div>
+        </details>
+      {% endif %}
+      {% if is_admin and here %}
+        <form method="post" action="{{ action('checklists_master', code=checklist_code) }}" class="mx-master-form">
+          <input type="hidden" name="on" value="{{ '0' if master_here else '1' }}">
+          <button class="btn" type="submit" title="{{ t('methodology.master.hint') }}">{{ t('methodology.master.unset') if master_here else t('methodology.master.set') }}</button>
+        </form>
+      {% endif %}
       <a class="btn{% if panel == 'scoring' %} is-on{% endif %}" href="{{ href(panel='scoring', item='') }}" data-mx-open>{{ t('methodology.bar.scoring') }}</a>
       <a class="btn{% if panel == 'versions' %} is-on{% endif %}" href="{{ href(panel='versions', item='') }}" data-mx-open>{{ t('methodology.versions.title') }}</a>
       {% if editable %}
@@ -250,29 +279,15 @@
   {% if missing_item %}
     <div class="note note--warn mt-gap" role="status"><div><div class="note__text">{{ t('methodology.item.missing', code=missing_item) }}</div></div></div>
   {% endif %}
-  <div class="mx-ver">
-    <span class="mx-muted">{{ t('methodology.version.in_effect') }}:</span> {{ version_label(composition.current) }}
-    {% if composition.version != composition.current %}
-      <span class="mx-muted">· {{ t('methodology.version.viewing', version='') }}</span> {{ version_label(composition.version) }}
-    {% endif %}
-  </div>
   </div>
 
-  {% if composition.unpublished %}
-    {# Публикация — ОТДЕЛЬНЫЙ шаг: правка успевает полежать проверенной, прежде чем по ней начнут считать партнёров. #}
-    <div class="note note--warn mx-draft" role="status">
-      <div class="grow">
-        <div class="note__title">{{ t('methodology.version.draft_bar') }}</div>
-        <div class="note__text">{{ t('methodology.draft.text') }}</div>
-      </div>
-      <a class="btn" href="{{ href(diff='1', item='', new='') }}" data-mx-open>{{ t('methodology.diff.open') }}</a>
-      <form method="post" action="{{ action('methodology_publish') }}">
-        <input type="hidden" name="version" value="{{ composition.latest }}">
-        <button class="btn btn--primary" type="submit">{{ t('methodology.publish.submit') }}</button>
-      </form>
+  {% if not can_edit_checklist %}
+    <div class="note note--info" role="status">
+      <div><div class="note__title">{{ t('methodology.master.readonly.title') }}</div>
+        <div class="note__text">{{ t('methodology.master_readonly') }}</div></div>
     </div>
   {% endif %}
-  {% if not editable %}
+  {% if can_edit_checklist and not composition.is_latest %}
     <div class="note note--warn" role="status">
       <div><div class="note__title">{{ t('methodology.old.title') }}</div>
         <div class="note__text">{{ t('methodology.old.text', version=composition.version, latest=composition.latest) }}</div></div>
@@ -691,6 +706,12 @@
           <a class="mx-icon" href="{{ href(panel='') }}" data-mx-close aria-label="{{ t('methodology.panel.close') }}">{{ icon('x') }}</a>
         </header>
         <div class="mx-drawer__body">
+          <p class="field-note">
+            <span class="mx-muted">{{ t('methodology.version.in_effect') }}:</span> {{ version_label(composition.current) }}
+            {% if composition.version != composition.current %}
+              <span class="mx-muted">· {{ t('methodology.version.viewing', version='') }}</span> {{ version_label(composition.version) }}
+            {% endif %}
+          </p>
           <p class="field-note">{{ t('methodology.versions.hint') }}</p>
           <table class="table mx-table">
             <thead><tr>

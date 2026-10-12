@@ -106,16 +106,16 @@ def test_админ_уК_отвязывает_чужую_привязку(monkey
         id="другой",
         login="petr",
         tenant="HQ",
-        role="auditor",
+        role="developer",
         email=None,
         created_at=datetime(2026, 9, 1, tzinfo=UTC),
         disabled_at=None,
     )
     админ = SimpleNamespace(
         id="админ",
-        login="dev",
+        login="boss",
         tenant="HQ",
-        role="admin",
+        role="superadmin",
         email=None,
         created_at=datetime(2026, 9, 1, tzinfo=UTC),
         disabled_at=None,
@@ -126,7 +126,7 @@ def test_админ_уК_отвязывает_чужую_привязку(monkey
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
         ответ = client.post("/users/bot-unlink", headers=ЗАГОЛОВКИ, data={"user_id": "другой"})
-        # #585: админ УК — только в охвате; привязку другого админа УК не снимает.
+        # #585: админ УК — только в охвате; привязку главного админа не снимает.
         вне_охвата = client.post("/users/bot-unlink", headers=ЗАГОЛОВКИ, data={"user_id": "админ"})
     assert ответ.status_code == 200 and отвязано == ["другой"]
     assert вне_охвата.status_code == 403

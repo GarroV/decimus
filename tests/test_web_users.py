@@ -31,7 +31,7 @@ from src.web.accounts import everyone as настоящий_перечень
 СВОЙ = {"Origin": "http://localhost"}
 
 
-def строка(login: str, *, role: str = "auditor", disabled: bool = False) -> SimpleNamespace:
+def строка(login: str, *, role: str = "developer", disabled: bool = False) -> SimpleNamespace:
     return SimpleNamespace(
         login=login,
         role=role,
@@ -57,7 +57,7 @@ def стенд_админа(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskCl
 
 @pytest.fixture
 def стенд_аудитора(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="auditor")
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="developer")
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -108,11 +108,13 @@ def test_пароль_заведённого_показан_один_раз_и_�
     monkeypatch.setattr(
         accounts,
         "add",
-        lambda login, **_: accounts.Added(login=login, role="auditor", password="СЕКРЕТ-РОВНО-РАЗ"),
+        lambda login, **_: accounts.Added(
+            login=login, role="developer", password="СЕКРЕТ-РОВНО-РАЗ"
+        ),
     )
 
     ответ = стенд_админа.post(
-        "/users/add", data={"login": "petr", "role": "auditor", "tenant": ТЕНАНТ}, headers=СВОЙ
+        "/users/add", data={"login": "petr", "role": "developer", "tenant": ТЕНАНТ}, headers=СВОЙ
     )
 
     # Страница, а не перенаправление: пароль в адресе остался бы в истории

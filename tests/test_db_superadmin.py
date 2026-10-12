@@ -128,7 +128,7 @@ def test_из_двух_главных_одного_снять_можно_вто�
 
     assert web_access.disable_account("dev", tenant="HQ") is True
     with pytest.raises(web_access.LastSuperadminError):
-        web_access.reassign_role("boss", tenant="HQ", role="auditor")
+        web_access.reassign_role("boss", tenant="HQ", role="developer")
     assert _живые_главные(pg_dsn) == {"boss"}
 
 
@@ -168,8 +168,8 @@ def test_двое_главных_снимают_друг_друга_одновр
 
 
 def test_снятие_не_главного_не_ждёт_и_не_мешает(роль_веба: str) -> None:
-    """Триггер срабатывает только на главного: аудитора отключают как прежде."""
-    web_access.create_account("petr", tenant="HQ", password=ПАРОЛЬ)
+    """Триггер срабатывает только на главного: бизнес-девелопера отключают как прежде."""
+    web_access.create_account("petr", tenant="HQ", password=ПАРОЛЬ, role="developer")
 
     assert web_access.disable_account("petr", tenant="HQ") is True
 
@@ -178,11 +178,11 @@ def test_снятие_не_главного_не_ждёт_и_не_мешает(�
 def test_чужая_роль_цели_не_правится_запросом(роль_веба: str, pg_dsn: str, дверь: str) -> None:
     """`only_roles` — условие в самом запросе: админа не тронет тот, кому он вне охвата."""
     web_access.create_account("dev", tenant="HQ", password=ПАРОЛЬ, role="admin")
-    охват = ("auditor", "control")
+    охват = ("developer", "control")
 
     if дверь == "role":
         assert (
-            web_access.reassign_role("dev", tenant="HQ", role="auditor", only_roles=охват) is None
+            web_access.reassign_role("dev", tenant="HQ", role="developer", only_roles=охват) is None
         )
     elif дверь == "disable":
         assert web_access.disable_account("dev", tenant="HQ", only_roles=охват) is False
@@ -200,11 +200,11 @@ def test_чужая_роль_цели_не_правится_запросом(р�
 
 
 def test_охват_по_роли_пропускает_свою_цель(роль_веба: str) -> None:
-    web_access.create_account("petr", tenant="HQ", password=ПАРОЛЬ)
+    web_access.create_account("petr", tenant="HQ", password=ПАРОЛЬ, role="developer")
 
     assert (
-        web_access.reassign_role("petr", tenant="HQ", role="control", only_roles=("auditor",))
-        == "auditor"
+        web_access.reassign_role("petr", tenant="HQ", role="control", only_roles=("developer",))
+        == "developer"
     )
 
 

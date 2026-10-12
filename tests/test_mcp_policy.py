@@ -56,7 +56,10 @@ _ВСЁ_УК = frozenset(
 МАТРИЦА: dict[tuple[str, str], frozenset[str]] = {
     ("HQ", "superadmin"): _ВСЁ_УК,
     ("HQ", "admin"): _ВСЁ_УК,
-    ("HQ", "auditor"): frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ}),
+    ("HQ", "developer"): frozenset({KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_RATINGS_READ}),
+    # Гость (D440): только чтение проверок и рейтингов. Аудитора в УК больше нет.
+    ("HQ", "guest"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
+    ("HQ", "auditor"): frozenset(),
     ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
     ("RS", "admin"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
     ("RS", "auditor"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
@@ -73,7 +76,7 @@ def test_клетка_матрицы(арендатор: str, роль: str, в�
     )
 
 
-@pytest.mark.parametrize("роль", ["superadmin", "admin", "auditor", "control"])
+@pytest.mark.parametrize("роль", ["superadmin", "admin", "developer", "guest", "control"])
 def test_снятие_проверки_через_oauth_закрыто_всем(роль: str) -> None:
     assert permits(роль, "HQ", KIND_RETRACTION) is False
 
