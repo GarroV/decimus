@@ -263,3 +263,80 @@ def load_states() -> tuple[LoadState, ...]:
     except psycopg.Error as exc:
         raise _fail("Журнал сбора агрегаторов не прочитался", exc) from exc
     return tuple(LoadState(str(r[0]), r[1], str(r[2]), int(r[3]), r[4], r[5]) for r in rows)
+
+
+@dataclass(frozen=True)
+class UpdateRequest:
+    """Заявка на обновление вне расписания (миграция 0052). `aggregators` — какие
+    собрать; пусто — все, что бот собирает сам. `done_at is None` — в очереди."""
+
+    id: int
+    requested_at: datetime
+    requested_by: str
+    aggregators: tuple[str, ...]
+    done_at: datetime | None
+    outcome: str | None
+    error: str | None
+
+
+def _request(row: tuple[object, ...]) -> UpdateRequest:
+    return UpdateRequest(
+        int(row[0]),  # type: ignore[call-overload]
+        row[1],  # type: ignore[arg-type]
+        str(row[2]),
+        tuple(str(a) for a in row[3] or ()),  # type: ignore[attr-defined]
+        row[4],  # type: ignore[arg-type]
+        None if row[5] is None else str(row[5]),
+        None if row[6] is None else str(row[6]),
+    )
+
+
+def open_request() -> UpdateRequest | None:
+    """Заявка, которую бот ещё не выполнил (`None` — очередь пуста)."""
+    sql = (
+        "select id, requested_at, requested_by, aggregators, done_at, outcome, error "
+        "from agg.requests where done_at is null"
+    )
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            row = conn.execute(sql).fetchone()
+    except psycopg.Error as exc:
+        raise _fail("Заявки на обновление агрегаторов не прочитались", exc) from exc
+    return _request(row) if row else None
+
+
+def request_update(aggregators: Sequence[str], *, by: str) -> tuple[UpdateRequest, bool]:
+    """Поставить заявку на обновление. Пока предыдущая не выполнена, второй не
+    заводится: вернётся она сама и `False`. Заявка принята — вернётся она и `True`.
+    `aggregators` пусто — все, что бот собирает сам."""
+    sql = (
+        "insert into agg.requests (requested_by, aggregators) values (%s, %s) "
+        "on conflict do nothing "
+        "returning id, requested_at, requested_by, aggregators, done_at, outcome, error"
+    )
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            row = conn.execute(sql, (by, list(aggregators) or None)).fetchone()
+    except psycopg.Error as exc:
+        raise _fail("Заявка на обновление агрегаторов не легла", exc) from exc
+    if row:
+        return _request(row), True
+    queued = open_request()
+    if queued is None:  # выполнили между вставкой и чтением — просьба ушла впустую
+        raise RatingsError(
+            "Заявка на обновление агрегаторов не легла: очередь сменилась, повторите"
+        )
+    return queued, False
+
+
+def finish_request(request_id: int, *, ok: bool, error: str | None = None) -> None:
+    """Закрыть заявку исходом сбора; текст ошибки обрезается, как у журнала."""
+    try:
+        with psycopg.connect(check_environment().dsn) as conn:
+            conn.execute(
+                "update agg.requests set done_at = now(), outcome = %s, error = %s "
+                "where id = %s and done_at is null",
+                ("ok" if ok else "failed", (error or "")[:500] or None, request_id),
+            )
+    except psycopg.Error as exc:
+        raise _fail("Заявка на обновление агрегаторов не закрылась", exc) from exc
