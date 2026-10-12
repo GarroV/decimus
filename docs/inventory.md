@@ -372,6 +372,7 @@
 | `0055_maps_ratings_index.sql` | — |
 | `0056_finish_modes.sql` | `finish_modes` |
 | `0057_checklist_langs.sql` | `checklist_langs` |
+| `0058_translate_modes.sql` | `translate_modes` |
 <!-- map:end -->
 
 ## Makefile

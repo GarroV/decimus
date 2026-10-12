@@ -294,7 +294,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -317,6 +317,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
 | `src/db/synonyms.py` | T284: карта синонимов формулировок — где живёт выученное (D119) |
+| `src/db/translate_modes.py` | Перевод комментариев на язык отчёта, выбранный аудитором (D443): чтение и запись |
 | `src/db/unit_profiles.py` | Справочник сведений о пиццериях (`unit_profiles`, миграция 0046): запись и чтение |
 | `src/db/units.py` | Нормализация названия точки для сопоставления повторного ввода |
 <!-- map:end -->
@@ -406,6 +407,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0055_maps_ratings_index.sql` | Индекс под выборки «последняя оценка филиала на карте» (`maps_store.latest`) и «оценка пиццерии на карте на дату» (`maps_store.unit_scores`) |
 | `0056_finish_modes.sql` | D449: «Завершить» в мини-аппе работает в одном из двух режимов, и каждый аудитор выбирает свой в настройках приложения: `summary` — сначала сводка в чат, `report` … |
 | `0057_checklist_langs.sql` | D451: язык чек-листа, выбранный аудитором на старте проверки в мини-аппе, запоминается за ЧЕЛОВЕКОМ — на следующем старте экран подставляет его же |
+| `0058_translate_modes.sql` | D443: перевод комментариев на язык отчёта — автоматически или по кнопке, и каждый аудитор выбирает свой в настройках мини-аппа: `button` — переводит сам по кнопке под… |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -470,6 +472,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/config.py` | Окружение бота: токен, кому отвечать, как запускаться |
 | `src/bot/dates.py` | Разбор даты из живой фразы аудитора (задача #220) |
 | `src/bot/errors.py` | Отказы блока `bot` |
+| `src/bot/finish_translate.py` | Автоперевод комментариев при сборке отчёта (D443) |
 | `src/bot/frame_copies.py` | Копии присланных кадров на диске площадки, на 7 дней (#367, решение владельца D179) |
 | `src/bot/info.py` | Информационная часть проверки: какие поля спрашиваются и чем они разные (T158) |
 | `src/bot/inspection.py` | Чтение проверки так, чтобы бот не онемел ни на одной форме порчи (T126) |
