@@ -1,0 +1,45 @@
+{#
+  «Подтвердите вход» (`web.reauth`): перед действием, создающим долгоживущий
+  доступ (токен Claude, привязка бота, почта Google, разрешение Claude), вход в
+  этой сессии должен быть не старше 15 минут. Подтверждают тем же способом, каким
+  учётка входит: с почтой Google при включённом входе Google — только Google
+  (D450), иначе паролем. Введённый пароль обратно в разметку не возвращается.
+#}{% extends "base.html" %}
+{% block title %}{{ t('settings.confirm.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+{% endblock %}
+{% block page_class %} page--settings{% endblock %}
+{% block body %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('settings.confirm.title') }}</h1>
+      <p class="shead__sub">{{ account.login }}</p>
+    </div>
+  </header>
+  <article class="sdetail ssettings">
+    <section class="ssec" id="confirm">
+      <p class="ssec__text">{{ t('settings.confirm.why') }}</p>
+      {% if locked_minutes %}
+        <div class="note note--warn"><div class="note__text">{{ t('settings.confirm.locked', minutes=locked_minutes) }}</div></div>
+      {% elif failed %}
+        <div class="note note--warn"><div class="note__text">{{ t('settings.confirm.failed_google' if via_google else 'settings.confirm.failed') }}</div></div>
+      {% endif %}
+      {% if via_google %}
+        <form method="post" action="{{ url('/settings/confirm/google') }}" class="sform">
+          <input type="hidden" name="next" value="{{ back }}">
+          <button class="sbtn sbtn--primary" type="submit">{{ t('settings.confirm.google') }}</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url('/settings/confirm') }}" class="sform" id="confirm-form">
+          <input type="hidden" name="next" value="{{ back }}">
+          <label><span class="sform__label">{{ t('settings.google.unlink_current') }}</span>
+            <input class="sinput" type="password" name="password" required autocomplete="current-password" autofocus></label>
+          <button class="sbtn sbtn--primary" type="submit">{{ t('settings.confirm.submit') }}</button>
+        </form>
+      {% endif %}
+      <p class="ssec__note"><a href="{{ url('/settings') }}?lang={{ lang }}">{{ t('settings.confirm.back') }}</a></p>
+    </section>
+  </article>
+{% endblock %}

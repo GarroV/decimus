@@ -101,6 +101,9 @@ class GoogleIdentity:
     email_verified: bool
     #: Домен Google Workspace аккаунта (`hd`); пусто — личный аккаунт, не Workspace.
     hosted_domain: str = ""
+    #: `nonce` из токена — то, что мы послали в уходе к Google; пусто — не посылали.
+    #: Привязка почты в «Настройках» сверяет его со своей меткой (`google_link`).
+    nonce: str = ""
 
 
 def load_google_settings(env: Mapping[str, str] | None = None) -> GoogleSettings | None:
@@ -136,8 +139,12 @@ def new_state() -> str:
     return secrets.token_urlsafe(32)
 
 
-def authorization_url(settings: GoogleSettings, *, state: str) -> str:
-    """Адрес, куда уводим человека на согласие."""
+def authorization_url(settings: GoogleSettings, *, state: str, nonce: str | None = None) -> str:
+    """Адрес, куда уводим человека на согласие.
+
+    `nonce` Google вернёт внутри `id_token`: так токен привязан к ЭТОМУ заходу,
+    а не только код — к метке (`google_link`).
+    """
     параметры = {
         "client_id": settings.client_id,
         "redirect_uri": settings.redirect_uri,
@@ -148,6 +155,8 @@ def authorization_url(settings: GoogleSettings, *, state: str) -> str:
         # и молчаливый вход «не тем» аккаунтом выглядит как отказ доступа.
         "prompt": "select_account",
     }
+    if nonce:
+        параметры["nonce"] = nonce
     return f"{AUTHORIZATION_ENDPOINT}?{urllib.parse.urlencode(параметры)}"
 
 
@@ -209,10 +218,12 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
         raise GoogleAuthError("почта в аккаунте Google не подтверждена")
 
     домен = нагрузка.get("hd")
+    метка = нагрузка.get("nonce")
     return GoogleIdentity(
         email=почта.strip().lower(),
         email_verified=True,
         hosted_domain=домен.strip().lower() if isinstance(домен, str) else "",
+        nonce=метка if isinstance(метка, str) else "",
     )
 
 
