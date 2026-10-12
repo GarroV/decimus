@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 from .texts_app import APP_TEXTS
+from .texts_hints import HINT_TEXTS
 
 WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.progress": {
@@ -83,17 +84,36 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.finish.sent": {"ru": "Итог отправлен в чат", "en": "The summary is in the chat"},
     "walk.finish.yes": {"ru": "Завершить", "en": "Finish"},
-    "walk.finish.manual": {
-        "ru": "Завершите проверку командой /finish в чате",
-        "en": "Finish the inspection with the /finish command in the chat",
+    # Режим «Сразу отчёт» (D449).
+    "walk.finish.ask_report": {
+        "ru": "Сформировать отчёт и прислать в чат?",
+        "en": "Build the report and send it to the chat?",
+    },
+    "walk.finish.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
+    "walk.finish.yes_report": {"ru": "Сформировать", "en": "Build"},
+    "walk.finish.sent_report": {
+        "ru": "Отчёт собирается — он придёт в чат",
+        "en": "The report is being built — it will arrive in the chat",
+    },
+    "walk.finish.err.lang": {
+        "ru": "Выберите язык отчёта из предложенных.",
+        "en": "Pick the report language from the offered ones.",
+    },
+    "walk.finish.err.info": {
+        "ru": "Сначала заполните сведения о визите: {count}",
+        "en": "Fill in the visit details first: {count}",
+    },
+    "walk.finish.err.busy": {
+        "ru": "Отчёт уже собирается — дождитесь его в чате.",
+        "en": "The report is already being built — wait for it in the chat.",
     },
     "walk.finish.err.none": {
         "ru": "Проверки нет — завершать нечего.",
         "en": "There is no inspection to finish.",
     },
     "walk.finish.err.failed": {
-        "ru": "Итог не отправился. Завершите проверку командой /finish в чате.",
-        "en": "The summary was not sent. Finish with the /finish command in the chat.",
+        "ru": "Не получилось. Завершите проверку командой /finish в чате.",
+        "en": "That did not work. Finish with the /finish command in the chat.",
     },
     "walk.zone.clean_done": {
         "ru": "Зона осмотрена, нарушений нет.",
@@ -218,6 +238,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.photos": {"ru": "Фото", "en": "Photos"},
     "walk.photo.uploading": {"ru": "Загружаю…", "en": "Uploading…"},
     "walk.photo.failed": {"ru": "Не загрузилось — повторить", "en": "Failed — retry"},
+    "walk.photo.waiting": {"ru": "Ждёт связи", "en": "Waiting for signal"},
     "walk.photo.remove": {"ru": "Убрать фото", "en": "Remove photo"},
     "walk.photo.chat": {"ru": "фото из чата", "en": "photo from chat"},
     "walk.photo.last": {
@@ -269,6 +290,10 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.add_photos": {"ru": "Добавить фото к записи", "en": "Add photos to the record"},
     "walk.sheet.need_photo": {"ru": "Нужно фото", "en": "A photo is needed"},
     "walk.sheet.need_upload": {"ru": "Дождитесь загрузки фото", "en": "Wait for the photo upload"},
+    "walk.sheet.need_online": {
+        "ru": "Кадры ждут связи — сохранить можно, когда они загрузятся",
+        "en": "Photos are waiting for a connection — you can save once they are uploaded",
+    },
     "walk.sheet.need_item": {"ru": "Выберите пункт", "en": "Choose an item"},
     "walk.sheet.need_level": {"ru": "Выберите класс", "en": "Choose a class"},
     "walk.sheet.need_zone": {"ru": "Выберите зону", "en": "Choose a zone"},
@@ -286,6 +311,14 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Your unsaved draft is back.",
     },
     "walk.sheet.saved": {"ru": "Записано", "en": "Recorded"},
+    "walk.sheet.saved_in": {"ru": "Записано: {zone}", "en": "Recorded: {zone}"},
+    "walk.sheet.saved_go": {"ru": "Перейти", "en": "Go there"},
+    "walk.sheet.where": {"ru": "Где?", "en": "Where?"},
+    "walk.sheet.zone_other": {"ru": "Другая зона…", "en": "Another zone…"},
+    "walk.sheet.need_where": {
+        "ru": "Укажите, где нарушение",
+        "en": "Say where the issue is",
+    },
     "walk.sheet.unusual": {
         "ru": "Зона не из списка пункта — запись пометится для перепроверки.",
         "en": "The zone is not on the item's list — the record will be flagged for review.",
@@ -377,6 +410,34 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Could not save. Try again in a minute.",
     },
     "walk.err.bad_date": {"ru": "Дата не разобрана.", "en": "The date was not understood."},
+    "walk.offline.parked": {
+        "ru": "Нет связи. Кадр сохранён на телефоне и уйдёт сам, когда сеть вернётся.",
+        "en": "No connection. The photo is kept on the phone and will upload by itself when "
+        "the network is back.",
+    },
+    "walk.offline.sent": {
+        "ru": "Кадры, снятые без связи, загружены: {n}. Они в черновике записи.",
+        "en": "Photos taken offline are uploaded: {n}. They are in the record draft.",
+    },
+    "walk.offline.full": {
+        "ru": "Память для кадров без связи заполнена — этот кадр не сохранён. "
+        "Дождитесь сети и снимите снова.",
+        "en": "The offline photo storage is full — this photo was not kept. "
+        "Wait for the network and take it again.",
+    },
+    "walk.offline.nostore": {
+        "ru": "Телефон не даёт сохранить кадр без связи. Дождитесь сети и снимите снова.",
+        "en": "The phone would not keep the photo offline. Wait for the network and take it again.",
+    },
+    "walk.offline.dropped": {
+        "ru": "Не удалось отправить кадров: {n}. Они удалены с телефона — снимите заново.",
+        "en": "Photos that could not be sent: {n}. They were removed from the phone — "
+        "take them again.",
+    },
+    "walk.offline.expired": {
+        "ru": "Кадры без связи старше {days} дней удалены: {n}. Снимите заново.",
+        "en": "Offline photos older than {days} days were removed: {n}. Take them again.",
+    },
     "walk.err.network": {
         "ru": "Нет связи с сервером. Черновик сохранён на телефоне — повторите, когда "
         "появится сеть.",
@@ -386,3 +447,4 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
 
 # Главная и настройки приложения (D373) — тем же каталогом, одним ответом.
 WALK_TEXTS.update(APP_TEXTS)
+WALK_TEXTS.update(HINT_TEXTS)
