@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from urllib.parse import urlsplit
 
 from flask import Flask, current_app, g, make_response, redirect, render_template, request, url_for
 from itsdangerous import BadSignature, URLSafeTimedSerializer
@@ -50,7 +51,7 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import canonical_tenant
 
-from . import swarm_api, walk_auth
+from . import oauth, swarm_api, walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -101,11 +102,49 @@ COOKIE_SALT = "web-session"
 #: `swarm_api_*` — API чтения для Swarm (#567, D387): опознаёт сервисный токен
 #: из `api.tokens` по отпечатку (`swarm_api._authorize`, D388), а не кука; без
 #: живого токена с нужным правом каждый адрес отвечает 401/403/429.
+#:
+#: `oauth_*` (кроме согласия) — метаданные, регистрация клиента и выдача
+#: токенов OAuth (D417, `oauth.py`): их зовёт сервер Claude, а не браузер
+#: вошедшего; сами они держатся PKCE и одноразовым кодом. Согласие
+#: (`oauth_authorize`) здесь НЕ стоит — оно требует входа.
 OPEN_ENDPOINTS = (
     frozenset({"login", "static", "google_start", "google_callback"})
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
+    | oauth.ENDPOINTS
 )
+
+#: Куда можно вернуть после входа (D417): только на согласие OAuth своего
+#: сайта. Произвольный `next` — открытый редирект: ссылка «войдите в decimus»
+#: уводила бы после входа на чужой сайт под видом своего.
+NEXT_PREFIX = f"{oauth.AUTHORIZE_PATH}?"
+
+
+def safe_next(raw: str | None) -> str | None:
+    """Путь возврата после входа — или `None`, если он не на согласие OAuth.
+
+    Принимается только путь ВНУТРИ приложения (без префикса площадки — его
+    добавляет `request.script_root` при редиректе), начинающийся ровно с
+    `/oauth/authorize?`: без схемы, без хоста, без «//» и обратной косой черты,
+    которые браузеры читают как начало чужого хоста.
+    """
+    if not raw or not raw.startswith(NEXT_PREFIX):
+        return None
+    if "\\" in raw or any(not знак.isprintable() for знак in raw):
+        return None
+    части = urlsplit(raw)
+    if части.scheme or части.netloc or части.path != oauth.AUTHORIZE_PATH:
+        return None
+    return raw
+
+
+def after_login(raw: str | None) -> Response:
+    """Куда уйти после входа: на согласие OAuth, если просили, иначе — на главную."""
+    путь = safe_next(raw)
+    if путь is None:
+        return redirect(url_for("home"))
+    return redirect(f"{request.script_root}{путь}")
+
 
 #: Ключ в `g`, под которым живёт вошедший на время запроса.
 CURRENT = "account"
@@ -234,6 +273,9 @@ def install(app: Flask, conf: Settings) -> None:
         token = token_of_request()
         account = resolve_session(token) if token else None
         if account is None:
+            if request.endpoint == oauth.AUTHORIZE_ENDPOINT and request.method == "GET":
+                # Claude открыл согласие неопознанному: на вход и обратно сюда.
+                return redirect(url_for("login", next=request.full_path))
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
@@ -250,7 +292,10 @@ def install(app: Flask, conf: Settings) -> None:
         """
         ответ = make_response(
             render_template(
-                "login.html", failed=False, locked_minutes=приговор.retry_after_minutes
+                "login.html",
+                failed=False,
+                locked_minutes=приговор.retry_after_minutes,
+                next_path=safe_next(request.form.get("next")),
             ),
             429,
         )
@@ -260,7 +305,12 @@ def install(app: Flask, conf: Settings) -> None:
     @app.route(LOGIN_PATH, methods=("GET", "POST"), endpoint="login")
     def login() -> str | Response | tuple[str, int]:
         if request.method != "POST":
-            return render_template("login.html", failed=False, locked_minutes=None)
+            return render_template(
+                "login.html",
+                failed=False,
+                locked_minutes=None,
+                next_path=safe_next(request.args.get("next")),
+            )
         refuse_foreign_origin()
         имя = request.form.get("login") or ""
         адрес = client_address(trusted_proxies=conf.trusted_proxies)
@@ -281,10 +331,16 @@ def install(app: Flask, conf: Settings) -> None:
             # Введённое обратно на страницу не возвращается — среди него
             # пароль, и он уехал бы в разметку, а оттуда в кэш и в снимок
             # экрана.
-            return render_template("login.html", failed=True, locked_minutes=None), 401
+            страница = render_template(
+                "login.html",
+                failed=True,
+                locked_minutes=None,
+                next_path=safe_next(request.form.get("next")),
+            )
+            return страница, 401
         note_success(tenant=рубеж, address=адрес, login=имя)
         session = open_session(account)
-        return remember(redirect(url_for("home")), session)
+        return remember(after_login(request.form.get("next")), session)
 
     google = load_google_settings()
     state_signer = URLSafeTimedSerializer(
@@ -315,10 +371,11 @@ def install(app: Flask, conf: Settings) -> None:
         ответ = redirect(authorization_url(_google_here(google), state=метка))
         # Метка кладётся В КУКУ, а не в память процесса: стенд может работать
         # несколькими воркерами, и возврат придёт не обязательно в тот, что
-        # уводил.
+        # уводил. Туда же — путь возврата после входа (D417): в подписанной
+        # куке его не подменить, а через Google он бы не доехал.
         ответ.set_cookie(
             GOOGLE_STATE_COOKIE,
-            state_signer.dumps(метка),
+            state_signer.dumps({"state": метка, "next": safe_next(request.args.get("next"))}),
             max_age=GOOGLE_STATE_TTL_SECONDS,
             httponly=True,
             samesite="Lax",
@@ -345,9 +402,14 @@ def install(app: Flask, conf: Settings) -> None:
         if not подписанная or not пришедшая:
             return отказано
         try:
-            ожидаемая = state_signer.loads(подписанная, max_age=GOOGLE_STATE_TTL_SECONDS)
+            содержимое = state_signer.loads(подписанная, max_age=GOOGLE_STATE_TTL_SECONDS)
         except BadSignature:
             return отказано
+        # Кука прежнего вида — одна метка строкой; нынешнего — метка и путь возврата.
+        if isinstance(содержимое, dict):
+            ожидаемая, вернуться = содержимое.get("state") or "", содержимое.get("next")
+        else:
+            ожидаемая, вернуться = содержимое, None
         # Сравнение постоянного времени: обычное `==` на строках отвечает тем
         # быстрее, чем раньше расходятся байты, и по этому времени метку
         # подбирают.
@@ -393,7 +455,7 @@ def install(app: Flask, conf: Settings) -> None:
             login=account.login,
         )
         session = open_session(account)
-        return очистить_метку(remember(redirect(url_for("home")), session))
+        return очистить_метку(remember(after_login(вернуться), session))
 
     def отказ_входа() -> tuple[str, int]:
         """Один и тот же отказ на все осечки возврата.

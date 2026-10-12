@@ -59,6 +59,7 @@ from . import (
     home_page,
     letter_draft,
     letter_markup,
+    oauth,
     prescriptions,
     ratings,
     registry_period,
@@ -158,6 +159,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
     swarm_api.install(app, conf)
+    # Подключение Claude входом через сайт (D417): только при публичных адресах.
+    oauth.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1024,6 +1027,10 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/add",
         f"{users_path}/email",
         f"{users_path}/disable",
+        # Подключение Claude (D417): согласие и отзыв своего подключения —
+        # дела самого человека; права в MCP контролю решает его роль.
+        oauth.AUTHORIZE_PATH,
+        f"{users_path}/claude-revoke",
     )
     return path in own
 

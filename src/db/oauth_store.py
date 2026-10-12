@@ -192,6 +192,8 @@ values (%s, %s, %s)
 returning id
 """
 
+_COUNT_RECENT_CLIENTS_SQL = "select count(*) from oauth_clients where created_at > now() - %s"
+
 _SELECT_CLIENT_SQL = """
 select id, client_id, client_name, redirect_uris from oauth_clients where client_id = %s
 """
@@ -320,6 +322,14 @@ def register_client(name: object, redirect_uris: Sequence[str]) -> Client:
     )
 
 
+def recent_clients(window: timedelta) -> int:
+    """Сколько клиентов заведено за окно — для общего предела регистраций."""
+    with _connected("сосчитать OAuth-клиентов") as conn, conn.cursor() as cur:
+        cur.execute(_COUNT_RECENT_CLIENTS_SQL, (window,))
+        row = cur.fetchone()
+    return 0 if row is None else int(row[0])
+
+
 def find_client(client_id: str) -> Client | None:
     """Клиент по `client_id` или `None`, если такого не заводили."""
     with _connected("найти OAuth-клиента") as conn, conn.cursor() as cur:
@@ -380,45 +390,124 @@ def _issue_pair(cur: Any, grant_id: str) -> TokenPair:
     )
 
 
+@dataclass(frozen=True)
+class CodeState:
+    """Строка кода так, как её видит решение об обмене."""
+
+    client_id: str
+    redirect_uri: str
+    code_challenge: str
+    used: bool
+    alive: bool
+    account_alive: bool
+
+
+@dataclass(frozen=True)
+class RefreshState:
+    """Строка refresh-токена так, как её видит решение об обновлении."""
+
+    client_id: str
+    used: bool
+    alive: bool
+    grant_alive: bool
+    account_alive: bool
+
+
+@dataclass(frozen=True)
+class Judgement:
+    """Решение об обмене: отказ (или `None` — выпускать) и отзывать ли подключение."""
+
+    refusal: str | None
+    revoke: bool = False
+
+
+def judge_code(
+    state: CodeState | None, *, client_id: str, redirect_uri: str, verifier: str
+) -> Judgement:
+    """Можно ли обменять код. Чистая функция: правила обмена отдельно от SQL.
+
+    Порядок важен. Повтор проверяется ПЕРВЫМ и отзывает подключение, кто бы ни
+    предъявил: настоящий клиент код второй раз не шлёт (RFC 6749 §4.1.2). Неудача
+    по прочим причинам код не сжигает — иначе чужой мог бы испортить код
+    человека, угадав только его значение.
+    """
+    if state is None:
+        return Judgement("Код авторизации не опознан")
+    if state.used:
+        return Judgement("Код авторизации уже обменян; подключение отозвано", revoke=True)
+    if state.client_id != client_id:
+        return Judgement("Код выдан другому клиенту")
+    if not state.alive:
+        return Judgement("Срок кода авторизации истёк")
+    if state.redirect_uri != redirect_uri:
+        return Judgement("redirect_uri не совпадает с адресом из запроса кода")
+    if not pkce_matches(verifier, state.code_challenge):
+        return Judgement("code_verifier не подходит к code_challenge")
+    if not state.account_alive:
+        return Judgement("Учётка отключена")
+    return Judgement(None)
+
+
+def judge_refresh(state: RefreshState | None, *, client_id: str) -> Judgement:
+    """Можно ли обновить пару по refresh. Чистая функция, как `judge_code`.
+
+    Повтор уже обменянного refresh отзывает подключение: настоящий клиент
+    держит только последний, и второй предъявитель — признак кражи.
+    """
+    if state is None:
+        return Judgement("Refresh-токен не опознан")
+    if state.client_id != client_id:
+        return Judgement("Refresh-токен выдан другому клиенту")
+    if not state.grant_alive:
+        return Judgement("Подключение отозвано")
+    if state.used:
+        return Judgement("Refresh-токен уже обменян; подключение отозвано", revoke=True)
+    if not state.alive:
+        return Judgement("Срок refresh-токена истёк")
+    if not state.account_alive:
+        return Judgement("Учётка отключена")
+    return Judgement(None)
+
+
 def exchange_code(code: str, *, client_id: str, redirect_uri: str, verifier: str) -> TokenPair:
     """Код + PKCE → первая пара токенов и новое подключение. Иначе `OAuthGrantError`.
 
-    Повтор уже обменянного кода отзывает выпущенное им подключение. Отзыв
-    фиксируется в базе до отказа: отказ поднимается после выхода из
+    Решает `judge_code`, здесь — только чтение под замком и запись. Отзыв при
+    повторе фиксируется в базе до отказа: отказ поднимается после выхода из
     транзакции, иначе он откатил бы и сам отзыв.
     """
-    отказ: OAuthGrantError | None = None
+    решение = Judgement("Код авторизации не опознан")
     пара: TokenPair | None = None
     with _connected("обменять код авторизации") as conn, conn.cursor() as cur:
         cur.execute(_LOCK_CODE_SQL, (fingerprint(code),))
         row = cur.fetchone()
-        if row is None:
-            отказ = _invalid_grant("Код авторизации не опознан")
-        else:
-            (код_id, клиент, адрес, вызов, использован, подключение, жив, учётка_жива) = row
-            if использован is not None:
-                cur.execute(_REVOKE_REUSED_SQL, (подключение,))
-                отказ = _invalid_grant("Код авторизации уже обменян; подключение отозвано")
-            elif клиент != client_id:
-                отказ = _invalid_grant("Код выдан другому клиенту")
-            elif not жив:
-                отказ = _invalid_grant("Срок кода авторизации истёк")
-            elif адрес != redirect_uri:
-                отказ = _invalid_grant("redirect_uri не совпадает с адресом из запроса кода")
-            elif not pkce_matches(verifier, str(вызов)):
-                отказ = _invalid_grant("code_verifier не подходит к code_challenge")
-            elif not учётка_жива:
-                отказ = _invalid_grant("Учётка отключена")
-            else:
-                cur.execute(_INSERT_GRANT_SQL, (код_id,))
-                grant = cur.fetchone()
-                if grant is None:
-                    raise AccessError("Не удалось завести подключение (insert без строки)")
-                grant_id = str(grant[0])
-                cur.execute(_USE_CODE_SQL, (grant_id, код_id))
-                пара = _issue_pair(cur, grant_id)
-    if отказ is not None:
-        raise отказ
+        состояние = (
+            None
+            if row is None
+            else CodeState(
+                client_id=str(row[1]),
+                redirect_uri=str(row[2]),
+                code_challenge=str(row[3]),
+                used=row[4] is not None,
+                alive=bool(row[6]),
+                account_alive=bool(row[7]),
+            )
+        )
+        решение = judge_code(
+            состояние, client_id=client_id, redirect_uri=redirect_uri, verifier=verifier
+        )
+        if row is not None and решение.revoke:
+            cur.execute(_REVOKE_REUSED_SQL, (row[5],))
+        if row is not None and решение.refusal is None:
+            cur.execute(_INSERT_GRANT_SQL, (row[0],))
+            grant = cur.fetchone()
+            if grant is None:
+                raise AccessError("Не удалось завести подключение (insert без строки)")
+            grant_id = str(grant[0])
+            cur.execute(_USE_CODE_SQL, (grant_id, row[0]))
+            пара = _issue_pair(cur, grant_id)
+    if решение.refusal is not None:
+        raise _invalid_grant(решение.refusal)
     if пара is None:
         raise AccessError("Обмен кода не выпустил токенов")
     return пара
@@ -427,34 +516,32 @@ def exchange_code(code: str, *, client_id: str, redirect_uri: str, verifier: str
 def refresh_tokens(refresh_token: str, *, client_id: str) -> TokenPair:
     """Refresh → новая пара; старый refresh больше не действует (ротация).
 
-    Повтор уже обменянного refresh отзывает всё подключение: настоящий клиент
-    держит только последний, и второй предъявитель — признак кражи.
+    Решает `judge_refresh`; отзыв при повторе фиксируется до отказа, как у кода.
     """
-    отказ: OAuthGrantError | None = None
+    решение = Judgement("Refresh-токен не опознан")
     пара: TokenPair | None = None
     with _connected("обновить токен доступа") as conn, conn.cursor() as cur:
         cur.execute(_LOCK_REFRESH_SQL, (fingerprint(refresh_token),))
         row = cur.fetchone()
-        if row is None:
-            отказ = _invalid_grant("Refresh-токен не опознан")
-        else:
-            токен_id, grant_id, клиент, использован, жив, подключение_живо, учётка_жива = row
-            if клиент != client_id:
-                отказ = _invalid_grant("Refresh-токен выдан другому клиенту")
-            elif not подключение_живо:
-                отказ = _invalid_grant("Подключение отозвано")
-            elif использован is not None:
-                cur.execute(_REVOKE_REUSED_SQL, (grant_id,))
-                отказ = _invalid_grant("Refresh-токен уже обменян; подключение отозвано")
-            elif not жив:
-                отказ = _invalid_grant("Срок refresh-токена истёк")
-            elif not учётка_жива:
-                отказ = _invalid_grant("Учётка отключена")
-            else:
-                cur.execute(_USE_REFRESH_SQL, (токен_id,))
-                пара = _issue_pair(cur, str(grant_id))
-    if отказ is not None:
-        raise отказ
+        состояние = (
+            None
+            if row is None
+            else RefreshState(
+                client_id=str(row[2]),
+                used=row[3] is not None,
+                alive=bool(row[4]),
+                grant_alive=bool(row[5]),
+                account_alive=bool(row[6]),
+            )
+        )
+        решение = judge_refresh(состояние, client_id=client_id)
+        if row is not None and решение.revoke:
+            cur.execute(_REVOKE_REUSED_SQL, (row[1],))
+        if row is not None and решение.refusal is None:
+            cur.execute(_USE_REFRESH_SQL, (row[0],))
+            пара = _issue_pair(cur, str(row[1]))
+    if решение.refusal is not None:
+        raise _invalid_grant(решение.refusal)
     if пара is None:
         raise AccessError("Обновление не выпустило токенов")
     return пара
