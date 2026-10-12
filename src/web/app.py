@@ -59,6 +59,7 @@ from . import (
     home_page,
     letter_draft,
     letter_markup,
+    oauth,
     prescriptions,
     ratings,
     registry_period,
@@ -161,6 +162,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
     swarm_api.install(app, conf)
+    # Подключение Claude входом через сайт (D417): только при публичных адресах.
+    oauth.install(app, conf)
     _register_methodology(app, conf)
     _mount_checklists(app, conf)
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
@@ -1055,6 +1058,10 @@ def _control_may_enter(path: str, *, ratings_path: str, users_path: str, logout_
         f"{users_path}/add",
         f"{users_path}/email",
         f"{users_path}/disable",
+        # Подключение Claude (D417): согласие и отзыв своего подключения —
+        # дела самого человека; права в MCP контролю решает его роль.
+        oauth.AUTHORIZE_PATH,
+        f"{users_path}/claude-revoke",
     )
     return path in own
 
@@ -1067,9 +1074,12 @@ def _install_origin_gate(app: Flask) -> None:
     вызова остался бы открытым для чужой страницы молча (аудит доступа, п.6).
     Вызовы в маршрутах остаются — второй слой. Мимо заслона идут только мини-апп
     обхода (опознание подписью Telegram в заголовке, куки админки до него не
-    доезжают) и API для сервисов (ключ в заголовке, только чтение).
+    доезжают), API для сервисов (ключ в заголовке, только чтение) и машинные
+    адреса OAuth — регистрация клиента и обмен кода (D417): их зовёт сервер
+    Claude без `Origin`, куки входа там не участвуют. Согласие (`/oauth/authorize`)
+    — форма человека и идёт под заслоном.
     """
-    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS
+    мимо = walk_auth.ENDPOINTS | swarm_api.ENDPOINTS | oauth.ENDPOINTS
 
     @app.before_request
     def _запись_только_со_своей_страницы() -> None:

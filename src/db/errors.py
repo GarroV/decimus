@@ -230,3 +230,17 @@ class HistoryImportError(DbError):
 
 class RatingsError(DbError):
     """Рейтинги: база не приняла загрузку или правку справочника. Текст — для человека."""
+
+
+class OAuthGrantError(DbError):
+    """Обмен кода или refresh-токена OAuth отклонён (D417).
+
+    `error` — код по RFC 6749 §5.2 (`invalid_grant`, `invalid_client`,
+    `invalid_request`, по RFC 8707 — `invalid_target`): его и отдаёт клиенту
+    точка выдачи токенов. Текст безопасен для ответа: ни кода, ни токена, ни
+    их отпечатков в нём нет.
+    """
+
+    def __init__(self, error: str, description: str) -> None:
+        super().__init__(description)
+        self.error = error

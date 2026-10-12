@@ -240,6 +240,13 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # Сведения о пиццерии из свода (`0046`): загрузка перезаписывает строку
     # целиком и убирает пропавшие из свода, поэтому полный набор прав.
     "unit_profiles": {"SELECT", "INSERT", "UPDATE", "DELETE"},
+    # Подключение Claude по OAuth (`0054`, D417): клиенты, коды, подключения и
+    # токены только заводятся. Правка — по колонкам (ниже), удаление отжившего —
+    # функцией `oauth_purge` с правами владельца, не ролью приложения.
+    "oauth_clients": {"SELECT", "INSERT"},
+    "oauth_codes": {"SELECT", "INSERT"},
+    "oauth_grants": {"SELECT", "INSERT"},
+    "oauth_tokens": {"SELECT", "INSERT"},
     # `schema_migrations` не отдаётся вовсе: историю схемы ведёт накат.
 }
 
@@ -271,6 +278,13 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # срок, страна и проверка запроса партнёру не правятся. В какой статус
     # можно перевести, держит триггер `action_plan_requests_guarded`.
     "action_plan_requests": {"UPDATE": {"status"}},
+    # OAuth (`0054`): код гасится обменом, токен — ротацией, подключение —
+    # отзывом и отметкой последнего вызова. Хеши, клиент, учётка, ресурс и
+    # сроки не правятся: иначе подключение можно было бы перевесить на другую
+    # учётку или продлить токен.
+    "oauth_codes": {"UPDATE": {"used_at", "grant_id"}},
+    "oauth_tokens": {"UPDATE": {"used_at"}},
+    "oauth_grants": {"UPDATE": {"last_used_at", "revoked_at", "revoked_reason"}},
 }
 
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
@@ -278,6 +292,13 @@ ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "units": {"SELECT"},
     # Сведения о пиццерии из свода (`0046`) — только чтение.
     "unit_profiles": {"SELECT"},
+    # OAuth (`0054`): смена пароля и почты идёт этой ролью и в той же
+    # транзакции отзывает подключения и гасит коды учётки — только чтение
+    # таблиц и правка отзыва и срока.
+    "oauth_clients": {"SELECT"},
+    "oauth_codes": {"SELECT"},
+    "oauth_grants": {"SELECT"},
+    "oauth_tokens": {"SELECT"},
     # Страны пространства (`0029`, #340): администратор пишет проверки в обход
     # продукта (снятие, перенос), и сторож точки проверки читает их его правами.
     # `0041` (#585, D364): экран «Пользователи» заводит пространство партнёра и
@@ -405,6 +426,9 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
             "previous_item_code",
         }
     },
+    # OAuth (`0054`): отзыв подключений и гашение кодов при смене пароля и почты.
+    "oauth_grants": {"UPDATE": {"revoked_at", "revoked_reason"}},
+    "oauth_codes": {"UPDATE": {"expires_at"}},
 }
 
 
