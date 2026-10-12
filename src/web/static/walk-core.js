@@ -53,6 +53,12 @@
     return node;
   };
 
+  /** Пометить элемент подсказкой: долгое нажатие покажет `walk.hint.<ключ>` (`walk-hints.js`). */
+  W.hinted = function (node, key) {
+    node.setAttribute("data-hint", key);
+    return node;
+  };
+
   W.button = function (cls, text, onClick) {
     var b = W.el("button", cls, text);
     b.type = "button";
@@ -138,7 +144,8 @@
   /* ── всплывающая строка «Записано» / отказ ─────────────────────────── */
 
   var toastTimer = null;
-  W.toast = function (text, tone) {
+  /** Уведомление. `action` — { label, run }: ссылка в нём, живёт дольше. */
+  W.toast = function (text, tone, action) {
     var node = document.getElementById("walk-toast");
     if (!node) {
       node = W.el("div", "walk-toast");
@@ -147,8 +154,15 @@
       document.body.appendChild(node);
     }
     node.textContent = text;
-    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "");
+    if (action) {
+      node.appendChild(document.createTextNode(" "));
+      node.appendChild(W.button("walk-toast__action", action.label, function () {
+        node.className = "walk-toast";
+        action.run();
+      }));
+    }
+    node.className = "walk-toast is-shown" + (tone ? " walk-toast--" + tone : "") + (action ? " has-action" : "");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, 2600);
+    toastTimer = setTimeout(function () { node.className = "walk-toast"; }, action ? 6000 : 2600);
   };
 })();
