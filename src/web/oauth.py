@@ -71,6 +71,11 @@ ENDPOINTS = frozenset({"oauth_metadata", "oauth_register", "oauth_token"})
 REGISTRATION_WINDOW = timedelta(hours=1)
 REGISTRATIONS_PER_ADDRESS = 10
 REGISTRATIONS_PER_WINDOW = 1000
+LIMITS = oauth_store.RegistrationLimits(
+    window=REGISTRATION_WINDOW,
+    per_address=REGISTRATIONS_PER_ADDRESS,
+    total=REGISTRATIONS_PER_WINDOW,
+)
 
 GRANT_TYPES = ("authorization_code", "refresh_token")
 
@@ -139,16 +144,6 @@ def _counted_failure(address: str, status: int, error: str, description: str) ->
         return _json_error(429, "slow_down", "too many failed attempts", запрет.retry_after_seconds)
     web_throttle.note_address_failure(tenant=рубеж, address=address)
     return _json_error(status, error, description)
-
-
-def registration_full(address: str) -> bool:
-    """Предел регистраций выбран: адресом или всеми вместе. Сначала свой — он дешевле и чаще."""
-    if (
-        oauth_store.recent_clients(REGISTRATION_WINDOW, address=address)
-        >= REGISTRATIONS_PER_ADDRESS
-    ):
-        return True
-    return oauth_store.recent_clients(REGISTRATION_WINDOW) >= REGISTRATIONS_PER_WINDOW
 
 
 def _purge_after_issue() -> None:
@@ -260,14 +255,18 @@ def install(app: Flask, conf: Settings) -> None:
         имя = тело.get("client_name") if isinstance(тело, dict) else None
         try:
             oauth_store.purge_stale()
-            if registration_full(адрес):
-                return _json_error(
-                    429,
-                    "temporarily_unavailable",
-                    "registration limit reached",
-                    int(REGISTRATION_WINDOW.total_seconds()),
-                )
-            клиент = oauth_store.register_client(имя, uris, address=адрес)
+            клиент = oauth_store.register_client(имя, uris, address=адрес, limits=LIMITS)
+        except OAuthGrantError as отказ:
+            if отказ.error != "temporarily_unavailable":
+                return _counted_failure(адрес, 400, отказ.error, str(отказ))
+            # Предел выбран. Счёт и запись — одна транзакция под замком
+            # (`register_client`): параллельные запросы предел не обходят.
+            return _json_error(
+                429,
+                "temporarily_unavailable",
+                "registration limit reached",
+                int(REGISTRATION_WINDOW.total_seconds()),
+            )
         except AccessError:
             return _json_error(503, "temporarily_unavailable", "storage unavailable")
         ответ = jsonify(

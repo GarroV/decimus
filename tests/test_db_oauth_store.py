@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 import pytest
@@ -21,11 +22,11 @@ psycopg = pytest.importorskip("psycopg")
 from src.db.errors import OAuthGrantError  # noqa: E402
 from src.db.oauth_store import (  # noqa: E402
     Client,
+    RegistrationLimits,
     exchange_code,
     issue_code,
     list_connections,
     purge_stale,
-    recent_clients,
     refresh_tokens,
     register_client,
     resolve_access_token,
@@ -48,6 +49,7 @@ pytestmark = requires_db
 ВОЗВРАТ = "https://claude.ai/api/mcp/auth_callback"
 АДРЕС = "203.0.113.5"
 РЕСУРС = "https://mcp.example/mcp"
+ПРЕДЕЛЫ = RegistrationLimits(window=timedelta(hours=1), per_address=100, total=1000)
 VERIFIER = "x" * 64
 CHALLENGE = (
     base64.urlsafe_b64encode(hashlib.sha256(VERIFIER.encode()).digest()).rstrip(b"=").decode()
@@ -68,7 +70,7 @@ def учётка(база: str) -> str:
 
 @pytest.fixture
 def клиент(база: str) -> Client:
-    return register_client("Claude", [ВОЗВРАТ], address=АДРЕС)
+    return register_client("Claude", [ВОЗВРАТ], address=АДРЕС, limits=ПРЕДЕЛЫ)
 
 
 def _код(клиент: Client, учётка: str) -> str:
@@ -161,7 +163,7 @@ def test_код_на_незарегистрированный_адрес_не_в
 
 def test_регистрация_с_чужим_адресом_отвергается(база: str) -> None:
     with pytest.raises(OAuthGrantError):
-        register_client("x", ["https://evil.com/cb"], address=АДРЕС)
+        register_client("x", ["https://evil.com/cb"], address=АДРЕС, limits=ПРЕДЕЛЫ)
 
 
 def test_refresh_ротируется(клиент: Client, учётка: str) -> None:
@@ -188,7 +190,7 @@ def test_повтор_refresh_отзывает_подключение(клиен
 
 def test_refresh_чужим_клиентом_отвергается(клиент: Client, учётка: str) -> None:
     пара = _обмен(_код(клиент, учётка), клиент)
-    другой = register_client("Другой", [ВОЗВРАТ], address=АДРЕС)
+    другой = register_client("Другой", [ВОЗВРАТ], address=АДРЕС, limits=ПРЕДЕЛЫ)
 
     with pytest.raises(OAuthGrantError):
         refresh_tokens(пара.refresh_token, client_id=другой.client_id)
@@ -249,16 +251,37 @@ def test_роль_приложения_не_удаляет_подключени�
         conn.execute("delete from oauth_grants")
 
 
-def test_регистрации_считаются_по_адресу(клиент: Client) -> None:
-    register_client("Ещё", [ВОЗВРАТ], address="198.51.100.7")
+def test_предел_регистраций_на_адрес_и_всего(база: str) -> None:
+    узкие = RegistrationLimits(window=timedelta(hours=1), per_address=2, total=3)
+    register_client("1", [ВОЗВРАТ], address=АДРЕС, limits=узкие)
+    register_client("2", [ВОЗВРАТ], address=АДРЕС, limits=узкие)
 
-    assert recent_clients(timedelta(hours=1), address=АДРЕС) == 1
-    assert recent_clients(timedelta(hours=1), address="198.51.100.7") == 1
-    assert recent_clients(timedelta(hours=1)) == 2
+    with pytest.raises(OAuthGrantError, match="Предел"):
+        register_client("3", [ВОЗВРАТ], address=АДРЕС, limits=узкие)
+    register_client("4", [ВОЗВРАТ], address="198.51.100.7", limits=узкие)
+    with pytest.raises(OAuthGrantError, match="Предел"):
+        register_client("5", [ВОЗВРАТ], address="198.51.100.8", limits=узкие)
+
+
+def test_параллельные_регистрации_не_обходят_предел(база: str) -> None:
+    """Счёт и запись под одним замком: двадцать разом с одного адреса — ровно предел."""
+    узкие = RegistrationLimits(window=timedelta(hours=1), per_address=3, total=1000)
+
+    def попытка(номер: int) -> bool:
+        try:
+            register_client(str(номер), [ВОЗВРАТ], address=АДРЕС, limits=узкие)
+        except OAuthGrantError:
+            return False
+        return True
+
+    with ThreadPoolExecutor(max_workers=20) as пул:
+        удачи = sum(пул.map(попытка, range(20)))
+
+    assert удачи == узкие.per_address
 
 
 def test_чистка_убирает_только_отжившее(база: str, клиент: Client, учётка: str) -> None:
-    брошенный = register_client("Брошенный", [ВОЗВРАТ], address=АДРЕС)
+    брошенный = register_client("Брошенный", [ВОЗВРАТ], address=АДРЕС, limits=ПРЕДЕЛЫ)
     пара = _обмен(_код(клиент, учётка), клиент)
     with psycopg.connect(база) as conn:
         conn.execute("update oauth_clients set created_at = now() - interval '2 days'")

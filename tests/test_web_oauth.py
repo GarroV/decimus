@@ -179,6 +179,49 @@ def test_предел_регистраций_на_адрес(клиент: Flask
     assert сосед.status_code == 201
 
 
+@pytest.mark.parametrize(
+    ("прокси", "заголовки"),
+    [
+        # Без доверенных прокси заголовки не читаются вовсе.
+        (0, {"X-Forwarded-For": "{подставной}"}),
+        (0, {"CF-Connecting-IP": "{подставной}", "X-Real-IP": "{подставной}"}),
+        # Один доверенный прокси: берётся звено, дописанное им, — крайнее справа;
+        # звенья левее клиент дописывает сам, и они не в счёт.
+        (1, {"X-Forwarded-For": "{подставной}, 198.51.100.7"}),
+    ],
+)
+def test_подставной_заголовок_не_даёт_нового_адреса(
+    monkeypatch: pytest.MonkeyPatch,
+    память: ПамятьOAuth,
+    прокси: int,
+    заголовки: dict[str, str],
+) -> None:
+    """Адрес — как у входа и `swarm_api`: `remote.client_address` и `trusted_proxies`."""
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    приложение = собрать(
+        tenant=ТЕНАНТ, admin_public_url=АДМИНКА, mcp_public_url=MCP, trusted_proxies=прокси
+    )
+    with приложение.test_client() as клиент:
+
+        def регистрация(номер: int) -> int:
+            подставные = {
+                имя: значение.format(подставной=f"203.0.113.{номер}")
+                for имя, значение in заголовки.items()
+            }
+            return клиент.post(
+                oauth.REGISTER_PATH,
+                json={"client_name": "Claude", "redirect_uris": [ВОЗВРАТ]},
+                headers=подставные,
+                environ_base={"REMOTE_ADDR": "198.51.100.7"},
+            ).status_code
+
+        коды = [регистрация(номер) for номер in range(oauth.REGISTRATIONS_PER_ADDRESS + 1)]
+
+    assert коды[:-1] == [201] * oauth.REGISTRATIONS_PER_ADDRESS
+    assert коды[-1] == 429
+    assert {откуда for откуда, _ in память.registered.values()} == {"198.51.100.7"}
+
+
 def test_общий_предел_регистраций(клиент: FlaskClient, память: ПамятьOAuth) -> None:
     сейчас = datetime.now(UTC)
     for номер in range(oauth.REGISTRATIONS_PER_WINDOW):

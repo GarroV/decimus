@@ -214,6 +214,7 @@ def собрать(
     bot_username: str | None = None,
     admin_public_url: str | None = None,
     mcp_public_url: str | None = None,
+    trusted_proxies: int | None = None,
 ) -> Flask:
     """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
@@ -226,6 +227,7 @@ def собрать(
             bot_username=bot_username,
             admin_public_url=admin_public_url,
             mcp_public_url=mcp_public_url,
+            **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )
     app.config.update(TESTING=True)
