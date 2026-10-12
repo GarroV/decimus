@@ -41,8 +41,10 @@ echo "версия кода: $sha"
 
 # `--profile backup`: голая сборка пропускает выгрузку состояния, и ночная
 # задача бэкапа крутила бы образ прошлой версии (та же ловушка, что в deploy.sh).
+# `--profile migrate` — по той же причине: накат идёт собственным сервисом, и без
+# сборки он катил бы схему кодом прошлой версии.
 step "сборка образа с версией $sha"
-BUILD_SHA="$sha" "${compose[@]}" --profile backup build
+BUILD_SHA="$sha" "${compose[@]}" --profile backup --profile migrate build
 
 # Хранилище кадров живёт на MUSPELHEIM (D257, D259), корзина там уже заведена;
 # своего хранилища на VPS нет с 30.09 (D293).
@@ -52,7 +54,9 @@ step "база"
 # Накат до подъёма приложений: новый код на старой схеме — это отказ админки,
 # а не «доедет само». Накат идемпотентен, повторный запуск ничего не ломает.
 step "накат миграций"
-"${compose[@]}" run --rm --no-deps bot python -m src.db.migrate
+# Сервис `migrate` — единственный, кому `docker-compose.yml` отдаёт владельца
+# схемы (`DATABASE_ADMIN_URL`); у бота, админки, MCP и обхода его нет (F-002).
+"${compose[@]}" run --rm --no-deps migrate
 
 step "подъём"
 "${compose[@]}" up -d --wait --remove-orphans

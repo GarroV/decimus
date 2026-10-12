@@ -304,6 +304,7 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.agg.name.trendyol_go": {"ru": "Trendyol Go", "en": "Trendyol Go"},
     "ratings.agg.name.pyszne_pl": {"ru": "Pyszne.pl", "en": "Pyszne.pl"},
     "ratings.agg.name.chowdeck": {"ru": "Chowdeck", "en": "Chowdeck"},
+    "ratings.agg.name.migros_yemek": {"ru": "Migros Yemek", "en": "Migros Yemek"},
     "ratings.coverage.title": {"ru": "Пиццерии на площадках", "en": "Pizzerias on platforms"},
     "ratings.coverage.open": {"ru": "по пиццериям →", "en": "by pizzeria →"},
     "ratings.coverage.hint": {

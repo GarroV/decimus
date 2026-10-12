@@ -468,6 +468,15 @@ on_speech_lang
 # крюк `@app.after_request`; оба регистрирует декоратор, по имени не зовёт никто.
 no_store
 walk_app
+# Подключение Claude через сайт (D417): маршруты OAuth и отзыв подключения
+# регистрирует декоратор `@app.*`, по имени не зовёт никто; `connections` блока
+# читает шаблон карточки (`users/_card.html`), а не питон.
+oauth_metadata
+oauth_register
+oauth_authorize
+oauth_token
+claude_revoke
+connections
 # Выбор языка отчёта кнопкой в конце проверки (D415): `on_report_lang` —
 # обработчик `@router.callback_query`, его регистрирует декоратор.
 on_report_lang
