@@ -1,0 +1,41 @@
+{#
+  Согласие на подключение Claude (D417). Человек уже вошёл; здесь он видит,
+  КТО просит доступ (имя клиента из регистрации), КУДА уйдёт код (хост
+  возврата) и с какими правами (его роль), — и решает сам. Для возврата на
+  петлю (Claude Code) — отдельное предупреждение: так велит спека MCP, потому
+  что код уходит программе на этой машине, а не Claude.
+
+  Параметры запроса едут скрытыми полями и проверяются на POST заново:
+  форме не верится, верится только тому, что сервер проверил сам.
+#}{% extends "base.html" %}
+{% block title %}{{ t('oauth.consent.title') }}{% endblock %}
+
+{% block body %}
+  <div class="section">
+    <div class="section__head">
+      <h1 class="section__title">{{ t('oauth.consent.title') }}</h1>
+    </div>
+  </div>
+
+  <div class="empty">
+    <p class="empty__text">{{ t('oauth.consent.lead', client=ask.client.client_name, login=login) }}</p>
+    <p class="empty__text">{{ t('oauth.consent.role', role=t(role_key(account.role, account.tenant))) }}</p>
+    <p class="empty__text">{{ t('oauth.consent.rights') }}</p>
+    <p class="empty__text">{{ t('oauth.consent.host', host=host) }}</p>
+    {% if loopback %}
+      <div class="note note--warn"><div class="note__text">{{ t('oauth.consent.loopback', host=host) }}</div></div>
+    {% endif %}
+
+    <form method="post" action="{{ url_for('oauth_authorize') }}">
+      <input type="hidden" name="client_id" value="{{ ask.client.client_id }}">
+      <input type="hidden" name="redirect_uri" value="{{ ask.redirect_uri }}">
+      <input type="hidden" name="response_type" value="code">
+      <input type="hidden" name="code_challenge" value="{{ ask.code_challenge }}">
+      <input type="hidden" name="code_challenge_method" value="S256">
+      {% if ask.state is not none %}<input type="hidden" name="state" value="{{ ask.state }}">{% endif %}
+      {% if ask.resource %}<input type="hidden" name="resource" value="{{ ask.resource }}">{% endif %}
+      <button class="sbtn sbtn--primary" type="submit" name="decision" value="allow">{{ t('oauth.consent.allow') }}</button>
+      <button class="sbtn" type="submit" name="decision" value="deny">{{ t('oauth.consent.deny') }}</button>
+    </form>
+  </div>
+{% endblock %}

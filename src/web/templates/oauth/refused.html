@@ -1,0 +1,13 @@
+{#
+  Отказ в начале подключения Claude (D417): клиент не опознан или адрес
+  возврата не из разрешённых. Редиректа нет намеренно — уводить некуда, а
+  подложенный адрес получил бы ответ сервера.
+#}{% extends "base.html" %}
+{% block title %}{{ t('oauth.refused.title') }}{% endblock %}
+
+{% block body %}
+  <div class="empty">
+    <div class="empty__title">{{ t('oauth.refused.title') }}</div>
+    <p class="empty__text">{{ t('oauth.refused.' ~ reason) }}</p>
+  </div>
+{% endblock %}

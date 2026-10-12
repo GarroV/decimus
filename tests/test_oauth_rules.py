@@ -15,10 +15,14 @@ import pytest
 from src.db.oauth_store import (
     DEFAULT_CLIENT_NAME,
     MAX_CLIENT_NAME,
+    CodeState,
+    RefreshState,
     challenge_valid,
     clean_client_name,
     fingerprint,
     is_loopback,
+    judge_code,
+    judge_refresh,
     new_secret,
     pkce_matches,
     redirect_uri_allowed,
@@ -118,3 +122,114 @@ def test_секрет_и_отпечаток() -> None:
     assert len(секрет) >= 43
     assert fingerprint(секрет) == hashlib.sha256(секрет.encode()).hexdigest()
     assert секрет not in fingerprint(секрет)
+
+
+# --- решение об обмене кода -------------------------------------------------
+
+КЛИЕНТ = "клиент-claude-0000000"
+ВОЗВРАТ = "https://claude.ai/api/mcp/auth_callback"
+
+
+def _код(**иное: object) -> CodeState:
+    поля: dict[str, object] = {
+        "client_id": КЛИЕНТ,
+        "redirect_uri": ВОЗВРАТ,
+        "code_challenge": _challenge(VERIFIER),
+        "used": False,
+        "alive": True,
+        "account_alive": True,
+    }
+    поля.update(иное)
+    return CodeState(**поля)  # type: ignore[arg-type]
+
+
+def _обмен(состояние: CodeState | None, **иное: str):  # type: ignore[no-untyped-def]
+    параметры = {"client_id": КЛИЕНТ, "redirect_uri": ВОЗВРАТ, "verifier": VERIFIER}
+    параметры.update(иное)
+    return judge_code(состояние, **параметры)
+
+
+def test_годный_код_обменивается() -> None:
+    решение = _обмен(_код())
+
+    assert решение.refusal is None and решение.revoke is False
+
+
+@pytest.mark.parametrize(
+    ("состояние", "иное", "причина"),
+    [
+        (None, {}, "не опознан"),
+        (_код(alive=False), {}, "Срок"),
+        (_код(), {"verifier": "w" * 43}, "code_verifier"),
+        (_код(), {"redirect_uri": "http://localhost:1/callback"}, "redirect_uri"),
+        (_код(), {"client_id": "другой-клиент-000000"}, "другому клиенту"),
+        (_код(account_alive=False), {}, "отключена"),
+    ],
+)
+def test_негодный_код_отвергается_без_отзыва(
+    состояние: CodeState | None, иное: dict[str, str], причина: str
+) -> None:
+    решение = _обмен(состояние, **иное)
+
+    assert решение.refusal is not None and причина in решение.refusal
+    assert решение.revoke is False
+
+
+def test_plain_вместо_s256_не_проходит_обмен() -> None:
+    """Клиент, приславший verifier равным challenge (метод plain), отвергнут."""
+    вызов = _challenge(VERIFIER)
+
+    решение = _обмен(_код(code_challenge=вызов), verifier=вызов)
+
+    assert решение.refusal is not None and "code_verifier" in решение.refusal
+
+
+def test_повтор_кода_отзывает_подключение_даже_с_верным_verifier() -> None:
+    решение = _обмен(_код(used=True))
+
+    assert решение.refusal is not None
+    assert решение.revoke is True
+
+
+# --- решение об обновлении --------------------------------------------------
+
+
+def _refresh(**иное: object) -> RefreshState:
+    поля: dict[str, object] = {
+        "client_id": КЛИЕНТ,
+        "used": False,
+        "alive": True,
+        "grant_alive": True,
+        "account_alive": True,
+    }
+    поля.update(иное)
+    return RefreshState(**поля)  # type: ignore[arg-type]
+
+
+def test_годный_refresh_обновляется() -> None:
+    assert judge_refresh(_refresh(), client_id=КЛИЕНТ).refusal is None
+
+
+def test_повтор_refresh_отзывает_подключение() -> None:
+    решение = judge_refresh(_refresh(used=True), client_id=КЛИЕНТ)
+
+    assert решение.refusal is not None and решение.revoke is True
+
+
+@pytest.mark.parametrize(
+    ("состояние", "клиент", "причина"),
+    [
+        (None, КЛИЕНТ, "не опознан"),
+        (_refresh(), "другой-клиент-000000", "другому клиенту"),
+        (_refresh(grant_alive=False), КЛИЕНТ, "отозвано"),
+        (_refresh(grant_alive=False, used=True), КЛИЕНТ, "отозвано"),
+        (_refresh(alive=False), КЛИЕНТ, "Срок"),
+        (_refresh(account_alive=False), КЛИЕНТ, "отключена"),
+    ],
+)
+def test_негодный_refresh_отвергается(
+    состояние: RefreshState | None, клиент: str, причина: str
+) -> None:
+    решение = judge_refresh(состояние, client_id=клиент)
+
+    assert решение.refusal is not None and причина in решение.refusal
