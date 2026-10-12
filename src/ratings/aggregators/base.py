@@ -9,12 +9,14 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from urllib.parse import urlsplit
 
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
@@ -86,11 +88,24 @@ def votes_of(value: object) -> tuple[int | None, bool]:
     return None, True
 
 
+#: Сеть Tailscale (CGNAT): канал между машинами шифрует сам Tailscale, поэтому
+#: ретранслятору Migros на домашнем сервере (D434) хватает http. Плюс петля — тесты.
+_PLAIN_HTTP_NETS = (ipaddress.ip_network("100.64.0.0/10"), ipaddress.ip_network("127.0.0.0/8"))
+
+
 def _https(url: str) -> str:
-    """Только https: адреса агрегаторов — константы кода, но схему держим явно."""
-    if not url.startswith("https://"):
-        raise AggregatorError(f"Не https-адрес: {url[:60]}")
-    return url
+    """Только https: адреса агрегаторов — константы кода, но схему держим явно.
+    Исключение — http на адрес сети Tailscale или петлю, по IP, не по имени."""
+    if url.startswith("https://"):
+        return url
+    parts = urlsplit(url)
+    try:
+        host = ipaddress.ip_address(parts.hostname or "")
+    except ValueError:
+        host = None
+    if parts.scheme == "http" and host and any(host in net for net in _PLAIN_HTTP_NETS):
+        return url
+    raise AggregatorError(f"Не https-адрес: {url[:60]}")
 
 
 class Http:
