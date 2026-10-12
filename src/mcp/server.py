@@ -25,6 +25,8 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from src.domain.public_urls import OAUTH_SCOPE, PROTECTED_RESOURCE_PATH
+
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, space_of
 from .config import Settings, resolve_access
@@ -153,7 +155,7 @@ class _Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         if status == HTTPStatus.UNAUTHORIZED:
-            self.send_header("WWW-Authenticate", 'Bearer realm="dodo-audit-mcp"')
+            self.send_header("WWW-Authenticate", _www_authenticate(self._settings))
         self.end_headers()
         if body:
             self.wfile.write(body)
@@ -226,14 +228,20 @@ class _Handler(BaseHTTPRequestHandler):
 
     # Имена do_GET/do_POST задаёт BaseHTTPRequestHandler — он ищет их по имени.
     def do_GET(self) -> None:
-        """Единственная просматриваемая поверхность — скрипт установки.
+        """Просматриваемых поверхностей две: скрипт установки и документ ресурса OAuth.
 
         Остальное по-прежнему 405: сервер отвечает на JSON-RPC по POST, и
         расширять эту дверь нечем — за ней история проверок партнёров.
+        Документ ресурса (RFC 9728, D417) публичен по устройству протокола:
+        клиент читает его ДО входа, чтобы узнать, где входить; в нём только
+        два внешних адреса и область доступа.
         """
         путь = self.path.split("?", 1)[0].rstrip("/") or "/"
         if путь == INSTALL_PATH:
             self._guarded(self._serve_install)
+            return
+        if self._settings.oauth_enabled and _is_resource_document(путь):
+            self._guarded(lambda: self._send(HTTPStatus.OK, protected_resource(self._settings)))
             return
         self._guarded(
             lambda: self._send(
@@ -301,6 +309,37 @@ class _Handler(BaseHTTPRequestHandler):
             self._send(_ACCEPTED)
             return
         self._send(HTTPStatus.OK, answer)
+
+
+def _is_resource_document(path: str) -> bool:
+    """Адрес документа ресурса: сам путь, с суффиксом ресурса (RFC 9728 §3.1) или под префиксом."""
+    return (
+        path == PROTECTED_RESOURCE_PATH
+        or path.startswith(f"{PROTECTED_RESOURCE_PATH}/")
+        or path.endswith(PROTECTED_RESOURCE_PATH)
+    )
+
+
+def protected_resource(settings: Settings) -> dict[str, Any]:
+    """Документ защищённого ресурса (RFC 9728): кто я и где выдают токены ко мне."""
+    return {
+        "resource": settings.mcp_public_url,
+        "authorization_servers": [settings.admin_public_url],
+        "scopes_supported": [OAUTH_SCOPE],
+        "bearer_methods_supported": ["header"],
+    }
+
+
+def _www_authenticate(settings: Settings) -> str:
+    """Заголовок отказа 401. При OAuth — с адресом документа ресурса (RFC 9728 §5.1).
+
+    По нему Claude узнаёт, где входить: без этого параметра подключение через
+    сайт не начинается вовсе.
+    """
+    if not settings.oauth_enabled:
+        return 'Bearer realm="dodo-audit-mcp"'
+    документ = f"{settings.mcp_public_url}{PROTECTED_RESOURCE_PATH}"
+    return f'Bearer realm="dodo-audit-mcp", resource_metadata="{документ}"'
 
 
 def _checklist_for(settings: Settings, tenant: str) -> Store | None:

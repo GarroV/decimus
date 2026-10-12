@@ -25,6 +25,9 @@ PROTECTED_RESOURCE_PATH = "/.well-known/oauth-protected-resource"
 #: Метаданные сервера авторизации (RFC 8414).
 AUTHORIZATION_SERVER_PATH = "/.well-known/oauth-authorization-server"
 
+#: Единственная область доступа OAuth: весь MCP decimus в пределах роли учётки.
+OAUTH_SCOPE = "mcp"
+
 #: Хосты, которым разрешён `http`: стенд на машине разработчика и тесты.
 _LOOPBACK_HOSTS = frozenset({"localhost", "127.0.0.1"})
 

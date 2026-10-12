@@ -8,7 +8,7 @@
 `docs/furca/blocks/db.md`). Снаружи арендатор не принимается ни в каком виде —
 ни аргументом вызова, ни заголовком, ни по имени.
 
-**Откуда он берётся — двух видов, и оба задаёт не спрашивающий** (T253):
+**Откуда он берётся — трёх видов, и все задаёт не спрашивающий** (T253, D417):
 
 1. Карта «арендатор=токен» из `.env` (`MCP_TOKENS`): токен принадлежит
    СТОРОНЕ, открывает всю её историю проверок, разбирается один раз на старте.
@@ -16,6 +16,10 @@
    Живёт отпечатком в базе (`src/db/mcp_access.py`), отзывается поимённо и
    немедленно, а арендатор у него записан при выпуске — из настройки стенда,
    не из разговора.
+3. Access-токен OAuth (D417): человек подключил Claude входом на сайт
+   своей учёткой. Пространство и РОЛЬ берутся из учётки на каждом вызове, и
+   права тогда решает роль (`policy.py`), а не только пространство. Дверь
+   открыта только при заданных `ADMIN_PUBLIC_URL` и `MCP_PUBLIC_URL`.
 
 Проверяются они по очереди (`resolve_access`) и обе действуют одновременно.
 Карту из `.env` не отключили намеренно: на момент перехода это единственный
@@ -37,6 +41,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .errors import AuthError, McpConfigError
@@ -160,6 +165,15 @@ class Settings:
     retraction_tokens: tuple[str, ...] = field(default=(), repr=False)
     #: Арендаторы, которым открыта загрузка исторических проверок (D305).
     import_tenants: tuple[str, ...] = ()
+    #: Внешний адрес админки — сервер авторизации OAuth (D417). `None` — OAuth выключен.
+    admin_public_url: str | None = None
+    #: Внешний адрес самого MCP — ресурс OAuth (D417). `None` — OAuth выключен.
+    mcp_public_url: str | None = None
+
+    @property
+    def oauth_enabled(self) -> bool:
+        """Третья дверь (OAuth, D417) открыта: оба внешних адреса заданы."""
+        return self.admin_public_url is not None and self.mcp_public_url is not None
 
     def may_import(self, tenant: str) -> bool:
         """Открыта ли ЭТОМУ арендатору загрузка исторических проверок (D305).
@@ -505,6 +519,14 @@ def _check_any_door(tokens: Mapping[str, str], src: Mapping[str, str]) -> None:
     )
 
 
+def _parse_public(src: Mapping[str, str], var: str) -> str | None:
+    """Внешний адрес для OAuth (D417); кривой — отказ запуска, а не тихо выключенный вход."""
+    try:
+        return parse_public_url(src.get(var) or "", var=var)
+    except ValueError as отказ:
+        raise McpConfigError(str(отказ)) from None
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение сервера. Связи с базой здесь не проверяется."""
     src = os.environ if env is None else env
@@ -527,6 +549,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         import_tenants=_parse_import(
             src.get(MCP_IMPORT_TENANTS_VAR) or "", store=store, data_dir=data_dir
         ),
+        admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
+        mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
     )
 
 
@@ -599,6 +623,42 @@ def _owner_from_store(token: str) -> tuple[str, int] | None:
     return None if владелец is None else (владелец.tenant, владелец.telegram_id)
 
 
+def _owner_from_oauth(token: str) -> Access | None:
+    """Третья дверь (D417): access-токен OAuth, выданный админкой после входа учёткой сайта.
+
+    Учётка, её пространство и роль читаются из базы на КАЖДЫЙ вызов, одним
+    запросом со сверкой токена (`oauth_store.resolve_access_token`):
+    отключённая учётка и отозванное подключение не находятся вовсе, смена роли
+    видна сразу. Права решает роль (`policy.py`), снятие проверок через OAuth
+    не выдаётся никому.
+
+    Импорт ленивый и отказ базы громкий в журнал — по тем же причинам, что у
+    личных токенов (`_owner_from_store`).
+    """
+    try:
+        from ..db.oauth_store import resolve_access_token
+    except ImportError:
+        return None
+    try:
+        владелец = resolve_access_token(token)
+    except Exception:
+        logger.warning(
+            "токены OAuth не сверены — хранилище недоступно; карта %s и личные токены "
+            "этот токен уже не опознали",
+            MCP_TOKENS_VAR,
+            exc_info=True,
+        )
+        return None
+    if владелец is None:
+        return None
+    return Access(
+        tenant=canonical_tenant(владелец.tenant),
+        may_retract=False,
+        actor=f"web:{владелец.login}",
+        role=владелец.role,
+    )
+
+
 def resolve_access(settings: Settings, header: str | None) -> Access:
     """Заголовок `Authorization` → чьи проверки и что с ними можно. Незнакомый токен — отказ.
 
@@ -611,9 +671,11 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
     этом называет ожидаемый вид заголовка — иначе забытая схема неотличима от
     неверного токена, и человек чинит не то.
 
-    **Дверей две, и порядок между ними важен** (T253). Сперва карта из `.env`
+    **Дверей три, и порядок между ними важен** (T253, D417). Сперва карта из `.env`
     — она в памяти и стоит одного сравнения; затем личные токены из базы,
-    выпущенные ботом. Обратный порядок означал бы поход в базу на каждый
+    выпущенные ботом; третьей — access-токены OAuth, выданные админкой после
+    входа учёткой сайта (только при заданных `ADMIN_PUBLIC_URL` и
+    `MCP_PUBLIC_URL`). Обратный порядок означал бы поход в базу на каждый
     запрос стороны, у которой токен и так в карте.
 
     Карта из `.env` продолжает работать намеренно. На момент перехода это
@@ -650,6 +712,10 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
         if владелец is not None:
             tenant, telegram_id = владелец
             actor = f"mcp:tg:{telegram_id}"
+    if tenant is None and settings.oauth_enabled:
+        через_сайт = _owner_from_oauth(token)
+        if через_сайт is not None:
+            return через_сайт
     if tenant is None:
         raise AuthError("Токен не опознан. Доступ к проверкам закрыт личным токеном")
     return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=actor)
