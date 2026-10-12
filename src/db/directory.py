@@ -28,6 +28,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
 from .errors import PushError, UnitExistsError
+from .pool import connection
 from .reach import Reach, require_reach
 from .space_guard import require_space
 from .units import normalize_unit_name
@@ -192,7 +193,7 @@ def resolve_unit(name: str, *, tenant: str = DEFAULT_TENANT) -> Unit | None:
     if not key:
         return None
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_RESOLVE_SQL, {"tenant": tenant, "key": key})
             row = cur.fetchone()
             if row is None:
@@ -221,7 +222,7 @@ def list_units(*, reach: Reach, country: str | None = None) -> list[Unit]:
     settings = check_environment()
     код = (country or "").strip().upper() or None
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_SELECT_UNITS_SQL, {**охват.params(), "country": код})
             rows = cur.fetchall()
     except psycopg.Error as exc:
@@ -267,7 +268,7 @@ def upsert_unit(
     страна = (country or "").strip().upper() or None
     город = (city or "").strip() or None
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             with conn.cursor() as cur:
                 # Пространство не заводится точкой справочника: незаведённое —
                 # отказ (#481).
@@ -380,7 +381,7 @@ def create_unit(
     }
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             with conn.cursor() as cur:
                 require_space(cur, tenant, error=PushError)
                 unit_id = _insert_new(cur, поля, tuple(синонимы))

@@ -34,7 +34,7 @@ from flask import (
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import directory, unit_profiles
+from src.db import directory, request_memo, unit_profiles
 from src.db.errors import (
     AcceptError,
     DatabaseTargetError,
@@ -132,6 +132,32 @@ SCREENS = (
 )
 
 
+_MEMO_ENVIRON_KEY = "decimus.db_memo_token"
+
+
+def _open_memo() -> None:
+    # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
+        enabled=request.method in ("GET", "HEAD")
+    )
+
+
+def _close_memo(_exc: BaseException | None) -> None:
+    token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
+    if token is not None:
+        request_memo.end(token)
+
+
+def _install_request_memo(app: Flask) -> None:
+    """Справочные чтения за один GET-запрос — один раз, а не по разу на блок (`request_memo`).
+
+    Только `GET`/`HEAD`: запрос, который пишет, читает как раньше, и прочитанное
+    до записи не может дожить до чтения после неё.
+    """
+    app.before_request(_open_memo)
+    app.teardown_request(_close_memo)
+
+
 def create_app(settings: Settings | None = None) -> Flask:
     """Собрать приложение. Отказ окружения — `WebConfigError` до первого запроса."""
     conf = settings or load_settings()
@@ -140,6 +166,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_BODY_BYTES
     assets.install(app)
+    _install_request_memo(app)
     _register_context(app, conf)
     # Заслон вешается ДО экранов и намеренно первым: `before_request` идёт в
     # порядке регистрации, и опознание обязано случиться раньше всего, что

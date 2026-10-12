@@ -32,6 +32,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment, load_retraction_settings
 from .errors import SynonymError
+from .pool import connection
 from .space_guard import require_space
 
 #: Арендатор по умолчанию — то же значение, что у `directory.DEFAULT_TENANT`.
@@ -272,7 +273,7 @@ def lookup_phrase(text: str, *, lang: str, tenant: str = DEFAULT_TENANT) -> Phra
         return None
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_LOOKUP_SQL, {"tenant": tenant, "lang": _lang_key(lang), "key": key})
             row = cur.fetchone()
     except psycopg.Error as exc:
@@ -329,7 +330,7 @@ def remember_phrase(
         "origin": origin,
     }
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             with conn.cursor() as cur:
                 # Пространство не заводится синонимом: незаведённое — отказ (#481).
                 require_space(cur, tenant, error=SynonymError)
@@ -394,7 +395,7 @@ def list_phrases(
         "retracted_too": include_retracted,
     }
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             cur.execute(_LIST_SQL, params)
             rows = cur.fetchall()
     except psycopg.Error as exc:
@@ -551,7 +552,7 @@ def retract_phrase(
     settings = load_retraction_settings()
     params = {"tenant": tenant, "lang": _lang_key(lang), "key": key}
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             строка = _read_row(cur, params)
             if строка.retracted_at is not None:
                 return PhraseEdit(ALREADY_RETRACTED, строка)
@@ -590,7 +591,7 @@ def repoint_phrase(
     settings = load_retraction_settings()
     params = {"tenant": tenant, "lang": _lang_key(lang), "key": key}
     try:
-        with psycopg.connect(settings.dsn) as conn, conn.cursor() as cur:
+        with connection(settings.dsn) as conn, conn.cursor() as cur:
             строка = _read_row(cur, params)
             смена_пункта = строка.item_code != code
             правка = {**params, "code": code, "reason": причина, "previous": строка.item_code}

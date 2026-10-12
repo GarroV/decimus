@@ -38,6 +38,7 @@ import psycopg
 
 from .config import load_retraction_settings
 from .errors import AccessError
+from .pool import connection
 from .web_throttle import (
     SCOPE_ADDRESS,
     SCOPE_LOGIN,
@@ -92,7 +93,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     settings = load_retraction_settings()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

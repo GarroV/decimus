@@ -42,6 +42,7 @@ import hashlib
 import logging
 import uuid
 from collections.abc import Callable, Sequence
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import date
 from typing import Any, Protocol
@@ -60,6 +61,7 @@ from .models import (
     UPLOADED_ORIGINS,
     InspectionDetail,
 )
+from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
 from .push import _INSERT_TRANSLATION_SQL
 from .queries import _read_detail, _require_inspection_id, _require_tenant
@@ -296,8 +298,8 @@ select count(*) filter (where finding_id = %s), count(*) from photos where inspe
 """
 
 
-def _connect() -> psycopg.Connection[Any]:
-    return psycopg.connect(check_environment().dsn)
+def _connect() -> AbstractContextManager[psycopg.Connection[Any]]:
+    return connection(check_environment().dsn)
 
 
 def _refused(exc: psycopg.Error, что: str) -> HistoryImportError:
