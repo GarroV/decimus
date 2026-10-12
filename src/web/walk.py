@@ -34,7 +34,8 @@ from typing import Any
 from flask import Flask, Response, jsonify, render_template, request
 
 from src.bot.config import BotSettings
-from src.db import queries
+from src.bot.keyboards import LANG_LABELS
+from src.db import finish_modes, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
@@ -43,7 +44,16 @@ from src.domain.info_fields import FIELDS
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
-from . import walk_access, walk_settings, walk_start, walk_suggest, walk_translate, walk_write
+from . import (
+    walk_access,
+    walk_finish,
+    walk_rate,
+    walk_settings,
+    walk_start,
+    walk_suggest,
+    walk_translate,
+    walk_write,
+)
 from .errors import WebTextError
 from .texts import UI_LANGS
 from .texts_walk import WALK_TEXTS
@@ -279,7 +289,16 @@ def walk_payload(
         info=info_fields(inspection, lang),
         sealed=handed_over(chat_id),
     )
-    return {**payload, "texts": texts_for(lang), "app": walk_settings.app_block(chat_id, lang, bot)}
+    app = walk_settings.app_block(chat_id, lang, bot)
+    out = {**payload, "texts": texts_for(lang), "app": app}
+    if app["finish_mode"] == finish_modes.REPORT:
+        # Языки отчёта нужны только режиму «Сразу отчёт» (D449): подтверждение
+        # в приложении предлагает их пилюлями. Остальным справочник не читаем.
+        out["report_langs"] = [
+            {"code": code, "label": LANG_LABELS.get(code, code)}
+            for code in walk_finish.offered_report_langs(chat_id)
+        ]
+    return out
 
 
 def init_data_of() -> str:
@@ -291,14 +310,15 @@ def init_data_of() -> str:
 
 
 def identify(
-    conf: WalkSettings, ui_lang: str, *, header_only: bool = False
+    conf: WalkSettings, ui_lang: str, *, header_only: bool = False, kind: str = walk_rate.OTHER
 ) -> int | tuple[Response, int]:
     """Чей это запрос — номер чата или готовый отказ.
 
     Одна дверь на чтение и запись: подпись, затем доступ бота (D372). Запись
     (`header_only`) берёт подпись только из заголовка. Доступ сверяется
     только при живом токене — на стенде без бота его не с чем сверить. База
-    молчит — 503, а не «пускаю вслепую».
+    молчит — 503, а не «пускаю вслепую». Чаще предела `walk_rate` (`kind` —
+    кадр или прочее) — 429 до всякого обращения к базе (#529, #710).
     """
     if not conf.enabled:
         return jsonify({"error": "disabled"}), 404
@@ -311,6 +331,10 @@ def identify(
     except WalkAccessError as exc:
         logger.info("Обход: отказ в опознании — %s", exc)
         return jsonify({"error": "unauthorized"}), 401
+    if not walk_rate.CHAT_RATE.allow(chat_id, kind):
+        logger.warning("Обход: чат %s превысил предел частоты (%s) — отказ", chat_id, kind)
+        message = WALK_TEXTS["walk.err.too_fast"]
+        return jsonify({"error": "refused", "message": message.get(ui_lang) or message["en"]}), 429
     if not walk_open_to(conf.users, chat_id):
         # Пробный запуск на боевом боте: кнопки у человека нет, а адрес мог
         # прийти пересланным — страница пускает ровно тех же, что и кнопка.

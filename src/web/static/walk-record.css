@@ -313,6 +313,7 @@
 .walk-strip__cell .walk-thumb { width: 88px; height: 88px; }
 
 .walk-strip__cell.is-uploading .walk-thumb__img,
+.walk-strip__cell.is-waiting .walk-thumb__img,
 .walk-strip__cell.is-failed .walk-thumb__img { opacity: .45; }
 
 .walk-strip__state,
@@ -331,6 +332,8 @@
   line-height: 14px;
   text-align: center;
 }
+
+.walk-strip__state--wait { background: var(--warn); }
 
 .walk-strip__retry { background: var(--err); cursor: pointer; }
 
@@ -625,6 +628,18 @@
 
 .walk-toast.is-shown { opacity: 1; transform: translate(-50%, 0); }
 .walk-toast--err { background: var(--err); }
+.walk-toast.has-action { pointer-events: auto; width: max-content; }
+.walk-toast__action {
+  margin-left: 6px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
 
 /* перевод свободного текста на язык отчёта (D394): полоса под полем */
 .walk-translate { margin-top: 2px; }

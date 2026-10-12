@@ -132,13 +132,15 @@ def test_поиск_отдаёт_карточки_и_ничего_не_запи�
     assert ответ.status_code == 200, ответ.get_json()
     тело = ответ.get_json()
     assert тело["via"] == "model"
-    assert тело["candidates"][0] | {"confidence": 0} == {
+    карточка = тело["candidates"][0]
+    assert {k: v for k, v in карточка.items() if k != "resolution"} | {"confidence": 0} == {
         "code": "CLN05",
         "level": "D2",
         "zone": "hot_kitchen",
         "wording": "Нагар.",
         "confidence": 0,
     }
+    assert карточка["resolution"]["source"] in {"single", "words", "model", "hint", "ask"}
     assert модель.звали[0]["photos"] == (JPEG,), "кадр мини-аппа дошёл до модели"
     assert get_state(АУДИТОР).findings == [], "модель предлагает, фиксирует человек"  # type: ignore[union-attr]
 

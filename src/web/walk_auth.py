@@ -41,8 +41,6 @@ MAX_AGE_SECONDS = 6 * 60 * 60
 
 TOKEN_VAR = "TELEGRAM_BOT_TOKEN"  # noqa: S105 — имя переменной, а не токен
 PREVIEW_VAR = "WEB_WALK_PREVIEW_CHAT"
-APP_FINISH_VAR = "WALK_APP_FINISH"
-_TRUE = frozenset({"1", "true", "yes", "on"})
 
 #: Чаты, на которые открывается просмотр без подписи: вымышленный диапазон
 #: демо-сидов (`tools/seed_*`), с номером человека в Telegram не совпадёт. Второй
@@ -117,9 +115,6 @@ class WalkSettings:
     #: мини-апп пускает ровно тех, кого бот (D372): кнопку меню видит каждый,
     #: кто открыл бота, а не только те, кому бот прислал сообщение с кнопкой.
     allowed_ids: frozenset[int] = frozenset()
-    #: «Завершить проверку» из приложения шлёт в чат итог, как `/finish` (D422).
-    #: Выключено, пока владелец не одобрил этот запуск сообщения (`WALK_APP_FINISH`).
-    app_finish: bool = False
 
     @property
     def enabled(self) -> bool:
@@ -160,7 +155,6 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
         preview_chat=preview,
         users=parse_walk_users(src),
         allowed_ids=allowed,
-        app_finish=(src.get(APP_FINISH_VAR) or "").strip().lower() in _TRUE,
     )
 
 

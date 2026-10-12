@@ -187,6 +187,9 @@
     window.scrollTo(0, 0);
   }
 
+  /** Перейти к зоне из чужого модуля — ссылка «Перейти» в уведомлении о записи (D445). */
+  W.goZone = function (code) { if (zoneIndex(code) !== -1) go(code); };
+
   function infoCount() {
     var all = S.data.info || [];
     return { done: all.filter(function (f) { return !!f.value; }).length, total: all.length };
@@ -206,7 +209,7 @@
     row.appendChild(title);
     var info = infoCount();
     if (info.total) {
-      var pill = W.button("walk-pill" + (info.done === info.total ? " is-done" : ""), null, openInfo);
+      var pill = W.hinted(W.button("walk-pill" + (info.done === info.total ? " is-done" : ""), null, openInfo), "info");
       pill.appendChild(el("span", null, tx("walk.info.open")));
       pill.appendChild(el("span", "walk-pill__count", info.done + "/" + info.total));
       row.appendChild(pill);
@@ -303,7 +306,7 @@
   }
 
   function renderSwitch(zones, zone) {
-    var box = el("section", "walk-switch");
+    var box = W.hinted(el("section", "walk-switch"), "zones");
     var bar = el("div", "walk-switch__bar");
     var at = zoneIndex(zone.code);
     var n = zones.length;
@@ -435,12 +438,12 @@
     var box = el("section", "walk-cl" + (S.list ? " is-open" : ""));
     var wrap = el("div", "walk-cl__wrap");
     wrap.inert = !S.list;
-    var head = W.button("walk-cl__head", null, function () {
+    var head = W.hinted(W.button("walk-cl__head", null, function () {
       S.list = !S.list;
       box.classList.toggle("is-open", S.list);
       head.setAttribute("aria-expanded", S.list ? "true" : "false");
       wrap.inert = !S.list;
-    });
+    }), "checklist");
     head.setAttribute("aria-expanded", S.list ? "true" : "false");
     head.appendChild(el("span", "walk-cl__title", tx("walk.cl.title")));
     head.appendChild(el("span", "walk-cl__count", tx("walk.cl.count", { count: items.length })));
@@ -588,16 +591,17 @@
 
   /** Тихая ссылка «Завершить проверку» в конце зоны: вход виден, пока не все зоны осмотрены. */
   function finishLink() {
-    return W.button("walk-link walk-link--quiet", tx("walk.finish.title"), W.finish.ask);
+    return W.hinted(W.button("walk-link walk-link--quiet", tx("walk.finish.title"), W.finish.ask), "finish");
   }
 
   function renderDock(zone) {
     var dock = el("div", "walk-dock");
     var row = el("div", "walk-dock__row");
-    var add = W.button("walk-mark walk-dock__add", null, function () {
-      // На остановке «Оборудование» зоны нет — её выберут в форме.
-      W.sheet.open({ mode: "violation", zone: zone.equipment ? null : zone.code });
-    });
+    var add = W.hinted(W.button("walk-mark walk-dock__add", null, function () {
+      // Нарушение не привязано к зоне на экране (D445): зона — мягкая подсказка,
+      // запись встанет в зону пункта и слов. На «Оборудовании» подсказки нет.
+      W.sheet.open({ mode: "violation", hint: zone.equipment ? null : zone.code });
+    }), "add");
     add.appendChild(W.icon("camera"));
     add.appendChild(el("span", null, "+ " + tx("walk.add.short")));
     row.appendChild(add);
@@ -616,7 +620,7 @@
       label = tx("walk.finish.dock");
       act = W.finish.ask;
     }
-    row.appendChild(W.button("walk-dock__next" + (finish ? " is-finish" : ""), label, act));
+    row.appendChild(W.hinted(W.button("walk-dock__next" + (finish ? " is-finish" : ""), label, act), finish ? "finish" : "next"));
     dock.appendChild(row);
     return dock;
   }
@@ -755,7 +759,7 @@
     root.textContent = "";
     // Обход — раздел приложения (D373): всё остальное рисует walk-app.js.
     W.app.start();
-    if (!W.app.showsWalk()) return W.app.render(root);
+    if (!W.app.showsWalk()) { W.app.render(root); W.hints.afterRender(); return; }
     var zones = S.data.zones;
     var zone = current();
     root.appendChild(renderTop(zones));
@@ -767,6 +771,7 @@
     }
     if (S.info) renderInfoSheet();
     window.scrollTo(0, y);
+    W.hints.afterRender();
   }
 
   function renderEmpty(title, text) {
@@ -779,10 +784,12 @@
   }
 
   W.render = render;
+  W.openInfo = openInfo;
 
   /** Принять свежие данные с сервера (ответ на чтение или запись). */
   W.apply = function (body, keepSheet) {
     var first = !S.data || S.data.key !== body.key;
+    if (first && W.offline) W.offline.start();
     S.data = body;
     S.data = withEquipment(body);
     document.documentElement.lang = body.lang;
@@ -797,6 +804,8 @@
     // Пока открыта форма, данные под ней не меняются: перерисовка унесла бы
     // выбранный пункт из-под пальца. Свежие придут ответом на сохранение.
     if (W.sheet.isOpen() || S.info) return;
+    // Без сети экран не затираем ошибкой: данные на нём свежие, кадры ждут связи (D442).
+    if (navigator.onLine === false && S.data && S.data.zones) return;
     W.post(W.urls.data, (tg && tg.initData) || "", "text/plain")
       .then(function (res) {
         if (!res.ok) {
