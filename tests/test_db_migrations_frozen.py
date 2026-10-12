@@ -190,12 +190,8 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0043_ratings_layout.sql": (
         "sql1:d3036c7bbeaf2906eb0449bbcffdc885f3583c520951323f5991d531360cf272"
     ),
-    "0044_maps.sql": (
-        "sql1:d7145e534c2037ec4843c39e990903eb5a5288fc00c893349fd6607d499d1c8e"
-    ),
-    "0045_maps_link.sql": (
-        "sql1:18ee3c24a242d496165e5d3b39f6edffce5a781b648d4b646ca05fc33e8cfb74"
-    ),
+    "0044_maps.sql": ("sql1:d7145e534c2037ec4843c39e990903eb5a5288fc00c893349fd6607d499d1c8e"),
+    "0045_maps_link.sql": ("sql1:18ee3c24a242d496165e5d3b39f6edffce5a781b648d4b646ca05fc33e8cfb74"),
     "0046_unit_profiles.sql": (
         "sql1:62168bcff56597f0ec7b5d4bd45e6fe1ced36fca46cc975f6e3cb613ae0f2d31"
     ),
