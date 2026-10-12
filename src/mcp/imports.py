@@ -42,6 +42,7 @@ from ..domain.kinds import INSPECTION_KINDS
 from ..domain.models import TEXT_LANGS
 from . import import_modes as modes
 from .checklist_layout import Store
+from .db_target import config_refusal
 from .errors import ToolError
 from .retraction import _same_unit
 from .tools import _finding, _parse_date, _require_inspection_id
@@ -104,8 +105,8 @@ def _db(*, accept: bool = False) -> Iterator[None]:
 
     try:
         yield
-    except DbConfigError:
-        raise ToolError(ACCEPT_NOT_CONNECTED if accept else NOT_CONNECTED) from None
+    except DbConfigError as отказ:
+        raise config_refusal(отказ, ACCEPT_NOT_CONNECTED if accept else NOT_CONNECTED) from None
     except (HistoryImportError, AcceptError) as отказ:
         raise ToolError(str(отказ)) from None
 
