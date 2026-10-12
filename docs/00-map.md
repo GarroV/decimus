@@ -218,7 +218,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/walk_access.py` | Кого пускает мини-апп — ровно тех, кого пускает бот (D372) |
 | `src/web/walk_app.py` | Сервис мини-аппа обхода: только адреса `/tg/walk*` и статика к ним |
 | `src/web/walk_auth.py` | Кто открыл мини-апп обхода — по подписи Telegram, а не по куке админки (#418) |
-| `src/web/walk_finish.py` | «Завершить проверку» из приложения (D422): тот же итог в чат, что даёт `/finish` |
+| `src/web/walk_finish.py` | «Завершить проверку» из приложения (D422, D449): сводка или сразу отчёт |
 | `src/web/walk_main.py` | Точка входа сервиса мини-аппа обхода: `python -m src.web.walk_main` |
 | `src/web/walk_proxy.py` | Адреса мини-аппа обхода в админке — передача сервису обхода, без своей логики |
 | `src/web/walk_rate.py` | Предел частоты запросов мини-аппа обхода по чату (#529, #710) |
@@ -292,7 +292,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -300,6 +300,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/bot_links.py` | Привязка бота к учётке через веб (D286): выпуск ссылки, погашение, привязка, отвязка |
 | `src/db/directory.py` | T092: справочник точек и карта синонимов |
 | `src/db/fingerprint.py` | Отпечаток содержимого завершённой проверки |
+| `src/db/finish_modes.py` | Режим «Завершить» в мини-аппе, выбранный аудитором (D449): чтение и запись |
 | `src/db/imports.py` | Загрузка проверки задним числом поштучно: черновик, записи, кадры (D305–D310, D334) |
 | `src/db/imports_legacy.py` | Записи исторической проверки (`origin = 'legacy'`, D332): без движка |
 | `src/db/letters.py` | T333 (#310): письмо партнёру, зафиксированное человеком |
@@ -400,6 +401,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0053_agg_requests.sql` | Заявка на обновление оценок агрегаторов вне суточного расписания (D420, docs/17-aggregators.md) |
 | `0054_oauth.sql` | Подключение Claude к decimus входом через сайт (D417): OAuth 2.1 с PKCE |
 | `0055_maps_ratings_index.sql` | Индекс под выборки «последняя оценка филиала на карте» (`maps_store.latest`) и «оценка пиццерии на карте на дату» (`maps_store.unit_scores`) |
+| `0056_finish_modes.sql` | D449: «Завершить» в мини-аппе работает в одном из двух режимов, и каждый аудитор выбирает свой в настройках приложения: `summary` — сначала сводка в чат, `report` … |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

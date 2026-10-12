@@ -231,6 +231,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0055_maps_ratings_index.sql": (
         "sql1:501361f432c626368e2244b6b4f02715281a15ad7fb644651144bba27b9c5dbe"
     ),
+    # Режим «Завершить» в мини-аппе за Telegram ID (D449). Ещё не на проде.
+    "0056_finish_modes.sql": (
+        "sql1:2d8ac7a95ee79af6f7f11955dc70dcf92d06539d4839936c9db82f0c480cd8cc"
+    ),
 }
 
 
