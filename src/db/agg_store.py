@@ -303,7 +303,7 @@ def save_units(units: Sequence[DodoUnit], today: date) -> int:
     весь список был бы «новым». Пиццерия без страны отбрасывается."""
     unique = {u.dodo_id: u for u in units if len(u.country) == 2}
     try:
-        with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
+        with connection(check_environment().dsn) as conn, conn.transaction():
             baseline = conn.execute("select not exists (select 1 from agg.units)").fetchone()
             first = None if baseline and baseline[0] else today
             with conn.cursor() as cur:
@@ -328,7 +328,7 @@ def units(countries: Sequence[str] | None = None) -> tuple[UnitRow, ...]:
     """
     wanted = None if countries is None else list(countries)
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (wanted, wanted)).fetchall()
     except psycopg.Error as exc:
         raise _fail("Реестр пиццерий не прочитался", exc) from exc
@@ -341,7 +341,7 @@ def units(countries: Sequence[str] | None = None) -> tuple[UnitRow, ...]:
 def imf_countries() -> tuple[str, ...]:
     """Коды стран IMF из справочника рейтингов — где искать пиццерии Dodo."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(
                 "select code from ratings.countries where is_imf order by code"
             ).fetchall()
@@ -353,7 +353,7 @@ def imf_countries() -> tuple[str, ...]:
 def point_keys(aggregator: str) -> frozenset[str]:
     """Все ключи точек агрегатора, в том числе отмеченные «не пиццерия»."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(
                 "select point_key from agg.points where aggregator = %s", (aggregator,)
             ).fetchall()
@@ -390,7 +390,7 @@ def coverage() -> tuple[CoverageRow, ...]:
         order by p.aggregator, p.dodo_id, r.on_date desc nulls last
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql).fetchall()
     except psycopg.Error as exc:
         raise _fail("Охват агрегаторов не прочитался", exc) from exc
@@ -410,7 +410,7 @@ def coverage() -> tuple[CoverageRow, ...]:
 def point_countries(aggregator: str) -> frozenset[str]:
     """Страны, где у агрегатора есть точки в справочнике."""
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(
                 "select distinct country_code from agg.points "
                 "where aggregator = %s and excluded_reason is null",

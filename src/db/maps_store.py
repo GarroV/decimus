@@ -247,7 +247,7 @@ def unit_latest(provider_id: int) -> dict[str, tuple[float, date]]:
         order by c.dodo_id, r.on_date desc
     """
     try:
-        with psycopg.connect(check_environment().dsn) as conn:
+        with connection(check_environment().dsn) as conn:
             rows = conn.execute(sql, (provider_id,)).fetchall()
     except psycopg.Error as exc:
         raise RatingsError(
