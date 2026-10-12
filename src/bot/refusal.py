@@ -27,6 +27,7 @@ from dataclasses import dataclass
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 
 from .inspection import read_inspection
 from .texts import t
@@ -77,7 +78,7 @@ def occupied_by(
     except DomainError:
         # Состояние не читается — но отказ аудитору сказать всё равно надо, и
         # он его получит без номера записи, а не вместо него молчание (T126).
-        logger.exception("состояние чата %s не читается при разборе отказа", chat_id)
+        logger.exception("состояние чата %s не читается при разборе отказа", log_id(chat_id))
         return None
     if inspection is None:
         return None
@@ -102,7 +103,7 @@ def occupied_pairs(chat_id: int) -> dict[tuple[str, str], int]:
     try:
         inspection = read_inspection(chat_id)
     except DomainError:
-        logger.exception("состояние чата %s не читается при разметке предложений", chat_id)
+        logger.exception("состояние чата %s не читается при разметке предложений", log_id(chat_id))
         return {}
     if inspection is None:
         return {}
@@ -128,7 +129,7 @@ def _refusal(
     skip: int | None = None,
     n: int | None = None,
 ) -> Refusal:
-    logger.warning("движок отказал в чате %s (%s в зоне %s): %s", chat_id, code, zone, exc)
+    logger.warning("движок отказал в чате %s (%s в зоне %s): %s", log_id(chat_id), code, zone, exc)
     duplicate_key, failed_key = keys
     clash = occupied_by(chat_id, code, zone, skip=skip)
     item = item_title(code, lang, chat_id=chat_id)
