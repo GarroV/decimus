@@ -123,3 +123,17 @@ def test_на_петле_временный_ключ_законен() -> None:
     assert settings.secret_key_is_ephemeral
     require_signing_key(settings)
     require_signing_key(replace(settings, secret_key_is_ephemeral=False, host="0.0.0.0"))  # noqa: S104
+
+
+def test_прод_требует_адрес_звена_без_допускающего_умолчания() -> None:
+    """F-038: прод-надстройка не подставляет `*` и не собирается без адреса звена."""
+    from pathlib import Path
+
+    строки = [
+        строка
+        for строка in Path("docker-compose.prod.yml").read_text(encoding="utf-8").splitlines()
+        if строка.strip().startswith(f"{WEB_TRUSTED_PROXY_ADDR_VAR}:")
+    ]
+    assert len(строки) == 1, строки
+    assert f"${{{WEB_TRUSTED_PROXY_ADDR_VAR}:?" in строки[0]
+    assert ":-" not in строки[0] and "*" not in строки[0].split(":?")[0]

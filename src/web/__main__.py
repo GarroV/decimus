@@ -33,6 +33,7 @@ from waitress import serve  # noqa: E402 -- окружение читается 
 
 from .app import create_app  # noqa: E402
 from .config import (  # noqa: E402
+    ANY_PEER,
     WEB_SECRET_KEY_VAR,
     WEB_TRUSTED_PROXY_ADDR_VAR,
     load_settings,
@@ -86,6 +87,13 @@ def main() -> int:
             "%s не задан: заголовкам X-Forwarded-* не верим ни от кого. Назовите адрес "
             "или подсеть своего прокси (docs/08-deploy.md, §8.1)",
             WEB_TRUSTED_PROXY_ADDR_VAR,
+        )
+    if settings.trusted_proxies > 0 and ANY_PEER in settings.trusted_proxy_addrs:
+        logger.warning(
+            "%s=%s: заголовкам X-Forwarded-* верим от ЛЮБОГО соседа. Сузьте до подсети "
+            "своего прокси (docs/08-deploy.md, §8.1)",
+            WEB_TRUSTED_PROXY_ADDR_VAR,
+            ANY_PEER,
         )
     serve(
         guard_forwarded(app, settings),
