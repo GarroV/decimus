@@ -138,6 +138,7 @@ def test_секрет_и_отпечаток() -> None:
 
 КЛИЕНТ = "клиент-claude-0000000"
 ВОЗВРАТ = "https://claude.ai/api/mcp/auth_callback"
+РЕСУРС = "https://mcp.example/mcp"
 
 
 def _код(**иное: object) -> CodeState:
@@ -148,6 +149,7 @@ def _код(**иное: object) -> CodeState:
         "used": False,
         "alive": True,
         "account_alive": True,
+        "resource": РЕСУРС,
     }
     поля.update(иное)
     return CodeState(**поля)  # type: ignore[arg-type]
@@ -201,6 +203,31 @@ def test_повтор_кода_отзывает_подключение_даже_
     assert решение.revoke is True
 
 
+@pytest.mark.parametrize("ресурс", [None, РЕСУРС, РЕСУРС + "/"])
+def test_код_с_тем_же_или_неназванным_ресурсом_обменивается(ресурс: str | None) -> None:
+    assert (
+        judge_code(
+            _код(), client_id=КЛИЕНТ, redirect_uri=ВОЗВРАТ, verifier=VERIFIER, resource=ресурс
+        ).refusal
+        is None
+    )
+
+
+def test_код_с_чужим_ресурсом_отвергается_как_invalid_target() -> None:
+    """RFC 8707: токен для другого сервера по коду, выданному для MCP, не выпускается."""
+    решение = judge_code(
+        _код(),
+        client_id=КЛИЕНТ,
+        redirect_uri=ВОЗВРАТ,
+        verifier=VERIFIER,
+        resource="https://other.example/mcp",
+    )
+
+    assert решение.refusal is not None
+    assert решение.error == "invalid_target"
+    assert решение.revoke is False
+
+
 # --- решение об обновлении --------------------------------------------------
 
 
@@ -211,6 +238,7 @@ def _refresh(**иное: object) -> RefreshState:
         "alive": True,
         "grant_alive": True,
         "account_alive": True,
+        "resource": РЕСУРС,
     }
     поля.update(иное)
     return RefreshState(**поля)  # type: ignore[arg-type]
@@ -243,3 +271,10 @@ def test_негодный_refresh_отвергается(
     решение = judge_refresh(состояние, client_id=клиент)
 
     assert решение.refusal is not None and причина in решение.refusal
+
+
+def test_refresh_с_чужим_ресурсом_отвергается_как_invalid_target() -> None:
+    решение = judge_refresh(_refresh(), client_id=КЛИЕНТ, resource="https://other.example/mcp")
+
+    assert решение.refusal is not None and решение.error == "invalid_target"
+    assert judge_refresh(_refresh(), client_id=КЛИЕНТ, resource=РЕСУРС).refusal is None

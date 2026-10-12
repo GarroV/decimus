@@ -623,14 +623,15 @@ def _owner_from_store(token: str) -> tuple[str, int] | None:
     return None if владелец is None else (владелец.tenant, владелец.telegram_id)
 
 
-def _owner_from_oauth(token: str) -> Access | None:
+def _owner_from_oauth(token: str, resource: str) -> Access | None:
     """Третья дверь (D417): access-токен OAuth, выданный админкой после входа учёткой сайта.
 
     Учётка, её пространство и роль читаются из базы на КАЖДЫЙ вызов, одним
     запросом со сверкой токена (`oauth_store.resolve_access_token`):
     отключённая учётка и отозванное подключение не находятся вовсе, смена роли
-    видна сразу. Права решает роль (`policy.py`), снятие проверок через OAuth
-    не выдаётся никому.
+    видна сразу. Токен, выданный для другого ресурса (RFC 8707), — не опознан:
+    годен только выданный для `MCP_PUBLIC_URL` этого сервера. Права решает роль
+    (`policy.py`), снятие проверок через OAuth не выдаётся никому.
 
     Импорт ленивый и отказ базы громкий в журнал — по тем же причинам, что у
     личных токенов (`_owner_from_store`).
@@ -640,7 +641,7 @@ def _owner_from_oauth(token: str) -> Access | None:
     except ImportError:
         return None
     try:
-        владелец = resolve_access_token(token)
+        владелец = resolve_access_token(token, resource=resource)
     except Exception:
         logger.warning(
             "токены OAuth не сверены — хранилище недоступно; карта %s и личные токены "
@@ -712,8 +713,8 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
         if владелец is not None:
             tenant, telegram_id = владелец
             actor = f"mcp:tg:{telegram_id}"
-    if tenant is None and settings.oauth_enabled:
-        через_сайт = _owner_from_oauth(token)
+    if tenant is None and settings.oauth_enabled and settings.mcp_public_url:
+        через_сайт = _owner_from_oauth(token, settings.mcp_public_url)
         if через_сайт is not None:
             return через_сайт
     if tenant is None:

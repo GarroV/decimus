@@ -85,7 +85,9 @@ import_ratings(kind, content, file_name?)   # kind: rko-violations | rko-evaluat
 **Вход через сайт (OAuth, D417, D420).** Третья дверь — access-токен, который
 выдаёт админка после входа учёткой decimus (`src/web/oauth.py`); сверка —
 `src/db/oauth_store.py:resolve_access_token` на каждый вызов, вместе с учёткой
-(`disabled_at is null`), подключением (не отозвано) и СВЕЖЕЙ ролью. Дверь
+(`disabled_at is null`), подключением (не отозвано) и СВЕЖЕЙ ролью. Годен
+только токен, выданный для `MCP_PUBLIC_URL` этого сервера (RFC 8707: ресурс
+хранится в токене, сверяется при обмене кода и refresh и здесь). Дверь
 открыта только при заданных `ADMIN_PUBLIC_URL` и `MCP_PUBLIC_URL`; тогда отказ 401
 несёт `resource_metadata`, а `GET /.well-known/oauth-protected-resource` (и с
 суффиксом пути) называет админку сервером авторизации (RFC 9728). Доступ через

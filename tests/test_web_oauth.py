@@ -397,6 +397,33 @@ def test_разрешение_и_обмен_выдают_токены(клиен
     assert ответ.headers["Cache-Control"] == "no-store"
 
 
+def test_код_без_resource_привязан_к_адресу_mcp(клиент: FlaskClient, память: ПамятьOAuth) -> None:
+    """RFC 8707: клиент ресурс не назвал — токен всё равно только для своего MCP."""
+    client_id = _клиент_claude(клиент)
+    войти(клиент)
+    параметры = {к: з for к, з in _параметры(client_id).items() if к != "resource"}
+    ответ = клиент.post(
+        oauth.AUTHORIZE_PATH, data={**параметры, "decision": "allow"}, headers={"Origin": СВОЙ}
+    )
+
+    данные = _обмен(клиент, client_id, _запрос_возврата(ответ)["code"][0]).get_json()
+
+    assert память.resolve_access_token(данные["access_token"], resource=MCP) is not None
+    assert (
+        память.resolve_access_token(данные["access_token"], resource="https://other.example/mcp")
+        is None
+    )
+
+
+def test_обмен_с_чужим_resource_отвергается(клиент: FlaskClient) -> None:
+    client_id = _клиент_claude(клиент)
+
+    ответ = _обмен(клиент, client_id, _код(клиент, client_id), resource="https://other.example/mcp")
+
+    assert ответ.status_code == 400
+    assert ответ.get_json()["error"] == "invalid_target"
+
+
 def test_неверный_verifier_отвергается(клиент: FlaskClient) -> None:
     client_id = _клиент_claude(клиент)
     код = _код(клиент, client_id)
@@ -426,7 +453,7 @@ def test_код_одноразовый_повтор_отзывает_подкл�
     повтор = _обмен(клиент, client_id, код)
 
     assert повтор.get_json()["error"] == "invalid_grant"
-    assert память.resolve_access_token(первая["access_token"]) is None
+    assert память.resolve_access_token(первая["access_token"], resource=MCP) is None
 
 
 def test_просроченный_код_отвергается(клиент: FlaskClient, память: ПамятьOAuth) -> None:
@@ -472,12 +499,12 @@ def test_refresh_ротируется_и_повтор_отзывает_подк�
 
     вторая = _refresh(клиент, client_id, первая["refresh_token"]).get_json()
     assert вторая["refresh_token"] != первая["refresh_token"]
-    assert память.resolve_access_token(вторая["access_token"]) is not None
+    assert память.resolve_access_token(вторая["access_token"], resource=MCP) is not None
 
     повтор = _refresh(клиент, client_id, первая["refresh_token"])
 
     assert повтор.get_json()["error"] == "invalid_grant"
-    assert память.resolve_access_token(вторая["access_token"]) is None
+    assert память.resolve_access_token(вторая["access_token"], resource=MCP) is None
     assert _refresh(клиент, client_id, вторая["refresh_token"]).status_code == 400
 
 
@@ -487,7 +514,7 @@ def test_отключённая_учётка_не_опознаётся(клие�
 
     память.disabled.add("22222222-2222-2222-2222-222222222222")
 
-    assert память.resolve_access_token(пара["access_token"]) is None
+    assert память.resolve_access_token(пара["access_token"], resource=MCP) is None
     assert _refresh(клиент, client_id, пара["refresh_token"]).status_code == 400
 
 

@@ -37,7 +37,7 @@
       <input type="hidden" name="code_challenge" value="{{ ask.code_challenge }}">
       <input type="hidden" name="code_challenge_method" value="S256">
       {% if ask.state is not none %}<input type="hidden" name="state" value="{{ ask.state }}">{% endif %}
-      {% if ask.resource %}<input type="hidden" name="resource" value="{{ ask.resource }}">{% endif %}
+      <input type="hidden" name="resource" value="{{ ask.resource }}">
       <button class="sbtn sbtn--primary" type="submit" name="decision" value="allow">{{ t('oauth.consent.allow') }}</button>
       <button class="sbtn" type="submit" name="decision" value="deny">{{ t('oauth.consent.deny') }}</button>
     </form>

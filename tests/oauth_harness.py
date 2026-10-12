@@ -36,6 +36,7 @@ class _Код:
     user_id: str
     redirect_uri: str
     challenge: str
+    resource: str
     expires_at: datetime
     grant: str | None = None
 
@@ -53,6 +54,7 @@ class _Подключение:
 class _Токен:
     grant: str
     kind: str
+    resource: str
     expires_at: datetime
     used: bool = False
 
@@ -112,29 +114,38 @@ class ПамятьOAuth:
         user_id: str,
         redirect_uri: str,
         code_challenge: str,
-        resource: str | None,
+        resource: str,
     ) -> str:
         if redirect_uri not in client.redirect_uris:
             raise OAuthGrantError("invalid_request", "двойник: адрес не у клиента")
+        if not resource:
+            raise OAuthGrantError("invalid_target", "двойник: ресурс не назван")
         код = oauth_store.new_secret()
         self.codes[код] = _Код(
             client=client,
             user_id=user_id,
             redirect_uri=redirect_uri,
             challenge=code_challenge,
+            resource=resource,
             expires_at=datetime.now(UTC) + oauth_store.CODE_TTL,
         )
         return код
 
-    def _пара(self, grant: str) -> TokenPair:
+    def _пара(self, grant: str, resource: str) -> TokenPair:
         сейчас = datetime.now(UTC)
         access, refresh = oauth_store.new_secret(), oauth_store.new_secret()
-        self.tokens[access] = _Токен(grant, "access", сейчас + oauth_store.ACCESS_TTL)
-        self.tokens[refresh] = _Токен(grant, "refresh", сейчас + oauth_store.REFRESH_TTL)
+        self.tokens[access] = _Токен(grant, "access", resource, сейчас + oauth_store.ACCESS_TTL)
+        self.tokens[refresh] = _Токен(grant, "refresh", resource, сейчас + oauth_store.REFRESH_TTL)
         return TokenPair(access_token=access, refresh_token=refresh, expires_in=3600)
 
     def exchange_code(
-        self, code: str, *, client_id: str, redirect_uri: str, verifier: str
+        self,
+        code: str,
+        *,
+        client_id: str,
+        redirect_uri: str,
+        verifier: str,
+        resource: str | None = None,
     ) -> TokenPair:
         строка = self.codes.get(code)
         состояние = (
@@ -147,21 +158,28 @@ class ПамятьOAuth:
                 used=строка.grant is not None,
                 alive=строка.expires_at > datetime.now(UTC),
                 account_alive=строка.user_id not in self.disabled,
+                resource=строка.resource,
             )
         )
         решение = judge_code(
-            состояние, client_id=client_id, redirect_uri=redirect_uri, verifier=verifier
+            состояние,
+            client_id=client_id,
+            redirect_uri=redirect_uri,
+            verifier=verifier,
+            resource=resource,
         )
         if строка is not None and решение.revoke and строка.grant is not None:
             self.grants[строка.grant].revoked = True
         if решение.refusal is not None or строка is None:
-            raise OAuthGrantError("invalid_grant", решение.refusal or "")
+            raise OAuthGrantError(решение.error, решение.refusal or "")
         grant = self._новый()
         self.grants[grant] = _Подключение(строка.user_id, строка.client, datetime.now(UTC))
         строка.grant = grant
-        return self._пара(grant)
+        return self._пара(grant, строка.resource)
 
-    def refresh_tokens(self, refresh_token: str, *, client_id: str) -> TokenPair:
+    def refresh_tokens(
+        self, refresh_token: str, *, client_id: str, resource: str | None = None
+    ) -> TokenPair:
         токен = self.tokens.get(refresh_token)
         if токен is not None and токен.kind != "refresh":
             токен = None
@@ -175,19 +193,22 @@ class ПамятьOAuth:
                 alive=токен.expires_at > datetime.now(UTC),
                 grant_alive=not подключение.revoked,
                 account_alive=подключение.user_id not in self.disabled,
+                resource=токен.resource,
             )
         )
-        решение = judge_refresh(состояние, client_id=client_id)
+        решение = judge_refresh(состояние, client_id=client_id, resource=resource)
         if подключение is not None and решение.revoke:
             подключение.revoked = True
         if решение.refusal is not None or токен is None:
-            raise OAuthGrantError("invalid_grant", решение.refusal or "")
+            raise OAuthGrantError(решение.error, решение.refusal or "")
         токен.used = True
-        return self._пара(токен.grant)
+        return self._пара(токен.grant, токен.resource)
 
-    def resolve_access_token(self, token: str) -> OAuthOwner | None:
+    def resolve_access_token(self, token: str, *, resource: str) -> OAuthOwner | None:
         токен = self.tokens.get(token)
         if токен is None or токен.kind != "access" or токен.expires_at <= datetime.now(UTC):
+            return None
+        if токен.resource != resource:
             return None
         подключение = self.grants[токен.grant]
         if подключение.revoked or подключение.user_id in self.disabled:

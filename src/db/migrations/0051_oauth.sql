@@ -69,7 +69,9 @@ create table oauth_codes (
     -- PKCE S256: base64url(SHA-256(verifier)) без выравнивания — 43 знака.
     code_challenge text not null check (code_challenge ~ '^[A-Za-z0-9_-]{43}$'),
     scope text not null,
-    resource text,
+    -- Ресурс (RFC 8707), к которому выдан код, — адрес MCP. Без `resource` в
+    -- запросе сервер подставляет свой адрес MCP: пустого здесь не бывает.
+    resource text not null check (char_length(resource) between 1 and 500),
     expires_at timestamptz not null,
     used_at timestamptz,
     -- Подключение, выпущенное этим кодом: повтор кода отзывает его (RFC 6749 §4.1.2).
@@ -85,6 +87,9 @@ create table oauth_tokens (
     grant_id uuid not null references oauth_grants (id),
     kind text not null check (kind in ('access', 'refresh')),
     fingerprint text not null unique check (fingerprint ~ '^[0-9a-f]{64}$'),
+    -- Ресурс, для которого выдан токен (RFC 8707): наследуется от кода, затем
+    -- от refresh. Сервер MCP принимает только токен своего адреса.
+    resource text not null check (char_length(resource) between 1 and 500),
     issued_at timestamptz not null default now(),
     expires_at timestamptz not null,
     -- Refresh, уже обменянный на новую пару. Повторное его предъявление — знак
