@@ -7,9 +7,9 @@
 **Как.** Раз в час: если сбора не было `FRESH_FOR_SEC`, собрать все агрегаторы.
 Раз в минуту — только таблица заявок (`queue.POLL_EVERY_SEC`): контроль попросил
 обновить кнопкой или через Claude — бот собирает названных сразу, не дожидаясь
-суток, и закрывает заявку исходом. Людям бот о сборе не пишет, кроме одного
-случая: суточный сбор с ошибками и задан `AGG_ALERT_CHAT_ID` — одно сообщение
-этому человеку (`aggregators/alert.py`, D434). Переменная пуста — молчит.
+суток, и закрывает заявку исходом. Людям бот о сборе не пишет; суточный сбор с
+ошибками даёт одну тревогу в канал FURCA (`aggregators/alert.py`, D438, D439),
+если канал задан.
 Считается любой сбор, удачный или нет: сломанный агрегатор пробуется снова на
 следующие сутки, а не гоняет весь сбор каждый час. Итог по каждому агрегатору —
 в журнале `agg.loads`, его видно на странице рейтингов. Ключей не нужно.
@@ -22,8 +22,6 @@ import logging
 import os
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
-
-from aiogram import Bot
 
 from src.db import agg_store
 from src.ratings.aggregators import alert, collect, queue
@@ -49,22 +47,22 @@ def _tick(*, scheduled: bool) -> Sequence[collect.Outcome]:
     return ()
 
 
-async def notify(bot: Bot | None, outcomes: Sequence[collect.Outcome]) -> bool:
-    """Сообщить о сбое суточного сбора, если задан адресат. Сбой отправки — в
-    журнал: сбор уже записан, а уведомление — не повод ронять задачу."""
-    target = alert.chat_id(os.environ.get(alert.CHAT_VAR))
+async def notify(outcomes: Sequence[collect.Outcome]) -> bool:
+    """Тревога о сбое суточного сбора в канал FURCA, если он задан. Сбой
+    отправки — в журнал: сбор уже записан, а тревога — не повод ронять задачу."""
+    target = alert.channel(os.environ)
     text = alert.message(outcomes)
-    if bot is None or target is None or text is None:
+    if target is None or text is None:
         return False
     try:
-        await bot.send_message(target, text)
+        await asyncio.to_thread(alert.send, target, text)
     except Exception:
         logger.exception("Оценки агрегаторов: уведомление о сбое не ушло")
         return False
     return True
 
 
-async def load_forever(bot: Bot | None = None) -> None:
+async def load_forever() -> None:
     """Задача бота: держит снимок оценок агрегаторов не старше суток и
     выполняет заявки на обновление."""
     since_check = CHECK_EVERY_SEC  # первый заход — сразу и с проверкой расписания
@@ -72,7 +70,7 @@ async def load_forever(bot: Bot | None = None) -> None:
         scheduled = since_check >= CHECK_EVERY_SEC
         try:
             outcomes = await asyncio.to_thread(_tick, scheduled=scheduled)
-            await notify(bot, outcomes)
+            await notify(outcomes)
         except Exception:
             # Упавшая задача asyncio молчит — поэтому ловим всё и живём дальше.
             logger.exception("Оценки агрегаторов: непредвиденный сбой сбора")
