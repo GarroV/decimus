@@ -252,6 +252,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0060_d440_roles.sql": (
         "sql1:cb9c791e7ceaa33e5e237dc7024d3901e4ac1ce4fe802904e0594c12cd763552"
     ),
+    # «Настройки» (D447): своя почта Google и язык сайта в профиле. Ещё не на проде.
+    "0061_web_own_google_lang.sql": (
+        "sql1:2cf41cb5512e4a2ceff7b42d3fc5c9ea78a4d381263805e8aacf4d731c444df6"
+    ),
 }
 
 

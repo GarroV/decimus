@@ -599,3 +599,51 @@ def test_согласие_открыто_партнёру(monkeypatch: pytest.Mo
         ответ = client.get(oauth.AUTHORIZE_PATH, query_string=_параметры(client_id))
 
     assert ответ.status_code == 200
+
+
+# --- свежий вход перед разрешением (аудит безопасности 12.10, `web.reauth`) ----
+
+
+def _несвежая_сессия(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Сессия открыта давно: украденная кука не должна разрешать Claude доступ."""
+    from datetime import timedelta
+
+    from web_harness import ТОКЕН, Учётка
+
+    давно = datetime.now(UTC) - timedelta(minutes=16)
+    monkeypatch.setattr(
+        auth,
+        "resolve_session",
+        lambda token: Учётка(tenant=ТЕНАНТ, signed_in_at=давно) if token == ТОКЕН else None,
+    )
+
+
+def test_несвежий_вход_согласие_переспрашивает_и_возвращает_сюда(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client_id = _клиент_claude(клиент)
+    войти(клиент)
+    _несвежая_сессия(monkeypatch)
+
+    ответ = клиент.get(oauth.AUTHORIZE_PATH, query_string=_параметры(client_id))
+
+    assert ответ.status_code == 302
+    адрес = urlsplit(ответ.headers["Location"])
+    assert адрес.path == "/settings/confirm"
+    назад = parse_qs(адрес.query)["next"][0]
+    assert назад.startswith(oauth.AUTHORIZE_PATH + "?") and client_id in назад
+
+
+def test_несвежий_вход_разрешение_кода_не_выдаёт(
+    клиент: FlaskClient, monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth
+) -> None:
+    client_id = _клиент_claude(клиент)
+    войти(клиент)
+    _несвежая_сессия(monkeypatch)
+
+    ответ = _разрешить(клиент, client_id)
+
+    assert ответ.status_code == 302
+    assert urlsplit(ответ.headers["Location"]).path == "/settings/confirm"
+    assert "decision" not in ответ.headers["Location"]
+    assert not память.codes, "код выдан по несвежей сессии"

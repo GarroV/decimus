@@ -7,6 +7,18 @@
   (отбор, страница) едут скрытыми полями: смена языка не должна сбрасывать
   выборку, которую человек только что собрал.
 #}
+{% if account %}
+{# Вошедший: выбор сохраняется в профиль (D447) — форма POST, назад на эту же
+   страницу с её параметрами, но без разового `?lang=`. #}
+<form class="langpill" method="post" action="{{ url(lang_save_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
+  <input type="hidden" name="next" value="{{ lang_next() }}">
+  {% for code in langs %}
+    <button class="langpill__item" type="submit" name="lang" value="{{ code }}"
+            aria-pressed="{{ 'true' if code == lang else 'false' }}"
+            title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
+  {% endfor %}
+</form>
+{% else %}
 <form class="langpill" method="get" action="{{ url(current_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
   {% for key, value in request.args.items(multi=True) if key != 'lang' %}
     <input type="hidden" name="{{ key }}" value="{{ value }}">
@@ -17,3 +29,4 @@
             title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
   {% endfor %}
 </form>
+{% endif %}
