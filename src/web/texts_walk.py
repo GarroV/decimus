@@ -83,17 +83,36 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.finish.sent": {"ru": "Итог отправлен в чат", "en": "The summary is in the chat"},
     "walk.finish.yes": {"ru": "Завершить", "en": "Finish"},
-    "walk.finish.manual": {
-        "ru": "Завершите проверку командой /finish в чате",
-        "en": "Finish the inspection with the /finish command in the chat",
+    # Режим «Сразу отчёт» (D449).
+    "walk.finish.ask_report": {
+        "ru": "Сформировать отчёт и прислать в чат?",
+        "en": "Build the report and send it to the chat?",
+    },
+    "walk.finish.report_lang": {"ru": "Язык отчёта", "en": "Report language"},
+    "walk.finish.yes_report": {"ru": "Сформировать", "en": "Build"},
+    "walk.finish.sent_report": {
+        "ru": "Отчёт собирается — он придёт в чат",
+        "en": "The report is being built — it will arrive in the chat",
+    },
+    "walk.finish.err.lang": {
+        "ru": "Выберите язык отчёта из предложенных.",
+        "en": "Pick the report language from the offered ones.",
+    },
+    "walk.finish.err.info": {
+        "ru": "Сначала заполните сведения о визите: {count}",
+        "en": "Fill in the visit details first: {count}",
+    },
+    "walk.finish.err.busy": {
+        "ru": "Отчёт уже собирается — дождитесь его в чате.",
+        "en": "The report is already being built — wait for it in the chat.",
     },
     "walk.finish.err.none": {
         "ru": "Проверки нет — завершать нечего.",
         "en": "There is no inspection to finish.",
     },
     "walk.finish.err.failed": {
-        "ru": "Итог не отправился. Завершите проверку командой /finish в чате.",
-        "en": "The summary was not sent. Finish with the /finish command in the chat.",
+        "ru": "Не получилось. Завершите проверку командой /finish в чате.",
+        "en": "That did not work. Finish with the /finish command in the chat.",
     },
     "walk.zone.clean_done": {
         "ru": "Зона осмотрена, нарушений нет.",

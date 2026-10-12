@@ -113,6 +113,8 @@
 
 .walk-confirm__title { margin: 0 0 6px; font-size: 18px; font-weight: 600; }
 .walk-confirm__text { margin: 0 0 16px; color: var(--ink-2); font-size: 15px; }
+.walk-confirm__langs { margin: 0 0 16px; }
+.walk-confirm__label { margin: 0 0 6px; color: var(--ink-3); font-size: 13px; }
 .walk-confirm__row { display: flex; gap: 8px; }
 .walk-confirm__row > button { flex: 1; width: auto; }
 

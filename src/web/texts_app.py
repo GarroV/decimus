@@ -71,6 +71,13 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     # ── настройки ────────────────────────────────────────────────────────
     "walk.app.settings": {"ru": "Настройки", "en": "Settings"},
     "walk.app.lang": {"ru": "Язык", "en": "Language"},
+    "walk.app.finish_mode": {"ru": "Завершение проверки", "en": "Finishing an inspection"},
+    "walk.app.finish_mode.summary": {"ru": "Сначала сводка", "en": "Summary first"},
+    "walk.app.finish_mode.report": {"ru": "Сразу отчёт", "en": "Report right away"},
+    "walk.app.finish_mode.hint": {
+        "ru": "«Завершить» пришлёт в чат сводку — отчёт после неё, или сразу отчёт.",
+        "en": "“Finish” sends a summary to the chat first, or builds the report right away.",
+    },
     "walk.app.help": {"ru": "Справка", "en": "Help"},
     "walk.app.help.text": {
         "ru": (
@@ -78,16 +85,20 @@ APP_TEXTS: dict[str, dict[str, str]] = {
             "система; проверьте и сохраните. «Осмотрено →» засчитывает зону.\n\n"
             "«Сведения» в шапке обхода — вопросы для отчёта; заполненное здесь бот в "
             "конце не спросит.\n\n"
-            "Начать проверку можно здесь или в чате (/start), завершить (/finish) — в "
-            "чате. Записанное в одном месте видно в другом."
+            "Начать и завершить проверку можно здесь или в чате (/start, /finish). "
+            "«Завершить» в приложении работает в режиме из настроек: сначала сводка в "
+            "чат или сразу отчёт; отчёту нужны заполненные «Сведения». Записанное в "
+            "одном месте видно в другом."
         ),
         "en": (
             "The walk goes zone by zone. “+ Violation” — a photo and a few words, the "
             "system finds the item; check it and save. “Checked →” counts the zone.\n\n"
             "“Details” in the walk header are the report questions; whatever is filled "
             "in here the bot will not ask at the end.\n\n"
-            "Start an inspection here or in the chat (/start); finish it (/finish) in "
-            "the chat. What is recorded in one place shows in the other."
+            "Start and finish an inspection here or in the chat (/start, /finish). "
+            "“Finish” in the app follows the mode in Settings: a summary in the chat "
+            "first, or the report right away; the report needs the “Details” filled in. "
+            "What is recorded in one place shows in the other."
         ),
     },
     "walk.app.version": {"ru": "Версия", "en": "Version"},
@@ -183,6 +194,7 @@ APP_TEXTS: dict[str, dict[str, str]] = {
     },
     "walk.app.err.days": {"ru": "Период — от 1 до 90 дней.", "en": "The period is 1 to 90 days."},
     "walk.app.err.lang": {"ru": "Такого языка нет.", "en": "No such language."},
+    "walk.app.err.finish_mode": {"ru": "Такого режима нет.", "en": "No such mode."},
     "walk.app.err.not_circle": {
         "ru": "Это доступно только кругу доступа к Claude.",
         "en": "Only the Claude access circle can do this.",
