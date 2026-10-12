@@ -31,6 +31,7 @@ from .catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_RATINGS,
+    KIND_RATINGS_READ,
     KIND_RETRACTION,
     ToolSpec,
     as_list,
@@ -378,6 +379,9 @@ def _call_tool(
             # подпись — для подтверждения (D308). Обе приходят от транспорта,
             # из токена, а не от собеседника.
             прочее = {"store": imports, "actor": actor}
+        if spec.kind == KIND_RATINGS:
+            # Кто просит — из токена, а не от собеседника: он ляжет автором заявки.
+            прочее = {"actor": actor}
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
         return _tool_text(str(отказ), failed=True)
@@ -418,9 +422,13 @@ def _call_tool(
                 "виден import_get_inspection",
             ),
             KIND_RATINGS: (
-                "загрузку рейтингов",
-                "Это отказ базы, а не отказ в загрузке; повтор безопасен: тот же файл "
-                "ответит «duplicate»",
+                "работу с рейтингами",
+                "Это отказ базы, а не отказ в просьбе; повтор безопасен: тот же файл "
+                "ответит «duplicate», а повторная заявка на обновление — «уже в очереди»",
+            ),
+            KIND_RATINGS_READ: (
+                "чтение рейтингов",
+                "Это отказ чтения, а не отсутствие рейтингов",
             ),
             KIND_RETRACTION: (
                 "снятие проверки",
