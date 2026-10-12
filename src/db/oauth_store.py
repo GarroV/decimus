@@ -89,6 +89,8 @@ _VERIFIER = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
 DEFAULT_CLIENT_NAME = "MCP client"
 MAX_CLIENT_NAME = 200
 MAX_REDIRECT_URIS = 10
+#: Длина адреса регистрации в схеме (`0051`, `registered_from`).
+MAX_ADDRESS = 100
 
 
 # --- чистые правила ---------------------------------------------------------
@@ -189,12 +191,19 @@ class Connection:
 # --- запросы ----------------------------------------------------------------
 
 _INSERT_CLIENT_SQL = """
-insert into oauth_clients (client_id, client_name, redirect_uris)
-values (%s, %s, %s)
+insert into oauth_clients (client_id, client_name, redirect_uris, registered_from)
+values (%s, %s, %s, %s)
 returning id
 """
 
 _COUNT_RECENT_CLIENTS_SQL = "select count(*) from oauth_clients where created_at > now() - %s"
+
+_COUNT_RECENT_FROM_SQL = """
+select count(*) from oauth_clients where registered_from = %s and created_at > now() - %s
+"""
+
+#: Чистка отжившего — функцией базы (`0051`): права DELETE у приложения нет.
+_PURGE_SQL = "select oauth_purge()"
 
 _SELECT_CLIENT_SQL = """
 select id, client_id, client_name, redirect_uris from oauth_clients where client_id = %s
@@ -306,8 +315,11 @@ def _invalid_grant(описание: str) -> OAuthGrantError:
 # --- клиенты ----------------------------------------------------------------
 
 
-def register_client(name: object, redirect_uris: Sequence[str]) -> Client:
-    """Завести клиента (RFC 7591). Адреса возврата уже проверены вызывающим — и здесь снова."""
+def register_client(name: object, redirect_uris: Sequence[str], *, address: str) -> Client:
+    """Завести клиента (RFC 7591). Адреса возврата уже проверены вызывающим — и здесь снова.
+
+    `address` — откуда пришла регистрация: по нему считается предел на адрес.
+    """
     if not 0 < len(redirect_uris) <= MAX_REDIRECT_URIS or not all(
         redirect_uri_allowed(uri) for uri in redirect_uris
     ):
@@ -315,7 +327,9 @@ def register_client(name: object, redirect_uris: Sequence[str]) -> Client:
     client_id = secrets.token_urlsafe(CLIENT_ID_BYTES)
     имя = clean_client_name(name)
     with _connected("завести OAuth-клиента") as conn, conn.cursor() as cur:
-        cur.execute(_INSERT_CLIENT_SQL, (client_id, имя, list(redirect_uris)))
+        cur.execute(
+            _INSERT_CLIENT_SQL, (client_id, имя, list(redirect_uris), address[:MAX_ADDRESS])
+        )
         row = cur.fetchone()
     if row is None:
         raise AccessError("Не удалось завести OAuth-клиента (insert без строки)")
@@ -324,10 +338,27 @@ def register_client(name: object, redirect_uris: Sequence[str]) -> Client:
     )
 
 
-def recent_clients(window: timedelta) -> int:
-    """Сколько клиентов заведено за окно — для общего предела регистраций."""
+def recent_clients(window: timedelta, *, address: str | None = None) -> int:
+    """Сколько клиентов заведено за окно: всего или с одного адреса — для пределов регистраций."""
     with _connected("сосчитать OAuth-клиентов") as conn, conn.cursor() as cur:
-        cur.execute(_COUNT_RECENT_CLIENTS_SQL, (window,))
+        if address is None:
+            cur.execute(_COUNT_RECENT_CLIENTS_SQL, (window,))
+        else:
+            cur.execute(_COUNT_RECENT_FROM_SQL, (address[:MAX_ADDRESS], window))
+        row = cur.fetchone()
+    return 0 if row is None else int(row[0])
+
+
+def purge_stale() -> int:
+    """Убрать отжившее: коды и токены, истёкшие больше суток назад, и брошенных клиентов.
+
+    Брошенный клиент — старше суток, без единого подключения и без кода.
+    Удаляет функция базы `oauth_purge` (`0051`): права DELETE у приложения нет,
+    и пробитое приложение не сотрёт живое подключение. Возвращает, сколько строк
+    убрано. Запросы идут по индексам сроков — чистку можно звать на каждой выдаче.
+    """
+    with _connected("убрать отжившее OAuth") as conn, conn.cursor() as cur:
+        cur.execute(_PURGE_SQL)
         row = cur.fetchone()
     return 0 if row is None else int(row[0])
 

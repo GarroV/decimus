@@ -27,6 +27,7 @@ Code — заголовка `Origin` там нет, и `refuse_foreign_origin` �
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import timedelta
 from typing import Any
@@ -54,13 +55,26 @@ AUTHORIZE_ENDPOINT = "oauth_authorize"
 #: Открыты без входа: их зовёт сервер Claude, а не браузер вошедшего.
 ENDPOINTS = frozenset({"oauth_metadata", "oauth_register", "oauth_token"})
 
-#: Общий предел регистраций клиентов за окно. Не по адресу: claude.ai
-#: регистрирует клиентов со своих серверов, и один адрес у него на всех людей —
-#: предел по адресу закрыл бы подключение всей компании разом.
+#: Пределы успешных регистраций клиентов за окно — два, и нужны оба.
+#:
+#: На адрес — 10 в час. Регистрация открыта без входа; без предела на адрес один
+#: перебирающий выбирал общий предел и закрывал подключение всей компании.
+#: claude.ai регистрирует клиентов со своих серверов, и адресов у него мало.
+#: Переиспользует ли он `client_id`, не проверено; в худшем случае — клиент на
+#: каждое подключение, и 10 в час с одного адреса Anthropic значат 10 новых
+#: подключений в час. Людей в decimus десятки, подключаются они один раз, а
+#: Claude Code регистрируется с машины человека — со своего адреса. Упёршийся
+#: получает 429 с `Retry-After` и повторяет позже.
+#:
+#: Общий — 1000 в час: чтобы выбрать его, нужна сотня адресов, а брошенных
+#: клиентов убирает чистка (`oauth_store.purge_stale`) — таблица не растёт.
 REGISTRATION_WINDOW = timedelta(hours=1)
-REGISTRATIONS_PER_WINDOW = 100
+REGISTRATIONS_PER_ADDRESS = 10
+REGISTRATIONS_PER_WINDOW = 1000
 
 GRANT_TYPES = ("authorization_code", "refresh_token")
+
+logger = logging.getLogger(__name__)
 
 _JSON_NO_STORE = {"Cache-Control": "no-store", "Pragma": "no-cache"}
 
@@ -124,6 +138,28 @@ def _counted_failure(address: str, status: int, error: str, description: str) ->
         return _json_error(429, "slow_down", "too many failed attempts", запрет.retry_after_seconds)
     web_throttle.note_address_failure(tenant=рубеж, address=address)
     return _json_error(status, error, description)
+
+
+def registration_full(address: str) -> bool:
+    """Предел регистраций выбран: адресом или всеми вместе. Сначала свой — он дешевле и чаще."""
+    if (
+        oauth_store.recent_clients(REGISTRATION_WINDOW, address=address)
+        >= REGISTRATIONS_PER_ADDRESS
+    ):
+        return True
+    return oauth_store.recent_clients(REGISTRATION_WINDOW) >= REGISTRATIONS_PER_WINDOW
+
+
+def _purge_after_issue() -> None:
+    """Чистка после выдачи токенов: так истёкшие токены не копятся и без новых регистраций.
+
+    Отдельной транзакцией и после выдачи: сбой чистки не отнимает у человека
+    выданную пару, а пишется в журнал — молча он не проходит.
+    """
+    try:
+        oauth_store.purge_stale()
+    except AccessError:
+        logger.warning("чистка OAuth не прошла — отжившие коды и токены остались", exc_info=True)
 
 
 def _registration_uris(body: object) -> list[str] | None:
@@ -220,15 +256,19 @@ def install(app: Flask, conf: Settings) -> None:
                 "invalid_redirect_uri",
                 "redirect_uris must be Claude callback addresses",
             )
-        if oauth_store.recent_clients(REGISTRATION_WINDOW) >= REGISTRATIONS_PER_WINDOW:
-            return _json_error(
-                429,
-                "temporarily_unavailable",
-                "registration limit reached",
-                int(REGISTRATION_WINDOW.total_seconds()),
-            )
         имя = тело.get("client_name") if isinstance(тело, dict) else None
-        клиент = oauth_store.register_client(имя, uris)
+        try:
+            oauth_store.purge_stale()
+            if registration_full(адрес):
+                return _json_error(
+                    429,
+                    "temporarily_unavailable",
+                    "registration limit reached",
+                    int(REGISTRATION_WINDOW.total_seconds()),
+                )
+            клиент = oauth_store.register_client(имя, uris, address=адрес)
+        except AccessError:
+            return _json_error(503, "temporarily_unavailable", "storage unavailable")
         ответ = jsonify(
             {
                 "client_id": клиент.client_id,
@@ -314,6 +354,7 @@ def install(app: Flask, conf: Settings) -> None:
             return _counted_failure(адрес, 400, отказ.error, str(отказ))
         except AccessError:
             return _json_error(503, "temporarily_unavailable", "storage unavailable")
+        _purge_after_issue()
         ответ = jsonify(
             {
                 "access_token": пара.access_token,
