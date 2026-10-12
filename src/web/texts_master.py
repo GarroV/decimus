@@ -28,6 +28,10 @@ MASTER_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Главный чек-лист правят только админы. Здесь его можно смотреть, но не менять.",
         "en": "Only admins edit the master checklist. You can view it here but not change it.",
     },
+    "methodology.apply_admins_only": {
+        "ru": "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть.",
+        "en": "Only admins can apply a checklist to production: one pointer for all.",
+    },
     "methodology.master_toggle_admins_only": {
         "ru": "Метку «Главный» ставят и снимают только админы.",
         "en": "Only admins can set or remove the “Master” mark.",

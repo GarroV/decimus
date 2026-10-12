@@ -16,13 +16,17 @@ from mcp_checklist_harness import build_methodology
 from src.mcp.checklist import Store, current_version
 from src.mcp.checklist_layout import for_code
 from src.mcp.checklists import set_master
-from src.mcp.rpc import MASTER_READONLY, handle
+from src.mcp.rpc import MASTER_READONLY, PROD_POINTER_ADMINS_ONLY, handle
 
 ГЛАВНЫЙ = "bizdev"
 СВОЙ = "rnd"
 НОВЫЙ = {"checklist": СВОЙ, "name_ru": "Аудит РНД", "name_en": "RnD audit"}
 #: Начало отказа: по нему отказ главного отличают от любого другого отказа двери.
 ОТКАЗ = MASTER_READONLY[:40]
+#: Отказ указателя прода — он один на всю сеть.
+ОТКАЗ_УКАЗАТЕЛЯ = PROD_POINTER_ADMINS_ONLY[:40]
+#: Пишущий инструмент без обязательных пунктов: закрыть чек-лист в боте.
+ЗАКРЫТЬ_В_БОТЕ = {"in_bot": False}
 
 
 @pytest.fixture
@@ -59,35 +63,63 @@ def test_девелопер_заводит_свой_чек_лист(хранил
     assert not ошибка, текст
 
 
-@pytest.mark.parametrize("аргументы", [{"checklist": ГЛАВНЫЙ}, {}])
+@pytest.mark.parametrize("код", [{"checklist": ГЛАВНЫЙ}, {}])
 def test_девелопер_правку_главного_получает_отказом_словами(
-    хранилище: Store, аргументы: dict[str, Any]
+    хранилище: Store, код: dict[str, Any]
 ) -> None:
     """Код назван — главный; код не назван — применённый к проду, это тоже главный."""
-    ошибка, текст = _вызвать("apply_checklist", аргументы, store=хранилище, роль="developer")
+    ошибка, текст = _вызвать(
+        "set_checklist_bot_access", {**ЗАКРЫТЬ_В_БОТЕ, **код}, store=хранилище, роль="developer"
+    )
 
     assert ошибка
     assert ОТКАЗ in текст
 
 
 def test_админ_того_же_вызова_отказа_главного_не_получает(хранилище: Store) -> None:
-    _, текст = _вызвать("apply_checklist", {"checklist": ГЛАВНЫЙ}, store=хранилище, роль="admin")
+    _, текст = _вызвать(
+        "set_checklist_bot_access",
+        {**ЗАКРЫТЬ_В_БОТЕ, "checklist": ГЛАВНЫЙ},
+        store=хранилище,
+        роль="admin",
+    )
 
     assert ОТКАЗ not in текст
 
 
 def test_свой_чек_лист_девелопер_правит_а_отмеченный_главным_уже_нет(хранилище: Store) -> None:
     _вызвать("create_checklist", НОВЫЙ, store=хранилище, роль="developer")
-    _, до = _вызвать("apply_checklist", {"checklist": СВОЙ}, store=хранилище, роль="developer")
+    аргументы = {**ЗАКРЫТЬ_В_БОТЕ, "checklist": СВОЙ}
+    _, до = _вызвать("set_checklist_bot_access", аргументы, store=хранилище, роль="developer")
     assert ОТКАЗ not in до, "неглавный чек-лист получил отказ главного"
 
     set_master(for_code(хранилище, СВОЙ), tenant="HQ", on=True, by="test")
     ошибка, после = _вызвать(
-        "apply_checklist", {"checklist": СВОЙ}, store=хранилище, роль="developer"
+        "set_checklist_bot_access", аргументы, store=хранилище, роль="developer"
     )
 
     assert ошибка
     assert ОТКАЗ in после
+
+
+@pytest.mark.parametrize("код", [ГЛАВНЫЙ, СВОЙ, None])
+def test_девелопер_указатель_прода_не_двигает_ни_для_какого_чек_листа(
+    хранилище: Store, код: str | None
+) -> None:
+    """Указатель один на всю сеть: свой применённый чек-лист сместил бы главный."""
+    _вызвать("create_checklist", НОВЫЙ, store=хранилище, роль="developer")
+    аргументы = {} if код is None else {"checklist": код}
+
+    ошибка, текст = _вызвать("apply_checklist", аргументы, store=хранилище, роль="developer")
+
+    assert ошибка
+    assert ОТКАЗ_УКАЗАТЕЛЯ in текст
+
+
+def test_админ_указатель_прода_двигает(хранилище: Store) -> None:
+    _, текст = _вызвать("apply_checklist", {"checklist": ГЛАВНЫЙ}, store=хранилище, роль="admin")
+
+    assert ОТКАЗ_УКАЗАТЕЛЯ not in текст
 
 
 def test_читать_главный_девелоперу_можно(хранилище: Store) -> None:

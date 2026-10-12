@@ -209,6 +209,17 @@ MASTER_READONLY = (
     "проверки, но не менять; свои чек-листы, не отмеченные главными, правятся как обычно"
 )
 
+#: Инструменты, двигающие указатель прода, — один на всю сеть (D440): применив
+#: свой чек-лист, бизнес-девелопер сдвинул бы с прода главный для всех. Отказ по
+#: имени инструмента, а не по хранилищу: указатель общий, чей бы чек-лист ни брался.
+PROD_POINTER_TOOLS = frozenset({"apply_checklist"})
+
+PROD_POINTER_ADMINS_ONLY = (
+    "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть, "
+    "и применённый чек-лист заменил бы главный для всех. Свой чек-лист можно вести и "
+    "публиковать, а применяет его админ"
+)
+
 ROLE_CLOSED = (
     "Этот инструмент не открыт роли «{роль}» вашей учётки decimus. Права в Claude, "
     "подключённом через сайт, решает роль учётки: что ей открыто, видно в списке инструментов"
@@ -358,6 +369,8 @@ def _call_tool(
         return f"Аргументы инструмента {name} ожидаются объектом"
     if role is not None and not permits(role, tenant, spec.kind):
         return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
+    if role is not None and role not in ADMIN_ROLES and spec.name in PROD_POINTER_TOOLS:
+        return _tool_text(PROD_POINTER_ADMINS_ONLY, failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
