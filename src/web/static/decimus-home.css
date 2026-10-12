@@ -18,6 +18,8 @@
 .page--home .shead__main { flex: 0 0 auto; min-width: 0; }
 .hm-slice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: auto; }
 .hm-slice .hm-more { margin-left: 0; }
+/* Список страны стоит у правого края шапки: меню раскрывается влево, а не за экран. */
+.hm-slice > .pick:not(.speriod__pick) .pick__menu { left: auto; right: 0; }
 
 /* Сетка компактных блоков (D418): колонки фиксированной ширины, а не одна
    строка на всю ширину; на телефоне — одна колонка. «Пиццерии» — на всю строку:
