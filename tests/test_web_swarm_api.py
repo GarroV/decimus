@@ -15,7 +15,15 @@ from typing import Any
 import pytest
 from flask.testing import FlaskClient
 
-from src.db import api_access, maps_store, queries, ratings_read, swarm_read, web_throttle
+from src.db import (
+    agg_store,
+    api_access,
+    maps_store,
+    queries,
+    ratings_read,
+    swarm_read,
+    web_throttle,
+)
 from src.db.errors import AccessError, DbError
 from src.db.maps_store import LatestRating
 from src.db.models import FindingRow, InspectionDetail
@@ -30,7 +38,16 @@ from src.web.config import Settings
 ВЕРНЫЙ = {"Authorization": f"Bearer {ТОКЕН}"}
 ТОКЕНЫ = {
     ТОКЕН: api_access.ApiToken(1, "swarm", api_access.SCOPES),
-    ТОЛЬКО_РЕЙТИНГИ: api_access.ApiToken(2, "swarm", (api_access.SCOPE_RATINGS_READ,)),
+    ТОЛЬКО_РЕЙТИНГИ: api_access.ApiToken(
+        2,
+        "swarm",
+        (
+            api_access.SCOPE_RATING_SCORES,
+            api_access.SCOPE_RATING_CHECKUPS,
+            api_access.SCOPE_RATING_VIOLATIONS,
+            api_access.SCOPE_MAPS,
+        ),
+    ),
 }
 АДРЕСА = (
     f"{swarm_api.SCORES_PATH}?type=rs",
@@ -38,6 +55,8 @@ from src.web.config import Settings
     f"{swarm_api.VIOLATIONS_PATH}?type=rs",
     swarm_api.INSPECTIONS_PATH,
     swarm_api.MAPS_PATH,
+    swarm_api.AGGREGATORS_PATH,
+    swarm_api.INSPECTION_VIOLATIONS_PATH,
 )
 ПЕРИОДЫ = [
     swarm_read.PeriodRow(11, date(2026, 9, 1), date(2026, 9, 15), "Сентябрь 1", "September 1"),
@@ -62,7 +81,13 @@ def _клиент() -> FlaskClient:
 @pytest.fixture
 def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     """Подменённые двери чтения; журнал вызовов — чтобы видеть, что дошло до базы."""
-    зовы: dict[str, list[Any]] = {"periods": [], "inspections": [], "maps": []}
+    зовы: dict[str, list[Any]] = {
+        "periods": [],
+        "inspections": [],
+        "maps": [],
+        "aggs": [],
+        "findings": [],
+    }
 
     def периоды(rating_type: str, **kw: Any) -> list[swarm_read.PeriodRow]:
         зовы["periods"].append((rating_type, kw))
@@ -134,6 +159,34 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     monkeypatch.setattr(
         maps_store, "last_ok_load", lambda: datetime(2026, 10, 11, 3, 10, tzinfo=UTC)
     )
+
+    def агрегаторы(countries: Any, *, until: date) -> tuple[agg_store.LatestRating, ...]:
+        зовы["aggs"].append((list(countries), until))
+        return (
+            agg_store.LatestRating("RS", "wolt", "aa" * 16, 9.2, 10, 120, date(2026, 10, 11)),
+            agg_store.LatestRating("RS", "glovo", "aa" * 16, 98.0, 100, 50, date(2026, 10, 11)),
+        )
+
+    def нарушения(**kw: Any) -> tuple[list[Any], list[Any]]:
+        зовы["findings"].append(kw)
+        return (
+            [
+                swarm_read.FindingCount("RS", "D1.1", 5, 3),
+                swarm_read.FindingCount("RS", "A2", 2, 2),
+                swarm_read.FindingCount("GE", "D1.1", 1, 1),
+            ],
+            [
+                swarm_read.CountryInspections("RS", 4, "v7"),
+                swarm_read.CountryInspections("GE", 2, "v7"),
+            ],
+        )
+
+    monkeypatch.setattr(agg_store, "latest", агрегаторы)
+    monkeypatch.setattr(agg_store, "last_run", lambda: datetime(2026, 10, 11, 4, 0, tzinfo=UTC))
+    monkeypatch.setattr(swarm_read, "finding_counts", нарушения)
+    monkeypatch.setattr(
+        inspection_titles, "item_titles", lambda version: {"D1.1": ("Грязь", "Dirt")}
+    )
     return зовы
 
 
@@ -192,7 +245,7 @@ def test_без_верного_токена_401(
     assert ответ.status_code == 401
     assert ответ.get_json()["error"] == "unauthorized"
     assert ответ.headers["WWW-Authenticate"].startswith("Bearer")
-    assert база == {"periods": [], "inspections": [], "maps": []}, "до базы дошёл неопознанный"
+    assert all(not зовы for зовы in база.values()), "до базы дошёл неопознанный"
     assert доступ["неудачи"] == 1, "неудача не записана в счётчик адреса"
     assert доступ["журнал"] == [(None, адрес.split("?")[0], 401)]
 
@@ -700,7 +753,9 @@ def test_карты_с_токеном_без_права_рейтингов_403(
         api_access,
         "resolve",
         lambda t: (
-            api_access.ApiToken(3, "x", (api_access.SCOPE_INSPECTIONS_READ,))
+            api_access.ApiToken(
+                3, "x", (api_access.SCOPE_INSPECTION_LIST, api_access.SCOPE_INSPECTION_DETAIL)
+            )
             if t == без_рейтингов
             else None
         ),
@@ -708,3 +763,123 @@ def test_карты_с_токеном_без_права_рейтингов_403(
     ответ = клиент.get(swarm_api.MAPS_PATH, headers={"Authorization": f"Bearer {без_рейтингов}"})
     assert ответ.status_code == 403
     assert база["maps"] == []
+
+
+# --- права по методам и страны токена (D425, аудит 12.10.2026) ------------------
+
+
+@pytest.mark.parametrize("адрес", АДРЕСА)
+def test_у_каждого_метода_своё_право(
+    клиент: FlaskClient, база: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch, адрес: str
+) -> None:
+    """Токен со всеми правами, кроме права этого метода, получает 403 и до базы не
+    доходит; с одним этим правом — 200. Так держится «ровно то, что включено»."""
+    путь = адрес.split("?")[0]
+    право = next(p for (маршрут, _, p, _) in swarm_api.routes() if маршрут.split("<")[0] == путь)
+    остальные = tuple(p for p in api_access.SCOPES if p != право)
+    без = "токен-со-всеми-правами-кроме-одного-длинный"
+    только = "токен-ровно-с-одним-правом-этого-метода-длинный"
+    токены = {
+        без: api_access.ApiToken(5, "x", остальные),
+        только: api_access.ApiToken(6, "x", (право,)),
+    }
+    monkeypatch.setattr(api_access, "resolve", токены.get)
+    ответ = клиент.get(адрес, headers={"Authorization": f"Bearer {без}"})
+    assert ответ.status_code == 403, путь
+    assert all(not зовы for зовы in база.values()), "до базы дошёл токен без права метода"
+    assert клиент.get(адрес, headers={"Authorization": f"Bearer {только}"}).status_code == 200
+
+
+def test_права_по_методам_разные_и_все_в_перечне() -> None:
+    права = [p for (_, _, p, _) in swarm_api.routes()]
+    assert len(права) == len(set(права)), "два метода под одним правом"
+    assert set(права) == set(api_access.SCOPES), "право без метода или метод без права"
+
+
+@pytest.mark.parametrize(
+    ("granted", "requested", "ждём"),
+    [
+        (None, None, None),
+        (None, ("RS",), ("RS",)),
+        (("RS", "GE"), None, ("RS", "GE")),
+        (("RS", "GE"), ("GE",), ("GE",)),
+    ],
+)
+def test_страны_ответа_в_пределах_токена(
+    granted: tuple[str, ...] | None,
+    requested: tuple[str, ...] | None,
+    ждём: tuple[str, ...] | None,
+) -> None:
+    assert swarm_api.allowed_countries(requested, granted) == ждём
+
+
+def test_чужая_страна_403_а_не_урезанный_ответ() -> None:
+    with pytest.raises(swarm_api.ApiRefusal) as отказ:
+        swarm_api.allowed_countries(("RS", "TR"), ("RS",))
+    assert отказ.value.status == 403 and отказ.value.code == "forbidden_country"
+
+
+def test_токен_со_странами_без_фильтра_видит_только_их(
+    клиент: FlaskClient, база: dict[str, list[Any]], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    узкий = "токен-только-по-грузии-тоже-очень-длинный"
+    monkeypatch.setattr(
+        api_access,
+        "resolve",
+        lambda t: api_access.ApiToken(7, "x", api_access.SCOPES, ("GE",)) if t == узкий else None,
+    )
+    шапка = {"Authorization": f"Bearer {узкий}"}
+    assert клиент.get(swarm_api.AGGREGATORS_PATH, headers=шапка).status_code == 200
+    assert база["aggs"][-1][0] == ["GE"], "без фильтра ушла вся сеть, а не страны токена"
+    assert клиент.get(swarm_api.INSPECTIONS_PATH, headers=шапка).status_code == 200
+    assert база["inspections"][-1]["reach"].countries == ("GE",)
+    ответ = клиент.get(f"{swarm_api.MAPS_PATH}?countries=RS", headers=шапка)
+    assert ответ.status_code == 403
+    assert ответ.get_json()["error"] == "forbidden_country"
+
+
+def test_деталь_чужой_страны_404(
+    клиент: FlaskClient, деталь: dict[str, Any], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    узкий = "токен-только-по-сербии-тоже-очень-длинный"
+    monkeypatch.setattr(
+        api_access,
+        "resolve",
+        lambda t: api_access.ApiToken(8, "x", api_access.SCOPES, ("RS",)) if t == узкий else None,
+    )
+    ответ = клиент.get(
+        f"{swarm_api.INSPECTIONS_PATH}/11111111-1111-1111-1111-111111111111",
+        headers={"Authorization": f"Bearer {узкий}"},
+    )
+    assert ответ.status_code == 404, "проверка Грузии видна токену только по Сербии"
+
+
+def test_агрегаторы_средние_и_пиццерии(клиент: FlaskClient) -> None:
+    тело = клиент.get(f"{swarm_api.AGGREGATORS_PATH}?countries=RS", headers=ВЕРНЫЙ).get_json()
+    assert [a["key"] for a in тело["aggregators"]] == ["wolt", "glovo"]
+    assert тело["aggregators"][0] == {"key": "wolt", "title": "Wolt", "scale": 10}
+    (страна,) = тело["countries"]
+    assert страна["cc"] == "RS" and страна["scores"]["wolt"]["avg"] == 9.2
+    assert страна["scores"]["glovo"] == {"avg": 98.0, "scale": 100, "votes": 50, "pizzerias": 1}
+    assert len(тело["units"]) == 2 and тело["units"][0]["on"] == "2026-10-11"
+
+
+def test_топ_нарушений_проверок_по_странам_и_сети(клиент: FlaskClient) -> None:
+    тело = клиент.get(
+        f"{swarm_api.INSPECTION_VIOLATIONS_PATH}?top=1&from=2026-09-01", headers=ВЕРНЫЙ
+    ).get_json()
+    assert тело["from"] == "2026-09-01" and тело["to"] is None
+    assert тело["network"] == {
+        "inspections": 6,
+        "top": [
+            {
+                "code": "D1.1",
+                "title_ru": "Грязь",
+                "title_en": "Dirt",
+                "findings": 6,
+                "inspections": 4,
+            }
+        ],
+    }
+    assert [c["cc"] for c in тело["countries"]] == ["GE", "RS"]
+    assert тело["countries"][1]["top"][0]["findings"] == 5

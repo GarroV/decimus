@@ -21,6 +21,7 @@ from psycopg.types.json import Jsonb
 
 from .config import check_environment
 from .errors import RatingsError
+from .pool import connection
 
 INSERTED = "inserted"
 UPDATED = "updated"
@@ -128,7 +129,7 @@ def record_failure(
     *, channel: str, actor: str, file_name: str | None, sha: str, note: str, fmt: str | None = None
 ) -> int:
     """След неудачной загрузки — своей транзакцией: основная уже откатилась."""
-    with psycopg.connect(check_environment().dsn) as conn:
+    with connection(check_environment().dsn) as conn:
         return open_import(
             conn,
             channel=channel,

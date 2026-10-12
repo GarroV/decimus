@@ -48,7 +48,7 @@ def _frames(refs: list[str]) -> list[bytes]:
 
 
 def _card(c: Candidate, offer: Offer, ask: _Ask) -> dict[str, Any]:
-    # Зона записи — не зона экрана (D435): выводится по пункту и словам.
+    # Зона записи — не зона экрана (D445): выводится по пункту и словам.
     # Зону кандидата как «зону модели» берём только у модели: у быстрого пути
     # и выученной фразы это эхо подсказки с экрана, а не её вывод.
     options = allowed_zones(c.code, chat_id=ask.chat_id)
@@ -126,7 +126,7 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
             busy.add(who)
         try:
             words = _text(body, "words")
-            # Зона на экране — только подсказка (D435). Старый клиент слал её
+            # Зона на экране — только подсказка (D445). Старый клиент слал её
             # полем `zone`.
             hint_key = "zone_hint" if body.get("zone_hint") else "zone"
             zone = _code(body, hint_key) if body.get(hint_key) else None

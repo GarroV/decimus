@@ -27,6 +27,7 @@ import re
 import unicodedata
 import uuid
 from collections.abc import Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
@@ -38,6 +39,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 from .action_plans import FileReader
 from .config import check_environment, load_storage_settings
 from .errors import PrescriptionError, StorageError
+from .pool import connection
 from .reach import Reach, require_reach
 from .storage import S3PhotoStorage, key_of_uri
 
@@ -444,8 +446,8 @@ def reach_params(reach: Reach) -> dict[str, Any]:
     return params
 
 
-def connect_read() -> psycopg.Connection[Any]:
-    return psycopg.connect(check_environment().dsn)
+def connect_read() -> AbstractContextManager[psycopg.Connection[Any]]:
+    return connection(check_environment().dsn)
 
 
 def read_with(

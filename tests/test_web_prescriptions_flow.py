@@ -176,7 +176,8 @@ def test_путь_предписания(как: Вход, почта: list[dict
     assert армения.get(f"/prescriptions/files/{файл.replies[0].id}").status_code == 404
     assert армения.get("/actions/prescriptions").status_code == 404
     assert армения.get(f"/actions/prescriptions/{п.id}").status_code == 404
-    assert "Предписание · Грузия" not in армения.get("/country/AM?lang=ru").get_data(as_text=True)
+    # «Страна» партнёру закрыта целиком (D371): не пустая, а 404.
+    assert армения.get("/country/AM?lang=ru").status_code == 404
 
     # УК видит ответ, скачивает файл и закрывает с комментарием.
     уК = как("HQ")
@@ -191,11 +192,13 @@ def test_путь_предписания(как: Вход, почта: list[dict
     )
     assert "Предписание закрыто." in закрыто.get_data(as_text=True)
 
-    # На экране страны — предписание и «Закрыто»; партнёру тоже.
+    # На экране страны — предписание и «Закрыто». Партнёр видит «Закрыто» на
+    # карточке предписания в своём разделе: «Страна» у него закрыта (D371).
     страна = уК.get("/country/GE?lang=ru").get_data(as_text=True)
     assert "Предписание · Грузия" in страна and "Закрыто" in страна
     грузия = как("GE")
-    assert "Предписание · Грузия" in грузия.get("/country/GE?lang=ru").get_data(as_text=True)
+    своё = грузия.get(f"/prescriptions/{п.id}?lang=ru").get_data(as_text=True)
+    assert "Закрыто" in своё
     итог = rx.get_prescription(п.id, reach=reach_of("HQ"))
     assert итог is not None
     assert [e.action for e in итог.events] == ["created", "issued", "replied", "closed"]
@@ -220,4 +223,3 @@ def test_черновик_партнёр_не_видит_нигде(как: Вх
     грузия = как("GE")
     assert "Черновая тема" not in грузия.get("/prescriptions?lang=ru").get_data(as_text=True)
     assert грузия.get(f"/prescriptions/{ident}").status_code == 404
-    assert "Черновая тема" not in грузия.get("/country/GE?lang=ru").get_data(as_text=True)
