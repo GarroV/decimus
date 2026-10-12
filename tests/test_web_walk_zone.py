@@ -24,9 +24,16 @@ from src.web.walk_zone import resolve_item_zone
 
 
 def test_пункт_одной_зоны_берёт_эту_зону_что_бы_ни_было_на_экране() -> None:
-    итог = resolve_item_zone(ПЕЧЬ, spoken="hall", model="cold_kitchen", hint="hall")
+    итог = resolve_item_zone(ПЕЧЬ, spoken=None, model="cold_kitchen", hint="hall")
 
     assert (итог.zone, итог.source) == ("hot_kitchen", "single")
+
+
+def test_зона_названная_человеком_сильнее_единственной_зоны_пункта() -> None:
+    """D206: названное человеком принимается и вне списка — движок пометит «нетипична»."""
+    итог = resolve_item_zone(ПЕЧЬ, spoken="hall", model="cold_kitchen", hint="hot_kitchen")
+
+    assert (итог.zone, итог.source) == ("hall", "words")
 
 
 def test_слова_аудитора_сильнее_модели_и_экрана() -> None:
@@ -54,10 +61,10 @@ def test_экран_вне_списка_пункта_подсказкой_не_�
     assert итог.options == НЕСКОЛЬКО, "спрашиваем только зонами пункта, в порядке методики"
 
 
-def test_слово_о_зоне_вне_списка_пункта_молча_не_подставляется() -> None:
-    итог = resolve_item_zone(НЕСКОЛЬКО, spoken="storage", model=None, hint=None)
+def test_зона_вне_списка_пункта_названная_словами_берётся_как_у_бота() -> None:
+    итог = resolve_item_zone(НЕСКОЛЬКО, spoken="storage", model="hall", hint="hall")
 
-    assert итог.zone is None and итог.source == "ask"
+    assert (итог.zone, итог.source) == ("storage", "words")
 
 
 def test_ничего_не_сказано_и_экрана_нет_спрашиваем() -> None:
