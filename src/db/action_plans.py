@@ -389,10 +389,14 @@ def _read(sql: str, params: dict[str, Any]) -> tuple[PlanRequest, ...]:
             cur.execute(sql, params)
             heads = cur.fetchall()
             ids = [str(row[0]) for row in heads]
-            cur.execute(_FILES_SQL, {"ids": ids})
-            files = cur.fetchall()
-            cur.execute(_EVENTS_SQL, {"ids": ids})
-            events = cur.fetchall()
+            # Запросов нет — файлов и событий нет: два похода в базу «за пустым».
+            files: list[tuple[Any, ...]] = []
+            events: list[tuple[Any, ...]] = []
+            if ids:
+                cur.execute(_FILES_SQL, {"ids": ids})
+                files = cur.fetchall()
+                cur.execute(_EVENTS_SQL, {"ids": ids})
+                events = cur.fetchall()
     except psycopg.Error as exc:
         raise DbError(f"Не удалось прочитать экшн-планы ({type(exc).__name__})") from exc
     return tuple(_assemble(row, files, events) for row in heads)
