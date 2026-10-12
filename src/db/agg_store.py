@@ -14,15 +14,33 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Protocol
 
 import psycopg
 from psycopg.types.json import Jsonb
 
-from src.ratings.maps_link import DodoUnit
-
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
+
+
+class UnitIn(Protocol):
+    """Пиццерия из публичного API Dodo, как её пишет `save_units`. Описана здесь,
+    а не взята из `src.ratings.maps_link`: db стоит ярусом ниже рейтингов и
+    импортировать их не может (контракт слоёв в pyproject.toml)."""
+
+    @property
+    def dodo_id(self) -> str: ...
+    @property
+    def country(self) -> str: ...
+    @property
+    def name(self) -> str: ...
+    @property
+    def lat(self) -> float: ...
+    @property
+    def lng(self) -> float: ...
+    @property
+    def working(self) -> bool: ...
 
 
 @dataclass(frozen=True)
@@ -373,7 +391,7 @@ on conflict (dodo_id) do update set
 """
 
 
-def save_units(units: Sequence[DodoUnit], today: date) -> int:
+def save_units(units: Sequence[UnitIn], today: date) -> int:
     """Записать реестр пиццерий; вернуть, сколько строк пришло. Новая пиццерия
     получает `first_seen = today`; известная обновляется, а `first_seen` остаётся.
     Первое заполнение (таблица была пуста) пишет `first_seen = null`: иначе
