@@ -35,6 +35,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.public_urls import OAUTH_SCOPE
+
 from .config import check_environment
 from .errors import AccessError, OAuthGrantError
 
@@ -60,7 +62,7 @@ SECRET_BYTES = 32
 CLIENT_ID_BYTES = 24
 
 #: Единственная область доступа: весь MCP decimus в пределах роли.
-SCOPE = "mcp"
+SCOPE = OAUTH_SCOPE
 
 #: Длина отпечатка SHA-256 шестнадцатеричной записью (схема `0051` требует её же).
 FINGERPRINT_LENGTH = 64
