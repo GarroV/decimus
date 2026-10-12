@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterator
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -292,8 +292,11 @@ def test_выдача_передаёт_базе_проверенное_и_лог
         ({"scope": ["ratings:write"]}, "Такого права нет"),
         ({"code": "Bad Code"}, "Код: латиница"),
         ({"countries": "GE ZZ"}, "Неизвестная страна: ZZ"),
-        ({"expires": str(date.today() - timedelta(days=1))}, "Срок не раньше завтрашнего дня"),
-        ({"expires": date.today().isoformat()}, "Срок не раньше завтрашнего дня"),
+        (
+            {"expires": str(datetime.now(UTC).date() - timedelta(days=1))},
+            "Срок не раньше завтрашнего дня",
+        ),
+        ({"expires": datetime.now(UTC).date().isoformat()}, "Срок не раньше завтрашнего дня"),
         ({"title": "  "}, "Назовите сервис"),
     ],
 )
