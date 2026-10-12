@@ -295,6 +295,7 @@ class _Handler(BaseHTTPRequestHandler):
             may_retract=доступ.may_retract,
             imports=_imports_for(self._settings, доступ.tenant),
             actor=доступ.actor,
+            role=доступ.role,
         )
         if answer is None:
             self._send(_ACCEPTED)
