@@ -395,6 +395,15 @@ def _правка_ответом_не_уходит_в_сеть(monkeypatch: pyte
     monkeypatch.setattr("src.bot.routers.correct.revise_finding", другое)
 
 
+@pytest.fixture(autouse=True)
+def _предел_обхода_свой_у_теста(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Счётчик частоты обхода (`walk_rate`) живёт в процессе — у каждого теста
+    свой, иначе запросы одного теста съедали бы предел следующего."""
+    from src.web import walk_rate
+
+    monkeypatch.setattr(walk_rate, "CHAT_RATE", walk_rate.ChatRate())
+
+
 @pytest.fixture
 def pg_dsn() -> Iterator[str]:
     """DSN одноразовой базы данных со свежо накатанной схемой блока `db`.
