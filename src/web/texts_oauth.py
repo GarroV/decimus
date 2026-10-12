@@ -13,6 +13,16 @@ OAUTH_TEXTS: dict[str, dict[str, str]] = {
         "ru": "«{client}» просит доступ к decimus от имени вашей учётки {login}.",
         "en": "“{client}” asks for access to decimus on behalf of your account {login}.",
     },
+    "oauth.consent.unverified": {
+        "ru": "Имя «{client}» клиент назвал сам, его никто не проверял.",
+        "en": "The name “{client}” was chosen by the client itself; nobody has verified it.",
+    },
+    "oauth.consent.only_you": {
+        "ru": "Разрешайте, только если подключение начали вы сами и только что. Если вы "
+        "попали сюда по чужой ссылке — нажмите «Отказать».",
+        "en": "Allow only if you started this connection yourself just now. If you came here "
+        "from someone else's link, press “Deny”.",
+    },
     "oauth.consent.role": {"ru": "Ваша роль: {role}.", "en": "Your role: {role}."},
     "oauth.consent.rights": {
         "ru": "Claude получит права вашей роли — не больше. Отключить подключение можно в "

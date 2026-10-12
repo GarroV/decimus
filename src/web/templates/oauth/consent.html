@@ -1,9 +1,11 @@
 {#
   Согласие на подключение Claude (D417). Человек уже вошёл; здесь он видит,
   КТО просит доступ (имя клиента из регистрации), КУДА уйдёт код (хост
-  возврата) и с какими правами (его роль), — и решает сам. Для возврата на
-  петлю (Claude Code) — отдельное предупреждение: так велит спека MCP, потому
-  что код уходит программе на этой машине, а не Claude.
+  возврата) и с какими правами (его роль), — и решает сам. Имя клиента любой
+  может назвать «Claude» при регистрации, поэтому рядом сказано, что его никто
+  не проверял, а предупреждение «только если начали сами и только что» стоит
+  всегда: ссылку на эту страницу может прислать и чужой. Для возврата на
+  петлю (Claude Code) — ещё одно: код уходит программе на этой машине.
 
   Параметры запроса едут скрытыми полями и проверяются на POST заново:
   форме не верится, верится только тому, что сервер проверил сам.
@@ -19,9 +21,11 @@
 
   <div class="empty">
     <p class="empty__text">{{ t('oauth.consent.lead', client=ask.client.client_name, login=login) }}</p>
+    <p class="empty__text"><small>{{ t('oauth.consent.unverified', client=ask.client.client_name) }}</small></p>
     <p class="empty__text">{{ t('oauth.consent.role', role=t(role_key(account.role, account.tenant))) }}</p>
     <p class="empty__text">{{ t('oauth.consent.rights') }}</p>
     <p class="empty__text">{{ t('oauth.consent.host', host=host) }}</p>
+    <div class="note note--warn"><div class="note__text">{{ t('oauth.consent.only_you') }}</div></div>
     {% if loopback %}
       <div class="note note--warn"><div class="note__text">{{ t('oauth.consent.loopback', host=host) }}</div></div>
     {% endif %}

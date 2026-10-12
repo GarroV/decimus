@@ -263,6 +263,39 @@ def test_согласие_показывает_клиента_и_хост(кли
     assert "https://claude.ai" in ответ.headers["Content-Security-Policy"]
 
 
+@pytest.mark.parametrize(
+    ("язык", "предупреждение", "непроверено"),
+    [
+        ("ru", "только если подключение начали вы сами и только что", "его никто не проверял"),
+        (
+            "en",
+            "Allow only if you started this connection yourself just now",
+            "nobody has verified",
+        ),
+    ],
+)
+def test_согласие_всегда_предупреждает_и_не_ручается_за_имя(
+    monkeypatch: pytest.MonkeyPatch,
+    память: ПамятьOAuth,
+    язык: str,
+    предупреждение: str,
+    непроверено: str,
+) -> None:
+    """Не только для петли: ссылку на согласие с адресом claude.ai может прислать и чужой."""
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
+    приложение = собрать(tenant=ТЕНАНТ, admin_public_url=АДМИНКА, mcp_public_url=MCP, ui_lang=язык)
+    with приложение.test_client() as клиент:
+        client_id = _клиент_claude(клиент)
+        войти(клиент)
+
+        страница = клиент.get(oauth.AUTHORIZE_PATH, query_string=_параметры(client_id)).get_data(
+            as_text=True
+        )
+
+    assert предупреждение in страница
+    assert непроверено in страница
+
+
 def test_согласие_для_петли_предупреждает(клиент: FlaskClient) -> None:
     петля = "http://localhost:4000/callback"
     client_id = _регистрация(клиент, петля).get_json()["client_id"]
