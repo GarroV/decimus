@@ -267,6 +267,7 @@
 | `GOOGLE_MAIL_REDIRECT_URI` | `src/web/google_mail.py` | да |
 | `GOOGLE_REDIRECT_URI` | `src/web/google_auth.py` | да |
 | `INSPECTION_FILE` | `engine/audit.py` | нет — подставляется кодом в окружение подпроцесса движка (src/domain/engine.py) |
+| `LOG_ID_SALT` | `src/domain/log_ids.py` | да |
 | `MCP_CHECKLIST_STORE` | `src/domain/config.py`, `src/mcp/config.py`, `src/report/letters.py` и ещё 1 | да |
 | `MCP_CHECKLIST_TENANTS` | `src/mcp/config.py` | да |
 | `MCP_HOST` | `src/mcp/config.py` | да |

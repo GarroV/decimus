@@ -34,6 +34,7 @@ from flask import Response as FlaskResponse
 
 from src.db import bot_links, mcp_access, oauth_store
 from src.db.errors import DbError
+from src.domain.log_ids import log_id
 
 from . import accounts, auth, profile, users_claude, users_mcp
 from .config import WEB_BOT_USERNAME_VAR, Settings
@@ -238,7 +239,7 @@ def _install_claude_token(app: Flask, base: str) -> None:
             note_target_mismatch(exc)
             return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
         # Значения токена в журнале нет: только факт выпуска.
-        logger.info("Веб: учётка %s выпустила себе токен MCP", чей)
+        logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
         return render(Show(token=выпуск))
 
     @app.post(f"{base}/claude-token-revoke")

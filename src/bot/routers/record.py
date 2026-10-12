@@ -67,6 +67,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.recognize.classify import album_mode, classify
 from src.recognize.errors import ModelUnavailable, RecognizeError
 from src.recognize.fastpath import NO_CUE, FastItem, fast_path
@@ -167,7 +168,9 @@ async def _drop_question(message: Message, chat_id: int, offer: Offer) -> None:
             chat_id=chat_id, message_id=offer.question_id, reply_markup=None
         )
     except Exception:
-        logger.warning("не удалось снять кнопку «Разобрать» в чате %s", chat_id, exc_info=True)
+        logger.warning(
+            "не удалось снять кнопку «Разобрать» в чате %s", log_id(chat_id), exc_info=True
+        )
 
 
 async def hear_voice(message: Message, file_id: str, lang: str) -> str | None:
@@ -380,7 +383,7 @@ async def _open_manual(
                 search_items, proposal.note, lang=report_lang, chat_id=chat_id
             )
         except RecognizeError as exc:
-            logger.warning("поиск пункта словом не сработал в чате %s: %s", chat_id, exc)
+            logger.warning("поиск пункта словом не сработал в чате %s: %s", log_id(chat_id), exc)
             найденные = ()
         if найденные:
             await _show_manual_page(
@@ -404,7 +407,7 @@ async def _open_manual(
         # Сырой текст исключения — в журнал, а не в чат (тот же принцип, что
         # у отказа движка, T127): в нём бывают пути на диске и ссылки на
         # внутренние документы.
-        logger.warning("ручной перечень не собрался в чате %s: %s", chat_id, exc)
+        logger.warning("ручной перечень не собрался в чате %s: %s", log_id(chat_id), exc)
         await message.answer(t("record.unavailable", lang))
         return
     ready = replace(proposal, manual=items, zone_hint=zone)
@@ -542,7 +545,7 @@ async def _try_learned(
         logger.info(
             "синоним поднял пункт %s в чате %s, но класс у пункта не один — разбор идёт дальше",
             code,
-            chat_id,
+            log_id(chat_id),
         )
         return False
     level = levels[0]
@@ -941,7 +944,7 @@ async def _analyze_resolved(
             # поэтому он идёт в журнал, а не в чат: аудитору он ничего не
             # объясняет, а объяснять отказ, за которым просто следует обычный
             # разбор, нечем. Читает его отсюда только правка зоны (T231).
-            logger.info("быстрый путь не сработал в чате %s: %s", chat_id, found.reason)
+            logger.info("быстрый путь не сработал в чате %s: %s", log_id(chat_id), found.reason)
             if found.reason == NO_CUE and await _correct_zone(message, chat_id, base, lang):
                 return
             # Прямого совпадения с методикой не нашлось — спрашиваем карту
@@ -992,13 +995,13 @@ async def _analyze_resolved(
         # показывается кнопками, выбирает человек (контракт `recognize`).
         # Сырой текст исключения — в журнал, а не в чат: в нём бывают пути на
         # диске и ссылки на внутренние документы, аудитору они ни к чему.
-        logger.warning("модель недоступна в чате %s: %s", chat_id, exc)
+        logger.warning("модель недоступна в чате %s: %s", log_id(chat_id), exc)
         await message.answer(t("record.degraded", lang))
         await _open_manual(message, chat_id, base, pending, lang)
         return
     except RecognizeError as exc:
         journal.note(chat_id, "model_failed", slot=base.slot, kind="error", error=str(exc))
-        logger.warning("разбор недоступен в чате %s: %s", chat_id, exc)
+        logger.warning("разбор недоступен в чате %s: %s", log_id(chat_id), exc)
         await message.answer(t("record.unavailable", lang))
         return
 

@@ -26,6 +26,7 @@ from src import domain
 from src.db.directory import upsert_unit
 from src.db.errors import DbError
 from src.domain.errors import DomainError
+from src.domain.log_ids import log_id
 from src.domain.unit_name import UNIT_NAME_BYTE_LIMIT as UNIT_NAME_BYTE_LIMIT
 from src.domain.unit_name import UNIT_NAME_LIMIT, UnitName, check_unit_name
 
@@ -166,10 +167,12 @@ async def _drop_sealed_copy(
     try:
         убрана = await asyncio.to_thread(domain.drop_inspection, chat_id)
     except DomainError:
-        logger.exception("сданная проверка чата %s не убралась", chat_id)
+        logger.exception("сданная проверка чата %s не убралась", log_id(chat_id))
         return False
     if not убрана:
-        logger.error("сданная проверка чата %s не убралась: drop_inspection вернул ложь", chat_id)
+        logger.error(
+            "сданная проверка чата %s не убралась: drop_inspection вернул ложь", log_id(chat_id)
+        )
         return False
     _forget_chat_notes(chat_id, pending, store)
     return True
@@ -209,7 +212,7 @@ def build_start_router(
         try:
             inspection = read_inspection(message.chat.id)
         except DomainError:
-            logger.exception("состояние чата %s не читается", message.chat.id)
+            logger.exception("состояние чата %s не читается", log_id(message.chat.id))
             await stops.refuse(
                 message,
                 lang,
@@ -244,7 +247,7 @@ def build_start_router(
             # Про повреждение аудитор уже прочитал на `/start` и нажал «Новая»
             # осознанно. Второй раз пугать его нечем, а тупик здесь означал бы,
             # что выхода нет и после нажатия единственной предложенной кнопки.
-            logger.exception("состояние чата %s не читается", message.chat.id)
+            logger.exception("состояние чата %s не читается", log_id(message.chat.id))
             await _ask_checklist(message, state, lang, space)
             return
         if inspection is not None:
@@ -333,7 +336,7 @@ def build_start_router(
         try:
             убрана = await asyncio.to_thread(domain.drop_inspection, chat_id)
         except DomainError:
-            logger.exception("проверка чата %s не убралась", chat_id)
+            logger.exception("проверка чата %s не убралась", log_id(chat_id))
             await stops.refuse(message, lang, step="start.drop", key="start.failed")
             return
         if not убрана:
@@ -577,7 +580,7 @@ def build_start_router(
             # Отказ движка приходит стеком с путями к его файлам: он написан
             # тому, кто зовёт движок из командной строки. В журнал целиком, в
             # чат — что делать (T151, тот же принцип, что у T127).
-            logger.exception("не удалось начать проверку в чате %s", message.chat.id)
+            logger.exception("не удалось начать проверку в чате %s", log_id(message.chat.id))
             await stops.refuse(message, lang, step="start.speech_lang", key="start.failed")
             return
         finally:
