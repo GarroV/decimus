@@ -109,8 +109,9 @@
 
   /* ── сервер ────────────────────────────────────────────────────────── */
 
-  /** POST с подписью Telegram. Ответ — { ok, status, body } или отказ сети. */
-  W.post = function (url, body, contentType) {
+  /** POST с подписью Telegram. Ответ — { ok, status, body } или отказ сети.
+   *  `signal` — необязательный AbortSignal: обрыв по сроку (кадры на слабой связи, D442). */
+  W.post = function (url, body, contentType, signal) {
     var headers = { "X-Telegram-Init-Data": (tg && tg.initData) || "" };
     headers["Content-Type"] = contentType || "application/json";
     return fetch(url, {
@@ -118,6 +119,7 @@
       headers: headers,
       body: contentType ? body : JSON.stringify(body),
       credentials: "omit",
+      signal: signal || undefined,
     }).then(function (r) {
       var type = r.headers.get("Content-Type") || "";
       if (type.indexOf("application/json") === -1) {
