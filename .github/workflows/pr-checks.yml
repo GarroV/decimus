@@ -60,3 +60,19 @@ jobs:
           tail -n 2 pytest.log >> "$GITHUB_STEP_SUMMARY"
           echo "Тесты с базой здесь пропущены — они идут на MUSPELHEIM (make test)." >> "$GITHUB_STEP_SUMMARY"
           exit "$status"
+
+  # Установщик MCP для Mac вызывает `plutil`, которого нет на Linux: там его тест
+  # пропускается с причиной, а гоняется здесь — иначе пропуск выглядел бы проверкой.
+  mac-installer:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Зависимости
+        run: pip install -e ".[dev]"
+      - name: Установщик MCP на macOS
+        run: pytest -q -p no:cacheprovider tests/test_mcp_install_endpoint.py
