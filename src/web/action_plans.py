@@ -31,11 +31,11 @@ from src.db.config import load_action_plan_settings
 from src.db.errors import ActionPlanError, DbError, StorageError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import auth
+from . import auth, ui_lang
 from .config import Settings
 from .origin import refuse_foreign_origin
 from .sections import section
-from .texts import lang_or_default, t
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -137,7 +137,7 @@ def _accepted() -> bool:
 
 
 def _lang(conf: Settings) -> str:
-    return lang_or_default(request.args.get("lang"), fallback=conf.ui_lang)
+    return ui_lang.request_lang(conf.ui_lang)
 
 
 def _common(lang: str) -> dict[str, Any]:

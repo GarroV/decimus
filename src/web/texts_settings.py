@@ -46,16 +46,98 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "server — you sign in with a password.",
     },
     "settings.google.none": {
-        "ru": "Почта Google не привязана, вы входите паролем. Почту к учётке привязывает "
-        "администратор; с ней вход идёт через Google, а пароль закрывается.",
-        "en": "No Google account is linked, you sign in with a password. An administrator "
-        "links the email; after that you sign in with Google and the password is closed.",
+        "ru": "Почта Google не привязана, вы входите паролем.",
+        "en": "No Google account is linked, you sign in with a password.",
     },
-    "settings.google.unlink": {
-        "ru": "Снять привязку почты — у администратора; он же вернёт вход паролем, если "
-        "доступ к Google потерян.",
-        "en": "An administrator removes the link; they also restore password sign-in if "
-        "access to Google is lost.",
+    "settings.google.none_off": {
+        "ru": "Вход через Google на этом стенде не включён — привязать почту пока нельзя.",
+        "en": "Google sign-in is not enabled on this server — you cannot link an account yet.",
+    },
+    "settings.google.link": {"ru": "Привязать Google", "en": "Link Google"},
+    "settings.google.link_warn": {
+        "ru": "После привязки вход паролем для этой учётки закроется: входить вы будете "
+        "кнопкой «Войти через Google». Ваши входы на других устройствах закроются, "
+        "Claude, подключённый через сайт, нужно будет подключить заново.",
+        "en": "Once linked, password sign-in is closed for this account: you will sign in "
+        "with the “Sign in with Google” button. Your sessions on other devices are "
+        "closed, and Claude connected through the site has to be connected again.",
+    },
+    "settings.google.link_hq": {
+        "ru": "Подойдёт только рабочий аккаунт Google компании ({domains}), личный — нет.",
+        "en": "Only a company Google Workspace account ({domains}) will do, not a personal one.",
+    },
+    "settings.google.link_partner": {
+        "ru": "Подойдёт аккаунт Google с подтверждённой почтой, если она не привязана к "
+        "другой учётке.",
+        "en": "Any Google account with a verified email will do, as long as the email is "
+        "not linked to another account.",
+    },
+    "settings.google.link_go": {"ru": "Продолжить в Google", "en": "Continue with Google"},
+    "settings.google.unlink": {"ru": "Отвязать Google", "en": "Unlink Google"},
+    "settings.google.unlink_note": {
+        "ru": "Отвязать можно, только зная пароль учётки: после отвязки вы входите паролем, "
+        "и без него вход закроется совсем. Пароль забыт — новый выдаст администратор на "
+        "«Пользователях». Ваши входы на других устройствах закроются, Claude, "
+        "подключённый через сайт, отключится.",
+        "en": "You can unlink only if you know the account password: after unlinking you "
+        "sign in with it, and without it you would lock yourself out. Forgot the "
+        "password — an administrator issues a new one in “Users”. Your sessions on "
+        "other devices are closed, and Claude connected through the site is disconnected.",
+    },
+    "settings.google.unlink_current": {"ru": "Пароль учётки", "en": "Account password"},
+    "settings.google.unlink_submit": {"ru": "Отвязать", "en": "Unlink"},
+    "settings.google.unlink.empty": {
+        "ru": "Введите пароль учётки — без него отвязать нельзя.",
+        "en": "Enter the account password — you cannot unlink without it.",
+    },
+    "settings.google.unlink.wrong": {
+        "ru": "Пароль не подошёл — привязка осталась.",
+        "en": "Wrong password — the link stays.",
+    },
+    "settings.google.unlink.locked": {
+        "ru": "Слишком много попыток. Попробуйте через {minutes} мин.",
+        "en": "Too many attempts. Try again in {minutes} min.",
+    },
+    "settings.google.done.linked": {
+        "ru": "Почта Google привязана. Теперь вы входите через Google, вход паролем закрыт.",
+        "en": "Google account linked. You now sign in with Google; password sign-in is closed.",
+    },
+    "settings.google.done.unlinked": {
+        "ru": "Почта Google отвязана. Входите логином и паролем.",
+        "en": "Google account unlinked. Sign in with your login and password.",
+    },
+    "settings.google.done.cancelled": {
+        "ru": "Привязку отменили в окне Google — ничего не изменилось.",
+        "en": "Linking was cancelled in the Google window — nothing changed.",
+    },
+    "settings.google.done.failed": {
+        "ru": "Google не подтвердил аккаунт — попробуйте ещё раз.",
+        "en": "Google did not confirm the account — please try again.",
+    },
+    "settings.google.done.state": {
+        "ru": "Заход устарел или начат в другом окне — начните привязку заново.",
+        "en": "The attempt expired or was started in another window — start linking again.",
+    },
+    "settings.google.done.unverified": {
+        "ru": "Почта этого аккаунта Google не подтверждена — привязать её нельзя.",
+        "en": "The email of this Google account is not verified — it cannot be linked.",
+    },
+    "settings.google.done.domain": {
+        "ru": "Для учётки УК подходит только рабочий аккаунт Google компании, а не личный.",
+        "en": "A head-office account takes only a company Google Workspace account, "
+        "not a personal one.",
+    },
+    "settings.google.done.taken": {
+        "ru": "Эта почта уже привязана к другой учётке.",
+        "en": "This email is already linked to another account.",
+    },
+    "settings.google.done.already": {
+        "ru": "К учётке уже привязана почта — сначала отвяжите её.",
+        "en": "An email is already linked to the account — unlink it first.",
+    },
+    "settings.google.done.db": {
+        "ru": "База не ответила — ничего не изменилось. Попробуйте позже.",
+        "en": "The database did not respond — nothing changed. Try again later.",
     },
     "settings.google.gmail": {
         "ru": "Доступ к Gmail спрашивается отдельно — когда вы впервые уводите письмо "
@@ -67,15 +149,19 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.lang.title": {"ru": "Язык интерфейса", "en": "Interface language"},
     "settings.lang.note": {
-        "ru": "Язык этого сайта; выбор сохраняется, пока вы идёте по ссылкам сайта. Бот и "
+        "ru": "Язык этого сайта хранится в вашем профиле — и выбор здесь, и переключатель в "
+        "меню сохраняют его. Ссылка с ?lang= в адресе меняет язык только для себя. Бот и "
         "мини-апп помнят язык отдельно (команда /lang, настройки мини-аппа).",
-        "en": "The language of this site; the choice carries over while you follow the "
-        "site's links. The bot and the mini-app keep their language separately "
+        "en": "The language of this site is kept in your profile — both the choice here and "
+        "the switcher in the menu save it. A link with ?lang= changes the language just "
+        "for itself. The bot and the mini-app keep their language separately "
         "(/lang, mini-app settings).",
     },
     "settings.password.google": {
-        "ru": "Вход паролем для этой учётки закрыт: вы входите через Google.",
-        "en": "Password sign-in is closed for this account: you sign in with Google.",
+        "ru": "Вход паролем для этой учётки закрыт: вы входите через Google. Вернуть вход "
+        "паролем — «Отвязать Google» выше.",
+        "en": "Password sign-in is closed for this account: you sign in with Google. To "
+        "sign in with a password again, use “Unlink Google” above.",
     },
     "users.panel.own_settings": {
         "ru": "Пароль, бот, Claude и язык — в «Настройках».",

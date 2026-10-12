@@ -128,6 +128,9 @@
     </section>
 
     {# ── Google ───────────────────────────────────────────────────────── #}
+    {# Привязывает и снимает почту сам человек (D447). Привязка закрывает вход
+       паролем (D450) — сказано ДО ухода к Google, в раскрытой форме. Снять
+       можно только с паролем учётки: после снятия входят им. #}
     {% set google_login = google_enabled and me.email %}
     <section class="ssec" id="google">
       <h2 class="ssec__title">{{ t('settings.google.title') }}</h2>
@@ -137,8 +140,28 @@
         <p class="ssec__text"><span class="sdot"></span>{{ t('settings.google.linked_off', email=me.email) }}</p>
       {% else %}
         <p class="ssec__text"><span class="sdot"></span>{{ t('settings.google.none') }}</p>
+        {% if not google_enabled %}<p class="ssec__note">{{ t('settings.google.none_off') }}</p>{% endif %}
       {% endif %}
-      {% if me.email %}<p class="ssec__note">{{ t('settings.google.unlink') }}</p>{% endif %}
+      {% if me.email %}
+        <details class="sfold" id="google-unlink"{% if show.flash and show.flash.key.startswith('settings.google.unlink.') %} open{% endif %}>
+          <summary class="sbtn">{{ t('settings.google.unlink') }}</summary>
+          <form method="post" action="{{ base }}/google-unlink?lang={{ lang }}" class="sform">
+            <p class="ssec__note">{{ t('settings.google.unlink_note') }}</p>
+            <label><span class="sform__label">{{ t('settings.google.unlink_current') }}</span>
+              <input class="sinput" type="password" name="current" required autocomplete="current-password"></label>
+            <button class="sbtn" type="submit">{{ t('settings.google.unlink_submit') }}</button>
+          </form>
+        </details>
+      {% elif google_enabled %}
+        <details class="sfold" id="google-link">
+          <summary class="sbtn sbtn--primary">{{ t('settings.google.link') }}</summary>
+          <form method="post" action="{{ base }}/google-link?lang={{ lang }}" class="sform">
+            <p class="ssec__text">{{ t('settings.google.link_warn') }}</p>
+            <p class="ssec__note">{% if hq_account %}{{ t('settings.google.link_hq', domains=hq_domains) }}{% else %}{{ t('settings.google.link_partner') }}{% endif %}</p>
+            <button class="sbtn sbtn--primary" type="submit">{{ t('settings.google.link_go') }}</button>
+          </form>
+        </details>
+      {% endif %}
       <p class="ssec__note">{{ t('settings.google.gmail') }}</p>
     </section>
 

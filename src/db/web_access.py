@@ -235,7 +235,7 @@ _OPEN_SESSION_SQL = """
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code, u.role, u.email
+    select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -323,6 +323,10 @@ class Account:
     #: Привязанная закрывает вход паролем и решает, в чью почту ложится
     #: черновик письма (D176).
     email: str | None = None
+    #: Язык сайта из «Настроек» (`web_users.web_lang`, `0061`); `None` — язык
+    #: стенда. Приезжает только с сессией: вход сразу уводит на страницу, и
+    #: она опознаётся сессией заново.
+    web_lang: str | None = None
 
 
 @dataclass(frozen=True)
@@ -893,7 +897,12 @@ def resolve_session(token: str) -> Account | None:
     if row is None:
         return None
     return Account(
-        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+        id=str(row[0]),
+        login=str(row[1]),
+        tenant=str(row[2]),
+        role=str(row[3]),
+        email=row[4],
+        web_lang=row[5],
     )
 
 

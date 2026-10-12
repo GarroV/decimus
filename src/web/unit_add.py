@@ -31,13 +31,13 @@ from src.domain.geo import COUNTRIES
 from src.domain.tenants import HQ_TENANT, may_add_units
 from src.domain.unit_new import OTHER_COUNTRY, NewUnit, NewUnitRefused, plan_new_unit
 
-from . import auth
+from . import auth, ui_lang
 from . import country as country_data
 from .config import Settings
 from .geo_names import country_title
 from .origin import refuse_foreign_origin
 from .sections import section
-from .texts import lang_or_default, t
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +67,7 @@ def _gate(raw_code: str) -> str:
 
 
 def _lang(conf: Settings) -> str:
-    return lang_or_default(request.args.get("lang"), fallback=conf.ui_lang)
+    return ui_lang.request_lang(conf.ui_lang)
 
 
 def _refusal_text(exc: NewUnitRefused, lang: str) -> str:
