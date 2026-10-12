@@ -1454,3 +1454,50 @@ D391) — так же: миграций нет, право — уже выдан
    `select aggregator, outcome, points, ratings, error from agg.loads order by id desc limit 10`
    — строка на каждый агрегатор, `ok`; на `/ratings` блок «Оценки в агрегаторах
    доставки» с колонками агрегаторов.
+
+### 8.19. Подключение Claude входом через сайт (OAuth, D417)
+
+Отдельного сервиса нет: сервер авторизации приезжает с образом веба
+(`src/web/oauth.py`), третья дверь — с образом MCP (`src/mcp/config.py`).
+Как устроено — `docs/furca/blocks/mcp.md`, раздел «Вход через сайт (OAuth)»;
+экран — `docs/12-web-admin.md`.
+
+1. **Миграция `0051_oauth.sql`** — таблицы `oauth_clients`, `oauth_codes`,
+   `oauth_grants` (подключения), `oauth_tokens` (только отпечатки SHA-256).
+   Данных не трогает. Накат: `docker compose exec -T bot python -m src.db.migrate`.
+2. **Переменные** — в `.env` площадки, читают и `web`, и `mcp` (общий `env_file`):
+
+   | Переменная | Значение | Что делает |
+   |---|---|---|
+   | `ADMIN_PUBLIC_URL` | внешний адрес админки, `https://<адрес входа>` (§8.9), с префиксом, если он есть | издатель OAuth: адреса `/oauth/authorize`, `/oauth/token`, `/oauth/register` в метаданных строятся от него |
+   | `MCP_PUBLIC_URL` | тот же адрес, что `BOT_MCP_URL` | ресурс OAuth: его человек вставляет в Claude; он же в `resource_metadata` отказа 401 |
+
+   Пусто хотя бы одно — OAuth выключен целиком, всё работает как раньше.
+   Кривое значение (не `https`, строка запроса) — сервис не поднимается и
+   называет переменную. После правки — перезапуск `web` и `mcp`.
+3. **Пути снаружи.** Claude ходит с серверов Anthropic: `ADMIN_PUBLIC_URL`
+   должен отдавать `/.well-known/oauth-authorization-server` и `/oauth/*` без
+   входа (их пропускает заслон админки), `MCP_PUBLIC_URL` — POST и GET
+   `/.well-known/oauth-protected-resource`. Админка отдаёт метаданные по адресу
+   `<ADMIN_PUBLIC_URL>/.well-known/oauth-authorization-server`. Если у неё снаружи
+   есть префикс пути, RFC 8414 велит искать их в корне хоста
+   (`/.well-known/oauth-authorization-server/<префикс>`), а корень — не админки;
+   такая раскладка не проверена, проще дать админке свой корень.
+4. **Смоук** — тестовой учёткой каждой роли (УК-админ, аудитор, контроль),
+   пароль только из окружения:
+
+   ```bash
+   OAUTH_SMOKE_PASSWORD=... python3 tools/oauth_smoke.py \
+       --admin "$ADMIN_PUBLIC_URL" --mcp "$MCP_PUBLIC_URL" --login <тестовая учётка>
+   ```
+
+   Ждём `OK` в конце; в выводе — роль и список инструментов (контроль — только
+   рейтинги, аудитор — без правки методики и загрузки). Прогон заводит и сам же
+   отзывает подключение. Затем в базе:
+   `select revoked_reason, count(*) from oauth_grants group by 1` — отзыв `user`.
+5. **Последний шаг — руками:** claude.ai → Настройки → Коннекторы → Добавить
+   свой коннектор → адрес с карточки; и `claude mcp add --transport http
+   decimus <MCP_PUBLIC_URL>` в Claude Code.
+6. **Отключить всё сразу** — опустошить обе переменные и перезапустить `web` и
+   `mcp`: маршрутов OAuth нет, токены через сайт не принимаются. Токены бота и
+   `.env` работают как прежде.
