@@ -212,7 +212,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:f7ac674be372612e8cbde59a764f6e7c034ec714a8f326c6f4bac052b610166a"
     ),
     "0051_finish_modes.sql": (
-        "sql1:cbc2f86c9c10026e1f1c0170c1f9344a2b0db047ee5ba08766e5b2f7aaec0445"
+        "sql1:fc39f060675b7b4958e2d8afdd406edccbaaba59028a2b1fe78bf8841827c5e0"
     ),
 }
 
