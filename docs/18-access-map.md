@@ -55,8 +55,8 @@
 
 | Дверь | Как спрашивает | Что ловит пропуск |
 |---|---|---|
-| Веб, запись | каждый пишущий маршрут объявляет действие (`@guard.action`), заслон `src/web/guard.py` спрашивает `can` до маршрута; маршрут с объектом — `guard.permit(действие, пространство_объекта)`; без кода — 403 (запрет по умолчанию) | `tests/test_web_guard.py`: `uncovered(app) == []`, забытый `permit` — 500 |
-| Веб, разделы | раздел открыт при `view.<раздел>`, иначе 404 (`guard.install`); навигация — `sections.visible_sections` | `tests/test_permissions_table.py` (каждый раздел в каталоге) |
+| Веб, запись | каждый пишущий маршрут объявляет действие (`@guard.action`), заслон `src/web/guard.py` спрашивает `can` до маршрута; маршрут с объектом — `guard.permit(действие, пространство_объекта)`; без кода — 403 (запрет по умолчанию); исключения — дела человека над своей учёткой (`guard.EXEMPT_ENDPOINTS`: выход, свой пароль, свой токен и подключение Claude) | `tests/test_web_guard.py`: `uncovered(app) == []`, забытый `permit` — 500 |
+| Веб, разделы | раздел открыт при `view.<раздел>`, иначе 404 (`guard.install`); «Настройки» — свой раздел любой роли (`sections.OWN_SECTIONS`, D447); навигация — `sections.visible_sections` | `tests/test_permissions_table.py` (каждый раздел в каталоге) |
 | Claude (MCP) | инструмент сведён к действию (`src/mcp/policy.py: action_of`), список и вызов — одна `permits_tool`; сверх матрицы закрыто в Claude `CLAUDE_CLOSED` (снятие проверки — всем, D341; методика — партнёру, D342/D417) | `tests/test_mcp_policy.py` |
 | Бот и мини-апп | вход — `inspection.conduct` (`src/bot/access.py: role_closed`), команды — `COMMAND_ACTIONS` | `tests/test_bot_command_actions.py` |
 

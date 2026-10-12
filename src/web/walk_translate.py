@@ -26,6 +26,7 @@ import threading
 from flask import Flask, Response, jsonify, request
 
 from src.domain import get_state
+from src.domain.log_ids import log_id
 from src.domain.models import TEXT_LANGS, Inspection
 from src.recognize.errors import RecognizeError
 from src.recognize.translate import translate_text
@@ -86,14 +87,14 @@ def install(app: Flask, *, conf: WalkSettings, ui_lang: str, identify: Identify)
         except RecognizeError as exc:
             # Модель недоступна — поле остаётся как было, аудитор видит причину
             # в экране. Сырой текст исключения — в журнал, не аудитору.
-            logger.warning("Обход: перевод для чата %s не удался: %s", who, exc)
+            logger.warning("Обход: перевод для чата %s не удался: %s", log_id(who), exc)
             return refused("walk.err.translate", lang, 503)
         finally:
             with guard:
                 busy.discard(who)
         if len(translated) > MAX_TEXT:
             return refused("walk.err.translate_long", lang)
-        logger.info("Обход: чат %s — перевод %s знаков на %s", who, len(text), target)
+        logger.info("Обход: чат %s — перевод %s знаков на %s", log_id(who), len(text), target)
         answer = jsonify({"text": translated, "lang": target})
         answer.headers["Cache-Control"] = "no-store"
         return answer, 200

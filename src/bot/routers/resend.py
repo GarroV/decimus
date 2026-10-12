@@ -31,6 +31,7 @@ from aiogram import Router
 from aiogram.filters import Command
 from aiogram.types import FSInputFile, Message
 
+from src.domain.log_ids import log_id
 from src.report import PhotoMissing, ReportError, build_pdf
 
 from ..inspection import read_inspection
@@ -73,7 +74,7 @@ def build_resend_router() -> Router:
             except (PhotoMissing, ReportError):
                 # Причина уходит в журнал целиком, аудитору — что пересборка не
                 # вышла: молчать нельзя, он ждёт документ.
-                log.exception("повторная сборка отчёта не удалась: чат %s", chat_id)
+                log.exception("повторная сборка отчёта не удалась: чат %s", log_id(chat_id))
                 await message.answer(t("resend.failed", lang))
                 return
             await message.answer_document(FSInputFile(pdf), caption=t("resend.caption", lang))

@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 
 from src import domain
+from src.domain.log_ids import log_id
 
 from . import lang_choice
 from .inspection import read_inspection
@@ -40,7 +41,7 @@ def _state(chat_id: int) -> domain.Inspection | None:
     except Exception:
         # В журнал — с разбором: путь к файлу и причина нужны тому, кто будет
         # чинить, и не нужны аудитору на точке.
-        logger.exception("состояние чата %s не читается — язык взят по умолчанию", chat_id)
+        logger.exception("состояние чата %s не читается — язык взят по умолчанию", log_id(chat_id))
         return None
 
 
@@ -87,7 +88,9 @@ def _chosen(telegram_id: int) -> str | None:
         # Только память: в базу ходит мидлварь, в потоке (ревью #492, п.1).
         return lang_choice.CHOICES.cached(telegram_id)
     except Exception:
-        logger.exception("выбор языка человека %s не прочитался — как без выбора", telegram_id)
+        logger.exception(
+            "выбор языка человека %s не прочитался — как без выбора", log_id(telegram_id)
+        )
         return None
 
 

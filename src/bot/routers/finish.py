@@ -41,6 +41,7 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from src import db, domain
 from src.domain.errors import ChecklistVersionMismatch, DomainError
+from src.domain.log_ids import log_id
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter, build_pdf
 
@@ -100,7 +101,7 @@ async def show_summary(message: Message, chat_id: int, lang: str, *, store: Mate
         # верен, но написан тому, кто зовёт блок из кода: в чат он уезжал общим
         # текстом последнего рубежа, из которого не видно ни версий, ни выхода
         # (T167). Обе версии — человеку, оба выхода — кнопками, выбор — за ним.
-        logger.warning("расхождение версии методики в чате %s: %s", chat_id, exc)
+        logger.warning("расхождение версии методики в чате %s: %s", log_id(chat_id), exc)
         await stops.refuse(
             message,
             lang,
@@ -186,7 +187,7 @@ async def archive(
     try:
         inspection_id = await asyncio.to_thread(db.push_inspection, chat_id)
     except db.ConfigError as exc:
-        logger.info("проверка чата %s не сливается в историю: %s", chat_id, exc)
+        logger.info("проверка чата %s не сливается в историю: %s", log_id(chat_id), exc)
         return
     except db.VersionMismatchError as exc:
         # Расхождение версии методики — не отказ базы (T182, задача #149). Связь
@@ -200,7 +201,7 @@ async def archive(
         # первой молча. Клавиатура здесь обязательна: последняя строка текста
         # называет два выхода, и один из них — кнопка. Без неё сообщение врало
         # бы, а довести проверку до истории аудитору было бы нечем.
-        logger.warning("расхождение версии методики на сливе чата %s: %s", chat_id, exc)
+        logger.warning("расхождение версии методики на сливе чата %s: %s", log_id(chat_id), exc)
         await stops.refuse(
             message,
             lang,
@@ -216,13 +217,13 @@ async def archive(
         # «нет». Текст «база не ответила» звал бы подождать и не начинать новую,
         # а повтор здесь не поможет никогда — нужна другая точка или правка
         # справочника в УК. Отличается это типом, как и расхождение версии.
-        logger.warning("слив проверки чата %s отклонён сторожем точки: %s", chat_id, exc)
+        logger.warning("слив проверки чата %s отклонён сторожем точки: %s", log_id(chat_id), exc)
         await stops.refuse(
             message, lang, step="finish.archive", key="finish.unit_refused", unit=exc.unit
         )
         return
     except db.DbError:
-        logger.exception("слив проверки чата %s не удался", chat_id)
+        logger.exception("слив проверки чата %s не удался", log_id(chat_id))
         await stops.refuse(message, lang, step="finish.archive", key="finish.not_archived")
         return
 
@@ -234,12 +235,12 @@ async def archive(
             allow_missing=allow_missing,
         )
     except db.ConfigError as exc:
-        logger.info("кадры проверки чата %s не выгружаются: %s", chat_id, exc)
+        logger.info("кадры проверки чата %s не выгружаются: %s", log_id(chat_id), exc)
     except db.PhotosDeferredError as exc:
         # Хранилище лежит (#459, D259: оно на MUSPELHEIM, а тот засыпает).
         # Проверка в истории, кадры в базе строками без ссылки — их дольёт
         # дозагрузка (`photo_backfill`). Аудитору — что делать ничего не надо.
-        logger.warning("кадры проверки чата %s отложены до дозагрузки: %s", chat_id, exc)
+        logger.warning("кадры проверки чата %s отложены до дозагрузки: %s", log_id(chat_id), exc)
         # Кадры, которых телеграм не отдал уже на сдаче (`lost`), дозагрузка
         # вернуть не обещает: за них «догрузим сам» было бы неправдой (ревью #514).
         if lost:
@@ -254,7 +255,7 @@ async def archive(
             )
         return
     except db.DbError:
-        logger.exception("выгрузка кадров проверки чата %s не удалась", chat_id)
+        logger.exception("выгрузка кадров проверки чата %s не удалась", log_id(chat_id))
         await message.answer(t("finish.photos_not_archived", lang))
 
     if report is None:
@@ -272,9 +273,9 @@ async def archive(
         data = await asyncio.to_thread(report.read_bytes)
         stored = await asyncio.to_thread(db.upload_report, inspection_id, data=data)
     except db.ConfigError as exc:
-        logger.info("отчёт проверки чата %s не выгружается: %s", chat_id, exc)
+        logger.info("отчёт проверки чата %s не выгружается: %s", log_id(chat_id), exc)
     except (db.DbError, OSError):
-        logger.exception("выгрузка отчёта проверки чата %s не удалась", chat_id)
+        logger.exception("выгрузка отчёта проверки чата %s не удалась", log_id(chat_id))
     else:
         logger.info(
             "отчёт проверки %s в хранилище: %s (%d байт%s)",
@@ -314,14 +315,14 @@ async def warn_untranslated(message: Message, inspection: domain.Inspection, lan
             untranslated, inspection.report_lang, codes=codes, zones=zones
         )
     except (DomainError, OSError):
-        logger.exception("язык методики не проверен для чата %s", message.chat.id)
+        logger.exception("язык методики не проверен для чата %s", log_id(message.chat.id))
         return
     if not found:
         return
     logger.warning(
         "методика не переведена на язык отчёта %s (чат %s): %s",
         inspection.report_lang,
-        message.chat.id,
+        log_id(message.chat.id),
         "; ".join(f"{one.code}.{one.field} = «{one.text}»" for one in found),
     )
     await message.answer(
@@ -388,7 +389,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             # Текст движка — для того, кто чинит стенд: в нём внутренности
             # рендерера, пути во временный каталог и совет поставить системные
             # библиотеки (T151). Аудитору на точке нужен не он.
-            logger.exception("отчёт чата %s не собрался", chat_id)
+            logger.exception("отчёт чата %s не собрался", log_id(chat_id))
             await stops.refuse(message, lang, step="finish.build", key="finish.pdf_failed")
             return
 
@@ -405,7 +406,7 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
             # Отчёт уже у человека, письмо и слив в историю впереди — уронить
             # их из-за незаписанной заметки было бы хуже самой заметки. Цена
             # известна и названа: `/start` снова назовёт проверку незавершённой.
-            logger.exception("отметка о сдаче проверки чата %s не записалась", chat_id)
+            logger.exception("отметка о сдаче проверки чата %s не записалась", log_id(chat_id))
         # Накопитель непокрытых формулировок уезжает в свою историю вместе с
         # проверкой (T269, #228): собранное относится к ней, а следующая
         # обязана начинаться с пустого накопителя — иначе слова прошлой точки
@@ -420,13 +421,13 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
         try:
             await asyncio.to_thread(domain.archive_uncovered, chat_id)
         except (DomainError, OSError):
-            logger.exception("накопитель чата %s не уехал в историю", chat_id)
+            logger.exception("накопитель чата %s не уехал в историю", log_id(chat_id))
         try:
             letter = await asyncio.to_thread(build_letter, chat_id)
         except ReportError:
             # Свой текст, а не тот же: отчёт аудитор к этому моменту уже
             # получил, и «отчёт не собрался» было бы неправдой (T151).
-            logger.exception("письмо чата %s не собралось", chat_id)
+            logger.exception("письмо чата %s не собралось", log_id(chat_id))
             await message.answer(t("finish.letter_failed", lang))
         else:
             await message.answer(t("finish.letter", lang, letter=letter))
@@ -484,7 +485,9 @@ def build_finish_router(store: MaterialStore) -> Router:
             # блокировкой — в поток по той же причине, что и подсчёт (T101).
             inspection = await asyncio.to_thread(domain.sync_checklist_version, chat_id)
         except DomainError:
-            logger.exception("перевод проверки чата %s на действующую методику не удался", chat_id)
+            logger.exception(
+                "перевод проверки чата %s на действующую методику не удался", log_id(chat_id)
+            )
             await stops.refuse(
                 message, lang, step="finish.version", key="finish.version_sync_failed"
             )
@@ -572,7 +575,7 @@ def build_finish_router(store: MaterialStore) -> Router:
         try:
             await asyncio.to_thread(domain.set_report_lang, chat_id, report_lang)
         except DomainError:
-            logger.exception("язык отчёта %s не задан в чате %s", report_lang, chat_id)
+            logger.exception("язык отчёта %s не задан в чате %s", report_lang, log_id(chat_id))
             await stops.refuse(
                 message, lang, step="finish.report_lang", key="finish.report_lang_failed"
             )

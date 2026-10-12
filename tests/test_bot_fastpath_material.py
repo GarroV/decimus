@@ -54,6 +54,12 @@ SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_I
 #: боевой карте покрыта целиком, колонка выбрана словом «грязная» → CLN05, D1.
 CLEAR = "печь грязная"
 
+#: Окно альбома. Второй кадр обязан успеть в окно первого, иначе альбом
+#: закроется на одном кадре и пойдёт быстрым путём — а под нагрузкой
+#: (`pytest -n auto`) разрыв между двумя `feed` не ограничен 10 мс (#753).
+#: Тест ждёт закрытия по событию, поэтому большое окно стоит только времени.
+ALBUM_WINDOW = 2.0
+
 
 def started() -> None:
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
@@ -65,23 +71,26 @@ def findings() -> list[Finding]:
 
 
 async def wait_for_album_close(
-    session: RecordingSession, deadline: float = 2.0, step: float = 0.05
+    session: RecordingSession, pick_callback: str, deadline: float = 60.0
 ) -> None:
-    """Дождаться, пока фоновый таймер альбома доведёт материал до показанной записи.
+    """Дождаться, пока фоновый таймер альбома доведёт материал до предложения с кнопкой.
 
-    Раньше закрытие альбома лишь собирало кадры и показывало кнопку — работа
-    без единого обращения к движку. Теперь оно само зовёт `_save` (T121): запись
-    появляется раньше, чем к ней прикрепится второй кадр (`domain.add_finding`
-    отдельно от `domain.attach_photo`), и раньше, чем уйдёт сообщение — два
-    подпроцесса движка (`add_finding`, `score`) ощутимо дольше окна альбома
-    (`album_window=0.01`). Ждать нужно до последнего шага — отправки сообщения,
-    иначе проверка кадров ловит запись в промежуточном состоянии. Фиксированный
-    `asyncio.sleep` гонится с этим временем на глаз — опрос с потолком нет.
+    Закрытие альбома — фоновая работа в несколько шагов: «Разбираю…», вызов
+    модели, подпроцессы движка, и только последним — сообщение с кнопкой
+    `pick_callback`. Ждать нужно именно его: раньше ждали «любое сообщение», и
+    под нагрузкой (`pytest -n auto`) тест просыпался на «Разбираю…», когда
+    модель ещё не звали (#753).
+
+    Ждём событие отправки (`RecordingSession.message_sent`), а не срок: время
+    фоновой работы под нагрузкой не ограничено сверху. `deadline` —
+    предохранитель от вечного зависания, а не оценка времени работы.
     """
-    waited = 0.0
-    while not session.texts and waited < deadline:
-        await asyncio.sleep(step)
-        waited += step
+    async with asyncio.timeout(deadline):
+        while pick_callback not in session.keyboard_data():
+            session.message_sent.clear()
+            if pick_callback in session.keyboard_data():
+                break
+            await session.message_sent.wait()
 
 
 def assert_recorded_from_words(asked: Calls, session: RecordingSession, photos: list[str]) -> None:
@@ -181,14 +190,14 @@ async def test_альбом_с_ясной_подписью_идёт_в_моде�
     started()
     asked = stub_classify(monkeypatch, suggestion(candidate("CLN05", "D1", "hot_kitchen")))
     bot, session = make_bot()
-    dp = build_dispatcher(SETTINGS, album_window=0.01)
+    dp = build_dispatcher(SETTINGS, album_window=ALBUM_WINDOW)
 
     group_id = "album-fast"
     await feed(dp, bot, photo_message("frame-1", media_group_id=group_id, caption=CLEAR))
     await feed(dp, bot, photo_message("frame-2", media_group_id=group_id))
-    await wait_for_album_close(session)
+    await wait_for_album_close(session, "rec:pick:0")
 
-    assert len(asked) == 1, "альбом с подписью не дошёл до модели"
+    assert len(asked) == 1, f"альбом с подписью не дошёл до модели: {session.texts!r}"
     assert get_state(CHAT_ID).findings == [], "альбом записался по словам без разбора кадров"  # type: ignore[union-attr]
     await feed(dp, bot, callback_query("rec:pick:0", message_id=session.sent_ids[-1]))
     assert [f.photos for f in get_state(CHAT_ID).findings] == [["frame-1", "frame-2"]]  # type: ignore[union-attr]
