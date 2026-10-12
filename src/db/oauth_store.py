@@ -76,14 +76,15 @@ _CLAUDE_CALLBACKS = frozenset(
         "https://claude.com/api/mcp/auth_callback",
     }
 )
-_LOOPBACK_CALLBACK = re.compile(r"^http://(localhost|127\.0\.0\.1):([0-9]{1,5})/callback$")
+#: Сверка — только `fullmatch`: у `match` знак `$` пропускает `\n` в конце строки.
+_LOOPBACK_CALLBACK = re.compile(r"http://(localhost|127\.0\.0\.1):([0-9]{1,5})/callback")
 _MAX_PORT = 65535
 
 #: `code_challenge` метода S256: base64url без выравнивания от 32 байт.
-_CHALLENGE = re.compile(r"^[A-Za-z0-9_-]{43}$")
+_CHALLENGE = re.compile(r"[A-Za-z0-9_-]{43}")
 
 #: `code_verifier` по RFC 7636 §4.1: 43–128 знаков из безопасного алфавита.
-_VERIFIER = re.compile(r"^[A-Za-z0-9._~-]{43,128}$")
+_VERIFIER = re.compile(r"[A-Za-z0-9._~-]{43,128}")
 
 #: Имя клиента при регистрации без имени.
 DEFAULT_CLIENT_NAME = "MCP client"
@@ -102,23 +103,23 @@ def redirect_uri_allowed(uri: object) -> bool:
         return False
     if uri in _CLAUDE_CALLBACKS:
         return True
-    петля = _LOOPBACK_CALLBACK.match(uri)
+    петля = _LOOPBACK_CALLBACK.fullmatch(uri)
     return петля is not None and 0 < int(петля.group(2)) <= _MAX_PORT
 
 
 def is_loopback(uri: str) -> bool:
     """Возврат на машину человека (Claude Code): странице согласия — предупреждение."""
-    return _LOOPBACK_CALLBACK.match(uri) is not None
+    return _LOOPBACK_CALLBACK.fullmatch(uri) is not None
 
 
 def challenge_valid(challenge: object) -> bool:
     """`code_challenge` по форме годится для S256."""
-    return isinstance(challenge, str) and _CHALLENGE.match(challenge) is not None
+    return isinstance(challenge, str) and _CHALLENGE.fullmatch(challenge) is not None
 
 
 def pkce_matches(verifier: object, challenge: str) -> bool:
     """PKCE S256: base64url(SHA-256(verifier)) == challenge. Метода `plain` нет."""
-    if not isinstance(verifier, str) or _VERIFIER.match(verifier) is None:
+    if not isinstance(verifier, str) or _VERIFIER.fullmatch(verifier) is None:
         return False
     digest = hashlib.sha256(verifier.encode("ascii")).digest()
     ожидание = base64.urlsafe_b64encode(digest).rstrip(b"=").decode("ascii")

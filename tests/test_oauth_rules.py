@@ -78,6 +78,16 @@ def test_чужой_адрес_отвергается(адрес: object) -> Non
     assert redirect_uri_allowed(адрес) is False
 
 
+def test_перевод_строки_в_конце_не_проходит() -> None:
+    """`$` с `match` пропускает `\n` в конце строки — сверка обязана быть полной."""
+    с_переводом = VERIFIER + "\n"
+
+    assert redirect_uri_allowed("http://localhost:8080/callback\n") is False
+    assert is_loopback("http://localhost:8080/callback\n") is False
+    assert challenge_valid(_challenge(VERIFIER) + "\n") is False
+    assert pkce_matches(с_переводом, _challenge(с_переводом)) is False
+
+
 def test_петля_помечается_для_предупреждения() -> None:
     assert is_loopback("http://localhost:8080/callback")
     assert not is_loopback("https://claude.ai/api/mcp/auth_callback")
