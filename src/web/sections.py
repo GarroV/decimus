@@ -56,6 +56,9 @@ class Section:
     partner_only: bool = False
     #: Иконка пункта в левой панели — имя из набора линейки (`icons.py`).
     icon: str = "doc"
+    #: Стоит ли пункт в левой панели и нижней полосе. «Настройки» — нет: это
+    #: профиль человека, и ведёт в него меню учётки, а не раздел среди дел.
+    menu: bool = True
 
 
 #: Девять разделов прототипа в порядке прототипа. Построены два — «Проверки»
@@ -88,6 +91,10 @@ SECTIONS: tuple[Section, ...] = (
     # живут на этом же экране — отдельного раздела «Проект» (`/tenants`,
     # заглушка прототипа) больше нет: один вопрос «у кого какой доступ» — один экран.
     Section(key="users", path="/users", built=True, icon="team"),
+    # «Настройки» (D447): подключение всего и вся у человека — Claude, бот,
+    # Google, язык, пароль. Свой профиль, открыт каждому вошедшему, любой роли;
+    # входит в него меню учётки (аватар), поэтому в левой панели пункта нет.
+    Section(key="settings", path="/settings", built=True, icon="dots", menu=False),
     # «Мини-апп» (`/mini`) был заглушкой «ещё в разработке» без экрана: мини-апп
     # обхода живёт у аудитора в Telegram (`/tg/walk*`), веб-админу в нём нечего
     # делать. Пункт снят из меню (#656).
@@ -162,6 +169,15 @@ def current_section(path: str) -> str | None:
 #: неё, как все (D378), а в «Рейтинги».
 CONTROL_HOME = "ratings"
 
+#: Разделы дел самого человека над своей учёткой: «Настройки» (D447, D448). Их
+#: открывает любая роль, включая гостя и контролинг; матрица их не решает.
+OWN_SECTIONS = frozenset({"settings"})
+
+
+def section_view(key: str) -> str | None:
+    """Код чтения раздела в матрице; у своего раздела (`OWN_SECTIONS`) его нет."""
+    return None if key in OWN_SECTIONS else view_code(key)
+
 
 def visible_sections(account: object | None) -> tuple[Section, ...]:
     """Разделы, которые этому человеку показывать.
@@ -181,7 +197,8 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
     return tuple(
         item
         for item in SECTIONS
-        if role_may(роль, пространство, view_code(item.key))
+        if item.menu
+        and (item.key in OWN_SECTIONS or role_may(роль, пространство, view_code(item.key)))
         and (уК or item.built)
         and not (уК and item.partner_only)
     )

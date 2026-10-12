@@ -23,6 +23,7 @@ from flask.testing import FlaskClient
 from web_harness import ЛОГИН, СВОЙ, Учётка, войти, подменить_двери, собрать
 
 from src.db.errors import EmailTakenError
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT
 from src.web import accounts
 from src.web.sections import visible_sections
@@ -319,7 +320,15 @@ def test_смена_роли_оставляет_след_в_журнале(
 
     след = [з.getMessage() for з in caplog.records if з.name == "src.web.people"]
     assert len(след) == 1, след
-    assert all(часть in след[0] for часть in (f"HQ/{ЛОГИН}", "GE/nino", "auditor", "admin"))
+    assert all(
+        часть in след[0]
+        for часть in (
+            f"{log_id('HQ')}/{log_id(ЛОГИН)}",
+            f"{log_id('GE')}/{log_id('nino')}",
+            "auditor",
+            "admin",
+        )
+    )
 
 
 def test_смена_почты_оставляет_след_без_адреса(
@@ -338,7 +347,10 @@ def test_смена_почты_оставляет_след_без_адреса(
 
     след = [з.getMessage() for з in caplog.records if з.name == "src.web.people"]
     assert len(след) == 2, след
-    assert all(f"HQ/{ЛОГИН}" in з and "HQ/petr" in з for з in след)
+    assert all(
+        f"{log_id('HQ')}/{log_id(ЛОГИН)}" in з and f"{log_id('HQ')}/{log_id('petr')}" in з
+        for з in след
+    )
     assert not any("@" in з for з in след)
 
 
@@ -450,10 +462,10 @@ def test_контроль_вне_рейтингов_не_пишет(
 ) -> None:
     """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут.
 
-    Заслон `_install_control_gate` — единственная защита методических POST
-    (`/admin/*`): маршрутной проверки роли у них нет. `/users/role` и retract
-    закрыты ещё и маршрутом; `/users/add` и `/users/disable` заслон пропускает
-    (D360), и чужую роль или человека отсекает маршрут (`_people_scope`).
+    Заслон прав (`src/web/guard.py`) спрашивает матрицу до маршрута: у контроля
+    нет клеток методики, смены роли и проверок. `/users/add` и `/users/disable`
+    матрица пропускает (`people.manage`, D360), и чужую роль или человека
+    отсекает маршрут (`_people_scope`).
     """
     ответ = контроль.post(путь, data=форма, headers=ЗАГОЛОВКИ)
 

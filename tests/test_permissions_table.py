@@ -14,9 +14,9 @@ import pytest
 
 from src.domain import permissions as perm
 from src.domain.permissions import ACTION_CODES, MATRIX, SIDE_HQ, SIDE_PARTNER, validate_matrix
-from src.web.sections import SECTIONS
+from src.web.sections import OWN_SECTIONS, SECTIONS
 
-ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS}
+ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS}
 ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.country", "view.actions"}
 
 РАБОТА_УК = {

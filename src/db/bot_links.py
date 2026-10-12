@@ -23,6 +23,8 @@ from typing import Any
 
 import psycopg
 
+from src.domain.log_ids import log_id
+
 from .web_access import _connected
 
 logger = logging.getLogger(__name__)
@@ -179,7 +181,7 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
             # Параллельная попытка успела привязать этот Telegram или эту
             # учётку раньше: проверка выше её строки ещё не видела.
             conn.rollback()
-            logger.warning("гонка привязки Telegram ID %s — попытка откачена", telegram_id)
+            logger.warning("гонка привязки Telegram ID %s — попытка откачена", log_id(telegram_id))
             return None
     return resolve(telegram_id)
 

@@ -55,6 +55,7 @@ from aiogram.dispatcher.event.bases import SkipHandler
 from aiogram.types import Message
 
 from src import domain
+from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
 from src.recognize.revise import Revision, revise_finding
 
@@ -149,7 +150,7 @@ async def _revision(
         logger.warning(
             "правка записи #%s в чате %s ответом не разобрана моделью — запись прежняя",
             finding.n,
-            chat_id,
+            log_id(chat_id),
             exc_info=True,
         )
         return None

@@ -1,0 +1,183 @@
+{#
+  «Настройки» (D447): настройки своего профиля — всё подключение человека на
+  одной странице, сверху вниз: Claude (MCP), бот в Telegram, Google, язык,
+  пароль. Открыта каждому вошедшему, любой роли; людей здесь нет, только
+  учётка самого человека, и чья она — решает сессия, а не форма.
+
+  Секреты — токен Claude и ссылка привязки бота — показаны ЗДЕСЬ, ответом на
+  отправку, и больше нигде: в адрес они не попадают, потому что адреса остаются
+  в истории браузера и журнале обратного прокси.
+#}{% extends "base.html" %}
+{% block title %}{{ t('section.settings.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+{% endblock %}
+{% block page_class %} page--settings{% endblock %}
+{% block body %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.settings.title') }}</h1>
+      <p class="shead__sub">{{ me.login }} · {{ t(role_key(me.role, me.tenant)) }} · <span class="mono">{{ me.tenant }}</span></p>
+    </div>
+  </header>
+  <article class="sdetail ssettings">
+    <p class="ssec__note">{{ t('settings.sub') }}</p>
+    {% if show.flash %}
+      <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **(show.flash.params or {})) }}</div></div>
+    {% endif %}
+
+    {# ── Claude (MCP) ─────────────────────────────────────────────────── #}
+    <section class="ssec" id="claude">
+      <h2 class="ssec__title">{{ t('settings.claude.title') }}</h2>
+      <p class="ssec__text">{{ t('settings.claude.lead') }}</p>
+
+      <div id="claude-token">
+        <h3 class="ssec__sub">{{ t('settings.claude.desktop') }}</h3>
+        <p class="ssec__note">{{ t('users.mcp.how') }}</p>
+        {% if show.token %}
+          <p class="ssec__text">{{ t('users.mcp.command') }}</p>
+          <p class="ssecret"><code id="claude-token-command">{{ show.token.command }}</code></p>
+          <p class="ssec__note">{{ t('users.mcp.restart') }}</p>
+          {% if show.token.expires_at %}<p class="ssec__note">{{ t('users.mcp.live', date=show.token.expires_at.strftime('%Y-%m-%d')) }}</p>{% endif %}
+          {% if show.token.replaced %}<p class="ssec__note">{{ t('users.mcp.replaced') }}</p>{% endif %}
+        {% elif not mcp.known %}
+          <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
+        {% elif mcp.expires_at %}
+          <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }}</p>
+          <form method="post" action="{{ base }}/claude-token?lang={{ lang }}" class="sform">
+            <button class="sbtn" type="submit">{{ t('users.mcp.again') }}</button>
+          </form>
+          <p class="ssec__note">{{ t('users.mcp.again_note') }}</p>
+          <form method="post" action="{{ base }}/claude-token-revoke?lang={{ lang }}" class="sform">
+            <button class="sbtn" type="submit">{{ t('users.mcp.revoke') }}</button>
+          </form>
+        {% else %}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('users.mcp.none') }}</p>
+          <form method="post" action="{{ base }}/claude-token?lang={{ lang }}" class="sform">
+            <button class="sbtn sbtn--primary" type="submit">{{ t('users.mcp.issue') }}</button>
+          </form>
+        {% endif %}
+      </div>
+
+      {# Подключение входом через сайт (D417): адрес MCP берётся из настройки
+         стенда (`MCP_PUBLIC_URL`), в разметке его нет. #}
+      {% if claude.enabled %}
+        <div id="claude-connect">
+          <h3 class="ssec__sub">{{ t('settings.claude.code') }}</h3>
+          <p class="ssec__note">{{ t('users.claude.address') }}</p>
+          <div class="ssecret">
+            <code id="claude-mcp-url">{{ claude.mcp_url }}</code>
+            <button class="sbtn" type="button" data-copy="#claude-mcp-url" data-copied="{{ t('users.claude.copied') }}" hidden>{{ t('users.claude.copy') }}</button>
+          </div>
+          <ol class="ssec__text">
+            <li>{{ t('users.claude.step_add') }}</li>
+            <li>{{ t('users.claude.step_login') }}</li>
+          </ol>
+          <p class="ssec__note">{{ t('users.claude.code') }}</p>
+          <div class="ssecret">
+            <code id="claude-code-command">{{ claude.command }}</code>
+            <button class="sbtn" type="button" data-copy="#claude-code-command" data-copied="{{ t('users.claude.copied') }}" hidden>{{ t('users.claude.copy') }}</button>
+          </div>
+          <h3 class="ssec__sub">{{ t('users.claude.connections') }}</h3>
+          {% if not claude.known %}
+            <p class="ssec__note">{{ t('users.claude.unknown') }}</p>
+          {% elif not claude.connections %}
+            <p class="ssec__note">{{ t('users.claude.none') }}</p>
+          {% else %}
+            {% for п in claude.connections %}
+              <form method="post" action="{{ base }}/claude-revoke?lang={{ lang }}" class="sform">
+                <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.claude.row', client=п.client_name, created=п.created_at.strftime('%Y-%m-%d %H:%M')) }} ·
+                  {% if п.last_used_at %}{{ t('users.claude.used', used=п.last_used_at.strftime('%Y-%m-%d %H:%M')) }}{% else %}{{ t('users.claude.unused') }}{% endif %}</p>
+                <input type="hidden" name="connection_id" value="{{ п.id }}">
+                <button class="sbtn" type="submit">{{ t('users.claude.revoke') }}</button>
+              </form>
+            {% endfor %}
+          {% endif %}
+        </div>
+      {% endif %}
+    </section>
+
+    {# ── Бот в Telegram ───────────────────────────────────────────────── #}
+    <section class="ssec" id="bot">
+      <h2 class="ssec__title">{{ t('settings.bot.title') }}</h2>
+      {% if show.bot_link %}
+        <p class="ssec__text">{{ t('profile.bot.link') }}</p>
+        <p class="ssecret"><a href="{{ show.bot_link }}" rel="noopener noreferrer"><code>{{ show.bot_link }}</code></a></p>
+        <p class="ssec__note">{{ t('profile.bot.until', time=show.bot_link_until.strftime('%H:%M') if show.bot_link_until else '') }}</p>
+      {% elif not own_binding_known %}
+        <p class="ssec__note">{{ t('profile.bot.unknown') }}</p>
+      {% elif own_binding %}
+        <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('profile.bot.bound', id=own_binding.telegram_id, date=own_binding.bound_at.strftime('%Y-%m-%d %H:%M')) }}</p>
+        <form method="post" action="{{ base }}/bot-unlink?lang={{ lang }}" class="sform">
+          <button class="sbtn" type="submit">{{ t('profile.bot.unlink') }}</button>
+        </form>
+      {% elif not may("inspection.conduct") %}
+        <p class="ssec__text"><span class="sdot"></span>{{ t('settings.bot.read_only') }}</p>
+      {% else %}
+        <p class="ssec__text"><span class="sdot"></span>{{ t('profile.bot.unbound') }}</p>
+        {% if bot_username %}
+          <form method="post" action="{{ base }}/bot-link?lang={{ lang }}" class="sform">
+            <button class="sbtn sbtn--primary" type="submit">{{ icon('tg') }}<span>{{ t('profile.bot.link_submit') }}</span></button>
+          </form>
+        {% else %}
+          <p class="ssec__note">{{ t('profile.bot.unset', var=bot_var) }}</p>
+        {% endif %}
+      {% endif %}
+    </section>
+
+    {# ── Google ───────────────────────────────────────────────────────── #}
+    {% set google_login = google_enabled and me.email %}
+    <section class="ssec" id="google">
+      <h2 class="ssec__title">{{ t('settings.google.title') }}</h2>
+      {% if me.email and google_enabled %}
+        <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('settings.google.linked', email=me.email) }}</p>
+      {% elif me.email %}
+        <p class="ssec__text"><span class="sdot"></span>{{ t('settings.google.linked_off', email=me.email) }}</p>
+      {% else %}
+        <p class="ssec__text"><span class="sdot"></span>{{ t('settings.google.none') }}</p>
+      {% endif %}
+      {% if me.email %}<p class="ssec__note">{{ t('settings.google.unlink') }}</p>{% endif %}
+      <p class="ssec__note">{{ t('settings.google.gmail') }}</p>
+    </section>
+
+    {# ── Язык интерфейса ──────────────────────────────────────────────── #}
+    <section class="ssec" id="language">
+      <h2 class="ssec__title">{{ t('settings.lang.title') }}</h2>
+      {% include "_langpick.html" %}
+      <p class="ssec__note">{{ t('settings.lang.note') }}</p>
+    </section>
+
+    {# ── Пароль ───────────────────────────────────────────────────────── #}
+    <section class="ssec" id="password">
+      <h2 class="ssec__title">{{ t('profile.password.title') }}</h2>
+      {% if google_login %}
+        {# D450: с привязанной почтой Google паролем не входят — форма была бы
+           кнопкой, которая меняет то, чем войти нельзя. #}
+        <p class="ssec__text"><span class="sdot"></span>{{ t('settings.password.google') }}</p>
+      {% else %}
+        {% if show.password %}
+          <div class="note {{ 'note--ok' if show.password.key == 'ok' else 'note--warn' }}">
+            <div class="note__text">{{ t('profile.password.' ~ show.password.key, min=min_password, max=max_password, minutes=show.password.locked_minutes) }}</div>
+          </div>
+        {% endif %}
+        {# Свой пароль (#324): чью строку трогать, решает сессия, а не поле
+           формы. Введённое обратно в разметку не возвращается. #}
+        <details class="sfold"{% if show.password %} open{% endif %}>
+          <summary class="sbtn">{{ t('profile.password.submit') }}</summary>
+          <form method="post" action="{{ base }}/password?lang={{ lang }}" class="sform" id="password-form">
+            <label><span class="sform__label">{{ t('profile.password.current') }}</span>
+              <input class="sinput" type="password" name="current" required autocomplete="current-password"></label>
+            <label><span class="sform__label">{{ t('profile.password.new') }}</span>
+              <input class="sinput" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+            <label><span class="sform__label">{{ t('profile.password.repeat') }}</span>
+              <input class="sinput" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+            <p class="ssec__note">{{ t('profile.password.hint', min=min_password) }}</p>
+            <button class="sbtn sbtn--primary" type="submit">{{ t('profile.password.submit') }}</button>
+          </form>
+        </details>
+      {% endif %}
+    </section>
+  </article>
+{% endblock %}

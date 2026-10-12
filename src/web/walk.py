@@ -41,6 +41,7 @@ from src.db.models import PreviousFindings
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
 from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
+from src.domain.log_ids import log_id
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
 from src.domain.walk_users import walk_open_to
 
@@ -332,25 +333,25 @@ def identify(
         logger.info("Обход: отказ в опознании — %s", exc)
         return jsonify({"error": "unauthorized"}), 401
     if not walk_rate.CHAT_RATE.allow(chat_id, kind):
-        logger.warning("Обход: чат %s превысил предел частоты (%s) — отказ", chat_id, kind)
+        logger.warning("Обход: чат %s превысил предел частоты (%s) — отказ", log_id(chat_id), kind)
         message = WALK_TEXTS["walk.err.too_fast"]
         return jsonify({"error": "refused", "message": message.get(ui_lang) or message["en"]}), 429
     if not walk_open_to(conf.users, chat_id):
         # Пробный запуск на боевом боте: кнопки у человека нет, а адрес мог
         # прийти пересланным — страница пускает ровно тех же, что и кнопка.
-        logger.info("Обход: чат %s не в круге тестеров — отказ", chat_id)
+        logger.info("Обход: чат %s не в круге тестеров — отказ", log_id(chat_id))
         return jsonify({"error": "closed", "texts": texts_for(ui_lang)}), 403
     try:
         if conf.bot_token is not None and walk_access.role_is_closed(chat_id):
             # Учётка своя, но её роли поле закрыто (D420): объяснить словами.
-            logger.info("Обход: роли учётки чата %s поле закрыто — отказ", chat_id)
+            logger.info("Обход: роли учётки чата %s поле закрыто — отказ", log_id(chat_id))
             lang = walk_settings.chosen_lang(chat_id) or ui_lang
             текст = WALK_TEXTS["walk.err.role"]
             return jsonify({"error": "role", "message": текст.get(lang) or текст[ui_lang]}), 403
         if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:
             # Бот этого человека не пускает (не привязан, доступ снят) — и
             # мини-апп тоже, хоть подпись и настоящая (D372).
-            logger.info("Обход: бот не пускает чат %s — отказ", chat_id)
+            logger.info("Обход: бот не пускает чат %s — отказ", log_id(chat_id))
             return jsonify({"error": "unauthorized"}), 401
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
@@ -365,7 +366,7 @@ def payload_response(
     try:
         ответ = jsonify(walk_payload(chat_id, fallback_lang=ui_lang, bot=bot))
     except STATE_FAILURES:
-        logger.exception("Обход: состояние чата %s не прочиталось", chat_id)
+        logger.exception("Обход: состояние чата %s не прочиталось", log_id(chat_id))
         return jsonify({"error": "state", "texts": texts_for(ui_lang)}), 500
     # Данные одного человека: ни прокси, ни WebView не должны их помнить.
     ответ.headers["Cache-Control"] = "no-store"

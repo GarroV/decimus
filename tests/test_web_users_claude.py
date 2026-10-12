@@ -83,11 +83,11 @@ def _стенд(
 
 
 @pytest.mark.parametrize(("tenant", "role"), РОЛИ)
-def test_блок_есть_на_своей_карточке_любой_роли(
+def test_блок_есть_в_настройках_любой_роли(
     monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth, tenant: str, role: str
 ) -> None:
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
-        ответ = client.get("/users?person=me")
+        ответ = client.get("/settings")
         страница = ответ.get_data(as_text=True)
 
         assert ответ.status_code == 200, (tenant, role)
@@ -101,10 +101,10 @@ def test_блок_есть_на_своей_карточке_любой_роли(
 
 def test_без_oauth_блока_нет(monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin", oauth=False):
-        страница = client.get("/users?person=me").get_data(as_text=True)
+        страница = client.get("/settings").get_data(as_text=True)
 
         assert 'id="claude-connect"' not in страница
-        assert client.post("/users/claude-revoke", headers={"Origin": СВОЙ}).status_code == 404
+        assert client.post("/settings/claude-revoke", headers={"Origin": СВОЙ}).status_code == 404
 
 
 def test_на_чужой_карточке_блока_нет(monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth) -> None:
@@ -120,7 +120,7 @@ def test_своё_подключение_отключается(
 ) -> None:
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
         ответ = client.post(
-            "/users/claude-revoke",
+            "/settings/claude-revoke",
             data={"connection_id": "мое-подключение"},
             headers={"Origin": СВОЙ},
         )
@@ -135,7 +135,7 @@ def test_чужое_подключение_не_отключается(
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="superadmin"):
         ответ = client.post(
-            "/users/claude-revoke",
+            "/settings/claude-revoke",
             data={"connection_id": "чужое-подключение", "user_id": ЧУЖОЙ},
             headers={"Origin": СВОЙ},
         )
@@ -148,7 +148,7 @@ def test_отключение_без_origin_отвергается(
     monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="developer"):
-        ответ = client.post("/users/claude-revoke", data={"connection_id": "мое-подключение"})
+        ответ = client.post("/settings/claude-revoke", data={"connection_id": "мое-подключение"})
 
         assert ответ.status_code == 403
         assert память.grants["мое-подключение"].revoked is False

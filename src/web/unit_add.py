@@ -28,6 +28,7 @@ from src.db import directory
 from src.db.errors import DbError, UnitExistsError
 from src.db.reach import Reach
 from src.domain.geo import COUNTRIES
+from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, may_add_units
 from src.domain.unit_new import OTHER_COUNTRY, NewUnit, NewUnitRefused, plan_new_unit
 
@@ -161,7 +162,7 @@ def install(app: Flask, conf: Settings) -> None:
             "пиццерия %s (%s) заведена из веба: %s",
             plan.name,
             plan.country,
-            вошедший.login if вошедший else "?",
+            log_id(вошедший.login if вошедший else "?"),
         )
         if заведена.taken_aliases:
             # Точка заведена, а написание ведёт к другой: сказать на экране.

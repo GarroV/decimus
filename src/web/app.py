@@ -68,6 +68,7 @@ from . import (
     review,
     revision,
     security_headers,
+    settings_screen,
     swarm_api,
     to_inspect,
     unit_add,
@@ -127,6 +128,7 @@ SCREENS = (
     "ratings",
     "admin",
     "users",
+    "settings",
     "actions",
     "plans",
     "orders",
@@ -187,6 +189,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
+    settings_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.
@@ -262,8 +265,8 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Роль словами — как должность; у партнёра свои названия (D346).
             "role_key": users_view.role_key,
             "hint_key": users_view.hint_key,
-            # Своя карточка — на экране «Пользователи», меню учётки ведёт туда.
-            "my_card_url": f"{request.script_root}{section('users').path}?person=me&lang={lang}",
+            # Меню учётки ведёт в «Настройки»: подключения, вход, язык (D447).
+            "settings_url": f"{request.script_root}{section('settings').path}?lang={lang}",
         }
 
 

@@ -31,6 +31,7 @@ from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
 from .texts_refusals import REFUSAL_TEXTS
 from .texts_registry import REGISTRY_TEXTS
+from .texts_settings import SETTINGS_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
@@ -1633,6 +1634,7 @@ _ЧАСТИ = (
     RATINGS_TEXTS,
     REFUSAL_TEXTS,
     REGISTRY_TEXTS,
+    SETTINGS_TEXTS,
     UNIT_TEXTS,
     USERS_TEXTS,
     WALK_TEXTS,
@@ -1656,6 +1658,7 @@ TEXTS = {
     **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
     **REGISTRY_TEXTS,
+    **SETTINGS_TEXTS,
     **UNIT_TEXTS,
     **USERS_TEXTS,
     **WALK_TEXTS,

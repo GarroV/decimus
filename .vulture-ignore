@@ -517,3 +517,12 @@ _ретранслятор
 # и зовёт их заслон прав в прогоне на сломанном приложении.
 telepathy
 forgot
+# Маршруты «Настроек» (D447): их регистрирует декоратор Flask, свои дела
+# заслон прав называет по имени эндпоинта (`guard.EXEMPT_ENDPOINTS`).
+settings_page
+settings_own_password
+settings_bot_link
+settings_bot_unlink
+settings_claude_token
+settings_claude_token_revoke
+settings_claude_revoke

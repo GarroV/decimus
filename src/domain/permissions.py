@@ -107,7 +107,6 @@ ACTIONS: tuple[Action, ...] = (
 
 _BY_CODE: Mapping[str, Action] = {a.code: a for a in ACTIONS}
 ACTION_CODES: frozenset[str] = frozenset(_BY_CODE)
-VIEW_CODES: frozenset[str] = frozenset(a.code for a in _VIEWS)
 
 RULE_OK = "ok"
 RULE_MATRIX = "matrix"

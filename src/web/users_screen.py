@@ -22,10 +22,10 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from flask import Flask, make_response, render_template, request
+from flask import Flask, render_template, request
 from flask import Response as FlaskResponse
 
-from src.db import bot_links, mcp_access, oauth_store
+from src.db import bot_links
 from src.db.errors import DbError
 from src.domain.tenants import canonical_tenant
 
@@ -37,18 +37,13 @@ from . import (
     guard,
     partner_spaces,
     people,
-    profile,
-    users_claude,
-    users_mcp,
 )
 from .access_policy import Scope
-from .config import WEB_BOT_USERNAME_VAR, Settings
+from .config import Settings
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
-from .remote import client_address
 from .sections import section
 from .users_page import (
-    BOT_USERNAME_KEY,
     ME,
     SEES_BINDINGS,
     Flash,
@@ -60,11 +55,6 @@ from .users_page import (
 from .users_view import TAB_CONNECTIONS, TAB_SPACES
 
 logger = logging.getLogger(__name__)
-
-
-def link_url(bot_username: str, token: str) -> str:
-    """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
-    return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
 
 
 def forbidden() -> FlaskResponse:
@@ -97,8 +87,6 @@ def _flash(key: str, *, ok: bool, **params: object) -> Flash:
 def install(app: Flask, conf: Settings) -> None:
     """Маршруты экрана «Пользователи»: люди, своя карточка, пространства партнёров."""
     users_path = section("users").path
-    app.config[BOT_USERNAME_KEY] = conf.bot_username
-    app.config[users_claude.MCP_URL_KEY] = conf.mcp_public_url if conf.oauth_enabled else None
 
     @app.get(users_path)
     def users() -> FlaskResponse | tuple[str, int]:
@@ -106,99 +94,33 @@ def install(app: Flask, conf: Settings) -> None:
             return connections_screen.show()
         return render()
 
-    @app.post(f"{users_path}/bot-link")
-    @guard.action("inspection.conduct")
-    def bot_link() -> FlaskResponse | tuple[str, int]:
-        """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
+    @app.post(f"{users_path}/bot-unlink")
+    @guard.action("people.manage")
+    def bot_unlink() -> FlaskResponse | tuple[str, int]:
+        """Снять привязку бота ЧУЖОЙ учётки: главный админ и админ УК, только в своём охвате.
 
-        Ключ учётки из формы не читается вовсе: ссылка привязала бы чужой
-        Telegram к выбранному человеку. Ссылка показывается на странице ответа,
-        а не в адресе: адрес оседает в истории браузера и журнале прокси.
+        Свою привязку человек снимает в «Настройках» (`settings_screen.py`, D447):
+        здесь свой `user_id` — отказ, второй двери для того же дела нет.
         """
         refuse_foreign_origin()
         вошедший = auth.current_account()
         if вошедший is None:
-            raise RuntimeError("выпуск ссылки привязки без вошедшего: маршрут прошёл мимо заслона")
-        if not conf.bot_username:
-            return render(
-                Show(
-                    person=ME, flash=_flash("profile.bot.unset", ok=False, var=WEB_BOT_USERNAME_VAR)
-                ),
-                503,
-            )
-        try:
-            ссылка = bot_links.issue_link(вошедший.id)
-        except DbError:
-            return render(Show(person=ME, flash=_flash("profile.bot.link_failed", ok=False)), 503)
-        return render(
-            Show(
-                person=ME,
-                bot_link=link_url(conf.bot_username, ссылка.token),
-                bot_link_until=ссылка.expires_at,
-            )
-        )
-
-    @app.post(f"{users_path}/bot-unlink")
-    @guard.action("people.manage", object_in_route=True, own_object=True)
-    def bot_unlink() -> FlaskResponse | tuple[str, int]:
-        """Отвязать бота: свою привязку — каждый; чужую — главный админ и админ УК в охвате."""
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
             raise RuntimeError("отвязка бота без вошедшего: маршрут прошёл мимо заслона")
-        чей = (request.form.get("user_id") or "").strip() or вошедший.id
-        карточка = ME if чей == вошедший.id else чей
-        if чей == вошедший.id:
-            guard.mark_own()  # свою привязку снимает каждый: это его учётка
-        else:
-            отказ = guard.permit("people.manage")
-            if отказ is not None:
-                return отказ
-            круг = people_scope()
-            if круг is None or круг.kind not in SEES_BINDINGS:
-                return forbidden()
-            try:
-                if not any(r.id == чей for r in access_policy.visible(круг, source(круг))):
-                    return forbidden()
-            except DbError:
-                return render(Show(flash=_flash("users.bot.unlink_failed", ok=False)), 503)
+        чей = (request.form.get("user_id") or "").strip()
+        круг = people_scope()
+        if not чей or чей == вошедший.id or круг is None or круг.kind not in SEES_BINDINGS:
+            return forbidden()
         try:
+            if not any(r.id == чей for r in access_policy.visible(круг, source(круг))):
+                return forbidden()
             отвязано = bot_links.unbind(чей)
         except DbError:
-            return render(
-                Show(person=карточка, flash=_flash("users.bot.unlink_failed", ok=False)), 503
-            )
+            return render(Show(person=чей, flash=_flash("users.bot.unlink_failed", ok=False)), 503)
         исход = "users.bot.unlinked" if отвязано else "users.bot.unlink_missing"
-        return render(Show(person=карточка, flash=_flash(исход, ok=отвязано)))
-
-    @app.post(f"{users_path}/password")
-    def own_password() -> FlaskResponse | tuple[str, int]:
-        """Сменить СВОЙ пароль (#324). Чей — решает сессия этого запроса, не форма."""
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("смена пароля без вошедшего: маршрут прошёл мимо заслона")
-        исход = profile.change_own(
-            current=request.form.get("current") or "",
-            new=request.form.get("new") or "",
-            repeat=request.form.get("repeat") or "",
-            token=auth.current_session_token(),
-            login=вошедший.login,
-            stand=auth.throttle_tenant(),
-            address=client_address(trusted_proxies=conf.trusted_proxies),
-        )
-        страница, код = render(Show(person=ME, password=исход), исход.status)
-        if исход.retry_after_seconds is None:
-            return страница, код
-        ответ = make_response(страница, код)
-        ответ.headers["Retry-After"] = str(исход.retry_after_seconds)
-        return ответ
+        return render(Show(person=чей, flash=_flash(исход, ok=отвязано)))
 
     _install_edits(app, users_path)
     _install_add_disable(app, users_path)
-    _install_mcp(app, users_path)
-    if conf.oauth_enabled:
-        _install_claude(app, users_path)
     _install_spaces(app, users_path)
     connections_screen.install(app)
 
@@ -376,73 +298,6 @@ def _install_add_disable(app: Flask, users_path: str) -> None:
             return render(Show(flash=_flash("users.disable.failed", ok=False)), 400)
         исход = "users.disable.ok" if отключено else "users.disable.missing"
         return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=отключено)))
-
-
-def _install_claude(app: Flask, users_path: str) -> None:
-    """Отключить своё подключение Claude через сайт (D417). Чужое — не найдётся."""
-
-    @app.post(f"{users_path}/claude-revoke")
-    def claude_revoke() -> FlaskResponse | tuple[str, int]:
-        """Отозвать подключение. Номер — из формы, владелец — всегда вошедший.
-
-        Учётка из формы не читается вовсе: `user_id` в запросе отзыва — это
-        вошедший, и номер чужого подключения просто не найдётся.
-        """
-        refuse_foreign_origin()
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError(
-                "отзыв подключения Claude без вошедшего: маршрут прошёл мимо заслона"
-            )
-        номер = (request.form.get("connection_id") or "").strip()
-        try:
-            отозвано = oauth_store.revoke_connection(номер, user_id=вошедший.id)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return render(Show(person=ME, flash=_flash("users.claude.failed", ok=False)), 503)
-        исход = "users.claude.revoked" if отозвано else "users.claude.revoke_missing"
-        return render(Show(person=ME, flash=_flash(исход, ok=отозвано)))
-
-
-def _install_mcp(app: Flask, users_path: str) -> None:
-    """Личный токен Claude: выпустить себе и отозвать свой (D447, D448).
-
-    Учётка — всегда вошедший, из формы не читается ничего: выдать или снять
-    токен другому человеку отсюда нельзя, и двери для этого нет вовсе.
-    """
-
-    def _вошедший_id() -> str:
-        вошедший = auth.current_account()
-        if вошедший is None:
-            raise RuntimeError("личный токен без вошедшего: маршрут прошёл мимо заслона")
-        return str(вошедший.id)
-
-    @app.post(f"{users_path}/claude-token")
-    def claude_token() -> FlaskResponse | tuple[str, int]:
-        """Выпустить себе токен; команда показывается этим ответом один раз."""
-        refuse_foreign_origin()
-        чей = _вошедший_id()
-        try:
-            выпуск = users_mcp.issue_own(чей)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return render(Show(person=ME, flash=_flash("users.mcp.failed", ok=False)), 503)
-        # Значения токена в журнале нет: только факт выпуска.
-        logger.info("Веб: учётка %s выпустила себе токен MCP", чей)
-        return render(Show(person=ME, token=выпуск))
-
-    @app.post(f"{users_path}/claude-token-revoke")
-    def claude_token_revoke() -> FlaskResponse | tuple[str, int]:
-        """Отозвать свой живой токен сразу."""
-        refuse_foreign_origin()
-        чей = _вошедший_id()
-        try:
-            погашено = mcp_access.revoke_tokens(чей)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return render(Show(person=ME, flash=_flash("users.mcp.failed", ok=False)), 503)
-        исход = "users.mcp.revoked" if погашено else "users.mcp.nothing"
-        return render(Show(person=ME, flash=_flash(исход, ok=bool(погашено))))
 
 
 def _install_spaces(app: Flask, users_path: str) -> None:

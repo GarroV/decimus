@@ -27,10 +27,10 @@ from typing import Any, TypeVar
 from flask import Flask, abort, current_app, g, render_template, request
 from werkzeug.wrappers import Response
 
-from src.domain.permissions import Actor, can, grants_of, require_action, view_code
+from src.domain.permissions import Actor, can, grants_of, require_action
 
 from . import auth
-from .sections import current_section
+from .sections import current_section, section_view
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,6 @@ F = TypeVar("F", bound=Callable[..., Any])
 ACTIONS_ATTR = "required_actions"
 OBJECT_IN_ROUTE_ATTR = "object_in_route"
 HIDDEN_ATTR = "hidden_route"
-OWN_OBJECT_ATTR = "own_object_allowed"
 WRITING_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 #: GET, который пишет: возврат от Google кладёт черновик письма в почту.
@@ -49,10 +48,10 @@ WRITING_GETS = frozenset({"google_mail_callback"})
 #: Матрица их не решает: их делает любая роль, включая гостя (D440, D448).
 EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "logout": "выход закрывает свою сессию",
-    "own_password": "свой пароль — у себя, без доступа к остальному",
-    "claude_token": "личный токен Claude себе выпускает любая роль (D448)",
-    "claude_token_revoke": "свой токен Claude гасит сам (D448)",
-    "claude_revoke": "своё подключение Claude отзывает сам (D417)",
+    "settings_own_password": "свой пароль — у себя, без доступа к остальному (D447)",
+    "settings_claude_token": "личный токен Claude себе выпускает любая роль (D448)",
+    "settings_claude_token_revoke": "свой токен Claude гасит сам (D448)",
+    "settings_claude_revoke": "своё подключение Claude отзывает сам (D417)",
     "oauth_authorize": "согласие на подключение своего Claude (D417)",
 }
 
@@ -64,22 +63,16 @@ _PERMITTED = "action_permitted"
 _REACHED = "guard_reached_view"
 
 
-def action(
-    *codes: str, object_in_route: bool = False, hidden: bool = False, own_object: bool = False
-) -> Callable[[F], F]:
+def action(*codes: str, object_in_route: bool = False, hidden: bool = False) -> Callable[[F], F]:
     """Объявить код действия маршрута. Ошибка объявления — при сборке приложения.
 
     `hidden` — экрана для закрытой роли «нет вовсе»: отказ 404, а не 403
     (ключи API главного админа — остальным экрана снаружи не видно).
-    `own_object` — над своей учёткой маршрут действует любой ролью (`mark_own`),
-    поэтому предпроверка клеток до маршрута его не отбивает.
     """
     if not codes:
         raise ValueError("Маршрут без кода действия: заслону нечего спрашивать")
     for код in codes:
         require_action(код)
-    if own_object and not object_in_route:
-        raise ValueError("own_object — про объект маршрута: нужен object_in_route=True")
     if len(codes) > 1 and not object_in_route:
         raise ValueError("Несколько кодов — какой спросить, решает объект: object_in_route=True")
 
@@ -87,7 +80,6 @@ def action(
         setattr(view, ACTIONS_ATTR, codes)
         setattr(view, OBJECT_IN_ROUTE_ATTR, object_in_route)
         setattr(view, HIDDEN_ATTR, hidden)
-        setattr(view, OWN_OBJECT_ATTR, own_object)
         return view
 
     return mark
@@ -132,11 +124,6 @@ def permit(code: str, object_tenant: str | None = None) -> tuple[str, int] | Non
     return forbidden()
 
 
-def mark_own() -> None:
-    """Маршрут с объектом действует над своей учёткой: матрица не нужна."""
-    setattr(g, _PERMITTED, True)
-
-
 def _writes(endpoint: str | None, methods: set[str] | frozenset[str]) -> bool:
     return bool(set(methods) & WRITING_METHODS) or endpoint in WRITING_GETS
 
@@ -144,7 +131,7 @@ def _writes(endpoint: str | None, methods: set[str] | frozenset[str]) -> bool:
 def _read_code(endpoint: str | None, path: str) -> str | None:
     ключ = current_section(path)
     if ключ is not None:
-        return view_code(ключ)
+        return section_view(ключ)
     return ENDPOINT_VIEWS.get(endpoint or "")
 
 
@@ -172,8 +159,6 @@ def install(app: Flask) -> None:
             logger.error("права: пишущий маршрут %s без кода действия — отказ", request.endpoint)
             return forbidden()
         if getattr(view, OBJECT_IN_ROUTE_ATTR, False):
-            if getattr(view, OWN_OBJECT_ATTR, False):
-                return None  # своё — `mark_own`, чужое — `permit` в маршруте
             # Объект решает маршрут, но роли без единой из объявленных клеток
             # до объекта (и до базы) дела нет: отказ сразу.
             if not any(код in grants_of(вошедший.role, вошедший.tenant) for код in коды):

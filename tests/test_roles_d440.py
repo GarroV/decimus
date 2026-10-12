@@ -340,11 +340,11 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
 #: Дела самого человека, которые гость делает и без права на запись в сеть.
 СВОИ_ДЕЛА_ГОСТЯ = {
     "/logout",
-    "/users/password",
+    "/settings/password",
     "/oauth/authorize",
-    "/users/claude-revoke",
-    "/users/claude-token",
-    "/users/claude-token-revoke",
+    "/settings/claude-revoke",
+    "/settings/claude-token",
+    "/settings/claude-token-revoke",
 }
 
 
