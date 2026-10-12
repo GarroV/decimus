@@ -50,9 +50,10 @@ create table oauth_grants (
     last_used_at timestamptz,
     -- Отзыв — пометка со следом, строка остаётся. Причина: `user` — человек
     -- нажал «Отключить», `reuse` — предъявлен уже обменянный refresh или код,
-    -- `password` — пароль учётки сменён (с экрана или командой).
+    -- `password` — пароль учётки сменён (с экрана или командой), `email` —
+    -- сменена почта входа через Google.
     revoked_at timestamptz,
-    revoked_reason text check (revoked_reason in ('user', 'reuse', 'password'))
+    revoked_reason text check (revoked_reason in ('user', 'reuse', 'password', 'email'))
 );
 alter table oauth_grants add constraint oauth_grants_revocation_is_named
     check ((revoked_at is null) = (revoked_reason is null));
@@ -170,6 +171,13 @@ grant update (expires_at) on oauth_codes to dodo_audit_admin;
 -- и подключение пережило бы смену, как пережила бы её незакрытая сессия.
 -- Гаснут и ещё не обменянные коды (срок — сейчас): иначе код, выданный до
 -- смены, обменялся бы после неё на новое подключение.
+--
+-- ПОРЯДОК ВАЖЕН: сперва коды, потом подключения. Обмен кода держит строку кода
+-- (`for update`) до конца своей транзакции; гашение кодов ждёт его, и только
+-- после — отзыв подключений, который новым снимком видит и подключение,
+-- только что выпущенное этим обменом. В обратном порядке оно бы уцелело.
+-- Ротация refresh держит строку подключения (`for update of t, g`), отзыв её
+-- же: кто второй, тот видит итог первого.
 -- Смена с экрана идёт функцией `change_own_password` (`0032`, путь поиска —
 -- `0033`); тело то же, добавлен отзыв в той же транзакции. Смена командой —
 -- `web_access.change_password`, отзывает сама.
@@ -203,16 +211,16 @@ begin
        and closed_at is null
        and fingerprint <> отпечаток;
 
-    update public.oauth_grants
-       set revoked_at = now(), revoked_reason = 'password'
-     where user_id = чей
-       and revoked_at is null;
-
     update public.oauth_codes
        set expires_at = now()
      where user_id = чей
        and used_at is null
        and expires_at > now();
+
+    update public.oauth_grants
+       set revoked_at = now(), revoked_reason = 'password'
+     where user_id = чей
+       and revoked_at is null;
     return true;
 end;
 $$;
