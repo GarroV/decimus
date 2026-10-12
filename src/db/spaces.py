@@ -1,9 +1,11 @@
 """Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340).
 
 Пространство — это строка `tenants`; страна партнёра — строка `space_countries`
-(миграция 0029). Заводит их команда `make space` ролью владельца схемы
-(`DATABASE_ADMIN_URL`) — и с #585 (D364) главный админ и админ УК на экране
-«Пользователи», той же ролью, что учётки (`_managing`, права — `0041`).
+(миграция 0029). Заводит их команда `make space` и — с #585 (D364) — главный админ и админ УК на
+экране «Пользователи», одной и той же узкой ролью, что учётки (`_managing`:
+администратор истории `DATABASE_RETRACTION_URL`, права — `0029`, `0041`).
+Владелец схемы (`DATABASE_ADMIN_URL`) сервисам не выдаётся вовсе (F-002): откат на
+него остаётся только у инструментов и стендов, где переменная задана.
 Пространство с экрана заводится вместе со странами одной транзакцией: без
 стран партнёр не видит ничего, и полузаведённое пространство было бы пустым.
 
@@ -27,7 +29,7 @@ from typing import Any
 from src.domain.tenants import HQ_TENANT, LEGACY_TENANTS, canonical_tenant
 
 from .errors import AccessError
-from .web_access import _connected, _managing, _owned
+from .web_access import _connected, _managing
 
 SPACE_CODE = re.compile(r"^[A-Z][A-Z0-9_-]{1,31}$")
 COUNTRY_CODE = re.compile(r"^[A-Z]{2}$")
@@ -83,14 +85,14 @@ def create_space(code: str, *, name: str) -> SpaceRow:
             f"Пространство «{код}» уже заведено (или совпадает с заведённым без учёта "
             f"регистра — каталог методики у них был бы один)"
         )
-    with _owned(f"завести пространство «{код}»") as conn, conn.cursor() as cur:
+    with _managing(f"завести пространство «{код}»") as conn, conn.cursor() as cur:
         cur.execute(_INSERT_SPACE_SQL, (код, название))
     return SpaceRow(code=код, name=название, countries=(), people=0)
 
 
 def list_spaces() -> tuple[SpaceRow, ...]:
     """Все пространства со странами и числом живых учёток."""
-    with _owned("перечислить пространства") as conn, conn.cursor() as cur:
+    with _managing("перечислить пространства") as conn, conn.cursor() as cur:
         cur.execute(_LIST_SPACES_SQL)
         строки = cur.fetchall()
     return tuple(
@@ -112,7 +114,7 @@ def bind_countries(space: str, countries: tuple[str, ...]) -> tuple[str, ...]:
             f"У УК стран нет: она видит всю сеть"
         )
     страны = _checked_countries(countries)
-    with _owned(f"привязать «{код}» к странам") as conn, conn.cursor() as cur:
+    with _managing(f"привязать «{код}» к странам") as conn, conn.cursor() as cur:
         _bind_in(cur, код, страны)
     return next(s.countries for s in list_spaces() if s.code == код)
 

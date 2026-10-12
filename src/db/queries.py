@@ -44,6 +44,7 @@ from .models import (
 from .reach import Reach
 from .reach import require_reach as _require_reach
 from .reading import reading as _reading
+from .request_memo import memoized
 from .units import normalize_unit_name
 
 #: Сколько строк отдаётся, если предел не назвали. Сотня — это и есть
@@ -1151,6 +1152,12 @@ def unit_geography(*, reach: Reach) -> dict[str, tuple[str, str]]:
     формулировки переводятся, коды нет.
     """
     охват = _require_reach(reach)
+    # Страница просит географию из нескольких блоков; ключ — весь охват читающего.
+    # Копия: словарь отдаётся наружу изменяемым, а память запроса общая.
+    return dict(memoized(("unit_geography", охват), lambda: _read_unit_geography(охват)))
+
+
+def _read_unit_geography(охват: Reach) -> dict[str, tuple[str, str]]:
     with _reading("география точек") as conn, conn.cursor() as cur:
         cur.execute(_UNIT_GEOGRAPHY_SQL, охват.params())
         return {

@@ -1,4 +1,5 @@
-"""API чтения для Swarm, v1 (#567, D387, D390): рейтинги, нарушения, проверки, карты.
+"""API чтения для сервисов, v1 (#567, D387, D390, D426): рейтинги, нарушения,
+проверки, карты, агрегаторы. Первый потребитель — Swarm.
 
 Децимус — единственный источник этих данных; Swarm их не хранит и не грузит у
 себя, а забирает отсюда с сервера (Edge Function), не из браузера. Контракт —
@@ -13,15 +14,20 @@
 
 - неизвестный или отозванный токен — 401 и неудача в счётчике адреса (тот же,
   что у формы входа, `web_throttle`); адрес заперт — 429 с `Retry-After`;
-- у токена нет права маршрута (`ratings:read` — баллы, собираемость,
-  нарушения; `inspections:read` — проверки) — 403;
+- у токена нет права метода (`api_access.SCOPES`, право на каждый метод —
+  D425; какое у какого — `install`) — 403;
 - больше `RATE_LIMIT_PER_MINUTE` обращений токеном за минуту — 429;
 - каждое обращение, включая отказы, пишется в `api.access_log`; не удалось
   записать или сверить — 503, а не открытый доступ.
 
-**Доступ по странам решает Swarm** (D387): API отдаёт то, что попросили, по
-всей сети, как УК. Персональных данных в ответах нет — ни аудиторов, ни почт,
-ни кадров.
+**Доступ по странам — у токена** (D425): без стран токен видит всю сеть, как
+Swarm (D387); со странами — только их: запрос без фильтра получает их, запрос
+чужой страны — 403, чужая проверка по номеру — 404, как несуществующая.
+
+Ни аудиторов, ни почт, ни Telegram, ни кадров в ответах нет. Два исключения,
+названные аудитом 12.10.2026: имя бизнес-девелопера страны в баллах (по нему
+Swarm группирует) и формулировки записей проверки — текст, который пишет
+аудитор по правилам фиксации и который код не вычищает от имён.
 
 Тексты ошибок — для разработчика на той стороне, по-английски; это не
 пользовательская поверхность.
@@ -35,19 +41,28 @@ from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, g, jsonify, request
 
-from src.db import api_access, maps_store, queries, ratings_read, swarm_read, web_throttle
+from src.db import (
+    agg_store,
+    api_access,
+    maps_store,
+    queries,
+    ratings_read,
+    swarm_read,
+    web_throttle,
+)
 from src.db.errors import DbError
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT
 from src.ratings import feed, maps
 from src.ratings.model import RKO, RS
 
-from . import inspection_titles
+from . import api_feed, inspection_titles
 from .config import Settings
 from .remote import client_address
 from .sections import section
+from .texts import TEXTS
 
 PREFIX = "/api/v1"
 SCORES_PATH = f"{PREFIX}/ratings/scores"
@@ -56,6 +71,8 @@ VIOLATIONS_PATH = f"{PREFIX}/ratings/violations"
 INSPECTIONS_PATH = f"{PREFIX}/inspections"
 INSPECTION_PATH = f"{PREFIX}/inspections/<inspection_id>"
 MAPS_PATH = f"{PREFIX}/maps/ratings"
+AGGREGATORS_PATH = f"{PREFIX}/aggregators/ratings"
+INSPECTION_VIOLATIONS_PATH = f"{PREFIX}/inspections/violations"
 
 SCORES_ENDPOINT = "swarm_api_scores"
 CHECKUPS_ENDPOINT = "swarm_api_checkups"
@@ -63,6 +80,8 @@ VIOLATIONS_ENDPOINT = "swarm_api_violations"
 INSPECTIONS_ENDPOINT = "swarm_api_inspections"
 INSPECTION_ENDPOINT = "swarm_api_inspection"
 MAPS_ENDPOINT = "swarm_api_maps"
+AGGREGATORS_ENDPOINT = "swarm_api_aggregators"
+INSPECTION_VIOLATIONS_ENDPOINT = "swarm_api_inspection_violations"
 #: Открыты заслону входа (`auth.OPEN_ENDPOINTS`): опознаёт токен, а не кука.
 ENDPOINTS = frozenset(
     {
@@ -72,6 +91,8 @@ ENDPOINTS = frozenset(
         INSPECTIONS_ENDPOINT,
         INSPECTION_ENDPOINT,
         MAPS_ENDPOINT,
+        AGGREGATORS_ENDPOINT,
+        INSPECTION_VIOLATIONS_ENDPOINT,
     }
 )
 
@@ -188,7 +209,13 @@ def _day(name: str) -> date | None:
         raise ApiRefusal(400, "bad_date", f"{name}: no such date") from None
 
 
-def _countries() -> tuple[str, ...] | None:
+def _token() -> api_access.ApiToken:
+    """Токен этого запроса — его кладёт `_respond` до сборки ответа."""
+    токен: api_access.ApiToken = g.api_token
+    return токен
+
+
+def _requested() -> tuple[str, ...] | None:
     raw = request.args.get("countries")
     if raw is None or not raw.strip():
         return None
@@ -198,6 +225,27 @@ def _countries() -> tuple[str, ...] | None:
     if len(коды) > MAX_COUNTRIES:
         raise ApiRefusal(400, "bad_countries", f"countries: at most {MAX_COUNTRIES} codes")
     return tuple(dict.fromkeys(коды))
+
+
+def allowed_countries(
+    requested: tuple[str, ...] | None, granted: tuple[str, ...] | None
+) -> tuple[str, ...] | None:
+    """Страны ответа: что попросили, в пределах того, что токену открыто.
+
+    `None` — без ограничения (вся сеть). Попросили чужую — отказ, а не молча
+    урезанный ответ: та сторона должна знать, что ей не всё отдали."""
+    if granted is None:
+        return requested
+    if requested is None:
+        return granted
+    чужие = [c for c in requested if c not in granted]
+    if чужие:
+        raise ApiRefusal(403, "forbidden_country", f"token has no access to {','.join(чужие)}")
+    return requested
+
+
+def _countries() -> tuple[str, ...] | None:
+    return allowed_countries(_requested(), _token().countries)
 
 
 def _query() -> Query:
@@ -346,6 +394,9 @@ def _inspection(_: Settings) -> dict[str, Any]:
         raise ApiRefusal(400, "bad_id", "inspection id: UUID expected")
     ident = ident.lower()
     row = swarm_read.inspection(reach=_network(), inspection_id=ident)
+    открыты = _token().countries
+    if row is not None and открыты is not None and row.country not in открыты:
+        row = None  # чужая страна — как несуществующая: не подтверждаем, что она есть
     detail = queries.get_inspection(ident, reach=_network()) if row else None
     if row is None or detail is None:
         raise ApiRefusal(404, "not_found", "no such finalized inspection")
@@ -407,6 +458,42 @@ def _maps(_: Settings) -> dict[str, Any]:
     }
 
 
+def _aggregators(_: Settings) -> dict[str, Any]:
+    """Оценки в агрегаторах доставки (D426): средние стран как на «Рейтингах» и
+    последняя оценка каждой пиццерии, в шкале агрегатора, на дату `on`."""
+    countries = _countries_or_imf(_countries())
+    on = _day("on") or datetime.now(UTC).date()
+    rows = agg_store.latest(countries, until=on)
+    prefix = "ratings.agg.name."
+    names = {k[len(prefix) :]: v["en"] for k, v in TEXTS.items() if k.startswith(prefix)}
+    return {
+        "on": on.isoformat(),
+        "aggregators": api_feed.aggregator_list(rows, names),
+        "countries": api_feed.aggregator_countries(rows, countries),
+        "units": api_feed.aggregator_units(rows),
+        "loaded_at": feed.iso_utc(agg_store.last_run()),
+    }
+
+
+def _inspection_violations(_: Settings) -> dict[str, Any]:
+    """Топ нарушений по принятым проверкам (D426): пункт методики, сколько раз
+    записан и в скольких проверках — по стране и по всему охвату запроса.
+    Только коды и подписи пунктов: ни формулировок аудитора, ни пиццерий."""
+    query = _query()
+    top = _int("top", DEFAULT_TOP, MAX_TOP)
+    reach = Reach(tenant=HQ_TENANT, tenants=None, countries=query.countries)
+    counts, totals = swarm_read.finding_counts(
+        reach=reach, date_from=query.date_from, date_to=query.date_to
+    )
+    return {
+        "from": query.date_from.isoformat() if query.date_from else None,
+        "to": query.date_to.isoformat() if query.date_to else None,
+        **api_feed.inspection_violations(
+            counts, totals, top=top, titles_of=inspection_titles.item_titles
+        ),
+    }
+
+
 def _respond(
     conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
 ) -> tuple[Response, int, int | None]:
@@ -417,6 +504,7 @@ def _respond(
         токен = _identify(адрес)
         токен_id = токен.id
         _authorize(токен, scope)
+        g.api_token = токен
         payload = build(conf)
     except ApiRefusal as refusal:
         return (
@@ -449,17 +537,28 @@ def _serve(
     return ответ, статус
 
 
+def routes() -> tuple[tuple[str, str, str, Callable[[Settings], dict[str, Any]]], ...]:
+    """Адрес, имя, право, сборка — у каждого метода своё право (D425)."""
+    return (
+        (SCORES_PATH, SCORES_ENDPOINT, api_access.SCOPE_RATING_SCORES, _scores),
+        (CHECKUPS_PATH, CHECKUPS_ENDPOINT, api_access.SCOPE_RATING_CHECKUPS, _checkups),
+        (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, api_access.SCOPE_RATING_VIOLATIONS, _violations),
+        (MAPS_PATH, MAPS_ENDPOINT, api_access.SCOPE_MAPS, _maps),
+        (AGGREGATORS_PATH, AGGREGATORS_ENDPOINT, api_access.SCOPE_AGGREGATORS, _aggregators),
+        (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, api_access.SCOPE_INSPECTION_LIST, _inspections),
+        (
+            INSPECTION_VIOLATIONS_PATH,
+            INSPECTION_VIOLATIONS_ENDPOINT,
+            api_access.SCOPE_INSPECTION_VIOLATIONS,
+            _inspection_violations,
+        ),
+        (INSPECTION_PATH, INSPECTION_ENDPOINT, api_access.SCOPE_INSPECTION_DETAIL, _inspection),
+    )
+
+
 def install(app: Flask, conf: Settings) -> None:
     """Повесить адреса API. Только GET (и HEAD, который Flask даёт сам)."""
-    маршруты = (
-        (SCORES_PATH, SCORES_ENDPOINT, api_access.SCOPE_RATINGS_READ, _scores),
-        (CHECKUPS_PATH, CHECKUPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _checkups),
-        (VIOLATIONS_PATH, VIOLATIONS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _violations),
-        (INSPECTIONS_PATH, INSPECTIONS_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspections),
-        (INSPECTION_PATH, INSPECTION_ENDPOINT, api_access.SCOPE_INSPECTIONS_READ, _inspection),
-        (MAPS_PATH, MAPS_ENDPOINT, api_access.SCOPE_RATINGS_READ, _maps),
-    )
-    for путь, имя, право, build in маршруты:
+    for путь, имя, право, build in routes():
         app.add_url_rule(
             путь,
             endpoint=имя,

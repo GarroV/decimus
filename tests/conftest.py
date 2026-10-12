@@ -423,6 +423,10 @@ def pg_dsn() -> Iterator[str]:
         apply_migrations(dsn)
         yield dsn
     finally:
+        # Пул держит соединения к этой базе и переподключал бы их к удалённой.
+        from src.db.pool import close_pools
+
+        close_pools()
         with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
             conn.execute(drop)
 

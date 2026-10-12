@@ -1,0 +1,102 @@
+{#
+  «Подключения» (D425): сервисы с ключом к API данных. Вкладка экрана
+  «Пользователи», видна только главному админу; чужой роли адрес отвечает 404.
+
+  Вопрос экрана — «кто ходит к нашим данным и что ему можно». Слева список
+  сервисов (живые, ниже отозванные и истёкшие), справа в панели — карточка,
+  форма «Подключить сервис» или страница ключа. Ключ показан ЗДЕСЬ и один раз:
+  в базе от него остаётся отпечаток, в адрес он не попадает намеренно.
+#}{% extends "_split_page.html" %}
+{% from "users/_tabs.html" import users_tabs with context %}
+{% from "users/_connections.html" import service_card, add_card, key_card with context %}
+{% block title %}{{ t('section.users.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-users.css') }}">{% endblock %}
+
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.users.title') }}</h1>
+      <p class="shead__sub">{{ t('connections.sub') }}</p>
+    </div>
+  </header>
+  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link) }}
+  {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
+  {% if show_flash and not split_open %}
+    <div class="note {{ 'note--ok' if show_flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show_flash.key, **show_flash.params) }}</div></div>
+  {% endif %}
+{% endblock %}
+
+{% macro service_row(s) %}
+  {% set состояние = status_of(s) %}
+  {% set текущий = split_open and picked is not none and picked.id == s.id and not add and not issued %}
+  <li>
+    <a class="srow{% if текущий %} is-current{% endif %}{% if состояние != 'live' %} is-off{% endif %}"
+       href="{{ link(tab='connections', service=s.id|string) }}"{% if текущий %} aria-current="true"{% endif %}>
+      <span class="srow__main"><b>{{ s.name }}</b><small class="mono">{{ s.consumer }}</small></span>
+      <span class="srow__cell" data-label="{{ t('connections.col.rights') }}" title="{% for c in s.scopes %}{{ t('connections.scope.name.' ~ c) }}{% if not loop.last %}, {% endif %}{% endfor %}">{{ t('connections.rights_count', count=s.scopes|length, total=scopes|length) }}: {% for c in s.scopes %}{{ t('connections.scope.short.' ~ c) }}{% if not loop.last %}, {% endif %}{% endfor %}</span>
+      <span class="srow__cell mono" data-label="{{ t('connections.col.countries') }}">{{ s.countries|join(' ') if s.countries else t('connections.all_network') }}</span>
+      <span class="srow__cell" data-label="{{ t('connections.col.expires') }}">{{ day(s.expires_at) or t('connections.no_expiry') }}</span>
+      <span class="srow__cell" data-label="{{ t('connections.col.last') }}">{{ stamp(s.last_used_at) or t('connections.never') }}</span>
+      <span class="srow__cell" data-label="{{ t('connections.col.week') }}">{{ t('connections.week', calls=s.calls_week, errors=s.errors_week) }}</span>
+      <span class="srow__cell">{% if состояние == 'live' %}<span class="sdot sdot--ok"></span>{% else %}<span class="sdot"></span>{% endif %}{{ t('connections.status.' ~ состояние) }}</span>
+    </a>
+  </li>
+{% endmacro %}
+
+{% block split_list %}
+  <div class="sbox">
+    <div class="sbar">
+      <span class="sbar__count">{{ t('connections.count', count=total) }}</span>
+      <a class="sbtn sbtn--primary sbar__add" href="{{ link(tab='connections', add='1') }}" data-drawer-open>{{ icon('plus') }}<span>{{ t('connections.add.open') }}</span></a>
+    </div>
+    {% if not tokens_known %}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('connections.unknown.title') }}</p>
+        <p class="sempty__text">{{ t('connections.unknown') }}</p>
+      </div>
+    {% elif not total %}
+      <div class="sempty">
+        <p class="sempty__title">{{ t('connections.empty.title') }}</p>
+        <p class="sempty__text">{{ t('connections.empty.text') }}</p>
+        <a class="sbtn sbtn--primary" href="{{ link(tab='connections', add='1') }}" data-drawer-open>{{ t('connections.add.open') }}</a>
+      </div>
+    {% else %}
+      <div class="slist slist--connections">
+        <div class="slist__head" aria-hidden="true">
+          <span>{{ t('connections.col.service') }}</span>
+          <span>{{ t('connections.col.rights') }}</span>
+          <span>{{ t('connections.col.countries') }}</span>
+          <span>{{ t('connections.col.expires') }}</span>
+          <span>{{ t('connections.col.last') }}</span>
+          <span>{{ t('connections.col.week') }}</span>
+          <span>{{ t('connections.col.status') }}</span>
+        </div>
+        <ul class="slist__rows">{% for s in live %}{{ service_row(s) }}{% endfor %}</ul>
+        {% if older %}
+          <p class="slist__group">{{ t('connections.older') }}</p>
+          <ul class="slist__rows">{% for s in older %}{{ service_row(s) }}{% endfor %}</ul>
+        {% endif %}
+      </div>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block split_title %}
+  {%- if issued -%}
+    {{ t('connections.drawer.key') }}
+  {%- elif add -%}
+    {{ t('connections.drawer.add') }}
+  {%- else -%}
+    {{ t('connections.drawer.card') }}
+  {%- endif -%}
+{% endblock %}
+
+{% block split_detail %}
+  {% if issued %}
+    {{ key_card(issued, reissued) }}
+  {% elif add %}
+    {{ add_card(values) }}
+  {% elif picked %}
+    {{ service_card(picked) }}
+  {% endif %}
+{% endblock %}

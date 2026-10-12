@@ -25,6 +25,8 @@ _MAX_QUERY = 80
 #: Вкладки экрана: люди и пространства партнёров (D364).
 TAB_PEOPLE = "people"
 TAB_SPACES = "spaces"
+#: Вкладка «Подключения» (D425): только главный админ, её ведёт `connections_screen`.
+TAB_CONNECTIONS = "connections"
 
 
 class _Row(Protocol):

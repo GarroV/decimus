@@ -43,6 +43,7 @@ import psycopg
 
 from .config import check_environment
 from .errors import AccessError
+from .pool import connection
 from .space_guard import require_space
 
 #: Сколько случайных байт в токене. 32 байта → 43 знака `token_urlsafe`, то
@@ -229,7 +230,7 @@ def _connected(зачем: str) -> Iterator[psycopg.Connection[Any]]:
     """
     settings = check_environment()
     try:
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             yield conn
     except psycopg.Error as exc:
         raise AccessError(f"Не удалось {зачем} ({type(exc).__name__})") from exc

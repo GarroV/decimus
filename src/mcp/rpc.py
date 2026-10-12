@@ -31,6 +31,7 @@ from .catalogue import (
     KIND_CHECKLIST_SOURCE,
     KIND_IMPORT,
     KIND_RATINGS,
+    KIND_RATINGS_READ,
     KIND_RETRACTION,
     ToolSpec,
     as_list,
@@ -40,6 +41,7 @@ from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .errors import McpError, ToolError
+from .policy import permits
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
 CODE_PARSE_ERROR = -32700
@@ -198,6 +200,15 @@ RETRACTION_CLOSED = (
 #: партнёра вместо названного молча — подменить чек-лист без единого слова об
 #: этом. Отказ называет причину, а не просто «аргумент обязателен»: спросивший
 #: не пропустил параметр, он забыл, что на этой двери он больше не опционален.
+#: Отказ по роли учётки сайта (D417): вход через OAuth, и роль этого не открывает.
+#: Текст называет роль, а не перечисляет, кому открыто: агент перескажет его
+#: человеку, и тот поймёт, что дело в правах его учётки, а не в сбое.
+ROLE_CLOSED = (
+    "Этот инструмент не открыт роли «{роль}» вашей учётки decimus. Права в Claude, "
+    "подключённом через сайт, решает роль учётки: что ей открыто, видно в списке инструментов"
+)
+
+
 IMPORT_CLOSED = (
     "Загрузка проверок задним числом для этого доступа не открыта. Она открывается только "
     "УК (MCP_IMPORT_TENANTS=HQ, D335) и требует хранилища версий методики "
@@ -312,6 +323,7 @@ def _call_tool(
     may_retract: bool,
     imports: Store | None = None,
     actor: str = "",
+    role: str | None = None,
 ) -> dict[str, Any] | str:
     """Вызов инструмента. Строка в ответе — отказ протокола, словарь — результат.
 
@@ -324,6 +336,10 @@ def _call_tool(
     Заслон стоит здесь, у входа, рядом с границей арендаторов, а не в
     обработчиках: обработчик, забывший спросить о правах, был бы дырой,
     которую видно только чтением всех обработчиков подряд.
+
+    `role` — роль учётки сайта у входа через OAuth (D417), `None` у дверей
+    бота и `.env`. Заданная роль спрашивается ПЕРВОЙ, раньше прежних заслонов:
+    она только сужает, и отказ по ней честнее отказа настройки.
     """
     name = params.get("name")
     if not isinstance(name, str) or not name:
@@ -334,6 +350,8 @@ def _call_tool(
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
         return f"Аргументы инструмента {name} ожидаются объектом"
+    if role is not None and not permits(role, tenant, spec.kind):
+        return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
@@ -378,6 +396,9 @@ def _call_tool(
             # подпись — для подтверждения (D308). Обе приходят от транспорта,
             # из токена, а не от собеседника.
             прочее = {"store": imports, "actor": actor}
+        if spec.kind == KIND_RATINGS:
+            # Кто просит — из токена, а не от собеседника: он ляжет автором заявки.
+            прочее = {"actor": actor}
         payload = spec.handler(tenant=tenant, **прочее, **arguments)
     except ToolError as отказ:
         return _tool_text(str(отказ), failed=True)
@@ -418,9 +439,13 @@ def _call_tool(
                 "виден import_get_inspection",
             ),
             KIND_RATINGS: (
-                "загрузку рейтингов",
-                "Это отказ базы, а не отказ в загрузке; повтор безопасен: тот же файл "
-                "ответит «duplicate»",
+                "работу с рейтингами",
+                "Это отказ базы, а не отказ в просьбе; повтор безопасен: тот же файл "
+                "ответит «duplicate», а повторная заявка на обновление — «уже в очереди»",
+            ),
+            KIND_RATINGS_READ: (
+                "чтение рейтингов",
+                "Это отказ чтения, а не отсутствие рейтингов",
             ),
             KIND_RETRACTION: (
                 "снятие проверки",
@@ -444,6 +469,7 @@ def handle(
     may_retract: bool = False,
     imports: Store | None = None,
     actor: str = "",
+    role: str | None = None,
 ) -> dict[str, Any] | None:
     """Разобранное сообщение JSON-RPC → ответ. `None` — уведомление, ответа нет.
 
@@ -452,6 +478,10 @@ def handle(
     хранилище версий методики, только если она открыта этому арендатору, а
     `None` по умолчанию означает, что до задачи T098 сервер отвечал только на
     вопросы о проверках, и таким он и остаётся, пока методику не открыли явно.
+
+    `role` — роль учётки сайта у входа через OAuth (D417, `policy.py`): при
+    ней `tools/list` показывает только открытые роли инструменты, а вызов
+    закрытого получает отказ. `None` — прежние двери, каталог целиком.
     """
     if not isinstance(message, dict):
         return _error(None, CODE_INVALID_REQUEST, "Ожидается объект JSON-RPC 2.0")
@@ -487,7 +517,8 @@ def handle(
     if method == "ping":
         return _result(request_id, {})
     if method == "tools/list":
-        return _result(request_id, {"tools": as_list()})
+        открыто = None if role is None else (lambda kind: permits(role, tenant, kind))
+        return _result(request_id, {"tools": as_list(открыто)})
     if method == "tools/call":
         outcome = _call_tool(
             params,
@@ -497,6 +528,7 @@ def handle(
             may_retract=may_retract,
             imports=imports,
             actor=actor,
+            role=role,
         )
         if isinstance(outcome, str):
             return _error(request_id, CODE_INVALID_PARAMS, outcome)

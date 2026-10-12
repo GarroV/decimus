@@ -24,7 +24,16 @@ from src.db import bot_links
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import access_policy, accounts, auth, partner_spaces, people, profile, users_mcp
+from . import (
+    access_policy,
+    accounts,
+    auth,
+    partner_spaces,
+    people,
+    profile,
+    users_claude,
+    users_mcp,
+)
 from .access_policy import Scope
 from .config import WEB_BOT_USERNAME_VAR
 from .db_refusal import note_target_mismatch
@@ -229,6 +238,10 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
             grantable=lambda s: access_policy.grantable_roles(круг, s) if круг else (),
             own_binding=своя_привязка,
             own_binding_known=своя_известна,
+            claude=users_claude.claude_connect(
+                getattr(auth.current_account(), "id", None),
+                current_app.config.get(users_claude.MCP_URL_KEY),
+            ),
             mcp=users_mcp.card_status(
                 круг_видит=круг is not None and круг.kind in SEES_BINDINGS,
                 own=своя_привязка,
@@ -289,6 +302,7 @@ def _space_context(
         "partner_spaces": пространства,
         "partner_spaces_known": известны,
         "manages_spaces": круг is not None and access_policy.manages_spaces(круг),
+        "has_connections_tab": круг is not None and круг.kind == access_policy.SUPER,
         "space_pick": _space_pick(show, пространства),
         "space_add": вкладка == TAB_SPACES
         and (show.add_space or request.args.get("add_space") == "1"),

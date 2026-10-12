@@ -31,6 +31,7 @@ from .config import check_environment
 from .directory import resolve_unit_id
 from .errors import PushError, UnitRefusedError, VersionMismatchError
 from .fingerprint import compute_fingerprint, previous_fingerprints
+from .pool import connection
 from .units import normalize_unit_name
 
 #: Арендатор по умолчанию, пока в проверке своего не задано. Совпадает со
@@ -486,7 +487,7 @@ def push_inspection(chat_id: int, *, allow_unknown_version: bool = False) -> str
                 f"push_inspection(chat_id, allow_unknown_version=True)"
             )
         result = domain_score(chat_id)
-        with psycopg.connect(settings.dsn) as conn:
+        with connection(settings.dsn) as conn:
             return _push(conn, inspection, result)
     except PushError:
         raise
