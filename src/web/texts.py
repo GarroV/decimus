@@ -23,6 +23,7 @@ from collections.abc import Mapping
 
 from .errors import WebTextError
 from .texts_home import HOME_TEXTS
+from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
 from .texts_ratings import RATINGS_TEXTS
@@ -1606,6 +1607,7 @@ TEXTS: dict[str, dict[str, str]] = {
 # рейтинги (спека 2026-10-08) — так же.
 _ЧАСТИ = (
     TEXTS,
+    OAUTH_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     RATINGS_TEXTS,
@@ -1626,6 +1628,7 @@ if _ПЕРЕСЕЧЕНИЕ:
 TEXTS = {
     **TEXTS,
     **HOME_TEXTS,
+    **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
     **RATINGS_TEXTS,
