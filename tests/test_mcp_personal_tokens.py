@@ -27,7 +27,7 @@ import logging
 
 import pytest
 from conftest import requires_db
-from db_harness import завести_пространства
+from db_harness import привязать_бота
 
 from src.mcp.config import (
     MCP_RETRACTION_TOKENS_VAR,
@@ -58,19 +58,27 @@ def _пространства(request: pytest.FixtureRequest) -> None:
     базы её не получает.
     """
     if "db_env" in request.fixturenames:
-        завести_пространства(request.getfixturevalue("pg_dsn"), АРЕНДАТОР_ЧЕЛОВЕКА)
+        request.getfixturevalue("db_env")  # учётку заводит дверь базы: ей нужна база
+        # Токен выпускается только на учётку сайта с привязанным ботом (аудит 12.10).
+        привязать_бота(
+            request.getfixturevalue("pg_dsn"),
+            request.getfixturevalue("monkeypatch"),
+            ЧЕЛОВЕК,
+            tenant=АРЕНДАТОР_ЧЕЛОВЕКА,
+            role="auditor",
+        )
 
 
 def _настройки(**env: str) -> Settings:
     return load_settings({MCP_TOKENS_VAR: f"{АРЕНДАТОР_СТОРОНЫ}={ТОКЕН_СТОРОНЫ}", **env})
 
 
-def _выпустить(кому: int = ЧЕЛОВЕК, арендатор: str = АРЕНДАТОР_ЧЕЛОВЕКА) -> str:
+def _выпустить(кому: int = ЧЕЛОВЕК) -> str:
     """Привести человека в круг и выпустить ему токен — как это делает бот."""
     from src.db.mcp_access import add_admin, issue_token
 
-    add_admin(кому, by=None)
-    return issue_token(кому, tenant=арендатор).value
+    add_admin(кому, by=None, within=None)
+    return issue_token(кому).value
 
 
 # --- вторая дверь ------------------------------------------------------------
@@ -114,7 +122,7 @@ def test_отозванный_личный_токен_не_опознаётся(
     from src.db.mcp_access import revoke_access
 
     личный = _выпустить()
-    revoke_access(ЧЕЛОВЕК, by=ЧЕЛОВЕК)
+    revoke_access(ЧЕЛОВЕК, by=ЧЕЛОВЕК, within=None)
 
     with pytest.raises(AuthError):
         resolve_access(_настройки(), f"Bearer {личный}")
@@ -209,3 +217,22 @@ def test_недоступная_база_не_выдаётся_за_незнак
     assert any(запись.levelno >= logging.WARNING for запись in caplog.records), (
         "о недоступном списке доступа сказано тише предупреждения"
     )
+
+
+# --- срок личного токена (аудит 12.10, F-035) ---------------------------------
+
+
+def test_срок_токена_по_умолчанию_и_из_окружения() -> None:
+    from src.db.mcp_access import TOKEN_TTL_DEFAULT_DAYS, TOKEN_TTL_VAR, token_ttl_days
+
+    assert token_ttl_days({}) == TOKEN_TTL_DEFAULT_DAYS == 30
+    assert token_ttl_days({TOKEN_TTL_VAR: " 7 "}) == 7
+
+
+@pytest.mark.parametrize("значение", ["0", "366", "abc", "-5", "1.5"])
+def test_негодный_срок_токена_это_отказ_а_не_умолчание(значение: str) -> None:
+    from src.db.errors import AccessError
+    from src.db.mcp_access import TOKEN_TTL_VAR, token_ttl_days
+
+    with pytest.raises(AccessError, match=TOKEN_TTL_VAR):
+        token_ttl_days({TOKEN_TTL_VAR: значение})

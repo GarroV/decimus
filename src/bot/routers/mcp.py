@@ -36,10 +36,14 @@
 следствием собственного действия.
 
 **Круг.** Пункт есть в меню не у всех (D099): меню телеграм объявляет на
-аккаунт, поэтому состав объявляется разный (`app.announce_commands`). Круг
-плоский — у всех в нём одинаковые возможности: выпустить себе токен, привести
-следующего, отозвать поимённо. Системы прав здесь нет намеренно: это отдельная
-работа, а не то, что тихо заводится вместе с первой таблицей.
+аккаунт, поэтому состав объявляется разный (`app.announce_commands`). Внутри
+пространства у всех в круге одинаковые возможности: выпустить себе токен,
+привести следующего, отозвать поимённо. Между пространствами круг поделён
+(аудит 12.10, F-036): участник из пространства партнёра видит, приводит и
+отзывает только людей своего пространства, участник из УК — всех
+(`mcp_access.in_scope`). Привести можно только человека с ботом, привязанным к
+учётке: токен выпускается на учётку, и права в Claude решает её роль
+(`src/mcp/policy.py`), а срок токена — `MCP_TOKEN_TTL_DAYS`.
 
 **Основатель круга приходит из настройки стенда** и потому отзыву в чате не
 поддаётся: отозванный, он вернулся бы при следующем подъёме бота, и отзыв
@@ -56,7 +60,7 @@ from aiogram import Bot, F, Router
 from aiogram.filters import Command, CommandObject
 from aiogram.types import CallbackQuery, Message, User
 
-from src.db.errors import DbError
+from src.db.errors import DbError, OutOfScopeError, UnboundError
 
 from ..config import BotSettings
 from ..keyboards import MCP_SETUP_SEND, mcp_setup_keyboard
@@ -116,7 +120,7 @@ async def _in_circle(user_id: int, settings: BotSettings) -> bool:
 
     if settings.mcp_owner_id is not None and user_id == settings.mcp_owner_id:
         # Идемпотентно: живого участника не трогает, отозванного возвращает.
-        await asyncio.to_thread(add_admin, user_id, by=None)
+        await asyncio.to_thread(add_admin, user_id, by=None, within=None)
         return True
     return bool(await asyncio.to_thread(is_admin, user_id))
 
@@ -252,7 +256,11 @@ def build_mcp_router(settings: BotSettings) -> Router:
         from src.db.mcp_access import issue_token
 
         try:
-            выпущен = await asyncio.to_thread(issue_token, user.id, tenant=space)
+            выпущен = await asyncio.to_thread(issue_token, user.id)
+        except UnboundError:
+            # Токен выпускается только на учётку сайта (аудит 12.10).
+            await message.answer(t("mcp.unbound_self", lang))
+            return
         except DbError:
             # В журнал — разбор, человеку — что делать. Значения токена нет ни
             # там, ни там: выпуск до него не дошёл.
@@ -260,13 +268,15 @@ def build_mcp_router(settings: BotSettings) -> Router:
             await message.answer(t("mcp.unavailable", lang))
             return
         await message.answer(t("mcp.setup", lang))
+        # Срок — до команды: после неё человек читает только «перезапустите».
+        await message.answer(t("mcp.expires", lang, date=выпущен.expires_at.date().isoformat()))
         await message.answer(setup_command(url=setup_url(lang), token=выпущен.value))
         await message.answer(t("mcp.code_restart", lang))
         if выпущен.replaced_previous:
             await message.answer(t("mcp.replaced", lang))
 
     @router.message(Command(MCP_ADD_COMMAND))
-    async def on_add(message: Message, command: CommandObject) -> None:
+    async def on_add(message: Message, command: CommandObject, space: str) -> None:
         """Привести следующего в круг: каждый, кто внутри, может позвать ещё одного.
 
         Токен приведённому здесь не выпускается и не показывается — он выпустит
@@ -286,15 +296,18 @@ def build_mcp_router(settings: BotSettings) -> Router:
                 else t("mcp.add_usage", lang)
             )
             return
-        if кому not in settings.allowed_ids:
-            # Доступ, выданный тому, кого мидлварь до бота не пускает, — это
-            # запись в базе и ничего больше. Отказ здесь честнее.
-            await message.answer(t("mcp.add_not_allowed", lang, who=кому))
-            return
         from src.db.mcp_access import add_admin
 
         try:
-            добавлен = await asyncio.to_thread(add_admin, кому, by=user.id)
+            # Охват — пространство приводящего (F-036); у цели обязана быть
+            # живая привязка бота к учётке в этом охвате.
+            добавлен = await asyncio.to_thread(add_admin, кому, by=user.id, within=space)
+        except UnboundError:
+            await message.answer(t("mcp.add_not_allowed", lang, who=кому))
+            return
+        except OutOfScopeError:
+            await message.answer(t("mcp.not_in_space", lang, who=кому))
+            return
         except DbError:
             logger.exception("не удалось привести %s в круг доступа к MCP", кому)
             await message.answer(t("mcp.unavailable", lang))
@@ -306,7 +319,7 @@ def build_mcp_router(settings: BotSettings) -> Router:
         await message.answer(t("mcp.added", lang, who=кому))
 
     @router.message(Command(MCP_REVOKE_COMMAND))
-    async def on_revoke(message: Message, command: CommandObject) -> None:
+    async def on_revoke(message: Message, command: CommandObject, space: str) -> None:
         """Отзыв поимённый и немедленный: и круг, и живые токены разом.
 
         Одним движением, а не двумя, и это не сокращение: отзыв одного токена
@@ -334,7 +347,10 @@ def build_mcp_router(settings: BotSettings) -> Router:
         from src.db.mcp_access import revoke_access
 
         try:
-            отзыв = await asyncio.to_thread(revoke_access, у_кого, by=user.id)
+            отзыв = await asyncio.to_thread(revoke_access, у_кого, by=user.id, within=space)
+        except OutOfScopeError:
+            await message.answer(t("mcp.not_in_space", lang, who=у_кого))
+            return
         except DbError:
             logger.exception("не удалось отозвать доступ к MCP у %s", у_кого)
             await message.answer(t("mcp.unavailable", lang))
@@ -346,7 +362,7 @@ def build_mcp_router(settings: BotSettings) -> Router:
         await message.answer(t("mcp.revoked", lang, who=у_кого, tokens=отзыв.tokens_revoked))
 
     @router.message(Command(MCP_WHO_COMMAND))
-    async def on_who(message: Message) -> None:
+    async def on_who(message: Message, space: str) -> None:
         """След: кто в круге, кто кого привёл, у кого выпущен токен, кто отозван.
 
         Ради этого след и заведён: что доступ остаётся ровно у тех, кого
@@ -359,7 +375,8 @@ def build_mcp_router(settings: BotSettings) -> Router:
         from src.db.mcp_access import list_admins
 
         try:
-            круг = await asyncio.to_thread(list_admins)
+            # Партнёру — только люди его пространства (F-036).
+            круг = await asyncio.to_thread(lambda: list_admins(within=space))
         except DbError:
             logger.exception("не удалось прочитать круг доступа к MCP")
             await message.answer(t("mcp.unavailable", lang))

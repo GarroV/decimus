@@ -337,3 +337,36 @@ def пространства_для_теста(request: pytest.FixtureRequest, *
     """
     if "db_env" in request.fixturenames:
         привязать_пространства(request.getfixturevalue("pg_dsn"), *tenants)
+
+
+def привязать_бота(
+    pg_dsn: str,
+    monkeypatch: pytest.MonkeyPatch,
+    telegram_id: int,
+    *,
+    tenant: str = "HQ",
+    role: str = "auditor",
+    login: str | None = None,
+) -> str:
+    """Завести учётку сайта и живую привязку бота к ней; вернуть `web_users.id`.
+
+    Личный токен MCP и место в круге выдаются только на учётку (аудит 12.10):
+    тесту, которому нужен токен, нужна и учётка с привязанным Telegram ID.
+    Учётку заводит `create_account` (роль владельца схемы), привязку — прямая
+    вставка под `pg_dsn`: одноразовая ссылка здесь не предмет проверки.
+    """
+    import psycopg
+
+    from src.db.web_access import create_account
+
+    monkeypatch.setenv("DATABASE_ADMIN_URL", pg_dsn)
+    завести_пространства(pg_dsn, tenant)
+    учётка = create_account(
+        login or f"tg-{telegram_id}", tenant=tenant, password="пароль-учётки-теста", role=role
+    )
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "insert into bot_bindings (telegram_id, user_id) values (%s, %s)",
+            (telegram_id, учётка.id),
+        )
+    return учётка.id

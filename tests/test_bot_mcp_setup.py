@@ -47,6 +47,7 @@ from bot_harness import (
     text_message,
 )
 from conftest import requires_db
+from db_harness import привязать_бота
 
 from src.bot.app import (
     MCP_MENU_COMMANDS,
@@ -107,6 +108,24 @@ SETTINGS_NO_CIRCLE = BotSettings(
     auditor_names={},
     mcp_owner_id=None,
 )
+
+
+@pytest.fixture(autouse=True)
+def _учётки(request: pytest.FixtureRequest) -> None:
+    """Учётки сайта с привязанным ботом у своих людей стенда (аудит 12.10).
+
+    Личный токен выпускается только на учётку: без привязки бот по-прежнему
+    пускает сотрудника УК по списку окружения (D290), но токена ему не выдаёт.
+    Фикстура с условием: тест без базы её не получает.
+    """
+    if "db_env" not in request.fixturenames:
+        return
+    request.getfixturevalue("db_env")  # учётку заводит дверь базы: ей нужна база
+    pg_dsn = request.getfixturevalue("pg_dsn")
+    monkeypatch = request.getfixturevalue("monkeypatch")
+    for кто, роль in ((AUDITOR_ID, "admin"), (SECOND_ID, "auditor"), (OUTSIDER_ID, "auditor")):
+        привязать_бота(pg_dsn, monkeypatch, кто, tenant="HQ", role=роль)
+
 
 #: Токен из напечатанной команды. Ищется ровно там, где стоит, а не
 #: «где-нибудь в тексте»: сверять надо то, что человек вставит в терминал.

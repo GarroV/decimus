@@ -274,6 +274,7 @@
 | `MCP_PUBLIC_URL` | `src/domain/public_urls.py`, `tools/mcp_watch.py`, `tools/oauth_smoke.py` | да |
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
+| `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
 | `MIGROS_RELAY_URL` | `src/ratings/aggregators/migros.py` | да |
 | `OAUTH_SMOKE_PASSWORD` | `tools/oauth_smoke.py` | да |
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
@@ -371,6 +372,7 @@
 | `0053_agg_requests.sql` | `agg.requests` |
 | `0054_oauth.sql` | `oauth_clients`, `oauth_grants`, `oauth_codes`, `oauth_tokens` |
 | `0055_maps_ratings_index.sql` | — |
+| `0056_mcp_token_identity.sql` | — |
 <!-- map:end -->
 
 ## Makefile

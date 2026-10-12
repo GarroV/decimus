@@ -417,7 +417,8 @@ def _install_mcp(app: Flask, users_path: str) -> None:
             if найдено is None:
                 return forbidden()
             цель, его, мой = найдено
-            mcp_access.add_admin(его, by=мой)
+            # Охват уже решён `access_policy.visible` (цель видна вошедшему).
+            mcp_access.add_admin(его, by=мой, within=None)
         except DbError as exc:
             note_target_mismatch(exc)
             return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
@@ -436,7 +437,7 @@ def _install_mcp(app: Flask, users_path: str) -> None:
                 return render(
                     Show(person=цель.id, flash=_flash("users.mcp.founder", ok=False)), 400
                 )
-            отзыв = mcp_access.revoke_access(его, by=мой)
+            отзыв = mcp_access.revoke_access(его, by=мой, within=None)
         except DbError as exc:
             note_target_mismatch(exc)
             return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)

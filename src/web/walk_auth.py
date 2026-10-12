@@ -38,6 +38,12 @@ from src.domain.walk_users import parse_walk_users
 #: обход длится час-два; шесть часов — с запасом на свёрнутое окно, и при
 #: этом утёкшая строка не живёт до завтра.
 MAX_AGE_SECONDS = 6 * 60 * 60
+#: Сколько живёт подпись для действий, которые выдают или меняют ДОСТУП:
+#: выпуск токена Claude и правка круга (аудит 12.10, F-032). Шесть часов здесь
+#: означали бы, что строка, утёкшая из журнала прокси или с экрана, шесть часов
+#: выпускает токены. Пять минут хватает: человек жмёт кнопку сразу после
+#: открытия, а задержавшемуся мини-апп предлагает открыть себя заново.
+MINT_MAX_AGE_SECONDS = 5 * 60
 
 TOKEN_VAR = "TELEGRAM_BOT_TOKEN"  # noqa: S105 — имя переменной, а не токен
 PREVIEW_VAR = "WEB_WALK_PREVIEW_CHAT"
@@ -164,7 +170,13 @@ def load_walk_settings(env: Mapping[str, str] | None = None) -> WalkSettings:
     )
 
 
-def chat_of(init_data: str, settings: WalkSettings, *, now: float | None = None) -> int:
+def chat_of(
+    init_data: str,
+    settings: WalkSettings,
+    *,
+    now: float | None = None,
+    max_age: int = MAX_AGE_SECONDS,
+) -> int:
     """Чат, чью проверку показывать: номер пользователя из подписанной строки.
 
     Мини-апп открывается из личного чата с ботом, а там номер чата равен
@@ -172,7 +184,7 @@ def chat_of(init_data: str, settings: WalkSettings, *, now: float | None = None)
     """
     if not init_data and settings.preview_chat is not None:
         return settings.preview_chat
-    return int(_signed_user(init_data, settings, now=now).id)
+    return int(_signed_user(init_data, settings, now=now, max_age=max_age).id)
 
 
 def full_name_of(init_data: str, settings: WalkSettings) -> str:
@@ -187,7 +199,13 @@ def full_name_of(init_data: str, settings: WalkSettings) -> str:
     return " ".join(part for part in (user.first_name, user.last_name) if part)
 
 
-def _signed_user(init_data: str, settings: WalkSettings, *, now: float | None = None) -> Any:
+def _signed_user(
+    init_data: str,
+    settings: WalkSettings,
+    *,
+    now: float | None = None,
+    max_age: int = MAX_AGE_SECONDS,
+) -> Any:
     """Пользователь из строки с проверенной подписью и свежестью."""
     if not init_data:
         raise WalkAccessError("нет initData")
@@ -198,7 +216,7 @@ def _signed_user(init_data: str, settings: WalkSettings, *, now: float | None = 
     except ValueError as exc:
         raise WalkAccessError("подпись initData не сошлась") from exc
     moment = time.time() if now is None else now
-    if moment - data.auth_date.timestamp() > MAX_AGE_SECONDS:
+    if moment - data.auth_date.timestamp() > max_age:
         raise WalkAccessError("подпись initData устарела")
     if data.user is None:
         raise WalkAccessError("в initData нет пользователя")

@@ -33,18 +33,21 @@ MCP его сверяет, и общее место у них ровно одн�
 from __future__ import annotations
 
 import hashlib
+import os
 import secrets
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any
 
 import psycopg
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
+
 from .config import check_environment
-from .errors import AccessError
+from .errors import AccessError, OutOfScopeError, UnboundError
 from .pool import connection
-from .space_guard import require_space
 
 #: Сколько случайных байт в токене. 32 байта → 43 знака `token_urlsafe`, то
 #: есть заведомо длиннее нижней границы, которую сервер требует от токенов из
@@ -58,18 +61,55 @@ TOKEN_BYTES = 32
 #: обязана быть видна на месте, а не отказом внешнего ограничения.
 FINGERPRINT_LENGTH = 64
 
+#: Срок личного токена в днях — переменная окружения и её умолчание (аудит
+#: 12.10, F-035). Месяц: настройка Claude делается раз, а утёкший токен не
+#: живёт вечно. Перевыпуск — та же кнопка `/mcp` или пункт мини-аппа.
+TOKEN_TTL_VAR = "MCP_TOKEN_TTL_DAYS"  # noqa: S105 — имя переменной, а не токен
+TOKEN_TTL_DEFAULT_DAYS = 30
+#: Предел срока: год. Больше — это снова «вечный токен», только записанный цифрой.
+TOKEN_TTL_MAX_DAYS = 365
+
+#: Годен ли токен `t` с учёткой `u` прямо сейчас — ОДНО условие на сверку
+#: токена сервером MCP и на отметку «токен на руках» в круге: две копии
+#: разошлись бы молча (аудит 12.10, F-023/F-035). Не отозван и не истёк; учётка
+#: не отключена; её роль и пространство те же, что при выпуске (смена роли
+#: гасит токен до перевыпуска); привязка бота, по которой токен выпущен, жива.
+_LIVE_ISSUE_SQL = """
+t.revoked_at is null
+   and t.expires_at > now()
+   and u.disabled_at is null
+   and u.role = t.role
+   and u.tenant_code = t.tenant_code
+   and exists (select 1 from bot_bindings b
+                where b.user_id = u.id and b.telegram_id = t.telegram_id
+                  and b.unbound_at is null)
+"""
+
 _SELECT_LIVE_ADMIN_SQL = """
 select 1 from mcp_admins where telegram_id = %s and revoked_at is null
 """
 
 #: Круг целиком, включая отозванных: это и есть след «кто кого привёл и кто
-#: отнял». Отозванные идут последними, живые — по времени привода.
-_SELECT_ADMINS_SQL = """
-select telegram_id, added_by, added_at, revoked_at, revoked_by,
-       exists (select 1 from mcp_tokens t
-               where t.telegram_id = a.telegram_id and t.revoked_at is null) as has_token
+#: отнял». Отозванные идут последними, живые — по времени привода. Вместе со
+#: строкой — пространство учётки, к которой Telegram ID привязан сейчас
+#: (`space`): по нему круг делится между пространствами (`in_scope`). Живой
+#: токен — тот, что годен прямо сейчас: не отозван и не истёк.
+_SELECT_ADMINS_SQL = f"""
+select a.telegram_id, a.added_by, a.added_at, a.revoked_at, a.revoked_by,
+       exists (select 1 from mcp_tokens t join web_users u on u.id = t.user_id
+               where t.telegram_id = a.telegram_id and {_LIVE_ISSUE_SQL}) as has_token,
+       (select u.tenant_code from bot_bindings b join web_users u on u.id = b.user_id
+         where b.telegram_id = a.telegram_id and b.unbound_at is null
+           and u.disabled_at is null) as space
 from mcp_admins a
-order by (revoked_at is not null), added_at, telegram_id
+order by (a.revoked_at is not null), a.added_at, a.telegram_id
+"""  # noqa: S608 — в склейке только условие модуля, данные идут параметрами
+
+#: Пространство учётки, к которой Telegram ID привязан сейчас. Нет живой
+#: привязки к неотключённой учётке — строки нет.
+_SPACE_OF_SQL = """
+select u.tenant_code from bot_bindings b join web_users u on u.id = b.user_id
+ where b.telegram_id = %s and b.unbound_at is null and u.disabled_at is null
 """
 
 #: Привод в круг. Повторный привод того же человека — не ошибка, а
@@ -98,21 +138,33 @@ where telegram_id = %(who)s and revoked_at is null
 #: константы и считает строку зашитым секретом (S105). Спорить с ним
 #: подавлением здесь не за что — запрос вставляет ОТПЕЧАТОК, и «issued»
 #: описывает происходящее точнее, чем подавленное предупреждение.
+#:
+#: Учётка, её пространство и роль берутся из живой привязки бота в ТОМ ЖЕ
+#: запросе, а не от вызывающего: пространство, названное снаружи, — это не
+#: граница, а её отсутствие. Нет живой привязки к неотключённой учётке — строки
+#: нет, и выпуск отказывает.
 _INSERT_ISSUED_SQL = """
-insert into mcp_tokens (telegram_id, tenant_code, fingerprint)
-values (%(who)s, %(tenant)s, %(fingerprint)s)
-returning id
+insert into mcp_tokens (telegram_id, tenant_code, fingerprint, user_id, role, expires_at)
+select %(who)s, u.tenant_code, %(fingerprint)s, u.id, u.role,
+       now() + make_interval(days => %(days)s)
+  from bot_bindings b join web_users u on u.id = b.user_id
+ where b.telegram_id = %(who)s and b.unbound_at is null and u.disabled_at is null
+returning tenant_code, role, expires_at
 """
 
 #: Сверка предъявленного токена. Идёт по отпечатку и только среди ЖИВЫХ:
 #: отозванный токен не «находится и отклоняется», а не находится вовсе —
 #: отдельной ветки «нашли, но он отозван» здесь нет намеренно, потому что
 #: ветка, которую забыли, и есть способ, которым отзыв перестаёт работать.
-_RESOLVE_FINGERPRINT_SQL = """
-select telegram_id, tenant_code
-from mcp_tokens
-where fingerprint = %s and revoked_at is null
-"""
+#:
+#: Живой — это всё сразу и в одном запросе (`_LIVE_ISSUE_SQL`). Роль уходит
+#: наверх — права в Claude решает она (`src/mcp/policy.py`).
+_RESOLVE_FINGERPRINT_SQL = f"""
+select t.telegram_id, u.tenant_code, u.role, u.login
+  from mcp_tokens t
+  join web_users u on u.id = t.user_id
+ where t.fingerprint = %s and {_LIVE_ISSUE_SQL}
+"""  # noqa: S608 — в склейке только условие модуля
 
 
 @dataclass(frozen=True)
@@ -131,6 +183,10 @@ class IssuedToken:
 
     value: str = field(repr=False)
     tenant: str
+    #: Роль учётки, с которой выпущен: права в Claude решает она (D417, D420).
+    role: str
+    #: До какого момента токен годен (`MCP_TOKEN_TTL_DAYS`).
+    expires_at: datetime
     #: Отозван ли при этом выпуске прежний токен того же человека. Нужен не
     #: для отчётности: человеку об этом говорится прямо в ответе, иначе он не
     #: поймёт, почему перестала работать настройка, сделанная в прошлый раз.
@@ -147,6 +203,10 @@ class TokenOwner:
 
     telegram_id: int
     tenant: str
+    #: Роль учётки сайта прямо сейчас — права в Claude решает она (`src/mcp/policy.py`).
+    role: str
+    #: Логин учётки — подпись для журнала, не секрет.
+    login: str
 
 
 @dataclass(frozen=True)
@@ -162,6 +222,9 @@ class AdminRow:
     #: которого след и заведён: доступ должен быть ровно у тех, кого назначил
     #: владелец (D098) — а это не то же самое, что просто состоять в круге.
     has_live_token: bool
+    #: Пространство учётки, к которой Telegram ID привязан сейчас; `None` —
+    #: живой привязки нет. По нему круг делится между пространствами (`in_scope`).
+    space: str | None = None
 
     @property
     def is_live(self) -> bool:
@@ -249,12 +312,36 @@ def is_admin(telegram_id: int) -> bool:
         return cur.fetchone() is not None
 
 
-def list_admins() -> list[AdminRow]:
-    """Круг целиком со следом: кто кого привёл, у кого живой токен, кто отозван."""
+def in_scope(within: str | None, space: str | None) -> bool:
+    """Виден ли и трогаем ли участник круга с пространством `space` из пространства `within`.
+
+    Одно правило на перечень, привод и отзыв (аудит 12.10, F-036): до него круг
+    был плоским, и участник из пространства партнёра видел Telegram ID людей УК
+    и отзывал их доступ. Теперь:
+
+    * `within` = УК — весь круг: в УК сидят те, кто ведёт пространства партнёров
+      (D364), и основатель круга;
+    * `within` = пространство партнёра — только люди, привязанные к учёткам
+      этого же пространства (D362, D429: партнёр ведёт своих). Участник без живой
+      привязки партнёру не виден: чей он, не известно;
+    * `None` — без ограничения. Только для двух вызывающих, у которых охват
+      решён раньше: возврат основателя из настройки и экран «Пользователи», где
+      цель уже прошла `access_policy.visible`.
+    """
+    if within is None:
+        return True
+    своё = canonical_tenant(within)
+    if своё == HQ_TENANT:
+        return True
+    return space is not None and canonical_tenant(space) == своё
+
+
+def list_admins(*, within: str | None) -> list[AdminRow]:
+    """Круг со следом — в охвате `within` (`in_scope`): кто кого привёл, у кого живой токен."""
     with _connected("прочитать круг доступа") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_ADMINS_SQL)
         rows = cur.fetchall()
-    return [
+    строки = [
         AdminRow(
             telegram_id=int(row[0]),
             added_by=None if row[1] is None else int(row[1]),
@@ -262,12 +349,43 @@ def list_admins() -> list[AdminRow]:
             revoked_at=None if row[3] is None else str(row[3]),
             revoked_by=None if row[4] is None else int(row[4]),
             has_live_token=bool(row[5]),
+            space=None if row[6] is None else str(row[6]),
         )
         for row in rows
     ]
+    return [строка for строка in строки if in_scope(within, строка.space)]
 
 
-def add_admin(telegram_id: int, *, by: int | None) -> bool:
+def _space_of(cur: psycopg.Cursor[Any], telegram_id: int) -> str | None:
+    cur.execute(_SPACE_OF_SQL, (telegram_id,))
+    row = cur.fetchone()
+    return None if row is None else str(row[0])
+
+
+def _require_scope(
+    cur: psycopg.Cursor[Any], telegram_id: int, within: str | None, *, bound: bool
+) -> None:
+    """Отказ, если цель вне охвата; `bound` — цель обязана иметь живую привязку.
+
+    Сверка в той же транзакции, что и правка: охват, проверенный заранее,
+    разошёлся бы с отвязкой, случившейся между «спросили» и «записали».
+    """
+    if within is None and not bound:
+        return
+    space = _space_of(cur, telegram_id)
+    # Охват — первым: участнику круга партнёра «нет привязки» и «привязан в
+    # чужом пространстве» отвечают одинаково, иначе отказ выдавал бы, числится
+    # ли чужой ID где-то ещё.
+    if not in_scope(within, space):
+        raise OutOfScopeError("Этот человек не из вашего пространства")
+    if bound and space is None:
+        raise UnboundError(
+            "У этого человека нет живой привязки бота к учётке: доступ к Claude "
+            "выдаётся только на учётку сайта"
+        )
+
+
+def add_admin(telegram_id: int, *, by: int | None, within: str | None) -> bool:
     """Привести человека в круг. Возвращает, изменилось ли что-нибудь.
 
     `by` — кто привёл; `None` только у основателя круга, которого называет
@@ -277,13 +395,19 @@ def add_admin(telegram_id: int, *, by: int | None) -> bool:
     Ложь в ответе означает «он и так был в круге» — не отказ: привести уже
     приведённого не ошибка, и переписывать при этом, кто и когда его привёл,
     нельзя, иначе след теряет первого приводившего.
+
+    `within` — пространство приводящего (`in_scope`). Заданное, оно требует от
+    цели живой привязки бота к учётке в охвате: токен выпускается только на
+    учётку сайта, и привод человека без неё — запись, которая ничего не даёт.
+    Без привязки — `UnboundError`, вне охвата — `OutOfScopeError` (F-036).
     """
     with _connected("привести человека в круг доступа") as conn, conn.cursor() as cur:
+        _require_scope(cur, telegram_id, within, bound=within is not None)
         cur.execute(_ADD_ADMIN_SQL, {"who": telegram_id, "by": by})
         return cur.rowcount > 0
 
 
-def revoke_access(telegram_id: int, *, by: int) -> Revocation:
+def revoke_access(telegram_id: int, *, by: int, within: str | None) -> Revocation:
     """Отозвать доступ поимённо и немедленно: и круг, и живые токены.
 
     **Одним движением, а не двумя.** Отзыв только токена не отзывает ничего:
@@ -296,8 +420,12 @@ def revoke_access(telegram_id: int, *, by: int) -> Revocation:
     Немедленность держится не расторопностью, а тем, что нигде нет копии: и
     бот, и сервер MCP спрашивают базу на каждое обращение, а перезапуск не
     участвует ни в одной из двух проверок.
+
+    `within` — пространство отзывающего (`in_scope`): партнёр отзывает только
+    людей своего пространства, УК — любого (F-036). Вне охвата — `OutOfScopeError`.
     """
     with _connected("отозвать доступ") as conn, conn.cursor() as cur:
+        _require_scope(cur, telegram_id, within, bound=False)
         cur.execute(_REVOKE_ADMIN_SQL, {"who": telegram_id, "by": by})
         was_admin = cur.rowcount > 0
         cur.execute(_REVOKE_TOKENS_SQL, {"who": telegram_id, "by": by})
@@ -305,22 +433,39 @@ def revoke_access(telegram_id: int, *, by: int) -> Revocation:
     return Revocation(telegram_id=telegram_id, was_admin=was_admin, tokens_revoked=max(tokens, 0))
 
 
-def issue_token(telegram_id: int, *, tenant: str) -> IssuedToken:
+def token_ttl_days(env: Mapping[str, str] | None = None) -> int:
+    """Срок личного токена в днях из `MCP_TOKEN_TTL_DAYS`; пусто — 30.
+
+    Негодное значение — отказ выпуска, а не тихое умолчание: срок, который
+    человек задал и который молча не применился, хуже отказа.
+    """
+    сырое = ((os.environ if env is None else env).get(TOKEN_TTL_VAR) or "").strip()
+    if not сырое:
+        return TOKEN_TTL_DEFAULT_DAYS
+    if not сырое.isdigit() or not 1 <= int(сырое) <= TOKEN_TTL_MAX_DAYS:
+        raise AccessError(
+            f"{TOKEN_TTL_VAR}: ожидается целое число дней от 1 до {TOKEN_TTL_MAX_DAYS}"
+        )
+    return int(сырое)
+
+
+def issue_token(telegram_id: int) -> IssuedToken:
     """Выпустить человеку личный токен, погасив прежний. Значение — только здесь.
+
+    **Токен выпускается на учётку сайта** (аудит 12.10, F-017/F-022): учётка,
+    её пространство и роль берутся из живой привязки бота этого Telegram ID в
+    том же запросе, что и вставка. Нет живой привязки к неотключённой учётке —
+    `UnboundError`. Срок — `MCP_TOKEN_TTL_DAYS` (по умолчанию 30 дней).
 
     **Круг проверяется в той же транзакции, что и выпуск**, а не заранее
     вызывающим. Проверка снаружи оставила бы щель между «спросили» и
     «выпустили»: отзыв, случившийся в этот промежуток, не помешал бы выдать
     токен — и отозванный человек получил бы работающий доступ ПОСЛЕ отзыва.
-    Щель узкая, но закрывается она даром, а «немедленно» из требования иначе
-    перестаёт быть правдой.
 
-    **Прежний токен гасится здесь же.** Не из аккуратности: у человека живым
-    может быть ровно один токен, и держит это частичный уникальный индекс
-    (миграция `0011`). Забытое погашение стало бы отказом записи, а не тихо
-    накопленной пачкой живых токенов, — но лучше не доводить: повторный вызов
-    обязан работать, а не отказывать.
+    **Прежний токен гасится здесь же.** У человека живым может быть ровно один
+    токен, и держит это частичный уникальный индекс (миграция `0011`).
     """
+    дней = token_ttl_days()
     token = new_token()
     with _connected("выпустить токен доступа") as conn, conn.cursor() as cur:
         cur.execute(_SELECT_LIVE_ADMIN_SQL, (telegram_id,))
@@ -331,15 +476,24 @@ def issue_token(telegram_id: int, *, tenant: str) -> IssuedToken:
             )
         cur.execute(_REVOKE_TOKENS_SQL, {"who": telegram_id, "by": telegram_id})
         replaced = cur.rowcount > 0
-        # Пространство не заводится выпуском токена: незаведённое — отказ (#481).
-        require_space(cur, tenant, error=AccessError)
         cur.execute(
             _INSERT_ISSUED_SQL,
-            {"who": telegram_id, "tenant": tenant, "fingerprint": token_fingerprint(token)},
+            {"who": telegram_id, "fingerprint": token_fingerprint(token), "days": дней},
         )
-        if cur.fetchone() is None:
-            raise AccessError("База не вернула строку после выпуска токена")
-    return IssuedToken(value=token, tenant=tenant, replaced_previous=replaced)
+        row = cur.fetchone()
+        if row is None:
+            # Транзакция откатывается целиком: прежний токен остаётся живым.
+            raise UnboundError(
+                "Токен выпускается только на учётку сайта: привяжите бота к своей "
+                "учётке на странице «Пользователи»"
+            )
+    return IssuedToken(
+        value=token,
+        tenant=str(row[0]),
+        role=str(row[1]),
+        expires_at=row[2],
+        replaced_previous=replaced,
+    )
 
 
 def resolve_token(token: str) -> TokenOwner | None:
@@ -366,4 +520,6 @@ def resolve_token(token: str) -> TokenOwner | None:
         row = cur.fetchone()
     if row is None:
         return None
-    return TokenOwner(telegram_id=int(row[0]), tenant=str(row[1]))
+    return TokenOwner(
+        telegram_id=int(row[0]), tenant=str(row[1]), role=str(row[2]), login=str(row[3])
+    )
