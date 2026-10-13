@@ -184,7 +184,7 @@ async def test_stops_показывает_счётчик_админу(
 
 
 @requires_db
-@pytest.mark.parametrize("роль", ["auditor", None])
+@pytest.mark.parametrize("роль", ["developer", None])
 async def test_stops_не_админу_отказ_словами(
     domain_env: Path,
     db_env: str,
@@ -192,7 +192,7 @@ async def test_stops_не_админу_отказ_словами(
     monkeypatch: pytest.MonkeyPatch,
     роль: str | None,
 ) -> None:
-    """Аудитор с учёткой и сотрудник без учётки (`None`) счётчика не видят (D448)."""
+    """Девелопер с учёткой и сотрудник без учётки (`None`) счётчика не видят (D448, D440)."""
     if роль is not None:
         привязать_бота(pg_dsn, monkeypatch, AUDITOR_ID, role=роль)
     stops.note_stop(1, step="start.unit", reason="start.unit_need_number")
