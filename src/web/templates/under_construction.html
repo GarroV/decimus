@@ -18,9 +18,6 @@
   <div class="empty">
     <div class="empty__title">{{ t('wip.title') }}</div>
     <p class="empty__text">{{ t('wip.text', section=title) }}</p>
-    {% if section.key in ('calendar', 'plans') %}
-      <p class="empty__text">{{ t('wip.calendar_note') }}</p>
-    {% endif %}
     <div class="empty__aside">
       {{ t('wip.aside', built=t('section.registry.title')) }}
     </div>

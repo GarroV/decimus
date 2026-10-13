@@ -1,4 +1,4 @@
-"""«Где нужно проверить» на экране «Проверки» (D399, переехало с «Главной» в D418).
+"""«Где нужно проверить» на экране «Календарь» (D399; с «Главной» в D418, оттуда в D466).
 
 Точки справочника охвата, у которых нет проверок за выбранный период: не
 проверявшиеся ни разу — первыми, затем те, что ждут дольше всех. Строится от
@@ -64,8 +64,13 @@ def pick_units(
     country: str = "",
     city: str = "",
     query: str = "",
+    top: int | None = TO_CHECK_TOP,
 ) -> tuple[tuple[ToCheck, ...], int]:
-    """Точки без проверок за период: не проверявшиеся ни разу, затем давнее всех."""
+    """Точки без проверок за период: не проверявшиеся ни разу, затем давнее всех.
+
+    `top=None` — весь список (экран «Календарь», где блок — единственное
+    содержимое и обрезанный остаток был бы тупиком, D466).
+    """
     ждут = []
     for имя, _, последняя, за_период in rows:
         страна, город = geo.get(имя, ("", ""))
@@ -75,7 +80,9 @@ def pick_units(
             continue
         ждут.append(ToCheck(имя, ids.get(имя, ""), страна, город, последняя))
     ждут.sort(key=lambda т: (т.last is not None, т.last or date.min, т.unit))
-    return tuple(ждут[:TO_CHECK_TOP]), max(len(ждут) - TO_CHECK_TOP, 0)
+    if top is None:
+        return tuple(ждут), 0
+    return tuple(ждут[:top]), max(len(ждут) - top, 0)
 
 
 def load(
@@ -86,6 +93,7 @@ def load(
     country: str = "",
     city: str = "",
     query: str = "",
+    top: int | None = TO_CHECK_TOP,
 ) -> Block:
     """Блок за период реестра в охвате вошедшего; отбор страны и города — реестра."""
     try:
@@ -95,5 +103,7 @@ def load(
     except DbError as exc:
         log.warning("проверки: «где нужно проверить» не прочитано (%s)", exc.__class__.__name__)
         return Block(failed=True)
-    units, more = pick_units(rows, geo=geo, ids=ids, country=country, city=city, query=query)
+    units, more = pick_units(
+        rows, geo=geo, ids=ids, country=country, city=city, query=query, top=top
+    )
     return Block(units=units, more=more)
