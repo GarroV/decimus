@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import Any
 from urllib.parse import urlsplit
 
 from flask import Flask, current_app, g, make_response, redirect, render_template, request, url_for
@@ -562,13 +563,16 @@ def install(app: Flask, conf: Settings) -> None:
 
     app.extensions[GOOGLE_LINK_KEY] = _начать_привязку
 
-    def _обновить_сессию(account: Account, назад: str) -> Response:
+    def _обновить_сессию(account: Account, назад: str, *, arm: bool = True) -> Response:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
         новая = open_session(account)
         if прежний:
             close_session(прежний)
-        return remember(redirect(f"{request.script_root}{назад}"), новая)
+        ответ = redirect(f"{request.script_root}{назад}")
+        if arm:
+            reauth.arm_intent(ответ, account, назад)
+        return remember(ответ, новая)
 
     def _начать_подтверждение(назад: str) -> Response:
         """Увод к Google подтвердить вход; метка и путь возврата — в подписанной куке."""
@@ -607,15 +611,23 @@ def install(app: Flask, conf: Settings) -> None:
             return мимо
         return _обновить_сессию(account, назад)
 
+    def _выполнить_намерение(действие: str) -> Any:
+        # Импорт при вызове: экран «Настроек» сам импортирует `auth`.
+        from . import settings_screen
+
+        return settings_screen.run_intent(conf, действие)
+
     reauth.install(
         app,
         stand=рубеж,
         trusted_proxies=conf.trusted_proxies,
         google_enabled=google is not None,
         rotate=_обновить_сессию,
+        run_intent=_выполнить_намерение,
         begin_google=_начать_подтверждение,
         # Имя ищется в момент вызова: так сверка идёт ровно той дверью, что у входа.
         verify=lambda login, password: authenticate(login, password),
+        secret_key=conf.secret_key,
     )
 
     def _вернуть_привязку(реквизиты: GoogleSettings, метка: str) -> Response:

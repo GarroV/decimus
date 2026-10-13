@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from flask import Flask, current_app, make_response, render_template, request
+from flask import Flask, current_app, make_response, redirect, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -155,8 +155,34 @@ def install(app: Flask, conf: Settings) -> None:
     app.config[users_claude.MCP_URL_KEY] = conf.mcp_public_url if conf.oauth_enabled else None
 
     @app.get(base)
-    def settings_page() -> tuple[str, int]:
-        return render()
+    def settings_page() -> FlaskResponse | tuple[str, int]:
+        """Чистое чтение: заряженное намерение здесь НИЧЕГО не выпускает.
+
+        Изменение состояния на GET позволило бы чужой странице выполнить действие,
+        пока намерение заряжено. Поэтому вместо выполнения — страница с одной
+        кнопкой, отправляющей POST (`/settings/continue`) с проверкой происхождения.
+        """
+        действие = reauth.take_intent(auth.current_account())
+        if действие is None:
+            return render()
+        ответ = make_response(render_template("settings/continue.html", action=действие))
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
+
+    @app.post(f"{base}/continue")
+    def settings_continue() -> Response | FlaskResponse | tuple[str, int]:
+        """Выполнить то, что человек просил до подтверждения входа (D457)."""
+        refuse_foreign_origin()
+        действие = reauth.take_intent(auth.current_account())
+        if действие is None:
+            ответ = redirect(f"{request.script_root}{base}")
+            reauth.drop_intent(ответ)
+            return ответ
+        ответ = make_response(run_intent(conf, действие))
+        reauth.drop_intent(ответ)
+        # Токен и ссылка в ответе показываются один раз — не в кэше.
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
 
     @app.post(f"{base}/password")
     def settings_own_password() -> FlaskResponse | tuple[str, int]:
@@ -184,9 +210,69 @@ def install(app: Flask, conf: Settings) -> None:
     _install_bot(app, base, conf)
     _install_google(app, base, conf)
     ui_lang.install(app, f"{base}/lang")
-    _install_claude_token(app, base)
+    _install_claude_token(app, base, conf)
     if conf.oauth_enabled:
         _install_claude_connection(app, base)
+
+
+def _issue_bot_link(conf: Settings, base: str) -> tuple[str, int]:
+    """Выпустить ссылку привязки бота своей учётке: кнопка и выполнение после подтверждения."""
+    чей = _current_id()
+    if not conf.bot_username:
+        return render(
+            Show(flash=_flash("profile.bot.unset", ok=False, var=WEB_BOT_USERNAME_VAR)), 503
+        )
+    try:
+        ссылка = bot_links.issue_link(чей)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return render(Show(flash=_flash("profile.bot.link_failed", ok=False)), 503)
+    return render(
+        Show(
+            bot_link=link_url(conf.bot_username, ссылка.token),
+            bot_link_until=ссылка.expires_at,
+        )
+    )
+
+
+def _start_google_link(conf: Settings, base: str) -> Response:
+    """Увести к Google привязывать почту: кнопка и выполнение после подтверждения."""
+    вошедший = auth.current_account()
+    if вошедший is not None and вошедший.email:
+        return google_link.back_to_settings("already")
+    return auth.begin_google_link()
+
+
+def _issue_claude_token(conf: Settings, base: str) -> tuple[str, int]:
+    """Выпустить себе токен Claude: кнопка и выполнение после подтверждения."""
+    чей = _current_id()
+    try:
+        выпуск = users_mcp.issue_own(чей)
+    except DbError as exc:
+        note_target_mismatch(exc)
+        return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
+    # Значения токена в журнале нет: только факт выпуска.
+    logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
+    return render(Show(token=выпуск))
+
+
+#: Что выполняется само после подтверждения входа (`reauth.INTENT_ACTIONS`).
+_RUN_INTENT = {
+    "bot-link": _issue_bot_link,
+    "google-link": _start_google_link,
+    "claude-token": _issue_claude_token,
+}
+
+
+def run_intent(conf: Settings, action: str) -> Any:
+    """Выполнить намерение тем же кодом, что кнопка, и с тем же правом.
+
+    Зовут `POST /settings/continue` и подтверждение паролем (`reauth`): ссылка
+    бота — по матрице `inspection.conduct`, как у кнопки.
+    """
+    if action == "bot-link" and not guard.may("inspection.conduct"):
+        return guard.forbidden()
+    return _RUN_INTENT[action](conf, section("settings").path)
 
 
 def _install_bot(app: Flask, base: str, conf: Settings) -> None:
@@ -202,24 +288,9 @@ def _install_bot(app: Flask, base: str, conf: Settings) -> None:
         """
         refuse_foreign_origin()
         # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
-        if (переспрос := reauth.require_fresh(f"{base}#bot")) is not None:
+        if (переспрос := reauth.require_fresh(f"{base}#bot", "bot-link")) is not None:
             return переспрос
-        чей = _current_id()
-        if not conf.bot_username:
-            return render(
-                Show(flash=_flash("profile.bot.unset", ok=False, var=WEB_BOT_USERNAME_VAR)), 503
-            )
-        try:
-            ссылка = bot_links.issue_link(чей)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return render(Show(flash=_flash("profile.bot.link_failed", ok=False)), 503)
-        return render(
-            Show(
-                bot_link=link_url(conf.bot_username, ссылка.token),
-                bot_link_until=ссылка.expires_at,
-            )
-        )
+        return _issue_bot_link(conf, base)
 
     @app.post(f"{base}/bot-unlink")
     @guard.action("inspection.conduct")
@@ -244,12 +315,9 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
         """Увести к Google. Только POST со своей страницы: чужая не начнёт привязку."""
         refuse_foreign_origin()
         # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
-        if (переспрос := reauth.require_fresh(f"{base}#google")) is not None:
+        if (переспрос := reauth.require_fresh(f"{base}#google", "google-link")) is not None:
             return переспрос
-        вошедший = auth.current_account()
-        if вошедший is not None and вошедший.email:
-            return google_link.back_to_settings("already")
-        return auth.begin_google_link()
+        return _start_google_link(conf, base)
 
     @app.post(f"{base}/google-unlink")
     def settings_google_unlink() -> Response | FlaskResponse | tuple[str, int]:
@@ -307,7 +375,7 @@ def _unlink_locked(приговор: Verdict) -> FlaskResponse:
     return ответ
 
 
-def _install_claude_token(app: Flask, base: str) -> None:
+def _install_claude_token(app: Flask, base: str, conf: Settings) -> None:
     """Личный токен Claude: выпустить себе и отозвать свой (D447, D448)."""
 
     @app.post(f"{base}/claude-token")
@@ -315,17 +383,9 @@ def _install_claude_token(app: Flask, base: str) -> None:
         """Выпустить себе токен; команда показывается этим ответом один раз."""
         refuse_foreign_origin()
         # Создаёт долгоживущий доступ — только по свежему входу (`reauth`).
-        if (переспрос := reauth.require_fresh(f"{base}#claude-token")) is not None:
+        if (переспрос := reauth.require_fresh(f"{base}#claude-token", "claude-token")) is not None:
             return переспрос
-        чей = _current_id()
-        try:
-            выпуск = users_mcp.issue_own(чей)
-        except DbError as exc:
-            note_target_mismatch(exc)
-            return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
-        # Значения токена в журнале нет: только факт выпуска.
-        logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
-        return render(Show(token=выпуск))
+        return _issue_claude_token(conf, base)
 
     @app.post(f"{base}/claude-token-revoke")
     def settings_claude_token_revoke() -> FlaskResponse | tuple[str, int]:

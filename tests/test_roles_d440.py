@@ -352,6 +352,7 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     # Подтверждение входа перед долгоживущим доступом — своя же учётка.
     "/settings/confirm",
     "/settings/confirm/google",
+    "/settings/continue",
 }
 
 
