@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 127 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 132 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -74,12 +74,15 @@
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
+| `/inspections/<inspection_id>/findings` | POST | `do_add_finding` | `src/web/app.py` |
+| `/inspections/<inspection_id>/findings/<finding_id>/photos` | POST | `do_add_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/findings/<finding_id>/revise` | POST | `do_revise` | `src/web/app.py` |
 | `/inspections/<inspection_id>/letter` | GET | `letter` | `src/web/app.py` |
 | `/inspections/<inspection_id>/letter/draft` | POST | `letter_draft` | `src/web/letter_draft.py` |
 | `/inspections/<inspection_id>/letter/save` | POST | `save_letter` | `src/web/app.py` |
 | `/inspections/<inspection_id>/move` | POST | `do_move` | `src/web/app.py` |
 | `/inspections/<inspection_id>/photos/<photo_id>` | GET | `photo` | `src/web/app.py` |
+| `/inspections/<inspection_id>/photos/<photo_id>/delete` | POST | `do_delete_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/report` | GET | `report` | `src/web/app.py` |
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
@@ -109,6 +112,7 @@
 | `/ratings/settings` | POST | `ratings_settings` | `src/web/ratings.py` |
 | `/ratings/sheet-sync` | POST | `ratings_sheet_sync` | `src/web/ratings.py` |
 | `/settings` | GET | `settings_page` | `src/web/settings_screen.py` |
+| `/settings/avatar` | GET | `settings_avatar` | `src/web/settings_screen.py` |
 | `/settings/bot-link` | POST | `settings_bot_link` | `src/web/settings_screen.py` |
 | `/settings/bot-unlink` | POST | `settings_bot_unlink` | `src/web/settings_screen.py` |
 | `/settings/claude-revoke` | POST | `settings_claude_revoke` | `src/web/settings_screen.py` |
@@ -121,9 +125,10 @@
 | `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
+| `/settings/menu` | GET | `settings_menu` | `src/web/settings_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
-| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
+| `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk_proxy.py` |
@@ -153,7 +158,7 @@
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
-| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
+| `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_settings.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk.py` |
@@ -396,6 +401,8 @@
 | `0062_space_isolation.sql` | — |
 | `0063_freeze.sql` | — |
 | `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
+| `0065_web_own_google_profile.sql` | — |
+| `0066_move_with_action_plan.sql` | — |
 <!-- map:end -->
 
 ## Makefile

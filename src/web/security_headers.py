@@ -115,6 +115,11 @@ WALK_HEADERS: dict[str, str] = {
 #: раз, «Настройки» — токен Claude и ссылку привязки бота (D447).
 NO_STORE_PREFIXES = ("/users", "/settings")
 
+#: Исключение из правила выше: своё фото из Google (D468) отдаётся с
+#: `private, max-age` и версией в адресе — без кэша браузера оно перекачивалось
+#: бы на каждой странице. Секретов в нём нет, общий кэш закрыт `private`.
+CACHEABLE_ENDPOINTS = frozenset({"settings_avatar"})
+
 
 def install(app: Flask, *, hsts: bool) -> None:
     """Повесить заголовки на каждый ответ приложения."""
@@ -134,7 +139,9 @@ def install(app: Flask, *, hsts: bool) -> None:
         if request.endpoint == oauth.AUTHORIZE_ENDPOINT:
             response.headers["Content-Security-Policy"] = OAUTH_CONTENT_SECURITY_POLICY
         путь = request.path
-        if any(путь == p or путь.startswith(f"{p}/") for p in NO_STORE_PREFIXES):
+        if request.endpoint not in CACHEABLE_ENDPOINTS and any(
+            путь == p or путь.startswith(f"{p}/") for p in NO_STORE_PREFIXES
+        ):
             # Свой заголовок маршрута с `no-store` не затирается: страница ключа
             # «Подключений» отдаёт `private, no-store` (D425).
             if "no-store" not in response.headers.get("Cache-Control", ""):

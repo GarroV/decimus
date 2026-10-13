@@ -25,7 +25,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from src.db.space import acting_space
-from src.domain.permissions import claude_may
+from src.domain.permissions import SIDE_HQ, claude_may, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .catalogue import (
@@ -220,6 +220,12 @@ PROD_POINTER_ADMINS_ONLY = (
     "публиковать, а применяет его админ"
 )
 
+#: То же админу партнёра (D460): ему методика открыта, а указатель прода — нет.
+PROD_POINTER_HQ_ONLY = (
+    "К проду применяет только УК: указатель прода один на всю сеть. В пространстве партнёра "
+    "чек-лист публикуется, а доступ к нему в боте задаётся инструментом set_checklist_bot_access"
+)
+
 APPLIED_READONLY = (
     "Этот чек-лист применён к проду, и по нему идут проверки всей сети, поэтому его правят "
     "только админы. Его можно читать; свои чек-листы, не применённые к проду и не главные, "
@@ -378,7 +384,10 @@ def _call_tool(
         # Указатель прода закрыт не-админам словами (D440): роль с правом на
         # методику должна понять, почему именно этот инструмент ей не дан.
         if action_of(spec) == "checklist.apply" and claude_may(role, tenant, "checklist.read"):
-            return _tool_text(PROD_POINTER_ADMINS_ONLY, failed=True)
+            return _tool_text(
+                PROD_POINTER_ADMINS_ONLY if side_of(tenant) == SIDE_HQ else PROD_POINTER_HQ_ONLY,
+                failed=True,
+            )
         return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)

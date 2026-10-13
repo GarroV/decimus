@@ -15,7 +15,18 @@ import pytest
 
 from src.bot import sidecar
 from src.bot.errors import BotNotesError
-from src.domain import HandedOverError, handed_over, start_inspection, while_open
+from src.domain import (
+    HandedOverError,
+    add_finding,
+    drop_finding,
+    edit_finding,
+    handed_over,
+    set_info,
+    set_report_lang,
+    start_inspection,
+    sync_checklist_version,
+    while_open,
+)
 from src.domain import state as domain_state
 from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
 
@@ -44,3 +55,36 @@ def test_сданная_проверка_не_открывается_на_зап
         записано.append("запись")
 
     assert записано == []
+
+
+def _сдать(domain_env: Path) -> None:
+    заметки = domain_env / f"chat_{ЧАТ}" / NOTES_FILE_NAME
+    заметки.write_text(json.dumps({HANDED_OVER_KEY: 1}), encoding="utf-8")
+
+
+@pytest.mark.parametrize(
+    "изменение",
+    [
+        pytest.param(
+            lambda: add_finding(ЧАТ, code="CLN05", level="D1", zone="hot_kitchen", text="x"),
+            id="add_finding",
+        ),
+        pytest.param(lambda: edit_finding(ЧАТ, 1, text="y"), id="edit_finding"),
+        pytest.param(lambda: drop_finding(ЧАТ, 1), id="drop_finding"),
+        pytest.param(lambda: set_info(ЧАТ, "INF06", "ответ"), id="set_info"),
+        pytest.param(lambda: set_report_lang(ЧАТ, "en"), id="set_report_lang"),
+        pytest.param(lambda: sync_checklist_version(ЧАТ), id="sync_checklist_version"),
+    ],
+)
+def test_домен_сам_отказывает_в_сданную_проверку(domain_env: Path, изменение) -> None:  # type: ignore[no-untyped-def]
+    """F-098/F-114: страж стоит внутри изменяющих функций, а не только в роутерах."""
+    start_inspection(ЧАТ, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
+    add_finding(ЧАТ, code="CLN05", level="D1", zone="hot_kitchen", text="до сдачи")
+    файл = domain_env / f"chat_{ЧАТ}" / "inspection.json"
+    _сдать(domain_env)
+    до = файл.read_bytes()
+
+    with pytest.raises(HandedOverError):
+        изменение()
+
+    assert файл.read_bytes() == до, "сданная проверка изменилась"

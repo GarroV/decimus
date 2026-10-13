@@ -114,7 +114,8 @@ def _require_reason(reason: str) -> str:
         raise RetractionError(
             "Не названа причина отклонения проверки. Причина — обязательное поле (D089): "
             "отклонённая проверка остаётся в истории пометкой, и без причины эта пометка "
-            "неотличима от подчистки истории"
+            "неотличима от подчистки истории",
+            code="retract_reason_required",
         )
     return записанное
 
@@ -138,7 +139,9 @@ def _refuse_if_referenced(cur: psycopg.Cursor[Any], inspection_id: str) -> None:
             f"Проверку {inspection_id} отклонить нельзя: на неё уже сослались как на "
             f"исходную — {', '.join(ссылающиеся)}. Отклонённая проверка осталась бы в "
             f"истории, но перестала бы быть видна, и у сославшейся пропало бы "
-            f"основание. Сперва разобраться со ссылающимися"
+            f"основание. Сперва разобраться со ссылающимися",
+            code="retract_referenced",
+            params={"refs": ", ".join(ссылающиеся)},
         )
 
 
@@ -161,7 +164,8 @@ def _mark_retracted(
             # существование чужого документа тому, кто перебирает
             # идентификаторы.
             raise RetractionError(
-                f"Проверки {inspection_id} у арендатора {tenant} нет — отклонять нечего"
+                f"Проверки {inspection_id} у арендатора {tenant} нет — отклонять нечего",
+                code="inspection_not_found",
             )
         статус, снята, причина = строка
         if снята is not None:
@@ -169,7 +173,8 @@ def _mark_retracted(
         if статус not in ("draft", "finalized"):
             raise RetractionError(
                 f"Проверка {inspection_id} не сдана (статус «{статус}») — отклонять "
-                f"можно только сданную проверку: принятую или ждущую приёмки"
+                f"можно только сданную проверку: принятую или ждущую приёмки",
+                code="retract_not_submitted",
             )
 
         _refuse_if_referenced(cur, inspection_id)
@@ -257,8 +262,9 @@ def _purge_photos(
             # уходила в «повторим позже».
             raise RetractionError(
                 f"Хранилище не убрало кадр проверки {inspection_id} "
-                f"({type(exc).__name__}): {exc} Пометка отклонения уже записана, убранные "
-                f"до отказа кадры остались убранными — повторный вызов доделает остаток"
+                f"({type(exc).__name__}). Пометка отклонения уже записана, убранные "
+                f"до отказа кадры остались убранными — повторный вызов доделает остаток",
+                code="retract_storage",
             ) from exc
         with conn.cursor() as cur:
             cur.execute(_MARK_PURGED_SQL, (photo_id,))

@@ -227,3 +227,90 @@ def test_непрочитанный_чек_лист_не_выдаёт_устро
     assert "не прочитан" in str(отказ.value)
     assert "MCP_CHECKLIST_STORE" not in str(отказ.value)
     assert "записано" not in стенд
+
+
+# --- новая запись и кадры (D465) ----------------------------------------------
+
+
+@pytest.fixture
+def добавление(стенд: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
+    def добавить(_inspection: str, **kw: Any) -> str:
+        новая = replace(
+            стенд["проверка"].findings[0], id="new", n=2, code=kw["addition"].code, text="x"
+        )
+        текущая = replace(стенд["проверка"], findings=(*стенд["проверка"].findings, новая))
+        стенд["добавлено"] = {**kw, "score": kw["score_of"](текущая)}
+        return "new"
+
+    def приложить(_i: str, finding: str, **kw: Any) -> str:
+        стенд["кадр"] = {"finding": finding, **kw}
+        return "photo"
+
+    monkeypatch.setattr(revision.review_edit, "add_finding", добавить)
+    monkeypatch.setattr(revision.review_edit, "attach_photo", приложить)
+    monkeypatch.setattr(revision, "_store", lambda s: s or "склад")
+    return стенд
+
+
+def _добавить(**поля: Any) -> str:
+    основа = {"code": "CLN05", "level": "D2", "zone": "dining", "text": "  пол в зале  "}
+    основа.update(поля)
+    return revision.add_card(
+        "11111111-1111-1111-1111-111111111111", tenant="HQ", lang="ru", **основа
+    )
+
+
+def test_новая_запись_считается_движком_вместе_со_всеми_записями(
+    добавление: dict[str, Any],
+) -> None:
+    # Act
+    ident = _добавить()
+
+    # Assert — движку ушли обе записи, запись сверена и помечена необычной зоной
+    assert ident == "new"
+    assert len(добавление["посчитано"].findings) == 2
+    assert добавление["добавлено"]["score"] is ОЦЕНКА
+    ушло = добавление["добавлено"]["addition"]
+    assert (ушло.text, ушло.zone_unusual) == ("пол в зале", True)
+    assert "кадр" not in добавление
+
+
+@pytest.mark.parametrize(
+    ("поля", "причина"),
+    [
+        ({"code": "XXX99"}, "нет"),
+        ({"level": "D3"}, "не предусмотрен"),
+        ({"zone": "moon"}, "Зоны moon"),
+        ({"text": " "}, "пуста"),
+    ],
+)
+def test_неверная_новая_запись_отклоняется_до_движка_и_базы(
+    добавление: dict[str, Any], поля: dict[str, str], причина: str
+) -> None:
+    with pytest.raises(ReviseError, match=причина):
+        _добавить(**поля)
+    assert "посчитано" not in добавление and "добавлено" not in добавление
+
+
+def test_кадр_не_изображение_запись_не_заводится(добавление: dict[str, Any]) -> None:
+    with pytest.raises(ReviseError, match="не читается"):
+        _добавить(photo=b"not an image")
+    assert "добавлено" not in добавление
+
+
+def test_кадр_прикладывается_к_новой_записи_после_неё(добавление: dict[str, Any]) -> None:
+    import io
+
+    from PIL import Image
+
+    буфер = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(буфер, format="PNG")
+    _добавить(photo=буфер.getvalue())
+    assert добавление["кадр"]["finding"] == "new"
+
+
+def test_у_принятой_запись_не_добавляется(добавление: dict[str, Any]) -> None:
+    добавление["проверка"] = _проверка(ждёт=False)
+    with pytest.raises(ReviseError, match="уже принята"):
+        _добавить()
+    assert "добавлено" not in добавление

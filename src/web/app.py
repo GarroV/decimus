@@ -32,6 +32,7 @@ from flask import (
     url_for,
 )
 from flask import Response as FlaskResponse
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.wrappers import Response
 
 from src.db import directory, request_memo, unit_profiles
@@ -49,6 +50,7 @@ from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
 from src.domain.tenants import HQ_TENANT, canonical_tenant
+from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report.info_titles import FOUND
 
 from . import (
@@ -85,7 +87,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import unit_card as unit_data
 from .config import Settings, load_settings
-from .db_refusal import public_reason
+from .db_refusal import domain_reason, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
@@ -854,7 +856,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             done = data.retract_card(inspection_id, tenant=auth.current_tenant(), reason=reason)
         except RetractionError as exc:
-            failure = t("retract.failed", _lang(conf), reason=str(exc))
+            failure = t("retract.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -878,7 +880,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 actor=вошедший.login if вошедший else "",
             )
         except AcceptError as exc:
-            failure = t("accept.failed", _lang(conf), reason=str(exc))
+            failure = t("accept.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("accept.done", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -906,9 +908,101 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 text=request.form.get("text") or "",
             )
         except ReviseError as exc:
-            failure = t("revise.failed", _lang(conf), reason=str(exc))
+            failure = t("revise.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("revise.done", _lang(conf))
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/findings")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_add_finding(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Добавить запись в ждущую проверку с пересчётом (D465); кадр — по желанию."""
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+        кадр, отказ_кадра = _uploaded_photo(lang)
+        if отказ_кадра is not None:
+            return _render_card(
+                inspection_id,
+                conf=conf,
+                notice=None,
+                failure=t("add.failed", lang, reason=отказ_кадра),
+            )
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            revision.add_card(
+                inspection_id,
+                tenant=auth.current_tenant(),
+                lang=lang,
+                code=request.form.get("code") or "",
+                level=request.form.get("level") or "",
+                zone=request.form.get("zone") or "",
+                text=request.form.get("text") or "",
+                photo=кадр,
+            )
+        except ReviseError as exc:
+            failure = t("add.failed", lang, reason=domain_reason(exc, lang))
+        else:
+            notice = t("add.done", lang)
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/photos")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_add_photo(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Приложить кадр к записи ждущей проверки (D465); с `replace` — вместо старого."""
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+        кадр, отказ_кадра = _uploaded_photo(lang)
+        failure: str | None = отказ_кадра
+        notice: str | None = None
+        if failure is None and кадр is None:
+            failure = t("photo.none", lang)
+        if failure is None and кадр is not None:
+            старый = (request.form.get("replace") or "").strip()
+            try:
+                if старый:
+                    revision.replace_photo(
+                        inspection_id,
+                        finding_id,
+                        старый,
+                        tenant=auth.current_tenant(),
+                        data=кадр,
+                    )
+                else:
+                    revision.attach_photo(
+                        inspection_id, finding_id, tenant=auth.current_tenant(), data=кадр
+                    )
+            except ReviseError as exc:
+                failure = domain_reason(exc, lang)
+            else:
+                notice = t("photo.replaced" if старый else "photo.added", lang)
+        if failure is not None:
+            failure = t("photo.failed", lang, reason=failure)
+        return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
+
+    @app.post(f"{section('registry').path}/<inspection_id>/photos/<photo_id>/delete")
+    @guard.action("inspection.revise", object_in_route=True)
+    def do_delete_photo(inspection_id: str, photo_id: str) -> FlaskResponse | str | tuple[str, int]:
+        """Снять кадр с записи ждущей проверки (D465)."""
+        отказ = _permit_inspection("inspection.revise", inspection_id)
+        if отказ is not None:
+            return отказ
+        refuse_foreign_origin()
+        lang = _lang(conf)
+        notice: str | None = None
+        failure: str | None = None
+        try:
+            revision.detach_photo(inspection_id, photo_id, tenant=auth.current_tenant())
+        except ReviseError as exc:
+            failure = t("photo.failed", lang, reason=domain_reason(exc, lang))
+        else:
+            notice = t("photo.deleted", lang)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
     @app.post(f"{section('registry').path}/<inspection_id>/move")
@@ -932,7 +1026,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 actor=вошедший.login if вошедший else "",
             )
         except MoveError as exc:
-            failure = t("move.failed", _lang(conf), reason=str(exc))
+            failure = t("move.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("move.done" if перенесено else "move.same", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -945,6 +1039,29 @@ def _own(detail: Any) -> bool:
     УК по пиццериям своей страны (D289). Запись по такой проверке — отказ.
     """
     return auth.is_own(detail.inspection.tenant_code)
+
+
+def _uploaded_photo(lang: str) -> tuple[bytes | None, str | None]:
+    """Кадр из поля `photo` формы: `(байты | None, отказ | None)`.
+
+    Предел — тот же, что у мини-аппа (`MAX_UPLOAD_BYTES`), и только этому
+    маршруту: остальные формы держат свой (`MAX_BODY_BYTES`). Пустое поле — не
+    отказ: кадр необязателен. Что это изображение, проверяет конвейер кадров
+    (`make_preview`), а не расширение имени.
+    """
+    request.max_content_length = MAX_UPLOAD_BYTES + action_plans.FORM_OVERHEAD_BYTES
+    try:
+        файл = request.files.get("photo")
+        if файл is None or not файл.filename:
+            return None, None
+        data = файл.stream.read(MAX_UPLOAD_BYTES + 1)
+    except RequestEntityTooLarge:
+        return None, t("photo.too_big", lang, mb=MAX_UPLOAD_BYTES // (1024 * 1024))
+    if len(data) > MAX_UPLOAD_BYTES:
+        return None, t("photo.too_big", lang, mb=MAX_UPLOAD_BYTES // (1024 * 1024))
+    if not data:
+        return None, t("photo.unreadable", lang)
+    return data, None
 
 
 def _install_hq_gate(app: Flask) -> None:

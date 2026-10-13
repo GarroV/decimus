@@ -44,7 +44,7 @@ from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
 from src.domain.log_ids import log_id
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
-from src.domain.tenants import HQ_TENANT
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.walk_users import walk_open_to
 
 from . import (
@@ -313,7 +313,12 @@ def init_data_of() -> str:
 
 
 def identify(
-    conf: WalkSettings, ui_lang: str, *, header_only: bool = False, kind: str = walk_rate.OTHER
+    conf: WalkSettings,
+    ui_lang: str,
+    *,
+    header_only: bool = False,
+    kind: str = walk_rate.OTHER,
+    new_inspection: bool = False,
 ) -> int | tuple[Response, int]:
     """Чей это запрос — номер чата или готовый отказ.
 
@@ -322,6 +327,11 @@ def identify(
     только при живом токене — на стенде без бота его не с чем сверить. База
     молчит — 503, а не «пускаю вслепую». Чаще предела `walk_rate` (`kind` —
     кадр или прочее) — 429 до всякого обращения к базе (#529, #710).
+
+    Проверка чужого пространства — тоже здесь, по умолчанию, чтобы новая ручка
+    не могла о ней забыть: идущая проверка чата должна быть из пространства
+    вошедшего, иначе 403 без подробностей. `new_inspection` снимает сверку у
+    входа, который эту проверку заменяет новой (старт).
     """
     if not conf.enabled:
         return jsonify({"error": "disabled"}), 404
@@ -361,6 +371,17 @@ def identify(
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
         return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
+    if not new_inspection and conf.bot_token is not None:
+        try:
+            current = get_state(chat_id)
+        except DomainError:
+            logger.warning("Обход: проверка чата %s не читается", log_id(chat_id), exc_info=True)
+            return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
+        if current is not None and canonical_tenant(current.tenant) != canonical_tenant(space):
+            # Проверка осталась от другого пространства (человека перепривязали):
+            # ни читать её, ни писать в неё отсюда нельзя. Ответ без подробностей.
+            logger.warning("Обход: чат %s — проверка другого пространства, отказ", log_id(chat_id))
+            return jsonify({"error": "forbidden"}), 403
     _act_for(space)
     return chat_id
 

@@ -1,10 +1,71 @@
-/* «Настройки» (D447): одна колонка поверх каркаса `decimus-split.css`
-   (`.sdetail`, `.ssec`, `.sform`, `.sbtn`) — своих компонентов у экрана нет. */
+/* «Настройки» (D447, D470): плитками, как «Настройки» в Swarm Brain — карточка
+   «Профиль» со строками «поле — значение — кнопка справа», рядом малые
+   карточки, ниже «Подключения»: плитки и панель выбранной справа. Поверх
+   каркаса `decimus-split.css` (`.shead`, `.ssec`, `.sform`, `.sbtn`, `.sdot`);
+   цвета — токены ядра, светлая и тёмная темы работают без правок. */
 
-.page--settings .ssettings { max-width: 720px; padding-left: 0; padding-right: 0; }
+.page--settings .ssettings { display: flex; flex-direction: column; gap: var(--space-7); max-width: 1100px; margin-top: var(--space-7); }
 .page--settings .ssec__sub { margin: var(--space-6) 0 var(--space-3); font-size: 13px; line-height: 18px;
   font-weight: var(--w-semibold); color: var(--ink); }
 .page--settings .ssec__sub:first-child { margin-top: 0; }
 .page--settings .ssecret { max-width: 100%; }
 .page--settings .ssecret code { overflow-wrap: anywhere; word-break: break-all; }
 .page--settings #claude-connect { margin-top: var(--space-7); }
+
+/* ── карточки ─────────────────────────────────────────────────────────── */
+.scard { min-width: 0; padding: var(--space-7) var(--space-8); border: 1px solid var(--line); border-radius: var(--r-block, 12px); background: var(--surface); }
+.scard__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-5); margin-bottom: var(--space-6); }
+.scard__title { margin: 0 0 var(--space-5); font-family: var(--font-mono); font-size: 11px; line-height: 14px; font-weight: var(--w-semibold);
+  letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); }
+.scard__head .scard__title { margin: 0; }
+.scard__count { font-size: 12px; color: var(--ink-3); }
+.scard .langpill { margin: 0 0 var(--space-4); }
+
+.stop { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: var(--space-7); align-items: start; }
+.sside { display: flex; flex-direction: column; gap: var(--space-7); min-width: 0; }
+
+/* ── профиль: строка «поле — значение — кнопка» ──────────────────────── */
+.sname { display: flex; flex-direction: column; margin-bottom: var(--space-5); }
+.sname__main { font-size: 18px; line-height: 24px; font-weight: var(--w-semibold); letter-spacing: -.01em; color: var(--ink); overflow-wrap: anywhere; }
+.sname__sub { font-size: 12px; color: var(--ink-3); }
+.srow2 { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); padding: var(--space-5) 0; border-top: 1px solid var(--line); min-height: 52px; }
+.srow2__label { flex: 0 0 160px; font-size: 12.5px; color: var(--ink-3); }
+.srow2__value { flex: 1; min-width: 0; font-size: 13px; line-height: 1.45; color: var(--ink); overflow-wrap: anywhere; }
+.srow2__act { flex: none; margin-left: auto; }
+.srow2__act .sconfirm { margin-top: 0; }
+.srow2__act form { margin: 0; }
+.srow2__act:has(details[open]) { flex: 1 1 100%; order: 3; margin-left: 0; }
+
+/* ── подключения: плитки слева, панель выбранной справа ──────────────── */
+.sconn { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: var(--space-7); align-items: start; }
+.stiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); }
+.stile { display: flex; align-items: center; gap: var(--space-5); min-width: 0; padding: var(--space-6); border: 1px solid var(--line-strong); border-radius: var(--r-block, 12px);
+  background: var(--surface); color: var(--ink); text-decoration: none; transition: background var(--t-state) var(--ease), border-color var(--t-state) var(--ease); }
+.stile:hover { background: var(--surface-2); text-decoration: none; }
+.stile:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.stile.is-current { border-color: var(--accent); background: var(--accent-soft); }
+.stile__icon { display: grid; place-items: center; width: 34px; height: 34px; flex: none; border-radius: 9px; background: var(--surface-2); color: var(--ink-2); }
+.stile.is-current .stile__icon { background: var(--surface); color: var(--accent); }
+.stile__icon svg { width: 18px; height: 18px; }
+.stile__main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.stile__main b { font-size: 13.5px; line-height: 18px; font-weight: var(--w-semibold); overflow-wrap: anywhere; }
+.stile__main small { font-size: 12px; line-height: 16px; color: var(--ink-2); }
+.stile .sdot { margin: 0; align-self: flex-start; margin-top: var(--space-3); }
+
+.sconn__panel { min-width: 0; padding: var(--space-7); border: 1px solid var(--line); border-radius: var(--r-block, 12px); background: var(--surface-2); }
+.sconn__panel__title { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin: 0 0 var(--space-5); font-size: 15px; font-weight: var(--w-semibold); color: var(--ink); }
+.sconn__panel__title svg { width: 18px; height: 18px; color: var(--ink-2); }
+.sconn__panel__title small { margin-left: auto; font-size: 12px; font-weight: var(--w-regular); color: var(--ink-2); }
+.sconn__panel .ssec { margin: 0; padding: 0; border-top: 0; }
+
+/* ── телефон: всё в одну колонку, панель — под плитками ──────────────── */
+@media (max-width: 899px) {
+  .stop, .sconn { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 719px) {
+  .scard { padding: var(--space-6); }
+  .srow2__label { flex: 1 1 100%; }
+  .srow2__value { flex: 1 1 100%; }
+  .srow2__act { margin-left: 0; }
+  .stiles { grid-template-columns: minmax(0, 1fr); }
+}

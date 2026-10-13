@@ -76,6 +76,8 @@ class Обмен:
         self.почта = ПОЧТА_УК
         self.домен = "dodobrands.io"
         self.подтверждена = True
+        self.имя = ""
+        self.фото = ""
         self.nonce = ""
         self.подменить_nonce: str | None = None
         self.звали = 0
@@ -89,6 +91,8 @@ class Обмен:
             email_verified=self.подтверждена,
             hosted_domain=self.домен,
             nonce=self.подменить_nonce if self.подменить_nonce is not None else self.nonce,
+            name=self.имя,
+            picture=self.фото,
         )
 
 
@@ -198,6 +202,41 @@ def test_ук_привязывает_рабочий_аккаунт(ук: FlaskCl
 
     assert вернуться(ук, метка) == "linked"
     assert база.finish == [(ТОКЕН, метка, ПОЧТА_УК)]
+
+
+def test_привязка_сохраняет_имя_и_фото_за_своей_сессией(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D468: после удачной привязки имя и фото из токена пишутся под токеном этой сессии."""
+    from src.web import google_profile
+
+    записано: list[tuple[str, str | None, bytes | None]] = []
+    monkeypatch.setattr(
+        web_own_profile,
+        "save_google_profile",
+        lambda token, *, name, avatar, avatar_type: записано.append((token, name, avatar)) or True,
+    )
+    monkeypatch.setattr(google_profile, "_open", lambda url: ("image/png", b"\x89PNG\r\n\x1a\n00"))
+    обмен.имя, обмен.фото = "Иван Петров", "https://lh3.googleusercontent.com/a/x"
+    метка = начать(ук, обмен)
+
+    assert вернуться(ук, метка) == "linked"
+    assert записано == [(ТОКЕН, "Иван Петров", b"\x89PNG\r\n\x1a\n00")]
+
+
+def test_отказанная_привязка_имя_и_фото_не_пишет(
+    ук: FlaskClient, база: База, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    записано: list[object] = []
+    monkeypatch.setattr(
+        web_own_profile, "save_google_profile", lambda *a, **k: записано.append(1) or True
+    )
+    обмен.домен = ""
+    обмен.имя = "Иван Петров"
+    метка = начать(ук, обмен)
+
+    assert вернуться(ук, метка) == "domain"
+    assert записано == []
 
 
 def test_ук_не_привязывает_личный_аккаунт(ук: FlaskClient, база: База, обмен: Обмен) -> None:
@@ -351,7 +390,7 @@ def test_журнал_не_пишет_почту_целиком(
 
 
 def test_до_ухода_к_google_сказано_что_пароль_закроется(ук: FlaskClient) -> None:
-    страница = ук.get("/settings").get_data(as_text=True)
+    страница = ук.get("/settings?tile=google").get_data(as_text=True)
 
     assert "Привязать Google" in страница
     assert "вход паролем для этой учётки закроется" in страница
@@ -360,7 +399,7 @@ def test_до_ухода_к_google_сказано_что_пароль_закро
 
 def test_без_реквизитов_привязки_нет(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, google=False):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=google").get_data(as_text=True)
 
         assert "Привязать Google" not in страница
         assert "привязать почту пока нельзя" in страница
@@ -370,7 +409,7 @@ def test_снять_почту_можно_только_с_паролем(
     monkeypatch: pytest.MonkeyPatch, база: База, caplog: pytest.LogCaptureFixture
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="guest", email=ПОЧТА_УК):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=google").get_data(as_text=True)
         assert "Отвязать Google" in страница and "только зная пароль учётки" in страница
 
         пусто = client.post("/settings/google-unlink", data={}, headers=ЗАГОЛОВКИ)

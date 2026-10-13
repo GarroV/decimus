@@ -266,6 +266,14 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0064_ratings_sheet.sql": (
         "sql1:f5ff00cc48e5d61000d6cbb37e038c293f383656e540ab4d011fdafa2daf8314"
     ),
+    # Имя и фото из Google в учётке, меню учётки (D468).
+    "0065_web_own_google_profile.sql": (
+        "sql1:ccc4b514078a965296e77a0d44443ef77c3f1a6ad1af2e3be8c43b92f62961b8"
+    ),
+    # Перенос проверки с экшн-планом в другую страну отвергается (GHSA-wqh3).
+    "0066_move_with_action_plan.sql": (
+        "sql1:22d3601fa97db019e08aff3e80219293791a0d2451bcbd7cf304f21e18fd4ca5"
+    ),
 }
 
 

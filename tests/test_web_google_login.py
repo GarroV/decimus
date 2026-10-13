@@ -37,6 +37,8 @@ class Обмен:
         self.срывается = срывается
         self.подтверждена = True
         self.домен = "dodobrands.io"
+        self.имя = ""
+        self.фото = ""
         self.звали = 0
 
     def __call__(self, settings: GoogleSettings, *, code: str) -> GoogleIdentity:
@@ -44,7 +46,11 @@ class Обмен:
         if self.срывается:
             raise GoogleAuthError("двойник: Google отказал")
         return GoogleIdentity(
-            email=self.почта, email_verified=self.подтверждена, hosted_domain=self.домен
+            email=self.почта,
+            email_verified=self.подтверждена,
+            hosted_domain=self.домен,
+            name=self.имя,
+            picture=self.фото,
         )
 
 
@@ -389,3 +395,114 @@ def test_учётка_без_почты_google_входит_паролем(monke
 
     assert ответ.status_code == 302
     assert зовы["open"]
+
+
+# ── Имя и фото из Google при входе (D468) ─────────────────────────────────
+
+
+class Запись:
+    """Двойник записи профиля: что и под каким токеном ушло в базу."""
+
+    def __init__(self) -> None:
+        self.вызовы: list[dict[str, object]] = []
+
+    def __call__(
+        self, token: str, *, name: str | None, avatar: bytes | None, avatar_type: str | None
+    ) -> bool:
+        self.вызовы.append({"token": token, "name": name, "avatar": avatar, "type": avatar_type})
+        return True
+
+
+@pytest.fixture
+def запись(monkeypatch: pytest.MonkeyPatch) -> Запись:
+    from src.db import web_own_profile
+
+    двойник = Запись()
+    monkeypatch.setattr(web_own_profile, "save_google_profile", двойник)
+    return двойник
+
+
+def _скачать(monkeypatch: pytest.MonkeyPatch, *, тело: bytes | None) -> None:
+    """Подменить скачивание фото: `None` — сеть отказала."""
+    from src.web import google_profile
+
+    def открыть(url: str) -> tuple[str, bytes]:
+        if тело is None:
+            raise OSError("двойник: сеть отказала")
+        return "image/jpeg", тело
+
+    monkeypatch.setattr(google_profile, "_open", открыть)
+
+
+ФОТО_ГУГЛ = "https://lh3.googleusercontent.com/a/x=s96-c"
+БАЙТЫ_ФОТО = b"\xff\xd8\xff\xe0" + b"\x00" * 32
+
+
+def test_вход_сохраняет_имя_и_фото_за_новой_сессией(
+    клиент: FlaskClient, обмен: Обмен, запись: Запись, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    обмен.имя, обмен.фото = "Иван Петров", ФОТО_ГУГЛ
+    _скачать(monkeypatch, тело=БАЙТЫ_ФОТО)
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+    assert запись.вызовы == [
+        {"token": Сессия().token, "name": "Иван Петров", "avatar": БАЙТЫ_ФОТО, "type": "image/jpeg"}
+    ]
+
+
+def test_сбой_скачивания_фото_не_ломает_вход_имя_всё_равно_пишется(
+    клиент: FlaskClient, обмен: Обмен, запись: Запись, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    обмен.имя, обмен.фото = "Иван Петров", ФОТО_ГУГЛ
+    _скачать(monkeypatch, тело=None)
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+    assert auth.COOKIE_NAME in ответ.headers.get("Set-Cookie", "")
+    assert запись.вызовы == [
+        {"token": Сессия().token, "name": "Иван Петров", "avatar": None, "type": None}
+    ]
+
+
+def test_отказ_базы_при_записи_профиля_не_ломает_вход(
+    клиент: FlaskClient, обмен: Обмен, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.db import web_own_profile
+    from src.db.errors import AccessError
+
+    def молчит(*_: object, **__: object) -> bool:
+        raise AccessError("двойник: база молчит")
+
+    monkeypatch.setattr(web_own_profile, "save_google_profile", молчит)
+    обмен.имя, обмен.фото = "Иван Петров", ФОТО_ГУГЛ
+    _скачать(monkeypatch, тело=БАЙТЫ_ФОТО)
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+    assert auth.COOKIE_NAME in ответ.headers.get("Set-Cookie", "")
+
+
+def test_чужой_адрес_фото_в_токене_не_скачивается(
+    клиент: FlaskClient, обмен: Обмен, запись: Запись, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from src.web import google_profile
+
+    ходили: list[str] = []
+    monkeypatch.setattr(
+        google_profile, "_open", lambda url: ходили.append(url) or ("image/jpeg", БАЙТЫ_ФОТО)
+    )
+    обмен.имя, обмен.фото = "Иван", "https://169.254.169.254/latest/meta-data"
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 302
+    assert ходили == []
+    assert запись.вызовы[0]["avatar"] is None
