@@ -1441,8 +1441,7 @@ def _card_context(
         # ошибку на приёмке чинят правкой записи (D200).
         may_retract=data.retraction_available()
         and _inspection_may("inspection.retract", detail)
-        and своя
-        and not detail.inspection.on_review,
+        and своя,
         own=своя,
         notice=notice,
         failure=failure,

@@ -120,13 +120,13 @@ def test_ждущая_своя_показана_с_плашкой_листом_�
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
-    # Assert — подтвердить и исправить можно, переносить и отклонять до приёмки нечего.
+    # Assert — принять, исправить и отклонить можно (D461); переносить до приёмки нечего.
     assert "Проверка на приёмке" in страница
     assert "/accept?lang=" in страница
     assert "/findings/f1/revise?lang=" in страница
     assert "Сохранить и пересчитать" in страница
     assert "/move?lang=" not in страница
-    assert "/retract?lang=" not in страница
+    assert "/retract?lang=" in страница
 
 
 @админ
