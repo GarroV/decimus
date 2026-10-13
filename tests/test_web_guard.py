@@ -15,6 +15,7 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 
 from src.domain.permissions import ACTION_CODES
 from src.web import guard
+from src.web import inspections as data
 
 ПУБЛИЧНЫЕ = {"admin_public_url": СВОЙ, "mcp_public_url": "https://mcp.example.test"}
 
@@ -202,6 +203,9 @@ def test_маршрут_с_действием_только_УК_партнёру
 ) -> None:
     """Граница — по коду матрицы, а не по пути: префикс раздела тут ни при чём."""
     подменить_двери(monkeypatch, tenant=ПАРТНЁР, role="admin")
+    # «Календарь» с D477 читает проверки, как реестр: база подменена, охват проверяет не этот тест.
+    monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    monkeypatch.setattr(data, "load_geography", lambda **_: {})
     app = собрать(tenant=ПАРТНЁР)
     app.add_url_rule("/zzz-hq", endpoint="zzz_hq", view_func=guard.action("unit.create")(_ок))
     with app.test_client() as client:

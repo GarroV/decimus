@@ -120,4 +120,22 @@ _TOCHECK: dict[str, dict[str, str]] = {
     },
 }
 
-REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL, **_TOCHECK}
+# «Календарь» (D477): сетка месяца с проверками по дням.
+_CALENDAR: dict[str, dict[str, str]] = {
+    "calendar.period.next_month": {"ru": "Следующий месяц", "en": "Next month"},
+    "calendar.chip.review": {"ru": "на приёмке", "en": "in review"},
+    "calendar.day.more": {"ru": "+{count}", "en": "+{count}"},
+    "calendar.month.empty": {
+        "ru": "В этом месяце проверок нет.",
+        "en": "No inspections this month.",
+    },
+}
+
+REGISTRY_TEXTS: dict[str, dict[str, str]] = {
+    **_MONTHS,
+    **_PERIOD,
+    **_BAR,
+    **_PANEL,
+    **_TOCHECK,
+    **_CALENDAR,
+}

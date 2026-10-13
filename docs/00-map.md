@@ -92,7 +92,7 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,db_refusal,errors,icons,sections,view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
@@ -104,7 +104,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
-| `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
 
 ### Экраны
@@ -112,10 +111,11 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,calendar_grid,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
+| `src/web/calendar_grid.py` | Сетка месяца для экрана «Календарь» (D477): проверки по дням |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
 | `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
 | `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
@@ -154,7 +154,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -167,20 +167,15 @@ Flask-приложение управляющей компании и партн
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
-| `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
-| `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Мои входы» человека |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
-| `src/web/passkey_login.py` | Вход ключом доступа с формы входа (D485): ключ — способ ВХОДА, а не вторая ступень |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
-| `src/web/second_step.py` | Вторая ступень входа: «Подтвердите вход» после Google или пароля (D463) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
-| `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
@@ -282,7 +277,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 48 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-registry.css, … (+40) |
+| `src/web/static/` | 49 | SOURCE.md, apple-touch-icon.png, decimus-calendar.css, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, … (+41) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -351,13 +346,12 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
-| `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3) |
@@ -365,7 +359,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
-| `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |

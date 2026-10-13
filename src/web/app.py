@@ -58,6 +58,7 @@ from . import (
     action_plans,
     assets,
     auth,
+    calendar_grid,
     country_page,
     edition,
     guard,
@@ -560,36 +561,91 @@ def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
     return _url("registry", lang=lang)
 
 
-def _register_calendar(app: Flask, conf: Settings) -> None:
-    """Раздел «Календарь» (D466): пока в нём одно — «Где нужно проверить».
+#: D477: список «Где нужно проверить» с «Календаря» скрыт, код и тексты не удалены —
+#: пригодится. Включается этим флагом (блок `to_inspect` тогда читается и рисуется).
+SHOW_TO_CHECK = False
 
-    Блок ушёл с «Проверок» (D418 → D466): он отвечает на вопрос «куда ехать», а
-    не «что проверено». Свой период, по умолчанию текущий месяц; охват и роли —
-    как были у блока на «Проверках».
+#: Предел чтения проверок для сетки: выше реестрового `REGISTRY_LIMIT` — месяцев
+#: на экране до `calendar_grid.MAX_MONTHS`, и обрезка посреди сетки хуже лишней строки.
+CALENDAR_LIMIT = 500
+
+
+def _register_calendar(app: Flask, conf: Settings) -> None:
+    """Раздел «Календарь» (D466, D477): проверки по дням месяца.
+
+    Данные — те же, что у реестра «Проверки» (`data.load_registry`, охват и роли
+    его), без новых запросов: принятые за период и ждущие приёмки с датой обхода
+    в периоде. Период — одна кнопка с меню, без стрелок; по умолчанию текущий месяц.
+    Страна — как на «Проверках».
     """
 
     @app.get(section("calendar").path)
     def calendar() -> str:
         язык = _lang(conf)
-        период = registry_period.read(request.args, today=date.today())
+        сегодня = date.today()
+        период = calendar_grid.clamp(registry_period.read(request.args, today=сегодня))
+        if период.start is None:
+            # «Всё время» сеткой не нарисовать: открытый адрес читается как текущий месяц.
+            период = registry_period.month_of(сегодня)
+        страна = request.args.get("country", "").strip().upper()[:2]
 
         def отбор(**изменения: str) -> str:
-            параметры = {**период.params(), "lang": язык, **изменения}
+            параметры = {**период.params(), "country": страна, "lang": язык, **изменения}
             return _url("calendar", **{к: з for к, з in параметры.items() if з})
 
+        охват = auth.current_reach()
+        гео = data.load_geography(reach=охват)
+        реестр = data.load_registry(
+            reach=охват, limit=CALENDAR_LIMIT, date_from=период.start, date_to=период.end
+        )
+        проверки = tuple(
+            row
+            for row in (*реестр.rows, *реестр.review)
+            if not row.retracted and (not страна or гео.get(row.unit_name, ("", ""))[0] == страна)
+        )
+        страны = tuple(
+            (код, sum(1 for row in реестр.rows if гео.get(row.unit_name, ("", ""))[0] == код))
+            for код in sorted({гео.get(row.unit_name, ("", ""))[0] for row in реестр.rows} - {""})
+        )
+        выбор_страны = (
+            _pick(
+                label=t("overview.filter.country", язык),
+                empty_title=t("overview.filter.all_countries", язык),
+                current=страна,
+                values=страны,
+                href=lambda значение: отбор(country=значение),
+                title=lambda код: country_title(код, язык),
+            )
+            if страны
+            else None
+        )
         hq = auth.current_tenant() == HQ_TENANT
+        to_check = (
+            to_inspect.load(reach=охват, date_from=период.start, date_to=период.end, top=None)
+            if SHOW_TO_CHECK
+            else to_inspect.Block()
+        )
+
+        def ссылка_дня(день: date, **доп: str) -> str:
+            return _url(
+                "registry",
+                **{"from": день.isoformat(), "to": день.isoformat(), "lang": язык, **доп},
+            )
+
         return render_template(
             "calendar/index.html",
-            to_check=to_inspect.load(
-                reach=auth.current_reach(), date_from=период.start, date_to=период.end, top=None
-            ),
+            months=calendar_grid.build(период, проверки, today=сегодня),
+            month_title=lambda первое: f"{t(f'registry.month.{первое.month}', язык)} {первое.year}",
+            day_link=ссылка_дня,
+            grade_tone=view.grade_tone,
+            pick_country=выбор_страны,
+            show_to_check=SHOW_TO_CHECK,
+            to_check=to_check,
             unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
             period=период,
             period_title=registry_view.period_title(период, язык),
-            period_prev=registry_view.period_link(период, -1, отбор),
-            period_next=registry_view.period_link(период, 1, отбор),
-            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
-            period_hidden={"lang": язык},
+            period_quick=registry_view.period_quick_months(период, сегодня, язык, отбор),
+            period_hidden={"lang": язык, **({"country": страна} if страна else {})},
         )
 
 
