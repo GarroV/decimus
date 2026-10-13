@@ -4,7 +4,7 @@
 шлёт, такие отправки — только по явному «да» владельца на текст и адресатов.
 Здесь бот отвечает лишь тому, кто спросил.
 
-Кого пускать — решает роль учётки, к которой привязан бот (`is_admin_role`:
+Кого пускать — решает роль учётки, к которой привязан бот (`refusals.read` в матрице:
 админ и главный админ). До D448 заслоном был круг доступа к MCP; круг снят, а
 второго списка «кто админ» в боте не заводится — он разошёлся бы с ролями
 учёток молча. Команды нет в меню — меню видят все аудиторы, а им она отвечает
@@ -25,9 +25,10 @@ from src.db import bot_links
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
-from src.domain.tenants import is_admin_role
+from src.domain.permissions import role_may
 
 from .. import stops
+from ..access import COMMAND_ACTIONS
 from ..lang import chat_ui_lang
 from ..texts import t
 
@@ -62,7 +63,9 @@ async def _admin(message: Message, lang: str) -> bool:
         logger.exception("привязка %s не прочиталась для /stops", log_id(user.id))
         await message.answer(t("stops.unreadable", lang))
         return False
-    if положение.binding is None or not is_admin_role(положение.binding.role):
+    привязка = положение.binding
+    действие = COMMAND_ACTIONS[STOPS_COMMAND]
+    if привязка is None or not role_may(привязка.role, привязка.tenant, действие):
         await message.answer(t("stops.not_admin", lang))
         return False
     return True

@@ -113,7 +113,7 @@
         <form method="post" action="{{ base }}/bot-unlink?lang={{ lang }}" class="sform">
           <button class="sbtn" type="submit">{{ t('profile.bot.unlink') }}</button>
         </form>
-      {% elif read_only %}
+      {% elif not may("inspection.conduct") %}
         <p class="ssec__text"><span class="sdot"></span>{{ t('settings.bot.read_only') }}</p>
       {% else %}
         <p class="ssec__text"><span class="sdot"></span>{{ t('profile.bot.unbound') }}</p>
