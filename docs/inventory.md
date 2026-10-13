@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 127 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 130 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -74,12 +74,15 @@
 | `/inspections` | GET | `registry` | `src/web/app.py` |
 | `/inspections/<inspection_id>` | GET | `card` | `src/web/app.py` |
 | `/inspections/<inspection_id>/accept` | POST | `do_accept` | `src/web/app.py` |
+| `/inspections/<inspection_id>/findings` | POST | `do_add_finding` | `src/web/app.py` |
+| `/inspections/<inspection_id>/findings/<finding_id>/photos` | POST | `do_add_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/findings/<finding_id>/revise` | POST | `do_revise` | `src/web/app.py` |
 | `/inspections/<inspection_id>/letter` | GET | `letter` | `src/web/app.py` |
 | `/inspections/<inspection_id>/letter/draft` | POST | `letter_draft` | `src/web/letter_draft.py` |
 | `/inspections/<inspection_id>/letter/save` | POST | `save_letter` | `src/web/app.py` |
 | `/inspections/<inspection_id>/move` | POST | `do_move` | `src/web/app.py` |
 | `/inspections/<inspection_id>/photos/<photo_id>` | GET | `photo` | `src/web/app.py` |
+| `/inspections/<inspection_id>/photos/<photo_id>/delete` | POST | `do_delete_photo` | `src/web/app.py` |
 | `/inspections/<inspection_id>/report` | GET | `report` | `src/web/app.py` |
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |

@@ -111,7 +111,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
@@ -137,6 +137,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
+| `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
@@ -308,7 +309,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -327,6 +328,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |
 | `src/db/retract.py` | T210, T233: снятие сданной проверки из истории |
+| `src/db/review_edit.py` | Правка проверки на приёмке сверх исправления записи: новая запись и кадры (D465) |
 | `src/db/revise.py` | Правка записи проверки на приёмке — вместе с пересчитанной оценкой (D200) |
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
@@ -338,7 +340,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -350,6 +352,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
+| `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
