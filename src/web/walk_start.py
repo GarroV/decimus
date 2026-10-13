@@ -332,7 +332,7 @@ def install(
 
     @app.post(START_PATH, endpoint=START_ENDPOINT)
     def walk_start() -> tuple[Response, int]:
-        who = identify(conf, ui_lang, header_only=True)
+        who = identify(conf, ui_lang, header_only=True, new_inspection=True)
         if not isinstance(who, int):
             return who
         body = request.get_json(silent=True)

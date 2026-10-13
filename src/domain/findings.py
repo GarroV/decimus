@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from .config import Settings
 from .engine import option, run_audit, state_file
 from .errors import EngineError, ValidationError
+from .handover import guard_writable
 from .models import SOURCES, Finding, Suggestion
 from .state import (
     check_confidence,
@@ -133,6 +134,7 @@ def add_finding(
     записи их не трогает (`edit_finding`), и это то же правило, что у
     предложения: разница между сказанным и записанным и есть весь сигнал.
     """
+    guard_writable(chat_id)
     settings = settings_for(chat_id)
     # До вызова движка: иначе запись есть, а источник у неё неизвестно какой.
     if source and source not in SOURCES:
@@ -199,6 +201,7 @@ def edit_finding(
     нарушение, это — сколько за него вычесть. И у него три состояния, а не два:
     `None` значит «не трогать», и без этого снять пометку было бы нечем.
     """
+    guard_writable(chat_id)
     settings = settings_for(chat_id)
     unknown = sorted(set(fields) - set(FIELD_OPTIONS))
     if unknown:
@@ -224,6 +227,7 @@ def edit_finding(
 
 def drop_finding(chat_id: int, n: int) -> None:
     """Удалить запись. Удалять нечего — отказ, а не тихий успех."""
+    guard_writable(chat_id)
     settings = settings_for(chat_id)
     run_audit(["drop", str(n)], chat_id=chat_id, settings=settings)
     path = state_file(chat_id, settings)
@@ -249,6 +253,7 @@ def attach_photo(chat_id: int, n: int, file_id: str) -> None:
     сборке отчёта. Запятая в идентификаторе запрещена не из вредности: движок
     режет по ней список, и один кадр молча превратился бы в два несуществующих.
     """
+    guard_writable(chat_id)
     settings = settings_for(chat_id)
     photo = _clean_photo(file_id, f"записи #{n}")
     run_audit(["photo", str(n), option("add", photo)], chat_id=chat_id, settings=settings)
@@ -272,6 +277,7 @@ def detach_photo(chat_id: int, n: int, ref: str) -> Finding:
     снятия вернули бы уже снятый кадр, а снятие рядом с доснятым ботом кадром
     стёрло бы его (ревью 07.10.2026).
     """
+    guard_writable(chat_id)
     settings = settings_for(chat_id)
     photo = _clean_photo(ref, f"записи #{n}")
     run_audit(["photo", str(n), option("remove", photo)], chat_id=chat_id, settings=settings)

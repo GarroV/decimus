@@ -21,6 +21,7 @@ from collections.abc import Sequence
 
 from .engine import option, run_audit
 from .errors import EngineError, ValidationError
+from .handover import guard_writable
 from .state import read_state, settings_for
 
 
@@ -48,6 +49,7 @@ def set_info(chat_id: int, code: str, text: str, *, photos: Sequence[str] = ()) 
     проверяется на непустоту, потому что пустой `--qid` движок принял бы за
     ключ без значения и отказал бы невнятно.
     """
+    guard_writable(chat_id)
     clean_code = code.strip()
     if not clean_code:
         raise ValidationError("Код информационного пункта пустой: записывать нечего")
