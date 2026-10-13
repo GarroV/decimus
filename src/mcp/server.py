@@ -268,13 +268,16 @@ class _Handler(BaseHTTPRequestHandler):
 
     def _post(self) -> None:
         rate: McpRate = self.server.rate  # type: ignore[attr-defined]
-        # Предел по адресу — до разбора токена: перебор токенов тоже запросы.
-        if not rate.by_address.allow(str(self.client_address[0])):
-            self._send_rate_limited()
-            return
         try:
             доступ = resolve_access(self._settings, self.headers.get("Authorization"))
         except AuthError as отказ:
+            # Предел по адресу считает только НЕУДАЧНЫЕ попытки (перебор
+            # токенов). Клиенты приходят через общий прокси, то есть с одного
+            # адреса: стой адресный предел до токена, посторонний без токена
+            # выедал бы его у всех, у кого токен есть.
+            if not rate.by_address.allow(str(self.client_address[0])):
+                self._send_rate_limited()
+                return
             # Ни имени арендатора, ни токена: по отказу нельзя перечислить,
             # какие партнёры вообще заведены на этом сервере.
             self._send(HTTPStatus.UNAUTHORIZED, {"error": str(отказ)})
