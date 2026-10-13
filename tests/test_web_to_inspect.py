@@ -1,6 +1,7 @@
-"""«Где нужно проверить» на экране «Проверки» (D418): отбор точек, охват, показ.
+"""«Где нужно проверить» на экране «Календарь» (D466): отбор точек, охват, показ.
 
-Блок переехал с «Главной»; его логика — та же, что была там (D399). Сторожится:
+Блок переехал с «Главной» (D418), затем с «Проверок» (D466); логика та же (D399).
+Сторожится:
 кто попадает в ряд и в каком порядке, что чтение идёт в охвате вошедшего, что
 пустой блок не показывается, а отказ базы называется строкой, а не тишиной.
 """
@@ -134,65 +135,69 @@ def test_отказ_базы_блок_называет_а_не_прячет(monk
     assert блок.failed and блок.shown
 
 
-def test_реестр_показывает_блок_над_списком(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_календарь_показывает_блок(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3", "Ниш-1", ещё=2))
 
     # Act
-    страница = стенд.get("/inspections").get_data(as_text=True)
+    страница = стенд.get("/calendar").get_data(as_text=True)
 
     # Assert
     assert t_ru("registry.tocheck.title") in страница
     assert "Нови-Сад-3" in страница and "и ещё 2" in страница
-    assert страница.index(t_ru("registry.tocheck.title")) < страница.index("Белград-1")
     assert "ни разу не проверяли" in страница and "последняя 2026-07-01" in страница
 
 
-def test_реестр_пустой_блок_не_показывает(стенд: FlaskClient) -> None:
+def test_проверки_блока_больше_не_показывают(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D466: «Где нужно проверить» ушёл с «Проверок» и там не читается вовсе."""
+    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3"))
+
     страница = стенд.get("/inspections").get_data(as_text=True)
 
-    assert t_ru("registry.tocheck.title") not in страница
+    assert t_ru("registry.tocheck.title") not in страница and "Нови-Сад-3" not in страница
 
 
-def test_реестр_отказ_блока_называется_строкой(
+def test_календарь_пустой_блок_одна_тихая_строка(стенд: FlaskClient) -> None:
+    страница = стенд.get("/calendar").get_data(as_text=True)
+
+    assert t_ru("calendar.tocheck.empty") in страница
+
+
+def test_календарь_отказ_блока_называется_строкой(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block(failed=True))
 
-    страница = стенд.get("/inspections").get_data(as_text=True)
+    страница = стенд.get("/calendar").get_data(as_text=True)
 
     assert t_ru("registry.tocheck.failed") in страница
 
 
-def test_реестр_передаёт_блоку_период_страну_и_город(
+def test_календарь_читает_свой_период_по_умолчанию_месяц(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     # Arrange
-    спросили: dict[str, object] = {}
-    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.update(kw) or to_inspect.Block())
+    спросили: list[dict[str, object]] = []
+    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or to_inspect.Block())
 
     # Act
-    стенд.get("/inspections?from=2026-09-01&to=2026-09-30&country=RS&city=beograd")
+    стенд.get("/calendar?from=2026-09-01&to=2026-09-30")
+    стенд.get("/calendar")
 
     # Assert
-    assert (спросили["date_from"], спросили["date_to"]) == (date(2026, 9, 1), date(2026, 9, 30))
-    assert (спросили["country"], спросили["city"]) == ("RS", "beograd")
+    assert (спросили[0]["date_from"], спросили[0]["date_to"]) == (
+        date(2026, 9, 1),
+        date(2026, 9, 30),
+    )
+    начало = спросили[1]["date_from"]
+    assert isinstance(начало, date) and начало.day == 1 and спросили[1]["date_to"] is not None
 
 
-def test_отбор_по_букве_блок_прячет(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    """У точек без проверок нет буквы: при отборе по ней блок противоречил бы отбору."""
-    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3"))
-
-    страница = стенд.get("/inspections?grade=D").get_data(as_text=True)
-
-    assert "Нови-Сад-3" not in страница
-
-
-def test_блок_по_английски(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_календарь_по_английски(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3", ещё=1))
 
-    страница = стенд.get("/inspections?lang=en").get_data(as_text=True)
+    страница = стенд.get("/calendar?lang=en").get_data(as_text=True)
 
     assert "Where to inspect" in страница and "and 1 more" in страница
