@@ -64,8 +64,14 @@ _ВСЁ_УК = frozenset(
     ("HQ", "guest"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
     ("HQ", "auditor"): frozenset(),
     ("HQ", "control"): frozenset({KIND_RATINGS_READ, KIND_RATINGS}),
-    ("RS", "admin"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
-    ("RS", "auditor"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
+    # Админ партнёра (D460): методика его пространства — как в вебе.
+    ("RS", "admin"): frozenset(
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+    ),
+    # Сотрудник партнёра (D460): методика на чтение, как в вебе; правящие инструменты закрыты.
+    ("RS", "auditor"): frozenset(
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+    ),
 }
 
 
@@ -129,7 +135,17 @@ def _виды(имена: set[str]) -> set[str]:
 
 #: Инструменты открытого роли вида, закрытые ей своим действием (D440): указатель
 #: прода двигают только админы.
-ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ: dict[tuple[str, str], set[str]] = {("HQ", "developer"): {"apply_checklist"}}
+ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ: dict[tuple[str, str], set[str]] = {
+    ("HQ", "developer"): {"apply_checklist"},
+    # Указатель прода один на всю сеть и в пространстве партнёра не двигается (D460).
+    ("RS", "admin"): {"apply_checklist", "uncovered_phrases"},
+}
+#: Правящие инструменты методики закрыты сотруднику партнёра (читает, но не правит).
+ПИШУЩИЕ_МЕТОДИКИ = {spec.name for spec in TOOLS if spec.kind == KIND_CHECKLIST and spec.writes}
+ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ[("RS", "auditor")] = ПИШУЩИЕ_МЕТОДИКИ | {
+    "apply_checklist",
+    "uncovered_phrases",
+}
 
 
 @pytest.mark.parametrize(("арендатор", "роль"), sorted(МАТРИЦА))
@@ -205,3 +221,29 @@ def test_контроль_не_читает_проверки_даже_с_пра�
     ответ = _вызов("network_summary", tenant="HQ", role="control", may_retract=True)
 
     assert ответ["result"]["isError"] is True
+
+
+def test_админу_партнёра_указатель_прода_отказом_словами() -> None:
+    ответ = _вызов("apply_checklist", tenant="RS", role="admin")
+
+    assert ответ["result"]["isError"] is True
+    assert "применяет только УК" in ответ["result"]["content"][0]["text"]
+
+
+def test_админу_партнёра_открыты_инструменты_методики_кроме_указателя_прода() -> None:
+    """D460: в `tools/list` у админа партнёра есть и чтение, и правка методики."""
+    имена = _список(tenant="RS", role="admin")
+    методика = {spec.name for spec in TOOLS if spec.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE)}
+
+    assert методика - {"apply_checklist", "uncovered_phrases"} <= имена
+    assert {"checklists", "edit_checklist_item", "publish_checklist_version"} <= имена
+    assert "checklist_source" in имена
+    assert not {"apply_checklist", "uncovered_phrases"} & имена
+
+
+def test_сотруднику_партнёра_в_claude_методика_только_на_чтение() -> None:
+    """D460: как в вебе — читает, не правит (D342 про правку и занесение остаётся)."""
+    имена = _список(tenant="RS", role="auditor")
+
+    assert {"checklists", "checklist_items", "checklist_source"} <= имена
+    assert not ПИШУЩИЕ_МЕТОДИКИ & имена
