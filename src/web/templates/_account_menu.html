@@ -1,0 +1,56 @@
+{#
+  Меню учётки поверх страницы (D468): одно на страницу, открывается из блока
+  учётки внизу панели (компьютер) или из аватара в верхней полосе (телефон).
+  Содержимое: шапка (кто), подключения, тема, язык, «Все настройки», «Выйти».
+
+  Компонент — `.popover` ядра; положение и раскладка — `decimus-web.css`
+  (`.acct-menu`). Без скрипта меню остаётся скрытым, а блок учётки — обычной
+  ссылкой в «Настройки» (прогрессивное улучшение: `shell.js`).
+
+  Подключения подгружаются фрагментом при первом открытии (`data-src`): их
+  состояния стоят трёх запросов в базу, и платить их каждой странице незачем.
+  До ответа (или без него) строки — просто ссылки в нужный раздел.
+#}
+<div class="popover acct-menu" id="acct-menu" role="menu" aria-label="{{ t('menu.title') }}" tabindex="-1" hidden>
+  <div class="acct-menu__head">
+    {{ acct_avatar('avatar--lg') }}
+    <div class="acct-menu__who">
+      <b>{{ shown_name }}</b>
+      {% if account.email %}<span class="acct-menu__mail">{{ account.email }}</span>{% endif %}
+      <small>{{ t(role_key(account.role, account.tenant)) }} · {{ tenant }}</small>
+    </div>
+  </div>
+
+  <div class="popover__group" role="presentation">{{ t('menu.connections') }}</div>
+  <div class="acct-menu__conns" role="none" data-src="{{ url('/settings/menu') }}">
+    {% set rows = [
+      {'key': 'settings.claude.title', 'anchor': 'claude', 'state': none},
+      {'key': 'settings.bot.title', 'anchor': 'bot', 'state': none},
+      {'key': 'settings.google.title', 'anchor': 'google', 'state': none},
+    ] %}
+    {% include "_account_menu_connections.html" %}
+  </div>
+
+  <div class="acct-menu__line" role="group" aria-label="{{ t('menu.theme') }}">
+    <span class="acct-menu__label">{{ t('menu.theme') }}</span>
+    {{ theme_pick() }}
+  </div>
+  <div class="acct-menu__line" role="group" aria-label="{{ t('menu.lang') }}">
+    <span class="acct-menu__label">{{ t('menu.lang') }}</span>
+    {% include "_langpick.html" %}
+  </div>
+
+  <a class="popover__row acct-menu__row" role="menuitem" href="{{ settings_url }}">
+    <span class="acct-menu__name">{{ t('menu.all_settings') }}</span>
+  </a>
+
+  <div class="popover__foot acct-menu__foot">
+    {#
+      Выход — форма, а не ссылка: по ссылке его запустила бы картинка на чужой
+      странице, выбив человека из админки без единого его движения.
+    #}
+    <form class="acct-menu__logout" method="post" action="{{ url(logout_path) }}" role="none">
+      <button class="acct-menu__out" type="submit" role="menuitem">{{ icon('arrow') }}<span>{{ t('auth.logout') }}</span></button>
+    </form>
+  </div>
+</div>

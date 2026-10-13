@@ -141,3 +141,52 @@ def test_домен_workspace_читается_из_токена() -> None:
 
 def test_личный_аккаунт_домена_не_несёт() -> None:
     assert identity_from_id_token(токен(), client_id=НАШ_КЛИЕНТ).hosted_domain == ""
+
+
+# ── Имя и фото в токене (D468) ───────────────────────────────────────────
+
+
+def test_имя_берётся_из_name_токена() -> None:
+    кто = identity_from_id_token(
+        токен(name="  Иван   Петров ", picture="https://lh3.googleusercontent.com/a/x=s96-c"),
+        client_id=НАШ_КЛИЕНТ,
+    )
+
+    assert кто.name == "Иван Петров"
+    assert кто.picture == "https://lh3.googleusercontent.com/a/x=s96-c"
+
+
+def test_без_name_имя_собирается_из_имени_и_фамилии() -> None:
+    кто = identity_from_id_token(
+        токен(given_name="Иван", family_name="Петров"), client_id=НАШ_КЛИЕНТ
+    )
+
+    assert кто.name == "Иван Петров"
+
+
+def test_нет_имени_и_фото_значит_пусто() -> None:
+    кто = identity_from_id_token(токен(), client_id=НАШ_КЛИЕНТ)
+
+    assert кто.name == "" and кто.picture == ""
+
+
+def test_имя_не_строка_и_управляющие_знаки_не_проходят() -> None:
+    assert identity_from_id_token(токен(name=42), client_id=НАШ_КЛИЕНТ).name == ""
+    грязное = identity_from_id_token(токен(name="Иван‮\x00\nПетров"), client_id=НАШ_КЛИЕНТ)
+    assert "\x00" not in грязное.name and "\n" not in грязное.name
+
+
+def test_имя_и_адрес_фото_ограничены_по_длине() -> None:
+    кто = identity_from_id_token(
+        токен(name="я" * 500, picture="https://x.googleusercontent.com/" + "a" * 600),
+        client_id=НАШ_КЛИЕНТ,
+    )
+
+    assert len(кто.name) == 120
+    assert кто.picture == ""
+
+
+def test_имя_из_токена_чужого_приложения_не_берётся() -> None:
+    """Имя читается ПОСЛЕ проверки `aud`: чужой токен не доходит до разбора имени."""
+    with pytest.raises(GoogleAuthError):
+        identity_from_id_token(токен(aud="чужой", name="Иван"), client_id=НАШ_КЛИЕНТ)

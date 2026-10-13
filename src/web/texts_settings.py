@@ -220,4 +220,13 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Password, bot, Claude and language are in “Settings”.",
     },
     "users.panel.open_settings": {"ru": "Открыть «Настройки»", "en": "Open “Settings”"},
+    # Меню учётки поверх страницы (D468).
+    "menu.title": {"ru": "Меню учётки", "en": "Account menu"},
+    "menu.connections": {"ru": "Подключения", "en": "Connections"},
+    "menu.on": {"ru": "Подключено", "en": "Connected"},
+    "menu.off": {"ru": "Не подключено", "en": "Not connected"},
+    "menu.unknown": {"ru": "Не удалось узнать", "en": "Could not check"},
+    "menu.theme": {"ru": "Тема", "en": "Theme"},
+    "menu.lang": {"ru": "Язык", "en": "Language"},
+    "menu.all_settings": {"ru": "Все настройки", "en": "All settings"},
 }

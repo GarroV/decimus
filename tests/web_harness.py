@@ -54,6 +54,8 @@ class Учётка:
         email: str | None = None,
         web_lang: str | None = None,
         signed_in_at: datetime | None = None,
+        display_name: str | None = None,
+        avatar_etag: str | None = None,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
@@ -68,6 +70,10 @@ class Учётка:
         # Язык сайта из профиля (`web_users.web_lang`, 0061): по умолчанию не
         # выбран — страницы говорят языком стенда.
         self.web_lang = web_lang
+        # Имя и версия фото из Google (`web_users`, 0063): по умолчанию нет —
+        # блок учётки показывает логин и инициалы.
+        self.display_name = display_name
+        self.avatar_etag = avatar_etag
         # Когда открыта сессия: по умолчанию только что — вход свежий, и
         # действия, требующие свежего входа (`web.reauth`), не переспрашивают.
         self.signed_in_at = signed_in_at or datetime.now(UTC)

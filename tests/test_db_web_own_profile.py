@@ -25,6 +25,8 @@ from src.db.web_access import (  # noqa: E402
 from src.db.web_own_profile import (  # noqa: E402
     begin_google_link,
     finish_google_link,
+    own_avatar,
+    save_google_profile,
     set_web_lang,
     unlink_google,
 )
@@ -186,3 +188,83 @@ def test_язык_сайта_хранится_за_учёткой(обе_рол�
     with pytest.raises(AccessError):
         set_web_lang(сессия.token, "english")
     assert set_web_lang("нет-такой-сессии", "ru") is False
+
+
+# ── Имя и фото из Google (D468, 0063) ─────────────────────────────────
+
+ФОТО = b"\xff\xd8\xff\xe0" + b"photo-of-director"
+ФОТО_ДРУГОГО = b"\x89PNG\r\n\x1a\n" + b"photo-of-somebody"
+
+
+def test_имя_и_фото_пишутся_своей_учётке_и_приезжают_с_сессией(обе_роли: str) -> None:
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    сессия = open_session(учётка)
+
+    assert save_google_profile(
+        сессия.token, name=" Иван Петров ", avatar=ФОТО, avatar_type="image/jpeg"
+    )
+
+    вошедший = resolve_session(сессия.token)
+    assert вошедший is not None
+    assert вошедший.display_name == "Иван Петров"
+    assert вошедший.avatar_etag is not None and len(вошедший.avatar_etag) == 16
+    assert own_avatar(сессия.token) == (ФОТО, "image/jpeg", вошедший.avatar_etag)
+
+
+def test_своё_фото_отдаётся_по_сессии_а_чужое_нет(обе_роли: str) -> None:
+    первая = open_session(create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    вторая = open_session(create_account("other", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    save_google_profile(первая.token, name="Первый", avatar=ФОТО, avatar_type="image/jpeg")
+    save_google_profile(вторая.token, name="Второй", avatar=ФОТО_ДРУГОГО, avatar_type="image/png")
+
+    assert own_avatar(первая.token) is not None and own_avatar(первая.token)[0] == ФОТО
+    assert own_avatar(вторая.token) is not None and own_avatar(вторая.token)[0] == ФОТО_ДРУГОГО
+    assert own_avatar("токен-которого-нет") is None
+
+
+def test_запись_без_живой_сессии_ничего_не_пишет(обе_роли: str) -> None:
+    учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
+    сессия = open_session(учётка)
+
+    assert (
+        save_google_profile("чужой-токен", name="Взломщик", avatar=ФОТО, avatar_type="image/jpeg")
+        is False
+    )
+    вошедший = resolve_session(сессия.token)
+    assert вошедший is not None and вошедший.display_name is None and вошедший.avatar_etag is None
+
+
+def test_пустое_значение_прежнее_не_затирает(обе_роли: str) -> None:
+    сессия = open_session(create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+    save_google_profile(сессия.token, name="Иван Петров", avatar=ФОТО, avatar_type="image/jpeg")
+
+    save_google_profile(сессия.token, name=None, avatar=None, avatar_type=None)
+    save_google_profile(сессия.token, name="  ", avatar=None, avatar_type=None)
+
+    вошедший = resolve_session(сессия.token)
+    assert вошедший is not None and вошедший.display_name == "Иван Петров"
+    assert own_avatar(сессия.token) is not None
+
+
+def test_фото_выше_предела_база_не_принимает(обе_роли: str) -> None:
+    сессия = open_session(create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+
+    with pytest.raises(AccessError):
+        save_google_profile(
+            сессия.token, name=None, avatar=ФОТО + b"\x00" * 204800, avatar_type="image/jpeg"
+        )
+
+
+def test_роль_приложения_сама_колонки_профиля_не_пишет(обе_роли: str, pg_dsn: str) -> None:
+    """Запись — только функцией по сессии: прямой `update` ролью приложения отказан."""
+    from src.db.config import check_environment
+    from src.db.pool import connection
+
+    open_session(create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ))
+
+    with (
+        pytest.raises(psycopg.errors.InsufficientPrivilege),
+        connection(check_environment().dsn) as conn,
+        conn.cursor() as cur,
+    ):
+        cur.execute("update web_users set display_name = 'Взломщик'")

@@ -235,7 +235,8 @@ _OPEN_SESSION_SQL = """
 #: «а жива ли учётка» это быть не может: между двумя запросами помещается
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
-    select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang, s.issued_at
+    select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang, s.issued_at,
+           u.display_name, u.avatar_etag
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -331,6 +332,12 @@ class Account:
     #: учётка пришла не из сессии (вход, опознание по почте). По нему действия,
     #: создающие долгоживущий доступ, требуют свежего входа (`web.reauth`).
     signed_in_at: datetime | None = None
+    #: Имя и фамилия из Google (`web_users.display_name`, `0063`); `None` —
+    #: показывается логин. Приезжает с сессией, как язык.
+    display_name: str | None = None
+    #: Версия фото из Google (`web_users.avatar_etag`, `0063`); `None` — фото
+    #: нет, показываются инициалы. Сами байты с сессией не едут.
+    avatar_etag: str | None = None
 
 
 @dataclass(frozen=True)
@@ -908,6 +915,8 @@ def resolve_session(token: str) -> Account | None:
         email=row[4],
         web_lang=row[5],
         signed_in_at=row[6],
+        display_name=row[7],
+        avatar_etag=row[8],
     )
 
 
