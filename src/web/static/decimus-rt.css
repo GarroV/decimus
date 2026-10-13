@@ -361,4 +361,7 @@
   .rt-tbl--stack .rt-stack__lead { justify-content: flex-start; font-weight: var(--w-semibold); color: var(--ink); text-align: left; }
   .rt-tbl--stack .rt-stack__lead::before { content: none; }
   .rt-tbl--stack tbody tr:hover > * { background: transparent; }
+  /* Длинная подпись (счётчики, формат, примечание) — строкой над значением, иначе значение уезжает за край. */
+  .rt-tbl--stack .rt-stack__wide { flex-direction: column; align-items: flex-start; gap: 0; text-align: left; }
+  .rt-tbl--stack .rt-stack__empty { display: none; }
 }
