@@ -38,6 +38,7 @@ add_finding(chat_id: int, code: str, level: str, zone: str, text: str, *,
             comment: str = "", source: str = "") -> Finding   # source: SOURCE_COMMENT | SOURCE_PHOTO
 edit_finding(chat_id: int, n: int, **fields: str) -> Finding   # code, level, zone, text, comment
 drop_finding(chat_id: int, n: int) -> None
+guard_writable(chat_id: int) -> None   # HandedOverError, если проверка сдана; внутри add/edit/drop/attach/detach_photo, set_info, set_report_lang, sync_checklist_version
 attach_photo(chat_id: int, n: int, file_id: str) -> None
 score(chat_id: int) -> Score
 sync_checklist_version(chat_id: int) -> Inspection   # перевести проверку на действующую методику

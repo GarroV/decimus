@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import io
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,7 @@ import pytest
 from PIL import Image
 from test_web_walk import АУДИТОР, ТОКЕН, _приложение, подписать
 
-from src.db.bot_links import NEVER_BOUND, Standing
+from src.db.bot_links import NEVER_BOUND, Binding, Standing
 from src.domain import get_state, start_inspection
 from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
 from src.web import walk, walk_access, walk_write
@@ -404,3 +405,32 @@ def test_у_рекомендации_последний_кадр_снимает�
 
     assert ответ.status_code == 200, ответ.get_json()
     assert get_state(АУДИТОР).findings[0].photos == []  # type: ignore[union-attr]
+
+
+# ── чужое пространство (F-098/F-114) ───────────────────────────────────────
+
+
+ЧУЖОЙ = АУДИТОР + 3
+
+
+def test_проверка_чужого_пространства_не_читается_и_не_пишется(
+    клиент: Клиент, domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Проверка осталась от пространства HQ, а человек теперь из GE: отказ без подробностей."""
+    start_inspection(ЧУЖОЙ, unit="Белград-1", kind="planned", report_lang="ru", ui_lang="ru")
+    monkeypatch.setattr(
+        walk_access.bot_links,
+        "standing",
+        lambda _: Standing.live(Binding(ЧУЖОЙ, "u", "login", "GE", datetime.now(UTC), "auditor")),
+    )
+    чужой = Клиент(клиент.c, ЧУЖОЙ)
+    ref = "tg-photo-1"
+    до = get_state(ЧУЖОЙ)
+
+    экран = чужой.c.post(walk.DATA_PATH, data=чужой.init, content_type="text/plain")
+    запись = чужой.запись(**_нарушение(ref))
+    сведение = чужой.сведение(code="INF06", value="что-то")
+
+    assert (экран.status_code, запись.status_code, сведение.status_code) == (403, 403, 403)
+    assert запись.get_json() == {"error": "forbidden"}, "отказ с подробностями"
+    assert get_state(ЧУЖОЙ) == до

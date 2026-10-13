@@ -180,14 +180,17 @@ def test_в_меню_тема_язык_все_настройки_и_выход_�
     assert "langpill" in меню
     assert "Все настройки" in меню
     assert '<form class="acct-menu__logout" method="post"' in меню
-    for якорь in ("#claude", "#bot", "#google"):
-        assert якорь in меню
+    for плитка in ("tile=claude", "tile=bot", "tile=google"):
+        assert плитка in меню
 
 
-def test_строки_темы_и_языка_убраны_из_подвала_панели(клиент: FlaskClient) -> None:
+def test_в_подвале_панели_тема_язык_и_кнопка_настроек_одной_строкой(клиент: FlaskClient) -> None:
     страница = клиент.get("/settings").get_data(as_text=True)
+    строка = страница[страница.index('class="sidenav__prefs"') :]
+    строка = строка[: строка.index('class="sidenav__user"')]
 
-    assert "sidenav__prefs" not in страница
+    assert "data-theme-value" in строка and "langpill" in строка
+    assert 'class="sidenav__gear is-current"' in строка, "на «Настройках» кнопка не подсвечена"
     assert 'class="logout"' not in страница, "стрелка выхода осталась в блоке учётки"
 
 

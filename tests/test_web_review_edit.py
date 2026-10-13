@@ -142,7 +142,7 @@ def test_отказ_двери_показан_текстом(стенд: FlaskCl
     _приёмка(monkeypatch)
 
     def отказать(*_a: Any, **_k: Any) -> None:
-        raise ReviseError("Проверка уже принята")
+        raise ReviseError("Проверка уже принята", code="revise_accepted")
 
     monkeypatch.setattr(revision, "add_card", отказать)
     monkeypatch.setattr(revision, "detach_photo", отказать)

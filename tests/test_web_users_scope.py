@@ -22,7 +22,7 @@ from flask.testing import FlaskClient
 from web_harness import ЛОГИН, СВОЙ, войти, подменить_двери, собрать
 
 from src.db import bot_links
-from src.db.errors import AccessError
+from src.db.errors import AccessError, EmailTakenError
 from src.web import accounts, partner_spaces
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
@@ -479,3 +479,43 @@ def test_тексты_экрана_есть_по_английски(
 
     for текст in ("Partner spaces", "Super admin", "Add countries", "Every space"):
         assert текст in страница, текст
+
+
+def _занять_почту(monkeypatch: pytest.MonkeyPatch) -> None:
+    def set_email(login: str, *, tenant: str, email: Any, only_roles: Any = None) -> bool:
+        raise EmailTakenError("почта у другой учётки")
+
+    monkeypatch.setattr(accounts, "set_email", set_email)
+
+
+def test_партнёр_не_узнаёт_что_почта_занята_в_другом_пространстве(
+    админ_GE: FlaskClient, monkeypatch: pytest.MonkeyPatch, база: Any
+) -> None:
+    """F-031: «почта занята» партнёру не называется — иначе он перебирает адреса сети."""
+    _занять_почту(monkeypatch)
+
+    ответ = админ_GE.post(
+        "/users/email",
+        data={"login": "gia", "tenant": "GE", "email": "someone@dodobrands.io"},
+        headers=ЗАГОЛОВКИ,
+    )
+    страница = ответ.get_data(as_text=True)
+
+    assert ответ.status_code == 400
+    assert "уже привязана" not in страница
+    assert "не удалось привязать" in страница
+
+
+def test_админ_ук_по_занятой_почте_видит_причину_прямо(
+    админ_уК: FlaskClient, monkeypatch: pytest.MonkeyPatch, база: Any
+) -> None:
+    _занять_почту(monkeypatch)
+
+    ответ = админ_уК.post(
+        "/users/email",
+        data={"login": "petr", "tenant": "HQ", "email": "someone@dodobrands.io"},
+        headers=ЗАГОЛОВКИ,
+    )
+
+    assert ответ.status_code == 409
+    assert "уже привязана" in ответ.get_data(as_text=True)

@@ -10,7 +10,7 @@
 | `dodo-ds.css` | `dodo/core/dodo-ds.css` | `4641dd5` (тема капсулой, 30.09.2026) |
 | `decimus-domain.css` | `dodo/decimus/domain.css` | `f70045d` |
 | `fonts/*.woff2` (13 файлов) | `dodo/core/fonts/` | `f70045d` |
-| `icons.json` | `dodo/core/icons.json` | `e9df93a` (значок `mail`, 13.10.2026) |
+| `icons.json` | `dodo/core/icons.json` | `151c3d4` (значок `sliders`, ветка forma#14, 13.10.2026) |
 | `mark-small.svg`, `icon-32.png`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` | `dodo/brand/decimus/` | `bdf2787` (знак «Глитч-мрамор» 04.10.2026, ободок плитки 05.10.2026 — D186) |
 
 Знак продукта приехал 04.10.2026 (D185 в MERIDIUS, раздел от 04.10.2026 в
@@ -36,7 +36,7 @@ Plex Mono, радиусы, левая и выдвижная панели, наб
 ```
 2d3818f93ebfc1825150fafd8d6c1d00eca460823d301cf0117cbf1d6954147d  dodo-ds.css
 1ffcb01978cdccc944efffb8e34ceccc33df5a23357c805568c50695708a2db5  decimus-domain.css
-fbf80732fc62bb703a98ba499c273c130fbf93ff2200274f4bec908f2cee2ed1  icons.json
+cf8c1b3edd7ede013c7e981098965b7da685afb281aa4738b3b2583155d7ac01  icons.json
 70cf502d77aa23c8a573db8853f20a8db705d18414d170f257a9e939113aad47  fonts/golos-text-cyrillic-ext.woff2
 17d048ca05cb1218af3c0d6dcdf882989e6d1cc5dcb598ea50eaf54850ff7229  fonts/golos-text-cyrillic.woff2
 05befabe4813f41238ce6ea4f5ecd6b758591e9ef2f303a9932bff68ba66dc66  fonts/golos-text-latin-ext.woff2

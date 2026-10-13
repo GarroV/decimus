@@ -22,7 +22,14 @@ from .checklist import (
 )
 from .config import check_environment
 from .findings import add_finding, attach_photo, detach_photo, drop_finding, edit_finding
-from .handover import HandedOverError, handed_over, holding_notes, reset_notes, while_open
+from .handover import (
+    HandedOverError,
+    guard_writable,
+    handed_over,
+    holding_notes,
+    reset_notes,
+    while_open,
+)
 from .info import set_info
 from .kinds import INSPECTION_KINDS, kind_title
 from .models import (
@@ -103,6 +110,7 @@ __all__ = [
     "edit_finding",
     "get_item",
     "get_state",
+    "guard_writable",
     "handed_over",
     "holding_notes",
     "is_upload_ref",
