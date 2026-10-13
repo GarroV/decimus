@@ -1,0 +1,29 @@
+{#
+  «Продолжить действие» (`web.reauth`, D457): вход подтверждён, и то, что человек
+  просил до подтверждения, выполняется одной кнопкой — POST с проверкой
+  происхождения. `GET /settings` сам действие не выполняет: изменение состояния
+  на GET мог бы вызвать чужой сайт, пока намерение заряжено.
+#}{% extends "base.html" %}
+{% block title %}{{ t('settings.continue.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+{% endblock %}
+{% block page_class %} page--settings{% endblock %}
+{% block body %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('settings.continue.title') }}</h1>
+      <p class="shead__sub">{{ account.login }}</p>
+    </div>
+  </header>
+  <article class="sdetail ssettings">
+    <section class="ssec" id="continue">
+      <p class="ssec__text">{{ t('settings.continue.why', action=t('settings.continue.' ~ action)) }}</p>
+      <form method="post" action="{{ url('/settings/continue') }}" class="sform">
+        <button class="sbtn sbtn--primary" type="submit" autofocus>{{ t('settings.continue.submit') }}</button>
+      </form>
+      <p class="ssec__note"><a href="{{ url('/settings') }}?lang={{ lang }}">{{ t('settings.confirm.back') }}</a></p>
+    </section>
+  </article>
+{% endblock %}
