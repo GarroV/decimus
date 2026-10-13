@@ -22,7 +22,7 @@ psycopg = pytest.importorskip("psycopg")
 from src.db import action_plans as plans  # noqa: E402
 from src.db.accept import accept_inspection  # noqa: E402
 from src.db.action_plans import _OPEN_SQL  # noqa: E402
-from src.db.errors import AcceptError, ActionPlanError  # noqa: E402
+from src.db.errors import AcceptError, ActionPlanError, MoveError  # noqa: E402
 from src.db.move import move_inspection  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
 from src.db.retract import retract_inspection  # noqa: E402
@@ -455,28 +455,60 @@ def test_админская_связь_не_та_что_у_приложения(
 # --- страна — у точки, а не копией в запросе (ревью #495, п.2) -----------------
 
 
-def test_перенос_в_точку_другой_страны_уводит_запрос(сеть: None, склад: Хранилище) -> None:
-    """Проверку перенесли в Армению — план кладёт Армения, Грузия запроса не видит."""
+def test_перенос_с_планом_в_точку_другой_страны_отказан(сеть: None, склад: Хранилище) -> None:
+    """GHSA-wqh3: запрос и файлы плана не уходят партнёру другой страны переносом."""
     # Arrange
     запрос = _запрос(_принятая("D2"))
     ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
 
-    # Act
-    move_inspection(
+    # Act / Assert
+    with pytest.raises(MoveError, match="экшн-план"):
+        move_inspection(
+            запрос.inspection_id,
+            tenant="HQ",
+            new_date=СЕГОДНЯ,
+            new_unit_id=ереван,
+            reason="не та точка",
+            actor="hq",
+        )
+    assert _запрос(запрос.inspection_id).country == "GE"
+    assert plans.get_request(запрос.id, reach=reach_of("AM")) is None
+
+
+def test_база_сама_отвергает_перенос_с_планом_в_другую_страну(сеть: None, admin_env: str) -> None:
+    """Мимо `move_inspection`: прямая правка шапки тоже упирается в триггер 0066."""
+    запрос = _запрос(_принятая("D2"))
+    ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
+    with pytest.raises(psycopg.errors.CheckViolation, match="экшн-планом"):
+        with psycopg.connect(admin_env) as conn:
+            conn.execute("select set_config('decimus.move_reason', 'x', true)")
+            conn.execute("select set_config('decimus.move_actor', 'x', true)")
+            conn.execute(
+                "update inspections set unit_id = %s where id = %s",
+                (ереван, запрос.inspection_id),
+            )
+
+
+def test_перенос_внутри_страны_с_планом_проходит(сеть: None) -> None:
+    запрос = _запрос(_принятая("D2"))
+    вторая = точка_справочника("Batumi-2", country="GE", city="Batumi")
+    assert move_inspection(
         запрос.inspection_id,
         tenant="HQ",
         new_date=СЕГОДНЯ,
-        new_unit_id=ереван,
+        new_unit_id=вторая,
         reason="не та точка",
         actor="hq",
     )
+    assert _запрос(запрос.inspection_id).country == "GE"
 
-    # Assert
-    assert _запрос(запрос.inspection_id).country == "AM"
-    assert plans.get_request(запрос.id, reach=reach_of("GE")) is None
-    with pytest.raises(ActionPlanError, match="Запроса нет"):
-        _загрузить(склад, запрос.id, tenant="GE")
-    assert _загрузить(склад, запрос.id, tenant="AM") == 1
+
+def test_перенос_без_плана_в_другую_страну_проходит(сеть: None) -> None:
+    ident = _принятая("D1")
+    ереван = точка_справочника(ЧУЖАЯ_ТОЧКА, country="AM", city="Yerevan")
+    assert move_inspection(
+        ident, tenant="HQ", new_date=СЕГОДНЯ, new_unit_id=ереван, reason="не та", actor="hq"
+    )
 
 
 def _вставить_запрос(dsn: str, ident: str) -> None:

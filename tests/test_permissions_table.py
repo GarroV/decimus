@@ -100,7 +100,6 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "phrases.manage",
         "people.manage",
         "people.role",
-        "refusals.read",
     },
     (SIDE_PARTNER, "auditor"): СОТРУДНИК_ПАРТНЁРА,
 }
