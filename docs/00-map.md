@@ -27,7 +27,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 
 | Термин | Что значит | Где живёт |
 |---|---|---|
-| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы, а не фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`; `docs/furca/blocks/spaces.md` |
+| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы по пространству, которое ставит дверь (`src/db/space.py`, миграция `0062`), а не только фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`, `src/db/space.py`; `docs/furca/blocks/spaces.md` |
 | УК | Управляющая компания: владелец методики, видит всю сеть, принимает проверки партнёров. Её пространство — `HQ` | `src/domain/tenants.py` (`HQ_TENANT`), `docs/18-access-map.md` |
 | Партнёр | Организация, чьи пиццерии проверяют; видит и правит только своё пространство и свои страны | `docs/18-access-map.md`, `src/db/reach.py` |
 | Роль | Одна из шести: в пространстве УК — главный админ (`superadmin`), админ (`admin`), контроль (`control`), аудитор (`auditor`); у партнёра — админ и аудитор | `src/domain/tenants.py`, `src/web/access_policy.py`, `src/mcp/policy.py` |
@@ -111,11 +111,14 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
+| `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
+| `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
+| `src/web/country_units.py` | Таблица «Пиццерии» экрана «Страна» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
@@ -138,7 +141,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
-| `src/web/to_inspect.py` | «Где нужно проверить» на экране «Проверки» (D399, переехало с «Главной» в D418) |
+| `src/web/to_inspect.py` | «Где нужно проверить» на экране «Календарь» (D399; с «Главной» в D418, оттуда в D466) |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
 <!-- map:end -->
@@ -198,6 +201,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
+| `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
@@ -249,15 +253,16 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 14 | _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, _split_ui.html, base.html, … (+6) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
-| `src/web/templates/country/` | 1 | index.html |
-| `src/web/templates/inspections/` | 6 | _card_parts.html, _panel.html, card.html, letter.html, list.html, not_found.html |
+| `src/web/templates/calendar/` | 1 | index.html |
+| `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
+| `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 2 | confirm.html, index.html |
+| `src/web/templates/settings/` | 3 | confirm.html, continue.html, index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -265,7 +270,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 44 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+36) |
+| `src/web/static/` | 45 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, … (+37) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -278,7 +283,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space_guard,storage,storage_reconcile,target_refusal}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -294,6 +299,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/recipe_audit.py` | T203 (#170): можно ли снять прежний рецепт отпечатка на ЭТОЙ базе |
 | `src/db/reports.py` | T336 (#317): готовый отчёт проверки уезжает в хранилище |
 | `src/db/request_memo.py` | Память одного HTTP-запроса для чтений, которые страница просит из разных блоков |
+| `src/db/space.py` | Пространство, от имени которого идёт обращение к базе (аудит 12.10, F-037, F-005) |
 | `src/db/space_guard.py` | Пространство записи обязано быть заведено — опечатка в коде это отказ (#481) |
 | `src/db/storage.py` | Хранилище кадров за S3-совместимым интерфейсом (D004, D054) |
 | `src/db/storage_reconcile.py` | Сверка хранилища файлов с таблицами: экшн-планы и ответы на предписания (#496) |
@@ -420,6 +426,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
 | `0061_web_own_google_lang.sql` | «Настройки» (D447): человек сам привязывает и снимает свою почту Google и хранит язык сайта в профиле |
+| `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
+| `0063_freeze.sql` | «Заморозить» (D462, шаг 1): отключение учётки становится заморозкой — одним действием закрывается всё, чем человек входил, и записывается, кто заморозил |
+| `0064_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -508,6 +517,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/roster.py` | Связки «юзернейм → Telegram ID», собранные по приглашениям до D286 (#230) |
 | `src/bot/run_guard.py` | Память бота о проверке и чужой старт: сверка личности проверки (D392) |
 | `src/bot/sealed.py` | Сданная проверка не правится (задача T201, решение владельца D080) |
+| `src/bot/sheet_loader.py` | Раз в несколько часов и по заявке — забор общей таблицы контроля «база рейтингов» (D464, docs/15-ratings.md) |
 | `src/bot/shown.py` | Карты «сообщение → запись»: чем бот показал запись и из чего она выросла |
 | `src/bot/sidecar.py` | Заметки бота рядом с проверкой: то, чего нет ни у движка, ни в отчёте |
 | `src/bot/start_options.py` | Что предлагает начало проверки: открытые чек-листы пространства человека |
@@ -552,6 +562,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 <!-- map:begin files src/ratings/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/ratings/base.py` | Листы общей таблицы контроля «база рейтингов» (D464) |
 | `src/ratings/countries.py` | Страны выгрузок рейтинга → код ISO |
 | `src/ratings/coverage.py` | Охват пиццерий на площадках — картах и агрегаторах (D424) |
 | `src/ratings/csvio.py` | Чтение CSV выгрузок: кодировка, разделитель, номера строк |
@@ -568,6 +579,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/pointer.py` | Клиент Pointer API: сети и филиалы с текущими оценками на картах |
 | `src/ratings/report.py` | Сводка раздела «Рейтинги» (D324): отбор → чтение → расчёты `summary` |
 | `src/ratings/sheet.py` | Лист «Качество по пиццериям» таблиц контроля (`sheet-scores`, D324) |
+| `src/ratings/sheet_sync.py` | Забор общей таблицы контроля «база рейтингов» самим decimus (D464) |
 | `src/ratings/snapshot.py` | Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника |
 | `src/ratings/summary.py` | Расчёты сводки рейтингов (D324): чистые функции над уже прочитанными фактами |
 | `src/ratings/svod.py` | «Свод пиццерий» девелопмента → справочник `unit_profiles` (D374–D376) |
@@ -748,7 +760,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/walk_healthcheck.py` | Проба здоровья сервиса мини-аппа обхода — изнутри его контейнера |
 | `tools/walk_mockup/build.py` | Кликабельный макет мини-аппа обхода (#418) — один HTML-файл для отзывов коллег |
 | `tools/web_unlock.py` | Запрет на вход: показать запертых и снять запрет |
-| `tools/web_user.py` | Учётки веб-админки: завести, перечислить, отключить |
+| `tools/web_user.py` | Учётки веб-админки: завести, перечислить, заморозить |
 | `tools/worktree_new.sh` | Рабочая копия для блока стройки — одинаково каждый раз |
 | `tools/zone_coverage.py` | T272: покрытие словаря зон — сколько формулировок доходит до зоны и что дописать |
 | `tools/zone_words_measure.py` | T242 (#198): узнаётся ли зона, названная НЕ в именительном падеже |
@@ -790,7 +802,7 @@ Telegram, ни HTTP, ни SQL.
 | Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/web/letter_markup.py` |
 | Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py`, `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) и `view.<раздел>` в матрице `src/domain/permissions.py`. Пишущий маршрут объявляет действие `@guard.action(...)` — без него он закрыт (403) и роняет `tests/test_web_guard.py` |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
-| Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Раздел «только УК» для партнёра — `_install_hq_gate` в `src/web/app.py`; «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |
+| Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Партнёру закрыто всё, что матрица не объявила открытым его пространству (`guard.open_to_tenant`, 404 в `_install_hq_gate` `src/web/app.py`; необъявленный маршрут называет `tests/test_web_guard.py`); «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |
 | Роль и права MCP | Инструмент → действие матрицы: `src/mcp/policy.py` (`action_of`, `TOOL_ACTIONS`); закрытое в Claude сверх матрицы — `CLAUDE_CLOSED` в `src/domain/permissions.py` |
 | Добавить инструмент MCP | Описание и схема — запись `ToolSpec` в `TOOLS` (`src/mcp/catalogue.py`), обработчик — рядом с похожими (`tools.py`, `checklist_tools.py`, `ratings_tools.py`); какой роли он открыт, решает действие матрицы (`policy.action_of`: по виду или `TOOL_ACTIONS`); перечень — `docs/inventory.md` (`make map`), контракт — `docs/furca/blocks/mcp.md` |
 | Новая миграция | Файл `src/db/migrations/NNNN_<смысл>.sql` со следующим номером, заголовок-комментарий «зачем» (первая фраза уйдёт в эту карту); накат — `make migrate`; применённый файл не править. Тест с базой — по образцу `tests/test_db_*.py` (`tests/db_harness.py`) |

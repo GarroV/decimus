@@ -31,18 +31,20 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, g, jsonify, render_template, request
 
 from src.bot.config import BotSettings
 from src.bot.keyboards import LANG_LABELS
 from src.db import finish_modes, queries
 from src.db.errors import DbError
 from src.db.models import PreviousFindings
+from src.db.space import enter_space, leave_space
 from src.domain import get_item, get_state, handed_over, is_upload_ref, list_items, list_zones
 from src.domain.errors import DomainError
 from src.domain.info_fields import FIELDS
 from src.domain.log_ids import log_id
 from src.domain.models import NON_DEDUCTING, ChecklistItem, Inspection, Zone
+from src.domain.tenants import HQ_TENANT
 from src.domain.walk_users import walk_open_to
 
 from . import (
@@ -348,7 +350,10 @@ def identify(
             lang = walk_settings.chosen_lang(chat_id) or ui_lang
             текст = WALK_TEXTS["walk.err.role"]
             return jsonify({"error": "role", "message": текст.get(lang) or текст[ui_lang]}), 403
-        if conf.bot_token is not None and walk_access.space_of(chat_id, conf) is None:
+        # Стенд без бота сверять не с чем — там всё от имени УК, как начало
+        # проверки (`walk_start`).
+        space = HQ_TENANT if conf.bot_token is None else walk_access.space_of(chat_id, conf)
+        if space is None:
             # Бот этого человека не пускает (не привязан, доступ снят) — и
             # мини-апп тоже, хоть подпись и настоящая (D372).
             logger.info("Обход: бот не пускает чат %s — отказ", log_id(chat_id))
@@ -356,7 +361,28 @@ def identify(
     except DbError:
         logger.warning("Обход: снятие доступа не сверить — база молчит", exc_info=True)
         return jsonify({"error": "unavailable", "texts": texts_for(ui_lang)}), 503
+    _act_for(space)
     return chat_id
+
+
+#: Ключ в `g` метки пространства человека обхода (`src/db/space.py`).
+_SPACE_MARK = "walk_space_mark"
+
+
+def _act_for(space: str) -> None:
+    """Дальше запрос идёт в базу от имени пространства человека (F-037).
+
+    Снимает метку `_leave_space` на выходе из запроса. Повторное опознание в
+    том же запросе пространство не меняет.
+    """
+    if g.get(_SPACE_MARK) is None:
+        setattr(g, _SPACE_MARK, enter_space(space))
+
+
+def _leave_space(_exc: BaseException | None) -> None:
+    метка = g.pop(_SPACE_MARK, None)
+    if метка is not None:
+        leave_space(метка)
 
 
 def payload_response(
@@ -376,6 +402,7 @@ def payload_response(
 def install(app: Flask, *, ui_lang: str, settings: WalkSettings | None = None) -> None:
     """Повесить страницу, данные и запись обхода. Без настроек — адреса отвечают 404."""
     conf = settings or load_walk_settings()
+    app.teardown_request(_leave_space)
     # Настройки бота — только при живом токене: на стенде без бота ни круга
     # MCP, ни выбора языка нет.
     bot = walk_settings.bot_settings() if conf.bot_token is not None else None

@@ -292,7 +292,8 @@ bound_at
 country_index
 users
 add_user
-disable_user
+freeze_user
+unfreeze_user
 connections_issue
 connections_update
 connections_reissue
@@ -431,6 +432,12 @@ ratings_rule_remove
 ratings_settings
 ratings_layout
 ratings_agg_update
+ratings_sheet_sync
+
+# Блок «Таблица контроля» на «Загрузках» (`src/web/ratings_sheet.py`, D464): время последнего
+# захода читает только шаблон Jinja.
+last_at
+unreadable
 
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
@@ -526,6 +533,7 @@ settings_bot_unlink
 settings_claude_token
 settings_claude_token_revoke
 settings_claude_revoke
+settings_sign_out_everywhere
 settings_google_link
 settings_google_unlink
 settings_lang

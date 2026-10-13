@@ -28,9 +28,9 @@ from web_harness import войти, подменить_двери, собрат�
 from src.db.errors import DbError
 from src.db.models import ORIGIN_FIELD, ORIGIN_LEGACY, InspectionRow
 from src.db.reach import own_reach
-from src.web import app as app_mod
 from src.web import home_board, home_ratings, home_ratings_block
 from src.web import overview as ov
+from src.web import overview as overview_data
 from src.web.texts import t as _t
 
 ПУСТО = ov.Overview(
@@ -118,7 +118,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
 
 
 def показать(client: FlaskClient, monkeypatch: pytest.MonkeyPatch, данные: ov.Overview) -> str:
-    monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: данные)
+    monkeypatch.setattr(overview_data, "load", lambda **_: данные)
     ответ = client.get("/overview")
     assert ответ.status_code == 200
     return ответ.get_data(as_text=True)
@@ -875,7 +875,7 @@ def test_выбранная_страна_стоит_в_списке_и_ведё�
     """Выбор страны живёт в адресе: подпись списка — выбранная страна, «Все страны» снимает."""
     # Arrange
     monkeypatch.setattr(
-        app_mod.overview_data, "load", lambda **_: снимок(countries=(("RS", 12), ("GE", 5)))
+        overview_data, "load", lambda **_: снимок(countries=(("RS", 12), ("GE", 5)))
     )
 
     # Act
@@ -896,7 +896,7 @@ def test_страна_вне_охвата_из_адреса_главную_не_
     )
     with собрать(tenant="GE").test_client() as client:
         assert войти(client).status_code == 302
-        monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: снимок())
+        monkeypatch.setattr(overview_data, "load", lambda **_: снимок())
         страница = client.get("/overview?country=HR").get_data(as_text=True)
     assert спрошено == [("GE",)]
     assert "Только Хорватия" not in страница

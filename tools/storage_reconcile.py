@@ -29,6 +29,7 @@ from datetime import UTC, datetime, timedelta
 import psycopg
 
 from src.db.errors import ConfigError, StorageError
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.db.storage_reconcile import DEFAULT_GRACE, AreaReport, reconcile_live
 
 EXIT_CLEAN = 0
@@ -111,4 +112,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    with acting_space(SYSTEM_SPACE):
+        raise SystemExit(main())

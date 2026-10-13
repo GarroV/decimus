@@ -12,14 +12,15 @@
   мелкая, — вид проверки и аудитор. Процент и буква печатаются такими, какими
   лежат в базе, — на экран приходит уже подготовленная строка (`view.py`).
 
-  «Где нужно проверить» (D418, раньше стояло на «Главной») — над списком: точки
-  охвата без проверок за выбранный период (`to_inspect.py`), с отбором страны и
-  города реестра. Пусто — блока нет; отказ базы — строка с ошибкой.
+  Два блока сверху вниз (D466). «На приёмке» — всё, что ждёт вычитки и
+  подтверждения (D199): мимо периода и отбора, давно ждущие первыми, у каждой
+  строки — сколько она ждёт. «Принятые» — история сети за выбранный период,
+  новые сверху; период и отбор (буква, вид, страна, город, пиццерия) действуют
+  только на неё, это подписано на блоке. «Где нужно проверить» живёт в
+  «Календарь» (`calendar/index.html`).
 
-  Период — «с — по» по дате обхода со стрелками ← →, по умолчанию текущий
-  месяц (`registry_period.py`). Ждущие приёмки (D199) — отдельной группой
-  сверху и мимо отбора: их мало, и ни одна не должна потеряться за выбранным
-  месяцем или буквой.
+  Период — «с — по» по дате обхода со стрелками ← →, по умолчанию всё время
+  (D404; `registry_period.py`).
 #}{% extends "_split_page.html" %}
 {% from "_pick.html" import pick %}
 {% from "_period.html" import period_picker with context %}
@@ -38,7 +39,7 @@
         <small>
           {{ kind_title(row.kind, lang) }} · {{ row.auditor or '—' }}
           {%- if checklist_names is not none %} · {{ checklist_names.get(row.checklist_code, row.checklist_code) }}{% endif %}
-          {%- if review %} · <span class="srow__warn">{{ t('state.review') }}</span>{% endif %}
+          {%- if review %} · <span class="srow__warn">{% if review_wait[row.id] %}{{ t('registry.review.wait', days=review_wait[row.id]) }}{% else %}{{ t('registry.review.wait_new') }}{% endif %}</span>{% endif %}
           {%- if row.retracted %} · <span class="srow__err">{{ t('state.retracted') }}</span>{% endif %}
         </small>
       </span>
@@ -60,9 +61,9 @@
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.registry.title') }}</h1>
       <p class="shead__sub">
-        {{ period_title }} · {{ t('registry.count', count=rows|length) }}
+        {{ t('registry.review.title') }}: {{ review_rows|length }}
+        · {{ t('registry.accepted.title') }} ({{ period_title }}): {{ rows|length }}
         {%- if registry.retracted_count %} · {{ t('registry.retracted_count', count=registry.retracted_count) }}{% endif %}
-        {%- if registry.review %} · {{ t('registry.review.title') }}: {{ registry.review|length }}{% endif %}
       </p>
     </div>
   </header>
@@ -70,6 +71,19 @@
 
 {% block split_list %}
   <div class="sbox">
+    {# «На приёмке» (D466): мимо периода и отбора, давно ждущие первыми. #}
+    <div class="slist slist--registry slist--review">
+      <div class="slist__group">
+        <span>{{ t('registry.review.title') }}</span><span class="sbadge">{{ review_rows|length }}</span>
+      </div>
+      {% if review_rows %}
+        <p class="slist__note">{{ t('registry.review.hint') }}</p>
+        <ul class="slist__rows">{% for row in review_rows %}{{ row_link(row, review=true) }}{% endfor %}</ul>
+      {% else %}
+        <p class="slist__note">{{ t('registry.review.empty') }}</p>
+      {% endif %}
+    </div>
+
     <div class="sbar sbar--registry">
       {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
       {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
@@ -89,45 +103,13 @@
       {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
 
-    {# «Где нужно проверить» (D418): точки без проверок за период; пусто — блока нет. #}
-    {% if to_check.shown %}
-      <div class="slist slist--tocheck">
-        <div class="slist__group">
-          <span>{{ t('registry.tocheck.title') }}</span>{% if not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
-        </div>
-        {% if to_check.failed %}
-          <p class="slist__note">{{ t('registry.tocheck.failed') }}</p>
-        {% else %}
-          <p class="slist__note">{{ t('registry.tocheck.hint') }}</p>
-          <ul class="slist__rows">
-            {% for item in to_check.units %}
-              <li>
-                <a class="srow" href="{{ unit_href(item) }}">
-                  <span class="srow__dot" aria-hidden="true"></span>
-                  <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
-                  <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
-          {% if to_check.more %}<p class="slist__note">{{ t('registry.tocheck.more', count=to_check.more) }}</p>{% endif %}
-        {% endif %}
+    {# «Принятые» — единственный блок, на который действуют период и отбор. #}
+    <div class="slist slist--registry">
+      <div class="slist__group">
+        <span>{{ t('registry.accepted.title') }}</span><span class="sbadge">{{ rows|length }}</span>
       </div>
-    {% endif %}
-
-    {% if registry.review %}
-      <div class="slist slist--registry">
-        <div class="slist__group">
-          <span>{{ t('registry.review.title') }}</span><span class="sbadge">{{ registry.review|length }}</span>
-        </div>
-        <p class="slist__note">{{ t('registry.review.hint') }}</p>
-        <ul class="slist__rows">{% for row in registry.review %}{{ row_link(row, review=true) }}{% endfor %}</ul>
-      </div>
-    {% endif %}
-
-    {% if rows %}
-      <div class="slist slist--registry">
-        {% if registry.review %}<div class="slist__group"><span>{{ t('registry.history') }}</span><span class="sbadge">{{ rows|length }}</span></div>{% endif %}
+      <p class="slist__note">{{ t('registry.accepted.hint') }}</p>
+      {% if rows %}
         <div class="slist__head" aria-hidden="true">
           <span></span>
           <span>{{ t('registry.col.unit') }}</span>
@@ -135,31 +117,31 @@
           <span class="is-num">{{ t('registry.col.date') }}</span>
         </div>
         <ul class="slist__rows">{% for row in rows %}{{ row_link(row) }}{% endfor %}</ul>
-      </div>
-    {% elif registry.rows %}
-      {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
-         реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
-      <div class="sempty">
-        <p class="sempty__title">{{ t('registry.filtered_out.title') }}</p>
-        <p class="sempty__text">{{ t('registry.filtered_out.text') }}</p>
-        <a class="sbtn" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>
-      </div>
-    {% elif not period.is_all %}
-      {# Пустой месяц — не пустой реестр: подсказать, куда листать. #}
-      <div class="sempty">
-        <p class="sempty__title">{{ t('registry.period.empty.title') }}</p>
-        <p class="sempty__text">{{ t('registry.period.empty.text') }}</p>
-        <div class="sactions">
-          {% if period_prev %}<a class="sbtn" href="{{ period_prev }}">{{ icon('cleft') }}<span>{{ t('registry.period.prev') }}</span></a>{% endif %}
-          <a class="sbtn sbtn--primary" href="{{ period_all }}">{{ t('registry.period.all') }}</a>
+      {% elif registry.rows %}
+        {# Строки есть, но отбор их все отсёк — это другое состояние, чем пустой
+           реестр, и говорить о нём надо иначе: тут виноват отбор, а не база. #}
+        <div class="sempty">
+          <p class="sempty__title">{{ t('registry.filtered_out.title') }}</p>
+          <p class="sempty__text">{{ t('registry.filtered_out.text') }}</p>
+          <a class="sbtn" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>
         </div>
-      </div>
-    {% else %}
-      <div class="sempty">
-        <p class="sempty__title">{{ t('registry.empty.title') }}</p>
-        <p class="sempty__text">{{ t('registry.empty.text') }}</p>
-      </div>
-    {% endif %}
+      {% elif not period.is_all %}
+        {# Пустой месяц — не пустой реестр: подсказать, куда листать. #}
+        <div class="sempty">
+          <p class="sempty__title">{{ t('registry.period.empty.title') }}</p>
+          <p class="sempty__text">{{ t('registry.period.empty.text') }}</p>
+          <div class="sactions">
+            {% if period_prev %}<a class="sbtn" href="{{ period_prev }}">{{ icon('cleft') }}<span>{{ t('registry.period.prev') }}</span></a>{% endif %}
+            <a class="sbtn sbtn--primary" href="{{ period_all }}">{{ t('registry.period.all') }}</a>
+          </div>
+        </div>
+      {% else %}
+        <div class="sempty">
+          <p class="sempty__title">{{ t('registry.empty.title') }}</p>
+          <p class="sempty__text">{{ t('registry.empty.text') }}</p>
+        </div>
+      {% endif %}
+    </div>
   </div>
 {% endblock %}
 
@@ -172,7 +154,7 @@
     <div class="sdetail sdetail--hint">
       <p class="sdetail__title">{{ t('registry.panel.failed.title') }}</p>
       <p class="sdetail__hint">{{ t('registry.panel.failed.text') }}</p>
-      <a class="sbtn" href="{{ url('/inspections/' ~ picked) }}?lang={{ lang }}">{{ t('registry.panel.open') }}</a>
+      <a class="sbtn" href="{{ select_url(inspection=picked) }}" data-drawer-open>{{ t('registry.panel.retry') }}</a>
     </div>
   {% elif card_missing %}
     <div class="sdetail sdetail--hint">

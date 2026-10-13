@@ -215,6 +215,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
         "ratings.read",
         "view.overview",
         "view.registry",
+        "view.calendar",
         "view.country",
         "view.ratings",
         "view.users",

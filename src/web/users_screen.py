@@ -27,6 +27,7 @@ from flask import Response as FlaskResponse
 
 from src.db import bot_links
 from src.db.errors import DbError
+from src.domain.log_ids import log_id
 from src.domain.tenants import canonical_tenant
 
 from . import (
@@ -120,7 +121,7 @@ def install(app: Flask, conf: Settings) -> None:
         return render(Show(person=чей, flash=_flash(исход, ok=отвязано)))
 
     _install_edits(app, users_path)
-    _install_add_disable(app, users_path)
+    _install_add_freeze(app, users_path)
     _install_spaces(app, users_path)
     connections_screen.install(app)
 
@@ -216,8 +217,8 @@ def _install_edits(app: Flask, users_path: str) -> None:
         )
 
 
-def _install_add_disable(app: Flask, users_path: str) -> None:
-    """Добавить человека и отключить доступ."""
+def _install_add_freeze(app: Flask, users_path: str) -> None:
+    """Добавить человека, заморозить и разморозить."""
 
     def _set_email(круг: Scope, логин: str, пространство: str, почта: str) -> bool:
         вошедший = auth.current_account()
@@ -269,35 +270,91 @@ def _install_add_disable(app: Flask, users_path: str) -> None:
         почта_не_легла = bool(почта) and not _set_email(круг, заведённый.login, пространство, почта)
         return render(Show(add=True, added=заведённый, added_email_failed=почта_не_легла))
 
-    @app.post(f"{users_path}/disable")
-    @guard.action("people.manage")
-    def disable_user() -> FlaskResponse | tuple[str, int]:
-        """Отключить учётку в охвате. Себя — нельзя; последнего главного админа — тоже."""
+    def _цель_заморозки() -> tuple[Scope, str, str] | FlaskResponse:
+        """Общее у заморозки и разморозки: охват, происхождение, логин и пространство из формы."""
         круг = people_scope()
         if круг is None:
             return forbidden()
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
         пространство = canonical_tenant((request.form.get("tenant") or "").strip())
+        return круг, логин, пространство
+
+    @app.post(f"{users_path}/freeze")
+    @guard.action("people.manage")
+    def freeze_user() -> FlaskResponse | tuple[str, int]:
+        """Заморозить учётку в охвате (D462): всё, чем человек входил, закрывается разом.
+
+        Сессии, подключения Claude, токены MCP, бот — одной транзакцией базы
+        (`0063`). Себя — нельзя; последнего главного админа — тоже. Главного
+        админа замораживает только главный: он не в охвате админа УК.
+        """
+        решено = _цель_заморозки()
+        if not isinstance(решено, tuple):
+            return решено
+        круг, логин, пространство = решено
         вошедший = auth.current_account()
         if вошедший is not None and логин.lower() == вошедший.login.strip().lower():
-            # Отключить себя — это выйти и не вернуться. Логин единый на всю
+            # Заморозить себя — это выйти и не вернуться. Логин единый на всю
             # систему (D282), поэтому сверка по нему одному, без пространства.
-            return render(Show(person=ME, flash=_flash("users.disable.self", ok=False)), 400)
+            return render(Show(person=ME, flash=_flash("users.freeze.self", ok=False)), 400)
         try:
             цель = _target(круг, логин, пространство)
             if цель is None:
                 return forbidden()
-            отключено = accounts.disable(
-                цель.login, tenant=цель.tenant, only_roles=_touchable_roles(круг, цель.tenant)
+            заморожено = accounts.freeze(
+                цель.login,
+                tenant=цель.tenant,
+                only_roles=_touchable_roles(круг, цель.tenant),
+                by=вошедший.id if вошедший else None,
             )
         except accounts.LastSuperadminError:
-            return render(Show(flash=_flash("users.disable.last_super", ok=False)), 409)
+            return render(Show(flash=_flash("users.freeze.last_super", ok=False)), 409)
         except DbError as exc:
             note_target_mismatch(exc)
-            return render(Show(flash=_flash("users.disable.failed", ok=False)), 400)
-        исход = "users.disable.ok" if отключено else "users.disable.missing"
-        return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=отключено)))
+            return render(Show(flash=_flash("users.freeze.failed", ok=False)), 400)
+        if заморожено:
+            logger.info(
+                "Веб: учётка %s заморозила учётку %s",
+                log_id(вошедший.id if вошедший else ""),
+                log_id(цель.id),
+            )
+        исход = "users.freeze.ok" if заморожено else "users.freeze.missing"
+        return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=заморожено)))
+
+    @app.post(f"{users_path}/unfreeze")
+    @guard.action("people.manage")
+    def unfreeze_user() -> FlaskResponse | tuple[str, int]:
+        """Разморозить учётку (D462): только главный админ. Снимает одну отметку.
+
+        Сессии, подключения Claude, токены и бот остаются закрытыми: человек
+        входит заново, привязывает бота и подключает Claude сам.
+        """
+        решено = _цель_заморозки()
+        if not isinstance(решено, tuple):
+            return решено
+        круг, логин, пространство = решено
+        if not access_policy.may_unfreeze(круг):
+            return forbidden()
+        try:
+            цель = _target(круг, логин, пространство)
+            if цель is None:
+                return forbidden()
+            разморожено = accounts.unfreeze(
+                цель.login, tenant=цель.tenant, only_roles=_touchable_roles(круг, цель.tenant)
+            )
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(flash=_flash("users.unfreeze.failed", ok=False)), 400)
+        if разморожено:
+            вошедший = auth.current_account()
+            logger.info(
+                "Веб: учётка %s разморозила учётку %s",
+                log_id(вошедший.id if вошедший else ""),
+                log_id(цель.id),
+            )
+        исход = "users.unfreeze.ok" if разморожено else "users.unfreeze.missing"
+        return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=разморожено)))
 
 
 def _install_spaces(app: Flask, users_path: str) -> None:

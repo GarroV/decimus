@@ -39,7 +39,7 @@ from src.db.web_access import (  # noqa: E402
     change_own_password,
     change_password,
     create_account,
-    disable_account,
+    freeze_account,
     open_session,
     set_role,
 )
@@ -200,7 +200,7 @@ def test_refresh_чужим_клиентом_отвергается(клиент
 def test_отключённая_учётка_не_опознаётся(клиент: Client, учётка: str) -> None:
     пара = _обмен(_код(клиент, учётка), клиент)
 
-    disable_account("anna", tenant=ТЕНАНТ)
+    freeze_account("anna", tenant=ТЕНАНТ)
 
     assert resolve_access_token(пара.access_token, resource=РЕСУРС) is None
     with pytest.raises(OAuthGrantError):

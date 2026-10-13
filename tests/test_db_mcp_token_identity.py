@@ -33,7 +33,7 @@ from src.db.mcp_access import (  # noqa: E402
     revoke_tokens,
 )
 from src.db.migrate import MIGRATIONS_DIR, apply_migrations  # noqa: E402
-from src.db.web_access import disable_account, password_hash, set_role  # noqa: E402
+from src.db.web_access import freeze_account, password_hash, set_role  # noqa: E402
 from src.mcp import config as mcp_config  # noqa: E402
 from src.mcp.catalogue import KIND_RATINGS, KIND_RATINGS_READ, find  # noqa: E402
 from src.mcp.rpc import handle  # noqa: E402
@@ -87,7 +87,7 @@ def test_токен_несёт_роль_и_пространство_учётки
 def test_отключённая_учётка_токеном_не_пользуется(учётки: dict[int, str]) -> None:
     токен = _выдать(СОТРУДНИК_ПАРТНЁРА)
 
-    assert disable_account(f"tg-{СОТРУДНИК_ПАРТНЁРА}", tenant="GE") is True
+    assert freeze_account(f"tg-{СОТРУДНИК_ПАРТНЁРА}", tenant="GE") is True
 
     assert resolve_token(токен) is None, "отключённый человек продолжает ходить в Claude"
 
@@ -202,7 +202,7 @@ def test_свой_отзыв_гасит_сразу(учётки: dict[int, str])
 
 
 def test_отключённой_учётке_токен_не_выпускается(учётки: dict[int, str]) -> None:
-    assert disable_account(f"tg-{СОТРУДНИК_ПАРТНЁРА}", tenant="GE") is True
+    assert freeze_account(f"tg-{СОТРУДНИК_ПАРТНЁРА}", tenant="GE") is True
 
     with pytest.raises(AccessError):
         issue_for_account(учётки[СОТРУДНИК_ПАРТНЁРА])
