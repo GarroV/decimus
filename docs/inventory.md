@@ -402,6 +402,7 @@
 | `0063_freeze.sql` | — |
 | `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
 | `0065_web_own_google_profile.sql` | — |
+| `0066_move_with_action_plan.sql` | — |
 <!-- map:end -->
 
 ## Makefile

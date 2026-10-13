@@ -44,6 +44,18 @@ where u.id = %(unit)s
             where s.tenant_code = %(tenant)s and s.country = u.country)))
 """
 
+# Экшн-план привязан к проверке, а партнёр видит запрос и файлы по стране её
+# точки (0036, D284). Перенос в точку другой страны отдал бы их партнёру той
+# страны, поэтому с планом между странами не переносят (F, GHSA-wqh3). Сверка
+# здесь — ради понятного отказа; граница — триггер миграции 0066.
+_CROSS_COUNTRY_PLAN_SQL = """
+select 1
+from units o, units n
+where o.id = %(old)s and n.id = %(new)s
+  and o.country is distinct from n.country
+  and exists (select 1 from action_plan_requests r where r.inspection_id = %(id)s)
+"""
+
 _MOVE_SQL = """
 update inspections
 set inspection_date = %(date)s, unit_id = %(unit)s
@@ -154,6 +166,15 @@ def _apply(
             raise MoveError("Такой пиццерии в справочнике этого пространства нет")
         if дата == new_date and str(точка) == new_unit_id:
             return False
+        cur.execute(_CROSS_COUNTRY_PLAN_SQL, {"old": точка, "new": new_unit_id, "id": ident})
+        if cur.fetchone() is not None:
+            raise MoveError(
+                f"Проверку {ident} нельзя перенести в пиццерию другой страны: по ней заведён "
+                f"экшн-план, и его запрос с файлами ушли бы партнёру той страны. Отклоните "
+                f"проверку и проведите заново / The inspection {ident} cannot be moved to a "
+                f"unit in another country: it has an action plan, whose request and files "
+                f"would become visible to that country's partner"
+            )
         # `set_config(..., true)` — то же, что `set local`: живёт до конца
         # транзакции и не утекает в следующую на том же подключении.
         cur.execute("select set_config('decimus.move_reason', %s, true)", (причина,))
