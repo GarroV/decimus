@@ -193,7 +193,7 @@ def render(
     def в_реестр() -> str:
         """Реестр проверок с тем же периодом и страной: куда ведёт «ещё N →»."""
         живые = {**period.params(), "lang": lang, "country": selection.country}
-        return url_for("registry", **{к: з for к, з in живые.items() if з})
+        return _url("registry", **{к: з for к, з in живые.items() if з})
 
     codes = (selection.country,) if selection.country else reach.countries
     рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
