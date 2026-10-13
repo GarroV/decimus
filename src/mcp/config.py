@@ -219,7 +219,9 @@ class Settings:
         Партнёру со входом по роли учётки (`role`, D417) список
         `MCP_CHECKLIST_TENANTS` не нужен (D460): партнёров в базе много и они
         заводятся без правки `.env`, поэтому методику в своём пространстве ему
-        открывает матрица (`claude_may`: админ — да, сотрудник — нет). Для УК и
+        открывает матрица (`claude_may`): хранилище получает и админ, и сотрудник, а что
+        из инструментов ему открыто, решает `policy.permits_tool` по действию
+        инструмента — сотруднику только чтение, правка отказывает до вызова. Для УК и
         для токенов без роли решает список, как раньше.
         """
         if self.checklist_store is None:
@@ -229,7 +231,7 @@ class Settings:
         return (
             role is not None
             and side_of(tenant) == SIDE_PARTNER
-            and claude_may(role, tenant, "checklist.edit")
+            and claude_may(role, tenant, "checklist.read")
         )
 
     def may_read_checklist(self, tenant: str, role: str | None = None) -> bool:

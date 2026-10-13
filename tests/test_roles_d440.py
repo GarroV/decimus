@@ -476,7 +476,9 @@ def test_у_гостя_доски_нет_а_девелопер_вычитыва�
     ("GE", "admin"): frozenset(
         {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
     ),
-    ("GE", "auditor"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
+    ("GE", "auditor"): frozenset(
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+    ),
 }
 
 

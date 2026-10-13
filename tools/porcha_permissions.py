@@ -41,27 +41,33 @@ cases = [
     # Закрытое в Claude.
     (
         "src/domain/permissions.py",
-        "    if action in CLAUDE_CLOSED.get(сторона, frozenset()):\n",
+        "    if action in CLAUDE_CLOSED.get(side_of(tenant), frozenset()):\n",
         "    if False:\n",
         T + "test_permissions_can.py::test_claude_снятие_закрыто_всем_методика_партнёру",
     ),
-    # D460: методика админа партнёра в Claude — своё пространство, не больше.
+    # D460: методика партнёра в Claude — как в вебе, не больше.
     (
         "src/domain/permissions.py",
-        '    SIDE_PARTNER: _codes("inspection.retract", "checklist.apply"),\n',
-        '    SIDE_PARTNER: _codes("inspection.retract"),\n',
-        T + "test_permissions_can.py::test_claude_снятие_закрыто_всем_методика_партнёру",
+        '    | _codes("checklist.master")\n',
+        "    | _CHECKLIST_OWNER\n",
+        T + "test_permissions_table.py::test_каждая_клетка_матрицы",
     ),
     (
         "src/domain/permissions.py",
-        '    (SIDE_PARTNER, "auditor"): _CHECKLISTS,\n',
-        "",
-        T + "test_mcp_partner_methodology.py::test_сотруднику_партнёра_методика_не_видна",
+        '    "checklist.read",\n    "ratings.read",\n)\n',
+        '    "checklist.read",\n    "checklist.edit",\n    "ratings.read",\n)\n',
+        T + "test_mcp_policy.py::test_сотруднику_партнёра_в_claude_методика_только_на_чтение",
     ),
     (
         "src/mcp/config.py",
-        '            and claude_may(role, tenant, "checklist.edit")\n',
-        "            and True\n",
+        '            and claude_may(role, tenant, "checklist.read")\n        )\n\n    def tenant_for',  # noqa: E501
+        "            and False\n        )\n\n    def tenant_for",
+        T + "test_mcp_partner_methodology.py::test_админ_партнёра_читает_эталон_но_не_правит_его",
+    ),
+    (
+        "src/mcp/config.py",
+        '            and claude_may(role, tenant, "checklist.read")\n        )\n\n    def may_read_checklist',  # noqa: E501
+        "            and False\n        )\n\n    def may_read_checklist",
         T + "test_mcp_partner_methodology.py::test_хранилище_партнёру_даёт_роль_а_не_список_env",
     ),
     (
@@ -70,6 +76,34 @@ cases = [
         "    свой = replace(база, space=DEFAULT_SPACE)\n",
         T
         + "test_mcp_partner_methodology.py::test_админ_партнёра_правит_свой_чек_лист_в_своём_пространстве",  # noqa: E501
+    ),
+    (
+        "src/web/templates/methodology/checklists.html",
+        '{% if not item.in_production and may("checklist.apply") %}',
+        "{% if not item.in_production %}",
+        T
+        + "test_web_methodology_spaces.py::test_партнёру_применение_к_проду_не_показано_и_не_выдано",  # noqa: E501
+    ),
+    # Ревью безопасности: токен партнёра не выходит за своё пространство.
+    (
+        "src/mcp/checklist_tools.py",
+        "    if side_of(tenant) != SIDE_HQ:\n",
+        "    if False:\n",
+        T + "test_mcp_partner_methodology.py::test_накопитель_слов_аудиторов_партнёру_не_отдаётся",
+    ),
+    (
+        "src/mcp/policy.py",
+        '    "uncovered_phrases": "phrases.raw",\n',
+        "",
+        T
+        + "test_mcp_policy.py::test_админу_партнёра_открыты_инструменты_методики_кроме_указателя_прода",  # noqa: E501
+    ),
+    (
+        "src/mcp/rpc.py",
+        "        if spec.writes:\n            raise ToolError(ETALON_READONLY_FOR_PARTNER",
+        "        if False:\n            raise ToolError(ETALON_READONLY_FOR_PARTNER",
+        T
+        + "test_mcp_partner_methodology.py::test_ни_один_инструмент_методики_не_трогает_чужое_пространство",  # noqa: E501
     ),
     # Веб: запрет по умолчанию, полнота, разделы, забытый `permit`.
     (

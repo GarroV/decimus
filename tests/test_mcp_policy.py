@@ -68,7 +68,10 @@ _ВСЁ_УК = frozenset(
     ("RS", "admin"): frozenset(
         {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
     ),
-    ("RS", "auditor"): frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ}),
+    # Сотрудник партнёра (D460): методика на чтение, как в вебе; правящие инструменты закрыты.
+    ("RS", "auditor"): frozenset(
+        {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
+    ),
 }
 
 
@@ -135,7 +138,13 @@ def _виды(имена: set[str]) -> set[str]:
 ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ: dict[tuple[str, str], set[str]] = {
     ("HQ", "developer"): {"apply_checklist"},
     # Указатель прода один на всю сеть и в пространстве партнёра не двигается (D460).
-    ("RS", "admin"): {"apply_checklist"},
+    ("RS", "admin"): {"apply_checklist", "uncovered_phrases"},
+}
+#: Правящие инструменты методики закрыты сотруднику партнёра (читает, но не правит).
+ПИШУЩИЕ_МЕТОДИКИ = {spec.name for spec in TOOLS if spec.kind == KIND_CHECKLIST and spec.writes}
+ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ[("RS", "auditor")] = ПИШУЩИЕ_МЕТОДИКИ | {
+    "apply_checklist",
+    "uncovered_phrases",
 }
 
 
@@ -226,17 +235,15 @@ def test_админу_партнёра_открыты_инструменты_м�
     имена = _список(tenant="RS", role="admin")
     методика = {spec.name for spec in TOOLS if spec.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE)}
 
-    assert методика - {"apply_checklist"} <= имена
+    assert методика - {"apply_checklist", "uncovered_phrases"} <= имена
     assert {"checklists", "edit_checklist_item", "publish_checklist_version"} <= имена
     assert "checklist_source" in имена
-    assert "apply_checklist" not in имена
+    assert not {"apply_checklist", "uncovered_phrases"} & имена
 
 
-def test_сотруднику_партнёра_методика_в_claude_закрыта() -> None:
-    """D342: сотрудник партнёра в Claude заносит проверку, методики у него нет."""
+def test_сотруднику_партнёра_в_claude_методика_только_на_чтение() -> None:
+    """D460: как в вебе — читает, не правит (D342 про правку и занесение остаётся)."""
     имена = _список(tenant="RS", role="auditor")
 
-    assert (
-        not {spec.name for spec in TOOLS if spec.kind in (KIND_CHECKLIST, KIND_CHECKLIST_SOURCE)}
-        & имена
-    )
+    assert {"checklists", "checklist_items", "checklist_source"} <= имена
+    assert not ПИШУЩИЕ_МЕТОДИКИ & имена
