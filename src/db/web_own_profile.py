@@ -38,6 +38,20 @@ _BEGIN_SQL = "select begin_own_google_link(%s, %s, %s)"
 _FINISH_SQL = "select finish_own_google_link(%s, %s, %s)"
 _UNLINK_SQL = "select unlink_own_google(%s, %s)"
 _SET_LANG_SQL = "select set_own_web_lang(%s, %s)"
+_SET_GOOGLE_PROFILE_SQL = "select set_own_google_profile(%s, %s, %s, %s)"
+
+#: Своё фото — по живой сессии, тем же условием, что у опознания. Чужой ключ
+#: сюда не передаётся вовсе: чьё фото, решает сессия.
+_SELECT_OWN_AVATAR_SQL = """
+    select u.avatar, u.avatar_type, u.avatar_etag
+      from web_sessions s
+      join web_users u on u.id = s.user_id
+     where s.fingerprint = %s
+       and s.closed_at is null
+       and s.expires_at > now()
+       and u.disabled_at is null
+       and u.avatar is not null
+"""
 
 #: Свой хеш — по живой сессии, тем же условием, что у опознания.
 _SELECT_OWN_HASH_SQL = """
@@ -110,3 +124,29 @@ def set_web_lang(token: str, lang: str) -> bool:
     только форму, чтобы третий язык добавлялся словарём, без миграции.
     """
     return bool(_one(_SET_LANG_SQL, (token, lang), "сохранить язык сайта"))
+
+
+def save_google_profile(
+    token: str, *, name: str | None, avatar: bytes | None, avatar_type: str | None
+) -> bool:
+    """Записать имя и фото из Google своей учётке (D468). `False` — сессии нет.
+
+    Пустое не затирает прежнее: сбой скачивания фото оставляет то, что было.
+    """
+    if (avatar is None) != (avatar_type is None):
+        raise ValueError("фото и его тип передаются вместе")
+    return bool(
+        _one(
+            _SET_GOOGLE_PROFILE_SQL, (token, name, avatar, avatar_type), "сохранить профиль Google"
+        )
+    )
+
+
+def own_avatar(token: str) -> tuple[bytes, str, str] | None:
+    """Своё фото: байты, тип, версия. `None` — сессии нет или фото не заведено."""
+    with _connected("прочитать своё фото") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_OWN_AVATAR_SQL, (_fingerprint(token),))
+        строка = cur.fetchone()
+    if строка is None:
+        return None
+    return bytes(строка[0]), str(строка[1]), str(строка[2])

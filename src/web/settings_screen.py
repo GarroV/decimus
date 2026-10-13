@@ -40,6 +40,7 @@ from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import (
+    account_menu,
     accounts,
     auth,
     google_link,
@@ -210,10 +211,65 @@ def install(app: Flask, conf: Settings) -> None:
     _install_bot(app, base, conf)
     _install_google(app, base, conf)
     ui_lang.install(app, f"{base}/lang")
+    _install_account_menu(app, base, conf)
     _install_claude_token(app, base, conf)
     _install_sign_out_everywhere(app, base)
     if conf.oauth_enabled:
         _install_claude_connection(app, base)
+
+
+#: Сколько браузер держит своё фото без вопросов. Адрес несёт версию
+#: (`?v=<avatar_etag>`), поэтому смена фото — новый адрес, а не ожидание.
+AVATAR_MAX_AGE_SECONDS = 86400
+
+
+def _install_account_menu(app: Flask, base: str, conf: Settings) -> None:
+    """Своё фото и подгружаемая часть меню учётки (D468)."""
+
+    @app.get(f"{base}/avatar")
+    def settings_avatar() -> FlaskResponse | Response:
+        """Фото ВОШЕДШЕГО из Google. Чужое по ключу не отдаётся: ключа нет вовсе.
+
+        Чьё фото — решает сессия этого запроса (`web_own_profile.own_avatar`
+        выбирает строку по её токену); в адрес и форму ничего, называющего
+        учётку, не входит. Ответ `private`: общий кэш прокси фото человека не
+        хранит.
+        """
+        try:
+            найдено = web_own_profile.own_avatar(auth.current_session_token())
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return make_response("", 503)
+        if найдено is None:
+            return make_response("", 404)
+        данные, тип, версия = найдено
+        ответ = make_response(данные)
+        ответ.mimetype = тип
+        ответ.set_etag(версия)
+        ответ.headers["Cache-Control"] = f"private, max-age={AVATAR_MAX_AGE_SECONDS}"
+        ответ.headers["Vary"] = "Cookie"
+        ответ.headers["X-Content-Type-Options"] = "nosniff"
+        return ответ.make_conditional(request)
+
+    @app.get(f"{base}/menu")
+    def settings_menu() -> FlaskResponse:
+        """Группа «Подключения» меню учётки — фрагмент, а не страница.
+
+        Подгружается при первом открытии меню: состояния стоят трёх запросов,
+        и каждая страница их платить не должна.
+        """
+        вошедший = auth.current_account()
+        if вошедший is None:
+            raise RuntimeError("меню без вошедшего: маршрут прошёл мимо заслона")
+        строки = account_menu.connections(
+            str(вошедший.id),
+            email=вошедший.email,
+            google_enabled=bool(current_app.extensions.get(auth.GOOGLE_ENABLED_KEY)),
+            mcp_url=current_app.config.get(users_claude.MCP_URL_KEY),
+        )
+        ответ = make_response(render_template("_account_menu_connections.html", rows=строки))
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
 
 
 def _install_sign_out_everywhere(app: Flask, base: str) -> None:

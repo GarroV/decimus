@@ -104,6 +104,12 @@ class GoogleIdentity:
     #: `nonce` из токена — то, что мы послали в уходе к Google; пусто — не посылали.
     #: Привязка почты в «Настройках» сверяет его со своей меткой (`google_link`).
     nonce: str = ""
+    #: Имя и фамилия из проверенного токена (`name`, иначе имя + фамилия); пусто —
+    #: Google не сказал (D468). Только для показа, на допуск не влияет.
+    name: str = ""
+    #: Адрес фото из токена (`picture`) — сырой, НЕ проверенный как адрес: перед
+    #: скачиванием его проверяет `google_profile` (https и хост Google).
+    picture: str = ""
 
 
 def load_google_settings(env: Mapping[str, str] | None = None) -> GoogleSettings | None:
@@ -224,7 +230,40 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
         email_verified=True,
         hosted_domain=домен.strip().lower() if isinstance(домен, str) else "",
         nonce=метка if isinstance(метка, str) else "",
+        name=_display_name(нагрузка),
+        picture=_picture(нагрузка),
     )
+
+
+#: Предел имени и адреса фото из токена: чужая строка не должна раздувать ни
+#: колонку, ни журнал (колонка `web_users.display_name` — до 120, `0065`).
+MAX_NAME_LENGTH = 120
+MAX_PICTURE_URL_LENGTH = 500
+
+
+def _clean(value: object) -> str:
+    """Строка из токена без управляющих знаков и лишних пробелов; не строка — пусто."""
+    if not isinstance(value, str):
+        return ""
+    return " ".join("".join(ch for ch in value if ch.isprintable()).split())
+
+
+def _display_name(payload: Mapping[str, Any]) -> str:
+    имя = _clean(payload.get("name"))
+    if not имя:
+        имя = " ".join(
+            часть
+            for часть in (_clean(payload.get("given_name")), _clean(payload.get("family_name")))
+            if часть
+        )
+    return имя[:MAX_NAME_LENGTH]
+
+
+def _picture(payload: Mapping[str, Any]) -> str:
+    адрес = payload.get("picture")
+    if not isinstance(адрес, str) or len(адрес) > MAX_PICTURE_URL_LENGTH:
+        return ""
+    return адрес.strip()
 
 
 def load_hq_domains(env: Mapping[str, str] | None = None) -> frozenset[str]:
