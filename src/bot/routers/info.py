@@ -47,11 +47,12 @@ from aiogram.types import CallbackQuery, Message
 
 from src import domain
 from src.domain.errors import DomainError
+from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
 from src.recognize.errors import RecognizeError
 from src.recognize.transcribe import transcribe
 
-from .. import frame_copies, sidecar, stops, view
+from .. import frame_copies, sealed, sidecar, stops, view
 from ..info import KIND_DATE, KIND_TEXT, KIND_YES_NO, fields_to_ask, parse_date
 from ..inspection import read_inspection
 from ..keyboards import (
@@ -103,6 +104,10 @@ async def start_info(message: Message, state: FSMContext, chat_id: int, lang: st
     """
     if read_inspection(chat_id) is None:
         await stops.refuse(message, lang, step="finish.info", key="material.no_inspection")
+        return
+    if sealed.is_sealed(chat_id):
+        await state.clear()
+        await sealed.refuse(message, lang)
         return
     asked = await asyncio.to_thread(partial(fields_to_ask, lang, chat_id=chat_id))
     if not asked:
@@ -212,6 +217,11 @@ async def _save(message: Message, state: FSMContext, lang: str, value: str) -> N
     try:
         # Подпроцесс движка — в поток, как и все остальные его вызовы (T101).
         await asyncio.to_thread(domain.set_info, message.chat.id, code, value, photos=shots)
+    except HandedOverError:
+        # Отчёт отдали, пока шёл опрос: сданная проверка не принимает записей.
+        await state.clear()
+        await sealed.refuse(message, lang)
+        return
     except DomainError:
         logger.exception(
             "информационное поле %s чата %s не записалось", code, log_id(message.chat.id)
