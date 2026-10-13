@@ -332,10 +332,10 @@ class Account:
     #: учётка пришла не из сессии (вход, опознание по почте). По нему действия,
     #: создающие долгоживущий доступ, требуют свежего входа (`web.reauth`).
     signed_in_at: datetime | None = None
-    #: Имя и фамилия из Google (`web_users.display_name`, `0063`); `None` —
+    #: Имя и фамилия из Google (`web_users.display_name`, `0064`); `None` —
     #: показывается логин. Приезжает с сессией, как язык.
     display_name: str | None = None
-    #: Версия фото из Google (`web_users.avatar_etag`, `0063`); `None` — фото
+    #: Версия фото из Google (`web_users.avatar_etag`, `0064`); `None` — фото
     #: нет, показываются инициалы. Сами байты с сессией не едут.
     avatar_etag: str | None = None
 

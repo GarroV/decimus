@@ -85,7 +85,17 @@
         if (!r.ok) throw new Error("status " + r.status);
         return r.text();
       })
-      .then(function (html) { box.innerHTML = html; })
+      .then(function (html) {
+        // Подмена строк уносит фокус, если он стоял на одной из них: вернуть
+        // его на то же по счёту место, иначе Tab начнёт с начала страницы.
+        var rows = Array.prototype.slice.call(box.querySelectorAll("a"));
+        var at = rows.indexOf(document.activeElement);
+        box.innerHTML = html;
+        if (at >= 0) {
+          var again = box.querySelectorAll("a")[at];
+          if (again) again.focus();
+        }
+      })
       .catch(function () { connectionsLoaded = false; });
   }
 

@@ -236,7 +236,7 @@ def identity_from_id_token(raw: str, *, client_id: str, now: float | None = None
 
 
 #: Предел имени и адреса фото из токена: чужая строка не должна раздувать ни
-#: колонку, ни журнал (колонка `web_users.display_name` — до 120, `0063`).
+#: колонку, ни журнал (колонка `web_users.display_name` — до 120, `0064`).
 MAX_NAME_LENGTH = 120
 MAX_PICTURE_URL_LENGTH = 500
 
