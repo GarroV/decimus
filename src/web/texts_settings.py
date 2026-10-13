@@ -166,11 +166,13 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "settings.confirm.title": {"ru": "Подтвердите вход", "en": "Confirm it's you"},
     "settings.confirm.why": {
         "ru": "Это действие даёт долгий доступ к вашей учётке — токен Claude, бот, почта "
-        "Google или подключение Claude. Поэтому вход должен быть свежим: не старше 15 "
-        "минут. Подтвердите, что это вы, и вернитесь к действию.",
+        "Google или подключение Claude. Поэтому вход должен быть свежим: не старше 12 "
+        "часов. Подтвердите, что это вы — и токен, ссылка на бота или переход к Google "
+        "выполнятся сами; остальное — нажмите ещё раз.",
         "en": "This action grants long-lived access to your account — a Claude token, the "
         "bot, a Google account or a Claude connection. So the sign-in must be recent: no "
-        "older than 15 minutes. Confirm it's you and go back to the action.",
+        "older than 12 hours. Confirm it's you — a token, a bot link or the Google step "
+        "then runs by itself; for anything else, press the button again.",
     },
     "settings.confirm.submit": {"ru": "Подтвердить", "en": "Confirm"},
     "settings.confirm.google": {
