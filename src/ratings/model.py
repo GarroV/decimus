@@ -50,6 +50,8 @@ ISSUE_UNIT_UNMATCHED = "unit_unmatched"
 ISSUE_COUNTRY_UNKNOWN = "country_unknown"
 ISSUE_BAD_ROW = "bad_row"
 ISSUE_DEVELOPER_CONFLICT = "developer_conflict"
+#: Пиццерия справочника таблицы: её id у нас уже занят пиццерией с другим именем.
+ISSUE_UNIT_ID_CLASH = "unit_id_clash"
 
 
 ERR_NOT_UTF8 = "not_utf8"

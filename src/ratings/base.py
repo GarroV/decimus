@@ -21,7 +21,7 @@ from collections.abc import Callable, Sequence
 from datetime import date, timedelta
 from typing import TypeVar
 
-from src.db.units import normalize_unit_name
+from src.domain.unit_name import fold_unit_name
 
 from .countries import is_excluded
 from .csvio import read_table
@@ -271,8 +271,9 @@ def parse_base_rs_violations(data: bytes, *, today: date) -> Parsed:
 def parse_directory(data: bytes) -> dict[str, str]:
     """Справочник ссылок «Пиццерия, Ссылка для РКО, Ссылка для РС» → имя → id Dodo IS.
 
-    Ключ — имя после `normalize_unit_name`. Имя, за которым стоят разные id (в двух
-    ссылках строки или в двух строках), в словарь не попадает: ошибиться пиццерией
+    Ключ — имя после `fold_unit_name` (D467: «İzmir-4» и «Izmir-4» — одна пиццерия).
+    Имя, за которым стоят разные id (в двух ссылках строки или в двух строках),
+    в словарь не попадает: ошибиться пиццерией
     хуже, чем оставить строку несопоставленной.
     """
     header, rows = read_table(data)
@@ -281,7 +282,7 @@ def parse_directory(data: bytes) -> dict[str, str]:
     ids: dict[str, set[str]] = {}
     for _, cells in rows:
         row = dict(zip(header, cells, strict=False))
-        key = normalize_unit_name(row.get("Пиццерия", ""))
+        key = fold_unit_name(row.get("Пиццерия", ""))
         if not key:
             continue
         found = {

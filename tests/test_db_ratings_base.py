@@ -227,3 +227,31 @@ def test_нарушения_ркО_лежат_замечаниями_перио�
         "select v.rating_type, v.category, p.begin_on from ratings.violations v "
         "join ratings.periods p on p.id = v.period_id where starts_with(v.row_key, 'sheet:')",
     ) == [("rko", "remark", date(2026, 9, 7))]
+
+
+def test_справочник_с_занятым_id_не_переименовывает_пиццерию_и_пишет_в_журнал(
+    db_env: str,
+) -> None:
+    _известная_пиццерия(db_env)
+    итог = _грузить(
+        scores(_score_row("05.01 — 11.01", "РКО", "70", unit="Testville-9")),
+        directory={"testville-9": U1},  # id у справочника чужой: он у Testville-1
+    )
+    assert (итог.accepted, итог.unmatched) == (0, 0)
+    assert _строки(db_env, "select dodo_id, name from ratings.units") == [(U1, "Testville-1")]
+    причины = {
+        r[0]
+        for r in _строки(
+            db_env,
+            "select reason from ratings.import_issues where import_id = %s",
+            (итог.import_id,),
+        )
+    }
+    assert причины == {"unit_id_clash"}
+
+
+def test_наше_название_не_перезаписывается_иным_написанием(db_env: str) -> None:
+    """D467: пришло «Izmir-4» с тем же id, у нас «İzmir-4» — остаётся наше."""
+    _грузить(snapshot(name="İzmir-4"))
+    _грузить(snapshot(name="Izmir-4"))
+    assert _строки(db_env, "select dodo_id, name from ratings.units") == [(U1, "İzmir-4")]

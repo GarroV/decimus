@@ -80,6 +80,24 @@ def _ascii(text: str) -> str:
     return "".join(c for c in разложено if not unicodedata.combining(c))
 
 
+#: Турецкие буквы: İ после `casefold` даёт «i» с точкой-знаком, ı не раскладывается вовсе.
+_FOLD_LETTERS = str.maketrans(
+    {"İ": "I", "ı": "i", "Ş": "S", "ş": "s", "Ğ": "G", "ğ": "g", "Ç": "C", "ç": "c"}
+    | {"Ö": "O", "ö": "o", "Ü": "U", "ü": "u"}
+)
+
+
+def fold_unit_name(name: str) -> str:
+    """Ключ сверки имени точки: «İzmir-4», «Izmır-4», «izmir-4» — одна пиццерия.
+
+    Турецкие буквы сводятся к латинским, диакритика снимается, пробелы схлопываются,
+    регистр — `casefold`. Номер точки не трогается: «Izmir-4» ≠ «İzmir-5».
+    """
+    разложено = unicodedata.normalize("NFKD", name.translate(_FOLD_LETTERS))
+    bare = "".join(c for c in разложено if not unicodedata.combining(c))
+    return " ".join(bare.split()).casefold()
+
+
 def _key(text: str) -> str:
     """Ключ сверки: без регистра, диакритики и всего, что не буква."""
     return "".join(c for c in _ascii(text.casefold()) if c.isalpha())

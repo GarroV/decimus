@@ -295,6 +295,10 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.issue.country_unknown": {"ru": "страна не узнана", "en": "unknown country"},
     "ratings.issue.bad_row": {"ru": "строка не разобрана", "en": "row not parsed"},
+    "ratings.issue.unit_id_clash": {
+        "ru": "id пиццерии занят другой пиццерией — строки не загружены",
+        "en": "the pizzeria id belongs to another pizzeria — rows not loaded",
+    },
     "ratings.issue.developer_conflict": {
         "ru": "у страны в файле разные девелоперы",
         "en": "the file gives the country different developers",

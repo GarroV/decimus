@@ -262,7 +262,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # «База рейтингов» контроля как источник РС и РКО (D464). Ещё не на проде.
     "0063_ratings_sheet.sql": (
-        "sql1:1f72f3e1d58396fc21fd6a508c929ed3327cd1ce7aa47fc329fc7acbe0a820d2"
+        "sql1:f5ff00cc48e5d61000d6cbb37e038c293f383656e540ab4d011fdafa2daf8314"
     ),
 }
 

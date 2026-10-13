@@ -346,3 +346,12 @@ def test_справочник_id_в_одной_форме_двусмысленн
         ],
     )
     assert base.parse_directory(data) == {"testville-1": U1}
+
+
+def test_справочник_турецкое_написание_сходится_с_латиницей() -> None:
+    """D467: в справочнике «İzmir-4», в листе оценок «Izmir-4» — одна пиццерия."""
+    data = to_csv(
+        ["Пиццерия", "Ссылка для РКО", "Ссылка для РС"],
+        [["İzmir-4", f"https://dodopizza.info/rating#/{U1}/1?", ""]],
+    )
+    assert base.parse_directory(data) == {"izmir-4": U1}
