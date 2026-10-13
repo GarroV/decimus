@@ -225,5 +225,5 @@ def test_нарушения_ркО_лежат_замечаниями_перио�
     assert _строки(
         db_env,
         "select v.rating_type, v.category, p.begin_on from ratings.violations v "
-        "join ratings.periods p on p.id = v.period_id where v.starts_with(row_key, 'sheet:')",
+        "join ratings.periods p on p.id = v.period_id where starts_with(v.row_key, 'sheet:')",
     ) == [("rko", "remark", date(2026, 9, 7))]
