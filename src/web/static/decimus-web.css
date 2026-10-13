@@ -987,6 +987,10 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .hbtn--danger { border-color: transparent; background: color-mix(in srgb, var(--err) 10%, transparent); color: var(--err); }
 .hbtn--danger:hover { background: color-mix(in srgb, var(--err) 18%, transparent); }
 .hbtn--err { color: var(--err); border-color: color-mix(in srgb, var(--err) 40%, transparent); }
+/* Кнопка-пиктограмма (D465): подпись — в aria-label и подсказке, на экране только значок. */
+a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
+.hbtn--icon { justify-content: center; width: 28px; padding: 0; }
+.hbtn--icon svg { width: 15px; height: 15px; }
 .hact__item[open] > summary { background: var(--surface-3); }
 .hact__pop { position: absolute; left: 0; right: 0; top: calc(100% + var(--space-3)); z-index: 20; max-width: 440px;
   padding: var(--space-6); border: 1px solid var(--line); border-radius: var(--r-block); background: var(--surface);
@@ -995,6 +999,7 @@ a.sidenav__current:hover { text-decoration: none; color: var(--accent); }
 .hact__form label { display: flex; flex-direction: column; gap: var(--space-2); align-self: stretch; }
 @media (max-width: 719px) {
   .hbtn { height: 36px; }
+  .hbtn--icon { width: 36px; }
   .zlist li { grid-template-columns: minmax(0, 1fr) 4.5rem auto; gap: var(--space-4); }
 }
 

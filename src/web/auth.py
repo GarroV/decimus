@@ -124,32 +124,32 @@ OPEN_ENDPOINTS = (
     | oauth.ENDPOINTS
 )
 
-#: Куда можно вернуть после входа (D417): только на согласие OAuth своего
-#: сайта. Произвольный `next` — открытый редирект: ссылка «войдите в decimus»
-#: уводила бы после входа на чужой сайт под видом своего.
-NEXT_PREFIX = f"{oauth.AUTHORIZE_PATH}?"
 
-
+#: Куда можно вернуть после входа (D417, D465): на любую свою страницу — путь
+#: внутри приложения. Произвольный `next` — открытый редирект: ссылка «войдите в
+#: decimus» уводила бы после входа на чужой сайт под видом своего.
 def safe_next(raw: str | None) -> str | None:
-    """Путь возврата после входа — или `None`, если он не на согласие OAuth.
+    """Путь возврата после входа — или `None`, если он не путь внутри приложения.
 
     Принимается только путь ВНУТРИ приложения (без префикса площадки — его
-    добавляет `request.script_root` при редиректе), начинающийся ровно с
-    `/oauth/authorize?`: без схемы, без хоста, без «//» и обратной косой черты,
-    которые браузеры читают как начало чужого хоста.
+    добавляет `request.script_root` при редиректе): ровно одна ведущая «/»,
+    без схемы и хоста, без «//» и обратной косой черты, которые браузеры читают
+    как начало чужого хоста, без управляющих знаков и без сегментов «.» и «..».
     """
-    if not raw or not raw.startswith(NEXT_PREFIX):
+    if not raw or not raw.startswith("/") or raw.startswith("//"):
         return None
     if "\\" in raw or any(not знак.isprintable() for знак in raw):
         return None
     части = urlsplit(raw)
-    if части.scheme or части.netloc or части.path != oauth.AUTHORIZE_PATH:
+    if части.scheme or части.netloc or части.fragment:
+        return None
+    if any(сегмент in (".", "..") for сегмент in части.path.split("/")):
         return None
     return raw
 
 
 def after_login(raw: str | None) -> Response:
-    """Куда уйти после входа: на согласие OAuth, если просили, иначе — на главную."""
+    """Куда уйти после входа: туда, откуда выбросило (свой путь), иначе — на главную."""
     путь = safe_next(raw)
     if путь is None:
         return redirect(url_for("home"))
@@ -297,9 +297,11 @@ def install(app: Flask, conf: Settings) -> None:
         token = token_of_request()
         account = resolve_session(token) if token else None
         if account is None:
-            if request.endpoint == oauth.AUTHORIZE_ENDPOINT and request.method == "GET":
-                # Claude открыл согласие неопознанному: на вход и обратно сюда.
-                return redirect(url_for("login", next=request.full_path))
+            if request.method == "GET":
+                # Сессия истекла на открытой странице (согласие OAuth, карточка в
+                # панели реестра): на вход и обратно сюда, а не на главную (D465).
+                # Только чтение: на POST-адрес обратно по GET не вернуться.
+                return redirect(url_for("login", next=request.full_path.rstrip("?")))
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)

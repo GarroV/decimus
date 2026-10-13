@@ -275,8 +275,7 @@ def test_неопознанного_уводит_на_вход_и_обратно
         "//evil.com/oauth/authorize?x=1",
         "/\\evil.com/oauth/authorize?x=1",
         "/oauth/authorize/../../evil?x=1",
-        "/oauth/authorizex?x=1",
-        "/inspections",
+        "javascript:alert(1)",
         "",
     ],
 )
