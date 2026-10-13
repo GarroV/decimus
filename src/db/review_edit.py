@@ -114,7 +114,9 @@ def add_finding(
     tenant_code = _require_tenant(tenant)
     слова = addition.text.strip()
     if not слова:
-        raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
+        raise ReviseError(
+            "Формулировка записи пуста — запись без слов в отчёт не идёт", code="revise_text_empty"
+        )
     try:
         with connection(check_environment().dsn) as conn, conn.cursor() as cur:
             cur.execute(_LOCK_SQL, {"id": ident, "tenant": tenant_code})
@@ -126,15 +128,22 @@ def add_finding(
                 raise ReviseError(
                     "Проверка историческая: оценка перенесена из старого отчёта как есть и "
                     "движком не пересчитывается (D332) — записи в неё добавляют инструментами "
-                    "загрузки"
+                    "загрузки",
+                    code="revise_legacy",
                 )
             detail = _read_detail(
                 cur, reach=own_reach(tenant_code), ident=ident, include_on_review=True
             )
             if detail is None:
-                raise ReviseError(f"Проверки {ident} у арендатора {tenant_code} нет")
+                raise ReviseError(
+                    f"Проверки {ident} у арендатора {tenant_code} нет", code="inspection_not_found"
+                )
             if len(detail.findings) >= MAX_FINDINGS:
-                raise ReviseError(f"В проверке уже {MAX_FINDINGS} записей — больше не принимается")
+                raise ReviseError(
+                    f"В проверке уже {MAX_FINDINGS} записей — больше не принимается",
+                    code="revise_findings_limit",
+                    params={"max": MAX_FINDINGS},
+                )
             cur.execute(_NEXT_N_SQL, (ident,))
             row = cur.fetchone()
             n = int(row[0]) if row else 1
@@ -162,7 +171,9 @@ def add_finding(
             if занята is not None:
                 raise ReviseError(
                     f"Пункт {addition.code} в этой зоне уже записан — запись {занята[0]}. "
-                    f"Одна пара «пункт + зона» — одна запись"
+                    f"Одна пара «пункт + зона» — одна запись",
+                    code="revise_pair_taken",
+                    params={"code": addition.code},
                 )
             cur.execute(
                 _INSERT_FINDING_SQL,
@@ -209,7 +220,8 @@ def attach_photo(
         копия = make_preview(data)
     except StorageError as exc:
         raise ReviseError(
-            "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен"
+            "Кадр не читается как изображение (ожидается JPEG, PNG или WebP) — не приложен",
+            code="photo_unreadable",
         ) from exc
     try:
         with connection(check_environment().dsn) as conn, conn.cursor() as cur:
@@ -218,15 +230,21 @@ def attach_photo(
                 raise _refuse_lock(cur, ident, tenant_code)
             cur.execute(_FINDING_EXISTS_SQL, (запись, ident))
             if cur.fetchone() is None:
-                raise ReviseError("Такой записи в этой проверке нет")
+                raise ReviseError("Такой записи в этой проверке нет", code="revise_no_finding")
             cur.execute(_COUNT_PHOTOS_SQL, (запись, ident))
             row = cur.fetchone()
             у_записи, у_проверки = (int(row[0]), int(row[1])) if row else (0, 0)
             if у_записи >= MAX_PHOTOS_PER_FINDING:
-                raise ReviseError(f"У записи уже {MAX_PHOTOS_PER_FINDING} кадров — больше нельзя")
+                raise ReviseError(
+                    f"У записи уже {MAX_PHOTOS_PER_FINDING} кадров — больше нельзя",
+                    code="photo_limit_finding",
+                    params={"max": MAX_PHOTOS_PER_FINDING},
+                )
             if у_проверки >= MAX_PHOTOS_PER_INSPECTION:
                 raise ReviseError(
-                    f"У проверки уже {MAX_PHOTOS_PER_INSPECTION} кадров — больше нельзя"
+                    f"У проверки уже {MAX_PHOTOS_PER_INSPECTION} кадров — больше нельзя",
+                    code="photo_limit_inspection",
+                    params={"max": MAX_PHOTOS_PER_INSPECTION},
                 )
             кадр = str(uuid.uuid4())
             try:
@@ -234,7 +252,8 @@ def attach_photo(
             except StorageError as exc:
                 raise ReviseError(
                     f"Хранилище кадров не приняло кадр ({type(exc).__name__}) — не приложен; "
-                    f"повторите позже"
+                    f"повторите позже",
+                    code="photo_storage",
                 ) from exc
             cur.execute(_INSERT_PHOTO_SQL, (кадр, запись, ident, PHOTO_PREFIX + кадр, uri, uri))
             conn.commit()
@@ -258,10 +277,12 @@ def detach_photo(inspection_id: str, photo_id: str, *, tenant: str, storage: Pho
             cur.execute(_PHOTO_PATH_SQL, (кадр, ident))
             найден = cur.fetchone()
             if найден is None:
-                raise ReviseError("Такого кадра у записей этой проверки нет")
+                raise ReviseError("Такого кадра у записей этой проверки нет", code="photo_no_photo")
             cur.execute(_DELETE_PHOTO_SQL, (кадр, ident))
             if cur.rowcount != 1:
-                raise ReviseError("Кадр не снят — проверка перестала ждать приёмки")
+                raise ReviseError(
+                    "Кадр не снят — проверка перестала ждать приёмки", code="revise_stale"
+                )
             conn.commit()
     except ReviseError:
         raise

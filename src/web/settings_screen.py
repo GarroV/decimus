@@ -501,7 +501,7 @@ def _install_google(app: Flask, base: str, conf: Settings) -> None:
             if попытка.verdict.locked:
                 return _unlink_locked(попытка.verdict)
             return render(Show(flash=_flash("settings.google.unlink.wrong", ok=False)), 400)
-        note_success(tenant=auth.throttle_tenant(), address=адрес, login=вошедший.login)
+        note_success(tenant=auth.throttle_tenant(), login=вошедший.login)
         if итог == "none":
             return google_link.back_to_settings()
         logger.info(

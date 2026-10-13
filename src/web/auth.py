@@ -394,7 +394,7 @@ def install(app: Flask, conf: Settings) -> None:
                 next_path=safe_next(request.form.get("next")),
             )
             return страница, 401
-        note_success(tenant=рубеж, address=адрес, login=имя)
+        note_success(tenant=рубеж, login=имя)
         session = open_session(account)
         return remember(after_login(request.form.get("next")), session)
 
@@ -528,11 +528,7 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return отказано
 
-        note_success(
-            tenant=рубеж,
-            address=client_address(trusted_proxies=conf.trusted_proxies),
-            login=account.login,
-        )
+        note_success(tenant=рубеж, login=account.login)
         session = open_session(account)
         # Имя и фото из Google (D468) — после открытия сессии и мимо исхода
         # входа: сбой здесь не отнимает у человека вход.
