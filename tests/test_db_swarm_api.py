@@ -15,14 +15,22 @@ from typing import Any
 
 import pytest
 from conftest import requires_db
-from ratings_samples import U1, rko_evaluations, rko_violations, rs_checkups, snapshot
+from ratings_samples import (
+    U1,
+    rko_evaluations,
+    rko_violations,
+    rs_checkups,
+    snapshot,
+    to_csv,
+)
 
 psycopg = pytest.importorskip("psycopg")
 
 from db_harness import слить_проверку, точка_справочника  # noqa: E402
 from flask.testing import FlaskClient  # noqa: E402
+from test_ratings_base import COLLECTION_HEADER  # noqa: E402
 
-from src.db import api_access, queries  # noqa: E402
+from src.db import api_access, queries, swarm_read  # noqa: E402
 from src.db.reach import reach_of  # noqa: E402
 from src.ratings.importer import CHANNEL_WEB, import_file  # noqa: E402
 from src.web import swarm_api  # noqa: E402
@@ -140,6 +148,25 @@ def test_топ_нарушений_по_стране(клиент: FlaskClient) 
     assert ячейка["checkups"] == 1
     assert ячейка["top"] == [{"text": "Ингредиенты на бортах", "count": 2}], "top=1 — одна строка"
     assert ячейка["total"] == 3, "(ML) у второго нарушения не мешает счёту"
+
+
+@pytest.mark.usefixtures("рейтинги")
+def test_проверок_ркО_в_ответе_столько_сколько_отчётов_собираемости() -> None:
+    """Лист нарушений РКО несёт лишь проверки с нарушениями: где есть собираемость, берётся она."""
+    до = swarm_read.periods("rko", date_from=None, date_to=None)
+    данные = to_csv(
+        COLLECTION_HEADER, [["05.10 — 11.10", "Dev", "Serbia", "Testville-1", "5", "7", ""]]
+    )
+    _грузить(данные)
+    после = swarm_read.periods("rko", date_from=None, date_to=None)
+    (новый,) = {p.id for p in после} - {p.id for p in до}
+    (старый,) = (p.id for p in до)
+    _, counts = swarm_read.violation_facts("rko", countries=["RS"], period_ids=[старый, новый])
+    # старая неделя без собираемости — прежний счёт проверок, новая — отчёты ресторана и доставки
+    assert {(страна, период): n for страна, период, n in counts} == {
+        ("RS", старый): 1,
+        ("RS", новый): 12,
+    }
 
 
 @pytest.fixture

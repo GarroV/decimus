@@ -14,7 +14,8 @@
 это строка `failed` в журнале и строка состояния с причиной, а не тишина.
 
 Справочник ссылок («Справочник», «Реестр_ссылок») не журналируется: он нужен, чтобы
-найти id пиццерии, чьё имя не сопоставилось с известными. Не скачался — листы
+найти id пиццерии, чьё имя не сопоставилось с известными. Имя с разными id в разных
+ссылках или строках помечено `base.AMBIGUOUS` — загрузка пишет его в журнал. Не скачался — листы
 идут без него, пиццерия без id попадает в «не сопоставлено».
 """
 
@@ -34,7 +35,7 @@ from src.db import ratings as store
 from src.db import ratings_sync as state
 from src.db.errors import RatingsError
 
-from .base import parse_directory
+from .base import one_id, parse_directory, shared_ids_ambiguous
 from .importer import CHANNEL_SYNC, OUTCOME_DUPLICATE, ImportReport, import_file
 from .model import (
     FORMAT_BASE_COLLECTION,
@@ -151,7 +152,7 @@ def _directory(sheet: str, fetch: Fetcher) -> dict[str, str]:
             continue
         for key, dodo_id in part.items():
             merged.setdefault(key, set()).add(dodo_id)
-    return {key: next(iter(ids)) for key, ids in merged.items() if len(ids) == 1}
+    return shared_ids_ambiguous({key: one_id(ids) for key, ids in merged.items()})
 
 
 def _failed(tab: str, note: str, *, sha: str | None) -> TabResult:
