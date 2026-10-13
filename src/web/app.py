@@ -133,6 +133,7 @@ SCREENS = (
     "actions",
     "plans",
     "orders",
+    "calendar",
 )
 
 
@@ -187,6 +188,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     unit_add.install(app, conf)
     _register_registry(app, conf)
+    _register_calendar(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
@@ -652,6 +654,39 @@ def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
     return _url("registry", lang=lang)
 
 
+def _register_calendar(app: Flask, conf: Settings) -> None:
+    """Раздел «Календарь» (D462): пока в нём одно — «Где нужно проверить».
+
+    Блок ушёл с «Проверок» (D418 → D462): он отвечает на вопрос «куда ехать», а
+    не «что проверено». Свой период, по умолчанию текущий месяц; охват и роли —
+    как были у блока на «Проверках».
+    """
+
+    @app.get(section("calendar").path)
+    def calendar() -> str:
+        язык = _lang(conf)
+        период = registry_period.read(request.args, today=date.today())
+
+        def отбор(**изменения: str) -> str:
+            параметры = {**период.params(), "lang": язык, **изменения}
+            return _url("calendar", **{к: з for к, з in параметры.items() if з})
+
+        hq = auth.current_tenant() == HQ_TENANT
+        return render_template(
+            "calendar/index.html",
+            to_check=to_inspect.load(
+                reach=auth.current_reach(), date_from=период.start, date_to=период.end
+            ),
+            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
+            period=период,
+            period_title=registry_view.period_title(период, язык),
+            period_prev=registry_view.period_link(период, -1, отбор),
+            period_next=registry_view.period_link(период, 1, отбор),
+            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_hidden={"lang": язык},
+        )
+
+
 def _register_registry(app: Flask, conf: Settings) -> None:
     """Раздел «Проверки»: реестр, карточка, снятие."""
 
@@ -703,26 +738,18 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         выбрано = request.args.get("inspection", "").strip()[:64]
         панель = _registry_panel(выбрано, conf=conf)
-        # «Где нужно проверить» (D418): у точек без проверок нет ни буквы, ни вида,
-        # поэтому при отборе по ним блок не показывается — он противоречил бы отбору.
-        ждут = (
-            to_inspect.Block()
-            if отбор_в.grade or отбор_в.kind
-            else to_inspect.load(
-                reach=auth.current_reach(),
-                date_from=период.start,
-                date_to=период.end,
-                country=отбор_в.country,
-                city=отбор_в.city,
-                query=отбор_в.q,
-            )
+        # «На приёмке» (D462): ждущие вычитки — мимо периода и отбора, самые
+        # давние сверху; сколько ждут — днями от даты обхода.
+        сегодня = date.today()
+        на_приёмке = tuple(
+            sorted(registry_data.review, key=lambda row: (row.inspection_date, row.pushed_at))
         )
-        hq = auth.current_tenant() == HQ_TENANT
+        ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
         return render_template(
             "inspections/list.html",
             registry=registry_data,
-            to_check=ждут,
-            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
+            review_rows=на_приёмке,
+            review_wait=ждёт_дней,
             rows=строки,
             picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
             grade_tone=view.grade_tone,
@@ -739,6 +766,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_next=registry_view.period_link(период, 1, отбор),
             period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
             period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
+            period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
             select_url=отбор,
             reset_url=отбор(grade="", kind="", country="", city="", q=""),
             picked=панель.picked,
