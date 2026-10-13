@@ -27,8 +27,11 @@ def may_add_units(tenant: str) -> bool:
 
     Партнёры выбирают из справочника своих стран, но не пополняют его: справочник
     один и принадлежит УК (D284). Одно правило на бота и на веб-админку (#437).
+    Граница — `unit.create` «только УК» в матрице; роль спрашивает маршрут.
     """
-    return canonical_tenant(tenant) == HQ_TENANT
+    from .permissions import open_to_space
+
+    return bool(canonical_tenant(tenant)) and open_to_space("unit.create", tenant)
 
 
 #: Контролинг: видит и ведёт только раздел «Рейтинги» (D319, D358).
@@ -38,14 +41,6 @@ CONTROL_ROLE = "control"
 #: главных админов. Только в УК (`0041`); последнего действующего снять нельзя —
 #: держит база, а не экран.
 SUPERADMIN_ROLE = "superadmin"
-
-#: Роли, которым открыто всё, что открыто админу: главный админ — админ и больше.
-ADMIN_ROLES = ("admin", SUPERADMIN_ROLE)
-
-
-def is_admin_role(role: str | None) -> bool:
-    """Админ или главный админ: всё, что открыто админу, открыто и главному."""
-    return role in ADMIN_ROLES
 
 
 #: Бизнес-девелопер (D440): пользуется сервисом полностью (проверки, приёмка,
@@ -57,46 +52,19 @@ DEVELOPER_ROLE = "developer"
 #: Только УК (`0060`).
 GUEST_ROLE = "guest"
 
-#: Кто в УК работает с проверками: правит, принимает, снимает, переносит, пишет письма.
-HQ_WORKER_ROLES = (*ADMIN_ROLES, DEVELOPER_ROLE)
 
+def _may(role: str | None, tenant: str | None, action: str) -> bool:
+    # Матрица живёт в `permissions`, а она сама опирается на этот модуль: импорт
+    # внутри функции, чтобы не замкнуть круг на загрузке.
+    from .permissions import role_may
 
-def is_hq_guest(role: str | None, tenant: str | None) -> bool:
-    """Гость УК: читает всю сеть и не пишет ничего (D440)."""
-    return role == GUEST_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
-
-
-def is_hq_developer(role: str | None, tenant: str | None) -> bool:
-    """Бизнес-девелопер УК (D440)."""
-    return role == DEVELOPER_ROLE and canonical_tenant(tenant or "") == HQ_TENANT
-
-
-def is_hq_worker(role: str | None, tenant: str | None) -> bool:
-    """Работающий в УК с проверками: главный админ, админ, бизнес-девелопер (D440)."""
-    return role in HQ_WORKER_ROLES and canonical_tenant(tenant or "") == HQ_TENANT
-
-
-#: Роли, которым открыта работа в поле — бот и мини-апп обхода: проверка,
-#: кадры, записи, круг доступа к Claude (аудит 12.10, F-024). Аудитор, бизнес-девелопер
-#: (D440) и админы в любом пространстве; контроля здесь нет — проверок он не касается никак
-#: (D420, D344). Незнакомая роль закрыта: новая роль, не внесённая сюда,
-#: получает отказ, а не тихий доступ.
-FIELD_ROLES = frozenset({"auditor", DEVELOPER_ROLE, *ADMIN_ROLES})
-
-
-def may_do_field_work(role: str | None) -> bool:
-    """Пускать ли учётку с этой ролью в бот и мини-апп обхода (D420)."""
-    return role in FIELD_ROLES
-
-
-#: Роли, которым открыта загрузка рейтингов и их справочники (D319).
-RATINGS_MANAGER_ROLES = (CONTROL_ROLE, *ADMIN_ROLES)
+    return role_may(role, tenant, action)
 
 
 def may_manage_ratings(role: str | None, tenant: str) -> bool:
-    """Загружать рейтинги и править их справочники — контроль и админ УК (D319).
+    """Загружать рейтинги и править их справочники — `ratings.manage` (D319, D420).
 
     Видеть рейтинги могут все (D327, «рейтинги видят все») — это решает не
     эта функция, а отсутствие заслона на чтении.
     """
-    return canonical_tenant(tenant) == HQ_TENANT and role in RATINGS_MANAGER_ROLES
+    return _may(role, tenant, "ratings.manage")

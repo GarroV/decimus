@@ -34,6 +34,7 @@ from . import (
     accounts,
     auth,
     connections_screen,
+    guard,
     partner_spaces,
     people,
 )
@@ -94,6 +95,7 @@ def install(app: Flask, conf: Settings) -> None:
         return render()
 
     @app.post(f"{users_path}/bot-unlink")
+    @guard.action("people.manage")
     def bot_unlink() -> FlaskResponse | tuple[str, int]:
         """Снять привязку бота ЧУЖОЙ учётки: главный админ и админ УК, только в своём охвате.
 
@@ -133,10 +135,10 @@ def _install_edits(app: Flask, users_path: str) -> None:
     ) -> FlaskResponse | tuple[str, int]:
         """Общее у правки роли и почты: охват, происхождение, цель по базе.
 
-        Контролю смена роли не открывается никогда (D360).
+        Смена роли — отдельная клетка матрицы (`people.role`): контролю её нет (D360).
         """
         круг = people_scope()
-        if круг is None or (роль_меняется and круг.kind == access_policy.CONTROL):
+        if круг is None or (роль_меняется and not guard.may("people.role")):
             return forbidden()
         refuse_foreign_origin()
         логин = (request.form.get("login") or "").strip()
@@ -169,6 +171,7 @@ def _install_edits(app: Flask, users_path: str) -> None:
         )
 
     @app.post(f"{users_path}/role")
+    @guard.action("people.role")
     def user_role() -> FlaskResponse | tuple[str, int]:
         """Назначить роль человеку в охвате; выдать можно только роль из охвата. Свою — нельзя."""
         вошедший = auth.current_account()
@@ -196,6 +199,7 @@ def _install_edits(app: Flask, users_path: str) -> None:
         return _правка(сменить, роль_меняется=True)
 
     @app.post(f"{users_path}/email")
+    @guard.action("people.manage")
     def user_email() -> FlaskResponse | tuple[str, int]:
         """Почта входа через Google (#399): задать или снять (пустое поле). Цель — в охвате."""
         вошедший = auth.current_account()
@@ -228,6 +232,7 @@ def _install_add_disable(app: Flask, users_path: str) -> None:
         return исход.key == "email.ok"
 
     @app.post(f"{users_path}/add")
+    @guard.action("people.manage")
     def add_user() -> FlaskResponse | tuple[str, int]:
         """Добавить человека. Пароль показывается ОДИН раз — на этой же странице.
 
@@ -265,6 +270,7 @@ def _install_add_disable(app: Flask, users_path: str) -> None:
         return render(Show(add=True, added=заведённый, added_email_failed=почта_не_легла))
 
     @app.post(f"{users_path}/disable")
+    @guard.action("people.manage")
     def disable_user() -> FlaskResponse | tuple[str, int]:
         """Отключить учётку в охвате. Себя — нельзя; последнего главного админа — тоже."""
         круг = people_scope()
@@ -308,6 +314,7 @@ def _install_spaces(app: Flask, users_path: str) -> None:
         return Show(tab=TAB_SPACES, space=код, add_space=add_space, flash=_flash(ключ, ok=ok))
 
     @app.post(f"{users_path}/spaces/add")
+    @guard.action("space.manage")
     def add_space() -> FlaskResponse | tuple[str, int]:
         """Завести пространство партнёра вместе со странами (D364)."""
         отказ = _ведёт_пространства()
@@ -326,6 +333,7 @@ def _install_spaces(app: Flask, users_path: str) -> None:
         return render(_исход(код, "users.spaces.space_added", ok=True))
 
     @app.post(f"{users_path}/spaces/countries")
+    @guard.action("space.manage")
     def space_countries() -> FlaskResponse | tuple[str, int]:
         """Добавить страны пространству партнёра."""
         отказ = _ведёт_пространства()

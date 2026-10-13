@@ -50,7 +50,7 @@ class Учётка:
         self,
         login: str = ЛОГИН,
         tenant: str = "default",
-        role: str = "auditor",
+        role: str | None = None,
         email: str | None = None,
         web_lang: str | None = None,
         signed_in_at: datetime | None = None,
@@ -58,6 +58,10 @@ class Учётка:
         self.id = "22222222-2222-2222-2222-222222222222"
         self.login = login
         self.tenant = tenant
+        # Роль по умолчанию — рабочая роль своей стороны (D440): в УК аудитора
+        # больше нет, его место занял бизнес-девелопер; у партнёра — сотрудник.
+        if role is None:
+            role = "developer" if canonical_tenant(tenant) == HQ_TENANT else "auditor"
         # Почта входа через Google (`web_users.email`): по умолчанию не
         # привязана — иначе вход паролем, которым входит оснастка, закрыт.
         self.email = email
@@ -67,7 +71,7 @@ class Учётка:
         # Когда открыта сессия: по умолчанию только что — вход свежий, и
         # действия, требующие свежего входа (`web.reauth`), не переспрашивают.
         self.signed_in_at = signed_in_at or datetime.now(UTC)
-        # Роль по умолчанию — САМАЯ УЗКАЯ, как и в базе. Двойник-администратор
+        # Роль по умолчанию — узкая рабочая, не админ: двойник-администратор
         # прятал бы отказ раздела людей во всех тестах разом.
         self.role = role
 
@@ -165,7 +169,7 @@ def подменить_двери(
     monkeypatch: pytest.MonkeyPatch,
     *,
     tenant: str,
-    role: str = "auditor",
+    role: str | None = None,
     email: str | None = None,
 ) -> dict[str, list[Any]]:
     """Двери опознания, подменённые на границе модуля. Пишут, кого звали.

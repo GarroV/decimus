@@ -29,8 +29,8 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.bot.title": {"ru": "Бот в Telegram", "en": "Telegram bot"},
     "settings.bot.read_only": {
-        "ru": "Бот для вашей роли не подключается: она только читает данные.",
-        "en": "The bot is not available for your role: it is read-only.",
+        "ru": "Бот для вашей роли не подключается: проверок в поле она не ведёт.",
+        "en": "The bot is not available for your role: it does not run field inspections.",
     },
     "settings.google.title": {"ru": "Google", "en": "Google"},
     "settings.google.linked": {

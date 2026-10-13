@@ -12,6 +12,8 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import войти, подменить_двери, собрать
 
+from src.web import guard
+
 ПРОБА = "/__probe"
 
 
@@ -20,7 +22,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant="HQ", role="admin")
     app = собрать(tenant="HQ")
     # Маршрут без собственной проверки источника — то, что заслон и ловит.
-    app.add_url_rule(ПРОБА, "probe", lambda: "записано", methods=["POST"])
+    # Код действия ему нужен лишь затем, чтобы заслон прав его пропустил: пишущий
+    # маршрут без кода тот отказывает сам.
+    app.add_url_rule(
+        ПРОБА, "probe", guard.action("inspection.conduct")(lambda: "записано"), methods=["POST"]
+    )
     with app.test_client() as c:
         assert войти(c).status_code == 302
         yield c

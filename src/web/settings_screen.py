@@ -39,7 +39,17 @@ from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import accounts, auth, google_link, profile, reauth, ui_lang, users_claude, users_mcp
+from . import (
+    accounts,
+    auth,
+    google_link,
+    guard,
+    profile,
+    reauth,
+    ui_lang,
+    users_claude,
+    users_mcp,
+)
 from .config import WEB_BOT_USERNAME_VAR, Settings
 from .db_refusal import note_target_mismatch
 from .google_auth import load_hq_domains
@@ -56,29 +66,6 @@ BOT_USERNAME_KEY = "DECIMUS_BOT_USERNAME"
 def link_url(bot_username: str, token: str) -> str:
     """Ссылка привязки бота: Telegram передаст метку боту командой `/start` (D286)."""
     return f"https://t.me/{bot_username}?start={bot_links.LINK_PREFIX}{token}"
-
-
-def own_post_paths() -> frozenset[str]:
-    """Дела самого человека, которые не требуют права писать в сеть.
-
-    Единый перечень для заслонов контролинга и гостя: свой пароль, свой токен
-    Claude, своё подключение Claude. Бота гость не привязывает — этого пути
-    здесь нет.
-    """
-    base = section("settings").path
-    return frozenset(
-        {
-            f"{base}/password",
-            f"{base}/claude-token",
-            f"{base}/claude-token-revoke",
-            f"{base}/claude-revoke",
-            f"{base}/google-link",
-            f"{base}/google-unlink",
-            f"{base}/lang",
-            reauth.CONFIRM_PATH,
-            reauth.CONFIRM_GOOGLE_PATH,
-        }
-    )
 
 
 @dataclass(frozen=True)
@@ -206,6 +193,7 @@ def _install_bot(app: Flask, base: str, conf: Settings) -> None:
     """Привязка бота к своей учётке и отвязка (D286)."""
 
     @app.post(f"{base}/bot-link")
+    @guard.action("inspection.conduct")
     def settings_bot_link() -> Response | FlaskResponse | tuple[str, int]:
         """Выпустить ссылку привязки бота — ВСЕГДА своей учётке (D286).
 
@@ -234,6 +222,7 @@ def _install_bot(app: Flask, base: str, conf: Settings) -> None:
         )
 
     @app.post(f"{base}/bot-unlink")
+    @guard.action("inspection.conduct")
     def settings_bot_unlink() -> FlaskResponse | tuple[str, int]:
         """Отвязать СВОЕГО бота. Чужую привязку снимает админ с карточки человека."""
         refuse_foreign_origin()

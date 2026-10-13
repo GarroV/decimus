@@ -1,36 +1,35 @@
-"""Права MCP по роли учётки сайта (D417): матрица «роль × вид инструментов».
+"""Права MCP по роли учётки сайта — по той же матрице, что веб и бот (D408, D417).
 
-Роль известна у личного токена из бота и у входа через OAuth
-(`config.resolve_access`): оба выпущены на учётку decimus, и права даёт её роль,
-а не пространство. С аудита 12.10 (F-017, F-022) личный токен тоже несёт роль —
-до этого он открывал всё пространство любому, кто попал в круг. Роли не знает
-только служебный токен из карты `MCP_TOKENS` в `.env`: его заводит владелец
-стенда руками, и для него матрица не применяется.
+Роль известна у личного токена и у входа через OAuth (`config.resolve_access`):
+оба выпущены на учётку decimus, и права даёт её роль. Роли не знает только
+служебный токен из карты `MCP_TOKENS` в `.env`: его заводит владелец стенда
+руками, и для него матрица не применяется.
 
-**Матрица только сужает.** Она отвечает «может ли эта роль вообще», а прежние
-заслоны (`rpc._call_tool`: методика по `MCP_CHECKLIST_TENANTS`, загрузка по
-`MCP_IMPORT_TENANTS`, рейтинги только УК) стоят дальше и действуют как раньше.
-Поэтому клетка «правка методики — да, если HQ открыта методика» здесь просто
-«да»: условие настройки держит настройка.
+Каждый инструмент каталога сводится к одному действию матрицы (`action_of`):
+вид задаёт действие по умолчанию, правящие инструменты методики — своё
+(`TOOL_ACTIONS`). Открыт ли инструмент роли, решает
+`src.domain.permissions.claude_may` — матрица минус закрытое в Claude
+(`CLAUDE_CLOSED`). Своей таблицы ролей здесь нет: вторая копия разошлась бы с
+вебом молча.
 
-**Одна функция на `tools/list` и на вызов.** Две копии одной таблицы
-разошлись бы молча: инструмент, скрытый из списка, но открытый на вызове, —
-это дыра, которую видно только перебором имён.
+Снятие проверки (`KIND_RETRACTION`) не открыто ни одной роли намеренно: через
+OAuth и личный токен его нет ни у кого (спека D417, D341) — держит
+`CLAUDE_CLOSED`, а не отсутствие строки здесь.
 
-Незнакомая роль и незнакомый вид закрыты: новая роль или новый вид, не
-внесённые сюда, получают отказ, а не тихий доступ.
+**Матрица только сужает.** Прежние заслоны (`rpc._call_tool`: методика по
+`MCP_CHECKLIST_TENANTS`, загрузка по `MCP_IMPORT_TENANTS`, рейтинги только УК)
+стоят дальше и действуют как раньше.
+
+**Одна функция на `tools/list` и на вызов** (`permits_tool`): инструмент,
+скрытый из списка, но открытый на вызове, — дыра, которую видно только перебором
+имён. Незнакомая роль закрыта.
 """
 
 from __future__ import annotations
 
-from src.domain.tenants import (
-    ADMIN_ROLES,
-    CONTROL_ROLE,
-    DEVELOPER_ROLE,
-    GUEST_ROLE,
-    HQ_TENANT,
-    canonical_tenant,
-)
+from collections.abc import Mapping
+
+from src.domain.permissions import claude_may, require_action
 
 from .catalogue import (
     KIND_CHECKLIST,
@@ -39,66 +38,58 @@ from .catalogue import (
     KIND_INSPECTIONS,
     KIND_RATINGS,
     KIND_RATINGS_READ,
+    KIND_RETRACTION,
+    ToolSpec,
 )
 
-#: Аудитор — роль сотрудника партнёра; в УК её больше нет (D440, `0060`).
-AUDITOR_ROLE = "auditor"
+#: Действие вида: читающий инструмент методики — `checklist.read`, правящий —
+#: `checklist.edit`, если не назван в `TOOL_ACTIONS`.
+KIND_ACTIONS: Mapping[str, str] = {
+    KIND_INSPECTIONS: "inspection.read",
+    KIND_CHECKLIST_SOURCE: "checklist.read",
+    KIND_CHECKLIST: "checklist.read",
+    KIND_RETRACTION: "inspection.retract",
+    KIND_IMPORT: "inspection.import",
+    KIND_RATINGS: "ratings.manage",
+    KIND_RATINGS_READ: "ratings.read",
+}
 
-#: Роли сайта, известные матрице. Остальные — ничего.
-KNOWN_ROLES = frozenset({AUDITOR_ROLE, CONTROL_ROLE, DEVELOPER_ROLE, GUEST_ROLE, *ADMIN_ROLES})
-
-#: УК: админ и главный админ — всё, кроме снятия (D335, D344).
-_HQ_ADMIN = frozenset(
-    {
-        KIND_INSPECTIONS,
-        KIND_CHECKLIST_SOURCE,
-        KIND_CHECKLIST,
-        KIND_IMPORT,
-        KIND_RATINGS_READ,
-        KIND_RATINGS,
-    }
-)
-
-#: УК: бизнес-девелопер (D440, заменил аудитора УК) читает проверки, эталон и
-#: рейтинги и ведёт методику; правка ГЛАВНОГО чек-листа ему закрыта не здесь, а
-#: словами в `rpc._call_tool` (вид один, а главный — свойство чек-листа).
-_HQ_DEVELOPER = frozenset(
-    {KIND_INSPECTIONS, KIND_CHECKLIST_SOURCE, KIND_CHECKLIST, KIND_RATINGS_READ}
-)
-
-#: УК: гость — только чтение проверок и рейтингов (D440).
-_HQ_GUEST = frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ})
-
-#: УК: контролинг — только рейтинги, чтение и управление; проверок не касается
-#: никак (D420, отменяет D350; D344, D358).
-_HQ_CONTROL = frozenset({KIND_RATINGS_READ, KIND_RATINGS})
-
-#: Партнёр, любая роль: чтение своих проверок и рейтингов (D335 — загрузки нет
-#: никогда).
-_PARTNER = frozenset({KIND_INSPECTIONS, KIND_RATINGS_READ})
-
-#: Снятие проверки (`KIND_RETRACTION`) не открыто ни одной строке намеренно:
-#: через OAuth его нет ни у кого (спека D417, «Безопасность»).
+#: Правящие инструменты методики, чьё действие — не правка пунктов.
+TOOL_ACTIONS: Mapping[str, str] = {
+    "publish_checklist_version": "checklist.publish",
+    "retract_learned_phrase": "phrases.manage",
+    "repoint_learned_phrase": "phrases.manage",
+    "create_checklist": "checklist.manage",
+    "rename_checklist": "checklist.manage",
+    "set_checklist_state": "checklist.manage",
+    "set_checklist_bot_access": "checklist.manage",
+    # Указатель прода один на всю сеть — только админы (D440).
+    "apply_checklist": "checklist.apply",
+}
 
 
-def kinds_for(role: str, tenant: str) -> frozenset[str]:
-    """Виды инструментов, открытые роли учётки в её пространстве."""
-    if role not in KNOWN_ROLES:
-        return frozenset()
-    if canonical_tenant(tenant) != HQ_TENANT:
-        return _PARTNER
-    if role in ADMIN_ROLES:
-        return _HQ_ADMIN
-    if role == CONTROL_ROLE:
-        return _HQ_CONTROL
-    if role == DEVELOPER_ROLE:
-        return _HQ_DEVELOPER
-    if role == GUEST_ROLE:
-        return _HQ_GUEST
-    # Аудитора в УК больше нет (D440): незнакомая в УК роль закрыта.
-    return frozenset()
+def action_of(spec: ToolSpec) -> str:
+    """Действие матрицы, которое открывает инструмент. Незнакомый вид — ошибка кода."""
+    if spec.name in TOOL_ACTIONS:
+        return require_action(TOOL_ACTIONS[spec.name]).code
+    if spec.kind == KIND_CHECKLIST and spec.writes:
+        return "checklist.edit"
+    if spec.kind not in KIND_ACTIONS:
+        raise ValueError(f"Вид инструмента «{spec.kind}» ({spec.name}) не сведён к матрице")
+    return require_action(KIND_ACTIONS[spec.kind]).code
+
+
+def permits_tool(role: str, tenant: str, spec: ToolSpec) -> bool:
+    """Открыт ли инструмент роли учётки. Одна функция и на список, и на вызов."""
+    return claude_may(role, tenant, action_of(spec))
 
 
 def permits(role: str, tenant: str, kind: str) -> bool:
-    """Открыт ли роли вид инструментов. Одна функция и на список, и на вызов."""
-    return kind in kinds_for(role, tenant)
+    """Открыт ли роли вид инструментов в целом (действие вида по умолчанию)."""
+    действие = KIND_ACTIONS.get(kind)
+    return действие is not None and claude_may(role, tenant, действие)
+
+
+def may_edit_protected(role: str, tenant: str) -> bool:
+    """Править главный или применённый к проду чек-лист — только админы (D440)."""
+    return claude_may(role, tenant, "checklist.master")

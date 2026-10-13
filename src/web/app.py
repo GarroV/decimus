@@ -47,23 +47,16 @@ from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
-from src.domain.tenants import (
-    HQ_TENANT,
-    canonical_tenant,
-    is_admin_role,
-    is_hq_developer,
-    is_hq_guest,
-    is_hq_worker,
-)
+from src.domain.permissions import is_read_only
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.report.info_titles import FOUND
 
 from . import (
-    accounts,
     action_plans,
     assets,
     auth,
     edition,
-    guest_gate,
+    guard,
     home_page,
     letter_draft,
     letter_markup,
@@ -98,7 +91,6 @@ from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
 from .origin import refuse_foreign_origin
-from .route_audience import check_audiences, partner_may_reach
 from .sections import (
     CONTROL_HOME,
     SECTIONS,
@@ -186,9 +178,9 @@ def create_app(settings: Settings | None = None) -> Flask:
     auth.install(app, conf)
     _install_origin_gate(app)
     _install_hq_gate(app)
-    _install_control_gate(app)
-    guest_gate.install(app)
-    _install_methodology_gate(app)
+    # Матрица «роль × действие» — один заслон на запись и на разделы (заменил
+    # заслоны контроля, гостя и методики).
+    guard.install(app)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)
@@ -210,8 +202,6 @@ def create_app(settings: Settings | None = None) -> Flask:
     # Мини-апп обхода пишет в идущие проверки, а админка их только читает:
     # адреса обхода передаются отдельному сервису со своим томом на запись.
     walk_proxy.install(app, upstream=conf.walk_upstream, ui_lang=conf.ui_lang)
-    # Все маршруты уже на месте: у каждого обязана быть отметка аудитории.
-    check_audiences(app)
     _register_errors(app, conf)
     security_headers.install(app, hsts=conf.hsts)
     return app
@@ -267,9 +257,11 @@ def _register_context(app: Flask, conf: Settings) -> None:
             # Кто вошёл — берётся из того же ответа, что пропустил запрос
             # через заслон, а не спрашивается у базы второй раз.
             "account": account,
-            # Гость УК (D440) только читает: кнопки действий разметка не рисует
-            # вовсе, а запись ему закрывает заслон `guest_gate`.
-            "read_only": account is not None and is_hq_guest(account.role, account.tenant),
+            # Роль без пишущих действий в матрице (гость УК, D440) только читает:
+            # кнопки действий разметка не рисует вовсе, а запись закрывает `guard`.
+            "read_only": account is not None and is_read_only(account.role, account.tenant),
+            # Матрица для разметки: `may("checklist.edit")` и т. п.
+            "may": guard.may,
             "logout_path": auth.LOGOUT_PATH,
             # Роль словами — как должность; у партнёра свои названия (D346).
             "role_key": users_view.role_key,
@@ -668,7 +660,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
     @app.get("/")
     def home() -> Response:
         вошедший = auth.current_account()
-        if вошедший is not None and вошедший.role == accounts.ROLE_CONTROL:
+        if вошедший is not None and not guard.may("view.overview"):
             # «Главной» у контролинга нет (D420) — его стартовый экран «Рейтинги».
             return redirect(url_for(CONTROL_HOME))
         return redirect(url_for("overview"))  # при входе все — на «Главной» (D378)
@@ -875,7 +867,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             saved=записанное,
             show_draft=показать_заготовку,
             saved_known=сохранённое_известно,
-            own=_own(detail) and not _is_guest(),
+            own=guard.may("inspection.letter", detail.inspection.tenant_code),
             save_outcome=request.args.get("saved"),
             gmail_outcome=request.args.get("gmail"),
             head=detail.inspection,
@@ -886,6 +878,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{section('registry').path}/<inspection_id>/letter/save")
+    @guard.action("inspection.letter", object_in_route=True)
     def save_letter(inspection_id: str) -> Response | FlaskResponse | tuple[str, int] | str:
         """Зафиксировать письмо в том виде, в каком его подтвердил человек (T333).
 
@@ -898,8 +891,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
-        if not _own(detail):
-            return render_template("users/forbidden.html"), 403
+        отказ = guard.permit("inspection.letter", detail.inspection.tenant_code)
+        if отказ is not None:
+            return отказ
         if detail.inspection.is_uploaded:
             return _card_refusal(
                 inspection_id, conf=conf, text=t("letter.uploaded", _lang(conf)), status=409
@@ -944,14 +938,12 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{section('registry').path}/<inspection_id>/retract")
+    @guard.action("inspection.retract", object_in_route=True)
     def do_retract(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        отказ = _hq_worker_only()
+        отказ = _permit_inspection("inspection.retract", inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
-        чужая = _refuse_unless_own(inspection_id)
-        if чужая is not None:
-            return чужая
         reason = (request.form.get("reason") or "").strip()
         notice: str | None = None
         failure: str | None = None
@@ -964,16 +956,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
     @app.post(f"{section('registry').path}/<inspection_id>/accept")
+    @guard.action("inspection.accept", object_in_route=True)
     def do_accept(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Подтвердить проверку на приёмке (D199). Админ УК по своей проверке (D283, D341),
         админ партнёра — свежую проверку своих сотрудников (D367)."""
-        отказ = _reviewer_only(inspection_id)
+        отказ = _permit_inspection("inspection.accept", inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
-        чужая = _refuse_unless_own(inspection_id)
-        if чужая is not None:
-            return чужая
         вошедший = auth.current_account()
         notice: str | None = None
         failure: str | None = None
@@ -990,16 +980,14 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
     @app.post(f"{section('registry').path}/<inspection_id>/findings/<finding_id>/revise")
+    @guard.action("inspection.revise", object_in_route=True)
     def do_revise(inspection_id: str, finding_id: str) -> FlaskResponse | str | tuple[str, int]:
         """Исправить запись ждущей проверки с пересчётом (D200). Админ УК (D341),
         админ партнёра — в свежей проверке своих сотрудников (D367)."""
-        отказ = _reviewer_only(inspection_id)
+        отказ = _permit_inspection("inspection.revise", inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
-        чужая = _refuse_unless_own(inspection_id)
-        if чужая is not None:
-            return чужая
         notice: str | None = None
         failure: str | None = None
         try:
@@ -1020,15 +1008,13 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
 
     @app.post(f"{section('registry').path}/<inspection_id>/move")
+    @guard.action("inspection.move", object_in_route=True)
     def do_move(inspection_id: str) -> FlaskResponse | str | tuple[str, int]:
-        """Перенести проверку по дате и пиццерии (D195). Только админ УК (D341)."""
-        отказ = _hq_worker_only()
+        """Перенести проверку по дате и пиццерии (D195). Только УК (D341)."""
+        отказ = _permit_inspection("inspection.move", inspection_id)
         if отказ is not None:
             return отказ
         refuse_foreign_origin()
-        чужая = _refuse_unless_own(inspection_id)
-        if чужая is not None:
-            return чужая
         вошедший = auth.current_account()
         notice: str | None = None
         failure: str | None = None
@@ -1057,28 +1043,13 @@ def _own(detail: Any) -> bool:
     return auth.is_own(detail.inspection.tenant_code)
 
 
-def _refuse_unless_own(inspection_id: str) -> FlaskResponse | None:
-    """Отказ записи по проверке: вне охвата — 404, чужого пространства — 403.
-
-    Вне охвата ответ тот же, что у несуществующей: «такой нет» и «вам её не
-    видно» снаружи неразличимы. Проверку, которую вошедший читать вправе, но
-    которая не его, — 403: он её видит, и делать вид, что её нет, — загадка.
-    """
-    detail = data.load_card(inspection_id, reach=auth.current_reach())
-    if detail is None:
-        return render_template("inspections/not_found.html"), 404  # type: ignore[return-value]
-    if not _own(detail):
-        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
-    return None
-
-
 def _install_hq_gate(app: Flask) -> None:
     """Раздел только для УК отвечает партнёру тем же 404, что несуществующий адрес (D264).
 
-    Решает по отметке аудитории эндпоинта (`route_audience`), по умолчанию — закрыто;
-    префикс раздела (`sections.refused_for`) — второй слой. Заслон на раздел
-    целиком, а не на каждую кнопку внутри: так доступы проще держать — это и
-    был довод владельца. Стоит после заслона входа: без вошедшего туда не
+    Решает по объявлениям маршрута в матрице (`guard.open_to_tenant`), по
+    умолчанию — закрыто; префикс раздела (`sections.refused_for`) — второй слой.
+    Заслон на раздел целиком, а не на каждую кнопку внутри: так доступы проще
+    держать — это и был довод владельца. Стоит после заслона входа: без вошедшего туда не
     доходит ни один закрытый адрес.
     """
 
@@ -1090,44 +1061,15 @@ def _install_hq_gate(app: Flask) -> None:
         if auth.current_account() is None:
             return
         # Умолчание — закрыто (аудит 12.10, F-004): партнёр идёт только к
-        # эндпоинту с отметкой аудитории (`route_audience`), а не «куда не
-        # запретили по префиксу». Префиксный заслон остаётся вторым слоем.
-        партнёр = canonical_tenant(auth.current_tenant()) != HQ_TENANT
-        if партнёр and not partner_may_reach(request.endpoint):
+        # маршруту, объявленному в матрице открытым его пространству, а не «куда
+        # не запретили по префиксу». Префиксный заслон остаётся вторым слоем.
+        пространство = auth.current_tenant()
+        if canonical_tenant(пространство) != HQ_TENANT and not guard.open_to_tenant(
+            app, request.endpoint, request.path, пространство
+        ):
             abort(404)
         if refused_for(request.path, auth.current_tenant()):
             abort(404)
-
-
-def _control_may_enter(
-    path: str, *, ratings_path: str, users_path: str, settings_path: str, logout_path: str
-) -> bool:
-    """Куда пускают «контроль»: рейтинги и дела самого человека, больше никуда (D358).
-
-    Свои дела — «Настройки» целиком (пароль, бот, Claude, язык: D447) и экран
-    «Пользователи» для своих людей, выход. Адреса разделов — из реестра, а не
-    строками здесь.
-    """
-    if path == ratings_path or path.startswith(f"{ratings_path}/"):
-        return True
-    if path == settings_path or path.startswith(f"{settings_path}/"):
-        return True
-    own = (
-        "/",
-        users_path,
-        logout_path,
-        # Люди контролинга (D360): заведение, почта, отключение. Смены роли
-        # (`/role`) здесь нет намеренно; кого можно трогать, решает маршрут.
-        f"{users_path}/add",
-        f"{users_path}/email",
-        f"{users_path}/disable",
-        # Подключение Claude (D417): согласие и отзыв своего подключения —
-        # дела самого человека; права в MCP контролю решает его роль.
-        oauth.AUTHORIZE_PATH,
-    )
-    # «Подключения» (D425) контролю не открыты, но отвечает им маршрут: 404, как всем,
-    # кроме главного админа, а не 403 заслона, который выдал бы, что экран есть.
-    return path in own or path.startswith(f"{users_path}/connections/")
 
 
 def _install_origin_gate(app: Flask) -> None:
@@ -1155,62 +1097,6 @@ def _install_origin_gate(app: Flask) -> None:
         refuse_foreign_origin()
 
 
-def _install_methodology_gate(app: Flask) -> None:
-    """Методику правят админы (D344) и — только неглавные чек-листы — бизнес-девелопер (D440).
-
-    Любая запись в разделе «Методика» не от них — 403.
-
-    Заслон `before_request`, а не проверка в каждом маршруте: у правящих
-    маршрутов `/admin/*` своей проверки роли нет, и новый закрыт с момента
-    появления. Читать методику по-прежнему могут все, кому открыт раздел.
-    """
-    methodology_path = section("admin").path
-
-    @app.before_request
-    def _методику_правят_админы() -> None:
-        if request.method in _READ_METHODS or request.endpoint in auth.OPEN_ENDPOINTS:
-            return
-        путь = request.path
-        if путь != methodology_path and not путь.startswith(f"{methodology_path}/"):
-            return
-        вошедший = auth.current_account()
-        if вошедший is None:
-            return
-        # Бизнес-девелопер (D440) заводит чек-листы и правит неглавные: какой
-        # чек-лист главный, решает дверь методики (`method.store_for`), а метку
-        # и указатель прода она отдаёт одним админам. Остальные — 403, как были.
-        if not (is_admin_role(вошедший.role) or is_hq_developer(вошедший.role, вошедший.tenant)):
-            abort(403)
-
-
-def _install_control_gate(app: Flask) -> None:
-    """Роль «контроль»: только рейтинги и свои люди, проверок не касается никак (D358, D420).
-
-    Заслон стоит `before_request`, а не на каждом маршруте: новый раздел закрыт
-    для контроля с момента появления, и закрывать его не придётся помнить.
-    Чужой раздел на чтение — 404, как закрытый раздел партнёру; запись — 403.
-    """
-    users_path = section("users").path
-    settings_path = section("settings").path
-    ratings_path = section("ratings").path
-
-    @app.before_request
-    def _контроль_только_рейтинги() -> None:
-        if request.endpoint in auth.OPEN_ENDPOINTS:
-            return
-        вошедший = auth.current_account()
-        if вошедший is None or вошедший.role != accounts.ROLE_CONTROL:
-            return
-        if not _control_may_enter(
-            request.path,
-            ratings_path=ratings_path,
-            users_path=users_path,
-            settings_path=settings_path,
-            logout_path=auth.LOGOUT_PATH,
-        ):
-            abort(404 if request.method in _READ_METHODS else 403)
-
-
 #: Безопасные методы: чужой раздел на чтение — 404, на запись — 403.
 _READ_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
 
@@ -1219,32 +1105,6 @@ def _role() -> str | None:
     """Роль вошедшего — для проверок, которые решает дверь методики (D440)."""
     вошёл = auth.current_account()
     return None if вошёл is None else вошёл.role
-
-
-def _is_guest() -> bool:
-    """Вошёл гость УК (D440): читает всё, кнопок действий не видит."""
-    вошёл = auth.current_account()
-    return вошёл is not None and is_hq_guest(вошёл.role, вошёл.tenant)
-
-
-def _hq_worker_only() -> FlaskResponse | None:
-    """Отказ 403 всем, кроме работающих в УК — главного админа, админа и
-    бизнес-девелопера (D440); `None` — можно.
-
-    Снятие, приёмка, правка записи и перенос проверки — только УК: партнёр
-    задним числом не меняет ничего, даже админ своего пространства (D341).
-    Гость, контроль и сотрудник партнёра сюда не проходят.
-
-    Заслон стоит на МАРШРУТЕ, а не в разметке: адрес известен, и POST набирается
-    руками. До 24.09.2026 отклонение проверки проверяло только вход, и отклонить
-    её с выносом кадров мог любой аудитор.
-    """
-    вошедший = auth.current_account()
-    if вошедший is not None and is_hq_worker(вошедший.role, вошедший.tenant):
-        return None
-    # 403, а не 404: человек вошёл, он здесь свой, и делать вид, что
-    # раздела нет, значит отвечать на «мне сюда нельзя?» загадкой.
-    return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
 
 
 def _partner_may_review(detail: Any) -> bool:
@@ -1263,19 +1123,32 @@ def _partner_may_review(detail: Any) -> bool:
     )
 
 
-def _reviewer_only(inspection_id: str) -> FlaskResponse | None:
-    """Заслон вычитки: админ УК — как раньше (D341); админ партнёра — только
-    свежая проверка своих сотрудников (D367). Снятие и перенос сюда не ходят."""
-    if _hq_worker_only() is None:
-        return None
-    вошедший = auth.current_account()
-    if вошедший is None or not is_admin_role(вошедший.role):
-        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+def _inspection_may(code: str, detail: Any) -> bool:
+    """Может ли вошедший `code` над этой проверкой — для кнопок карточки.
+
+    Граница — пространство самой проверки (`can`); партнёру сверх матрицы —
+    только свежая проверка своих сотрудников (D367).
+    """
+    if not guard.may(code, detail.inspection.tenant_code):
+        return False
+    return auth.current_tenant() == HQ_TENANT or _partner_may_review(detail)
+
+
+def _permit_inspection(code: str, inspection_id: str) -> FlaskResponse | None:
+    """Заслон записи по проверке: матрица над пространством проверки.
+
+    Вне охвата — 404, как несуществующая: «такой нет» и «вам её не видно»
+    снаружи неразличимы. Видимая, но не своя или закрытая роли — 403. Партнёру
+    сверх матрицы — только свежая проверка своих сотрудников (D367).
+    """
     detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
         return render_template("inspections/not_found.html"), 404  # type: ignore[return-value]
-    if not _partner_may_review(detail):
-        return render_template("users/forbidden.html"), 403  # type: ignore[return-value]
+    отказ = guard.permit(code, detail.inspection.tenant_code)
+    if отказ is not None:
+        return отказ  # type: ignore[return-value]
+    if auth.current_tenant() != HQ_TENANT and not _partner_may_review(detail):
+        return guard.forbidden()  # type: ignore[return-value]
     return None
 
 
@@ -1421,8 +1294,7 @@ def _card_context(
     if detail is None:
         return None
     lang = _lang(conf)
-    админ = _hq_worker_only() is None
-    гость = _is_guest()
+    тенант = detail.inspection.tenant_code
     try:
         переносы = data.load_moves(inspection_id, reach=auth.current_reach())
         история_известна = True
@@ -1433,22 +1305,18 @@ def _card_context(
         история_известна = False
     своя = _own(detail)
     можно_переносить = (
-        админ
+        _inspection_may("inspection.move", detail)
         and своя
         and история_известна
         and data.retraction_available()
         and not detail.inspection.retracted
         and not detail.inspection.on_review
     )
-    # Подтверждать и править записи вправе тот же, кто снимает и переносит, —
-    # админ УК по своей проверке (D283, D341), и ровно до подтверждения (D199, D200).
-    # Ждущую приёмки партнёра УК видит на чтение: кнопок у неё нет.
-    вошедший = auth.current_account()
-    админ_партнёра = (
-        вошедший is not None and is_admin_role(вошедший.role) and _partner_may_review(detail)
-    )
+    # Подтверждать и править записи — по матрице (`inspection.accept`): УК по своей
+    # проверке (D283, D341), админ партнёра — свежую своих сотрудников (D367), и
+    # ровно до подтверждения (D199, D200). Ждущую приёмки партнёра УК видит на чтение.
     можно_подтвердить = (
-        (админ or админ_партнёра)
+        _inspection_may("inspection.accept", detail)
         and своя
         and data.retraction_available()
         and detail.inspection.on_review
@@ -1485,8 +1353,7 @@ def _card_context(
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
     # запросить, либо у точки нет страны — тогда только видимая отметка.
     план_нужен = (
-        action_plans.is_hq()
-        and not гость
+        guard.may("plan.manage", тенант)
         and своя
         and план is None
         and план_известен
@@ -1512,8 +1379,7 @@ def _card_context(
         plan_no_country=без_страны,
         # Запросить вручную (D272) — УК по своей принятой проверке без запроса.
         may_request_plan=(
-            action_plans.is_hq()
-            and not гость
+            guard.may("plan.manage", тенант)
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
@@ -1522,15 +1388,14 @@ def _card_context(
         # Предписание с карточки (решение владельца 11.10.2026): раздел УК, принятая
         # проверка УК. Какие проверки годятся основанием, решает база (`inspection_basis`).
         may_prescribe=(
-            action_plans.is_hq()
-            and not гость
+            guard.may("prescription.manage", тенант)
             and своя
             and not detail.inspection.on_review
             and not detail.inspection.retracted
         ),
         sheet=лист,
         may_accept=можно_подтвердить,
-        may_revise=можно_подтвердить,
+        may_revise=можно_подтвердить and _inspection_may("inspection.revise", detail),
         levels=REVISE_LEVELS,
         report=отчёт,
         report_known=отчёт_известен,
@@ -1568,7 +1433,7 @@ def _card_context(
         # Ждущую приёмки не снимают: снятие — для принятой (retract.py), а
         # ошибку на приёмке чинят правкой записи (D200).
         may_retract=data.retraction_available()
-        and админ
+        and _inspection_may("inspection.retract", detail)
         and своя
         and not detail.inspection.on_review,
         own=своя,
@@ -1618,6 +1483,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return redirect(_url("methodology", **request.args.to_dict(), item=code))
 
     @app.post(f"{путь}/items")
+    @guard.action("checklist.edit")
     def methodology_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1644,6 +1510,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure)
 
     @app.post(f"{путь}/items/<code>")
+    @guard.action("checklist.edit")
     def methodology_edit(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1669,6 +1536,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/disable")
+    @guard.action("checklist.edit")
     def methodology_disable(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1685,6 +1553,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/items/<code>/restore")
+    @guard.action("checklist.edit")
     def methodology_restore(code: str) -> str:
         refuse_foreign_origin()
         итог = _apply(
@@ -1701,6 +1570,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, item=code)
 
     @app.post(f"{путь}/zones")
+    @guard.action("checklist.edit")
     def methodology_zone_add() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1722,6 +1592,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/shares")
+    @guard.action("checklist.edit")
     def methodology_zone_shares() -> str:
         refuse_foreign_origin()
         # Доли приезжают полями `share_<код>` и отправляются ВСЕ разом: сумма
@@ -1746,6 +1617,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/rename")
+    @guard.action("checklist.edit")
     def methodology_zone_rename(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1765,6 +1637,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/zones/<code>/remove")
+    @guard.action("checklist.edit")
     def methodology_zone_remove(code: str) -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1783,6 +1656,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/route")
+    @guard.action("checklist.edit")
     def methodology_route() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1802,6 +1676,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/scoring")
+    @guard.action("checklist.edit")
     def methodology_scoring() -> str:
         refuse_foreign_origin()
         form = request.form
@@ -1822,6 +1697,7 @@ def _register_methodology(app: Flask, conf: Settings) -> None:
         return _render_methodology(conf, notice=итог.notice, failure=итог.failure, panel="scoring")
 
     @app.post(f"{путь}/publish")
+    @guard.action("checklist.publish")
     def methodology_publish() -> str:
         refuse_foreign_origin()
         version = (request.form.get("version") or "").strip()
@@ -1874,6 +1750,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         return _render_checklists(conf, notice=None, failure=None)
 
     @app.post(путь)
+    @guard.action("checklist.manage")
     def checklists_create() -> str | Response:
         refuse_foreign_origin()
         form = request.form
@@ -1916,6 +1793,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/state")
+    @guard.action("checklist.manage")
     def checklists_state(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()
@@ -1943,6 +1821,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/master")
+    @guard.action("checklist.master")
     def checklists_master(code: str) -> str | Response:
         """Метка «главный» (D440): ставят и снимают только админы. Отказ — словами."""
         refuse_foreign_origin()
@@ -1975,6 +1854,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{section('admin').path}/bot/<code>")
+    @guard.action("checklist.manage")
     def methodology_bot(code: str) -> str | Response:
         """Переключатель панели «Бот»: открыть чек-лист в боте или закрыть (волна 3)."""
         refuse_foreign_origin()
@@ -2035,6 +1915,7 @@ def _mount_checklists(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<code>/apply")
+    @guard.action("checklist.apply")
     def checklists_apply(code: str) -> str:
         refuse_foreign_origin()
         state = method.load_store()
@@ -2316,16 +2197,18 @@ def _render_methodology(
     # Правка чек-листа (D440): главный правят только админы, остальные — и
     # бизнес-девелопер. Решает та же дверь, что отказывает на записи
     # (`method.store_for`), поэтому кнопки не расходятся с отказом.
-    админ = is_admin_role(_role())
+    админ = guard.may("checklist.master")
     главный = method.is_master(склад)
     закрыт_по = method.protection_of(склад)
+    правит = guard.may("checklist.edit") and (админ or закрыт_по is None)
     return render_template(
         "methodology/index.html",
         composition=состав,
         is_admin=админ,
         master_here=главный,
-        can_edit_checklist=админ or закрыт_по is None,
-        protected_by=закрыт_по,
+        can_edit_checklist=правит,
+        # Почему только чтение: метка чек-листа или роль без правки (партнёрский аудитор).
+        protected_by=закрыт_по or (None if правит else "role"),
         checklists=перечень,
         # Колонка слева (D222). Без чек-листа в адресе экран помечен выбором:
         # на телефоне первым экраном тогда идёт список, а не боевой чек-лист.

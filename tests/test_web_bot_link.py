@@ -77,6 +77,7 @@ def test_привязанный_видит_свой_telegram_и_может_от�
         bound_at=datetime(2026, 10, 1, 9, 30, tzinfo=UTC),
     )
     отвязано: list[str] = []
+    # Свою привязку снимает и аудитор партнёра — без people.manage (D447).
     подменить_двери(monkeypatch, tenant="GE")
     monkeypatch.setattr(bot_links, "binding_of", lambda _u: привязка)
     monkeypatch.setattr(bot_links, "unbind", lambda u: отвязано.append(u) or True)

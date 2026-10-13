@@ -32,7 +32,7 @@ from werkzeug.wrappers import Response
 
 from src.db.errors import DbError
 
-from . import auth
+from . import auth, guard
 from . import inspections as data
 from .config import Settings
 from .google_auth import GoogleSettings, load_google_settings, new_state
@@ -180,15 +180,17 @@ def install(app: Flask, conf: Settings) -> None:
     app.extensions.setdefault(MAIL_RETURNS_KEY, {})
 
     @app.post(f"{реестр}/<inspection_id>/letter/draft", endpoint="letter_draft")
+    @guard.action("inspection.letter", object_in_route=True)
     def letter_draft(inspection_id: str) -> Response | tuple[str, int]:
         refuse_foreign_origin()
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
-        if not auth.is_own(detail.inspection.tenant_code):
+        отказ = guard.permit("inspection.letter", detail.inspection.tenant_code)
+        if отказ is not None:
             # Черновик письма — запись от имени пространства: по проверке,
             # которую вошедший только читает (D283), — отказ.
-            return render_template("users/forbidden.html"), 403
+            return отказ
 
         письмо_на = request.form.get("letter_lang") or detail.inspection.report_lang
         if detail.inspection.on_review or detail.inspection.is_uploaded:
@@ -241,6 +243,7 @@ def install(app: Flask, conf: Settings) -> None:
         return возврат.finish(ident, lang, lambda: _токен_вошедшего(реквизиты, код))
 
     @app.get(MAIL_CALLBACK_PATH, endpoint="google_mail_callback")
+    @guard.action("inspection.letter")
     def google_mail_callback() -> Response | tuple[str, int]:
         """Возврат от Google: сверить метку, обменять код, положить черновик.
 
@@ -295,10 +298,10 @@ def install(app: Flask, conf: Settings) -> None:
         detail = data.load_card(inspection_id, reach=auth.current_reach())
         if detail is None:
             return render_template("inspections/not_found.html"), 404
-        if not auth.is_own(detail.inspection.tenant_code):
+        if not guard.may("inspection.letter", detail.inspection.tenant_code):
             # Черновик письма — запись от имени пространства: по проверке,
             # которую вошедший только читает (D283), — отказ.
-            return render_template("users/forbidden.html"), 403
+            return guard.forbidden()
         if detail.inspection.on_review or detail.inspection.is_uploaded:
             # Возврат от Google — второй вход в ту же запись, его можно позвать
             # и руками: непринятая проверка (D199) черновика не получает и здесь.

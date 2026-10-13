@@ -25,7 +25,8 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
 from src.db.space import acting_space
-from src.domain.tenants import ADMIN_ROLES, HQ_TENANT, canonical_tenant
+from src.domain.permissions import claude_may
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .catalogue import (
     KIND_CHECKLIST,
@@ -43,7 +44,7 @@ from .checklist_layout import DEFAULT_SPACE, exists, space_of
 from .checklist_layout import for_code as for_checklist
 from .checklists import PROTECTED_APPLIED, protection_of
 from .errors import McpError, ToolError
-from .policy import permits
+from .policy import action_of, may_edit_protected, permits_tool
 
 # Коды ошибок JSON-RPC 2.0. Свои коды не заводятся: клиент разбирает эти.
 CODE_PARSE_ERROR = -32700
@@ -210,11 +211,9 @@ MASTER_READONLY = (
     "проверки, но не менять; свои чек-листы, не отмеченные главными, правятся как обычно"
 )
 
-#: Инструменты, двигающие указатель прода, — один на всю сеть (D440): применив
-#: свой чек-лист, бизнес-девелопер сдвинул бы с прода главный для всех. Отказ по
-#: имени инструмента, а не по хранилищу: указатель общий, чей бы чек-лист ни брался.
-PROD_POINTER_TOOLS = frozenset({"apply_checklist"})
-
+#: Указатель прода один на всю сеть (D440): применив свой чек-лист, бизнес-девелопер
+#: сдвинул бы с прода главный для всех. Какой инструмент его двигает, знает
+#: `policy.TOOL_ACTIONS` (`checklist.apply`), а не список здесь.
 PROD_POINTER_ADMINS_ONLY = (
     "Применять чек-лист к проду могут только админы: указатель прода один на всю сеть, "
     "и применённый чек-лист заменил бы главный для всех. Свой чек-лист можно вести и "
@@ -375,10 +374,12 @@ def _call_tool(
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
         return f"Аргументы инструмента {name} ожидаются объектом"
-    if role is not None and not permits(role, tenant, spec.kind):
+    if role is not None and not permits_tool(role, tenant, spec):
+        # Указатель прода закрыт не-админам словами (D440): роль с правом на
+        # методику должна понять, почему именно этот инструмент ей не дан.
+        if action_of(spec) == "checklist.apply" and claude_may(role, tenant, "checklist.read"):
+            return _tool_text(PROD_POINTER_ADMINS_ONLY, failed=True)
         return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
-    if role is not None and role not in ADMIN_ROLES and spec.name in PROD_POINTER_TOOLS:
-        return _tool_text(PROD_POINTER_ADMINS_ONLY, failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
@@ -422,7 +423,7 @@ def _call_tool(
             spec.kind == KIND_CHECKLIST
             and spec.writes
             and role is not None
-            and role not in ADMIN_ROLES
+            and not may_edit_protected(role, tenant)
             and (причина := protection_of(прочее["store"])) is not None
         ):
             # Главный чек-лист (D440): правка только админам. Роль без права на
@@ -557,7 +558,7 @@ def handle(
     if method == "ping":
         return _result(request_id, {})
     if method == "tools/list":
-        открыто = None if role is None else (lambda kind: permits(role, tenant, kind))
+        открыто = None if role is None else (lambda spec: permits_tool(role, tenant, spec))
         return _result(request_id, {"tools": as_list(открыто)})
     if method == "tools/call":
         # Пространство токена — и базе (F-037): политики роли приложения отдают

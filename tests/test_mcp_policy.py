@@ -16,6 +16,7 @@ from typing import Any
 
 import pytest
 
+from src.domain.permissions import ACTION_CODES
 from src.mcp.catalogue import (
     KIND_CHECKLIST,
     KIND_CHECKLIST_SOURCE,
@@ -26,7 +27,7 @@ from src.mcp.catalogue import (
     KIND_RETRACTION,
     TOOLS,
 )
-from src.mcp.policy import permits
+from src.mcp.policy import action_of, permits
 from src.mcp.rpc import handle
 
 ВСЕ_ВИДЫ = (
@@ -90,11 +91,11 @@ def test_старый_код_уk_переводится() -> None:
 
 @pytest.mark.parametrize("роль", ["control", "superadmin"])
 def test_роли_только_уk_у_партнёра_не_дают_больше_чтения(роль: str) -> None:
-    """control/superadmin бывают только в HQ; если такая строка всё же есть у
-    партнёра — это партнёр, и открыто ему ровно чтение своих проверок."""
+    """control/superadmin бывают только в HQ (держит база); строка с такой ролью у
+    партнёра — незнакомая матрице роль стороны партнёра, и ей не открыто ничего."""
     открыто = {вид for вид in ВСЕ_ВИДЫ if permits(роль, "RS", вид)}
 
-    assert открыто == {KIND_INSPECTIONS, KIND_RATINGS_READ}
+    assert открыто == set()
 
 
 @pytest.mark.parametrize("роль", ["", "owner", "ADMIN", "root"])
@@ -126,12 +127,35 @@ def _виды(имена: set[str]) -> set[str]:
     return {spec.kind for spec in TOOLS if spec.name in имена}
 
 
+#: Инструменты открытого роли вида, закрытые ей своим действием (D440): указатель
+#: прода двигают только админы.
+ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ: dict[tuple[str, str], set[str]] = {("HQ", "developer"): {"apply_checklist"}}
+
+
 @pytest.mark.parametrize(("арендатор", "роль"), sorted(МАТРИЦА))
 def test_tools_list_показывает_ровно_открытые_роли_виды(арендатор: str, роль: str) -> None:
     имена = _список(tenant=арендатор, role=роль)
+    закрыто = ЗАКРЫТЫЕ_ИНСТРУМЕНТЫ.get((арендатор, роль), set())
 
     assert _виды(имена) == set(МАТРИЦА[(арендатор, роль)]) & ВИДЫ_КАТАЛОГА
-    assert имена == {spec.name for spec in TOOLS if spec.kind in МАТРИЦА[(арендатор, роль)]}
+    assert имена == {
+        spec.name
+        for spec in TOOLS
+        if spec.kind in МАТРИЦА[(арендатор, роль)] and spec.name not in закрыто
+    }
+
+
+def test_каждый_инструмент_сведён_к_действию_матрицы() -> None:
+    """Новый инструмент или вид без действия матрицы роняет сборку списка — и этот тест."""
+    for spec in TOOLS:
+        assert action_of(spec) in ACTION_CODES, spec.name
+
+
+def test_девелоперу_указатель_прода_отказом_словами() -> None:
+    ответ = _вызов("apply_checklist", tenant="HQ", role="developer")
+
+    assert ответ["result"]["isError"] is True
+    assert "только админы" in ответ["result"]["content"][0]["text"]
 
 
 def test_без_роли_tools_list_как_раньше() -> None:
