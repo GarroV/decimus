@@ -357,7 +357,7 @@
   .rt-tbl--stack tr { padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--line); }
   .rt-tbl--stack td { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-1) 0; border: 0; text-align: right; overflow-wrap: anywhere; }
   .rt-tbl--stack td:first-child, .rt-tbl--stack td:last-child { padding-left: 0; padding-right: 0; }
-  .rt-tbl--stack td::before { content: attr(data-label); flex: none; color: var(--ink-3); text-align: left; }
+  .rt-tbl--stack td::before { content: attr(data-label); flex: none; max-width: 100%; color: var(--ink-3); text-align: left; white-space: normal; }
   .rt-tbl--stack .rt-stack__lead { justify-content: flex-start; font-weight: var(--w-semibold); color: var(--ink); text-align: left; }
   .rt-tbl--stack .rt-stack__lead::before { content: none; }
   .rt-tbl--stack tbody tr:hover > * { background: transparent; }
