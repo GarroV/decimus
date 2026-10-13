@@ -111,7 +111,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
@@ -134,6 +134,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
+| `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
@@ -333,7 +334,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -345,6 +346,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
+| `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
@@ -422,6 +424,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
 | `0061_web_own_google_lang.sql` | «Настройки» (D447): человек сам привязывает и снимает свою почту Google и хранит язык сайта в профиле |
 | `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
+| `0063_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -510,6 +513,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/roster.py` | Связки «юзернейм → Telegram ID», собранные по приглашениям до D286 (#230) |
 | `src/bot/run_guard.py` | Память бота о проверке и чужой старт: сверка личности проверки (D392) |
 | `src/bot/sealed.py` | Сданная проверка не правится (задача T201, решение владельца D080) |
+| `src/bot/sheet_loader.py` | Раз в несколько часов и по заявке — забор общей таблицы контроля «база рейтингов» (D464, docs/15-ratings.md) |
 | `src/bot/shown.py` | Карты «сообщение → запись»: чем бот показал запись и из чего она выросла |
 | `src/bot/sidecar.py` | Заметки бота рядом с проверкой: то, чего нет ни у движка, ни в отчёте |
 | `src/bot/start_options.py` | Что предлагает начало проверки: открытые чек-листы пространства человека |
@@ -554,6 +558,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 <!-- map:begin files src/ratings/*.py -->
 | Файл | Что делает |
 |---|---|
+| `src/ratings/base.py` | Листы общей таблицы контроля «база рейтингов» (D464) |
 | `src/ratings/countries.py` | Страны выгрузок рейтинга → код ISO |
 | `src/ratings/coverage.py` | Охват пиццерий на площадках — картах и агрегаторах (D424) |
 | `src/ratings/csvio.py` | Чтение CSV выгрузок: кодировка, разделитель, номера строк |
@@ -570,6 +575,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/ratings/pointer.py` | Клиент Pointer API: сети и филиалы с текущими оценками на картах |
 | `src/ratings/report.py` | Сводка раздела «Рейтинги» (D324): отбор → чтение → расчёты `summary` |
 | `src/ratings/sheet.py` | Лист «Качество по пиццериям» таблиц контроля (`sheet-scores`, D324) |
+| `src/ratings/sheet_sync.py` | Забор общей таблицы контроля «база рейтингов» самим decimus (D464) |
 | `src/ratings/snapshot.py` | Снимок рейтинга Dodo IS (JSON) — то, что Claude собирает в браузере сотрудника |
 | `src/ratings/summary.py` | Расчёты сводки рейтингов (D324): чистые функции над уже прочитанными фактами |
 | `src/ratings/svod.py` | «Свод пиццерий» девелопмента → справочник `unit_profiles` (D374–D376) |

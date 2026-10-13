@@ -811,6 +811,99 @@ cases = [
         "        kind=KIND_INSPECTIONS,\n",
         "tests/test_mcp_ratings.py::test_инструмент_своего_вида",
     ),
+    # Таблица контроля «база рейтингов» (D464): период, год, флаги, повтор, справочник.
+    (
+        "src/ratings/base.py",
+        "    if label.rating_type != rating_type:\n",
+        "    if False:\n",
+        "tests/test_ratings_base.py::test_подпись_не_того_типа_или_неузнанная_отказ",
+    ),
+    (
+        "src/ratings/base.py",
+        "    year = label.year or (seen.year if seen else _year_from_today(label, today))\n",
+        "    year = label.year or _year_from_today(label, today)\n",
+        "tests/test_ratings_base.py::test_год_строки_главнее_вывода_от_сегодня",
+    ),
+    (
+        "src/ratings/base.py",
+        "            if date(year, label.begin_month, label.begin_day) <= today + _TODAY_SLACK:\n",
+        "            if True:\n",
+        "tests/test_ratings_base.py::test_год_берётся_от_сегодня_а_не_вперёд",
+    ),
+    (
+        "src/ratings/base.py",
+        "        if len({same(item) for item in group}) == 1:\n",
+        "        if True:\n",
+        "tests/test_ratings_base.py::test_повтор_периода_с_разными_значениями_не_пишется",
+    ),
+    (
+        "src/ratings/base.py",
+        '_NO = frozenset({"нет", "no", "false", "0", ""})\n',
+        '_NO = frozenset({"нет", "no", "false", "0", "", "возможно"})\n',
+        "tests/test_ratings_base.py::test_плохая_строка_в_журнал_файл_продолжается",
+    ),
+    (
+        "src/ratings/base.py",
+        "        if is_excluded(country):\n",
+        "        if False:\n",
+        "tests/test_ratings_base.py::test_страны_вне_imf_отброшены_неизвестная_в_журнал",
+    ),
+    (
+        "src/ratings/base.py",
+        "    return {key: next(iter(found)) for key, found in ids.items() if len(found) == 1}\n",
+        "    return {key: next(iter(found)) for key, found in ids.items() if found}\n",
+        "tests/test_ratings_base.py::test_справочник_id_в_одной_форме_двусмысленное_имя_выброшено",
+    ),
+    (
+        "src/db/ratings.py",
+        '            "  is distinct from (excluded.score, excluded.d3, excluded.d3_name, "\n',
+        '            "  is not distinct from (excluded.score, excluded.d3, excluded.d3_name, "\n',
+        "tests/test_db_ratings_base.py::test_изменённая_ячейка_обновляет_строку_и_флаги",
+    ),
+    (
+        "src/db/ratings.py",
+        "        \"where category = 'remark' and unit_dodo_id = %s and period_id = %s \"\n"
+        '        "and row_key like %s",\n'
+        '        (unit, period_id, SHEET_REMARK_PREFIX + "%"),\n    )\n    _insert(',
+        "        \"where category = 'remark' and unit_dodo_id = %s and period_id = %s \"\n"
+        '        "and (row_key like %s or true)",\n'
+        '        (unit, period_id, SHEET_REMARK_PREFIX + "%"),\n    )\n    _insert(',
+        "tests/test_db_ratings_base.py::test_нарушения_рс_набором_замечания_снимка_целы",
+    ),
+    (
+        "src/ratings/sheet_sync.py",
+        "    if last is not None and last[0] == sha:\n",
+        "    if False:\n",
+        "tests/test_db_ratings_sheet_sync.py::test_неизменный_лист_пропускается_без_строки_журнала",
+    ),
+    (
+        "src/ratings/sheet_sync.py",
+        "    salt = datetime.now(UTC).isoformat() if state.was_loaded(sha) else None\n",
+        "    salt = None\n",
+        "tests/test_db_ratings_sheet_sync.py::"
+        "test_изменённая_ячейка_обновляет_данные_а_откат_листа_применяется_заново",
+    ),
+    (
+        "src/ratings/sheet_sync.py",
+        '    if kind != "text/csv" or body.lstrip()[:1] == b"<":\n',
+        "    if False:\n",
+        "tests/test_ratings_sheet_fetch.py::test_закрытая_таблица_страница_входа_с_кодом_200",
+    ),
+    (
+        "src/ratings/sheet_sync.py",
+        "        return _failed(tab, _note(exc.code, str(exc)), sha=None)\n",
+        "        return TabResult(tab, UNCHANGED)\n",
+        "tests/test_db_ratings_sheet_sync.py::test_сбой_листа_в_журнале_остальные_идут_дальше",
+    ),
+    (
+        "src/web/ratings.py",
+        "        if not may_manage():\n            return _forbidden()\n"
+        "        refuse_foreign_origin()\n        try:\n"
+        "            _, created = sheet_state.request_sync(by=_actor())\n",
+        "        refuse_foreign_origin()\n        try:\n"
+        "            _, created = sheet_state.request_sync(by=_actor())\n",
+        "tests/test_web_ratings_sheet.py::test_остальным_адрес_закрыт",
+    ),
 ]
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}

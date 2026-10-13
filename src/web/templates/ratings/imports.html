@@ -23,6 +23,45 @@
   {% if notice %}<div class="note note--ok"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
 
+  {#- Таблица контроля (D464): забор самим decimus; сбой — строкой, а не тишиной. -#}
+  <section class="rt-sec" aria-labelledby="rt-sheet">
+    {{ sec_head('rt-sheet', 'ratings.sheet.title', t('ratings.sheet.hint', h=sheet_every_h)) }}
+    {% if sheet_notice %}<div class="note note--ok"><div><div class="note__title">{{ t(sheet_notice) }}</div></div></div>{% endif %}
+    {% if not sheet.configured %}
+    <div class="rt-empty">{{ t('ratings.sheet.off') }}</div>
+    {% elif sheet.unreadable %}
+    <div class="note note--error"><div><div class="note__title">{{ t('ratings.sheet.unreadable') }}</div></div></div>
+    {% else %}
+    <div class="rt-card"><div class="rt-card__body">
+      <p>{% if sheet.last_at %}{{ t('ratings.sheet.last', at=sheet.last_at.strftime(at_format)) }}{% else %}{{ t('ratings.sheet.never') }}{% endif %}</p>
+      {% if sheet.failed %}<div class="note note--error"><div><div class="note__title">{{ t('ratings.sheet.failed', n=sheet.failed, m=sheet.rows|length) }}</div></div></div>{% endif %}
+      {% if sheet.pending %}<p>{{ t('ratings.sheet.pending', at=sheet.pending.requested_at.strftime(at_format), by=sheet.pending.requested_by) }}</p>
+      {% else %}
+      <form method="post" action="{{ action('/sheet-sync') }}" class="rt-form">
+        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.sheet.now') }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if sheet.rows %}
+    <div class="rt-scroll"><table class="rt-tbl">
+      <thead><tr>
+        <th scope="col" class="is-text">{{ t('ratings.sheet.col.tab') }}</th><th scope="col" class="is-text">{{ t('ratings.sheet.col.at') }}</th>
+        <th scope="col" class="is-text">{{ t('ratings.sheet.col.result') }}</th><th scope="col" class="rt-th-wrap">{{ t('ratings.journal.counts') }}</th>
+        <th scope="col" class="is-text">{{ t('ratings.sheet.col.reason') }}</th>
+      </tr></thead>
+      <tbody>{% for row in sheet.rows %}<tr>
+        <td class="is-text rt-wrap">{{ t('ratings.format.' ~ row.tab) }}</td>
+        <td class="is-text num">{{ row.checked_at.strftime(at_format) }}</td>
+        <td class="is-text"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.sheet.outcome.' ~ row.outcome) }}</span></td>
+        <td class="num">{% if row.counts %}{{ row.counts[0] }} · {{ row.counts[1] }} · {{ row.counts[2] }} · {{ row.counts[3] }}{% else %}—{% endif %}</td>
+        <td class="is-text rt-wrap">{{ row.reason or '' }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
   <section class="rt-sec" aria-labelledby="rt-upload">
     {{ sec_head('rt-upload', 'ratings.imports.submit', t('ratings.imports.hint', mb=max_mb)) }}
     <div class="rt-card"><div class="rt-card__body">
