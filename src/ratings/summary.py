@@ -213,6 +213,11 @@ class ViolationBlock:
     per_checkup: float | None
     top: tuple[ViolationLine, ...]
 
+    @property
+    def has_data(self) -> bool:
+        """Есть проверки или нарушения: РС таблицы контроля — нарушения без числа проверок."""
+        return self.checkups != 0 or self.total != 0
+
 
 def violation_block(
     facts: Sequence[ViolationFact], *, checkups: int, limit: int = VIOLATIONS_LIMIT

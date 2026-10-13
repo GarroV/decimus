@@ -262,6 +262,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # «Заморозить» и «Выйти везде» (D462): disabled_by, триггер заморозки, функция выхода.
     "0063_freeze.sql": ("sql1:da101ad0687e59f4913894ca003d4fe35fe15b1646b19d4eaffdf260406f75c2"),
+    # «База рейтингов» контроля как источник РС и РКО (D464). Ещё не на проде.
+    "0064_ratings_sheet.sql": (
+        "sql1:f5ff00cc48e5d61000d6cbb37e038c293f383656e540ab4d011fdafa2daf8314"
+    ),
 }
 
 
