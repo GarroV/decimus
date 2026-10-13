@@ -189,7 +189,7 @@ class _Writer:
             wanted = ref.dodo_id.casefold()
             ours = next((k for k in self.known if k.dodo_id.casefold() == wanted), None)
             dodo_id = ours.dodo_id if ours else ref.dodo_id
-            # D467: наше название не перезаписывается другим написанием того же.
+            # D472: наше название не перезаписывается другим написанием того же.
             same = ours is not None and fold_unit_name(ours.name) == fold_unit_name(ref.name)
             name = ours.name if ours and same else ref.name
             store.upsert_unit(

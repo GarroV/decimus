@@ -111,7 +111,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
@@ -137,6 +137,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/ratings.py` | Раздел «Рейтинги» (спека 2026-10-08) и подраздел «Загрузки» |
 | `src/web/ratings_calendar.py` | Период раздела «Рейтинги»: «‹ 2026 Q3 ›», по щелчку — календарь «с — по» |
 | `src/web/ratings_line.py` | График средних раздела «Рейтинги» (D396): линия по периодам рейтинга |
+| `src/web/ratings_sheet.py` | Блок «Таблица контроля» на «Загрузках»: когда забирали, чем кончилось, кнопка (D464) |
 | `src/web/registry_period.py` | Период реестра проверок: «с — по» по дате обхода |
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
@@ -152,16 +153,18 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,google_link,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
+| `src/web/account_menu.py` | Меню учётки (D468): состояние подключений для строки «Подключения» |
 | `src/web/accounts.py` | Учётки админки так, как их видит экран (T338, #322) |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
+| `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -203,7 +206,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
-| `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны |
+| `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
@@ -251,7 +254,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 14 | _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, _split_ui.html, base.html, … (+6) |
+| `src/web/templates/` | 16 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+8) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
@@ -270,7 +273,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 45 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, … (+37) |
+| `src/web/static/` | 46 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, … (+38) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -308,7 +311,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -327,6 +330,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |
 | `src/db/retract.py` | T210, T233: снятие сданной проверки из истории |
+| `src/db/review_edit.py` | Правка проверки на приёмке сверх исправления записи: новая запись и кадры (D465) |
 | `src/db/revise.py` | Правка записи проверки на приёмке — вместе с пересчитанной оценкой (D200) |
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
@@ -338,7 +342,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -350,6 +354,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
+| `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
@@ -429,6 +434,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
 | `0063_freeze.sql` | «Заморозить» (D462, шаг 1): отключение учётки становится заморозкой — одним действием закрывается всё, чем человек входил, и записывается, кто заморозил |
 | `0064_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
+| `0065_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
+| `0066_move_with_action_plan.sql` | Перенос проверки в пиццерию другой страны не оставляет по ней экшн-план (приватный advisory GHSA-wqh3-3qcr-cccp) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

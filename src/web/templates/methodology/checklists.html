@@ -60,7 +60,7 @@
           </select>
           <button type="submit" class="btn btn--sm btn--ghost">{{ t('checklists.state.submit') }}</button>
         </form>
-        {% if not item.in_production %}
+        {% if not item.in_production and may("checklist.apply") %}
           <a class="btn btn--sm" href="{{ url_for('checklists_apply_preview', code=item.code) }}">{{ t('checklists.apply.open') }}</a>
         {% endif %}
       </div>

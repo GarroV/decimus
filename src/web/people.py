@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from src.db.errors import DbError, EmailTakenError
 from src.domain.log_ids import log_id
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import accounts
 
@@ -106,7 +107,12 @@ def change_email(
             login, tenant=tenant, email=почта or None, only_roles=only_roles
         )
     except EmailTakenError:
-        return Outcome("email.taken", 409)
+        # УК видит сеть целиком и называет занятую почту прямо. Партнёр — нет: по
+        # отдельному «почта занята» он перебирал бы адреса и узнавал, есть ли
+        # человек в сети (F-031). Ему ответ нейтральный, без причины.
+        if canonical_tenant(actor_tenant) == HQ_TENANT:
+            return Outcome("email.taken", 409)
+        return Outcome("email.unavailable", 400)
     except DbError:
         return Outcome("email.failed", 503)
     if not сделано:

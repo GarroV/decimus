@@ -159,9 +159,9 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.password.google": {
         "ru": "Вход паролем для этой учётки закрыт: вы входите через Google. Вернуть вход "
-        "паролем — «Отвязать Google» выше.",
+        "паролем — «Отвязать Google» в подключении Google.",
         "en": "Password sign-in is closed for this account: you sign in with Google. To "
-        "sign in with a password again, use “Unlink Google” above.",
+        "sign in with a password again, use “Unlink Google” in the Google connection.",
     },
     "settings.confirm.title": {"ru": "Подтвердите вход", "en": "Confirm it's you"},
     "settings.confirm.why": {
@@ -220,6 +220,29 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Password, bot, Claude and language are in “Settings”.",
     },
     "users.panel.open_settings": {"ru": "Открыть «Настройки»", "en": "Open “Settings”"},
+    # Меню учётки поверх страницы (D468).
+    # Плитки (D470): профиль, малые карточки и подключения, как в Swarm Brain.
+    "settings.profile.title": {"ru": "Профиль", "en": "Profile"},
+    "settings.profile.role": {"ru": "Роль и пространство", "en": "Role and space"},
+    "settings.profile.email": {"ru": "Почта", "en": "Email"},
+    "settings.profile.email_none": {"ru": "Не привязана", "en": "Not linked"},
+    "settings.profile.sessions": {"ru": "Другие входы", "en": "Other sessions"},
+    "settings.profile.account": {"ru": "Аккаунт", "en": "Account"},
+    "settings.profile.details": {"ru": "Подробнее", "en": "Details"},
+    "settings.profile.change": {"ru": "Изменить", "en": "Change"},
+    "settings.password.card": {
+        "ru": "Пароль для входа на сайт.",
+        "en": "The password you sign in to this site with.",
+    },
+    "settings.conn.count": {"ru": "{n} из {total}", "en": "{n} of {total}"},
+    "menu.title": {"ru": "Меню учётки", "en": "Account menu"},
+    "menu.connections": {"ru": "Подключения", "en": "Connections"},
+    "menu.on": {"ru": "Подключено", "en": "Connected"},
+    "menu.off": {"ru": "Не подключено", "en": "Not connected"},
+    "menu.unknown": {"ru": "Не удалось узнать", "en": "Could not check"},
+    "menu.theme": {"ru": "Тема", "en": "Theme"},
+    "menu.lang": {"ru": "Язык", "en": "Language"},
+    "menu.all_settings": {"ru": "Все настройки", "en": "All settings"},
     "settings.signout.title": {"ru": "Выйти везде", "en": "Sign out everywhere"},
     "settings.signout.note": {
         "ru": "Закроет ваши сессии на сайте на всех устройствах, включая эту, отзовёт "

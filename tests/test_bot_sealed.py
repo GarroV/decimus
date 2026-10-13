@@ -50,14 +50,20 @@ from src.bot.config import BotSettings
 from src.bot.keyboards import (
     EDIT_DROP,
     EDIT_PREFIX,
+    FINISH_BUILD_CALLBACK,
+    FINISH_BUILD_NO_PHOTOS_CALLBACK,
     NEW_INSPECTION_CALLBACK,
     PICK_PREFIX,
+    REPORT_LANG_PREFIX,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    VERSION_SYNC_CALLBACK,
 )
 from src.bot.texts import t
 from src.domain import Finding, add_finding, get_state, start_inspection
+from src.domain.config import check_environment
+from src.domain.engine import state_file
 
 pytestmark = pytest.mark.asyncio
 
@@ -205,6 +211,31 @@ async def test_правка_ответом_в_сданной_не_проходи
         "запись сданной проверки поправлена ответом"
     )
     assert "сдана" in session.last_text
+
+
+@pytest.mark.parametrize(
+    "ввод",
+    [
+        pytest.param(text_message("/finish"), id="finish"),
+        pytest.param(callback(FINISH_BUILD_CALLBACK), id="build"),
+        pytest.param(callback(f"{REPORT_LANG_PREFIX}ru"), id="язык-отчёта"),
+        pytest.param(callback(FINISH_BUILD_NO_PHOTOS_CALLBACK), id="build-без-кадров"),
+        pytest.param(callback(VERSION_SYNC_CALLBACK), id="синхронизация-методики"),
+    ],
+)
+async def test_завершение_сданной_отказ_и_состояние_не_меняется(
+    domain_env: Path, ввод: object
+) -> None:
+    """Ядро F-098/F-114: /finish и /build по сданной проверке не перезаписывают её."""
+    bot, session, dp = await сданная()
+    файл = state_file(CHAT_ID, check_environment())
+    до = файл.read_bytes()
+
+    await feed(dp, bot, ввод)  # type: ignore[arg-type]
+
+    assert файл.read_bytes() == до, "сданная проверка изменилась"
+    assert not session.documents, "по сданной проверке собран второй отчёт"
+    assert t("sealed.blocked", "ru") in session.texts
 
 
 async def test_undo_в_сданной_не_проходит(domain_env: Path) -> None:

@@ -89,8 +89,13 @@ ACTIONS: tuple[Action, ...] = (
     Action("checklist.publish", "checklist"),
     Action("checklist.manage", "checklist"),
     Action("checklist.master", "checklist"),
-    Action("checklist.apply", "checklist"),
+    # Указатель прода один на всю сеть: партнёру не выдаётся (D460), дверь
+    # `apply_to_production` в его пространстве отказывала и раньше.
+    Action("checklist.apply", "checklist", hq_only=True),
     Action("phrases.manage", "checklist"),
+    # Сырые слова аудиторов всех пространств из накопителя бота: разделения по
+    # пространствам в нём нет, поэтому партнёру не выдаётся (D460, ревью безопасности).
+    Action("phrases.raw", "checklist", hq_only=True, writes=False),
     # Рейтинги
     Action("ratings.read", "ratings", writes=False),
     Action("ratings.manage", "ratings", hq_only=True),
@@ -100,8 +105,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("space.manage", "people", hq_only=True),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
-    # Бот: счётчик отказов мастера (`/stops`)
-    Action("refusals.read", "bot", writes=False),
+    # Бот: счётчик отказов мастера (`/stops`). Журнал отказов один на весь бот,
+    # разделения по пространствам в нём нет, поэтому партнёру не выдаётся (F-104).
+    Action("refusals.read", "bot", hq_only=True, writes=False),
     *_VIEWS,
 )
 
@@ -155,6 +161,7 @@ _HQ_WORK = _codes(
     "plan.manage",
     "ratings.read",
     "unit.create",
+    "phrases.raw",
 )
 
 #: Методика без главного чек-листа и указателя прода (D440).
@@ -216,20 +223,19 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     ),
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
-    | _CHECKLIST_OWNER
-    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role")
-    | _codes("refusals.read"),
+    | _codes("checklist.master")
+    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role"),
     (SIDE_PARTNER, "auditor"): _PARTNER_AUDITOR,
 }
 
 #: Закрыто в Claude (MCP) поверх матрицы, для всех ролей стороны.
 #: Снятие проверки через Claude — только служебный токен на экстренный случай
-#: (D341, спека D417); партнёр в Claude методику не читает и не правит (D342, D417),
-#: хотя в вебе админ пространства ведёт свои чек-листы (D413). Расхождение веба и
-#: Claude у партнёра — вопрос владельцу.
+#: (D341, спека D417). Методика партнёра в Claude открыта ровно как в вебе (D460,
+#: уточняет D342/D417): админ ведёт свою, сотрудник только читает — это решает
+#: матрица, лишнего закрытия здесь нет.
 CLAUDE_CLOSED: Mapping[str, frozenset[str]] = {
     SIDE_HQ: _codes("inspection.retract"),
-    SIDE_PARTNER: _codes("inspection.retract") | _CHECKLISTS | _CHECKLIST_OWNER,
+    SIDE_PARTNER: _codes("inspection.retract"),
 }
 
 

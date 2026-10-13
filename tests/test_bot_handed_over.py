@@ -40,7 +40,8 @@ from src.bot import sidecar
 from src.bot.app import build_dispatcher
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.domain import add_finding, get_state, start_inspection
+from src.domain import add_finding, check_environment, get_state, start_inspection
+from src.domain.engine import option, run_audit
 
 # Меток у модуля нет: последний случай синхронный — он смотрит на файл заметок,
 # а не на диалог, и метка asyncio на нём была бы неправдой. Боевая методика
@@ -132,14 +133,26 @@ async def test_число_записей_запечатанность_не_от�
     проверка, в которой записей всё-таки стало больше (заметки от прежней версии
     бота, правка файла руками), снова открылась бы для дописывания.
 
-    Запись здесь делается движком в обход бота намеренно: через бота она уже не
-    проходит, а проверяется именно то, что признак не зависит от их числа.
+    Запись здесь делается движком в обход бота и домена намеренно: через них она
+    уже не проходит (`domain.guard_writable`), а проверяется именно то, что
+    признак не зависит от числа записей.
     """
     начать()
     записать()
     bot, session = make_bot()
     await сдать(bot, session)
-    записать("CLN06", "Нагар на дверце")
+    run_audit(
+        [
+            "add",
+            option("qid", "CLN06"),
+            option("level", "D1"),
+            option("zone", "hot_kitchen"),
+            option("evidence", "Нагар на дверце"),
+            option("comment", ""),
+        ],
+        chat_id=CHAT_ID,
+        settings=check_environment(),
+    )
     session.clear()
 
     await feed(build_dispatcher(SETTINGS), bot, text_message("/start"))

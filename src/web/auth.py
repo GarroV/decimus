@@ -55,7 +55,7 @@ from src.db.web_access import (
 from src.db.web_throttle import Verdict, admit_attempt, note_success
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import google_link, oauth, reauth, swarm_api, walk_auth
+from . import google_link, google_profile, oauth, reauth, swarm_api, walk_auth
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -169,6 +169,9 @@ def current_account() -> Account | None:
     """Кто сейчас на странице. `None` — никого, и до страницы дело не дошло."""
     return getattr(g, CURRENT, None)
 
+
+#: Где в `app.extensions` лежит «настроен ли вход через Google» (D468).
+GOOGLE_ENABLED_KEY = "decimus_google_enabled"
 
 #: Где в `app.extensions` лежит тенант, по которому ведётся счётчик попыток.
 THROTTLE_KEY = "decimus_throttle_tenant"
@@ -391,13 +394,16 @@ def install(app: Flask, conf: Settings) -> None:
                 next_path=safe_next(request.form.get("next")),
             )
             return страница, 401
-        note_success(tenant=рубеж, address=адрес, login=имя)
+        note_success(tenant=рубеж, login=имя)
         session = open_session(account)
         return remember(after_login(request.form.get("next")), session)
 
     state_signer = URLSafeTimedSerializer(
         conf.secret_key, salt=GOOGLE_STATE_SALT, signer_kwargs={"digest_method": hashlib.sha256}
     )
+
+    # То же знание — для маршрутов, которым нужен признак без шаблона (меню учётки).
+    app.extensions[GOOGLE_ENABLED_KEY] = google is not None
 
     @app.context_processor
     def _вход_через_google_доступен() -> dict[str, bool]:
@@ -522,12 +528,11 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return отказано
 
-        note_success(
-            tenant=рубеж,
-            address=client_address(trusted_proxies=conf.trusted_proxies),
-            login=account.login,
-        )
+        note_success(tenant=рубеж, login=account.login)
         session = open_session(account)
+        # Имя и фото из Google (D468) — после открытия сессии и мимо исхода
+        # входа: сбой здесь не отнимает у человека вход.
+        google_profile.remember(session.token, кто)
         return очистить_метку(remember(after_login(вернуться), session))
 
     def _начать_привязку() -> Response:

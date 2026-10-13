@@ -46,6 +46,86 @@
   {% endif %}
 {% endmacro %}
 
+{# Кадры записи на листе вычитки (D465). Миниатюры видны всегда; в режиме правки
+   (карандаш в шапке панели, класс `is-editing` на `.spanel`) у каждой — «✕» и
+   «Заменить», у записи — «+ Фото». Формы уходят фоном (`data-panel-form`), файл
+   отправляется сразу после выбора (`data-autofile`, `split.js`). #}
+{% macro photo_forms_url(c, finding_id) -%}
+  {{ url('/inspections/' ~ c.head.id ~ '/findings/' ~ finding_id ~ '/photos') }}?lang={{ lang }}
+{%- endmacro %}
+
+{% macro finding_shots(c, finding, panel=False) %}
+  {% set review_shots = c.photos.get(finding.id) %}
+  {% for photo_id in (review_shots.shown if review_shots else ()) %}
+    <span class="shot">
+      <a href="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
+        <img class="review-photo" src="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id) }}"
+             alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
+      </a>
+      {% if c.may_revise %}
+        <span class="shot__tools review-edit">
+          <form method="post" data-panel-form data-confirm="{{ t('photo.confirm_delete') }}"
+                action="{{ url('/inspections/' ~ c.head.id ~ '/photos/' ~ photo_id ~ '/delete') }}?lang={{ lang }}">
+            <button class="hbtn hbtn--icon" type="submit" aria-label="{{ t('photo.delete') }}" title="{{ t('photo.delete') }}">{{ icon('x') }}</button>
+          </form>
+          <form method="post" enctype="multipart/form-data" data-panel-form
+                action="{{ photo_forms_url(c, finding.id) }}">
+            <input type="hidden" name="replace" value="{{ photo_id }}">
+            <label class="hbtn hbtn--icon" title="{{ t('photo.replace') }}">{{ icon('pencil') }}
+              <span class="sr-only">{{ t('photo.replace') }}</span>
+              <input class="sr-only" type="file" name="photo" accept="image/*" data-autofile></label>
+          </form>
+        </span>
+      {% endif %}
+    </span>
+  {% endfor %}
+  {% if review_shots and review_shots.missing %}
+    <span class="find-row__meta find-row__lost">{{ t('card.findings.photos_lost', n=review_shots.missing) }}</span>
+  {% endif %}
+  {% if c.may_revise %}
+    <form method="post" enctype="multipart/form-data" class="review-edit shot__add" data-panel-form
+          action="{{ photo_forms_url(c, finding.id) }}">
+      <label class="hbtn">{{ icon('plus') }}<span>{{ t('photo.add') }}</span>
+        <input class="sr-only" type="file" name="photo" accept="image/*" data-autofile></label>
+    </form>
+  {% endif %}
+{% endmacro %}
+
+{# Добавить запись на приёмке (D465): пункт — поиском по коду и названию, класс, зона,
+   слова, кадр по желанию. Оценку пересчитывает движок, как при правке записи. #}
+{% macro add_form(c) %}
+  {% set sheet = c.sheet %}
+  {% if c.may_revise and not c.head.is_legacy and sheet.catalogue %}
+  <details class="review-edit review-add">
+  <summary class="btn btn--ghost">+ {{ t('add.open') }}</summary>
+  <form method="post" enctype="multipart/form-data" class="stack mt-gap" data-panel-form
+        action="{{ url('/inspections/' ~ c.head.id ~ '/findings') }}?lang={{ lang }}">
+    <label><span class="field-label">{{ t('revise.item') }}</span>
+      <input class="input" type="search" data-pick-filter="#add-code-{{ c.head.id }}" placeholder="{{ t('add.search') }}" autocomplete="off">
+      <select class="input" name="code" id="add-code-{{ c.head.id }}" size="6" required>
+        {% for code, question in sheet.catalogue %}
+          <option value="{{ code }}">{{ code }} — {{ question }}</option>
+        {% endfor %}
+      </select></label>
+    <label><span class="field-label">{{ t('revise.level') }}</span>
+      <select class="input" name="level">
+        {% for lvl in c.levels %}<option>{{ lvl }}</option>{% endfor %}
+      </select></label>
+    <label><span class="field-label">{{ t('revise.zone') }}</span>
+      <select class="input" name="zone">
+        {% for z in sheet.zones %}<option value="{{ z.code }}">{{ z.name }}</option>{% endfor %}
+      </select></label>
+    <label><span class="field-label">{{ t('revise.text') }}</span>
+      <textarea class="input" name="text" required maxlength="1000" rows="2"></textarea></label>
+    <label><span class="field-label">{{ t('add.photo') }}</span>
+      <input class="input" type="file" name="photo" accept="image/*"></label>
+    <p class="field-note">{{ t('revise.hint') }}</p>
+    <button class="btn" type="submit">{{ t('add.submit') }}</button>
+  </form>
+  </details>
+  {% endif %}
+{% endmacro %}
+
 {% macro card_body(c, panel=False) %}
   {% set head = c.head %}
   {% set detail = c.detail %}
@@ -156,6 +236,7 @@
           {% for finding in sheet.unplaced %}
             <div class="note__text">{{ finding.n }} · {{ finding.code }} · {{ finding.zone }} — <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></div>
             {% if may_revise %}{{ revise_form(c, finding, panel) }}{% endif %}
+            {{ finding_shots(c, finding, panel) }}
           {% endfor %}
         </div></div>
       {% endif %}
@@ -180,22 +261,14 @@
                 {% for finding in item.findings %}
                   <span class="find-row__meta">{{ finding.n }} · <span lang="{{ finding.lang }}">{{ finding.text or '—' }}</span></span>
                   {% if may_revise %}{{ revise_form(c, finding, panel) }}{% endif %}
-                  {% set review_shots = photos.get(finding.id) %}
-                  {% for photo_id in (review_shots.shown if review_shots else ()) %}
-                    <a href="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}" target="_blank" rel="noopener">
-                      <img class="review-photo" src="{{ url('/inspections/' ~ head.id ~ '/photos/' ~ photo_id) }}"
-                           alt="{{ t('review.photo.alt', n=finding.n) }}" loading="lazy" width="160" height="120">
-                    </a>
-                  {% endfor %}
-                  {% if review_shots and review_shots.missing %}
-                    <span class="find-row__meta find-row__lost">{{ t('card.findings.photos_lost', n=review_shots.missing) }}</span>
-                  {% endif %}
+                  {{ finding_shots(c, finding, panel) }}
                 {% endfor %}
               </span>
             </div>
           {% endfor %}
         </details>
       {% endfor %}
+      {{ add_form(c) }}
     </section>
   {% endif %}
 

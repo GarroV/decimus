@@ -72,11 +72,15 @@ def test_неудачи_складываются_и_запирают(db_env: str
     assert not попытка().admitted, "запертую попытку понесли к сверке пароля"
 
 
-def test_удачный_вход_забывает_обе_строки(db_env: str) -> None:
+def test_удачный_вход_забывает_строку_логина_а_адрес_оставляет(db_env: str) -> None:
     попытка()
-    note_success(tenant=ТЕНАНТ, address=АДРЕС, login=ЛОГИН)
+    note_success(tenant=ТЕНАНТ, login=ЛОГИН)
     строка = load_counter(tenant=ТЕНАНТ, scope=SCOPE_LOGIN, fingerprint=key_fingerprint(ЛОГИН))
     assert строка is None
+    адрес = load_counter(
+        tenant=ТЕНАНТ, scope=SCOPE_ADDRESS, fingerprint=key_fingerprint(canonical_address(АДРЕС))
+    )
+    assert адрес is not None, "успешный вход обнулил счётчик адреса — перебор обходится"
 
 
 def test_счётчик_соседнего_тенанта_не_запирается(db_env: str) -> None:

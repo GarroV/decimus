@@ -43,8 +43,9 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from src.domain import get_state, set_report_lang
+from src.domain import get_state, handed_over, set_report_lang
 from src.domain.errors import DomainError
+from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
 
 if TYPE_CHECKING:
@@ -57,6 +58,8 @@ logger = logging.getLogger(__name__)
 SENT = "sent"
 NO_INSPECTION = "no_inspection"
 FAILED = "failed"
+#: Проверка сдана — завершение её не трогает (D080).
+SEALED = "sealed"
 #: Отчёт: сборка запущена; язык не из перечня страны; не заполнены сведения; уже собирается.
 STARTED = "started"
 LANG_GONE = "lang_gone"
@@ -116,6 +119,12 @@ def send_summary(token: str, chat_id: int) -> str:
     """Отправить итог в чат человека. `SENT` или причина, по которой не вышло."""
     if not has_inspection(chat_id):
         return NO_INSPECTION
+    try:
+        if handed_over(chat_id):
+            return SEALED
+    except DomainError:
+        logger.exception("Завершение из приложения: чат %s — заметки не читаются", log_id(chat_id))
+        return FAILED
     try:
         asyncio.run(_send_summary(token, chat_id))
     except Exception:  # — сеть, Bot API, расчёт: любой сбой — отказ словами экрана
@@ -195,6 +204,8 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         offered = _offered(chat_id)
         if offered is None:
             return ReportStart(NO_INSPECTION)
+        if handed_over(chat_id):
+            return ReportStart(SEALED)
         chosen = report_lang or (offered[0] if len(offered) == 1 else None)
         if chosen is None or chosen not in offered:
             return ReportStart(LANG_GONE)
@@ -211,7 +222,13 @@ def start_report(token: str, chat_id: int, report_lang: str | None, ui_lang: str
         )
         return ReportStart(FAILED)
     try:
-        set_report_lang(chat_id, chosen)
+        try:
+            set_report_lang(chat_id, chosen)
+        except HandedOverError:
+            # Сдали между проверкой выше и записью: сборку не начинаем.
+            with _building_lock:
+                _building.discard(chat_id)
+            return ReportStart(SEALED)
         # Поток не наследует контекст сам: без копии сборка ушла бы в базу без
         # пространства человека и получила бы отказ (F-037, `src/db/space.py`).
         threading.Thread(

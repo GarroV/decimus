@@ -2,6 +2,7 @@
   "_about": "Иконки линейки — набор Swarm Brain (miniapp/src/lib/royIcons.ts, origin/main), решение MERIDIUS D164. Рисовать так: <svg viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"…\"/></svg>. Правка — здесь, в продукты раскатывается spread.py.",
   "search": "M11 11l4 4M7 12a5 5 0 100-10 5 5 0 000 10z",
   "spark": "M10 2.5l1.7 4.3 4.3 1.7-4.3 1.7L10 14.5l-1.7-4.3L4 8.5l4.3-1.7z",
+  "sliders": "M3 6h7M14 6h3M3 14h3M10 14h7M12 4v4M8 12v4",
   "task": "M5 4.5h2M5 10h2M5 15.5h2M10 4.5h6M10 10h6M10 15.5h6",
   "tag": "M4 4h6l6 6-6 6-6-6V4z M6.5 6.5h.01",
   "book": "M3 4h6a2 2 0 012 2v10a2 2 0 00-2-2H3zM17 4h-6a2 2 0 00-2 2v10a2 2 0 012-2h6z",

@@ -645,6 +645,9 @@ def set_report_lang(chat_id: int, lang: str) -> Inspection:
     Язык вне `TEXT_LANGS` — отказ ДО движка, по той же причине, что и на старте:
     без слова на этом языке шапку не заполнить.
     """
+    from .handover import guard_writable  # handover сам читает `state_lock` отсюда
+
+    guard_writable(chat_id)
     code = lang.strip().lower()
     if code not in TEXT_LANGS:
         raise ValidationError(
@@ -778,6 +781,9 @@ def sync_checklist_version(chat_id: int) -> Inspection:
     снимается тем же движением — иначе следующее переиздание оставило бы
     переведённую проверку без опоры.
     """
+    from .handover import guard_writable  # handover сам читает `state_lock` отсюда
+
+    guard_writable(chat_id)
     settings = check_environment()
     path = state_file(chat_id, settings)
     if not path.is_file():

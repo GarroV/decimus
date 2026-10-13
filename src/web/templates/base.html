@@ -23,6 +23,22 @@
               aria-label="{{ t('nav.theme.' ~ value) }}">{{ icon(name) }}</button>
     {% endfor %}
   </div>
+{% endmacro %}{#
+  Имя и аватар вошедшего (D468): имя и фото из Google, если они есть; иначе
+  логин и инициалы. Фото — со своего адреса (`/settings/avatar`), версия в
+  адресе: смена фото — новый адрес, а старый браузер держит без вопросов.
+#}{% set shown_name = account.display_name or account.login if account else '' %}
+{% macro acct_avatar(extra='') %}
+  <span class="avatar {{ extra }}" aria-hidden="true">
+    {%- if account.avatar_etag -%}
+      <img class="avatar__img" src="{{ url('/settings/avatar') }}?v={{ account.avatar_etag }}" alt="" decoding="async">
+    {%- elif account.display_name -%}
+      {%- set words = account.display_name.split() -%}
+      {{ (words[0][0] ~ (words[1][0] if words|length > 1 else ''))|upper }}
+    {%- else -%}
+      {{ account.login[:2]|upper }}
+    {%- endif -%}
+  </span>
 {% endmacro %}<!doctype html>
 <html lang="{{ lang }}">
 <head>
@@ -75,9 +91,8 @@
 
   {% if account %}
     {#
-      Полоса телефона: ниже 720px левой панели нет, и тема с языком были
-      на телефоне недоступны вовсе. Здесь марка и те же два переключателя —
-      те же элементы, что в панели, а не свои копии.
+      Полоса телефона: ниже 720px левой панели нет. Здесь марка и аватар,
+      открывающий меню учётки с темой и языком (D468).
     #}
     <header class="mbar">
       <a class="mbar__brand" href="{{ url('/') }}?lang={{ lang }}">
@@ -85,11 +100,10 @@
         <span class="topbar__name">{{ t('app.name') }}</span>
       </a>
       <span class="topbar__spacer"></span>
-      {{ theme_pick() }}
-      {% include "_langpick.html" %}
-      {# На телефоне левой панели нет — в «Настройки» ведёт аватар, как в панели. #}
-      <a class="mbar__me" href="{{ settings_url }}" title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}">
-        <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
+      {# На телефоне левой панели нет: аватар открывает то же меню учётки (D468),
+         а тема и язык лежат в нём. Без скрипта — ссылка в «Настройки». #}
+      <a class="mbar__me" href="{{ settings_url }}" data-acct-menu data-place="down" title="{{ t('menu.title') }}" aria-label="{{ t('menu.title') }}">
+        {{ acct_avatar() }}
       </a>
     </header>
   {% endif %}
@@ -136,30 +150,26 @@
           {% endfor %}
         </div>
 
+        {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
+           строкой. Блок учётки ниже — отдельно (D468). #}
         <div class="sidenav__foot">
-          {# Тема и язык — две капсулы одной строкой, без подписей (владелец
-             30.09.2026: «я просил и язык и тему сделать пилюлей. при этом без
-             надписей»). Название выбора — в aria-label группы и title. #}
           <div class="sidenav__prefs">
             {{ theme_pick() }}
-            <div class="sidenav__lang">{% include "_langpick.html" %}</div>
+            {% include "_langpick.html" %}
+            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
+               title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}"
+               {% if current_key == 'settings' %}aria-current="page"{% endif %}>{{ icon('sliders') }}</a>
           </div>
         </div>
 
         <div class="sidenav__user">
-          {# Меню учётки ведёт в «Настройки» (D447): Claude, бот, Google, язык,
-             пароль — всё своё в одном месте. #}
-          <a class="sidenav__me" href="{{ settings_url }}" title="{{ t('section.settings.title') }}">
-            <span class="avatar" aria-hidden="true">{{ account.login[:2]|upper }}</span>
-            <span class="sidenav__who"><b>{{ account.login }}</b><small>{{ t(role_key(account.role, account.tenant)) }}</small></span>
+          {# Блок учётки открывает меню поверх страницы (D468); без скрипта —
+             ссылка в «Настройки» (D447). Выход, тема и язык — в меню. #}
+          <a class="sidenav__me" href="{{ settings_url }}" data-acct-menu data-place="up" title="{{ t('menu.title') }}">
+            {{ acct_avatar() }}
+            <span class="sidenav__who"><b>{{ shown_name }}</b><small>{{ t(role_key(account.role, account.tenant)) }}</small></span>
+            <span class="sidenav__chev" aria-hidden="true">{{ icon('cright') }}</span>
           </a>
-          {#
-            Выход — форма, а не ссылка: по ссылке его запустила бы картинка на
-            чужой странице, выбив человека из админки без единого его движения.
-          #}
-          <form class="logout" method="post" action="{{ url(logout_path) }}">
-            <button class="icon-btn icon-btn--sm" type="submit" title="{{ t('auth.logout') }}" aria-label="{{ t('auth.logout') }}">{{ icon('arrow') }}</button>
-          </form>
         </div>
       </nav>
     {% endif %}
@@ -178,6 +188,7 @@
     продукта целиком остаётся в боковом меню компьютера (D138).
   #}
   {% if account %}
+    {% include "_account_menu.html" %}
     <nav class="tabbar" aria-label="{{ t('nav.sections') }}">
       {% for item in sections %}
         <a class="tabbar__item{% if item.key == current_key %} is-current{% endif %}{% if not item.built %} is-wip{% endif %}"
