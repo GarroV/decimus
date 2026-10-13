@@ -7,66 +7,36 @@
   в Swarm), и каждое живёт ровно в одном месте. Действию с полями (запрос
   плана, перенос, отклонение) кнопка раскрывает форму под рядом кнопок, без
   скрипта: `<details name>` держит открытой не больше одной.
-  В панели то, что требует листа вычитки или списка точек (подтвердить,
-  исправить дату), кнопкой ведёт в полную карточку — читать их там.
+  В панели (D465) действия — пиктограммы с подсказкой (`aria-label` + `title`),
+  кроме «Принять проверку»: она подписана и работает прямо в панели, формой,
+  которую `split.js` отправляет фоном (`data-panel-form`), не уводя со страницы.
+  Принятую проверку не правят: кнопки «Исправить» у неё в панели нет.
 #}
 
-{% macro _pop(id, ico, label, tone='') %}
+{% macro _pop(id, ico, label, tone='', iconic=False) %}
   <details class="hact__item" name="hact" id="{{ id }}">
-    <summary class="hbtn {{ tone }}">{{ icon(ico) }}<span>{{ label }}</span></summary>
+    <summary class="hbtn {{ 'hbtn--icon ' if iconic }}{{ tone }}"{% if iconic %} aria-label="{{ label }}" title="{{ label }}"{% endif %}>{{ icon(ico) }}{% if not iconic %}<span>{{ label }}</span>{% endif %}</summary>
     <div class="hact__pop">{{ caller() }}</div>
   </details>
+{% endmacro %}
+
+{# Ссылка-действие: в панели пиктограмма с подсказкой, на странице — с подписью. #}
+{% macro _link(href, ico, label, panel, tone='', hint='') %}
+  <a class="hbtn {{ 'hbtn--icon ' if panel }}{{ tone }}" href="{{ href }}"
+     {%- if panel %} aria-label="{{ label }}" title="{{ hint or label }}"{% elif hint %} title="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel %}<span>{{ label }}</span>{% endif %}</a>
 {% endmacro %}
 
 {% macro card_actions(c, panel=False) %}
   {% set head = c.head %}
   {% set full = url('/inspections/' ~ head.id) %}
   <div class="hact" role="group" aria-label="{{ t('card.actions.label') }}">
-    {% if panel %}
-      <a class="hbtn hbtn--primary" href="{{ full }}?lang={{ lang }}">{{ icon('arrow') }}<span>{{ t('registry.panel.open') }}</span></a>
-    {% endif %}
-    {# PDF — тот самый файл, что получил аудитор (D204); кнопка только когда он
-       сохранён: ссылка, ведущая в отказ, хуже её отсутствия. #}
-    {% if c.report %}
-      <a class="hbtn" href="{{ full }}/report?lang={{ lang }}">{{ icon('pdf') }}<span>{{ t('card.report.download') }}</span></a>
-    {% endif %}
-    {# Письмо партнёру — запись от имени пространства: у проверки, которую
-       вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
-       задним числом письма нет вовсе (D310). #}
-    {% if c.own and not head.is_uploaded %}
-      <a class="hbtn" href="{{ full }}/letter?lang={{ lang }}">{{ icon('doc') }}<span>{{ t('letter.open') }}</span></a>
-    {% endif %}
-
-    {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
-       Без запроса и без права запросить кнопки нет (D217). #}
-    {% if c.plan %}
-      <a class="hbtn{% if c.plan.overdue(c.plan_today) %} hbtn--err{% endif %}" href="{{ url(c.plan_link) }}?lang={{ lang }}"
-         title="{{ t('actions.request.due', due=c.plan.due_on) }}">{{ icon('task') }}<span>{{ t('card.plan.title') }} · {{ t('plans.state.' ~ c.plan.state) }}{% if c.plan.overdue(c.plan_today) %} · {{ t('plans.overdue') }}{% endif %}</span></a>
-    {% elif c.plan_known and not c.plan_no_country and c.may_request_plan %}
-      {% if panel %}
-        <a class="hbtn" href="{{ full }}?lang={{ lang }}">{{ icon('task') }}<span>{{ t('card.plan.title') }}</span></a>
-      {% else %}
-        {% call _pop('plan', 'task', t('card.plan.title')) %}
-          <p class="field-note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
-          <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="hact__form">
-            <input type="hidden" name="inspection_id" value="{{ head.id }}">
-            <label><span class="field-label">{{ t('card.plan.due') }}</span>
-              <input class="input" type="date" name="due" value="{{ c.plan_due_default }}" min="{{ c.plan_today }}" required></label>
-            <button class="btn btn--primary btn--sm" type="submit">{{ t('card.plan.request_submit') }}</button>
-          </form>
-        {% endcall %}
-      {% endif %}
-    {% endif %}
-
-    {# Предписание по этой проверке (D403): форма раздела УК, где проверка уже
-       выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
-    {% if c.may_prescribe %}
-      <a class="hbtn" href="{{ url('/actions/prescriptions/new') }}?inspection={{ head.id }}&amp;lang={{ lang }}">{{ icon('doc') }}<span>{{ t('card.act.rx') }}</span></a>
-    {% endif %}
-
+    {# Принять — подписанной кнопкой и сразу в панели (D465): ведёт не на страницу,
+       а выполняется на месте. На странице карточки — раскрывающимся подтверждением. #}
     {% if c.may_accept %}
       {% if panel %}
-        <a class="hbtn" href="{{ full }}?lang={{ lang }}#review">{{ icon('check') }}<span>{{ t('accept.title') }}</span></a>
+        <form method="post" action="{{ full }}/accept?lang={{ lang }}" data-panel-form>
+          <button class="hbtn hbtn--primary" type="submit">{{ icon('check') }}<span>{{ t('accept.title') }}</span></button>
+        </form>
       {% else %}
         {% call _pop('accept', 'check', t('accept.title')) %}
           <p class="field-note">{{ t('accept.hint') }}</p>
@@ -77,33 +47,73 @@
       {% endif %}
     {% endif %}
 
-    {% if c.may_move %}
-      {% if panel %}
-        <a class="hbtn" href="{{ full }}?lang={{ lang }}">{{ icon('pencil') }}<span>{{ t('card.act.move') }}</span></a>
-      {% else %}
-        {% call _pop('move', 'pencil', t('card.act.move')) %}
-          <p class="field-note">{{ t('move.hint') }}</p>
-          <form method="post" action="{{ full }}/move?lang={{ lang }}" class="hact__form">
-            <label><span class="field-label">{{ t('move.date_label') }}</span>
-              <input class="input" type="date" name="date" required value="{{ head.inspection_date }}"></label>
-            <label><span class="field-label">{{ t('move.unit_label') }}</span>
-              <select class="input" name="unit" required>
-                {% for unit_id, unit_name in c.units %}
-                  <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
-                {% endfor %}
-              </select></label>
-            <label><span class="field-label">{{ t('move.reason_label') }}</span>
-              <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
-            <button class="btn btn--sm" type="submit">{{ t('move.submit') }}</button>
-          </form>
-        {% endcall %}
+    {# PDF — тот самый файл, что получил аудитор (D204); кнопка только когда он
+       сохранён: ссылка, ведущая в отказ, хуже её отсутствия. Ответ — вложение:
+       щелчок скачивает файл и страницу не меняет. #}
+    {% if c.report %}
+      {{ _link(full ~ '/report?lang=' ~ lang, 'pdf', t('card.report.download'), panel) }}
+    {% endif %}
+    {# Письмо партнёру — запись от имени пространства: у проверки, которую
+       вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
+       задним числом письма нет вовсе (D310). #}
+    {% if c.own and not head.is_uploaded %}
+      {{ _link(full ~ '/letter?lang=' ~ lang, 'mail', t('letter.open'), panel) }}
+    {% endif %}
+
+    {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
+       Без запроса и без права запросить кнопки нет (D217). #}
+    {% if c.plan %}
+      {% set plan_label = t('card.plan.title') ~ ' · ' ~ t('plans.state.' ~ c.plan.state) ~ ((' · ' ~ t('plans.overdue')) if c.plan.overdue(c.plan_today) else '') %}
+      {{ _link(url(c.plan_link) ~ '?lang=' ~ lang, 'task', plan_label, panel, tone=('hbtn--err' if c.plan.overdue(c.plan_today) else ''), hint=t('actions.request.due', due=c.plan.due_on)) }}
+    {% elif c.plan_known and not c.plan_no_country and c.may_request_plan %}
+      {% call _pop('plan', 'task', t('card.plan.title'), '', panel) %}
+        <p class="field-note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
+        <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="hact__form">
+          <input type="hidden" name="inspection_id" value="{{ head.id }}">
+          <label><span class="field-label">{{ t('card.plan.due') }}</span>
+            <input class="input" type="date" name="due" value="{{ c.plan_due_default }}" min="{{ c.plan_today }}" required></label>
+          <button class="btn btn--primary btn--sm" type="submit">{{ t('card.plan.request_submit') }}</button>
+        </form>
+      {% endcall %}
+    {% endif %}
+
+    {# Предписание по этой проверке (D403): форма раздела УК, где проверка уже
+       выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
+    {% if c.may_prescribe %}
+      {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel) }}
+    {% endif %}
+
+    {# «Исправить» (D465). В панели — правка записей ждущей проверки: кнопка
+       раскрывает формы правки в листе вычитки (`split.js`, `data-edit-toggle`);
+       принятую не правят, и кнопки у неё нет. На странице карточки — перенос
+       по дате и пиццерии (D195). #}
+    {% if panel %}
+      {% if c.may_revise and c.sheet %}
+        <a class="hbtn hbtn--icon" href="#review" data-edit-toggle aria-label="{{ t('card.act.move') }}" title="{{ t('card.act.move') }}">{{ icon('pencil') }}</a>
       {% endif %}
+    {% elif c.may_move %}
+      {% call _pop('move', 'pencil', t('card.act.move')) %}
+        <p class="field-note">{{ t('move.hint') }}</p>
+        <form method="post" action="{{ full }}/move?lang={{ lang }}" class="hact__form">
+          <label><span class="field-label">{{ t('move.date_label') }}</span>
+            <input class="input" type="date" name="date" required value="{{ head.inspection_date }}"></label>
+          <label><span class="field-label">{{ t('move.unit_label') }}</span>
+            <select class="input" name="unit" required>
+              {% for unit_id, unit_name in c.units %}
+                <option value="{{ unit_id }}"{% if unit_name == head.unit_name %} selected{% endif %}>{{ unit_name }}</option>
+              {% endfor %}
+            </select></label>
+          <label><span class="field-label">{{ t('move.reason_label') }}</span>
+            <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
+          <button class="btn btn--sm" type="submit">{{ t('move.submit') }}</button>
+        </form>
+      {% endcall %}
     {% endif %}
 
     {% if c.may_retract and not head.retracted %}
-      {% call _pop('retract', 'x', t('retract.title'), 'hbtn--danger') %}
+      {% call _pop('retract', 'trash' if panel else 'x', t('retract.title'), 'hbtn--danger', panel) %}
         <p class="field-note">{{ t('retract.hint') }}</p>
-        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form">
+        <form method="post" action="{{ full }}/retract?lang={{ lang }}" class="hact__form"{% if panel %} data-panel-form{% endif %}>
           <label><span class="field-label">{{ t('retract.reason_label') }}</span>
             <input class="input" type="text" name="reason" required maxlength="500" autocomplete="off"></label>
           <button class="btn btn--danger btn--sm" type="submit">{{ t('retract.submit') }}</button>

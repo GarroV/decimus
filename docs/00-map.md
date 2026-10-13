@@ -250,7 +250,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/` | 14 | _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, _split_ui.html, base.html, … (+6) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/country/` | 1 | index.html |
-| `src/web/templates/inspections/` | 6 | _card_parts.html, _panel.html, card.html, letter.html, list.html, not_found.html |
+| `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
