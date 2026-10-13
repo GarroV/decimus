@@ -437,7 +437,7 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
 ) -> None:
     # Arrange — причина обязательна, и правило это живёт в блоке `db`.
     def снять(*_a: Any, **_k: Any) -> Retraction:
-        raise RetractionError("Причина снятия не названа")
+        raise RetractionError("Причина снятия не названа", code="retract_reason_required")
 
     monkeypatch.setattr(data, "retract_card", снять)
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: карточка(шапка()))
@@ -449,7 +449,7 @@ def test_отказ_снятия_показан_текстом_а_не_трас�
 
     # Assert
     assert ответ.status_code == 200
-    assert "Причина снятия не названа" in ответ.get_data(as_text=True)
+    assert "Не названа причина отклонения" in ответ.get_data(as_text=True)
 
 
 @админ
@@ -624,9 +624,10 @@ def test_отказ_снятия_показан_на_карточке_а_не_п
         headers={"Origin": "http://localhost"},
     )
 
-    # Assert — причина отказа на экране есть, адреса базы в ней нет.
+    # Assert — причина отказа на экране общим текстом, ни адреса базы, ни типа ошибки.
     страница = ответ.get_data(as_text=True)
-    assert "OperationalError" in страница
+    assert "Действие не выполнено" in страница
+    assert "OperationalError" not in страница
     for след in ("host=", "port=", "dbname=", "user=", "postgresql://"):
         assert след not in страница, след
 
@@ -923,7 +924,7 @@ def test_отказ_переноса_показан_текстом(
     _перенос(monkeypatch)
 
     def отказать(*_a: Any, **_k: Any) -> bool:
-        raise MoveError("Не назван повод исправления")
+        raise MoveError("Не назван повод исправления", code="move_reason_required")
 
     monkeypatch.setattr(data, "move_card", отказать)
 

@@ -87,7 +87,7 @@ from . import methodology as method
 from . import methodology_view as mview
 from . import unit_card as unit_data
 from .config import Settings, load_settings
-from .db_refusal import public_reason
+from .db_refusal import domain_reason, public_reason
 from .errors import MethodologyRefused
 from .geo_names import city_title, country_title
 from .icons import icon
@@ -856,7 +856,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             done = data.retract_card(inspection_id, tenant=auth.current_tenant(), reason=reason)
         except RetractionError as exc:
-            failure = t("retract.failed", _lang(conf), reason=str(exc))
+            failure = t("retract.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("retract.done", _lang(conf), photos=done.photos_purged)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -880,7 +880,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 actor=вошедший.login if вошедший else "",
             )
         except AcceptError as exc:
-            failure = t("accept.failed", _lang(conf), reason=str(exc))
+            failure = t("accept.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("accept.done", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -908,7 +908,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 text=request.form.get("text") or "",
             )
         except ReviseError as exc:
-            failure = t("revise.failed", _lang(conf), reason=str(exc))
+            failure = t("revise.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("revise.done", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -944,7 +944,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 photo=кадр,
             )
         except ReviseError as exc:
-            failure = t("add.failed", lang, reason=str(exc))
+            failure = t("add.failed", lang, reason=domain_reason(exc, lang))
         else:
             notice = t("add.done", lang)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -979,7 +979,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                         inspection_id, finding_id, tenant=auth.current_tenant(), data=кадр
                     )
             except ReviseError as exc:
-                failure = str(exc)
+                failure = domain_reason(exc, lang)
             else:
                 notice = t("photo.replaced" if старый else "photo.added", lang)
         if failure is not None:
@@ -1000,7 +1000,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         try:
             revision.detach_photo(inspection_id, photo_id, tenant=auth.current_tenant())
         except ReviseError as exc:
-            failure = t("photo.failed", lang, reason=str(exc))
+            failure = t("photo.failed", lang, reason=domain_reason(exc, lang))
         else:
             notice = t("photo.deleted", lang)
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)
@@ -1026,7 +1026,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 actor=вошедший.login if вошедший else "",
             )
         except MoveError as exc:
-            failure = t("move.failed", _lang(conf), reason=str(exc))
+            failure = t("move.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))
         else:
             notice = t("move.done" if перенесено else "move.same", _lang(conf))
         return _render_card(inspection_id, conf=conf, notice=notice, failure=failure)

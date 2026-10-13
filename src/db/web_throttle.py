@@ -437,15 +437,17 @@ def admit_attempt(*, tenant: str, address: str, login: str) -> Attempt:
     return Attempt(admitted=True, verdict=_строже(стало))
 
 
-def note_success(*, tenant: str, address: str, login: str) -> None:
-    """Забыть неудачи обоих ключей: человек доказал, что он тот самый.
+def note_success(*, tenant: str, login: str) -> None:
+    """Забыть неудачи логина: человек доказал, что он тот самый.
 
-    Адрес забывается вместе с логином намеренно. Сохранить его — значит
-    запереть вход конторе, где один человек трижды ошибся, а остальные
-    работают; а тому, у кого есть верный пароль, перебор не нужен вовсе.
+    Сбрасывается ТОЛЬКО счётчик его логина. Счётчик адреса остаётся и живёт
+    своим окном (`FORGET_AFTER`): иначе перебор с одного адреса обходится
+    чередованием с входом под своей учёткой — каждый успех обнулял бы счёт, и
+    порог по адресу не достигался бы никогда (GHSA-pchf-85ph-vg9x). Цена —
+    контора за одним адресом, где неудач набралось много, ждёт срока забвения
+    адреса; перебор паролей это дороже, чем ожидание.
     """
-    for scope, отпечаток in _keys(address, login):
-        forget_counter(tenant=tenant, scope=scope, fingerprint=отпечаток)
+    forget_counter(tenant=tenant, scope=SCOPE_LOGIN, fingerprint=key_fingerprint(login))
 
 
 def _address_key(address: str) -> tuple[str, str]:

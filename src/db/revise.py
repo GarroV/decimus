@@ -120,7 +120,9 @@ def revise_finding(
     запись = _require_inspection_id(finding_id)
     tenant_code = _require_tenant(tenant)
     if not revision.text.strip():
-        raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
+        raise ReviseError(
+            "Формулировка записи пуста — запись без слов в отчёт не идёт", code="revise_text_empty"
+        )
     try:
         with connection(check_environment().dsn) as conn:
             _apply(conn, ident, запись, tenant_code, revision, score_of)
@@ -139,12 +141,15 @@ def _refuse_lock(cur: Any, ident: str, tenant: str) -> ReviseError:
     cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
     шапка = cur.fetchone()
     if шапка is None:
-        return ReviseError(f"Проверки {ident} у арендатора {tenant} нет")
+        return ReviseError(
+            f"Проверки {ident} у арендатора {tenant} нет", code="inspection_not_found"
+        )
     if шапка[1] is not None:
-        return ReviseError("Проверка отклонена — её записи не исправляют")
+        return ReviseError("Проверка отклонена — её записи не исправляют", code="revise_rejected")
     return ReviseError(
         "Проверка уже принята — записи принятой не исправляются (D200). "
-        "Поправить можно только шапку, под журналом"
+        "Поправить можно только шапку, под журналом",
+        code="revise_accepted",
     )
 
 
@@ -152,7 +157,7 @@ def _revised(detail: InspectionDetail, запись: str, revision: Revision) ->
     """Проверка, какой она станет после правки, — её и считает движок."""
     прежняя = next((f for f in detail.findings if f.id == запись), None)
     if прежняя is None:
-        raise ReviseError("Такой записи в этой проверке нет")
+        raise ReviseError("Такой записи в этой проверке нет", code="revise_no_finding")
     исправленная = replace(
         прежняя,
         code=revision.code,
@@ -188,13 +193,16 @@ def _apply(
             raise ReviseError(
                 "Проверка историческая: оценка перенесена из старого отчёта как есть и "
                 "движком не пересчитывается (D332). Её записи правят инструментами "
-                "загрузки (import_edit_finding) до подтверждения"
+                "загрузки (import_edit_finding) до подтверждения",
+                code="revise_legacy",
             )
         # Всё ниже — после замка: соседняя правка этой проверки уже записана
         # целиком или ещё не началась.
         detail = _read_detail(cur, reach=own_reach(tenant), ident=ident, include_on_review=True)
         if detail is None:
-            raise ReviseError(f"Проверки {ident} у арендатора {tenant} нет")
+            raise ReviseError(
+                f"Проверки {ident} у арендатора {tenant} нет", code="inspection_not_found"
+            )
         score = score_of(_revised(detail, запись, revision))
         cur.execute(
             _PAIR_TAKEN_SQL,
@@ -204,7 +212,9 @@ def _apply(
         if занята is not None:
             raise ReviseError(
                 f"Пункт {revision.code} в этой зоне уже записан — запись {занята[0]}. "
-                f"Одна пара «пункт + зона» — одна запись"
+                f"Одна пара «пункт + зона» — одна запись",
+                code="revise_pair_taken",
+                params={"code": revision.code},
             )
         cur.execute(
             _UPDATE_FINDING_SQL,
@@ -220,7 +230,8 @@ def _apply(
         if cur.rowcount != 1:
             raise ReviseError(
                 "Запись не исправлена: проверка уже подтверждена или записи больше нет. "
-                "Ни запись, ни оценка не изменились"
+                "Ни запись, ни оценка не изменились",
+                code="revise_stale",
             )
         cur.execute(
             _INSERT_TRANSLATION_SQL,
@@ -244,7 +255,8 @@ def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:
     )
     if cur.rowcount != 1:
         raise ReviseError(
-            "Оценку не удалось записать: проверка перестала ждать приёмки, пока её правили"
+            "Оценку не удалось записать: проверка перестала ждать приёмки, пока её правили",
+            code="revise_stale",
         )
     for lang, label in (("ru", score.label_ru), ("en", score.label_en)):
         if label:
