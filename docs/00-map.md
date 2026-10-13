@@ -141,7 +141,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
-| `src/web/to_inspect.py` | «Где нужно проверить» на экране «Проверки» (D399, переехало с «Главной» в D418) |
+| `src/web/to_inspect.py` | «Где нужно проверить» на экране «Календарь» (D399; с «Главной» в D418, оттуда в D466) |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
 <!-- map:end -->
@@ -253,6 +253,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 |---|---|---|
 | `src/web/templates/` | 14 | _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, _split_ui.html, base.html, … (+6) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
+| `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |

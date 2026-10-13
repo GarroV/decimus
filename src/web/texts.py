@@ -329,10 +329,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "The built section is “{built}”. The rest are shown so the product map stays visible."
         ),
     },
-    "wip.calendar_note": {
-        "ru": "Календарь и планирование проверок в текущий объём не входят (решение D139).",
-        "en": "The calendar and inspection planning are out of the current scope (decision D139).",
-    },
     # --- реестр проверок ---------------------------------------------------
     # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
     "unit.back": {"ru": "‹ Обзор", "en": "‹ Overview"},
@@ -423,7 +419,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Clear some conditions."
         ),
     },
-    "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
+    "registry.count": {"ru": "Принятых: {count}", "en": "Accepted: {count}"},
     "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
@@ -450,7 +446,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     "state.review": {"ru": "На приёмке", "en": "Awaiting review"},
     # --- этап приёмки (D199) -------------------------------------------------
-    "registry.review.title": {"ru": "Ждут приёмки", "en": "Awaiting review"},
+    "registry.review.title": {"ru": "На приёмке", "en": "Awaiting review"},
+    "registry.review.empty": {"ru": "Ничего не ждёт приёмки", "en": "Nothing is awaiting review"},
+    "registry.review.wait": {"ru": "ждёт {days} дн.", "en": "waiting {days} d"},
+    "registry.review.wait_new": {"ru": "ждёт меньше суток", "en": "waiting under a day"},
     "registry.review.hint": {
         "ru": (
             "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
