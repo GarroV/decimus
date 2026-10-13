@@ -135,3 +135,26 @@ def test_отказ_правки_эталона_назван_словами(ск
             "/admin/items?checklist=bizdev", headers={"Origin": СВОЙ}, data={"id": "X01"}
         )
     assert t("methodology.etalon_readonly", "ru") in ответ.get_data(as_text=True)
+
+
+def test_партнёру_применение_к_проду_не_показано_и_не_выдано(
+    склад: Store, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D460: `checklist.apply` — только УК. Кнопки у админа партнёра нет, дверь отказывает;
+    у админа УК кнопка есть (чтобы проверка не прошла на пустой странице)."""
+    ссылка = "/admin/checklists/rnd/apply"
+    подменить_двери(monkeypatch, tenant="AM", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        страница = client.get("/admin/checklists")
+        прямо = client.post(ссылка, headers={"Origin": СВОЙ})
+    assert страница.status_code == 200
+    assert "РНД" in страница.get_data(as_text=True)
+    assert ссылка not in страница.get_data(as_text=True)
+    assert прямо.status_code in (403, 404)
+
+    подменить_двери(monkeypatch, tenant="HQ", role="admin")
+    with собрать(tenant="HQ").test_client() as client:
+        войти(client)
+        у_ук = client.get("/admin/checklists").get_data(as_text=True)
+    assert ссылка in у_ук

@@ -298,8 +298,8 @@ class _Handler(BaseHTTPRequestHandler):
         answer = handle(
             message,
             tenant=доступ.tenant,
-            checklist=_checklist_for(self._settings, доступ.tenant),
-            source=_checklist_source_for(self._settings, доступ.tenant),
+            checklist=_checklist_for(self._settings, доступ.tenant, доступ.role),
+            source=_checklist_source_for(self._settings, доступ.tenant, доступ.role),
             may_retract=доступ.may_retract,
             imports=_imports_for(self._settings, доступ.tenant),
             actor=доступ.actor,
@@ -342,7 +342,7 @@ def _www_authenticate(settings: Settings) -> str:
     return f'Bearer realm="dodo-audit-mcp", resource_metadata="{документ}"'
 
 
-def _checklist_for(settings: Settings, tenant: str) -> Store | None:
+def _checklist_for(settings: Settings, tenant: str, role: str | None = None) -> Store | None:
     """Хранилище версий методики — или `None`, если этому арендатору она не открыта.
 
     Право спрашивается здесь, на входе, по коду арендатора, разобранному из
@@ -357,12 +357,12 @@ def _checklist_for(settings: Settings, tenant: str) -> Store | None:
     хранилище, методика = settings.checklist_store, settings.data_dir
     if хранилище is None or методика is None:
         return None
-    if not settings.may_manage_checklist(tenant):
+    if not settings.may_manage_checklist(tenant, role):
         return None
     return Store(root=хранилище, live=методика, space=space_of(tenant))
 
 
-def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
+def _checklist_source_for(settings: Settings, tenant: str, role: str | None = None) -> Store | None:
     """Хранилище для ЧТЕНИЯ исходника эталона — или `None`, если методики нет.
 
     Отдельная подстановка, а не та же самая с флагом (T315, D132): вниз уходят
@@ -382,7 +382,7 @@ def _checklist_source_for(settings: Settings, tenant: str) -> Store | None:
     хранилище, методика = settings.checklist_store, settings.data_dir
     if хранилище is None or методика is None:
         return None
-    if not settings.may_read_checklist(tenant):
+    if not settings.may_read_checklist(tenant, role):
         return None
     return Store(root=хранилище, live=методика, space=DEFAULT_SPACE)
 
