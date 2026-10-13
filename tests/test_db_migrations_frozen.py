@@ -256,6 +256,16 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0061_web_own_google_lang.sql": (
         "sql1:2cf41cb5512e4a2ceff7b42d3fc5c9ea78a4d381263805e8aacf4d731c444df6"
     ),
+    # Изоляция пространств в базе (аудит 12.10, F-037, F-005). Ещё не на проде.
+    "0062_space_isolation.sql": (
+        "sql1:6914454f0f5520b392b18aa0fd07beb05925abff1e68271bf8c31681693427d9"
+    ),
+    # «Заморозить» и «Выйти везде» (D462): disabled_by, триггер заморозки, функция выхода.
+    "0063_freeze.sql": ("sql1:da101ad0687e59f4913894ca003d4fe35fe15b1646b19d4eaffdf260406f75c2"),
+    # «База рейтингов» контроля как источник РС и РКО (D464). Ещё не на проде.
+    "0064_ratings_sheet.sql": (
+        "sql1:f5ff00cc48e5d61000d6cbb37e038c293f383656e540ab4d011fdafa2daf8314"
+    ),
 }
 
 

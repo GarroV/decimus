@@ -275,8 +275,7 @@ def test_неопознанного_уводит_на_вход_и_обратно
         "//evil.com/oauth/authorize?x=1",
         "/\\evil.com/oauth/authorize?x=1",
         "/oauth/authorize/../../evil?x=1",
-        "/oauth/authorizex?x=1",
-        "/inspections",
+        "javascript:alert(1)",
         "",
     ],
 )
@@ -610,7 +609,7 @@ def _несвежая_сессия(monkeypatch: pytest.MonkeyPatch) -> None:
 
     from web_harness import ТОКЕН, Учётка
 
-    давно = datetime.now(UTC) - timedelta(minutes=16)
+    давно = datetime.now(UTC) - timedelta(hours=12, minutes=1)
     monkeypatch.setattr(
         auth,
         "resolve_session",

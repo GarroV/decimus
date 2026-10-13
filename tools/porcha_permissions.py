@@ -136,6 +136,21 @@ cases = [
         "        if True:\n",
         T + "test_web_guard.py::test_маршрут_с_объектом_обязан_спросить_матрицу",
     ),
+    # Граница пространств: необъявленный маршрут открылся бы партнёру (F-004).
+    (
+        "src/web/guard.py",
+        "    return any(open_to_space(код, tenant) for код in "
+        "_declared_codes(app, endpoint, path))\n",
+        "    коды = _declared_codes(app, endpoint, path)\n"
+        "    return not коды or any(open_to_space(код, tenant) for код in коды)\n",
+        T + "test_web_guard.py::test_необъявленный_маршрут_партнёру_закрыт_УК_открыт",
+    ),
+    (
+        "src/web/guard.py",
+        "        and not _declared_codes(app, rule.endpoint, rule.rule)\n",
+        "        and False\n",
+        T + "test_web_guard.py::test_полнота_ловит_необъявленный_маршрут",
+    ),
     # MCP: инструмент указателя прода у девелопера.
     (
         "src/mcp/policy.py",

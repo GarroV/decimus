@@ -24,6 +24,7 @@ from collections.abc import Sequence
 from datetime import UTC, date, datetime
 
 from src.db import agg_store
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.ratings.aggregators import alert, collect, queue
 
 logger = logging.getLogger(__name__)
@@ -63,6 +64,16 @@ async def notify(outcomes: Sequence[collect.Outcome]) -> bool:
 
 
 async def load_forever() -> None:
+    """Задача бота: оценки агрегаторов и заявки на обновление.
+
+    Служебная работа без человека: в базу — от имени служебного пространства
+    (F-037, `src/db/space.py`).
+    """
+    with acting_space(SYSTEM_SPACE):
+        await _load_forever()
+
+
+async def _load_forever() -> None:
     """Задача бота: держит снимок оценок агрегаторов не старше суток и
     выполняет заявки на обновление."""
     since_check = CHECK_EVERY_SEC  # первый заход — сразу и с проверкой расписания

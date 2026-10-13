@@ -35,7 +35,14 @@ from aiogram.types import (
 
 from src import domain
 
-from . import agg_loader, frame_copies, maps_loader, photo_backfill, upload_sweeper
+from . import (
+    agg_loader,
+    frame_copies,
+    maps_loader,
+    photo_backfill,
+    sheet_loader,
+    upload_sweeper,
+)
 from .access import AccessMiddleware, BindingCache, ChatSpaceMiddleware
 from .albums import ALBUM_WINDOW_SECONDS, AlbumBuffer
 from .config import BotSettings, load_bot_settings
@@ -387,6 +394,8 @@ async def start_polling() -> None:
     map_ratings = asyncio.create_task(maps_loader.load_forever())
     # Оценки пиццерий в агрегаторах доставки — раз в сутки (D389, docs/17-aggregators.md).
     agg_ratings = asyncio.create_task(agg_loader.load_forever())
+    # Общая таблица контроля «база рейтингов» — раз в несколько часов и по заявке (D464).
+    sheet_ratings = asyncio.create_task(sheet_loader.load_forever())
     try:
         await dispatcher.start_polling(bot, handle_as_tasks=False)
     finally:
@@ -395,6 +404,7 @@ async def start_polling() -> None:
         uploads.cancel()
         map_ratings.cancel()
         agg_ratings.cancel()
+        sheet_ratings.cancel()
         await bot.session.close()
 
 

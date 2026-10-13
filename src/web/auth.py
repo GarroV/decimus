@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from typing import Any
 from urllib.parse import urlsplit
 
 from flask import Flask, current_app, g, make_response, redirect, render_template, request, url_for
@@ -40,6 +41,7 @@ from werkzeug.wrappers import Response
 from src.db import web_own_profile
 from src.db.errors import DbError
 from src.db.reach import Reach, reach_of
+from src.db.space import enter_space, leave_space
 from src.db.web_access import (
     SESSION_TTL,
     Account,
@@ -122,32 +124,32 @@ OPEN_ENDPOINTS = (
     | oauth.ENDPOINTS
 )
 
-#: Куда можно вернуть после входа (D417): только на согласие OAuth своего
-#: сайта. Произвольный `next` — открытый редирект: ссылка «войдите в decimus»
-#: уводила бы после входа на чужой сайт под видом своего.
-NEXT_PREFIX = f"{oauth.AUTHORIZE_PATH}?"
 
-
+#: Куда можно вернуть после входа (D417, D465): на любую свою страницу — путь
+#: внутри приложения. Произвольный `next` — открытый редирект: ссылка «войдите в
+#: decimus» уводила бы после входа на чужой сайт под видом своего.
 def safe_next(raw: str | None) -> str | None:
-    """Путь возврата после входа — или `None`, если он не на согласие OAuth.
+    """Путь возврата после входа — или `None`, если он не путь внутри приложения.
 
     Принимается только путь ВНУТРИ приложения (без префикса площадки — его
-    добавляет `request.script_root` при редиректе), начинающийся ровно с
-    `/oauth/authorize?`: без схемы, без хоста, без «//» и обратной косой черты,
-    которые браузеры читают как начало чужого хоста.
+    добавляет `request.script_root` при редиректе): ровно одна ведущая «/»,
+    без схемы и хоста, без «//» и обратной косой черты, которые браузеры читают
+    как начало чужого хоста, без управляющих знаков и без сегментов «.» и «..».
     """
-    if not raw or not raw.startswith(NEXT_PREFIX):
+    if not raw or not raw.startswith("/") or raw.startswith("//"):
         return None
     if "\\" in raw or any(not знак.isprintable() for знак in raw):
         return None
     части = urlsplit(raw)
-    if части.scheme or части.netloc or части.path != oauth.AUTHORIZE_PATH:
+    if части.scheme or части.netloc or части.fragment:
+        return None
+    if any(сегмент in (".", "..") for сегмент in части.path.split("/")):
         return None
     return raw
 
 
 def after_login(raw: str | None) -> Response:
-    """Куда уйти после входа: на согласие OAuth, если просили, иначе — на главную."""
+    """Куда уйти после входа: туда, откуда выбросило (свой путь), иначе — на главную."""
     путь = safe_next(raw)
     if путь is None:
         return redirect(url_for("home"))
@@ -197,6 +199,10 @@ def current_session_token() -> str:
 
 #: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
 REACH = "reach"
+
+#: Ключ в `g` метки пространства вошедшего (`src/db/space.py`): снимается на
+#: выходе из запроса, чтобы не достаться следующему на том же потоке.
+SPACE_MARK = "space_mark"
 
 
 def begin_google_link() -> Response:
@@ -291,13 +297,24 @@ def install(app: Flask, conf: Settings) -> None:
         token = token_of_request()
         account = resolve_session(token) if token else None
         if account is None:
-            if request.endpoint == oauth.AUTHORIZE_ENDPOINT and request.method == "GET":
-                # Claude открыл согласие неопознанному: на вход и обратно сюда.
-                return redirect(url_for("login", next=request.full_path))
+            if request.method == "GET":
+                # Сессия истекла на открытой странице (согласие OAuth, карточка в
+                # панели реестра): на вход и обратно сюда, а не на главную (D465).
+                # Только чтение: на POST-адрес обратно по GET не вернуться.
+                return redirect(url_for("login", next=request.full_path.rstrip("?")))
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
+        # Пространство вошедшего — и базе (F-037): политики роли приложения
+        # отдают по нему, даже если запрос маршрута забыл условие охвата.
+        setattr(g, SPACE_MARK, enter_space(account.tenant))
         return None
+
+    @app.teardown_request
+    def _снять_пространство(_exc: BaseException | None) -> None:
+        метка = g.pop(SPACE_MARK, None)
+        if метка is not None:
+            leave_space(метка)
 
     def заперто(приговор: Verdict) -> Response:
         """Ответ запертому: та же форма, но со сроком и без сверки пароля.
@@ -548,13 +565,16 @@ def install(app: Flask, conf: Settings) -> None:
 
     app.extensions[GOOGLE_LINK_KEY] = _начать_привязку
 
-    def _обновить_сессию(account: Account, назад: str) -> Response:
+    def _обновить_сессию(account: Account, назад: str, *, arm: bool = True) -> Response:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
         новая = open_session(account)
         if прежний:
             close_session(прежний)
-        return remember(redirect(f"{request.script_root}{назад}"), новая)
+        ответ = redirect(f"{request.script_root}{назад}")
+        if arm:
+            reauth.arm_intent(ответ, account, назад)
+        return remember(ответ, новая)
 
     def _начать_подтверждение(назад: str) -> Response:
         """Увод к Google подтвердить вход; метка и путь возврата — в подписанной куке."""
@@ -593,15 +613,23 @@ def install(app: Flask, conf: Settings) -> None:
             return мимо
         return _обновить_сессию(account, назад)
 
+    def _выполнить_намерение(действие: str) -> Any:
+        # Импорт при вызове: экран «Настроек» сам импортирует `auth`.
+        from . import settings_screen
+
+        return settings_screen.run_intent(conf, действие)
+
     reauth.install(
         app,
         stand=рубеж,
         trusted_proxies=conf.trusted_proxies,
         google_enabled=google is not None,
         rotate=_обновить_сессию,
+        run_intent=_выполнить_намерение,
         begin_google=_начать_подтверждение,
         # Имя ищется в момент вызова: так сверка идёт ровно той дверью, что у входа.
         verify=lambda login, password: authenticate(login, password),
+        secret_key=conf.secret_key,
     )
 
     def _вернуть_привязку(реквизиты: GoogleSettings, метка: str) -> Response:

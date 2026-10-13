@@ -24,6 +24,7 @@ from dataclasses import replace
 from importlib.metadata import PackageNotFoundError, version
 from typing import Any
 
+from src.db.space import acting_space
 from src.domain.permissions import SIDE_HQ, claude_may, side_of
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -569,16 +570,19 @@ def handle(
         открыто = None if role is None else (lambda spec: permits_tool(role, tenant, spec))
         return _result(request_id, {"tools": as_list(открыто)})
     if method == "tools/call":
-        outcome = _call_tool(
-            params,
-            tenant=tenant,
-            checklist=checklist,
-            source=source,
-            may_retract=may_retract,
-            imports=imports,
-            actor=actor,
-            role=role,
-        )
+        # Пространство токена — и базе (F-037): политики роли приложения отдают
+        # по нему, даже если инструмент забыл условие охвата.
+        with acting_space(tenant):
+            outcome = _call_tool(
+                params,
+                tenant=tenant,
+                checklist=checklist,
+                source=source,
+                may_retract=may_retract,
+                imports=imports,
+                actor=actor,
+                role=role,
+            )
         if isinstance(outcome, str):
             return _error(request_id, CODE_INVALID_PARAMS, outcome)
         return _result(request_id, outcome)

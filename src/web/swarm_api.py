@@ -54,6 +54,7 @@ from src.db import (
 )
 from src.db.errors import DbError
 from src.db.reach import Reach
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.domain.tenants import HQ_TENANT
 from src.ratings import feed, maps
 from src.ratings.model import RKO, RS
@@ -522,7 +523,18 @@ def _respond(
 def _serve(
     conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
 ) -> tuple[Response, int]:
-    """Ответить и записать обращение в журнал. Не записалось — 503, а не ответ без следа."""
+    """Ответить и записать обращение в журнал. Не записалось — 503, а не ответ без следа.
+
+    Служебная дверь (F-037): человека за ключом нет, пространства тоже — читает
+    сеть от имени служебной работы, а сужает ответ право и страны ключа.
+    """
+    with acting_space(SYSTEM_SPACE):
+        return _serve_as_system(conf, scope, build)
+
+
+def _serve_as_system(
+    conf: Settings, scope: str, build: Callable[[Settings], dict[str, Any]]
+) -> tuple[Response, int]:
     ответ, статус, токен_id = _respond(conf, scope, build)
     if статус == 429 and токен_id is None:
         # Отказ запертому адресу в журнал не идёт: перебор с него не должен

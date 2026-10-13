@@ -83,6 +83,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "ratings.read",
         "view.overview",
         "view.registry",
+        "view.calendar",
         "view.country",
         "view.ratings",
         "view.users",

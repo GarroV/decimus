@@ -107,13 +107,22 @@
       <section class="ssec ssec--danger">
         <h3 class="ssec__title">{{ t('users.panel.access_title') }}</h3>
         {% if row.disabled_at %}
-          <p class="ssec__text"><span class="sdot"></span>{{ t('users.panel.disabled', date=row.disabled_at.strftime('%Y-%m-%d')) }}</p>
+          <p class="ssec__text"><span class="sdot"></span>{% if row.disabled_by %}{{ t('users.panel.frozen', date=row.disabled_at.strftime('%Y-%m-%d'), by=row.disabled_by) }}{% else %}{{ t('users.panel.frozen_nobody', date=row.disabled_at.strftime('%Y-%m-%d')) }}{% endif %}</p>
+          {% if may_unfreeze %}
+            <form method="post" action="{{ users_url }}/unfreeze?lang={{ lang }}" class="sform">
+              <input type="hidden" name="login" value="{{ row.login }}">
+              <input type="hidden" name="tenant" value="{{ row.tenant }}">
+              <button class="sbtn" type="submit">{{ t('users.unfreeze.open') }}</button>
+            </form>
+          {% else %}
+            <p class="ssec__note">{{ t('users.panel.frozen_note') }}</p>
+          {% endif %}
         {% elif свой %}
-          <p class="ssec__note">{{ t('users.disable.self') }}</p>
+          <p class="ssec__note">{{ t('users.freeze.self') }}</p>
         {% else %}
           <p class="ssec__note">{{ t('users.panel.active') }}</p>
-          {{ confirm('off-' ~ row.id, t('users.disable.open'), t('users.disable.confirm', login=row.login), t('users.disable.yes'),
-                     users_url ~ '/disable?lang=' ~ lang, [('login', row.login), ('tenant', row.tenant)]) }}
+          {{ confirm('off-' ~ row.id, t('users.freeze.open'), t('users.freeze.confirm', login=row.login), t('users.freeze.yes'),
+                     users_url ~ '/freeze?lang=' ~ lang, [('login', row.login), ('tenant', row.tenant)]) }}
         {% endif %}
       </section>
     {% endif %}

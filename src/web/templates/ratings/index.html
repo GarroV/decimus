@@ -17,13 +17,13 @@
 {#- Блок нарушений пустой по двум разным причинам (P16): проверок не было — нет
     данных; проверки были, нарушений нет — «не найдено». Это не одно и то же. -#}
 {% macro vblock(block, kind, title, level) %}
-  {% set has = block.checkups != 0 and block.total != 0 %}
+  {% set has = block.total != 0 %}
   <div class="rt-viol__head"><h{{ level }} class="rt-card__title">{{ title }}</h{{ level }}>
     {% if has %}<span class="rt-stats">
       <span class="rt-stat">{{ t('ratings.violations.total', n='') }}<b>{{ block.total }}</b></span>
       <span class="rt-stat">{{ t('ratings.violations.per', x='') }}<b>{{ ('%.2f'|format(block.per_checkup)) if block.per_checkup is not none else '—' }}</b></span>
     </span>{% endif %}</div>
-  {% if block.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+  {% if not block.has_data %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
   {% elif block.total == 0 %}<div class="rt-empty">{{ t('ratings.empty.violations') }}</div>
   {% else %}
   {% set most = block.top|map(attribute='count')|max %}
@@ -168,11 +168,11 @@
   {% for kind, cluster, by in (('rko', summary.rko_cluster, summary.rko_by_country), ('rs', summary.rs_cluster, summary.rs_by_country)) %}
   <section class="rt-sec" aria-labelledby="rt-{{ kind }}-viol">
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-{{ kind }}-viol">{{ t('ratings.block.' ~ kind ~ '_violations') }}</h2></div>
-    {% if cluster.checkups == 0 %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>{% else %}
+    {% if not cluster.has_data %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>{% else %}
     <div class="rt-card rt-viol__cluster"><div class="rt-card__body">
       {{ vblock(cluster, kind, t('ratings.cluster'), 3) }}
     </div></div>{% endif %}
-    {% if selection.group == 'developer' and summary.countries|length > 1 and cluster.checkups != 0 %}
+    {% if selection.group == 'developer' and summary.countries|length > 1 and cluster.has_data %}
     <div class="rt-viol">
       {% for code in summary.countries %}
       <div class="rt-card"><div class="rt-card__body">
@@ -196,7 +196,7 @@
       {% set units = summary[kind ~ '_' ~ side] %}
       <div class="rt-card"><div class="rt-card__body">
         <h3 class="rt-card__title"><span class="rt-dot rt-dot--{{ 'ok' if side == 'top' else 'err' }}" aria-hidden="true"></span> {{ t('ratings.' ~ kind) }} · {{ t('ratings.' ~ side, x=thr(summary.thresholds.top_threshold)) }}</h3>
-        {% if summary[kind ~ '_cluster'].checkups == 0 and not summary[kind ~ '_top'] and not summary[kind ~ '_bottom'] %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
+        {% if not summary[kind ~ '_cluster'].has_data and not summary[kind ~ '_top'] and not summary[kind ~ '_bottom'] %}<div class="rt-empty">{{ t('ratings.empty.' ~ kind) }}</div>
         {% elif units %}<ol class="rt-rank rt-rank--{{ side }}">{% for u in units %}{{ rank_item(u, kind) }}{% endfor %}</ol>
         {% else %}<div class="rt-empty">{{ t('ratings.empty.' ~ side) }}</div>{% endif %}
       </div></div>
@@ -207,7 +207,7 @@
   {#- Хард-нарушения РС и РКО — одна таблица с фильтром по странам (11.10.2026).
       Без проверок за период — «нет данных», а не «чисто» (P16, P37). -#}
   {% set hard_rows = [] %}{% for v in summary.rs_hard %}{% set _ = hard_rows.append(('rs', v)) %}{% endfor %}{% for v in summary.rko_hard %}{% set _ = hard_rows.append(('rko', v)) %}{% endfor %}
-  {% set no_data = [] %}{% for kind in ('rs', 'rko') %}{% if summary[kind ~ '_cluster'].checkups == 0 %}{% set _ = no_data.append(kind) %}{% endif %}{% endfor %}
+  {% set no_data = [] %}{% for kind in ('rs', 'rko') %}{% if not summary[kind ~ '_cluster'].has_data %}{% set _ = no_data.append(kind) %}{% endif %}{% endfor %}
   <section class="rt-sec" aria-labelledby="rt-hard" data-rt-filtered>
     <div class="rt-sec__head"><h2 class="rt-sec__title" id="rt-hard">{{ t('ratings.block.hard') }}</h2>{% if hard_rows %}<span class="rt-sec__meta num">{{ hard_rows|length }}</span>{% endif %}</div>
     {% if no_data|length == 2 %}<div class="rt-empty">{{ t('ratings.empty.rs_rko') }}</div>
