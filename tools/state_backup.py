@@ -11,6 +11,11 @@
 Бэкап площадки сегодня умеет только дампы Postgres (задача по метке
 `backup.pgdump=true`), ретеншн 14 суток — отсюда умолчание `BACKUP_KEEP_DAYS`.
 
+ВНИМАНИЕ: архив НЕ зашифрован — открытый tar.gz, в котором лежат связки доступа
+и папки проверок. Файл получает права 0600, но шифрования это не заменяет.
+На проде бэкап идёт через restic (с шифрованием), этот инструмент — для
+ноутбука или ручного случая; архив держать только в каталоге с закрытым доступом.
+
 Запуск (в контейнере стенда):
 
     python tools/state_backup.py
@@ -58,6 +63,14 @@ ROSTER_IN_ARCHIVE_LINE = f"Связки доступа ({ROSTER_RELATIVE_PATH}) 
 ROSTER_ABSENT_LINE = "Связок нет: на этом стенде ещё никто не приглашён."
 
 SECONDS_PER_DAY = 86400
+
+#: Права файла архива: читает только владелец.
+ARCHIVE_MODE = 0o600
+
+UNENCRYPTED_WARNING = (
+    "ВНИМАНИЕ: архив не зашифрован (открытый tar.gz, права 0600). "
+    "На проде бэкап идёт через restic; этот инструмент — для ноутбука или ручного случая."
+)
 
 
 class BackupError(Exception):
@@ -136,6 +149,9 @@ def _write_archive(state_dir: Path, archive_path: Path) -> list[str]:
                 относительный = файл.relative_to(state_dir).as_posix()
                 архив.add(файл, arcname=относительный)
                 имена.append(относительный)
+        # Права ставятся ДО переименования: на месте бэкапа файл никогда не
+        # лежит с правами шире 0600.
+        os.chmod(tmp_path, ARCHIVE_MODE)
         os.replace(tmp_path, archive_path)
     except BaseException:
         tmp_path.unlink(missing_ok=True)
@@ -237,6 +253,7 @@ def _print_result(result: BackupResult) -> None:
     print(f"Файлов в архиве: {result.file_count}")
     print(f"Размер архива: {result.archive_size} байт")
     print(result.roster_line)
+    print(UNENCRYPTED_WARNING)
     for имя in result.removed:
         print(f"Удалён старый бэкап: {имя}")
 

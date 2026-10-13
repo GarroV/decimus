@@ -14,9 +14,11 @@ Migros ходит через домашний сервер, а тот засып
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import urllib.request
 from collections.abc import Mapping, Sequence
+from urllib.parse import urlsplit
 
 from .collect import Outcome
 
@@ -47,11 +49,30 @@ _TEXT = {
 }
 
 
+def _is_internal_host(host: str) -> bool:
+    """Внутреннее имя: localhost, имя без точки (сеть docker) или локальный адрес."""
+    if host == "localhost" or "." not in host:
+        return True
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return False  # имя с точкой — публичное
+    return address.is_loopback or address.is_private
+
+
 def channel(env: Mapping[str, str]) -> tuple[str, str] | None:
-    """Адрес `/notify` канала и ключ; чего-то нет — уведомление выключено."""
+    """Адрес `/notify` канала и ключ; чего-то нет — уведомление выключено.
+
+    `http://` годится только для внутреннего имени (localhost, имя без точки);
+    внешний хост по открытому http — тоже выключено, нужен https.
+    """
     base = (env.get(URL_VAR) or "").strip().rstrip("/")
     secret = (env.get(SECRET_VAR) or "").strip()
     if not base.startswith(("http://", "https://")) or not secret:
+        return None
+    # Ключ канала уходит заголовком: по открытому http через интернет он ушёл бы
+    # читаемым. http — только для внутренних имён, иначе https обязателен.
+    if base.startswith("http://") and not _is_internal_host(urlsplit(base).hostname or ""):
         return None
     return f"{base}/notify", secret
 
