@@ -390,7 +390,7 @@ def test_журнал_не_пишет_почту_целиком(
 
 
 def test_до_ухода_к_google_сказано_что_пароль_закроется(ук: FlaskClient) -> None:
-    страница = ук.get("/settings").get_data(as_text=True)
+    страница = ук.get("/settings?tile=google").get_data(as_text=True)
 
     assert "Привязать Google" in страница
     assert "вход паролем для этой учётки закроется" in страница
@@ -399,7 +399,7 @@ def test_до_ухода_к_google_сказано_что_пароль_закро
 
 def test_без_реквизитов_привязки_нет(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, google=False):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=google").get_data(as_text=True)
 
         assert "Привязать Google" not in страница
         assert "привязать почту пока нельзя" in страница
@@ -409,7 +409,7 @@ def test_снять_почту_можно_только_с_паролем(
     monkeypatch: pytest.MonkeyPatch, база: База, caplog: pytest.LogCaptureFixture
 ) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="guest", email=ПОЧТА_УК):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=google").get_data(as_text=True)
         assert "Отвязать Google" in страница and "только зная пароль учётки" in страница
 
         пусто = client.post("/settings/google-unlink", data={}, headers=ЗАГОЛОВКИ)

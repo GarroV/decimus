@@ -60,7 +60,7 @@ def test_без_имени_бота_ссылки_нет_и_переменная_
     подменить_двери(monkeypatch, tenant="GE")
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=bot").get_data(as_text=True)
         ответ = client.post("/settings/bot-link", headers=ЗАГОЛОВКИ)
     assert "WEB_BOT_USERNAME" in страница and "/settings/bot-link" not in страница
     assert ответ.status_code == 503 and выпуски == []
@@ -83,7 +83,7 @@ def test_привязанный_видит_свой_telegram_и_может_от�
     monkeypatch.setattr(bot_links, "unbind", lambda u: отвязано.append(u) or True)
     with собрать(tenant="HQ", bot_username=БОТ).test_client() as client:
         войти(client)
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=bot").get_data(as_text=True)
         ответ = client.post("/settings/bot-unlink", headers=ЗАГОЛОВКИ)
     assert "501" in страница and "2026-10-01 09:30" in страница
     assert ответ.status_code == 200 and отвязано == [Учётка().id]
