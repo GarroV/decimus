@@ -289,16 +289,20 @@ class Выпуски:
         monkeypatch.setattr(users_mcp, "issue_own", _issue)
 
 
-def _подтвердить_паролем(client: FlaskClient) -> None:
-    ответ = client.post(
+def _подтвердить_паролем(client: FlaskClient) -> Any:
+    return client.post(
         reauth.CONFIRM_PATH,
         data={"password": "верный-пароль", "next": "/settings#claude-token"},
         headers=ЗАГОЛОВКИ,
     )
-    assert ответ.status_code == 302 and ответ.headers["Location"] == "/settings#claude-token"
 
 
-def test_после_подтверждения_токен_выпускается_сам_и_один_раз(
+def _заряжено_через_google(client: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Подтверждение через Google заряжает намерение, но само его не выполняет."""
+    _через_google(client, monkeypatch, почта=ПОЧТА, домен="dodobrands.io")
+
+
+def test_после_подтверждения_паролем_токен_выпускается_сразу_и_один_раз(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
@@ -306,7 +310,28 @@ def test_после_подтверждения_токен_выпускается
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
         assert выпуски.число == 0
 
-        _подтвердить_паролем(client)
+        страница = _подтвердить_паролем(client)
+
+        assert выпуски.число == 1
+        assert "СЕКРЕТНАЯ-КОМАНДА" in страница.get_data(as_text=True)
+        assert страница.headers["Cache-Control"] == "no-store"
+        # Новая сессия приехала в этом же ответе.
+        assert any(
+            кука.startswith(auth.COOKIE_NAME) for кука in страница.headers.getlist("Set-Cookie")
+        )
+        # Повтор подтверждения: намерение снято тем же ответом — второго выпуска нет.
+        повтор = _подтвердить_паролем(client)
+        assert выпуски.число == 1
+        assert "СЕКРЕТНАЯ-КОМАНДА" not in повтор.get_data(as_text=True)
+
+
+def test_после_подтверждения_через_google_токен_выпускается_кнопкой_и_один_раз(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА):
+        выпуски = Выпуски(monkeypatch)
+        _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
+        _заряжено_через_google(client, monkeypatch)
         # GET — чистое чтение: заряженное намерение здесь ничего не выпускает.
         assert "СЕКРЕТНАЯ-КОМАНДА" not in client.get("/settings").get_data(as_text=True)
         assert выпуски.число == 0
@@ -316,7 +341,6 @@ def test_после_подтверждения_токен_выпускается
         assert выпуски.число == 1
         assert "СЕКРЕТНАЯ-КОМАНДА" in страница.get_data(as_text=True)
         assert страница.headers["Cache-Control"] == "no-store"
-        # Повтор: намерение снято тем же ответом — второй POST ничего не выпускает.
         повтор = client.post("/settings/continue", headers=ЗАГОЛОВКИ)
         assert выпуски.число == 1
         assert "СЕКРЕТНАЯ-КОМАНДА" not in повтор.get_data(as_text=True)
@@ -325,10 +349,10 @@ def test_после_подтверждения_токен_выпускается
 def test_get_настроек_с_заряженным_намерением_ничего_не_выпускает(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА):
         выпуски = Выпуски(monkeypatch)
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
-        _подтвердить_паролем(client)
+        _заряжено_через_google(client, monkeypatch)
 
         for _ in range(3):
             client.get("/settings")
@@ -337,10 +361,10 @@ def test_get_настроек_с_заряженным_намерением_ни�
 
 
 def test_продолжить_чужой_страницей_не_выполняется(monkeypatch: pytest.MonkeyPatch) -> None:
-    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА):
         выпуски = Выпуски(monkeypatch)
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
-        _подтвердить_паролем(client)
+        _заряжено_через_google(client, monkeypatch)
 
         ответ = client.post("/settings/continue", headers={"Origin": "https://evil.example"})
 
@@ -377,10 +401,10 @@ def test_намерение_без_подтверждения_не_выполн�
 
 
 def test_подделанное_и_чужое_намерение_не_выполняется(monkeypatch: pytest.MonkeyPatch) -> None:
-    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА):
         выпуски = Выпуски(monkeypatch)
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
-        _подтвердить_паролем(client)
+        _заряжено_через_google(client, monkeypatch)
         app = client.application
         подпись = app.extensions[reauth.INTENT_SIGNER_KEY]
 
@@ -410,10 +434,10 @@ def test_снятие_почты_само_не_выполняется(monkeypatc
 
 
 def test_намерение_не_переживает_срок(monkeypatch: pytest.MonkeyPatch) -> None:
-    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, email=ПОЧТА):
         выпуски = Выпуски(monkeypatch)
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
-        _подтвердить_паролем(client)
+        _заряжено_через_google(client, monkeypatch)
         monkeypatch.setattr(reauth, "INTENT_TTL_SECONDS", -1)
 
         client.post("/settings/continue", headers=ЗАГОЛОВКИ)

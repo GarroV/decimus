@@ -178,12 +178,7 @@ def install(app: Flask, conf: Settings) -> None:
             ответ = redirect(f"{request.script_root}{base}")
             reauth.drop_intent(ответ)
             return ответ
-        # Право то же, что у кнопки: ссылка бота — по матрице `inspection.conduct`.
-        if действие == "bot-link" and not guard.may("inspection.conduct"):
-            return guard.forbidden()
-        # Тем же кодом, что кнопка; намерение снимается этим же ответом.
-        итог = _RUN_INTENT[действие](conf, base)
-        ответ = make_response(итог)
+        ответ = make_response(run_intent(conf, действие))
         reauth.drop_intent(ответ)
         # Токен и ссылка в ответе показываются один раз — не в кэше.
         ответ.headers["Cache-Control"] = "no-store"
@@ -267,6 +262,17 @@ _RUN_INTENT = {
     "google-link": _start_google_link,
     "claude-token": _issue_claude_token,
 }
+
+
+def run_intent(conf: Settings, action: str) -> Any:
+    """Выполнить намерение тем же кодом, что кнопка, и с тем же правом.
+
+    Зовут `POST /settings/continue` и подтверждение паролем (`reauth`): ссылка
+    бота — по матрице `inspection.conduct`, как у кнопки.
+    """
+    if action == "bot-link" and not guard.may("inspection.conduct"):
+        return guard.forbidden()
+    return _RUN_INTENT[action](conf, section("settings").path)
 
 
 def _install_bot(app: Flask, base: str, conf: Settings) -> None:
