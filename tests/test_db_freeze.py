@@ -16,17 +16,20 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import shutil
 from datetime import timedelta
+from pathlib import Path
 from typing import Any
 
 import pytest
 from conftest import requires_db
-from db_harness import привязать_бота
+from db_harness import empty_database, привязать_бота
 
 psycopg = pytest.importorskip("psycopg")
 
 from src.db import bot_links, mcp_access  # noqa: E402
 from src.db.errors import OAuthGrantError  # noqa: E402
+from src.db.migrate import MIGRATIONS_DIR, apply_migrations  # noqa: E402
 from src.db.oauth_store import (  # noqa: E402
     Client,
     RegistrationLimits,
@@ -41,6 +44,7 @@ from src.db.web_access import (  # noqa: E402
     freeze_account,
     list_accounts,
     open_session,
+    password_hash,
     resolve_session,
     sign_out_everywhere,
     unfreeze_account,
@@ -342,3 +346,107 @@ def test_после_выйти_везде_входит_заново(анна: Ч
     учётка = authenticate("anna", ПАРОЛЬ)
     assert учётка is not None
     assert resolve_session(open_session(учётка).token) is not None
+
+
+# --- сбой одного шага и возврат учётки: всё закрывается и не оживает ---------------
+
+
+@pytest.mark.parametrize("дверь", ДВЕРИ)
+def test_отключение_мимо_триггера_разморозка_закрывает_всё(
+    pg_dsn: str, анна: Человек, дверь: str
+) -> None:
+    """Отключение, сделанное до `0063` или мимо триггера, не должно воскреснуть при разморозке."""
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("alter table web_users disable trigger web_users_freeze_cascade")
+        cur.execute(
+            "alter table web_users disable trigger web_users_access_change_revokes_mcp_tokens"
+        )
+        cur.execute("update web_users set disabled_at = now() where id = %s", (анна.id,))
+        cur.execute("alter table web_users enable trigger web_users_freeze_cascade")
+        cur.execute(
+            "alter table web_users enable trigger web_users_access_change_revokes_mcp_tokens"
+        )
+
+    assert unfreeze_account("anna", tenant=ТЕНАНТ)
+
+    assert not анна.живое()[дверь], f"дверь «{дверь}» пережила отключение мимо триггера"
+
+
+@pytest.mark.parametrize("дверь", ["Claude access", "Claude refresh"])
+def test_токен_oauth_не_оживает_даже_без_отметки_отзыва(
+    pg_dsn: str, анна: Человек, дверь: str
+) -> None:
+    """Токены гаснут и сроком: снятая отметка отзыва подключения их не воскрешает."""
+    freeze_account("anna", tenant=ТЕНАНТ)
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute(
+            "update oauth_grants set revoked_at = null, revoked_reason = null where user_id = %s",
+            (анна.id,),
+        )
+    unfreeze_account("anna", tenant=ТЕНАНТ)
+
+    assert not анна.живое()[дверь]
+
+
+def test_выйти_везде_гасит_и_срок_токенов_oauth(pg_dsn: str, анна: Человек) -> None:
+    sign_out_everywhere(анна.сессия)
+
+    (живых,) = _строка(
+        pg_dsn,
+        "select count(*) from oauth_tokens t join oauth_grants g on g.id = t.grant_id "
+        "where g.user_id = %s and t.expires_at > now()",
+        анна.id,
+    )
+    assert живых == 0
+
+
+# --- накат `0063`: учётки, отключённые раньше -----------------------------------------
+
+МИГРАЦИЯ = "0063_freeze.sql"
+
+
+def _каталог(tmp_path: Path, *, включая: bool) -> Path:
+    каталог = tmp_path / ("по" if включая else "до")
+    каталог.mkdir()
+    for файл in sorted(MIGRATIONS_DIR.glob("*.sql")):
+        if файл.name < МИГРАЦИЯ or (включая and файл.name == МИГРАЦИЯ):
+            shutil.copy(файл, каталог / файл.name)
+    return каталог
+
+
+def test_накат_закрывает_всё_у_ранее_отключённых(tmp_path: Path) -> None:
+    хеш = password_hash("пароль-учётки-теста")
+    with empty_database() as dsn:
+        apply_migrations(dsn, directory=_каталог(tmp_path, включая=False))
+        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute("insert into tenants (code) values ('HQ') on conflict do nothing")
+            ids = {}
+            for логин in ("stary", "zhivoy"):
+                cur.execute(
+                    "insert into web_users (tenant_code, login, password_hash, role) "
+                    "values ('HQ', %s, %s, 'admin') returning id",
+                    (логин, хеш),
+                )
+                ids[логин] = cur.fetchone()[0]  # type: ignore[index]
+                cur.execute(
+                    "insert into web_sessions (user_id, fingerprint, expires_at) "
+                    "values (%s, %s, now() + interval '1 hour')",
+                    (ids[логин], f"{len(ids):064x}"),
+                )
+                cur.execute(
+                    "insert into bot_bindings (telegram_id, user_id) values (%s, %s)",
+                    (len(ids), ids[логин]),
+                )
+            # Отключён ДО миграции: сессия и привязка бота остались живыми (`0059` гасил
+            # только токены MCP).
+            cur.execute("update web_users set disabled_at = now() where login = 'stary'")
+
+        assert apply_migrations(dsn, directory=_каталог(tmp_path, включая=True)) == [МИГРАЦИЯ]
+
+        with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+            cur.execute(
+                "select u.login, s.closed_at is not null, b.unbound_at is not null "
+                "from web_users u join web_sessions s on s.user_id = u.id "
+                "join bot_bindings b on b.user_id = u.id order by u.login"
+            )
+            assert cur.fetchall() == [("stary", True, True), ("zhivoy", False, False)]
