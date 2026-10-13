@@ -395,7 +395,7 @@
 | `0061_web_own_google_lang.sql` | `web_google_link_states` |
 | `0062_space_isolation.sql` | — |
 | `0063_freeze.sql` | — |
-| `0064_web_own_google_profile.sql` | — |
+| `0065_web_own_google_profile.sql` | — |
 <!-- map:end -->
 
 ## Makefile

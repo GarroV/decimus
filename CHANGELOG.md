@@ -14,7 +14,7 @@
 фото скачивается один раз и отдаётся со своего адреса `GET /settings/avatar` (только своё,
 `private`), политика источников остаётся `img-src 'self'`. Скачивание — только `https` с
 `*.googleusercontent.com`, без редиректов, не больше 200 КБ, тип по сигнатуре байт; сбой не
-ломает вход. Миграция `0064` (колонки `web_users.display_name`, `avatar`, `avatar_type`,
+ломает вход. Миграция `0065` (колонки `web_users.display_name`, `avatar`, `avatar_type`,
 `avatar_etag`, функция `set_own_google_profile`).
 ## 2026-10-13 — «Заморозить» и «Выйти везде» (D462, шаг 1)
 
