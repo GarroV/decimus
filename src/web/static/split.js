@@ -6,6 +6,8 @@
 //     из ответа берётся панель; адрес меняется, «назад» браузера работает);
 //   * закрытие с анимацией выезда, по Esc и по щелчку на затемнении;
 //   * фильтры применяются сразу при выборе, кнопка «Показать» прячется;
+//   * действия в панели проверки (`form[data-panel-form]`) уходят фоном, ответ
+//     подменяет карточку, панель остаётся открытой (D465);
 //   * «Скопировать» у одноразового пароля;
 //   * в форме «Новый человек» роли сужаются под выбранное пространство.
 (function () {
@@ -46,15 +48,39 @@
     if (push) history.pushState({ split: true }, "", href);
   }
 
+  // Вход истёк: сервер уже увёл запрос на форму входа с `next=` на этот адрес
+  // (`auth._guard`) — идём туда целиком, и после входа вернёмся на ту же панель.
+  function loginWithNext(loginUrl) {
+    var u = new URL(loginUrl);
+    if (u.searchParams.has("next")) return loginUrl;
+    // Ответ на действие (POST) уводит на вход без адреса возврата: добавляем тот
+    // же, что у `auth._guard` — путь внутри приложения, без префикса площадки.
+    var root = u.pathname.replace(/\/+$/, "").slice(0, -"/login".length);
+    var here = window.location.pathname;
+    if (root && here.indexOf(root) === 0) here = here.slice(root.length);
+    u.searchParams.set("next", here + window.location.search);
+    return u.toString();
+  }
+
+  function wentToLogin(r) {
+    return r.redirected && new URL(r.url).pathname.replace(/\/+$/, "").endsWith("/login");
+  }
+
   // Панель из ответа сервера: страница целиком, из неё берётся только панель.
-  // Не вышло (сеть, вход истёк, панели нет) — обычный переход по ссылке.
+  // Не вышло (сеть, панели нет) — обычный переход по ссылке; истёкший вход —
+  // на форму входа с возвратом сюда.
   function openDrawer(href, push) {
     fetch(href, { credentials: "same-origin", headers: { Accept: "text/html" } })
       .then(function (r) {
+        if (wentToLogin(r)) {
+          window.location.href = loginWithNext(r.url);
+          return null;
+        }
         if (!r.ok || r.redirected) throw new Error("status");
         return r.text();
       })
       .then(function (html) {
+        if (html === null) return;
         var doc = new DOMParser().parseFromString(html, "text/html");
         var next = doc.querySelector("[data-drawer]");
         if (!next && !push) {
@@ -104,6 +130,107 @@
   // «Назад» браузера: адрес уже сменился — панель приводится к нему.
   window.addEventListener("popstate", function () {
     openDrawer(window.location.href, false);
+  });
+
+  function refreshList() {
+    fetch(window.location.href, { credentials: "same-origin", headers: { Accept: "text/html" } })
+      .then(function (r) {
+        return r.ok && !r.redirected ? r.text() : null;
+      })
+      .then(function (html) {
+        if (!html) return;
+        var fresh = new DOMParser().parseFromString(html, "text/html").querySelector(".split__list");
+        var list = document.querySelector(".split__list");
+        if (!fresh || !list) return;
+        list.innerHTML = fresh.innerHTML;
+        markCurrent(window.location.href);
+      })
+      .catch(function () {});
+  }
+
+  function panelFailed(body) {
+    var panel = body.querySelector(".spanel");
+    var note = document.createElement("div");
+    note.className = "note note--error";
+    note.setAttribute("role", "alert");
+    note.innerHTML = '<div class="note__text"></div>';
+    note.firstChild.textContent = panel ? panel.dataset.netError || "" : "";
+    var old = body.querySelector(".note[data-net-note]");
+    if (old) old.remove();
+    note.setAttribute("data-net-note", "");
+    if (panel) panel.querySelector(".sdetail__head").after(note);
+  }
+
+  // Действие в панели — фоном: форму принимает сервер, обратно приходит та же
+  // карточка с итогом («принята» или причина отказа), и панель остаётся открытой
+  // на том же месте. Не вышло дойти до сервера — сказано в панели, форма цела.
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form.matches || !form.matches("[data-drawer] form[data-panel-form]")) return;
+    if (!window.fetch || !window.FormData) return;
+    e.preventDefault();
+    var body = form.closest(".sdrawer__body");
+    var top = body.scrollTop;
+    var buttons = form.querySelectorAll("button[type=submit]");
+    buttons.forEach(function (b) {
+      b.disabled = true;
+    });
+    fetch(form.action, {
+      method: "POST",
+      body: new FormData(form),
+      credentials: "same-origin",
+      headers: { "X-Panel": "1" },
+    })
+      .then(function (r) {
+        if (wentToLogin(r)) {
+          window.location.href = loginWithNext(r.url);
+          return null;
+        }
+        return r.text().then(function (html) {
+          return { ok: r.ok, html: html };
+        });
+      })
+      .then(function (res) {
+        if (res === null) return;
+        var tpl = document.createElement("template");
+        tpl.innerHTML = res.html;
+        var next = tpl.content.querySelector(".spanel");
+        if (!res.ok || !next) throw new Error("status");
+        var node = document.importNode(next, true);
+        body.querySelector(".spanel").replaceWith(node);
+        bind(node);
+        body.scrollTop = top;
+        var note = node.querySelector(".note--ok, .note--error");
+        if (note) note.scrollIntoView({ block: "nearest" });
+        refreshList();
+      })
+      .catch(function () {
+        buttons.forEach(function (b) {
+          b.disabled = false;
+        });
+        panelFailed(body);
+      });
+  });
+
+  // «Исправить» на проверке, ждущей приёмки: раскрыть формы правки записей в
+  // листе вычитки и подвести к нему (повторный щелчок — свернуть).
+  document.addEventListener("click", function (e) {
+    var toggle = e.target.closest("[data-edit-toggle]");
+    if (!toggle) return;
+    var sheet = document.getElementById("review");
+    if (!sheet) return;
+    e.preventDefault();
+    var on = toggle.getAttribute("aria-pressed") !== "true";
+    toggle.setAttribute("aria-pressed", on ? "true" : "false");
+    sheet.querySelectorAll("details.review-revise").forEach(function (d) {
+      d.open = on;
+    });
+    if (on) {
+      sheet.querySelectorAll("details.review-zone").forEach(function (d) {
+        d.open = true;
+      });
+      sheet.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
   });
 
   function bind(root) {

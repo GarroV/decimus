@@ -58,12 +58,15 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.search": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.search.apply": {"ru": "Найти", "en": "Search"},
     "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
-    "registry.history": {"ru": "История", "en": "History"},
+    "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
+    "registry.accepted.hint": {
+        "ru": "Период и отбор действуют только на принятые проверки, новые — сверху.",
+        "en": "The period and filters apply to accepted inspections only, newest first.",
+    },
 }
 
 _PANEL: dict[str, dict[str, str]] = {
     "registry.drawer.title": {"ru": "Проверка", "en": "Inspection"},
-    "registry.panel.open": {"ru": "Открыть полностью", "en": "Open in full"},
     "registry.panel.pick_title": {"ru": "Выберите проверку", "en": "Pick an inspection"},
     "registry.panel.pick_text": {
         "ru": "Карточка откроется здесь: оценка, потери по блокам, записи и действия.",
@@ -82,21 +85,22 @@ _PANEL: dict[str, dict[str, str]] = {
         "en": "The card did not open just now",
     },
     "registry.panel.failed.text": {
-        "ru": "База не ответила на запрос карточки. Список жив; откройте проверку полностью.",
-        "en": "The database did not answer for the card. The list works; open it in full.",
+        "ru": "База не ответила на запрос карточки. Список жив; откройте проверку ещё раз.",
+        "en": "The database did not answer for the card. The list works; try opening it again.",
     },
     "registry.panel.score": {"ru": "Итог", "en": "Total"},
     "registry.panel.facts": {"ru": "Проверка", "en": "Inspection"},
     "registry.panel.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.panel.kind": {"ru": "Вид", "en": "Kind"},
     "registry.panel.checklist": {"ru": "Чек-лист", "en": "Checklist"},
-    "registry.panel.findings_more": {
-        "ru": "Ещё {n} — в полной карточке",
-        "en": "{n} more in the full card",
+    "registry.panel.retry": {"ru": "Повторить", "en": "Try again"},
+    "registry.panel.net_error": {
+        "ru": "Не удалось связаться с сервером. Попробуйте ещё раз.",
+        "en": "Could not reach the server. Please try again.",
     },
 }
 
-# «Где нужно проверить» над списком (D399, перенесено с «Главной» в D418).
+# «Где нужно проверить» (D399; с «Главной» на «Проверки» в D418, оттуда в «Календарь» в D466).
 _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
     "registry.tocheck.hint": {
@@ -106,6 +110,10 @@ _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
     "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
     "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "calendar.tocheck.empty": {
+        "ru": "За этот период проверять нечего: у каждой точки охвата есть проверка.",
+        "en": "Nothing to inspect in this period: every unit in reach has an inspection.",
+    },
     "registry.tocheck.failed": {
         "ru": "Список не загрузился: база не ответила. Обновите страницу.",
         "en": "The list did not load: the database did not answer. Reload the page.",
