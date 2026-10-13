@@ -366,4 +366,146 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "action was stopped to keep data from going to the wrong place. Please contact the "
         "administrator.",
     },
+    # --- действия над проверкой: белый список отказов (F-012; `db_refusal.domain_reason`) -
+    "refusal.domain_generic": {
+        "ru": "Действие не выполнено. Попробуйте позже; если повторяется — обратитесь к "
+        "администратору.",
+        "en": "The action was not completed. Please try again later; if it keeps happening, "
+        "contact the administrator.",
+    },
+    "refusal.domain.inspection_not_found": {
+        "ru": "Такой проверки в вашем пространстве нет.",
+        "en": "There is no such inspection in your space.",
+    },
+    "refusal.domain.retract_reason_required": {
+        "ru": "Не названа причина отклонения: она обязательна, без неё пометка неотличима от "
+        "подчистки истории.",
+        "en": "The rejection reason is missing. It is required: without it the mark cannot be "
+        "told from erased history.",
+    },
+    "refusal.domain.retract_referenced": {
+        "ru": "На эту проверку уже сослались как на исходную: {refs}. Сначала разберитесь со "
+        "ссылающимися проверками.",
+        "en": "This inspection is already referenced as the original by: {refs}. Deal with the "
+        "referencing inspections first.",
+    },
+    "refusal.domain.retract_not_submitted": {
+        "ru": "Отклонить можно только сданную проверку: принятую или ждущую приёмки.",
+        "en": "Only a submitted inspection can be rejected: an accepted one or one awaiting "
+        "acceptance.",
+    },
+    "refusal.domain.retract_storage": {
+        "ru": "Проверка помечена отклонённой, но часть кадров убрать не удалось. Повторите "
+        "отклонение — оно доделает остаток.",
+        "en": "The inspection is marked rejected, but some photos could not be removed. Repeat "
+        "the rejection to finish the rest.",
+    },
+    "refusal.domain.accept_rejected": {
+        "ru": "Проверка отклонена — отклонённую не подтверждают.",
+        "en": "The inspection is rejected; a rejected inspection cannot be accepted.",
+    },
+    "refusal.domain.accept_already": {
+        "ru": "Проверка уже принята — подтверждать второй раз нечего.",
+        "en": "The inspection is already accepted; there is nothing to accept again.",
+    },
+    "refusal.domain.accept_plan_failed": {
+        "ru": "Проверка не подтверждена: вместе с ней должен был завестись запрос экшн-плана, а "
+        "он не завёлся. Проверка осталась на приёмке; попробуйте ещё раз или обратитесь к "
+        "администратору.",
+        "en": "The inspection was not accepted: the action plan request that goes with it could "
+        "not be created. It stays awaiting acceptance; try again or contact the "
+        "administrator.",
+    },
+    "refusal.domain.move_reason_required": {
+        "ru": "Не назван повод исправления: история исправлений обязательна.",
+        "en": "The reason for the correction is missing: the correction history is required.",
+    },
+    "refusal.domain.move_unit_invalid": {
+        "ru": "Пиццерия не выбрана или указана неверно.",
+        "en": "The pizzeria is not selected or is invalid.",
+    },
+    "refusal.domain.move_date_invalid": {
+        "ru": "Дата не указана или указана не в формате ГГГГ-ММ-ДД.",
+        "en": "The date is missing or not in the YYYY-MM-DD format.",
+    },
+    "refusal.domain.revise_text_empty": {
+        "ru": "Формулировка записи пуста: запись без слов в отчёт не идёт.",
+        "en": "The record wording is empty: a record without words does not go into the report.",
+    },
+    "refusal.domain.revise_text_long": {
+        "ru": "Формулировка длиннее {max} знаков.",
+        "en": "The wording is longer than {max} characters.",
+    },
+    "refusal.domain.revise_checklist": {
+        "ru": "Чек-лист этой проверки не прочитан, сверять не с чем.",
+        "en": "The checklist of this inspection could not be read, so there is nothing to check "
+        "against.",
+    },
+    "refusal.domain.revise_no_item": {
+        "ru": "Пункта нарушения {item} в чек-листе версии этой проверки нет.",
+        "en": "There is no violation item {item} in the checklist version of this inspection.",
+    },
+    "refusal.domain.revise_bad_level": {
+        "ru": "Класс {level} для пункта {item} не предусмотрен. Допустимы: {allowed}.",
+        "en": "Class {level} is not provided for item {item}. Allowed: {allowed}.",
+    },
+    "refusal.domain.revise_no_zone": {
+        "ru": "Зоны {zone} в чек-листе версии этой проверки нет.",
+        "en": "There is no zone {zone} in the checklist version of this inspection.",
+    },
+    "refusal.domain.revise_foreign": {
+        "ru": "Исправлять можно только проверки своего пространства.",
+        "en": "Only inspections of your own space can be corrected.",
+    },
+    "refusal.domain.revise_accepted": {
+        "ru": "Проверка уже принята: записи принятой не исправляются. Поправить можно только "
+        "шапку, под журналом.",
+        "en": "The inspection is already accepted: its records are not edited. Only the header "
+        "can be corrected, below the log.",
+    },
+    "refusal.domain.revise_rejected": {
+        "ru": "Проверка отклонена: её записи не исправляют.",
+        "en": "The inspection is rejected: its records are not edited.",
+    },
+    "refusal.domain.revise_no_finding": {
+        "ru": "Такой записи в этой проверке нет.",
+        "en": "There is no such record in this inspection.",
+    },
+    "refusal.domain.revise_recalc": {
+        "ru": "Пересчитать проверку не удалось, изменения не сохранены. Попробуйте ещё раз или "
+        "обратитесь к администратору.",
+        "en": "The inspection could not be rescored and nothing was saved. Try again or contact "
+        "the administrator.",
+    },
+    "refusal.domain.revise_pair_taken": {
+        "ru": "Пункт {code} в этой зоне уже записан: одна пара «пункт + зона» — одна запись.",
+        "en": "Item {code} is already recorded in this zone: one item + zone pair is one record.",
+    },
+    "refusal.domain.revise_stale": {
+        "ru": "Изменение не записано: проверка уже подтверждена или записи больше нет. Обновите "
+        "страницу.",
+        "en": "The change was not saved: the inspection is already accepted or the record is "
+        "gone. Reload the page.",
+    },
+    "refusal.domain.revise_findings_limit": {
+        "ru": "В проверке уже {max} записей: больше не принимается.",
+        "en": "The inspection already has {max} records: no more are accepted.",
+    },
+    "refusal.domain.photo_limit_finding": {
+        "ru": "У записи уже {max} кадров: больше нельзя.",
+        "en": "The record already has {max} photos: no more allowed.",
+    },
+    "refusal.domain.photo_limit_inspection": {
+        "ru": "У проверки уже {max} кадров: больше нельзя.",
+        "en": "The inspection already has {max} photos: no more allowed.",
+    },
+    "refusal.domain.photo_storage": {
+        "ru": "Хранилище кадров не приняло кадр, он не приложен. Повторите позже.",
+        "en": "The photo storage did not accept the photo, so it was not attached. Please try "
+        "again later.",
+    },
+    "refusal.domain.photo_no_photo": {
+        "ru": "Такого кадра у записей этой проверки нет.",
+        "en": "There is no such photo among this inspection's records.",
+    },
 }

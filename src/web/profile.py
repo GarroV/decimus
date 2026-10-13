@@ -75,7 +75,7 @@ def change_own(
         if попытка.verdict.locked:
             return _заперто(попытка.verdict)
         return Outcome(WRONG, 400)
-    note_success(tenant=stand, address=address, login=login)
+    note_success(tenant=stand, login=login)
     return Outcome(OK, 200)
 
 
