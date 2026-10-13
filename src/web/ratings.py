@@ -24,10 +24,11 @@ from werkzeug.wrappers import Response
 
 from src.db import agg_store, maps_store
 from src.db import ratings_read as read
+from src.db import ratings_sync as sheet_state
 from src.db.errors import RatingsError
 from src.db.ratings_read import REFUSED_SETTING, RatingsEditError
 from src.domain.tenants import may_manage_ratings
-from src.ratings import coverage, pointer, report
+from src.ratings import coverage, pointer, report, sheet_sync
 from src.ratings import layout as rl
 from src.ratings import maps as rmaps
 from src.ratings.aggregators import collect, glovo_link, migros_link
@@ -39,7 +40,7 @@ from src.ratings.model import RatingsFormatError
 from src.ratings.periods import KIND_RANGE, KIND_RATING, ReportPeriod
 from src.ratings.pointer import GOOGLE
 
-from . import auth, guard, ratings_calendar, ui_lang
+from . import auth, guard, ratings_calendar, ratings_sheet, ui_lang
 from . import ratings_line as rl_chart
 from .action_plans import FORM_OVERHEAD_BYTES
 from .config import Settings
@@ -303,6 +304,9 @@ def render_imports(conf: Settings, *, notice: str | None = None, failure: str | 
         rules=read.hard_rules(),
         layout=_layout(),
         settings=read.settings(),
+        sheet=ratings_sheet.build(lang),
+        sheet_every_h=sheet_sync.SYNC_EVERY_SEC // 3600,
+        sheet_notice=ratings_sheet.NOTICES.get(request.args.get(ratings_sheet.ARG, "")),
         max_mb=UPLOAD_MAX_BYTES // _MB,
         ratings_path=section("ratings").path,
         country_name=lambda code: names.get(code) or country_title(code, lang),
@@ -569,6 +573,25 @@ def install(app: Flask, conf: Settings) -> None:
             outcome = "db_down"
         args = {**request.args.to_dict(), "agg": outcome}
         return redirect(f"{request.script_root}{путь}?{urlencode(args)}", code=303)
+
+    @app.post(f"{путь}/sheet-sync")
+    @guard.action("ratings.manage")
+    def ratings_sheet_sync() -> Response | tuple[str, int]:
+        """Кнопка «Забрать сейчас» (D464): заявка, которую выполняет бот. Назад — на
+        «Загрузки» с пометкой исхода."""
+        if not may_manage():
+            return _forbidden()
+        refuse_foreign_origin()
+        try:
+            _, created = sheet_state.request_sync(by=_actor())
+            outcome = "queued" if created else "already"
+        except RatingsError:
+            logger.warning("рейтинги: заявка на забор таблицы не легла", exc_info=True)
+            outcome = "db_down"
+        return redirect(
+            f"{request.script_root}{путь}/imports?{urlencode({ratings_sheet.ARG: outcome})}",
+            code=303,
+        )
 
     @app.post(f"{путь}/layout")
     @guard.action("ratings.manage")

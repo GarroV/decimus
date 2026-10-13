@@ -24,12 +24,23 @@ from src.db.config import check_environment
 from src.db.errors import RatingsError
 from src.db.space import apply_space
 from src.db.units import normalize_unit_name
+from src.domain.unit_name import fold_unit_name
 
+from .base import (
+    parse_base_collection,
+    parse_base_rko_violations,
+    parse_base_rs_violations,
+    parse_base_scores,
+)
 from .countries import country_names, is_excluded
 from .formats import detect_format, parse_rko_evaluations, parse_rko_violations, parse_rs_checkups
 from .matching import KnownUnit, match_unit
 from .model import (
     ERR_UNKNOWN_FORMAT,
+    FORMAT_BASE_COLLECTION,
+    FORMAT_BASE_RKO_VIOLATIONS,
+    FORMAT_BASE_RS_VIOLATIONS,
+    FORMAT_BASE_SCORES,
     FORMAT_RKO_EVALUATIONS,
     FORMAT_RKO_VIOLATIONS,
     FORMAT_RS_CHECKUPS,
@@ -37,6 +48,7 @@ from .model import (
     FORMAT_SNAPSHOT,
     FORMATS,
     ISSUE_BAD_ROW,
+    ISSUE_UNIT_ID_CLASH,
     ISSUE_UNIT_UNMATCHED,
     Issue,
     Parsed,
@@ -53,6 +65,8 @@ logger = logging.getLogger(__name__)
 CHANNEL_WEB = "web"
 CHANNEL_MCP = "mcp"
 CHANNEL_SEED = "seed"
+#: Забор общей таблицы контроля самим decimus (D464, `sheet_sync.py`).
+CHANNEL_SYNC = "sync"
 OUTCOME_LOADED = "loaded"
 OUTCOME_DUPLICATE = "duplicate"
 
@@ -63,6 +77,12 @@ _CSV_PARSERS = {
     FORMAT_RKO_VIOLATIONS: parse_rko_violations,
     FORMAT_RKO_EVALUATIONS: parse_rko_evaluations,
     FORMAT_RS_CHECKUPS: parse_rs_checkups,
+}
+_BASE_PARSERS = {
+    FORMAT_BASE_SCORES: parse_base_scores,
+    FORMAT_BASE_COLLECTION: parse_base_collection,
+    FORMAT_BASE_RKO_VIOLATIONS: parse_base_rko_violations,
+    FORMAT_BASE_RS_VIOLATIONS: parse_base_rs_violations,
 }
 
 
@@ -97,6 +117,9 @@ def parse_file(data: bytes, *, kind: str | None, today: date) -> Parsed:
         return parse_snapshot(data)
     if fmt == FORMAT_SHEET_SCORES:
         return parse_sheet_scores(data, today=today)
+    base = _BASE_PARSERS.get(fmt)
+    if base is not None:
+        return base(data, today=today)
     return _CSV_PARSERS[fmt](data)
 
 
@@ -116,9 +139,20 @@ class _Writer:
     """Пишет разобранный файл в открытую транзакцию и считает строки."""
 
     def __init__(
-        self, conn: psycopg.Connection, parsed: Parsed, import_id: int, source: str
+        self,
+        conn: psycopg.Connection,
+        parsed: Parsed,
+        import_id: int,
+        source: str,
+        directory: Mapping[str, str] | None = None,
     ) -> None:
         self.conn, self.parsed, self.import_id, self.source = conn, parsed, import_id, source
+        #: Справочник «имя → id Dodo IS» общей таблицы: когда имя не нашлось среди
+        #: известных пиццерий, id берётся из него (D464).
+        self.directory = directory or {}
+        self._found: dict[tuple[str, str | None], str | None] = {}
+        self._clashed: set[tuple[str, str | None]] = set()
+        self._periods: dict[tuple[str, date], int] = {}
         self.known = [KnownUnit(*row) for row in store.known_units(conn)]
         self.countries: set[str] = set()
         self.issues: list[Issue] = list(parsed.issues)
@@ -150,21 +184,48 @@ class _Writer:
     def unit(self, ref: UnitRef, row_no: int) -> str | None:
         self.country(ref.country)
         if ref.dodo_id is not None:
+            # D467: наше название не перезаписывается другим написанием того же.
+            ours = next((k.name for k in self.known if k.dodo_id == ref.dodo_id), None)
+            name = ours if ours and fold_unit_name(ours) == fold_unit_name(ref.name) else ref.name
             store.upsert_unit(
                 self.conn,
                 ref.dodo_id,
-                name=ref.name,
-                name_normalized=normalize_unit_name(ref.name),
+                name=name,
+                name_normalized=normalize_unit_name(name),
                 country=ref.country,
             )
             if all(known.dodo_id != ref.dodo_id for known in self.known):
                 self.known.append(KnownUnit(ref.dodo_id, ref.name, ref.country))
             return ref.dodo_id
-        found = self.match(ref)
-        if found is None:
+        key = (ref.name, ref.country)
+        if key not in self._found:
+            self._found[key] = self.match(ref) or self.from_directory(ref, row_no)
+        found = self._found[key]
+        if found is None and key not in self._clashed:
             detail = {"unit": ref.name, "country": ref.country or ""}
             self.issues.append(Issue(row_no, ISSUE_UNIT_UNMATCHED, detail))
         return found
+
+    def from_directory(self, ref: UnitRef, row_no: int) -> str | None:
+        """Пиццерия, которой ещё нет среди известных, но есть в справочнике ссылок."""
+        dodo_id = self.directory.get(fold_unit_name(ref.name))
+        if dodo_id is None or ref.country is None:
+            return None
+        if any(known.dodo_id == dodo_id for known in self.known):
+            # Имя не сошлось ни с одной известной, а id уже чей-то: не переименовываем.
+            detail = {"unit": ref.name, "country": ref.country or ""}
+            self.issues.append(Issue(row_no, ISSUE_UNIT_ID_CLASH, detail))
+            self._clashed.add((ref.name, ref.country))
+            return None
+        store.upsert_unit(
+            self.conn,
+            dodo_id,
+            name=ref.name,
+            name_normalized=normalize_unit_name(ref.name),
+            country=ref.country,
+        )
+        self.known.append(KnownUnit(dodo_id, ref.name, ref.country))
+        return dodo_id
 
     def match(self, ref: UnitRef) -> str | None:
         """Только пиццерии с известной страной: запись справочника без страны
@@ -183,7 +244,9 @@ class _Writer:
         self.checkups()
         self.evaluations()
         self.scores()
+        self.collections()
         self.remarks()
+        self.sheet_remarks()
 
     def checkups(self) -> None:
         for c in self.parsed.checkups:
@@ -233,20 +296,43 @@ class _Writer:
             )
 
     def period(self, p: PeriodRef) -> int:
-        return store.upsert_period(
-            self.conn,
-            rating_type=p.rating_type,
-            begin_on=p.begin_on,
-            end_on=p.end_on,
-            title_ru=p.title_ru,
-            title_en=p.title_en,
-            dodo_id=p.dodo_id,
-        )
+        slot = (p.rating_type, p.begin_on)
+        if p.dodo_id is not None or slot not in self._periods:
+            self._periods[slot] = store.upsert_period(
+                self.conn,
+                rating_type=p.rating_type,
+                begin_on=p.begin_on,
+                end_on=p.end_on,
+                title_ru=p.title_ru,
+                title_en=p.title_en,
+                dodo_id=p.dodo_id,
+            )
+        return self._periods[slot]
 
     def scores(self) -> None:
         for s in self.parsed.scores:
             unit = self.unit(s.unit, s.row_no)
             if unit is None:
+                continue
+            if s.flags is not None:
+                f = s.flags
+                self.count(
+                    store.upsert_base_score(
+                        self.conn,
+                        unit=unit,
+                        period_id=self.period(s.period),
+                        score=s.score,
+                        flags=(
+                            f.d3,
+                            f.d3_name,
+                            f.critical,
+                            f.critical_name,
+                            f.zeroing,
+                            f.zeroing_name,
+                        ),
+                        import_id=self.import_id,
+                    )
+                )
                 continue
             self.count(
                 store.upsert_score(
@@ -257,6 +343,44 @@ class _Writer:
                     status=s.status,
                     checkups_count=s.checkups_count,
                     source=self.source,
+                    import_id=self.import_id,
+                )
+            )
+
+    def collections(self) -> None:
+        for c in self.parsed.collections:
+            unit = self.unit(c.unit, c.row_no)
+            if unit is None:
+                continue
+            self.count(
+                store.upsert_collection(
+                    self.conn,
+                    unit=unit,
+                    period_id=self.period(c.period),
+                    restaurant=c.restaurant,
+                    delivery=c.delivery,
+                    import_id=self.import_id,
+                )
+            )
+
+    def sheet_remarks(self) -> None:
+        """Нарушения листов «базы рейтингов»: набор на пиццерию и период, повтор — одной строкой."""
+        groups: dict[tuple[str, int, str], dict[str, store.ViolationRow]] = {}
+        for r in self.parsed.sheet_remarks:
+            unit = self.unit(r.unit, r.row_no)
+            if unit is None:
+                continue
+            period_id = self.period(r.period)
+            key = _row_key(f"{store.SHEET_REMARK_PREFIX}{unit}:{period_id}", r.violation.text)
+            _merge(groups.setdefault((unit, period_id, r.period.rating_type), {}), key, r.violation)
+        for (unit, period_id, rating_type), rows in groups.items():
+            self.count(
+                store.replace_sheet_remarks(
+                    self.conn,
+                    rating_type=rating_type,
+                    unit=unit,
+                    period_id=period_id,
+                    rows=list(rows.values()),
                     import_id=self.import_id,
                 )
             )
@@ -341,6 +465,7 @@ def _write(
     actor: str,
     file_name: str | None,
     source: str | None,
+    directory: Mapping[str, str] | None = None,
 ) -> ImportReport:
     with psycopg.connect(check_environment().dsn) as conn:
         apply_space(conn)
@@ -379,7 +504,7 @@ def _write(
                 note=parsed.label,
             )
             default = SOURCE_SNAPSHOT if parsed.format == FORMAT_SNAPSHOT else SOURCE_SHEET
-            writer = _Writer(conn, parsed, import_id, source or default)
+            writer = _Writer(conn, parsed, import_id, source or default, directory)
             writer.run()
             issues = _journal_issues(writer.issues)
             unmatched = sum(1 for _, reason, _ in issues if reason == ISSUE_UNIT_UNMATCHED)
@@ -416,11 +541,18 @@ def import_file(
     file_name: str | None,
     today: date | None = None,
     source: str | None = None,
+    directory: Mapping[str, str] | None = None,
+    sha_salt: str | None = None,
 ) -> ImportReport:
     """Загрузить файл. `RatingsFormatError` — не разобран, `RatingsError` — база отказала
     или файл противоречит базе; любой другой сбой уходит наружу как есть. Во всех
-    случаях строка `failed` в журнале уже есть, данных из файла — нет."""
-    sha = hashlib.sha256(data).hexdigest()
+    случаях строка `failed` в журнале уже есть, данных из файла — нет.
+
+    `sha_salt` подмешивается к отпечатку журнала: забор таблицы (`sheet_sync.py`) так
+    заново применяет лист, вернувшийся к содержимому, которое уже грузилось раньше, —
+    без соли журнал назвал бы его повтором и данные остались бы от более позднего
+    содержимого."""
+    sha = hashlib.sha256(data + (sha_salt or "").encode()).hexdigest()
 
     def failed(note: str, fmt: str | None) -> None:
         _trace_failure(
@@ -437,7 +569,13 @@ def import_file(
         raise
     try:
         return _write(
-            parsed, sha=sha, channel=channel, actor=actor, file_name=file_name, source=source
+            parsed,
+            sha=sha,
+            channel=channel,
+            actor=actor,
+            file_name=file_name,
+            source=source,
+            directory=directory,
         )
     except psycopg.Error as exc:
         reason = _db_reason(exc)

@@ -432,6 +432,12 @@ ratings_rule_remove
 ratings_settings
 ratings_layout
 ratings_agg_update
+ratings_sheet_sync
+
+# Блок «Таблица контроля» на «Загрузках» (`src/web/ratings_sheet.py`, D464): время последнего
+# захода читает только шаблон Jinja.
+last_at
+unreadable
 
 # Демо-рейтинги (`tools/seed_ratings_demo.py`): канал сида зовёт только сид,
 # а `paths` vulture его не охватывает.
