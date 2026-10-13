@@ -261,7 +261,7 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
         "sql1:6914454f0f5520b392b18aa0fd07beb05925abff1e68271bf8c31681693427d9"
     ),
     # «Заморозить» и «Выйти везде» (D462): disabled_by, триггер заморозки, функция выхода.
-    "0063_freeze.sql": ("sql1:e5e103eac57a8d711842a5fac114bd4887c917b77400f546cef475489a342fb3"),
+    "0063_freeze.sql": ("sql1:da101ad0687e59f4913894ca003d4fe35fe15b1646b19d4eaffdf260406f75c2"),
 }
 
 

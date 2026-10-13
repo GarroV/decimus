@@ -15,10 +15,11 @@
 --    с машины или отключено до этой миграции. Пишет та же роль, что
 --    `disabled_at` (администратор истории, `0020`), и тем же запросом.
 -- 2. `oauth_grants.revoked_reason` принимает `frozen`.
--- 3. Триггер `web_users_freeze_cascade`: переход `disabled_at` из `null` в дату
---    закрывает сессии, гасит необменянные коды OAuth, отзывает подключения
---    Claude, снимает живую привязку бота и гасит неиспользованные ссылки
---    привязки. Личные токены MCP по-прежнему гасит триггер `0059`. Триггер, а не
+-- 3. Триггер `web_users_freeze_cascade`: смена `disabled_at` (заморозка И разморозка)
+--    закрывает сессии, гасит необменянные коды и выпущенные токены OAuth, отзывает
+--    подключения Claude и токены MCP, снимает живую привязку бота и гасит
+--    неиспользованные ссылки привязки (`close_all_access`). Учётки, отключённые до
+--    этой миграции, закрываются при накате. Триггер, а не
 --    код экрана: заморозка держится для ЛЮБОГО пути отключения (экран, команда
 --    `tools/web_user.py`), и забыть шаг на новом пути нельзя. Функция владельца
 --    (`security definer`), потому что у роли, которая отключает, прав на эти
@@ -44,38 +45,71 @@ alter table oauth_grants add constraint oauth_grants_revoked_reason_check
 
 grant select (disabled_by), update (disabled_by) on web_users to dodo_audit_admin;
 
-create function freeze_cascade() returns trigger
+-- Всё закрывается ОДНОЙ функцией (`close_all_access`): заморозка, разморозка и
+-- накат зовут её же, и список закрываемого не расходится между путями.
+-- Токены OAuth, выпущенные подключением, гасятся и сроком, и отзывом
+-- подключения: отзыв — то, что читают двери, срок — запас на случай, если
+-- отметку отзыва кто-то снимет.
+create function close_all_access(p_user uuid) returns void
 language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
 begin
     update public.web_sessions
        set closed_at = now()
-     where user_id = new.id and closed_at is null;
+     where user_id = p_user and closed_at is null;
     update public.oauth_codes
        set expires_at = now()
-     where user_id = new.id and used_at is null and expires_at > now();
+     where user_id = p_user and used_at is null and expires_at > now();
+    update public.oauth_tokens
+       set expires_at = now()
+     where grant_id in (select id from public.oauth_grants where user_id = p_user)
+       and expires_at > now();
     update public.oauth_grants
        set revoked_at = now(), revoked_reason = 'frozen'
-     where user_id = new.id and revoked_at is null;
+     where user_id = p_user and revoked_at is null;
+    update public.mcp_tokens
+       set revoked_at = now(), revoked_by = 0
+     where user_id = p_user and revoked_at is null;
     update public.bot_bindings
        set unbound_at = now()
-     where user_id = new.id and unbound_at is null;
+     where user_id = p_user and unbound_at is null;
     update public.bot_link_tokens
        set used_at = now()
-     where user_id = new.id and used_at is null;
+     where user_id = p_user and used_at is null;
+end $$;
+
+revoke all on function close_all_access(uuid) from public;
+
+comment on function close_all_access(uuid) is
+    'Закрыть всё, чем человек входит (D462): сессии, коды и токены OAuth, подключения '
+    'Claude, токены MCP, привязку бота, ссылки привязки. Только для триггера заморозки '
+    'и наката: прав на неё нет ни у кого, кроме владельца.';
+
+create function freeze_cascade() returns trigger
+language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
+begin
+    perform public.close_all_access(new.id);
     return new;
 end $$;
 
 revoke all on function freeze_cascade() from public;
 
+-- И при заморозке, и при разморозке. Заморозка закрывает всё; разморозка закрывает
+-- ещё раз то, что могло пережить отключение, сделанное до этой миграции или
+-- мимо триггера: размороженная учётка не получает назад ничего прежнего.
 create trigger web_users_freeze_cascade
     after update of disabled_at on web_users
     for each row
-    when (new.disabled_at is not null and old.disabled_at is null)
+    when ((old.disabled_at is null) <> (new.disabled_at is null))
     execute function freeze_cascade();
 
 comment on function freeze_cascade() is
-    'Заморозка (D462): при отключении учётки закрывает сессии, гасит коды и подключения '
-    'Claude, снимает привязку бота и неиспользованные ссылки привязки. Токены MCP гасит 0059.';
+    'Заморозка и разморозка (D462): при смене disabled_at закрывает всё, чем человек входит '
+    '(close_all_access).';
+
+-- Накат: учётки, отключённые ДО этой миграции, держали сессии, подключения Claude и
+-- бота живыми (отключение гасило только токены MCP, `0059`), и разморозка вернула бы
+-- их. Закрываем сейчас.
+select public.close_all_access(id) from web_users where disabled_at is not null;
 
 create function sign_out_everywhere(p_token text) returns boolean
 language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
@@ -101,6 +135,10 @@ begin
     update public.oauth_codes
        set expires_at = now()
      where user_id = чей and used_at is null and expires_at > now();
+    update public.oauth_tokens
+       set expires_at = now()
+     where grant_id in (select id from public.oauth_grants where user_id = чей)
+       and expires_at > now();
     update public.oauth_grants
        set revoked_at = now(), revoked_reason = 'user'
      where user_id = чей and revoked_at is null;
