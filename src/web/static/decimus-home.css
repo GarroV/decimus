@@ -1,6 +1,6 @@
 /* «Главная» (D378) — по образцу новой главной Swarm Brain, путь — miniapp/src:
      сетка — components/roy/home/HomeGrid.tsx:130 (у decimus с D418 — колонки
-       фиксированной ширины `auto-fill`, «вся строка» — только у таблицы);
+       одинаковые карточки `auto-fill` в верхнем ряду, ниже таблица и панель фильтров, D471);
      карточка rounded 12, рамка, фон surface, p-4;
      заголовок виджета моно-капсом с серой припиской — HomeLabel;
      главная цифра 46px моно, «/100», дельта ▲▼, IMF рядом — QualityWidgets.tsx:58–73;
@@ -12,23 +12,37 @@
 
 .page--home { max-width: 110rem; }
 
-/* Шапка (D418): заголовок и срез (период, страна) в одной строке, ниже и плотнее
-   общей `.shead`; на телефоне срез уходит под заголовок. */
+/* Шапка (D471): один заголовок; срез переехал в панель фильтров справа от списка. */
 .page--home .shead { align-items: center; gap: var(--space-3) var(--space-6); }
 .page--home .shead__main { flex: 0 0 auto; min-width: 0; }
-.hm-slice { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-left: auto; }
-.hm-slice .hm-more { margin-left: 0; }
-/* Список страны стоит у правого края шапки: меню раскрывается влево, а не за экран. */
-.hm-slice > .pick:not(.speriod__pick) .pick__menu { left: auto; right: 0; }
 
-/* Сетка компактных блоков (D418): колонки фиксированной ширины, а не одна
-   строка на всю ширину; на телефоне — одна колонка. «Пиццерии» — на всю строку:
-   ей нужны колонки таблицы. */
-/* Колонками, а не сеткой рядов: блоки разной высоты в сетке оставляли рядом с
-   низким блоком пустую дыру во всю строку. В колонках блок встаёт под соседом. */
-.hm-grid { columns: 340px auto; column-gap: 12px; margin-top: var(--space-4); }
-.hm-grid > .hm-card { break-inside: avoid; margin-bottom: 12px; }
-.hm-card--wide { column-span: all; }
+/* Верхний ряд (D471): карточки одного размера — колонки одной ширины, ряды одной
+   высоты. Что длиннее карточки, прокручивается внутри неё (`.hm-card__body`), а не
+   растягивает ряд. На телефоне — одна колонка и высота по содержимому. */
+.hm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 330px), 1fr));
+  grid-auto-rows: 22rem; gap: 12px; margin-top: var(--space-4); }
+.hm-grid > .hm-card { overflow: hidden; }
+.hm-card__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+
+/* Ниже — список и справа от него панель фильтров (sticky). */
+.hm-main { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: 12px; align-items: start; margin-top: 12px; }
+.hm-filters { position: sticky; top: var(--space-4); z-index: 2; padding: 14px; border: 1px solid var(--line-strong);
+  border-radius: var(--r-block); background: var(--surface); box-shadow: var(--sh-card); }
+.hm-filters__flag, .hm-filters__toggle { display: none; }
+.hm-filters__body { display: flex; flex-direction: column; gap: 14px; }
+.hm-filters__title { margin-bottom: -4px; }
+.hm-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.hm-field__label { font-size: 11.5px; color: var(--ink-3); }
+/* Выбор отбора — как «Девелопер» на «Стране» (`.cn-devpick`): чип на всю ширину панели,
+   список раскрывается под ним, а не поверх таблицы. Календарь — всплывающий, как везде. */
+.hm-field > .pick:not(.speriod__pick) { display: block; }
+.hm-field .ov-chip { font-size: 12.5px; display: flex; width: 100%; justify-content: space-between; }
+.hm-field .pick:not(.speriod__pick) .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+.hm-field .speriod { display: flex; width: 100%; }
+.hm-field .speriod > .pick { flex: 1; min-width: 0; }
+.hm-field .speriod__title { display: flex; width: 100%; justify-content: center; }
+.hm-filters__open { margin-left: 0; white-space: normal; }
+.hm-filters__note { margin: 0; font-size: 11.5px; line-height: 1.4; color: var(--ink-3); }
 
 /* Блок — карточка, как `.card` ядра: поверхность, рамка `--line-strong` (у `--line`
    в светлой теме контраст с холстом почти нулевой, цифры «висели в воздухе»),
@@ -118,7 +132,7 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-board { background-color: var(--surface);
   background-image: repeating-linear-gradient(-45deg, transparent 0 9px, color-mix(in srgb, var(--line) 55%, transparent) 9px 10px); }
 .hm-stickers { display: flex; gap: 16px; padding: 4px 4px 10px; overflow-x: auto; scroll-snap-type: x mandatory; }
-.hm-sticker { position: relative; display: flex; flex-direction: column; gap: 8px; flex: 0 0 200px; min-height: 170px; padding: 18px 14px 14px;
+.hm-sticker { position: relative; display: flex; flex-direction: column; gap: 8px; flex: 0 0 170px; min-height: 128px; padding: 16px 12px 12px;
   border-radius: 4px; box-shadow: 0 1px 2px rgba(10, 13, 17, .08), 0 6px 14px rgba(10, 13, 17, .08);
   color: var(--ink); text-decoration: none; scroll-snap-align: start; transform: rotate(-1.2deg); transition: transform .12s ease; }
 .hm-sticker:nth-child(even) { transform: rotate(1.2deg); }
@@ -130,12 +144,28 @@ a.hm-row:hover { background: var(--surface-2); text-decoration: none; }
 .hm-sticker--2 { background: var(--ok-soft); }
 .hm-sticker--3 { background: var(--err-soft); }
 .hm-sticker__kind { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase; color: var(--ink-2); }
-.hm-sticker__title { font-size: 19px; line-height: 1.2; font-weight: var(--w-semibold); letter-spacing: -.01em; }
+.hm-sticker__title { font-size: 16px; line-height: 1.2; font-weight: var(--w-semibold); letter-spacing: -.01em; }
 .hm-sticker__urgent { font-size: 12px; font-weight: var(--w-semibold); color: var(--err); }
 .hm-sticker__cta { margin-top: auto; font-size: 12.5px; font-weight: var(--w-semibold); color: var(--accent); }
 
+@media (max-width: 899px) {
+  .hm-main { grid-template-columns: minmax(0, 1fr); }
+  .hm-filters { position: static; order: -1; }
+}
 @media (max-width: 719px) {
+  .hm-grid { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; }
+  .hm-grid > .hm-card { max-height: 30rem; }
   .hm-big__value { font-size: 38px; }
   .hm-card { padding: 14px 12px; }
+  /* Фильтры — свёрнутым блоком «Фильтры» над таблицей; флажок вместо JS. */
+  .hm-filters__toggle { display: flex; align-items: center; justify-content: space-between; min-height: 32px; cursor: pointer;
+    font-family: var(--font-mono); font-size: 11px; font-weight: var(--w-semibold); letter-spacing: .06em; text-transform: uppercase; }
+  .hm-filters__toggle::after { content: "▾"; }
+  .hm-filters__flag { display: block; position: absolute; width: 1px; height: 1px; opacity: 0; }
+  .hm-filters__flag:focus-visible + .hm-filters__toggle { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .hm-filters__flag:checked + .hm-filters__toggle::after { content: "▴"; }
+  .hm-filters__body { display: none; margin-top: 12px; }
+  .hm-filters__flag:checked ~ .hm-filters__body { display: flex; }
+  .hm-filters__title { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .hm-sticker { transition: none; } }

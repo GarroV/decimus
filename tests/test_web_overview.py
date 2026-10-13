@@ -180,7 +180,6 @@ def test_пустые_вспомогательные_блоки_не_показ�
 
     # Assert
     assert t_ru("home.attention.title") not in страница
-    assert t_ru("home.latest.title") not in страница
     assert t_ru("home.top.title") not in страница
     assert t_ru("overview.zones.title") not in страница
     assert t_ru("overview.systemic.title") not in страница
@@ -247,7 +246,6 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
             "home.attention.title",
             "home.inspections.title",
             "home.rb.rs",
-            "home.latest.title",
             "home.top.title",
             "overview.zones.title",
             "home.units.title",
@@ -900,3 +898,74 @@ def test_страна_вне_охвата_из_адреса_главную_не_
         страница = client.get("/overview?country=HR").get_data(as_text=True)
     assert спрошено == [("GE",)]
     assert "Только Хорватия" not in страница
+
+
+def _справочник_стран(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Справочник рейтингов: Сербия и Грузия в CEE, Турция — в «Другие страны»."""
+    from src.db import ratings_read
+
+    строки = (
+        ratings_read.CountryRow("RS", "Сербия", "Serbia", None, True, "CEE"),
+        ratings_read.CountryRow("GE", "Грузия", "Georgia", None, True, "CEE"),
+        ratings_read.CountryRow("TR", "Турция", "Turkey", None, True, "OTHER"),
+    )
+    monkeypatch.setattr(ratings_read, "countries", lambda: строки)
+
+
+def test_кластер_сужает_страны_всей_выборки(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D471: фильтр «Кластер» сужает охват и для проверок, и для рейтингов, и для списка стран."""
+    # Arrange
+    _справочник_стран(monkeypatch)
+    охваты: list[object] = []
+    monkeypatch.setattr(
+        overview_data, "load", lambda **kw: охваты.append(kw["reach"].countries) or снимок()
+    )
+    блоки: list[object] = []
+    monkeypatch.setattr(
+        home_ratings_block,
+        "load",
+        lambda **kw: блоки.append(kw["scope"]) or home_ratings_block.Block(),
+    )
+
+    # Act
+    ответ = стенд.get("/overview?cluster=CEE")
+
+    # Assert
+    assert ответ.status_code == 200
+    assert set(охваты[0] or ()) == {"RS", "GE"}
+    assert set(блоки[0] or ()) == {"RS", "GE"}
+
+
+def test_кластер_нарисован_в_панели_и_неизвестный_из_адреса_не_сужает(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Arrange
+    _справочник_стран(monkeypatch)
+    охваты: list[object] = []
+    monkeypatch.setattr(
+        overview_data, "load", lambda **kw: охваты.append(kw["reach"].countries) or снимок()
+    )
+
+    # Act
+    страница = стенд.get("/overview?cluster=XX").get_data(as_text=True)
+
+    # Assert
+    assert t_ru("home.filters.cluster") in страница
+    assert t_ru("home.cluster.all") in страница
+    assert t_ru("home.filters.note") in страница
+    assert "hm-filters" in страница
+    assert охваты[0] is None or set(охваты[0]) >= {"RS", "GE", "TR"}
+
+
+def test_последних_проверок_на_главной_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D471: список проверок — таблица «Пиццерии»; отдельного блока нет."""
+    # Act
+    страница = показать(стенд, monkeypatch, снимок())
+
+    # Assert
+    assert "Последние проверки" not in страница
+    assert "hm-card--wide" not in страница
