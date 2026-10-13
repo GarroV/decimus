@@ -85,18 +85,22 @@ def test_role_may_без_пространства_отказ() -> None:
         perm.role_may("admin", None, "nope.nope")
 
 
-def test_claude_снятие_закрыто_всем_методика_партнёру() -> None:
-    """D341, D417: снятия в Claude нет ни у кого. D460: методика админа партнёра в Claude
-    открыта как в вебе, кроме указателя прода; сотруднику партнёра методика в Claude закрыта."""
+def test_claude_снятие_закрыто_всем_методика_партнёра_как_в_вебе() -> None:
+    """D341, D417: снятия в Claude нет ни у кого. D460: методика партнёра в Claude —
+    ровно как в вебе: админ ведёт свою, сотрудник читает; указатель прода — только УК."""
     assert perm.role_may("superadmin", "HQ", "inspection.retract")
     assert not perm.claude_may("superadmin", "HQ", "inspection.retract")
     assert not perm.claude_may("admin", "RS", "inspection.retract")
     for действие in ("checklist.read", "checklist.edit", "checklist.publish", "checklist.manage"):
         assert perm.claude_may("admin", "RS", действие), действие
-    assert perm.role_may("admin", "RS", "checklist.apply")
+        assert perm.claude_may("admin", "RS", действие) == perm.role_may("admin", "RS", действие)
+    assert perm.claude_may("auditor", "RS", "checklist.read")
+    for действие in ("checklist.edit", "checklist.publish", "checklist.manage", "phrases.manage"):
+        assert not perm.claude_may("auditor", "RS", действие), действие
+    # Указатель прода — «только УК»: партнёру не выдаётся ни в вебе, ни в Claude.
+    assert not perm.role_may("admin", "RS", "checklist.apply")
     assert not perm.claude_may("admin", "RS", "checklist.apply")
-    assert perm.role_may("auditor", "RS", "checklist.read")
-    assert not perm.claude_may("auditor", "RS", "checklist.read")
+    assert perm.role_may("admin", "HQ", "checklist.apply")
     assert perm.claude_may("developer", "HQ", "checklist.edit")
     assert perm.claude_may("auditor", "RS", "inspection.read")
 
