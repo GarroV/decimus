@@ -62,7 +62,7 @@ from src.domain.journal import (
 )
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import google_link, google_profile, oauth, reauth, swarm_api, walk_auth
+from . import google_link, google_profile, oauth, reauth, second_step, swarm_api, walk_auth
 from . import journal as web_journal
 from .config import Settings
 from .google_auth import (
@@ -130,6 +130,7 @@ OPEN_ENDPOINTS = (
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
     | oauth.ENDPOINTS
+    | second_step.ENDPOINTS
 )
 
 
@@ -294,6 +295,8 @@ def install(app: Flask, conf: Settings) -> None:
         )
         return response
 
+    second_step.install(app, conf, remember=remember, stand=рубеж)
+
     @app.before_request
     def _guard() -> Response | None:
         """Ни одна страница админки не отдаётся неопознанному.
@@ -314,6 +317,15 @@ def install(app: Flask, conf: Settings) -> None:
                 # Только чтение: на POST-адрес обратно по GET не вернуться.
                 return redirect(url_for("login", next=request.full_path.rstrip("?")))
             return redirect(url_for("login"))
+        # Админ без второго способа (D463) пользуется только подключением способа: пока
+        # он не подключён, остальное закрыто — и для сессии, выданной до включения ступени.
+        if (
+            second_step.must_enroll(account)
+            and request.endpoint not in second_step.ENROLL_ENDPOINTS
+        ):
+            if request.method == "GET":
+                return redirect(url_for("security_page", required="1"))
+            return make_response("", 403)
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
         # Пространство вошедшего — и базе (F-037): политики роли приложения
@@ -360,6 +372,7 @@ def install(app: Flask, conf: Settings) -> None:
                 "login.html",
                 failed=False,
                 locked_minutes=None,
+                second_expired=request.args.get("second_step") == "expired",
                 next_path=safe_next(request.args.get("next")),
             )
         refuse_foreign_origin()
@@ -428,6 +441,12 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return страница, 401
         note_success(tenant=рубеж, login=имя)
+        # Первая ступень пройдена. Есть второй способ — сессии пока нет (D463).
+        вторая = second_step.begin(
+            account, method=METHOD_PASSWORD, next_path=safe_next(request.form.get("next"))
+        )
+        if вторая is not None:
+            return вторая
         session = open_session(account, ip=откуда, user_agent=браузер)
         journals.record_login(
             method=METHOD_PASSWORD,
@@ -581,6 +600,9 @@ def install(app: Flask, conf: Settings) -> None:
             return отказано
 
         note_success(tenant=рубеж, login=account.login)
+        вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
+        if вторая is not None:
+            return очистить_метку(вторая)
         session = open_session(account, ip=откуда, user_agent=браузер)
         journals.record_login(
             method=METHOD_GOOGLE,

@@ -63,6 +63,11 @@
                        base ~ '/sign-out-everywhere?lang=' ~ lang, []) }}
           </span>
         </div>
+        <div class="srow2" id="security">
+          <span class="srow2__label">{{ t('sf.sec.title') }}</span>
+          <span class="srow2__value"><span class="sdot{% if me.has_second_factor %} sdot--ok{% endif %}"></span>{{ t('sf.sec.status_on' if me.has_second_factor else 'sf.sec.status_off') }} · {{ t('sf.sec.card') }}</span>
+          <span class="srow2__act"><a class="sbtn" href="{{ url('/settings/security') }}?lang={{ lang }}">{{ t('sf.sec.open') }}</a></span>
+        </div>
         <div class="srow2" id="signins">
           <span class="srow2__label">{{ t('journal.own.title') }}</span>
           <span class="srow2__value">{{ t('journal.own.row') }}</span>

@@ -1,0 +1,163 @@
+{#
+  «Вход и защита» (D463): чем подтверждается вход человека — ключи доступа, приложение-
+  аутентификатор, резервные коды. Один вопрос: «как защищён мой вход и как это поменять».
+  Итог (подключено ли что-нибудь) — сверху, под ним три способа, у каждого свои строки.
+
+  Менять способы можно только сразу после входа (не позже 10 минут): старее — сверху
+  кнопка «Войти заново», а действия не показаны. Админу и главному админу без способа
+  сюда ведёт заслон, остальное для них закрыто.
+
+  Секреты: QR и ключ приложения — пока приложение не подтверждено; резервные коды — один
+  раз, ответом на выпуск. В адрес они не попадают.
+#}{% extends "base.html" %}
+{% block title %}{{ t('sf.sec.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
+  <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
+{% endblock %}
+{% block page_class %} page--settings{% endblock %}
+{% block body %}
+  {% from "_split_ui.html" import confirm %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('sf.sec.title') }}</h1>
+      <p class="ssec__note">{{ t('sf.sec.sub') }}</p>
+    </div>
+  </header>
+  <article class="ssettings">
+  {% if db_down %}
+    <div class="note note--warn"><div class="note__text">{{ t('sf.sec.db') }}</div></div>
+  {% else %}
+    {% if flash %}
+      <div class="note {{ 'note--ok' if flash.ok else 'note--warn' }}"><div class="note__text">{{ t(flash.key, **(flash.params or {})) }}</div></div>
+    {% endif %}
+    {% if show_required or (required and not enrolled) %}
+      <div class="note note--warn" role="alert"><div class="note__text">{{ t('sf.sec.required') }}</div></div>
+    {% elif not enrolled %}
+      <div class="note"><div class="note__text">{{ t('sf.sec.optional') }}</div></div>
+    {% endif %}
+    {% if not fresh %}
+      <div class="note note--warn" role="alert"><div class="note__text">{{ t('sf.sec.stale') }}</div></div>
+      <form method="post" action="{{ base }}/relogin?lang={{ lang }}" class="sform">
+        <button class="sbtn sbtn--primary" type="submit">{{ t('sf.sec.relogin') }}</button>
+      </form>
+    {% elif enrolled and status.backup_left == 0 and not codes %}
+      <div class="note"><div class="note__text">{{ t('sf.sec.recommend_codes') }}</div></div>
+    {% endif %}
+
+    {% if codes %}
+      <section class="scard" id="codes-shown" aria-live="polite">
+        <h2 class="scard__title">{{ t('sf.codes.title') }}</h2>
+        <p class="ssec__note">{{ t('sf.codes.shown') }}</p>
+        <ul class="scodes mono">
+          {% for item in codes %}<li>{{ item }}</li>{% endfor %}
+        </ul>
+      </section>
+    {% endif %}
+
+    <div class="stop">
+      {# ── Ключи доступа ────────────────────────────────────────────────────── #}
+      <section class="scard" id="passkeys">
+        <h2 class="scard__title">{{ t('sf.pk.title') }}</h2>
+        <p class="ssec__note">{{ t('sf.pk.lead') }}</p>
+        {% if status.passkeys %}
+          <ul class="slist">
+            {% for key in status.passkeys %}
+              <li class="slist__row">
+                <span class="slist__main">
+                  <span class="slist__name">{{ key.name }}</span>
+                  <span class="ssec__note">{{ t('sf.pk.added', date=key.created_at.strftime('%Y-%m-%d')) }} ·
+                    {% if key.last_used_at %}{{ t('sf.pk.used', date=key.last_used_at.strftime('%Y-%m-%d')) }}{% else %}{{ t('sf.pk.never_used') }}{% endif %}</span>
+                </span>
+                {% if fresh %}
+                  <span class="slist__act">
+                    {{ confirm('pk-del-' ~ loop.index, t('sf.pk.remove'), t('sf.pk.remove_confirm', name=key.name), t('sf.pk.remove_yes'),
+                               base ~ '/passkey/' ~ key.id ~ '/delete?lang=' ~ lang, []) }}
+                  </span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('sf.pk.none') }}</p>
+        {% endif %}
+        {% if not passkeys_enabled %}
+          <p class="ssec__note">{{ t('sf.pk.off') }}</p>
+        {% elif fresh and status.passkeys|length < max_passkeys %}
+          <div class="sform" data-passkey-register
+               data-options-url="{{ base }}/passkey/options"
+               data-register-url="{{ base }}/passkey/register"
+               data-msg-failed="{{ t('sf.pk.failed') }}"
+               data-msg-unavailable="{{ t('sf.pk.unavailable') }}">
+            <label><span class="sform__label">{{ t('sf.pk.name') }}</span>
+              <input class="sinput" type="text" maxlength="60" data-passkey-name autocomplete="off"
+                     value="{{ t('sf.pk.default_name', n=status.passkeys|length + 1) }}"
+                     placeholder="{{ t('sf.pk.name_placeholder') }}"></label>
+            <button class="sbtn sbtn--primary" type="button" data-passkey-button>{{ t('sf.pk.add') }}</button>
+            <div class="note note--warn" role="alert" data-passkey-message hidden>
+              <div class="note__text" data-passkey-message-text></div>
+            </div>
+          </div>
+        {% endif %}
+      </section>
+
+      <div class="sside">
+        {# ── Приложение-аутентификатор ────────────────────────────────────── #}
+        <section class="scard" id="totp">
+          <h2 class="scard__title">{{ t('sf.totp.title') }}</h2>
+          <p class="ssec__note">{{ t('sf.totp.lead') }}</p>
+          {% if status.totp_confirmed %}
+            <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('sf.totp.on') }}</p>
+            {% if fresh %}
+              {{ confirm('totp-del', t('sf.totp.remove'), t('sf.totp.remove_confirm'), t('sf.totp.remove_yes'),
+                         base ~ '/totp/remove?lang=' ~ lang, []) }}
+            {% endif %}
+          {% elif setup %}
+            <p class="ssec__text">{{ t('sf.totp.scan') }}</p>
+            <div class="sqr" role="img" aria-label="{{ t('sf.totp.qr_alt') }}">{{ setup.qr_svg }}</div>
+            <p class="ssec__note">{{ t('sf.totp.key') }}</p>
+            <p class="skey mono">{{ setup.secret_groups }}</p>
+            {% if fresh %}
+              <form method="post" action="{{ base }}/totp/confirm?lang={{ lang }}" class="sform">
+                <label><span class="sform__label">{{ t('sf.totp.confirm_label') }}</span>
+                  <input class="sinput" type="text" name="code" inputmode="numeric" pattern="[0-9 ]*"
+                         maxlength="8" autocomplete="one-time-code" required autofocus></label>
+                <button class="sbtn sbtn--primary" type="submit">{{ t('sf.totp.confirm') }}</button>
+              </form>
+            {% endif %}
+          {% else %}
+            <p class="ssec__text"><span class="sdot"></span>{{ t('sf.totp.off') }}</p>
+            {% if fresh %}
+              <form method="post" action="{{ base }}/totp/start?lang={{ lang }}" class="sform">
+                <button class="sbtn sbtn--primary" type="submit">{{ t('sf.totp.start') }}</button>
+              </form>
+            {% endif %}
+          {% endif %}
+        </section>
+
+        {# ── Резервные коды ────────────────────────────────────────────────── #}
+        <section class="scard" id="backup">
+          <h2 class="scard__title">{{ t('sf.codes.title') }}</h2>
+          <p class="ssec__note">{{ t('sf.codes.lead') }}</p>
+          {% if not enrolled %}
+            <p class="ssec__text"><span class="sdot"></span>{{ t('sf.codes.need_factor') }}</p>
+          {% else %}
+            <p class="ssec__text"><span class="sdot{% if status.backup_left %} sdot--ok{% endif %}"></span>{% if status.backup_left %}{{ t('sf.codes.left', n=status.backup_left) }}{% else %}{{ t('sf.codes.none') }}{% endif %}</p>
+            {% if fresh %}
+              {% if status.backup_left %}
+                {{ confirm('codes-regen', t('sf.codes.regenerate'), t('sf.codes.regenerate_confirm'), t('sf.codes.regenerate_yes'),
+                           base ~ '/backup/generate?lang=' ~ lang, []) }}
+              {% else %}
+                <form method="post" action="{{ base }}/backup/generate?lang={{ lang }}" class="sform">
+                  <button class="sbtn sbtn--primary" type="submit">{{ t('sf.codes.generate') }}</button>
+                </form>
+              {% endif %}
+            {% endif %}
+          {% endif %}
+        </section>
+      </div>
+    </div>
+  {% endif %}
+  </article>
+{% endblock %}

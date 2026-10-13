@@ -72,6 +72,7 @@ from . import (
     review,
     revision,
     security_headers,
+    security_screen,
     settings_screen,
     swarm_api,
     to_inspect,
@@ -197,6 +198,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     action_plans.install(app, conf)
     users_screen.install(app, conf)
     settings_screen.install(app, conf)
+    security_screen.install(app, conf)
     prescriptions.install(app, conf)
     ratings.install(app, conf)
     # API чтения для Swarm (#567): свой токен, заслон входа его адреса пропускает.

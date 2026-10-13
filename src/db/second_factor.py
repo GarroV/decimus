@@ -99,11 +99,6 @@ class Pending:
     failures: int
 
 
-_PASSKEY_COLUMNS = (
-    "id, credential_id, public_key, sign_count, transports, name, created_at, last_used_at"
-)
-
-
 def _passkey(row: Any) -> Passkey:
     return Passkey(
         id=str(row[0]),
@@ -124,7 +119,8 @@ def status_of(user_id: str) -> Status:
     """Способы входа человека и сколько резервных кодов не погашено."""
     with _connected("прочитать способы входа") as conn, conn.cursor() as cur:
         cur.execute(
-            f"select {_PASSKEY_COLUMNS} from web_passkeys where user_id = %s order by created_at",  # noqa: S608 — колонки константой
+            "select id, credential_id, public_key, sign_count, transports, name,"
+            " created_at, last_used_at from web_passkeys where user_id = %s order by created_at",
             (user_id,),
         )
         ключи = tuple(_passkey(r) for r in cur.fetchall())
@@ -148,7 +144,8 @@ def has_any(user_id: str) -> bool:
     with _connected("узнать, есть ли вторая ступень") as conn, conn.cursor() as cur:
         cur.execute(
             "select exists (select 1 from web_passkeys where user_id = %(u)s)"
-            " or exists (select 1 from web_totp where user_id = %(u)s and confirmed_at is not null)",
+            " or exists (select 1 from web_totp"
+            " where user_id = %(u)s and confirmed_at is not null)",
             {"u": user_id},
         )
         строка = cur.fetchone()
@@ -172,9 +169,6 @@ def open_pending(user_id: str, *, method: str, next_path: str | None) -> str:
     return токен
 
 
-_PENDING_COLUMNS = "id, user_id, method, next_path, expires_at, failures"
-
-
 def _pending(row: Any) -> Pending:
     return Pending(
         id=str(row[0]),
@@ -190,7 +184,7 @@ def find_pending(token: str) -> Pending | None:
     """Живой полупройденный вход по токену из куки; погашенный, просроченный, мёртвый — `None`."""
     with _connected("найти вторую ступень входа") as conn, conn.cursor() as cur:
         cur.execute(
-            f"select {_PENDING_COLUMNS} from web_second_steps"  # noqa: S608 — колонки константой
+            "select id, user_id, method, next_path, expires_at, failures from web_second_steps"
             " where fingerprint = %s and consumed_at is null and expires_at > now()"
             " and failures < %s",
             (session_fingerprint(token), MAX_PENDING_FAILURES),
@@ -220,7 +214,7 @@ def consume_pending(token: str) -> Pending | None:
         cur.execute(
             "update web_second_steps set consumed_at = now()"
             " where fingerprint = %s and consumed_at is null and expires_at > now()"
-            f" and failures < %s returning {_PENDING_COLUMNS}",  # noqa: S608 — колонки константой
+            " and failures < %s returning id, user_id, method, next_path, expires_at, failures",
             (session_fingerprint(token), MAX_PENDING_FAILURES),
         )
         строка = cur.fetchone()
@@ -240,7 +234,8 @@ def store_challenge(bound_token: str, *, purpose: str, user_id: str, challenge: 
             (отпечаток, purpose),
         )
         cur.execute(
-            "insert into web_webauthn_challenges (bound_fp, purpose, user_id, challenge, expires_at)"
+            "insert into web_webauthn_challenges"
+            " (bound_fp, purpose, user_id, challenge, expires_at)"
             " values (%s, %s, %s, %s, now() + %s)",
             (отпечаток, purpose, user_id, challenge, CHALLENGE_TTL),
         )
@@ -277,7 +272,8 @@ def add_passkey(
         cur.execute(
             "insert into web_passkeys (user_id, credential_id, public_key, sign_count,"
             " transports, name) values (%s, %s, %s, %s, %s, %s)"
-            f" returning {_PASSKEY_COLUMNS}",  # noqa: S608 — колонки константой
+            " returning id, credential_id, public_key, sign_count, transports, name,"
+            " created_at, last_used_at",
             (user_id, credential_id, public_key, sign_count, list(transports), name),
         )
         строка = cur.fetchone()
@@ -289,7 +285,8 @@ def passkey_by_credential(credential_id: bytes) -> tuple[Passkey, str] | None:
     """Ключ доступа по номеру и номер учётки-владельца; нет такого — `None`."""
     with _connected("найти ключ доступа") as conn, conn.cursor() as cur:
         cur.execute(
-            f"select {_PASSKEY_COLUMNS}, user_id from web_passkeys where credential_id = %s",  # noqa: S608
+            "select id, credential_id, public_key, sign_count, transports, name,"
+            " created_at, last_used_at, user_id from web_passkeys where credential_id = %s",
             (credential_id,),
         )
         строка = cur.fetchone()
@@ -358,9 +355,7 @@ def begin_totp(user_id: str, secret: str) -> bool:
     """Завести неподтверждённое приложение. `False` — подтверждённое уже есть."""
     with _connected("начать подключение приложения") as conn, conn.cursor() as cur:
         cur.execute(_LOCK_SQL, (ADVISORY_NAMESPACE, str(user_id)))
-        cur.execute(
-            "select confirmed_at is not null from web_totp where user_id = %s", (user_id,)
-        )
+        cur.execute("select confirmed_at is not null from web_totp where user_id = %s", (user_id,))
         строка = cur.fetchone()
         if строка is not None and строка[0]:
             return False
@@ -436,17 +431,55 @@ def use_backup_code(user_id: str, code_hash: str) -> bool:
 # --- сброс -----------------------------------------------------------------------
 
 
+def _reset(cur: Any, user_id: str) -> int:
+    cur.execute(
+        "update web_sessions set closed_at = now() where user_id = %s and closed_at is null",
+        (user_id,),
+    )
+    cur.execute("delete from web_webauthn_challenges where user_id = %s", (user_id,))
+    cur.execute("delete from web_second_steps where user_id = %s", (user_id,))
+    cur.execute("delete from web_backup_codes where user_id = %s", (user_id,))
+    cur.execute("delete from web_passkeys where user_id = %s", (user_id,))
+    ключей = int(cur.rowcount)
+    cur.execute("delete from web_totp where user_id = %s", (user_id,))
+    return ключей + int(cur.rowcount)
+
+
 def reset_all(user_id: str) -> int:
     """Сбросить вторую ступень человека целиком: ключи, приложение, резервные коды, начатые входы.
 
-    Рука администратора истории (`0068`), а не роли приложения. Вернуть: сколько способов
-    входа (ключей и приложение) снято.
+    Рука администратора истории (`0068`), а не роли приложения. Открытые сессии человека
+    закрываются: сброс делают, когда ключ или телефон потеряны или украдены, и вошедший
+    ими остаться не должен. Вернуть: сколько способов входа (ключей и приложение) снято.
     """
     with _managing("сбросить вторую ступень входа") as conn, conn.cursor() as cur:
-        cur.execute("delete from web_webauthn_challenges where user_id = %s", (user_id,))
-        cur.execute("delete from web_second_steps where user_id = %s", (user_id,))
-        cur.execute("delete from web_backup_codes where user_id = %s", (user_id,))
-        cur.execute("delete from web_passkeys where user_id = %s", (user_id,))
-        ключей = cur.rowcount
-        cur.execute("delete from web_totp where user_id = %s", (user_id,))
-        return int(ключей) + int(cur.rowcount)
+        return _reset(cur, user_id)
+
+
+@dataclass(frozen=True)
+class ResetOutcome:
+    """Кому сбросили вторую ступень командой с сервера."""
+
+    user_id: str
+    role: str
+    tenant: str
+    removed: int
+
+
+def reset_by_login(login: str, *, tenant: str) -> ResetOutcome | None:
+    """Сбросить вторую ступень по логину (команда с сервера); нет такой учётки — `None`."""
+    with _managing("сбросить вторую ступень входа") as conn, conn.cursor() as cur:
+        cur.execute(
+            "select id, role, tenant_code from web_users"
+            " where login = %s and tenant_code = %s and disabled_at is null",
+            (login.strip().lower(), tenant),
+        )
+        строка = cur.fetchone()
+        if строка is None:
+            return None
+        return ResetOutcome(
+            user_id=str(строка[0]),
+            role=str(строка[1]),
+            tenant=str(строка[2]),
+            removed=_reset(cur, str(строка[0])),
+        )

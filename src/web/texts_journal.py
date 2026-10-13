@@ -32,6 +32,36 @@ _WEB: dict[str, tuple[str, str]] = {
     "do_move": ("Проверка перенесена", "Inspection moved"),
     "do_retract": ("Проверка снята", "Inspection retracted"),
     "do_revise": ("Нарушение исправлено", "Finding revised"),
+    "reset_second_factor": (
+        "Сброшена вторая ступень входа у человека",
+        "Second sign-in step reset for a person",
+    ),
+    "security_passkey_register": ("Подключён ключ доступа", "Passkey added"),
+    "security_passkey_delete": ("Удалён ключ доступа", "Passkey removed"),
+    "security_totp_confirm": (
+        "Подключено приложение-аутентификатор",
+        "Authenticator app connected",
+    ),
+    "security_totp_remove": (
+        "Отключено приложение-аутентификатор",
+        "Authenticator app disconnected",
+    ),
+    "second_step_code": ("Второй шаг входа: код", "Second sign-in step: code"),
+    "second_step_passkey_options": (
+        "Второй шаг входа: запрос ключа доступа",
+        "Second sign-in step: passkey request",
+    ),
+    "second_step_passkey_verify": (
+        "Второй шаг входа: ключ доступа",
+        "Second sign-in step: passkey",
+    ),
+    "security_passkey_options": ("Запрос на добавление ключа доступа", "Passkey add request"),
+    "security_relogin": ("Выход для повторного входа", "Sign-out to sign in again"),
+    "security_totp_start": (
+        "Начато подключение приложения-аутентификатора",
+        "Authenticator app setup started",
+    ),
+    "security_backup_generate": ("Выпущены резервные коды", "Backup codes issued"),
     "freeze_user": ("Заморожена учётка", "Account frozen"),
     "unfreeze_user": ("Разморожена учётка", "Account unfrozen"),
     "letter_draft": ("Черновик письма", "Letter draft"),
@@ -93,6 +123,14 @@ _WEB: dict[str, tuple[str, str]] = {
     "user_role": ("Изменена роль человека", "Person's role changed"),
 }
 
+#: Действия командной строки на сервере (`tools/web_user.py`): маршрута у них нет.
+_CLI: dict[str, tuple[str, str]] = {
+    "reset_second_factor_cli": (
+        "Сброшена вторая ступень входа командой с сервера",
+        "Second sign-in step reset by a server command",
+    ),
+}
+
 #: Инструменты MCP (Claude).
 _MCP: dict[str, tuple[str, str]] = {
     "add_checklist_item": ("Добавлен пункт чек-листа", "Checklist item added"),
@@ -139,6 +177,7 @@ _METHODS: dict[str, tuple[str, str]] = {
     "oauth-claude": ("Claude (через сайт)", "Claude (via the site)"),
     "personal-mcp-token": ("Личный токен Claude", "Personal Claude token"),
     "bot-link": ("Ссылка привязки бота", "Bot link"),
+    "second-step": ("Вторая ступень входа", "Second sign-in step"),
 }
 _RESULTS: dict[str, tuple[str, str]] = {
     "ok": ("Вход выполнен", "Signed in"),
@@ -147,6 +186,9 @@ _RESULTS: dict[str, tuple[str, str]] = {
     "unknown": ("Нет такой учётки", "No such account"),
     "rate-limited": ("Запрещено: много попыток", "Blocked: too many attempts"),
     "refused": ("Способ закрыт для учётки", "Method closed for the account"),
+    "bad-code": ("Код не подошёл", "Code rejected"),
+    "passkey-fail": ("Ключ доступа не принят", "Passkey rejected"),
+    "backup-used": ("Вход по резервному коду", "Signed in with a backup code"),
 }
 _DOORS: dict[str, tuple[str, str]] = {
     "web": ("Сайт", "Web"),
@@ -237,7 +279,7 @@ _SCREEN: dict[str, dict[str, str]] = {
 def _build() -> dict[str, dict[str, str]]:
     return {
         **_SCREEN,
-        **_pairs("journal.action", {**_MCP, **_WEB}),
+        **_pairs("journal.action", {**_MCP, **_WEB, **_CLI}),
         **_pairs("journal.method", _METHODS),
         **_pairs("journal.result", _RESULTS),
         **_pairs("journal.door", _DOORS),

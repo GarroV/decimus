@@ -119,6 +119,16 @@ def may_unfreeze(scope: Scope) -> bool:
     return scope.kind == SUPER
 
 
+def may_reset_second_factor(scope: Scope) -> bool:
+    """Сбросить чужую вторую ступень входа (D463): только главный админ.
+
+    Свою ступень он не сбрасывает через сайт — для него команда с сервера
+    (`tools/web_user.py reset-second-factor`): сброс через сайт был бы обходом второй
+    ступени для того, кто в неё уже вошёл.
+    """
+    return scope.kind == SUPER
+
+
 def may_grant(scope: Scope, *, tenant: str, role: str) -> bool:
     """Можно ли выдать эту роль в этом пространстве (заведение или смена роли).
 

@@ -58,6 +58,20 @@
 .sconn__panel__title small { margin-left: auto; font-size: 12px; font-weight: var(--w-regular); color: var(--ink-2); }
 .sconn__panel .ssec { margin: 0; padding: 0; border-top: 0; }
 
+/* ── «Вход и защита» (D463): список ключей, QR, ключ для ввода, резервные коды ── */
+.slist { list-style: none; margin: 0 0 var(--space-5); padding: 0; }
+.slist__row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-6); padding: var(--space-5) 0; border-top: 1px solid var(--line); }
+.slist__main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.slist__name { font-size: 13.5px; line-height: 18px; font-weight: var(--w-semibold); color: var(--ink); overflow-wrap: anywhere; }
+.slist__act { flex: none; margin-left: auto; }
+.slist__act .sconfirm { margin-top: 0; }
+.slist__act:has(details[open]) { flex: 1 1 100%; order: 3; margin-left: 0; }
+.sqr { display: inline-block; padding: var(--space-3); border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+.sqr svg { display: block; width: 176px; height: 176px; }
+.skey { margin: 0 0 var(--space-5); font-size: 14px; letter-spacing: .06em; overflow-wrap: anywhere; color: var(--ink); }
+.scodes { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-3) var(--space-7); font-size: 14px; letter-spacing: .04em; color: var(--ink); }
+.scodes li { padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+
 /* ── телефон: всё в одну колонку, панель — под плитками ──────────────── */
 @media (max-width: 899px) {
   .stop, .sconn { grid-template-columns: minmax(0, 1fr); }
@@ -68,4 +82,5 @@
   .srow2__value { flex: 1 1 100%; }
   .srow2__act { margin-left: 0; }
   .stiles { grid-template-columns: minmax(0, 1fr); }
+  .scodes { grid-template-columns: minmax(0, 1fr); }
 }

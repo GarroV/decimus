@@ -26,7 +26,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import bot_links, journals, web_throttle
+from src.db import bot_links, journals, second_factor, web_throttle
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth, home_board, home_ratings, home_ratings_block, to_inspect
@@ -56,6 +56,7 @@ class Учётка:
         signed_in_at: datetime | None = None,
         display_name: str | None = None,
         avatar_etag: str | None = None,
+        has_second_factor: bool = True,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
         # Номер сессии (`web_sessions.id`): на него ссылаются журналы входов и действий (D462).
@@ -76,6 +77,9 @@ class Учётка:
         # блок учётки показывает логин и инициалы.
         self.display_name = display_name
         self.avatar_etag = avatar_etag
+        # Вторая ступень (D463): по умолчанию подключена — админ-двойник без неё видел бы
+        # только экран подключения во всех тестах разом. Наборы про ступень задают сами.
+        self.has_second_factor = has_second_factor
         # Когда открыта сессия: по умолчанию только что — вход свежий, и
         # действия, требующие свежего входа (`web.reauth`), не переспрашивают.
         self.signed_in_at = signed_in_at or datetime.now(UTC)
@@ -239,6 +243,9 @@ def подменить_двери(
     # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
     # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.
     monkeypatch.setattr(auth, "reach_of", охват_без_базы)
+    # Вторая ступень (D463): наборы экранов её не поднимают — способа входа ни у кого нет,
+    # сессия выдаётся сразу. Наборы про ступень (`test_web_second_step`) ходят в настоящую базу.
+    monkeypatch.setattr(second_factor, "has_any", lambda _user_id: False)
     # Привязка бота (D286) на вкладке «Пользователи» тоже читает базу: по
     # умолчанию бот не привязан ни у кого. Наборы про привязку подменяют сами.
     monkeypatch.setattr(bot_links, "binding_of", lambda _user_id: None)

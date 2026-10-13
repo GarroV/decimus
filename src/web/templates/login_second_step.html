@@ -1,0 +1,69 @@
+{#
+  «Подтвердите вход» (D463): первая ступень (Google или пароль) пройдена, сессии ещё
+  нет. Страница открыта по куке полупройденного входа, а не по сессии: что она ничего
+  не открывает, держит сам вход (см. `second_step.py`).
+
+  Ответ об осечке один на все причины («не подошло»). Введённый код обратно в разметку
+  не возвращается.
+
+  Ключ доступа — кнопка со скриптом (`passkey.js`): без скрипта и в окнах без WebAuthn
+  (встроенный браузер Telegram) остаётся код, а скрипт при отсутствии WebAuthn показывает
+  подсказку «откройте в Safari или Chrome».
+#}{% extends "base.html" %}
+{% block title %}{{ t('sf.step.title') }}{% endblock %}
+{% block head %}
+  <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
+{% endblock %}
+
+{% block body %}
+  <div class="login">
+    <h1 class="section__title login__head">{{ t('sf.step.title') }}</h1>
+    <p class="login__lead">{{ t('sf.step.lead') }}</p>
+    <p class="login__aside">{{ t('sf.step.who', login=login) }}</p>
+
+    {% if locked_minutes %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('sf.step.locked', minutes=locked_minutes) }}</div></div>
+      </div>
+    {% elif failed %}
+      <div class="note note--error login__note" role="alert">
+        <div><div class="note__title">{{ t('sf.step.failed') }}</div></div>
+      </div>
+    {% endif %}
+
+    {% if has_passkeys %}
+      <div class="login__google" data-passkey-login
+           data-options-url="{{ url('/login/second-step/passkey/options') }}"
+           data-verify-url="{{ url('/login/second-step/passkey/verify') }}"
+           data-msg-failed="{{ t('sf.step.passkey_failed') }}"
+           data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
+        <button class="btn btn--primary" type="button" data-passkey-button>{{ t('sf.step.passkey') }}</button>
+        <p class="login__aside">{{ t('sf.step.passkey_hint') }}</p>
+        <div class="note note--warn login__note" role="alert" data-passkey-message hidden>
+          <div><div class="note__title" data-passkey-message-text></div></div>
+        </div>
+      </div>
+    {% elif passkeys_off %}
+      <p class="login__aside">{{ t('sf.step.passkey_off') }}</p>
+    {% endif %}
+
+    {% if has_passkeys and has_code %}
+      <div class="login__or" aria-hidden="true"><span>{{ t('auth.or') }}</span></div>
+    {% endif %}
+
+    {% if has_code %}
+      <form class="login__form" method="post" action="{{ url('/login/second-step/code') }}?lang={{ lang }}">
+        <label class="sr-only" for="code">{{ t('sf.step.code') }}</label>
+        <input class="input" id="code" name="code" type="text" inputmode="text"
+               placeholder="{{ t('sf.step.code') }}" autocomplete="one-time-code"
+               autocapitalize="characters" spellcheck="false" maxlength="40"
+               {% if not has_passkeys %}autofocus{% endif %} required>
+        <button class="btn{% if not has_passkeys %} btn--primary{% endif %}" type="submit">{{ t('sf.step.submit') }}</button>
+      </form>
+      <p class="login__aside">{{ t('sf.step.code_hint') }}</p>
+    {% endif %}
+
+    <p class="login__aside">{{ t('sf.step.lost') }}</p>
+    <p class="login__aside"><a href="{{ url_for('login') }}?lang={{ lang }}">{{ t('sf.step.restart') }}</a></p>
+  </div>
+{% endblock %}

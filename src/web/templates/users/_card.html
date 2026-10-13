@@ -103,6 +103,15 @@
       </section>
     {% endif %}
 
+    {% if row and manage and may_reset_factor and not свой and not row.disabled_at %}
+      <section class="ssec">
+        <h3 class="ssec__title">{{ t('sf.reset.title') }}</h3>
+        <p class="ssec__note">{{ t('sf.reset.note') }}</p>
+        {{ confirm('sf-reset-' ~ row.id, t('sf.reset.open'), t('sf.reset.confirm', login=row.login), t('sf.reset.yes'),
+                   users_url ~ '/reset-second-factor?lang=' ~ lang, [('login', row.login), ('tenant', row.tenant)]) }}
+      </section>
+    {% endif %}
+
     {% if row and manage %}
       <section class="ssec ssec--danger">
         <h3 class="ssec__title">{{ t('users.panel.access_title') }}</h3>
