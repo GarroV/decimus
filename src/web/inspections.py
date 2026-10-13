@@ -312,7 +312,9 @@ def move_card(
     try:
         дата = date.fromisoformat((new_date or "").strip())
     except ValueError:
-        raise MoveError("Дата не указана или указана не в формате ГГГГ-ММ-ДД") from None
+        raise MoveError(
+            "Дата не указана или указана не в формате ГГГГ-ММ-ДД", code="move_date_invalid"
+        ) from None
     return move.move_inspection(
         inspection_id,
         tenant=tenant,

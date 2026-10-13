@@ -101,12 +101,21 @@ def _apply(conn: psycopg.Connection[Any], ident: str, tenant: str, автор: s
         cur.execute(_SELECT_HEAD_SQL, {"id": ident, "tenant": tenant})
         шапка = cur.fetchone()
         if шапка is None:
-            raise AcceptError(f"Проверки {ident} у арендатора {tenant} нет — подтверждать нечего")
+            raise AcceptError(
+                f"Проверки {ident} у арендатора {tenant} нет — подтверждать нечего",
+                code="inspection_not_found",
+            )
         статус, отклонена, происхождение = шапка
         if отклонена is not None:
-            raise AcceptError(f"Проверка {ident} отклонена — отклонённую не подтверждают")
+            raise AcceptError(
+                f"Проверка {ident} отклонена — отклонённую не подтверждают",
+                code="accept_rejected",
+            )
         if статус != "draft":
-            raise AcceptError(f"Проверка {ident} уже принята — подтверждать второй раз нечего")
+            raise AcceptError(
+                f"Проверка {ident} уже принята — подтверждать второй раз нечего",
+                code="accept_already",
+            )
         cur.execute(_ACCEPT_SQL, {"id": ident, "tenant": tenant, "actor": автор})
         if cur.rowcount != 1:
             raise AcceptError(
@@ -134,5 +143,6 @@ def _open_plan_request(conn: psycopg.Connection[Any], ident: str, автор: st
         raise AcceptError(
             f"Проверка {ident} не подтверждена: в ней есть D2 или D3, и вместе с ней "
             f"должен завестись запрос экшн-плана, а он не завёлся. Проверка осталась на "
-            f"приёмке; причина записана в журнал"
+            f"приёмке; причина записана в журнал",
+            code="accept_plan_failed",
         ) from exc

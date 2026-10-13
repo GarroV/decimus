@@ -34,6 +34,7 @@ from aiogram.types import (
 )
 
 from src import domain
+from src.domain.log_ids import log_id
 
 from . import (
     agg_loader,
@@ -107,7 +108,9 @@ def _lang_here(chat_id: int) -> str:
     try:
         return chat_ui_lang(chat_id)
     except Exception:
-        logger.exception("язык чата %s не выбрался — отвечаем на %s", chat_id, DEFAULT_UI_LANG)
+        logger.exception(
+            "язык чата %s не выбрался — отвечаем на %s", log_id(chat_id), DEFAULT_UI_LANG
+        )
         return DEFAULT_UI_LANG
 
 
@@ -145,7 +148,7 @@ async def on_unexpected_error(event: ErrorEvent) -> bool:
     except Exception:
         # Ответить не вышло — телеграм отказал или чат недоступен. Падать
         # отсюда нельзя: это последний рубеж, за ним обработчика уже нет.
-        logger.exception("не удалось сказать аудитору о сбое в чате %s", message.chat.id)
+        logger.exception("не удалось сказать аудитору о сбое в чате %s", log_id(message.chat.id))
     return True
 
 
@@ -348,7 +351,9 @@ async def _menu_button(
     try:
         await bot.set_chat_menu_button(chat_id=chat_id, menu_button=кнопка)
     except Exception:
-        logger.exception("кнопка у поля ввода не объявилась (%s) — бот работает без неё", chat_id)
+        logger.exception(
+            "кнопка у поля ввода не объявилась (%s) — бот работает без неё", log_id(chat_id)
+        )
 
 
 def log_startup(settings: BotSettings) -> None:

@@ -153,7 +153,29 @@ class UnboundError(AccessError):
     """
 
 
-class RetractionError(DbError):
+class DomainRefusal(DbError):
+    """Отказ действия над проверкой, который можно показать человеку (F-012).
+
+    Текст (`str(exc)`) пишется оператору: в него попадают строки хранилища,
+    счётчики строк и устройство политики. Человеку на экране он не уходит —
+    переводчик `src/web/db_refusal.domain_reason` берёт по `code` фразу из
+    каталога `texts_refusals.py`, подставляя `params`. Отказ без кода или с
+    неизвестным кодом получает общий текст, а подробности идут в журнал.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str | None = None,
+        params: dict[str, object] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.params: dict[str, object] = dict(params or {})
+
+
+class RetractionError(DomainRefusal):
     """Проверку не сняли из истории (T210, T233).
 
     Отдельный тип, а не `PushError`: слив и снятие отказывают по разным
@@ -165,7 +187,7 @@ class RetractionError(DbError):
     """
 
 
-class MoveError(DbError):
+class MoveError(DomainRefusal):
     """Проверку не перенесли по дате или пиццерии (D195).
 
     Текст безопасен для показа на карточке: ни строки подключения, ни текста
@@ -187,7 +209,7 @@ class SynonymError(DbError):
     """
 
 
-class AcceptError(DbError):
+class AcceptError(DomainRefusal):
     """Проверку не подтвердили на приёмке (D199).
 
     Текст безопасен для показа на карточке: ни строки подключения, ни текста
@@ -195,7 +217,7 @@ class AcceptError(DbError):
     """
 
 
-class ReviseError(DbError):
+class ReviseError(DomainRefusal):
     """Запись проверки на приёмке не исправлена (D200).
 
     Текст безопасен для показа на карточке: ни строки подключения, ни текста

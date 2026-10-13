@@ -138,6 +138,7 @@ left join lateral (
     from inspections p
     where p.unit_id = i.unit_id
       and p.status = 'finalized'
+      and p.retracted_at is null
       and (%(tenants)s::text[] is null or p.tenant_code = any(%(tenants)s))
       and (p.inspection_date, p.pushed_at) < (i.inspection_date, i.pushed_at)
     order by p.inspection_date desc, p.pushed_at desc
@@ -149,6 +150,7 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and i.status = 'finalized'
+  and i.retracted_at is null
 order by i.inspection_date desc, i.pushed_at desc, i.id
 limit %(limit)s
 """
@@ -341,6 +343,7 @@ from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
 where i.status = 'finalized'
+  and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
@@ -353,6 +356,7 @@ select u.country, count(*),
 from inspections i
 join units u on u.id = i.unit_id
 where i.status = 'finalized'
+  and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
