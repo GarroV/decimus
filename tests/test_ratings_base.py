@@ -28,6 +28,7 @@ from src.ratings.model import (
 )
 
 СЕГОДНЯ = date(2026, 10, 13)
+ДРУГОЙ = "bb000000000000000000000000000002"
 
 SCORES_HEADER = [
     "Месяц",
@@ -330,7 +331,51 @@ def test_нарушения_рс_пустое_нарушение_пропуще�
     assert parsed.sheet_remarks[0].period.rating_type == RS and parsed.skipped == 1
 
 
-def test_справочник_id_в_одной_форме_двусмысленное_имя_выброшено() -> None:
+def test_флаги_повтор_названий_схлопывается_порядок_первого_вхождения() -> None:
+    """«Название Д3 / Критичного» — тексты через «, », часто с повтором."""
+    flags = (
+        "Да",
+        "Температура на линии, Температура на линии",
+        "Да",
+        "Белое дно, Пиццу привезли холодной,  Белое дно",
+        "Нет",
+        "",
+    )
+    parsed = base.parse_base_scores(scores(_score_row(flags=flags)), today=СЕГОДНЯ)
+    (s,) = parsed.scores
+    assert s.flags is not None
+    assert s.flags.d3_name == "Температура на линии"
+    assert s.flags.critical_name == "Белое дно, Пиццу привезли холодной"
+    assert s.flags.zeroing_name is None
+
+
+def test_неделя_через_новый_год_с_датой_строки_после_конца_недели() -> None:
+    """Дата листа — время оценки, на день позже конца недели: год всё равно у недели."""
+    после = base.period_for(
+        "28.12 — 03.01", rating_type=RKO, today=date(2027, 1, 12), seen=date(2027, 1, 4)
+    )
+    assert (после.begin_on, после.end_on) == (date(2026, 12, 28), date(2027, 1, 3))
+    внутри = base.period_for(
+        "28.12 — 03.01", rating_type=RKO, today=date(2027, 1, 12), seen=date(2027, 1, 2)
+    )
+    assert внутри.begin_on == date(2026, 12, 28)
+    начало = base.period_for(
+        "28.12 — 03.01", rating_type=RKO, today=date(2027, 1, 12), seen=date(2026, 12, 29)
+    )
+    assert начало.begin_on == date(2026, 12, 28)
+
+
+def test_дата_строки_на_день_позже_конца_обычной_недели_период_тот_же() -> None:
+    p = base.period_for("07.09 — 13.09", rating_type=RKO, today=СЕГОДНЯ, seen=date(2026, 9, 14))
+    assert (p.begin_on, p.end_on) == (date(2026, 9, 7), date(2026, 9, 13))
+
+
+def test_рс_декабрь_2_с_датой_в_январе_остаётся_декабрём() -> None:
+    p = base.period_for("Декабрь 2", rating_type=RS, today=date(2027, 1, 12), seen=date(2027, 1, 2))
+    assert (p.begin_on, p.end_on) == (date(2026, 12, 16), date(2026, 12, 31))
+
+
+def test_справочник_id_в_одной_форме_двусмысленное_имя_помечено() -> None:
     upper = U1.upper()
     other = "bb000000000000000000000000000002"
     data = to_csv(
@@ -345,13 +390,31 @@ def test_справочник_id_в_одной_форме_двусмысленн
             ["Testville-3", "", ""],
         ],
     )
-    assert base.parse_directory(data) == {"testville-1": U1}
+    # Testville-2: в ссылках РКО и РС разные id — имя помечено, а не угадано
+    assert base.parse_directory(data) == {"testville-1": U1, "testville-2": base.AMBIGUOUS}
 
 
 def test_справочник_турецкое_написание_сходится_с_латиницей() -> None:
-    """D467: в справочнике «İzmir-4», в листе оценок «Izmir-4» — одна пиццерия."""
+    """D472: в справочнике «İzmir-4», в листе оценок «Izmir-4» — одна пиццерия."""
     data = to_csv(
         ["Пиццерия", "Ссылка для РКО", "Ссылка для РС"],
         [["İzmir-4", f"https://dodopizza.info/rating#/{U1}/1?", ""]],
     )
     assert base.parse_directory(data) == {"izmir-4": U1}
+
+
+def test_справочник_id_двух_имён_не_достаётся_ни_одному() -> None:
+    """Настоящий случай: у «Новополоцк-1» обе ссылки несут id «Полоцк-1»."""
+    data = to_csv(
+        ["Пиццерия", "Ссылка для РКО", "Ссылка для РС"],
+        [
+            ["Testville-1", f"https://dodopizza.info/rating#/{U1}/1?", ""],
+            ["Testville-2", f"https://dodopizza.info/rating#/{U1}/1?", ""],
+            ["Testville-3", f"https://dodopizza.info/rating#/{ДРУГОЙ}/1?", ""],
+        ],
+    )
+    assert base.parse_directory(data) == {
+        "testville-1": base.AMBIGUOUS,
+        "testville-2": base.AMBIGUOUS,
+        "testville-3": ДРУГОЙ,
+    }

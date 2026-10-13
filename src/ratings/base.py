@@ -57,8 +57,13 @@ _NO = frozenset({"нет", "no", "false", "0", ""})
 _JS_DATE = re.compile(r"^[A-Za-z]{3} (?P<mon>[A-Za-z]{3}) (?P<day>\d{1,2}) (?P<year>\d{4}) ")
 _MONTHS = ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec")
 _COUNT = re.compile(r"^\d{1,6}$")
+#: Разделитель названий в ячейках «Название Д3 / Критичного / Обнуления».
+_SEP = ", "
 
 _T = TypeVar("_T")
+
+#: Вместо id в справочнике ссылок: у имени разные id в ссылках РКО и РС или в разных строках.
+AMBIGUOUS = ""
 
 
 def row_date(cell: str) -> date | None:
@@ -84,8 +89,30 @@ def _year_from_today(label: Label, today: date) -> int:
     raise _BadRow("нет года, в котором период с такой датой начала мог начаться")
 
 
+def _year_near(label: Label, seen: date) -> int:
+    """Год, в котором период подписи ближе всего к дате строки.
+
+    «Дата» листа нарушений — время оценки, а не проверки: она бывает днём позже конца
+    недели, и у недели через Новый год это другой календарный год, чем у её начала
+    («28.12 — 03.01» с датой 4 января — неделя декабря прошлого года). Берётся год,
+    в котором строка лежит в периоде или ближе всего к нему.
+    """
+    best: tuple[int, int] | None = None
+    for year in (seen.year - 1, seen.year, seen.year + 1):
+        try:
+            period = period_of(label, year)
+        except ValueError:  # 29 февраля в невисокосном году
+            continue
+        gap = max((period.begin_on - seen).days, (seen - period.end_on).days, 0)
+        if best is None or gap < best[0]:
+            best = (gap, year)
+    if best is None:
+        raise _BadRow("нет года, в котором период с такой датой начала существует")
+    return best[1]
+
+
 def period_for(text: str, *, rating_type: str, today: date, seen: date | None = None) -> PeriodRef:
-    """Период по подписи листа. `seen` — дата строки: её год главнее вывода от «сегодня».
+    """Период по подписи листа. `seen` — дата строки: она главнее вывода от «сегодня».
 
     Подпись не периода, период другого типа или несуществующая дата — `_BadRow`.
     """
@@ -94,7 +121,7 @@ def period_for(text: str, *, rating_type: str, today: date, seen: date | None = 
         raise _BadRow(f"подпись периода «{text}» не узнана")
     if label.rating_type != rating_type:
         raise _BadRow(f"период «{text}» не относится к этому типу рейтинга")
-    year = label.year or (seen.year if seen else _year_from_today(label, today))
+    year = label.year or (_year_near(label, seen) if seen else _year_from_today(label, today))
     try:
         return period_of(label, year)
     except ValueError as exc:
@@ -117,8 +144,14 @@ def _flag(cell: str, column: str) -> bool:
     raise _BadRow(f"в колонке «{column}» не «Да» и не «Нет»: «{cell.strip()}»")
 
 
+def _collapse(text: str) -> str | None:
+    """«X, X, Y» → «X, Y»: названия флагов таблица склеивает через «, » и часто повторяет."""
+    parts = dict.fromkeys(part for part in (" ".join(p.split()) for p in text.split(_SEP)) if part)
+    return _SEP.join(parts) or None
+
+
 def _named(row: dict[str, str], flag: str, name: str) -> tuple[bool, str | None]:
-    return _flag(row.get(flag, ""), flag), row.get(name, "").strip() or None
+    return _flag(row.get(flag, ""), flag), _collapse(row.get(name, ""))
 
 
 def _build(
@@ -271,10 +304,11 @@ def parse_base_rs_violations(data: bytes, *, today: date) -> Parsed:
 def parse_directory(data: bytes) -> dict[str, str]:
     """Справочник ссылок «Пиццерия, Ссылка для РКО, Ссылка для РС» → имя → id Dodo IS.
 
-    Ключ — имя после `fold_unit_name` (D467: «İzmir-4» и «Izmir-4» — одна пиццерия).
-    Имя, за которым стоят разные id (в двух ссылках строки или в двух строках),
-    в словарь не попадает: ошибиться пиццерией
-    хуже, чем оставить строку несопоставленной.
+    Ключ — имя после `fold_unit_name` (D472: «İzmir-4» и «Izmir-4» — одна пиццерия).
+    Имя, за которым стоят разные id (в двух ссылках строки или в двух строках), и два
+    имени с одним id получают `AMBIGUOUS` вместо id: ошибиться пиццерией хуже, чем
+    оставить строку несопоставленной, и загрузка пишет такое имя в журнал, а не молчит.
+    Id сравниваются без учёта регистра.
     """
     header, rows = read_table(data)
     if "Пиццерия" not in header:
@@ -291,4 +325,26 @@ def parse_directory(data: bytes) -> dict[str, str]:
             if (link := parse_rating_link(row.get(column, ""))) is not None
         }
         ids.setdefault(key, set()).update(found)
-    return {key: next(iter(found)) for key, found in ids.items() if len(found) == 1}
+    return shared_ids_ambiguous({key: one_id(found) for key, found in ids.items() if found})
+
+
+def shared_ids_ambiguous(directory: dict[str, str]) -> dict[str, str]:
+    """Id, на который ссылаются два разных имени, не достаётся ни одному из них.
+
+    В настоящем справочнике у «Новополоцк-1» обе ссылки несут id «Полоцк-1»: кто из
+    двух придёт в загрузку первым, забрал бы чужой id.
+    """
+    owners: dict[str, int] = {}
+    for dodo_id in directory.values():
+        if dodo_id != AMBIGUOUS:
+            owners[dodo_id.casefold()] = owners.get(dodo_id.casefold(), 0) + 1
+    return {
+        key: AMBIGUOUS if dodo_id == AMBIGUOUS or owners[dodo_id.casefold()] > 1 else dodo_id
+        for key, dodo_id in directory.items()
+    }
+
+
+def one_id(found: set[str]) -> str:
+    """Единственный id из набора; несколько разных — `AMBIGUOUS`."""
+    unique = {dodo_id.casefold(): dodo_id for dodo_id in found}
+    return next(iter(unique.values())) if len(unique) == 1 else AMBIGUOUS

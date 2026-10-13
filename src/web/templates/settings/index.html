@@ -4,6 +4,12 @@
   пароль. Открыта каждому вошедшему, любой роли; людей здесь нет, только
   учётка самого человека, и чья она — решает сессия, а не форма.
 
+  Страница плитками, как «Настройки» в Swarm Brain (D470): карточка «Профиль»
+  со строками, малые карточки «Язык» и «Пароль», ниже «Подключения» — плитки
+  Claude, бота и Google и панель выбранной справа. Выбранная плитка — в адресе
+  (`?tile=claude|bot|google`), плитки — обычные ссылки, скрипт не нужен. Все
+  формы, маршруты и подтверждение входа (D457) прежние.
+
   Секреты — токен Claude и ссылка привязки бота — показаны ЗДЕСЬ, ответом на
   отправку, и больше нигде: в адрес они не попадают, потому что адреса остаются
   в истории браузера и журнале обратного прокси.
@@ -13,25 +19,128 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-settings.css') }}">
   <script src="{{ url_for('static', filename='split.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='settings.js') }}" defer></script>
 {% endblock %}
 {% block page_class %} page--settings{% endblock %}
 {% block body %}
   {% from "_split_ui.html" import confirm %}
+  {% set tile_icon = {'claude': 'spark', 'bot': 'tg', 'google': 'globe'} %}
+  {% set tile_name = {'claude': 'settings.claude.title', 'bot': 'settings.bot.title', 'google': 'settings.google.title'} %}
+  {% set google_login = google_enabled and me.email %}
   <header class="shead">
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.settings.title') }}</h1>
-      <p class="shead__sub">{{ me.login }} · {{ t(role_key(me.role, me.tenant)) }} · <span class="mono">{{ me.tenant }}</span></p>
+      <p class="ssec__note">{{ t('settings.sub') }}</p>
     </div>
   </header>
-  <article class="sdetail ssettings">
-    <p class="ssec__note">{{ t('settings.sub') }}</p>
+  <article class="ssettings">
     {% if show.flash %}
       <div class="note {{ 'note--ok' if show.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show.flash.key, **(show.flash.params or {})) }}</div></div>
     {% endif %}
 
-    {# ── Claude (MCP) ─────────────────────────────────────────────────── #}
-    <section class="ssec" id="claude">
-      <h2 class="ssec__title">{{ t('settings.claude.title') }}</h2>
+    <div class="stop">
+      {# ── Профиль: строки «поле — значение — кнопка справа» ───────────── #}
+      <section class="scard scard--profile" id="profile">
+        <h2 class="scard__title">{{ t('settings.profile.title') }}</h2>
+        <div class="sname">
+          <span class="sname__main">{{ me.display_name or me.login }}</span>
+          {% if me.display_name %}<span class="sname__sub mono">{{ me.login }}</span>{% endif %}
+        </div>
+        <div class="srow2">
+          <span class="srow2__label">{{ t('settings.profile.role') }}</span>
+          <span class="srow2__value">{{ t(role_key(me.role, me.tenant)) }} · <span class="mono">{{ me.tenant }}</span></span>
+        </div>
+        <div class="srow2">
+          <span class="srow2__label">{{ t('settings.profile.email') }}</span>
+          <span class="srow2__value">{{ me.email or t('settings.profile.email_none') }}</span>
+          <span class="srow2__act"><a class="sbtn" href="{{ base }}?lang={{ lang }}&tile=google#connections">{{ t('settings.profile.details') }}</a></span>
+        </div>
+        <div class="srow2" id="signout">
+          <span class="srow2__label">{{ t('settings.profile.sessions') }}</span>
+          <span class="srow2__value">{{ t('settings.signout.note') }}</span>
+          <span class="srow2__act">
+            {{ confirm('signout-confirm', t('settings.signout.open'), t('settings.signout.confirm'), t('settings.signout.yes'),
+                       base ~ '/sign-out-everywhere?lang=' ~ lang, []) }}
+          </span>
+        </div>
+        <div class="srow2">
+          <span class="srow2__label">{{ t('settings.profile.account') }}</span>
+          <span class="srow2__value mono">{{ me.login }}</span>
+          <span class="srow2__act">
+            {# Выход — форма, а не ссылка (как в меню учётки): ссылку запустила бы чужая страница. #}
+            <form method="post" action="{{ url(logout_path) }}"><button class="sbtn" type="submit">{{ t('auth.logout') }}</button></form>
+          </span>
+        </div>
+      </section>
+
+      <div class="sside">
+        <section class="scard" id="language">
+          <h2 class="scard__title">{{ t('settings.lang.title') }}</h2>
+          {% include "_langpick.html" %}
+          <p class="ssec__note">{{ t('settings.lang.note') }}</p>
+        </section>
+
+        <section class="scard" id="password">
+          <h2 class="scard__title">{{ t('profile.password.title') }}</h2>
+          <p class="ssec__note">{{ t('settings.password.card') }}</p>
+        {% if google_login %}
+          {# D450: с привязанной почтой Google паролем не входят — форма была бы
+             кнопкой, которая меняет то, чем войти нельзя. #}
+          <p class="ssec__text"><span class="sdot"></span>{{ t('settings.password.google') }}</p>
+        {% else %}
+          {% if show.password %}
+            <div class="note {{ 'note--ok' if show.password.key == 'ok' else 'note--warn' }}">
+              <div class="note__text">{{ t('profile.password.' ~ show.password.key, min=min_password, max=max_password, minutes=show.password.locked_minutes) }}</div>
+            </div>
+          {% endif %}
+          {# Свой пароль (#324): чью строку трогать, решает сессия, а не поле
+             формы. Введённое обратно в разметку не возвращается. #}
+          <details class="sfold"{% if show.password %} open{% endif %}>
+            <summary class="sbtn">{{ t('profile.password.submit') }}</summary>
+            <form method="post" action="{{ base }}/password?lang={{ lang }}" class="sform" id="password-form">
+              <label><span class="sform__label">{{ t('profile.password.current') }}</span>
+                <input class="sinput" type="password" name="current" required autocomplete="current-password"></label>
+              <label><span class="sform__label">{{ t('profile.password.new') }}</span>
+                <input class="sinput" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+              <label><span class="sform__label">{{ t('profile.password.repeat') }}</span>
+                <input class="sinput" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
+              <p class="ssec__note">{{ t('profile.password.hint', min=min_password) }}</p>
+              <button class="sbtn sbtn--primary" type="submit">{{ t('profile.password.submit') }}</button>
+            </form>
+          </details>
+        {% endif %}
+
+        </section>
+      </div>
+    </div>
+
+    {# ── Подключения: плитки и панель выбранной ──────────────────────── #}
+    <section class="scard scard--wide" id="connections">
+      <div class="scard__head">
+        <h2 class="scard__title">{{ t('menu.connections') }}</h2>
+        <span class="scard__count mono">{{ t('settings.conn.count', n=tile_count, total=tiles|length) }}</span>
+      </div>
+      <div class="sconn">
+        <nav class="stiles" aria-label="{{ t('menu.connections') }}">
+          {% for key in tiles %}
+            {% set state = tile_states[key] %}
+            <a class="stile{% if key == tile %} is-current{% endif %}" href="{{ base }}?lang={{ lang }}&tile={{ key }}#connections"
+               {% if key == tile %}aria-current="true"{% endif %}>
+              <span class="stile__icon">{{ icon(tile_icon[key]) }}</span>
+              <span class="stile__main">
+                <b>{{ t(tile_name[key]) }}</b>
+                <small>{{ t('menu.' ~ state) }}</small>
+              </span>
+              <span class="sdot{% if state == 'on' %} sdot--ok{% endif %}" aria-hidden="true"></span>
+            </a>
+          {% endfor %}
+        </nav>
+
+        <div class="sconn__panel">
+          <h3 class="sconn__panel__title">{{ icon(tile_icon[tile]) }}<span>{{ t(tile_name[tile]) }}</span>
+            <small><span class="sdot{% if tile_states[tile] == 'on' %} sdot--ok{% endif %}"></span>{{ t('menu.' ~ tile_states[tile]) }}</small></h3>
+          {% if tile == 'claude' %}
+          <div class="ssec" id="claude">
       <p class="ssec__text">{{ t('settings.claude.lead') }}</p>
 
       <div id="claude-token">
@@ -98,11 +207,9 @@
           {% endif %}
         </div>
       {% endif %}
-    </section>
-
-    {# ── Бот в Telegram ───────────────────────────────────────────────── #}
-    <section class="ssec" id="bot">
-      <h2 class="ssec__title">{{ t('settings.bot.title') }}</h2>
+          </div>
+          {% elif tile == 'bot' %}
+          <div class="ssec" id="bot">
       {% if show.bot_link %}
         <p class="ssec__text">{{ t('profile.bot.link') }}</p>
         <p class="ssecret"><a href="{{ show.bot_link }}" rel="noopener noreferrer"><code>{{ show.bot_link }}</code></a></p>
@@ -126,15 +233,9 @@
           <p class="ssec__note">{{ t('profile.bot.unset', var=bot_var) }}</p>
         {% endif %}
       {% endif %}
-    </section>
-
-    {# ── Google ───────────────────────────────────────────────────────── #}
-    {# Привязывает и снимает почту сам человек (D447). Привязка закрывает вход
-       паролем (D450) — сказано ДО ухода к Google, в раскрытой форме. Снять
-       можно только с паролем учётки: после снятия входят им. #}
-    {% set google_login = google_enabled and me.email %}
-    <section class="ssec" id="google">
-      <h2 class="ssec__title">{{ t('settings.google.title') }}</h2>
+          </div>
+          {% else %}
+          <div class="ssec" id="google">
       {% if me.email and google_enabled %}
         <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('settings.google.linked', email=me.email) }}</p>
       {% elif me.email %}
@@ -164,52 +265,10 @@
         </details>
       {% endif %}
       <p class="ssec__note">{{ t('settings.google.gmail') }}</p>
-    </section>
-
-    {# ── Язык интерфейса ──────────────────────────────────────────────── #}
-    <section class="ssec" id="language">
-      <h2 class="ssec__title">{{ t('settings.lang.title') }}</h2>
-      {% include "_langpick.html" %}
-      <p class="ssec__note">{{ t('settings.lang.note') }}</p>
-    </section>
-
-    {# ── Пароль ───────────────────────────────────────────────────────── #}
-    <section class="ssec" id="password">
-      <h2 class="ssec__title">{{ t('profile.password.title') }}</h2>
-      {% if google_login %}
-        {# D450: с привязанной почтой Google паролем не входят — форма была бы
-           кнопкой, которая меняет то, чем войти нельзя. #}
-        <p class="ssec__text"><span class="sdot"></span>{{ t('settings.password.google') }}</p>
-      {% else %}
-        {% if show.password %}
-          <div class="note {{ 'note--ok' if show.password.key == 'ok' else 'note--warn' }}">
-            <div class="note__text">{{ t('profile.password.' ~ show.password.key, min=min_password, max=max_password, minutes=show.password.locked_minutes) }}</div>
           </div>
-        {% endif %}
-        {# Свой пароль (#324): чью строку трогать, решает сессия, а не поле
-           формы. Введённое обратно в разметку не возвращается. #}
-        <details class="sfold"{% if show.password %} open{% endif %}>
-          <summary class="sbtn">{{ t('profile.password.submit') }}</summary>
-          <form method="post" action="{{ base }}/password?lang={{ lang }}" class="sform" id="password-form">
-            <label><span class="sform__label">{{ t('profile.password.current') }}</span>
-              <input class="sinput" type="password" name="current" required autocomplete="current-password"></label>
-            <label><span class="sform__label">{{ t('profile.password.new') }}</span>
-              <input class="sinput" type="password" name="new" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
-            <label><span class="sform__label">{{ t('profile.password.repeat') }}</span>
-              <input class="sinput" type="password" name="repeat" required minlength="{{ min_password }}" maxlength="{{ max_password }}" autocomplete="new-password"></label>
-            <p class="ssec__note">{{ t('profile.password.hint', min=min_password) }}</p>
-            <button class="sbtn sbtn--primary" type="submit">{{ t('profile.password.submit') }}</button>
-          </form>
-        </details>
-      {% endif %}
-    </section>
-
-    {# ── Выйти везде (D462) ───────────────────────────────────────────── #}
-    <section class="ssec ssec--danger" id="signout">
-      <h2 class="ssec__title">{{ t('settings.signout.title') }}</h2>
-      <p class="ssec__note">{{ t('settings.signout.note') }}</p>
-      {{ confirm('signout-confirm', t('settings.signout.open'), t('settings.signout.confirm'), t('settings.signout.yes'),
-                 base ~ '/sign-out-everywhere?lang=' ~ lang, []) }}
+          {% endif %}
+        </div>
+      </div>
     </section>
   </article>
 {% endblock %}

@@ -34,7 +34,7 @@ from src.mcp.config import (
     resolve_access,
 )
 from src.mcp.errors import McpConfigError
-from src.mcp.rpc import CHECKLIST_CLOSED, RETRACTION_CLOSED, handle
+from src.mcp.rpc import CHECKLIST_CLOSED, ROLE_CLOSED, handle
 
 АРЕНДАТОР = "партнёр-а"
 ТОКЕН_ПЕРВЫЙ = "a" * MIN_TOKEN_LENGTH
@@ -176,6 +176,7 @@ def _вызов(
         tenant=АРЕНДАТОР,
         checklist=checklist,
         may_retract=may_retract,
+        role="admin",
     )
 
 
@@ -186,16 +187,7 @@ def test_снятие_без_права_это_помеченный_отказ()
     ответ = _вызов("retract_inspection", {}, may_retract=False)
 
     assert ответ["result"]["isError"] is True
-    assert ответ["result"]["content"][0]["text"] == RETRACTION_CLOSED
-
-
-def test_отказ_снятия_называет_переменную_настройки() -> None:
-    """Читает отказ тот же человек, который держит сервер у себя на петле:
-    без имени переменной он пойдёт искать причину в коде, а не в `.env`."""
-    ответ = _вызов("retract_inspection", {}, may_retract=False)
-    текст = ответ["result"]["content"][0]["text"]
-
-    assert MCP_RETRACTION_TOKENS_VAR in текст
+    assert ответ["result"]["content"][0]["text"] == ROLE_CLOSED.format(роль="admin")
 
 
 def test_заслон_снятия_срабатывает_раньше_проверки_обязательных_аргументов() -> None:
@@ -206,7 +198,7 @@ def test_заслон_снятия_срабатывает_раньше_пров�
     ответ = _вызов("retract_inspection", {}, may_retract=False)
 
     assert "error" not in ответ
-    assert ответ["result"]["content"][0]["text"] == RETRACTION_CLOSED
+    assert ответ["result"]["content"][0]["text"] == ROLE_CLOSED.format(роль="admin")
 
 
 def test_заслон_снятия_срабатывает_раньше_проверки_неизвестных_аргументов() -> None:
@@ -216,22 +208,25 @@ def test_заслон_снятия_срабатывает_раньше_пров�
     ответ = _вызов("retract_inspection", {"совсем_не_тот_аргумент": True}, may_retract=False)
 
     assert "error" not in ответ
-    assert ответ["result"]["content"][0]["text"] == RETRACTION_CLOSED
+    assert ответ["result"]["content"][0]["text"] == ROLE_CLOSED.format(роль="admin")
 
 
-def test_снятие_видно_в_перечне_инструментов_даже_без_права() -> None:
-    """Перечень инструментов от права не зависит — то же правило, что у
-    методики: перечень, зависящий от прав, сказал бы «такого инструмента
-    нет», и человек пошёл бы искать причину в коде вместо `.env`."""
-    ответ = handle(
-        {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
-        tenant=АРЕНДАТОР,
-        may_retract=False,
-    )
+def test_снятие_видно_в_перечне_только_с_правом() -> None:
+    """Снятие закрыто матрицей для любой роли (`CLAUDE_CLOSED`); открывает его
+    только право из `MCP_RETRACTION_TOKENS` у служебного токена (`may_retract`)."""
 
-    assert ответ is not None
-    имена = {инструмент["name"] for инструмент in ответ["result"]["tools"]}
-    assert "retract_inspection" in имена
+    def имена(*, may_retract: bool) -> set[str]:
+        ответ = handle(
+            {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            tenant=АРЕНДАТОР,
+            may_retract=may_retract,
+            role="admin",
+        )
+        assert ответ is not None
+        return {инструмент["name"] for инструмент in ответ["result"]["tools"]}
+
+    assert "retract_inspection" not in имена(may_retract=False)
+    assert "retract_inspection" in имена(may_retract=True)
 
 
 # --- право не протекает на соседние виды инструментов -----------------------
@@ -253,4 +248,4 @@ def test_доступ_к_методике_не_открывает_снятие(t
 
     ответ = _вызов("retract_inspection", {}, checklist=store, may_retract=False)
 
-    assert ответ["result"]["content"][0]["text"] == RETRACTION_CLOSED
+    assert ответ["result"]["content"][0]["text"] == ROLE_CLOSED.format(роль="admin")

@@ -36,6 +36,15 @@ name: decimus-infra
 # `tunnel` ниже, решение D100). Диапазон 8220-8229, выделенный этой рабочей
 # копии, поэтому не занят ни одним портом.
 
+# Ротация логов: json-file без предела растёт, пока не съест диск площадки.
+# Якорь, а не копия в каждом сервисе — `x-stand` и сервисы с готовым образом
+# ссылаются на него.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 # Общая часть обоих стендов. Якорь, а не копия: скопированный блок разъезжается
 # молча, и демо снова начнёт отставать от продукта.
 x-stand: &stand
@@ -47,6 +56,7 @@ x-stand: &stand
       # «неизвестна» — это лучше правдоподобной подделки (T246).
       BUILD_SHA: ${BUILD_SHA:-}
   restart: unless-stopped
+  logging: *logging
   # Базовая защита процесса (F-003, аудит 12.10): образ идёт не от root
   # (Dockerfile), а здесь у него отбирается всё, что ему не нужно. Бот, MCP,
   # веб и обход слушают порты выше 1024 и пишут только в свои тома, поэтому
@@ -382,6 +392,7 @@ services:
     # Версия прибита, как у звена до MCP: обновление — отдельное осознанное
     # изменение, а не то, что подтянулось между двумя `up`.
     image: alpine/socat:1.8.0.0
+    logging: *logging
     restart: unless-stopped
     network_mode: "service:web"
     command:
@@ -475,6 +486,7 @@ services:
     # Версия прибита, как у туннеля и базы: обновление звена — отдельное
     # осознанное изменение, а не то, что подтянулось между двумя `up`.
     image: alpine/socat:1.8.0.0
+    logging: *logging
     restart: unless-stopped
     network_mode: "service:mcp"
     # Звено сидит в сетевом пространстве сервера не от красоты: сервер слушает
@@ -527,6 +539,7 @@ services:
     # Версия прибита, как и у Postgres: обновление туннеля — отдельное
     # осознанное изменение, а не то, что подтянулось между двумя `up`.
     image: cloudflare/cloudflared:2026.8.3
+    logging: *logging
     restart: unless-stopped
     network_mode: "service:mcp"
     # `--no-autoupdate` уже стоит в entrypoint образа: обновляться сам он не
@@ -595,6 +608,7 @@ services:
     # осознанное изменение, а не то, что подтянулось само между двумя `up`.
     # 16.x — та же ветка, на которой блок разрабатывался и проверялся.
     image: postgres:16.14-alpine
+    logging: *logging
     restart: unless-stopped
 
     environment:
@@ -668,6 +682,7 @@ services:
   storage:
     profiles: ["storage"]
     image: adobe/s3mock:4.9.0
+    logging: *logging
     restart: unless-stopped
 
     environment:
@@ -704,6 +719,7 @@ services:
   storage-live:
     profiles: ["storage-live"]
     image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    logging: *logging
     restart: unless-stopped
     # Без учётки — отказ подняться, а не хранилище с учёткой по умолчанию (F-014
     # аудита 12.10). Пустую учётку MinIO читает как «не задана» и встаёт со
@@ -760,6 +776,7 @@ services:
   storage-init:
     profiles: ["storage-live"]
     image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    logging: *logging
     restart: "no"
 
     depends_on:

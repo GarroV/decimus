@@ -190,6 +190,8 @@ def _finish(who: int, conf: WalkSettings, body: dict[str, Any], lang: str) -> tu
     outcome = walk_finish.send_summary(conf.bot_token, who)
     if outcome == walk_finish.NO_INSPECTION:
         raise Refused("walk.finish.err.none", 409)
+    if outcome == walk_finish.SEALED:
+        raise Refused("walk.sealed", 409)
     if outcome == walk_finish.FAILED:
         raise Refused("walk.finish.err.failed", 503)
     return jsonify({"sent": True, "mode": mode}), 200
@@ -200,6 +202,7 @@ _REPORT_REFUSALS = {
     walk_finish.LANG_GONE: ("walk.finish.err.lang", 409),
     walk_finish.INFO_MISSING: ("walk.finish.err.info", 409),
     walk_finish.BUSY: ("walk.finish.err.busy", 409),
+    walk_finish.SEALED: ("walk.sealed", 409),
     walk_finish.FAILED: ("walk.finish.err.failed", 503),
 }
 

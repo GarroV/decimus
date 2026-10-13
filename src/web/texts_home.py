@@ -1,4 +1,4 @@
-"""Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны.
+"""Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры.
 
 Отдельным модулем: `texts.py` уже длиннее предела файла. Сливаются в общий
 каталог (`texts.TEXTS`). Подписи блоков, общих со «Страной» (потери по зонам,
@@ -10,6 +10,16 @@ from __future__ import annotations
 HOME_TEXTS: dict[str, dict[str, str]] = {
     "home.country.all": {"ru": "Все страны", "en": "All countries"},
     "home.countries.open": {"ru": "Открыть страну: {country}", "en": "Open the country: {country}"},
+    "home.cluster.all": {"ru": "Все кластеры", "en": "All clusters"},
+    # ── Панель фильтров справа от списка (D471) ─────────────────────────
+    "home.filters.title": {"ru": "Фильтры", "en": "Filters"},
+    "home.filters.period": {"ru": "Период", "en": "Period"},
+    "home.filters.cluster": {"ru": "Кластер", "en": "Cluster"},
+    "home.filters.country": {"ru": "Страна", "en": "Country"},
+    "home.filters.note": {
+        "ru": "Фильтры действуют на весь экран, включая верхние блоки.",
+        "en": "Filters apply to the whole screen, including the top blocks.",
+    },
     "home.more.registry": {"ru": "Проверки", "en": "Inspections"},
     # ── «Требует внимания»: задания по живым счётчикам (D217) и пиццерии (D398) ─────────────
     "home.board.failed": {
@@ -63,9 +73,15 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "За период проверок нет.",
         "en": "No inspections in the period.",
     },
-    # ── Последние проверки (D399) ───────────────────────────────────────
-    "home.latest.title": {"ru": "Последние проверки", "en": "Latest inspections"},
-    "home.latest.all": {"ru": "Все проверки", "en": "All inspections"},
+    "home.more.n": {"ru": "ещё {n}", "en": "{n} more"},
+    "home.top.none": {
+        "ru": "Системных нарушений за период нет.",
+        "en": "No systemic violations in the period.",
+    },
+    "home.zones.none": {
+        "ru": "Потерь по зонам за период нет.",
+        "en": "No zone losses in the period.",
+    },
     "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
     # ── Колонки рейтинга клиента в таблице пиццерий (D399) ──────────────
     "home.rs.short": {"ru": "РС", "en": "RS"},

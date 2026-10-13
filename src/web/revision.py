@@ -71,27 +71,45 @@ def _checked_entry(
     """
     код, класс, зона, слова = code.strip(), level.strip().upper(), zone.strip(), text.strip()
     if not слова:
-        raise ReviseError("Формулировка записи пуста — запись без слов в отчёт не идёт")
+        raise ReviseError(
+            "Формулировка записи пуста — запись без слов в отчёт не идёт", code="revise_text_empty"
+        )
     if len(слова) > MAX_TEXT:
-        raise ReviseError(f"Формулировка длиннее {MAX_TEXT} знаков")
+        raise ReviseError(
+            f"Формулировка длиннее {MAX_TEXT} знаков",
+            code="revise_text_long",
+            params={"max": MAX_TEXT},
+        )
     try:
         состав = checklist_of(detail.inspection, lang=lang)
     except MethodologyRefused as exc:
         # Подробность (имена переменных окружения, пути хранилища) — в журнал
         # сервера, не на экран: человеку она ничего не даёт, а устройство стенда выдаёт.
         logger.warning("правка записи: чек-лист проверки %s не прочитан: %s", inspection_id, exc)
-        raise ReviseError("Чек-лист этой проверки не прочитан, сверять не с чем") from exc
+        raise ReviseError(
+            "Чек-лист этой проверки не прочитан, сверять не с чем", code="revise_checklist"
+        ) from exc
     пункт = next((i for i in состав.items if str(i.get("id", "")) == код), None)
     if пункт is None or (пункт.get("kind") or VIOLATION).strip() != VIOLATION:
-        raise ReviseError(f"Пункта нарушения {код} в чек-листе версии этой проверки нет")
+        raise ReviseError(
+            f"Пункта нарушения {код} в чек-листе версии этой проверки нет",
+            code="revise_no_item",
+            params={"item": код},
+        )
     if класс not in _levels(пункт):
         raise ReviseError(
             f"Класс {класс} для пункта {код} не предусмотрен — допустимы: "
-            f"{', '.join(_levels(пункт)) or 'никакие'}"
+            f"{', '.join(_levels(пункт)) or 'никакие'}",
+            code="revise_bad_level",
+            params={"level": класс, "item": код, "allowed": ", ".join(_levels(пункт)) or "—"},
         )
     зоны_версии = {str(z.get("code", "")) for z in состав.zones}
     if зона not in зоны_версии:
-        raise ReviseError(f"Зоны {зона} в чек-листе версии этой проверки нет")
+        raise ReviseError(
+            f"Зоны {зона} в чек-листе версии этой проверки нет",
+            code="revise_no_zone",
+            params={"zone": зона},
+        )
     свои = _zones(пункт)
     необычная = bool(свои) and свои != ("*",) and зона not in свои
     return код, класс, зона, слова, необычная
@@ -101,20 +119,23 @@ def _editable(inspection_id: str, *, tenant: str, lang: str) -> InspectionDetail
     """Проверка своего пространства, ждущая приёмки и не историческая — или `ReviseError`."""
     detail = queries.get_inspection(inspection_id, reach=reach_of(tenant), include_on_review=True)
     if detail is None:
-        raise ReviseError("Такой проверки нет")
+        raise ReviseError("Такой проверки нет", code="inspection_not_found")
     if canonical_tenant(detail.inspection.tenant_code) != canonical_tenant(tenant):
         # Охват отдаёт и чужие проверки на чтение (D289); исправлять — только своё.
-        raise ReviseError("Исправлять можно только проверки своего пространства")
+        raise ReviseError(
+            "Исправлять можно только проверки своего пространства", code="revise_foreign"
+        )
     if not detail.inspection.on_review:
         raise ReviseError(
             "Проверка уже принята — записи принятой не исправляются (D200). "
-            "Поправить можно только шапку, под журналом"
+            "Поправить можно только шапку, под журналом",
+            code="revise_accepted",
         )
     if detail.inspection.is_legacy:
         # Историческая (D332): чек-листа её методики в хранилище нет и не
         # будет, а оценку движок не пересчитывает никогда — сверять запись не
         # с чем, и это не поломка, а свойство проверки.
-        raise ReviseError(t("revise.legacy", lang))
+        raise ReviseError(t("revise.legacy", lang), code="revise_legacy")
     return detail
 
 
@@ -133,7 +154,7 @@ def revise_card(
     detail = _editable(inspection_id, tenant=tenant, lang=lang)
     прежняя = next((f for f in detail.findings if f.id == finding_id), None)
     if прежняя is None:
-        raise ReviseError("Такой записи в этой проверке нет")
+        raise ReviseError("Такой записи в этой проверке нет", code="revise_no_finding")
     код, класс, зона, слова, необычная = _checked_entry(
         detail, inspection_id, lang=lang, code=code, level=level, zone=zone, text=text
     )
@@ -152,7 +173,9 @@ def revise_card(
             score_of=lambda current: rescore(current, papers=бумаги),
         )
     except LetterError as exc:
-        raise ReviseError(f"Пересчитать проверку не удалось, запись не тронута: {exc}") from exc
+        raise ReviseError(
+            "Пересчитать проверку не удалось, запись не тронута", code="revise_recalc"
+        ) from exc
 
 
 def add_card(
@@ -183,7 +206,7 @@ def add_card(
         try:
             make_preview(photo)
         except StorageError as exc:
-            raise ReviseError(t("photo.unreadable", lang)) from exc
+            raise ReviseError(t("photo.unreadable", lang), code="photo_unreadable") from exc
     бумаги = letter_sources()
     try:
         finding_id = review_edit.add_finding(
@@ -195,12 +218,18 @@ def add_card(
             score_of=lambda current: rescore(current, papers=бумаги),
         )
     except LetterError as exc:
-        raise ReviseError(f"Пересчитать проверку не удалось, запись не добавлена: {exc}") from exc
+        raise ReviseError(
+            "Пересчитать проверку не удалось, запись не добавлена", code="revise_recalc"
+        ) from exc
     if photo is not None:
         try:
             attach_photo(inspection_id, finding_id, tenant=tenant, data=photo, storage=storage)
         except ReviseError as exc:
-            raise ReviseError(t("add.photo_failed", lang, reason=str(exc))) from exc
+            raise ReviseError(
+                t("add.photo_failed", lang, reason=str(exc)),
+                code="add_photo_failed",
+                params={"reason": exc},
+            ) from exc
     return finding_id
 
 

@@ -100,6 +100,16 @@ _RKO_CHECKUPS_SQL = (
     "and p.id = any(%(periods)s) and c.acceptance is distinct from 'rejected' "
     "group by 1, 2"
 )
+#: Собираемость базы рейтингов (D464): отчёты ресторана и доставки за неделю — это
+#: проверки недели; выгрузка нарушений несёт только проверки с нарушениями, и счёт по
+#: ней занизил бы знаменатель. Есть у (страны, периода) — берётся она, иначе счёт выше.
+_RKO_COLLECTION_SQL = (
+    "select u.country_code, c.period_id, sum(c.restaurant_reports + c.delivery_reports) "
+    "from ratings.collection c join ratings.units u on u.dodo_id = c.unit_dodo_id "
+    "join ratings.periods p on p.id = c.period_id "
+    "where p.rating_type = 'rko' and u.country_code = any(%(countries)s) "
+    "and p.id = any(%(periods)s) group by 1, 2"
+)
 
 #: Нарушения РС — замечания периода из снимка; проверок — сумма поля снимка.
 _RS_VIOLATIONS_SQL = (
@@ -138,6 +148,7 @@ left join lateral (
     from inspections p
     where p.unit_id = i.unit_id
       and p.status = 'finalized'
+      and p.retracted_at is null
       and (%(tenants)s::text[] is null or p.tenant_code = any(%(tenants)s))
       and (p.inspection_date, p.pushed_at) < (i.inspection_date, i.pushed_at)
     order by p.inspection_date desc, p.pushed_at desc
@@ -149,6 +160,7 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
   and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
   and i.status = 'finalized'
+  and i.retracted_at is null
 order by i.inspection_date desc, i.pushed_at desc, i.id
 limit %(limit)s
 """
@@ -264,7 +276,12 @@ def violation_facts(
         facts_sql, counts_sql = _RKO_VIOLATIONS_SQL, _RKO_CHECKUPS_SQL
     else:
         facts_sql, counts_sql = _RS_VIOLATIONS_SQL, _RS_CHECKUPS_SQL
-    return _rows("нарушения рейтинга", facts_sql, scope), _rows("нарушения", counts_sql, scope)
+    counts = _rows("нарушения", counts_sql, scope)
+    if rating_type == "rko":
+        collected = {(r[0], r[1]): r[2] for r in _rows("собираемость", _RKO_COLLECTION_SQL, scope)}
+        counts = [r for r in counts if (r[0], r[1]) not in collected]
+        counts += [(country, period, n) for (country, period), n in collected.items()]
+    return _rows("нарушения рейтинга", facts_sql, scope), counts
 
 
 def loaded_at(formats: Sequence[str]) -> datetime | None:
@@ -341,6 +358,7 @@ from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
 where i.status = 'finalized'
+  and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
@@ -353,6 +371,7 @@ select u.country, count(*),
 from inspections i
 join units u on u.id = i.unit_id
 where i.status = 'finalized'
+  and i.retracted_at is null
   and (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
   and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
