@@ -54,8 +54,8 @@
         <td class="is-text rt-wrap rt-stack__lead">{{ t('ratings.format.' ~ row.tab) }}</td>
         <td class="is-text num" data-label="{{ t('ratings.sheet.col.at') }}">{{ row.checked_at.strftime(at_format) }}</td>
         <td class="is-text" data-label="{{ t('ratings.sheet.col.result') }}"><span class="tag{% if row.outcome == 'failed' %} tag--err{% else %} tag--ok{% endif %}">{{ t('ratings.sheet.outcome.' ~ row.outcome) }}</span></td>
-        <td class="num" data-label="{{ t('ratings.journal.counts') }}">{% if row.counts %}{{ row.counts[0] }} · {{ row.counts[1] }} · {{ row.counts[2] }} · {{ row.counts[3] }}{% else %}—{% endif %}</td>
-        {% if has_reason %}<td class="is-text rt-wrap" data-label="{{ t('ratings.sheet.col.reason') }}">{{ row.reason or '' }}</td>{% endif %}
+        <td class="num rt-stack__wide" data-label="{{ t('ratings.journal.counts') }}">{% if row.counts %}{{ row.counts[0] }} · {{ row.counts[1] }} · {{ row.counts[2] }} · {{ row.counts[3] }}{% else %}—{% endif %}</td>
+        {% if has_reason %}<td class="is-text rt-wrap rt-stack__wide{% if not row.reason %} rt-stack__empty{% endif %}" data-label="{{ t('ratings.sheet.col.reason') }}">{{ row.reason or '' }}</td>{% endif %}
       </tr>{% endfor %}</tbody>
     </table></div>
     {% endif %}
@@ -110,10 +110,10 @@
         <td class="is-text num rt-stack__lead">{{ row.at.strftime(at_format) }}</td>
         <td class="is-text" data-label="{{ t('ratings.journal.actor') }}">{{ row.actor }}</td>
         <td class="is-text" data-label="{{ t('ratings.journal.channel') }}">{{ t('ratings.channel.' ~ row.channel) }}</td>
-        <td class="is-text rt-wrap" data-label="{{ t('ratings.journal.format') }}">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
+        <td class="is-text rt-wrap rt-stack__wide" data-label="{{ t('ratings.journal.format') }}">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
         <td class="is-text" data-label="{{ t('ratings.journal.outcome') }}"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.outcome.' ~ row.outcome) }}</span></td>
-        <td class="num" data-label="{{ t('ratings.journal.counts') }}">{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
-        {% if lang == 'ru' %}<td class="is-text rt-wrap" data-label="{{ t('ratings.journal.note') }}">{{ row.note or '' }}</td>{% endif %}
+        <td class="num rt-stack__wide" data-label="{{ t('ratings.journal.counts') }}">{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
+        {% if lang == 'ru' %}<td class="is-text rt-wrap rt-stack__wide{% if not row.note %} rt-stack__empty{% endif %}" data-label="{{ t('ratings.journal.note') }}">{{ row.note or '' }}</td>{% endif %}
       </tr>{% endfor %}</tbody>
     </table></div>
     {% else %}<div class="rt-empty">{{ t('ratings.journal.empty') }}</div>{% endif %}
