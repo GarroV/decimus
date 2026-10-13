@@ -31,12 +31,14 @@ from src.db.web_access import (
     LastSuperadminError,
     change_own_password,
     create_account,
-    disable_account,
+    freeze_account,
     list_accounts,
     list_spaces,
     reassign_role,
     roles_for,
     set_email,
+    sign_out_everywhere,
+    unfreeze_account,
 )
 
 __all__ = [
@@ -54,12 +56,14 @@ __all__ = [
     "LastSuperadminError",
     "add",
     "change_own_password",
-    "disable",
     "everyone",
+    "freeze",
     "reassign_role",
     "roles_for",
     "set_email",
+    "sign_out_everywhere",
     "spaces",
+    "unfreeze",
 ]
 
 #: Длина сгенерированного пароля в байтах случайности. 18 байт — 24 знака в
@@ -98,6 +102,17 @@ def spaces() -> tuple[str, ...]:
     return list_spaces()
 
 
-def disable(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет или её роль вне `only_roles`."""
-    return disable_account(login, tenant=tenant, only_roles=only_roles)
+def freeze(
+    login: str,
+    *,
+    tenant: str,
+    only_roles: tuple[str, ...] | None = None,
+    by: str | None = None,
+) -> bool:
+    """Заморозить учётку (D462). `False` — живой учётки нет или её роль вне `only_roles`."""
+    return freeze_account(login, tenant=tenant, only_roles=only_roles, by=by)
+
+
+def unfreeze(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Разморозить учётку. `False` — такой замороженной учётки нет или её роль вне `only_roles`."""
+    return unfreeze_account(login, tenant=tenant, only_roles=only_roles)

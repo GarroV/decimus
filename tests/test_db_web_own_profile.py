@@ -16,8 +16,8 @@ psycopg = pytest.importorskip("psycopg")
 from src.db.errors import AccessError  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     create_account,
-    disable_account,
     find_by_email,
+    freeze_account,
     open_session,
     resolve_session,
     set_email,
@@ -118,7 +118,7 @@ def test_отключённая_учётка_не_привязывает(обе_
     учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     сессия = open_session(учётка)
     begin_google_link(сессия.token, state=МЕТКА, ttl_seconds=СРОК)
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
 
     assert finish_google_link(сессия.token, state=МЕТКА, email=ПОЧТА) == "session"
     assert begin_google_link(сессия.token, state="вторая", ttl_seconds=СРОК) is False

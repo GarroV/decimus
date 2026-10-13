@@ -19,8 +19,8 @@ from web_harness import СВОЙ, войти, подменить_двери, с�
 from src.db.directory import CreatedUnit
 from src.db.errors import PushError, UnitExistsError
 from src.db.reach import Reach
-from src.web import app as app_mod
 from src.web import auth, unit_add
+from src.web import country as country_data
 
 ЗАГОЛОВКИ = {"Origin": СВОЙ}
 АДРЕС = "/country/RS/units/new"
@@ -44,7 +44,7 @@ def заведено(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         return CreatedUnit(id="u-new")
 
     monkeypatch.setattr(unit_add.directory, "create_unit", _create)
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("RS", 1),))
+    monkeypatch.setattr(country_data, "countries", lambda **_: (("RS", 1),))
     return позвали
 
 
@@ -114,7 +114,7 @@ def test_чужой_источник_запроса_отказ(уК: FlaskClient
 
 def test_вход_на_экране_страны_только_у_уК(monkeypatch: pytest.MonkeyPatch, заведено: Any) -> None:
     # Список стран шапки — справочник базы, как в `test_web_country`.
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 1),))
+    monkeypatch.setattr(country_data, "countries", lambda **_: (("GE", 1),))
     for client in стенд(monkeypatch, tenant="HQ", role="admin"):
         страница = открыть(client, monkeypatch, данные(), "/country/GE")
         assert "/country/GE/units/new" in страница

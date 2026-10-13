@@ -63,8 +63,14 @@ def load(
     selection: Selection,
     unit_id: str = "",
     today: date | None = None,
+    dates: tuple[date | None, date | None] | None = None,
+    dates_before: tuple[date | None, date | None] | None = None,
 ) -> CountryView:
     """Снимок страны и, если попросили, история одной её точки.
+
+    Период — кодом окна в `selection` или датами «с — по» (`dates`, D467:
+    календарь со стрелками, как на «Главной»); тогда окно для движения —
+    `dates_before`.
 
     Непонятный код (`normalize_code` вернул пусто) — пустой снимок без похода
     в базу. Пустая страна в отборе «Обзора» значит «не сужать», и экран
@@ -73,12 +79,17 @@ def load(
     if not code:
         return CountryView(code="", snapshot=_EMPTY)
     snapshot = overview.load(
-        reach=reach, limit=limit, selection=replace(selection, country=code), today=today
+        reach=reach,
+        limit=limit,
+        selection=replace(selection, country=code),
+        today=today,
+        dates=dates,
+        dates_before=dates_before,
     )
     имя = next((name for name, uid in snapshot.unit_ids.items() if uid == unit_id and unit_id), "")
-    history = tuple(row for row in snapshot.inspections if имя and row.unit_name == имя)
-    if not history:
+    if not имя:
         return CountryView(code=code, snapshot=snapshot)
+    history = tuple(row for row in snapshot.inspections if row.unit_name == имя)
     return CountryView(
         code=code, snapshot=snapshot, unit_id=unit_id, unit_name=имя, history=history
     )

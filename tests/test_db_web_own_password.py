@@ -22,7 +22,7 @@ from src.db.web_access import (  # noqa: E402
     authenticate,
     change_own_password,
     create_account,
-    disable_account,
+    freeze_account,
     open_session,
     password_hash,
     resolve_session,
@@ -110,7 +110,7 @@ def test_закрытая_сессия_пароль_не_меняет(обе_р�
 def test_отключённая_учётка_пароль_не_меняет(обе_роли: str) -> None:
     учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     сессия = open_session(учётка)
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
 
     assert change_own_password(сессия.token, current=ПАРОЛЬ, new=НОВЫЙ) is False
 

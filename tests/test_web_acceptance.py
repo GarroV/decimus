@@ -233,7 +233,7 @@ def test_реестр_показывает_ждущих_приёмки_отде�
     страница = стенд.get("/inspections").get_data(as_text=True)
 
     # Assert
-    assert "Ждут приёмки" in страница
+    assert "На приёмке" in страница
     assert "Ждущая точка" in страница
 
 
