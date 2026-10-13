@@ -214,6 +214,15 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
     # владельца). Появится здесь `select` — любой запрос приложения прочтёт чужие входы.
     "login_journal": {"INSERT"},
     "action_journal": {"INSERT"},
+    # Вторая ступень входа (`0068`, D463). Ключи, приложение, резервные коды, полувход и
+    # вызовы заводятся, читаются и снимаются самой дверью входа; правятся ровно названные
+    # колонки (ниже). Своя рука ключом чужой учётки не владеет: что и чьё — условие запроса
+    # `src/db/second_factor.py`, а сброс чужой ступени — только администратор истории.
+    "web_passkeys": {"SELECT", "INSERT", "DELETE"},
+    "web_totp": {"SELECT", "INSERT", "DELETE"},
+    "web_backup_codes": {"SELECT", "INSERT", "DELETE"},
+    "web_second_steps": {"SELECT", "INSERT", "DELETE"},
+    "web_webauthn_challenges": {"SELECT", "INSERT", "DELETE"},
     # История переносов (`0025`, D195) — только чтение. Пишет её триггер от
     # имени владельца схемы; появится здесь INSERT — и роль сможет дописать
     # «перенос», которого не было.
@@ -268,6 +277,13 @@ APP_TABLE_GRANTS: dict[str, set[str]] = {
 #: выпуска не правятся ни одним запросом, потому что права на них нет (`0011`).
 APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     "mcp_tokens": {"UPDATE": {"revoked_at", "revoked_by"}},
+    # Вторая ступень (`0068`): ни владелец, ни открытый ключ, ни отпечаток не правятся —
+    # только счётчик подписей и время использования, секрет и отметки приложения,
+    # пометка погашения кода и отметки полувхода (погашение, неудачи).
+    "web_passkeys": {"UPDATE": {"sign_count", "last_used_at"}},
+    "web_totp": {"UPDATE": {"secret", "created_at", "confirmed_at", "last_step"}},
+    "web_backup_codes": {"UPDATE": {"used_at"}},
+    "web_second_steps": {"UPDATE": {"consumed_at", "failures"}},
     # Погашение ссылки и отвязка бота (`0031`): отпечаток, учётка и срок не
     # правятся ничем, иначе погашенную ссылку можно было бы перевыпустить.
     "bot_link_tokens": {"UPDATE": {"used_at", "used_by"}},
@@ -304,6 +320,12 @@ APP_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
 #: Права администратора истории на таблицу целиком — только чтение (`0010`).
 ADMIN_TABLE_GRANTS: dict[str, set[str]] = {
     "units": {"SELECT"},
+    # Сброс второй ступени другому человеку (`0068`, D463): читать и снимать, не писать.
+    "web_passkeys": {"SELECT", "DELETE"},
+    "web_totp": {"SELECT", "DELETE"},
+    "web_backup_codes": {"SELECT", "DELETE"},
+    "web_second_steps": {"SELECT", "DELETE"},
+    "web_webauthn_challenges": {"SELECT", "DELETE"},
     # Сведения о пиццерии из свода (`0046`) — только чтение.
     "unit_profiles": {"SELECT"},
     # OAuth (`0054`): смена пароля и почты идёт этой ролью и в той же

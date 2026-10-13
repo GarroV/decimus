@@ -39,7 +39,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
 from src.db import journals, web_own_profile
-from src.db.errors import DbError
+from src.db.errors import DbError, SecondStepRequiredError
 from src.db.reach import Reach, reach_of
 from src.db.space import enter_space, leave_space
 from src.db.web_access import (
@@ -62,7 +62,7 @@ from src.domain.journal import (
 )
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import google_link, google_profile, oauth, reauth, swarm_api, walk_auth
+from . import google_link, google_profile, oauth, reauth, second_step, swarm_api, walk_auth
 from . import journal as web_journal
 from .config import Settings
 from .google_auth import (
@@ -130,6 +130,7 @@ OPEN_ENDPOINTS = (
     | walk_auth.ENDPOINTS
     | swarm_api.ENDPOINTS
     | oauth.ENDPOINTS
+    | second_step.ENDPOINTS
 )
 
 
@@ -294,6 +295,15 @@ def install(app: Flask, conf: Settings) -> None:
         )
         return response
 
+    second_step.install(app, conf, remember=remember, stand=рубеж)
+
+    @app.errorhandler(SecondStepRequiredError)
+    def _second_step_required(_: SecondStepRequiredError) -> Response:
+        """Путь входа попытался выдать полную сессию без второй ступени: на вход, без куки."""
+        ответ = redirect(url_for("login", second_step="expired"))
+        ответ.delete_cookie(COOKIE_NAME, path="/")
+        return ответ
+
     @app.before_request
     def _guard() -> Response | None:
         """Ни одна страница админки не отдаётся неопознанному.
@@ -314,6 +324,15 @@ def install(app: Flask, conf: Settings) -> None:
                 # Только чтение: на POST-адрес обратно по GET не вернуться.
                 return redirect(url_for("login", next=request.full_path.rstrip("?")))
             return redirect(url_for("login"))
+        # Админ без второго способа (D463) пользуется только подключением способа: пока
+        # он не подключён, остальное закрыто — и для сессии, выданной до включения ступени.
+        if (
+            second_step.must_enroll(account)
+            and request.endpoint not in second_step.ENROLL_ENDPOINTS
+        ):
+            if request.method == "GET":
+                return redirect(url_for("security_page", required="1"))
+            return make_response("", 403)
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
         # Пространство вошедшего — и базе (F-037): политики роли приложения
@@ -360,6 +379,7 @@ def install(app: Flask, conf: Settings) -> None:
                 "login.html",
                 failed=False,
                 locked_minutes=None,
+                second_expired=request.args.get("second_step") == "expired",
                 next_path=safe_next(request.args.get("next")),
             )
         refuse_foreign_origin()
@@ -428,6 +448,12 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return страница, 401
         note_success(tenant=рубеж, login=имя)
+        # Первая ступень пройдена. Есть второй способ — сессии пока нет (D463).
+        вторая = second_step.begin(
+            account, method=METHOD_PASSWORD, next_path=safe_next(request.form.get("next"))
+        )
+        if вторая is not None:
+            return вторая
         session = open_session(account, ip=откуда, user_agent=браузер)
         journals.record_login(
             method=METHOD_PASSWORD,
@@ -581,6 +607,9 @@ def install(app: Flask, conf: Settings) -> None:
             return отказано
 
         note_success(tenant=рубеж, login=account.login)
+        вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
+        if вторая is not None:
+            return очистить_метку(вторая)
         session = open_session(account, ip=откуда, user_agent=браузер)
         journals.record_login(
             method=METHOD_GOOGLE,
@@ -633,7 +662,9 @@ def install(app: Flask, conf: Settings) -> None:
     def _обновить_сессию(account: Account, назад: str, *, arm: bool = True) -> Response:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
-        новая = open_session(account)
+        новая = open_session(
+            account, second_step=bool(getattr(account, "passed_second_step", False))
+        )
         if прежний:
             close_session(прежний)
         ответ = redirect(f"{request.script_root}{назад}")

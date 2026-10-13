@@ -53,7 +53,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
 from .database_target import managing_dsn
-from .errors import AccessError, EmailTakenError
+from .errors import AccessError, EmailTakenError, SecondStepRequiredError
 from .pool import connection
 from .reading import reading
 from .space_guard import require_space
@@ -234,6 +234,12 @@ _SET_EMAIL_SQL = """
  returning u.id, прежняя.email is distinct from u.email
 """
 
+_SELECT_USER_BY_ID_SQL = """
+    select id, login, tenant_code, role, email
+      from web_users
+     where id = %s and disabled_at is null
+"""
+
 _SELECT_USER_BY_EMAIL_SQL = """
     select id, login, tenant_code, role, email
       from web_users
@@ -241,8 +247,12 @@ _SELECT_USER_BY_EMAIL_SQL = """
 """
 
 _OPEN_SESSION_SQL = """
-    insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent)
-    values (%s, %s, now() + %s, %s, %s)
+    insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent, second_step_at)
+    select %(user)s, %(fp)s, now() + %(ttl)s, %(ip)s, %(ua)s, case when %(second)s then now() end
+     where %(second)s
+        or not (exists (select 1 from web_passkeys p where p.user_id = %(user)s)
+                or exists (select 1 from web_totp t
+                            where t.user_id = %(user)s and t.confirmed_at is not null))
     returning expires_at, id
 """
 
@@ -251,7 +261,11 @@ _OPEN_SESSION_SQL = """
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
     select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang, s.issued_at,
-           u.display_name, u.avatar_etag, s.id
+           u.display_name, u.avatar_etag, s.id,
+           (exists (select 1 from web_passkeys p where p.user_id = u.id)
+            or exists (select 1 from web_totp t
+                        where t.user_id = u.id and t.confirmed_at is not null)),
+           s.second_step_at is not null
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -356,6 +370,11 @@ class Account:
     #: Номер сессии этого запроса (`web_sessions.id`); `None` — учётка не из сессии.
     #: Нужен журналу действий (D462): чем вошёл тот, кто действует.
     session_id: str | None = None
+    #: Подключена ли вторая ступень входа (ключ доступа или приложение, D463). Приезжает
+    #: с сессией: админу без неё заслон оставляет только экран подключения.
+    has_second_factor: bool = False
+    #: Сессия выдана после второй ступени; без неё способы входа не снимаются (D463).
+    passed_second_step: bool = False
 
 
 @dataclass(frozen=True)
@@ -903,6 +922,22 @@ def find_by_email(email: str) -> Account | None:
     )
 
 
+def find_by_id(user_id: str) -> Account | None:
+    """Номер учётки → учётка. Нет такой или отключена — `None`.
+
+    Для второй ступени входа (D463): первая ступень назвала человека, вторая обязана
+    открыть сессию той же учётке — и только если её не заморозили за это время.
+    """
+    with _connected("найти учётку") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_BY_ID_SQL, (user_id,))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
+
+
 def authenticate(login: str, password: str) -> Account | None:
     """Логин и пароль → учётка. Не тот пароль и нет такой учётки — `None`.
 
@@ -938,27 +973,40 @@ def authenticate(login: str, password: str) -> Account | None:
 
 
 def open_session(
-    account: Account, *, ip: str | None = None, user_agent: str | None = None
+    account: Account,
+    *,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    second_step: bool = False,
 ) -> OpenedSession:
     """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке.
 
+    **Полную сессию человеку со вторым способом без `second_step=True` не выдаёт сама эта
+    функция** (`SecondStepRequiredError`): любой путь входа, нынешний или будущий, упрётся здесь.
+    Админ без способа получает сессию, но заслон оставляет ему одно подключение способа.
+
     `ip` и `user_agent` — откуда вошли (D462): адрес по цепочке доверенных звеньев и
-    браузер, усечённый до `MAX_USER_AGENT`.
+    браузер, усечённый до `MAX_USER_AGENT`. `second_step` — сессия прошла вторую ступень
+    (D463): только такой сессии разрешено СНИМАТЬ способы входа.
     """
     token = new_session_token()
     with _connected("открыть сессию") as conn, conn.cursor() as cur:
         cur.execute(
             _OPEN_SESSION_SQL,
-            (
-                account.id,
-                session_fingerprint(token),
-                SESSION_TTL,
-                ip,
-                truncate_user_agent(user_agent),
-            ),
+            {
+                "user": account.id,
+                "fp": session_fingerprint(token),
+                "ttl": SESSION_TTL,
+                "ip": ip,
+                "ua": truncate_user_agent(user_agent),
+                "second": second_step,
+            },
         )
         row = cur.fetchone()
-    assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
+    if row is None:
+        # У человека есть второй способ, а доказательства второй ступени нет (D463): полная
+        # сессия не выдаётся ни одним путём. Проверка — в самом запросе, а не у вызывающих.
+        raise SecondStepRequiredError("сессия без второй ступени человеку, у которого она есть")
     return OpenedSession(token=token, expires_at=row[0], session_id=str(row[1]))
 
 
@@ -994,6 +1042,8 @@ def resolve_session(token: str) -> Account | None:
         display_name=row[7],
         avatar_etag=row[8],
         session_id=str(row[9]),
+        has_second_factor=bool(row[10]),
+        passed_second_step=bool(row[11]),
     )
 
 

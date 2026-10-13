@@ -354,6 +354,15 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/confirm",
     "/settings/confirm/google",
     "/settings/continue",
+    # Свои способы входа (D463): ключи, приложение, резервные коды — доступны любой роли.
+    "/settings/security/relogin",
+    "/settings/security/passkey/options",
+    "/settings/security/passkey/register",
+    "/settings/security/passkey/x/delete",
+    "/settings/security/totp/start",
+    "/settings/security/totp/confirm",
+    "/settings/security/totp/remove",
+    "/settings/security/backup/generate",
 }
 
 

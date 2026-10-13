@@ -45,6 +45,10 @@
       <div class="note note--error login__note" role="alert">
         <div><div class="note__title">{{ t('auth.failed') }}</div></div>
       </div>
+    {% elif second_expired %}
+      <div class="note note--warn login__note" role="alert">
+        <div><div class="note__title">{{ t('sf.login.expired') }}</div></div>
+      </div>
     {% endif %}
 
     {% if google_enabled %}

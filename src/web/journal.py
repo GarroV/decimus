@@ -16,6 +16,10 @@
 
 Запись не меняет ответ: действие уже выполнено, и отказ журнала уходит в журнал
 процесса (`db.journals`), а не человеку.
+
+**Способы входа — для любой роли.** Подключение, снятие ключей и приложения и выпуск
+резервных кодов (`SECOND_FACTOR_ENDPOINTS`, D463) пишутся и у ролей, которые админами
+не являются: смена способов входа важна независимо от роли.
 """
 
 from __future__ import annotations
@@ -35,6 +39,18 @@ from src.domain.journal import (
 
 from .config import Settings
 from .remote import UNKNOWN, client_address
+
+#: Подключение и снятие способов входа пишутся в журнал действий КАЖДОЙ роли, а не только
+#: админской (D463): человек, чей ключ добавили или сняли, должен видеть это в следах.
+SECOND_FACTOR_ENDPOINTS = frozenset(
+    {
+        "security_passkey_register",
+        "security_passkey_delete",
+        "security_totp_confirm",
+        "security_totp_remove",
+        "security_backup_generate",
+    }
+)
 
 #: Методы, которые считаются изменением состояния.
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
@@ -82,7 +98,9 @@ def install(app: Flask, conf: Settings) -> None:
         if request.method not in WRITE_METHODS or request.endpoint is None:
             return response
         account = current_account()
-        if account is None or account.role not in JOURNALED_ROLES:
+        if account is None or (
+            account.role not in JOURNALED_ROLES and request.endpoint not in SECOND_FACTOR_ENDPOINTS
+        ):
             return response
         сессия = account.session_id
         journals.record_action(

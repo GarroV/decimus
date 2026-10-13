@@ -25,7 +25,7 @@ from collections.abc import Callable
 from flask import Flask, render_template, request
 from flask import Response as FlaskResponse
 
-from src.db import bot_links
+from src.db import bot_links, second_factor
 from src.db.errors import DbError
 from src.domain.log_ids import log_id
 from src.domain.tenants import canonical_tenant
@@ -45,6 +45,7 @@ from .config import Settings
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
 from .sections import section
+from .security_screen import may_remove as may_remove_factor
 from .users_page import (
     ME,
     SEES_BINDINGS,
@@ -359,6 +360,49 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
             )
         исход = "users.unfreeze.ok" if разморожено else "users.unfreeze.missing"
         return render(Show(person=цель.id, show_off=True, flash=_flash(исход, ok=разморожено)))
+
+    @app.post(f"{users_path}/reset-second-factor")
+    @guard.action("people.manage")
+    def reset_second_factor() -> FlaskResponse | tuple[str, int]:
+        """Сбросить вторую ступень входа человека (D463): только главный админ, только чужую.
+
+        Ключи, приложение, резервные коды и начатые входы снимаются, открытые сессии
+        человека закрываются: он войдёт Google или паролем и подключит способы заново
+        (админу заслон не даст ничего другого). Свою ступень главный админ сбрасывает
+        командой с сервера (`tools/web_user.py reset-second-factor`).
+        """
+        решено = _цель_заморозки()
+        if not isinstance(решено, tuple):
+            return решено
+        круг, логин, пространство = решено
+        if not access_policy.may_reset_second_factor(круг):
+            return forbidden()
+        вошедший = auth.current_account()
+        if вошедший is None or not may_remove_factor(вошедший):
+            # Сброс — снятие чужого способа: сессия обязана пройти вторую ступень и быть свежей.
+            return render(Show(flash=_flash("sf.sec.stale_refused", ok=False)), 403)
+        if логин.lower() == вошедший.login.strip().lower():
+            return render(Show(person=ME, flash=_flash("sf.reset.self", ok=False)), 400)
+        try:
+            цель = _target(круг, логин, пространство)
+            if цель is None:
+                return forbidden()
+            снято = second_factor.reset_all(цель.id)
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(flash=_flash("users.freeze.failed", ok=False)), 400)
+        logger.info(
+            "Веб: учётка %s сбросила вторую ступень учётки %s (снято способов: %d)",
+            log_id(вошедший.id if вошедший else ""),
+            log_id(цель.id),
+            снято,
+        )
+        ключ = "sf.reset.done" if снято else "sf.reset.none"
+        return render(
+            Show(
+                person=цель.id, show_off=True, flash=_flash(ключ, ok=bool(снято), login=цель.login)
+            )
+        )
 
 
 def _install_spaces(app: Flask, users_path: str) -> None:

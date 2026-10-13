@@ -29,6 +29,8 @@ METHOD_GOOGLE = "google"
 METHOD_OAUTH_CLAUDE = "oauth-claude"
 METHOD_MCP_TOKEN = "personal-mcp-token"  # noqa: S105 — название способа входа
 METHOD_BOT_LINK = "bot-link"
+#: Вторая ступень входа (D463): ключ доступа, код приложения или резервный код.
+METHOD_SECOND_STEP = "second-step"
 
 #: Исходы входа (`login_journal.result`).
 RESULT_OK = "ok"
@@ -38,6 +40,10 @@ RESULT_UNKNOWN = "unknown"
 RESULT_RATE_LIMITED = "rate-limited"
 #: Пароль верный, но учётке этот способ закрыт (привязана почта Google).
 RESULT_REFUSED = "refused"
+#: Вторая ступень (D463): код не подошёл, ключ доступа не принят, погашен резервный код.
+RESULT_BAD_CODE = "bad-code"
+RESULT_PASSKEY_FAIL = "passkey-fail"
+RESULT_BACKUP_USED = "backup-used"
 
 #: Двери журнала действий (`action_journal.door`).
 DOOR_WEB = "web"

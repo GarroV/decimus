@@ -548,3 +548,25 @@ reauth_confirm_google
 # вызывает диспетчер запросов, а регистрирует декоратор.
 _journal_action
 settings_signins
+
+# Вторая ступень входа (D463): маршруты Flask (`@app.get/post` внутри `install`) вызывает
+# сервер по адресу, по имени их не зовёт никто. Поля данных читают шаблоны Jinja
+# (`setup.qr_svg`, `setup.secret_groups`), свойства `Status` — тесты и экран.
+second_step_page
+second_step_code
+second_step_passkey_options
+second_step_passkey_verify
+security_page
+security_relogin
+security_passkey_options
+security_passkey_register
+security_passkey_delete
+security_totp_start
+security_totp_confirm
+security_totp_remove
+security_backup_generate
+reset_second_factor
+qr_svg
+secret_groups
+last_step
+factor_count

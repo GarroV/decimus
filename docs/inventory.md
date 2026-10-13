@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 133 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 147 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -87,6 +87,10 @@
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
 | `/login/google` | GET | `google_start` | `src/web/auth.py` |
+| `/login/second-step` | GET | `second_step_page` | `src/web/second_step.py` |
+| `/login/second-step/code` | POST | `second_step_code` | `src/web/second_step.py` |
+| `/login/second-step/passkey/options` | POST | `second_step_passkey_options` | `src/web/second_step.py` |
+| `/login/second-step/passkey/verify` | POST | `second_step_passkey_verify` | `src/web/second_step.py` |
 | `/logout` | POST | `logout` | `src/web/auth.py` |
 | `/oauth/authorize` | GET, POST | `oauth_authorize` | `src/web/oauth.py` |
 | `/oauth/register` | POST | `oauth_register` | `src/web/oauth.py` |
@@ -127,6 +131,15 @@
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
 | `/settings/menu` | GET | `settings_menu` | `src/web/settings_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
+| `/settings/security` | GET | `security_page` | `src/web/security_screen.py` |
+| `/settings/security/backup/generate` | POST | `security_backup_generate` | `src/web/security_screen.py` |
+| `/settings/security/passkey/<passkey_id>/delete` | POST | `security_passkey_delete` | `src/web/security_screen.py` |
+| `/settings/security/passkey/options` | POST | `security_passkey_options` | `src/web/security_screen.py` |
+| `/settings/security/passkey/register` | POST | `security_passkey_register` | `src/web/security_screen.py` |
+| `/settings/security/relogin` | POST | `security_relogin` | `src/web/security_screen.py` |
+| `/settings/security/totp/confirm` | POST | `security_totp_confirm` | `src/web/security_screen.py` |
+| `/settings/security/totp/remove` | POST | `security_totp_remove` | `src/web/security_screen.py` |
+| `/settings/security/totp/start` | POST | `security_totp_start` | `src/web/security_screen.py` |
 | `/settings/sign-ins` | GET | `settings_signins` | `src/web/journal_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
 | `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
@@ -150,6 +163,7 @@
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
+| `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
@@ -319,6 +333,8 @@
 | `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/web/walk_auth.py` | да |
 | `WALK_MOCKUP_ZONES` | `tools/walk_mockup/build.py` | нет — ручной рычаг сборки макета (tools/walk_mockup/build.py), не настройка |
 | `WALK_USERS` | `src/domain/walk_users.py` | да |
+| `WEBAUTHN_ORIGIN` | `src/web/config.py` | да |
+| `WEBAUTHN_RP_ID` | `src/web/config.py` | да |
 | `WEB_BOT_USERNAME` | `src/web/config.py` | да |
 | `WEB_HOST` | `src/web/config.py` | да |
 | `WEB_HSTS` | `src/web/config.py` | да |
@@ -407,6 +423,7 @@
 | `0065_web_own_google_profile.sql` | — |
 | `0066_move_with_action_plan.sql` | — |
 | `0067_journals.sql` | `login_journal`, `action_journal` |
+| `0068_second_factor.sql` | `web_passkeys`, `web_totp`, `web_backup_codes`, `web_second_steps`, `web_webauthn_challenges` |
 <!-- map:end -->
 
 ## Makefile
@@ -435,6 +452,7 @@
 | `make mcp-outside` | смоук доступа к MCP с чужой машины |
 | `make migrate` | накат SQL-миграций; на накатанной базе ничего не делает |
 | `make porcha-permissions` | порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы) |
+| `make porcha-second-factor` | порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест (нужна тестовая база) |
 | `make processhint` | замер признака «<описание>, это <процесс>»: сколько раз он срабатывает зря |
 | `make recipe-check` | можно ли снять совместимость с прежним рецептом отпечатка проверки на этой базе |
 | `make regress` | движок на эталонных данных: цифры не должны разойтись |

@@ -129,11 +129,82 @@ class Settings:
     admin_public_url: str | None = None
     #: Внешний адрес MCP (`MCP_PUBLIC_URL`, D417): ресурс, к которому выдаются токены.
     mcp_public_url: str | None = None
+    #: Домен ключей доступа (`WEBAUTHN_RP_ID`, D463): хост внешнего адреса админки. Ключ
+    #: привязан к нему навсегда: сменили адрес — ключи выпускаются заново. `None` — ключи
+    #: доступа выключены (остаётся приложение-аутентификатор и резервные коды).
+    webauthn_rp_id: str | None = None
+    #: Происхождение, которое обязан назвать браузер (`WEBAUTHN_ORIGIN`): схема + хост
+    #: внешнего адреса. Берётся из настройки, а не из заголовков запроса.
+    webauthn_origin: str | None = None
+
+    @property
+    def webauthn_enabled(self) -> bool:
+        """Ключи доступа включены: известны и домен, и происхождение (D463)."""
+        return self.webauthn_rp_id is not None and self.webauthn_origin is not None
 
     @property
     def oauth_enabled(self) -> bool:
         """Подключение Claude входом через сайт включено: оба адреса заданы (D417)."""
         return self.admin_public_url is not None and self.mcp_public_url is not None
+
+
+WEBAUTHN_RP_ID_VAR = "WEBAUTHN_RP_ID"
+WEBAUTHN_ORIGIN_VAR = "WEBAUTHN_ORIGIN"
+
+#: Публичные суффиксы, на которые ключ доступа не привязывается: ими пользуются тысячи
+#: чужих сайтов. Привязка к `workers.dev` дала бы чужому Worker'у право на наши ключи, а
+#: браузер такой домен всё равно отвергнет. Полный список (PSL) не тянем — это ловушка на
+#: частую ошибку, а не замена списку.
+_SHARED_SUFFIXES = frozenset({"workers.dev", "pages.dev", "github.io", "vercel.app", "netlify.app"})
+
+
+def _parse_webauthn(
+    src: Mapping[str, str], admin_public_url: str | None
+) -> tuple[str | None, str | None]:
+    """Домен и происхождение ключей доступа: из настроек, иначе из внешнего адреса админки."""
+    origin_raw = (src.get(WEBAUTHN_ORIGIN_VAR) or "").strip()
+    rp_raw = (src.get(WEBAUTHN_RP_ID_VAR) or "").strip().lower()
+    if origin_raw:
+        try:
+            origin = parse_public_url(origin_raw, var=WEBAUTHN_ORIGIN_VAR)
+        except ValueError as отказ:
+            raise WebConfigError(str(отказ)) from None
+    elif admin_public_url:
+        origin = admin_public_url
+    else:
+        origin = None
+    if origin is None:
+        if rp_raw:
+            raise WebConfigError(
+                f"{WEBAUTHN_RP_ID_VAR} задан без {WEBAUTHN_ORIGIN_VAR} и без {ADMIN_PUBLIC_URL_VAR}"
+            )
+        return None, None
+    части = urlsplit(origin)
+    if origin_raw and части.path:
+        raise WebConfigError(
+            f"{WEBAUTHN_ORIGIN_VAR} — только схема и хост (https://хост[:порт]), без пути"
+        )
+    # Из внешнего адреса берётся только происхождение: путь к нему не относится.
+    origin = f"{части.scheme}://{части.netloc}"
+    host = части.hostname or ""
+    rp_id = rp_raw or host
+    if not re.fullmatch(r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?", rp_id) or re.fullmatch(
+        r"[0-9.]+", rp_id
+    ):
+        raise WebConfigError(
+            f"{WEBAUTHN_RP_ID_VAR}={rp_id!r} — нужен домен без схемы, порта и пути"
+        )
+    if host != rp_id and not host.endswith(f".{rp_id}"):
+        raise WebConfigError(
+            f"{WEBAUTHN_RP_ID_VAR}={rp_id!r} не годится для {origin}: домен ключа обязан быть "
+            f"хостом происхождения или его родителем"
+        )
+    if rp_id in _SHARED_SUFFIXES:
+        raise WebConfigError(
+            f"{WEBAUTHN_RP_ID_VAR}={rp_id!r} — общий суффикс, на нём ключи не выпускаются: "
+            f"укажите полный хост продукта"
+        )
+    return rp_id, origin
 
 
 def _parse_public(src: Mapping[str, str], var: str) -> str | None:
@@ -388,6 +459,8 @@ def _parse_trusted_proxies(raw: str) -> int:
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение админки. Отказ — `WebConfigError`."""
     src = os.environ if env is None else env
+    admin_public_url = _parse_public(src, ADMIN_PUBLIC_URL_VAR)
+    rp_id, origin = _parse_webauthn(src, admin_public_url)
     secret_key, ephemeral = _parse_secret_key(src.get(WEB_SECRET_KEY_VAR) or "")
     listen_network = _parse_listen_network(src.get(WEB_LISTEN_NETWORK_VAR) or "")
     return Settings(
@@ -403,6 +476,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         bot_username=_parse_bot_username(src.get(WEB_BOT_USERNAME_VAR) or ""),
         hsts=_parse_hsts(src.get(WEB_HSTS_VAR) or ""),
         walk_upstream=_parse_walk_upstream(src.get(WEB_WALK_UPSTREAM_VAR) or ""),
-        admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
+        admin_public_url=admin_public_url,
         mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
+        webauthn_rp_id=rp_id,
+        webauthn_origin=origin,
     )

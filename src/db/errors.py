@@ -129,6 +129,10 @@ class StorageError(DbError):
     """
 
 
+class SecondStepRequiredError(DbError):
+    """Полную сессию человеку со вторым способом выдать нельзя без второй ступени (D463)."""
+
+
 class AccessError(DbError):
     """Личный токен MCP не выпущен, не отозван или не сверен (T253, D098, D448).
 

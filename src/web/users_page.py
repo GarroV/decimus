@@ -250,6 +250,7 @@ def _people_context(
         "space_filter": sorted({canonical_tenant(r.tenant) for r in люди}),
         "bindings": привязки,
         "may_unfreeze": круг is not None and access_policy.may_unfreeze(круг),
+        "may_reset_factor": круг is not None and access_policy.may_reset_second_factor(круг),
     }
 
 

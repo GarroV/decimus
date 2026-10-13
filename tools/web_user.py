@@ -25,6 +25,11 @@
     .venv/bin/python tools/web_user.py add director --tenant demo
     .venv/bin/python tools/web_user.py list --tenant demo
     .venv/bin/python tools/web_user.py freeze director --tenant demo
+    .venv/bin/python tools/web_user.py reset-second-factor director --tenant demo
+
+`reset-second-factor` снимает у человека вторую ступень входа (ключи доступа, приложение,
+резервные коды) и закрывает его сессии (D463). Для главного админа это единственный путь:
+свою ступень он через сайт не сбрасывает. Запись о сбросе ложится в журнал действий.
 """
 
 from __future__ import annotations
@@ -45,8 +50,10 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from src.db import journals  # noqa: E402
 from src.db.database_target import managing_target  # noqa: E402
 from src.db.errors import DbError  # noqa: E402
+from src.db.second_factor import reset_by_login  # noqa: E402
 from src.db.spaces import space_exists  # noqa: E402
 from src.db.web_access import (  # noqa: E402
     MIN_PASSWORD_LENGTH,
@@ -175,6 +182,11 @@ def main(argv: list[str] | None = None) -> int:
     )
     отключить = с_арендатором("freeze", "заморозить учётку (закрывает сессии, Claude и бота)")
     отключить.add_argument("login")
+    сброс = с_арендатором(
+        "reset-second-factor",
+        "сбросить вторую ступень входа (ключи, приложение, резервные коды) и закрыть сессии",
+    )
+    сброс.add_argument("login")
     # Роль назначается отдельной командой, а не ключом у `add`. Накат `0020`
     # не даёт прав никому, и первым админом стенда кого-то делает именно
     # она — на живом стенде это единственный способ открыть экран учёток.
@@ -230,6 +242,28 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
                 return 1
             print(f"Роль назначена: {args.login} · {args.role}")
+            return 0
+        if args.command == "reset-second-factor":
+            итог = reset_by_login(args.login, tenant=tenant)
+            if итог is None:
+                print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
+                return 1
+            # Запись о сбросе — в журнал действий: команда с машины, поэтому «кто» —
+            # сама учётка, а чем — «cli». Отказ записи в журнал процесса не отменяет сброс.
+            journals.record_action(
+                user_id=итог.user_id,
+                role=итог.role,
+                tenant=итог.tenant,
+                action="reset_second_factor_cli",
+                target=f"login={args.login.strip().lower()}",
+                outcome="ok",
+                ip=None,
+                credential="cli",
+            )
+            print(
+                f"Вторая ступень сброшена: {args.login} (снято способов: {итог.removed}). "
+                f"Сессии закрыты; человек войдёт Google или паролем и подключит способы заново"
+            )
             return 0
         if args.command == "list":
             строки = list_accounts(tenant=tenant)
