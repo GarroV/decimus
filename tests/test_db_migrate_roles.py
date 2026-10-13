@@ -388,9 +388,18 @@ ADMIN_COLUMN_GRANTS: dict[str, dict[str, set[str]]] = {
     # заодно. В SELECT свёртки по-прежнему нет: менять пароль можно, не читая
     # старый, и читать его незачем никому.
     "web_users": {
-        "SELECT": {"id", "login", "tenant_code", "disabled_at", "role", "created_at", "email"},
+        "SELECT": {
+            "id",
+            "login",
+            "tenant_code",
+            "disabled_at",
+            "disabled_by",
+            "role",
+            "created_at",
+            "email",
+        },
         "INSERT": {"tenant_code", "login", "password_hash", "role", "email"},
-        "UPDATE": {"disabled_at", "role", "email", "password_hash"},
+        "UPDATE": {"disabled_at", "disabled_by", "role", "email", "password_hash"},
     },
     # Смена пароля закрывает открытые сессии учётки (`0022`): иначе пароль
     # сменили, а старый вход продолжает работать — и человек, ради которого
