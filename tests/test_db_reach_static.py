@@ -208,10 +208,12 @@ def test_находки_по_идентификатору_читаются_то�
 #: строки своего пространства (`_LOCK_SQL` с `tenant_code`).
 #: `imports._locked_detail` — после замка загруженного черновика своего
 #: пространства (D305, D334, `imports._LOCK_SQL` с `tenant_code` и `origin`).
+#: `review_edit.add_finding` — после того же замка, что у правки (`revise._LOCK_SQL`, D465).
 _ЧИТАЮТ_ПРОВЕРКУ_ЦЕЛИКОМ = {
     ("db/queries.py", "get_inspection"),
     ("db/revise.py", "_apply"),
     ("db/imports.py", "_locked_detail"),
+    ("db/review_edit.py", "add_finding"),
 }
 
 
