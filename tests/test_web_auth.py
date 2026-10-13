@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import Response
@@ -108,6 +109,73 @@ def test_статика_открыта_без_опознания(стенд: Fla
     """Форма входа обязана быть одетой: стиль ничего о данных не рассказывает."""
     ответ = стенд.get("/static/dodo-ds.css")
     assert ответ.status_code in (200, 404), "статику заслон пропускать обязан"
+
+
+# --- возврат после входа (D461) ---------------------------------------------
+
+
+def test_истёкший_вход_на_панели_уводит_на_вход_с_возвратом_на_неё(стенд: FlaskClient) -> None:
+    """Сессия истекла на открытой панели реестра: после входа — на ту же панель."""
+    ответ = стенд.get("/inspections?inspection=abc")
+
+    assert ответ.status_code == 302
+    куда = urlsplit(ответ.headers["Location"])
+    assert куда.path == "/login"
+    assert parse_qs(куда.query) == {"next": ["/inspections?inspection=abc"]}
+
+
+def test_адрес_без_запроса_возвращается_без_висящего_вопроса(стенд: FlaskClient) -> None:
+    ответ = стенд.get("/inspections")
+
+    assert parse_qs(urlsplit(ответ.headers["Location"]).query) == {"next": ["/inspections"]}
+
+
+def test_действие_без_входа_возврата_не_несёт(стенд: FlaskClient) -> None:
+    """На POST-адрес по GET не вернуться — вход ведёт на главную, а не в 405."""
+    ответ = стенд.post("/inspections/abc/retract", headers={"Origin": СВОЙ})
+
+    assert ответ.headers["Location"] == "/login"
+
+
+def test_после_входа_человек_попадает_туда_откуда_его_выбросило(стенд: FlaskClient) -> None:
+    ответ = стенд.post(
+        auth.LOGIN_PATH,
+        data={"login": ЛОГИН, "password": ПАРОЛЬ, "next": "/inspections?inspection=abc"},
+        headers={"Origin": СВОЙ},
+    )
+
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"] == "/inspections?inspection=abc"
+
+
+@pytest.mark.parametrize(
+    "чужой",
+    [
+        "//evil.com",
+        "//evil.com/inspections",
+        "https://evil.com",
+        "https://evil.com/inspections",
+        "/\\evil",
+        "\\\\evil.com",
+        "javascript:alert(1)",
+        "inspections",
+        "/inspections\nSet-Cookie: x=1",
+        "/inspections/../../evil",
+        "/inspections#frag",
+        "",
+    ],
+)
+def test_next_после_входа_не_уводит_с_сайта(стенд: FlaskClient, чужой: str) -> None:
+    assert auth.safe_next(чужой) is None
+
+    ответ = стенд.post(
+        auth.LOGIN_PATH,
+        data={"login": ЛОГИН, "password": ПАРОЛЬ, "next": чужой},
+        headers={"Origin": СВОЙ},
+    )
+
+    assert ответ.status_code == 302
+    assert ответ.headers["Location"] == "/"
 
 
 # --- вход -------------------------------------------------------------------

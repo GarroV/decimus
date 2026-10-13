@@ -525,7 +525,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Here it is read-only."
         ),
     },
-    "accept.title": {"ru": "Подтвердить проверку", "en": "Accept inspection"},
+    "accept.title": {"ru": "Принять проверку", "en": "Accept inspection"},
     "accept.hint": {
         "ru": (
             "После подтверждения проверка входит в историю сети, а её записи больше не "
@@ -536,7 +536,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "longer be edited. It cannot be sent back for review."
         ),
     },
-    "accept.submit": {"ru": "Подтвердить", "en": "Accept"},
+    "accept.submit": {"ru": "Принять", "en": "Accept"},
     "accept.done": {"ru": "Проверка принята.", "en": "The inspection is accepted."},
     "accept.failed": {
         "ru": "Проверку не подтвердили: {reason}",
