@@ -66,8 +66,8 @@ _ROLES: dict[str, dict[str, str]] = {
         "en": "Runs inspections in the bot and sees their results.",
     },
     "users.hint.partner.admin": {
-        "ru": "Добавляет и отключает людей своего пространства, вычитывает их проверки.",
-        "en": "Adds and disables people of their space, reviews their inspections.",
+        "ru": "Добавляет и замораживает людей своего пространства, вычитывает их проверки.",
+        "en": "Adds and freezes people of their space, reviews their inspections.",
     },
     "users.hint.partner.auditor": {
         "ru": "Проводит проверки и видит статистику. Людей не добавляет.",
@@ -77,7 +77,7 @@ _ROLES: dict[str, dict[str, str]] = {
 
 _SCREEN: dict[str, dict[str, str]] = {
     "users.count": {"ru": "С доступом: {count}", "en": "With access: {count}"},
-    "users.count_off": {"ru": "отключено: {count}", "en": "disabled: {count}"},
+    "users.count_off": {"ru": "заморожено: {count}", "en": "frozen: {count}"},
     # Охват — одна строка под заголовком (#585, D364).
     "users.scope.super": {"ru": "Все пространства.", "en": "Every space."},
     "users.scope.hq_admin": {
@@ -93,7 +93,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "users.filter.space_all": {"ru": "Все пространства", "en": "All spaces"},
     "users.filter.role_all": {"ru": "Все роли", "en": "All roles"},
     "users.filter.auditor_any": {"ru": "Аудитор или сотрудник", "en": "Auditor or staff"},
-    "users.filter.off": {"ru": "Показать отключённых", "en": "Show disabled"},
+    "users.filter.off": {"ru": "Показать замороженных", "en": "Show frozen"},
     "users.filter.apply": {"ru": "Показать", "en": "Apply"},
     "users.filter.reset": {"ru": "Сбросить", "en": "Reset"},
     "users.col.person": {"ru": "Человек", "en": "Person"},
@@ -104,7 +104,7 @@ _SCREEN: dict[str, dict[str, str]] = {
     "users.bot.yes": {"ru": "Привязан", "en": "Linked"},
     "users.bot.no": {"ru": "Нет", "en": "No"},
     "users.status.active": {"ru": "Работает", "en": "Active"},
-    "users.status.off": {"ru": "Отключён", "en": "Disabled"},
+    "users.status.off": {"ru": "Заморожен", "en": "Frozen"},
     "users.no_email": {"ru": "почта не задана", "en": "no email"},
     "users.empty.title": {"ru": "Пока никого", "en": "Nobody yet"},
     "users.empty.text": {
@@ -163,25 +163,36 @@ _PANEL: dict[str, dict[str, str]] = {
         "en": "Linked to Telegram ID {id} since {date}.",
     },
     "users.panel.bot_unbound": {"ru": "Не привязан.", "en": "Not linked."},
-    "users.panel.disabled": {
-        "ru": "Доступ отключён {date}. Вернуть его с этого экрана нельзя.",
-        "en": "Access disabled on {date}. It cannot be restored from this screen.",
+    "users.panel.frozen": {
+        "ru": "Заморожен {date}, кем: {by}. Сессии, подключения Claude и бот закрыты.",
+        "en": "Frozen on {date} by {by}. Sessions, Claude connections and the bot are closed.",
+    },
+    "users.panel.frozen_nobody": {
+        "ru": "Заморожен {date}. Сессии, подключения Claude и бот закрыты.",
+        "en": "Frozen on {date}. Sessions, Claude connections and the bot are closed.",
+    },
+    "users.panel.frozen_note": {
+        "ru": "Разморозить может только главный админ. Размороженный входит заново, "
+        "привязывает бота и подключает Claude сам.",
+        "en": "Only a super admin can unfreeze. After that the person signs in again, "
+        "links the bot and connects Claude on their own.",
     },
     "users.save": {"ru": "Сохранить", "en": "Save"},
     "users.email.placeholder": {"ru": "name@dodobrands.io", "en": "name@dodobrands.io"},
     "users.bot.unlink_other": {"ru": "Отвязать бота", "en": "Unlink the bot"},
-    "users.disable.open": {"ru": "Отключить доступ", "en": "Disable access"},
-    "users.disable.confirm": {
+    "users.freeze.open": {"ru": "Заморозить", "en": "Freeze"},
+    "users.freeze.confirm": {
         "ru": (
-            "{login} больше не сможет войти, открытые сессии закроются. "
-            "Вернуть доступ с этого экрана нельзя."
+            "{login} сразу потеряет всё: сессии на сайте закроются, подключения Claude и "
+            "токены отзовутся, бот отвяжется. Вернуть вход сможет только главный админ."
         ),
         "en": (
-            "{login} will no longer be able to sign in; open sessions will end. "
-            "Access cannot be restored from this screen."
+            "{login} loses everything at once: web sessions close, Claude connections and "
+            "tokens are revoked, the bot is unlinked. Only a super admin can restore sign-in."
         ),
     },
-    "users.disable.yes": {"ru": "Да, отключить", "en": "Yes, disable"},
+    "users.freeze.yes": {"ru": "Да, заморозить", "en": "Yes, freeze"},
+    "users.unfreeze.open": {"ru": "Разморозить", "en": "Unfreeze"},
 }
 
 _ADD: dict[str, dict[str, str]] = {
@@ -293,25 +304,39 @@ _OUTCOMES: dict[str, dict[str, str]] = {
         "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
         "en": "Email not saved: the database did not respond. Please try again.",
     },
-    "users.disable.ok": {
-        "ru": "Доступ отключён. Открытые сессии этого человека закрыты.",
-        "en": "Access disabled. This person's open sessions have ended.",
+    "users.freeze.ok": {
+        "ru": "Заморожен. Сессии закрыты, подключения Claude и токены отозваны, бот отвязан.",
+        "en": "Frozen. Sessions closed, Claude connections and tokens revoked, bot unlinked.",
     },
-    "users.disable.missing": {
-        "ru": "Такой работающей учётки нет — возможно, её уже отключили.",
-        "en": "No such active account — it may already be disabled.",
+    "users.freeze.missing": {
+        "ru": "Такой работающей учётки нет — возможно, её уже заморозили.",
+        "en": "No such active account — it may already be frozen.",
     },
-    "users.disable.self": {
-        "ru": "Себя отключить нельзя: это выход без возврата.",
-        "en": "You cannot disable yourself: there is no way back.",
+    "users.freeze.self": {
+        "ru": "Себя заморозить нельзя: это выход без возврата.",
+        "en": "You cannot freeze yourself: there is no way back.",
     },
-    "users.disable.failed": {
-        "ru": "Не отключено — база не ответила.",
-        "en": "Not disabled — the database did not answer.",
+    "users.freeze.failed": {
+        "ru": "Не заморожено — база не ответила.",
+        "en": "Not frozen — the database did not answer.",
     },
-    "users.disable.last_super": {
-        "ru": "Последнего главного админа отключить нельзя: сначала назначьте другого.",
-        "en": "The last active super admin cannot be disabled: appoint another one first.",
+    "users.freeze.last_super": {
+        "ru": "Последнего главного админа заморозить нельзя: сначала назначьте другого.",
+        "en": "The last active super admin cannot be frozen: appoint another one first.",
+    },
+    "users.unfreeze.ok": {
+        "ru": "Разморожен. Сессии, Claude и бот остались закрытыми: человек входит и "
+        "подключает их заново.",
+        "en": "Unfrozen. Sessions, Claude and the bot stay closed: the person signs in "
+        "and reconnects them.",
+    },
+    "users.unfreeze.missing": {
+        "ru": "Такой замороженной учётки нет — возможно, её уже разморозили.",
+        "en": "No such frozen account — it may already be unfrozen.",
+    },
+    "users.unfreeze.failed": {
+        "ru": "Не разморожено — база не ответила.",
+        "en": "Not unfrozen — the database did not answer.",
     },
     "users.bot.unlinked": {
         "ru": "Бот отвязан. Этот Telegram больше не проводит проверки от учётки.",
@@ -489,10 +514,10 @@ _MCP: dict[str, dict[str, str]] = {
     },
     "users.mcp.how": {
         "ru": "Команда настраивает Claude Desktop на Mac одной строкой в терминале. Что "
-        "доступно в Claude, решает ваша роль; отключение учётки или смена роли гасят "
+        "доступно в Claude, решает ваша роль; заморозка учётки или смена роли гасят "
         "токен сразу.",
         "en": "The command sets up Claude Desktop on a Mac with one line in a terminal. "
-        "What you can do in Claude depends on your role; a disabled account or a role "
+        "What you can do in Claude depends on your role; a frozen account or a role "
         "change ends the token at once.",
     },
     "users.mcp.issue": {"ru": "Получить команду", "en": "Get the command"},
@@ -545,8 +570,9 @@ _CARD: dict[str, dict[str, str]] = {
     },
     "users.panel.access_title": {"ru": "Доступ к учётке", "en": "Account access"},
     "users.panel.active": {
-        "ru": "Учётка работает. Отключение закрывает вход и все открытые сессии.",
-        "en": "The account is active. Disabling closes sign-in and every open session.",
+        "ru": "Учётка работает. Заморозка закрывает вход, сессии, подключения Claude и бота.",
+        "en": "The account is active. Freezing closes sign-in, sessions, Claude "
+        "connections and the bot.",
     },
     "users.panel.pick_title": {"ru": "Выберите человека", "en": "Pick a person"},
     "users.panel.pick_text": {

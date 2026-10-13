@@ -37,7 +37,7 @@
 до маршрута. «Пользователи» видят все; кто кого ведёт — охват по роли
 (`src/web/access_policy.py`, #585: главный админ, админ УК, контроль, админ
 партнёра), маршруты — `src/web/users_screen.py`: `POST /users/add`,
-`/users/disable`, `/users/role`, `/users/email`, `/users/spaces/add`,
+`/users/freeze`, `/users/unfreeze`, `/settings/sign-out-everywhere`, `/users/role`, `/users/email`, `/users/spaces/add`,
 `/users/spaces/countries`, свой пароль `POST /users/password`; привязка
 бота — `POST /users/bot-link`, `POST /users/bot-unlink` (`src/db/bot_links.py`).
 Таблица охватов — `docs/12-web-admin.md`, «Экран доступа».

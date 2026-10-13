@@ -345,6 +345,7 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/claude-revoke",
     "/settings/claude-token",
     "/settings/claude-token-revoke",
+    "/settings/sign-out-everywhere",
     # Свой профиль (D447): своя почта Google и свой язык сайта.
     "/settings/google-link",
     "/settings/google-unlink",

@@ -229,4 +229,24 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "menu.theme": {"ru": "Тема", "en": "Theme"},
     "menu.lang": {"ru": "Язык", "en": "Language"},
     "menu.all_settings": {"ru": "Все настройки", "en": "All settings"},
+    "settings.signout.title": {"ru": "Выйти везде", "en": "Sign out everywhere"},
+    "settings.signout.note": {
+        "ru": "Закроет ваши сессии на сайте на всех устройствах, включая эту, отзовёт "
+        "подключения Claude и личный токен. Бот в Telegram останется привязанным. "
+        "Войдёте заново — как обычно.",
+        "en": "Closes your web sessions on every device, including this one, and revokes "
+        "your Claude connections and personal token. The Telegram bot stays linked. "
+        "You sign in again as usual.",
+    },
+    "settings.signout.open": {"ru": "Выйти везде", "en": "Sign out everywhere"},
+    "settings.signout.confirm": {
+        "ru": "Все ваши входы и подключения Claude закроются сразу, вы выйдете и здесь.",
+        "en": "All your sign-ins and Claude connections close at once; you are "
+        "signed out here too.",
+    },
+    "settings.signout.yes": {"ru": "Да, выйти везде", "en": "Yes, sign out everywhere"},
+    "settings.signout.failed": {
+        "ru": "Не закрыто — база не ответила. Попробуйте ещё раз.",
+        "en": "Not closed — the database did not respond. Please try again.",
+    },
 }

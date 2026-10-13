@@ -73,7 +73,7 @@ class Show:
     added: accounts.Added | None = None
     added_email_failed: bool = False
     add_space: bool = False
-    #: Показать отключённых: после отключения человек не пропадает из виду.
+    #: Показать замороженных: после заморозки человек не пропадает из виду.
     show_off: bool = False
 
 
@@ -249,6 +249,7 @@ def _people_context(
         "role_filter": role_options(люди),
         "space_filter": sorted({canonical_tenant(r.tenant) for r in люди}),
         "bindings": привязки,
+        "may_unfreeze": круг is not None and access_policy.may_unfreeze(круг),
     }
 
 

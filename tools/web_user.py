@@ -1,4 +1,4 @@
-"""Учётки веб-админки: завести, перечислить, отключить. Запускается `make web-user`.
+"""Учётки веб-админки: завести, перечислить, заморозить. Запускается `make web-user`.
 
 **Это и есть «учётки заводит команда проекта».** Регистрации снаружи у админки
 нет и не будет (D155): круг узкий — сотрудники управляющей компании, — и
@@ -24,7 +24,7 @@
 
     .venv/bin/python tools/web_user.py add director --tenant demo
     .venv/bin/python tools/web_user.py list --tenant demo
-    .venv/bin/python tools/web_user.py disable director --tenant demo
+    .venv/bin/python tools/web_user.py freeze director --tenant demo
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ from src.db.web_access import (  # noqa: E402
     ROLES,
     change_password,
     create_account,
-    disable_account,
+    freeze_account,
     list_accounts,
     set_email,
     set_role,
@@ -173,7 +173,7 @@ def main(argv: list[str] | None = None) -> int:
     почта.add_argument(
         "email", nargs="?", help="почта; без неё — СНЯТЬ привязку, вход останется по паролю"
     )
-    отключить = с_арендатором("disable", "отключить учётку")
+    отключить = с_арендатором("freeze", "заморозить учётку (закрывает сессии, Claude и бота)")
     отключить.add_argument("login")
     # Роль назначается отдельной командой, а не ключом у `add`. Накат `0020`
     # не даёт прав никому, и первым админом стенда кого-то делает именно
@@ -238,18 +238,20 @@ def main(argv: list[str] | None = None) -> int:
                 return 0
             for строка in строки:
                 метка = (
-                    f"отключена {строка.disabled_at:%Y-%m-%d}" if строка.disabled_at else "работает"
+                    f"заморожена {строка.disabled_at:%Y-%m-%d}"
+                    if строка.disabled_at
+                    else "работает"
                 )
                 print(
                     f"{строка.login:<24} {строка.role:<8} {метка:<10} "
                     f"заведена {строка.created_at:%Y-%m-%d}"
                 )
             return 0
-        отключено = disable_account(args.login, tenant=tenant)
+        отключено = freeze_account(args.login, tenant=tenant)
         if not отключено:
             print(f"Живой учётки «{args.login}» у арендатора {tenant} нет")
             return 1
-        print(f"Учётка отключена: {args.login}. Открытые по ней сессии перестали действовать")
+        print(f"Учётка заморожена: {args.login}. Сессии, Claude и бот закрыты")
         return 0
     except DbError as exc:
         # Отказ печатается строкой, а не трассировкой: человеку нужна причина и
