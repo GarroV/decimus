@@ -1,6 +1,7 @@
 """Сопоставление пиццерии рейтинга без id (D323): нормализация, разбор, допуск опечаток.
 
-Порядок — от строгого к мягкому: имя после `normalize_unit_name`; имя после
+Порядок — от строгого к мягкому: имя после свёртки `fold_unit_name` (турецкие буквы,
+диакритика, регистр); имя после
 разбора бота `canonical_unit` («Белград 2» → «Belgrade-2»); близкое написание
 города (`difflib`, пороги бота). Номер точки должен совпасть всегда:
 «Belgrade-7» не становится «Beograd-1», сколько бы букв ни совпало.
@@ -14,8 +15,13 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from src.db.units import normalize_unit_name
-from src.domain.unit_name import SHORT_CUTOFF, SHORT_NAME, SIMILARITY_CUTOFF, canonical_unit
+from src.domain.unit_name import (
+    SHORT_CUTOFF,
+    SHORT_NAME,
+    SIMILARITY_CUTOFF,
+    canonical_unit,
+    fold_unit_name,
+)
 
 _NUMBER = re.compile(r"(\d+)\s*$")
 
@@ -29,7 +35,7 @@ class KnownUnit:
 
 def _canon(name: str) -> str:
     found = canonical_unit(name)
-    return normalize_unit_name(found.name if found else name)
+    return fold_unit_name(found.name if found else name)
 
 
 def _number(key: str) -> str | None:
@@ -42,11 +48,11 @@ def _only(ids: set[str]) -> str | None:
 
 
 def match_unit(name: str, country: str | None, known: Sequence[KnownUnit]) -> str | None:
-    key = normalize_unit_name(name)
+    key = fold_unit_name(name)
     if not key:
         return None
     pool = [unit for unit in known if country is None or unit.country in (None, country)]
-    exact = {unit.dodo_id for unit in pool if normalize_unit_name(unit.name) == key}
+    exact = {unit.dodo_id for unit in pool if fold_unit_name(unit.name) == key}
     if exact:
         return _only(exact)
     canon = _canon(name)

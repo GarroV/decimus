@@ -28,6 +28,10 @@ from .model import (
     CATEGORY_VIOLATION,
     ERR_MISSING_COLUMNS,
     ERR_UNKNOWN_FORMAT,
+    FORMAT_BASE_COLLECTION,
+    FORMAT_BASE_RKO_VIOLATIONS,
+    FORMAT_BASE_RS_VIOLATIONS,
+    FORMAT_BASE_SCORES,
     FORMAT_RKO_EVALUATIONS,
     FORMAT_RKO_VIOLATIONS,
     FORMAT_RS_CHECKUPS,
@@ -72,6 +76,28 @@ _REQUIRED: dict[str, frozenset[str]] = {
             "Формат проверки",
         }
     ),
+    # Листы общей таблицы контроля «база рейтингов» (D464, `src/ratings/base.py`).
+    FORMAT_BASE_SCORES: frozenset(
+        {
+            "Период",
+            "Страна",
+            "Пиццерия",
+            "Тип проверки",
+            "Балл",
+            "Нарушение Д3",
+            "Критическое нарушение",
+            "Обнуление",
+        }
+    ),
+    FORMAT_BASE_COLLECTION: frozenset(
+        {"Период", "Страна", "Пиццерия", "Отчеты_Ресторан", "Отчеты_Доставка"}
+    ),
+    FORMAT_BASE_RKO_VIOLATIONS: frozenset(
+        {"Период", "Страна", "Пиццерия", "Номер заказа", "Нарушение", "Дата"}
+    ),
+    FORMAT_BASE_RS_VIOLATIONS: frozenset(
+        {"Период", "Страна", "Пиццерия", "Нарушение", "Нарушение (EN)", "Дата"}
+    ),
 }
 #: Колонка приёмки: в живом файле «Результат оценки», в части выгрузок — с
 #: припиской «(Принято/Отклонено)». Ищется по началу имени.
@@ -83,8 +109,8 @@ _ACCEPTANCE = {"принято": "accepted", "отклонено": "rejected"}
 _DATETIME_FORMATS = ("%Y-%m-%d %H:%M:%S", "%d.%m.%Y %H:%M:%S", "%d.%m.%Y %H:%M")
 _UNKNOWN = (
     "Формат файла не узнан по заголовку. Ожидаются выгрузки rko-violations, "
-    "rko-evaluations, rs-checkups, лист «Качество по пиццериям» (sheet-scores) "
-    "или снимок рейтинга (JSON) — docs/15-ratings.md"
+    "rko-evaluations, rs-checkups, лист «Качество по пиццериям» (sheet-scores), "
+    "листы «базы рейтингов» (base-*) или снимок рейтинга (JSON) — docs/15-ratings.md"
 )
 
 

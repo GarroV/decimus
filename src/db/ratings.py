@@ -415,3 +415,112 @@ def replace_remarks(
         period_id=period_id,
         import_id=import_id,
     )
+
+
+def upsert_base_score(
+    conn: psycopg.Connection,
+    *,
+    unit: str,
+    period_id: int,
+    score: float,
+    flags: tuple[bool, str | None, bool, str | None, bool, str | None],
+    import_id: int,
+) -> str:
+    """Оценка из листа «база рейтингов» с флагами Д3, критичное, обнуление (D464).
+
+    Строка, где всё то же, не трогается (`kept`): повтор листа не двигает ни
+    `updated_at`, ни счётчики. Балл снимка листом не перезаписывается, как у
+    `upsert_score`.
+    """
+    return _outcome(
+        conn.execute(
+            "insert into ratings.scores (unit_dodo_id, period_id, score, source, import_id, "
+            "  d3, d3_name, critical, critical_name, zeroing, zeroing_name) "
+            "values (%s, %s, %s, 'sheet', %s, %s, %s, %s, %s, %s, %s) "
+            "on conflict (unit_dodo_id, period_id) do update set score = excluded.score, "
+            "  source = 'sheet', import_id = excluded.import_id, updated_at = now(), "
+            "  d3 = excluded.d3, d3_name = excluded.d3_name, critical = excluded.critical, "
+            "  critical_name = excluded.critical_name, zeroing = excluded.zeroing, "
+            "  zeroing_name = excluded.zeroing_name "
+            "where ratings.scores.source <> 'snapshot' "
+            "  and (ratings.scores.score, ratings.scores.d3, ratings.scores.d3_name, "
+            "    ratings.scores.critical, ratings.scores.critical_name, ratings.scores.zeroing, "
+            "    ratings.scores.zeroing_name) "
+            "  is distinct from (excluded.score, excluded.d3, excluded.d3_name, "
+            "    excluded.critical, excluded.critical_name, excluded.zeroing, "
+            "    excluded.zeroing_name) "
+            "returning (xmax = 0)",
+            (unit, period_id, score, import_id, *flags),
+        ).fetchone()
+    )
+
+
+def upsert_collection(
+    conn: psycopg.Connection,
+    *,
+    unit: str,
+    period_id: int,
+    restaurant: int,
+    delivery: int,
+    import_id: int,
+) -> str:
+    """Отчёты РКО пиццерии за неделю; те же числа — `kept`."""
+    return _outcome(
+        conn.execute(
+            "insert into ratings.collection "
+            "(unit_dodo_id, period_id, restaurant_reports, delivery_reports, import_id) "
+            "values (%s, %s, %s, %s, %s) "
+            "on conflict (unit_dodo_id, period_id) do update set "
+            "  restaurant_reports = excluded.restaurant_reports, "
+            "  delivery_reports = excluded.delivery_reports, "
+            "  import_id = excluded.import_id, updated_at = now() "
+            "where (ratings.collection.restaurant_reports, ratings.collection.delivery_reports) "
+            "  is distinct from (excluded.restaurant_reports, excluded.delivery_reports) "
+            "returning (xmax = 0)",
+            (unit, period_id, restaurant, delivery, import_id),
+        ).fetchone()
+    )
+
+
+#: Нарушения листов «базы рейтингов» узнаются по префиксу ключа: набор пиццерии
+#: и периода заменяется целиком, замечания снимка (`replace_remarks`) не трогаются.
+SHEET_REMARK_PREFIX = "sheet:"
+
+
+def replace_sheet_remarks(
+    conn: psycopg.Connection,
+    *,
+    rating_type: str,
+    unit: str,
+    period_id: int,
+    rows: Sequence[ViolationRow],
+    import_id: int,
+) -> str:
+    """Нарушения пиццерии за период из листа — набором. Тот же набор — `kept`."""
+    existing = {
+        str(r[0]): int(r[1])
+        for r in conn.execute(
+            "select row_key, amount from ratings.violations "
+            "where category = 'remark' and unit_dodo_id = %s and period_id = %s "
+            "and row_key like %s",
+            (unit, period_id, SHEET_REMARK_PREFIX + "%"),
+        ).fetchall()
+    }
+    if existing == {r.row_key: r.amount for r in rows}:
+        return KEPT
+    conn.execute(
+        "delete from ratings.violations "
+        "where category = 'remark' and unit_dodo_id = %s and period_id = %s "
+        "and row_key like %s",
+        (unit, period_id, SHEET_REMARK_PREFIX + "%"),
+    )
+    _insert(
+        conn,
+        rows,
+        rating_type=rating_type,
+        checkup=None,
+        unit=unit,
+        period_id=period_id,
+        import_id=import_id,
+    )
+    return UPDATED if existing else INSERTED

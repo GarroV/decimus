@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 128 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 129 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -107,6 +107,7 @@
 | `/ratings/imports` | GET | `ratings_imports` | `src/web/ratings.py` |
 | `/ratings/layout` | POST | `ratings_layout` | `src/web/ratings.py` |
 | `/ratings/settings` | POST | `ratings_settings` | `src/web/ratings.py` |
+| `/ratings/sheet-sync` | POST | `ratings_sheet_sync` | `src/web/ratings.py` |
 | `/settings` | GET | `settings_page` | `src/web/settings_screen.py` |
 | `/settings/avatar` | GET | `settings_avatar` | `src/web/settings_screen.py` |
 | `/settings/bot-link` | POST | `settings_bot_link` | `src/web/settings_screen.py` |
@@ -295,6 +296,7 @@
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
 | `POINTER_API_KEY` | `src/ratings/maps.py` | да |
 | `PRESCRIPTION_MAX_REPLIES` | `src/db/config.py` | да |
+| `RATINGS_SHEET_ID` | `src/ratings/sheet_sync.py` | да |
 | `RECOGNIZE_MAX_CANDIDATES` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MERGE_MODEL` | `src/recognize/config.py` | да |
 | `RECOGNIZE_MIN_CONFIDENCE` | `src/recognize/config.py` | да |
@@ -395,6 +397,7 @@
 | `0061_web_own_google_lang.sql` | `web_google_link_states` |
 | `0062_space_isolation.sql` | — |
 | `0063_freeze.sql` | — |
+| `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
 | `0065_web_own_google_profile.sql` | — |
 <!-- map:end -->
 
