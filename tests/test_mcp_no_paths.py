@@ -451,6 +451,7 @@ def _вызвать(имя: str, аргументы: dict[str, Any], *, store: S
         may_retract=True,
         imports=store,
         actor="mcp:HQ",
+        role="admin",
     )
 
 

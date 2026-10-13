@@ -32,6 +32,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import ipaddress
 import logging
 import os
@@ -41,7 +42,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from src.domain.permissions import SIDE_PARTNER, claude_may, side_of
+from src.domain.permissions import MATRIX, SIDE_HQ, SIDE_PARTNER, claude_may, side_of
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -125,6 +126,12 @@ MAX_PORT = 65535
 #: строку удобнее разложить построчно, а короткую — записать в одну.
 _SEPARATORS = re.compile(r"[,\n]")
 
+#: Роль служебного токена из карты `MCP_TOKENS`, если запись её не называет:
+#: самая узкая роль УК — вся сеть на чтение, ничего не меняет (D429, D440).
+#: Прежние записи без роли не открывают ничего сверх чтения; нужное владелец
+#: стенда называет явно: `HQ:admin=<токен>`.
+DEFAULT_TOKEN_ROLE = "guest"  # noqa: S105 — имя роли, не пароль
+
 #: Схема авторизации, которую понимает сервер. Регистр в заголовке
 #: HTTP-клиенты пишут по-разному, поэтому сверка идёт без учёта регистра.
 _BEARER = "bearer"
@@ -154,6 +161,10 @@ class Settings:
     tenants: tuple[str, ...]
     host: str
     port: int
+    #: Роль служебного токена: «токен → роль» из записей `арендатор:роль=токен`.
+    #: Нет записи — `DEFAULT_TOKEN_ROLE`. `repr=False` по той же причине, что и
+    #: у карты токенов: ключи здесь — значения секретов.
+    token_roles: Mapping[str, str] = field(default_factory=dict, repr=False)
     #: Хранилище версий методики. `None` — инструменты методики выключены.
     checklist_store: Path | None = None
     #: Арендаторы, которым методика открыта. Пусто — никому.
@@ -283,9 +294,42 @@ class Settings:
                 found = tenant
         return found
 
+    def role_for(self, token: str) -> str:
+        """Роль служебного токена: названная в записи или самая узкая (чтение).
 
-def _parse_tokens(raw: str) -> dict[str, str]:
-    """`арендатор=токен` через запятую или перевод строки → карта «токен → арендатор».
+        Сверка та же, что у `tenant_for` (байты, `compare_digest`, без
+        досрочного выхода). Незнакомый токен до сюда не доходит, но и ему
+        достанется не «всё», а роль по умолчанию.
+        """
+        предъявленный = _bytes(token)
+        found = DEFAULT_TOKEN_ROLE
+        for known, role in self.token_roles.items():
+            if secrets.compare_digest(_bytes(known), предъявленный):
+                found = role
+        return found
+
+
+def _check_role(tenant: str, role: str) -> None:
+    """Роль записи должна быть в матрице для стороны арендатора, иначе служба не стартует."""
+    side = side_of(canonical_tenant(tenant))
+    if (side, role) not in MATRIX:
+        known = sorted(r for (s, r) in MATRIX if s == side)
+        raise McpConfigError(
+            f"Запись {MCP_TOKENS_VAR} для арендатора «{tenant}» называет роль «{role}», которой "
+            f"нет у этой стороны. Молча заменить её нельзя: доступ считался бы выданным по "
+            f"одной роли, а работал по другой. Известны: {', '.join(known)}"
+        )
+
+
+def _parse_tokens(raw: str) -> tuple[dict[str, str], dict[str, str]]:
+    """`арендатор[:роль]=токен` через запятую или перевод строки → карты токена.
+
+    Две карты: «токен → арендатор» и «токен → роль».
+
+    Роль необязательна: запись без неё читается как `DEFAULT_TOKEN_ROLE` (только
+    чтение), а в карту ролей не попадает. У партнёра роли «только чтение» нет:
+    запись без роли для него остаётся закрытой целиком (роль `guest` у стороны
+    партнёра в матрице не заведена) и пишет предупреждение при разборе.
 
     Разбор идёт по ПЕРВОМУ `=`: код арендатора — простой идентификатор, а
     токен произвольный и вполне может содержать `=` (хвост base64). Разбор по
@@ -293,12 +337,19 @@ def _parse_tokens(raw: str) -> dict[str, str]:
     доступе, а не в разборе настроек.
     """
     tokens: dict[str, str] = {}
+    roles: dict[str, str] = {}
     for chunk in _SEPARATORS.split(raw):
         entry = chunk.strip()
         if not entry:
             continue
-        tenant, sign, token = entry.partition("=")
-        tenant, token = tenant.strip(), token.strip()
+        head, sign, token = entry.partition("=")
+        tenant, colon, role = head.partition(":")
+        tenant, role, token = tenant.strip(), role.strip(), token.strip()
+        if colon and not role:
+            raise McpConfigError(
+                f"Запись {MCP_TOKENS_VAR} для арендатора «{tenant}» ставит «:», но роль не "
+                f"названа. Читается как «арендатор:роль=токен»"
+            )
         if not sign or not tenant or not token:
             raise McpConfigError(
                 f"Запись {MCP_TOKENS_VAR} читается как «арендатор=токен», а пришло нечто "
@@ -322,8 +373,26 @@ def _parse_tokens(raw: str) -> dict[str, str]:
                 f"Один и тот же токен назван дважды, у арендаторов «{tokens[token]}» и "
                 f"«{tenant}». Чью историю он открывает — решал бы порядок строк в файле"
             )
+        if role:
+            _check_role(tenant, role)
+        elif side_of(canonical_tenant(tenant)) != SIDE_HQ:
+            # У партнёра роли «только чтение» нет, а выбирать за владельца роль с
+            # правом писать разбор не вправе: токен остаётся закрытым целиком.
+            logger.warning(
+                "запись %s арендатора «%s» без роли: у партнёра нет роли только на чтение, "
+                "токен ничего не откроет, пока роль не названа (арендатор:admin=… или :auditor=…)",
+                MCP_TOKENS_VAR,
+                tenant,
+            )
+        if token in tokens and role != roles.get(token, ""):
+            raise McpConfigError(
+                f"Один и тот же токен назван дважды с разными ролями, у арендатора «{tenant}». "
+                f"Какую роль он получит — решал бы порядок строк в файле"
+            )
         tokens[token] = tenant
-    return tokens
+        if role:
+            roles[token] = role
+    return tokens, roles
 
 
 def _parse_listen_network(raw: str) -> bool:
@@ -550,12 +619,13 @@ def _parse_public(src: Mapping[str, str], var: str) -> str | None:
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение сервера. Связи с базой здесь не проверяется."""
     src = os.environ if env is None else env
-    tokens = _parse_tokens(src.get(MCP_TOKENS_VAR) or "")
+    tokens, token_roles = _parse_tokens(src.get(MCP_TOKENS_VAR) or "")
     _check_any_door(tokens, src)
     tenants = tuple(sorted(set(tokens.values())))
     store, checklist_tenants, data_dir = _parse_checklist(src, tenants)
     return Settings(
         tokens=tokens,
+        token_roles=token_roles,
         tenants=tenants,
         host=_parse_host(
             src.get(MCP_HOST_VAR) or "",
@@ -596,11 +666,15 @@ class Access:
     #: стороннего из карты `.env`. Нужна подтверждению загруженной проверки
     #: (D308): принятая подписывается тем, кто её принял (D199).
     actor: str = ""
-    #: Роль учётки сайта — у личного токена и у входа через OAuth (D417, аудит
-    #: 12.10): права тогда решает матрица `policy.py`. Роли нет (`None`) только
-    #: у служебного токена из карты `MCP_TOKENS` — его заводит владелец стенда
-    #: руками, и открывает он всё пространство.
+    #: Роль — у личного токена и у входа через OAuth это роль учётки сайта (D417,
+    #: аудит 12.10), у служебного токена из карты `MCP_TOKENS` — названная в
+    #: записи или `DEFAULT_TOKEN_ROLE`. Права решает матрица `policy.py`. Роли
+    #: нет (`None`) — отказ везде: «без роли» никогда не значит «без ограничений».
     role: str | None = None
+    #: Метка служебного токена для журнала: первые 8 знаков SHA-256, по ней
+    #: различаются токены одного арендатора, а сам токен не восстанавливается.
+    #: У личного токена и OAuth пусто — там автор назван логином (`actor`).
+    token_label: str = ""
 
 
 def _owner_from_store(token: str) -> Access | None:
@@ -744,7 +818,13 @@ def resolve_access(settings: Settings, header: str | None) -> Access:
         )
     tenant = settings.tenant_for(token)
     if tenant is not None:
-        return Access(tenant=tenant, may_retract=settings.may_retract(token), actor=f"mcp:{tenant}")
+        return Access(
+            tenant=tenant,
+            may_retract=settings.may_retract(token),
+            actor=f"mcp:{tenant}",
+            role=settings.role_for(token),
+            token_label=hashlib.sha256(_bytes(token)).hexdigest()[:8],
+        )
     личный = _owner_from_store(token)
     if личный is not None:
         return личный

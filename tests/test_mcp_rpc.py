@@ -45,6 +45,7 @@ def _вызов(инструмент: str, аргументы: Any) -> Any:
             "params": {"name": инструмент, "arguments": аргументы},
         },
         tenant=АРЕНДАТОР,
+        role="admin",
     )
 
 
@@ -56,6 +57,7 @@ def test_вызов_без_внятного_имени_инструмента_э
     ответ = handle(
         {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": имя}},
         tenant=АРЕНДАТОР,
+        role="admin",
     )
 
     assert ответ is not None
@@ -122,6 +124,7 @@ def test_знакомая_версия_протокола_подтверждае
     ответ = handle(
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": версия}},
         tenant=АРЕНДАТОР,
+        role="admin",
     )
 
     assert ответ is not None
@@ -134,6 +137,7 @@ def test_незнакомая_версия_протокола_получает_�
     ответ = handle(
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": версия}},
         tenant=АРЕНДАТОР,
+        role="admin",
     )
 
     assert ответ is not None
@@ -143,7 +147,9 @@ def test_незнакомая_версия_протокола_получает_�
 def test_параметры_не_объектом_не_роняют_разбор() -> None:
     """Кривые `params` у метода без аргументов — не повод падать трейсбеком."""
     ответ = handle(
-        {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": "мимо"}, tenant=АРЕНДАТОР
+        {"jsonrpc": "2.0", "id": 1, "method": "ping", "params": "мимо"},
+        tenant=АРЕНДАТОР,
+        role="admin",
     )
 
     assert ответ == {"jsonrpc": "2.0", "id": 1, "result": {}}
@@ -320,7 +326,7 @@ def test_сбой_чтения_говорит_про_чтение(monkeypatch: p
     # `ToolSpec` заморожен, а `find` смотрит в словарь, собранный при импорте,
     # — поэтому подменяется запись именно в нём.
     monkeypatch.setitem(_BY_NAME, "list_inspections", replace(spec, handler=падает))
-    ответ = handle(_запрос("list_inspections", {}), tenant=АРЕНДАТОР)
+    ответ = handle(_запрос("list_inspections", {}), tenant=АРЕНДАТОР, role="admin")
 
     текст = _текст_отказа(ответ)
     assert "проверки" in текст, текст
@@ -349,6 +355,7 @@ def test_сбой_записи_методики_не_говорит_про_чт�
         _запрос("checklist_versions", {}),
         tenant=АРЕНДАТОР,
         checklist=ПадающееХранилище(),
+        role="admin",
     )
 
     текст = _текст_отказа(ответ)

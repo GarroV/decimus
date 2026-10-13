@@ -174,10 +174,11 @@ def test_девелоперу_указатель_прода_отказом_сл�
     assert "только админы" in ответ["result"]["content"][0]["text"]
 
 
-def test_без_роли_tools_list_как_раньше() -> None:
-    """Двери бота и `.env` роли не знают: каталог целиком, как до D417."""
-    assert _список(tenant="HQ") == {spec.name for spec in TOOLS}
-    assert _список(tenant="HQ", role=None) == {spec.name for spec in TOOLS}
+def test_без_роли_tools_list_пуст() -> None:
+    """Роли нет — прав нет: `None` никогда не значит «каталог целиком»."""
+    assert _список(tenant="HQ") == set()
+    assert _список(tenant="HQ", role=None) == set()
+    assert _список(tenant="HQ", role=None, may_retract=True) == set()
 
 
 def _вызов(имя: str, **доступ: Any) -> dict[str, Any]:
@@ -209,7 +210,7 @@ def _первый(вид: str) -> str:
 
 @pytest.mark.parametrize(("арендатор", "роль", "вид"), ЗАКРЫТЫЕ)
 def test_вызов_закрытого_роли_вида_это_отказ_роли(арендатор: str, роль: str, вид: str) -> None:
-    ответ = _вызов(_первый(вид), tenant=арендатор, role=роль, may_retract=True)
+    ответ = _вызов(_первый(вид), tenant=арендатор, role=роль, may_retract=False)
 
     результат = ответ["result"]
     assert результат["isError"] is True
