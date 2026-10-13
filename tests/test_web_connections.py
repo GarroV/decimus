@@ -285,11 +285,6 @@ def test_выдача_передаёт_базе_проверенное_и_лог
     assert kw["expires_at"] == datetime(2099, 1, 1, 23, 59, 59, tzinfo=UTC)
 
 
-#: Экран считает «сегодня» по UTC; `date.today()` в первые часы суток по местному
-#: времени (восточнее UTC) уже завтрашняя для UTC дата, и тест ждал отказа на законном сроке.
-СЕГОДНЯ_UTC = datetime.now(UTC).date()
-
-
 @pytest.mark.parametrize(
     ("поля", "текст"),
     [
@@ -297,8 +292,11 @@ def test_выдача_передаёт_базе_проверенное_и_лог
         ({"scope": ["ratings:write"]}, "Такого права нет"),
         ({"code": "Bad Code"}, "Код: латиница"),
         ({"countries": "GE ZZ"}, "Неизвестная страна: ZZ"),
-        ({"expires": str(СЕГОДНЯ_UTC - timedelta(days=1))}, "Срок не раньше завтрашнего дня"),
-        ({"expires": СЕГОДНЯ_UTC.isoformat()}, "Срок не раньше завтрашнего дня"),
+        (
+            {"expires": str(datetime.now(UTC).date() - timedelta(days=1))},
+            "Срок не раньше завтрашнего дня",
+        ),
+        ({"expires": datetime.now(UTC).date().isoformat()}, "Срок не раньше завтрашнего дня"),
         ({"title": "  "}, "Назовите сервис"),
     ],
 )
