@@ -256,6 +256,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0061_web_own_google_lang.sql": (
         "sql1:2cf41cb5512e4a2ceff7b42d3fc5c9ea78a4d381263805e8aacf4d731c444df6"
     ),
+    # Изоляция пространств в базе (аудит 12.10, F-037, F-005). Ещё не на проде.
+    "0062_space_isolation.sql": (
+        "sql1:6914454f0f5520b392b18aa0fd07beb05925abff1e68271bf8c31681693427d9"
+    ),
 }
 
 
