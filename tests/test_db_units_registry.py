@@ -133,7 +133,7 @@ def test_экран_охвата_значок_устаревших_прочер�
 ) -> None:
     _наполнить()
 
-    подменить_двери(monkeypatch, tenant="HQ", role="auditor")
+    подменить_двери(monkeypatch, tenant="HQ", role="developer")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
         html = _страница(client)
@@ -176,7 +176,7 @@ def test_привязка_glovo_по_ссылке_только_управляю�
     monkeypatch.setattr(screen.glovo_link, "link_by_url", без_сети)
     форма = {"dodo_id": ПЕРВЫЙ, "url": "https://glovoapp.com/en/ro/bucharest/stores/dodo"}
 
-    подменить_двери(monkeypatch, tenant="HQ", role="auditor")
+    подменить_двери(monkeypatch, tenant="HQ", role="developer")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
         assert client.post("/ratings/coverage/link", data=форма, headers=ORIGIN).status_code == 403

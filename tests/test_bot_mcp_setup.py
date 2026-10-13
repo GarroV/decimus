@@ -105,7 +105,7 @@ def _учётки(request: pytest.FixtureRequest) -> None:
     request.getfixturevalue("db_env")  # учётку заводит дверь базы: ей нужна база
     pg_dsn = request.getfixturevalue("pg_dsn")
     monkeypatch = request.getfixturevalue("monkeypatch")
-    for кто, роль in ((AUDITOR_ID, "admin"), (SECOND_ID, "auditor")):
+    for кто, роль in ((AUDITOR_ID, "admin"), (SECOND_ID, "developer")):
         привязать_бота(pg_dsn, monkeypatch, кто, tenant="HQ", role=роль)
 
 
@@ -425,7 +425,7 @@ async def test_каждый_со_своей_учёткой_выпускает_с
 
     владелец = resolve_token(выданный_токен(строка_настройки(session)))
     assert владелец is not None and владелец.login == f"tg-{SECOND_ID}"
-    assert владелец.role == "auditor", "права в Claude решает роль учётки"
+    assert владелец.role == "developer", "права в Claude решает роль учётки"
 
 
 @requires_db
