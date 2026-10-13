@@ -86,11 +86,16 @@ def test_role_may_без_пространства_отказ() -> None:
 
 
 def test_claude_снятие_закрыто_всем_методика_партнёру() -> None:
-    """D341, D417: снятия в Claude нет ни у кого; партнёр в Claude методику не видит."""
+    """D341, D417: снятия в Claude нет ни у кого. D460: методика админа партнёра в Claude
+    открыта как в вебе, кроме указателя прода; сотруднику партнёра методика в Claude закрыта."""
     assert perm.role_may("superadmin", "HQ", "inspection.retract")
     assert not perm.claude_may("superadmin", "HQ", "inspection.retract")
-    assert perm.role_may("admin", "RS", "checklist.edit")
-    assert not perm.claude_may("admin", "RS", "checklist.edit")
+    assert not perm.claude_may("admin", "RS", "inspection.retract")
+    for действие in ("checklist.read", "checklist.edit", "checklist.publish", "checklist.manage"):
+        assert perm.claude_may("admin", "RS", действие), действие
+    assert perm.role_may("admin", "RS", "checklist.apply")
+    assert not perm.claude_may("admin", "RS", "checklist.apply")
+    assert perm.role_may("auditor", "RS", "checklist.read")
     assert not perm.claude_may("auditor", "RS", "checklist.read")
     assert perm.claude_may("developer", "HQ", "checklist.edit")
     assert perm.claude_may("auditor", "RS", "inspection.read")

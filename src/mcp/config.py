@@ -41,6 +41,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.domain.permissions import SIDE_PARTNER, claude_may, side_of
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -208,18 +209,30 @@ class Settings:
                 found = True
         return found
 
-    def may_manage_checklist(self, tenant: str) -> bool:
+    def may_manage_checklist(self, tenant: str, role: str | None = None) -> bool:
         """Открыта ли методика этому арендатору.
 
         Проверяется по коду арендатора, а тот приходит из токена и ниоткуда
         больше, — то есть право на правку методики держится на той же двери,
         что и граница арендаторов, и отдельного способа его получить нет.
+
+        Партнёру со входом по роли учётки (`role`, D417) список
+        `MCP_CHECKLIST_TENANTS` не нужен (D460): партнёров в базе много и они
+        заводятся без правки `.env`, поэтому методику в своём пространстве ему
+        открывает матрица (`claude_may`: админ — да, сотрудник — нет). Для УК и
+        для токенов без роли решает список, как раньше.
         """
+        if self.checklist_store is None:
+            return False
+        if canonical_tenant(tenant) in self.checklist_tenants:
+            return True
         return (
-            self.checklist_store is not None and canonical_tenant(tenant) in self.checklist_tenants
+            role is not None
+            and side_of(tenant) == SIDE_PARTNER
+            and claude_may(role, tenant, "checklist.edit")
         )
 
-    def may_read_checklist(self, tenant: str) -> bool:
+    def may_read_checklist(self, tenant: str, role: str | None = None) -> bool:
         """Открыт ли ЭТОМУ арендатору ИСХОДНИК эталона — чтение, не правка.
 
         Право разведено с `may_manage_checklist` намеренно (T315, D132).
@@ -234,10 +247,15 @@ class Settings:
         `load_settings` (ровно тесты и будущий вызывающий), и чтение, открытое
         незаведённому коду, было бы правом, выданному никому — или кому-то.
         """
+        if self.checklist_store is None or self.data_dir is None:
+            return False
+        if tenant in self.tenants:
+            return True
+        # Партнёр со входом по роли (D460): заведён в базе, а не в карте `.env`.
         return (
-            self.checklist_store is not None
-            and self.data_dir is not None
-            and tenant in self.tenants
+            role is not None
+            and side_of(tenant) == SIDE_PARTNER
+            and claude_may(role, tenant, "checklist.read")
         )
 
     def tenant_for(self, token: str) -> str | None:
