@@ -96,9 +96,10 @@
 {% macro add_form(c) %}
   {% set sheet = c.sheet %}
   {% if c.may_revise and not c.head.is_legacy and sheet.catalogue %}
-  <form method="post" enctype="multipart/form-data" class="stack mt-gap review-edit review-add" data-panel-form
+  <details class="review-edit review-add">
+  <summary class="btn btn--ghost">+ {{ t('add.open') }}</summary>
+  <form method="post" enctype="multipart/form-data" class="stack mt-gap" data-panel-form
         action="{{ url('/inspections/' ~ c.head.id ~ '/findings') }}?lang={{ lang }}">
-    <div class="field-label">{{ t('add.open') }}</div>
     <label><span class="field-label">{{ t('revise.item') }}</span>
       <input class="input" type="search" data-pick-filter="#add-code-{{ c.head.id }}" placeholder="{{ t('add.search') }}" autocomplete="off">
       <select class="input" name="code" id="add-code-{{ c.head.id }}" size="6" required>
@@ -121,6 +122,7 @@
     <p class="field-note">{{ t('revise.hint') }}</p>
     <button class="btn" type="submit">{{ t('add.submit') }}</button>
   </form>
+  </details>
   {% endif %}
 {% endmacro %}
 
