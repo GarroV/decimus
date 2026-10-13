@@ -33,8 +33,8 @@ from src.db.web_access import (  # noqa: E402
     change_password,
     close_session,
     create_account,
-    disable_account,
     find_by_email,
+    freeze_account,
     list_accounts,
     list_spaces,
     new_session_token,
@@ -122,7 +122,7 @@ def test_незнакомый_логин_не_опознаётся(обе_рол
 
 def test_отключённая_учётка_не_опознаётся(обе_роли: str) -> None:
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
-    assert disable_account("director", tenant=ТЕНАНТ) is True
+    assert freeze_account("director", tenant=ТЕНАНТ) is True
     assert authenticate("director", ПАРОЛЬ) is None
 
 
@@ -158,7 +158,7 @@ def test_сессия_несёт_пространство_своей_учётк�
 
 def test_отключённая_учётка_другого_пространства_не_входит(обе_роли: str) -> None:
     сессия = open_session(create_account("partner", tenant=ЧУЖОЙ, password=ПАРОЛЬ))
-    disable_account("partner", tenant=ЧУЖОЙ)
+    freeze_account("partner", tenant=ЧУЖОЙ)
     assert authenticate("partner", ПАРОЛЬ) is None
     assert resolve_session(сессия.token) is None
 
@@ -309,7 +309,7 @@ def test_отключение_учётки_гасит_живую_сессию(о
     """Отняли учётку — отняли и то, что по ней уже открыто."""
     учётка = create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     сессия = open_session(учётка)
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
     assert resolve_session(сессия.token) is None
 
 
@@ -391,7 +391,7 @@ def test_список_показывает_отключённую_отключё
     """Отключённая учётка остаётся в списке: «у кого был доступ» — часть следа."""
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     assert list_accounts(tenant=ТЕНАНТ)[0].disabled_at is None
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
     строки = list_accounts(tenant=ТЕНАНТ)
     assert [строка.login for строка in строки] == ["director"]
     assert строки[0].disabled_at is not None
@@ -563,7 +563,7 @@ def test_отключённая_учётка_не_входит_и_через_goo
     """Отзыв доступа закрывает все двери сразу, иначе это не отзыв."""
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
     set_email("director", tenant=ТЕНАНТ, email=ПОЧТА)
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
 
     assert find_by_email(ПОЧТА) is None
 
@@ -672,7 +672,7 @@ def test_пароль_не_меняется_несуществующей_учё�
 def test_пароль_не_меняется_отключённой_учётке(обе_роли: str) -> None:
     """Отключённую не воскрешают сменой пароля: её включают отдельно и осознанно."""
     create_account("director", tenant=ТЕНАНТ, password=ПАРОЛЬ)
-    disable_account("director", tenant=ТЕНАНТ)
+    freeze_account("director", tenant=ТЕНАНТ)
 
     assert change_password("director", tenant=ТЕНАНТ, password=ПАРОЛЬ + "-другой") is False
 

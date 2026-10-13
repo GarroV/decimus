@@ -70,7 +70,7 @@ def test_аудитор_видит_на_вкладке_только_себя(с�
     assert ответ.status_code == 200
     страница = ответ.get_data(as_text=True)
     assert ЛОГИН in страница
-    assert "/users/add" not in страница and "/users/disable" not in страница
+    assert "/users/add" not in страница and "/users/freeze" not in страница
 
 
 def test_аудитор_не_заводит_людей_даже_прямой_отправкой(
@@ -125,15 +125,15 @@ def test_пароль_заведённого_показан_один_раз_и_�
     assert ответ.headers.get("Location") is None
 
 
-def test_себя_отключить_нельзя(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_себя_заморозить_нельзя(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     отключённые: list[str] = []
     monkeypatch.setattr(
         accounts,
-        "disable",
+        "freeze",
         lambda login, **_: отключённые.append(login) or True,  # type: ignore[func-returns-value]
     )
 
-    ответ = стенд_админа.post("/users/disable", data={"login": ЛОГИН}, headers=СВОЙ)
+    ответ = стенд_админа.post("/users/freeze", data={"login": ЛОГИН}, headers=СВОЙ)
 
     # Отключить себя — это выход без возврата, а на стенде с одним
     # администратором ещё и закрытый навсегда экран людей: снять пометку
@@ -142,19 +142,19 @@ def test_себя_отключить_нельзя(стенд_админа: Flask
     assert отключённые == []
 
 
-def test_отключение_чужой_учётки_доходит_до_базы(
+def test_заморозка_чужой_учётки_доходит_до_базы(
     стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     отключённые: list[str] = []
 
-    def _disable(login: str, **_: object) -> bool:
+    def _freeze(login: str, **_: object) -> bool:
         отключённые.append(login)
         return True
 
-    monkeypatch.setattr(accounts, "disable", _disable)
+    monkeypatch.setattr(accounts, "freeze", _freeze)
 
     ответ = стенд_админа.post(
-        "/users/disable", data={"login": "petr", "tenant": ТЕНАНТ}, headers=СВОЙ
+        "/users/freeze", data={"login": "petr", "tenant": ТЕНАНТ}, headers=СВОЙ
     )
 
     assert ответ.status_code == 200
@@ -173,9 +173,7 @@ def test_сотрудник_партнёра_не_заводит_людей(monk
     with собрать(tenant="HQ").test_client() as client:
         войти(client)
         ответ = client.post("/users/add", headers=СВОЙ, data={"login": "x", "tenant": "GE"})
-        отключение = client.post(
-            "/users/disable", headers=СВОЙ, data={"login": "x", "tenant": "GE"}
-        )
+        отключение = client.post("/users/freeze", headers=СВОЙ, data={"login": "x", "tenant": "GE"})
     assert ответ.status_code == 403 and заведено == []
     assert отключение.status_code == 403
 

@@ -260,6 +260,8 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0062_space_isolation.sql": (
         "sql1:6914454f0f5520b392b18aa0fd07beb05925abff1e68271bf8c31681693427d9"
     ),
+    # «Заморозить» и «Выйти везде» (D462): disabled_by, триггер заморозки, функция выхода.
+    "0063_freeze.sql": ("sql1:da101ad0687e59f4913894ca003d4fe35fe15b1646b19d4eaffdf260406f75c2"),
 }
 
 

@@ -73,7 +73,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
         зовы["add"].append((login, tenant, role))
         return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
 
-    def disable(login: str, *, tenant: str, only_roles: Any = None) -> bool:
+    def disable(login: str, *, tenant: str, only_roles: Any = None, by: Any = None) -> bool:
         зовы["disable"].append((login, tenant, only_roles))
         return True
 
@@ -96,7 +96,7 @@ def база(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[Any]]:
     monkeypatch.setattr(accounts, "everyone", everyone)
     monkeypatch.setattr(accounts, "spaces", lambda: ("AM", "GE", "HQ"))
     monkeypatch.setattr(accounts, "add", add)
-    monkeypatch.setattr(accounts, "disable", disable)
+    monkeypatch.setattr(accounts, "freeze", disable)
     monkeypatch.setattr(accounts, "reassign_role", reassign)
     monkeypatch.setattr(accounts, "set_email", set_email)
     monkeypatch.setattr(partner_spaces, "create_partner_space", create_space)
@@ -203,20 +203,20 @@ def test_последнего_главного_не_снять_сказано_с
         raise accounts.LastSuperadminError("последний")
 
     monkeypatch.setattr(accounts, "reassign_role", отказ)
-    monkeypatch.setattr(accounts, "disable", отказ)
+    monkeypatch.setattr(accounts, "freeze", отказ)
 
     роль = главный.post(
         "/users/role", data={"login": "boss2", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
     )
     отключение = главный.post(
-        "/users/disable", data={"login": "boss2", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+        "/users/freeze", data={"login": "boss2", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
     )
 
     assert роль.status_code == 409 and "последний действующий главный" in роль.get_data(
         as_text=True
     )
     assert отключение.status_code == 409
-    assert "главного админа отключить нельзя" in отключение.get_data(as_text=True)
+    assert "главного админа заморозить нельзя" in отключение.get_data(as_text=True)
 
 
 def test_свою_роль_не_меняет_и_главный(главный: FlaskClient, база: dict[str, list[Any]]) -> None:
@@ -248,7 +248,7 @@ def test_админ_уК_видит_всех_кроме_главного_адм�
         ("/users/add", {"login": "x", "tenant": "HQ", "role": "superadmin"}),
         ("/users/role", {"login": "petr", "tenant": "HQ", "role": "superadmin"}),
         ("/users/role", {"login": "boss2", "tenant": "HQ", "role": "developer"}),
-        ("/users/disable", {"login": "boss2", "tenant": "HQ"}),
+        ("/users/freeze", {"login": "boss2", "tenant": "HQ"}),
         ("/users/email", {"login": "boss2", "tenant": "HQ", "email": "me@evil.example"}),
     ],
 )
@@ -269,7 +269,7 @@ def test_админ_уК_заводит_админа_и_ведёт_других_
         "/users/add", data={"login": "newadm", "tenant": "HQ", "role": "admin"}, headers=ЗАГОЛОВКИ
     )
     отключён = админ_уК.post(
-        "/users/disable", data={"login": "kostya", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+        "/users/freeze", data={"login": "kostya", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
     )
 
     assert добавлен.status_code == 200 and отключён.status_code == 200
@@ -365,7 +365,7 @@ def test_админ_партнёра_ведёт_людей_своего_прос
         headers=ЗАГОЛОВКИ,
     )
     отключение = админ_GE.post(
-        "/users/disable", data={"login": "gia", "tenant": "GE"}, headers=ЗАГОЛОВКИ
+        "/users/freeze", data={"login": "gia", "tenant": "GE"}, headers=ЗАГОЛОВКИ
     )
 
     assert [r.status_code for r in (заведение, роль, почта, отключение)] == [200] * 4
@@ -383,9 +383,9 @@ def test_админ_партнёра_ведёт_людей_своего_прос
         ("/users/add", {"login": "x", "tenant": "GE", "role": "control"}),
         ("/users/add", {"login": "x", "tenant": "GE", "role": "superadmin"}),
         # Учётка другого пространства — с её настоящим пространством и с подменой на своё.
-        ("/users/disable", {"login": "aramayis", "tenant": "AM"}),
-        ("/users/disable", {"login": "aramayis", "tenant": "GE"}),
-        ("/users/disable", {"login": "petr", "tenant": "HQ"}),
+        ("/users/freeze", {"login": "aramayis", "tenant": "AM"}),
+        ("/users/freeze", {"login": "aramayis", "tenant": "GE"}),
+        ("/users/freeze", {"login": "petr", "tenant": "HQ"}),
         ("/users/role", {"login": "anahit", "tenant": "AM", "role": "auditor"}),
         ("/users/role", {"login": "gia", "tenant": "GE", "role": "superadmin"}),
         ("/users/email", {"login": "anahit", "tenant": "AM", "email": "me@evil.example"}),
@@ -429,7 +429,7 @@ def test_сотрудник_партнёра_и_аудитор_уК_не_упр�
             client.post(путь, data=форма, headers=ЗАГОЛОВКИ).status_code
             for путь, форма in (
                 ("/users/add", {"login": "x", "tenant": tenant, "role": "auditor"}),
-                ("/users/disable", {"login": "gia", "tenant": "GE"}),
+                ("/users/freeze", {"login": "gia", "tenant": "GE"}),
                 ("/users/role", {"login": "gia", "tenant": "GE", "role": "admin"}),
                 ("/users/email", {"login": "gia", "tenant": "GE", "email": "a@b.example"}),
                 ("/users/spaces/add", {"code": "KZ", "countries": "KZ"}),
