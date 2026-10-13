@@ -325,8 +325,9 @@
 .rt-layout { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); }
 .rt-layout__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
 .rt-layout__row:last-child { border-bottom: 0; }
-.rt-layout__name { display: flex; align-items: center; gap: var(--space-2); }
-.rt-layout__moves { display: flex; gap: var(--space-1); }
+.rt-layout__name { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-2); }
+.rt-layout__moves { display: flex; flex: none; gap: var(--space-1); }
+.rt-layout__moves .btn--sm { min-width: 44px; padding: 0 var(--space-3); }  /* ↑/↓ без запаса под подпись: на 390px строка помещается в карточку */
 
 /* «Пиццерии на площадках»: таблица охвата. Таблица прокручивается внутри .rt-scroll,
    страница на 390px не едет вбок. Устаревшее — значок у числа, строка не красится. */
