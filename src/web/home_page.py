@@ -5,25 +5,26 @@
 (D399). Партнёр видит свои пиццерии, УК — всю сеть: страница одна, различается
 охват. Сверху вниз:
 
-Блоки (D418) — компактной сеткой колонок, а не растянутыми по ширине; шире
-других только «Пиццерии»:
+Блоки (D418, D471) — верхний ряд одинаковых карточек (одна ширина колонки, одна
+высота ряда; что длиннее — прокручивается внутри карточки), ниже таблица
+«Пиццерии» и справа от неё панель фильтров:
 
 1. «Требует внимания» — одна карточка: стикеры доски по живым счётчикам
    (`home_board`) и под ними пиццерии, куда смотреть. Нечего показать — карточки
    нет вовсе; отказ доски остаётся строкой с ошибкой, не тишиной;
 2. «Проверки за период» — итог; без проверок — одной строкой;
 3. «Рейтинги» — РС, РКО и карты: CEE и остальные страны (`home_ratings_block`);
-4. «Последние проверки» — короткий список;
-5. «Топ нарушений», «Потери по зонам», пустое скрыто;
-6. «Пиццерии» — на всю строку, с порядком на самом блоке и колонками последней
-   оценки РС / РКО (`home_ratings.load_latest`; сбой — прочерки и строка в
-   шапке блока, экран остаётся).
+4. «Топ нарушений», «Потери по зонам», пустое скрыто;
+5. «Пиццерии» — таблица с колонками последней оценки РС / РКО
+   (`home_ratings.load_latest`; сбой — прочерки и строка в шапке блока, экран
+   остаётся). «Последних проверок» нет: список проверок — и есть эта таблица (D471).
 
-Срез — в шапке одной строкой: период и страна. Период — календарь «с — по» со
-стрелками, по умолчанию текущий месяц (D378, тот же `registry_period`, что у
-«Проверок»). Страна — выпадающий список (только если стран больше одной), он
-сужает весь экран. Срез живёт в адресе, ссылкой делятся. «Город» и «Буква» с
-главной ушли: город — работа «Страны» (D260), буква видна в таблице пиццерий.
+Срез живёт в панели фильтров справа от таблицы (D471) и действует на весь экран,
+верхний ряд тоже: период (календарь «с — по» со стрелками, по умолчанию текущий
+месяц, тот же `registry_period`, что у «Проверок»), кластер (CEE / «Другие
+страны» из `ratings.countries.cluster`), страна, порядок таблицы. Кластер сужает
+страны выборки; страна — одну из них. Срез в адресе, ссылкой делятся. «Город» и
+«Буква» с главной ушли: город — работа «Страны» (D260), буква видна в таблице.
 «Где нужно проверить» живёт в «Проверках» (D418).
 
 Блок, чьи данные не прочитались, говорит об этом сам, а экран остаётся: доска и
@@ -35,13 +36,16 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import Any
 
 from flask import render_template, request, url_for
 
+from src.db import ratings_read
 from src.db.errors import DbError
 from src.domain.tenants import HQ_TENANT
+from src.ratings import report
 
 from . import (
     auth,
@@ -58,9 +62,6 @@ from .sections import section
 from .texts import t
 
 log = logging.getLogger(__name__)
-
-#: Сколько последних проверок показывает карточка «Последние проверки».
-LATEST_COUNT = 6
 
 
 def _url(endpoint: str, **params: Any) -> str:
@@ -107,6 +108,29 @@ def _latest_ratings(
         return {}, True
 
 
+def _clusters(
+    countries: tuple[str, ...] | None,
+) -> dict[str, tuple[str, ...]]:
+    """Кластеры и их страны в охвате: `{CEE: (...), OTHER: (...)}`; сбой чтения — пусто.
+
+    Сопоставление страна → кластер ведёт справочник рейтингов; страны вне него ни в
+    один кластер не попадают. Пусто — фильтра на экране нет, сам экран остаётся.
+    """
+    try:
+        rows = ratings_read.countries()
+    except DbError as exc:
+        log.warning("главная: кластеры стран не прочитались (%s)", exc.__class__.__name__)
+        return {}
+    found: dict[str, tuple[str, ...]] = {}
+    for key in report.CLUSTERS:
+        members = tuple(
+            r.code for r in rows if r.cluster == key and (countries is None or r.code in countries)
+        )
+        if members:
+            found[key] = members
+    return found
+
+
 def render(
     *,
     lang: str,
@@ -117,7 +141,14 @@ def render(
     today = date.today()
     period = registry_period.read(request.args, today=today)
     before = registry_period.shift(period, -1)
-    reach = auth.current_reach()
+    full_reach = auth.current_reach()
+    кластеры = _clusters(full_reach.countries)
+    кластер = request.args.get("cluster", "").strip().upper()
+    if кластер not in кластеры:
+        кластер = ""
+    # Кластер сужает страны всей выборки (D471); доска заданий не срез — она по
+    # полному охвату вошедшего.
+    reach = replace(full_reach, countries=кластеры[кластер]) if кластер else full_reach
     страна = request.args.get("country", "").strip().upper()[:2]
     # Страна вне охвата из адреса не сужает экран: иначе рейтинги показали бы
     # её, а проверки (их держит охват в запросе) — пустоту, без объяснения.
@@ -139,6 +170,7 @@ def render(
     def select(**изменения: str) -> str:
         """Адрес главной с изменённым срезом; пустое и умолчания из адреса выпадают."""
         параметры = {
+            "cluster": кластер,
             "country": selection.country,
             "sort": selection.sort,
             **period.params(),
@@ -154,7 +186,7 @@ def render(
 
     codes = (selection.country,) if selection.country else reach.countries
     рейтинги, рейтинги_отказ = _latest_ratings(codes, min(period.end or today, today))
-    стикеры, доска_отказ = _board(reach)
+    стикеры, доска_отказ = _board(full_reach)
     # Блок «Рейтинги» (D418): среднее группы считают «Рейтинги», здесь — только показ.
     блок_рейтингов = home_ratings_block.load(
         scope=reach.countries, country=страна, period=period, today=today
@@ -164,8 +196,8 @@ def render(
     ratings_href = _url(
         "ratings", lang=lang, **({"group": "country", "value": страна} if страна else {})
     )
-    # Страна — выпадающим списком в шапке (D418): страны охвата вошедшего, пустое
-    # значение — все. Одна страна — выбирать нечего, списка нет.
+    # Страна — выпадающим списком в панели фильтров (D471): страны выборки (охват и
+    # кластер), пустое значение — все. Одна страна — выбирать нечего, списка нет.
     выбор_страны = (
         pick(
             label="",
@@ -178,8 +210,20 @@ def render(
         if len(snapshot.countries) > 1
         else None
     )
+    выбор_кластера = (
+        pick(
+            label="",
+            empty_title=t("home.cluster.all", lang),
+            current=кластер,
+            values=tuple((ключ, len(страны)) for ключ, страны in кластеры.items()),
+            href=lambda значение: select(cluster=значение, country=""),
+            title=lambda ключ: t("ratings.cluster." + ключ, lang),
+        )
+        if len(кластеры) > 1
+        else None
+    )
     порядок = pick(
-        label=t("overview.sort", lang),
+        label="",
         empty_title=t("overview.sort.score", lang),
         current="" if selection.sort == "score" else selection.sort,
         values=tuple((код, None) for код in overview_data.ПОРЯДКИ if код != "score"),
@@ -197,18 +241,22 @@ def render(
         period_quick=registry_view.period_quick(period, today, lang, select),
         hidden_params={
             к: з
-            for к, з in (("country", selection.country), ("sort", selection.sort))
+            for к, з in (
+                ("cluster", кластер),
+                ("country", selection.country),
+                ("sort", selection.sort),
+            )
             if з and з != "score"
         },
         only_country=selection.country,
         stickers=стикеры,
         board_failed=доска_отказ,
-        latest_count=LATEST_COUNT,
         ratings_href=ratings_href,
         ratings_block=блок_рейтингов,
         ratings_block_href=_url("ratings", lang=lang, **dict(блок_рейтингов.link)),
         unit_ratings=рейтинги,
         ratings_failed=рейтинги_отказ,
+        cluster_pick=выбор_кластера,
         country_pick=выбор_страны,
         sort_pick=порядок,
         registry_path=section("registry").path,
