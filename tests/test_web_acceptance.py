@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from typing import Any
 
 import pytest
@@ -119,13 +120,13 @@ def test_ждущая_своя_показана_с_плашкой_листом_�
     # Act
     страница = стенд.get("/inspections/x").get_data(as_text=True)
 
-    # Assert — подтвердить и исправить можно, переносить и отклонять до приёмки нечего.
+    # Assert — принять, исправить и отклонить можно (D465); переносить до приёмки нечего.
     assert "Проверка на приёмке" in страница
     assert "/accept?lang=" in страница
     assert "/findings/f1/revise?lang=" in страница
     assert "Сохранить и пересчитать" in страница
     assert "/move?lang=" not in страница
-    assert "/retract?lang=" not in страница
+    assert "/retract?lang=" in страница
 
 
 @админ
@@ -232,7 +233,7 @@ def test_реестр_показывает_ждущих_приёмки_отде�
     страница = стенд.get("/inspections").get_data(as_text=True)
 
     # Assert
-    assert "Ждут приёмки" in страница
+    assert "На приёмке" in страница
     assert "Ждущая точка" in страница
 
 
@@ -347,3 +348,95 @@ def test_письмо_открывается_и_у_ждущей_приёмки(
     for отказ in ("saved=on_review", "gmail=on_review"):
         страница = стенд.get(f"/inspections/x/letter?{отказ}").get_data(as_text=True)
         assert "Проверка ещё не подтверждена" in страница, отказ
+
+
+# --- панель реестра — полный просмотр (D465) ---------------------------------
+
+ПАНЕЛЬ = "/inspections?inspection=x"
+
+
+@админ
+def test_панель_ждущей_принимает_и_правит_на_месте(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Приёмка и правка записей — формами самой панели, а не ссылкой в полную карточку."""
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+
+    страница = стенд.get(ПАНЕЛЬ).get_data(as_text=True)
+
+    assert (
+        'action="/inspections/11111111-1111-1111-1111-111111111111/accept?lang=ru" data-panel-form'
+        in страница
+    )
+    assert "Принять проверку" in страница
+    assert (
+        "/findings/f1/revise?lang=ru" in страница
+        and '<form method="post" class="stack mt-gap" data-panel-form' in страница
+    )
+    assert "data-edit-toggle" in страница  # «Исправить» ведёт к формам правки
+    assert 'id="review"' in страница
+    # Отдельной страницы карточки среди действий панели нет: «Открыть полностью» снято.
+    assert 'href="/inspections/11111111-1111-1111-1111-111111111111?lang=ru"' not in страница
+    assert "?lang=ru#review" not in страница
+
+
+@админ
+def test_панель_принятой_не_предлагает_исправить(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Принятую не правят (решение владельца 13.10): ни карандаша, ни переноса."""
+    _приёмка(monkeypatch, ждёт=False)
+
+    страница = стенд.get(ПАНЕЛЬ).get_data(as_text=True)
+
+    assert "data-edit-toggle" not in страница
+    assert "/move?lang=" not in страница
+    assert "/retract?lang=" in страница  # отклонить — по прежнему правилу
+
+
+@админ
+def test_панель_показывает_все_записи_без_ещё_n(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Раньше панель резала список на 8 записей ссылкой «Ещё N — в полной карточке»."""
+    _приёмка(monkeypatch, ждёт=False)
+    базовая = карточка(шапка())
+    записи = tuple(
+        replace(базовая.findings[0], id=f"f{n}", n=n, text=f"Замечание номер {n}")
+        for n in range(1, 13)
+    )
+    monkeypatch.setattr(data, "load_card", lambda *_a, **_k: replace(базовая, findings=записи))
+
+    страница = стенд.get(ПАНЕЛЬ).get_data(as_text=True)
+
+    assert "Замечание номер 12" in страница
+    assert "в полной карточке" not in страница
+
+
+@админ
+def test_действие_из_панели_отвечает_карточкой_а_не_страницей(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`split.js` шлёт форму фоном с `X-Panel` и подменяет панель ответом (D465)."""
+    вызовы = _приёмка(monkeypatch)
+    _лист(monkeypatch)
+
+    ответ = стенд.post("/inspections/x/accept", headers={**ORIGIN, "X-Panel": "1"})
+
+    текст = ответ.get_data(as_text=True)
+    assert ответ.status_code == 200 and len(вызовы) == 1
+    assert "<html" not in текст and 'class="sdetail spanel"' in текст
+    assert "Проверка принята." in текст
+
+
+@админ
+def test_действие_без_скрипта_отвечает_страницей_карточки_как_раньше(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _приёмка(monkeypatch)
+    _лист(monkeypatch)
+
+    текст = стенд.post("/inspections/x/accept", headers=ORIGIN).get_data(as_text=True)
+
+    assert "<html" in текст and "Проверка принята." in текст

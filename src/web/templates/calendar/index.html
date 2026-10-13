@@ -1,0 +1,57 @@
+{#
+  «Календарь» (D466). Вопрос экрана — «где пора проверить». Пока в нём один блок,
+  «Где нужно проверить» (D399, D418; раньше стоял на «Проверках»): точки охвата
+  без проверок за выбранный период (`to_inspect.py`). Период — один на экран:
+  «с — по» со стрелками ← →, по умолчанию текущий месяц (`registry_period.py`).
+  Пусто — одна тихая строка; отказ базы — строка с ошибкой. Каркас — общий
+  `_split_page.html` без панели: выбирать тут нечего.
+#}{% extends "_split_page.html" %}
+{% from "_period.html" import period_picker with context %}
+{% block title %}{{ t('section.calendar.title') }}{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
+
+{% block split_top %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
+      <p class="shead__sub">
+        {{ period_title }}
+        {%- if to_check.shown and not to_check.failed %} · {{ t('registry.tocheck.title') }}: {{ to_check.total }}{% endif %}
+      </p>
+    </div>
+  </header>
+{% endblock %}
+
+{% block split_list %}
+  <div class="sbox">
+    <div class="sbar sbar--registry">
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
+                       period_hidden) }}
+    </div>
+
+    <div class="slist slist--tocheck">
+      <div class="slist__group">
+        <span>{{ t('registry.tocheck.title') }}</span>{% if to_check.shown and not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
+      </div>
+      {% if to_check.failed %}
+        <p class="slist__note">{{ t('registry.tocheck.failed') }}</p>
+      {% elif not to_check.shown %}
+        <p class="slist__note">{{ t('calendar.tocheck.empty') }}</p>
+      {% else %}
+        <p class="slist__note">{{ t('registry.tocheck.hint') }}</p>
+        <ul class="slist__rows">
+          {% for item in to_check.units %}
+            <li>
+              <a class="srow" href="{{ unit_href(item) }}">
+                <span class="srow__dot" aria-hidden="true"></span>
+                <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
+                <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+        {% if to_check.more %}<p class="slist__note">{{ t('registry.tocheck.more', count=to_check.more) }}</p>{% endif %}
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

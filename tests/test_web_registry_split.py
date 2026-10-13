@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -40,15 +40,16 @@ def _ловушка(
 # --- период: что уходит в базу ---------------------------------------------
 
 
-def test_без_периода_в_адресе_база_отдаёт_всё_время(
+def test_без_периода_в_адресе_принятые_за_текущий_месяц(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D404: «Проверки» открываются со всеми проверками, без деления по месяцам."""
+    """D466: «Принятые» открываются последними — текущим месяцем, а не всем подряд."""
     вызовы = _ловушка(monkeypatch)
 
     стенд.get("/inspections")
 
-    assert (вызовы[0]["date_from"], вызовы[0]["date_to"]) == (None, None)
+    месяц = rp.month_of(date.today())
+    assert (вызовы[0]["date_from"], вызовы[0]["date_to"]) == (месяц.start, месяц.end)
 
 
 def test_у_главной_без_периода_в_адресе_текущий_месяц() -> None:
@@ -144,6 +145,56 @@ def test_ждущие_приёмки_видны_когда_история_мес
     assert t("registry.review.title", "ru") in страница
 
 
+def test_на_приёмке_давно_ждущие_первыми_и_с_числом_дней(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D466: очередь идёт от самой давней, у каждой строки — сколько она ждёт."""
+    свежая = шапка(
+        id="aaaaaaaa-0000-0000-0000-000000000001",
+        unit_name="Свежая-1",
+        on_review=True,
+        inspection_date=СЕГОДНЯ - timedelta(days=1),
+    )
+    давняя = шапка(
+        id="bbbbbbbb-0000-0000-0000-000000000002",
+        unit_name="Давняя-9",
+        on_review=True,
+        inspection_date=СЕГОДНЯ - timedelta(days=12),
+    )
+    _ловушка(monkeypatch, review=(свежая, давняя))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert страница.index("Давняя-9") < страница.index("Свежая-1")
+    assert "ждёт 12 дн." in страница and "ждёт 1 дн." in страница
+
+
+def test_на_приёмке_пусто_одна_тихая_строка(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ловушка(monkeypatch, rows=(шапка(),))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert t("registry.review.empty", "ru") in страница
+
+
+def test_приёмка_мимо_периода_и_отбора_принятые_под_отбором(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Очередь видна при любом отборе; период и отбор — только у «Принятых»."""
+    ждущая = шапка(unit_name="Ждущая-5", on_review=True, grade="D")
+    принятая = шапка(unit_name="Принятая-3", grade="A")
+    _ловушка(monkeypatch, rows=(принятая,), review=(ждущая,))
+
+    страница = стенд.get("/inspections?grade=D&from=2020-01-01&to=2020-01-31").get_data(
+        as_text=True
+    )
+
+    assert "Ждущая-5" in страница
+    assert "Принятая-3" not in страница
+
+
 # --- правая колонка ---------------------------------------------------------
 
 
@@ -158,7 +209,9 @@ def test_выбранная_адресом_проверка_открыта_сп�
 
     assert "data-drawer" in страница
     assert 'id="inspection-title">Тбилиси-2<' in страница
-    assert f'href="/inspections/{строка.id}?lang=ru"' in страница
+    # Панель — полный просмотр (D465): ссылки на отдельную страницу карточки нет.
+    assert f'href="/inspections/{строка.id}?lang=ru"' not in страница
+    assert "Открыть полностью" not in страница
 
 
 def test_проверка_вне_охвата_справа_не_показана(
@@ -186,8 +239,10 @@ def test_действия_справа_те_же_что_у_карточки(
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    for действие in ("/retract", "/letter", t("card.act.move", "ru")):
+    for действие in ("/retract", "/letter"):
         assert (действие in страница) is свои_действия, действие
+    # Принятую проверку не правят (D465): «Исправить» в панели у неё нет ни у кого.
+    assert t("card.act.move", "ru") not in страница
 
 
 @pytest.mark.parametrize("стенд", ["guest"], indirect=True)
