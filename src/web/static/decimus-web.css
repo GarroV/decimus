@@ -1029,7 +1029,9 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
    на `.spanel`; всё правочное (`.review-edit`) до этого скрыто. */
 .review-edit { display: none; }
 .spanel.is-editing .review-edit { display: flex; }
-.spanel.is-editing form.review-add { display: flex; flex-direction: column; }
+.spanel.is-editing details.review-add { display: block; }
+.review-add > summary { list-style: none; display: inline-flex; cursor: pointer; }
+.review-add > summary::-webkit-details-marker { display: none; }
 .shot { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: top; }
 .shot__tools { gap: var(--space-2); margin-top: var(--space-2); }
 .shot__tools form { margin: 0; }
