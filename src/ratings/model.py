@@ -18,12 +18,25 @@ FORMAT_RKO_EVALUATIONS = "rko-evaluations"
 FORMAT_RS_CHECKUPS = "rs-checkups"
 FORMAT_SNAPSHOT = "snapshot"
 FORMAT_SHEET_SCORES = "sheet-scores"
+#: Листы общей таблицы контроля «база рейтингов» (D464): оценки с флагами, собираемость
+#: РКО, нарушения РКО и РС. Формат узнаётся по заголовку листа.
+FORMAT_BASE_SCORES = "base-scores"
+FORMAT_BASE_COLLECTION = "base-collection"
+FORMAT_BASE_RKO_VIOLATIONS = "base-rko-violations"
+FORMAT_BASE_RS_VIOLATIONS = "base-rs-violations"
+BASE_FORMATS = (
+    FORMAT_BASE_SCORES,
+    FORMAT_BASE_COLLECTION,
+    FORMAT_BASE_RKO_VIOLATIONS,
+    FORMAT_BASE_RS_VIOLATIONS,
+)
 FORMATS = (
     FORMAT_RKO_VIOLATIONS,
     FORMAT_RKO_EVALUATIONS,
     FORMAT_RS_CHECKUPS,
     FORMAT_SNAPSHOT,
     FORMAT_SHEET_SCORES,
+    *BASE_FORMATS,
 )
 
 CATEGORY_VIOLATION = "violation"
@@ -124,6 +137,29 @@ class Score:
     status: str | None = None
     checkups_count: int | None = None
     row_no: int = 0
+    #: Флаги листа «база рейтингов»: нарушение Д3, критичное, обнуление и их названия.
+    flags: ScoreFlags | None = None
+
+
+@dataclass(frozen=True)
+class ScoreFlags:
+    d3: bool = False
+    d3_name: str | None = None
+    critical: bool = False
+    critical_name: str | None = None
+    zeroing: bool = False
+    zeroing_name: str | None = None
+
+
+@dataclass(frozen=True)
+class Collection:
+    """Отчёты РКО пиццерии за неделю: сколько в ресторане и сколько в доставке."""
+
+    unit: UnitRef
+    period: PeriodRef
+    restaurant: int
+    delivery: int
+    row_no: int = 0
 
 
 @dataclass(frozen=True)
@@ -131,6 +167,7 @@ class Remark:
     unit: UnitRef
     period: PeriodRef
     violation: Violation
+    row_no: int = 0
 
 
 @dataclass(frozen=True)
@@ -153,6 +190,9 @@ class Parsed:
     evaluations: tuple[Evaluation, ...] = ()
     scores: tuple[Score, ...] = ()
     remarks: tuple[Remark, ...] = ()
+    #: Нарушения периода из листов «базы рейтингов»: у пиццерии нет id, её находит импортёр.
+    sheet_remarks: tuple[Remark, ...] = ()
+    collections: tuple[Collection, ...] = ()
     countries: tuple[CountryRef, ...] = ()
     developers: Mapping[str, str] = field(default_factory=dict)
     issues: tuple[Issue, ...] = ()
