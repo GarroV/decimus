@@ -21,9 +21,10 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     },
     "country.facts.developer": {"ru": "Девелопер: {name}", "en": "Developer: {name}"},
     "country.facts.partner": {"ru": "Партнёр: {name}", "en": "Partner: {name}"},
-    "country.facts.partners": {
+    "country.facts.partners": {"ru": "Партнёры: {names}", "en": "Partners: {names}"},
+    "country.facts.partners_more": {
         "ru": "Партнёры: {names} и ещё {n}",
-        "en": "Partners: {names} and {n} in total",
+        "en": "Partners: {names} and {n} more",
     },
     "country.facts.units": {"ru": "Пиццерий: {total}", "en": "Pizzerias: {total}"},
     "country.figures.title": {"ru": "Ключевые цифры", "en": "Key figures"},
@@ -88,6 +89,7 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "country.col.last": {"ru": "Последняя проверка", "en": "Latest inspection"},
     "country.col.country": {"ru": "Страна", "en": "Country"},
+    "country.col.average": {"ru": "Средняя", "en": "Average"},
     "country.col.checked": {"ru": "Проверено", "en": "Inspected"},
     "country.col.inspections": {"ru": "Проверок", "en": "Inspections"},
     "country.panel.facts": {"ru": "Сведения", "en": "Details"},

@@ -40,7 +40,7 @@
   letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
 
 /* плитки ключевых цифр */
-.cn-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); }
+.cn-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
 .cn-tile { padding: var(--space-6) var(--space-7); border-left: 1px solid var(--line-2); min-width: 0; }
 .cn-tile:first-child { border-left: 0; }
 .cn-tile__label { font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui); letter-spacing: .12em;
@@ -56,7 +56,8 @@
 .cn-delta.is-up { color: var(--ok); }
 .cn-delta.is-down { color: var(--err); }
 .cn-letters { display: inline-flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; }
-.cn-letter { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-num); font-size: var(--fs-dense); }
+.cn-letter { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-num); }
+.cn-letter b { font-size: var(--fs-lead); font-weight: var(--w-semibold); color: var(--ink); }
 
 /* «Где болит»: две колонки внутри одной рамки */
 .cn-hurt { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
@@ -86,7 +87,8 @@
 .cn-closed[open] > summary::before { content: "▾ "; }
 .cn-closed .cn-unit { color: var(--ink-3); }
 .cn-countries .ov-table__head, .cn-countries .ov-table__row {
-  grid-template-columns: minmax(9rem, 1.4fr) 7rem 5rem 5.5rem minmax(9rem, 1.2fr); min-width: 36rem; }
+  grid-template-columns: minmax(8rem, 1.2fr) 6.5rem 6rem 6rem minmax(10rem, 1.4fr); min-width: 40rem; }
+.cn-countries .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* статус пиццерии: тихая метка с точкой */
 .cn-st { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); }
