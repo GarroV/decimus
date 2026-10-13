@@ -23,7 +23,18 @@
     try { return localStorage.getItem(STORE); } catch (e) { return null; }
   }
 
+  var THEME_ORDER = ["system", "light", "dark"];
+
   function mark(choice) {
+    // Узкая панель показывает одну кнопку-цикл: её значок выбирает CSS по этому атрибуту.
+    document.documentElement.dataset.themeChoice = choice;
+    var named = document.querySelector("[data-theme-value='" + choice + "']");
+    document.querySelectorAll("[data-theme-cycle]").forEach(function (b) {
+      var label = (b.getAttribute("aria-label") || "").split(":")[0];
+      var text = label + (named ? ": " + named.title : "");
+      b.title = text;
+      b.setAttribute("aria-label", text);
+    });
     document.querySelectorAll("[data-theme-value]").forEach(function (b) {
       b.setAttribute("aria-checked", String(b.dataset.themeValue === choice));
     });
@@ -39,6 +50,23 @@
     mark(choice);
   }
 
+
+  // Язык в низу панели (`_langmenu.html`) — `<details>`: закрываем по клику мимо и Esc.
+  function openLangMenus() { return document.querySelectorAll(".langmenu[open]"); }
+  document.addEventListener("click", function (e) {
+    openLangMenus().forEach(function (d) { if (!d.contains(e.target)) d.removeAttribute("open"); });
+  });
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    openLangMenus().forEach(function (d) {
+      d.removeAttribute("open");
+      var summary = d.querySelector("summary");
+      if (summary) summary.focus();
+    });
+  });
+  document.addEventListener("decimus:leave", function () {
+    openLangMenus().forEach(function (d) { d.removeAttribute("open"); });
+  });
 
   // ── Меню учётки (D468) ──────────────────────────────────────────────
   // Одно меню `#acct-menu` на страницу; открывают его блок учётки в панели
@@ -192,6 +220,13 @@
     mark(now === "light" || now === "dark" ? now : "system");
     document.querySelectorAll("[data-theme-value]").forEach(function (b) {
       b.addEventListener("click", function () { apply(b.dataset.themeValue); });
+    });
+    document.querySelectorAll("[data-theme-cycle]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var now = stored();
+        var at = THEME_ORDER.indexOf(now === "light" || now === "dark" ? now : "system");
+        apply(THEME_ORDER[(at + 1) % THEME_ORDER.length]);
+      });
     });
   });
 })();

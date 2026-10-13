@@ -134,72 +134,61 @@
           </div>
           {% elif tile == 'claude' %}
           <div class="ssec" id="claude">
-      <p class="ssec__text">{{ t('settings.claude.lead') }}</p>
+            <p class="ssec__text">{{ t('settings.claude.lead') }}</p>
 
-      <div id="claude-token">
-        <h3 class="ssec__sub">{{ t('settings.claude.desktop') }}</h3>
-        <p class="ssec__note">{{ t('users.mcp.how') }}</p>
-        {% if show.token %}
-          <p class="ssec__text">{{ t('users.mcp.command') }}</p>
-          <p class="ssecret"><code id="claude-token-command">{{ show.token.command }}</code></p>
-          <p class="ssec__note">{{ t('users.mcp.restart') }}</p>
-          {% if show.token.expires_at %}<p class="ssec__note">{{ t('users.mcp.live', date=show.token.expires_at.strftime('%Y-%m-%d')) }}</p>{% endif %}
-          {% if show.token.replaced %}<p class="ssec__note">{{ t('users.mcp.replaced') }}</p>{% endif %}
-        {% elif not mcp.known %}
-          <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
-        {% elif mcp.expires_at %}
-          <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }}</p>
-          <form method="post" action="{{ base }}/claude-token?lang={{ lang }}" class="sform">
-            <button class="sbtn" type="submit">{{ t('users.mcp.again') }}</button>
-          </form>
-          <p class="ssec__note">{{ t('users.mcp.again_note') }}</p>
-          <form method="post" action="{{ base }}/claude-token-revoke?lang={{ lang }}" class="sform">
-            <button class="sbtn" type="submit">{{ t('users.mcp.revoke') }}</button>
-          </form>
-        {% else %}
-          <p class="ssec__text"><span class="sdot"></span>{{ t('users.mcp.none') }}</p>
-          <form method="post" action="{{ base }}/claude-token?lang={{ lang }}" class="sform">
-            <button class="sbtn sbtn--primary" type="submit">{{ t('users.mcp.issue') }}</button>
-          </form>
-        {% endif %}
-      </div>
+            <div id="claude-token">
+              {% if show.token %}
+                <p class="ssecret"><code id="claude-token-command">{{ show.token.command }}</code></p>
+                <div class="sform">
+                  <button class="sbtn sbtn--primary" type="button" data-copy="#claude-token-command" data-copied="{{ t('settings.claude.copied') }}" hidden>{{ t('settings.claude.copy') }}</button>
+                </div>
+                <p class="ssec__note">{{ t('settings.claude.run') }}</p>
+              {% elif not mcp.known %}
+                <p class="ssec__note">{{ t('users.mcp.unknown') }}</p>
+              {% elif mcp.expires_at %}
+                <p class="ssec__note"><span class="sdot sdot--ok"></span>{{ t('users.mcp.live', date=mcp.expires_at.strftime('%Y-%m-%d')) }}</p>
+                {# Перевыпуск гасит прежний токен — с подтверждением (макрос общий с «Выйти везде»). #}
+                {{ confirm('claude-reissue-confirm', t('settings.claude.reissue'), t('settings.claude.reissue_confirm'), t('settings.claude.reissue_yes'),
+                           base ~ '/claude-token?lang=' ~ lang, []) }}
+                <form method="post" action="{{ base }}/claude-token-revoke?lang={{ lang }}" class="sform">
+                  <button class="sbtn" type="submit">{{ t('users.mcp.revoke') }}</button>
+                </form>
+              {% else %}
+                <form method="post" action="{{ base }}/claude-token?lang={{ lang }}" class="sform">
+                  <button class="sbtn sbtn--primary" type="submit">{{ t('settings.claude.get') }}</button>
+                </form>
+              {% endif %}
+            </div>
 
-      {# Подключение входом через сайт (D417): адрес MCP берётся из настройки
-         стенда (`MCP_PUBLIC_URL`), в разметке его нет. #}
-      {% if claude.enabled %}
-        <div id="claude-connect">
-          <h3 class="ssec__sub">{{ t('settings.claude.code') }}</h3>
-          <p class="ssec__note">{{ t('users.claude.address') }}</p>
-          <div class="ssecret">
-            <code id="claude-mcp-url">{{ claude.mcp_url }}</code>
-            <button class="sbtn" type="button" data-copy="#claude-mcp-url" data-copied="{{ t('users.claude.copied') }}" hidden>{{ t('users.claude.copy') }}</button>
-          </div>
-          <ol class="ssec__text">
-            <li>{{ t('users.claude.step_add') }}</li>
-            <li>{{ t('users.claude.step_login') }}</li>
-          </ol>
-          <p class="ssec__note">{{ t('users.claude.code') }}</p>
-          <div class="ssecret">
-            <code id="claude-code-command">{{ claude.command }}</code>
-            <button class="sbtn" type="button" data-copy="#claude-code-command" data-copied="{{ t('users.claude.copied') }}" hidden>{{ t('users.claude.copy') }}</button>
-          </div>
-          <h3 class="ssec__sub">{{ t('users.claude.connections') }}</h3>
-          {% if not claude.known %}
-            <p class="ssec__note">{{ t('users.claude.unknown') }}</p>
-          {% elif not claude.connections %}
-            <p class="ssec__note">{{ t('users.claude.none') }}</p>
-          {% else %}
-            {% for п in claude.connections %}
-              <form method="post" action="{{ base }}/claude-revoke?lang={{ lang }}" class="sform">
-                <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.claude.row', client=п.client_name, created=п.created_at.strftime('%Y-%m-%d %H:%M')) }} ·
-                  {% if п.last_used_at %}{{ t('users.claude.used', used=п.last_used_at.strftime('%Y-%m-%d %H:%M')) }}{% else %}{{ t('users.claude.unused') }}{% endif %}</p>
-                <input type="hidden" name="connection_id" value="{{ п.id }}">
-                <button class="sbtn" type="submit">{{ t('users.claude.revoke') }}</button>
-              </form>
-            {% endfor %}
-          {% endif %}
-        </div>
-      {% endif %}
+            {# Подключение входом через сайт (D417), без подразделов и шагов (D476): адрес
+               одной строкой и список уже сделанных подключений с «Отключить». Адрес MCP
+               берётся из настройки стенда (`MCP_PUBLIC_URL`), в разметке его нет. #}
+            {% if claude.enabled %}
+              <div id="claude-connect">
+                <p class="ssec__note">{{ t('settings.claude.address') }}</p>
+                <div class="ssecret">
+                  <code id="claude-mcp-url">{{ claude.mcp_url }}</code>
+                  <button class="sbtn" type="button" data-copy="#claude-mcp-url" data-copied="{{ t('settings.claude.copied') }}" hidden>{{ t('users.claude.copy') }}</button>
+                </div>
+                {% if not claude.known %}
+                  <p class="ssec__note">{{ t('users.claude.unknown') }}</p>
+                {% endif %}
+                {% for п in claude.connections %}
+                  <form method="post" action="{{ base }}/claude-revoke?lang={{ lang }}" class="sform">
+                    <p class="ssec__text"><span class="sdot sdot--ok"></span>{{ t('users.claude.row', client=п.client_name, created=п.created_at.strftime('%Y-%m-%d %H:%M')) }}</p>
+                    <input type="hidden" name="connection_id" value="{{ п.id }}">
+                    <button class="sbtn" type="submit">{{ t('users.claude.revoke') }}</button>
+                  </form>
+                {% endfor %}
+              </div>
+            {% endif %}
+
+            {# Инструкции для проекта Claude: текст один (`texts_settings.py`); раскрытие блока копирует его (`settings.js`). #}
+            <details class="sfold sinstr" id="claude-instructions" data-copy-on-open data-copied="{{ t('settings.claude.copied') }}">
+              <summary class="sbtn">{{ t('settings.claude.instr') }}</summary>
+              <pre class="sinstr__text" id="claude-instructions-text">{{ t('settings.claude.instr_text') }}</pre>
+              <button class="sbtn" type="button" data-copy="#claude-instructions-text" data-copied="{{ t('settings.claude.copied') }}" hidden>{{ t('settings.claude.copy_again') }}</button>
+            </details>
           </div>
           {% elif tile == 'bot' %}
           <div class="ssec" id="bot">

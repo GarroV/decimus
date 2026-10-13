@@ -11,6 +11,9 @@
 .page--settings .ssecret { max-width: 100%; }
 .page--settings .ssecret code { overflow-wrap: anywhere; word-break: break-all; }
 .page--settings #claude-connect { margin-top: var(--space-7); }
+/* Инструкции для проекта Claude: блок с прокруткой, текст как есть (D476). */
+.sinstr__text { max-height: 160px; margin: var(--space-4) 0; padding: var(--space-5); overflow: auto; border: 1px solid var(--line); border-radius: var(--r-control);
+  background: var(--surface); color: var(--ink-2); font-family: var(--font-mono); font-size: 12px; line-height: 17px; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* ── карточки ─────────────────────────────────────────────────────────── */
 .scard { min-width: 0; padding: var(--space-7) var(--space-8); border: 1px solid var(--line); border-radius: var(--r-block, 12px); background: var(--surface); }

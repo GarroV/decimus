@@ -186,11 +186,12 @@ def test_в_меню_тема_язык_все_настройки_и_выход_�
 
 def test_в_подвале_панели_тема_язык_и_кнопка_настроек_одной_строкой(клиент: FlaskClient) -> None:
     страница = клиент.get("/settings").get_data(as_text=True)
-    строка = страница[страница.index('class="sidenav__prefs"') :]
+    строка = страница[страница.index('class="sidenav__foot"') :]
     строка = строка[: строка.index('class="sidenav__user"')]
 
-    assert "data-theme-value" in строка and "langpill" in строка
-    assert 'class="sidenav__gear is-current"' in строка, "на «Настройках» кнопка не подсвечена"
+    assert "data-theme-value" in строка and "data-theme-cycle" in строка
+    assert "langmenu" in строка and 'name="lang" value="en"' in строка, "меню языка из реестра"
+    assert 'class="sidenav__tool is-current"' in строка, "на «Настройках» кнопка не подсвечена"
     assert 'class="logout"' not in страница, "стрелка выхода осталась в блоке учётки"
 
 
