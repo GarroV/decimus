@@ -171,7 +171,7 @@ def test_средняя_в_плитке_показывается_всегда_к
     assert "разные чек-листы" not in страница
 
 
-def test_пустые_вспомогательные_блоки_не_показываются(
+def test_пустые_блоки_верхнего_ряда_говорят_об_этом_а_внимание_скрыто(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """D398: «всё сделано» экрану ни о чём не говорит — пустое скрыто, итог — строкой."""
@@ -180,8 +180,9 @@ def test_пустые_вспомогательные_блоки_не_показ�
 
     # Assert
     assert t_ru("home.attention.title") not in страница
-    assert t_ru("home.top.title") not in страница
-    assert t_ru("overview.zones.title") not in страница
+    # D471: четыре карточки верхнего ряда есть всегда — без данных с пустым состоянием.
+    assert t_ru("home.top.none") in страница
+    assert t_ru("home.zones.none") in страница
     assert t_ru("overview.systemic.title") not in страница
     assert t_ru("home.country.all") not in страница
     assert t_ru("home.inspections.none") in страница
