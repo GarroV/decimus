@@ -214,13 +214,8 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     },
     "settings.lang.title": {"ru": "Язык интерфейса", "en": "Interface language"},
     "settings.lang.note": {
-        "ru": "Язык этого сайта хранится в вашем профиле — и выбор здесь, и переключатель в "
-        "меню сохраняют его. Ссылка с ?lang= в адресе меняет язык только для себя. Бот и "
-        "мини-апп помнят язык отдельно (команда /lang, настройки мини-аппа).",
-        "en": "The language of this site is kept in your profile — both the choice here and "
-        "the switcher in the menu save it. A link with ?lang= changes the language just "
-        "for itself. The bot and the mini-app keep their language separately "
-        "(/lang, mini-app settings).",
+        "ru": "Сохраняется в профиле. У бота и мини-аппа — свой язык.",
+        "en": "Saved in your profile. The bot and the mini-app keep their own.",
     },
     "settings.password.google": {
         "ru": "Вход паролем для этой учётки закрыт: вы входите через Google. Вернуть вход "
