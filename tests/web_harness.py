@@ -70,7 +70,7 @@ class Учётка:
         # Язык сайта из профиля (`web_users.web_lang`, 0061): по умолчанию не
         # выбран — страницы говорят языком стенда.
         self.web_lang = web_lang
-        # Имя и версия фото из Google (`web_users`, 0064): по умолчанию нет —
+        # Имя и версия фото из Google (`web_users`, 0065): по умолчанию нет —
         # блок учётки показывает логин и инициалы.
         self.display_name = display_name
         self.avatar_etag = avatar_etag
