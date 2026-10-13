@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 125 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 127 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -66,7 +66,7 @@
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
 | `/auth/google/callback` | GET | `google_callback` | `src/web/auth.py` |
 | `/auth/google/mail` | GET | `google_mail_callback` | `src/web/letter_draft.py` |
-| `/calendar` | GET | `wip_calendar` | `src/web/app.py` |
+| `/calendar` | GET | `calendar` | `src/web/app.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
@@ -122,6 +122,7 @@
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
+| `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
 | `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
@@ -141,11 +142,12 @@
 | `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
-| `/users/disable` | POST | `disable_user` | `src/web/users_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
+| `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/role` | POST | `user_role` | `src/web/users_screen.py` |
 | `/users/spaces/add` | POST | `add_space` | `src/web/users_screen.py` |
 | `/users/spaces/countries` | POST | `space_countries` | `src/web/users_screen.py` |
+| `/users/unfreeze` | POST | `unfreeze_user` | `src/web/users_screen.py` |
 
 **Мини-апп обхода (`src/web/walk_app.py: create_walk_app`)** — 11 маршрутов
 
@@ -392,7 +394,8 @@
 | `0060_d440_roles.sql` | — |
 | `0061_web_own_google_lang.sql` | `web_google_link_states` |
 | `0062_space_isolation.sql` | — |
-| `0063_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
+| `0063_freeze.sql` | — |
+| `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
 <!-- map:end -->
 
 ## Makefile

@@ -55,6 +55,7 @@ from . import (
     action_plans,
     assets,
     auth,
+    country_page,
     edition,
     guard,
     home_page,
@@ -79,11 +80,9 @@ from . import (
     walk_auth,
     walk_proxy,
 )
-from . import country as country_data
 from . import inspections as data
 from . import methodology as method
 from . import methodology_view as mview
-from . import overview as overview_data
 from . import unit_card as unit_data
 from .config import Settings, load_settings
 from .db_refusal import public_reason
@@ -133,6 +132,7 @@ SCREENS = (
     "actions",
     "plans",
     "orders",
+    "calendar",
 )
 
 
@@ -187,6 +187,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     unit_add.install(app, conf)
     _register_registry(app, conf)
+    _register_calendar(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
@@ -417,171 +418,46 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
 
 def _register_country(app: Flask, conf: Settings) -> None:
-    """Раздел «Страна»: работа с одной страной (D260, D262).
+    """Раздел «Страна»: работа с одной страной (D260, D262, D467).
 
-    Экран — «Обзор» с отбором по стране; своих подсчётов у него нет. Отбор
-    живёт в адресе, как на «Обзоре»: ссылку на «Грузия, за 90 дней, Батуми-1
-    раскрыта» отправляют коллеге, и он видит ровно это.
+    Рабочая зона — шапка и сегменты («Сводка», «Пиццерии»); сборка в
+    `country_page`. Срез живёт в адресе, как на «Главной»: «Грузия, пиццерии,
+    октябрь, Батуми-1 раскрыта» отправляют коллеге, и он видит ровно это.
     """
 
     @app.get(section("country").path, endpoint="country_index")
     def country_index() -> Any:
-        страны = country_data.countries(reach=auth.current_reach())
-        if len(страны) == 1:
-            # Язык переезжает, только если его выбрали в адресе: иначе
-            # переход в единственную страну вешал бы `?lang=` умолчания.
-            язык = {"lang": _lang(conf)} if request.args.get("lang") else {}
-            return redirect(_url("country", code=страны[0][0], **язык))
-        if not страны:
-            return render_template("country/index.html", view=None, choices=страны)
-        # Рабочая зона не пустует, как в «Методике»: без страны в адресе
-        # справа сразу первая страна колонки (самая большая). Экран помечен
-        # выбором — на телефоне первым идёт список стран, а не эта страна.
-        return country(страны[0][0], picking=True)
+        язык = _lang(conf)
+        # Язык переезжает, только если его выбрали в адресе: иначе переход в
+        # единственную страну вешал бы `?lang=` умолчания.
+        переход = country_page.index_redirect(bool(request.args.get("lang")), язык)
+        if переход is not None:
+            return переход
+        # Рабочая зона не пустует, как в «Методике»: без страны в адресе справа
+        # сразу первая страна колонки (самая большая). Экран помечен выбором —
+        # на телефоне первым идёт список стран, а не эта страна.
+        return country_page.render(
+            code=None,
+            picking=False,
+            lang=язык,
+            limit=REGISTRY_LIMIT,
+            item_titles=_item_titles(conf, язык),
+            pick=_pick,
+        )
 
     @app.get(section("country").path + "/<code>", endpoint="country")
-    def country(code: str, picking: bool = False) -> str:
+    def country(code: str) -> Any:
         язык = _lang(conf)
         # Код страны из адреса — ввод снаружи: регистр приводится, чужое
         # сужает выборку в пустоту, и экран говорит об этом словами, а не 500.
-        код = country_data.normalize_code(code)
-        selection = overview_data.Selection(
-            city=request.args.get("city", "").strip()[:80],
-            grade=request.args.get("grade", "").strip().upper()[:1],
-            period=request.args.get("period", "all").strip()[:8],
-            sort=request.args.get("sort", "score").strip()[:8],
-        )
-        вид = country_data.load(
-            reach=auth.current_reach(),
+        return country_page.render(
+            code=code,
+            picking=False,
+            lang=язык,
             limit=REGISTRY_LIMIT,
-            code=код,
-            selection=selection,
-            unit_id=request.args.get("unit", "").strip()[:64],
-        )
-
-        def отбор(**изменения: str) -> str:
-            """Адрес того же экрана с изменённым срезом; умолчания выпадают."""
-            параметры = {
-                "city": selection.city,
-                "grade": selection.grade,
-                "period": selection.period,
-                "sort": selection.sort,
-                "unit": вид.unit_id,
-                "lang": язык,
-                **изменения,
-            }
-            умолчания = {"period": "all", "sort": "score"}
-            живые = {к: з for к, з in параметры.items() if з and умолчания.get(к) != з}
-            return _url("country", code=код or "-", **живые)
-
-        def раскрыть(unit_id: str) -> str:
-            """Строка точки: раскрыть её, а раскрытую — свернуть. Якорь — к строке."""
-            if unit_id == вид.unit_id:
-                return отбор(unit="")
-            return отбор(unit=unit_id) + f"#unit-{unit_id}"
-
-        чипы = []
-        # Выбор страны — колонкой слева, как чек-листы в «Методике» (владелец
-        # 30.09.2026), а не чипом в отборе. Переход в другую страну сбрасывает
-        # весь срез: город и раскрытая точка другой страны дали бы пустоту.
-        страны = country_data.countries(reach=auth.current_reach())
-        if вид.snapshot.cities:
-            чипы.append(
-                _pick(
-                    label=t("overview.filter.city", язык),
-                    empty_title=t("overview.filter.all_cities", язык),
-                    current=selection.city,
-                    values=вид.snapshot.cities,
-                    href=lambda значение: отбор(city=значение, unit=""),
-                    title=lambda код_города: city_title(код_города, язык),
-                )
-            )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.grade", язык),
-                empty_title=t("overview.filter.all_grades", язык),
-                current=selection.grade,
-                values=вид.snapshot.grades,
-                href=lambda значение: отбор(grade=значение, unit=""),
-            )
-        )
-        чипы.append(
-            _pick(
-                label=t("overview.filter.period", язык),
-                empty_title=t("overview.period.all", язык),
-                current="" if selection.period == "all" else selection.period,
-                values=tuple((к, None) for к in overview_data.PERIODS if к != "all"),
-                href=lambda значение: отбор(period=значение or "all", unit=""),
-                title=lambda к: t("overview.period." + к, язык),
-            )
-        )
-        return render_template(
-            "country/index.html",
-            view=вид,
-            choices=страны,
-            picking=picking,
-            picks=tuple(чипы),
-            selection=selection,
-            select_url=отбор,
-            open_url=раскрыть,
-            reset_url=_url("country", code=код or "-", lang=язык),
-            registry_path=section("registry").path,
-            grade_tone=view.grade_tone,
-            level_tone=view.level_tone,
             item_titles=_item_titles(conf, язык),
-            can_add_units=unit_add.can_add_here(код),
-            **_country_units(код),
-            **_country_plans(код),
-            **prescriptions.country_block(код),
+            pick=_pick,
         )
-
-
-STAGE_ORDER = {"open": 0, "paused": 1, "pipeline": 2, "closed": 3}
-
-
-def _country_units(код: str) -> dict[str, Any]:
-    """Пиццерии страны по своду (D376): строки, счёт по стадиям, ссылки в карточки.
-    Блок справочный: сбой чтения гасит только его, а не экран страны."""
-    try:
-        строки = unit_profiles.by_country(код) if код else ()
-        ссылки = (
-            {
-                u.code: u.id
-                for u in directory.list_units(reach=auth.current_reach(), country=код)
-                if u.code
-            }
-            if строки
-            else {}
-        )
-    except DbError:
-        logger.warning("Сведения о пиццериях страны не прочитались", exc_info=True)
-        строки, ссылки = (), {}
-    счёт = {
-        стадия: sum(1 for p in строки if p.stage == стадия)
-        for стадия in ("open", "pipeline", "closed")
-    }
-    return {
-        "units_profiles": sorted(строки, key=lambda p: (STAGE_ORDER.get(p.stage, 9), p.name)),
-        "units_count": счёт,
-        "units_links": ссылки,
-    }
-
-
-def _country_plans(код: str) -> dict[str, Any]:
-    """Блок экшн-планов экрана страны: запросы, их состояние и куда действовать."""
-    открытые, принятые, известны = action_plans.country_plans(код)
-    уК = action_plans.is_hq()
-    return {
-        "plans": открытые.rows + принятые.rows,
-        "plans_truncated": открытые.truncated or принятые.truncated,
-        "plans_limit": action_plans.LIST_LIMIT,
-        "plans_known": известны,
-        "plans_today": action_plans.today(),
-        "plans_path": section("plans").path,
-        "plans_act_path": section("actions" if уК else "plans").path,
-        "plans_act_country": уК,
-        "state_tones": action_plans.STATE_TONES,
-    }
 
 
 def _unit_profile(code: str | None) -> unit_profiles.Profile | None:
@@ -652,6 +528,39 @@ def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
     return _url("registry", lang=lang)
 
 
+def _register_calendar(app: Flask, conf: Settings) -> None:
+    """Раздел «Календарь» (D466): пока в нём одно — «Где нужно проверить».
+
+    Блок ушёл с «Проверок» (D418 → D466): он отвечает на вопрос «куда ехать», а
+    не «что проверено». Свой период, по умолчанию текущий месяц; охват и роли —
+    как были у блока на «Проверках».
+    """
+
+    @app.get(section("calendar").path)
+    def calendar() -> str:
+        язык = _lang(conf)
+        период = registry_period.read(request.args, today=date.today())
+
+        def отбор(**изменения: str) -> str:
+            параметры = {**период.params(), "lang": язык, **изменения}
+            return _url("calendar", **{к: з for к, з in параметры.items() if з})
+
+        hq = auth.current_tenant() == HQ_TENANT
+        return render_template(
+            "calendar/index.html",
+            to_check=to_inspect.load(
+                reach=auth.current_reach(), date_from=период.start, date_to=период.end, top=None
+            ),
+            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
+            period=период,
+            period_title=registry_view.period_title(период, язык),
+            period_prev=registry_view.period_link(период, -1, отбор),
+            period_next=registry_view.period_link(период, 1, отбор),
+            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_hidden={"lang": язык},
+        )
+
+
 def _register_registry(app: Flask, conf: Settings) -> None:
     """Раздел «Проверки»: реестр, карточка, снятие."""
 
@@ -671,7 +580,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        период = registry_period.read(request.args, today=date.today(), default_all=True)
+        # «Принятые» открываются текущим месяцем — последние, а не всё подряд
+        # (D466 сменил умолчание D404); «Всё время» — одной кнопкой.
+        период = registry_period.read(request.args, today=date.today())
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
@@ -703,26 +614,18 @@ def _register_registry(app: Flask, conf: Settings) -> None:
 
         выбрано = request.args.get("inspection", "").strip()[:64]
         панель = _registry_panel(выбрано, conf=conf)
-        # «Где нужно проверить» (D418): у точек без проверок нет ни буквы, ни вида,
-        # поэтому при отборе по ним блок не показывается — он противоречил бы отбору.
-        ждут = (
-            to_inspect.Block()
-            if отбор_в.grade or отбор_в.kind
-            else to_inspect.load(
-                reach=auth.current_reach(),
-                date_from=период.start,
-                date_to=период.end,
-                country=отбор_в.country,
-                city=отбор_в.city,
-                query=отбор_в.q,
-            )
+        # «На приёмке» (D466): ждущие вычитки — мимо периода и отбора, самые
+        # давние сверху; сколько ждут — днями от даты обхода.
+        сегодня = date.today()
+        на_приёмке = tuple(
+            sorted(registry_data.review, key=lambda row: (row.inspection_date, row.pushed_at))
         )
-        hq = auth.current_tenant() == HQ_TENANT
+        ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
         return render_template(
             "inspections/list.html",
             registry=registry_data,
-            to_check=ждут,
-            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
+            review_rows=на_приёмке,
+            review_wait=ждёт_дней,
             rows=строки,
             picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
             grade_tone=view.grade_tone,
@@ -739,6 +642,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             period_next=registry_view.period_link(период, 1, отбор),
             period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
             period_hidden={"lang": язык, **{к: з for к, з in отбор_в.params().items() if з}},
+            period_all=отбор(**{"from": "", "to": "", "period": registry_period.ALL}),
             select_url=отбор,
             reset_url=отбор(grade="", kind="", country="", city="", q=""),
             picked=панель.picked,

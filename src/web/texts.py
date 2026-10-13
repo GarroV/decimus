@@ -23,6 +23,7 @@ from collections.abc import Mapping
 
 from .errors import WebTextError
 from .texts_connections import CONNECTIONS_TEXTS
+from .texts_country import COUNTRY_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_master import MASTER_TEXTS
 from .texts_oauth import OAUTH_TEXTS
@@ -238,39 +239,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "В справочнике нет ни одной пиццерии со страной.",
         "en": "No pizzeria in the directory has a country.",
     },
-    "country.summary": {
-        "ru": "Проверок: {inspections} · средняя: {average} · не проверено точек: {unchecked}",
-        "en": "Inspections: {inspections} · average: {average} · units not inspected: {unchecked}",
-    },
-    "country.units.title": {"ru": "Последние проверки", "en": "Latest inspections"},
-    "country.units.hint": {
-        "ru": "Последняя проверка каждой точки. Нажмите строку — откроется история проверок.",
-        "en": "Latest inspection of each unit. Click a row to open its inspection history.",
-    },
-    "country.units.empty": {
-        "ru": "В этой стране за выбранный период проверок нет.",
-        "en": "No inspections in this country for the selected period.",
-    },
-    "country.history.title": {"ru": "История проверок", "en": "Inspection history"},
     "country.history.latest": {"ru": "последняя", "en": "latest"},
     "country.history.card": {"ru": "Карточка пиццерии", "en": "Pizzeria card"},
-    "country.history.close": {"ru": "Свернуть", "en": "Collapse"},
-    "country.systemic.title": {
-        "ru": "Что системно болит в стране",
-        "en": "Systemic issues in the country",
-    },
-    "country.systemic.empty": {
-        "ru": "Пунктов, нарушенных сразу в нескольких пиццериях, нет.",
-        "en": "No item is violated in more than one pizzeria.",
-    },
-    "country.zones.title": {
-        "ru": "Где страна теряет больше всего",
-        "en": "Where the country loses most",
-    },
-    "country.zones.empty": {
-        "ru": "Потерь по зонам за период нет.",
-        "en": "No zone losses for the period.",
-    },
     "section.overview.title": {"ru": "Главная", "en": "Home"},
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
@@ -359,10 +329,6 @@ TEXTS: dict[str, dict[str, str]] = {
             "The built section is “{built}”. The rest are shown so the product map stays visible."
         ),
     },
-    "wip.calendar_note": {
-        "ru": "Календарь и планирование проверок в текущий объём не входят (решение D139).",
-        "en": "The calendar and inspection planning are out of the current scope (decision D139).",
-    },
     # --- реестр проверок ---------------------------------------------------
     # ── Карточка точки (экран «point» прототипа, T355) ──────────────────
     "unit.back": {"ru": "‹ Обзор", "en": "‹ Overview"},
@@ -373,26 +339,13 @@ TEXTS: dict[str, dict[str, str]] = {
     "unit.last": {"ru": "Последняя проверка", "en": "Last audit"},
     "unit.movement": {"ru": "Движение оценки", "en": "Score movement"},
     "unit.profile": {"ru": "Сведения", "en": "Details"},
-    "country.register.title": {"ru": "Свод пиццерий", "en": "Pizzeria register"},
     "country.register.hint": {
         "ru": "работают {open}, открываются {pipeline}, закрыты {closed}",
         "en": "open {open}, opening {pipeline}, closed {closed}",
     },
-    "country.register.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
     "country.register.col.partner": {"ru": "Партнёр", "en": "Partner"},
-    "country.register.col.place": {"ru": "Город", "en": "City"},
     "country.register.col.opened": {"ru": "Открыта", "en": "Opened"},
     "country.register.col.status": {"ru": "Статус", "en": "Status"},
-    "country.none": {"ru": "Пока нет: {what}.", "en": "Nothing yet: {what}."},
-    "country.none.plans": {"ru": "экшн-планов", "en": "action plans"},
-    "country.none.rx": {"ru": "предписаний", "en": "notices"},
-    "country.none.systemic": {"ru": "системных нарушений", "en": "systemic issues"},
-    "country.none.zones": {"ru": "потерь по зонам", "en": "zone losses"},
-    "country.register.since": {"ru": "с {day}", "en": "since {day}"},
-    "country.register.empty": {
-        "ru": "Свод пиццерий по этой стране не загружен.",
-        "en": "The pizzeria register has nothing for this country yet.",
-    },
     "unit.profile.hint": {"ru": "из свода пиццерий", "en": "from the pizzeria register"},
     "unit.profile.empty": {
         "ru": "В своде пиццерий строки для этой точки нет.",
@@ -466,7 +419,7 @@ TEXTS: dict[str, dict[str, str]] = {
             "Clear some conditions."
         ),
     },
-    "registry.count": {"ru": "Проверок: {count}", "en": "Inspections: {count}"},
+    "registry.count": {"ru": "Принятых: {count}", "en": "Accepted: {count}"},
     "registry.retracted_count": {"ru": "отклонённых: {count}", "en": "rejected: {count}"},
     "registry.col.grade": {"ru": "Оценка", "en": "Grade"},
     "registry.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
@@ -493,7 +446,10 @@ TEXTS: dict[str, dict[str, str]] = {
     "state.retracted": {"ru": "Отклонена", "en": "Rejected"},
     "state.review": {"ru": "На приёмке", "en": "Awaiting review"},
     # --- этап приёмки (D199) -------------------------------------------------
-    "registry.review.title": {"ru": "Ждут приёмки", "en": "Awaiting review"},
+    "registry.review.title": {"ru": "На приёмке", "en": "Awaiting review"},
+    "registry.review.empty": {"ru": "Ничего не ждёт приёмки", "en": "Nothing is awaiting review"},
+    "registry.review.wait": {"ru": "ждёт {days} дн.", "en": "waiting {days} d"},
+    "registry.review.wait_new": {"ru": "ждёт меньше суток", "en": "waiting under a day"},
     "registry.review.hint": {
         "ru": (
             "Обход закончен, но проверка ещё не вычитана. В историю сети, обзор и "
@@ -1628,6 +1584,7 @@ _ЧАСТИ = (
     TEXTS,
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
+    COUNTRY_TEXTS,
     MASTER_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
@@ -1650,6 +1607,7 @@ if _ПЕРЕСЕЧЕНИЕ:
 TEXTS = {
     **TEXTS,
     **CONNECTIONS_TEXTS,
+    **COUNTRY_TEXTS,
     **HOME_TEXTS,
     **MASTER_TEXTS,
     **OAUTH_TEXTS,

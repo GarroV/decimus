@@ -438,7 +438,7 @@ def контроль(monkeypatch: pytest.MonkeyPatch, зовы: Any) -> Iterator
     [
         ("/users/role", {"login": "petr", "tenant": "HQ", "role": "admin"}),
         ("/users/add", {"login": "zed", "tenant": "HQ", "role": "developer"}),
-        ("/users/disable", {"login": "petr", "tenant": "HQ"}),
+        ("/users/freeze", {"login": "petr", "tenant": "HQ"}),
         ("/admin/publish", {}),
         ("/admin/items", {"code": "X1"}),
         ("/admin/items/X1", {"name_ru": "x", "name_en": "x"}),
@@ -463,7 +463,7 @@ def test_контроль_вне_рейтингов_не_пишет(
     """Методика, люди и проверки — на чтение: заслон `before_request`, не каждый маршрут.
 
     Заслон прав (`src/web/guard.py`) спрашивает матрицу до маршрута: у контроля
-    нет клеток методики, смены роли и проверок. `/users/add` и `/users/disable`
+    нет клеток методики, смены роли и проверок. `/users/add` и `/users/freeze`
     матрица пропускает (`people.manage`, D360), и чужую роль или человека
     отсекает маршрут (`_people_scope`).
     """
@@ -539,12 +539,12 @@ def люди_контроля(
         зовы["add"].append((login, tenant, role))
         return accounts.Added(login=login, role=role, password="одноразовый-пароль-24-знака")
 
-    def _отключить(login: str, *, tenant: str, only_roles: Any = None) -> bool:
+    def _отключить(login: str, *, tenant: str, only_roles: Any = None, by: Any = None) -> bool:
         зовы["disable"].append((login, tenant))
         return True
 
     monkeypatch.setattr(accounts, "add", _завести)
-    monkeypatch.setattr(accounts, "disable", _отключить)
+    monkeypatch.setattr(accounts, "freeze", _отключить)
     monkeypatch.setattr(
         accounts,
         "everyone",
@@ -606,7 +606,7 @@ def test_контроль_не_трогает_чужих_людей(
         headers=ЗАГОЛОВКИ,
     )
     отключение = контроль.post(
-        "/users/disable", data={"login": логин, "tenant": пространство}, headers=ЗАГОЛОВКИ
+        "/users/freeze", data={"login": логин, "tenant": пространство}, headers=ЗАГОЛОВКИ
     )
 
     assert (почта.status_code, отключение.status_code) == (403, 403)
@@ -630,7 +630,7 @@ def test_контроль_отключает_контроль(
     контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
     ответ = контроль.post(
-        "/users/disable", data={"login": "vika", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
+        "/users/freeze", data={"login": "vika", "tenant": "HQ"}, headers=ЗАГОЛОВКИ
     )
 
     assert ответ.status_code == 200
@@ -641,9 +641,7 @@ def test_контроль_не_отключает_себя(
     контроль: FlaskClient, люди_контроля: dict[str, list[Any]]
 ) -> None:
     """То же правило, что у админа: отключить себя — выйти и не вернуться."""
-    ответ = контроль.post(
-        "/users/disable", data={"login": ЛОГИН, "tenant": "HQ"}, headers=ЗАГОЛОВКИ
-    )
+    ответ = контроль.post("/users/freeze", data={"login": ЛОГИН, "tenant": "HQ"}, headers=ЗАГОЛОВКИ)
 
     assert ответ.status_code == 400
     assert люди_контроля["disable"] == []
@@ -670,7 +668,7 @@ def test_контроль_видит_только_людей_контролин�
         assert чужое not in страница, чужое
     assert 'action="/users/role' not in страница
     assert 'href="/users?add=1"' in страница
-    assert 'action="/users/disable' in страница
+    assert 'action="/users/freeze' in страница
     новый = контроль.get("/users?add=1").get_data(as_text=True)
     форма = новый.split('action="/users/add')[1].split("</form>")[0]
     assert 'value="control"' in форма and 'value="HQ"' in форма
@@ -701,7 +699,6 @@ def test_партнёру_страна_закрыта_и_не_в_меню(адм
     """D371: «Страна» — только УК; партнёр не видит её в меню и не открывает адресом."""
     assert админ_партнёра.get("/country/GE").status_code == 404
     страница = админ_партнёра.get("/users").get_data(as_text=True)
-    for чужой in ("/country", "/calendar"):
-        assert f'href="{чужой}?lang=' not in страница, чужой
-    for свой in ("/overview", "/inspections", "/admin", "/users", "/ratings"):
+    assert 'href="/country?lang=' not in страница
+    for свой in ("/overview", "/inspections", "/calendar", "/admin", "/users", "/ratings"):
         assert f'href="{свой}?lang=' in страница, свой

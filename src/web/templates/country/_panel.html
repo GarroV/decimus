@@ -1,0 +1,64 @@
+{#
+  Панель пиццерии справа (D467): сведения свода, рейтинги и последние проверки.
+  Каркас панели — тот же, что у «Проверок» (`_split_page.html`, `decimus-split.css`);
+  без выбора панели нет, закрытие — ссылка на тот же экран без `unit`.
+#}
+{% macro unit_panel(row, history) %}
+  <article class="sdetail spanel">
+    <header class="sdetail__head">
+      {% if row.last %}<span class="grade grade--lg tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>{% endif %}
+      <div class="sdetail__who">
+        <p class="sdetail__hint">{{ city_title(row.city) or '—' }} · {{ t('unit.stage.' ~ row.stage) }}</p>
+      </div>
+    </header>
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('country.panel.facts') }}</h3>
+      <dl class="sprops">
+        <div><dt>{{ t('country.register.col.partner') }}</dt><dd>{{ row.partner or '—' }}</dd></div>
+        <div><dt>{{ t('country.panel.address') }}</dt><dd>{{ row.address or '—' }}</dd></div>
+        <div><dt>{{ t('country.register.col.opened') }}</dt><dd>{{ row.opened or '—' }}</dd></div>
+        <div><dt>{{ t('country.register.col.status') }}</dt><dd>{{ row.status or t('unit.stage.' ~ row.stage) }}{% if row.closed_on %} · {{ t('unit.profile.closed') }} {{ row.closed_on }}{% endif %}</dd></div>
+      </dl>
+    </section>
+
+    {% if row.rs is not none or row.rko is not none or row.maps %}
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('country.panel.ratings') }}</h3>
+      <dl class="sprops">
+        {% if row.rs is not none %}<div><dt>{{ t('home.rs.short') }}</dt><dd>{{ '%.1f'|format(row.rs) }}</dd></div>{% endif %}
+        {% if row.rko is not none %}<div><dt>{{ t('home.rko.short') }}</dt><dd>{{ '%.1f'|format(row.rko) }}</dd></div>{% endif %}
+        {% for provider, avg in row.maps.items() %}<div><dt>{{ t('ratings.maps.provider.' ~ provider) }}</dt><dd>{{ '%.1f'|format(avg) }}</dd></div>{% endfor %}
+      </dl>
+    </section>
+    {% endif %}
+
+    <section class="ssec">
+      <h3 class="ssec__title">{{ t('country.panel.history') }}</h3>
+      {% if history %}
+        <div class="cn-history">
+          {% for h in history %}
+            <a class="ov-row" href="{{ url(registry_path ~ '/' ~ h.id) }}?lang={{ lang }}">
+              <span class="grade tag {{ grade_tone(h.grade) }}">{{ h.grade or '—' }}</span>
+              <span class="ov-row__name">
+                {{ h.inspection_date }}
+                {% if loop.first %}<span class="ov-row__meta">{{ t('country.history.latest') }}</span>{% endif %}
+              </span>
+              <span class="ov-row__num">{{ '%.1f'|format(h.pct) }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="ssec__note">{{ t('country.panel.history_empty') }}</p>
+      {% endif %}
+    </section>
+
+    <div class="sactions">
+      {% if row.unit_id %}
+        <a class="sbtn" href="{{ url('/units/' ~ row.unit_id) }}?lang={{ lang }}">{{ t('country.history.card') }}</a>
+      {% else %}
+        <p class="ssec__note">{{ t('country.panel.no_card') }}</p>
+      {% endif %}
+    </div>
+  </article>
+{% endmacro %}
