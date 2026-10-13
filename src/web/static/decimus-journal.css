@@ -32,11 +32,11 @@
 
 @media (max-width: 860px) {
   .jbar__person, .jviews { margin-left: 0; }
-  .jrow--head { display: none; }
   .jrow { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5) var(--space-6); }
   .jcell { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
   .jcell::before { content: attr(data-label); flex: 0 0 96px; font-size: 11.5px; color: var(--ink-3); }
   .jcell b, .jcell small { display: inline; }
   .jrow.is-bad .jcell:first-child { margin-left: 0; padding-left: 0; box-shadow: none; }
+  .jrow.jrow--head { display: none; }
   .jrow.is-bad { box-shadow: inset 3px 0 0 var(--err); }
 }
