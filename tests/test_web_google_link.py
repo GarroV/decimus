@@ -306,7 +306,7 @@ def test_возврат_в_чужой_сессии_ничего_не_привя�
     for client in _стенд(monkeypatch, tenant="GE", role="auditor"):
         обмен.почта, обмен.домен = ПОЧТА_ЛИЧНАЯ, ""
         метка = начать(client, обмен)
-        monkeypatch.setattr(auth, "open_session", lambda account: Сессия(ДРУГОЙ_ТОКЕН))
+        monkeypatch.setattr(auth, "open_session", lambda account, **_: Сессия(ДРУГОЙ_ТОКЕН))
         monkeypatch.setattr(
             auth,
             "resolve_session",

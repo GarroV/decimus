@@ -42,6 +42,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from src.domain.client_ip import parse_peers
 from src.domain.permissions import MATRIX, SIDE_HQ, SIDE_PARTNER, claude_may, side_of
 from src.domain.public_urls import ADMIN_PUBLIC_URL_VAR, MCP_PUBLIC_URL_VAR, parse_public_url
 from src.domain.tenants import HQ_TENANT, canonical_tenant
@@ -55,6 +56,11 @@ MCP_TOKENS_VAR = "MCP_TOKENS"
 MCP_HOST_VAR = "MCP_HOST"
 MCP_PORT_VAR = "MCP_PORT"
 MCP_LISTEN_NETWORK_VAR = "MCP_LISTEN_NETWORK"
+#: Сколько своих звеньев стоит перед сервером (Cloudflare Worker, прокси площадки) и
+#: какие адреса им принадлежат — для адреса клиента в журнале действий (D462).
+#: Без обоих заголовку `X-Forwarded-For` не верим вовсе: в журнал идёт адрес соединения.
+MCP_TRUSTED_PROXIES_VAR = "MCP_TRUSTED_PROXIES"
+MCP_TRUSTED_PROXY_ADDR_VAR = "MCP_TRUSTED_PROXY_ADDR"
 
 #: Где хранилище версий методики. Пусто — инструменты методики выключены
 #: целиком: до задачи T098 весь MCP был только чтением проверок, и запись в
@@ -181,6 +187,10 @@ class Settings:
     admin_public_url: str | None = None
     #: Внешний адрес самого MCP — ресурс OAuth (D417). `None` — OAuth выключен.
     mcp_public_url: str | None = None
+    #: Свои звенья перед сервером (D462): сколько и с каких адресов. Нужны только адресу
+    #: клиента в журнале действий; ноль или пустой список — заголовку не верим.
+    trusted_proxies: int = 0
+    trusted_proxy_addrs: tuple[str, ...] = ()
 
     @property
     def oauth_enabled(self) -> bool:
@@ -616,6 +626,26 @@ def _parse_public(src: Mapping[str, str], var: str) -> str | None:
         raise McpConfigError(str(отказ)) from None
 
 
+def _parse_trusted_proxies(src: Mapping[str, str]) -> tuple[int, tuple[str, ...]]:
+    """Свои звенья перед сервером: число и адреса. Кривая запись — отказ запуска.
+
+    Опечатка в адресе звена тихо означала бы «не верить никому» — и в журнале действий
+    у всех стоял бы адрес прокси, поэтому запуск отказывает, а не молчит.
+    """
+    сырое = (src.get(MCP_TRUSTED_PROXIES_VAR) or "").strip()
+    try:
+        число = int(сырое) if сырое else 0
+        адреса = parse_peers(src.get(MCP_TRUSTED_PROXY_ADDR_VAR) or "")
+    except ValueError as отказ:
+        raise McpConfigError(
+            f"{MCP_TRUSTED_PROXIES_VAR} — целое число звеньев, {MCP_TRUSTED_PROXY_ADDR_VAR} — "
+            f"адреса или подсети через запятую: {отказ}"
+        ) from None
+    if число < 0:
+        raise McpConfigError(f"{MCP_TRUSTED_PROXIES_VAR}: число звеньев не бывает отрицательным")
+    return число, адреса
+
+
 def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     """Прочитать окружение сервера. Связи с базой здесь не проверяется."""
     src = os.environ if env is None else env
@@ -623,6 +653,7 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
     _check_any_door(tokens, src)
     tenants = tuple(sorted(set(tokens.values())))
     store, checklist_tenants, data_dir = _parse_checklist(src, tenants)
+    trusted_proxies, trusted_proxy_addrs = _parse_trusted_proxies(src)
     return Settings(
         tokens=tokens,
         token_roles=token_roles,
@@ -641,6 +672,8 @@ def load_settings(env: Mapping[str, str] | None = None) -> Settings:
         ),
         admin_public_url=_parse_public(src, ADMIN_PUBLIC_URL_VAR),
         mcp_public_url=_parse_public(src, MCP_PUBLIC_URL_VAR),
+        trusted_proxies=trusted_proxies,
+        trusted_proxy_addrs=trusted_proxy_addrs,
     )
 
 
@@ -675,6 +708,12 @@ class Access:
     #: различаются токены одного арендатора, а сам токен не восстанавливается.
     #: У личного токена и OAuth пусто — там автор назван логином (`actor`).
     token_label: str = ""
+    #: Учётка сайта за токеном (личный токен и OAuth); пусто у служебного токена из
+    #: карты. Нужна журналу действий (D462): служебный токен — не человек, и его
+    #: вызовы в журнал учётки не ложатся (у них свой след `[mcp-audit]`).
+    user_id: str = ""
+    #: Чем вошёл: метка личного токена или номер подключения Claude, для журнала.
+    credential: str = ""
 
 
 def _owner_from_store(token: str) -> Access | None:
@@ -730,6 +769,8 @@ def _owner_from_store(token: str) -> Access | None:
         may_retract=False,
         actor=f"web:{владелец.login}",
         role=владелец.role,
+        user_id=владелец.user_id,
+        credential=владелец.credential,
     )
 
 
@@ -767,6 +808,8 @@ def _owner_from_oauth(token: str, resource: str) -> Access | None:
         may_retract=False,
         actor=f"web:{владелец.login}",
         role=владелец.role,
+        user_id=владелец.user_id,
+        credential=владелец.credential,
     )
 
 

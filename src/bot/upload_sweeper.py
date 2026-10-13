@@ -1,4 +1,4 @@
-"""Уборка брошенных кадров мини-аппа по расписанию (F-033, #531).
+"""Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) и старых записей журналов.
 
 Что убирается и что никогда — `src/domain/upload_sweep.py`. Здесь — когда:
 задача живёт в боте рядом с уборкой копий кадров (`frame_copies`) и дозагрузкой
@@ -16,6 +16,7 @@ import asyncio
 import logging
 
 from src import db
+from src.db import journals
 from src.db.photos import walk_photo_refs
 from src.domain import check_environment
 from src.domain.upload_sweep import SweepResult, sweep_uploads
@@ -50,4 +51,15 @@ async def sweep_forever() -> None:
                 )
         except Exception:
             logger.exception("уборка кадров мини-аппа не прошла")
+        await _purge_journals()
         await asyncio.sleep(SWEEP_EVERY_SEC)
+
+
+async def _purge_journals() -> None:
+    """Срок хранения журналов входов (180 дней) и действий (365), D462. Сбой — в журнал процесса."""
+    try:
+        убрано = await asyncio.to_thread(journals.purge)
+        if убрано:
+            logger.info("убрано старых записей журналов входов и действий: %s", убрано)
+    except Exception:
+        logger.exception("уборка журналов входов и действий не прошла")

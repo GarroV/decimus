@@ -61,6 +61,7 @@ from . import (
     edition,
     guard,
     home_page,
+    journal,
     letter_draft,
     letter_markup,
     oauth,
@@ -183,6 +184,8 @@ def create_app(settings: Settings | None = None) -> Flask:
     # Матрица «роль × действие» — один заслон на запись и на разделы (заменил
     # заслоны контроля, гостя и методики).
     guard.install(app)
+    # Журнал действий админов (D462): одна точка на весь веб, маршруты о нём не знают.
+    journal.install(app, conf)
     _register_sections(app)
     _register_overview(app, conf)
     _register_country(app, conf)

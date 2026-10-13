@@ -48,6 +48,11 @@ services:
       DB_POOL_MAX: "4"
       MCP_HOST: 0.0.0.0
       MCP_LISTEN_NETWORK: "1"
+      # Адрес клиента в журнале действий (D462): перед MCP то же одно своё звено, что
+      # перед админкой, — Caddy из сети `edge-decimus`. Без этого в журнал идёт адрес
+      # Caddy. Подсеть берётся у админки, отдельной переменной по умолчанию не нужно.
+      MCP_TRUSTED_PROXIES: ${MCP_TRUSTED_PROXIES:-1}
+      MCP_TRUSTED_PROXY_ADDR: ${MCP_TRUSTED_PROXY_ADDR:-${WEB_TRUSTED_PROXY_ADDR:?задайте WEB_TRUSTED_PROXY_ADDR (подсеть сети edge-decimus), docs/08-deploy.md 8.1}}
     ports: !override
       - "127.0.0.1:${MCP_HOST_PORT:-8266}:${MCP_PORT:-8265}"
     depends_on: !override

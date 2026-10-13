@@ -175,6 +175,8 @@ class TokenOwner:
     role: str
     #: Логин учётки — подпись для журнала, не секрет.
     login: str
+    #: Метка токена для журнала действий (D462): `pt:` и первые 8 знаков отпечатка.
+    credential: str = ""
 
 
 def token_fingerprint(token: str) -> str:
@@ -352,8 +354,14 @@ def resolve_token(token: str) -> TokenOwner | None:
     доступ всем и объяснить это каждому неверным словом.
     """
     with _connected("сверить токен доступа") as conn, conn.cursor() as cur:
-        cur.execute(_RESOLVE_FINGERPRINT_SQL, (token_fingerprint(token),))
+        cur.execute(_RESOLVE_FINGERPRINT_SQL, (отпечаток := token_fingerprint(token),))
         row = cur.fetchone()
     if row is None:
         return None
-    return TokenOwner(user_id=str(row[0]), tenant=str(row[1]), role=str(row[2]), login=str(row[3]))
+    return TokenOwner(
+        user_id=str(row[0]),
+        tenant=str(row[1]),
+        role=str(row[2]),
+        login=str(row[3]),
+        credential=f"pt:{отпечаток[:8]}",
+    )

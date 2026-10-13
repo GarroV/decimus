@@ -48,6 +48,7 @@ from typing import Any
 
 import psycopg
 
+from src.domain.journal import truncate_user_agent
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
@@ -240,9 +241,9 @@ _SELECT_USER_BY_EMAIL_SQL = """
 """
 
 _OPEN_SESSION_SQL = """
-    insert into web_sessions (user_id, fingerprint, expires_at)
-    values (%s, %s, now() + %s)
-    returning expires_at
+    insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent)
+    values (%s, %s, now() + %s, %s, %s)
+    returning expires_at, id
 """
 
 #: Учётка сверяется ВМЕСТЕ с сессией, одним запросом. Отдельной проверкой
@@ -250,7 +251,7 @@ _OPEN_SESSION_SQL = """
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
     select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang, s.issued_at,
-           u.display_name, u.avatar_etag
+           u.display_name, u.avatar_etag, s.id
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -352,6 +353,9 @@ class Account:
     #: Версия фото из Google (`web_users.avatar_etag`, `0065`); `None` — фото
     #: нет, показываются инициалы. Сами байты с сессией не едут.
     avatar_etag: str | None = None
+    #: Номер сессии этого запроса (`web_sessions.id`); `None` — учётка не из сессии.
+    #: Нужен журналу действий (D462): чем вошёл тот, кто действует.
+    session_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -390,6 +394,8 @@ class OpenedSession:
 
     token: str
     expires_at: datetime
+    #: Номер строки сессии: им входы и действия в журналах (D462) ссылаются на неё.
+    session_id: str = ""
 
 
 def password_hash(password: str) -> str:
@@ -931,14 +937,29 @@ def authenticate(login: str, password: str) -> Account | None:
     )
 
 
-def open_session(account: Account) -> OpenedSession:
-    """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке."""
+def open_session(
+    account: Account, *, ip: str | None = None, user_agent: str | None = None
+) -> OpenedSession:
+    """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке.
+
+    `ip` и `user_agent` — откуда вошли (D462): адрес по цепочке доверенных звеньев и
+    браузер, усечённый до `MAX_USER_AGENT`.
+    """
     token = new_session_token()
     with _connected("открыть сессию") as conn, conn.cursor() as cur:
-        cur.execute(_OPEN_SESSION_SQL, (account.id, session_fingerprint(token), SESSION_TTL))
+        cur.execute(
+            _OPEN_SESSION_SQL,
+            (
+                account.id,
+                session_fingerprint(token),
+                SESSION_TTL,
+                ip,
+                truncate_user_agent(user_agent),
+            ),
+        )
         row = cur.fetchone()
     assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
-    return OpenedSession(token=token, expires_at=row[0])
+    return OpenedSession(token=token, expires_at=row[0], session_id=str(row[1]))
 
 
 def resolve_session(token: str) -> Account | None:
@@ -972,6 +993,7 @@ def resolve_session(token: str) -> Account | None:
         signed_in_at=row[6],
         display_name=row[7],
         avatar_etag=row[8],
+        session_id=str(row[9]),
     )
 
 

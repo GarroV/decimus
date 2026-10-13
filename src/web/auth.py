@@ -38,7 +38,7 @@ from flask import Flask, current_app, g, make_response, redirect, render_templat
 from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
-from src.db import web_own_profile
+from src.db import journals, web_own_profile
 from src.db.errors import DbError
 from src.db.reach import Reach, reach_of
 from src.db.space import enter_space, leave_space
@@ -53,9 +53,17 @@ from src.db.web_access import (
     resolve_session,
 )
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.journal import (
+    METHOD_GOOGLE,
+    METHOD_PASSWORD,
+    RESULT_OK,
+    RESULT_RATE_LIMITED,
+    RESULT_REFUSED,
+)
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from . import google_link, google_profile, oauth, reauth, swarm_api, walk_auth
+from . import journal as web_journal
 from .config import Settings
 from .google_auth import (
     FRONT_MARKER_HEADER,
@@ -363,7 +371,15 @@ def install(app: Flask, conf: Settings) -> None:
         # пароля идёт ПОСЛЕ: смысл ограничителя в том, что запертый не доходит
         # до дорогой части вовсе — ни до scrypt, ни до базы учёток.
         попытка = admit_attempt(tenant=рубеж, address=адрес, login=имя)
+        откуда, браузер = web_journal.login_origin(conf)
         if not попытка.admitted:
+            journals.record_failed_login(
+                login=имя,
+                method=METHOD_PASSWORD,
+                ip=откуда,
+                user_agent=браузер,
+                result=RESULT_RATE_LIMITED,
+            )
             return заперто(попытка.verdict)
         account = authenticate(имя, request.form.get("password") or "")
         if account is not None and google is not None and account.email:
@@ -372,6 +388,13 @@ def install(app: Flask, conf: Settings) -> None:
             # ПОСЛЕ сверки пароля: до неё он рассказал бы любому, у кого какой
             # вход. Аварийный путь — снять привязку командой обслуживания
             # (`tools/web_user.py email <логин>`, docs/12-web-admin.md).
+            journals.record_login(
+                method=METHOD_PASSWORD,
+                result=RESULT_REFUSED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
             return render_template(
                 "login.html",
                 failed=False,
@@ -381,7 +404,17 @@ def install(app: Flask, conf: Settings) -> None:
             ), 403
         if account is None:
             if попытка.verdict.locked:
+                journals.record_failed_login(
+                    login=имя,
+                    method=METHOD_PASSWORD,
+                    ip=откуда,
+                    user_agent=браузер,
+                    result=RESULT_RATE_LIMITED,
+                )
                 return заперто(попытка.verdict)
+            journals.record_failed_login(
+                login=имя, method=METHOD_PASSWORD, ip=откуда, user_agent=браузер
+            )
             # Один и тот же отказ на «нет такого логина» и «пароль не тот»:
             # иначе форма сама рассказывает перебором, кто здесь заведён.
             # Введённое обратно на страницу не возвращается — среди него
@@ -395,7 +428,15 @@ def install(app: Flask, conf: Settings) -> None:
             )
             return страница, 401
         note_success(tenant=рубеж, login=имя)
-        session = open_session(account)
+        session = open_session(account, ip=откуда, user_agent=браузер)
+        journals.record_login(
+            method=METHOD_PASSWORD,
+            result=RESULT_OK,
+            user_id=account.id,
+            ip=откуда,
+            user_agent=браузер,
+            session_id=session.session_id,
+        )
         return remember(after_login(request.form.get("next")), session)
 
     state_signer = URLSafeTimedSerializer(
@@ -512,8 +553,12 @@ def install(app: Flask, conf: Settings) -> None:
         # ВОТ ЗДЕСЬ круг допущенных: Google подтвердил владение почтой и не
         # более того. Незнакомая почта получает отказ, а не заводит учётку —
         # иначе круг допущенных задавал бы Google, а не владелец.
+        откуда, браузер = web_journal.login_origin(conf)
         account = find_by_email(кто.email)
         if account is None:
+            journals.record_failed_login(
+                email=кто.email, method=METHOD_GOOGLE, ip=откуда, user_agent=браузер
+            )
             return отказано
         # Учётка УК — только из домена компании (D430, F-028): совпавшая почта
         # без `hd` компании — это аккаунт, заведённый на чужой адрес, а не
@@ -526,10 +571,25 @@ def install(app: Flask, conf: Settings) -> None:
                 "вход через Google: домен организации %r не в GOOGLE_HQ_DOMAINS",
                 кто.hosted_domain,
             )
+            journals.record_login(
+                method=METHOD_GOOGLE,
+                result=RESULT_REFUSED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
             return отказано
 
         note_success(tenant=рубеж, login=account.login)
-        session = open_session(account)
+        session = open_session(account, ip=откуда, user_agent=браузер)
+        journals.record_login(
+            method=METHOD_GOOGLE,
+            result=RESULT_OK,
+            user_id=account.id,
+            ip=откуда,
+            user_agent=браузер,
+            session_id=session.session_id,
+        )
         # Имя и фото из Google (D468) — после открытия сессии и мимо исхода
         # входа: сбой здесь не отнимает у человека вход.
         google_profile.remember(session.token, кто)
