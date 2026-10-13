@@ -40,6 +40,7 @@ from src.db.errors import DbError
 from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
+from . import google_profile
 from .google_auth import GoogleIdentity, hq_domain_ok
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,8 @@ def finish(
         return "db"
     if итог == "ok":
         logger.info("Google: %s привязал почту %s", кто, mask_email(identity.email))
+        # Имя и фото (D468): после привязки и мимо её исхода — сбой не отменяет её.
+        google_profile.remember(token, identity)
         return "linked"
     logger.info("Google: привязка %s не состоялась — %s", кто, итог)
     return {"linked": "already", "session": "state"}.get(итог, итог)

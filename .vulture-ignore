@@ -529,6 +529,8 @@ settings_claude_revoke
 settings_google_link
 settings_google_unlink
 settings_lang
+settings_avatar
+settings_menu
 _lang_next
 reauth_confirm
 reauth_confirm_password
