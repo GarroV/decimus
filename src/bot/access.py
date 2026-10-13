@@ -13,8 +13,9 @@
    молчание на просроченную ссылку выглядит как поломка. Ответ один на все
    причины отказа и не подсказывает, чем отказ вызван.
 2. Живая привязка — пространство УЧЁТКИ, к которой привязан Telegram ID, если
-   роли учётки открыто поле (`may_do_field_work`: аудитор и админы, не контроль —
-   D420, аудит 12.10 F-024). Роль читается тем же запросом, что и привязка, —
+   роли учётки открыто поле (`inspection.conduct` в матрице
+   `src/domain/permissions.py`; не контроль и не гость — D420, аудит 12.10
+   F-024). Роль читается тем же запросом, что и привязка, —
    смена роли в вебе действует не позже `BINDING_TTL`. Контролю бот отвечает
    словами, почему не пускает: человек свой, и молчание выглядело бы поломкой.
 3. Совместимость до снятия (вопрос 2): `ALLOWED_TELEGRAM_IDS` и связки
@@ -47,7 +48,8 @@ from src.db.bot_links import LINK_PREFIX, NEVER_BOUND, Binding, Standing
 from src.db.errors import DbError
 from src.domain.errors import DomainError
 from src.domain.log_ids import log_id
-from src.domain.tenants import HQ_TENANT, canonical_tenant, may_do_field_work
+from src.domain.permissions import role_may
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .inspection import read_inspection
 from .lang import chat_ui_lang
@@ -60,6 +62,27 @@ Handler = Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]]
 
 #: Ключ пространства человека в `data` апдейта.
 SPACE_KEY = "space"
+
+#: Действие матрицы на вход в бота: бот — инструмент поля, и мидлварь пускает
+#: только роль с `inspection.conduct` (`role_closed`).
+FIELD_ACTION = "inspection.conduct"
+
+#: Команды бота и действие матрицы, которое их открывает (`src/domain/permissions.py`).
+#: Всё, кроме `/stops`, открывает вход в бота; `/stops` сверх него спрашивает своё.
+#: Новая команда без строки здесь роняет `tests/test_bot_command_actions.py`.
+COMMAND_ACTIONS: dict[str, str] = {
+    "start": FIELD_ACTION,
+    "records": FIELD_ACTION,
+    "undo": FIELD_ACTION,
+    "finish": FIELD_ACTION,
+    "resend": FIELD_ACTION,
+    "help": FIELD_ACTION,
+    "lang": FIELD_ACTION,
+    "version": FIELD_ACTION,
+    # Личный токен Claude себе (D448): человек уже прошёл вход в бота.
+    "mcp": FIELD_ACTION,
+    "stops": "refusals.read",
+}
 #: Сколько живёт ответ «чья привязка»: не ходить в базу на каждый кадр альбома.
 #: Столько же после отвязки в вебе бот ещё пускает человека в прежнее пространство.
 BINDING_TTL = timedelta(seconds=60)
@@ -199,7 +222,7 @@ def role_closed(положение: Standing | None) -> bool:
     return (
         положение is not None
         and положение.binding is not None
-        and not may_do_field_work(положение.binding.role)
+        and not role_may(положение.binding.role, положение.binding.tenant, FIELD_ACTION)
     )
 
 

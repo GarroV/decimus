@@ -142,7 +142,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(action_plans.plans, "list_requests", lambda **_: action_plans.EMPTY)
     # Сводка рейтингов читает базу; её путь на настоящей базе — test_web_ratings_flow.
     monkeypatch.setattr(ratings_screen, "render_summary", lambda *_a, **_k: "<p>сводка</p>")
-    роль = getattr(request, "param", "auditor")
+    роль = getattr(request, "param", "developer")
     подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=роль)
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
@@ -777,9 +777,11 @@ def test_лежащая_база_по_прежнему_отказ(monkeypatch: p
         data.load_registry(reach=own_reach(ТЕНАНТ), limit=10)
 
 
-def test_аудитор_не_отклоняет_проверку(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гость_не_отклоняет_проверку(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange — до 24.09.2026 маршрут проверял только вход, и отклонить
-    # проверку с выносом кадров мог любой вошедший.
+    # проверку с выносом кадров мог любой вошедший. Бизнес-девелопер УК снимает
+    # проверки по матрице (D440), поэтому отказ держим на госте.
     def отклонить(*_a: Any, **_k: Any) -> Retraction:
         raise AssertionError("до базы дойти не должно")
 
@@ -790,11 +792,11 @@ def test_аудитор_не_отклоняет_проверку(стенд: Fla
     ответ = стенд.post(
         "/inspections/x/retract", data={"reason": "дубль"}, headers={"Origin": "http://localhost"}
     )
-    карточка_аудитора = стенд.get("/inspections/x").get_data(as_text=True)
+    карточка_гостя = стенд.get("/inspections/x").get_data(as_text=True)
 
     # Assert — отказ, и формы ему не показывают.
     assert ответ.status_code == 403
-    assert "/retract" not in карточка_аудитора
+    assert "/retract" not in карточка_гостя
 
 
 @pytest.mark.parametrize("стенд", ["control"], indirect=True)
@@ -865,7 +867,8 @@ def test_администратор_переносит_и_автор_берёт�
     assert "Исправлено." in ответ.get_data(as_text=True)
 
 
-def test_аудитор_не_переносит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гость_не_переносит(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     # Arrange
     вызовы = _перенос(monkeypatch)
 

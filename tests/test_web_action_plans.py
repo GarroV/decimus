@@ -144,7 +144,9 @@ def test_второй_заслон_держит_и_без_флага_в_реес
     """Флаг `hq_only` сняли по ошибке — маршрут всё равно отказывает сам."""
     monkeypatch.setattr("src.web.app.refused_for", lambda *_: False)
     ответ = getattr(партнёр, метод)(адрес, data={"verdict": "accepted"}, headers=ORIGIN)
-    assert ответ.status_code == 404
+    # Запись без права в матрице отказывает заслоном ещё до маршрута: 403;
+    # чтение закрытого раздела — 404.
+    assert ответ.status_code == (403 if метод == "post" else 404)
 
 
 def test_панель_партнёру_зовёт_в_экшн_планы_а_не_в_действия(партнёр: FlaskClient) -> None:

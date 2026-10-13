@@ -2107,14 +2107,14 @@ def find(name: str) -> ToolSpec | None:
     return _BY_NAME.get(name)
 
 
-def as_list(open_kind: Callable[[str], bool] | None = None) -> list[dict[str, object]]:
+def as_list(open_tool: Callable[[ToolSpec], bool] | None = None) -> list[dict[str, object]]:
     """Каталог в форме ответа MCP `tools/list`: ровно `name`/`description`/`inputSchema`.
 
-    `open_kind` — фильтр по виду (права роли, `policy.permits`, D417); без
-    него — каталог целиком, как у дверей бота и `.env`.
+    `open_tool` — фильтр по инструменту (права роли, `policy.permits_tool`, D417);
+    без него — каталог целиком, как у служебного токена `.env`.
     """
     return [
         {"name": spec.name, "description": spec.description, "inputSchema": spec.input_schema}
         for spec in TOOLS
-        if open_kind is None or open_kind(spec.kind)
+        if open_tool is None or open_tool(spec)
     ]

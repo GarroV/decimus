@@ -106,7 +106,7 @@ async def test_контроль_с_привязкой_в_бот_не_пуска�
     assert _ответы(session) == [t("access.role_closed", "ru")], "отказ без объяснения"
 
 
-@pytest.mark.parametrize("роль", ["auditor", "admin", "superadmin"])
+@pytest.mark.parametrize("роль", ["developer", "admin", "superadmin"])
 async def test_полевые_роли_бот_пускает(роль: str) -> None:
     mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "HQ", role=роль)}), None)
     assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
@@ -177,7 +177,9 @@ async def test_привязка_главнее_совместимости() -> N
 
 
 async def test_старый_код_тенанта_учётки_читается_как_уК() -> None:
-    mw = AccessMiddleware(frozenset(), _кэш({501: _привязка(501, "default")}), None)
+    mw = AccessMiddleware(
+        frozenset(), _кэш({501: _привязка(501, "default", role="developer")}), None
+    )
     assert await _пустить(mw, _msg(501)[0]) == HQ_TENANT
 
 

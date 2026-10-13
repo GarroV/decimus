@@ -20,14 +20,8 @@ from src.db import action_plans, prescriptions, queries
 from src.db import ratings_read as ratings
 from src.db.models import ORIGIN_FIELD
 from src.db.reach import Reach
-from src.domain.tenants import (
-    CONTROL_ROLE,
-    DEVELOPER_ROLE,
-    GUEST_ROLE,
-    HQ_TENANT,
-    SUPERADMIN_ROLE,
-    is_admin_role,
-)
+from src.domain.permissions import role_may
+from src.domain.tenants import CONTROL_ROLE, HQ_TENANT, SUPERADMIN_ROLE
 
 #: Через сколько дней без загрузки РС / РКО контролингу напоминают о ней.
 #: РКО приходит неделями, поэтому две недели — уже пропуск, а не пауза.
@@ -88,22 +82,22 @@ def kinds_for(who: Who) -> tuple[str, ...]:
     «Действиях УК» (только админ), партнёр отвечает на них в своих разделах
     (D371). Загрузку рейтингов ведёт контролинг (D358), главный админ видит её же.
     """
-    if who.role == CONTROL_ROLE:
-        return (RATINGS_STALE,)
-    if who.role == GUEST_ROLE:
-        return ()  # гость только читает (D440): делать ему на доске нечего
+
+    def может(code: str) -> bool:
+        return role_may(who.role, who.tenant, code)
+
     out: list[str] = []
-    # Бизнес-девелопер работает с проверками и очередями наравне с админом (D440).
-    работает = is_admin_role(who.role) or who.role == DEVELOPER_ROLE
-    if работает:
+    # Приёмка — у тех, кому матрица открывает `inspection.accept` (D341, D367, D440).
+    if может("inspection.accept"):
         out.append(REVIEW)
-    if who.hq:
-        if работает:
-            out += [PLANS_REVIEW, ORDERS_DUE]
-        if who.role == SUPERADMIN_ROLE:
-            out.append(RATINGS_STALE)
-    else:
+    if может("plan.manage"):  # УК рассматривает планы и следит за сроками предписаний
+        out += [PLANS_REVIEW, ORDERS_DUE]
+    if может("plan.submit"):  # партнёр сдаёт планы и отвечает на предписания (D371)
         out += [PLANS_DUE, ORDERS_DUE]
+    # Напоминание о загрузке рейтингов — работа контролинга (D358) и главного
+    # админа: выбор доски, а не право (загружать может и админ УК).
+    if может("ratings.manage") and who.role in (CONTROL_ROLE, SUPERADMIN_ROLE):
+        out.append(RATINGS_STALE)
     return tuple(out)
 
 

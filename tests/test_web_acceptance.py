@@ -37,7 +37,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=getattr(request, "param", "auditor"))
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role=getattr(request, "param", "developer"))
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -185,8 +185,9 @@ def test_принятой_проверке_кнопки_подтверждени
     assert "Принята" in страница
 
 
-def test_аудитор_не_подтверждает(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Arrange
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гость_не_подтверждает(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Arrange — приёмку ведёт бизнес-девелопер (D440), поэтому отказ держим на госте.
     вызовы = _приёмка(monkeypatch)
 
     # Act
@@ -272,7 +273,8 @@ def test_запись_чужого_пространства_не_исправл�
     assert вызовы == []
 
 
-def test_аудитор_записи_не_исправляет(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гость_записи_не_исправляет(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
     вызовы = _правка(monkeypatch)
     ответ = стенд.post("/inspections/x/findings/f1/revise", data=ИСПРАВЛЕНИЕ, headers=ORIGIN)
     assert ответ.status_code == 403

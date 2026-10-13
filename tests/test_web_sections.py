@@ -10,6 +10,7 @@ from __future__ import annotations
 import pytest
 from web_harness import войти, подменить_двери, собрать
 
+from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import action_plans
 from src.web.errors import SectionRegistryError
 from src.web.sections import (
@@ -132,7 +133,10 @@ def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
 
 
 class _Кто:
-    def __init__(self, tenant: str, role: str = "auditor") -> None:
+    def __init__(self, tenant: str, role: str | None = None) -> None:
+        # Рабочая роль стороны (D440): в УК аудитора нет — бизнес-девелопер.
+        if role is None:
+            role = "developer" if canonical_tenant(tenant) == HQ_TENANT else "auditor"
         self.tenant, self.role = tenant, role
 
 
