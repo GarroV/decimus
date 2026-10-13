@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from flask import Flask, current_app, make_response, render_template, request
+from flask import Flask, current_app, make_response, redirect, render_template, request
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -155,13 +155,33 @@ def install(app: Flask, conf: Settings) -> None:
     app.config[users_claude.MCP_URL_KEY] = conf.mcp_public_url if conf.oauth_enabled else None
 
     @app.get(base)
-    def settings_page() -> FlaskResponse | Response | tuple[str, int]:
-        вошедший = auth.current_account()
-        действие = reauth.take_intent(вошедший)
+    def settings_page() -> FlaskResponse | tuple[str, int]:
+        """Чистое чтение: заряженное намерение здесь НИЧЕГО не выпускает.
+
+        Изменение состояния на GET позволило бы чужой странице выполнить действие,
+        пока намерение заряжено. Поэтому вместо выполнения — страница с одной
+        кнопкой, отправляющей POST (`/settings/continue`) с проверкой происхождения.
+        """
+        действие = reauth.take_intent(auth.current_account())
         if действие is None:
             return render()
-        # Подтверждение входа прошло (D457): то, что человек просил, делается
-        # само — тем же кодом, что кнопка, — и намерение снимается этим же ответом.
+        ответ = make_response(render_template("settings/continue.html", action=действие))
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
+
+    @app.post(f"{base}/continue")
+    def settings_continue() -> Response | FlaskResponse | tuple[str, int]:
+        """Выполнить то, что человек просил до подтверждения входа (D457)."""
+        refuse_foreign_origin()
+        действие = reauth.take_intent(auth.current_account())
+        if действие is None:
+            ответ = redirect(f"{request.script_root}{base}")
+            reauth.drop_intent(ответ)
+            return ответ
+        # Право то же, что у кнопки: ссылка бота — по матрице `inspection.conduct`.
+        if действие == "bot-link" and not guard.may("inspection.conduct"):
+            return guard.forbidden()
+        # Тем же кодом, что кнопка; намерение снимается этим же ответом.
         итог = _RUN_INTENT[действие](conf, base)
         ответ = make_response(итог)
         reauth.drop_intent(ответ)

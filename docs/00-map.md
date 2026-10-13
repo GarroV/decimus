@@ -257,7 +257,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 2 | confirm.html, index.html |
+| `src/web/templates/settings/` | 3 | confirm.html, continue.html, index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
