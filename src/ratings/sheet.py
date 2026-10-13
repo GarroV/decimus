@@ -140,7 +140,7 @@ def is_sheet_table(header: Sequence[str], rows: Sequence[tuple[int, Sequence[str
     return find_header_row([(1, header), *rows]) is not None
 
 
-def _period(label: Label, year: int) -> PeriodRef:
+def period_of(label: Label, year: int) -> PeriodRef:
     begin = date(year, label.begin_month, label.begin_day)
     if label.rating_type == RS:
         last = calendar.monthrange(year, label.begin_month)[1]
@@ -179,7 +179,7 @@ def assign_years(labels: Sequence[Label], *, today: date) -> list[PeriodRef]:
         elif start > later:
             year -= 1
         later = start
-        result.append(_period(label, year))
+        result.append(period_of(label, year))
     return list(reversed(result))
 
 
@@ -190,7 +190,7 @@ class _Column:
     period: PeriodRef
 
 
-def _score(cell: str) -> float | None:
+def score_of(cell: str) -> float | None:
     clean = cell.strip().rstrip("%").strip().replace(",", ".")
     if clean in _NO_SCORE:
         return None
@@ -262,7 +262,7 @@ def _stray_score_columns(
 
 def _is_number(cell: str) -> bool:
     try:
-        return _score(cell) is not None
+        return score_of(cell) is not None
     except ValueError:
         return False
 
@@ -363,7 +363,7 @@ def _row_scores(
     bad: list[str] = []
     for column in columns:
         try:
-            value = _score(cells[column.index])
+            value = score_of(cells[column.index])
         except ValueError:
             bad.append(column.name)
             continue
