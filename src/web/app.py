@@ -675,7 +675,7 @@ def _register_calendar(app: Flask, conf: Settings) -> None:
         return render_template(
             "calendar/index.html",
             to_check=to_inspect.load(
-                reach=auth.current_reach(), date_from=период.start, date_to=период.end
+                reach=auth.current_reach(), date_from=период.start, date_to=период.end, top=None
             ),
             unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
             period=период,
@@ -706,7 +706,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        период = registry_period.read(request.args, today=date.today(), default_all=True)
+        # «Принятые» открываются текущим месяцем — последние, а не всё подряд
+        # (D466 сменил умолчание D404); «Всё время» — одной кнопкой.
+        период = registry_period.read(request.args, today=date.today())
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
