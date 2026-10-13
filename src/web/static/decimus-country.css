@@ -30,15 +30,14 @@
 
 /* ── таблица пиццерий: без горизонтальной прокрутки ──────────────────── */
 .cn-units.ov-table, .cn-countries.ov-table { overflow: visible; }
-.cn-units .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cn-units .ov-table__head, .cn-units .ov-table__row {
   grid-template-columns: minmax(0, 1fr) 12rem; min-width: 0; font-size: var(--fs-dense); }
 /* РС / РКО / карты — только когда блок шире 34rem; уже — остаются в панели пиццерии */
 .cn-units .ov-table__head > :nth-child(n+3), .cn-units .ov-table__row > :nth-child(n+3) { display: none; }
 .cn-unit { cursor: pointer; }
 .cn-unit__name { display: flex; flex-direction: column; min-width: 0; }
-.cn-unit__name b { font-weight: var(--w-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cn-unit__name small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cn-unit__name b { font-weight: var(--w-semibold); }
+.cn-unit__name small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); }
 .cn-unit__last { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-3); min-width: 0; }
 .cn-unit__nope { flex-basis: 100%; font-size: var(--fs-micro); color: var(--warn); }
 .cn-unit__maps { display: flex; flex-direction: column; align-items: flex-end; line-height: 15px; }
@@ -52,7 +51,6 @@
 .cn-closed .cn-unit { color: var(--ink-3); }
 .cn-countries .ov-table__head, .cn-countries .ov-table__row {
   grid-template-columns: minmax(0, 1.2fr) 6.5rem 5.5rem 5.5rem minmax(0, 1.2fr); min-width: 0; }
-.cn-countries .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* статус пиццерии: тихая метка с точкой */
 .cn-st { display: inline-flex; align-items: center; gap: var(--space-3); font-size: var(--fs-meta); color: var(--ink-3); }

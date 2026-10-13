@@ -40,6 +40,7 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
     "country.tile.checked": {"ru": "Проверено", "en": "Inspected"},
     "country.tile.of": {"ru": "{checked} из {total}", "en": "{checked} of {total}"},
     "country.tile.units": {"ru": "пиццерий", "en": "pizzerias"},
+    "country.tile.critical": {"ru": "Критические", "en": "Critical"},
     "country.tile.letters": {"ru": "Буквы", "en": "Grades"},
     "country.tile.rs.hint": {
         "ru": "Среднее РС по пиццериям страны (как на «Рейтингах»)",
@@ -92,7 +93,7 @@ COUNTRY_TEXTS: dict[str, dict[str, str]] = {
         "en": "Map ratings could not be read.",
     },
     "country.col.unit": {"ru": "Пиццерия", "en": "Pizzeria"},
-    "country.col.last": {"ru": "Последняя проверка", "en": "Latest inspection"},
+    "country.col.last": {"ru": "Последняя", "en": "Latest"},
     "country.col.country": {"ru": "Страна", "en": "Country"},
     "country.col.average": {"ru": "Средняя", "en": "Average"},
     "country.col.checked": {"ru": "Проверено", "en": "Inspected"},

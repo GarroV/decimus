@@ -45,8 +45,12 @@
   </div>
 {% endmacro %}
 
-{# Ряд плиток: тело вызова — несколько `pick_tile`. #}
-{% macro pick_tiles() %}<div class="pk-tiles">{{ caller() }}</div>{% endmacro %}
+{# Ряд плиток: `n` плиток — равные колонки на всю ширину, без дыр. До 4 — в один ряд
+   (`n` колонок), больше — равными рядами не шире 4 колонок. Тело вызова — `n` плиток. #}
+{% macro pick_tiles(n) %}
+  {% set rows = (n + 3) // 4 %}
+  <div class="pk-tiles" style="--pk-cols: {{ (n + rows - 1) // rows }}">{{ caller() }}</div>
+{% endmacro %}
 
 {# Блок: заголовок капсом, подсказка, счётчик справа; тело — список или таблица. #}
 {% macro pick_block(title, hint='', count='') %}

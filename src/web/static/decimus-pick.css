@@ -40,10 +40,8 @@
   box-shadow: 0 0 0 1px var(--line); text-align: center; font-family: var(--font-num); font-size: 10.5px;
   font-weight: var(--w-semibold); color: var(--ink-2); letter-spacing: .02em; }
 .pk-item__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
-.pk-item__title { font-size: 13px; line-height: 18px; font-weight: var(--w-medium, 500); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
-.pk-item__meta { font-size: 11.5px; line-height: 16px; color: var(--ink-3); white-space: nowrap;
-  overflow: hidden; text-overflow: ellipsis; }
+.pk-item__title { font-size: 13px; line-height: 18px; font-weight: var(--w-medium, 500); overflow-wrap: anywhere; }
+.pk-item__meta { font-size: 11.5px; line-height: 16px; color: var(--ink-3); overflow-wrap: anywhere; }
 .pk-item__count { flex: none; font-family: var(--font-num); font-size: 11.5px; color: var(--ink-2);
   font-variant-numeric: tabular-nums; }
 
@@ -67,10 +65,9 @@
   letter-spacing: -.01em; color: var(--ink); overflow-wrap: anywhere; }
 
 /* плитки ключевых цифр */
-.pk-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr)); gap: var(--space-4); }
+.pk-tiles { display: grid; grid-template-columns: repeat(var(--pk-cols, 4), minmax(0, 1fr)); gap: var(--space-4); }
 .pk-tile { min-width: 0; padding: 14px 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
-.pk-tile__label { font: var(--w-semibold) 10.5px / 1 var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3);
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-tile__label { font: var(--w-semibold) 10.5px / 1 var(--font-ui); letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); line-height: 12px; overflow-wrap: anywhere; }
 .pk-tile__value { margin-top: var(--space-3); display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap;
   font-family: var(--font-num); font-size: 24px; line-height: 28px; font-weight: var(--w-semibold);
   letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -95,5 +92,6 @@
 }
 @media (max-width: 479px) {
   .pk-tiles { grid-template-columns: 1fr 1fr; gap: var(--space-3); }
+  .pk-tiles > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .pk-tile { padding: 12px; }
 }
