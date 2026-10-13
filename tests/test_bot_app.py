@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.types import MenuButtonDefault
 from bot_harness import AUDITOR_ID, FAKE_TOKEN
 
 from src.bot import app
@@ -170,3 +171,34 @@ def test_entry_point_runs_polling(monkeypatch: pytest.MonkeyPatch) -> None:
     app.main()
 
     assert started == [True]
+
+
+# --- журнал без сырого chat_id (F-015) ------------------------------------------
+
+СЫРОЙ_ЧАТ = 424242424
+
+
+def test_language_lookup_failure_logs_masked_chat_id(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    def broken(_chat_id: int) -> str:
+        raise RuntimeError("нет базы")
+
+    monkeypatch.setattr(app, "chat_ui_lang", broken)
+
+    app._lang_here(СЫРОЙ_ЧАТ)
+
+    assert str(СЫРОЙ_ЧАТ) not in caplog.text
+    assert "id:" in caplog.text
+
+
+@pytest.mark.asyncio
+async def test_menu_button_failure_logs_masked_chat_id(caplog: pytest.LogCaptureFixture) -> None:
+    class Сломанный:
+        async def set_chat_menu_button(self, **_kw: Any) -> None:
+            raise RuntimeError("телеграм отказал")
+
+    await app._menu_button(Сломанный(), СЫРОЙ_ЧАТ, MenuButtonDefault())  # type: ignore[arg-type]
+
+    assert str(СЫРОЙ_ЧАТ) not in caplog.text
+    assert "id:" in caplog.text

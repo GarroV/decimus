@@ -41,11 +41,12 @@ from aiogram.types import CallbackQuery, FSInputFile, Message
 
 from src import db, domain
 from src.domain.errors import ChecklistVersionMismatch, DomainError
+from src.domain.handover import HandedOverError
 from src.domain.log_ids import log_id
 from src.domain.translation import untranslated
 from src.report import PhotoMissing, ReportError, build_letter, build_pdf
 
-from .. import sidecar, stops, view
+from .. import sealed, sidecar, stops, view
 from ..errors import BotNotesError
 from ..finish_translate import translate_comments
 from ..inspection import read_inspection
@@ -73,6 +74,20 @@ from ..texts import t
 from .records import show_records
 
 logger = logging.getLogger(__name__)
+
+
+async def refuse_if_sealed(message: Message, chat_id: int, lang: str) -> bool:
+    """Сданную проверку завершение не трогает: отказ и обе двери (D080). `True` — отказано.
+
+    Страж стоит и внутри домена (`domain.guard_writable`), но сюда он не
+    доходит до самой записи: аудитору нужен понятный отказ в начале шага, а не
+    сообщение «не записалось» в конце.
+    """
+    if not sealed.is_sealed(chat_id):
+        return False
+    logger.info("завершение чата %s: проверка сдана — отказ", log_id(chat_id))
+    await sealed.refuse(message, lang)
+    return True
 
 
 async def show_summary(message: Message, chat_id: int, lang: str, *, store: MaterialStore) -> None:
@@ -351,6 +366,8 @@ async def deliver(message: Message, chat_id: int, lang: str, *, allow_missing: b
     if bot is None or inspection is None:
         await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
         return
+    if await refuse_if_sealed(message, chat_id, lang):
+        return
     await message.answer(t("finish.building", lang))
     # Автоперевод комментариев (D443): до сборки, чтобы в отчёт легли переведённые.
     translate_failed = await asyncio.to_thread(translate_comments, chat_id, inspection)
@@ -464,7 +481,10 @@ def build_finish_router(store: MaterialStore) -> Router:
     @router.message(Command("finish"))
     async def on_finish(message: Message) -> None:
         chat_id = message.chat.id
-        await show_summary(message, chat_id, chat_ui_lang(chat_id), store=store)
+        lang = chat_ui_lang(chat_id)
+        if await refuse_if_sealed(message, chat_id, lang):
+            return
+        await show_summary(message, chat_id, lang, store=store)
 
     @router.callback_query(F.data == VERSION_SYNC_CALLBACK)
     async def on_version_sync(callback: CallbackQuery) -> None:
@@ -480,10 +500,15 @@ def build_finish_router(store: MaterialStore) -> Router:
         if here is None:
             return
         message, chat_id, lang = here
+        if await refuse_if_sealed(message, chat_id, lang):
+            return
         try:
             # Подпроцесса тут нет, но есть чтение и запись файла проверки под
             # блокировкой — в поток по той же причине, что и подсчёт (T101).
             inspection = await asyncio.to_thread(domain.sync_checklist_version, chat_id)
+        except HandedOverError:
+            await sealed.refuse(message, lang)
+            return
         except DomainError:
             logger.exception(
                 "перевод проверки чата %s на действующую методику не удался", log_id(chat_id)
@@ -574,6 +599,9 @@ def build_finish_router(store: MaterialStore) -> Router:
         """
         try:
             await asyncio.to_thread(domain.set_report_lang, chat_id, report_lang)
+        except HandedOverError:
+            await sealed.refuse(message, lang)
+            return
         except DomainError:
             logger.exception("язык отчёта %s не задан в чате %s", report_lang, log_id(chat_id))
             await stops.refuse(
@@ -601,6 +629,8 @@ def build_finish_router(store: MaterialStore) -> Router:
         if here is None:
             return
         message, chat_id, lang = here
+        if await refuse_if_sealed(message, chat_id, lang):
+            return
         inspection = read_inspection(chat_id)
         if inspection is None:
             await stops.refuse(message, lang, step="finish.build", key="material.no_inspection")
@@ -626,6 +656,8 @@ def build_finish_router(store: MaterialStore) -> Router:
         if here is None:
             return
         message, chat_id, lang = here
+        if await refuse_if_sealed(message, chat_id, lang):
+            return
         inspection = read_inspection(chat_id)
         if inspection is None:
             await stops.refuse(

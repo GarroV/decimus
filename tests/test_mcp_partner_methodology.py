@@ -293,6 +293,7 @@ def test_накопитель_слов_аудиторов_партнёру_не_
         tenant=ПАРТНЁР,
         checklist=_checklist_for(список, ПАРТНЁР),
         source=_checklist_source_for(список, ПАРТНЁР),
+        role="admin",
     )
     assert ответ is not None
 

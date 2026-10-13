@@ -160,6 +160,7 @@ def _отказ_инструмента(имя: str, методика: Store) -> 
         },
         tenant=АРЕНДАТОР,
         checklist=методика,
+        role="admin",
     )
     assert ответ is not None
     результат = ответ["result"]

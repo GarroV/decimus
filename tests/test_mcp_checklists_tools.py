@@ -50,6 +50,7 @@ def _вызвать(имя: str, аргументы: dict[str, Any], *, store: S
         checklist=store,
         source=store,
         may_retract=False,
+        role="admin",
     )
     assert ответ is not None
     return ответ

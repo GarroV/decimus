@@ -5,7 +5,7 @@
   состоянием: точка и слово, не цвет один.
 #}
 {% for row in rows %}
-  <a class="popover__row acct-menu__row" role="menuitem" href="{{ settings_url }}#{{ row.anchor }}">
+  <a class="popover__row acct-menu__row" role="menuitem" href="{{ settings_url }}&tile={{ row.anchor }}#connections">
     <span class="acct-menu__name">{{ t(row.key) }}</span>
     {% if row.state %}
       <span class="acct-menu__state"><span class="acct-dot{% if row.state == 'on' %} acct-dot--ok{% endif %}" aria-hidden="true"></span>{{ t('menu.' ~ row.state) }}</span>

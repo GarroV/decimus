@@ -209,7 +209,9 @@ def test_отказ_подтверждения_показан_текстом(
     _приёмка(monkeypatch)
 
     def отказать(*_a: Any, **_k: Any) -> None:
-        raise AcceptError("Проверка x уже принята — подтверждать второй раз нечего")
+        raise AcceptError(
+            "Проверка x уже принята — подтверждать второй раз нечего", code="accept_already"
+        )
 
     monkeypatch.setattr(data, "accept_card", отказать)
 
@@ -288,7 +290,11 @@ def test_отказ_правки_показан_текстом(стенд: Flask
     _правка(monkeypatch)
 
     def отказать(*_a: Any, **_k: Any) -> None:
-        raise ReviseError("Класс D3 для пункта CLN05 не предусмотрен")
+        raise ReviseError(
+            "Класс D3 для пункта CLN05 не предусмотрен",
+            code="revise_bad_level",
+            params={"level": "D3", "item": "CLN05", "allowed": "D1, D2"},
+        )
 
     monkeypatch.setattr(revision, "revise_card", отказать)
 
@@ -296,7 +302,7 @@ def test_отказ_правки_показан_текстом(стенд: Flask
     ответ = стенд.post("/inspections/x/findings/f1/revise", data=ИСПРАВЛЕНИЕ, headers=ORIGIN)
 
     # Assert
-    assert "Запись не исправлена: Класс D3 для пункта CLN05 не предусмотрен" in ответ.get_data(
+    assert "Запись не исправлена: Класс D3 для пункта CLN05 не предусмотрен." in ответ.get_data(
         as_text=True
     )
 

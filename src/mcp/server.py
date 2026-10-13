@@ -27,11 +27,13 @@ from typing import Any
 
 from src.domain.public_urls import OAUTH_SCOPE, PROTECTED_RESOURCE_PATH
 
+from .audit import log_write_call
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, space_of
 from .config import Settings, resolve_access
 from .errors import AuthError
 from .install import INSTALL_CONTENT_TYPE, INSTALL_PATH, InstallScriptError, install_script
+from .ratelimit import CODE_RATE_LIMITED, RATE_LIMITED, McpRate, token_key
 from .rpc import CODE_PARSE_ERROR, handle
 
 #: Больше мегабайта читающему серверу присылать нечего: вопросы к базе
@@ -83,6 +85,7 @@ class _Server(ThreadingHTTPServer):
     def __init__(self, address: tuple[str, int], settings: Settings) -> None:
         self.settings = settings
         self._slots = threading.Semaphore(MAX_CONNECTIONS)
+        self.rate = McpRate()
         super().__init__(address, _Handler)
 
     def process_request(self, request: Any, client_address: Any) -> None:
@@ -252,13 +255,37 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._guarded(self._post)
 
+    def _send_rate_limited(self, request_id: Any = None) -> None:
+        self.close_connection = True
+        self._send(
+            HTTPStatus.TOO_MANY_REQUESTS,
+            {
+                "jsonrpc": "2.0",
+                "id": request_id,
+                "error": {"code": CODE_RATE_LIMITED, "message": RATE_LIMITED},
+            },
+        )
+
     def _post(self) -> None:
+        rate: McpRate = self.server.rate  # type: ignore[attr-defined]
         try:
             доступ = resolve_access(self._settings, self.headers.get("Authorization"))
         except AuthError as отказ:
+            # Предел по адресу считает только НЕУДАЧНЫЕ попытки (перебор
+            # токенов). Клиенты приходят через общий прокси, то есть с одного
+            # адреса: стой адресный предел до токена, посторонний без токена
+            # выедал бы его у всех, у кого токен есть.
+            if not rate.by_address.allow(str(self.client_address[0])):
+                self._send_rate_limited()
+                return
             # Ни имени арендатора, ни токена: по отказу нельзя перечислить,
             # какие партнёры вообще заведены на этом сервере.
             self._send(HTTPStatus.UNAUTHORIZED, {"error": str(отказ)})
+            return
+
+        _, _, bearer = (self.headers.get("Authorization") or "").partition(" ")
+        if not rate.by_token.allow(token_key(bearer.strip())):
+            self._send_rate_limited()
             return
 
         raw = self.headers.get("Content-Length") or "0"
@@ -304,6 +331,9 @@ class _Handler(BaseHTTPRequestHandler):
             imports=_imports_for(self._settings, доступ.tenant),
             actor=доступ.actor,
             role=доступ.role,
+        )
+        log_write_call(
+            message, answer, actor=доступ.actor, role=доступ.role, label=доступ.token_label
         )
         if answer is None:
             self._send(_ACCEPTED)

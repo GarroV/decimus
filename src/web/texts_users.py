@@ -300,6 +300,12 @@ _OUTCOMES: dict[str, dict[str, str]] = {
         "ru": "Эта почта уже привязана к другой учётке — ничего не изменено.",
         "en": "This email is already linked to another account — nothing changed.",
     },
+    "users.email.unavailable": {
+        "ru": "Эту почту не удалось привязать — ничего не изменено. Проверьте адрес; если он "
+        "верный, обратитесь в управляющую компанию.",
+        "en": "This email could not be linked — nothing changed. Check the address; if it is "
+        "correct, contact the head office.",
+    },
     "users.email.failed": {
         "ru": "Почта не сохранена: база не ответила. Попробуйте ещё раз.",
         "en": "Email not saved: the database did not respond. Please try again.",
