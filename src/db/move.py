@@ -83,7 +83,8 @@ def _require_text(value: str, *, what: str) -> str:
     if not записанное:
         raise MoveError(
             f"Не назван {what} исправления. История исправлений обязательна (D195): без неё "
-            f"правка даты или пиццерии неотличима от подчистки"
+            f"правка даты или пиццерии неотличима от подчистки",
+            code="move_reason_required" if what == "повод" else None,
         )
     return записанное
 
@@ -109,7 +110,9 @@ def move_inspection(
     try:
         new_unit_id = str(uuid.UUID(new_unit_id))
     except (ValueError, TypeError, AttributeError):
-        raise MoveError("Пиццерия не выбрана или указана неверно") from None
+        raise MoveError(
+            "Пиццерия не выбрана или указана неверно", code="move_unit_invalid"
+        ) from None
     settings = load_retraction_settings()
     try:
         with connection(settings.dsn) as conn:

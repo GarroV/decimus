@@ -282,7 +282,7 @@ def install(
         сверено = verify(account.login, request.form.get("password") or "")
         if сверено is None or str(сверено.id) != str(account.id):
             return _page(back, failed=True), 401
-        note_success(tenant=stand, address=адрес, login=account.login)
+        note_success(tenant=stand, login=account.login)
         действие = pending_intent(account, back)
         if действие is None:
             return rotate(account, back)
