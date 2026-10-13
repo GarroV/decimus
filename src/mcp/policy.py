@@ -57,6 +57,8 @@ KIND_ACTIONS: Mapping[str, str] = {
 #: Правящие инструменты методики, чьё действие — не правка пунктов.
 TOOL_ACTIONS: Mapping[str, str] = {
     "publish_checklist_version": "checklist.publish",
+    # Накопитель непокрытых слов общий на все пространства: только УК.
+    "uncovered_phrases": "phrases.raw",
     "retract_learned_phrase": "phrases.manage",
     "repoint_learned_phrase": "phrases.manage",
     "create_checklist": "checklist.manage",
