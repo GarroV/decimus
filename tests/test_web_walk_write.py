@@ -421,9 +421,7 @@ def test_проверка_чужого_пространства_не_читае�
     monkeypatch.setattr(
         walk_access.bot_links,
         "standing",
-        lambda _: Standing.live(
-            Binding(ЧУЖОЙ, "u", "login", "GE", datetime.now(UTC), "auditor")
-        ),
+        lambda _: Standing.live(Binding(ЧУЖОЙ, "u", "login", "GE", datetime.now(UTC), "auditor")),
     )
     чужой = Клиент(клиент.c, ЧУЖОЙ)
     ref = "tg-photo-1"

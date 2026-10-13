@@ -52,18 +52,18 @@ from src.bot.keyboards import (
     EDIT_PREFIX,
     FINISH_BUILD_CALLBACK,
     FINISH_BUILD_NO_PHOTOS_CALLBACK,
-    REPORT_LANG_PREFIX,
-    VERSION_SYNC_CALLBACK,
     NEW_INSPECTION_CALLBACK,
     PICK_PREFIX,
+    REPORT_LANG_PREFIX,
     RESUME_CONTINUE_CALLBACK,
     RESUME_NEW_CALLBACK,
     SEALED_DROP_CALLBACK,
+    VERSION_SYNC_CALLBACK,
 )
 from src.bot.texts import t
 from src.domain import Finding, add_finding, get_state, start_inspection
-from src.domain.engine import state_file
 from src.domain.config import check_environment
+from src.domain.engine import state_file
 
 pytestmark = pytest.mark.asyncio
 
