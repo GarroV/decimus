@@ -30,6 +30,7 @@ from src.domain.journal import (  # noqa: E402
     RESULT_BAD_PASSWORD,
     RESULT_FROZEN,
     RESULT_OK,
+    RESULT_RATE_LIMITED,
     RESULT_UNKNOWN,
 )
 
@@ -138,7 +139,7 @@ def test_без_живой_сессии_журнал_пуст(люди: Люди
 
 def test_вход_с_неизвестным_логином_виден_только_главному_админу(люди: Люди) -> None:
     journals.record_failed_login(
-        login="nobody", method=METHOD_PASSWORD, ip="1.2.3.4", user_agent=""
+        login="nobody", method=METHOD_PASSWORD, ip="10.1.2.3", user_agent=""
     )
 
     assert [e.result for e in journals.read_logins(люди.токены["sofia"])] == [RESULT_UNKNOWN]
@@ -282,3 +283,40 @@ def test_уборка_убирает_входы_старше_180_и_действ
     assert убрано == 2
     assert len(journals.read_logins(люди.токены["sofia"])) == 1
     assert len(journals.read_actions(люди.токены["sofia"])) == 1
+
+
+def test_отказы_по_частоте_с_одного_адреса_схлопываются_в_одну_строку(люди: Люди) -> None:
+    """Запертый адрес не раздувает журнал: строка на адрес, способ и учётку за 10 минут."""
+    for _ in range(50):
+        journals.record_failed_login(
+            login="anna", method=METHOD_PASSWORD, ip="10.8.8.8", user_agent="UA",
+            result=RESULT_RATE_LIMITED,
+        )  # fmt: skip
+    for n in range(50):  # перебор логинов с одного адреса: учётки нет, строка одна
+        journals.record_failed_login(
+            login=f"нет-такого-{n}", method=METHOD_PASSWORD, ip="10.8.8.9", user_agent="UA",
+            result=RESULT_RATE_LIMITED,
+        )  # fmt: skip
+    journals.record_failed_login(  # другой адрес — своя строка
+        login="anna", method=METHOD_PASSWORD, ip="10.8.8.10", user_agent="UA",
+        result=RESULT_RATE_LIMITED,
+    )  # fmt: skip
+
+    видно = journals.read_logins(люди.токены["sofia"])
+
+    assert len([e for e in видно if e.result == RESULT_RATE_LIMITED]) == 3
+    assert {e.ip for e in видно} == {"10.8.8.8", "10.8.8.9", "10.8.8.10"}
+    assert next(e for e in видно if e.ip == "10.8.8.8").login == "anna", "учётка не определена"
+    assert all("нет-такого" not in repr(e) for e in видно), "введённый логин попал в журнал"
+
+
+def test_отказ_по_частоте_пишется_снова_после_окна(люди: Люди, pg_dsn: str) -> None:
+    запись = dict(login="anna", method=METHOD_PASSWORD, ip="10.8.8.8", user_agent="UA",
+                  result=RESULT_RATE_LIMITED)  # fmt: skip
+    journals.record_failed_login(**запись)
+    with psycopg.connect(pg_dsn) as conn, conn.cursor() as cur:
+        cur.execute("update login_journal set occurred_at = now() - interval '11 minutes'")
+
+    journals.record_failed_login(**запись)
+
+    assert len(journals.read_logins(люди.токены["sofia"])) == 2

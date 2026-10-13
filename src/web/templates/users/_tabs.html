@@ -1,11 +1,11 @@
 {#
-  Вкладки экрана «Пользователи»: «Люди», «Пространства партнёров», «Подключения».
+  Вкладки экрана «Пользователи»: «Люди», «Пространства партнёров», «Подключения», «Журнал».
   Одни на обе страницы (людей и подключений): две копии разметки разошлись бы
   при первой же правке. «Подключения» видны только главному админу — флаг
   `has_connections_tab` ставит маршрут по охвату сессии.
 #}
-{% macro users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link) %}
-  {% if has_spaces_tab or has_connections_tab %}
+{% macro users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab=false) %}
+  {% if has_spaces_tab or has_connections_tab or has_journal_tab %}
     <nav class="stabs" aria-label="{{ t('section.users.title') }}">
       <a class="stabs__item{% if tab == 'people' %} is-current{% endif %}" href="{{ link() }}"{% if tab == 'people' %} aria-current="page"{% endif %}>{{ t('users.tab.people') }}</a>
       {% if has_spaces_tab %}
@@ -13,6 +13,9 @@
       {% endif %}
       {% if has_connections_tab %}
         <a class="stabs__item{% if tab == 'connections' %} is-current{% endif %}" href="{{ link(tab='connections') }}"{% if tab == 'connections' %} aria-current="page"{% endif %}>{{ t('connections.tab') }}</a>
+      {% endif %}
+      {% if has_journal_tab %}
+        <a class="stabs__item{% if tab == 'journal' %} is-current{% endif %}" href="{{ link(tab='journal') }}"{% if tab == 'journal' %} aria-current="page"{% endif %}>{{ t('journal.tab') }}</a>
       {% endif %}
     </nav>
   {% endif %}

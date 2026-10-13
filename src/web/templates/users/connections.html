@@ -19,7 +19,7 @@
       <p class="shead__sub">{{ t('connections.sub') }}</p>
     </div>
   </header>
-  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link) }}
+  {{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab) }}
   {# Исход действия без открытой панели — над списком, иначе он потерялся бы. #}
   {% if show_flash and not split_open %}
     <div class="note {{ 'note--ok' if show_flash.ok else 'note--warn' }}"><div class="note__text">{{ t(show_flash.key, **show_flash.params) }}</div></div>

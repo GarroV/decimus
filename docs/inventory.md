@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 132 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 133 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -127,8 +127,9 @@
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
 | `/settings/menu` | GET | `settings_menu` | `src/web/settings_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
+| `/settings/sign-ins` | GET | `settings_signins` | `src/web/journal_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
-| `/static/<path:filename>` | GET | `static` | (библиотека) |
+| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk_proxy.py` |
@@ -158,7 +159,7 @@
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
-| `/static/<path:filename>` | GET | `static` | (библиотека) |
+| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_settings.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk.py` |
@@ -294,6 +295,8 @@
 | `MCP_RETRACTION_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKENS` | `src/mcp/config.py` | да |
 | `MCP_TOKEN_TTL_DAYS` | `src/db/mcp_access.py` | да |
+| `MCP_TRUSTED_PROXIES` | `src/mcp/config.py` | да |
+| `MCP_TRUSTED_PROXY_ADDR` | `src/mcp/config.py` | да |
 | `MIGROS_RELAY_URL` | `src/ratings/aggregators/migros.py` | да |
 | `OAUTH_SMOKE_PASSWORD` | `tools/oauth_smoke.py` | да |
 | `OPENAI_API_KEY` | `src/recognize/config.py` | да |
@@ -403,6 +406,7 @@
 | `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
 | `0065_web_own_google_profile.sql` | — |
 | `0066_move_with_action_plan.sql` | — |
+| `0067_journals.sql` | `login_journal`, `action_journal` |
 <!-- map:end -->
 
 ## Makefile

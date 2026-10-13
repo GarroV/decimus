@@ -50,6 +50,9 @@ create table login_journal (
 
 create index login_journal_time_idx on login_journal (occurred_at desc);
 create index login_journal_user_time_idx on login_journal (user_id, occurred_at desc);
+-- Для сверки «уже записан отказ по частоте с этого адреса» (`record_rate_limited_login`).
+create index login_journal_rate_limited_idx on login_journal (ip, occurred_at desc)
+    where result = 'rate-limited';
 
 comment on table login_journal is
     'Журнал входов (D462): каждая попытка и исход. Роль приложения только дописывает; '
@@ -86,6 +89,42 @@ grant insert on login_journal to dodo_audit_app;
 grant insert on action_journal to dodo_audit_app;
 grant usage on sequence login_journal_id_seq to dodo_audit_app;
 grant usage on sequence action_journal_id_seq to dodo_audit_app;
+
+-- Отказ по частоте: запертый адрес шлёт попытки сколь угодно часто, и по строке на каждую
+-- журнал раздулся бы за счёт чужого перебора (потолок размера — тот же, что у ограничителя:
+-- запертому отказ дёшев, и писать ему дорого нельзя). Поэтому одна строка на связку
+-- «адрес + способ + учётка» за 10 минут. Дедупликация живёт здесь, а не в приложении: роль
+-- приложения `select` на таблицу не имеет. Учётку по логину или почте находит сама функция,
+-- введённое значение нигде не сохраняется.
+create function record_rate_limited_login(
+    p_login text, p_email text, p_ip text, p_user_agent text, p_method text
+) returns void
+language plpgsql security definer set search_path = pg_catalog, public, pg_temp as $$
+declare
+    кто uuid;
+begin
+    if coalesce(p_login, '') <> '' then
+        select u.id into кто from public.web_users u where u.login = lower(btrim(p_login));
+    elsif coalesce(p_email, '') <> '' then
+        select u.id into кто from public.web_users u where u.email = lower(btrim(p_email));
+    end if;
+    if exists (
+        select 1 from public.login_journal j
+         where j.result = 'rate-limited'
+           and j.method = p_method
+           and j.ip is not distinct from p_ip
+           and j.user_id is not distinct from кто
+           and j.occurred_at > now() - interval '10 minutes'
+    ) then
+        return;
+    end if;
+    insert into public.login_journal (user_id, ip, user_agent, method, result)
+    values (кто, p_ip, left(p_user_agent, 200), p_method, 'rate-limited');
+end $$;
+
+revoke all on function record_rate_limited_login(text, text, text, text, text) from public;
+grant execute on function record_rate_limited_login(text, text, text, text, text)
+    to dodo_audit_app;
 
 -- Зритель по токену живой сессии: учётка и роль. Пусто — сессия не живая.
 create function journal_viewer(p_token text, out viewer uuid, out viewer_role text)

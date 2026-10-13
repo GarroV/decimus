@@ -1,0 +1,42 @@
+/* Журнал входов и действий (D462) поверх общего каркаса (`decimus-split.css`,
+   `decimus-period.css`): панель периода и человека, затем строки. Цвета — токены ядра;
+   светлая и тёмная темы работают без правок. На узком экране строка складывается в
+   карточку: подпись колонки берётся из `data-label`. */
+
+.jbar { gap: var(--space-5) var(--space-7); }
+.jbar__person { display: flex; align-items: center; gap: var(--space-3); margin: 0; }
+.jbar__label { font-size: 12.5px; color: var(--ink-3); }
+.jbar__person .sinput { min-width: 160px; max-width: 240px; }
+.jviews { display: inline-flex; gap: var(--space-2); margin-left: auto; padding: 2px; border: 1px solid var(--line); border-radius: var(--r-block, 12px); }
+.jviews__item { padding: var(--space-2) var(--space-5); border-radius: calc(var(--r-block, 12px) - 2px); font-size: 13px; color: var(--ink-2); text-decoration: none; }
+.jviews__item:hover { color: var(--ink); text-decoration: none; }
+.jviews__item.is-current { background: var(--accent-soft); color: var(--ink); font-weight: var(--w-semibold); }
+
+.jcount { margin: 0; padding: var(--space-4) var(--space-7); font-size: 12.5px; color: var(--ink-2); border-top: 1px solid var(--line); }
+.jcount__note { margin-left: var(--space-4); color: var(--ink-3); }
+.jcount--warn { color: var(--warn, var(--ink-2)); border-top: 0; padding-top: 0; }
+
+.jlist { margin: 0; padding: 0; list-style: none; }
+.jrow { display: grid; grid-template-columns: var(--jcols); align-items: start; column-gap: var(--space-5);
+  padding: var(--space-3) var(--space-7); border-top: 1px solid var(--line); font-size: 13px; line-height: 18px; color: var(--ink); }
+.jlist--logins { --jcols: 150px minmax(110px, 1fr) minmax(130px, 1fr) minmax(150px, 1.2fr) 130px minmax(0, 2fr); }
+.jlist--actions { --jcols: 150px minmax(130px, 1fr) minmax(170px, 1.4fr) minmax(0, 2fr) 130px 70px; }
+.jrow--head { min-height: 32px; align-items: center; padding-top: 0; padding-bottom: 0; font-family: var(--font-mono); font-size: 10.5px;
+  letter-spacing: .05em; text-transform: uppercase; color: var(--ink-3); }
+.jrow.is-bad .jcell:first-child { box-shadow: inset 3px 0 0 var(--err); padding-left: var(--space-3); margin-left: calc(var(--space-3) * -1); }
+.jcell { min-width: 0; overflow-wrap: anywhere; }
+.jcell b { display: block; font-weight: var(--w-semibold); }
+.jcell small { display: block; font-size: 12px; color: var(--ink-3); }
+.jcell--ua { color: var(--ink-2); font-size: 12px; }
+.jcell--target { font-size: 12px; color: var(--ink-2); }
+
+@media (max-width: 860px) {
+  .jbar__person, .jviews { margin-left: 0; }
+  .jrow--head { display: none; }
+  .jrow { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-5) var(--space-6); }
+  .jcell { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
+  .jcell::before { content: attr(data-label); flex: 0 0 96px; font-size: 11.5px; color: var(--ink-3); }
+  .jcell b, .jcell small { display: inline; }
+  .jrow.is-bad .jcell:first-child { margin-left: 0; padding-left: 0; box-shadow: none; }
+  .jrow.is-bad { box-shadow: inset 3px 0 0 var(--err); }
+}

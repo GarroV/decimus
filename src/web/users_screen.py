@@ -36,6 +36,7 @@ from . import (
     auth,
     connections_screen,
     guard,
+    journal_screen,
     partner_spaces,
     people,
 )
@@ -53,7 +54,7 @@ from .users_page import (
     render,
     source,
 )
-from .users_view import TAB_CONNECTIONS, TAB_SPACES
+from .users_view import TAB_CONNECTIONS, TAB_JOURNAL, TAB_SPACES
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +94,8 @@ def install(app: Flask, conf: Settings) -> None:
     def users() -> FlaskResponse | tuple[str, int]:
         if request.args.get("tab") == TAB_CONNECTIONS:
             return connections_screen.show()
+        if request.args.get("tab") == TAB_JOURNAL:
+            return journal_screen.show_users(conf)
         return render()
 
     @app.post(f"{users_path}/bot-unlink")
@@ -124,6 +127,7 @@ def install(app: Flask, conf: Settings) -> None:
     _install_add_freeze(app, users_path)
     _install_spaces(app, users_path)
     connections_screen.install(app)
+    journal_screen.install(app, conf)
 
 
 def _install_edits(app: Flask, users_path: str) -> None:

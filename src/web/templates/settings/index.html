@@ -63,6 +63,11 @@
                        base ~ '/sign-out-everywhere?lang=' ~ lang, []) }}
           </span>
         </div>
+        <div class="srow2" id="signins">
+          <span class="srow2__label">{{ t('journal.own.title') }}</span>
+          <span class="srow2__value">{{ t('journal.own.row') }}</span>
+          <span class="srow2__act"><a class="sbtn" href="{{ base }}/sign-ins?lang={{ lang }}">{{ t('journal.own.link') }}</a></span>
+        </div>
         <div class="srow2">
           <span class="srow2__label">{{ t('settings.profile.account') }}</span>
           <span class="srow2__value mono">{{ me.login }}</span>

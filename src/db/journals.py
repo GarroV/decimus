@@ -24,6 +24,7 @@ from src.domain.journal import (
     MAX_ACTION,
     RESULT_BAD_PASSWORD,
     RESULT_FROZEN,
+    RESULT_RATE_LIMITED,
     RESULT_UNKNOWN,
     truncate_user_agent,
 )
@@ -136,6 +137,24 @@ def record_login(
         logger.exception("журнал входов: запись не прошла (способ %s, исход %s)", method, result)
 
 
+def _record_rate_limited(
+    *, method: str, ip: str | None, user_agent: str | None, login: str | None, email: str | None
+) -> None:
+    """Отказ по частоте — одним вызовом функции базы, одна строка на адрес и способ за 10 минут.
+
+    Запертый ключ ограничитель отсекает дёшево; запись для него не должна стать дорогой и
+    не должна раздувать журнал, поэтому дедупликация и поиск учётки — на стороне базы.
+    """
+    try:
+        with _connected("записать отказ по частоте") as conn, conn.cursor() as cur:
+            cur.execute(
+                "select record_rate_limited_login(%s, %s, %s, %s, %s)",
+                (login, email, ip, truncate_user_agent(user_agent), method),
+            )
+    except DbError:
+        logger.exception("журнал входов: отказ по частоте не записан (способ %s)", method)
+
+
 def record_failed_login(
     *,
     method: str,
@@ -150,6 +169,9 @@ def record_failed_login(
     `result` задаёт исход сам (отказ по частоте, закрытый способ) — учётка при этом
     всё равно ищется, чтобы запись легла на человека.
     """
+    if result == RESULT_RATE_LIMITED:
+        _record_rate_limited(method=method, ip=ip, user_agent=user_agent, login=login, email=email)
+        return
     try:
         user_id, найденный = failure_result(login, email=email)
     except DbError:

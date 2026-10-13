@@ -62,9 +62,35 @@ def test_сводка_усечена() -> None:
     assert len(summarize_target({f"поле{n}": "1" for n in range(500)})) == MAX_TARGET
 
 
-def test_имена_без_секретного_куска_не_скрываются() -> None:
+def test_имя_без_допуска_скрыто_даже_с_безобидным_значением() -> None:
+    """Допуск, а не запрет: поле, которого завтра добавят, по умолчанию закрыто."""
+    сводка = summarize_target({"новое_поле": "abc123", "typed": "hunter2", "country": "GE"})
+
+    assert "abc123" not in сводка
+    assert "hunter2" not in сводка
+    assert сводка == f"новое_поле={HIDDEN}; typed={HIDDEN}; country=GE"
+
+
+def test_допущенное_имя_с_почтой_или_пробелом_в_значении_скрыто() -> None:
+    сводка = summarize_target({"code": "a@b.co", "role": "two words", "target_id": "17"})
+
+    assert сводка == f"code={HIDDEN}; role={HIDDEN}; target_id=17"
+
+
+def test_часть_пути_с_почтой_скрыта_а_с_логином_видна() -> None:
+    assert summarize_target(ids={"login": "anna"}) == "login=anna"
+    assert summarize_target(ids={"login": "anna@example.org"}) == f"login={HIDDEN}"
+
+
+def test_вето_по_секретному_имени_сильнее_допуска() -> None:
+    assert summarize_target({"token_id": "17"}) == f"token_id={HIDDEN}"
+
+
+def test_допуск_определяется_по_имени() -> None:
     assert not is_hidden_field("country")
+    assert not is_hidden_field("zone_id")
     assert is_hidden_field("OLD_PASSWORD")
+    assert is_hidden_field("brand_new_field")
 
 
 # --- чей адрес ---------------------------------------------------------------
@@ -81,7 +107,7 @@ def test_заголовок_от_постороннего_не_принимае�
 def test_заголовок_от_своего_звена_считается_с_конца_цепочки() -> None:
     адрес = forwarded_client(
         "172.19.0.4",
-        "6.6.6.6, 198.51.100.7",
+        "10.6.6.6, 198.51.100.7",
         trusted_proxies=1,
         trusted_addrs=("172.19.0.0/16",),
     )
@@ -92,7 +118,7 @@ def test_заголовок_от_своего_звена_считается_с_�
 def test_два_звена_берут_предпоследний_адрес() -> None:
     адрес = forwarded_client(
         "172.19.0.4",
-        "6.6.6.6, 198.51.100.7, 172.19.0.2",
+        "10.6.6.6, 198.51.100.7, 172.19.0.2",
         trusted_proxies=2,
         trusted_addrs=("172.19.0.0/16",),
     )
