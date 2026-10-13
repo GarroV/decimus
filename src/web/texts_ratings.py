@@ -203,6 +203,89 @@ _IMPORTS: dict[str, dict[str, str]] = {
     "ratings.channel.web": {"ru": "веб", "en": "web"},
     "ratings.channel.mcp": {"ru": "MCP", "en": "MCP"},
     "ratings.channel.seed": {"ru": "сид", "en": "seed"},
+    "ratings.channel.sync": {"ru": "таблица", "en": "sheet"},
+    "ratings.sheet.title": {"ru": "Таблица контроля", "en": "Control team spreadsheet"},
+    "ratings.sheet.hint": {
+        "ru": "Рейтинги РС и РКО забираются из общей таблицы сами, раз в {h} ч; загрузка файлом "
+        "ниже остаётся запасным путём.",
+        "en": "Standards and customer-experience ratings are pulled from the shared spreadsheet "
+        "every {h} h; the file upload below stays as a fallback.",
+    },
+    "ratings.sheet.off": {
+        "ru": "Адрес таблицы не задан в настройках сервера: самозабор выключен, данные "
+        "загружаются файлами.",
+        "en": "The spreadsheet address is not set in the server settings: automatic pull is off, "
+        "data is uploaded as files.",
+    },
+    "ratings.sheet.last": {
+        "ru": "Последний заход по таблице: {at}.",
+        "en": "Last spreadsheet check: {at}.",
+    },
+    "ratings.sheet.never": {
+        "ru": "Таблицу ещё не забирали: первый заход — в течение минуты после включения.",
+        "en": "The spreadsheet has not been pulled yet: the first pull runs within a minute.",
+    },
+    "ratings.sheet.now": {"ru": "Забрать сейчас", "en": "Pull now"},
+    "ratings.sheet.pending": {
+        "ru": "Заявка в очереди с {at} ({by}); бот заберёт таблицу в течение минуты.",
+        "en": "Request queued since {at} ({by}); the bot pulls the spreadsheet within a minute.",
+    },
+    "ratings.sheet.queued": {
+        "ru": "Заявка принята: бот заберёт таблицу в течение минуты, обновите страницу позже.",
+        "en": "Request accepted: the bot pulls the spreadsheet within a minute, reload later.",
+    },
+    "ratings.sheet.already": {
+        "ru": "Заявка уже в очереди — второй раз просить не нужно.",
+        "en": "A request is already queued, no need to ask again.",
+    },
+    "ratings.sheet.db_down": {
+        "ru": "База не приняла заявку. Попробуйте позже.",
+        "en": "The database did not accept the request. Try again later.",
+    },
+    "ratings.sheet.failed": {
+        "ru": "Не удалось забрать листов: {n} из {m}. Данные остались прежними; причины ниже.",
+        "en": "Could not pull {n} of {m} sheets. The data is unchanged; reasons below.",
+    },
+    "ratings.sheet.unreadable": {
+        "ru": "Состояние забора таблицы не прочиталось (база не ответила); попробуйте позже.",
+        "en": "The spreadsheet pull status could not be read (database unavailable); try later.",
+    },
+    "ratings.sheet.col.tab": {"ru": "Лист", "en": "Sheet"},
+    "ratings.sheet.col.at": {"ru": "Заход", "en": "Checked"},
+    "ratings.sheet.col.result": {"ru": "Итог", "en": "Result"},
+    "ratings.sheet.col.reason": {"ru": "Причина", "en": "Reason"},
+    "ratings.sheet.outcome.loaded": {"ru": "загружен", "en": "loaded"},
+    "ratings.sheet.outcome.unchanged": {"ru": "без изменений", "en": "unchanged"},
+    "ratings.sheet.outcome.failed": {"ru": "сбой", "en": "failed"},
+    "ratings.sheet.err.closed": {
+        "ru": "таблица закрыта: вместо листа пришла страница входа; проверьте доступ по ссылке",
+        "en": "the spreadsheet is closed: a sign-in page came back; check link sharing",
+    },
+    "ratings.sheet.err.http": {
+        "ru": "таблица ответила ошибкой; проверьте адрес таблицы и доступ",
+        "en": "the spreadsheet answered with an error; check its address and sharing",
+    },
+    "ratings.sheet.err.network": {
+        "ru": "таблица не отвечает; повторим на следующем заходе",
+        "en": "the spreadsheet does not answer; retrying on the next pull",
+    },
+    "ratings.sheet.err.too_big": {
+        "ru": "лист больше допустимого размера",
+        "en": "the sheet is larger than allowed",
+    },
+    "ratings.sheet.err.header": {
+        "ru": "заголовок листа изменился или лист не тот; подробности — в журнале ниже",
+        "en": "the sheet header changed or it is the wrong sheet; details in the journal below",
+    },
+    "ratings.sheet.err.db": {
+        "ru": "база не приняла лист; ничего не записано",
+        "en": "the database rejected the sheet; nothing was written",
+    },
+    "ratings.sheet.err.bad_id": {
+        "ru": "адрес таблицы в настройках сервера не похож на адрес",
+        "en": "the spreadsheet address in the server settings does not look valid",
+    },
+    "ratings.sheet.err.unknown": {"ru": "сбой забора", "en": "pull failed"},
     "ratings.issues": {"ru": "Несопоставленные и битые строки", "en": "Unmatched and broken rows"},
     "ratings.issues.empty": {"ru": "Всё сопоставлено.", "en": "Everything is matched."},
     "ratings.issues.row": {"ru": "строка {n}", "en": "row {n}"},
@@ -212,6 +295,10 @@ _IMPORTS: dict[str, dict[str, str]] = {
     },
     "ratings.issue.country_unknown": {"ru": "страна не узнана", "en": "unknown country"},
     "ratings.issue.bad_row": {"ru": "строка не разобрана", "en": "row not parsed"},
+    "ratings.issue.unit_id_clash": {
+        "ru": "id пиццерии занят другой пиццерией — строки не загружены",
+        "en": "the pizzeria id belongs to another pizzeria — rows not loaded",
+    },
     "ratings.issue.developer_conflict": {
         "ru": "у страны в файле разные девелоперы",
         "en": "the file gives the country different developers",
@@ -418,6 +505,16 @@ _FORMATS: dict[str, dict[str, str]] = {
     "ratings.format.rs-checkups": {"ru": "проверки РС", "en": "standards checks"},
     "ratings.format.snapshot": {"ru": "снимок рейтинга", "en": "rating snapshot"},
     "ratings.format.sheet-scores": {"ru": "лист оценок", "en": "scores sheet"},
+    "ratings.format.base-scores": {"ru": "оценки с флагами", "en": "scores with flags"},
+    "ratings.format.base-collection": {"ru": "собираемость РКО", "en": "customer exp. collection"},
+    "ratings.format.base-rko-violations": {
+        "ru": "нарушения РКО (таблица)",
+        "en": "customer exp. violations (sheet)",
+    },
+    "ratings.format.base-rs-violations": {
+        "ru": "нарушения РС (таблица)",
+        "en": "standards violations (sheet)",
+    },
 }
 
 #: Отказы разбора — по `RatingsFormatError.code`; параметры — из `exc.params`.

@@ -123,6 +123,14 @@ def test_ноль_проверок_не_деление_на_ноль() -> None:
     assert block.checkups == 0  # «нет данных» отличимо от «нарушений нет»
 
 
+def test_нарушения_без_числа_проверок_данные_есть_без_доли() -> None:
+    """РС из таблицы контроля (D464) несёт нарушения, но не число проверок: это не «нет данных»."""
+    block = violation_block([v("A", 2)], checkups=0)
+    assert (block.total, block.per_checkup, block.has_data) == (2, None, True)
+    assert violation_block([], checkups=0).has_data is False
+    assert violation_block([], checkups=3).has_data is True
+
+
 def test_хард_по_тексту_и_по_подстроке_родителя() -> None:
     rules = [HardRule("rko", "text", "пиццу привезли холодной"), HardRule("rs", "contains", "D3")]
     facts = [
