@@ -150,6 +150,18 @@
           {% endfor %}
         </div>
 
+        {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
+           строкой. Блок учётки ниже — отдельно (D468). #}
+        <div class="sidenav__foot">
+          <div class="sidenav__prefs">
+            {{ theme_pick() }}
+            {% include "_langpick.html" %}
+            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
+               title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}"
+               {% if current_key == 'settings' %}aria-current="page"{% endif %}>{{ icon('filter') }}</a>
+          </div>
+        </div>
+
         <div class="sidenav__user">
           {# Блок учётки открывает меню поверх страницы (D468); без скрипта —
              ссылка в «Настройки» (D447). Выход, тема и язык — в меню. #}

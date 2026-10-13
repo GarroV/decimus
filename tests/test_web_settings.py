@@ -32,9 +32,8 @@ from src.web.google_auth import GoogleSettings
 ]
 
 РАЗДЕЛЫ = (
-    'id="claude"',
-    'id="bot"',
-    'id="google"',
+    'id="profile"',
+    'id="connections"',
     'id="language"',
     'id="password"',
     'id="signout"',
@@ -59,6 +58,10 @@ def test_настройки_открыты_каждой_роли_одним_на
         страница = ответ.get_data(as_text=True)
 
         assert ответ.status_code == 200, (tenant, role)
+        # Плитки (D470): каждая плитка — свой выбор в адресе, панель — выбранная.
+        for плитка in ("claude", "bot", "google"):
+            панель = client.get(f"/settings?tile={плитка}")
+            assert f'id="{плитка}"' in панель.get_data(as_text=True), (tenant, role, плитка)
         for раздел in РАЗДЕЛЫ:
             assert раздел in страница, (tenant, role, раздел)
         assert 'href="/settings?lang=' in страница, "из меню учётки в настройки пути нет"
@@ -125,7 +128,7 @@ def test_контролю_настройки_открыты_а_проверки_
 
 def test_бот_без_имени_называет_переменную(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="developer"):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=bot").get_data(as_text=True)
 
         assert "WEB_BOT_USERNAME" in страница and "/settings/bot-link" not in страница
 
@@ -179,7 +182,7 @@ def test_с_почтой_без_google_пароль_остаётся(monkeypatch
 
 def test_без_почты_так_и_сказано(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=google").get_data(as_text=True)
 
         assert "Почта Google не привязана" in страница and 'name="current"' in страница
 
@@ -273,3 +276,46 @@ def test_выйти_везде_при_отказе_базы_не_выходит_
             "Set-Cookie" not in ответ.headers
             or auth.COOKIE_NAME + "=;" not in ответ.headers["Set-Cookie"]
         ), "кука стёрта, а сессия в базе жива"
+
+
+def test_выбранная_плитка_берётся_из_адреса_а_без_него_первая(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin", bot_username="decimus_bot"):
+        по_умолчанию = client.get("/settings").get_data(as_text=True)
+        бот = client.get("/settings?tile=bot").get_data(as_text=True)
+        чужое = client.get("/settings?tile=../x").get_data(as_text=True)
+
+        assert 'id="claude"' in по_умолчанию and 'id="bot"' not in по_умолчанию
+        assert 'id="bot"' in бот and 'id="claude"' not in бот
+        assert бот.count('aria-current="true"') == 1, "выбрана должна быть ровно одна плитка"
+        assert 'id="claude"' in чужое, "неизвестная плитка не должна ломать страницу"
+
+
+def test_плитки_показывают_статус_и_счётчик(monkeypatch: pytest.MonkeyPatch) -> None:
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin", bot_username="decimus_bot"):
+        страница = client.get("/settings").get_data(as_text=True)
+
+        assert страница.count('<a class="stile') == 3
+        assert "Не подключено" in страница
+        assert "0 из 3" in страница
+
+
+def test_исход_действия_раскрывает_свою_плитку() -> None:
+    from src.web import settings_screen as экран
+
+    assert (
+        экран.selected_tile(
+            экран.Show(flash=экран.Flash("settings.google.unlink.wrong", ok=False)), None
+        )
+        == "google"
+    )
+    assert (
+        экран.selected_tile(экран.Show(flash=экран.Flash("users.bot.unlinked", ok=True)), None)
+        == "bot"
+    )
+    assert (
+        экран.selected_tile(экран.Show(flash=экран.Flash("users.mcp.revoked", ok=True)), None)
+        == "claude"
+    )
+    assert экран.selected_tile(экран.Show(), "bot") == "bot"
