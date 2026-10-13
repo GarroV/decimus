@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -256,6 +257,33 @@ def test_отчёт_сразу_уходит_в_чат_подписавшего(
 
     state = get_state(АУДИТОР)
     assert state is not None and state.report_lang == "en"
+
+
+def test_сданная_проверка_отчёт_не_запускается_и_язык_не_меняется(
+    база: База,  # noqa: F811
+    отчёты: list[tuple[str, int]],
+    domain_env: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """F-098/F-114: «сразу отчёт» по сданной проверке — отказ, состояние то же."""
+    from src.domain import get_state
+    from src.domain.handover import HANDED_OVER_KEY, NOTES_FILE_NAME
+
+    _начать()
+    _заполнить_сведения()
+    (domain_env / f"chat_{АУДИТОР}" / NOTES_FILE_NAME).write_text(
+        json.dumps({HANDED_OVER_KEY: 0}), encoding="utf-8"
+    )
+    client = _клиент(monkeypatch)
+    _режим(client, АУДИТОР, "report")
+    до = get_state(АУДИТОР)
+
+    ответ = _действие(client, АУДИТОР, op="finish", report_lang="en")
+
+    assert ответ.status_code == 409
+    assert отчёты == [], "по сданной проверке запущена сборка"
+    assert get_state(АУДИТОР) == до, "язык отчёта сданной проверки изменён"
+    assert walk_finish._building == set(), "чат остался занятым"
 
 
 def test_язык_вне_перечня_страны_отказ_и_ничего_не_собрано(
