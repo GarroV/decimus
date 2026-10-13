@@ -216,7 +216,7 @@
   });
 
   // «Исправить» на проверке, ждущей приёмки: режим правки панели (D465) —
-  // раскрыть формы правки записей, показать «✕/Заменить/+ Фото» и «Добавить
+  // показать входы в правку записей, показать «✕/Заменить/+ Фото» и «Добавить
   // запись» (повторный щелчок — свернуть). Режим переживает ответ на действие.
   function setEditing(panel, on) {
     panel.classList.toggle("is-editing", on);
@@ -224,9 +224,13 @@
     if (toggle) toggle.setAttribute("aria-pressed", on ? "true" : "false");
     var sheet = panel.querySelector("#review");
     if (!sheet) return;
-    sheet.querySelectorAll("details.review-revise").forEach(function (d) {
-      d.open = on;
-    });
+    // Формы записей не раскрываем разом (стена полей, D465): режим правки
+    // показывает только входы «Править запись»; при выходе всё сворачивается.
+    if (!on) {
+      sheet.querySelectorAll("details.review-revise, details.review-add").forEach(function (d) {
+        d.open = false;
+      });
+    }
     if (on) {
       sheet.querySelectorAll("details.review-zone").forEach(function (d) {
         d.open = true;
