@@ -260,6 +260,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0062_space_isolation.sql": (
         "sql1:6914454f0f5520b392b18aa0fd07beb05925abff1e68271bf8c31681693427d9"
     ),
+    # «База рейтингов» контроля как источник РС и РКО (D464). Ещё не на проде.
+    "0063_ratings_sheet.sql": (
+        "sql1:1f72f3e1d58396fc21fd6a508c929ed3327cd1ce7aa47fc329fc7acbe0a820d2"
+    ),
 }
 
 
