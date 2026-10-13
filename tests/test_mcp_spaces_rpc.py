@@ -100,6 +100,7 @@ def _вызов(имя: str, аргументы: dict[str, Any], настрой�
         tenant=ПАРТНЁР,
         checklist=_checklist_for(настройки, ПАРТНЁР),
         source=_checklist_source_for(настройки, ПАРТНЁР),
+        role="admin",
     )
     assert ответ is not None
     return ответ

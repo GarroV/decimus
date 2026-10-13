@@ -343,6 +343,21 @@ def _aimed(spec: ToolSpec, база: Store, *, tenant: str, код: str | None) 
     return кандидат
 
 
+def _tool_open(role: str | None, tenant: str, spec: ToolSpec, may_retract: bool) -> bool:
+    """Открыт ли инструмент этому доступу. Одно решение и на `tools/list`, и на вызов.
+
+    Роли нет — закрыто всё (`None` никогда не значит «без ограничений»). Роль
+    есть — решает матрица. Исключение одно: снятие проверки у служебного токена,
+    названного владельцем в `MCP_RETRACTION_TOKENS` (`may_retract`), — матрица его
+    закрывает для всех ролей (`CLAUDE_CLOSED`), а выдаётся оно только этой картой.
+    """
+    if role is None:
+        return False
+    if spec.kind == KIND_RETRACTION and may_retract:
+        return True
+    return permits_tool(role, tenant, spec)
+
+
 def _call_tool(
     params: dict[str, Any],
     *,
@@ -366,10 +381,10 @@ def _call_tool(
     обработчиках: обработчик, забывший спросить о правах, был бы дырой,
     которую видно только чтением всех обработчиков подряд.
 
-    `role` — роль учётки сайта у личного токена и у входа через OAuth (D417,
-    аудит 12.10), `None` только у служебного токена `.env`. Заданная роль
-    спрашивается ПЕРВОЙ, раньше прежних заслонов: она только сужает, и отказ по
-    ней честнее отказа настройки.
+    `role` — роль доступа: учётки сайта у личного токена и у входа через OAuth
+    (D417, аудит 12.10), названная в записи или `guest` у служебного токена `.env`.
+    `None` — отказ на любой инструмент. Роль спрашивается ПЕРВОЙ, раньше прежних
+    заслонов: она только сужает, и отказ по ней честнее отказа настройки.
     """
     name = params.get("name")
     if not isinstance(name, str) or not name:
@@ -380,15 +395,19 @@ def _call_tool(
     arguments = params.get("arguments", {})
     if not isinstance(arguments, dict):
         return f"Аргументы инструмента {name} ожидаются объектом"
-    if role is not None and not permits_tool(role, tenant, spec):
+    if role is None or not _tool_open(role, tenant, spec, may_retract):
         # Указатель прода закрыт не-админам словами (D440): роль с правом на
         # методику должна понять, почему именно этот инструмент ей не дан.
-        if action_of(spec) == "checklist.apply" and claude_may(role, tenant, "checklist.read"):
+        if (
+            role is not None
+            and action_of(spec) == "checklist.apply"
+            and claude_may(role, tenant, "checklist.read")
+        ):
             return _tool_text(
                 PROD_POINTER_ADMINS_ONLY if side_of(tenant) == SIDE_HQ else PROD_POINTER_HQ_ONLY,
                 failed=True,
             )
-        return _tool_text(ROLE_CLOSED.format(роль=role), failed=True)
+        return _tool_text(ROLE_CLOSED.format(роль=role or "—"), failed=True)
     if spec.kind == KIND_CHECKLIST and checklist is None:
         return _tool_text(CHECKLIST_CLOSED, failed=True)
     if spec.kind == KIND_CHECKLIST_SOURCE and source is None:
@@ -431,7 +450,6 @@ def _call_tool(
         if (
             spec.kind == KIND_CHECKLIST
             and spec.writes
-            and role is not None
             and not may_edit_protected(role, tenant)
             and (причина := protection_of(прочее["store"])) is not None
         ):
@@ -528,10 +546,9 @@ def handle(
     `None` по умолчанию означает, что до задачи T098 сервер отвечал только на
     вопросы о проверках, и таким он и остаётся, пока методику не открыли явно.
 
-    `role` — роль учётки сайта у личного токена и у входа через OAuth (D417,
-    `policy.py`): при ней `tools/list` показывает только открытые роли
-    инструменты, а вызов закрытого получает отказ. `None` — служебный токен
-    `.env`, каталог целиком.
+    `role` — роль доступа (`policy.py`): `tools/list` показывает только открытые
+    ей инструменты, а вызов закрытого получает отказ. `None` — каталог пуст и
+    вызовы отказывают: роли нет — значит, нет и прав.
     """
     if not isinstance(message, dict):
         return _error(None, CODE_INVALID_REQUEST, "Ожидается объект JSON-RPC 2.0")
@@ -567,8 +584,11 @@ def handle(
     if method == "ping":
         return _result(request_id, {})
     if method == "tools/list":
-        открыто = None if role is None else (lambda spec: permits_tool(role, tenant, spec))
-        return _result(request_id, {"tools": as_list(открыто)})
+        # Без роли каталог пуст: «роли нет» не значит «видно всё».
+        return _result(
+            request_id,
+            {"tools": as_list(lambda spec: _tool_open(role, tenant, spec, may_retract))},
+        )
     if method == "tools/call":
         # Пространство токена — и базе (F-037): политики роли приложения отдают
         # по нему, даже если инструмент забыл условие охвата.
