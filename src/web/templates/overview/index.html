@@ -1,10 +1,11 @@
 {#
-  «Главная» (D378, D398, D399, D418) — в первую очередь про проверки. Шапка: заголовок
-  и срез в одной строке — календарь периода и выпадающий список стран (если их
-  больше одной). Блоки — компактной сеткой, шире остальных только «Пиццерии»:
-  «Требует внимания» (доска + «куда смотреть» в одной карточке), итог периода,
-  «Рейтинги» (РС, РКО и карты: CEE и остальные страны), «Последние проверки»,
-  «Топ нарушений», потери по зонам, пиццерии с колонками последней оценки РС / РКО.
+  «Главная» (D378, D398, D399, D418, D471) — в первую очередь про проверки. Сверху ряд
+  одинаковых карточек (одна ширина колонки, одна высота; длинное прокручивается
+  внутри): «Требует внимания» (доска + «куда смотреть»), итог периода, «Рейтинги»
+  (РС, РКО и карты: CEE и остальные страны), «Топ нарушений», потери по зонам.
+  Ниже — таблица «Пиццерии» (она и есть список проверок: блока «Последние проверки»
+  нет) и справа от неё панель фильтров: период, кластер, страна, порядок. Фильтры
+  действуют на весь экран, верхний ряд тоже.
   «Где нужно проверить» живёт в «Проверках», таблицы «Страны» нет.
   Сборка данных — `src/web/home_page.py`;
   в шаблоне ни одного вычисления: проценты и буквы записал движок, средние
@@ -40,63 +41,57 @@
 {%- endmacro %}
 
 {% block body %}
-  {# Шапка (D418): заголовок и срез в одной строке — календарь периода и страна. На
-     телефоне срез переносится под заголовок. Всё — ссылками, срез живёт в адресе. #}
   <header class="shead hm-head">
     <div class="shead__main">
       <h1 class="shead__title">{{ t('section.overview.title') }}</h1>
-    </div>
-    <div class="hm-slice">
-      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
-      {% if country_pick %}{{ pick(country_pick) }}{% endif %}
-      {# Вход на экран страны — только у УК и только при выбранной стране. #}
-      {% if only_country and country_url %}<a class="hm-more" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
     </div>
   </header>
 
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
-  <div class="hm-grid">
-    {# ── 1. Требует внимания (D398): задания доски и пиццерии «куда смотреть» —
-          одна карточка; нечего показать — карточки нет, «всё сделано» не пишем.
-          Отказ доски — строка с ошибкой: тишина читалась бы как «всё в порядке». #}
-    {% if board_failed or stickers or data.attention %}
-      <section class="hm-card hm-board">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.attention.title') }}</h2>
-          {% if data.attention %}<span class="hm-meta">{{ t('overview.attention.hint') }}</span>{% endif %}
-        </header>
-        {% if board_failed %}
-          {{ empty(t('home.board.failed')) }}
-        {% endif %}
-        {% if stickers %}
-          <div class="hm-stickers">
-            {% for s in stickers %}
-              <a class="hm-sticker hm-sticker--{{ loop.index0 % 4 }}" href="{{ url(s.href) }}?lang={{ lang }}">
-                <span class="hm-sticker__kind">{{ t('home.board.' ~ s.kind ~ '.kind') }}</span>
-                <span class="hm-sticker__title">{{ t('home.board.' ~ s.kind ~ '.title', count=s.count) }}</span>
-                {% if s.urgent %}<span class="hm-sticker__urgent">{{ t('home.board.overdue', count=s.urgent) }}</span>{% endif %}
-                <span class="hm-sticker__cta">{{ t('home.board.' ~ s.kind ~ '.cta') }} →</span>
+  {# ── Требует внимания (D398, D471): полоса во всю ширину над верхним рядом; задания
+        доски стикерами, ниже пиццерии «куда смотреть» — в несколько колонок. Нечего
+        показать — полосы нет, «всё сделано» не пишем. Отказ доски — строка с
+        ошибкой: тишина читалась бы как «всё в порядке». #}
+  {% if board_failed or stickers or data.attention %}
+    <section class="hm-card hm-board">
+      <header class="hm-card__head">
+        <h2 class="hm-label">{{ t('home.attention.title') }}</h2>
+        {% if data.attention %}<span class="hm-meta">{{ t('overview.attention.hint') }}</span>{% endif %}
+      </header>
+      {% if board_failed %}
+        {{ empty(t('home.board.failed')) }}
+      {% endif %}
+      {% if stickers %}
+        <div class="hm-stickers">
+          {% for s in stickers %}
+            <a class="hm-sticker hm-sticker--{{ loop.index0 % 4 }}" href="{{ url(s.href) }}?lang={{ lang }}">
+              <span class="hm-sticker__kind">{{ t('home.board.' ~ s.kind ~ '.kind') }}</span>
+              <span class="hm-sticker__title">{{ t('home.board.' ~ s.kind ~ '.title', count=s.count) }}</span>
+              {% if s.urgent %}<span class="hm-sticker__urgent">{{ t('home.board.overdue', count=s.urgent) }}</span>{% endif %}
+              <span class="hm-sticker__cta">{{ t('home.board.' ~ s.kind ~ '.cta') }} →</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% if data.attention %}
+        <ul class="hm-rows hm-rows--cols">
+          {% for item in data.attention[:attention_rows] %}
+            <li>
+              <a class="hm-row" href="{{ url(registry_path ~ '/' ~ item.inspection_id) }}?lang={{ lang }}">
+                <span class="hm-dot hm-dot--{{ item.tone }}"></span>
+                <span class="hm-row__main">{{ item.unit }}<span class="hm-row__meta">{{ t('overview.why.' ~ item.why, detail=item.detail) }}</span></span>
+                <span class="hm-row__num mono">{{ item.when }}</span>
               </a>
-            {% endfor %}
-          </div>
-        {% endif %}
-        {% if data.attention %}
-          <ul class="hm-rows">
-            {% for item in data.attention %}
-              <li>
-                <a class="hm-row" href="{{ url(registry_path ~ '/' ~ item.inspection_id) }}?lang={{ lang }}">
-                  <span class="hm-dot hm-dot--{{ item.tone }}"></span>
-                  <span class="hm-row__main">{{ item.unit }}<span class="hm-row__meta">{{ t('overview.why.' ~ item.why, detail=item.detail) }}</span></span>
-                  <span class="hm-row__num mono">{{ item.when }}</span>
-                </a>
-              </li>
-            {% endfor %}
-          </ul>
-        {% endif %}
-      </section>
-    {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+        {% if data.attention|length > attention_rows %}<a class="hm-more hm-more--end" href="{{ registry_all }}">{{ t('home.more.n', n=data.attention|length - attention_rows) }} →</a>{% endif %}
+      {% endif %}
+    </section>
+  {% endif %}
 
+  <div class="hm-grid">
     {# ── 2. Проверки за период ──────────────────────────────────────────── #}
     <section class="hm-card">
       <header class="hm-card__head">
@@ -139,7 +134,7 @@
         {% if ratings_block.maps_failed %}<span class="hm-meta">{{ t('home.rb.maps_failed') }}</span>{% endif %}
         <a class="hm-more" href="{{ ratings_block_href }}">{{ t('home.rb.more') }} →</a>
       </header>
-      {% if ratings_block.failed %}
+            {% if ratings_block.failed %}
         {{ empty(t('home.rb.failed')) }}
       {% elif not ratings_block.columns %}
         {{ empty(t('home.rb.none')) }}
@@ -169,37 +164,19 @@
       {% endif %}
     </section>
 
-    {# ── 4. Последние проверки (D399). Пустое скрыто. #}
-    {% set has_latest = data.inspections|length > 0 %}
-    {% if has_latest %}
-      <section class="hm-card">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.latest.title') }}</h2>
-          <a class="hm-more" href="{{ url(registry_path) }}?lang={{ lang }}{% for k, v in period.params().items() if v %}&amp;{{ k }}={{ v }}{% endfor %}{% if only_country %}&amp;country={{ only_country }}{% endif %}">{{ t('home.latest.all') }} →</a>
-        </header>
+    {# ── 4. Топ нарушений | Потери по зонам (D471): четыре карточки всегда, без
+          данных — пустое состояние, чтобы сетка 2×2 не ломалась. Список урезан по
+          числу строк, что влезают целиком; остальное — «ещё N →» в «Проверки». #}
+    <section class="hm-card">
+      <header class="hm-card__head">
+        <h2 class="hm-label">{{ t('home.top.title') }}</h2>
+        <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
+      </header>
+      {% if not data.systemic %}
+        {{ empty(t('home.top.none')) }}
+      {% else %}
         <ul class="hm-rows">
-          {% for row in data.inspections[:latest_count] %}
-            <li>
-              <a class="hm-row" href="{{ url(registry_path ~ '/' ~ row.id) }}?lang={{ lang }}">
-                <span class="grade tag {{ grade_tone(row.grade) }}">{{ row.grade or '—' }}</span>
-                <span class="hm-row__main">{{ row.unit_name }}<span class="hm-row__meta">{{ '%.1f'|format(row.pct) }}%</span></span>
-                <span class="hm-row__num mono">{{ row.inspection_date }}</span>
-              </a>
-            </li>
-          {% endfor %}
-        </ul>
-      </section>
-    {% endif %}
-
-    {# ── 4. Топ нарушений | Потери по зонам; пустое скрыто, пусты оба — ряда нет. #}
-    {% if data.systemic %}
-      <section class="hm-card">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('home.top.title') }}</h2>
-          <span class="hm-meta">{{ t('overview.systemic.hint') }}</span>
-        </header>
-        <ul class="hm-rows">
-          {% for item in data.systemic %}
+          {% for item in data.systemic[:top_rows] %}
             <li class="hm-row">
               <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
               <span class="hm-row__main">
@@ -209,16 +186,19 @@
             </li>
           {% endfor %}
         </ul>
-      </section>
-    {% endif %}
-    {% if data.zone_losses %}
-      <section class="hm-card">
-        <header class="hm-card__head">
-          <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
-          <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
-        </header>
+        {% if data.systemic|length > top_rows %}<a class="hm-more hm-more--end" href="{{ registry_all }}">{{ t('home.more.n', n=data.systemic|length - top_rows) }} →</a>{% endif %}
+      {% endif %}
+    </section>
+    <section class="hm-card">
+      <header class="hm-card__head">
+        <h2 class="hm-label">{{ t('overview.zones.title') }}</h2>
+        <span class="hm-meta">{{ t('overview.zones.hint') }}</span>
+      </header>
+      {% if not data.zone_losses %}
+        {{ empty(t('home.zones.none')) }}
+      {% else %}
         <ul class="hm-rows">
-          {% for zone in data.zone_losses %}
+          {% for zone in data.zone_losses[:zone_rows] %}
             <li class="hm-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
               <span class="hm-row__main">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
               <span class="hm-bar"><span class="hm-bar__fill" style="width:{{ zone.share }}%"></span></span>
@@ -226,16 +206,18 @@
             </li>
           {% endfor %}
         </ul>
-      </section>
-    {% endif %}
+        {% if data.zone_losses|length > zone_rows %}<a class="hm-more hm-more--end" href="{{ registry_all }}">{{ t('home.more.n', n=data.zone_losses|length - zone_rows) }} →</a>{% endif %}
+      {% endif %}
+    </section>
+  </div>
 
+  <div class="hm-main">
     {# ── 5. Пиццерии: проверки и последние оценки рейтинга колонками (D399) ─── #}
-    <section class="hm-card hm-card--wide">
+    <section class="hm-card hm-units">
       <header class="hm-card__head">
         <h2 class="hm-label">{{ t('home.units.title') }}</h2>
         <span class="hm-meta">{{ data.points|length }}</span>
         {% if ratings_failed %}<span class="hm-meta">{{ t('home.ratings.failed') }}</span>{% endif %}
-        <span class="hm-card__tools">{{ pick(sort_pick) }}</span>
       </header>
       {% if data.points %}
         <div class="hm-table hm-table--units">
@@ -273,5 +255,38 @@
         {{ empty(t('home.units.empty')) }}
       {% endif %}
     </section>
+
+    {# ── Фильтры (D471): справа от списка, действуют на весь экран. На телефоне —
+          свёрнутым блоком над таблицей (флажок без JS). #}
+    <aside class="hm-filters" aria-label="{{ t('home.filters.title') }}">
+      <input class="hm-filters__flag" type="checkbox" id="hm-filters-flag">
+      <label class="hm-filters__toggle" for="hm-filters-flag">{{ t('home.filters.title') }}</label>
+      <div class="hm-filters__body">
+        <h2 class="hm-label hm-filters__title">{{ t('home.filters.title') }}</h2>
+        <div class="hm-field">
+          <span class="hm-field__label">{{ t('home.filters.period') }}</span>
+          {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
+        </div>
+        {% if cluster_pick %}
+          <div class="hm-field">
+            <span class="hm-field__label">{{ t('home.filters.cluster') }}</span>
+            {{ pick(cluster_pick) }}
+          </div>
+        {% endif %}
+        {% if country_pick %}
+          <div class="hm-field">
+            <span class="hm-field__label">{{ t('home.filters.country') }}</span>
+            {{ pick(country_pick) }}
+          </div>
+        {% endif %}
+        <div class="hm-field">
+          <span class="hm-field__label">{{ t('overview.sort') }}</span>
+          {{ pick(sort_pick) }}
+        </div>
+        {# Вход на экран страны — только у УК и только при выбранной стране. #}
+        {% if only_country and country_url %}<a class="hm-more hm-filters__open" href="{{ country_url(only_country) }}">{{ t('home.countries.open', country=country_title(only_country)) }} →</a>{% endif %}
+        <p class="hm-filters__note">{{ t('home.filters.note') }}</p>
+      </div>
+    </aside>
   </div>
 {% endblock %}
