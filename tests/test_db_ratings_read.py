@@ -20,9 +20,11 @@ from ratings_samples import (
     rko_violations,
     sheet_rs,
     snapshot,
+    to_csv,
 )
 
 psycopg = pytest.importorskip("psycopg")
+from test_ratings_base import COLLECTION_HEADER  # noqa: E402
 
 from src.db import ratings_read  # noqa: E402
 from src.db.errors import RatingsError  # noqa: E402
@@ -84,6 +86,29 @@ def test_принятая_проверка_в_счёте(db_env: str) -> None:
         countries=["RS", "BY"], begin=date(2026, 10, 1), end=date(2026, 12, 31)
     )
     assert checkups == {"RS": 1, "BY": 1}
+    assert {f[2] for f in facts} == {"RS", "BY"}
+
+
+def _собираемость(*недели: tuple[str, str, str]) -> bytes:
+    return to_csv(
+        COLLECTION_HEADER,
+        [
+            [w, "Dev", "Serbia", "Testville-1", ресторан, доставка, ""]
+            for w, ресторан, доставка in недели
+        ],
+    )
+
+
+def test_знаменатель_ркО_берётся_из_собираемости_где_она_есть(db_env: str) -> None:
+    """Лист нарушений РКО несёт только проверки с нарушениями: счёт по ним занижает знаменатель."""
+    _грузить(rko_violations())
+    _грузить(rko_evaluations())
+    _грузить(_собираемость(("05.10 — 11.10", "5", "7"), ("14.09 — 20.09", "100", "100")))
+    facts, checkups = ratings_read.rko_violation_facts(
+        countries=["RS", "BY"], begin=date(2026, 10, 1), end=date(2026, 12, 31)
+    )
+    # RS: 5 + 7 отчётов недели 05.10, неделя 14.09 в рамку не задевает; BY без собираемости — счёт
+    assert checkups == {"RS": 12, "BY": 1}
     assert {f[2] for f in facts} == {"RS", "BY"}
 
 

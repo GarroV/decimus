@@ -27,6 +27,7 @@ from src.db.units import normalize_unit_name
 from src.domain.unit_name import fold_unit_name
 
 from .base import (
+    AMBIGUOUS,
     parse_base_collection,
     parse_base_rko_violations,
     parse_base_rs_violations,
@@ -184,19 +185,23 @@ class _Writer:
     def unit(self, ref: UnitRef, row_no: int) -> str | None:
         self.country(ref.country)
         if ref.dodo_id is not None:
+            # Id сравниваются без учёта регистра: известный id остаётся как лежит у нас.
+            wanted = ref.dodo_id.casefold()
+            ours = next((k for k in self.known if k.dodo_id.casefold() == wanted), None)
+            dodo_id = ours.dodo_id if ours else ref.dodo_id
             # D472: наше название не перезаписывается другим написанием того же.
-            ours = next((k.name for k in self.known if k.dodo_id == ref.dodo_id), None)
-            name = ours if ours and fold_unit_name(ours) == fold_unit_name(ref.name) else ref.name
+            same = ours is not None and fold_unit_name(ours.name) == fold_unit_name(ref.name)
+            name = ours.name if ours and same else ref.name
             store.upsert_unit(
                 self.conn,
-                ref.dodo_id,
+                dodo_id,
                 name=name,
                 name_normalized=normalize_unit_name(name),
                 country=ref.country,
             )
-            if all(known.dodo_id != ref.dodo_id for known in self.known):
-                self.known.append(KnownUnit(ref.dodo_id, ref.name, ref.country))
-            return ref.dodo_id
+            if ours is None:
+                self.known.append(KnownUnit(dodo_id, ref.name, ref.country))
+            return dodo_id
         key = (ref.name, ref.country)
         if key not in self._found:
             self._found[key] = self.match(ref) or self.from_directory(ref, row_no)
@@ -211,8 +216,12 @@ class _Writer:
         dodo_id = self.directory.get(fold_unit_name(ref.name))
         if dodo_id is None or ref.country is None:
             return None
-        if any(known.dodo_id == dodo_id for known in self.known):
-            # Имя не сошлось ни с одной известной, а id уже чей-то: не переименовываем.
+        taken = dodo_id != AMBIGUOUS and any(
+            known.dodo_id.casefold() == dodo_id.casefold() for known in self.known
+        )
+        if dodo_id == AMBIGUOUS or taken:
+            # Справочник сам себе противоречит или id уже чей-то, а имя не сошлось ни с
+            # одной известной: пиццерию не заводим и чужую не переименовываем.
             detail = {"unit": ref.name, "country": ref.country or ""}
             self.issues.append(Issue(row_no, ISSUE_UNIT_ID_CLASH, detail))
             self._clashed.add((ref.name, ref.country))
