@@ -105,8 +105,9 @@ ACTIONS: tuple[Action, ...] = (
     Action("space.manage", "people", hq_only=True),
     Action("unit.create", "unit", hq_only=True),
     Action("api.manage", "api", hq_only=True),
-    # Бот: счётчик отказов мастера (`/stops`)
-    Action("refusals.read", "bot", writes=False),
+    # Бот: счётчик отказов мастера (`/stops`). Журнал отказов один на весь бот,
+    # разделения по пространствам в нём нет, поэтому партнёру не выдаётся (F-104).
+    Action("refusals.read", "bot", hq_only=True, writes=False),
     *_VIEWS,
 )
 
@@ -223,8 +224,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
     | _codes("checklist.master")
-    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role")
-    | _codes("refusals.read"),
+    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role"),
     (SIDE_PARTNER, "auditor"): _PARTNER_AUDITOR,
 }
 
