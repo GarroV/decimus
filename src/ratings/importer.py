@@ -22,6 +22,7 @@ import psycopg
 from src.db import ratings as store
 from src.db.config import check_environment
 from src.db.errors import RatingsError
+from src.db.space import apply_space
 from src.db.units import normalize_unit_name
 
 from .countries import country_names, is_excluded
@@ -341,54 +342,56 @@ def _write(
     file_name: str | None,
     source: str | None,
 ) -> ImportReport:
-    with psycopg.connect(check_environment().dsn) as conn, conn.transaction():
-        store.lock_imports(conn)
-        prior = store.loaded_with(conn, sha)
-        if prior is not None:
-            dup = store.open_import(
+    with psycopg.connect(check_environment().dsn) as conn:
+        apply_space(conn)
+        with conn.transaction():
+            store.lock_imports(conn)
+            prior = store.loaded_with(conn, sha)
+            if prior is not None:
+                dup = store.open_import(
+                    conn,
+                    channel=channel,
+                    actor=actor,
+                    fmt=parsed.format,
+                    file_name=file_name,
+                    sha=sha,
+                    outcome=OUTCOME_DUPLICATE,
+                    duplicate_of=prior[0],
+                    note=parsed.label,
+                )
+                return ImportReport(
+                    dup,
+                    parsed.format,
+                    OUTCOME_DUPLICATE,
+                    label=parsed.label,
+                    loaded_at=prior[1],
+                    chunk_index=parsed.chunk_index,
+                    chunk_of=parsed.chunk_of,
+                )
+            import_id = store.open_import(
                 conn,
                 channel=channel,
                 actor=actor,
                 fmt=parsed.format,
                 file_name=file_name,
                 sha=sha,
-                outcome=OUTCOME_DUPLICATE,
-                duplicate_of=prior[0],
+                outcome=OUTCOME_LOADED,
                 note=parsed.label,
             )
-            return ImportReport(
-                dup,
-                parsed.format,
-                OUTCOME_DUPLICATE,
-                label=parsed.label,
-                loaded_at=prior[1],
-                chunk_index=parsed.chunk_index,
-                chunk_of=parsed.chunk_of,
+            default = SOURCE_SNAPSHOT if parsed.format == FORMAT_SNAPSHOT else SOURCE_SHEET
+            writer = _Writer(conn, parsed, import_id, source or default)
+            writer.run()
+            issues = _journal_issues(writer.issues)
+            unmatched = sum(1 for _, reason, _ in issues if reason == ISSUE_UNIT_UNMATCHED)
+            store.add_issues(conn, import_id, issues)
+            store.close_import(
+                conn,
+                import_id,
+                accepted=writer.accepted,
+                updated=writer.updated,
+                skipped=writer.skipped,
+                unmatched=unmatched,
             )
-        import_id = store.open_import(
-            conn,
-            channel=channel,
-            actor=actor,
-            fmt=parsed.format,
-            file_name=file_name,
-            sha=sha,
-            outcome=OUTCOME_LOADED,
-            note=parsed.label,
-        )
-        default = SOURCE_SNAPSHOT if parsed.format == FORMAT_SNAPSHOT else SOURCE_SHEET
-        writer = _Writer(conn, parsed, import_id, source or default)
-        writer.run()
-        issues = _journal_issues(writer.issues)
-        unmatched = sum(1 for _, reason, _ in issues if reason == ISSUE_UNIT_UNMATCHED)
-        store.add_issues(conn, import_id, issues)
-        store.close_import(
-            conn,
-            import_id,
-            accepted=writer.accepted,
-            updated=writer.updated,
-            skipped=writer.skipped,
-            unmatched=unmatched,
-        )
     return ImportReport(
         import_id,
         parsed.format,

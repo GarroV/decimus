@@ -32,6 +32,7 @@ import psycopg
 
 from src.db.config import check_environment
 from src.db.directory import DEFAULT_TENANT
+from src.db.space import SYSTEM_SPACE, acting_space, apply_space
 from src.db.units import normalize_unit_name
 from src.domain.unit_name import canonical_unit
 
@@ -103,6 +104,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--tenant", default=DEFAULT_TENANT)
     args = parser.parse_args(argv)
     with psycopg.connect(check_environment().dsn) as conn:
+        apply_space(conn)
         with conn.cursor() as cur:
             отчёт = plan_and_apply(cur, args.tenant)
         if args.apply:
@@ -117,4 +119,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    with acting_space(SYSTEM_SPACE):
+        raise SystemExit(main())

@@ -13,9 +13,17 @@
 закрытый — 404, как несуществующий адрес. Адреса вне разделов, которые читают
 данные сети, перечислены в `ENDPOINT_VIEWS`.
 
+**Граница пространств — тоже из матрицы, и по умолчанию закрыто** (аудит 12.10,
+F-004). Партнёрское пространство пускается к маршруту, только если хоть один код,
+которым маршрут объявлен в матрице (действие, `view.<раздел>` по пути,
+`ENDPOINT_VIEWS`), этому пространству открыт (`open_to_space`), либо маршрут — дело
+самого человека (`EXEMPT_ENDPOINTS`, свой раздел), переадресация (`NAVIGATION_ENDPOINTS`) или
+своя дверь (`auth.OPEN_ENDPOINTS`). Маршрут без объявления партнёру закрыт (404 в
+`app._install_hq_gate`), а `undeclared` называет его по имени. Второго реестра
+«кому открыт маршрут» нет: аудитория выводится из тех же объявлений.
+
 Этот заслон заменил заслоны контроля, гостя и методики: один вопрос — одна
-матрица. Заслон разделов «только УК» (`app._install_hq_gate`) остаётся: он про
-границу пространств, а не про роль.
+матрица.
 """
 
 from __future__ import annotations
@@ -27,10 +35,10 @@ from typing import Any, TypeVar
 from flask import Flask, abort, current_app, g, render_template, request
 from werkzeug.wrappers import Response
 
-from src.domain.permissions import Actor, can, grants_of, require_action
+from src.domain.permissions import Actor, can, grants_of, open_to_space, require_action
 
 from . import auth
-from .sections import current_section, section_view
+from .sections import OWN_SECTIONS, current_section, section_view
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +67,11 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "reauth_confirm_password": "подтверждение своего входа паролем перед выдачей доступа",
     "reauth_confirm_google": "подтверждение своего входа через Google перед выдачей доступа",
     "oauth_authorize": "согласие на подключение своего Claude (D417)",
+}
+
+#: Адреса без данных, открытые любому вошедшему: только переадресация.
+NAVIGATION_ENDPOINTS: Mapping[str, str] = {
+    "home": "корень сайта переадресует на стартовый экран роли (D378, D420)",
 }
 
 #: Адреса вне разделов, которые читают данные сети: карточка пиццерии — история
@@ -202,3 +215,45 @@ def uncovered(app: Flask) -> list[str]:
         if not getattr(app.view_functions[rule.endpoint], ACTIONS_ATTR, ()):
             непокрытые.append(f"{rule.endpoint} ({rule.rule})")
     return sorted(непокрытые)
+
+
+def _open_to_all(endpoint: str | None, path: str) -> bool:
+    """Своя дверь, дело человека над своей учёткой, переадресация — любому пространству."""
+    if endpoint in auth.OPEN_ENDPOINTS or endpoint in EXEMPT_ENDPOINTS:
+        return True
+    if endpoint in NAVIGATION_ENDPOINTS:
+        return True
+    return current_section(path) in OWN_SECTIONS
+
+
+def _declared_codes(app: Flask, endpoint: str | None, path: str) -> frozenset[str]:
+    """Коды матрицы, которыми объявлен маршрут: действия, чтение раздела, `ENDPOINT_VIEWS`."""
+    view = app.view_functions.get(endpoint or "")
+    коды = set(getattr(view, ACTIONS_ATTR, ()))
+    ключ = current_section(path)
+    if ключ is not None and (код := section_view(ключ)) is not None:
+        коды.add(код)
+    if (код := ENDPOINT_VIEWS.get(endpoint or "")) is not None:
+        коды.add(код)
+    return frozenset(коды)
+
+
+def open_to_tenant(app: Flask, endpoint: str | None, path: str, tenant: str) -> bool:
+    """Пускать ли пространство `tenant` к маршруту — по объявлениям матрицы.
+
+    Без объявления — закрыто (аудит 12.10, F-004). Открыто — значит лишь «сюда
+    ходят»: что именно человек увидит и изменит, решают роль (`can`) и охват.
+    """
+    if _open_to_all(endpoint, path):
+        return True
+    return any(open_to_space(код, tenant) for код in _declared_codes(app, endpoint, path))
+
+
+def undeclared(app: Flask) -> list[str]:
+    """Маршруты, которые матрица не объявила ничем, — `эндпоинт (путь)`; партнёру они закрыты."""
+    return sorted(
+        f"{rule.endpoint} ({rule.rule})"
+        for rule in app.url_map.iter_rules()
+        if not _open_to_all(rule.endpoint, rule.rule)
+        and not _declared_codes(app, rule.endpoint, rule.rule)
+    )

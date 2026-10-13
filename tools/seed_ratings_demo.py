@@ -35,6 +35,7 @@ import psycopg  # noqa: E402
 import seed_web_demo  # noqa: E402 -- путь к репозиторию выставляется выше
 
 from src.db.config import check_environment  # noqa: E402
+from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
 from src.ratings.importer import CHANNEL_SEED, import_file  # noqa: E402
 
 DEMO_PREFIX = "de00"
@@ -180,6 +181,7 @@ def main() -> int:
     dsn = check_environment().dsn
     seed_web_demo._require_local_dsn(dsn)
     with psycopg.connect(dsn) as conn:
+        apply_space(conn)
         wipe(conn)
     for name, data in (
         ("demo-snapshot.json", snapshot()),
@@ -196,6 +198,7 @@ def main() -> int:
         )
         print(f"{name}: {report.outcome}, +{report.accepted} ~{report.updated}")
     with psycopg.connect(dsn) as conn:
+        apply_space(conn)
         for code in COUNTRY_IDS:
             conn.execute(
                 "update ratings.countries set developer = %s where code = %s", (DEVELOPER, code)
@@ -204,4 +207,5 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    with acting_space(SYSTEM_SPACE):
+        sys.exit(main())

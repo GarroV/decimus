@@ -40,6 +40,7 @@ from .config import check_environment, load_storage_settings
 from .errors import PhotosDeferredError, PushError, StorageError
 from .pool import connection
 from .previews import PREVIEW_CONTENT_TYPE, make_preview
+from .space import SYSTEM_SPACE, acting_space
 from .storage import PHOTO_CONTENT_TYPE, PhotoStorage, S3PhotoStorage, object_key
 
 logger = logging.getLogger(__name__)
@@ -273,7 +274,15 @@ def walk_photo_refs() -> set[str]:
     """
     settings = check_environment()
     try:
-        with connection(settings.dsn) as conn, conn.cursor() as cur:
+        # Список обязан быть полным по ВСЕЙ сети: кадр пространства, которого
+        # не видно, уборка сочла бы брошенным и удалила (F-037). Поэтому —
+        # служебным пространством всегда; внутри двери человека это отказ
+        # (`acting_space`), и уборка пропускает проход, а не удаляет лишнее.
+        with (
+            acting_space(SYSTEM_SPACE),
+            connection(settings.dsn) as conn,
+            conn.cursor() as cur,
+        ):
             cur.execute(_SELECT_WALK_REFS_SQL)
             rows = cur.fetchall()
     except psycopg.Error as exc:
