@@ -55,6 +55,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "settings_lang": "язык сайта своей учётки (D447)",
     "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
     "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
+    "settings_continue": "своё отложенное до подтверждения входа действие; право бота — внутри",
     "reauth_confirm_password": "подтверждение своего входа паролем перед выдачей доступа",
     "reauth_confirm_google": "подтверждение своего входа через Google перед выдачей доступа",
     "oauth_authorize": "согласие на подключение своего Claude (D417)",

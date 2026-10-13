@@ -307,15 +307,45 @@ def test_после_подтверждения_токен_выпускается
         assert выпуски.число == 0
 
         _подтвердить_паролем(client)
-        страница = client.get("/settings")
+        # GET — чистое чтение: заряженное намерение здесь ничего не выпускает.
+        assert "СЕКРЕТНАЯ-КОМАНДА" not in client.get("/settings").get_data(as_text=True)
+        assert выпуски.число == 0
+
+        страница = client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert выпуски.число == 1
         assert "СЕКРЕТНАЯ-КОМАНДА" in страница.get_data(as_text=True)
         assert страница.headers["Cache-Control"] == "no-store"
-        # Повтор: намерение снято тем же ответом — вторая загрузка ничего не выпускает.
-        повтор = client.get("/settings")
+        # Повтор: намерение снято тем же ответом — второй POST ничего не выпускает.
+        повтор = client.post("/settings/continue", headers=ЗАГОЛОВКИ)
         assert выпуски.число == 1
         assert "СЕКРЕТНАЯ-КОМАНДА" not in повтор.get_data(as_text=True)
+
+
+def test_get_настроек_с_заряженным_намерением_ничего_не_выпускает(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+        выпуски = Выпуски(monkeypatch)
+        _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
+        _подтвердить_паролем(client)
+
+        for _ in range(3):
+            client.get("/settings")
+
+        assert выпуски.число == 0
+
+
+def test_продолжить_чужой_страницей_не_выполняется(monkeypatch: pytest.MonkeyPatch) -> None:
+    for client, _ in _стенд(monkeypatch, минут=ПОСЛЕ_ОКНА, google=False):
+        выпуски = Выпуски(monkeypatch)
+        _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
+        _подтвердить_паролем(client)
+
+        ответ = client.post("/settings/continue", headers={"Origin": "https://evil.example"})
+
+        assert ответ.status_code == 403
+        assert выпуски.число == 0
 
 
 def test_после_подтверждения_через_google_действие_тоже_выполняется(
@@ -326,7 +356,7 @@ def test_после_подтверждения_через_google_действи�
         _на_подтверждение(client.post("/settings/claude-token", headers=ЗАГОЛОВКИ))
 
         _через_google(client, monkeypatch, почта=ПОЧТА, домен="dodobrands.io")
-        client.get("/settings")
+        client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert выпуски.число == 1
 
@@ -341,7 +371,7 @@ def test_намерение_без_подтверждения_не_выполн�
             auth, "resolve_session", lambda token: Учётка(tenant="HQ", role="admin")
         )
 
-        client.get("/settings")
+        client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert выпуски.число == 0
 
@@ -360,7 +390,7 @@ def test_подделанное_и_чужое_намерение_не_выпол
             подпись.dumps({"a": "снять-всё", "u": Учётка().id, "armed": True}),
         ):
             client.set_cookie(reauth.INTENT_COOKIE, кука)
-            client.get("/settings")
+            client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert выпуски.число == 0
 
@@ -374,7 +404,7 @@ def test_снятие_почты_само_не_выполняется(monkeypatc
         _на_подтверждение(ответ)
         _подтвердить_паролем(client)
 
-        client.get("/settings")
+        client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert "unlink" not in двери.звали
 
@@ -386,6 +416,6 @@ def test_намерение_не_переживает_срок(monkeypatch: pyte
         _подтвердить_паролем(client)
         monkeypatch.setattr(reauth, "INTENT_TTL_SECONDS", -1)
 
-        client.get("/settings")
+        client.post("/settings/continue", headers=ЗАГОЛОВКИ)
 
         assert выпуски.число == 0

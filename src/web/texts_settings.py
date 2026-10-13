@@ -167,12 +167,12 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
     "settings.confirm.why": {
         "ru": "Это действие даёт долгий доступ к вашей учётке — токен Claude, бот, почта "
         "Google или подключение Claude. Поэтому вход должен быть свежим: не старше 12 "
-        "часов. Подтвердите, что это вы — и токен, ссылка на бота или переход к Google "
-        "выполнятся сами; остальное — нажмите ещё раз.",
+        "часов. Подтвердите, что это вы — и нажмите «Продолжить»: токен, ссылка на бота или "
+        "переход к Google выполнятся; остальное — нажмите кнопку ещё раз.",
         "en": "This action grants long-lived access to your account — a Claude token, the "
         "bot, a Google account or a Claude connection. So the sign-in must be recent: no "
-        "older than 12 hours. Confirm it's you — a token, a bot link or the Google step "
-        "then runs by itself; for anything else, press the button again.",
+        "older than 12 hours. Confirm it's you, then press “Continue”: a token, a bot link or "
+        "the Google step runs; for anything else, press the button again.",
     },
     "settings.confirm.submit": {"ru": "Подтвердить", "en": "Confirm"},
     "settings.confirm.google": {
@@ -194,6 +194,25 @@ SETTINGS_TEXTS: dict[str, dict[str, str]] = {
         "en": "Too many attempts. Try again in {minutes} min.",
     },
     "settings.confirm.back": {"ru": "Вернуться в «Настройки»", "en": "Back to Settings"},
+    "settings.continue.title": {"ru": "Продолжить действие", "en": "Continue"},
+    "settings.continue.why": {
+        "ru": "Вход подтверждён. Вы просили: {action}. Нажмите «Продолжить» — действие "
+        "выполнится один раз.",
+        "en": "Sign-in confirmed. You asked to: {action}. Press “Continue” — it will run once.",
+    },
+    "settings.continue.claude-token": {
+        "ru": "выпустить токен Claude",
+        "en": "issue a Claude token",
+    },
+    "settings.continue.bot-link": {
+        "ru": "выпустить ссылку привязки бота",
+        "en": "issue a bot link",
+    },
+    "settings.continue.google-link": {
+        "ru": "привязать почту Google",
+        "en": "link a Google account",
+    },
+    "settings.continue.submit": {"ru": "Продолжить", "en": "Continue"},
     "users.panel.own_settings": {
         "ru": "Пароль, бот, Claude и язык — в «Настройках».",
         "en": "Password, bot, Claude and language are in “Settings”.",
