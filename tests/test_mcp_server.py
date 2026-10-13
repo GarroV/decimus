@@ -72,6 +72,7 @@ def сервер() -> Iterator[str]:
     """
     settings = Settings(
         tokens={ТОКЕН_А: АРЕНДАТОР_А, ТОКЕН_Б: АРЕНДАТОР_Б},
+        token_roles={ТОКЕН_А: "admin", ТОКЕН_Б: "admin"},
         tenants=(АРЕНДАТОР_А, АРЕНДАТОР_Б),
         host="127.0.0.1",
         port=0,
@@ -280,101 +281,21 @@ def test_рукопожатие_называет_сервер_и_версию_п
     assert "tools" in ответ["result"]["capabilities"]
 
 
-def test_перечень_инструментов_отдаётся_целиком(сервер: str) -> None:
-    """Перечень един для всех и от настроек не зависит.
+def test_перечень_инструментов_зависит_от_роли_а_не_от_настроек(сервер: str) -> None:
+    """Перечень решает роль токена (`permits_tool`), и один и тот же у всех
+    токенов одной роли. Инструменты методики видны и тому, кому она не открыта
+    настройкой, а отказ приходит при вызове и объясняет себя
+    (`test_mcp_checklist_access.py`). Полный состав по ролям —
+    `test_mcp_policy.py`; здесь проверяется только дверь сервера."""
+    первый = _rpc(сервер, "tools/list", токен=ТОКЕН_А)
+    второй = _rpc(сервер, "tools/list", токен=ТОКЕН_Б)
 
-    Инструменты методики видны и тому, кому она не открыта, а отказ приходит
-    при вызове и объясняет себя (`test_mcp_checklist_access.py`). Перечень,
-    зависящий от прав, сказал бы агенту «такого инструмента нет», и человек
-    пошёл бы искать причину в коде вместо `.env`.
-    """
-    ответ = _rpc(сервер, "tools/list")
-
-    имена = {инструмент["name"] for инструмент in ответ["result"]["tools"]}
-    assert имена == {
-        # проверки — только чтение (T095, T119)
-        "list_inspections",
-        "unit_history",
-        "network_summary",
-        "get_inspection",
-        "findings_by_unit",
-        # письмо партнёру по записанной проверке — пересборка движком, не запись (T171)
-        "inspection_letter",
-        # снятие проверки из истории (T211, D086/D089) — единственный инструмент,
-        # который меняет уже выданный документ, и право на него личное
-        "retract_inspection",
-        # загрузка исторических проверок поштучно (D305–D310): только загруженные
-        # черновики своего пространства, право — MCP_IMPORT_TENANTS
-        "import_create_inspection",
-        "import_add_finding",
-        "import_edit_finding",
-        "import_remove_finding",
-        "import_get_inspection",
-        "import_list_drafts",
-        "import_add_photo",
-        "import_accept_inspection",
-        "import_discard_draft",
-        # исходник эталона (T315, D132): чтение открыто всякому токену —
-        # проверяемый обязан видеть, по какому чек-листу его проверяют, —
-        # и правки в этих двух нет вовсе
-        "checklist_source",
-        "checklist_source_item",
-        # чек-лист как сущность (T344): хранилище несёт их много, и все шесть
-        # закрыты тем же правом методики — это те же чек-листы
-        "checklists",
-        "checklist_meta",
-        "create_checklist",
-        "rename_checklist",
-        "set_checklist_state",
-        "set_checklist_bot_access",
-        "apply_checklist",
-        # методика — чтение версий и правка (T098), закрыта отдельной настройкой
-        "checklist_versions",
-        "checklist_items",
-        "checklist_item",
-        "add_checklist_item",
-        "edit_checklist_item",
-        "remove_checklist_item",
-        "restore_checklist_item",
-        "add_zone",
-        "remove_zone",
-        # доля существующей зоны и её имя (T313) — своими инструментами
-        "set_zone_shares",
-        "rename_zone",
-        # порядок обхода точки (T317) — чтение и правка тем же правом
-        "route",
-        "set_route",
-        "scoring",
-        "set_scoring",
-        "publish_checklist_version",
-        # карта слов — правка версиями (T144)
-        "photo_cues",
-        "add_photo_cue",
-        "edit_photo_cue",
-        "remove_photo_cue",
-        # зона строки карты — отдельным инструментом (T293, D125)
-        "set_photo_cue_zone",
-        # предложения для управляющей компании из расхождений модели (T165)
-        "photo_cue_suggestions",
-        # накопитель непокрытых формулировок (T270) — обратная сторона
-        # предложений: там, где записи не случилось вовсе
-        "uncovered_phrases",
-        # карта синонимов формулировок (T294): что продукт выучил на словах
-        # аудиторов. Просмотр, снятие и правка — три инструмента, а не флаг у
-        # одного (D125), и открыты они тем же правом, что методика
-        "learned_phrases",
-        "retract_learned_phrase",
-        "repoint_learned_phrase",
-        # загрузка рейтингов РС/РКО (D320), только токен УК
-        "import_ratings",
-        # заявка на обновление агрегаторов (D420), только токен УК
-        "request_aggregators_update",
-        # чтение рейтингов (D420), любой токен, с охватом
-        "ratings_summary",
-        "ratings_units",
-        "aggregators_status",
-    }
-    assert all("inputSchema" in инструмент for инструмент in ответ["result"]["tools"])
+    имена = {инструмент["name"] for инструмент in первый["result"]["tools"]}
+    assert имена == {инструмент["name"] for инструмент in второй["result"]["tools"]}
+    assert "list_inspections" in имена
+    assert "retract_inspection" not in имена
+    assert имена <= {spec.name for spec in TOOLS}
+    assert all("inputSchema" in инструмент for инструмент in первый["result"]["tools"])
 
 
 def test_уведомление_остаётся_без_ответа(сервер: str) -> None:
@@ -459,9 +380,6 @@ def test_содержимое_проверки_остаётся_нетронут
     методикой, снятием или загрузкой, обработчик обязан лежать в модуле чтения
     проверок, где записи нет вовсе.
     """
-    ответ = _rpc(сервер, "tools/list")
-    объявленные = {инструмент["name"] for инструмент in ответ["result"]["tools"]}
-
     снимающие = [spec for spec in TOOLS if spec.kind == KIND_RETRACTION]
     assert len(снимающие) == 1, (
         "снятие проверки — названное исключение из правила, и оно обязано быть "
@@ -482,7 +400,6 @@ def test_содержимое_проверки_остаётся_нетронут
     )
 
     for spec in TOOLS:
-        assert spec.name in объявленные
         if spec.kind in (KIND_CHECKLIST, KIND_RETRACTION, KIND_IMPORT):
             continue
         if spec.kind == KIND_CHECKLIST_SOURCE:

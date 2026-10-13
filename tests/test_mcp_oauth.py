@@ -19,8 +19,10 @@ import pytest
 
 from src.db import oauth_store
 from src.db.oauth_store import OAuthOwner
+from src.domain.permissions import require_action
 from src.mcp.catalogue import KIND_RATINGS, KIND_RATINGS_READ, TOOLS
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings, resolve_access
+from src.mcp.policy import action_of
 from src.mcp.server import build_server
 
 АДМИНКА = "https://admin.example"
@@ -203,8 +205,13 @@ def test_админ_видит_больше_аудитора_а_аудитор_�
     assert "retract_inspection" not in админ
 
 
-def test_токен_env_видит_каталог_целиком(сервер: str) -> None:
-    assert _инструменты(сервер, ТОКЕН_ENV) == {spec.name for spec in TOOLS}
+def test_токен_env_без_роли_видит_только_чтение(сервер: str) -> None:
+    видно = _инструменты(сервер, ТОКЕН_ENV)
+
+    assert видно
+    # Только действия матрицы без записи: ни одного изменяющего инструмента.
+    assert all(not require_action(action_of(spec)).writes for spec in TOOLS if spec.name in видно)
+    assert "apply_checklist" not in видно
 
 
 def test_отозванный_токен_получает_401_на_следующем_вызове(сервер: str) -> None:
@@ -248,5 +255,5 @@ def test_доступ_через_сайт_без_снятия_и_с_подпис
     assert доступ.tenant == "HQ"
 
 
-def test_двери_env_роли_не_дают() -> None:
-    assert resolve_access(_настройки(oauth=True), f"Bearer {ТОКЕН_ENV}").role is None
+def test_токен_env_без_роли_получает_самую_узкую() -> None:
+    assert resolve_access(_настройки(oauth=True), f"Bearer {ТОКЕН_ENV}").role == "guest"
