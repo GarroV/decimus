@@ -41,9 +41,35 @@ cases = [
     # Закрытое в Claude.
     (
         "src/domain/permissions.py",
-        "    if action in CLAUDE_CLOSED.get(side_of(tenant), frozenset()):\n",
+        "    if action in CLAUDE_CLOSED.get(сторона, frozenset()):\n",
         "    if False:\n",
         T + "test_permissions_can.py::test_claude_снятие_закрыто_всем_методика_партнёру",
+    ),
+    # D460: методика админа партнёра в Claude — своё пространство, не больше.
+    (
+        "src/domain/permissions.py",
+        '    SIDE_PARTNER: _codes("inspection.retract", "checklist.apply"),\n',
+        '    SIDE_PARTNER: _codes("inspection.retract"),\n',
+        T + "test_permissions_can.py::test_claude_снятие_закрыто_всем_методика_партнёру",
+    ),
+    (
+        "src/domain/permissions.py",
+        '    (SIDE_PARTNER, "auditor"): _CHECKLISTS,\n',
+        "",
+        T + "test_mcp_partner_methodology.py::test_сотруднику_партнёра_методика_не_видна",
+    ),
+    (
+        "src/mcp/config.py",
+        '            and claude_may(role, tenant, "checklist.edit")\n',
+        "            and True\n",
+        T + "test_mcp_partner_methodology.py::test_хранилище_партнёру_даёт_роль_а_не_список_env",
+    ),
+    (
+        "src/mcp/rpc.py",
+        "    свой = replace(база, space=space_of(tenant))\n",
+        "    свой = replace(база, space=DEFAULT_SPACE)\n",
+        T
+        + "test_mcp_partner_methodology.py::test_админ_партнёра_правит_свой_чек_лист_в_своём_пространстве",  # noqa: E501
     ),
     # Веб: запрет по умолчанию, полнота, разделы, забытый `permit`.
     (

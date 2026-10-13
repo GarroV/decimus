@@ -10,7 +10,7 @@
 2. **Матрица**: есть ли у роли (пространство × роль учётки) это действие.
 
 Сюда же сведены разделы веба на чтение (`view.<раздел>`) и то, что закрыто
-в Claude поверх матрицы (`CLAUDE_CLOSED`). Остальные модули не сравнивают роли
+в Claude поверх матрицы (`CLAUDE_CLOSED`, `CLAUDE_CLOSED_ROLE`). Остальные модули не сравнивают роли
 строками — спрашивают здесь (`can`, `role_may`); полноту держат тесты
 `tests/test_permissions_*.py`, `tests/test_web_guard.py`, `tests/test_mcp_policy.py`
 и `tests/test_bot_command_actions.py`.
@@ -223,12 +223,19 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
 
 #: Закрыто в Claude (MCP) поверх матрицы, для всех ролей стороны.
 #: Снятие проверки через Claude — только служебный токен на экстренный случай
-#: (D341, спека D417); партнёр в Claude методику не читает и не правит (D342, D417),
-#: хотя в вебе админ пространства ведёт свои чек-листы (D413). Расхождение веба и
-#: Claude у партнёра — вопрос владельцу.
+#: (D341, спека D417). Методика админа партнёра в Claude открыта так же, как в
+#: вебе (D460, уточняет D342/D417), кроме указателя прода: он один на всю сеть,
+#: и в пространстве партнёра дверь `apply_to_production` его всё равно отказывает.
 CLAUDE_CLOSED: Mapping[str, frozenset[str]] = {
     SIDE_HQ: _codes("inspection.retract"),
-    SIDE_PARTNER: _codes("inspection.retract") | _CHECKLISTS | _CHECKLIST_OWNER,
+    SIDE_PARTNER: _codes("inspection.retract", "checklist.apply"),
+}
+
+#: Закрыто в Claude только этой роли стороны. Методику в Claude ведёт админ
+#: партнёра (D460); сотрудник партнёра — по D342 заносит проверку и читает своё,
+#: методики в Claude у него нет, хотя в матрице `checklist.read` у него есть.
+CLAUDE_CLOSED_ROLE: Mapping[tuple[str, str], frozenset[str]] = {
+    (SIDE_PARTNER, "auditor"): _CHECKLISTS,
 }
 
 
@@ -316,8 +323,11 @@ def role_may(role: str | None, tenant: str | None, action: str) -> bool:
 
 
 def claude_may(role: str | None, tenant: str, action: str) -> bool:
-    """Может ли роль это через Claude (MCP): матрица минус `CLAUDE_CLOSED`."""
-    if action in CLAUDE_CLOSED.get(side_of(tenant), frozenset()):
+    """Может ли роль это через Claude (MCP): матрица минус закрытое в Claude (`CLAUDE_CLOSED*`)."""
+    сторона = side_of(tenant)
+    if action in CLAUDE_CLOSED.get(сторона, frozenset()):
+        return False
+    if action in CLAUDE_CLOSED_ROLE.get((сторона, role or ""), frozenset()):
         return False
     return role_may(role, tenant, action)
 
