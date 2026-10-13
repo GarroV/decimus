@@ -14,7 +14,8 @@
 
 После подтверждения человек возвращается туда, откуда его попросили: в «Настройки»
 или на страницу согласия Claude. Действие в «Настройках» (токен Claude, ссылка
-бота, уход к Google) выполняется после одной кнопки (D457): при отказе по свежести в подписанную
+бота, уход к Google) после подтверждения ПАРОЛЕМ выполняется тут же, после
+подтверждения через Google — после одной кнопки (D457): при отказе по свежести в подписанную
 куку кладётся намерение — только название действия и учётка, ничего из формы;
 подтверждение «заряжает» его, а выполняет его POST `/settings/continue` (кнопка
 «Продолжить», проверка происхождения) тем же кодом, что кнопка, и снимает куку.
@@ -169,6 +170,17 @@ def arm_intent(ответ: Response, account: object, back: str) -> None:
     _set_intent(ответ, account, найдено[0], armed=True)
 
 
+def pending_intent(account: object, back: str) -> str | None:
+    """Намерение этой учётки (заряженное или нет) для выполнения прямо при подтверждении
+    паролем: подпись, учётка и срок те же, возврат — только в «Настройки»."""
+    найдено = _read_intent(account)
+    if найдено is None or not (
+        back == "/settings" or back.startswith(("/settings#", "/settings?"))
+    ):
+        return None
+    return найдено[0]
+
+
 def take_intent(account: object) -> str | None:
     """Заряженное намерение этой учётки при свежем входе; иначе `None`.
 
@@ -218,14 +230,16 @@ def install(
     stand: str,
     trusted_proxies: int,
     google_enabled: bool,
-    rotate: Callable[[Any, str], Response],
+    rotate: Callable[..., Response],
+    run_intent: Callable[[str], Any],
     begin_google: Callable[[str], Response],
     verify: Callable[[str, str], Any],
     secret_key: str,
 ) -> None:
     """Страница подтверждения входа.
 
-    `rotate(account, back)` меняет сессию на свежую, `begin_google(back)` уводит
+    `rotate(account, back, arm=…)` меняет сессию на свежую, `run_intent(action)` выполняет
+    намерение (то же, что кнопка), `begin_google(back)` уводит
     к Google, `verify(login, password)` — сверка пароля той же дверью, что у входа.
     """
 
@@ -269,7 +283,19 @@ def install(
         if сверено is None or str(сверено.id) != str(account.id):
             return _page(back, failed=True), 401
         note_success(tenant=stand, address=адрес, login=account.login)
-        return rotate(account, back)
+        действие = pending_intent(account, back)
+        if действие is None:
+            return rotate(account, back)
+        # Пароль подтверждён POST'ом со своей страницы (проверка Origin выше): то,
+        # что человек просил, выполняется здесь же (D457), пока прежняя сессия жива,
+        # а ответ несёт куку новой. Кука намерения снимается этим же ответом —
+        # повторная отправка подтверждения второй раз ничего не выпустит.
+        ответ = make_response(run_intent(действие))
+        for кука in rotate(account, back, arm=False).headers.getlist("Set-Cookie"):
+            ответ.headers.add("Set-Cookie", кука)
+        drop_intent(ответ)
+        ответ.headers["Cache-Control"] = "no-store"
+        return ответ
 
     @app.post(CONFIRM_GOOGLE_PATH)
     def reauth_confirm_google() -> Response:
