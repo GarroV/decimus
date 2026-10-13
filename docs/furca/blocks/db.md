@@ -200,6 +200,11 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 - `0041_superadmin.sql` — роль веб-учётки `superadmin` (главный админ, D364), только в пространстве УК (ограничение `web_users_superadmin_only_hq`); триггер `web_users_keep_last_superadmin` → функция `keep_last_superadmin()`: отключение, смена роли или удаление последнего действующего главного — отказ `SQLSTATE DC001`, гонку закрывает `pg_advisory_xact_lock`; роли `dodo_audit_admin` выданы `select, insert on tenants` и `insert on space_countries` — экран «Пользователи» заводит пространство партнёра со странами. Никого не назначает: первого главного — `tools/web_user.py role <логин> superadmin --tenant HQ` (`docs/08-deploy.md`).
 - Двери: `src/db/web_access.py` — `ROLE_SUPERADMIN`, `LastSuperadminError`, `only_roles` у `reassign_role`, `set_email`, `disable_account` (охват по роли цели условием в запросе); `src/db/spaces.py` — `create_partner_space`, `add_countries` (роль `_managing`, всё или ничего), `overview` (роль приложения).
 
+### Заморозка (миграция `0063`, D462)
+
+- `0063_freeze.sql` — `web_users.disabled_by` (кто заморозил); `oauth_grants.revoked_reason` принимает `frozen`; триггер `web_users_freeze_cascade` → `freeze_cascade()` (security definer): при переходе `disabled_at` из `null` в дату закрывает сессии, гасит необменянные коды OAuth, отзывает подключения Claude, снимает живую привязку бота и неиспользованные ссылки привязки (токены MCP гасит `0059`); функция `sign_out_everywhere(token)` («Выйти везде»: сессии, коды, подключения, личный токен; бот остаётся) — `execute` только у роли приложения; роли администратора истории выданы `select, update (disabled_by)` на `web_users`.
+- Двери: `src/db/web_access.py` — `freeze_account`, `unfreeze_account` (снимает только отметку), `sign_out_everywhere`; проверка по каждой двери входа — `tests/test_db_freeze.py`.
+
 ## Зависимости
 
 `domain`.
