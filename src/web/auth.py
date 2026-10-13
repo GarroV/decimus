@@ -40,6 +40,7 @@ from werkzeug.wrappers import Response
 from src.db import web_own_profile
 from src.db.errors import DbError
 from src.db.reach import Reach, reach_of
+from src.db.space import enter_space, leave_space
 from src.db.web_access import (
     SESSION_TTL,
     Account,
@@ -198,6 +199,10 @@ def current_session_token() -> str:
 #: Ключ охвата вошедшего в `g`: страны читаются из базы один раз на запрос.
 REACH = "reach"
 
+#: Ключ в `g` метки пространства вошедшего (`src/db/space.py`): снимается на
+#: выходе из запроса, чтобы не достаться следующему на том же потоке.
+SPACE_MARK = "space_mark"
+
 
 def begin_google_link() -> Response:
     """Увести вошедшего к Google привязать почту к СВОЕЙ учётке (D447).
@@ -297,7 +302,16 @@ def install(app: Flask, conf: Settings) -> None:
             return redirect(url_for("login"))
         setattr(g, CURRENT, account)
         setattr(g, SESSION_TOKEN, token)
+        # Пространство вошедшего — и базе (F-037): политики роли приложения
+        # отдают по нему, даже если запрос маршрута забыл условие охвата.
+        setattr(g, SPACE_MARK, enter_space(account.tenant))
         return None
+
+    @app.teardown_request
+    def _снять_пространство(_exc: BaseException | None) -> None:
+        метка = g.pop(SPACE_MARK, None)
+        if метка is not None:
+            leave_space(метка)
 
     def заперто(приговор: Verdict) -> Response:
         """Ответ запертому: та же форма, но со сроком и без сверки пароля.

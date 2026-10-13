@@ -27,7 +27,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 
 | Термин | Что значит | Где живёт |
 |---|---|---|
-| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы, а не фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`; `docs/furca/blocks/spaces.md` |
+| Пространство (в коде — `tenant`, «тенант») | Замкнутый круг данных одной организации: её пиццерии, люди, проверки. Одно пространство — управляющая компания (код `HQ`), остальные — партнёры. Изоляция держится ключами схемы и политиками базы по пространству, которое ставит дверь (`src/db/space.py`, миграция `0062`), а не только фильтром в запросе. На экране и в разговоре говорят «пространство» | `src/db/spaces.py`, `src/domain/tenants.py`, `src/db/reach.py`, `src/db/space.py`; `docs/furca/blocks/spaces.md` |
 | УК | Управляющая компания: владелец методики, видит всю сеть, принимает проверки партнёров. Её пространство — `HQ` | `src/domain/tenants.py` (`HQ_TENANT`), `docs/18-access-map.md` |
 | Партнёр | Организация, чьи пиццерии проверяют; видит и правит только своё пространство и свои страны | `docs/18-access-map.md`, `src/db/reach.py` |
 | Роль | Одна из шести: в пространстве УК — главный админ (`superadmin`), админ (`admin`), контроль (`control`), аудитор (`auditor`); у партнёра — админ и аудитор | `src/domain/tenants.py`, `src/web/access_policy.py`, `src/mcp/policy.py` |
@@ -278,7 +278,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Подключение, схема, файлы
 
-<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space_guard,storage,storage_reconcile,target_refusal}.py -->
+<!-- map:begin files src/db/{checksum,config,database_target,errors,migrate,models,photos,pool,previews,reading,recipe_audit,reports,request_memo,space,space_guard,storage,storage_reconcile,target_refusal}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/checksum.py` | Отпечаток миграции: что в нём участвует, а что нет (#258) |
@@ -294,6 +294,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/recipe_audit.py` | T203 (#170): можно ли снять прежний рецепт отпечатка на ЭТОЙ базе |
 | `src/db/reports.py` | T336 (#317): готовый отчёт проверки уезжает в хранилище |
 | `src/db/request_memo.py` | Память одного HTTP-запроса для чтений, которые страница просит из разных блоков |
+| `src/db/space.py` | Пространство, от имени которого идёт обращение к базе (аудит 12.10, F-037, F-005) |
 | `src/db/space_guard.py` | Пространство записи обязано быть заведено — опечатка в коде это отказ (#481) |
 | `src/db/storage.py` | Хранилище кадров за S3-совместимым интерфейсом (D004, D054) |
 | `src/db/storage_reconcile.py` | Сверка хранилища файлов с таблицами: экшн-планы и ответы на предписания (#496) |
@@ -420,6 +421,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0059_mcp_token_identity.sql` | Личный токен MCP принадлежит учётке сайта и получает срок; круг доступа к MCP снимается (аудит 12.10.2026, F-017/F-022/F-023/F-035/F-036; решения D417, D420, D447, D448) |
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
 | `0061_web_own_google_lang.sql` | «Настройки» (D447): человек сам привязывает и снимает свою почту Google и хранит язык сайта в профиле |
+| `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -790,7 +792,7 @@ Telegram, ни HTTP, ни SQL.
 | Поправить текст письма партнёру или PDF | Тексты отчёта и письма — в `engine/report.py` (`letter_text`, `build_letter`); пересборка по записанной проверке — `src/report/letters.py`; разметка письма в почте — `src/web/letter_markup.py` |
 | Добавить страницу или маршрут веба | Модуль с `install(app, conf)` по образцу `src/web/prescriptions.py`, вызов — в `create_app` (`src/web/app.py`); шаблон — `src/web/templates/<раздел>/`; тексты — `texts_<раздел>.py` и подключение в `texts.py`. Новый раздел навигации — ещё `SECTIONS` в `src/web/sections.py`, `SCREENS` в `app.py` (приложение не соберётся, если они разошлись) и `view.<раздел>` в матрице `src/domain/permissions.py`. Пишущий маршрут объявляет действие `@guard.action(...)` — без него он закрыт (403) и роняет `tests/test_web_guard.py` |
 | Сделать адрес открытым без входа | Только через `OPEN_ENDPOINTS` в `src/web/auth.py` — по умолчанию закрыто всё; зачем и что открыто — `docs/18-access-map.md` |
-| Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Раздел «только УК» для партнёра — `_install_hq_gate` в `src/web/app.py`; «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |
+| Дать или закрыть роли действие, ограничить раздел по роли | Одна матрица «роль × действие» — `src/domain/permissions.py` (`MATRIX`, граница — `_boundary`); веб спрашивает её заслоном `src/web/guard.py`, MCP — `src/mcp/policy.py`, бот — `src/bot/access.py`. Партнёру закрыто всё, что матрица не объявила открытым его пространству (`guard.open_to_tenant`, 404 в `_install_hq_gate` `src/web/app.py`; необъявленный маршрут называет `tests/test_web_guard.py`); «кто кем управляет» — `src/web/access_policy.py`; охват чтения — `src/db/reach.py`; потом `docs/18-access-map.md` и `make porcha-permissions` |
 | Роль и права MCP | Инструмент → действие матрицы: `src/mcp/policy.py` (`action_of`, `TOOL_ACTIONS`); закрытое в Claude сверх матрицы — `CLAUDE_CLOSED` в `src/domain/permissions.py` |
 | Добавить инструмент MCP | Описание и схема — запись `ToolSpec` в `TOOLS` (`src/mcp/catalogue.py`), обработчик — рядом с похожими (`tools.py`, `checklist_tools.py`, `ratings_tools.py`); какой роли он открыт, решает действие матрицы (`policy.action_of`: по виду или `TOOL_ACTIONS`); перечень — `docs/inventory.md` (`make map`), контракт — `docs/furca/blocks/mcp.md` |
 | Новая миграция | Файл `src/db/migrations/NNNN_<смысл>.sql` со следующим номером, заголовок-комментарий «зачем» (первая фраза уйдёт в эту карту); накат — `make migrate`; применённый файл не править. Тест с базой — по образцу `tests/test_db_*.py` (`tests/db_harness.py`) |

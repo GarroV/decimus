@@ -388,6 +388,7 @@
 | `0059_mcp_token_identity.sql` | — |
 | `0060_d440_roles.sql` | — |
 | `0061_web_own_google_lang.sql` | `web_google_link_states` |
+| `0062_space_isolation.sql` | — |
 <!-- map:end -->
 
 ## Makefile

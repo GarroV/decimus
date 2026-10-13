@@ -70,6 +70,7 @@ from src.db.config import check_environment  # noqa: E402
 from src.db.directory import upsert_unit  # noqa: E402
 from src.db.errors import AccessError  # noqa: E402
 from src.db.push import push_inspection  # noqa: E402
+from src.db.space import SYSTEM_SPACE, acting_space, apply_space  # noqa: E402
 from src.db.spaces import bind_countries  # noqa: E402
 from src.domain.engine import chat_dir  # noqa: E402
 from src.domain.tenants import HQ_TENANT  # noqa: E402
@@ -242,6 +243,7 @@ def _reset(app_dsn: str) -> int:
     dsn = (os.environ.get(ADMIN_URL_VAR) or "").strip() or app_dsn
     _require_local_dsn(dsn)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        apply_space(conn)
         cur.execute("delete from inspections where tenant_code = %s", (DEMO_TENANT,))
         return cur.rowcount
 
@@ -260,6 +262,7 @@ def _bind_demo(dsn: str) -> frozenset[str]:
     """Завести пространство `demo` и привязать его к странам точек. Вернуть его страны."""
     _require_local_dsn(dsn)
     with psycopg.connect(dsn) as conn:
+        apply_space(conn)
         conn.execute(
             "insert into tenants (code, name) values (%s, %s) on conflict (code) do nothing",
             (DEMO_TENANT, "Demo partner"),
@@ -318,6 +321,7 @@ def _accept(app_dsn: str, ids: list[str]) -> None:
     )
     _require_local_dsn(dsn)
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
+        apply_space(conn)
         cur.execute(
             "update inspections set status = 'finalized', accepted_at = now(), "
             "accepted_by = 'demo' where tenant_code = %s and id = any(%s::uuid[])",
@@ -367,4 +371,5 @@ def seed() -> list[str]:
 
 
 if __name__ == "__main__":
-    seed()
+    with acting_space(SYSTEM_SPACE):
+        seed()

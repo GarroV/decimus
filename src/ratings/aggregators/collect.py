@@ -22,6 +22,7 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
 from collections.abc import Callable, MutableMapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
@@ -303,5 +304,8 @@ def run_all(
     searching = [m for m in modules if m in SEARCHERS + PAUSED]
     units = fetch_units(_registry_countries(searching))
     _save_registry(units, today)
+    # Потоки пула не наследуют контекст: без копии запись в базу шла бы без
+    # пространства и получала отказ (F-037, `src/db/space.py`).
+    родитель = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=len(modules), thread_name_prefix="agg") as pool:
-        return tuple(pool.map(lambda m: run_one(m, units, today), modules))
+        return tuple(pool.map(lambda m: родитель.copy().run(run_one, m, units, today), modules))
