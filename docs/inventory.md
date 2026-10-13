@@ -66,7 +66,7 @@
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
 | `/auth/google/callback` | GET | `google_callback` | `src/web/auth.py` |
 | `/auth/google/mail` | GET | `google_mail_callback` | `src/web/letter_draft.py` |
-| `/calendar` | GET | `wip_calendar` | `src/web/app.py` |
+| `/calendar` | GET | `calendar` | `src/web/app.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |

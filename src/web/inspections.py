@@ -80,6 +80,12 @@ def retraction_available() -> bool:
     return True
 
 
+#: Сколько ждущих приёмки читать: очередь показывается целиком и старые сверху
+#: (D466), поэтому предел выше предела истории — иначе самые давние, ради
+#: которых очередь и стоит наверху, отрезались бы первыми.
+REVIEW_LIMIT = 1000
+
+
 def load_registry(
     *, reach: Reach, limit: int, date_from: date | None = None, date_to: date | None = None
 ) -> Registry:
@@ -92,7 +98,7 @@ def load_registry(
     очередь приёмки показывается целиком — ждущая не должна потеряться за
     выбранным месяцем.
     """
-    review = tuple(queries.list_inspections(reach=reach, limit=limit, on_review=True))
+    review = tuple(queries.list_inspections(reach=reach, limit=REVIEW_LIMIT, on_review=True))
     if retraction_available():
         try:
             rows = queries.list_inspections(
