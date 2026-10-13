@@ -28,6 +28,14 @@ MASTER_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Главный чек-лист правят только админы. Здесь его можно смотреть, но не менять.",
         "en": "Only admins edit the master checklist. You can view it here but not change it.",
     },
+    "methodology.role.readonly.title": {
+        "ru": "Чек-лист: только чтение",
+        "en": "Checklist: read-only",
+    },
+    "methodology.role_readonly": {
+        "ru": "Чек-листы правят админы пространства. Здесь чек-лист можно смотреть, но не менять.",
+        "en": "Space admins edit checklists. You can view this checklist here but not change it.",
+    },
     "methodology.applied.readonly.title": {
         "ru": "Применён к проду: только чтение",
         "en": "Applied to production: read-only",

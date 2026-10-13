@@ -29,6 +29,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Protocol
 
+from src.domain.permissions import role_may
 from src.domain.tenants import (
     CONTROL_ROLE,
     DEVELOPER_ROLE,
@@ -70,8 +71,13 @@ class Scope:
 
 
 def scope_of(role: str | None, tenant: str | None) -> Scope | None:
-    """Охват по роли и пространству вошедшего; `None` — людьми не управляет."""
+    """Охват по роли и пространству вошедшего; `None` — людьми не управляет.
+
+    Управляет ли вообще — решает матрица (`people.manage`); здесь — только КОГО.
+    """
     своё = canonical_tenant(tenant or "")
+    if not своё or not role_may(role, своё, "people.manage"):
+        return None
     в_уК = своё == HQ_TENANT
     if role == SUPERADMIN_ROLE and в_уК:
         return Scope(SUPER, своё)

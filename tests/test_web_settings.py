@@ -117,7 +117,7 @@ def test_контролю_настройки_открыты_а_проверки_
 
 
 def test_бот_без_имени_называет_переменную(monkeypatch: pytest.MonkeyPatch) -> None:
-    for client in _стенд(monkeypatch, tenant="HQ", role="auditor"):
+    for client in _стенд(monkeypatch, tenant="HQ", role="developer"):
         страница = client.get("/settings").get_data(as_text=True)
 
         assert "WEB_BOT_USERNAME" in страница and "/settings/bot-link" not in страница

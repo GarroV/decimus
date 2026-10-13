@@ -276,10 +276,10 @@ _запомнить_пространство_вошедшего
 # `_только_уК` — заслон разделов «только УК» (D264): крюк Flask
 # `@app.before_request`, его регистрирует декоратор, по имени не зовёт никто.
 _только_уК
-# `_контроль_только_рейтинги` — заслон роли «контроль» (D319, D358): крюк Flask `@app.before_request`.
-_контроль_только_рейтинги
-# `_гость_только_читает` — заслон роли «гость» (D440): крюк Flask `@app.before_request`.
-_гость_только_читает
+# `_права` и `_спросил_ли` — заслон прав по матрице (D408, `src/web/guard.py`):
+# крюки Flask `@app.before_request` / `@app.after_request`.
+_права
+_спросил_ли
 # Привязка бота (D286): `bot_unlink` — маршрут Flask, его регистрирует
 # декоратор; `bound_at` привязки читает шаблон вкладки «Пользователи».
 bot_unlink
@@ -442,8 +442,6 @@ is_current
 # (`src/web/users_screen.py`) — регистрирует декоратор, по имени их не зовёт никто.
 add_space
 space_countries
-# `_методику_правят_админы` — заслон записи в методику (D344): крюк Flask `@app.before_request`.
-_методику_правят_админы
 
 # Экран «Пользователи» слева список, справа карточка (переделка экрана, 09.10.2026).
 # Маршруты Flask (`src/web/users_screen.py`) — регистрирует декоратор:
@@ -514,3 +512,24 @@ _учётки
 # обхода у каждого теста; `tests/test_migros_link.py` — подмена ретранслятора.
 _предел_обхода_свой_у_теста
 _ретранслятор
+
+# Маршруты-приманки `tests/test_web_guard.py`: их регистрирует декоратор Flask,
+# и зовёт их заслон прав в прогоне на сломанном приложении.
+telepathy
+forgot
+# Маршруты «Настроек» (D447): их регистрирует декоратор Flask, свои дела
+# заслон прав называет по имени эндпоинта (`guard.EXEMPT_ENDPOINTS`).
+settings_page
+settings_own_password
+settings_bot_link
+settings_bot_unlink
+settings_claude_token
+settings_claude_token_revoke
+settings_claude_revoke
+settings_google_link
+settings_google_unlink
+settings_lang
+_lang_next
+reauth_confirm
+reauth_confirm_password
+reauth_confirm_google

@@ -32,7 +32,7 @@ from src.db import prescriptions_write as rxw
 from src.db.config import load_action_plan_settings
 from src.db.errors import DbError, IssuedDraftLostError, PrescriptionError, StorageError
 
-from . import auth, ui_lang
+from . import auth, guard, ui_lang
 from . import country as country_data
 from .action_plans import FORM_OVERHEAD_BYTES, is_hq
 from .config import Settings
@@ -195,6 +195,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(путь, endpoint="rx_create")
+    @guard.action("prescription.manage")
     def rx_create() -> Response | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -235,6 +236,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         )
 
     @app.post(f"{путь}/<prescription_id>/edit", endpoint="rx_update")
+    @guard.action("prescription.manage")
     def rx_update(prescription_id: str) -> Response | str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -255,6 +257,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _after_save(текущее.id, lang)
 
     @app.post(f"{путь}/<prescription_id>/send", endpoint="rx_send")
+    @guard.action("prescription.manage")
     def rx_send(prescription_id: str) -> Response | str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -264,6 +267,7 @@ def _install_hq(app: Flask, conf: Settings) -> None:
         return _go_to_gmail(текущее.id, _lang(conf))
 
     @app.post(f"{путь}/<prescription_id>/close", endpoint="rx_close")
+    @guard.action("prescription.manage")
     def rx_close(prescription_id: str) -> str | tuple[str, int]:
         _require_hq()
         refuse_foreign_origin()
@@ -522,6 +526,7 @@ def _install_partner(app: Flask, conf: Settings, *, max_bytes: int) -> None:
         )
 
     @app.post(f"{путь}/<prescription_id>/reply", endpoint="order_reply")
+    @guard.action("prescription.reply")
     def order_reply(prescription_id: str) -> str | tuple[str, int]:
         if is_hq():
             return render_template("users/forbidden.html"), 403

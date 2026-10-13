@@ -190,7 +190,8 @@ def test_действия_справа_те_же_что_у_карточки(
         assert (действие in страница) is свои_действия, действие
 
 
-def test_аудитор_не_видит_отклонения_справа(
+@pytest.mark.parametrize("стенд", ["guest"], indirect=True)
+def test_гость_не_видит_отклонения_справа(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     строка = шапка()
