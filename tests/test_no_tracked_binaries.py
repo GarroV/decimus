@@ -21,8 +21,6 @@ BINARY_SUFFIXES = (".png", ".jpg", ".jpeg", ".pdf", ".docx", ".xlsx", ".zip")
 ALLOWED_PREFIXES: tuple[str, ...] = (
     # Иконки веб-админки и мини-аппа (apple-touch-icon, icon-*.png).
     "src/web/static/",
-    # Держит D143, пересмотр за владельцем: папку не удалять.
-    "Бриф системы аудитов Decimus 2/",
 )
 
 HINT = (
@@ -65,6 +63,5 @@ def test_checker_accepts_allowlisted_and_text_files() -> None:
     names = [
         "src/web/static/icon-32.png",
         "docs/readme.md",
-        "Бриф системы аудитов Decimus 2/uploads/a.png",
     ]
     assert unexpected_binaries(names) == []
