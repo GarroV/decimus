@@ -552,6 +552,43 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Запись не исправлена: {reason}",
         "en": "The record was not corrected: {reason}",
     },
+    # --- новая запись и кадры на приёмке (D465) --------------------------------
+    "add.open": {"ru": "Добавить запись", "en": "Add a record"},
+    "add.search": {"ru": "Найти пункт по коду или названию", "en": "Find an item by code or title"},
+    "add.submit": {"ru": "Добавить и пересчитать", "en": "Add and recalculate"},
+    "add.photo": {"ru": "Фото (необязательно)", "en": "Photo (optional)"},
+    "add.done": {
+        "ru": "Запись добавлена, оценка пересчитана.",
+        "en": "The record is added and the score recalculated.",
+    },
+    "add.failed": {
+        "ru": "Запись не добавлена: {reason}",
+        "en": "The record was not added: {reason}",
+    },
+    "add.photo_failed": {
+        "ru": "запись добавлена и оценка пересчитана, но кадр не приложен: {reason}",
+        "en": (
+            "the record is added and the score recalculated, "
+            "but the photo was not attached: {reason}"
+        ),
+    },
+    "photo.add": {"ru": "Фото", "en": "Photo"},
+    "photo.replace": {"ru": "Заменить", "en": "Replace"},
+    "photo.delete": {"ru": "Убрать кадр", "en": "Remove photo"},
+    "photo.confirm_delete": {"ru": "Убрать этот кадр?", "en": "Remove this photo?"},
+    "photo.none": {"ru": "кадр не выбран", "en": "no photo chosen"},
+    "photo.unreadable": {
+        "ru": "кадр не читается как изображение (нужен JPEG, PNG или WebP)",
+        "en": "the photo cannot be read as an image (JPEG, PNG or WebP expected)",
+    },
+    "photo.too_big": {"ru": "кадр больше {mb} МБ", "en": "the photo is larger than {mb} MB"},
+    "photo.added": {"ru": "Кадр приложен.", "en": "The photo is attached."},
+    "photo.replaced": {"ru": "Кадр заменён.", "en": "The photo is replaced."},
+    "photo.deleted": {"ru": "Кадр убран.", "en": "The photo is removed."},
+    "photo.failed": {
+        "ru": "Кадр не изменён: {reason}",
+        "en": "The photo was not changed: {reason}",
+    },
     # --- карточка проверки -------------------------------------------------
     "card.back": {"ru": "К проверкам", "en": "Back to inspections"},
     "card.build.title": {"ru": "Сборка чек-листа", "en": "Checklist build"},

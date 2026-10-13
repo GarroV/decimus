@@ -1025,6 +1025,18 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
   border-radius: var(--r-control);
   object-fit: cover;
 }
+/* Режим правки на приёмке (D465): карандаш в шапке панели ставит `.is-editing`
+   на `.spanel`; всё правочное (`.review-edit`) до этого скрыто. */
+.review-edit { display: none; }
+.spanel.is-editing .review-edit { display: flex; }
+.spanel.is-editing form.review-add { display: flex; flex-direction: column; }
+.shot { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: top; }
+.shot__tools { gap: var(--space-2); margin-top: var(--space-2); }
+.shot__tools form { margin: 0; }
+.shot__add { margin-top: var(--space-3); }
+.shot__tools label.hbtn, .shot__add label.hbtn { cursor: pointer; }
+.review-add { padding: var(--space-5) var(--space-7); border-top: 1px solid var(--line-2); }
+.review-add select[size] { height: auto; }
 .find-row__level { flex: none; }
 .find-row__num {
   font-family: var(--font-num);
