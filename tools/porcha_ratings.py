@@ -908,7 +908,11 @@ cases = [
 
 env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
 failed = False
+# `porcha_ratings.py <подстрока> …` — только случаи, где подстрока есть в пути или в тесте.
+only = sys.argv[1:]
 for path, original, broken, test in cases:
+    if only and not any(part in path or part in test for part in only):
+        continue
     file = pathlib.Path(path)
     text = file.read_text(encoding="utf-8")
     if original not in text:
