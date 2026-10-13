@@ -9,7 +9,7 @@
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Any
 
 import pytest
@@ -142,6 +142,57 @@ def test_ждущие_приёмки_видны_когда_история_мес
 
     assert вызовы and "Белград-7" in страница
     assert t("registry.review.title", "ru") in страница
+
+
+def test_на_приёмке_давно_ждущие_первыми_и_с_числом_дней(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D462: очередь идёт от самой давней, у каждой строки — сколько она ждёт."""
+    свежая = шапка(
+        id="aaaaaaaa-0000-0000-0000-000000000001",
+        id="aaaaaaaa-0000-0000-0000-000000000001",
+        unit_name="Свежая-1",
+        on_review=True,
+        inspection_date=СЕГОДНЯ - timedelta(days=1),
+    )
+    давняя = шапка(
+        id="bbbbbbbb-0000-0000-0000-000000000002",
+        unit_name="Давняя-9",
+        on_review=True,
+        inspection_date=СЕГОДНЯ - timedelta(days=12),
+    )
+    _ловушка(monkeypatch, review=(свежая, давняя))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert страница.index("Давняя-9") < страница.index("Свежая-1")
+    assert "ждёт 12 дн." in страница and "ждёт 1 дн." in страница
+
+
+def test_на_приёмке_пусто_одна_тихая_строка(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _ловушка(monkeypatch, rows=(шапка(),))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert t("registry.review.empty", "ru") in страница
+
+
+def test_приёмка_мимо_периода_и_отбора_принятые_под_отбором(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Очередь видна при любом отборе; период и отбор — только у «Принятых»."""
+    ждущая = шапка(unit_name="Ждущая-5", on_review=True, grade="D")
+    принятая = шапка(unit_name="Принятая-3", grade="A")
+    _ловушка(monkeypatch, rows=(принятая,), review=(ждущая,))
+
+    страница = стенд.get("/inspections?grade=D&from=2020-01-01&to=2020-01-31").get_data(
+        as_text=True
+    )
+
+    assert "Ждущая-5" in страница
+    assert "Принятая-3" not in страница
 
 
 # --- правая колонка ---------------------------------------------------------

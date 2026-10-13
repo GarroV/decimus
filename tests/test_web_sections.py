@@ -7,11 +7,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 from web_harness import войти, подменить_двери, собрать
 
 from src.domain.tenants import HQ_TENANT, canonical_tenant
-from src.web import action_plans
+from src.web import action_plans, sections
 from src.web.errors import SectionRegistryError
 from src.web.sections import (
     SECTIONS,
@@ -51,6 +53,7 @@ def test_built_keys_are_the_built_screens() -> None:
             "orders",
             "country",
             "ratings",
+            "calendar",
             "admin",
             "users",
             "settings",
@@ -92,6 +95,7 @@ def test_check_registry_accepts_exactly_the_built_sections() -> None:
             "orders",
             "country",
             "ratings",
+            "calendar",
             "admin",
             "users",
             "settings",
@@ -105,7 +109,8 @@ def test_check_registry_refuses_a_built_section_left_without_a_screen() -> None:
         check_registry(("admin", "users"))
 
 
-def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
+def test_check_registry_refuses_a_built_calendar_left_without_a_screen() -> None:
+    """«Календарь» построен (D462): экрана нет — приложение не собирается."""
     with pytest.raises(SectionRegistryError, match="calendar"):
         check_registry(
             (
@@ -119,9 +124,21 @@ def test_check_registry_refuses_a_screen_for_an_unbuilt_section() -> None:
                 "admin",
                 "users",
                 "settings",
-                "calendar",
             )
         )
+
+
+def test_check_registry_refuses_a_screen_for_an_unbuilt_section(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Непостроенных разделов в реестре сейчас нет, поэтому один снимается на время теста."""
+    monkeypatch.setattr(
+        sections,
+        "SECTIONS",
+        tuple(replace(item, built=False) if item.key == "calendar" else item for item in SECTIONS),
+    )
+    with pytest.raises(SectionRegistryError, match="calendar"):
+        check_registry(sections.built_keys() | {"calendar"})
 
 
 def test_check_registry_refuses_a_screen_outside_the_registry() -> None:
