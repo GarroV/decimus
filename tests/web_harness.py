@@ -26,7 +26,7 @@ import pytest
 from flask import Flask
 from flask.testing import FlaskClient
 
-from src.db import bot_links, web_throttle
+from src.db import bot_links, journals, web_throttle
 from src.db.reach import Reach
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.web import auth, home_board, home_ratings, home_ratings_block, to_inspect
@@ -58,6 +58,8 @@ class Учётка:
         avatar_etag: str | None = None,
     ) -> None:
         self.id = "22222222-2222-2222-2222-222222222222"
+        # Номер сессии (`web_sessions.id`): на него ссылаются журналы входов и действий (D462).
+        self.session_id = "33333333-3333-3333-3333-333333333333"
         self.login = login
         self.tenant = tenant
         # Роль по умолчанию — рабочая роль своей стороны (D440): в УК аудитора
@@ -85,6 +87,7 @@ class Учётка:
 class Сессия:
     def __init__(self, token: str = ТОКЕН) -> None:
         self.token = token
+        self.session_id = "33333333-3333-3333-3333-333333333333"
         # Срок, который админка кладёт в куку. Настоящий, а не «через год»:
         # просроченный здесь закрыл бы вход всему набору.
         self.expires_at = datetime.now(UTC) + timedelta(hours=12)
@@ -186,7 +189,15 @@ def подменить_двери(
     входит через любой стенд, и опознание своего тенанта стенда больше не
     знает вовсе.
     """
-    зовы: dict[str, list[Any]] = {"authenticate": [], "open": [], "resolve": [], "close": []}
+    зовы: dict[str, list[Any]] = {
+        "authenticate": [],
+        "open": [],
+        "resolve": [],
+        "close": [],
+        # Журналы входов и действий (D462): что бы записали в базу.
+        "login_journal": [],
+        "action_journal": [],
+    }
 
     def _authenticate(login: str, password: str) -> Учётка | None:
         зовы["authenticate"].append((login, password))
@@ -194,9 +205,19 @@ def подменить_двери(
             return Учётка(tenant=tenant, role=role, email=email)
         return None
 
-    def _open(account: Учётка) -> Сессия:
+    def _open(account: Учётка, **origin: Any) -> Сессия:
         зовы["open"].append(account.login)
+        зовы.setdefault("open_origin", []).append(origin)
         return Сессия()
+
+    def _record_login(**запись: Any) -> None:
+        зовы["login_journal"].append(запись)
+
+    def _record_failed(**запись: Any) -> None:
+        зовы["login_journal"].append({"failed": True, **запись})
+
+    def _record_action(**запись: Any) -> None:
+        зовы["action_journal"].append(запись)
 
     def _resolve(token: str) -> Учётка | None:
         зовы["resolve"].append((token,))
@@ -210,6 +231,10 @@ def подменить_двери(
     monkeypatch.setattr(auth, "open_session", _open)
     monkeypatch.setattr(auth, "resolve_session", _resolve)
     monkeypatch.setattr(auth, "close_session", _close)
+    # Журналы пишут в базу; наборы экранов её не поднимают и записи собирают в списки.
+    monkeypatch.setattr(journals, "record_login", _record_login)
+    monkeypatch.setattr(journals, "record_failed_login", _record_failed)
+    monkeypatch.setattr(journals, "record_action", _record_action)
     # Охват вошедшего (волна 1, #340) у партнёра читает его страны из базы.
     # Экранные наборы базы не поднимают, поэтому дверь охвата подменена так
     # же, как двери опознания: УК — вся сеть, партнёр — его же код страны.

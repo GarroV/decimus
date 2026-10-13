@@ -543,3 +543,8 @@ _lang_next
 reauth_confirm
 reauth_confirm_password
 reauth_confirm_google
+
+# Журналы входов и действий (D462): обработчики Flask — по имени их не зовёт никто,
+# вызывает диспетчер запросов, а регистрирует декоратор.
+_journal_action
+settings_signins

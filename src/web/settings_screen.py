@@ -35,9 +35,10 @@ from flask import Flask, current_app, make_response, redirect, render_template, 
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
-from src.db import bot_links, mcp_access, oauth_store, web_own_profile
+from src.db import bot_links, journals, mcp_access, oauth_store, web_own_profile
 from src.db.errors import DbError
 from src.db.web_throttle import Verdict, admit_attempt, note_success
+from src.domain.journal import METHOD_MCP_TOKEN, RESULT_OK
 from src.domain.log_ids import log_id
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
@@ -53,6 +54,7 @@ from . import (
     users_claude,
     users_mcp,
 )
+from . import journal as web_journal
 from .config import WEB_BOT_USERNAME_VAR, Settings
 from .db_refusal import note_target_mismatch
 from .google_auth import load_hq_domains
@@ -405,6 +407,16 @@ def _issue_claude_token(conf: Settings, base: str) -> tuple[str, int]:
         return render(Show(flash=_flash("users.mcp.failed", ok=False)), 503)
     # Значения токена в журнале нет: только факт выпуска.
     logger.info("Веб: учётка %s выпустила себе токен MCP", log_id(чей))
+    вошедший = auth.current_account()
+    откуда, браузер = web_journal.login_origin(conf)
+    journals.record_login(
+        method=METHOD_MCP_TOKEN,
+        result=RESULT_OK,
+        user_id=чей,
+        ip=откуда,
+        user_agent=браузер,
+        session_id=вошедший.session_id if вошедший else None,
+    )
     return render(Show(token=выпуск))
 
 

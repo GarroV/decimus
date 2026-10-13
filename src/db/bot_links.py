@@ -23,8 +23,11 @@ from typing import Any
 
 import psycopg
 
+from src.domain.journal import METHOD_BOT_LINK, RESULT_FROZEN, RESULT_OK, RESULT_UNKNOWN
 from src.domain.log_ids import log_id
 
+from . import journals
+from .errors import DbError
 from .web_access import _connected
 
 logger = logging.getLogger(__name__)
@@ -149,7 +152,7 @@ def issue_link(user_id: str) -> IssuedLink:
     return IssuedLink(token=token, expires_at=row[0])
 
 
-def redeem(token: str, *, telegram_id: int) -> Binding | None:
+def _redeem(token: str, *, telegram_id: int) -> Binding | None:
     """Погасить ссылку и привязать Telegram ID. `None` — один ответ на все отказы.
 
     Нет такой, использована, просрочена, учётка отключена, этот Telegram уже
@@ -184,6 +187,40 @@ def redeem(token: str, *, telegram_id: int) -> Binding | None:
             logger.warning("гонка привязки Telegram ID %s — попытка откачена", log_id(telegram_id))
             return None
     return resolve(telegram_id)
+
+
+_LINK_OWNER_SQL = """
+    select t.user_id, u.disabled_at is not null
+      from bot_link_tokens t join web_users u on u.id = t.user_id
+     where t.fingerprint = %s
+"""
+
+
+def redeem(token: str, *, telegram_id: int) -> Binding | None:
+    """Погасить ссылку и привязать Telegram ID — и записать попытку во вход (D462).
+
+    Исход пишется в журнал входов способом `bot-link`; адреса у бота нет (его не
+    передаёт Telegram), поэтому запись без него. Отказ: учётка заморожена —
+    `frozen`, любой другой — `unknown`; различие в ответ человеку не уходит.
+    Запись журнала ничего не меняет в исходе: её сбой только в журнале процесса.
+    """
+    binding = _redeem(token, telegram_id=telegram_id)
+    if binding is not None:
+        journals.record_login(method=METHOD_BOT_LINK, result=RESULT_OK, user_id=binding.user_id)
+        return binding
+    чей, результат = None, RESULT_UNKNOWN
+    if token:
+        try:
+            with _connected("определить исход привязки") as conn, conn.cursor() as cur:
+                cur.execute(_LINK_OWNER_SQL, (_fingerprint(token),))
+                row = cur.fetchone()
+            if row is not None:
+                чей = str(row[0])
+                результат = RESULT_FROZEN if row[1] else RESULT_UNKNOWN
+        except DbError:
+            logger.exception("журнал входов: владелец ссылки привязки не определён")
+    journals.record_login(method=METHOD_BOT_LINK, result=результат, user_id=чей)
+    return None
 
 
 def resolve(telegram_id: int) -> Binding | None:

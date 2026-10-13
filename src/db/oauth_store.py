@@ -186,6 +186,8 @@ class OAuthOwner:
     login: str
     tenant: str
     role: str
+    #: Метка подключения для журнала действий (D462): `oauth:` и номер подключения.
+    credential: str = ""
 
 
 @dataclass(frozen=True)
@@ -654,7 +656,13 @@ def resolve_access_token(token: str, *, resource: str) -> OAuthOwner | None:
             return None
         if row[5]:
             cur.execute(_TOUCH_GRANT_SQL, (row[4],))
-    return OAuthOwner(user_id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]))
+    return OAuthOwner(
+        user_id=str(row[0]),
+        login=str(row[1]),
+        tenant=str(row[2]),
+        role=str(row[3]),
+        credential=f"oauth:{row[4]}",
+    )
 
 
 def list_connections(user_id: str) -> tuple[Connection, ...]:

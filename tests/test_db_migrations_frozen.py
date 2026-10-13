@@ -274,6 +274,8 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0066_move_with_action_plan.sql": (
         "sql1:22d3601fa97db019e08aff3e80219293791a0d2451bcbd7cf304f21e18fd4ca5"
     ),
+    # Журнал входов и журнал действий админов (D462, шаг 2).
+    "0067_journals.sql": ("sql1:4bd23f1e6ce862a7771df95a021c89adf923e3a9516fdb742714fb3bdd5173ee"),
 }
 
 

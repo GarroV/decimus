@@ -25,9 +25,10 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 
+from src.domain.client_ip import forwarded_client
 from src.domain.public_urls import OAUTH_SCOPE, PROTECTED_RESOURCE_PATH
 
-from .audit import log_write_call
+from .audit import journal_write_call, log_write_call
 from .checklist import Store
 from .checklist_layout import DEFAULT_SPACE, space_of
 from .config import Settings, resolve_access
@@ -255,6 +256,15 @@ class _Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         self._guarded(self._post)
 
+    def _client_ip(self) -> str:
+        """Адрес клиента для журнала действий: по цепочке своих звеньев, не по сырому заголовку."""
+        return forwarded_client(
+            str(self.client_address[0]),
+            self.headers.get("X-Forwarded-For"),
+            trusted_proxies=self._settings.trusted_proxies,
+            trusted_addrs=self._settings.trusted_proxy_addrs,
+        )
+
     def _send_rate_limited(self, request_id: Any = None) -> None:
         self.close_connection = True
         self._send(
@@ -335,6 +345,7 @@ class _Handler(BaseHTTPRequestHandler):
         log_write_call(
             message, answer, actor=доступ.actor, role=доступ.role, label=доступ.token_label
         )
+        journal_write_call(message, answer, access=доступ, ip=self._client_ip())
         if answer is None:
             self._send(_ACCEPTED)
             return

@@ -171,6 +171,7 @@ def _page(
         has_spaces_tab=True,
         manages_spaces=True,
         has_connections_tab=True,
+        has_journal_tab=True,
         users_url=base,
         link=_link,
         tokens_known=known,

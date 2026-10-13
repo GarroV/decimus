@@ -1,0 +1,101 @@
+{#
+  «Журнал» (D462): кто входил и что делали админы. Вопрос экрана — «что происходило с
+  доступом». Два представления одного журнала — «Входы» и «Действия» — над одной
+  таблицей; период один на экран (календарь «с — по», стрелки ← →, по умолчанию
+  текущий месяц), человек — один фильтр над таблицей. Итог («Записей: N») стоит над
+  строками.
+
+  Два входа в один шаблон: вкладка «Журнал» экрана «Пользователей» (главный админ:
+  входы всех, действия, фильтр по человеку) и «Мои входы» в «Настройках» (любая роль:
+  только свои входы, `own`). Кто чьи записи видит, решает база; шаблон ничего не скрывает
+  сам — у обычного человека в ответе просто нет чужого.
+#}{% extends "base.html" %}
+{% from "_period.html" import period_picker with context %}
+{% from "users/_tabs.html" import users_tabs with context %}
+{% block title %}{{ t('journal.own.title' if own else 'section.users.title') }}{% endblock %}
+{% block head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='decimus-journal.css') }}">
+{% endblock %}
+{% block page_class %} page--split{% endblock %}
+{% block body %}
+  <header class="shead">
+    <div class="shead__main">
+      <h1 class="shead__title">{{ t('journal.own.title' if own else 'section.users.title') }}</h1>
+      <p class="shead__sub">{{ t('journal.own.sub' if own else 'journal.sub') }}</p>
+    </div>
+    {% if own %}<a class="sbtn" href="{{ settings_url }}?lang={{ lang }}">{{ t('journal.own.back') }}</a>{% endif %}
+  </header>
+  {% if not own %}{{ users_tabs(tab, has_spaces_tab, manages_spaces, has_connections_tab, link, has_journal_tab) }}{% endif %}
+
+  <div class="sbox jbox">
+    <div class="sbar sbar--registry jbar">
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, period_action, period_hidden) }}
+      {% if not own %}
+        <form class="jbar__person" method="get" action="{{ base }}">
+          <input type="hidden" name="tab" value="journal">
+          <input type="hidden" name="view" value="{{ view }}">
+          <input type="hidden" name="lang" value="{{ lang }}">
+          {% for name, value in period.params().items() %}{% if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endif %}{% endfor %}
+          <label class="jbar__label" for="journal-person">{{ t('journal.filter.person') }}</label>
+          <select class="sinput" id="journal-person" name="person">
+            <option value="">{{ t('journal.filter.everyone') }}</option>
+            {% for pid, plogin in people %}<option value="{{ pid }}"{% if pid == person %} selected{% endif %}>{{ plogin }}</option>{% endfor %}
+          </select>
+          <button class="sbtn" type="submit">{{ t('journal.filter.apply') }}</button>
+        </form>
+        <nav class="jviews" aria-label="{{ t('journal.tab') }}">
+          <a class="jviews__item{% if view == 'logins' %} is-current{% endif %}" href="{{ view_url('logins') }}"{% if view == 'logins' %} aria-current="page"{% endif %}>{{ t('journal.view.logins') }}</a>
+          <a class="jviews__item{% if view == 'actions' %} is-current{% endif %}" href="{{ view_url('actions') }}"{% if view == 'actions' %} aria-current="page"{% endif %}>{{ t('journal.view.actions') }}</a>
+        </nav>
+      {% endif %}
+    </div>
+
+    {% if failed %}
+      <div class="sempty"><p class="sempty__title">{{ t('journal.failed.title') }}</p><p class="sempty__text">{{ t('journal.failed.text') }}</p></div>
+    {% else %}
+      <p class="jcount">{{ t('journal.count', count=rows|length) }}
+        <span class="jcount__note">{{ t('journal.retention.actions' if view == 'actions' else 'journal.retention.logins') }}</span></p>
+      {% if capped %}<p class="jcount jcount--warn">{{ t('journal.capped', count=limit) }}</p>{% endif %}
+      {% if not rows %}
+        <div class="sempty"><p class="sempty__title">{{ t('journal.empty.title') }}</p>
+          <p class="sempty__text">{{ t('journal.empty.actions' if view == 'actions' else 'journal.empty.logins') }}</p></div>
+      {% elif view == 'actions' %}
+        <ul class="jlist jlist--actions">
+          <li class="jrow jrow--head" aria-hidden="true">
+            <span>{{ t('journal.col.time') }}</span><span>{{ t('journal.col.person') }}</span><span>{{ t('journal.col.action') }}</span>
+            <span>{{ t('journal.col.target') }}</span><span>{{ t('journal.col.ip') }}</span><span>{{ t('journal.col.outcome') }}</span>
+          </li>
+          {% for r in rows %}
+            <li class="jrow{% if r.failed %} is-bad{% endif %}">
+              <span class="jcell mono" data-label="{{ t('journal.col.time') }}">{{ r.time }}</span>
+              <span class="jcell" data-label="{{ t('journal.col.person') }}"><b>{{ r.login }}</b><small>{{ t('users.role.' ~ r.role) }} · {{ t('journal.door.' ~ r.door) }}</small></span>
+              <span class="jcell" data-label="{{ t('journal.col.action') }}"><b>{{ r.label }}</b>{% if r.label != r.code %}<small class="mono">{{ r.code }}</small>{% endif %}</span>
+              <span class="jcell mono jcell--target" data-label="{{ t('journal.col.target') }}">{{ r.target or '—' }}</span>
+              <span class="jcell mono" data-label="{{ t('journal.col.ip') }}">{{ r.ip or t('journal.no_address') }}</span>
+              <span class="jcell mono" data-label="{{ t('journal.col.outcome') }}">{{ r.outcome }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <ul class="jlist jlist--logins">
+          <li class="jrow jrow--head" aria-hidden="true">
+            <span>{{ t('journal.col.time') }}</span><span>{{ t('journal.col.person') }}</span><span>{{ t('journal.col.method') }}</span>
+            <span>{{ t('journal.col.result') }}</span><span>{{ t('journal.col.ip') }}</span><span>{{ t('journal.col.browser') }}</span>
+          </li>
+          {% for r in rows %}
+            <li class="jrow{% if not r.ok %} is-bad{% endif %}">
+              <span class="jcell mono" data-label="{{ t('journal.col.time') }}">{{ r.time }}</span>
+              <span class="jcell" data-label="{{ t('journal.col.person') }}">{% if r.login %}<b>{{ r.login }}</b>{% else %}<small>{{ t('journal.unknown_person') }}</small>{% endif %}</span>
+              <span class="jcell" data-label="{{ t('journal.col.method') }}">{{ t('journal.method.' ~ r.method) }}</span>
+              <span class="jcell" data-label="{{ t('journal.col.result') }}"><span class="sdot{% if r.ok %} sdot--ok{% endif %}"></span>{{ t('journal.result.' ~ r.result) }}</span>
+              <span class="jcell mono" data-label="{{ t('journal.col.ip') }}">{{ r.ip or t('journal.no_address') }}</span>
+              <span class="jcell jcell--ua" data-label="{{ t('journal.col.browser') }}" title="{{ r.browser }}">{{ r.browser or '—' }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

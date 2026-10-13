@@ -90,7 +90,7 @@ def _стенд(
 
         monkeypatch.setattr(auth, "resolve_session", _resolve)
 
-        def _open(account: Учётка) -> Сессия:
+        def _open(account: Учётка, **_: object) -> Сессия:
             двери.открыто.append(account.login)
             return Сессия(НОВЫЙ_ТОКЕН)
 

@@ -267,3 +267,35 @@ def test_выключенный_ключ_оставляет_петлю(ключ:
 def test_опечатка_в_ключе_это_отказ_а_не_тихое_нет(ключ: str) -> None:
     with pytest.raises(McpConfigError, match="MCP_LISTEN_NETWORK"):
         _настройки(MCP_LISTEN_NETWORK=ключ)
+
+
+# --- свои звенья перед сервером: адрес клиента в журнале действий (D462) -----
+
+
+def test_звенья_перед_сервером_по_умолчанию_не_заданы() -> None:
+    настройки = _настройки()
+
+    assert настройки.trusted_proxies == 0
+    assert настройки.trusted_proxy_addrs == ()
+
+
+def test_звенья_и_их_адреса_читаются_из_окружения() -> None:
+    настройки = _настройки(
+        MCP_TRUSTED_PROXIES="1", MCP_TRUSTED_PROXY_ADDR="172.19.0.0/16, 10.0.0.5"
+    )
+
+    assert настройки.trusted_proxies == 1
+    assert настройки.trusted_proxy_addrs == ("172.19.0.0/16", "10.0.0.5")
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"MCP_TRUSTED_PROXIES": "много"},
+        {"MCP_TRUSTED_PROXIES": "-1"},
+        {"MCP_TRUSTED_PROXY_ADDR": "не-адрес"},
+    ],
+)
+def test_кривые_звенья_отказывают_запуску_а_не_молча_не_верят(env: dict[str, str]) -> None:
+    with pytest.raises(McpConfigError, match="MCP_TRUSTED_PROXIES"):
+        _настройки(**env)

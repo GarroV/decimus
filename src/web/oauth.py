@@ -37,10 +37,12 @@ from flask import Flask, jsonify, redirect, render_template, request
 from werkzeug.datastructures import MultiDict
 from werkzeug.wrappers import Response
 
-from src.db import oauth_store, web_throttle
+from src.db import journals, oauth_store, web_throttle
 from src.db.errors import AccessError, OAuthGrantError
+from src.domain.journal import METHOD_OAUTH_CLAUDE, RESULT_OK
 from src.domain.public_urls import AUTHORIZATION_SERVER_PATH
 
+from . import journal as web_journal
 from . import reauth
 from .config import Settings
 from .origin import refuse_foreign_origin
@@ -326,6 +328,15 @@ def install(app: Flask, conf: Settings) -> None:
             redirect_uri=запрос.redirect_uri,
             code_challenge=запрос.code_challenge,
             resource=запрос.resource,
+        )
+        откуда, браузер = web_journal.login_origin(conf)
+        journals.record_login(
+            method=METHOD_OAUTH_CLAUDE,
+            result=RESULT_OK,
+            user_id=account.id,
+            ip=откуда,
+            user_agent=браузер,
+            session_id=account.session_id,
         )
         return redirect(with_query(запрос.redirect_uri, code=код, state=запрос.state, iss=issuer))
 
