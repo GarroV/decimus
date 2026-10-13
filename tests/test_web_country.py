@@ -1,9 +1,10 @@
-"""Экран «Страна»: пиццерии страны, раскрытие истории, фильтры в адресе."""
+"""Экран «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии, отбор «Девелопер»."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import date
 
 import pytest
 from flask.testing import FlaskClient
@@ -11,15 +12,37 @@ from test_web_app import ТЕНАНТ
 from test_web_overview import снимок, строка
 from web_harness import войти, подменить_двери, собрать
 
-from src.web import app as app_mod
+from src.db.directory import Unit
 from src.web import country as cn
+from src.web import country_page, country_summary, country_units
+from src.web import overview as ov
+from src.web import prescriptions
 
 
 @pytest.fixture
 def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant=ТЕНАНТ)
-    # Список стран шапки — справочник базы; экрану в этих тестах база не нужна.
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 1),))
+    # Список стран, девелоперы, таблица пиццерий, планы и предписания — база;
+    # экрану в этих тестах она не нужна, отдельные наборы подменяют своё сами.
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 1),))
+    monkeypatch.setattr(country_summary, "developers_of", lambda _codes: ({}, {}, False))
+    monkeypatch.setattr(country_units, "load", lambda **_: country_units.UnitsData())
+    monkeypatch.setattr(country_units, "history", lambda **kw: kw["fallback"])
+    monkeypatch.setattr(
+        country_page,
+        "_country_plans",
+        lambda _код: {
+            "plans": (), "plans_known": True, "plans_act_path": "/actions", "plans_act_country": True,
+        },
+    )  # fmt: skip
+    monkeypatch.setattr(
+        prescriptions,
+        "country_block",
+        lambda _код: {
+            "rx_rows": (), "rx_known": True, "rx_hq_path": "/actions/prescriptions",
+            "rx_partner_path": "/orders", "rx_act_hq": True,
+        },
+    )  # fmt: skip
     with собрать(tenant=ТЕНАНТ).test_client() as client:
         assert войти(client).status_code == 302
         yield client
@@ -44,7 +67,7 @@ def с_точкой(вид: cn.CountryView) -> cn.CountryView:
     История раскрывается ПОД строкой точки: без строки раскрывать нечего.
     """
     последняя = вид.snapshot.inspections[0]
-    точка = app_mod.overview_data.PointRow(
+    точка = ov.PointRow(
         unit="Батуми-1",
         city="batumi",
         country="GE",
@@ -63,7 +86,7 @@ def с_точкой(вид: cn.CountryView) -> cn.CountryView:
 def открыть(
     client: FlaskClient, monkeypatch: pytest.MonkeyPatch, вид: cn.CountryView, адрес: str
 ) -> str:
-    monkeypatch.setattr(app_mod.country_data, "load", lambda **_: вид)
+    monkeypatch.setattr(cn, "load", lambda **_: вид)
     ответ = client.get(адрес)
     assert ответ.status_code == 200, ответ.status_code
     return ответ.get_data(as_text=True)
@@ -85,58 +108,112 @@ def test_мусорный_код_страны_не_роняет_экран(
         видели.append(str(kw["code"]))
         return replace(данные(), code=str(kw["code"]))
 
-    monkeypatch.setattr(app_mod.country_data, "load", load)
+    monkeypatch.setattr(cn, "load", load)
     assert стенд.get("/country/ge").status_code == 200
     assert стенд.get("/country/%3Cs%3E").status_code == 200
     assert видели == ["GE", ""]
 
 
-def test_раскрытая_точка_показывает_историю_и_карточку(
+def строка_таблицы(**поля: object) -> country_units.UnitRow:
+    основа: dict[str, object] = {
+        "key": "u-1", "name": "Батуми-1", "unit_id": "u-1", "stage": "open", "city": "batumi",
+        "partner": "ООО Ромашка", "address": "ул. Руставели, 1", "opened": date(2024, 5, 1),
+        "status": "Работает",
+    }  # fmt: skip
+    основа.update(поля)
+    return country_units.UnitRow(**основа)  # type: ignore[arg-type]
+
+
+def с_таблицей(monkeypatch: pytest.MonkeyPatch, *строки: country_units.UnitRow) -> None:
+    monkeypatch.setattr(
+        country_units, "load", lambda **_: country_units.UnitsData(rows=tuple(строки))
+    )
+
+
+def test_сводка_по_умолчанию_таблицы_пиццерий_в_ней_нет(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    с_таблицей(monkeypatch, строка_таблицы())
+    страница = открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE")
+    assert 'class="seg"' in страница and "seg=units" in страница
+    assert "cn-tiles" in страница and "cn-units" not in страница
+    # Мусорный сегмент — не отказ, а сводка.
+    assert "cn-tiles" in открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE?seg=<x>")
+
+
+def test_сегмент_пиццерии_одна_таблица_и_закрытые_свёрнуты(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    с_таблицей(
+        monkeypatch,
+        строка_таблицы(),
+        строка_таблицы(key="u-2", name="Тбилиси-2", unit_id="u-2", stage="closed"),
+    )
+    страница = открыть(стенд, monkeypatch, с_точкой(данные()), "/country/GE?seg=units")
+    assert страница.count("cn-units") >= 2 and "cn-tiles" not in страница
+    открытые, закрытые = страница.split('class="cn-closed"', 1)
+    assert "Батуми-1" in открытые and "Тбилиси-2" not in открытые
+    assert "Тбилиси-2" in закрытые
+    # Свод и результаты — не отдельные блоки: адрес и партнёр в таблицу не выносятся.
+    assert "Руставели" not in страница
+
+
+def test_раскрытая_точка_открывает_панель_со_сведениями_и_историей(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     вид = с_точкой(данные())
     вид = replace(вид, unit_id="u-1", unit_name="Батуми-1", history=вид.snapshot.inspections)
-    страница = открыть(стенд, monkeypatch, вид, "/country/GE?unit=u-1")
-    assert 'id="unit-u-1"' in страница
-    assert 'class="ov-history"' in страница
+    с_таблицей(monkeypatch, строка_таблицы())
+    страница = открыть(стенд, monkeypatch, вид, "/country/GE?seg=units&unit=u-1")
+    assert "data-drawer" in страница and 'id="sdrawer-title"' in страница
+    assert "Руставели" in страница and "ООО Ромашка" in страница
     assert "/units/u-1" in страница
-    assert f"/inspections/{вид.history[0].id}" in страница
+    assert f"/inspections/{вид.snapshot.inspections[0].id}" in страница
+    # Без выбора панели нет.
+    assert "data-drawer>" not in открыть(стенд, monkeypatch, вид, "/country/GE?seg=units")
 
 
-def test_ссылки_строк_сохраняют_фильтры_и_язык(
+def test_точка_только_из_свода_открывается_без_карточки(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    вид = с_точкой(данные())
-    страница = открыть(стенд, monkeypatch, вид, "/country/GE?period=d90&grade=B&lang=en")
-    assert "unit=u-1" in страница
-    строка_ссылки = next(ч for ч in страница.split('"') if "unit=u-1" in ч)
-    assert (
-        "period=d90" in строка_ссылки and "grade=B" in строка_ссылки and "lang=en" in строка_ссылки
+    ключ = country_units.SVOD_KEY + "pipe-1"
+    с_таблицей(monkeypatch, строка_таблицы(key=ключ, name="Pipe-1", unit_id="", stage="pipeline"))
+    страница = открыть(стенд, monkeypatch, данные(), f"/country/GE?seg=units&unit={ключ}")
+    assert "data-drawer" in страница and "/units/" not in страница
+
+
+def test_ссылки_строк_сохраняют_сегмент_период_и_язык(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    с_таблицей(monkeypatch, строка_таблицы())
+    страница = открыть(
+        стенд, monkeypatch, с_точкой(данные()), "/country/GE?seg=units&from=2026-09-01&to=2026-09-30&lang=en"
     )
+    ссылка = next(ч for ч in страница.split('"') if "unit=u-1" in ч)
+    assert "seg=units" in ссылка and "from=2026-09-01" in ссылка and "lang=en" in ссылка
 
 
-def test_пустая_страна_говорит_словами(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_пустая_страна_одна_тихая_строка_без_пустых_рамок(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
     вид = replace(
         данные(),
-        snapshot=replace(данные().snapshot, points=(), inspections=(), systemic=(), zone_losses=()),
-    )
+        snapshot=replace(
+            данные().snapshot,
+            points=(), inspections=(), inspections_total=0, systemic=(), zone_losses=(),
+        ),
+    )  # fmt: skip
     страница = открыть(стенд, monkeypatch, вид, "/country/GE")
-    assert "проверок нет" in страница or "No inspections" in страница
+    assert страница.count("cn-quiet") == 1
+    assert "За период проверок не было" in страница and "period=all" in страница
+    assert "cn-tiles" not in страница and "cn-hurt" not in страница
 
 
-def test_список_стран_с_одной_страной_сразу_ведёт_в_неё(
+def test_где_болит_одним_блоком_и_только_при_проверках(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3),))
-    ответ = стенд.get("/country")
-    assert ответ.status_code == 302
-    assert ответ.headers["Location"].endswith("/country/GE")
-
-
-def test_список_стран_показывает_все(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
-    страница = открыть(стенд, monkeypatch, данные(), "/country")
-    assert "/country/GE" in страница and "/country/RS" in страница
+    страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
+    assert страница.count("cn-hurt\"") == 1 and "K-041" in страница and "Кухня" in страница
 
 
 def test_смена_языка_оставляет_страну_и_раскрытую_точку(
@@ -155,7 +232,7 @@ def test_на_экране_страны_слева_колонка_всех_ст�
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Раскладка как у «Методики»: слева страны, справа выбранная (владелец 30.09.2026)."""
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 3), ("RS", 2)))
     страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
     колонка = страница.split('class="mx-rail', 1)[1].split("</aside>", 1)[0]
     assert "/country/GE" in колонка and "/country/RS" in колонка
@@ -171,14 +248,14 @@ def test_без_страны_в_адресе_справа_первая_стра�
     """Рабочая зона не пустует, как в «Методике» (владелец 30.09.2026, скриншот
     пустого «Выберите страну»): справа первая страна колонки, экран помечен
     выбором — на телефоне первым идёт список стран."""
-    monkeypatch.setattr(app_mod.country_data, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 3), ("RS", 2)))
     просили: list[str] = []
 
     def load(**kw: object) -> cn.CountryView:
         просили.append(str(kw["code"]))
         return данные()
 
-    monkeypatch.setattr(app_mod.country_data, "load", load)
+    monkeypatch.setattr(cn, "load", load)
     ответ = стенд.get("/country")
     assert ответ.status_code == 200, ответ.status_code
     страница = ответ.get_data(as_text=True)
@@ -194,48 +271,8 @@ def test_обрезанный_срез_страны_экран_называет_
     вид = данные()
     обрезан = replace(вид, snapshot=replace(вид.snapshot, truncated=True))
 
-    assert "В срезе больше 1 проверок" in открыть(стенд, monkeypatch, обрезан, "/country/GE")
+    assert "В срезе больше 100 проверок" in открыть(стенд, monkeypatch, обрезан, "/country/GE")
     assert "В срезе больше" not in открыть(стенд, monkeypatch, вид, "/country/GE")
-
-
-def test_страна_без_проверок_схлопывает_пустое_в_одну_строку(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    пустая = replace(
-        данные(),
-        snapshot=replace(
-            данные().snapshot,
-            inspections=(),
-            inspections_total=0,
-            zone_losses=(),
-            systemic=(),
-        ),
-    )
-    # Чтение планов и предписаний — база; здесь они «известны и пусты».
-    monkeypatch.setattr(
-        app_mod,
-        "_country_plans",
-        lambda _код: {
-            "plans": (), "plans_known": True, "plans_truncated": False, "plans_limit": 50,
-            "plans_today": None, "plans_path": "/plans", "plans_act_path": "/actions",
-            "plans_act_country": True, "state_tones": {},
-        },
-    )  # fmt: skip
-    monkeypatch.setattr(
-        app_mod.prescriptions,
-        "country_block",
-        lambda _код: {
-            "rx_rows": (), "rx_known": True, "rx_truncated": False, "rx_limit": 50,
-            "rx_hq_path": "/actions/prescriptions", "rx_partner_path": "/orders",
-            "rx_act_hq": True, "today_rx": None,
-        },
-    )  # fmt: skip
-    страница = открыть(стенд, monkeypatch, пустая, "/country/GE")
-    assert страница.count("cn-quiet") == 1
-    assert "Пока нет:" in страница
-    # Пустые рамки и отбор без проверок не рисуются.
-    assert "ov-filters" not in страница
-    assert "country.systemic.title" not in страница and "Где страна теряет" not in страница
 
 
 def test_шапка_страны_держит_кнопки_и_счётчики(
