@@ -38,11 +38,10 @@ from bot_harness import callback_query as callback
 
 from src.bot import sidecar
 from src.bot.app import build_dispatcher
-from src.domain import check_environment
-from src.domain.engine import option, run_audit
 from src.bot.config import BotSettings
 from src.bot.texts import t
-from src.domain import add_finding, get_state, start_inspection
+from src.domain import add_finding, check_environment, get_state, start_inspection
+from src.domain.engine import option, run_audit
 
 # Меток у модуля нет: последний случай синхронный — он смотрит на файл заметок,
 # а не на диалог, и метка asyncio на нём была бы неправдой. Боевая методика
@@ -143,8 +142,14 @@ async def test_число_записей_запечатанность_не_от�
     bot, session = make_bot()
     await сдать(bot, session)
     run_audit(
-        ["add", option("qid", "CLN06"), option("level", "D1"), option("zone", "hot_kitchen"),
-         option("evidence", "Нагар на дверце"), option("comment", "")],
+        [
+            "add",
+            option("qid", "CLN06"),
+            option("level", "D1"),
+            option("zone", "hot_kitchen"),
+            option("evidence", "Нагар на дверце"),
+            option("comment", ""),
+        ],
         chat_id=CHAT_ID,
         settings=check_environment(),
     )
