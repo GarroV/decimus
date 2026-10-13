@@ -325,8 +325,9 @@
 .rt-layout { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-1); }
 .rt-layout__row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-1) 0; border-bottom: 1px solid var(--line); }
 .rt-layout__row:last-child { border-bottom: 0; }
-.rt-layout__name { display: flex; align-items: center; gap: var(--space-2); }
-.rt-layout__moves { display: flex; gap: var(--space-1); }
+.rt-layout__name { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-2); }
+.rt-layout__moves { display: flex; flex: none; gap: var(--space-1); }
+.rt-layout__moves .btn--sm { width: auto; min-width: 44px; padding: 0 var(--space-3); }  /* ↑/↓ без запаса под подпись: на 390px строка помещается в карточку */
 
 /* «Пиццерии на площадках»: таблица охвата. Таблица прокручивается внутри .rt-scroll,
    страница на 390px не едет вбок. Устаревшее — значок у числа, строка не красится. */
@@ -348,3 +349,19 @@
 .rt-link form { display: flex; flex-direction: column; gap: var(--space-2); min-width: 13rem; margin-top: var(--space-2); }
 .rt-link .input { width: 100%; max-width: none; }
 @media (max-width: 640px) { .rt-cov__counters { margin-left: 0; } }
+
+/* Таблица-журнал на телефоне: строка — карточка «подпись — значение», а не лента с прокруткой вбок. */
+@media (max-width: 719px) {
+  .rt-tbl--stack thead { display: none; }
+  .rt-tbl--stack, .rt-tbl--stack tbody, .rt-tbl--stack tr { display: block; }
+  .rt-tbl--stack tr { padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--line); }
+  .rt-tbl--stack td { display: flex; justify-content: space-between; gap: var(--space-4); padding: var(--space-1) 0; border: 0; text-align: right; overflow-wrap: anywhere; }
+  .rt-tbl--stack td:first-child, .rt-tbl--stack td:last-child { padding-left: 0; padding-right: 0; }
+  .rt-tbl--stack td::before { content: attr(data-label); flex: none; max-width: 100%; color: var(--ink-3); text-align: left; white-space: normal; }
+  .rt-tbl--stack .rt-stack__lead { justify-content: flex-start; font-weight: var(--w-semibold); color: var(--ink); text-align: left; }
+  .rt-tbl--stack .rt-stack__lead::before { content: none; }
+  .rt-tbl--stack tbody tr:hover > * { background: transparent; }
+  /* Длинная подпись (счётчики, формат, примечание) — строкой над значением, иначе значение уезжает за край. */
+  .rt-tbl--stack .rt-stack__wide { flex-direction: column; align-items: flex-start; gap: 0; text-align: left; }
+  .rt-tbl--stack .rt-stack__empty { display: none; }
+}

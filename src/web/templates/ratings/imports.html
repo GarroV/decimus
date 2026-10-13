@@ -23,6 +23,46 @@
   {% if notice %}<div class="note note--ok"><div><div class="note__title">{{ notice }}</div></div></div>{% endif %}
   {% if failure %}<div class="note note--error"><div><div class="note__title">{{ failure }}</div></div></div>{% endif %}
 
+  {#- Таблица контроля (D464): забор самим decimus; сбой — строкой, а не тишиной. -#}
+  <section class="rt-sec" aria-labelledby="rt-sheet">
+    {{ sec_head('rt-sheet', 'ratings.sheet.title', t('ratings.sheet.hint', h=sheet_every_h)) }}
+    {% if sheet_notice %}<div class="note note--ok"><div><div class="note__title">{{ t(sheet_notice) }}</div></div></div>{% endif %}
+    {% if not sheet.configured %}
+    <div class="rt-empty">{{ t('ratings.sheet.off') }}</div>
+    {% elif sheet.unreadable %}
+    <div class="note note--error"><div><div class="note__title">{{ t('ratings.sheet.unreadable') }}</div></div></div>
+    {% else %}
+    <div class="rt-card"><div class="rt-card__body">
+      <p>{% if sheet.last_at %}{{ t('ratings.sheet.last', at=sheet.last_at.strftime(at_format)) }}{% else %}{{ t('ratings.sheet.never') }}{% endif %}</p>
+      {% if sheet.failed %}<div class="note note--error"><div><div class="note__title">{{ t('ratings.sheet.failed', n=sheet.failed, m=sheet.rows|length) }}</div></div></div>{% endif %}
+      {% if sheet.pending %}<p>{{ t('ratings.sheet.pending', at=sheet.pending.requested_at.strftime(at_format), by=sheet.pending.requested_by) }}</p>
+      {% else %}
+      <form method="post" action="{{ action('/sheet-sync') }}" class="rt-form">
+        <button class="btn btn--primary btn--sm" type="submit">{{ t('ratings.sheet.now') }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% if sheet.rows %}
+    {% set has_reason = sheet.rows|selectattr('reason')|list|length > 0 %}
+    <div class="rt-scroll"><table class="rt-tbl rt-tbl--stack">
+      <thead><tr>
+        <th scope="col" class="is-text">{{ t('ratings.sheet.col.tab') }}</th><th scope="col" class="is-text">{{ t('ratings.sheet.col.at') }}</th>
+        <th scope="col" class="is-text">{{ t('ratings.sheet.col.result') }}</th><th scope="col" class="rt-th-wrap">{{ t('ratings.journal.counts') }}</th>
+        {% if has_reason %}<th scope="col" class="is-text">{{ t('ratings.sheet.col.reason') }}</th>{% endif %}
+      </tr></thead>
+      <tbody>{% for row in sheet.rows %}<tr>
+        <td class="is-text rt-wrap rt-stack__lead">{{ t('ratings.format.' ~ row.tab) }}</td>
+        <td class="is-text num" data-label="{{ t('ratings.sheet.col.at') }}">{{ row.checked_at.strftime(at_format) }}</td>
+        <td class="is-text" data-label="{{ t('ratings.sheet.col.result') }}"><span class="tag{% if row.outcome == 'failed' %} tag--err{% else %} tag--ok{% endif %}">{{ t('ratings.sheet.outcome.' ~ row.outcome) }}</span></td>
+        <td class="num rt-stack__wide" data-label="{{ t('ratings.journal.counts') }}">{% if row.counts %}{{ row.counts[0] }} · {{ row.counts[1] }} · {{ row.counts[2] }} · {{ row.counts[3] }}{% else %}—{% endif %}</td>
+        {% if has_reason %}<td class="is-text rt-wrap rt-stack__wide{% if not row.reason %} rt-stack__empty{% endif %}" data-label="{{ t('ratings.sheet.col.reason') }}">{{ row.reason or '' }}</td>{% endif %}
+      </tr>{% endfor %}</tbody>
+    </table></div>
+    {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
   <section class="rt-sec" aria-labelledby="rt-upload">
     {{ sec_head('rt-upload', 'ratings.imports.submit', t('ratings.imports.hint', mb=max_mb)) }}
     <div class="rt-card"><div class="rt-card__body">
@@ -59,7 +99,7 @@
   <section class="rt-sec" aria-labelledby="rt-journal">
     {{ sec_head('rt-journal', 'ratings.journal') }}
     {% if journal %}
-    <div class="rt-card rt-scroll"><table class="rt-tbl">
+    <div class="rt-card rt-scroll"><table class="rt-tbl rt-tbl--stack">
       <thead><tr>
         <th scope="col" class="is-text">{{ t('ratings.journal.at') }}</th><th scope="col" class="is-text">{{ t('ratings.journal.actor') }}</th>
         <th scope="col" class="is-text">{{ t('ratings.journal.channel') }}</th><th scope="col" class="is-text">{{ t('ratings.journal.format') }}</th>
@@ -67,13 +107,13 @@
         {% if lang == 'ru' %}<th scope="col" class="is-text">{{ t('ratings.journal.note') }}</th>{% endif %}
       </tr></thead>
       <tbody>{% for row in journal %}<tr>
-        <td class="is-text num">{{ row.at.strftime(at_format) }}</td>
-        <td class="is-text">{{ row.actor }}</td>
-        <td class="is-text">{{ t('ratings.channel.' ~ row.channel) }}</td>
-        <td class="is-text rt-wrap">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
-        <td class="is-text"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.outcome.' ~ row.outcome) }}</span></td>
-        <td class="num">{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
-        {% if lang == 'ru' %}<td class="is-text rt-wrap">{{ row.note or '' }}</td>{% endif %}
+        <td class="is-text num rt-stack__lead">{{ row.at.strftime(at_format) }}</td>
+        <td class="is-text" data-label="{{ t('ratings.journal.actor') }}">{{ row.actor }}</td>
+        <td class="is-text" data-label="{{ t('ratings.journal.channel') }}">{{ t('ratings.channel.' ~ row.channel) }}</td>
+        <td class="is-text rt-wrap rt-stack__wide" data-label="{{ t('ratings.journal.format') }}">{% if row.format %}<span title="{{ row.format }}">{{ t('ratings.format.' ~ row.format) }}</span>{% else %}—{% endif %}{% if row.file_name %}<br><small>{{ row.file_name }}</small>{% endif %}</td>
+        <td class="is-text" data-label="{{ t('ratings.journal.outcome') }}"><span class="tag{% if row.outcome == 'failed' %} tag--err{% elif row.outcome == 'loaded' %} tag--ok{% endif %}">{{ t('ratings.outcome.' ~ row.outcome) }}</span></td>
+        <td class="num rt-stack__wide" data-label="{{ t('ratings.journal.counts') }}">{{ row.accepted }} · {{ row.updated }} · {{ row.skipped }} · {{ row.unmatched }}</td>
+        {% if lang == 'ru' %}<td class="is-text rt-wrap rt-stack__wide{% if not row.note %} rt-stack__empty{% endif %}" data-label="{{ t('ratings.journal.note') }}">{{ row.note or '' }}</td>{% endif %}
       </tr>{% endfor %}</tbody>
     </table></div>
     {% else %}<div class="rt-empty">{{ t('ratings.journal.empty') }}</div>{% endif %}
