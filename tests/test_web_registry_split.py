@@ -158,7 +158,9 @@ def test_выбранная_адресом_проверка_открыта_сп�
 
     assert "data-drawer" in страница
     assert 'id="inspection-title">Тбилиси-2<' in страница
-    assert f'href="/inspections/{строка.id}?lang=ru"' in страница
+    # Панель — полный просмотр (D465): ссылки на отдельную страницу карточки нет.
+    assert f'href="/inspections/{строка.id}?lang=ru"' not in страница
+    assert "Открыть полностью" not in страница
 
 
 def test_проверка_вне_охвата_справа_не_показана(
@@ -186,8 +188,10 @@ def test_действия_справа_те_же_что_у_карточки(
 
     страница = стенд.get(f"/inspections?inspection={строка.id}").get_data(as_text=True)
 
-    for действие in ("/retract", "/letter", t("card.act.move", "ru")):
+    for действие in ("/retract", "/letter"):
         assert (действие in страница) is свои_действия, действие
+    # Принятую проверку не правят (D465): «Исправить» в панели у неё нет ни у кого.
+    assert t("card.act.move", "ru") not in страница
 
 
 @pytest.mark.parametrize("стенд", ["guest"], indirect=True)

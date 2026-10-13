@@ -1178,7 +1178,7 @@ def _registry_panel(chosen: str, *, conf: Settings) -> _RegistryPanel:
     if not chosen:
         return _RegistryPanel("", None, False, False)
     try:
-        контекст = _card_context(chosen, conf=conf, notice=None, failure=None, compact=True)
+        контекст = _card_context(chosen, conf=conf, notice=None, failure=None, panel=True)
     except DatabaseTargetError:
         raise
     except DbError as exc:
@@ -1263,12 +1263,21 @@ def _registry_picks(
     return tuple(чипы)
 
 
+#: Заголовок, которым `split.js` отличает действие из панели от обычной формы.
+PANEL_HEADER = "X-Panel"
+
+
 def _render_card(
     inspection_id: str, *, conf: Settings, notice: str | None, failure: str | None
 ) -> str | tuple[str, int]:
     контекст = _card_context(inspection_id, conf=conf, notice=notice, failure=failure)
     if контекст is None:
         return render_template("inspections/not_found.html"), 404
+    # Действие из панели реестра (`split.js`) отправлено фоном и ждёт обратно
+    # только карточку с итогом, а не страницу целиком (D465). Без скрипта форма
+    # идёт обычным путём и получает страницу карточки, как и раньше.
+    if request.method == "POST" and request.headers.get(PANEL_HEADER) == "1":
+        return render_template("inspections/_panel_fragment.html", c=контекст)
     return render_template("inspections/card.html", c=контекст, **контекст)
 
 
@@ -1278,7 +1287,7 @@ def _card_context(
     conf: Settings,
     notice: str | None,
     failure: str | None,
-    compact: bool = False,
+    panel: bool = False,
 ) -> dict[str, Any] | None:
     """Всё, что карточка проверки знает и разрешает; `None` — проверки нет в охвате.
 
@@ -1286,9 +1295,10 @@ def _card_context(
     колонку реестра (`?inspection=`). Права (`may_*`) считаются здесь и только
     здесь — у панели не может оказаться кнопки, которой нет у карточки.
 
-    `compact` — для панели: лист вычитки, кадры, информационная часть и
-    список точек для переноса не читаются. Панель их не показывает, а ведёт
-    в полную карточку, и платить за них на каждом щелчке по строке незачем.
+    Панель реестра — это и есть полный просмотр (D465): лист вычитки, кадры,
+    информационная часть читаются так же, как для отдельной страницы. Отличие
+    одно: принятую проверку в панели не правят, переноса там нет — и список
+    точек для него (`panel=True`) не читается.
     """
     detail = data.load_card(inspection_id, reach=auth.current_reach())
     if detail is None:
@@ -1326,7 +1336,7 @@ def _card_context(
     # уже нечего, а чтение чек-листа версии на каждом открытии не бесплатно.
     лист = (
         review.load_sheet(detail.inspection, detail.findings, lang=lang)
-        if detail.inspection.on_review and not compact
+        if detail.inspection.on_review
         else None
     )
     # Есть ли PDF — спрашивается при каждом открытии: кнопка, ведущая в отказ,
@@ -1338,16 +1348,15 @@ def _card_context(
     except DbError:
         отчёт = None
         отчёт_известен = False
-    поля, методика_полей = ((), "") if compact else data.load_info(detail, lang=lang)
+    поля, методика_полей = data.load_info(detail, lang=lang)
     # Кадры — украшение к записи, а не её часть: отказ базы здесь карточку не
     # роняет, записи показываются без кадров, и это сказано словами.
     кадры: dict[str, Any] = {}
     кадры_известны = True
-    if not compact:
-        try:
-            кадры = data.load_previews(inspection_id, reach=auth.current_reach())
-        except DbError:
-            кадры_известны = False
+    try:
+        кадры = data.load_previews(inspection_id, reach=auth.current_reach())
+    except DbError:
+        кадры_известны = False
     zone_lines = view.zone_lines(detail.by_zone, lang)
     план, план_известен = action_plans.card_plan(inspection_id)
     # План нужен (D2/D3 у принятой проверки УК), а запроса нет: либо его можно
@@ -1406,9 +1415,7 @@ def _card_context(
         moves=переносы,
         moves_known=история_известна,
         may_move=можно_переносить,
-        units=data.load_units(reach=auth.current_reach())
-        if можно_переносить and not compact
-        else (),
+        units=data.load_units(reach=auth.current_reach()) if можно_переносить and not panel else (),
         detail=detail,
         head=detail.inspection,
         zones=zone_lines,
@@ -1434,8 +1441,7 @@ def _card_context(
         # ошибку на приёмке чинят правкой записи (D200).
         may_retract=data.retraction_available()
         and _inspection_may("inspection.retract", detail)
-        and своя
-        and not detail.inspection.on_review,
+        and своя,
         own=своя,
         notice=notice,
         failure=failure,

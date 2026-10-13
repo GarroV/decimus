@@ -63,7 +63,6 @@ _BAR: dict[str, dict[str, str]] = {
 
 _PANEL: dict[str, dict[str, str]] = {
     "registry.drawer.title": {"ru": "Проверка", "en": "Inspection"},
-    "registry.panel.open": {"ru": "Открыть полностью", "en": "Open in full"},
     "registry.panel.pick_title": {"ru": "Выберите проверку", "en": "Pick an inspection"},
     "registry.panel.pick_text": {
         "ru": "Карточка откроется здесь: оценка, потери по блокам, записи и действия.",
@@ -82,17 +81,18 @@ _PANEL: dict[str, dict[str, str]] = {
         "en": "The card did not open just now",
     },
     "registry.panel.failed.text": {
-        "ru": "База не ответила на запрос карточки. Список жив; откройте проверку полностью.",
-        "en": "The database did not answer for the card. The list works; open it in full.",
+        "ru": "База не ответила на запрос карточки. Список жив; откройте проверку ещё раз.",
+        "en": "The database did not answer for the card. The list works; try opening it again.",
     },
     "registry.panel.score": {"ru": "Итог", "en": "Total"},
     "registry.panel.facts": {"ru": "Проверка", "en": "Inspection"},
     "registry.panel.date": {"ru": "Дата обхода", "en": "Visit date"},
     "registry.panel.kind": {"ru": "Вид", "en": "Kind"},
     "registry.panel.checklist": {"ru": "Чек-лист", "en": "Checklist"},
-    "registry.panel.findings_more": {
-        "ru": "Ещё {n} — в полной карточке",
-        "en": "{n} more in the full card",
+    "registry.panel.retry": {"ru": "Повторить", "en": "Try again"},
+    "registry.panel.net_error": {
+        "ru": "Не удалось связаться с сервером. Попробуйте ещё раз.",
+        "en": "Could not reach the server. Please try again.",
     },
 }
 
