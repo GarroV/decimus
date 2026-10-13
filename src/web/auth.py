@@ -554,7 +554,9 @@ def install(app: Flask, conf: Settings) -> None:
         новая = open_session(account)
         if прежний:
             close_session(прежний)
-        return remember(redirect(f"{request.script_root}{назад}"), новая)
+        ответ = redirect(f"{request.script_root}{назад}")
+        reauth.arm_intent(ответ, account, назад)
+        return remember(ответ, новая)
 
     def _начать_подтверждение(назад: str) -> Response:
         """Увод к Google подтвердить вход; метка и путь возврата — в подписанной куке."""
@@ -602,6 +604,7 @@ def install(app: Flask, conf: Settings) -> None:
         begin_google=_начать_подтверждение,
         # Имя ищется в момент вызова: так сверка идёт ровно той дверью, что у входа.
         verify=lambda login, password: authenticate(login, password),
+        secret_key=conf.secret_key,
     )
 
     def _вернуть_привязку(реквизиты: GoogleSettings, метка: str) -> Response:

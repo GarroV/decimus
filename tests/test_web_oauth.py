@@ -610,7 +610,7 @@ def _несвежая_сессия(monkeypatch: pytest.MonkeyPatch) -> None:
 
     from web_harness import ТОКЕН, Учётка
 
-    давно = datetime.now(UTC) - timedelta(minutes=16)
+    давно = datetime.now(UTC) - timedelta(hours=12, minutes=1)
     monkeypatch.setattr(
         auth,
         "resolve_session",
