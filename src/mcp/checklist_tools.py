@@ -29,6 +29,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from src.domain.permissions import SIDE_HQ, side_of
+
 from . import checklist as store_api
 from . import photo_cues as cues_api
 from . import route as route_api
@@ -37,7 +39,7 @@ from . import suggestions as proposals_api
 from . import tools as reads
 from . import uncovered as uncovered_api
 from .checklist import Outcome, Store
-from .errors import ChecklistError
+from .errors import ChecklistError, ToolError
 
 #: Виды пунктов, которые можно завести. `off` сюда не входит намеренно: это не
 #: вид пункта, а выключенное состояние, и включают-выключают его
@@ -716,8 +718,15 @@ def uncovered_phrases(
     аудиторов не открываются партнёрскому токену заодно с историей его
     пиццерий.
     """
-    del tenant  # право на методику проверено на входе, по коду арендатора
     del store  # накопитель лежит в состоянии проверки, а не в хранилище версий
+    # Накопитель общий на все пространства: партнёру его отдавать нельзя, чьим бы
+    # токеном ни открыли методику (список `.env` или роль, D460). Это второй
+    # замок поверх матрицы (`phrases.raw`): токен без роли матрицу не проходит.
+    if side_of(tenant) != SIDE_HQ:
+        raise ToolError(
+            "Слова аудиторов из накопителя общие для всех пространств и доступны только УК. "
+            "Слова вашего пространства показывает learned_phrases"
+        )
     return uncovered_api.read_all(
         limit=uncovered_api.DEFAULT_CANDIDATES if limit is None else limit
     )
