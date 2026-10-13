@@ -83,7 +83,7 @@ def test_последнего_главного_не_отключить(роль_
     web_access.create_account("boss", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
 
     with pytest.raises(web_access.LastSuperadminError):
-        web_access.disable_account("boss", tenant="HQ")
+        web_access.freeze_account("boss", tenant="HQ")
     assert _живые_главные(pg_dsn) == {"boss"}
 
 
@@ -126,7 +126,7 @@ def test_из_двух_главных_одного_снять_можно_вто�
     web_access.create_account("boss", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
     web_access.create_account("dev", tenant="HQ", password=ПАРОЛЬ, role="superadmin")
 
-    assert web_access.disable_account("dev", tenant="HQ") is True
+    assert web_access.freeze_account("dev", tenant="HQ") is True
     with pytest.raises(web_access.LastSuperadminError):
         web_access.reassign_role("boss", tenant="HQ", role="developer")
     assert _живые_главные(pg_dsn) == {"boss"}
@@ -171,7 +171,7 @@ def test_снятие_не_главного_не_ждёт_и_не_мешает(�
     """Триггер срабатывает только на главного: бизнес-девелопера отключают как прежде."""
     web_access.create_account("petr", tenant="HQ", password=ПАРОЛЬ, role="developer")
 
-    assert web_access.disable_account("petr", tenant="HQ") is True
+    assert web_access.freeze_account("petr", tenant="HQ") is True
 
 
 @pytest.mark.parametrize("дверь", ["role", "disable", "email"])
@@ -185,7 +185,7 @@ def test_чужая_роль_цели_не_правится_запросом(р�
             web_access.reassign_role("dev", tenant="HQ", role="developer", only_roles=охват) is None
         )
     elif дверь == "disable":
-        assert web_access.disable_account("dev", tenant="HQ", only_roles=охват) is False
+        assert web_access.freeze_account("dev", tenant="HQ", only_roles=охват) is False
     else:
         assert (
             web_access.set_email("dev", tenant="HQ", email="dev@example.com", only_roles=охват)

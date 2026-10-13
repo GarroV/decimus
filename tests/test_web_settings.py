@@ -31,7 +31,14 @@ from src.web.google_auth import GoogleSettings
     ("GE", "auditor"),
 ]
 
-РАЗДЕЛЫ = ('id="claude"', 'id="bot"', 'id="google"', 'id="language"', 'id="password"')
+РАЗДЕЛЫ = (
+    'id="claude"',
+    'id="bot"',
+    'id="google"',
+    'id="language"',
+    'id="password"',
+    'id="signout"',
+)
 
 
 def _стенд(
@@ -185,3 +192,84 @@ def test_тексты_есть_по_английски(monkeypatch: pytest.Monke
 
     assert "Settings" in страница and "Telegram bot" in страница
     assert "Interface language" in страница and "Настройки" not in страница
+
+
+# --- «Выйти везде» (D462) ----------------------------------------------------------
+
+
+@pytest.mark.parametrize(("tenant", "role"), РОЛИ)
+def test_выйти_везде_закрывает_свою_сессию_и_уводит_на_вход(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, role: str
+) -> None:
+    from src.web import accounts
+
+    закрытые: list[str] = []
+    monkeypatch.setattr(
+        accounts, "sign_out_everywhere", lambda token: закрытые.append(token) or True
+    )
+
+    for client in _стенд(monkeypatch, tenant=tenant, role=role):
+        ответ = client.post("/settings/sign-out-everywhere", headers=ЗАГОЛОВКИ)
+
+        assert ответ.status_code == 302 and ответ.headers["Location"].endswith("/login"), role
+        assert закрытые == [ТОКЕН], "закрыта не та сессия: чья учётка — решает сессия, не форма"
+        assert f"{auth.COOKIE_NAME}=;" in ответ.headers.get("Set-Cookie", ""), "кука осталась"
+
+
+def test_выйти_везде_берёт_учётку_из_сессии_а_не_из_формы(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.web import accounts
+
+    закрытые: list[str] = []
+    monkeypatch.setattr(
+        accounts, "sign_out_everywhere", lambda token: закрытые.append(token) or True
+    )
+
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        client.post(
+            "/settings/sign-out-everywhere",
+            data={"user_id": "чужая-учётка", "token": "чужой-токен", "login": "boss2"},
+            headers=ЗАГОЛОВКИ,
+        )
+
+    assert закрытые == [ТОКЕН]
+
+
+def test_выйти_везде_с_чужой_страницы_не_закрывает_ничего(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from src.web import accounts
+
+    закрытые: list[str] = []
+    monkeypatch.setattr(
+        accounts, "sign_out_everywhere", lambda token: закрытые.append(token) or True
+    )
+
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        ответ = client.post(
+            "/settings/sign-out-everywhere", headers={"Origin": "https://evil.example"}
+        )
+
+        assert ответ.status_code == 403
+    assert закрытые == []
+
+
+def test_выйти_везде_при_отказе_базы_не_выходит_молча(monkeypatch: pytest.MonkeyPatch) -> None:
+    from src.db.errors import AccessError
+    from src.web import accounts
+
+    def отказ(token: str) -> bool:
+        raise AccessError("база не ответила")
+
+    monkeypatch.setattr(accounts, "sign_out_everywhere", отказ)
+
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
+        ответ = client.post("/settings/sign-out-everywhere", headers=ЗАГОЛОВКИ)
+
+        assert ответ.status_code == 503
+        assert "Не закрыто" in ответ.get_data(as_text=True)
+        assert (
+            "Set-Cookie" not in ответ.headers
+            or auth.COOKIE_NAME + "=;" not in ответ.headers["Set-Cookie"]
+        ), "кука стёрта, а сессия в базе жива"

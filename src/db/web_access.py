@@ -120,10 +120,12 @@ _SELECT_USER_SQL = """
 #: Пустое пространство (`null`) — люди всех пространств: экран админа УК
 #: (D286). Условие в тексте неизменно, охват приходит параметром (S608).
 _LIST_USERS_SQL = """
-    select login, created_at, disabled_at, role, tenant_code, id, email
-      from web_users
-     where (%(tenant)s::text is null or tenant_code = %(tenant)s)
-     order by tenant_code, login
+    select u.login, u.created_at, u.disabled_at, u.role, u.tenant_code, u.id, u.email,
+           f.login
+      from web_users u
+      left join web_users f on f.id = u.disabled_by
+     where (%(tenant)s::text is null or u.tenant_code = %(tenant)s)
+     order by u.tenant_code, u.login
 """
 
 _LIST_SPACES_SQL = "select code from tenants order by code"
@@ -131,12 +133,24 @@ _LIST_SPACES_SQL = "select code from tenants order by code"
 #: `roles` — охват правящего по роли ЦЕЛИ (#585): условие в самом запросе, а не
 #: только в маршруте. Цель, ставшая админом между чтением перечня и записью,
 #: не правится тем, кому админы вне охвата. `null` — без ограничения.
-_DISABLE_USER_SQL = """
+_FREEZE_USER_SQL = """
     update web_users
-       set disabled_at = now()
+       set disabled_at = now(), disabled_by = %(by)s
      where tenant_code = %(tenant)s and login = %(login)s and disabled_at is null
        and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
 """
+
+#: Разморозка снимает только отметку: закрытое заморозкой (`0063`) остаётся
+#: закрытым. Условие на роль цели — то же, что у заморозки.
+_UNFREEZE_USER_SQL = """
+    update web_users
+       set disabled_at = null, disabled_by = null
+     where tenant_code = %(tenant)s and login = %(login)s and disabled_at is not null
+       and (%(roles)s::text[] is null or role = any(%(roles)s::text[]))
+"""
+
+#: «Выйти везде» — функцией базы (`0063`): строку выбирает живая сессия.
+_SIGN_OUT_EVERYWHERE_SQL = "select sign_out_everywhere(%s)"
 
 #: Прежняя роль читается той же командой, что пишет новую: строка запирается
 #: (`for update`), и между «было» и «стало» вторая правка не вклинится.
@@ -358,6 +372,9 @@ class AccountRow:
     #: Почта входа через Google (#399): экран людей правит её и обязан видеть,
     #: какая стоит сейчас. `None` — вход через Google закрыт.
     email: str | None = None
+    #: Логин того, кто заморозил (D462); `None` — не заморожена, заморожена
+    #: командой с машины или до `0063`.
+    disabled_by: str | None = None
 
 
 @dataclass(frozen=True)
@@ -591,6 +608,7 @@ def list_accounts(*, tenant: str | None) -> tuple[AccountRow, ...]:
             tenant=str(r[4]),
             id=str(r[5]),
             email=None if r[6] is None else str(r[6]),
+            disabled_by=None if r[7] is None else str(r[7]),
         )
         for r in строки
     )
@@ -611,24 +629,61 @@ def _roles_param(only_roles: tuple[str, ...] | None) -> list[str] | None:
     return None if only_roles is None else list(only_roles)
 
 
-def disable_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
-    """Отключить учётку. `False` — такой живой учётки нет (или её роль вне `only_roles`).
+def freeze_account(
+    login: str,
+    *,
+    tenant: str,
+    only_roles: tuple[str, ...] | None = None,
+    by: str | None = None,
+) -> bool:
+    """Заморозить учётку (D462). `False` — такой живой учётки нет (или её роль вне `only_roles`).
 
-    Действует немедленно и на уже открытые сессии: опознание сверяет учётку
-    вместе с сессией на каждом запросе, а не запоминает её при входе.
-    Последнего главного админа не отключает — `LastSuperadminError` (`0041`).
+    Одним запросом ставится отметка и кто заморозил (`by` — `web_users.id`;
+    `None` — команда с машины). Остальное делает база в той же транзакции:
+    триггеры `0059` (токены MCP) и `0063` (сессии, подключения Claude, привязка
+    бота, ссылки привязки). Действует немедленно: опознание сверяет учётку на
+    каждом запросе. Последнего главного админа не замораживает —
+    `LastSuperadminError` (`0041`).
     """
-    with _managing("отключить учётку") as conn, conn.cursor() as cur:
+    with _managing("заморозить учётку") as conn, conn.cursor() as cur:
         with _guarding_last_superadmin():
             cur.execute(
-                _DISABLE_USER_SQL,
+                _FREEZE_USER_SQL,
                 {
                     "tenant": tenant,
                     "login": login.strip().lower(),
                     "roles": _roles_param(only_roles),
+                    "by": by,
                 },
             )
         return cur.rowcount > 0
+
+
+def unfreeze_account(login: str, *, tenant: str, only_roles: tuple[str, ...] | None = None) -> bool:
+    """Разморозить учётку: снять отметку. `False` — такой замороженной учётки нет.
+
+    Сессии, подключения Claude, токены и привязка бота остаются закрытыми:
+    человек входит заново, привязывает бота и подключает Claude сам.
+    """
+    with _managing("разморозить учётку") as conn, conn.cursor() as cur:
+        cur.execute(
+            _UNFREEZE_USER_SQL,
+            {"tenant": tenant, "login": login.strip().lower(), "roles": _roles_param(only_roles)},
+        )
+        return cur.rowcount > 0
+
+
+def sign_out_everywhere(token: str) -> bool:
+    """«Выйти везде»: закрыть ВСЕ сессии человека (и ту, чей токен предъявлен) и всё, чем он
+    подключал Claude. `False` — сессия не живая, ничего не сделано.
+
+    Привязка бота остаётся. Строку выбирает функция базы по живой сессии
+    (`0063`): чужую учётку этой дверью не закрыть.
+    """
+    with _connected("выйти на всех устройствах") as conn, conn.cursor() as cur:
+        cur.execute(_SIGN_OUT_EVERYWHERE_SQL, (token,))
+        строка = cur.fetchone()
+    return bool(строка and строка[0])
 
 
 def set_role(login: str, *, tenant: str, role: str) -> bool:
