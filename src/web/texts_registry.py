@@ -100,7 +100,7 @@ _PANEL: dict[str, dict[str, str]] = {
     },
 }
 
-# «Где нужно проверить» (D399; с «Главной» на «Проверки» в D418, оттуда в «Календарь» в D462).
+# «Где нужно проверить» (D399; с «Главной» на «Проверки» в D418, оттуда в «Календарь» в D466).
 _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
     "registry.tocheck.hint": {

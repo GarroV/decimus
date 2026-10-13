@@ -110,7 +110,7 @@ def test_check_registry_refuses_a_built_section_left_without_a_screen() -> None:
 
 
 def test_check_registry_refuses_a_built_calendar_left_without_a_screen() -> None:
-    """«Календарь» построен (D462): экрана нет — приложение не собирается."""
+    """«Календарь» построен (D466): экрана нет — приложение не собирается."""
     with pytest.raises(SectionRegistryError, match="calendar"):
         check_registry(
             (
