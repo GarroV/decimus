@@ -184,7 +184,7 @@ class _Writer:
     def unit(self, ref: UnitRef, row_no: int) -> str | None:
         self.country(ref.country)
         if ref.dodo_id is not None:
-            # D467: наше название не перезаписывается другим написанием того же.
+            # D472: наше название не перезаписывается другим написанием того же.
             ours = next((k.name for k in self.known if k.dodo_id == ref.dodo_id), None)
             name = ours if ours and fold_unit_name(ours) == fold_unit_name(ref.name) else ref.name
             store.upsert_unit(
