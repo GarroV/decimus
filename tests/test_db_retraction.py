@@ -92,7 +92,7 @@ def test_снятие_ставит_пометку_и_записывает_при
 def test_ждущую_приёмки_можно_отклонить_и_она_уходит_из_очереди(
     domain_env: Path, retraction_env: str
 ) -> None:
-    """D461: у проверки на приёмке есть «Принять» и «Отклонить», а не только «Принять»."""
+    """D465: у проверки на приёмке есть «Принять» и «Отклонить», а не только «Принять»."""
     start_inspection(402, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="default")
     add_finding(402, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
     ident = push_inspection(402)  # не принята: ждёт приёмки (D199)
