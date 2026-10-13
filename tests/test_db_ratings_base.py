@@ -251,7 +251,7 @@ def test_справочник_с_занятым_id_не_переименовыв
 
 
 def test_наше_название_не_перезаписывается_иным_написанием(db_env: str) -> None:
-    """D467: пришло «Izmir-4» с тем же id, у нас «İzmir-4» — остаётся наше."""
+    """D472: пришло «Izmir-4» с тем же id, у нас «İzmir-4» — остаётся наше."""
     _грузить(snapshot(name="İzmir-4"))
     _грузить(snapshot(name="Izmir-4"))
     assert _строки(db_env, "select dodo_id, name from ratings.units") == [(U1, "İzmir-4")]
