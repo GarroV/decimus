@@ -67,6 +67,19 @@ def handed_over(chat_id: int) -> bool:
         raise DomainError(f"Признак сдачи в заметках {path} не число: {raw!r}") from exc
 
 
+def guard_writable(chat_id: int) -> None:
+    """Отказать, если проверка сдана: стоит ВНУТРИ каждой изменяющей функции домена.
+
+    Страж живёт в домене, а не в роутерах: новый вход (команда бота, ручка
+    мини-аппа, инструмент) вызывает те же функции и не может «забыть» проверку.
+    Замка не берёт — он не повторный, а вызывающий мог уже сидеть под
+    `while_open`; решающая проверка против гонки с самой сдачей остаётся за
+    `while_open`, здесь — отказ по состоянию на момент вызова.
+    """
+    if handed_over(chat_id):
+        raise HandedOverError(f"Проверка чата {chat_id} сдана — запись не принимается")
+
+
 @contextmanager
 def while_open(chat_id: int) -> Iterator[None]:
     """Держать проверку несданной на время записи: проверка и запись — под одним замком.
@@ -77,8 +90,7 @@ def while_open(chat_id: int) -> Iterator[None]:
     — другой файл, и движок внутри блока берёт его как обычно.
     """
     with state_lock(_notes_path(chat_id)):
-        if handed_over(chat_id):
-            raise HandedOverError(f"Проверка чата {chat_id} сдана — запись не принимается")
+        guard_writable(chat_id)
         yield
 
 
