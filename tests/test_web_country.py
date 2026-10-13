@@ -1,4 +1,4 @@
-"""Экран «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии, отбор «Девелопер»."""
+"""Экран «Страна» (D467): шапка, сегменты, панель пиццерии, отбор «Девелопер»."""
 
 from __future__ import annotations
 
@@ -14,9 +14,8 @@ from web_harness import войти, подменить_двери, собрат�
 
 from src.db.directory import Unit
 from src.web import country as cn
-from src.web import country_page, country_summary, country_units
+from src.web import country_page, country_summary, country_units, prescriptions
 from src.web import overview as ov
-from src.web import prescriptions
 
 
 @pytest.fixture
@@ -32,7 +31,8 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
         country_page,
         "_country_plans",
         lambda _код: {
-            "plans": (), "plans_known": True, "plans_act_path": "/actions", "plans_act_country": True,
+            "plans": (), "plans_known": True, "plans_act_path": "/actions",
+            "plans_act_country": True,
         },
     )  # fmt: skip
     monkeypatch.setattr(
@@ -179,7 +179,9 @@ def test_точка_только_из_свода_открывается_без_�
     ключ = country_units.SVOD_KEY + "pipe-1"
     с_таблицей(monkeypatch, строка_таблицы(key=ключ, name="Pipe-1", unit_id="", stage="pipeline"))
     страница = открыть(стенд, monkeypatch, данные(), f"/country/GE?seg=units&unit={ключ}")
-    assert "data-drawer" in страница and "/units/" not in страница
+    assert (
+        "data-drawer" in страница and "/units/u-" not in страница and "/units/pipe" not in страница
+    )
 
 
 def test_ссылки_строк_сохраняют_сегмент_период_и_язык(
@@ -187,7 +189,10 @@ def test_ссылки_строк_сохраняют_сегмент_период_
 ) -> None:
     с_таблицей(monkeypatch, строка_таблицы())
     страница = открыть(
-        стенд, monkeypatch, с_точкой(данные()), "/country/GE?seg=units&from=2026-09-01&to=2026-09-30&lang=en"
+        стенд,
+        monkeypatch,
+        с_точкой(данные()),
+        "/country/GE?seg=units&from=2026-09-01&to=2026-09-30&lang=en",
     )
     ссылка = next(ч for ч in страница.split('"') if "unit=u-1" in ч)
     assert "seg=units" in ссылка and "from=2026-09-01" in ссылка and "lang=en" in ссылка
@@ -213,7 +218,7 @@ def test_где_болит_одним_блоком_и_только_при_про
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
-    assert страница.count("cn-hurt\"") == 1 and "K-041" in страница and "Кухня" in страница
+    assert страница.count('cn-hurt"') == 1 and "K-041" in страница and "Кухня" in страница
 
 
 def test_смена_языка_оставляет_страну_и_раскрытую_точку(
@@ -281,3 +286,52 @@ def test_шапка_страны_держит_кнопки_и_счётчики(
     страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
     шапка = страница.split('class="cn-actions"', 1)[1].split("</div>", 1)[0]
     assert "cn-count" in шапка and "Экшн-планы" in шапка and "Предписания" in шапка
+
+
+def test_девелопер_в_колонке_и_сводка_его_стран(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cn, "countries", lambda **_: (("GE", 3), ("RS", 2)))
+    monkeypatch.setattr(
+        country_summary,
+        "developers_of",
+        lambda _c: ({"Иван": ("RS",)}, {"RS": "Иван"}, False),
+    )
+    видели: list[str] = []
+
+    def load(**kw: object) -> cn.CountryView:
+        видели.append(str(kw["code"]))
+        return replace(данные(), code=str(kw["code"]))
+
+    monkeypatch.setattr(cn, "load", load)
+    без = стенд.get("/country/GE").get_data(as_text=True)
+    assert "cn-devpick" in без and "dev=" in без
+    сводка = стенд.get("/country?dev=Иван").get_data(as_text=True)
+    assert видели[-1] == "RS" and "/country/GE" not in сводка.split('class="mx-main', 1)[0]
+    assert "Страна</div>" not in сводка.split('class="mx-main', 1)[1].split("<h1", 1)[0]
+    # Неизвестный девелопер не сужает ничего.
+    assert "/country/GE" in стенд.get("/country?dev=нет").get_data(as_text=True)
+
+
+def test_среднее_нескольких_стран_взвешено_числом_проверок() -> None:
+    a = replace(снимок(inspections=()), inspections_total=1, average=60.0, grades=(("D", 1),))
+    b = replace(снимок(inspections=()), inspections_total=3, average=100.0, grades=(("A", 3),))
+    итог = country_summary.summarize([a, b])
+    assert итог.average == 90.0 and итог.inspections == 4
+    assert итог.grades == (("A", 3), ("D", 1))
+
+
+def test_строки_таблицы_сводят_справочник_и_свод_по_коду_а_свод_без_пары_остаётся() -> None:
+    from src.db.unit_profiles import Profile
+
+    точки = [Unit(id="u-1", name="Батуми-1", code="C1", aliases=(), country="GE", city="batumi")]
+    свод = [
+        Profile(country_code="GE", name="Батуми-1", stage="closed", status="x", dodo_id="C1",
+                partner="П"),
+        Profile(country_code="GE", name="Новая", stage="pipeline", status="y", name_normalized="n"),
+    ]  # fmt: skip
+    строки = country_units.build_rows(точки, свод, {}, {"C1": (91.0, 88.0)}, {"C1": {2: 4.6}})
+    by = {r.name: r for r in строки}
+    assert by["Батуми-1"].is_closed and by["Батуми-1"].partner == "П"
+    assert (by["Батуми-1"].rs, by["Батуми-1"].maps) == (91.0, {2: 4.6})
+    assert by["Новая"].unit_id == "" and by["Новая"].key == "svod:n"

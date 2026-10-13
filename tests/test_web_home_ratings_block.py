@@ -24,8 +24,8 @@ from src.db.errors import RatingsError
 from src.db.ratings_read import CountryRow
 from src.ratings import maps as rmaps
 from src.ratings import report
-from src.web import app as app_mod
 from src.web import home_ratings_block as block
+from src.web import overview as overview_data
 from src.web.registry_period import Period
 from src.web.texts import t
 
@@ -185,7 +185,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
     подменить_двери(monkeypatch, tenant="HQ")
     with собрать(tenant="HQ").test_client() as client:
         assert войти(client).status_code == 302
-        monkeypatch.setattr(app_mod.overview_data, "load", lambda **_: снимок())
+        monkeypatch.setattr(overview_data, "load", lambda **_: снимок())
         yield client
 
 
@@ -242,9 +242,7 @@ def test_страница_передаёт_блоку_страну_и_перио
 ) -> None:
     спросили: dict[str, object] = {}
     monkeypatch.setattr(block, "load", lambda **kw: спросили.update(kw) or block.Block())
-    monkeypatch.setattr(
-        app_mod.overview_data, "load", lambda **_: снимок(countries=(("RS", 3), ("GE", 2)))
-    )
+    monkeypatch.setattr(overview_data, "load", lambda **_: снимок(countries=(("RS", 3), ("GE", 2))))
 
     стенд.get("/overview?country=RS&from=2026-09-01&to=2026-09-30")
 

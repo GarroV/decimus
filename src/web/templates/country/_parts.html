@@ -24,6 +24,6 @@
 {# Буквы периода плашками: «A 3  B 5». #}
 {% macro letters(grades) %}
   <span class="cn-letters">
-    {% for letter, n in grades %}<span class="cn-letter"><span class="grade tag {{ grade_tone(letter) }}">{{ letter }}</span><b>{{ n }}</b></span>{% else %}—{% endfor %}
+    {% for letter, n in grades if n %}<span class="cn-letter"><span class="grade tag {{ grade_tone(letter) }}">{{ letter }}</span><b>{{ n }}</b></span>{% else %}—{% endfor %}
   </span>
 {% endmacro %}

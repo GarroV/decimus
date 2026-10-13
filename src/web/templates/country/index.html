@@ -72,7 +72,8 @@
             {% if developer %}<span>{{ t('country.facts.developer', name=developer) }}</span>{% endif %}
             {% if partners %}
               <span>{% if partners|length == 1 %}{{ t('country.facts.partner', name=partners[0]) }}
-                {% else %}{{ t('country.facts.partners', names=partners[:partners_shown]|join(', '), n=partners|length) }}{% endif %}</span>
+                {% elif partners|length <= partners_shown %}{{ t('country.facts.partners', names=partners|join(', ')) }}
+                {% else %}{{ t('country.facts.partners_more', names=partners[:partners_shown]|join(', '), n=partners|length - partners_shown) }}{% endif %}</span>
             {% endif %}
             {% set open_n = units.rows|selectattr('stage', 'equalto', 'open')|list|length %}
             {% set pipe_n = units.rows|selectattr('stage', 'equalto', 'pipeline')|list|length %}
@@ -118,7 +119,7 @@
           <span>{{ t('country.col.country') }}</span>
           <span class="ov-num">{{ t('country.col.checked') }}</span>
           <span class="ov-num">{{ t('country.col.inspections') }}</span>
-          <span class="ov-num">{{ t('country.tile.average') }}</span>
+          <span class="ov-num">{{ t('country.col.average') }}</span>
           <span>{{ t('country.tile.letters') }}</span>
         </div>
         {% for r in dev_rows %}
