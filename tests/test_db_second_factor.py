@@ -304,7 +304,7 @@ def test_первый_способ_закрывает_прочие_сессии_
     assert resolve_session(своя.token) is not None
     assert resolve_session(чужая.token) is None
     # Второй способ уже не первый: сессии не трогаются.
-    третья = open_session(учётка)
+    третья = open_session(учётка, second_step=True)
     sf.add_passkey(
         учётка.id,
         keep_session_id=своя.session_id,
@@ -344,3 +344,16 @@ def test_журнал_входов_принимает_вторую_ступен�
             "select count(*) from login_journal where method = 'second-step'"
         ).fetchone()
     assert число is not None and число[0] == 4
+
+
+def test_полная_сессия_человеку_со_способом_без_второй_ступени_не_выдаётся(люди: Люди) -> None:
+    from src.db.errors import SecondStepRequiredError
+
+    учётка = authenticate("anna", ПАРОЛЬ)
+    assert учётка is not None
+    assert open_session(учётка) is not None  # способа нет: сессия (для админа — только подключение)
+    sf.add_passkey(учётка.id, **_ключ("anna"))  # type: ignore[arg-type]
+
+    with pytest.raises(SecondStepRequiredError):
+        open_session(учётка)
+    assert open_session(учётка, second_step=True) is not None

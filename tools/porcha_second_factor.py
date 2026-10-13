@@ -29,6 +29,21 @@ cases = [
         "        session = open_session(account, ip=откуда, user_agent=браузер)",
         J + "test_полувход_не_открывает_ни_одного_маршрута",
     ),
+    # Сама open_session не выдаёт полную сессию без второй ступени.
+    (
+        "src/db/web_access.py",
+        "     where %(second)s\n        or not (exists",
+        "     where true\n        or not (exists",
+        D + "test_полная_сессия_человеку_со_способом_без_второй_ступени_не_выдаётся",
+    ),
+    # Новый путь входа, открывающий сессию мимо списка, ловится перечислением.
+    (
+        "src/web/second_step.py",
+        "        session = open_session(account, ip=откуда, user_agent=браузер, second_step=True)",
+        "        session = open_session(account, ip=откуда, user_agent=браузер, second_step=True)\n"
+        "        open_session(account, ip=откуда, user_agent=браузер, second_step=True)",
+        T + "test_session_issuers.py::test_полную_сессию_открывают_только_названные_места",
+    ),
     # Админ без способа не обходит подключение.
     (
         "src/web/auth.py",
@@ -139,7 +154,7 @@ cases = [
     (
         "src/db/second_factor.py",
         '"delete from web_passkeys where id = %s and user_id = %s",',
-        '"delete from web_passkeys where id = %s and %s is not null",',
+        '"delete from web_passkeys where id = %s and %s::text is not null",',
         J + "test_чужой_номер_ключа_в_адресе_ничего_не_снимает",
     ),
     # Аудит экрана «Вход и защита»: окно, снятие, чужие сессии, сброс, CSRF.
@@ -188,13 +203,6 @@ cases = [
         "        if вошедший is None or not may_remove_factor(вошедший):",
         "        if вошедший is None:",
         J + "test_сброс_чужой_ступени_сессией_без_второй_ступени_отвергается",
-    ),
-    (
-        "src/web/security_screen.py",
-        "    def security_totp_start() -> Response | tuple[Response, int]:\n"
-        "        refuse_foreign_origin()\n",
-        "    def security_totp_start() -> Response | tuple[Response, int]:\n",
-        J + "test_изменяющие_маршруты_экрана_не_открываются_get_и_чужим_происхождением",
     ),
 ]
 

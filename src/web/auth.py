@@ -39,7 +39,7 @@ from itsdangerous import BadSignature, URLSafeTimedSerializer
 from werkzeug.wrappers import Response
 
 from src.db import journals, web_own_profile
-from src.db.errors import DbError
+from src.db.errors import DbError, SecondStepRequiredError
 from src.db.reach import Reach, reach_of
 from src.db.space import enter_space, leave_space
 from src.db.web_access import (
@@ -296,6 +296,13 @@ def install(app: Flask, conf: Settings) -> None:
         return response
 
     second_step.install(app, conf, remember=remember, stand=рубеж)
+
+    @app.errorhandler(SecondStepRequiredError)
+    def _second_step_required(_: SecondStepRequiredError) -> Response:
+        """Путь входа попытался выдать полную сессию без второй ступени: на вход, без куки."""
+        ответ = redirect(url_for("login", second_step="expired"))
+        ответ.delete_cookie(COOKIE_NAME, path="/")
+        return ответ
 
     @app.before_request
     def _guard() -> Response | None:

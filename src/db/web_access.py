@@ -53,7 +53,7 @@ from src.domain.tenants import HQ_TENANT, canonical_tenant
 
 from .config import check_environment
 from .database_target import managing_dsn
-from .errors import AccessError, EmailTakenError
+from .errors import AccessError, EmailTakenError, SecondStepRequiredError
 from .pool import connection
 from .reading import reading
 from .space_guard import require_space
@@ -248,7 +248,11 @@ _SELECT_USER_BY_EMAIL_SQL = """
 
 _OPEN_SESSION_SQL = """
     insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent, second_step_at)
-    values (%s, %s, now() + %s, %s, %s, case when %s then now() end)
+    select %(user)s, %(fp)s, now() + %(ttl)s, %(ip)s, %(ua)s, case when %(second)s then now() end
+     where %(second)s
+        or not (exists (select 1 from web_passkeys p where p.user_id = %(user)s)
+                or exists (select 1 from web_totp t
+                            where t.user_id = %(user)s and t.confirmed_at is not null))
     returning expires_at, id
 """
 
@@ -977,6 +981,10 @@ def open_session(
 ) -> OpenedSession:
     """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке.
 
+    **Полную сессию человеку со вторым способом без `second_step=True` не выдаёт сама эта
+    функция** (`SecondStepRequiredError`): любой путь входа, нынешний или будущий, упрётся здесь.
+    Админ без способа получает сессию, но заслон оставляет ему одно подключение способа.
+
     `ip` и `user_agent` — откуда вошли (D462): адрес по цепочке доверенных звеньев и
     браузер, усечённый до `MAX_USER_AGENT`. `second_step` — сессия прошла вторую ступень
     (D463): только такой сессии разрешено СНИМАТЬ способы входа.
@@ -985,17 +993,20 @@ def open_session(
     with _connected("открыть сессию") as conn, conn.cursor() as cur:
         cur.execute(
             _OPEN_SESSION_SQL,
-            (
-                account.id,
-                session_fingerprint(token),
-                SESSION_TTL,
-                ip,
-                truncate_user_agent(user_agent),
-                second_step,
-            ),
+            {
+                "user": account.id,
+                "fp": session_fingerprint(token),
+                "ttl": SESSION_TTL,
+                "ip": ip,
+                "ua": truncate_user_agent(user_agent),
+                "second": second_step,
+            },
         )
         row = cur.fetchone()
-    assert row is not None  # noqa: S101 — insert ... returning без строки не бывает
+    if row is None:
+        # У человека есть второй способ, а доказательства второй ступени нет (D463): полная
+        # сессия не выдаётся ни одним путём. Проверка — в самом запросе, а не у вызывающих.
+        raise SecondStepRequiredError("сессия без второй ступени человеку, у которого она есть")
     return OpenedSession(token=token, expires_at=row[0], session_id=str(row[1]))
 
 
