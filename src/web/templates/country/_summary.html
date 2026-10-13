@@ -1,0 +1,112 @@
+{#
+  Сегмент «Сводка» (D467): ключевые цифры периода и «Где болит». Страна без
+  проверок за период — ОДНА тихая строка и ссылка на всё время, без пустых рамок.
+  Плитки рейтингов (РС, РКО, карты) показываются, когда у страны они есть, и без проверок.
+#}
+{% from "country/_parts.html" import delta, tile, letters with context %}
+
+{% macro key_figures(summary, column, show_ratings) %}
+  {% set has_ratings = show_ratings and column is not none and (column.rs is not none or column.rko is not none or column.maps) %}
+  {% if summary.has_inspections or has_ratings %}
+  <section class="ov-card cn-block">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.figures.title') }}</div>
+      <div class="ov-card__hint">{{ period_title }}</div>
+    </div>
+    <div class="cn-tiles">
+      {% if summary.has_inspections %}
+        {{ tile(t('country.tile.average'),
+                '—' if summary.average is none else '%.1f'|format(summary.average),
+                t('country.tile.inspections', n=summary.inspections)) }}
+        {{ tile(t('country.tile.checked'),
+                t('country.tile.of', checked=summary.units_checked, total=summary.units_total),
+                t('country.tile.units')) }}
+        <div class="cn-tile">
+          <div class="cn-tile__label">{{ t('country.tile.letters') }}</div>
+          <div class="cn-tile__value cn-tile__value--letters">{{ letters(summary.grades) }}</div>
+        </div>
+      {% endif %}
+      {% if has_ratings %}
+        {% if column.rs is not none %}
+          <div class="cn-tile" title="{{ t('country.tile.rs.hint') }}">
+            <div class="cn-tile__label">{{ t('home.rs.short') }}</div>
+            <div class="cn-tile__value">{{ '%.1f'|format(column.rs) }} {{ delta(column.rs_delta) }}</div>
+          </div>
+        {% endif %}
+        {% if column.rko is not none %}
+          <div class="cn-tile" title="{{ t('country.tile.rko.hint') }}">
+            <div class="cn-tile__label">{{ t('home.rko.short') }}</div>
+            <div class="cn-tile__value">{{ '%.1f'|format(column.rko) }} {{ delta(column.rko_delta) }}</div>
+          </div>
+        {% endif %}
+        {% if column.maps %}
+          <div class="cn-tile">
+            <div class="cn-tile__label">{{ t('home.rb.maps') }}</div>
+            <div class="cn-tile__value cn-tile__value--maps">
+              {% for m in column.maps %}<span><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>{% endfor %}
+            </div>
+          </div>
+        {% endif %}
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+{% endmacro %}
+
+{# Тихая строка вместо пустых рамок: что было бы пусто — не рисуется. #}
+{% macro nothing(summary) %}
+  {% if not summary.has_inspections %}
+    <p class="cn-quiet">
+      {% if period.is_all %}{{ t('country.none.ever') }}
+      {% else %}{{ t('country.none.period') }} <a href="{{ all_time_url }}">{{ t('country.none.all_time') }}</a>{% endif %}
+    </p>
+  {% endif %}
+{% endmacro %}
+
+{# «Где болит»: системные нарушения и потери по зонам — одним блоком, только при проверках. #}
+{% macro hurt(data) %}
+  {% if data.systemic or data.zone_losses %}
+  <section class="ov-card cn-block">
+    <div class="ov-card__head">
+      <div class="ov-card__title">{{ t('country.hurt.title') }}</div>
+      <div class="ov-card__hint">{{ period_title }}</div>
+    </div>
+    <div class="cn-hurt">
+      {% if data.systemic %}
+      <div class="cn-hurt__col">
+        <div class="cn-sub">{{ t('country.hurt.systemic') }}</div>
+        {% for item in data.systemic %}
+          <div class="ov-row">
+            <span class="tag {{ level_tone(item.level) }}">{{ item.level }}</span>
+            <span class="ov-row__name">
+              {% if item_titles.get(item.code) %}{{ item_titles.get(item.code) }}
+              {% elif item.text %}<span lang="{{ item.lang }}">{{ item.text }}</span>
+              {% else %}{{ item.code }}{% endif %}
+              <span class="ov-row__meta">
+                {% if item_titles.get(item.code) or item.text %}{{ item.code }} · {% endif %}
+                {{ t('overview.systemic.spread', units=item.units, records=item.records) }}
+              </span>
+            </span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+      {% if data.zone_losses %}
+      <div class="cn-hurt__col">
+        <div class="cn-sub">{{ t('country.hurt.zones') }}</div>
+        {% for zone in data.zone_losses %}
+          <div class="ov-row" title="{{ t('overview.zones.spread', units=zone.units, inspections=zone.inspections) }}">
+            <span class="ov-row__name">{{ zone.name_ru if lang == "ru" else zone.name_en }}</span>
+            <span class="ov-bar">
+              <span class="ov-bar__part" style="flex:{{ zone.share }};background:var(--err)"></span>
+              <span class="ov-bar__part" style="flex:{{ 100 - zone.share }}"></span>
+            </span>
+            <span class="ov-row__num">−{{ '%.1f'|format(zone.loss) }}</span>
+          </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+{% endmacro %}

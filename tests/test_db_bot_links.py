@@ -26,7 +26,7 @@ from src.db.bot_links import (  # noqa: E402
     standing,
     unbind,
 )
-from src.db.web_access import create_account, disable_account  # noqa: E402
+from src.db.web_access import create_account, freeze_account  # noqa: E402
 
 pytestmark = requires_db
 ПАРОЛЬ = "верный-пароль-учётки"
@@ -85,7 +85,7 @@ def test_новая_ссылка_гасит_прежнюю(учётки: dict[st
 
 def test_ссылка_отключённой_учётки_не_срабатывает(учётки: dict[str, str]) -> None:
     ссылка = issue_link(учётки["ge"])
-    disable_account("ge-auditor", tenant="GE")
+    freeze_account("ge-auditor", tenant="GE")
     assert redeem(ссылка.token, telegram_id=501) is None
 
 
@@ -170,7 +170,7 @@ def test_отвязка_и_отключение_снимают_доступ(уч
     assert resolve(501) is None and binding_of(учётки["ge"]) is None
     assert unbind(учётки["ge"]) is False
     redeem(issue_link(учётки["hq"]).token, telegram_id=601)
-    disable_account("hq-auditor", tenant="HQ")
+    freeze_account("hq-auditor", tenant="HQ")
     assert resolve(601) is None
 
 
@@ -183,7 +183,7 @@ def test_положение_помнит_снятую_привязку(учёт�
     unbind(учётки["ge"])
     assert (standing(501).binding, standing(501).ever_bound) == (None, True)
     redeem(issue_link(учётки["hq"]).token, telegram_id=601)
-    disable_account("hq-auditor", tenant="HQ")
+    freeze_account("hq-auditor", tenant="HQ")
     assert (standing(601).binding, standing(601).ever_bound) == (None, True)
 
 

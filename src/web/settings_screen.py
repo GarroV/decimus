@@ -29,7 +29,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from flask import Flask, current_app, make_response, redirect, render_template, request
+from flask import Flask, current_app, make_response, redirect, render_template, request, url_for
 from flask import Response as FlaskResponse
 from werkzeug.wrappers import Response
 
@@ -213,6 +213,7 @@ def install(app: Flask, conf: Settings) -> None:
     ui_lang.install(app, f"{base}/lang")
     _install_account_menu(app, base, conf)
     _install_claude_token(app, base, conf)
+    _install_sign_out_everywhere(app, base)
     if conf.oauth_enabled:
         _install_claude_connection(app, base)
 
@@ -268,6 +269,27 @@ def _install_account_menu(app: Flask, base: str, conf: Settings) -> None:
         )
         ответ = make_response(render_template("_account_menu_connections.html", rows=строки))
         ответ.headers["Cache-Control"] = "no-store"
+        return ответ
+
+
+def _install_sign_out_everywhere(app: Flask, base: str) -> None:
+    """«Выйти везде» (D462): все свои сессии, подключения Claude и личный токен. Бот остаётся."""
+
+    @app.post(f"{base}/sign-out-everywhere")
+    def settings_sign_out_everywhere() -> Response | tuple[str, int]:
+        """Закрыть всё, чем вошёл человек, и увести на вход. Чья учётка — решает сессия."""
+        refuse_foreign_origin()
+        чей = _current_id()
+        try:
+            закрыто = accounts.sign_out_everywhere(auth.current_session_token())
+        except DbError as exc:
+            note_target_mismatch(exc)
+            return render(Show(flash=_flash("settings.signout.failed", ok=False)), 503)
+        if закрыто:
+            logger.info("Веб: учётка %s вышла везде", log_id(чей))
+        # Сессия закрыта и в базе, и в браузере: кука больше ничего не значит.
+        ответ = redirect(url_for("login"))
+        ответ.delete_cookie(auth.COOKIE_NAME, path="/")
         return ответ
 
 

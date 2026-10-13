@@ -111,11 +111,14 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
+| `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
+| `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
+| `src/web/country_units.py` | Таблица «Пиццерии» экрана «Страна» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
@@ -200,6 +203,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts.py` | Тексты веб-админки: каталог по ключам, язык — параметр |
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
+| `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418): «Требует внимания», проверки, блок «Рейтинги», выбор страны |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
@@ -252,7 +256,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/` | 16 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+8) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
-| `src/web/templates/country/` | 1 | index.html |
+| `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
@@ -268,7 +272,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 44 | SOURCE.md, apple-touch-icon.png, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, decimus-rt.js, … (+36) |
+| `src/web/static/` | 45 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-registry.css, decimus-rt.css, … (+37) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -425,7 +429,8 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0060_d440_roles.sql` | Роли УК по D440: «бизнес-девелопер» (`developer`) вместо аудитора УК и «гость» (`guest`) — вся сеть на чтение |
 | `0061_web_own_google_lang.sql` | «Настройки» (D447): человек сам привязывает и снимает свою почту Google и хранит язык сайта в профиле |
 | `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
-| `0063_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
+| `0063_freeze.sql` | «Заморозить» (D462, шаг 1): отключение учётки становится заморозкой — одним действием закрывается всё, чем человек входил, и записывается, кто заморозил |
+| `0064_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -754,7 +759,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/walk_healthcheck.py` | Проба здоровья сервиса мини-аппа обхода — изнутри его контейнера |
 | `tools/walk_mockup/build.py` | Кликабельный макет мини-аппа обхода (#418) — один HTML-файл для отзывов коллег |
 | `tools/web_unlock.py` | Запрет на вход: показать запертых и снять запрет |
-| `tools/web_user.py` | Учётки веб-админки: завести, перечислить, отключить |
+| `tools/web_user.py` | Учётки веб-админки: завести, перечислить, заморозить |
 | `tools/worktree_new.sh` | Рабочая копия для блока стройки — одинаково каждый раз |
 | `tools/zone_coverage.py` | T272: покрытие словаря зон — сколько формулировок доходит до зоны и что дописать |
 | `tools/zone_words_measure.py` | T242 (#198): узнаётся ли зона, названная НЕ в именительном падеже |

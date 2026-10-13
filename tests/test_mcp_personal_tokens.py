@@ -279,12 +279,12 @@ def _учётка_человека(pg_dsn: str) -> str:
 def test_отключение_учётки_закрывает_дверь_со_следующего_запроса(
     db_env: str, pg_dsn: str, без_триггера: None
 ) -> None:
-    from src.db.web_access import disable_account
+    from src.db.web_access import freeze_account
 
     личный = _выпустить()
     assert resolve_access(_настройки(), f"Bearer {личный}").role == "auditor"
 
-    assert disable_account(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА) is True
+    assert freeze_account(_учётка_человека(pg_dsn), tenant=АРЕНДАТОР_ЧЕЛОВЕКА) is True
 
     with pytest.raises(AuthError):
         resolve_access(_настройки(), f"Bearer {личный}")
