@@ -32,9 +32,9 @@ from src.web.google_auth import GoogleIdentity, GoogleSettings
 
 #: (путь, данные, якорь возврата, дверь, которую НЕ должны позвать)
 ДЕЙСТВИЯ = [
-    ("/settings/claude-token", {}, "#claude-token", "issue"),
-    ("/settings/bot-link", {}, "#bot", "link"),
-    ("/settings/google-link", {}, "#google", "begin"),
+    ("/settings/claude-token", {}, "?tile=claude", "issue"),
+    ("/settings/bot-link", {}, "?tile=bot", "link"),
+    ("/settings/google-link", {}, "?tile=google", "begin"),
 ]
 
 
@@ -127,7 +127,7 @@ def test_несвежий_вход_почту_google_не_снимает(monkeyp
             "/settings/google-unlink", data={"current": "верный-пароль"}, headers=ЗАГОЛОВКИ
         )
 
-        assert _на_подтверждение(ответ) == "/settings#google"
+        assert _на_подтверждение(ответ) == "/settings?tile=google"
         assert "unlink" not in двери.звали
 
 

@@ -1933,3 +1933,13 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .rx-send form { display: contents; }
 
 /* Раздел «Рейтинги» — свои стили в decimus-rt.css, подключаются только его шаблонами (D354). */
+
+/* Низ панели (D470): тема, язык и кнопка настроек одной строкой, как в Swarm.
+   Капсулы здесь уже, чем в меню учётки: строка должна уместиться в 216px. */
+.sidenav__prefs .langpill__item { min-width: 28px; padding: 0 var(--space-3); }
+.sidenav__prefs .sidenav__theme button { width: 26px; }
+.sidenav__gear { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface); color: var(--ink-3); transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.sidenav__gear:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
+.sidenav__gear:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.sidenav__gear.is-current { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.sidenav__gear svg { width: 15px; height: 15px; }
