@@ -24,6 +24,7 @@ from src.db.config import check_environment
 from src.db.errors import RatingsError
 from src.db.space import apply_space
 from src.db.units import normalize_unit_name
+from src.domain.unit_name import fold_unit_name
 
 from .base import (
     parse_base_collection,
@@ -47,6 +48,7 @@ from .model import (
     FORMAT_SNAPSHOT,
     FORMATS,
     ISSUE_BAD_ROW,
+    ISSUE_UNIT_ID_CLASH,
     ISSUE_UNIT_UNMATCHED,
     Issue,
     Parsed,
@@ -149,6 +151,7 @@ class _Writer:
         #: известных пиццерий, id берётся из него (D464).
         self.directory = directory or {}
         self._found: dict[tuple[str, str | None], str | None] = {}
+        self._clashed: set[tuple[str, str | None]] = set()
         self._periods: dict[tuple[str, date], int] = {}
         self.known = [KnownUnit(*row) for row in store.known_units(conn)]
         self.countries: set[str] = set()
@@ -181,11 +184,14 @@ class _Writer:
     def unit(self, ref: UnitRef, row_no: int) -> str | None:
         self.country(ref.country)
         if ref.dodo_id is not None:
+            # D467: наше название не перезаписывается другим написанием того же.
+            ours = next((k.name for k in self.known if k.dodo_id == ref.dodo_id), None)
+            name = ours if ours and fold_unit_name(ours) == fold_unit_name(ref.name) else ref.name
             store.upsert_unit(
                 self.conn,
                 ref.dodo_id,
-                name=ref.name,
-                name_normalized=normalize_unit_name(ref.name),
+                name=name,
+                name_normalized=normalize_unit_name(name),
                 country=ref.country,
             )
             if all(known.dodo_id != ref.dodo_id for known in self.known):
@@ -193,17 +199,23 @@ class _Writer:
             return ref.dodo_id
         key = (ref.name, ref.country)
         if key not in self._found:
-            self._found[key] = self.match(ref) or self.from_directory(ref)
+            self._found[key] = self.match(ref) or self.from_directory(ref, row_no)
         found = self._found[key]
-        if found is None:
+        if found is None and key not in self._clashed:
             detail = {"unit": ref.name, "country": ref.country or ""}
             self.issues.append(Issue(row_no, ISSUE_UNIT_UNMATCHED, detail))
         return found
 
-    def from_directory(self, ref: UnitRef) -> str | None:
+    def from_directory(self, ref: UnitRef, row_no: int) -> str | None:
         """Пиццерия, которой ещё нет среди известных, но есть в справочнике ссылок."""
-        dodo_id = self.directory.get(normalize_unit_name(ref.name))
+        dodo_id = self.directory.get(fold_unit_name(ref.name))
         if dodo_id is None or ref.country is None:
+            return None
+        if any(known.dodo_id == dodo_id for known in self.known):
+            # Имя не сошлось ни с одной известной, а id уже чей-то: не переименовываем.
+            detail = {"unit": ref.name, "country": ref.country or ""}
+            self.issues.append(Issue(row_no, ISSUE_UNIT_ID_CLASH, detail))
+            self._clashed.add((ref.name, ref.country))
             return None
         store.upsert_unit(
             self.conn,

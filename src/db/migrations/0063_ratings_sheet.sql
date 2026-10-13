@@ -37,6 +37,13 @@ alter table ratings.imports add constraint imports_format_check check (
     )
 );
 
+alter table ratings.import_issues drop constraint import_issues_reason_check;
+alter table ratings.import_issues add constraint import_issues_reason_check check (
+    reason in (
+        'unit_unmatched', 'country_unknown', 'bad_row', 'developer_conflict', 'unit_id_clash'
+    )
+);
+
 create table ratings.collection (
     unit_dodo_id text not null references ratings.units (dodo_id),
     period_id bigint not null references ratings.periods (id),
