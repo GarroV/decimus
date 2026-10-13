@@ -1,11 +1,14 @@
 {#
-  Сегмент «Пиццерии» (D467): ОДНА таблица вместо «Результатов проверок по
+  Блок «Пиццерии» (D467, D474): ОДНА таблица вместо «Результатов проверок по
   пиццериям» и «Свода пиццерий». Строка — ссылка `?unit=<ключ>`: сведения и
   история открываются в панели справа (`split.js`, как в «Проверках»), без
   ухода со страницы и без длинного списка адресов в таблице. Закрытые — свёрнутым
-  блоком внизу. Проверка в строке — последняя ЗА ВЫБРАННЫЙ ПЕРИОД.
+  блоком внизу. «Последняя проверка» — дата последней проверки ВООБЩЕ; оценка и
+  буква рядом — из выбранного периода, а если за период не проверяли — пометка
+  «за период нет» рядом с датой, а не вместо неё.
 #}
 {% from "country/_parts.html" import stage with context %}
+{% from "_pick_ui.html" import pick_block with context %}
 
 {% macro unit_row(row, current_key) %}
   <a class="ov-table__row cn-unit{% if row.key == current_key %} is-open{% endif %}" data-drawer-open
@@ -16,10 +19,12 @@
     </span>
     <span class="cn-unit__last">
       {% if row.last %}
-        <span class="grade tag {{ grade_tone(row.last.grade) }}">{{ row.last.grade or '—' }}</span>
+        <span class="grade tag {{ grade_tone(row.last.grade) }}" title="{{ row.last.when }}">{{ row.last.grade or '—' }}</span>
         <b class="ov-num">{{ '%.1f'|format(row.last.pct) }}</b>
-        <span class="ov-cell__muted">{{ row.last.when }}</span>
-      {% else %}<span class="ov-cell__muted">{{ t('country.units.not_checked') }}</span>{% endif %}
+      {% endif %}
+      {% if row.last_ever or row.last %}<span class="ov-cell__muted">{{ row.last_ever or row.last.when }}</span>
+      {% else %}<span class="ov-cell__muted">{{ t('country.units.never') }}</span>{% endif %}
+      {% if not row.last and row.last_ever %}<span class="cn-unit__nope">{{ t('country.units.not_in_period') }}</span>{% endif %}
     </span>
     {% if units.has_ratings %}
       <span class="ov-num">{{ '—' if row.rs is none else '%.1f'|format(row.rs) }}</span>
@@ -45,12 +50,7 @@
 {% macro units_table(units, current_key) %}
   {% set open_rows = units.open_rows %}
   {% set closed_rows = units.closed_rows %}
-  <section class="ov-card cn-block">
-    <div class="ov-card__head">
-      <div class="ov-card__title">{{ t('country.units.title') }}</div>
-      <div class="ov-card__hint">{{ t('country.units.hint') }}</div>
-      <div class="ov-card__count">{{ open_rows|length }}</div>
-    </div>
+  {% call pick_block(t('country.units.title'), t('country.units.hint'), open_rows|length) %}
     {% if units.profiles_failed %}<div class="note note--warn"><div><div class="note__text">{{ t('country.units.profiles_failed') }}</div></div></div>{% endif %}
     {% if units.ratings_failed %}<div class="note note--warn"><div><div class="note__text">{{ t('country.units.ratings_failed') }}</div></div></div>{% endif %}
     {% if units.maps_failed %}<div class="note note--warn"><div><div class="note__text">{{ t('country.units.maps_failed') }}</div></div></div>{% endif %}
@@ -60,7 +60,7 @@
         {% for row in open_rows %}{{ unit_row(row, current_key) }}{% endfor %}
       </div>
     {% elif not closed_rows %}
-      <div class="ov-card__empty">{{ t('country.units.empty') }}</div>
+      <div class="cn-units__empty">{{ t('country.units.empty') }}</div>
     {% endif %}
     {% if closed_rows %}
       <details class="cn-closed"{% if current_key and units.find(current_key) and units.find(current_key).is_closed %} open{% endif %}>
@@ -71,5 +71,5 @@
         </div>
       </details>
     {% endif %}
-  </section>
+  {% endcall %}
 {% endmacro %}

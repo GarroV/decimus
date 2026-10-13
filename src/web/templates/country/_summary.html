@@ -1,76 +1,56 @@
 {#
-  Сегмент «Сводка» (D467): ключевые цифры периода и «Где болит». Страна без
+  Плитки ключевых цифр периода и «Где болит» (D467, D474). Страна без
   проверок за период — ОДНА тихая строка и ссылка на всё время, без пустых рамок.
   Плитки рейтингов (РС, РКО, карты) показываются, когда у страны они есть, и без проверок.
 #}
-{% from "country/_parts.html" import delta, tile, letters with context %}
+{% from "country/_parts.html" import delta, letters with context %}
+{% from "_pick_ui.html" import pick_tile, pick_tiles, pick_block, pick_empty with context %}
 
 {% macro key_figures(summary, column, show_ratings) %}
   {% set has_ratings = show_ratings and column is not none and (column.rs is not none or column.rko is not none or column.maps) %}
   {% if summary.has_inspections or has_ratings %}
-  <section class="ov-card cn-block">
-    <div class="ov-card__head">
-      <div class="ov-card__title">{{ t('country.figures.title') }}</div>
-      <div class="ov-card__hint">{{ period_title }}</div>
-    </div>
-    <div class="cn-tiles">
+    {% call pick_tiles() %}
       {% if summary.has_inspections %}
-        {{ tile(t('country.tile.average'),
-                '—' if summary.average is none else '%.1f'|format(summary.average),
-                t('country.tile.inspections', n=summary.inspections)) }}
-        {{ tile(t('country.tile.checked'),
-                t('country.tile.of', checked=summary.units_checked, total=summary.units_total),
-                t('country.tile.units')) }}
-        <div class="cn-tile">
-          <div class="cn-tile__label">{{ t('country.tile.letters') }}</div>
-          <div class="cn-tile__value cn-tile__value--letters">{{ letters(summary.grades) }}</div>
-        </div>
+        {% call pick_tile(t('country.tile.average'), '', t('country.tile.inspections', n=summary.inspections)) %}
+          {{ '—' if summary.average is none else '%.1f'|format(summary.average) }} {{ delta(summary.average_delta) }}
+        {% endcall %}
+        {{ pick_tile(t('country.tile.checked'),
+                     t('country.tile.of', checked=summary.units_checked, total=summary.units_total),
+                     t('country.tile.units')) }}
+        {{ pick_tile(t('overview.tile.critical'), summary.critical, t('overview.tile.note.critical')) }}
+        {% call pick_tile(t('country.tile.letters')) %}<span class="cn-tile__letters">{{ letters(summary.grades) }}</span>{% endcall %}
       {% endif %}
       {% if has_ratings %}
         {% if column.rs is not none %}
-          <div class="cn-tile" title="{{ t('country.tile.rs.hint') }}">
-            <div class="cn-tile__label">{{ t('home.rs.short') }}</div>
-            <div class="cn-tile__value">{{ '%.1f'|format(column.rs) }} {{ delta(column.rs_delta) }}</div>
-          </div>
+          {% call pick_tile(t('home.rs.short'), '', '', t('country.tile.rs.hint')) %}{{ '%.1f'|format(column.rs) }} {{ delta(column.rs_delta) }}{% endcall %}
         {% endif %}
         {% if column.rko is not none %}
-          <div class="cn-tile" title="{{ t('country.tile.rko.hint') }}">
-            <div class="cn-tile__label">{{ t('home.rko.short') }}</div>
-            <div class="cn-tile__value">{{ '%.1f'|format(column.rko) }} {{ delta(column.rko_delta) }}</div>
-          </div>
+          {% call pick_tile(t('home.rko.short'), '', '', t('country.tile.rko.hint')) %}{{ '%.1f'|format(column.rko) }} {{ delta(column.rko_delta) }}{% endcall %}
         {% endif %}
         {% if column.maps %}
-          <div class="cn-tile">
-            <div class="cn-tile__label">{{ t('home.rb.maps') }}</div>
-            <div class="cn-tile__value cn-tile__value--maps">
-              {% for m in column.maps %}<span><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>{% endfor %}
-            </div>
-          </div>
+          {% call pick_tile(t('home.rb.maps')) %}
+            <span class="cn-tile__maps">{% for m in column.maps %}<span><small>{{ t('ratings.maps.provider.' ~ m.provider) }}</small> {{ '—' if m.avg is none else '%.2f'|format(m.avg) }} {{ delta(m.delta, '%+.2f') }}</span>{% endfor %}</span>
+          {% endcall %}
         {% endif %}
       {% endif %}
-    </div>
-  </section>
+    {% endcall %}
   {% endif %}
 {% endmacro %}
 
 {# Тихая строка вместо пустых рамок: что было бы пусто — не рисуется. #}
 {% macro nothing(summary) %}
   {% if not summary.has_inspections %}
-    <p class="cn-quiet">
+    {% call pick_empty() %}
       {% if period.is_all %}{{ t('country.none.ever') }}
       {% else %}{{ t('country.none.period') }} <a href="{{ all_time_url }}">{{ t('country.none.all_time') }}</a>{% endif %}
-    </p>
+    {% endcall %}
   {% endif %}
 {% endmacro %}
 
 {# «Где болит»: системные нарушения и потери по зонам — одним блоком, только при проверках. #}
 {% macro hurt(data) %}
   {% if data.systemic or data.zone_losses %}
-  <section class="ov-card cn-block">
-    <div class="ov-card__head">
-      <div class="ov-card__title">{{ t('country.hurt.title') }}</div>
-      <div class="ov-card__hint">{{ period_title }}</div>
-    </div>
+  {% call pick_block(t('country.hurt.title'), period_title) %}
     <div class="cn-hurt">
       {% if data.systemic %}
       <div class="cn-hurt__col">
@@ -107,6 +87,6 @@
       </div>
       {% endif %}
     </div>
-  </section>
+  {% endcall %}
   {% endif %}
 {% endmacro %}

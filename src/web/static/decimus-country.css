@@ -1,93 +1,57 @@
-/* Экран «Страна» (D467): шапка-рамка, сегменты, плитки ключевых цифр, таблица
-   пиццерий. Продуктовые стили decimus: дизайн-система (`dodo-ds.css`,
-   `decimus-domain.css`) здесь не правится, всё собрано из её токенов.
-   Рамки — `.ov-card` (общие с «Обзором»), панель пиццерии — `decimus-split.css`,
-   период — `decimus-period.css`. Если для блока не хватает компонента в forma —
-   он заводится там, а здесь остаётся временной раскладкой. */
+/* Экран «Страна» (D467, D474): то, что есть только у него, — счётчики шапки,
+   движение числа, «Где болит», таблица пиццерий. Каркас, колонка выбора, шапка,
+   плитки и блоки — общий шаблон `decimus-pick.css`; панель пиццерии —
+   `decimus-split.css`, период — `decimus-period.css`. Дизайн-система
+   (`dodo-ds.css`, `decimus-domain.css`) здесь не правится, всё собрано из её
+   токенов. Если для блока не хватает компонента в forma — он заводится там, а
+   здесь остаётся временной раскладкой. */
 
-.cn-shell { --cn-gap: var(--space-5); }
-.cn-shell .mx-main > * + * { margin-top: var(--cn-gap); }
-.cn-shell .mx-main > .cn-back { margin-bottom: 0; }
-.cn-shell .mx-main > .cn-back + * { margin-top: var(--space-3); }
-
-/* ── шапка ──────────────────────────────────────────────────────────── */
-.cn-headcard { padding: var(--space-6) var(--space-7); overflow: visible; }
-.cn-head { display: flex; align-items: flex-start; gap: var(--space-5); flex-wrap: wrap; }
-.cn-head__main { flex: 1; min-width: 14rem; }
-.cn-actions { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
-.cn-actions .btn { text-decoration: none; width: auto; flex: none; min-height: 0; }
-.cn-facts { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-6); margin-top: var(--space-3);
-  font-size: var(--fs-dense); line-height: var(--lh-dense); color: var(--ink-2); }
-.cn-facts__muted { color: var(--ink-3); }
 .cn-count { margin-left: var(--space-3); font-family: var(--font-num); font-variant-numeric: tabular-nums;
   color: var(--ink-3); font-weight: var(--w-semibold); }
 .cn-count.is-on { color: var(--accent); }
-.cn-period { margin-top: var(--space-5); padding-top: var(--space-5); border-top: 1px solid var(--line); }
-
-/* ── сегменты: переключатель вверху рабочей зоны ───────────────────── */
-.cn-segs { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
-.cn-segs::-webkit-scrollbar { display: none; }
-.cn-segs .seg { display: inline-flex; }
-.cn-segs .seg__item, .cn-segs .seg__current { height: 32px; text-decoration: none; }
-.cn-segs .seg__current .seg__count, .cn-segs .seg__item .seg__count { margin-left: var(--space-1); }
-
-/* ── блоки ──────────────────────────────────────────────────────────── */
-.cn-block .ov-card__head { display: flex; align-items: baseline; gap: var(--space-4); flex-wrap: wrap; }
-.cn-block .ov-card__hint { margin-top: 0; }
-.cn-quiet { margin: 0; font-size: var(--fs-meta); color: var(--ink-3); }
-.cn-quiet a { color: var(--accent); }
-.cn-sub { padding: var(--space-4) var(--space-7) var(--space-2); font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
-  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
-
-/* плитки ключевых цифр */
-.cn-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); }
-.cn-tile { padding: var(--space-6) var(--space-7); border-left: 1px solid var(--line-2); min-width: 0; }
-.cn-tile:first-child { border-left: 0; }
-.cn-tile__label { font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui); letter-spacing: .12em;
-  text-transform: uppercase; color: var(--ink-3); }
-.cn-tile__value { margin-top: var(--space-4); font-family: var(--font-num); font-size: 26px; line-height: 30px;
-  font-weight: var(--w-semibold); letter-spacing: -.01em; color: var(--ink); font-variant-numeric: tabular-nums;
-  display: flex; align-items: baseline; gap: var(--space-3); flex-wrap: wrap; }
-.cn-tile__value--letters { font-size: var(--fs-lead); line-height: 30px; }
-.cn-tile__value--maps { flex-direction: column; align-items: flex-start; gap: var(--space-1); font-size: var(--fs-lead); line-height: 20px; }
-.cn-tile__value--maps small { margin-right: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-regular); }
-.cn-tile__sub { margin-top: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); }
 .cn-delta { font-family: var(--font-num); font-size: var(--fs-dense); font-weight: var(--w-semibold); color: var(--ink-2); }
 .cn-delta.is-up { color: var(--ok); }
 .cn-delta.is-down { color: var(--err); }
 .cn-letters { display: inline-flex; flex-wrap: wrap; gap: var(--space-3) var(--space-5); align-items: center; }
 .cn-letter { display: inline-flex; align-items: center; gap: var(--space-2); font-family: var(--font-num); }
 .cn-letter b { font-size: var(--fs-lead); font-weight: var(--w-semibold); color: var(--ink); }
+.cn-tile__letters { font-size: var(--fs-lead); }
+.cn-tile__maps { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-lead); line-height: 20px; }
+.cn-tile__maps small { margin-right: var(--space-2); font-size: var(--fs-meta); color: var(--ink-3); font-weight: var(--w-regular); }
+.cn-quiet a, .pk-empty a { color: var(--accent); }
 
-/* «Где болит»: две колонки внутри одной рамки */
-.cn-hurt { display: grid; grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); }
+/* «Где болит»: две колонки внутри одного блока */
+.cn-sub { padding: var(--space-4) var(--space-5) var(--space-2); font: var(--w-semibold) var(--fs-micro) / 1 var(--font-ui);
+  letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); }
+.cn-hurt { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.cn-hurt__col { min-width: 0; }
 .cn-hurt__col + .cn-hurt__col { border-left: 1px solid var(--line-2); }
+.cn-hurt .ov-row { padding-left: var(--space-5); padding-right: var(--space-5); }
 
-/* ── таблица пиццерий ───────────────────────────────────────────────── */
+/* ── таблица пиццерий: без горизонтальной прокрутки ──────────────────── */
+.cn-units.ov-table, .cn-countries.ov-table { overflow: visible; }
+.cn-units .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cn-units .ov-table__head, .cn-units .ov-table__row {
-  grid-template-columns: minmax(12rem, 1.6fr) minmax(13rem, 1.2fr);
-  min-width: 30rem; font-size: var(--fs-dense); }
-.cn-units.has-ratings .ov-table__head, .cn-units.has-ratings .ov-table__row {
-  grid-template-columns: minmax(12rem, 1.6fr) minmax(13rem, 1.2fr) 4rem 4rem; min-width: 38rem; }
-.cn-units.has-maps .ov-table__head, .cn-units.has-maps .ov-table__row {
-  grid-template-columns: minmax(12rem, 1.6fr) minmax(13rem, 1.2fr) 7.5rem; min-width: 36rem; }
-.cn-units.has-ratings.has-maps .ov-table__head, .cn-units.has-ratings.has-maps .ov-table__row {
-  grid-template-columns: minmax(12rem, 1.6fr) minmax(13rem, 1.2fr) 4rem 4rem 7.5rem; min-width: 45rem; }
+  grid-template-columns: minmax(0, 1fr) 12rem; min-width: 0; font-size: var(--fs-dense); }
+/* РС / РКО / карты — только когда блок шире 34rem; уже — остаются в панели пиццерии */
+.cn-units .ov-table__head > :nth-child(n+3), .cn-units .ov-table__row > :nth-child(n+3) { display: none; }
 .cn-unit { cursor: pointer; }
 .cn-unit__name { display: flex; flex-direction: column; min-width: 0; }
 .cn-unit__name b { font-weight: var(--w-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cn-unit__name small { font-size: var(--fs-meta); line-height: var(--lh-meta); color: var(--ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cn-unit__last { display: flex; align-items: center; gap: var(--space-4); white-space: nowrap; }
+.cn-unit__last { display: flex; align-items: center; flex-wrap: wrap; gap: 0 var(--space-3); min-width: 0; }
+.cn-unit__nope { flex-basis: 100%; font-size: var(--fs-micro); color: var(--warn); }
 .cn-unit__maps { display: flex; flex-direction: column; align-items: flex-end; line-height: 15px; }
 .cn-unit__maps small { color: var(--ink-3); margin-right: var(--space-1); }
+.cn-units__empty { padding: var(--space-5); font-size: var(--fs-meta); color: var(--ink-3); }
 .cn-closed { border-top: 1px solid var(--line); }
-.cn-closed > summary { cursor: pointer; padding: var(--space-4) var(--space-7); font-size: var(--fs-meta); color: var(--ink-3); list-style: none; }
+.cn-closed > summary { cursor: pointer; padding: var(--space-4) var(--space-5); font-size: var(--fs-meta); color: var(--ink-3); list-style: none; }
 .cn-closed > summary::-webkit-details-marker { display: none; }
 .cn-closed > summary::before { content: "▸ "; }
 .cn-closed[open] > summary::before { content: "▾ "; }
 .cn-closed .cn-unit { color: var(--ink-3); }
 .cn-countries .ov-table__head, .cn-countries .ov-table__row {
-  grid-template-columns: minmax(8rem, 1.2fr) 6.5rem 6rem 6rem minmax(10rem, 1.4fr); min-width: 40rem; }
+  grid-template-columns: minmax(0, 1.2fr) 6.5rem 5.5rem 5.5rem minmax(0, 1.2fr); min-width: 0; }
 .cn-countries .ov-table__head > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* статус пиццерии: тихая метка с точкой */
@@ -101,27 +65,18 @@
 /* история в панели пиццерии */
 .cn-history .ov-row { padding-left: 0; padding-right: 0; }
 
-/* ── колонка стран: отбор «Девелопер» раскрывается внутри колонки ───── */
-.cn-devpick { padding: 0 var(--space-4) var(--space-3); }
-.cn-devpick .pick { display: block; }
-.cn-devpick .ov-chip { display: flex; width: 100%; justify-content: space-between; }
-.cn-devpick .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
-
-/* ── узкий экран ────────────────────────────────────────────────────── */
-@media (max-width: 1023px) {
-  /* Без страны в адресе на узком экране — только колонка стран, как у
-     «Методики»; рабочая зона с первой страной видна лишь шире 1023px. */
-  .cn-shell.mx-shell--pick .mx-rail { display: grid; position: static; max-height: none; }
-  .cn-shell.mx-shell--pick .mx-rail__meta { display: block; }
-  .cn-shell.mx-shell--pick .mx-main { display: none; }
+/* таблица сжимается, а не прокручивается */
+.pk-block:has(.cn-units) { container-type: inline-size; }
+@container (min-width: 34rem) {
+  .cn-units .ov-table__head > :nth-child(n+3), .cn-units .ov-table__row > :nth-child(n+3) { display: block; }
+  .cn-units .ov-table__row > .cn-unit__maps { display: flex; }
+  .cn-units.has-ratings .ov-table__head, .cn-units.has-ratings .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) 13.5rem 3.25rem 3.25rem; }
+  .cn-units.has-maps .ov-table__head, .cn-units.has-maps .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) 13.5rem 6rem; }
+  .cn-units.has-ratings.has-maps .ov-table__head, .cn-units.has-ratings.has-maps .ov-table__row {
+    grid-template-columns: minmax(0, 1fr) 13.5rem 3.25rem 3.25rem 6rem; }
 }
 @media (max-width: 719px) {
-  .cn-headcard { padding: var(--space-5); }
-  .cn-tile { padding: var(--space-5); }
-  .cn-tile:nth-child(odd) { border-left: 0; }
-  .cn-tile:nth-child(n+3) { border-top: 1px solid var(--line-2); }
-  .cn-tiles { grid-template-columns: 1fr 1fr; }
   .cn-hurt__col + .cn-hurt__col { border-left: 0; border-top: 1px solid var(--line-2); }
-  .cn-sub { padding-left: var(--space-5); padding-right: var(--space-5); }
-  .cn-closed > summary { padding-left: var(--space-5); padding-right: var(--space-5); }
 }

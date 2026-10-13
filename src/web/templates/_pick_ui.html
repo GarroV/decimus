@@ -1,0 +1,64 @@
+{#
+  Части каркаса `_pick_page.html` (D474): элемент списка слева, поле поиска,
+  шапка выбранного, плитка ключевой цифры, блок со списком или таблицей.
+  Ни одного вычисления — приходит готовое.
+#}
+
+{# Элемент списка: название, мета, справа счётчик моноширинным; выбранный — подложкой и кольцом. #}
+{% macro pick_item(href, title, meta='', count='', on=false, code='') %}
+  <a class="pk-item{% if on %} is-on{% endif %}" href="{{ href }}"{% if on %} aria-current="page"{% endif %}>
+    {% if code %}<span class="pk-item__code">{{ code }}</span>{% endif %}
+    <span class="pk-item__main">
+      <span class="pk-item__title">{{ title }}</span>
+      {% if meta %}<span class="pk-item__meta">{{ meta }}</span>{% endif %}
+    </span>
+    {% if count != '' %}<span class="pk-item__count">{{ count }}</span>{% endif %}
+  </a>
+{% endmacro %}
+
+{# Поиск над списком — обычная форма GET: Enter отправляет, скрипт не нужен. `keep` — что оставить в адресе. #}
+{% macro pick_search(action, value, placeholder, keep, name='q') %}
+  <form class="pk-search" method="get" action="{{ action }}" role="search">
+    {% for k, v in keep.items() %}<input type="hidden" name="{{ k }}" value="{{ v }}">{% endfor %}
+    <input class="pk-search__input" type="search" name="{{ name }}" value="{{ value }}"
+           placeholder="{{ placeholder }}" aria-label="{{ placeholder }}" autocomplete="off" maxlength="60">
+  </form>
+{% endmacro %}
+
+{# Шапка выбранного: надпись, заголовок; в теле — `pk-head__facts`, `pk-head__actions`, `pk-head__period`. #}
+{% macro pick_head(kicker, title) %}
+  <header class="pk-head">
+    <div class="pk-head__main">
+      <div class="pk-kicker">{{ kicker }}</div>
+      <h1 class="pk-title">{{ title }}</h1>
+    </div>
+    {{ caller() }}
+  </header>
+{% endmacro %}
+
+{# Плитка цифры: подпись, значение (строкой или телом вызова), пояснение. #}
+{% macro pick_tile(label, value='', sub='', title='') %}
+  <div class="pk-tile"{% if title %} title="{{ title }}"{% endif %}>
+    <div class="pk-tile__label">{{ label }}</div>
+    <div class="pk-tile__value">{% if caller is defined %}{{ caller() }}{% else %}{{ value }}{% endif %}</div>
+    {% if sub %}<div class="pk-tile__sub">{{ sub }}</div>{% endif %}
+  </div>
+{% endmacro %}
+
+{# Ряд плиток: тело вызова — несколько `pick_tile`. #}
+{% macro pick_tiles() %}<div class="pk-tiles">{{ caller() }}</div>{% endmacro %}
+
+{# Блок: заголовок капсом, подсказка, счётчик справа; тело — список или таблица. #}
+{% macro pick_block(title, hint='', count='') %}
+  <section class="pk-block">
+    <header class="pk-block__head">
+      <h2 class="pk-block__title">{{ title }}</h2>
+      {% if hint %}<span class="pk-block__hint">{{ hint }}</span>{% endif %}
+      {% if count != '' %}<span class="pk-block__count">{{ count }}</span>{% endif %}
+    </header>
+    {{ caller() }}
+  </section>
+{% endmacro %}
+
+{# Тихая строка вместо пустого блока. #}
+{% macro pick_empty() %}<p class="pk-empty">{{ caller() }}</p>{% endmacro %}

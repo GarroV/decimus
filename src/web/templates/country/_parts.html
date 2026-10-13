@@ -1,20 +1,11 @@
 {#
-  Мелкие части экрана «Страна» (D467): движение числа, плитка ключевой цифры,
-  метка стадии пиццерии. Ни одного вычисления — приходит готовое.
+  Мелкие части экрана «Страна» (D467): движение числа, метка стадии пиццерии. Ни одного вычисления — приходит готовое.
 #}
 {% macro delta(value, digits='%+.1f') -%}
   {%- if value is not none -%}
     <span class="cn-delta{% if value < 0 %} is-down{% elif value > 0 %} is-up{% endif %}">{{ '▲' if value > 0 else ('▼' if value < 0 else '') }}{{ digits|format(value) }}</span>
   {%- endif -%}
 {%- endmacro %}
-
-{% macro tile(label, value, sub='', title='') %}
-  <div class="cn-tile"{% if title %} title="{{ title }}"{% endif %}>
-    <div class="cn-tile__label">{{ label }}</div>
-    <div class="cn-tile__value">{{ value }}</div>
-    {% if sub %}<div class="cn-tile__sub">{{ sub }}</div>{% endif %}
-  </div>
-{% endmacro %}
 
 {% macro stage(row) %}
   <span class="cn-st cn-st--{{ row.stage }}"{% if row.stage == 'closed' and row.closed_on %} title="{{ t('unit.profile.closed') }} {{ row.closed_on }}"{% endif %}>

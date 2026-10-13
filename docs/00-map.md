@@ -92,7 +92,7 @@ Flask-приложение управляющей компании и партн
 `app.py` собирает приложение и ещё держит часть экранов; остальные экраны
 подключаются своими `install(app, conf)`.
 
-<!-- map:begin files src/web/{__main__,app,assets,config,db_refusal,errors,icons,sections,view,webauthn_rp}.py -->
+<!-- map:begin files src/web/{__main__,app,assets,config,db_refusal,errors,icons,sections,view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/__main__.py` | Точка входа веб-админки: `python -m src.web` |
@@ -104,7 +104,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/icons.py` | Иконки админки — набор линейки из дизайн-системы (`static/icons.json`) |
 | `src/web/sections.py` | Разделы веб-админки и признак «построен / не построен» (D138) |
 | `src/web/view.py` | Подготовка того, что уже посчитано, к показу |
-| `src/web/webauthn_rp.py` | Ключи доступа (WebAuthn): тонкая обёртка над `webauthn` (duo-labs/py_webauthn, D463) |
 <!-- map:end -->
 
 ### Экраны
@@ -112,18 +111,17 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
-| `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
+| `src/web/country_page.py` | Сборка экрана «Страна» (D467, D474): колонка выбора слева, рабочая область справа |
 | `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Таблица «Пиццерии» экрана «Страна» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
-| `src/web/grade_explain.py` | «Почему такая буква» и «расшифровка» для карточки проверки (D490) |
 | `src/web/home_board.py` | Задания карточки «Требует внимания» на «Главной» (D378, D398): стикеры по живым счётчикам |
 | `src/web/home_page.py` | Экран «Главная» (D378): по образцу новой главной Swarm Brain |
 | `src/web/home_ratings.py` | Блоки «Стандарты · РС» и «Клиентский опыт · РКО» на «Главной» (D378) |
@@ -155,7 +153,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -168,20 +166,15 @@ Flask-приложение управляющей компании и партн
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
 | `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
-| `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
-| `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Мои входы» человека |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
-| `src/web/passkey_login.py` | Вход ключом доступа с формы входа (D485): ключ — способ ВХОДА, а не вторая ступень |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
 | `src/web/reauth.py` | Свежий вход для действий, создающих долгоживущий доступ (аудит безопасности 12.10) |
 | `src/web/remote.py` | Чей это адрес: кто пришёл на страницу, когда между нами стоит туннель |
-| `src/web/second_step.py` | Вторая ступень входа: «Подтвердите вход» после Google или пароля (D463) |
 | `src/web/security_headers.py` | Заголовки безопасности админки: один набор на КАЖДЫЙ ответ (#489) |
-| `src/web/security_screen.py` | Экран «Вход и защита» (`/settings/security`, D463): способы подтверждения входа |
 | `src/web/settings_screen.py` | Экран «Настройки» (`/settings`): настройки своего профиля — всё подключение в одном месте |
 | `src/web/ui_lang.py` | Язык сайта: из профиля учётки, `?lang=` — разовый перекрёсток (D447) |
 | `src/web/users_claude.py` | Блок «Подключить Claude» в «Настройках» (D417): адрес MCP и подключения через сайт |
@@ -212,10 +205,8 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
-| `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
-| `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
@@ -223,7 +214,6 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
-| `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
@@ -264,19 +254,18 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 17 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+9) |
+| `src/web/templates/` | 18 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, _plan.html, … (+10) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
-| `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
+| `src/web/templates/settings/` | 3 | confirm.html, continue.html, index.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -284,7 +273,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 48 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-registry.css, … (+40) |
+| `src/web/static/` | 47 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-pick.css, decimus-registry.css, … (+39) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -353,13 +342,12 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
 | `src/db/agg_store.py` | Оценки в агрегаторах доставки в базе (схема `agg`, миграция 0050) |
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
-| `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3) |
@@ -367,7 +355,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/ratings.py` | Запись рейтингов РС/РКО: журнал загрузок и строки схемы `ratings` (0039) |
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
-| `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
@@ -449,9 +436,6 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0064_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
 | `0065_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
 | `0066_move_with_action_plan.sql` | Перенос проверки в пиццерию другой страны не оставляет по ней экшн-план (приватный advisory GHSA-wqh3-3qcr-cccp) |
-| `0067_journals.sql` | Два журнала на случай взлома учётки (D462, шаг 2): «кто и откуда входил» и «что делали админы» |
-| `0068_second_factor.sql` | Вторая ступень входа (D463): ключ доступа (passkey, Touch ID), код из приложения- аутентификатора (TOTP, RFC 6238) и одноразовые резервные коды |
-| `0069_passkey_login.sql` | Вход ключом идёт с формы входа, до того как известно, кто пришёл: вызов выдаётся браузеру без учётки (ключ находится по номеру, а не по логину) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -550,7 +534,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/stops.py` | Отказы, которые останавливают мастер проверки: журнал и счётчик (#436) |
 | `src/bot/texts.py` | Тексты интерфейса бота: каталог по ключам, язык — параметр |
 | `src/bot/unit_pick.py` | Пиццерия проверки — из справочника, а не из написанного (D196) |
-| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) и старых записей журналов |
+| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) |
 | `src/bot/version.py` | Версия сборки: чем именно отвечает этот процесс (T246, #201) |
 | `src/bot/view.py` | Из чего складываются строки, которые аудитор читает в чате |
 | `src/bot/zones.py` | Зона из слов аудитора (задача T124, решения D047 и D048, правило 6) |
@@ -650,7 +634,6 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/bot_checklists.py` | Чек-листы, по которым аудитор может начать проверку в боте (волна 3, D221) |
 | `src/domain/checklist.py` | Чтение методики: пункты чек-листа, зоны, допустимые классы, версия набора |
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
-| `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
@@ -660,7 +643,6 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
-| `src/domain/journal.py` | Что и как попадает в журналы входов и действий (D462, `0067`) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
@@ -669,7 +651,6 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
 | `src/domain/scoring.py` | Оценка проверки |
-| `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
@@ -724,7 +705,6 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/engine.py` | Вызов `engine/report.py` подпроцессом — единственный способ собрать отчёт |
 | `src/report/engine_call.py` | Общее для тех, кто зовёт движок подпроцессом: где он лежит, сколько ждать, что печатать |
 | `src/report/errors.py` | Отказы блока `report` |
-| `src/report/explain.py` | Почему оценка такая — ответ движка по записанной проверке (D490) |
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
@@ -771,7 +751,6 @@ Telegram, ни HTTP, ни SQL.
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
 | `tools/porcha_permissions.py` | Порча матрицы прав (D408): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_ratings.py` | Порча защит рейтингов: каждая сломанная защита обязана уронить свой тест |
-| `tools/porcha_second_factor.py` | Порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_walk.py` | Порча защит мини-аппа обхода (D312): каждая сломанная защита обязана уронить свой тест |
 | `tools/pre-push-guard.sh` | Сторож пуша: не пускает наружу значения из приватного списка |
 | `tools/process_hint_measure.py` | T166 (D077): сколько раз признак «<описание>, это <процесс>» срабатывает зря |
@@ -816,7 +795,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/` | 4 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 
