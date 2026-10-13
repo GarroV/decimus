@@ -22,7 +22,7 @@ from src.mcp import ratings_read as tool
 from src.mcp import ratings_tools
 from src.mcp.catalogue import KIND_RATINGS, KIND_RATINGS_READ, find
 from src.mcp.errors import ToolError
-from src.mcp.rpc import RATINGS_CLOSED, handle
+from src.mcp.rpc import handle
 from src.ratings import report
 from src.ratings.aggregators import queue
 from src.ratings.summary import group_average
@@ -264,6 +264,7 @@ def _звать(имя: str, tenant: str, arguments: dict[str, Any], actor: str 
         source=None,
         may_retract=False,
         actor=actor,
+        role="admin",
     )
     assert ответ is not None
     return ответ
@@ -290,7 +291,8 @@ def test_чтение_открыто_токену_партнёра_а_заявк
     запросы: list[Any] = []
     monkeypatch.setattr(queue, "ask", lambda *a, **k: запросы.append((a, k)))
     закрыто = _звать("request_aggregators_update", "GE", {})
-    assert RATINGS_CLOSED in str(закрыто) and запросы == []
+    # Закрыто уже матрицей роли (`ratings.manage` — только УК), до заслона вида.
+    assert закрыто["result"]["isError"] is True and запросы == []
 
 
 class _Очередь:

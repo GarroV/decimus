@@ -10,7 +10,7 @@ import pytest
 from src.mcp import ratings_tools
 from src.mcp.catalogue import KIND_RATINGS, find
 from src.mcp.errors import ToolError
-from src.mcp.rpc import RATINGS_CLOSED, handle
+from src.mcp.rpc import handle
 from src.ratings.importer import ImportReport
 from src.ratings.model import RatingsFormatError
 
@@ -47,6 +47,7 @@ def _call(tenant: str, arguments: dict[str, Any]) -> dict[str, Any]:
         checklist=None,
         source=None,
         may_retract=False,
+        role="admin",
     )
     assert answer is not None
     return answer
@@ -77,7 +78,8 @@ def test_токен_уК_грузит(грузы: list[dict[str, Any]]) -> None:
 
 def test_токен_партнёра_отказ_до_двери(грузы: list[dict[str, Any]]) -> None:
     ответ = _call("GE", {"kind": "snapshot", "content": "{}"})
-    assert RATINGS_CLOSED in str(ответ)
+    # Закрыто уже матрицей роли (`ratings.manage` — только УК), до заслона вида.
+    assert ответ["result"]["isError"] is True
     assert грузы == []
 
 

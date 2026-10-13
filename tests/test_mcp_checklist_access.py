@@ -52,7 +52,7 @@ from src.mcp.server import _checklist_for, build_server
 # `_checklist_for` у него отказывает раньше, на `may_manage_checklist`, до
 # всякого обращения к `space_of`.
 УК = "HQ"
-ПАРТНЁР = "партнёр-б"
+ПАРТНЁР = "partner-b"
 
 
 @pytest.fixture
@@ -70,6 +70,7 @@ def настройки(tmp_path: Path, методика: Path) -> Settings:
     """Сервер, на котором методика открыта управляющей компании и только ей."""
     return Settings(
         tokens={ТОКЕН_УК: УК, ТОКЕН_ПАРТНЁРА: ПАРТНЁР},
+        token_roles={ТОКЕН_УК: "admin", ТОКЕН_ПАРТНЁРА: "auditor"},
         tenants=(ПАРТНЁР, УК),
         host="127.0.0.1",
         port=0,
@@ -209,6 +210,7 @@ def _вызов(имя: str, аргументы: dict[str, Any], *, checklist: S
         },
         tenant=УК,
         checklist=checklist,
+        role="admin",
     )
 
 
@@ -291,7 +293,9 @@ def test_каждый_инструмент_методики_закрыт_одн�
         if spec.kind != KIND_CHECKLIST:
             continue
         ответ = _вызов(spec.name, {}, checklist=None)
-        assert ответ["result"]["content"][0]["text"] == CHECKLIST_CLOSED, spec.name
+        # Закрыто хранилищем, матрицей роли или требованием назвать чек-лист — но
+        # не успехом: правка не проходит ни одной дверью.
+        assert ответ["result"]["isError"] is True, spec.name
 
 
 # --- сервер -------------------------------------------------------------------
@@ -335,8 +339,8 @@ def test_через_сервер_методика_открыта_только_с
     чужой = _спросить(сервер, ТОКЕН_ПАРТНЁРА, "checklist_versions", {})
 
     assert "isError" not in свой["result"]
+    # Партнёру со служебным токеном (роль названа записью) методика УК закрыта.
     assert чужой["result"]["isError"] is True
-    assert чужой["result"]["content"][0]["text"] == CHECKLIST_CLOSED
 
 
 def test_через_сервер_правка_доходит_до_новой_версии(сервер: str) -> None:
@@ -404,6 +408,7 @@ def _вызов_партнёра(имя: str, аргументы: dict[str, Any]
         tenant=ПАРТНЁР,
         checklist=_checklist_for(настройки, ПАРТНЁР),
         source=_checklist_source_for(настройки, ПАРТНЁР),
+        role="auditor",
     )
 
 
@@ -467,8 +472,9 @@ def test_партнёру_чтение_эталона_не_даёт_ни_одн�
         if spec.kind != KIND_CHECKLIST:
             continue
         ответ = _вызов_партнёра(spec.name, {}, настройки=настройки)
+        # Закрыто матрицей роли или требованием назвать чек-лист — но не успехом:
+        # правка не проходит ни одной дверью.
         assert ответ["result"]["isError"] is True, spec.name
-        assert ответ["result"]["content"][0]["text"] == CHECKLIST_CLOSED, spec.name
 
 
 def test_исходник_не_отдаёт_колонок_управляющей_компании(настройки: Settings) -> None:

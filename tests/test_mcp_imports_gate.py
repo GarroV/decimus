@@ -46,6 +46,7 @@ def _вызов(имя: str, **права: Any) -> dict[str, Any]:
         },
         tenant="HQ",
         **права,
+        role="admin",
     )
     assert ответ is not None
     return ответ
