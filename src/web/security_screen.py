@@ -27,7 +27,7 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 import segno
@@ -48,11 +48,12 @@ from src.db import second_factor as store
 from src.db.errors import DbError
 from src.db.web_access import close_session
 from src.domain.second_factor import (
-    FRESH_FOR_ENROLLMENT,
     MAX_PASSKEY_NAME,
     backup_code_hash,
+    is_fresh_login,
     is_required,
     match_totp_step,
+    may_remove_factor,
     new_backup_codes,
     new_totp_secret,
     normalize_totp_code,
@@ -92,11 +93,28 @@ class TotpSetup:
 
 
 def is_fresh(account: Any, *, now: datetime | None = None) -> bool:
-    """Вход не старше `FRESH_FOR_ENROLLMENT`; неизвестно когда — не свежий."""
-    когда = getattr(account, "signed_in_at", None)
-    if not isinstance(когда, datetime):
-        return False
-    return (now or datetime.now(UTC)) - когда <= FRESH_FOR_ENROLLMENT
+    """Вход достаточно свеж для подключения способа (`enrollment_window`).
+
+    Админу без способа окно короче — 5 минут: первая ступень, украденная ради подключения
+    чужого способа, должна успеть меньше всего.
+    """
+    return is_fresh_login(
+        getattr(account, "signed_in_at", None),
+        role=str(account.role),
+        has_factor=bool(getattr(account, "has_second_factor", False)),
+        now=now,
+    )
+
+
+def may_remove(account: Any, *, now: datetime | None = None) -> bool:
+    """Снять способ можно сессией, прошедшей вторую ступень, и только свежей."""
+    return may_remove_factor(
+        passed_second_step=bool(getattr(account, "passed_second_step", False)),
+        signed_in_at=getattr(account, "signed_in_at", None),
+        role=str(account.role),
+        has_factor=bool(getattr(account, "has_second_factor", False)),
+        now=now,
+    )
 
 
 def _qr_svg(uri: str) -> Markup:
@@ -263,6 +281,7 @@ def install(app: Flask, conf: Settings) -> None:
                 sign_count=новое.sign_count,
                 transports=новое.transports,
                 name=имя,
+                keep_session_id=account.session_id,
             )
         except webauthn_rp.PasskeyError:
             return jsonify(error="failed"), 400
@@ -276,7 +295,7 @@ def install(app: Flask, conf: Settings) -> None:
     def security_passkey_delete(passkey_id: str) -> Response | tuple[Response, int]:
         refuse_foreign_origin()
         account = _me()
-        if not is_fresh(account):
+        if not may_remove(account):
             return _stale_response(json_body=False)
         try:
             исход = store.remove_passkey(account.id, passkey_id)
@@ -314,7 +333,9 @@ def install(app: Flask, conf: Settings) -> None:
                 if строка is not None and not строка.confirmed and цифры is not None
                 else None
             )
-            if шаг is None or not store.confirm_totp(account.id, step=шаг):
+            if шаг is None or not store.confirm_totp(
+                account.id, step=шаг, keep_session_id=account.session_id
+            ):
                 return render_page(flash=Flash("sf.totp.bad", ok=False), code=400)
         except DbError as exc:
             note_target_mismatch(exc)
@@ -326,7 +347,7 @@ def install(app: Flask, conf: Settings) -> None:
     def security_totp_remove() -> Response | tuple[Response, int]:
         refuse_foreign_origin()
         account = _me()
-        if not is_fresh(account):
+        if not may_remove(account):
             return _stale_response(json_body=False)
         try:
             исход = store.remove_totp(account.id)

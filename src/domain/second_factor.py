@@ -142,6 +142,49 @@ def backup_code_hash(user_id: str, code: str) -> str | None:
     return hashlib.sha256(f"decimus-backup:{user_id}:{чистый}".encode()).hexdigest()
 
 
+def enrollment_window(role: str, *, has_factor: bool) -> timedelta:
+    """Сколько после входа можно менять способы входа.
+
+    Админу и главному админу, у которых способа ещё нет, окно короче — как у полувхода
+    (`PENDING_TTL`): подключение первого способа — единственное место, где украденная
+    первая ступень могла бы закрепить ЧУЖОЙ способ (D463). Остальным и тем, у кого способ
+    уже есть, — `FRESH_FOR_ENROLLMENT`.
+    """
+    if is_required(role) and not has_factor:
+        return PENDING_TTL
+    return FRESH_FOR_ENROLLMENT
+
+
+def is_fresh_login(
+    signed_in_at: datetime | None, *, role: str, has_factor: bool, now: datetime | None = None
+) -> bool:
+    """Вход достаточно свеж для изменения способов; время неизвестно — не свеж."""
+    if signed_in_at is None:
+        return False
+    return (now or datetime.now(UTC)) - signed_in_at <= enrollment_window(
+        role, has_factor=has_factor
+    )
+
+
+def may_remove_factor(
+    *,
+    passed_second_step: bool,
+    signed_in_at: datetime | None,
+    role: str,
+    has_factor: bool,
+    now: datetime | None = None,
+) -> bool:
+    """Снять способ входа или сбросить чужую ступень: сессия прошла вторую ступень И свежая.
+
+    Сессия, выданная одной первой ступенью (пусть даже она потом подключила способ),
+    снимать способы не может: украденный пароль не должен хватать, чтобы разоружить
+    вторую ступень. Замена единственного способа — это снятие, и она тоже требует этого.
+    """
+    return passed_second_step and is_fresh_login(
+        signed_in_at, role=role, has_factor=has_factor, now=now
+    )
+
+
 def removal_leaves_required_factor(*, role: str, remaining_factors: int) -> bool:
     """Можно ли убрать способ, если после этого останется `remaining_factors` способов.
 

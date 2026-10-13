@@ -258,6 +258,27 @@ def take_challenge(bound_token: str, *, purpose: str, user_id: str) -> bytes | N
 # --- ключи доступа ---------------------------------------------------------------
 
 
+def _close_others_if_first(cur: Any, user_id: str, keep_session_id: str | None) -> None:
+    """Если способов входа ещё нет — закрыть прочие сессии человека (D463).
+
+    Сессия, открытая одной первой ступенью до подключения способа, иначе пережила бы его:
+    украденный пароль, которым зашли раньше хозяина, остался бы действующим входом.
+    """
+    cur.execute(
+        "select (select count(*) from web_passkeys where user_id = %(u)s)"
+        " + (select count(*) from web_totp where user_id = %(u)s and confirmed_at is not null)",
+        {"u": user_id},
+    )
+    строка = cur.fetchone()
+    if строка is None or int(строка[0]) > 0:
+        return
+    cur.execute(
+        "update web_sessions set closed_at = now()"
+        " where user_id = %s and closed_at is null and id is distinct from %s",
+        (user_id, keep_session_id),
+    )
+
+
 def add_passkey(
     user_id: str,
     *,
@@ -266,9 +287,11 @@ def add_passkey(
     sign_count: int,
     transports: tuple[str, ...],
     name: str,
+    keep_session_id: str | None = None,
 ) -> Passkey:
-    """Записать новый ключ доступа."""
+    """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии."""
     with _connected("записать ключ доступа") as conn, conn.cursor() as cur:
+        _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "insert into web_passkeys (user_id, credential_id, public_key, sign_count,"
             " transports, name) values (%s, %s, %s, %s, %s, %s)"
@@ -381,9 +404,13 @@ def totp_of(user_id: str) -> TotpRow | None:
     )
 
 
-def confirm_totp(user_id: str, *, step: int) -> bool:
-    """Подтвердить приложение первым верным кодом; его шаг запоминается (повтор не пройдёт)."""
+def confirm_totp(user_id: str, *, step: int, keep_session_id: str | None = None) -> bool:
+    """Подтвердить приложение первым верным кодом; его шаг запоминается (повтор не пройдёт).
+
+    Первый способ человека закрывает его ДРУГИЕ сессии (кроме `keep_session_id`).
+    """
     with _connected("подтвердить приложение") as conn, conn.cursor() as cur:
+        _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "update web_totp set confirmed_at = now(), last_step = %s"
             " where user_id = %s and confirmed_at is null",

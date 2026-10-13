@@ -205,8 +205,14 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
         "en": "This is your last sign-in method and your role requires one: connect another first.",
     },
     "sf.sec.stale_refused": {
-        "ru": "Прошло больше 10 минут с входа. Войдите заново, чтобы менять способы входа.",
-        "en": "More than 10 minutes have passed since sign-in. Sign in again to change methods.",
+        "ru": (
+            "Чтобы менять способы входа, войдите заново: вход должен быть свежим (до 10 минут, "
+            "админу без способа — до 5) и подтверждённым вторым шагом."
+        ),
+        "en": (
+            "To change sign-in methods, sign in again: the sign-in must be recent (up to 10 "
+            "minutes, 5 for an admin without a method) and confirmed with the second step."
+        ),
     },
     "sf.sec.db": {
         "ru": "Не удалось сохранить: база недоступна. Попробуйте ещё раз.",

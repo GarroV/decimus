@@ -247,8 +247,8 @@ _SELECT_USER_BY_EMAIL_SQL = """
 """
 
 _OPEN_SESSION_SQL = """
-    insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent)
-    values (%s, %s, now() + %s, %s, %s)
+    insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent, second_step_at)
+    values (%s, %s, now() + %s, %s, %s, case when %s then now() end)
     returning expires_at, id
 """
 
@@ -260,7 +260,8 @@ _RESOLVE_SESSION_SQL = """
            u.display_name, u.avatar_etag, s.id,
            (exists (select 1 from web_passkeys p where p.user_id = u.id)
             or exists (select 1 from web_totp t
-                        where t.user_id = u.id and t.confirmed_at is not null))
+                        where t.user_id = u.id and t.confirmed_at is not null)),
+           s.second_step_at is not null
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -368,6 +369,8 @@ class Account:
     #: Подключена ли вторая ступень входа (ключ доступа или приложение, D463). Приезжает
     #: с сессией: админу без неё заслон оставляет только экран подключения.
     has_second_factor: bool = False
+    #: Сессия выдана после второй ступени; без неё способы входа не снимаются (D463).
+    passed_second_step: bool = False
 
 
 @dataclass(frozen=True)
@@ -966,12 +969,17 @@ def authenticate(login: str, password: str) -> Account | None:
 
 
 def open_session(
-    account: Account, *, ip: str | None = None, user_agent: str | None = None
+    account: Account,
+    *,
+    ip: str | None = None,
+    user_agent: str | None = None,
+    second_step: bool = False,
 ) -> OpenedSession:
     """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке.
 
     `ip` и `user_agent` — откуда вошли (D462): адрес по цепочке доверенных звеньев и
-    браузер, усечённый до `MAX_USER_AGENT`.
+    браузер, усечённый до `MAX_USER_AGENT`. `second_step` — сессия прошла вторую ступень
+    (D463): только такой сессии разрешено СНИМАТЬ способы входа.
     """
     token = new_session_token()
     with _connected("открыть сессию") as conn, conn.cursor() as cur:
@@ -983,6 +991,7 @@ def open_session(
                 SESSION_TTL,
                 ip,
                 truncate_user_agent(user_agent),
+                second_step,
             ),
         )
         row = cur.fetchone()
@@ -1023,6 +1032,7 @@ def resolve_session(token: str) -> Account | None:
         avatar_etag=row[8],
         session_id=str(row[9]),
         has_second_factor=bool(row[10]),
+        passed_second_step=bool(row[11]),
     )
 
 

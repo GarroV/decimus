@@ -1602,7 +1602,8 @@ D391) — так же: миграций нет, право — уже выдан
 
    | Переменная | Значение | Что делает |
    |---|---|---|
-   | `ADMIN_PUBLIC_URL` | внешний адрес админки, `https://<адрес входа>` (§8.9), с префиксом, если он есть | издатель OAuth: адреса `/oauth/authorize`, `/oauth/token`, `/oauth/register` в метаданных строятся от него |
+   | `WEBAUTHN_RP_ID`, `WEBAUTHN_ORIGIN` | домен и происхождение для ключей доступа второй ступени (D463); пусты — берутся из `ADMIN_PUBLIC_URL` | на проде `decimus.vasiliy-garro.workers.dev` и `https://decimus.vasiliy-garro.workers.dev`, НЕ `workers.dev` (общий суффикс, отказ на старте). Потерянный доступ главного админа: `dc exec web python tools/web_user.py reset-second-factor <логин> --tenant HQ` |
+| `ADMIN_PUBLIC_URL` | внешний адрес админки, `https://<адрес входа>` (§8.9), с префиксом, если он есть | издатель OAuth: адреса `/oauth/authorize`, `/oauth/token`, `/oauth/register` в метаданных строятся от него |
    | `MCP_PUBLIC_URL` | тот же адрес, что `BOT_MCP_URL` | ресурс OAuth: его человек вставляет в Claude; он же в `resource_metadata` отказа 401 |
 
    Пусто хотя бы одно — OAuth выключен целиком, всё работает как раньше.

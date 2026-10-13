@@ -45,6 +45,7 @@ from .config import Settings
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
 from .sections import section
+from .security_screen import may_remove as may_remove_factor
 from .users_page import (
     ME,
     SEES_BINDINGS,
@@ -377,7 +378,10 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
         if not access_policy.may_reset_second_factor(круг):
             return forbidden()
         вошедший = auth.current_account()
-        if вошедший is not None and логин.lower() == вошедший.login.strip().lower():
+        if вошедший is None or not may_remove_factor(вошедший):
+            # Сброс — снятие чужого способа: сессия обязана пройти вторую ступень и быть свежей.
+            return render(Show(flash=_flash("sf.sec.stale_refused", ok=False)), 403)
+        if логин.lower() == вошедший.login.strip().lower():
             return render(Show(person=ME, flash=_flash("sf.reset.self", ok=False)), 400)
         try:
             цель = _target(круг, логин, пространство)

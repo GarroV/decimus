@@ -655,7 +655,9 @@ def install(app: Flask, conf: Settings) -> None:
     def _обновить_сессию(account: Account, назад: str, *, arm: bool = True) -> Response:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
-        новая = open_session(account)
+        новая = open_session(
+            account, second_step=bool(getattr(account, "passed_second_step", False))
+        )
         if прежний:
             close_session(прежний)
         ответ = redirect(f"{request.script_root}{назад}")

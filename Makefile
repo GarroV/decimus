@@ -1,4 +1,4 @@
-.PHONY: bootstrap check test test-honest porcha-permissions cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
+.PHONY: bootstrap check test test-honest porcha-permissions porcha-second-factor cov image regress web walk web-up web-demo web-user space web-unlock web-stand-user units demo demo-down loadcheck loadcheck-live fastpath zonecov processhint zonewords lint types dead bounds fmt migrate recipe-check db-up db-down storage-up storage-down mcp mcp-outside cov-engine state-backup map
 
 VENV := ./.venv/bin
 DATA := $(shell grep -E '^AUDIT_DATA_DIR=' .env 2>/dev/null | cut -d= -f2-)
@@ -126,6 +126,12 @@ test-honest:  ## прогон тестов без кеша байткода — 
 
 porcha-permissions:  ## порча матрицы прав: каждая сломанная защита обязана уронить свой тест (без базы)
 	$(VENV)/python tools/porcha_permissions.py
+
+porcha-second-factor: export DATABASE_URL = $(TEST_DATABASE_URL)
+porcha-second-factor: export DATABASE_APP_PASSWORD = $(TEST_APP_PASSWORD)
+porcha-second-factor: export DATABASE_RETRACTION_PASSWORD = $(TEST_RETRACTION_PASSWORD)
+porcha-second-factor:  ## порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест (нужна тестовая база)
+	$(VENV)/python tools/porcha_second_factor.py
 
 dead:  ## мёртвый код и неиспользуемые зависимости (`vulture`, `deptry`)
 	$(VENV)/vulture

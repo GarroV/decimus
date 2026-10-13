@@ -251,7 +251,7 @@ def install(
         if pending is None or pending.user_id != account.id:
             return None
         откуда, браузер = web_journal.login_origin(conf)
-        session = open_session(account, ip=откуда, user_agent=браузер)
+        session = open_session(account, ip=откуда, user_agent=браузер, second_step=True)
         journals.record_login(
             method=METHOD_SECOND_STEP,
             result=result,

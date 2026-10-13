@@ -80,6 +80,7 @@ class Учётка:
         # Вторая ступень (D463): по умолчанию подключена — админ-двойник без неё видел бы
         # только экран подключения во всех тестах разом. Наборы про ступень задают сами.
         self.has_second_factor = has_second_factor
+        self.passed_second_step = True
         # Когда открыта сессия: по умолчанию только что — вход свежий, и
         # действия, требующие свежего входа (`web.reauth`), не переспрашивают.
         self.signed_in_at = signed_in_at or datetime.now(UTC)
@@ -279,6 +280,8 @@ def собрать(
     admin_public_url: str | None = None,
     mcp_public_url: str | None = None,
     trusted_proxies: int | None = None,
+    webauthn_rp_id: str | None = None,
+    webauthn_origin: str | None = None,
 ) -> Flask:
     """Приложение с настройками стенда набора. Публичные адреса включают OAuth (D417)."""
     app = create_app(
@@ -291,6 +294,8 @@ def собрать(
             bot_username=bot_username,
             admin_public_url=admin_public_url,
             mcp_public_url=mcp_public_url,
+            webauthn_rp_id=webauthn_rp_id,
+            webauthn_origin=webauthn_origin,
             **({} if trusted_proxies is None else {"trusted_proxies": trusted_proxies}),
         )
     )

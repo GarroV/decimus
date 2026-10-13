@@ -275,12 +275,53 @@ def test_сброс_снимает_всё_и_полувход(люди: Люди
 def test_сессия_знает_есть_ли_вторая_ступень(люди: Люди) -> None:
     учётка = authenticate("anna", ПАРОЛЬ)
     assert учётка is not None
-    токен = open_session(учётка).token
+    открыта = open_session(учётка)
+    токен = открыта.token
     до = resolve_session(токен)
     assert до is not None and до.has_second_factor is False
-    sf.add_passkey(учётка.id, **_ключ("anna"))  # type: ignore[arg-type]
+    assert до.passed_second_step is False
+    sf.add_passkey(
+        учётка.id,
+        keep_session_id=открыта.session_id,
+        **_ключ("anna"),  # type: ignore[arg-type]
+    )
     после = resolve_session(токен)
     assert после is not None and после.has_second_factor is True
+
+
+def test_первый_способ_закрывает_прочие_сессии_но_не_свою(люди: Люди) -> None:
+    учётка = authenticate("anna", ПАРОЛЬ)
+    assert учётка is not None
+    своя = open_session(учётка)
+    чужая = open_session(учётка)
+
+    sf.add_passkey(
+        учётка.id,
+        keep_session_id=своя.session_id,
+        **_ключ("anna"),  # type: ignore[arg-type]
+    )
+
+    assert resolve_session(своя.token) is not None
+    assert resolve_session(чужая.token) is None
+    # Второй способ уже не первый: сессии не трогаются.
+    третья = open_session(учётка)
+    sf.add_passkey(
+        учётка.id,
+        keep_session_id=своя.session_id,
+        **_ключ("anna", 2),  # type: ignore[arg-type]
+    )
+    assert resolve_session(третья.token) is not None
+
+
+def test_сессия_после_второй_ступени_помечена(люди: Люди) -> None:
+    учётка = authenticate("anna", ПАРОЛЬ)
+    assert учётка is not None
+
+    обычная = resolve_session(open_session(учётка).token)
+    после = resolve_session(open_session(учётка, second_step=True).token)
+
+    assert обычная is not None and обычная.passed_second_step is False
+    assert после is not None and после.passed_second_step is True
 
 
 def test_замороженный_не_находится_для_второй_ступени(люди: Люди) -> None:

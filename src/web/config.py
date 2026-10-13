@@ -155,9 +155,7 @@ WEBAUTHN_ORIGIN_VAR = "WEBAUTHN_ORIGIN"
 #: чужих сайтов. Привязка к `workers.dev` дала бы чужому Worker'у право на наши ключи, а
 #: браузер такой домен всё равно отвергнет. Полный список (PSL) не тянем — это ловушка на
 #: частую ошибку, а не замена списку.
-_SHARED_SUFFIXES = frozenset(
-    {"workers.dev", "pages.dev", "github.io", "vercel.app", "netlify.app", "ts.net"}
-)
+_SHARED_SUFFIXES = frozenset({"workers.dev", "pages.dev", "github.io", "vercel.app", "netlify.app"})
 
 
 def _parse_webauthn(
@@ -182,7 +180,7 @@ def _parse_webauthn(
             )
         return None, None
     части = urlsplit(origin)
-    if части.path:
+    if origin_raw and части.path:
         raise WebConfigError(
             f"{WEBAUTHN_ORIGIN_VAR} — только схема и хост (https://хост[:порт]), без пути"
         )
