@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 AVATAR_HOST_SUFFIX = ".googleusercontent.com"
 #: Сколько ждём Google за фото: вход не должен зависеть от его картинок.
 AVATAR_TIMEOUT_SECONDS = 3
-#: Предел размера (совпадает с ограничением колонки `0063`).
+#: Предел размера (совпадает с ограничением колонки `0064`).
 MAX_AVATAR_BYTES = 200 * 1024
 
 JPEG = "image/jpeg"

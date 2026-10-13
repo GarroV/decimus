@@ -1,4 +1,4 @@
--- 0063_web_own_google_profile.sql
+-- 0064_web_own_google_profile.sql
 --
 -- Имя и фото из Google в блоке учётки (D468). Берутся при входе через Google и
 -- при привязке Google в «Настройках»; у учётки без Google колонки пусты, и
@@ -45,13 +45,13 @@ alter table web_users
     );
 
 comment on column web_users.display_name is
-    'Имя и фамилия из Google (D468); null — показывается логин. Пишет только set_own_google_profile (0063).';
+    'Имя и фамилия из Google (D468); null — показывается логин. Пишет только set_own_google_profile (0064).';
 comment on column web_users.avatar is
     'Фото из Google, скачанное один раз при входе (D468); до 200 КБ. Отдаёт только /settings/avatar своей сессии.';
 comment on column web_users.avatar_type is
-    'Тип фото по сигнатуре байт, не по заголовку: image/jpeg, image/png или image/webp (0063).';
+    'Тип фото по сигнатуре байт, не по заголовку: image/jpeg, image/png или image/webp (0064).';
 comment on column web_users.avatar_etag is
-    'Первые 16 знаков sha256 байтов фото: версия для ETag и адреса (0063).';
+    'Первые 16 знаков sha256 байтов фото: версия для ETag и адреса (0064).';
 
 create function set_own_google_profile(p_token text, p_name text, p_avatar bytea, p_type text)
     returns boolean
