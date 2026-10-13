@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from src.db import unit_profiles
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.db.unit_profiles import Profile
 
 from . import maps_link
@@ -273,4 +274,5 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    with acting_space(SYSTEM_SPACE):
+        raise SystemExit(main())

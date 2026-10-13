@@ -22,6 +22,7 @@ from psycopg.types.json import Jsonb
 from .config import check_environment
 from .errors import RatingsError
 from .pool import connection
+from .space import apply_space
 
 
 class UnitIn(Protocol):
@@ -323,6 +324,7 @@ def open_request() -> UpdateRequest | None:
     )
     try:
         with psycopg.connect(check_environment().dsn) as conn:
+            apply_space(conn)
             row = conn.execute(sql).fetchone()
     except psycopg.Error as exc:
         raise _fail("Заявки на обновление агрегаторов не прочитались", exc) from exc
@@ -340,6 +342,7 @@ def request_update(aggregators: Sequence[str], *, by: str) -> tuple[UpdateReques
     )
     try:
         with psycopg.connect(check_environment().dsn) as conn:
+            apply_space(conn)
             row = conn.execute(sql, (by, list(aggregators) or None)).fetchone()
     except psycopg.Error as exc:
         raise _fail("Заявка на обновление агрегаторов не легла", exc) from exc
@@ -357,6 +360,7 @@ def finish_request(request_id: int, *, ok: bool, error: str | None = None) -> No
     """Закрыть заявку исходом сбора; текст ошибки обрезается, как у журнала."""
     try:
         with psycopg.connect(check_environment().dsn) as conn:
+            apply_space(conn)
             conn.execute(
                 "update agg.requests set done_at = now(), outcome = %s, error = %s "
                 "where id = %s and done_at is null",

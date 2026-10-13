@@ -44,6 +44,7 @@ from aiogram import Bot
 from src import db
 from src.db.config import load_storage_settings
 from src.db.photos import PENDING_BATCH
+from src.db.space import SYSTEM_SPACE, acting_space
 from src.db.storage import S3PhotoStorage
 
 from .photos import MAX_PARALLEL, fetch_bytes
@@ -236,6 +237,16 @@ async def _pass(fetch: FetchAsync, *, stale: bool) -> None:
 
 
 async def backfill_forever(bot: Bot) -> None:
+    """Досылка кадров в хранилище по расписанию.
+
+    Служебная работа без человека: в базу — от имени служебного пространства
+    (F-037, `src/db/space.py`).
+    """
+    with acting_space(SYSTEM_SPACE):
+        await _backfill_forever(bot)
+
+
+async def _backfill_forever(bot: Bot) -> None:
     """Проход по расписанию, пока бот работает; раз в сутки — по застарелым."""
 
     async def fetch(file_id: str) -> bytes | None:

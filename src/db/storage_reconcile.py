@@ -38,6 +38,7 @@ from .action_plans import STORAGE_PREFIX as ACTION_PLANS_PREFIX
 from .config import check_environment, load_storage_settings
 from .errors import StorageError
 from .prescriptions_write import STORAGE_PREFIX as PRESCRIPTIONS_PREFIX
+from .space import apply_space
 from .storage import S3PhotoStorage, StoredObject, key_of_uri
 
 #: Сколько ждать, прежде чем объект без строки считать расхождением. Загрузка
@@ -181,6 +182,7 @@ def reconcile_live(
     """
     store = S3PhotoStorage(load_storage_settings())
     with psycopg.connect(check_environment().dsn) as conn:
+        apply_space(conn)
         conn.set_read_only(True)
 
         def read_rows(area: Area) -> list[StoredRow]:

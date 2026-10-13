@@ -1046,15 +1046,28 @@ def _own(detail: Any) -> bool:
 def _install_hq_gate(app: Flask) -> None:
     """Раздел только для УК отвечает партнёру тем же 404, что несуществующий адрес (D264).
 
+    Решает по объявлениям маршрута в матрице (`guard.open_to_tenant`), по
+    умолчанию — закрыто; префикс раздела (`sections.refused_for`) — второй слой.
     Заслон на раздел целиком, а не на каждую кнопку внутри: так доступы проще
-    держать — это и был довод владельца. Стоит после заслона входа: без
-    вошедшего туда не доходит ни один закрытый адрес.
+    держать — это и был довод владельца. Стоит после заслона входа: без вошедшего туда не
+    доходит ни один закрытый адрес.
     """
 
     @app.before_request
     def _только_уК() -> None:
-        if request.endpoint in auth.OPEN_ENDPOINTS or auth.current_account() is None:
+        # Маршрут не нашёлся (`endpoint is None`) — 404/405 даст сам Flask.
+        if request.endpoint is None or request.endpoint in auth.OPEN_ENDPOINTS:
             return
+        if auth.current_account() is None:
+            return
+        # Умолчание — закрыто (аудит 12.10, F-004): партнёр идёт только к
+        # маршруту, объявленному в матрице открытым его пространству, а не «куда
+        # не запретили по префиксу». Префиксный заслон остаётся вторым слоем.
+        пространство = auth.current_tenant()
+        if canonical_tenant(пространство) != HQ_TENANT and not guard.open_to_tenant(
+            app, request.endpoint, request.path, пространство
+        ):
+            abort(404)
         if refused_for(request.path, auth.current_tenant()):
             abort(404)
 

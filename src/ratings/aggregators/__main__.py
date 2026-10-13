@@ -19,6 +19,7 @@ from typing import Any
 
 from src.db import agg_store
 from src.db.agg_store import PointRow
+from src.db.space import SYSTEM_SPACE, acting_space
 
 from .collect import run_all
 
@@ -69,4 +70,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with acting_space(SYSTEM_SPACE):
+        main()

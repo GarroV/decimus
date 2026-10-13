@@ -161,3 +161,61 @@ def test_скрытый_экран_отвечает_404(monkeypatch: pytest.Monk
     for client in _клиент(monkeypatch, app, tenant="HQ", role=role):
         ответ = client.post("/users/connections/issue", headers={"Origin": СВОЙ})
     assert ответ.status_code == 404
+
+
+# --- Граница пространств выводится из объявлений (аудит 12.10, F-004) ---------
+
+ПАРТНЁР = "GE"
+
+
+def _ок() -> str:
+    return "ok"
+
+
+@pytest.mark.parametrize("публичные", [{}, ПУБЛИЧНЫЕ], ids=["стенд", "с публичными адресами"])
+def test_каждый_маршрут_объявлен_в_матрице(публичные: dict[str, str]) -> None:
+    """Маршрут, который матрица не объявила ничем, партнёру закрыт — и назван здесь."""
+    assert guard.undeclared(собрать(tenant="HQ", **публичные)) == []
+
+
+def test_полнота_ловит_необъявленный_маршрут() -> None:
+    """Прогон на сломанном приложении: новый GET вне разделов без объявления обязан всплыть."""
+    app = собрать(tenant="HQ")
+    app.add_url_rule("/zzz-new", endpoint="zzz_new", view_func=_ок)
+    assert guard.undeclared(app) == ["zzz_new (/zzz-new)"]
+
+
+@pytest.mark.parametrize(("tenant", "ожидание"), [(ПАРТНЁР, 404), ("HQ", 200)])
+def test_необъявленный_маршрут_партнёру_закрыт_УК_открыт(
+    monkeypatch: pytest.MonkeyPatch, tenant: str, ожидание: int
+) -> None:
+    подменить_двери(monkeypatch, tenant=tenant, role="admin")
+    app = собрать(tenant=tenant)
+    app.add_url_rule("/zzz-new", endpoint="zzz_new", view_func=_ок)
+    with app.test_client() as client:
+        войти(client)
+        assert client.get("/zzz-new").status_code == ожидание
+
+
+def test_маршрут_с_действием_только_УК_партнёру_закрыт_и_вне_префикса(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Граница — по коду матрицы, а не по пути: префикс раздела тут ни при чём."""
+    подменить_двери(monkeypatch, tenant=ПАРТНЁР, role="admin")
+    app = собрать(tenant=ПАРТНЁР)
+    app.add_url_rule("/zzz-hq", endpoint="zzz_hq", view_func=guard.action("unit.create")(_ок))
+    with app.test_client() as client:
+        войти(client)
+        assert client.get("/zzz-hq").status_code == 404
+        assert client.get("/calendar").status_code == 200  # объявленный раздел открыт
+
+
+def test_разделы_только_УК_партнёру_закрыты_по_матрице() -> None:
+    app = собрать(tenant="HQ", **ПУБЛИЧНЫЕ)
+    закрытые = {
+        rule.endpoint
+        for rule in app.url_map.iter_rules()
+        if not guard.open_to_tenant(app, rule.endpoint, rule.rule, ПАРТНЁР)
+    }
+    assert {"country", "country_index", "actions", "unit_new", "unit_create"} <= закрытые
+    assert not закрытые & {"overview", "registry", "card", "ratings", "settings_page", "home"}
