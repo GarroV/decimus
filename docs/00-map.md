@@ -153,16 +153,18 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,accounts,auth,connections_form,connections_screen,google_auth,google_link,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
+| `src/web/account_menu.py` | Меню учётки (D468): состояние подключений для строки «Подключения» |
 | `src/web/accounts.py` | Учётки админки так, как их видит экран (T338, #322) |
 | `src/web/auth.py` | Вход в админку: форма, сессия в подписанной куке, выход (T323, D155) |
 | `src/web/connections_form.py` | Разбор формы «Подключить сервис» и правки сервиса (D425) |
 | `src/web/connections_screen.py` | Вкладка «Подключения» экрана «Пользователи»: ключи API сервисов (D425, #568) |
 | `src/web/google_auth.py` | Вход в админку по учётке Google (T332, D163, D168) |
 | `src/web/google_link.py` | Привязка своей почты Google из «Настроек» (D447, D450, D430) |
+| `src/web/google_profile.py` | Имя и фото из Google в учётку (D468): скачать фото один раз и записать |
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
@@ -252,7 +254,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 14 | _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, _split_ui.html, base.html, … (+6) |
+| `src/web/templates/` | 16 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+8) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
@@ -432,6 +434,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0062_space_isolation.sql` | Изоляция пространств на уровне базы (аудит 12.10, F-037, F-005) |
 | `0063_freeze.sql` | «Заморозить» (D462, шаг 1): отключение учётки становится заморозкой — одним действием закрывается всё, чем человек входил, и записывается, кто заморозил |
 | `0064_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
+| `0065_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

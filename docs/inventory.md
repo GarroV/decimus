@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 130 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 132 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -112,6 +112,7 @@
 | `/ratings/settings` | POST | `ratings_settings` | `src/web/ratings.py` |
 | `/ratings/sheet-sync` | POST | `ratings_sheet_sync` | `src/web/ratings.py` |
 | `/settings` | GET | `settings_page` | `src/web/settings_screen.py` |
+| `/settings/avatar` | GET | `settings_avatar` | `src/web/settings_screen.py` |
 | `/settings/bot-link` | POST | `settings_bot_link` | `src/web/settings_screen.py` |
 | `/settings/bot-unlink` | POST | `settings_bot_unlink` | `src/web/settings_screen.py` |
 | `/settings/claude-revoke` | POST | `settings_claude_revoke` | `src/web/settings_screen.py` |
@@ -124,6 +125,7 @@
 | `/settings/google-link` | POST | `settings_google_link` | `src/web/settings_screen.py` |
 | `/settings/google-unlink` | POST | `settings_google_unlink` | `src/web/settings_screen.py` |
 | `/settings/lang` | POST | `settings_lang` | `src/web/ui_lang.py` |
+| `/settings/menu` | GET | `settings_menu` | `src/web/settings_screen.py` |
 | `/settings/password` | POST | `settings_own_password` | `src/web/settings_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
 | `/static/<path:filename>` | GET | `static` | (библиотека) |
@@ -399,6 +401,7 @@
 | `0062_space_isolation.sql` | — |
 | `0063_freeze.sql` | — |
 | `0064_ratings_sheet.sql` | `ratings.collection`, `ratings.sheet_sync`, `ratings.sheet_sync_requests` |
+| `0065_web_own_google_profile.sql` | — |
 <!-- map:end -->
 
 ## Makefile

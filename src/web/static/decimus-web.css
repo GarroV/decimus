@@ -1752,10 +1752,54 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .ap-table th[scope=row] { font-weight: var(--w-regular); color: var(--ink-2); width: 30%; }
 .ap-table tr.ap-diff td { font-weight: var(--w-semibold); background: var(--warn-soft); }
 .users-add { align-items: flex-end; }
-/* Меню учётки внизу слева ведёт в свою карточку на «Пользователях». */
+/* Блок учётки внизу слева открывает меню учётки (D468); без скрипта ведёт в «Настройки». */
 .sidenav__me { display: flex; align-items: center; gap: var(--space-4); flex: 1; min-width: 0; color: inherit; text-decoration: none; border-radius: var(--r-control); }
 .sidenav__me:hover { text-decoration: none; }
 .sidenav__me:hover b { color: var(--accent); }
+.sidenav__me:focus-visible, .mbar__me:focus-visible { outline: var(--focus-outline); outline-offset: 2px; }
+.sidenav__chev { display: inline-flex; margin-left: auto; color: var(--ink-3); }
+.sidenav__chev svg { width: 14px; height: 14px; transform: rotate(-90deg); transition: transform var(--t-state) var(--ease); }
+.sidenav__me[aria-expanded="true"] .sidenav__chev svg { transform: rotate(90deg); }
+@media (max-width: 1099px) { .sidenav__chev { display: none; } }
+
+/* Фото из Google вместо инициалов (D468): круг обрезает картинку. */
+.avatar { overflow: hidden; }
+.avatar__img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.avatar--lg { width: 36px; height: 36px; font-size: 12px; }
+
+/* ── Меню учётки поверх страницы (D468) ──────────────────────────────
+   Компонент — `.popover` ядра. Положение — fixed, от блока учётки: скрипт
+   кладёт якорь в `--acct-x` / `--acct-y`, здесь — только раскладка. Компьютер:
+   над блоком внизу панели (`--up`). Телефон: от аватара в верхней полосе вниз,
+   почти во всю ширину (`--down`). */
+.acct-menu { position: fixed; z-index: 70; left: var(--acct-x, var(--space-4)); width: min(320px, calc(100vw - 2 * var(--space-4))); max-height: calc(100vh - var(--space-9)); overflow-y: auto; overscroll-behavior: contain; }
+.acct-menu[hidden] { display: none; }
+.acct-menu--up { bottom: var(--acct-y, 64px); }
+.acct-menu--down { top: var(--acct-y, 52px); }
+.acct-menu:focus { outline: none; }
+@media (max-width: 719px) {
+  .acct-menu { left: var(--space-4); right: var(--space-4); width: auto; max-height: calc(100vh - var(--acct-y, 52px) - var(--space-9)); }
+}
+.acct-menu__head { display: flex; align-items: center; gap: var(--space-5); padding: var(--space-6); border-bottom: 1px solid var(--line); }
+.acct-menu__who { display: flex; flex-direction: column; min-width: 0; }
+.acct-menu__who b { font-size: var(--fs-dense); line-height: 18px; font-weight: var(--w-semibold); color: var(--ink); overflow-wrap: anywhere; }
+.acct-menu__mail { font-size: 12px; line-height: 16px; color: var(--ink-2); overflow-wrap: anywhere; }
+.acct-menu__who small { margin-top: 2px; font-family: var(--font-mono); font-size: 10px; line-height: 14px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink-3); overflow-wrap: anywhere; }
+.acct-menu__row { justify-content: space-between; color: var(--ink); text-decoration: none; }
+.acct-menu__row:hover { text-decoration: none; }
+.acct-menu__row:focus-visible, .acct-menu__out:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+.acct-menu__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-menu__state { display: inline-flex; align-items: center; gap: var(--space-3); flex: none; font-size: 12px; color: var(--ink-3); }
+.acct-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--ink-3); }
+.acct-dot--ok { background: var(--ok); }
+.acct-menu__line { display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); min-height: 36px; margin: 0 var(--space-3); padding: 0 var(--space-5); }
+.acct-menu__label { font-size: var(--fs-dense); color: var(--ink-2); }
+.acct-menu__line .sidenav__theme { flex-direction: row; margin: 0; padding: 2px; }
+.acct-menu__foot { margin-top: var(--space-3); padding: var(--space-3); }
+.acct-menu__logout { margin: 0; }
+.acct-menu__out { display: flex; align-items: center; gap: var(--space-4); width: 100%; height: 32px; padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; font: inherit; font-size: var(--fs-dense); color: var(--ink); text-align: left; cursor: pointer; }
+.acct-menu__out:hover { background: var(--surface); }
+.acct-menu__out svg { width: 15px; height: 15px; color: var(--ink-3); }
 
 /* Таблица-перечень (люди): у `.table` ядра ячейки текста без полей — она
    построена под денежные таблицы, где поля даёт закреплённая колонка имени.
