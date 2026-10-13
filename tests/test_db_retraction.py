@@ -89,6 +89,26 @@ def test_снятие_ставит_пометку_и_записывает_при
     assert float(строка[3]) == 100.0 - 0.5, "оценка снятой проверки изменилась"
 
 
+def test_ждущую_приёмки_можно_отклонить_и_она_уходит_из_очереди(
+    domain_env: Path, retraction_env: str
+) -> None:
+    """D465: у проверки на приёмке есть «Принять» и «Отклонить», а не только «Принять»."""
+    start_inspection(402, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="default")
+    add_finding(402, code="CLN05", level="D1", zone="hot_kitchen", text="нагар на печи")
+    ident = push_inspection(402)  # не принята: ждёт приёмки (D199)
+
+    снятие = retract_inspection(ident, tenant="default", reason=ПРИЧИНА)
+
+    assert снятие.reason == ПРИЧИНА
+    строка = _строка(
+        retraction_env, "select status, retracted_at from inspections where id = %s", (ident,)
+    )
+    assert строка is not None and строка[1] is not None, "пометки снятия нет"
+    assert строка[0] == "draft", "отклонение не должно ни принимать, ни распечатывать проверку"
+    очередь = list_inspections(reach=own_reach("default"), on_review=True)
+    assert ident not in {r.id for r in очередь}, "отклонённая осталась в очереди приёмки"
+
+
 def test_причина_снятия_обязательна(domain_env: Path, retraction_env: str) -> None:
     """Снятие без причины неотличимо от подчистки истории (D089).
 

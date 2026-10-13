@@ -172,7 +172,7 @@
     <div class="sdetail sdetail--hint">
       <p class="sdetail__title">{{ t('registry.panel.failed.title') }}</p>
       <p class="sdetail__hint">{{ t('registry.panel.failed.text') }}</p>
-      <a class="sbtn" href="{{ url('/inspections/' ~ picked) }}?lang={{ lang }}">{{ t('registry.panel.open') }}</a>
+      <a class="sbtn" href="{{ select_url(inspection=picked) }}" data-drawer-open>{{ t('registry.panel.retry') }}</a>
     </div>
   {% elif card_missing %}
     <div class="sdetail sdetail--hint">

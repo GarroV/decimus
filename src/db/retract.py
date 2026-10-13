@@ -56,14 +56,15 @@ _SELECT_REFERRING_SQL = """
 select id from inspections where repeat_of_id = %(id)s order by inspection_date, id limit 5
 """
 
-#: Снятие. Условия в `where` не украшение: снять можно только запечатанную и
-#: только ещё не снятую проверку, и число затронутых строк ниже проверяется, а
-#: не считается заведомо единицей (конституция: у операции с наблюдаемым
-#: результатом проверяется результат, а не отсутствие исключения).
+#: Снятие. Условия в `where` не украшение: снять можно только сданную —
+#: принятую или ждущую приёмки (D465), — и только ещё не снятую проверку, и
+#: число затронутых строк ниже проверяется, а не считается заведомо единицей
+#: (конституция: у операции с наблюдаемым результатом проверяется результат, а
+#: не отсутствие исключения).
 _RETRACT_SQL = """
 update inspections
 set retracted_at = now(), retraction_reason = %(reason)s
-where id = %(id)s and status = 'finalized' and retracted_at is null
+where id = %(id)s and status in ('draft', 'finalized') and retracted_at is null
 """
 
 _SELECT_RETRACTED_AT_SQL = "select retracted_at from inspections where id = %s"
@@ -165,10 +166,10 @@ def _mark_retracted(
         статус, снята, причина = строка
         if снята is not None:
             return str(причина), снята.isoformat()
-        if статус != "finalized":
+        if статус not in ("draft", "finalized"):
             raise RetractionError(
-                f"Проверка {inspection_id} не запечатана (статус «{статус}») — отклонять "
-                f"можно только сданную проверку"
+                f"Проверка {inspection_id} не сдана (статус «{статус}») — отклонять "
+                f"можно только сданную проверку: принятую или ждущую приёмки"
             )
 
         _refuse_if_referenced(cur, inspection_id)
