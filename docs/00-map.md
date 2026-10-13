@@ -308,7 +308,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Проверки, справочники, чтение
 
-<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
+<!-- map:begin files src/db/{accept,bot_langs,bot_links,checklist_langs,directory,fingerprint,finish_modes,imports,imports_legacy,letters,mcp_access,move,push,queries,reach,retract,review_edit,revise,spaces,swarm_read,synonyms,translate_modes,unit_profiles,units}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/accept.py` | Подтверждение проверки на приёмке (D199) |
@@ -327,6 +327,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/queries.py` | Чтение уже слитых проверок |
 | `src/db/reach.py` | Охват чтения: что видит пространство (волна 1, #340; D283, D284, D289) |
 | `src/db/retract.py` | T210, T233: снятие сданной проверки из истории |
+| `src/db/review_edit.py` | Правка проверки на приёмке сверх исправления записи: новая запись и кадры (D465) |
 | `src/db/revise.py` | Правка записи проверки на приёмке — вместе с пересчитанной оценкой (D200) |
 | `src/db/spaces.py` | Пространства и их страны — заводит команда проекта (D284, D287, волна 1 — #340) |
 | `src/db/swarm_read.py` | Чтение для API Swarm (#567, D387): рейтинги, собираемость, нарушения, проверки |
