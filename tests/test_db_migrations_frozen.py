@@ -276,6 +276,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     ),
     # Журнал входов и журнал действий админов (D462, шаг 2).
     "0067_journals.sql": ("sql1:4bd23f1e6ce862a7771df95a021c89adf923e3a9516fdb742714fb3bdd5173ee"),
+    # Вторая ступень входа: ключи доступа, приложение, резервные коды (D463).
+    "0068_second_factor.sql": (
+        "sql1:ac23e6d9c9aa0e78fddedb0d563c57bd8832f234d51dbb39b61ccc38d054bb17"
+    ),
 }
 
 

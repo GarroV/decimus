@@ -234,6 +234,12 @@ _SET_EMAIL_SQL = """
  returning u.id, прежняя.email is distinct from u.email
 """
 
+_SELECT_USER_BY_ID_SQL = """
+    select id, login, tenant_code, role, email
+      from web_users
+     where id = %s and disabled_at is null
+"""
+
 _SELECT_USER_BY_EMAIL_SQL = """
     select id, login, tenant_code, role, email
       from web_users
@@ -251,7 +257,10 @@ _OPEN_SESSION_SQL = """
 #: отключение, и отключённый доработал бы страницу до конца.
 _RESOLVE_SESSION_SQL = """
     select u.id, u.login, u.tenant_code, u.role, u.email, u.web_lang, s.issued_at,
-           u.display_name, u.avatar_etag, s.id
+           u.display_name, u.avatar_etag, s.id,
+           (exists (select 1 from web_passkeys p where p.user_id = u.id)
+            or exists (select 1 from web_totp t
+                        where t.user_id = u.id and t.confirmed_at is not null))
       from web_sessions s
       join web_users u on u.id = s.user_id
      where s.fingerprint = %s
@@ -356,6 +365,9 @@ class Account:
     #: Номер сессии этого запроса (`web_sessions.id`); `None` — учётка не из сессии.
     #: Нужен журналу действий (D462): чем вошёл тот, кто действует.
     session_id: str | None = None
+    #: Подключена ли вторая ступень входа (ключ доступа или приложение, D463). Приезжает
+    #: с сессией: админу без неё заслон оставляет только экран подключения.
+    has_second_factor: bool = False
 
 
 @dataclass(frozen=True)
@@ -903,6 +915,22 @@ def find_by_email(email: str) -> Account | None:
     )
 
 
+def find_by_id(user_id: str) -> Account | None:
+    """Номер учётки → учётка. Нет такой или отключена — `None`.
+
+    Для второй ступени входа (D463): первая ступень назвала человека, вторая обязана
+    открыть сессию той же учётке — и только если её не заморозили за это время.
+    """
+    with _connected("найти учётку") as conn, conn.cursor() as cur:
+        cur.execute(_SELECT_USER_BY_ID_SQL, (user_id,))
+        row = cur.fetchone()
+    if row is None:
+        return None
+    return Account(
+        id=str(row[0]), login=str(row[1]), tenant=str(row[2]), role=str(row[3]), email=row[4]
+    )
+
+
 def authenticate(login: str, password: str) -> Account | None:
     """Логин и пароль → учётка. Не тот пароль и нет такой учётки — `None`.
 
@@ -994,6 +1022,7 @@ def resolve_session(token: str) -> Account | None:
         display_name=row[7],
         avatar_etag=row[8],
         session_id=str(row[9]),
+        has_second_factor=bool(row[10]),
     )
 
 
