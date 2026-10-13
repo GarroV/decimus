@@ -182,12 +182,30 @@ _RKO_COUNTS = (
 )
 
 
+#: Число проверок РКО по собираемости базы рейтингов (D464): отчёты ресторана и
+#: доставки за неделю — это и есть проверки недели. Недели, задевающие рамку, как у РС.
+_RKO_COLLECTION_COUNTS = (
+    "select u.country_code, sum(c.restaurant_reports + c.delivery_reports) "
+    "from ratings.collection c join ratings.units u on u.dodo_id = c.unit_dodo_id "
+    "join ratings.periods p on p.id = c.period_id "
+    "where p.rating_type = 'rko' and u.country_code = any(%s) "
+    "and p.end_on >= %s and p.begin_on <= %s group by 1"
+)
+
+
 def rko_violation_facts(
     *, countries: Sequence[str], begin: date, end: date
 ) -> tuple[list[tuple[Any, ...]], dict[str, int]]:
-    """Нарушения проверок РКО с датой в `[begin, end]` и число проверок по стране."""
+    """Нарушения проверок РКО с датой в `[begin, end]` и число проверок по стране.
+
+    Выгрузка нарушений несёт только проверки с нарушениями, и счёт по ней занизил
+    бы знаменатель «нарушений на проверку». Поэтому, где у недель РКО страны, задевших
+    рамку, есть собираемость (D464), берётся её сумма; у страны без неё — счёт по
+    проверкам. Неделя берётся целиком, как у РС (D396).
+    """
     params = (list(countries), begin, end)
     counts = {r[0]: int(r[1]) for r in _rows(_RKO_COUNTS, params)}
+    counts.update({r[0]: int(r[1]) for r in _rows(_RKO_COLLECTION_COUNTS, params)})
     return _rows(_RKO_FACTS, params), counts
 
 
