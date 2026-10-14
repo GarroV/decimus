@@ -31,12 +31,19 @@ from src.web.google_auth import GoogleSettings
     ("GE", "auditor"),
 ]
 
-РАЗДЕЛЫ = (
-    'id="profile"',
-    'id="connections"',
-    'id="language"',
-    'id="password"',
-    'id="signout"',
+РАЗДЕЛЫ = ('id="connections"',)
+
+#: Все плитки страницы (D470, вся страница плитками): у каждой своя панель, `id` панели = ключ.
+ПЛИТКИ = (
+    "profile",
+    "language",
+    "password",
+    "security",
+    "signins",
+    "signout",
+    "claude",
+    "bot",
+    "google",
 )
 
 
@@ -59,7 +66,7 @@ def test_настройки_открыты_каждой_роли_одним_на
 
         assert ответ.status_code == 200, (tenant, role)
         # Плитки (D470): каждая плитка — свой выбор в адресе, панель — выбранная.
-        for плитка in ("claude", "bot", "google"):
+        for плитка in ПЛИТКИ:
             панель = client.get(f"/settings?tile={плитка}")
             assert f'id="{плитка}"' in панель.get_data(as_text=True), (tenant, role, плитка)
         for раздел in РАЗДЕЛЫ:
@@ -141,7 +148,7 @@ def test_адрес_mcp_берётся_из_настройки_стенда(monk
         admin_public_url="https://admin.example",
         mcp_public_url="https://mcp.example/mcp",
     ):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
 
         assert "claude mcp add --transport http decimus https://mcp.example/mcp" in страница
 
@@ -166,25 +173,26 @@ def _с_почтой(monkeypatch: pytest.MonkeyPatch, *, google: bool) -> Iterat
 
 def test_с_почтой_и_google_пароль_закрыт_и_так_сказано(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _с_почтой(monkeypatch, google=True):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=password").get_data(as_text=True)
 
-        assert ПОЧТА in страница
         assert 'id="password-form"' not in страница, "форма смены пароля при закрытом входе паролем"
         assert "Вход паролем для этой учётки закрыт" in страница
 
 
 def test_с_почтой_без_google_пароль_остаётся(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _с_почтой(monkeypatch, google=False):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=password").get_data(as_text=True)
 
-        assert ПОЧТА in страница and 'id="password-form"' in страница
+        assert 'id="password-form"' in страница
+        assert ПОЧТА in client.get("/settings").get_data(as_text=True)
 
 
 def test_без_почты_так_и_сказано(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin"):
         страница = client.get("/settings?tile=google").get_data(as_text=True)
+        пароль = client.get("/settings?tile=password").get_data(as_text=True)
 
-        assert "Почта Google не привязана" in страница and 'name="current"' in страница
+        assert "Почта Google не привязана" in страница and 'name="current"' in пароль
 
 
 def test_тексты_есть_по_английски(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -286,19 +294,32 @@ def test_выбранная_плитка_берётся_из_адреса_а_б�
         бот = client.get("/settings?tile=bot").get_data(as_text=True)
         чужое = client.get("/settings?tile=../x").get_data(as_text=True)
 
-        assert 'id="claude"' in по_умолчанию and 'id="bot"' not in по_умолчанию
-        assert 'id="bot"' in бот and 'id="claude"' not in бот
+        assert 'id="profile"' in по_умолчанию and 'id="bot"' not in по_умолчанию
+        assert 'id="bot"' in бот and 'id="profile"' not in бот
         assert бот.count('aria-current="true"') == 1, "выбрана должна быть ровно одна плитка"
-        assert 'id="claude"' in чужое, "неизвестная плитка не должна ломать страницу"
+        assert 'id="profile"' in чужое, "неизвестная плитка не должна ломать страницу"
 
 
 def test_плитки_показывают_статус_и_счётчик(monkeypatch: pytest.MonkeyPatch) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin", bot_username="decimus_bot"):
         страница = client.get("/settings").get_data(as_text=True)
 
-        assert страница.count('<a class="stile') == 3
+        assert страница.count('<a class="stile') == len(ПЛИТКИ), "не все плитки на месте"
         assert "Не подключено" in страница
-        assert "0 из 3" in страница
+
+
+def test_каждая_плитка_со_своей_панелью_и_своим_статусом(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Вся страница плитками: одинаковые плитки, у каждой своя панель, длинное — не на плитке."""
+    for client in _стенд(monkeypatch, tenant="HQ", role="admin", bot_username="decimus_bot"):
+        for плитка in ПЛИТКИ:
+            страница = client.get(f"/settings?tile={плитка}").get_data(as_text=True)
+
+            assert f"&tile={плитка}#connections" in страница, f"плитки {плитка} нет"
+            assert страница.count('class="ssec"') == 1, f"панель {плитка}: не одна"
+            assert f'<div class="ssec" id="{плитка}">' in страница, f"нет панели {плитка}"
+        # Профиль, язык и пароль больше не отдельные карточки страницы.
+        страница = client.get("/settings").get_data(as_text=True)
+        assert "scard--profile" not in страница and 'class="scard" id="language"' not in страница
 
 
 def test_исход_действия_раскрывает_свою_плитку() -> None:
@@ -319,3 +340,10 @@ def test_исход_действия_раскрывает_свою_плитку(
         == "claude"
     )
     assert экран.selected_tile(экран.Show(), "bot") == "bot"
+    assert экран.selected_tile(экран.Show(), "security") == "security"
+    assert (
+        экран.selected_tile(
+            экран.Show(flash=экран.Flash("settings.signout.failed", ok=False)), None
+        )
+        == "signout"
+    )
