@@ -111,7 +111,7 @@ from ..propose import model_frames, sent_at
 from ..shown import remember as remember_shown
 from ..shown import remember_origin, remember_repeat_ask, tell_refusal
 from ..texts import t
-from ..zones import DICTIONARY, WORDS, ZoneConflict, allowed_zones, resolve_zone
+from ..zones import DICTIONARY, ITEM, MODEL, WORDS, ZoneConflict, allowed_zones, resolve_zone
 
 logger = logging.getLogger(__name__)
 
@@ -862,6 +862,10 @@ def _source_of(resolved: str) -> str:
         return domain.ZONE_SOURCE_WORDS
     if resolved == DICTIONARY:
         return domain.ZONE_SOURCE_DICTIONARY
+    if resolved == ITEM:
+        return domain.ZONE_SOURCE_ITEM
+    if resolved == MODEL:
+        return domain.ZONE_SOURCE_MODEL
     return ""
 
 
@@ -1658,23 +1662,42 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             and not сказанная
             and candidate.zone not in allowed_zones(candidate.code, chat_id=chat_id)
         )
+        # Зона у кандидата не годится — прежде чем спрашивать, смотрим, не
+        # очевидна ли она: пункт в одной зоне методики или зона от модели из
+        # слов аудитора (#838). Выведенная так зона правится в мини-приложении.
+        очевидная = None
         if неизвестна or чужая:
-            await _ask_zone(
-                message,
-                chat_id,
-                replace(proposal, picked=index),
-                pending,
-                ZONE_FOR_PICK_PREFIX,
-                lang,
-                item_code=candidate.code,
+            очевидная = await asyncio.to_thread(
+                resolve_zone,
+                proposal.note,
+                candidate.code,
+                chat_id=chat_id,
+                model_zone=None if неизвестна else candidate.zone,
+                model_confidence=candidate.confidence,
             )
-            return
+            if очевидная.source not in (ITEM, MODEL):
+                await _ask_zone(
+                    message,
+                    chat_id,
+                    replace(proposal, picked=index),
+                    pending,
+                    ZONE_FOR_PICK_PREFIX,
+                    lang,
+                    item_code=candidate.code,
+                )
+                return
         if await _save(
             message,
             chat_id,
             code=candidate.code,
             level=candidate.level,
-            zone=candidate.zone,
+            # Зона пункта (`ITEM`) пустой уходит намеренно: подставит её сам
+            # `_save` и скажет об этом оговоркой (#218).
+            zone=(
+                candidate.zone
+                if очевидная is None
+                else ("" if очевидная.source == ITEM else очевидная.zone or "")
+            ),
             text=candidate.wording,
             file_ids=proposal.file_ids,
             source=proposal.source,
@@ -1696,7 +1719,11 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # только тогда, когда совпал с выведенным до неё. Разошлись —
             # накопитель честно скажет «не вывелась»: подписать ответ модели
             # словами аудитора значило бы соврать там, где сигнал и собирают.
-            zone_source=(proposal.zone_source if candidate.zone == proposal.zone_hint else ""),
+            zone_source=(
+                _source_of(очевидная.source)
+                if очевидная is not None
+                else (proposal.zone_source if candidate.zone == proposal.zone_hint else "")
+            ),
             suggested=_model_suggestion(proposal),
             # Нажатие под правкой означает «поправить на этот пункт», а не
             # «завести ещё один»: адресат назван ответом аудитора и с тех пор
@@ -1824,7 +1851,20 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         кнопка «Формулировка» под ним (T056) стоит там же, где стояла.
         """
         item = proposal.manual[index]
+        evident = None
         if not proposal.zone_hint:
+            suggestion = _model_suggestion(proposal)
+            evident = await asyncio.to_thread(
+                resolve_zone,
+                proposal.note,
+                item.code,
+                chat_id=chat_id,
+                model_zone=None if suggestion is None else suggestion.zone,
+                model_confidence=None if suggestion is None else suggestion.confidence,
+            )
+            if evident.source not in (ITEM, MODEL):
+                evident = None
+        if not proposal.zone_hint and evident is None:
             # Пункт выбран, а зона не выведена: поиск словом зоны не требует
             # (T267), и спросить её надо здесь — кнопками ТОЛЬКО из зон,
             # допустимых методикой для этого пункта (T266). Раньше зона
@@ -1845,7 +1885,11 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             chat_id,
             code=item.code,
             level=level,
-            zone=proposal.zone_hint,
+            # Зона пункта (`ITEM`) пустой уходит намеренно: подставит её сам
+            # `_save` и скажет об этом оговоркой (#218, #838).
+            zone=proposal.zone_hint
+            if evident is None
+            else ("" if evident.source == ITEM else evident.zone or ""),
             text=proposal.note.strip(),
             file_ids=proposal.file_ids,
             source=proposal.source,
@@ -1858,7 +1902,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
             # словами — `zone_spoken` уже стоит.
             zone_spoken=proposal.zone_spoken,
             zone_from_cues=proposal.zone_from_cues,
-            zone_source=proposal.zone_source,
+            zone_source=proposal.zone_source if evident is None else _source_of(evident.source),
             # Предложения здесь нет и быть не может: ручной перечень
             # показывается ровно тогда, когда модель не ответила ничего —
             # недоступна или вернула пустой список. Записать предложением

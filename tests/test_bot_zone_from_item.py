@@ -176,3 +176,46 @@ async def test_расхождение_слова_со_словарём_назы�
     )
     assert "Печь" in session.last_text, "аудитору не сказано, ЧТО разошлось со словарём"
     assert session.keyboard_data() == ["rec:cz", "rec:ci"]
+
+
+# --- очевидная зона не спрашивается (#838) -------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_пункт_в_одной_зоне_при_неизвестной_зоне_модели_не_спрашивается(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Выезд 14.10.2026: «он спрашивал, какая это зона, хотя можно было понять».
+
+    Модель места не назвала (`UNKNOWN`), слов о месте нет, но методика держит
+    пункт в одном цехе — вопрос лишний. Запись ложится сразу, с оговоркой об
+    источнике зоны, и зона правится в мини-приложении.
+    """
+    начата()
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await разобрать(dp, bot, monkeypatch, код="CLN05", зона="UNKNOWN", слова="посмотри что тут")
+
+    состояние = get_state(CHAT_ID)
+    assert состояние is not None and состояние.findings, (
+        "зона пункта очевидна, а бот снова спросил её кнопками"
+    )
+    assert состояние.findings[-1].zone == "hot_kitchen"
+    assert t("record.ask_zone_for_item", "ru", code="CLN05") not in session.last_text
+
+
+@pytest.mark.asyncio
+async def test_пункт_многих_зон_при_неизвестной_зоне_модели_спрашивается(
+    domain_env: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Негативный прогон: у пункта несколько зон, модель молчит — вопрос остаётся."""
+    начата()
+    bot, session = make_bot()
+    dp = build_dispatcher(SETTINGS)
+
+    await разобрать(dp, bot, monkeypatch, код="CLN03", зона="UNKNOWN", слова="посмотри что тут")
+
+    состояние = get_state(CHAT_ID)
+    assert состояние is not None and not состояние.findings, "зона выдумана там, где её нет"
+    assert session.last_text == t("record.ask_zone_for_item", "ru", code="CLN03")
