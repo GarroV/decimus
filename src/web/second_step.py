@@ -111,8 +111,15 @@ ENROLL_ENDPOINTS = frozenset(
 THROTTLE_PREFIX = "2fa:"
 
 
+#: Закрывать ли разделы админу без второго способа. Выключено 14.10.2026: блокировка
+#: заперла владельца посреди встречи; подключение остаётся рекомендацией на экране.
+ENFORCE_ENROLL = False
+
+
 def must_enroll(account: Any) -> bool:
     """Админу или главному админу без второго способа доступен только экран подключения."""
+    if not ENFORCE_ENROLL:
+        return False
     return is_required(str(account.role)) and not bool(getattr(account, "has_second_factor", True))
 
 

@@ -187,20 +187,17 @@ def test_согласие_claude_требует_второй_ступени(ст
 # --- админ без способа: только подключение ----------------------------------------
 
 
-def test_админ_без_способа_не_обходит_подключение(стенд: Стенд) -> None:
+def test_админ_без_способа_не_заперт(стенд: Стенд) -> None:
+    # Блокировка снята 14.10.2026 (ENFORCE_ENROLL выключен): админ без второго способа
+    # работает, подключение — рекомендация на экране «Вход и защита».
     ответ = стенд.вход_паролем("anna")
     assert ответ.status_code == 302  # type: ignore[attr-defined]
     assert _сессия(стенд.client)
-
-    for путь in ("/", "/users", "/inspections", "/settings", "/oauth/authorize?client_id=x"):
+    for путь in ("/", "/users", "/inspections"):
         r = стенд.client.get(путь, headers=HDR)
-        assert r.status_code in (302, 403), f"{путь} открылся админу без второго способа"
         if r.status_code == 302:
-            assert SECURITY in r.headers["Location"], путь
+            assert SECURITY not in r.headers["Location"], f"{путь} снова запирает админа"
     assert стенд.client.get(SECURITY, headers=HDR).status_code == 200
-    r = стенд.client.post("/users/freeze", data={"login": "dev"}, headers=HDR)
-    assert r.status_code in (302, 403)
-    assert not стенд.sql("select 1 from web_users where login='dev' and disabled_at is not null")
 
 
 def test_админ_после_подключения_приложения_работает_дальше(стенд: Стенд) -> None:
