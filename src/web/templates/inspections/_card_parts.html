@@ -13,17 +13,29 @@
   Принятую проверку не правят: кнопки «Исправить» у неё в панели нет.
 #}
 
-{% macro _pop(id, ico, label, tone='', iconic=False) %}
+{# Подсказка — CSS `[data-tip]` (мгновенно при наведении и фокусе), не `title`
+   с его задержкой; имя для чтения с экрана остаётся в `aria-label`. #}
+{% macro _pop(id, ico, label, tone='', iconic=False, short='') %}
   <details class="hact__item" name="hact" id="{{ id }}">
-    <summary class="hbtn {{ 'hbtn--icon ' if iconic }}{{ tone }}"{% if iconic %} aria-label="{{ label }}" title="{{ label }}"{% endif %}>{{ icon(ico) }}{% if not iconic %}<span>{{ label }}</span>{% endif %}</summary>
+    <summary class="hbtn {{ 'hbtn--icon ' if iconic }}{{ tone }}"{% if iconic %} aria-label="{{ label }}" data-tip="{{ label }}"{% elif short %} aria-label="{{ label }}" data-tip="{{ label }}"{% endif %}>{{ icon(ico) }}{% if not iconic %}<span>{{ short or label }}</span>{% endif %}</summary>
     <div class="hact__pop">{{ caller() }}</div>
   </details>
 {% endmacro %}
 
 {# Ссылка-действие: в панели пиктограмма с подсказкой, на странице — с подписью. #}
-{% macro _link(href, ico, label, panel, tone='', hint='') %}
+{# `short` — короткая надпись на странице (полное имя — в подсказке и aria-label). #}
+{% macro _link(href, ico, label, panel, tone='', hint='', short='') %}
   <a class="hbtn {{ 'hbtn--icon ' if panel }}{{ tone }}" href="{{ href }}"
-     {%- if panel %} aria-label="{{ label }}" title="{{ hint or label }}"{% elif hint %} title="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel %}<span>{{ label }}</span>{% endif %}</a>
+     {%- if panel %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
+     {%- elif short %} aria-label="{{ label }}" data-tip="{{ hint or label }}"
+     {%- elif hint %} data-tip="{{ hint }}"{% endif %}>{{ icon(ico) }}{% if not panel %}<span>{{ short or label }}</span>{% endif %}</a>
+{% endmacro %}
+
+{# Метка «Принята» объясняет себя при наведении и фокусе. Проверки, принятые до
+   появления приёмки, `accepted_at` не имеют — они сразу легли в историю сети. #}
+{% macro accept_badge(head, cls='tag tag--neutral tag--micro') %}
+  {% set hint = t('accept.meta', at=head.accepted_at[:16].replace('T', ' '), by=head.accepted_by or '—') if head.accepted_at else t('accept.legacy_hint') %}
+  <span class="{{ cls }} tip tip--end" tabindex="0" data-tip="{{ hint }}">{{ t('state.sealed') }}</span>
 {% endmacro %}
 
 {% macro card_actions(c, panel=False) %}
@@ -38,7 +50,7 @@
           <button class="hbtn hbtn--primary" type="submit">{{ icon('check') }}<span>{{ t('accept.title') }}</span></button>
         </form>
       {% else %}
-        {% call _pop('accept', 'check', t('accept.title')) %}
+        {% call _pop('accept', 'check', t('accept.title'), 'hbtn--primary') %}
           <p class="field-note">{{ t('accept.hint') }}</p>
           <form method="post" action="{{ full }}/accept?lang={{ lang }}" class="hact__form">
             <button class="btn btn--primary btn--sm" type="submit">{{ t('accept.submit') }}</button>
@@ -57,16 +69,16 @@
        вошедший только читает (УК у партнёра, D283), кнопки нет. У заведённой
        задним числом письма нет вовсе (D310). #}
     {% if c.own and not head.is_uploaded %}
-      {{ _link(full ~ '/letter?lang=' ~ lang, 'mail', t('letter.open'), panel) }}
+      {{ _link(full ~ '/letter?lang=' ~ lang, 'mail', t('letter.open'), panel, short=t('card.act.letter')) }}
     {% endif %}
 
     {# Экшн-план: запрос открыт — ссылка на него; нет — УК запрашивает (D272).
        Без запроса и без права запросить кнопки нет (D217). #}
     {% if c.plan %}
       {% set plan_label = t('card.plan.title') ~ ' · ' ~ t('plans.state.' ~ c.plan.state) ~ ((' · ' ~ t('plans.overdue')) if c.plan.overdue(c.plan_today) else '') %}
-      {{ _link(url(c.plan_link) ~ '?lang=' ~ lang, 'task', plan_label, panel, tone=('hbtn--err' if c.plan.overdue(c.plan_today) else ''), hint=t('actions.request.due', due=c.plan.due_on)) }}
+      {{ _link(url(c.plan_link) ~ '?lang=' ~ lang, 'task', plan_label, panel, tone=('hbtn--err' if c.plan.overdue(c.plan_today) else ''), hint=t('actions.request.due', due=c.plan.due_on), short=t('card.act.plan')) }}
     {% elif c.plan_known and not c.plan_no_country and c.may_request_plan %}
-      {% call _pop('plan', 'task', t('card.plan.title'), '', panel) %}
+      {% call _pop('plan', 'task', t('card.plan.title'), '', panel, short=t('card.act.plan')) %}
         <p class="field-note">{{ t('card.plan.request_hint_needed') if c.plan_needed else t('card.plan.request_hint') }}</p>
         <form method="post" action="{{ url('/actions/request') }}?lang={{ lang }}" class="hact__form">
           <input type="hidden" name="inspection_id" value="{{ head.id }}">
@@ -80,7 +92,7 @@
     {# Предписание по этой проверке (D403): форма раздела УК, где проверка уже
        выбрана основанием. Право — `may_prescribe` из `_card_context`. #}
     {% if c.may_prescribe %}
-      {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel) }}
+      {{ _link(url('/actions/prescriptions/new') ~ '?inspection=' ~ head.id ~ '&lang=' ~ lang, 'flag', t('card.act.rx'), panel, short=t('card.act.rx_short')) }}
     {% endif %}
 
     {# «Исправить» (D465). В панели — правка записей ждущей проверки: кнопка

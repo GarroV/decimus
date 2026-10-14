@@ -79,6 +79,7 @@
 
 .head-line { display: flex; align-items: center; gap: var(--space-7); flex-wrap: wrap; }
 .head-line__score { display: flex; align-items: baseline; gap: var(--space-3); }
+.head-line__lead { display: flex; align-items: center; gap: var(--space-5); }
 .head-line__grow { flex: 1 1 260px; min-width: 0; }
 .head-line__counts { margin-top: var(--space-2); align-items: center; }
 
@@ -1960,3 +1961,24 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .passkey-here:hover .note__title { text-decoration: underline; }
 .enroll-banner { display: block; margin-bottom: var(--space-7); text-decoration: none; }
 .enroll-banner:hover { text-decoration: underline; }
+
+/* Мгновенная подсказка вместо `title` (владелец 14.10.2026, D489): по наведению
+   и фокусу, без скрипта; имя для чтения с экрана остаётся в aria-label. */
+[data-tip] { position: relative; }
+[data-tip]:hover::after, [data-tip]:focus-visible::after {
+  content: attr(data-tip); position: absolute; left: 0; top: calc(100% + 6px); z-index: 30;
+  width: max-content; max-width: min(260px, 70vw); padding: var(--space-3) var(--space-4);
+  border-radius: var(--r-control, 6px); background: var(--ink); color: var(--ink-inverse);
+  font-size: 12px; font-weight: var(--w-medium); line-height: 1.3; white-space: normal; pointer-events: none; }
+.tip--end:hover::after, .tip--end:focus-visible::after { left: auto; right: 0; }
+.hact__item[open] > summary[data-tip]::after { display: none; }
+.tip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--focus-soft, transparent); }
+
+/* Шапка страницы проверки: действия крупнее, с короткими надписями. */
+.head-line .hbtn { height: 34px; padding: 0 var(--space-6); font-size: 13.5px; }
+.head-line .hbtn svg { width: 18px; height: 18px; }
+.head-line .hact { gap: var(--space-4); }
+@media (max-width: 520px) {
+  .head-line { gap: var(--space-5); }
+  .head-line__lead { flex: 1 1 100%; }
+}
