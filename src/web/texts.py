@@ -534,6 +534,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "revise.level": {"ru": "Класс", "en": "Class"},
     "revise.zone": {"ru": "Зона", "en": "Zone"},
     "revise.text": {"ru": "Формулировка", "en": "Wording"},
+    "revise.reading": {"ru": "Температура, °C", "en": "Temperature, °C"},
     "revise.hint": {
         "ru": "После сохранения оценка пересчитывается движком по методике этой проверки.",
         "en": "Saving recalculates the score with the engine, using this inspection's checklist.",
@@ -633,6 +634,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.findings.col.zone": {"ru": "Зона", "en": "Zone"},
     "card.findings.col.text": {"ru": "Формулировка", "en": "Wording"},
     "card.findings.zone_unusual": {"ru": "зона нетипична", "en": "unusual zone"},
+    "card.findings.reading": {"ru": "{value} °C", "en": "{value} °C"},
     "card.findings.advice": {"ru": "Рекомендация", "en": "Recommendation"},
     "card.findings.note": {"ru": "Общая заметка", "en": "General note"},
     # Историческая проверка (D332): записи старого отчёта без пункта, класса, зоны.
