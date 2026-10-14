@@ -826,6 +826,21 @@ def grade_rule(pct, counts, cfg):
     return -1, cfg["grades"]["fallback"]
 
 
+def better_rule_if(fired, cfg):
+    """Условие первого «проходного» правила (с порогом процента) с буквой лучше сработавшей — или `None`.
+
+    Нужно, чтобы объяснить «почему не выше»: у B это условие A (нет D2 и балл не
+    ниже порога), и карточка сверяет с ним записанные D2 и процент. Цифр здесь
+    нет — условие целиком берётся из `scoring.json`.
+    """
+    if "pct_at_least" not in (fired.get("if") or {}):
+        return None
+    for rule in cfg["grades"]["rules"]:
+        if rule["grade"] < fired["grade"] and "pct_at_least" in rule["if"]:
+            return dict(rule["if"])
+    return None
+
+
 def breakdown(items, per_zone, cfg, pct):
     """Расшифровка оценки: от стартовых 100 % до итога, строка за строкой.
 
@@ -999,7 +1014,8 @@ def compute(st, cl_rows, zones, cfg):
         p["loss"] = round(p["loss"], 4)
 
     return {"meta": st["meta"], "pct": pct, "grade": grade["grade"],
-            "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {})},
+            "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {}),
+                           "better_if": better_rule_if(grade, cfg)},
             "breakdown": breakdown(items, per_zone, cfg, pct),
             "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
             "counts": counts, "deductions": round(deductions, 2),

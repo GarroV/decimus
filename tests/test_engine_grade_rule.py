@@ -82,8 +82,10 @@ def test_grade_rule_возвращает_сработавшее_правило(
 
 
 def test_grade_rule_запасное_правило_имеет_индекс_минус_один() -> None:
-    cfg = {**CFG, "grades": {"rules": [_правило("A", pct_at_least=95.0)],
-                             "fallback": {"grade": "C"}}}
+    cfg = {
+        **CFG,
+        "grades": {"rules": [_правило("A", pct_at_least=95.0)], "fallback": {"grade": "C"}},
+    }
     i, правило = движок().grade_rule(80.0, _counts(), cfg)
     assert (i, правило["grade"]) == (-1, "C")
 
@@ -100,14 +102,17 @@ def _find(n: int, level: str, zone: str, repeat: bool = False) -> dict[str, Any]
 def test_compute_берёт_букву_и_правило_у_grade_rule() -> None:
     res = _оценка([_find(1, "D3", "hot_kitchen")])
     assert res["grade"] == "D"
-    assert res["grade_rule"] == {"index": 0, "if": {"min_d3": 1}}
+    assert res["grade_rule"] == {"index": 0, "if": {"min_d3": 1}, "better_if": None}
 
 
 def test_расшифровка_Батуми_сходится_с_итогом() -> None:
     # D1 x10 (две зоны), D2 x2 (одна в зоне с D3), D3 x1: 100 - 5 - 2 - 10 = 83.
     находки = [_find(n, "D1", "dining" if n <= 5 else "fridge") for n in range(1, 11)]
-    находки += [_find(11, "D2", "fridge"), _find(12, "D2", "hot_kitchen"),
-                _find(13, "D3", "hot_kitchen")]
+    находки += [
+        _find(11, "D2", "fridge"),
+        _find(12, "D2", "hot_kitchen"),
+        _find(13, "D3", "hot_kitchen"),
+    ]
     res = _оценка(находки)
     b = res["breakdown"]
     assert b["exact"] is True
@@ -131,3 +136,9 @@ def test_расшифровка_не_точна_если_потолок_зоны
     res = движок().compute({"meta": {"date": "2026-10-14"}, "findings": находки}, [], ЗОНЫ, cfg)
     assert res["pct"] == 90.0
     assert res["breakdown"]["exact"] is False
+
+
+def test_у_B_в_ответе_движка_есть_условие_A_для_объяснения_почему_не_выше() -> None:
+    res = _оценка([_find(1, "D2", "dining")])
+    assert res["grade"] == "B"
+    assert res["grade_rule"]["better_if"] == {"pct_at_least": 95.0, "max_d2": 0}
