@@ -307,7 +307,10 @@ def install(app: Flask, conf: Settings) -> None:
                 transports=новое.transports,
                 name=имя,
                 keep_session_id=account.session_id,
+                only_if_first=not bool(getattr(account, "has_second_factor", False)),
             )
+        except store.NotFirstFactorError:
+            return jsonify(error="limit"), 409
         except webauthn_rp.PasskeyError:
             return jsonify(error="failed"), 400
         except DbError as exc:
@@ -359,7 +362,12 @@ def install(app: Flask, conf: Settings) -> None:
                 else None
             )
             if шаг is None or not store.confirm_totp(
-                account.id, step=шаг, keep_session_id=account.session_id
+                account.id,
+                step=шаг,
+                keep_session_id=account.session_id,
+                # Способов не было — подключается первый; к моменту записи он уже мог
+                # появиться (параллельный запрос), тогда этот не записывается.
+                only_if_first=not bool(getattr(account, "has_second_factor", False)),
             ):
                 return render_page(flash=Flash("sf.totp.bad", ok=False), code=400)
         except DbError as exc:

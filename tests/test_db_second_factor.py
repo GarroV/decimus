@@ -399,3 +399,36 @@ def test_простаивающий_ключ_снимается_а_свежий_
     assert оставшиеся == {недавний.id, свежий.id}, "снят не тот ключ"
     записи = люди.rows("select action, target from action_journal where action = 'passkey_expired'")
     assert записи == [("passkey_expired", "keys=2")]
+
+
+# --- первый способ: проверка и вставка в одной транзакции (D485) ---------------------
+
+
+def test_первым_объявленный_ключ_не_пишется_если_способ_уже_есть(люди: Люди) -> None:
+    uid = люди.ид["dev"]
+    sf.add_passkey(uid, **_ключ("dev", 1))  # type: ignore[arg-type]
+
+    with pytest.raises(sf.NotFirstFactorError):
+        sf.add_passkey(uid, only_if_first=True, **_ключ("dev", 2))  # type: ignore[arg-type]
+
+    assert len(sf.status_of(uid).passkeys) == 1
+
+
+def test_два_параллельных_первых_ключа_записывается_ровно_один(люди: Люди) -> None:
+    from concurrent.futures import ThreadPoolExecutor
+
+    uid = люди.ид["dev"]
+
+    def попытка(n: int) -> bool:
+        try:
+            sf.add_passkey(uid, only_if_first=True, **_ключ("dev", n))  # type: ignore[arg-type]
+        except sf.NotFirstFactorError:
+            return False
+        return True
+
+    for круг in range(5):
+        люди.sql("delete from web_passkeys where user_id = %s", uid)
+        with ThreadPoolExecutor(max_workers=4) as пул:
+            исходы = list(пул.map(попытка, [круг * 10 + i for i in range(4)]))
+        assert sum(исходы) == 1, f"«первым» записалось {sum(исходы)} способов: {исходы}"
+        assert len(sf.status_of(uid).passkeys) == 1

@@ -291,19 +291,38 @@ def take_login_challenge(bound_token: str) -> bytes | None:
 # --- ключи доступа ---------------------------------------------------------------
 
 
-def _close_others_if_first(cur: Any, user_id: str, keep_session_id: str | None) -> None:
-    """Если способов входа ещё нет — закрыть прочие сессии человека (D463).
+class NotFirstFactorError(Exception):
+    """Способ подключали как ПЕРВЫЙ, но у человека уже есть другой (проиграна гонка, D485)."""
 
-    Сессия, открытая одной первой ступенью до подключения способа, иначе пережила бы его:
-    украденный пароль, которым зашли раньше хозяина, остался бы действующим входом.
-    """
+
+def _factor_count(cur: Any, user_id: str) -> int:
     cur.execute(
         "select (select count(*) from web_passkeys where user_id = %(u)s)"
         " + (select count(*) from web_totp where user_id = %(u)s and confirmed_at is not null)",
         {"u": user_id},
     )
     строка = cur.fetchone()
-    if строка is None or int(строка[0]) > 0:
+    return 0 if строка is None else int(строка[0])
+
+
+def _take_first_slot(cur: Any, user_id: str, *, only_if_first: bool) -> None:
+    """Замок учётки и, если подключают ПЕРВЫЙ способ без доказательства ступени, проверка «их нет».
+
+    Замок и проверка — в той же транзакции, что вставка способа: два параллельных запроса,
+    каждый считающий себя первым, выстраиваются в очередь, и второй видит способ первого.
+    """
+    cur.execute(_LOCK_SQL, (ADVISORY_NAMESPACE, str(user_id)))
+    if only_if_first and _factor_count(cur, user_id) > 0:
+        raise NotFirstFactorError(user_id)
+
+
+def _close_others_if_first(cur: Any, user_id: str, keep_session_id: str | None) -> None:
+    """Если способов входа ещё нет — закрыть прочие сессии человека (D463).
+
+    Сессия, открытая одной первой ступенью до подключения способа, иначе пережила бы его:
+    украденный пароль, которым зашли раньше хозяина, остался бы действующим входом.
+    """
+    if _factor_count(cur, user_id) > 0:
         return
     cur.execute(
         "update web_sessions set closed_at = now()"
@@ -321,9 +340,15 @@ def add_passkey(
     transports: tuple[str, ...],
     name: str,
     keep_session_id: str | None = None,
+    only_if_first: bool = False,
 ) -> Passkey:
-    """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии."""
+    """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии.
+
+    `only_if_first` — вызывающий считает этот способ первым (у учётки их не было); если к
+    моменту вставки способ уже есть — `NotFirstFactorError`, ключ не записан.
+    """
     with _connected("записать ключ доступа") as conn, conn.cursor() as cur:
+        _take_first_slot(cur, user_id, only_if_first=only_if_first)
         _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "insert into web_passkeys (user_id, credential_id, public_key, sign_count,"
@@ -475,12 +500,18 @@ def totp_of(user_id: str) -> TotpRow | None:
     )
 
 
-def confirm_totp(user_id: str, *, step: int, keep_session_id: str | None = None) -> bool:
+def confirm_totp(
+    user_id: str, *, step: int, keep_session_id: str | None = None, only_if_first: bool = False
+) -> bool:
     """Подтвердить приложение первым верным кодом; его шаг запоминается (повтор не пройдёт).
 
     Первый способ человека закрывает его ДРУГИЕ сессии (кроме `keep_session_id`).
     """
     with _connected("подтвердить приложение") as conn, conn.cursor() as cur:
+        try:
+            _take_first_slot(cur, user_id, only_if_first=only_if_first)
+        except NotFirstFactorError:
+            return False
         _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "update web_totp set confirmed_at = now(), last_step = %s"
