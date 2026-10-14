@@ -470,7 +470,7 @@ def _finding(
     sources: Mapping[int, str],
     suggestions: Mapping[int, Suggestion],
     words: Mapping[int, str],
-    readings: Mapping[int, float],
+    readings: Mapping[int, float] | None = None,
 ) -> Finding:
     photos = [p for p in (raw.get("photos") or []) if p]
     if not photos and raw.get("photo"):
@@ -490,7 +490,7 @@ def _finding(
         repeat=bool(raw.get("repeat")),
         source=sources.get(int(raw["n"]), ""),
         words=words.get(int(raw["n"]), ""),
-        reading_c=readings.get(int(raw["n"])),
+        reading_c=(readings or {}).get(int(raw["n"])),
         # Предложение разворачивается в четыре поля здесь, а не на границе с
         # базой: слив берёт их с записи по имени, и вложенный объект пришлось бы
         # разбирать в чужом блоке.
