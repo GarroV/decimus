@@ -57,6 +57,8 @@ class UnitRow:
     status: str = ""
     #: Последняя проверка ЗА ПЕРИОД экрана; `None` — за период не проверяли.
     last: PointRow | None = None
+    #: Дата последней проверки ВООБЩЕ, не за период; `None` — не проверяли ни разу.
+    last_ever: date | None = None
     rs: float | None = None
     rko: float | None = None
     #: Оценки на картах: код карты → средняя.
@@ -106,8 +108,10 @@ def build_rows(
     points: Mapping[str, PointRow],
     ratings: Mapping[str, tuple[float | None, float | None]],
     maps: Mapping[str, Mapping[int, float]],
+    last_ever: Mapping[str, date] | None = None,
 ) -> tuple[UnitRow, ...]:
     """Свести справочник, свод, проверки периода и оценки в строки."""
+    last_ever = last_ever or {}
     by_code = {p.dodo_id: p for p in profiles if p.dodo_id}
     used: set[int] = set()
     rows: list[UnitRow] = []
@@ -129,6 +133,7 @@ def build_rows(
                 closed_on=profile.closed_on if profile else None,
                 status=profile.status if profile else "",
                 last=points.get(unit.name),
+                last_ever=last_ever.get(unit.name),
                 rs=rs,
                 rko=rko,
                 maps=maps.get(unit.code or "", {}),
@@ -183,6 +188,21 @@ def _maps(until: date) -> tuple[dict[str, dict[int, float]], bool]:
     return out, False
 
 
+def _last_ever(reach: Reach) -> dict[str, date]:
+    """Дата последней проверки каждой точки за всё время, по названию точки.
+
+    Тот же запрос, что у «Где нужно проверить» (`queries.unit_last_inspections`),
+    без периода: новой выборки в `src/db` нет. Не прочиталось — пусто, и колонка
+    показывает только проверки периода.
+    """
+    try:
+        rows = queries.unit_last_inspections(reach=reach)
+    except DbError:
+        log.warning("Даты последних проверок точек не прочитались", exc_info=True)
+        return {}
+    return {name: last for name, _code, last, _n in rows if last is not None}
+
+
 def load(
     *,
     reach: Reach,
@@ -201,7 +221,9 @@ def load(
     profiles, profiles_failed = _profiles(code)
     ratings, ratings_failed = _ratings(code, until)
     maps, maps_failed = _maps(until)
-    rows = build_rows(units, profiles, {p.unit: p for p in points}, ratings, maps)
+    rows = build_rows(
+        units, profiles, {p.unit: p for p in points}, ratings, maps, _last_ever(reach)
+    )
     return UnitsData(
         rows=rows,
         profiles_failed=profiles_failed,

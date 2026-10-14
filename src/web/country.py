@@ -10,16 +10,20 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, replace
 from datetime import date
 
 from src.db import queries
+from src.db.errors import DbError
 from src.db.models import InspectionRow
 from src.db.reach import Reach
 
 from . import overview
 from .overview import Overview, Selection
+
+log = logging.getLogger(__name__)
 
 #: Код страны справочника — две латинские буквы (`GE`, `RS`).
 _CODE = re.compile(r"[A-Z]{2}")
@@ -102,3 +106,20 @@ def countries(*, reach: Reach) -> tuple[tuple[str, int], ...]:
         if country:
             счёт[country] = счёт.get(country, 0) + 1
     return tuple(sorted(счёт.items(), key=lambda пара: (-пара[1], пара[0])))
+
+
+def rail_stats(
+    *, reach: Reach, dates: tuple[date | None, date | None]
+) -> dict[str, tuple[float | None, int]]:
+    """Колонка стран: `{код: (средняя за период, проверок за период)}` одним запросом.
+
+    Тот же запрос, что у сводки по странам; среднее — сумма процентов на число
+    проверок, как у снимка страны. Не прочиталось — пусто: колонка остаётся
+    без средних, экран живёт.
+    """
+    try:
+        rows = queries.country_summary(reach=reach, date_from=dates[0], date_to=dates[1])
+    except DbError:
+        log.warning("Средние по странам для колонки не прочитались", exc_info=True)
+        return {}
+    return {code: (round(total / n, 1) if n else None, n) for code, _u, _c, n, total, _d in rows}
