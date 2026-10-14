@@ -204,19 +204,19 @@ _ADD: dict[str, dict[str, str]] = {
     },
     "users.add.email": {"ru": "Почта для Google", "en": "Google sign-in email"},
     "users.add.email_hint": {
-        "ru": "Необязательно. С ней человек входит через Google.",
-        "en": "Optional. With it the person signs in with Google.",
+        "ru": "Человек входит с ней через Google; имя подтянется оттуда.",
+        "en": "The person signs in with it via Google; the name comes from there.",
     },
     "users.add.space": {"ru": "Пространство", "en": "Space"},
     "users.add.role": {"ru": "Роль", "en": "Role"},
     "users.add.submit": {"ru": "Добавить", "en": "Add"},
     "users.add.hint": {
-        "ru": "Пароль придумает система и покажет один раз.",
-        "en": "The system makes up the password and shows it once.",
+        "ru": "Достаточно рабочей почты и роли.",
+        "en": "A work email and a role are enough.",
     },
     "users.add.failed": {
-        "ru": "Не добавлено: логин уже занят или не годится по форме.",
-        "en": "Not added: the login is taken or malformed.",
+        "ru": "Не добавлено: человек с такой почтой уже есть.",
+        "en": "Not added: someone with this email already exists.",
     },
     "users.add.role_space": {
         "ru": (

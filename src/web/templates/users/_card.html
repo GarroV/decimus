@@ -162,11 +162,8 @@
       </section>
     {% else %}
       <form method="post" action="{{ users_url }}/add?lang={{ lang }}" class="sform" data-role-by-space>
-        <label><span class="sform__label">{{ t('users.add.login') }}</span>
-          <input class="sinput" name="login" required autocomplete="off" pattern="[a-z0-9][a-z0-9._-]{1,63}" spellcheck="false" autofocus>
-          <small class="sform__hint">{{ t('users.add.login_hint') }}</small></label>
         <label><span class="sform__label">{{ t('users.add.email') }}</span>
-          <input class="sinput" type="email" name="email" autocomplete="off" spellcheck="false" placeholder="{{ t('users.email.placeholder') }}">
+          <input class="sinput" type="email" name="email" required autocomplete="off" spellcheck="false" autofocus placeholder="{{ t('users.email.placeholder') }}">
           <small class="sform__hint">{{ t('users.add.email_hint') }}</small></label>
         {% if spaces|length > 1 %}
           <label><span class="sform__label">{{ t('users.add.space') }}</span>

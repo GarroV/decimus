@@ -21,7 +21,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import ЛОГИН, войти, подменить_двери, собрать
 
-from src.web import accounts
+from src.web import accounts, people, users_screen
 from src.web.accounts import everyone as настоящий_перечень
 
 #: Админ УК: управлять людьми может только он (D288).
@@ -123,6 +123,33 @@ def test_пароль_заведённого_показан_один_раз_и_�
     assert ответ.status_code == 200
     assert "СЕКРЕТ-РОВНО-РАЗ" in ответ.get_data(as_text=True)
     assert ответ.headers.get("Location") is None
+
+
+def test_логин_берётся_из_почты(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D488: в форме только почта и роль — логин система берёт из почты."""
+    заведённые: list[str] = []
+
+    def _добавить(login: str, **_: object) -> accounts.Added:
+        заведённые.append(login)
+        return accounts.Added(login=login, role="developer", password="x")
+
+    monkeypatch.setattr(accounts, "add", _добавить)
+    monkeypatch.setattr(people, "change_email", lambda **_: people.Outcome("email.ok", 200))
+
+    ответ = стенд_админа.post(
+        "/users/add",
+        data={"email": "N.Kushnirchuk@dodobrands.io", "role": "developer", "tenant": ТЕНАНТ},
+        headers=СВОЙ,
+    )
+
+    assert ответ.status_code == 200
+    assert заведённые == ["n.kushnirchuk"]
+
+
+def test_логин_из_почты_по_форме() -> None:
+    assert users_screen.login_from_email("a.b-c@x.io") == "a.b-c"
+    assert users_screen.login_from_email("Иван+tag@x.io") == "tag"
+    assert users_screen.login_from_email("") == ""
 
 
 def test_себя_заморозить_нельзя(стенд_админа: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
