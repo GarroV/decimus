@@ -18,6 +18,7 @@ import io
 import logging
 import uuid
 from collections.abc import Callable
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Any
@@ -47,6 +48,7 @@ from src.db.errors import (
 )
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
+from src.db.pool import shared_connections
 from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
@@ -148,17 +150,28 @@ SCREENS = (
 _MEMO_ENVIRON_KEY = "decimus.db_memo_token"
 
 
+_SHARED_DB_ENVIRON_KEY = "decimus.db_shared"
+
+
 def _open_memo() -> None:
     # Метка есть у любого запроса: на POST память явно выключена, а не «не тронута».
-    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(
-        enabled=request.method in ("GET", "HEAD")
-    )
+    читает = request.method in ("GET", "HEAD")
+    request.environ[_MEMO_ENVIRON_KEY] = request_memo.begin(enabled=читает)
+    if читает:
+        # Одно соединение на DSN за весь запрос (#732): чтения страницы не платят
+        # выдачей и сбросом пула каждое. Возврат в пул — в `_close_memo`.
+        стек = ExitStack()
+        стек.enter_context(shared_connections())
+        request.environ[_SHARED_DB_ENVIRON_KEY] = стек
 
 
 def _close_memo(_exc: BaseException | None) -> None:
     token = request.environ.pop(_MEMO_ENVIRON_KEY, None)
     if token is not None:
         request_memo.end(token)
+    стек = request.environ.pop(_SHARED_DB_ENVIRON_KEY, None)
+    if стек is not None:
+        стек.close()
 
 
 def _install_request_memo(app: Flask) -> None:
