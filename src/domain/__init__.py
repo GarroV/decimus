@@ -21,7 +21,14 @@ from .checklist import (
     only_zone,
 )
 from .config import check_environment
-from .findings import add_finding, attach_photo, detach_photo, drop_finding, edit_finding
+from .findings import (
+    add_finding,
+    attach_photo,
+    detach_photo,
+    drop_finding,
+    edit_finding,
+    set_reading,
+)
 from .handover import (
     HandedOverError,
     guard_writable,
@@ -129,6 +136,7 @@ __all__ = [
     "save_upload",
     "score",
     "set_info",
+    "set_reading",
     "set_report_lang",
     "settings_for",
     "start_inspection",

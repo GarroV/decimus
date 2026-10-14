@@ -184,6 +184,10 @@ def build_walk(
                 "text": finding.text,
                 "comment": finding.comment,
                 "repeat": finding.repeat,
+                "reading_c": finding.reading_c,
+                # Слова аудитора нужны форме правки: пересчёт по исправленной
+                # температуре (#836) ищет пункт по ним же, а не по формулировке.
+                "words": finding.words,
                 "unusual": finding.zone_unusual,
                 "photos": [_photo(ref) for ref in finding.photos],
             }

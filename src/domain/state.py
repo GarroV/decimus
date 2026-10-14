@@ -68,6 +68,12 @@ SOURCES_KEY = "sources"
 #: годятся — они обнуляются на старте следующей проверки того же чата.
 WORDS_KEY = "words"
 
+#: Показание термометра к записям (#836): номер записи → °C, число, которое
+#: аудитор подтвердил или исправил. Лежит рядом с источниками и словами по той
+#: же причине: свойство самой записи, переживает слив в базу вместе с проверкой.
+#: Нет ключа — замера у записи нет.
+READINGS_KEY = "readings"
+
 #: Предложения системы к записям (решение D077, задача T181): номер записи →
 #: `{code, level, zone, confidence?}`. Лежит рядом с источниками и по той же
 #: причине: это свойство самой записи, а не переписки, и оно обязано пережить
@@ -288,6 +294,46 @@ def forget_words(path: Path, n: int) -> None:
         _write_atomic(path, raw)
 
 
+def read_readings(raw: Mapping[str, Any], path: Path) -> dict[int, float]:
+    """Показания термометра из блока `domain`. Непонятное значение — отказ.
+
+    Тот же довод, что у `read_words`: прочитанное «неизвестно что» показалось бы
+    аудитору температурой на фото. Отсутствие ключа отказом не является.
+    """
+    block: Mapping[str, Any] = raw.get(DOMAIN_KEY) or {}
+    result: dict[int, float] = {}
+    for key, value in dict(block.get(READINGS_KEY) or {}).items():
+        try:
+            n = int(key)
+        except (TypeError, ValueError):
+            raise DomainError(
+                f"Номер записи «{key}» в показаниях {path} не похож на число"
+            ) from None
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            raise DomainError(
+                f"Показание к записи #{n} в {path} не похоже на температуру: "
+                f"ожидается число, а лежит «{value!r}»"
+            )
+        result[n] = float(value)
+    return result
+
+
+def remember_reading(path: Path, n: int, reading_c: float | None) -> None:
+    """Записать показание записи №`n`; `None` снимает его (замера у записи нет)."""
+    with state_lock(path):
+        raw = _read_raw(path)
+        block = dict(raw.get(DOMAIN_KEY) or {})
+        stored = dict(block.get(READINGS_KEY) or {})
+        if reading_c is None:
+            if stored.pop(str(n), None) is None:
+                return
+        else:
+            stored[str(n)] = reading_c
+        block[READINGS_KEY] = stored
+        raw[DOMAIN_KEY] = block
+        _write_atomic(path, raw)
+
+
 def check_confidence(value: Any, where: str) -> float | None:
     """Уверенность системы: доля от нуля до единицы либо ничего.
 
@@ -424,6 +470,7 @@ def _finding(
     sources: Mapping[int, str],
     suggestions: Mapping[int, Suggestion],
     words: Mapping[int, str],
+    readings: Mapping[int, float],
 ) -> Finding:
     photos = [p for p in (raw.get("photos") or []) if p]
     if not photos and raw.get("photo"):
@@ -443,6 +490,7 @@ def _finding(
         repeat=bool(raw.get("repeat")),
         source=sources.get(int(raw["n"]), ""),
         words=words.get(int(raw["n"]), ""),
+        reading_c=readings.get(int(raw["n"])),
         # Предложение разворачивается в четыре поля здесь, а не на границе с
         # базой: слив берёт их с записи по имени, и вложенный объект пришлось бы
         # разбирать в чужом блоке.
@@ -486,6 +534,7 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
     sources = read_sources(raw, path)
     suggestions = read_suggestions(raw, path)
     words = read_words(raw, path)
+    readings = read_readings(raw, path)
     return Inspection(
         chat_id=chat_id,
         unit=str(meta.get("unit") or ""),
@@ -507,7 +556,9 @@ def _inspection(chat_id: int, raw: Mapping[str, Any], path: Path) -> Inspection:
         partner=str(meta.get("partner") or ""),
         contact=str(meta.get("contact") or ""),
         auditor=str(meta.get("auditor") or ""),
-        findings=[_finding(f, sources, suggestions, words) for f in (raw.get("findings") or [])],
+        findings=[
+            _finding(f, sources, suggestions, words, readings) for f in (raw.get("findings") or [])
+        ],
         info=read_info(raw),
         run_id=str(block.get("run_id") or ""),
     )

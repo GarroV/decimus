@@ -62,7 +62,10 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from math import ceil
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
+from aiogram.dispatcher.event.bases import SkipHandler
+from aiogram.filters import StateFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 
 from src import domain
@@ -89,6 +92,7 @@ from ..keyboards import (
     MANUAL_PICK_PREFIX,
     MODEL_CALLBACK,
     PICK_PREFIX,
+    READING_CALLBACK,
     SKIP_CALLBACK,
     ZONE_FOR_ITEM_PREFIX,
     ZONE_FOR_MANUAL_PREFIX,
@@ -108,8 +112,10 @@ from ..pending import Offer, PendingStore, Proposal
 from ..photos import fetch_bytes
 from ..phrases import Learned, learn, recall
 from ..propose import model_frames, sent_at
+from ..reading import parse_reading, reading_text
 from ..shown import remember as remember_shown
 from ..shown import remember_origin, remember_repeat_ask, tell_refusal
+from ..states import ReadingFlow
 from ..texts import t
 from ..zones import DICTIONARY, ITEM, MODEL, WORDS, ZoneConflict, allowed_zones, resolve_zone
 
@@ -218,6 +224,11 @@ async def _hand(
     pending.propose(chat_id, proposal, at=getattr(sent, "message_id", None))
 
 
+def _reading_of(proposal: Proposal) -> float | None:
+    """Показание термометра, прочитанное по этому материалу, — первое из предложений."""
+    return next((c.reading_c for c in proposal.candidates if c.reading_c is not None), None)
+
+
 async def _show_candidates(
     message: Message,
     chat_id: int,
@@ -256,6 +267,11 @@ async def _show_candidates(
         text = t("record.candidates_batch", lang, no=no, total=total, lines=lines)
     else:
         text = t("record.candidates", lang, count=len(proposal.file_ids), lines=lines)
+    reading = _reading_of(proposal)
+    if reading is not None:
+        # Показание на своей строке (#836): его читает модель и может ошибиться,
+        # поэтому аудитор видит число отдельно от формулировок и правит кнопкой.
+        text += "\n\n" + t("record.reading_line", lang, value=reading_text(reading))
     if proposal.question:
         text = t("record.question", lang, question=proposal.question) + "\n\n" + text
     await _hand(
@@ -265,7 +281,10 @@ async def _show_candidates(
         proposal,
         text,
         candidates_keyboard(
-            len(proposal.candidates), lang, correcting=proposal.correcting is not None
+            len(proposal.candidates),
+            lang,
+            correcting=proposal.correcting is not None,
+            fix_reading=reading is not None,
         ),
     )
 
@@ -902,6 +921,21 @@ async def _ask_zone_conflict(
     )
 
 
+async def _model_frames(bot: Bot | None, base: Proposal) -> tuple[bytes | None, tuple[bytes, ...]]:
+    """Кадры, которые уйдут в модель: один первый либо вся пачка (D208, D209).
+
+    Не скачавшийся кадр не останавливает разбор — уходят те, что есть. Правило
+    одно на бота и мини-апп (`bot.propose.model_frames`, D330).
+    """
+    which = model_frames(base.note, len(base.file_ids), correcting=base.correcting is not None)
+    photo = await fetch_bytes(bot, base.file_ids[0]) if which.first and bot is not None else None
+    photos: tuple[bytes, ...] = ()
+    if which.all and bot is not None:
+        fetched = await asyncio.gather(*(fetch_bytes(bot, f) for f in base.file_ids))
+        photos = tuple(raw for raw in fetched if raw is not None)
+    return photo, photos
+
+
 async def _analyze_resolved(
     message: Message,
     chat_id: int,
@@ -970,12 +1004,7 @@ async def _analyze_resolved(
     # Кадры с комментарием — хоть один — модель смотрит вместе со словами
     # (D208, D209). Не скачавшийся кадр не останавливает разбор — уходят те, что есть.
     # Правило одно на бота и мини-апп (`bot.propose.model_frames`, D330).
-    which = model_frames(note, len(base.file_ids), correcting=base.correcting is not None)
-    photo = await fetch_bytes(bot, base.file_ids[0]) if which.first and bot is not None else None
-    photos: tuple[bytes, ...] = ()
-    if which.all and bot is not None:
-        fetched = await asyncio.gather(*(fetch_bytes(bot, f) for f in base.file_ids))
-        photos = tuple(raw for raw in fetched if raw is not None)
+    photo, photos = await _model_frames(bot, base)
 
     if base.batch is None:
         # У пачки (T206) «Разбираю…» на каждый кадр — это N одинаковых строк
@@ -1046,6 +1075,76 @@ async def _analyze_resolved(
     proposal = replace(base, candidates=suggestion.candidates, question=suggestion.question)
     await _show_candidates(message, chat_id, proposal, pending, lang)
     await _offer_also_seen(message, chat_id, base, suggestion.also_seen, pending, lang)
+
+
+async def _reevaluate_reading(
+    message: Message,
+    chat_id: int,
+    proposal: Proposal,
+    value: float,
+    pending: PendingStore,
+    lang: str,
+    report_lang: str,
+    *,
+    at: int | None,
+) -> None:
+    """Пересчитать предложение по исправленной температуре и показать его (#836).
+
+    Один запрос того же семейства, что и первый разбор, с явным «реальная
+    температура N °C»: те же слова и кадры, поэтому пункт модель находит тот же
+    путь, а класс выбирает уже по числу человека. Показание — слово аудитора, и
+    оно остаётся в предложении, что бы модель ни вернула.
+
+    Новое предложение, как любое, ждёт подтверждения: ничего не записывается.
+    Прежнее снимается целиком — его кнопки несут устаревшее число, и нажатие под
+    ними записало бы нарушение по неверному показанию. Модель недоступна —
+    прежнее остаётся, и аудитор выбирает кандидата как было либо правит
+    повторно.
+    """
+    photo, photos = await _model_frames(message.bot, proposal)
+    await message.answer(t("record.thinking", lang))
+    try:
+        suggestion = await asyncio.to_thread(
+            classify,
+            proposal.note,
+            photo,
+            proposal.zone_hint or None,
+            lang=report_lang,
+            chat_id=chat_id,
+            photos=photos,
+            sent_at=sent_at(),
+            reading_c=value,
+        )
+    except (ModelUnavailable, RecognizeError) as exc:
+        journal.note(chat_id, "reading_failed", slot=proposal.slot, error=str(exc))
+        logger.warning("пересчёт по температуре не удался в чате %s: %s", log_id(chat_id), exc)
+        await message.answer(t("record.unavailable", lang))
+        return
+    journal.note(
+        chat_id,
+        "reading_corrected",
+        slot=proposal.slot,
+        reading_c=value,
+        candidates=journal.candidates(suggestion.candidates),
+        question=suggestion.question,
+        usage=suggestion.usage,
+    )
+    pending.take_proposal(chat_id, at=at)
+    if not suggestion.candidates:
+        if suggestion.question:
+            await message.answer(t("record.question", lang, question=suggestion.question))
+        await message.answer(t("record.reading_no_violation", lang, value=reading_text(value)))
+        await asyncio.to_thread(
+            _frame_without_record, chat_id, proposal.file_ids, sidecar.OUTCOME_NOTHING_FOUND
+        )
+        return
+    fresh = replace(
+        proposal,
+        candidates=suggestion.candidates,
+        question=suggestion.question,
+        slot=pending.next_slot(),
+    )
+    await _show_candidates(message, chat_id, fresh, pending, lang)
 
 
 async def _offer_also_seen(
@@ -1194,8 +1293,12 @@ async def _save(
     suggested: domain.Suggestion | None = None,
     correcting: int | None = None,
     origin: int | None = None,
+    reading_c: float | None = None,
 ) -> Message | None:
     """Зафиксировать запись и показать её (T055, T121), а с T204 — и поправить.
+
+    `reading_c` — показание термометра, которое аудитор видел и подтвердил или
+    исправил (#836); ложится в запись рядом со словами. Пусто — замера нет.
 
     Возвращает сообщение, которым запись показана, — или ничего, если записать
     не вышло. Тот же пункт в той же зоне аудитор снимает дважды за обход, и с
@@ -1310,6 +1413,10 @@ async def _save(
                 text=text,
                 zone_by_person=zone_spoken,
             )
+            if reading_c is not None:
+                finding = await asyncio.to_thread(
+                    domain.set_reading, chat_id, correcting, reading_c
+                )
         else:
             finding = await asyncio.to_thread(
                 domain.add_finding,
@@ -1322,6 +1429,7 @@ async def _save(
                 words=words,
                 suggested=suggested,
                 zone_by_person=zone_spoken,
+                reading_c=reading_c,
             )
     except DomainError as exc:
         taken = (
@@ -1593,6 +1701,54 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
         await _drop_question(message, chat_id, offer)
         await _analyze_frames(message, chat_id, offer.file_ids, pending, lang)
 
+    @router.callback_query(F.data == READING_CALLBACK)
+    async def on_fix_reading(callback: CallbackQuery, state: FSMContext) -> None:
+        """«Исправить температуру»: спросить число и ждать его следующим сообщением."""
+        await callback.answer()
+        here = chat_of(callback)
+        if here is None:
+            return
+        message, chat_id, lang = here
+        proposal = pending.proposal(chat_id, at=message.message_id)
+        if proposal is None or _reading_of(proposal) is None:
+            await stale(message, lang)
+            return
+        await state.set_state(ReadingFlow.waiting_value)
+        await state.update_data(reading_at=message.message_id)
+        await message.answer(t("record.ask_reading", lang))
+
+    @router.message(StateFilter(ReadingFlow.waiting_value), F.text, ~F.text.startswith("/"))
+    async def on_reading_value(message: Message, state: FSMContext) -> None:
+        """Число от аудитора. Не число — спросить снова, а не пересчитывать по мусору."""
+        chat_id = message.chat.id
+        lang, report_lang = chat_langs(chat_id)
+        value = parse_reading(message.text or "")
+        if value is None:
+            await message.answer(t("record.reading_bad", lang))
+            return
+        data = await state.get_data()
+        await state.clear()
+        at = data.get("reading_at")
+        proposal = pending.proposal(chat_id, at=at if isinstance(at, int) else None)
+        if proposal is None:
+            await stale(message, lang)
+            return
+        await _reevaluate_reading(
+            message, chat_id, proposal, value, pending, lang, report_lang, at=at
+        )
+
+    @router.message(StateFilter(ReadingFlow.waiting_value))
+    async def on_reading_other(message: Message, state: FSMContext) -> None:
+        """Кадр, голос или команда вместо числа — аудитор вернулся к работе.
+
+        Вопрос снимается, сообщение идёт дальше своим обработчикам: иначе кадр
+        пропал бы, а следующий комментарий молча стал бы ответом на вопрос о
+        температуре.
+        """
+        await state.clear()
+        await message.answer(t("record.reading_dropped", chat_langs(message.chat.id)[0]))
+        raise SkipHandler
+
     @router.callback_query(F.data == MODEL_CALLBACK)
     async def on_model(callback: CallbackQuery) -> None:
         """«Разобрать моделью»: сверка по словам ответила не то или не на всё.
@@ -1725,6 +1881,7 @@ def build_record_router(*, store: MaterialStore, pending: PendingStore) -> Route
                 else (proposal.zone_source if candidate.zone == proposal.zone_hint else "")
             ),
             suggested=_model_suggestion(proposal),
+            reading_c=candidate.reading_c,
             # Нажатие под правкой означает «поправить на этот пункт», а не
             # «завести ещё один»: адресат назван ответом аудитора и с тех пор
             # не меняется, сколько бы кадров он ни прислал между показом
