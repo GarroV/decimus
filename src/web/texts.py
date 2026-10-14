@@ -28,6 +28,7 @@ from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
+from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -1635,6 +1636,7 @@ _ЧАСТИ = (
     GRADE_TEXTS,
     JOURNAL_TEXTS,
     MASTER_TEXTS,
+    MODEL_KEY_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     RATINGS_TEXTS,
@@ -1662,6 +1664,7 @@ TEXTS = {
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,
+    **MODEL_KEY_TEXTS,
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,

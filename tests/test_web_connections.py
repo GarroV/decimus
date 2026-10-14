@@ -21,7 +21,7 @@ import pytest
 from flask.testing import FlaskClient
 from web_harness import СВОЙ, войти, подменить_двери, собрать
 
-from src.db import api_access
+from src.db import api_access, model_key
 from src.db import ratings_read as ratings
 from src.db.errors import AccessError
 
@@ -134,6 +134,8 @@ def склад(monkeypatch: pytest.MonkeyPatch) -> Склад:
     monkeypatch.setattr(
         ratings, "countries", lambda: tuple(SimpleNamespace(code=c) for c in ("GE", "AM", "RS"))
     )
+    # Блок «Ключ модели» (D491) читает свою запись: здесь базы нет, ключа тоже.
+    monkeypatch.setattr(model_key, "status", lambda: None)
     return склад
 
 

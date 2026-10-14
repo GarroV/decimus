@@ -57,6 +57,7 @@ Swarm — через MCP и API чтения. Какие поверхности 
 | MCP | Протокол, которым Claude у человека читает историю проверок и правит методику и рейтинги. Свой сервер, только петля, наружу — туннелем | `src/mcp/`, `docs/furca/blocks/mcp.md`, [`inventory.md`](inventory.md) |
 | Личный токен | Ключ Claude Desktop, который человек с учёткой выпускает себе сам — в своих настройках на сайте, в боте (`/mcp`) или мини-аппе; никто никому его не выдаёт (D448). В базе — отпечаток, учётка, роль, срок. Права — по роли учётки и допускам пространства; срок 30 дней (`MCP_TOKEN_TTL_DAYS`); отключение учётки и смена роли гасят его сразу. Не путать со служебным токеном `MCP_TOKENS` из `.env` | `src/db/mcp_access.py`, `src/mcp/policy.py`, `docs/furca/blocks/mcp.md` |
 | Сервисный токен | Ключ внешнего сервиса к API чтения (`/api/v1/*`): только чтение, право на каждый метод, страны и срок у ключа | `src/db/api_access.py`, `tools/api_token.py`, `docs/18-access-map.md` |
+| Ключ модели | Ключ провайдера нейросети для разбора комментариев и голосовых: вставляется главным админом на «Подключениях», лежит в базе зашифрованным (`SECRETS_KEY` — вне базы), иначе берётся `OPENAI_API_KEY` | `src/db/model_key.py`, `src/db/secret_crypto.py`, `src/web/model_key_screen.py`, `docs/12-web-admin.md` |
 | FURCA | Процесс разработки проекта: анкета, спека, блоки с контрактами, граф задач, журнал решений. Артефакты — в `docs/furca/` | `docs/furca/`, `progress.md`, `tasks.md` |
 | D###, T###, #N | Номер решения владельца (`docs/furca/decisions.md`), номер задачи стройки (`tasks.md`), номер issue на GitHub. Ссылки на них стоят в докстрингах — это «почему так» | `docs/furca/decisions.md`, `tasks.md` |
 | Тестовая база | Тесты блока `db` и всего, что ходит в Postgres, идут на отдельной базе; без неё пропускаются, а пропуск — не зелёный | `Makefile` (`make test`), `tests/db_harness.py`, `tests/conftest.py` |
@@ -155,7 +156,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,model_key_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -170,6 +171,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/guard.py` | Заслон прав веба: каждый маршрут спрашивает матрицу (`src/domain/permissions.py`) |
 | `src/web/journal.py` | Журналы входов и действий на стороне веба (D462, `0067`) |
 | `src/web/journal_screen.py` | Экраны журналов (D462): «Журнал» главного админа и «Мои входы» человека |
+| `src/web/model_key_screen.py` | Блок «Ключ модели» на вкладке «Подключения»: вставить, проверить, убрать (D491) |
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
@@ -217,6 +219,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
 | `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
+| `src/web/texts_model_key.py` | Тексты блока «Ключ модели» на вкладке «Подключения» (D491) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
 | `src/web/texts_prescriptions.py` | Тексты предписаний (волна 3): раздел УК, раздел партнёра, блок экрана страны |
@@ -278,7 +281,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
 | `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
-| `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
+| `src/web/templates/users/` | 8 | _card.html, _connections.html, _model_key.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
 
 <!-- map:begin tree src/web/static -->
@@ -353,7 +356,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 
 ### Учётки, экшн-планы, предписания, рейтинги
 
-<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,web_access,web_own_profile,web_throttle,web_unlock}.py -->
+<!-- map:begin files src/db/{action_plans,agg_store,api_access,journals,maps_store,model_key,oauth_store,prescriptions,prescriptions_write,ratings,ratings_read,ratings_sync,second_factor,secret_crypto,web_access,web_own_profile,web_throttle,web_unlock}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/db/action_plans.py` | Экшн-планы: запрос, версии файла, приём и возврат (волна 2, D263–D274) |
@@ -361,6 +364,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/api_access.py` | Сервисные токены внешнего API и журнал обращений (D356, D388, #568) |
 | `src/db/journals.py` | Журнал входов и журнал действий (D462, `0067`): запись и чтение |
 | `src/db/maps_store.py` | Оценки на картах в базе (схема `maps`, миграция 0044): запись снимка и чтение |
+| `src/db/model_key.py` | Ключ модели из базы (D491): запись, чтение, кэш на минуту |
 | `src/db/oauth_store.py` | Хранилище OAuth: клиенты, коды, подключения и токены (D417, миграция `0054`) |
 | `src/db/prescriptions.py` | Предписания: черновик, отправка через Gmail сотрудника, ответ партнёра, закрытие (волна 3) |
 | `src/db/prescriptions_write.py` | Предписания: запись — черновик, отправка, закрытие (УК) и ответ партнёра (волна 3) |
@@ -368,6 +372,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/db/ratings_read.py` | Чтение рейтингов для сводки и экрана «Загрузки», правка справочников (0039) |
 | `src/db/ratings_sync.py` | Забор общей таблицы контроля: состояние по листам и заявки «Забрать сейчас» (D464) |
 | `src/db/second_factor.py` | Вторая ступень входа (D463, `0068`): хранение и одноразовые переходы |
+| `src/db/secret_crypto.py` | Шифрование секретов, которые лежат в базе (D491): AES-256-GCM, ключ — вне базы |
 | `src/db/web_access.py` | Учётки и сессии веб-админки: кто входит и чем это подтверждается (T323) |
 | `src/db/web_own_profile.py` | Свой профиль с экрана «Настройки» (D447): почта Google и язык сайта — уровень базы |
 | `src/db/web_throttle.py` | Ограничитель перебора пароля на форме входа (T325, решения D154 и D155) |
@@ -452,6 +457,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0067_journals.sql` | Два журнала на случай взлома учётки (D462, шаг 2): «кто и откуда входил» и «что делали админы» |
 | `0068_second_factor.sql` | Вторая ступень входа (D463): ключ доступа (passkey, Touch ID), код из приложения- аутентификатора (TOTP, RFC 6238) и одноразовые резервные коды |
 | `0069_passkey_login.sql` | Вход ключом идёт с формы входа, до того как известно, кто пришёл: вызов выдаётся браузеру без учётки (ключ находится по номеру, а не по логину) |
+| `0070_model_key.sql` | Раньше ключ жил только в окружении процессов (`OPENAI_API_KEY`), и сменить его значило править `.env` на площадке |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

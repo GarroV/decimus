@@ -70,8 +70,9 @@ CONFIRM_ENDPOINT = "reauth_confirm"
 #: Вид метки в куке захода Google: подтверждение входа.
 REAUTH_KIND = "reauth"
 
-#: Куда можно вернуть после подтверждения: «Настройки» и согласие OAuth.
-_BACK_PREFIXES = ("/settings#", "/settings?", "/oauth/authorize?")
+#: Куда можно вернуть после подтверждения: «Настройки», согласие OAuth и вкладка
+#: «Подключения» (ключ модели, D491).
+_BACK_PREFIXES = ("/settings#", "/settings?", "/oauth/authorize?", "/users?tab=connections")
 
 
 def is_fresh(account: object, *, now: datetime | None = None) -> bool:

@@ -106,6 +106,7 @@ _язык_интерфейса_не_протекает_из_оболочки
 _методика_не_протекает_из_оболочки
 _сведение_комментария_не_уходит_в_сеть
 _правка_ответом_не_уходит_в_сеть
+_чистый_кэш
 _бот_без_базы_не_знает_привязок
 
 # Фикстура pytest, подключённая по имени строкой (T151): `usefixtures` берёт её
@@ -298,6 +299,9 @@ connections_issue
 connections_update
 connections_reissue
 connections_revoke
+model_key_check
+model_key_save
+model_key_delete
 do_move
 methodology_zone_add
 methodology_zone_shares
@@ -570,3 +574,6 @@ qr_svg
 secret_groups
 last_step
 factor_count
+
+# Поле записи о ключе модели читает шаблон блока («Поставлен»): кодом оно не используется.
+set_at
