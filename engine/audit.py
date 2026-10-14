@@ -802,6 +802,68 @@ def cmd_list(a):
         print(f"[инфо] {k}: {поле['text'][:120]}{ph}")
 
 
+def grade_rule(pct, counts, cfg):
+    """Какое правило `grades` дало букву: `(индекс, правило)`.
+
+    Правила проверяются строго по порядку, первое совпадение выигрывает. Не
+    подошло ни одно — запасное правило (`fallback`), его индекс -1. Это ЕДИНСТВЕННАЯ
+    реализация выбора буквы: `compute` берёт букву отсюда же, а карточка проверки
+    объясняет по ней же, почему буква именно такая (D490).
+    """
+    for index, rule in enumerate(cfg["grades"]["rules"]):
+        c = rule["if"]
+        if "min_d3" in c and counts["D3"] < c["min_d3"]:
+            continue
+        if "min_d2" in c and counts["D2"] < c["min_d2"]:
+            continue
+        if "max_d2" in c and counts["D2"] > c["max_d2"]:
+            continue
+        if "pct_below" in c and not pct < c["pct_below"]:
+            continue
+        if "pct_at_least" in c and not pct >= c["pct_at_least"]:
+            continue
+        return index, rule
+    return -1, cfg["grades"]["fallback"]
+
+
+def breakdown(items, per_zone, cfg, pct):
+    """Расшифровка оценки: от стартовых 100 % до итога, строка за строкой.
+
+    Числа берутся из тех же `items` и `per_zone`, что дали вычеты, — своей
+    арифметики ставок здесь нет: вычет строки — сумма `cost` её записей, а
+    D3 — потеря зоны, как её посчитал `compute`. `exact` говорит, что строки
+    сходятся с итогом (`start - сумма вычетов == pct`); при режиме `zero_total`,
+    потолке по зоне или полу процента они не сойдутся, и тогда показывающий
+    строки по классам не выводит вовсе.
+    """
+    levels = {}
+    skipped = {}
+    for i in items:
+        lvl = i["level"]
+        if lvl in (ADVICE, "D3") or lvl not in ("D1", "D2"):
+            continue
+        if not i["counted"]:
+            skipped[lvl] = skipped.get(lvl, 0) + 1
+            continue
+        key = (lvl, bool(i.get("repeat")))
+        row = levels.setdefault(key, {"kind": "level", "level": lvl, "repeat": key[1],
+                                      "count": 0, "loss": 0.0})
+        row["count"] += 1
+        row["loss"] += i["cost"]
+    lines = []
+    for _, row in sorted(levels.items()):
+        lines.append({**row, "loss": round(row["loss"], 4)})
+    for code, z in per_zone.items():
+        if z["zeroed"]:
+            lines.append({"kind": "d3_zone", "zone": code, "name_ru": z["name_ru"],
+                          "name_en": z["name_en"], "count": z["D3"], "loss": z["loss"]})
+    lost = sum(row["loss"] for row in lines)
+    exact = (cfg["d3"].get("mode") == "zero_zone_share" and not cfg.get("cap_zone_loss_at_share")
+             and round(max(cfg["start_pct"] - lost, cfg.get("floor_pct", 0.0)) + 1e-9, 2) == pct)
+    return {"start": cfg["start_pct"], "lines": lines,
+            "skipped": dict(sorted(skipped.items())), "total": pct, "exact": exact}
+
+
 def compute(st, cl_rows, zones, cfg):
     inspected = inspection_date(st)
     cl = {r["id"]: r for r in cl_rows}
@@ -873,25 +935,7 @@ def compute(st, cl_rows, zones, cfg):
     pct = max(pct, cfg.get("floor_pct", 0.0))
     pct = round(pct + 1e-9, 2)
 
-    grade = None
-    for rule in cfg["grades"]["rules"]:
-        c = rule["if"]
-        ok = True
-        if "min_d3" in c and counts["D3"] < c["min_d3"]:
-            ok = False
-        if "min_d2" in c and counts["D2"] < c["min_d2"]:
-            ok = False
-        if "max_d2" in c and counts["D2"] > c["max_d2"]:
-            ok = False
-        if "pct_below" in c and not pct < c["pct_below"]:
-            ok = False
-        if "pct_at_least" in c and not pct >= c["pct_at_least"]:
-            ok = False
-        if ok:
-            grade = rule
-            break
-    if grade is None:
-        grade = cfg["grades"]["fallback"]
+    rule_index, grade = grade_rule(pct, counts, cfg)
 
     # Разбивка по процессам (D120/D121). Ключ — код: формулировки переводятся и
     # правятся, коды нет. `loss` — вклад процесса в потерю итога, в той же
@@ -955,6 +999,8 @@ def compute(st, cl_rows, zones, cfg):
         p["loss"] = round(p["loss"], 4)
 
     return {"meta": st["meta"], "pct": pct, "grade": grade["grade"],
+            "grade_rule": {"index": rule_index, "if": dict(grade.get("if") or {})},
+            "breakdown": breakdown(items, per_zone, cfg, pct),
             "grade_label_ru": grade.get("label_ru", ""), "grade_label_en": grade.get("label_en", ""),
             "counts": counts, "deductions": round(deductions, 2),
             "zones": per_zone, "by_process": by_process, "findings": items,
