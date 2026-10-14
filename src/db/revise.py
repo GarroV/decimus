@@ -57,6 +57,8 @@ class Revision:
     zone: str
     zone_unusual: bool
     text: str
+    #: Показание термометра, °C (#855, D495); `None` — замера нет или снят.
+    reading_c: float | None = None
 
 
 # Замок строки ждущей проверки — первое действие транзакции. Под ролью
@@ -85,7 +87,8 @@ where inspection_id = %(id)s and code = %(code)s and zone = %(zone)s and id <> %
 
 _UPDATE_FINDING_SQL = """
 update findings
-set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_unusual)s
+set code = %(code)s, level = %(level)s, zone = %(zone)s, zone_unusual = %(zone_unusual)s,
+    reading_c = %(reading_c)s
 where id = %(finding)s and inspection_id = %(id)s
 """
 
@@ -225,6 +228,7 @@ def _apply(
                 "level": revision.level,
                 "zone": revision.zone,
                 "zone_unusual": revision.zone_unusual,
+                "reading_c": revision.reading_c,
             },
         )
         if cur.rowcount != 1:

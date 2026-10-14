@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import logging
+import math
 from collections.abc import Mapping
 
 from src.db import queries, review_edit, revise
@@ -31,6 +32,7 @@ from src.db.models import InspectionDetail
 from src.db.previews import make_preview
 from src.db.reach import reach_of
 from src.db.storage import PhotoStorage, S3PhotoStorage
+from src.domain.models import READING_MAX_C, READING_MIN_C
 from src.domain.tenants import canonical_tenant
 from src.report.letters import LetterError
 from src.report.letters import sources as letter_sources
@@ -139,6 +141,25 @@ def _editable(inspection_id: str, *, tenant: str, lang: str) -> InspectionDetail
     return detail
 
 
+def reading_of(raw: str) -> float | None:
+    """Показание термометра из формы вычитки (#855, D495): пусто — замера нет.
+
+    Запятая принимается как десятичный знак — так число пишут на точке. Не
+    число или вне пределов термометра — отказ, а не тихое «замера нет»:
+    вычитывающий правит факт, и молча потерянная правка хуже отказа.
+    """
+    text = raw.strip().replace(",", ".")
+    if not text:
+        return None
+    try:
+        value = float(text)
+    except ValueError:
+        value = math.nan
+    if not math.isfinite(value) or not READING_MIN_C <= value <= READING_MAX_C:
+        raise ReviseError(f"Показание «{raw}» не похоже на температуру", code="revise_reading")
+    return value
+
+
 def revise_card(
     inspection_id: str,
     finding_id: str,
@@ -149,8 +170,10 @@ def revise_card(
     level: str,
     zone: str,
     text: str,
+    reading: str = "",
 ) -> None:
     """Исправить запись ждущей проверки и пересчитать её. Отказ — `ReviseError`."""
+    показание = reading_of(reading)
     detail = _editable(inspection_id, tenant=tenant, lang=lang)
     прежняя = next((f for f in detail.findings if f.id == finding_id), None)
     if прежняя is None:
@@ -166,7 +189,12 @@ def revise_card(
             finding_id,
             tenant=tenant,
             revision=revise.Revision(
-                code=код, level=класс, zone=зона, zone_unusual=необычная, text=слова
+                code=код,
+                level=класс,
+                zone=зона,
+                zone_unusual=необычная,
+                text=слова,
+                reading_c=показание,
             ),
             # Движок считает ВНУТРИ транзакции правки, после замка проверки:
             # соседняя правка той же проверки уже учтена (`src/db/revise.py`).

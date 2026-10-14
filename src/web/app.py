@@ -937,6 +937,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 level=request.form.get("level") or "",
                 zone=request.form.get("zone") or "",
                 text=request.form.get("text") or "",
+                reading=request.form.get("reading_c") or "",
             )
         except ReviseError as exc:
             failure = t("revise.failed", _lang(conf), reason=domain_reason(exc, _lang(conf)))

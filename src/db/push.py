@@ -82,12 +82,12 @@ returning id
 _INSERT_FINDING_SQL = """
 insert into findings (
     inspection_id, n, code, level, zone, zone_unusual, source, words,
-    suggested_code, suggested_level, suggested_zone, suggested_confidence, repeat
+    suggested_code, suggested_level, suggested_zone, suggested_confidence, repeat, reading_c
 ) values (
     %(inspection_id)s, %(n)s, %(code)s, %(level)s, %(zone)s, %(zone_unusual)s, %(source)s,
     %(words)s,
     %(suggested_code)s, %(suggested_level)s, %(suggested_zone)s, %(suggested_confidence)s,
-    %(repeat)s
+    %(repeat)s, %(reading_c)s
 )
 returning id
 """
@@ -425,6 +425,8 @@ def _push(conn: psycopg.Connection[Any], inspection: Inspection, result: Score) 
                     # запись назначил аудитор, и база обязана помнить решение,
                     # а не выводить его заново (#359).
                     "repeat": bool(getattr(finding, "repeat", False)),
+                    # Показание термометра (#836, D495): факт проверки, как повтор.
+                    "reading_c": getattr(finding, "reading_c", None),
                     **_suggestion(finding),
                 },
             )

@@ -194,7 +194,7 @@ select
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
         and t.field = 'comment' and t.lang = i.speech_lang),
-    f.repeat
+    f.repeat, f.reading_c
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
@@ -215,7 +215,7 @@ select
     (select t.text from translations t
       where t.entity_type = 'finding' and t.entity_id = f.id
         and t.field = 'comment' and t.lang = i.speech_lang),
-    f.repeat
+    f.repeat, f.reading_c
 from findings f
 join inspections i on i.id = f.inspection_id
 join units u on u.id = i.unit_id
@@ -362,6 +362,8 @@ def _row_to_finding(row: Any) -> FindingRow:
         # отмечено»: у записанной проверки состояния «неизвестно, был ли
         # повтор» не бывает.
         repeat=bool(row[18]),
+        # Показание термометра (#855): `numeric` приходит `Decimal`-ом.
+        reading_c=None if row[19] is None else float(row[19]),
     )
 
 

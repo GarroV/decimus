@@ -433,6 +433,7 @@
 | `0068_second_factor.sql` | `web_passkeys`, `web_totp`, `web_backup_codes`, `web_second_steps`, `web_webauthn_challenges` |
 | `0069_passkey_login.sql` | — |
 | `0070_model_key.sql` | `vault.secrets` |
+| `0071_finding_reading.sql` | — |
 <!-- map:end -->
 
 ## Makefile

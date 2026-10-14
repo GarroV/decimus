@@ -432,6 +432,10 @@ REFUSAL_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Формулировка записи пуста: запись без слов в отчёт не идёт.",
         "en": "The record wording is empty: a record without words does not go into the report.",
     },
+    "refusal.domain.revise_reading": {
+        "ru": "Температура указана не числом или вне пределов термометра (от −60 до 500 °C).",
+        "en": "The temperature is not a number or is out of the thermometer range (−60…500 °C).",
+    },
     "refusal.domain.revise_text_long": {
         "ru": "Формулировка длиннее {max} знаков.",
         "en": "The wording is longer than {max} characters.",
