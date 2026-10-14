@@ -257,9 +257,9 @@ TEXTS: dict[str, dict[str, str]] = {
     # тот» превращают форму в справочник заведённых людей: перебором по ней
     # узнают, кто здесь есть, ещё не зная ни одного пароля.
     "auth.title": {"ru": "Вход", "en": "Sign in"},
-    "auth.lead": {
-        "ru": "Админка управляющей компании. Учётку заводит команда проекта.",
-        "en": "Management company admin panel. Accounts are created by the project team.",
+    "auth.sub": {
+        "ru": "Выездные проверки пиццерий Dodo",
+        "en": "Dodo pizzeria field inspections",
     },
     "auth.login": {"ru": "Логин", "en": "Login"},
     "auth.password": {"ru": "Пароль", "en": "Password"},
@@ -281,19 +281,12 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "This account has a Google address linked — use “Sign in with Google”. "
         "Password sign-in is turned off for it.",
     },
-    "auth.google_hint": {
-        "ru": "Если к учётке привязана почта Google, вход — только через Google.",
-        "en": "If your account has a Google address linked, sign in with Google only.",
-    },
-    "auth.aside": {
-        "ru": (
-            "Забыли пароль или нужна учётка — обратитесь к команде проекта: "
-            "самостоятельной регистрации здесь нет."
-        ),
-        "en": (
-            "Forgot your password or need an account — ask the project team: "
-            "there is no self-service sign-up here."
-        ),
+    # Две мелкие строки внизу экрана входа (D492): кто сюда допущен и что делать с
+    # забытым паролем. Самостоятельной регистрации нет — об этом первая строка.
+    "auth.invite": {"ru": "Только по приглашению · Dodo", "en": "Invite-only · Dodo"},
+    "auth.forgot": {
+        "ru": "Забыли пароль — напишите команде проекта",
+        "en": "Forgot your password — message the project team",
     },
     # Запрет после перебора (T325). Про счётчик говорится прямо: человек,
     # который трижды промахнулся раскладкой, обязан понять, что дверь закрыта

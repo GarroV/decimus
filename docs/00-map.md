@@ -262,7 +262,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 17 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+9) |
+| `src/web/templates/` | 19 | _account_menu.html, _account_menu_connections.html, _langpick.html, _login_lang.html, _period.html, _pick.html, _plan.html, _prescription.html, … (+11) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
@@ -282,7 +282,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 48 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-registry.css, … (+40) |
+| `src/web/static/` | 49 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-login.css, decimus-period.css, … (+41) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
