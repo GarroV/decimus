@@ -8,6 +8,7 @@ Google отвечает, а то, что делаем МЫ — кого пуск
 from __future__ import annotations
 
 from collections.abc import Iterator
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from flask import Response
@@ -506,3 +507,71 @@ def test_чужой_адрес_фото_в_токене_не_скачивает�
     assert ответ.status_code == 302
     assert ходили == []
     assert запись.вызовы[0]["avatar"] is None
+
+
+# --- подсказка аккаунта: Google не спрашивает выбор, если почту уже знаем ---------------
+
+
+def _запрос_к_google(client: FlaskClient) -> dict[str, list[str]]:
+    адрес = client.get(auth.GOOGLE_START_PATH).headers["Location"]
+    return parse_qs(urlsplit(адрес).query)
+
+
+def _кука(ответ: Response, имя: str) -> str:
+    return next((c for c in ответ.headers.getlist("Set-Cookie") if c.startswith(f"{имя}=")), "")
+
+
+def test_без_куки_подсказки_google_спрашивает_аккаунт(клиент: FlaskClient) -> None:
+    параметры = _запрос_к_google(клиент)
+
+    assert параметры["prompt"] == ["select_account"]
+    assert "login_hint" not in параметры
+
+
+def test_с_кукой_подсказки_идём_сразу_в_тот_аккаунт_без_окна_выбора(клиент: FlaskClient) -> None:
+    клиент.set_cookie(auth.GOOGLE_HINT_COOKIE, ПОЧТА_СВОЯ)
+
+    параметры = _запрос_к_google(клиент)
+
+    assert параметры["login_hint"] == [ПОЧТА_СВОЯ]
+    assert "prompt" not in параметры
+
+
+def test_мусор_в_куке_подсказки_не_уходит_к_google(клиент: FlaskClient) -> None:
+    клиент.set_cookie(auth.GOOGLE_HINT_COOKIE, "не-почта")
+
+    параметры = _запрос_к_google(клиент)
+
+    assert "login_hint" not in параметры
+    assert параметры["prompt"] == ["select_account"]
+
+
+def test_успешный_вход_запоминает_почту_в_долгой_куке(клиент: FlaskClient, обмен: Обмен) -> None:
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    кука = _кука(ответ, auth.GOOGLE_HINT_COOKIE)
+    assert ПОЧТА_СВОЯ in кука
+    assert f"Max-Age={auth.GOOGLE_HINT_TTL_SECONDS}" in кука
+    assert "HttpOnly" in кука
+    assert "SameSite=Lax" in кука
+
+
+def test_отказ_в_допуске_стирает_куку_подсказки(клиент: FlaskClient, обмен: Обмен) -> None:
+    обмен.почта = ПОЧТА_ЧУЖАЯ
+    клиент.set_cookie(auth.GOOGLE_HINT_COOKIE, ПОЧТА_ЧУЖАЯ)
+    метка = метка_захода(клиент)
+
+    ответ = клиент.get(f"{auth.GOOGLE_CALLBACK_PATH}?code=код&state={метка}")
+
+    assert ответ.status_code == 401
+    assert "Max-Age=0" in _кука(ответ, auth.GOOGLE_HINT_COOKIE)
+
+
+def test_выход_не_стирает_куку_подсказки(клиент: FlaskClient) -> None:
+    клиент.set_cookie(auth.GOOGLE_HINT_COOKIE, ПОЧТА_СВОЯ)
+
+    ответ = клиент.post(auth.LOGOUT_PATH)
+
+    assert auth.GOOGLE_HINT_COOKIE not in "".join(ответ.headers.getlist("Set-Cookie"))

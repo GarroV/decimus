@@ -145,11 +145,22 @@ def new_state() -> str:
     return secrets.token_urlsafe(32)
 
 
-def authorization_url(settings: GoogleSettings, *, state: str, nonce: str | None = None) -> str:
+def authorization_url(
+    settings: GoogleSettings,
+    *,
+    state: str,
+    nonce: str | None = None,
+    login_hint: str | None = None,
+) -> str:
     """Адрес, куда уводим человека на согласие.
 
     `nonce` Google вернёт внутри `id_token`: так токен привязан к ЭТОМУ заходу,
     а не только код — к метке (`google_link`).
+
+    `login_hint` — почта, которой человек входил в прошлый раз (кука браузера):
+    с ней Google идёт сразу в этот аккаунт, без окна выбора. Допуск от подсказки
+    не зависит — решает наш список после возврата. Без подсказки окно выбора
+    остаётся.
     """
     параметры = {
         "client_id": settings.client_id,
@@ -157,10 +168,13 @@ def authorization_url(settings: GoogleSettings, *, state: str, nonce: str | None
         "response_type": "code",
         "scope": " ".join(SCOPES),
         "state": state,
+    }
+    if login_hint:
+        параметры["login_hint"] = login_hint
+    else:
         # Своя почта у человека одна, но аккаунтов в браузере бывает несколько,
         # и молчаливый вход «не тем» аккаунтом выглядит как отказ доступа.
-        "prompt": "select_account",
-    }
+        параметры["prompt"] = "select_account"
     if nonce:
         параметры["nonce"] = nonce
     return f"{AUTHORIZATION_ENDPOINT}?{urllib.parse.urlencode(параметры)}"
