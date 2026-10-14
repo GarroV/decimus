@@ -9,7 +9,7 @@
   записаны, а подписи вокруг — на языке интерфейса. Это разные языки, и
   смешивать их нельзя (`CLAUDE.md`).
 #}{% extends "base.html" %}
-{% from "inspections/_card_parts.html" import card_actions, accept_badge with context %}
+{% from "inspections/_card_parts.html" import card_actions, accept_badge, grade_reason, explain_block with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
 
@@ -80,6 +80,7 @@
         {% if not head.is_legacy %}
         <div class="meta head-line__counts"><span>{{ t('card.score.note', deductions=detail.deductions) }}</span></div>
         {% endif %}
+        {{ grade_reason(c) }}
       </div>
       {% if head.retracted %}
         <span class="tag tag--err tag--micro">{{ t('state.retracted') }}</span>
@@ -113,6 +114,7 @@
       </div>
     </div>
 
+    {{ explain_block(c) }}
   </div>
 
   {# Экшн-план: сам запрос — кнопка в шапке (`card_actions`). Здесь только то,

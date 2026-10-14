@@ -19,18 +19,20 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from typing import Any
 
 from flask import Flask, abort, make_response, render_template, request
 from flask import Response as FlaskResponse
+from werkzeug.wrappers import Response
 
 from src.db import api_access
 from src.db import ratings_read as ratings
 from src.db.errors import DbError
 
-from . import access_policy, auth, connections_form, guard
+from . import access_policy, auth, connections_form, guard, model_key_screen, reauth
 from .connections_form import Draft, Refusal
 from .db_refusal import note_target_mismatch
 from .origin import refuse_foreign_origin
@@ -152,6 +154,7 @@ def _page(
     reissued: bool = False,
     picked_id: int | None = None,
     add: bool = False,
+    key_flash: model_key_screen.KeyFlash | None = None,
     code: int = 200,
 ) -> FlaskResponse:
     """Страница вкладки целиком — для GET и для ответа на любое действие."""
@@ -194,6 +197,7 @@ def _page(
         max_contact=connections_form.MAX_CONTACT,
         split_open=issued is not None or add or picked is not None,
         split_back=_link(tab=TAB_CONNECTIONS),
+        **model_key_screen.context(key_flash),
     )
     response = make_response(html, code)
     if issued is not None:
@@ -355,3 +359,39 @@ def install(app: Flask) -> None:
         return _page(
             flash=Flash("connections.ok.revoked", True, {"name": name}), picked_id=token_id
         )
+
+
+def _key_action(do: Callable[[str], tuple[model_key_screen.KeyFlash, int]]) -> Response:
+    """Общий порядок для действий над ключом модели (D491).
+
+    Роль → происхождение → свежий вход (иначе увод на «Подтвердите вход») → действие.
+    Ответ — вкладка целиком, а не перенаправление: исход виден сразу, ключа в ответе нет.
+    """
+    автор = _boss()
+    refuse_foreign_origin()
+    if (
+        переспрос := reauth.require_fresh(f"{section('users').path}?tab={TAB_CONNECTIONS}")
+    ) is not None:
+        return переспрос
+    flash, code = do(автор)
+    return _page(key_flash=flash, code=code)
+
+
+def install_model_key(app: Flask) -> None:
+    """Действия блока «Ключ модели»: проверить, сохранить, убрать."""
+    base = f"{section('users').path}/connections/model-key"
+
+    @app.post(f"{base}/check")
+    @guard.action("api.manage", hidden=True)
+    def model_key_check() -> Response:
+        return _key_action(lambda _by: model_key_screen.check())
+
+    @app.post(f"{base}/save")
+    @guard.action("api.manage", hidden=True)
+    def model_key_save() -> Response:
+        return _key_action(model_key_screen.save)
+
+    @app.post(f"{base}/delete")
+    @guard.action("api.manage", hidden=True)
+    def model_key_delete() -> Response:
+        return _key_action(lambda _by: model_key_screen.remove())

@@ -161,3 +161,26 @@
     <span class="tag tag--micro {{ line.tone }}">{{ t('card.findings.no_class') if line.level == 'NC' else line.level }}<span class="tag__note">{{ line.count }}</span></span>
   {% endfor %}
 {% endmacro %}
+
+{# Почему такая буква (D490): одна фраза о сработавшем правиле. Текст и пороги
+   приходят готовыми из движка и `scoring.json` (`src/web/grade_explain.py`);
+   у исторической проверки объяснения нет — оценка перенесена из старого отчёта. #}
+{% macro grade_reason(c) %}
+  {% if c.grade_explain and c.grade_explain.reason %}
+    <div class="meta grade-reason"><span>{{ c.grade_explain.reason }}</span></div>
+  {% endif %}
+{% endmacro %}
+
+{# «Расшифровка» (D490): от стартовых 100 % до итога, свёрнуто. Строки по классам
+   — только если они сходятся с итогом, иначе записанные вычеты по зонам. #}
+{% macro explain_block(c) %}
+  {% if c.grade_explain and c.grade_explain.lines %}
+  <details class="mx-more mx-more--explain">
+    <summary>{{ t('explain.title') }}</summary>
+    {% if c.grade_explain.note %}<p class="muted explain__note">{{ c.grade_explain.note }}</p>{% endif %}
+    <ul class="explain">
+      {% for line in c.grade_explain.lines %}<li>{{ line }}</li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+{% endmacro %}

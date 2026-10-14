@@ -24,9 +24,11 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
+from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
+from .texts_model_key import MODEL_KEY_TEXTS
 from .texts_oauth import OAUTH_TEXTS
 from .texts_plans import PLAN_TEXTS
 from .texts_prescriptions import PRESCRIPTION_TEXTS
@@ -1624,8 +1626,10 @@ _ЧАСТИ = (
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
+    GRADE_TEXTS,
     JOURNAL_TEXTS,
     MASTER_TEXTS,
+    MODEL_KEY_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
     RATINGS_TEXTS,
@@ -1649,9 +1653,11 @@ TEXTS = {
     **TEXTS,
     **CONNECTIONS_TEXTS,
     **COUNTRY_TEXTS,
+    **GRADE_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,
+    **MODEL_KEY_TEXTS,
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,

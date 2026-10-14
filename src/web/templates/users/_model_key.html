@@ -1,0 +1,39 @@
+{#
+  Блок «Ключ модели» на «Подключениях» (D491). Ключ ТОЛЬКО НА ЗАПИСЬ: здесь нет ни одного
+  места, куда подставилось бы его значение, — поле пустое и после отказа, и после сохранения.
+  Показываются провайдер, «••••» и последние четыре знака, кто и когда поставил.
+#}
+{% set mk = model_key %}
+<section class="ssec" id="model-key" aria-labelledby="model-key-title">
+  <h2 class="ssec__title" id="model-key-title">{{ t('model_key.title') }}</h2>
+  <p class="ssec__note">{{ t('model_key.sub') }}</p>
+  {% if mk.flash %}
+    <div class="note {{ 'note--ok' if mk.flash.ok else 'note--warn' }}"><div class="note__text">{{ t(mk.flash.key) }}</div></div>
+  {% endif %}
+  {% if not mk.known %}
+    <p class="ssec__note">{{ t('model_key.unknown') }}</p>
+  {% elif mk.status %}
+    <dl class="sprops">
+      <div><dt>{{ t('model_key.provider') }}</dt><dd>{{ mk.status.provider }}</dd></div>
+      <div><dt>{{ t('model_key.key') }}</dt><dd class="mono">{{ mk.status.masked }}</dd></div>
+      <div><dt>{{ t('model_key.set') }}</dt><dd>{{ t('connections.card.issued_by', by=mk.status.set_by, date=day(mk.status.set_at)) }}</dd></div>
+    </dl>
+  {% else %}
+    <p class="ssec__note">{{ t('model_key.from_env') }}</p>
+  {% endif %}
+  <form method="post" action="{{ users_url }}/connections/model-key/save?lang={{ lang }}" class="sform" autocomplete="off">
+    <label><span class="sform__label">{{ t('model_key.new') }}</span>
+      <input class="sinput mono" type="password" name="{{ model_key_field }}" maxlength="{{ model_key_max }}" autocomplete="new-password" spellcheck="false" required>
+      <small class="sform__hint">{{ t('model_key.new_hint') }}</small></label>
+    <div class="sactions">
+      <button class="sbtn sbtn--primary" type="submit">{{ t('model_key.save') }}</button>
+      <button class="sbtn sbtn--ghost" type="submit" formaction="{{ users_url }}/connections/model-key/check?lang={{ lang }}">{{ t('model_key.check') }}</button>
+    </div>
+  </form>
+  {% if mk.status %}
+    <form method="post" action="{{ users_url }}/connections/model-key/delete?lang={{ lang }}" class="sform">
+      <div class="sactions"><button class="sbtn sbtn--ghost" type="submit">{{ t('model_key.delete') }}</button></div>
+      <small class="sform__hint">{{ t('model_key.delete_hint') }}</small>
+    </form>
+  {% endif %}
+</section>

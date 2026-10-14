@@ -15,6 +15,8 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 
+from src.db import model_key
+
 from .errors import RecognizeConfigError
 
 MODEL_VAR = "RECOGNIZE_MODEL"
@@ -101,13 +103,25 @@ def _number(env: Mapping[str, str], name: str, default: float) -> float:
         ) from exc
 
 
+def resolve_api_key(env: Mapping[str, str] | None = None) -> str:
+    """Ключ модели: из базы (вставлен на экране «Подключения», D491), иначе из окружения.
+
+    Явный `env` (тесты, замеры) — только он, базы нет: подставленное окружение не должно
+    уходить к настоящему ключу. Без `env` — база, затем `OPENAI_API_KEY`: площадка работает
+    на прежнем ключе, пока на экране ничего не вставляли. Кэш на минуту — в `model_key`.
+    """
+    if env is not None:
+        return (env.get(API_KEY_VAR) or "").strip()
+    return (model_key.stored_key() or os.environ.get(API_KEY_VAR) or "").strip()
+
+
 def load_recognize_settings(env: Mapping[str, str] | None = None) -> RecognizeSettings:
     """Собрать настройки. Отсутствующий ключ — не отказ здесь, а отказ при вызове."""
     src = os.environ if env is None else env
     return RecognizeSettings(
         model=(src.get(MODEL_VAR) or "").strip() or DEFAULT_MODEL,
         transcribe_model=(src.get(TRANSCRIBE_MODEL_VAR) or "").strip() or DEFAULT_TRANSCRIBE_MODEL,
-        api_key=(src.get(API_KEY_VAR) or "").strip(),
+        api_key=resolve_api_key(env),
         timeout=_number(src, TIMEOUT_VAR, DEFAULT_TIMEOUT),
         min_confidence=_number(src, MIN_CONFIDENCE_VAR, DEFAULT_MIN_CONFIDENCE),
         max_candidates=int(_number(src, MAX_CANDIDATES_VAR, DEFAULT_MAX_CANDIDATES)),

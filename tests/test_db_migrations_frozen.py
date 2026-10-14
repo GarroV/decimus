@@ -284,6 +284,8 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0069_passkey_login.sql": (
         "sql1:6e90e207a16d3ce7378a331741fd8fda315f07e022a1ff3f9c76575ed92b9992"
     ),
+    # Ключ модели в базе, зашифрованный: схема `vault` (D491).
+    "0070_model_key.sql": ("sql1:bba15fddbb72adb1f90c42806a5ca13ff4dd634e849a6376b0f310c6e923f9d5"),
 }
 
 
