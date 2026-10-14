@@ -18,7 +18,6 @@ from oauth_harness import ПамятьOAuth, _Подключение, подме
 from web_harness import СВОЙ, Учётка, войти, подменить_двери, собрать
 
 from src.web import accounts
-from src.web.users_claude import claude_code_command
 
 MCP = "https://mcp.example/mcp"
 АДМИНКА = "https://admin.example"
@@ -87,21 +86,20 @@ def test_блок_есть_в_настройках_любой_роли(
     monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth, tenant: str, role: str
 ) -> None:
     for client in _стенд(monkeypatch, tenant=tenant, role=role):
-        ответ = client.get("/settings")
+        ответ = client.get("/settings?tile=claude")
         страница = ответ.get_data(as_text=True)
 
         assert ответ.status_code == 200, (tenant, role)
         assert 'id="claude-connect"' in страница
         assert MCP in страница
-        assert claude_code_command(MCP) in страница
-        assert "Коннекторы" in страница
+        assert "Коннекторы" not in страница, "шаги подключения убраны (D476): адрес одной строкой"
         assert "мое-подключение" in страница
         assert "чужое-подключение" not in страница
 
 
 def test_без_oauth_блока_нет(monkeypatch: pytest.MonkeyPatch, память: ПамятьOAuth) -> None:
     for client in _стенд(monkeypatch, tenant="HQ", role="admin", oauth=False):
-        страница = client.get("/settings").get_data(as_text=True)
+        страница = client.get("/settings?tile=claude").get_data(as_text=True)
 
         assert 'id="claude-connect"' not in страница
         assert client.post("/settings/claude-revoke", headers={"Origin": СВОЙ}).status_code == 404

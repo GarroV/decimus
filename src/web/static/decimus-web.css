@@ -1946,16 +1946,6 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 
 /* Раздел «Рейтинги» — свои стили в decimus-rt.css, подключаются только его шаблонами (D354). */
 
-/* Низ панели (D470): тема, язык и кнопка настроек одной строкой, как в Swarm.
-   Капсулы здесь уже, чем в меню учётки: строка должна уместиться в 216px. */
-.sidenav__prefs .langpill__item { min-width: 28px; padding: 0 var(--space-3); }
-.sidenav__prefs .sidenav__theme button { width: 26px; }
-.sidenav__gear { display: inline-grid; place-items: center; width: 30px; height: 30px; flex: none; border: 1px solid var(--line-strong); border-radius: var(--r-pill); background: var(--surface); color: var(--ink-3); transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
-.sidenav__gear:hover { background: var(--surface-2); color: var(--ink); text-decoration: none; }
-.sidenav__gear:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
-.sidenav__gear.is-current { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.sidenav__gear svg { width: 15px; height: 15px; }
-
 /* Плашка «подключите вход в два шага» (D483): ссылка целиком, предупреждающий тон из .note--warn. */
 /* Способы второй ступени: без метки «ключ в этом браузере» (D485) сверху поле кода,
    ключ — запасной вариант ниже. Порядок в разметке не меняется. */
@@ -1987,4 +1977,52 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 @media (max-width: 520px) {
   .head-line { gap: var(--space-5); }
   .head-line__lead { flex: 1 1 100%; }
+}
+
+/* Левая колонка — один вид со Swarm (D478, D474): рейка `RoyRail`. Размеры
+   пунктов, шрифты, поиск и строка профиля уже совпадают (ядро `.sidenav`);
+   здесь — то, чего ядро не знает: черты между группами и низ панели. */
+
+/* Группы пунктов: тонкая черта, `mx-2.5 my-1.5` как в Swarm. */
+.sidenav__sep { height: 1px; margin: 6px var(--space-5); background: var(--line); flex: none; }
+
+/* Низ: капсула темы слева, значки справа, одним рядом (`px-2 py-2 gap-1`). */
+.sidenav__foot { flex-direction: row; align-items: center; gap: var(--space-2); padding: var(--space-4); }
+.sidenav__foot .sidenav__theme { margin: 0; padding: 2px; }
+.sidenav__tools { display: flex; align-items: center; gap: var(--space-1); margin-left: auto; }
+/* Значок 28px, радиус 7: язык и настройки одного вида. Активный — мягкий акцент. */
+.sidenav__tool { display: grid; place-items: center; width: 28px; height: 28px; flex: none; padding: 0; border: 0; border-radius: 7px; background: transparent; color: var(--ink-3); cursor: pointer; list-style: none; transition: background var(--t-state) var(--ease), color var(--t-state) var(--ease); }
+.sidenav__tool::-webkit-details-marker { display: none; }
+.sidenav__tool:hover { background: var(--surface); color: var(--ink); text-decoration: none; }
+.sidenav__tool:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
+.sidenav__tool.is-current, .langmenu[open] > .sidenav__tool { background: var(--accent-soft); color: var(--accent); }
+.sidenav__tool svg { width: 15px; height: 15px; }
+.sidenav__themecycle { display: none; border-radius: var(--r-pill); }
+.sidenav__themecycle [data-theme-icon] { display: none; }
+.sidenav__themecycle [data-theme-icon="system"] { display: grid; }
+html[data-theme-choice] .sidenav__themecycle [data-theme-icon] { display: none; }
+html[data-theme-choice="system"] .sidenav__themecycle [data-theme-icon="system"],
+html[data-theme-choice="light"] .sidenav__themecycle [data-theme-icon="light"],
+html[data-theme-choice="dark"] .sidenav__themecycle [data-theme-icon="dark"] { display: grid; }
+
+/* Меню языка: список из реестра языков, открывается вверх от значка. */
+.sidenav__foot { position: relative; }
+.langmenu__list { position: absolute; z-index: 60; left: var(--space-4); right: var(--space-4); bottom: calc(100% + 6px); width: auto; min-width: 0; max-height: 60vh; overflow-y: auto; margin: 0; padding: var(--space-3) 0; }
+.langmenu__item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-5); width: calc(100% - 2 * var(--space-3)); height: 32px; margin: 0 var(--space-3); padding: 0 var(--space-5); border: 0; border-radius: var(--r-control); background: transparent; color: var(--ink); font: inherit; font-size: var(--fs-dense); text-align: left; cursor: pointer; }
+.langmenu__item:hover { background: var(--surface-2); }
+.langmenu__item:focus-visible { outline: var(--focus-outline); outline-offset: -2px; }
+.langmenu__item.is-current { background: var(--accent-soft); color: var(--accent); font-weight: var(--w-semibold); cursor: default; }
+.langmenu__code { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+
+/* Свёрнутая панель (56px): одна кнопка темы по кругу, значки столбиком, как в Swarm. */
+@media (max-width: 1099px) {
+  .sidenav__sep { margin-left: 6px; margin-right: 6px; }
+  .sidenav__foot { flex-direction: column; align-items: stretch; gap: var(--space-1); padding: var(--space-4); }
+  .sidenav__foot .sidenav__theme { display: none; }
+  .sidenav__themecycle { display: grid; }
+  .sidenav__tools { flex-direction: column; align-items: stretch; margin-left: 0; gap: var(--space-1); }
+  .sidenav__tool { width: 100%; height: 34px; border-radius: var(--r-control); }
+  .sidenav__themecycle { border-radius: var(--r-pill); }
+  .sidenav__tool svg { width: 16px; height: 16px; }
+  .langmenu__list { right: auto; bottom: 0; left: calc(100% + 8px); width: 168px; }
 }

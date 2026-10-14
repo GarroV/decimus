@@ -136,6 +136,8 @@
 
         <div class="sidenav__list">
           {% for item in sections %}
+            {#- Группа пункта — поле реестра `sections.py` (D478): между группами тонкая черта. -#}
+            {% if not loop.first and loop.previtem.group != item.group %}<div class="sidenav__sep" role="separator"></div>{% endif %}
             {% set title = t('section.' ~ item.key ~ '.title') %}
             {% if item.path == current_path %}
               <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></span>
@@ -150,13 +152,18 @@
           {% endfor %}
         </div>
 
-        {# Низ панели, как в Swarm (D470): тема, язык и явная кнопка настроек одной
-           строкой. Блок учётки ниже — отдельно (D468). #}
+        {# Низ панели, как в Swarm (D470, D474): капсула темы и ряд одинаковых
+           квадратных значков — язык (меню со списком языков) и настройки. В узкой
+           панели капсула становится одной кнопкой по кругу, значки встают столбиком. #}
         <div class="sidenav__foot">
-          <div class="sidenav__prefs">
-            {{ theme_pick() }}
-            {% include "_langpick.html" %}
-            <a class="sidenav__gear{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
+          {{ theme_pick() }}
+          <button class="sidenav__tool sidenav__themecycle" type="button" data-theme-cycle
+                  title="{{ t('nav.theme') }}" aria-label="{{ t('nav.theme') }}">
+            {% for value, name in (('system', 'monitor'), ('light', 'sun'), ('dark', 'moon')) %}<span data-theme-icon="{{ value }}">{{ icon(name) }}</span>{% endfor %}
+          </button>
+          <div class="sidenav__tools">
+            {% include "_langmenu.html" %}
+            <a class="sidenav__tool{% if current_key == 'settings' %} is-current{% endif %}" href="{{ settings_url }}"
                title="{{ t('section.settings.title') }}" aria-label="{{ t('section.settings.title') }}"
                {% if current_key == 'settings' %}aria-current="page"{% endif %}>{{ icon('sliders') }}</a>
           </div>
