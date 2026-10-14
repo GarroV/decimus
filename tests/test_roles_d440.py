@@ -363,6 +363,7 @@ def test_загрузка_рейтингов(роль: str, можно: bool) ->
     "/settings/security/totp/confirm",
     "/settings/security/totp/remove",
     "/settings/security/backup/generate",
+    "/settings/security/prove",
 }
 
 

@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from collections.abc import Callable
 
 from flask import Flask, render_template, request
@@ -251,13 +252,16 @@ def _install_add_freeze(app: Flask, users_path: str) -> None:
         if круг is None:
             return forbidden()
         refuse_foreign_origin()
-        логин = (request.form.get("login") or "").strip()
         роль = request.form.get("role") or accounts.ROLE_AUDITOR
         пространство = canonical_tenant((request.form.get("tenant") or "").strip())
         почта = (request.form.get("email") or "").strip()
         if not access_policy.grantable_roles(круг, пространство):
             return forbidden()
         if почта and not people.EMAIL_SHAPE.match(почта):
+            return render(Show(add=True, flash=_flash("users.email.shape", ok=False)), 400)
+        # Логин не спрашиваем (D488): берётся из почты, имя подтянет Google при входе.
+        логин = (request.form.get("login") or "").strip() or login_from_email(почта)
+        if not логин:
             return render(Show(add=True, flash=_flash("users.email.shape", ok=False)), 400)
         try:
             if пространство not in accounts.spaces():
@@ -453,3 +457,10 @@ def _install_spaces(app: Flask, users_path: str) -> None:
             note_target_mismatch(exc)
             return render(_исход(код, "users.spaces.countries_failed", ok=False), 400)
         return render(_исход(код, "users.spaces.countries_added", ok=True))
+
+
+def login_from_email(email: str) -> str:
+    """Логин из почты: часть до @, строчная латиница, цифры, точка, дефис (D488)."""
+    имя = email.split("@", 1)[0].strip().lower()
+    имя = re.sub(r"[^a-z0-9._-]+", "-", имя).strip("._-")[:64]
+    return имя if len(имя) >= 2 else ""
