@@ -612,9 +612,9 @@ def _register_registry(app: Flask, conf: Settings) -> None:
         # обзоре: ссылкой на срез делятся. Буква и вид проверки — коды, и
         # сравниваются как коды; непонятное значение сужает выборку в пустоту,
         # но страницу не роняет.
-        # «Принятые» открываются текущим месяцем — последние, а не всё подряд
-        # (D466 сменил умолчание D404); «Всё время» — одной кнопкой.
-        период = registry_period.read(request.args, today=date.today())
+        # «Проверки» открываются всем временем (D487 вернул умолчание D404 поверх
+        # D466): месяц прятал проверки, и их искали; месяц — одной кнопкой.
+        период = registry_period.read(request.args, today=date.today(), default_all=True)
         registry_data = data.load_registry(
             reach=auth.current_reach(),
             limit=REGISTRY_LIMIT,
