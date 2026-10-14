@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from flask.testing import FlaskClient
@@ -19,8 +20,10 @@ from src.web import inspections as data
 АДРЕС = "/inspections/11111111-1111-1111-1111-111111111111?lang=ru"
 
 
-def _открыть(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, *, уК: bool) -> str:
-    деталь = карточка(шапка())
+def _открыть(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch, *, уК: bool, **поля_шапки: Any
+) -> str:
+    деталь = карточка(шапка(**поля_шапки))
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: деталь)
     monkeypatch.setattr(data, "load_moves", lambda *_a, **_k: ())
     monkeypatch.setattr(data, "load_units", lambda **_: (("u1", "Demo Pizzeria #1"),))
@@ -40,7 +43,7 @@ def test_админ_уК_видит_весь_ряд_и_форм_внизу_не�
     страница = _открыть(стенд, monkeypatch, уК=True)
 
     # Assert — кнопки в ряду, формы действий живут во всплывающих блоках.
-    for подпись in ("Экшн-план", "Предписание", "Исправить", "Отклонить проверку"):
+    for подпись in ("План", "Предписание", "Исправить", "Отклонить проверку"):
         assert f"<span>{подпись}</span>" in страница or f">{подпись}</a>" in страница, подпись
     assert "/actions/prescriptions/new?inspection=11111111" in страница
     assert 'action="/inspections/11111111-1111-1111-1111-111111111111/move' in страница
@@ -58,3 +61,49 @@ def test_гостю_управляющих_кнопок_нет(стенд: Flask
     for запретное in ("/retract", "/move", "/actions/prescriptions/new", "/actions/request"):
         assert запретное not in страница, запретное
     assert "Скачать PDF" in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_оценка_слева_у_названия_а_действия_подписаны(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Act
+    страница = _открыть(стенд, monkeypatch, уК=True)
+
+    # Assert — оценка раньше названия, в левом блоке шапки (D489).
+    assert 'class="head-line__lead"' in страница
+    assert страница.index('class="head-line__lead"') < страница.index('class="card__title"')
+    assert страница.index('class="grade ') < страница.index('class="card__title"')
+    # Короткие надписи, полное имя — в aria-label и в мгновенной подсказке.
+    for короткая in ("Письмо", "План", "Предписание"):
+        assert f"<span>{короткая}</span>" in страница, короткая
+    assert 'aria-label="Письмо партнёру" data-tip="Письмо партнёру"' in страница
+    assert 'title="Письмо партнёру"' not in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_принята_без_даты_объясняет_себя(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Act — проверка из времён до приёмки: accepted_at пуст.
+    страница = _открыть(стенд, monkeypatch, уК=True)
+
+    # Assert
+    assert 'data-tip="Принята — в истории сети"' in страница
+
+
+@pytest.mark.parametrize("стенд", ["admin"], indirect=True)
+def test_принята_с_датой_называет_кто_принял(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Act
+    страница = _открыть(
+        стенд,
+        monkeypatch,
+        уК=True,
+        accepted_at="2026-09-19T08:30:00+00:00",
+        accepted_by="Demo Lead",
+    )
+
+    # Assert
+    assert 'data-tip="Принята 2026-09-19 08:30 · Demo Lead"' in страница

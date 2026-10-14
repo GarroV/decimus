@@ -9,7 +9,7 @@
   `split.js` отправляет фоном, а ответ (`inspections/_panel_fragment.html`)
   подменяет содержимое панели. Без скрипта формы работают как раньше — страницей.
 #}
-{% from "inspections/_card_parts.html" import card_actions with context %}
+{% from "inspections/_card_parts.html" import card_actions, accept_badge, grade_reason, explain_block with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 
 {% macro inspection_panel(c) %}
@@ -17,15 +17,16 @@
   <article class="sdetail spanel" aria-labelledby="inspection-title" data-net-error="{{ t('registry.panel.net_error') }}">
     <header class="sdetail__head">
       <span class="grade grade--lg tag {{ c.grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
+      <b class="mono spanel__pct">{{ head.pct }}</b>
       <div class="sdetail__who">
         <h2 class="sdetail__title" id="inspection-title">{{ head.unit_name }}</h2>
         <p class="sdetail__hint">{{ head.inspection_date }} · {{ c.kind }}</p>
+        {{ grade_reason(c) }}
       </div>
       <div class="spanel__score">
-        <b class="mono">{{ head.pct }}</b>
         {% if head.retracted %}<span class="sbadge sbadge--err">{{ t('state.retracted') }}</span>
         {% elif head.on_review %}<span class="sbadge sbadge--warn">{{ t('state.review') }}</span>
-        {% else %}<span class="sbadge">{{ t('state.sealed') }}</span>{% endif %}
+        {% else %}{{ accept_badge(head, 'sbadge') }}{% endif %}
       </div>
       {{ card_actions(c, panel=True) }}
     </header>
@@ -55,6 +56,8 @@
       </dl>
       {% if head.is_legacy %}<p class="ssec__note">{{ t('card.legacy.title') }}</p>{% endif %}
     </section>
+
+    {{ explain_block(c) }}
 
     {{ card_body(c, panel=True) }}
   </article>

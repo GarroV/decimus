@@ -24,6 +24,7 @@ from collections.abc import Mapping
 from .errors import WebTextError
 from .texts_connections import CONNECTIONS_TEXTS
 from .texts_country import COUNTRY_TEXTS
+from .texts_grade import GRADE_TEXTS
 from .texts_home import HOME_TEXTS
 from .texts_journal import JOURNAL_TEXTS
 from .texts_master import MASTER_TEXTS
@@ -502,6 +503,10 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "The inspection was not accepted: {reason}",
     },
     "accept.meta": {"ru": "Принята {at} · {by}", "en": "Accepted {at} · {by}"},
+    "accept.legacy_hint": {
+        "ru": "Принята — в истории сети",
+        "en": "Accepted — in the network history",
+    },
     "review.sheet.title": {"ru": "Весь чек-лист", "en": "Full checklist"},
     "review.sheet.hint": {
         "ru": (
@@ -616,6 +621,9 @@ TEXTS: dict[str, dict[str, str]] = {
     "card.actions.label": {"ru": "Действия с проверкой", "en": "Inspection actions"},
     "card.act.move": {"ru": "Исправить", "en": "Correct"},
     "card.act.rx": {"ru": "Предписание", "en": "Compliance notice"},
+    "card.act.rx_short": {"ru": "Предписание", "en": "Notice"},
+    "card.act.letter": {"ru": "Письмо", "en": "Letter"},
+    "card.act.plan": {"ru": "План", "en": "Plan"},
     "card.zones.total": {"ru": "итого потеряно: {loss}", "en": "total lost: {loss}"},
     "card.zones.zeroed": {"ru": "обнулена", "en": "zeroed"},
     "card.findings.title": {"ru": "Записи проверки", "en": "Inspection findings"},
@@ -1625,6 +1633,7 @@ _ЧАСТИ = (
     OAUTH_TEXTS,
     CONNECTIONS_TEXTS,
     COUNTRY_TEXTS,
+    GRADE_TEXTS,
     JOURNAL_TEXTS,
     MASTER_TEXTS,
     MODEL_KEY_TEXTS,
@@ -1651,6 +1660,7 @@ TEXTS = {
     **TEXTS,
     **CONNECTIONS_TEXTS,
     **COUNTRY_TEXTS,
+    **GRADE_TEXTS,
     **HOME_TEXTS,
     **JOURNAL_TEXTS,
     **MASTER_TEXTS,

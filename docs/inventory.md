@@ -145,7 +145,7 @@
 | `/settings/security/totp/start` | POST | `security_totp_start` | `src/web/security_screen.py` |
 | `/settings/sign-ins` | GET | `settings_signins` | `src/web/journal_screen.py` |
 | `/settings/sign-out-everywhere` | POST | `settings_sign_out_everywhere` | `src/web/settings_screen.py` |
-| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
+| `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk_proxy.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_proxy.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk_proxy.py` |
@@ -179,7 +179,7 @@
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
-| `/static/<path:filename>` | GET | `static` | `.venv/lib/python3.12/site-packages/flask/app.py` |
+| `/static/<path:filename>` | GET | `static` | (библиотека) |
 | `/tg/walk` | GET | `walk_page` | `src/web/walk.py` |
 | `/tg/walk/app` | POST | `walk_app` | `src/web/walk_settings.py` |
 | `/tg/walk/data` | POST | `walk_data` | `src/web/walk.py` |
