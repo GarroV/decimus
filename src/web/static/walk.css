@@ -747,3 +747,38 @@
   .walk-cl__caret,
   .walk-toast { transition: none; }
 }
+
+/* «Ещё не смотрели» (#837): тот же вид, что у чек-листа зоны; формулировка — не длиннее двух строк */
+
+.walk-cl--unseen { margin-bottom: 10px; }
+
+.walk-cl__text--short {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.walk-unseen__info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 6px 14px 8px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+.walk-unseen__link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.walk-cl--unseen .walk-cl__head:focus-visible,
+.walk-unseen__link:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

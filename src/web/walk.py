@@ -55,6 +55,7 @@ from . import (
     walk_start,
     walk_suggest,
     walk_translate,
+    walk_unseen,
     walk_write,
 )
 from .errors import WebTextError
@@ -157,6 +158,7 @@ def build_walk(
     нет, не теряется — она добавляется в конец под своим кодом.
     """
     found = previous.found
+    catalogue = list(items)
     again = {(f.code, f.zone) for f in inspection.findings if f.level not in NON_DEDUCTING}
     by_zone: dict[str, dict[str, Any]] = {}
     for zone in zones:
@@ -165,6 +167,7 @@ def build_walk(
             "title": zone.title(lang),
             "recorded": [],
             "previous": [],
+            **walk_unseen.unseen_in_zone(zone.code, catalogue, inspection.findings, lang=lang),
         }
 
     def slot(code: str) -> dict[str, Any]:
@@ -209,7 +212,7 @@ def build_walk(
         ),
         "previous_unavailable": previous.unavailable,
         "zones": list(by_zone.values()),
-        "items": _catalogue(items, lang),
+        "items": _catalogue(catalogue, lang),
         "info": info or [],
     }
 

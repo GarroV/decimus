@@ -534,6 +534,8 @@
     } else if (!zone.previous.length && writable()) {
       if (zoneDone(zone)) stage.appendChild(el("p", "walk-stage__note", tx("walk.zone.clean_done")));
     }
+    var unseen = W.unseenBlock(zone, writable());
+    if (unseen) stage.appendChild(unseen);
     var list = renderChecklist(zone);
     if (list) stage.appendChild(list);
 
