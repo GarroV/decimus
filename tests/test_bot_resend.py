@@ -27,14 +27,13 @@ from src.bot.routers.resend import RESEND_COMMAND
 from src.bot.texts import TEXTS, UI_LANGS, t
 from src.domain import add_finding, get_state, start_inspection
 
-pytestmark = pytest.mark.asyncio
-
 SETTINGS = BotSettings(token="unused-in-tests", allowed_ids=frozenset({AUDITOR_ID}), mode="polling")
 
 #: Имя команды строкой: аудитор набирает именно её.
 COMMAND = "/resend"
 
 
+@pytest.mark.asyncio
 async def test_без_проверки_говорит_что_присылать_нечего(domain_env: object) -> None:
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
@@ -44,6 +43,7 @@ async def test_без_проверки_говорит_что_присылать_
     assert session.texts == [t("resend.no_inspection", "ru")], session.texts
 
 
+@pytest.mark.asyncio
 async def test_проверка_остаётся_нетронутой(domain_env: object) -> None:
     """Пересборка отчёта — чтение: записи после неё те же, что были."""
     start_inspection(CHAT_ID, "Белград 2", "planned", "ru")
@@ -59,6 +59,7 @@ async def test_проверка_остаётся_нетронутой(domain_env
     assert состояние.findings[0].zone == "fridge"
 
 
+@pytest.mark.asyncio
 async def test_команда_объявлена_в_меню() -> None:
     bot, session = make_bot()
 
