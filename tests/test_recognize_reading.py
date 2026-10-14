@@ -17,7 +17,7 @@ def _record(reading: object) -> dict[str, Any]:
     return {
         "item": "CLN05:D1",
         "zone": "hot_kitchen",
-        "wording": "Температура выше нормы.",
+        "wording": "Про градусы.",
         "reason": "термометр на кадре",
         "confidence": 0.9,
         "reading_c": reading,

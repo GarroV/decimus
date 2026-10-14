@@ -104,7 +104,7 @@ async def test_показание_стоит_отдельной_строкой_�
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     начата()
-    stub_model(monkeypatch, с_показанием(26.0, "Температура выше нормы"))
+    stub_model(monkeypatch, с_показанием(26.0, "Про градусы"))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
 
@@ -136,7 +136,7 @@ async def test_исправленная_температура_пересчит�
     начата()
     calls = stub_model(
         monkeypatch,
-        с_показанием(26.0, "Температура выше нормы"),
+        с_показанием(26.0, "Про градусы"),
         с_показанием(6.0, "Температура в норме"),
     )
     bot, session = make_bot()
@@ -177,7 +177,7 @@ async def test_при_исправленной_температуре_наруш
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     начата()
-    stub_model(monkeypatch, с_показанием(26.0, "Температура выше нормы"), suggestion())
+    stub_model(monkeypatch, с_показанием(26.0, "Про градусы"), suggestion())
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     await feed(dp, bot, photo_message("frame-1", caption=WORDS))
@@ -195,7 +195,7 @@ async def test_не_число_спрашивается_снова_без_зап
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     начата()
-    calls = stub_model(monkeypatch, с_показанием(26.0, "Температура выше нормы"))
+    calls = stub_model(monkeypatch, с_показанием(26.0, "Про градусы"))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     await feed(dp, bot, photo_message("frame-1", caption=WORDS))
@@ -213,7 +213,7 @@ async def test_модель_недоступна_прежнее_предложе
 ) -> None:
     начата()
     stub_model(
-        monkeypatch, с_показанием(26.0, "Температура выше нормы"), ModelUnavailable("нет сети")
+        monkeypatch, с_показанием(26.0, "Про градусы"), ModelUnavailable("нет сети")
     )
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
@@ -235,7 +235,7 @@ async def test_кадр_вместо_числа_снимает_вопрос_и_�
     начата()
     stub_model(
         monkeypatch,
-        с_показанием(26.0, "Температура выше нормы"),
+        с_показанием(26.0, "Про градусы"),
         с_показанием(None, "Нагар на поду"),
     )
     bot, session = make_bot()

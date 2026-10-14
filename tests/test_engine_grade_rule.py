@@ -51,7 +51,7 @@ CFG: dict[str, Any] = {
 }
 
 ЗОНЫ = [
-    {"code": "hot_kitchen", "name_ru": "Горячий цех", "name_en": "Hot kitchen", "share_pct": 10.0},
+    {"code": "hot_kitchen", "name_ru": "Цех Альфа", "name_en": "Alpha shop", "share_pct": 10.0},
     {"code": "dining", "name_ru": "Зал", "name_en": "Dining room", "share_pct": 10.0},
     {"code": "fridge", "name_ru": "Холодильная", "name_en": "Fridge", "share_pct": 10.0},
 ]
