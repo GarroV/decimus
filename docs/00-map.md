@@ -205,8 +205,10 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
+| `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
+| `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
 | `src/web/texts_master.py` | Тексты метки «главный чек-лист» и шапки «Методики» (D440) |
 | `src/web/texts_oauth.py` | Тексты подключения Claude входом через сайт (D417): согласие, отказ, блок в «Настройках» |
 | `src/web/texts_plans.py` | Тексты экшн-планов (волна 2): раздел УК, раздел партнёра, блоки страны и карточки |
@@ -214,6 +216,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_ratings.py` | Тексты раздела «Рейтинги» и подраздела «Загрузки» (спека 2026-10-08) |
 | `src/web/texts_refusals.py` | Тексты отказов раздела «Методика»: хранилище методики и формы экрана (#475) |
 | `src/web/texts_registry.py` | Тексты раздела «Проверки» в раскладке «список слева, карточка справа» |
+| `src/web/texts_second_factor.py` | Тексты второй ступени входа (D463): «Подтвердите вход» и «Вход и защита» |
 | `src/web/texts_settings.py` | Тексты экрана «Настройки» (D447): подключения, Google, язык, пароль |
 | `src/web/texts_units.py` | Тексты заведения пиццерии из веб-админки (#437, D233, D240) |
 | `src/web/texts_users.py` | Тексты экрана «Пользователи» вместе с карточкой человека (#585, переделка экрана) |
@@ -254,18 +257,19 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/templates -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/templates/` | 18 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, _plan.html, … (+10) |
+| `src/web/templates/` | 19 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _pick_page.html, _pick_ui.html, _plan.html, … (+11) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
 | `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
+| `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
 | `src/web/templates/oauth/` | 2 | consent.html, refused.html |
 | `src/web/templates/overview/` | 1 | index.html |
 | `src/web/templates/plans/` | 1 | index.html |
 | `src/web/templates/prescriptions/` | 3 | card.html, index.html, not_found.html |
 | `src/web/templates/ratings/` | 3 | coverage.html, imports.html, index.html |
-| `src/web/templates/settings/` | 3 | confirm.html, continue.html, index.html |
+| `src/web/templates/settings/` | 4 | confirm.html, continue.html, index.html, security.html |
 | `src/web/templates/units/` | 3 | _profile.html, card.html, new.html |
 | `src/web/templates/users/` | 7 | _card.html, _connections.html, _spaces.html, _tabs.html, connections.html, forbidden.html, index.html |
 <!-- map:end -->
@@ -273,7 +277,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 47 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-period.css, decimus-pick.css, decimus-registry.css, … (+39) |
+| `src/web/static/` | 49 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-pick.css, … (+41) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
@@ -436,6 +440,9 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0064_ratings_sheet.sql` | Общая таблица контроля «база рейтингов» как источник РС и РКО (D464, docs/15-ratings.md) |
 | `0065_web_own_google_profile.sql` | Имя и фото из Google в блоке учётки (D468) |
 | `0066_move_with_action_plan.sql` | Перенос проверки в пиццерию другой страны не оставляет по ней экшн-план (приватный advisory GHSA-wqh3-3qcr-cccp) |
+| `0067_journals.sql` | Два журнала на случай взлома учётки (D462, шаг 2): «кто и откуда входил» и «что делали админы» |
+| `0068_second_factor.sql` | Вторая ступень входа (D463): ключ доступа (passkey, Touch ID), код из приложения- аутентификатора (TOTP, RFC 6238) и одноразовые резервные коды |
+| `0069_passkey_login.sql` | Вход ключом идёт с формы входа, до того как известно, кто пришёл: вызов выдаётся браузеру без учётки (ключ находится по номеру, а не по логину) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер
@@ -534,7 +541,7 @@ JSON-RPC поверх одного POST на локальной петле, ли
 | `src/bot/stops.py` | Отказы, которые останавливают мастер проверки: журнал и счётчик (#436) |
 | `src/bot/texts.py` | Тексты интерфейса бота: каталог по ключам, язык — параметр |
 | `src/bot/unit_pick.py` | Пиццерия проверки — из справочника, а не из написанного (D196) |
-| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) |
+| `src/bot/upload_sweeper.py` | Уборка брошенных кадров мини-аппа по расписанию (F-033, #531) и старых записей журналов |
 | `src/bot/version.py` | Версия сборки: чем именно отвечает этот процесс (T246, #201) |
 | `src/bot/view.py` | Из чего складываются строки, которые аудитор читает в чате |
 | `src/bot/zones.py` | Зона из слов аудитора (задача T124, решения D047 и D048, правило 6) |
@@ -634,6 +641,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/bot_checklists.py` | Чек-листы, по которым аудитор может начать проверку в боте (волна 3, D221) |
 | `src/domain/checklist.py` | Чтение методики: пункты чек-листа, зоны, допустимые классы, версия набора |
 | `src/domain/checklist_store.py` | Раскладка хранилища методик — та её часть, которую читает бот (#455) |
+| `src/domain/client_ip.py` | Чей это адрес у сервера MCP: клиент за общим прокси (D462, журнал действий) |
 | `src/domain/config.py` | Окружение блока: где лежит методика, где состояние, где движок |
 | `src/domain/edition.py` | Издание методики, на котором идёт проверка, и его снимок рядом с состоянием |
 | `src/domain/engine.py` | Вызов движка подпроцессом — единственный способ, которым блок его трогает |
@@ -643,6 +651,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/handover.py` | Сдана ли проверка: признак, который ставит бот, а читают и бот, и мини-апп (D080, D312) |
 | `src/domain/info.py` | Информационные поля проверки — блок `info` состояния (T158, решения D069, D070) |
 | `src/domain/info_fields.py` | Состав информационной части проверки: какие поля и каким способом вводятся (T158, D312) |
+| `src/domain/journal.py` | Что и как попадает в журналы входов и действий (D462, `0067`) |
 | `src/domain/kinds.py` | Вид проверки: код — сущность, слово — перевод (T152, задача #123) |
 | `src/domain/log_ids.py` | Идентификаторы людей и пространств в журнале — меткой, а не как есть (F-015) |
 | `src/domain/models.py` | Типы предметной области, которыми блок разговаривает с остальными |
@@ -651,6 +660,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/domain/report_langs.py` | Языки отчёта по странам (D415): перечень — данные, а не код |
 | `src/domain/route.py` | Маршрут обхода: в каком порядке аудитор идёт по зонам и по пунктам внутри них |
 | `src/domain/scoring.py` | Оценка проверки |
+| `src/domain/second_factor.py` | Вторая ступень входа (D463): правила без базы и без веба |
 | `src/domain/shape.py` | Оценочная форма издания: чем считали, а не что написано (T349, #337) |
 | `src/domain/state.py` | Состояние проверки: чтение, старт и собственные поля блока |
 | `src/domain/tenants.py` | Код тенанта управляющей компании и перевод старого кода (D234, #439) |
@@ -705,6 +715,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/engine.py` | Вызов `engine/report.py` подпроцессом — единственный способ собрать отчёт |
 | `src/report/engine_call.py` | Общее для тех, кто зовёт движок подпроцессом: где он лежит, сколько ждать, что печатать |
 | `src/report/errors.py` | Отказы блока `report` |
+| `src/report/explain.py` | Почему оценка такая — ответ движка по записанной проверке (D490) |
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |
@@ -751,6 +762,7 @@ Telegram, ни HTTP, ни SQL.
 | `tools/oauth_smoke.py` | Сквозной прогон подключения Claude входом через сайт (D417) против живого стенда |
 | `tools/porcha_permissions.py` | Порча матрицы прав (D408): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_ratings.py` | Порча защит рейтингов: каждая сломанная защита обязана уронить свой тест |
+| `tools/porcha_second_factor.py` | Порча второй ступени входа (D463): каждая сломанная защита обязана уронить свой тест |
 | `tools/porcha_walk.py` | Порча защит мини-аппа обхода (D312): каждая сломанная защита обязана уронить свой тест |
 | `tools/pre-push-guard.sh` | Сторож пуша: не пускает наружу значения из приватного списка |
 | `tools/process_hint_measure.py` | T166 (D077): сколько раз признак «<описание>, это <процесс>» срабатывает зря |
@@ -795,7 +807,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 4 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc |
+| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 
