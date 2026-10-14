@@ -112,7 +112,7 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
@@ -123,6 +123,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
 | `src/web/geo_names.py` | Названия стран и городов для людей — по коду из справочника точек |
 | `src/web/google_mail.py` | Черновик письма партнёру в почте вошедшего (D174, D176, #332) |
+| `src/web/grade_explain.py` | «Почему такая буква» и «расшифровка» для карточки проверки (D490) |
 | `src/web/home_board.py` | Задания карточки «Требует внимания» на «Главной» (D378, D398): стикеры по живым счётчикам |
 | `src/web/home_page.py` | Экран «Главная» (D378): по образцу новой главной Swarm Brain |
 | `src/web/home_ratings.py` | Блоки «Стандарты · РС» и «Клиентский опыт · РКО» на «Главной» (D378) |
@@ -211,6 +212,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/texts_app.py` | Тексты мини-аппа как приложения аудитора (D373): главная и настройки |
 | `src/web/texts_connections.py` | Тексты вкладки «Подключения» экрана «Пользователи» (D425, #568) |
 | `src/web/texts_country.py` | Тексты экрана «Страна» (D467): шапка, сегменты, плитки, таблица пиццерий, панель |
+| `src/web/texts_grade.py` | Тексты «почему такая буква» и «расшифровка оценки» на карточке проверки (D490) |
 | `src/web/texts_hints.py` | Тексты подсказок и обучения мини-аппа (D444) |
 | `src/web/texts_home.py` | Тексты «Главной» (D378, D398, D418, D471): внимание, проверки, «Рейтинги», фильтры |
 | `src/web/texts_journal.py` | Тексты журналов входов и действий (D462): подписи действий и экран «Журнал» |
@@ -722,6 +724,7 @@ Telegram, ни HTTP, ни SQL.
 | `src/report/engine.py` | Вызов `engine/report.py` подпроцессом — единственный способ собрать отчёт |
 | `src/report/engine_call.py` | Общее для тех, кто зовёт движок подпроцессом: где он лежит, сколько ждать, что печатать |
 | `src/report/errors.py` | Отказы блока `report` |
+| `src/report/explain.py` | Почему оценка такая — ответ движка по записанной проверке (D490) |
 | `src/report/info_titles.py` | Подписи полей информационной части — формулировки вопросов по кодам |
 | `src/report/letters.py` | Письмо партнёру по уже записанной проверке — пересборка, а не пересчёт |
 | `src/report/photos.py` | Где взять кадр, приложенный к записи или к информационному полю, и что считать его пропажей |

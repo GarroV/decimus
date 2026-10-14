@@ -1682,6 +1682,12 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .mx-more > summary::-webkit-details-marker { display: none; }
 .mx-more > summary::before { content: "▸ "; color: var(--ink-3); }
 .mx-more[open] > summary::before { content: "▾ "; }
+/* «Расшифровка» оценки в карточке проверки (D490): свёрнута, строки — столбиком. */
+.mx-more--explain { margin: var(--space-5) var(--space-7) var(--space-6); }
+.grade-reason { margin-top: var(--space-2); }
+.explain { margin: var(--space-4) 0 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); font-size: var(--fs-meta); }
+.explain li:last-child { font-weight: 600; }
+.explain__note { margin: var(--space-3) 0 0; font-size: var(--fs-meta); }
 /* Справка «ключ — значение» (сборка чек-листа в карточке проверки, D218). */
 .kv { display: grid; gap: var(--space-2); margin: 0; font-size: var(--fs-meta); }
 .kv > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: var(--space-3); }
