@@ -9,7 +9,7 @@
   записаны, а подписи вокруг — на языке интерфейса. Это разные языки, и
   смешивать их нельзя (`CLAUDE.md`).
 #}{% extends "base.html" %}
-{% from "inspections/_card_parts.html" import card_actions with context %}
+{% from "inspections/_card_parts.html" import card_actions, accept_badge with context %}
 {% from "inspections/_card_body.html" import card_body with context %}
 {% block title %}{{ head.unit_name }}{% endblock %}
 
@@ -64,10 +64,13 @@
 
   <div class="card mt-gap">
     <div class="card__head head-line">
-      <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
-      <div class="head-line__score">
-        <span class="num num--hero">{{ head.pct }}</span>
-        <span class="muted">{{ t('card.score.unit') }}</span>
+      {# Оценка — слева, вплотную к названию пиццерии (владелец 14.10.2026, D489). #}
+      <div class="head-line__lead">
+        <span class="grade grade--lg tag {{ grade_tone(head.grade) }}">{{ head.grade or '—' }}</span>
+        <div class="head-line__score">
+          <span class="num num--hero">{{ head.pct }}</span>
+          <span class="muted">{{ t('card.score.unit') }}</span>
+        </div>
       </div>
       <div class="head-line__grow">
         <div class="card__title">{{ head.unit_name }}</div>
@@ -83,10 +86,7 @@
       {% elif head.on_review %}
         <span class="tag tag--warn tag--micro">{{ t('state.review') }}</span>
       {% else %}
-        <span class="tag tag--neutral tag--micro"
-              {% if head.accepted_at %}title="{{ t('accept.meta', at=head.accepted_at[:16].replace('T', ' '), by=head.accepted_by) }}"{% endif %}>
-          {{ t('state.sealed') }}
-        </span>
+        {{ accept_badge(head) }}
       {% endif %}
       {# Действия — маленькими кнопками в шапке (D401), и только здесь. #}
       {{ card_actions(c) }}

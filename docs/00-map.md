@@ -813,7 +813,7 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 4 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc |
+| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 
