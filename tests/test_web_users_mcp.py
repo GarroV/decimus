@@ -116,7 +116,7 @@ def test_учётка_выпуска_только_из_сессии(админ_�
 def test_команда_показана_один_раз(админ_уК: FlaskClient, токены: dict[str, Any]) -> None:
     админ_уК.post("/settings/claude-token", headers=ЗАГОЛОВКИ)
 
-    потом = админ_уК.get("/settings").get_data(as_text=True)
+    потом = админ_уК.get("/settings?tile=claude").get_data(as_text=True)
 
     assert "tok-SECRET" not in потом, "команда с токеном осталась на странице"
     assert "2026-11-11" in потом, "срок живого токена не показан"
