@@ -48,15 +48,16 @@ import logging
 import os
 import threading
 from collections.abc import Iterator
-from contextlib import contextmanager
-from dataclasses import dataclass
+from contextlib import AbstractContextManager, contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import Any
 
 import psycopg
 from psycopg_pool import ConnectionPool, PoolTimeout
 
 from .errors import DbError
-from .space import apply_space
+from .space import apply_space, current_space
 
 log = logging.getLogger(__name__)
 
@@ -188,6 +189,93 @@ def _pool_for(dsn: str, max_size: int) -> ConnectionPool[Any]:
     return pool
 
 
+@dataclass
+class _Held:
+    """Соединение, взятое на весь запрос страницы (`shared_connections`)."""
+
+    conn: psycopg.Connection[Any]
+    lease: AbstractContextManager[psycopg.Connection[Any]]
+    #: Пространство, переданное соединению; `None` — не передавалось.
+    space: str | None = None
+    busy: bool = field(default=False)
+
+
+#: Соединения запроса по DSN; `None` — запрос их не делит (#732).
+_SHARED: ContextVar[dict[str, _Held] | None] = ContextVar("decimus_shared_db", default=None)
+
+
+@contextmanager
+def shared_connections() -> Iterator[None]:
+    """На время блока соединение каждого DSN берётся из пула один раз (#732).
+
+    Страница «Обзор» делала 22 чтения, и каждое платило выдачей из пула:
+    проверка соединения, передача пространства, а на возврате сброс и commit —
+    около 7 мс на чтение, треть серверного времени страницы (замер 14.10.2026).
+    Внутри блока чтения идут одним соединением, а в пул оно возвращается (со
+    сбросом) один раз, на выходе.
+
+    Семантика каждого `with connection()` прежняя: чистый выход — `commit`,
+    исключение — `rollback`. Вложенный блок (соединение уже занято) и блок с
+    ДРУГИМ пространством получают отдельное соединение, как без этого режима.
+    """
+    if _settings().max_size == 0 or _SHARED.get() is not None:
+        yield
+        return
+    held: dict[str, _Held] = {}
+    метка = _SHARED.set(held)
+    try:
+        yield
+    finally:
+        _SHARED.reset(метка)
+        for h in held.values():
+            h.lease.__exit__(None, None, None)
+
+
+def _lease(dsn: str, max_size: int, timeout: float) -> _Held:
+    lease = _pool_for(dsn, max_size).connection(timeout=timeout)
+    try:
+        conn = lease.__enter__()
+    except PoolTimeout as exc:
+        raise PoolBusyError(
+            f"База не отдала соединение за {timeout:g} с (занята или пул мал)"
+        ) from exc
+    return _Held(conn=conn, lease=lease)
+
+
+def _reusable(h: _Held, space: str | None) -> bool:
+    """Можно ли отдать удержанное соединение этому блоку."""
+    if h.busy or h.conn.closed:
+        return False
+    if h.conn.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
+        return False
+    # Пространство только ставится, не снимается: соединение с чужим
+    # пространством этому блоку не годится — он получит своё из пула.
+    return h.space is None or h.space == space
+
+
+@contextmanager
+def _shared(held: dict[str, _Held], dsn: str, h: _Held) -> Iterator[psycopg.Connection[Any]]:
+    space = current_space()
+    if h.space != space and space is not None:
+        apply_space(h.conn)
+        h.space = space
+    h.busy = True
+    try:
+        yield h.conn
+    except BaseException as exc:
+        try:
+            h.conn.rollback()
+        except psycopg.Error:
+            # Соединение сломано: в пул — как сломанное, запросу — больше не отдавать.
+            held.pop(dsn, None)
+            h.lease.__exit__(type(exc), exc, exc.__traceback__)
+        raise
+    else:
+        h.conn.commit()
+    finally:
+        h.busy = False
+
+
 @contextmanager
 def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
     """Соединение на время блока: из пула, а при `DB_POOL_MAX=0` — своё."""
@@ -199,6 +287,15 @@ def connection(dsn: str) -> Iterator[psycopg.Connection[Any]]:
             yield conn
         return
     timeout = cfg.timeout_s
+    held = _SHARED.get()
+    if held is not None:
+        h = held.get(dsn)
+        if h is None:
+            h = held[dsn] = _lease(dsn, max_size, timeout)
+        if _reusable(h, current_space()):
+            with _shared(held, dsn, h) as conn:
+                yield conn
+            return
     try:
         with _pool_for(dsn, max_size).connection(timeout=timeout) as conn:
             apply_space(conn)
