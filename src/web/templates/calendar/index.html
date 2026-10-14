@@ -1,14 +1,24 @@
 {#
-  «Календарь» (D466). Вопрос экрана — «где пора проверить». Пока в нём один блок,
-  «Где нужно проверить» (D399, D418; раньше стоял на «Проверках»): точки охвата
-  без проверок за выбранный период (`to_inspect.py`). Период — один на экран:
-  «с — по» со стрелками ← →, по умолчанию текущий месяц (`registry_period.py`).
-  Пусто — одна тихая строка; отказ базы — строка с ошибкой. Каркас — общий
-  `_split_page.html` без панели: выбирать тут нечего.
+  «Календарь» (D466, D477) — раздел самого календаря для планирования
+  командировок и поездок: месяц сеткой Пн–Вс, в днях — проверки, проведённые в
+  этот день (пиццерия + буква, тон по букве; ждущая приёмки — пунктиром и словом
+  «на приёмке»). Клик по проверке открывает её в реестре, «+N» — день как период
+  реестра. Данные те же, что у реестра «Проверок» (`calendar_grid.py`).
+
+  Период — одна кнопка-пилюля с меню (`_period.html`, `arrows=False`: стрелок ← →
+  у календаря нет), по умолчанию текущий месяц; период шире месяца — несколько
+  сеток подряд, у каждой заголовок. Страна — как на «Проверках». Клетка дня
+  фиксированной высоты, лишнее прокручивается внутри; на телефоне сетка — список
+  дней с проверками, пустые не показываются (`decimus-calendar.css`).
+
+  Список «Где нужно проверить» (D399, D418) скрыт (D477: не удалён): блок ниже
+  рисуется, только если обработчик включил `SHOW_TO_CHECK`. Каркас — общий
+  `_split_page.html` без панели.
 #}{% extends "_split_page.html" %}
 {% from "_period.html" import period_picker with context %}
+{% from "_pick.html" import pick with context %}
 {% block title %}{{ t('section.calendar.title') }}{% endblock %}
-{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}">{% endblock %}
+{% block split_assets %}<link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-registry.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='decimus-calendar.css') }}">{% endblock %}
 
 {% block split_top %}
   <header class="shead">
@@ -16,19 +26,56 @@
       <h1 class="shead__title">{{ t('section.calendar.title') }}</h1>
       <p class="shead__sub">
         {{ period_title }}
-        {%- if to_check.shown and not to_check.failed %} · {{ t('registry.tocheck.title') }}: {{ to_check.total }}{% endif %}
+        {%- if show_to_check and to_check.shown and not to_check.failed %} · {{ t('registry.tocheck.title') }}: {{ to_check.total }}{% endif %}
       </p>
     </div>
   </header>
 {% endblock %}
 
 {% block split_list %}
+  {% set weekdays = t('registry.weekdays').split(' ') %}
   <div class="sbox">
     <div class="sbar sbar--registry">
-      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
-                       period_hidden) }}
+      {{ period_picker(period, period_title, none, none, period_quick, url(current_path),
+                       period_hidden, arrows=False) }}
+      {% if pick_country %}{{ pick(pick_country) }}{% endif %}
     </div>
 
+    <div class="cal">
+      {% for month in months %}
+        <section class="cal__month" aria-label="{{ month_title(month.first) }}">
+          <h2 class="cal__title">{{ month_title(month.first) }}<span class="sbadge">{{ month.count }}</span></h2>
+          <div class="cal__wds" aria-hidden="true">{% for wd in weekdays %}<span>{{ wd }}</span>{% endfor %}</div>
+          <div class="cal__grid">
+            {% for week in month.weeks %}{% for d in week %}
+              <div class="cal__day{% if not d.in_month %} is-out{% endif %}{% if not d.in_period %} is-off{% endif %}{% if d.is_today %} is-today{% endif %}{% if not d.total %} is-empty{% endif %}"{% if d.is_today %} aria-current="date"{% endif %}>
+                <div class="cal__head"><span class="cal__num">{{ d.day.day }}</span><span class="cal__wd">{{ weekdays[d.day.weekday()] }}</span>
+                  {%- if d.more %}<a class="cal__more" href="{{ day_link(d.day) }}" title="{{ t('section.registry.title') }}">{{ t('calendar.day.more', count=d.more) }}</a>{% endif %}</div>
+                {% if d.chips %}
+                  <ul class="cal__list">
+                    {% for c in d.chips %}
+                      <li>
+                        <a class="cal__chip{% if c.on_review %} is-review{% endif %}"
+                           href="{{ day_link(d.day, inspection=c.id) }}"
+                           title="{{ c.unit }} · {{ c.grade or '—' }} {{ c.pct }}%{% if c.on_review %} · {{ t('calendar.chip.review') }}{% endif %}">
+                          <span class="tag {{ grade_tone(c.grade) }}{% if c.on_review %} tag--dashed{% endif %} cal__grade">{{ c.grade or '—' }}</span>
+                          <span class="cal__unit">{{ c.unit }}</span>
+                          {% if c.on_review %}<small class="cal__rev">{{ t('calendar.chip.review') }}</small>{% endif %}
+                        </a>
+                      </li>
+                    {% endfor %}
+                  </ul>
+                {% endif %}
+              </div>
+            {% endfor %}{% endfor %}
+          </div>
+          {% if not month.count %}<p class="slist__note cal__none">{{ t('calendar.month.empty') }}</p>{% endif %}
+        </section>
+      {% endfor %}
+    </div>
+
+    {# D477: скрыт, не удалён. #}
+    {% if show_to_check %}
     <div class="slist slist--tocheck">
       <div class="slist__group">
         <span>{{ t('registry.tocheck.title') }}</span>{% if to_check.shown and not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
@@ -53,5 +100,6 @@
         {% if to_check.more %}<p class="slist__note">{{ t('registry.tocheck.more', count=to_check.more) }}</p>{% endif %}
       {% endif %}
     </div>
+    {% endif %}
   </div>
 {% endblock %}

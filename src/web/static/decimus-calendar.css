@@ -1,0 +1,47 @@
+/* «Календарь» (D477): месяц сеткой Пн–Вс, в днях — проверки. Свой файл экрана:
+   `dodo-ds.css` и `decimus-domain.css` — копии `forma`, правятся только там.
+   Клетка дня фиксированной высоты, лишнее прокручивается внутри, чтобы экран
+   не вырастал в «стену». На телефоне сетка — список дней с проверками. */
+
+.cal { display: grid; gap: var(--space-7); padding: var(--space-5) var(--space-7) var(--space-7); }
+.cal__title { display: flex; align-items: center; gap: var(--space-3); margin: 0 0 var(--space-3);
+  font-size: 15px; font-weight: var(--w-semibold); color: var(--ink); }
+.cal__wds, .cal__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cal__wds span { padding: 0 var(--space-3) var(--space-2); font-size: 11px; font-weight: var(--w-semibold); color: var(--ink-3); }
+.cal__grid { border-top: 1px solid var(--line); border-left: 1px solid var(--line); border-radius: var(--r-control) 0 0 0; }
+.cal__day { display: flex; flex-direction: column; gap: 2px; height: 132px; min-width: 0; padding: var(--space-2);
+  overflow-y: auto; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface); }
+.cal__day.is-out { background: var(--surface-2); }
+.cal__day.is-out > *, .cal__day.is-off .cal__num { opacity: .45; }
+.cal__day.is-out > .cal__head { visibility: hidden; }
+.cal__head { display: flex; align-items: baseline; gap: var(--space-2); }
+.cal__num { font-size: 12px; font-weight: var(--w-semibold); color: var(--ink-2); }
+.cal__wd { display: none; font-size: 12px; color: var(--ink-3); }
+.cal__day.is-today { box-shadow: inset 0 0 0 2px var(--accent); }
+.cal__day.is-today .cal__num { display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px;
+  padding: 0 var(--space-2); border-radius: var(--r-pill); background: var(--accent); color: var(--ink-inverse); }
+.cal__list { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.cal__chip { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-2); min-width: 0; padding: 2px var(--space-2);
+  border: 1px solid var(--line-control); border-radius: var(--r-control); background: var(--surface-2);
+  font-size: 11.5px; line-height: 1.3; color: var(--ink); }
+.cal__chip:hover { background: var(--accent-soft); border-color: var(--accent-line); text-decoration: none; }
+.cal__chip.is-review { border-style: dashed; background: transparent; }
+.cal__grade { flex: none; min-width: 16px; justify-content: center; }
+.cal__unit { flex: 1 1 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cal__rev { flex-basis: 100%; font-size: 10.5px; color: var(--warn-ink); }
+.cal__more { margin-left: auto; padding: 0 var(--space-2); font-size: 11.5px; font-weight: var(--w-semibold); color: var(--accent); }
+.cal__none { display: none; margin: var(--space-3) 0 0; }
+
+/* ── телефон: список дней с проверками, пустые не показываются ── */
+@media (max-width: 719px) {
+  .cal { gap: var(--space-5); padding: var(--space-4); }
+  .cal__wds { display: none; }
+  .cal__grid { display: block; border-left: 0; border-radius: 0; }
+  .cal__day { height: auto; overflow: visible; padding: var(--space-3) 0; border-right: 0; }
+  .cal__day.is-empty, .cal__day.is-out { display: none; }
+  .cal__wd { display: inline; }
+  .cal__day.is-today { box-shadow: none; }
+  .cal__num { font-size: 13px; }
+  .cal__chip { font-size: 13px; padding: var(--space-2) var(--space-3); }
+  .cal__none { display: block; }
+}

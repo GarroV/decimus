@@ -1,6 +1,7 @@
 """«Где нужно проверить» на экране «Календарь» (D466): отбор точек, охват, показ.
 
 Блок переехал с «Главной» (D418), затем с «Проверок» (D466); логика та же (D399).
+С D477 экран «Календарь» его не рисует и не читает (`app.SHOW_TO_CHECK`), код живёт.
 Сторожится:
 кто попадает в ряд и в каком порядке, что чтение идёт в охвате вошедшего, что
 пустой блок не показывается, а отказ базы называется строкой, а не тишиной.
@@ -8,42 +9,13 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from datetime import date
 
 import pytest
-from flask.testing import FlaskClient
-from test_web_app import ТЕНАНТ, шапка
-from web_harness import войти, подменить_двери, собрать
 
 from src.db.errors import DbError
 from src.db.reach import Reach
-from src.web import inspections as data
 from src.web import to_inspect
-from src.web.texts import t
-
-
-def t_ru(ключ: str) -> str:
-    return t(ключ, "ru")
-
-
-@pytest.fixture
-def стенд(monkeypatch: pytest.MonkeyPatch) -> Iterator[FlaskClient]:
-    подменить_двери(monkeypatch, tenant=ТЕНАНТ)
-    monkeypatch.setattr(
-        data, "load_registry", lambda **_: data.Registry((шапка(unit_name="Белград-1"),), True)
-    )
-    with собрать(tenant=ТЕНАНТ).test_client() as client:
-        assert войти(client).status_code == 302
-        yield client
-
-
-def _блок(*имена: str, ещё: int = 0, отказ: bool = False) -> to_inspect.Block:
-    точки = tuple(
-        to_inspect.ToCheck(имя, f"u-{n}", "RS", "", date(2026, 7, 1) if n % 2 else None)
-        for n, имя in enumerate(имена)
-    )
-    return to_inspect.Block(units=точки, more=ещё, failed=отказ)
 
 
 def test_отбирает_точки_без_проверок_за_период() -> None:
@@ -133,71 +105,3 @@ def test_отказ_базы_блок_называет_а_не_прячет(monk
 
     # Assert
     assert блок.failed and блок.shown
-
-
-def test_календарь_показывает_блок(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Arrange
-    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3", "Ниш-1", ещё=2))
-
-    # Act
-    страница = стенд.get("/calendar").get_data(as_text=True)
-
-    # Assert
-    assert t_ru("registry.tocheck.title") in страница
-    assert "Нови-Сад-3" in страница and "и ещё 2" in страница
-    assert "ни разу не проверяли" in страница and "последняя 2026-07-01" in страница
-
-
-def test_проверки_блока_больше_не_показывают(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """D466: «Где нужно проверить» ушёл с «Проверок» и там не читается вовсе."""
-    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3"))
-
-    страница = стенд.get("/inspections").get_data(as_text=True)
-
-    assert t_ru("registry.tocheck.title") not in страница and "Нови-Сад-3" not in страница
-
-
-def test_календарь_пустой_блок_одна_тихая_строка(стенд: FlaskClient) -> None:
-    страница = стенд.get("/calendar").get_data(as_text=True)
-
-    assert t_ru("calendar.tocheck.empty") in страница
-
-
-def test_календарь_отказ_блока_называется_строкой(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block(failed=True))
-
-    страница = стенд.get("/calendar").get_data(as_text=True)
-
-    assert t_ru("registry.tocheck.failed") in страница
-
-
-def test_календарь_читает_свой_период_по_умолчанию_месяц(
-    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # Arrange
-    спросили: list[dict[str, object]] = []
-    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or to_inspect.Block())
-
-    # Act
-    стенд.get("/calendar?from=2026-09-01&to=2026-09-30")
-    стенд.get("/calendar")
-
-    # Assert
-    assert (спросили[0]["date_from"], спросили[0]["date_to"]) == (
-        date(2026, 9, 1),
-        date(2026, 9, 30),
-    )
-    начало = спросили[1]["date_from"]
-    assert isinstance(начало, date) and начало.day == 1 and спросили[1]["date_to"] is not None
-
-
-def test_календарь_по_английски(стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3", ещё=1))
-
-    страница = стенд.get("/calendar?lang=en").get_data(as_text=True)
-
-    assert "Where to inspect" in страница and "and 1 more" in страница
