@@ -1947,5 +1947,13 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__gear svg { width: 15px; height: 15px; }
 
 /* Плашка «подключите вход в два шага» (D483): ссылка целиком, предупреждающий тон из .note--warn. */
+/* Способы второй ступени: без метки «ключ в этом браузере» (D485) сверху поле кода,
+   ключ — запасной вариант ниже. Порядок в разметке не меняется. */
+.login__methods { display: flex; flex-direction: column; }
+.login__methods--code-first > .login__or { order: 1; }
+.login__methods--code-first > .login__google { order: 2; margin-top: var(--space-5); }
+.passkey-here { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-4); margin-bottom: var(--space-7); }
+.passkey-here[hidden] { display: none; }
+.passkey-here__title { flex: 1 1 16rem; }
 .enroll-banner { display: block; margin-bottom: var(--space-7); text-decoration: none; }
 .enroll-banner:hover { text-decoration: underline; }

@@ -9,6 +9,31 @@
   var supported = !!(window.PublicKeyCredential && navigator.credentials &&
     typeof navigator.credentials.create === "function");
 
+  // Ключ живёт там, где создан: в другом браузере окно ключа показало бы QR-код. Поэтому
+  // браузер помнит, что ключ тут есть (создан или вошли им), и без метки окно само не
+  // открывается. Хранилище бывает закрыто (приватное окно) — любая осечка читается как «нет».
+  var HERE_KEY = "decimus.passkey.here";
+  var DISMISS_KEY = "decimus.passkey.dismissed";
+
+  function storageGet(key) {
+    try { return window.localStorage.getItem(key) === "1"; } catch (e) { return false; }
+  }
+
+  function storageSet(key) {
+    try { window.localStorage.setItem(key, "1"); } catch (e) { /* без метки — только без автозапуска */ }
+  }
+
+  // «Chrome · Mac»: имя ключа по браузеру и системе, чтобы не спрашивать его у человека.
+  function deviceName() {
+    var ua = navigator.userAgent || "";
+    var browser = /Edg\//.test(ua) ? "Edge" : /OPR\//.test(ua) ? "Opera"
+      : /Firefox\//.test(ua) ? "Firefox" : /Chrome\//.test(ua) ? "Chrome"
+      : /Safari\//.test(ua) ? "Safari" : "Browser";
+    var os = /iPhone/.test(ua) ? "iPhone" : /iPad/.test(ua) ? "iPad" : /Android/.test(ua) ? "Android"
+      : /Mac/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
+    return os ? browser + " \u00b7 " + os : browser;
+  }
+
   function fromB64(text) {
     var pad = "=".repeat((4 - (text.length % 4)) % 4);
     var raw = atob((text + pad).replace(/-/g, "+").replace(/_/g, "/"));
@@ -133,6 +158,7 @@
         })
         .then(function (res) {
           if (res.ok && res.data && res.data.redirect) {
+            storageSet(HERE_KEY);
             window.location.href = res.data.redirect;
             return;
           }
@@ -149,7 +175,14 @@
     }
 
     button.addEventListener("click", function () { run(false); });
-    if (root.hasAttribute("data-passkey-autostart")) run(true);
+    // Автозапуск — только в браузере, где ключ уже был (метка). В остальных страница
+    // ведёт с поля кода, а кнопка ключа остаётся запасной.
+    if (storageGet(HERE_KEY)) {
+      if (root.hasAttribute("data-passkey-autostart")) run(true);
+    } else {
+      var methods = root.parentNode;
+      if (methods && methods.classList) methods.classList.add("login__methods--code-first");
+    }
   }
 
   // --- добавление ключа на «Вход и защита» ----------------------------------------------
@@ -176,6 +209,7 @@
         })
         .then(function (res) {
           if (res.ok && res.data && res.data.redirect) {
+            storageSet(HERE_KEY);
             window.location.href = res.data.redirect;
             return;
           }
@@ -188,7 +222,54 @@
     });
   }
 
+  // --- «Входить по Touch ID в этом браузере?» после входа (D485) -------------------------
+  // Плашка скрыта разметкой и показывается, только если браузер поддерживает ключи, метки
+  // тут нет и «Не сейчас» не нажимали. Один клик — ключ создаётся тут же, без имени.
+  // Отказ сервера (окно подключения закрылось, лимит) уводит на «Вход и защиту» без шума.
+  function initHere(root) {
+    var button = root.querySelector("[data-passkey-here-enable]");
+    var later = root.querySelector("[data-passkey-here-later]");
+    if (!button || !supported || storageGet(HERE_KEY) || storageGet(DISMISS_KEY)) return;
+    root.hidden = false;
+    var busy = false;
+    var toSecurity = function () { window.location.href = root.getAttribute("data-security-url"); };
+
+    if (later) later.addEventListener("click", function () {
+      storageSet(DISMISS_KEY);
+      root.hidden = true;
+    });
+    button.addEventListener("click", function () {
+      if (busy) return;
+      busy = true;
+      postJson(root.getAttribute("data-options-url"))
+        .then(function (opts) {
+          if (!opts.ok) { toSecurity(); return null; }
+          return navigator.credentials.create({ publicKey: creationOptions(opts.data) })
+            .then(function (cred) {
+              return postJson(root.getAttribute("data-register-url"), {
+                name: deviceName(),
+                credential: encodeCreated(cred),
+              });
+            })
+            .then(function (res) {
+              if (!res.ok) { toSecurity(); return; }
+              storageSet(HERE_KEY);
+              root.hidden = true;
+            });
+        })
+        .catch(function (err) {
+          busy = false;
+          var name = err && err.name;
+          // Ключ с этого устройства уже есть (InvalidStateError): метка просто потерялась.
+          if (name === "InvalidStateError") { storageSet(HERE_KEY); root.hidden = true; return; }
+          // Окно закрыли или отказали (NotAllowedError): тихо, кнопка остаётся.
+          if (name !== "NotAllowedError" && name !== "AbortError") toSecurity();
+        });
+    });
+  }
+
   function init() {
+    Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-here]"), initHere);
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-login]"), initLogin);
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-register]"), initRegister);
   }

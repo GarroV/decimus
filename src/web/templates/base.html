@@ -181,6 +181,19 @@
           <div class="note__title">{{ t('sf.banner.enroll') }}</div>
         </a>
       {% endif %}
+      {% if passkey_here_url %}
+        {# После входа второй ступенью (D485): одна кнопка заводит ключ в ЭТОМ браузере. Скрыта,
+           пока passkey.js не убедится, что метки «ключ тут есть» нет и «Не сейчас» не нажимали. #}
+        <div class="note passkey-here" data-passkey-here hidden
+             data-options-url="{{ passkey_here_url }}/passkey/options"
+             data-register-url="{{ passkey_here_url }}/passkey/register"
+             data-security-url="{{ passkey_here_url }}?lang={{ lang }}">
+          <div class="note__title passkey-here__title">{{ t('sf.here.title') }}</div>
+          <button class="btn btn--primary" type="button" data-passkey-here-enable>{{ t('sf.here.enable') }}</button>
+          <button class="btn" type="button" data-passkey-here-later>{{ t('sf.here.later') }}</button>
+        </div>
+        <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
+      {% endif %}
       {% block body %}{% endblock %}
     </main>
   </div>

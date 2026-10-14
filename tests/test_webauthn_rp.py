@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 
 import pytest
@@ -176,3 +177,13 @@ def test_номер_ключа_достаётся_из_ответа() -> None:
     assert rp.credential_id_of(ключ.get(параметры, origin=СВОЙ.origin)) == ключ.credential_id
     with pytest.raises(rp.PasskeyError):
         rp.credential_id_of("не json")
+
+
+def test_параметры_просят_встроенный_датчик_устройства() -> None:
+    """Touch ID этого устройства, а не QR и телефон (D485): `hints` и платформенный ключ."""
+    создание, _ = rp.registration_options(СВОЙ, user_id=ЧЕЛОВЕК, login="anna", existing=())
+    вход, _ = rp.authentication_options(СВОЙ, credential_ids=(b"x" * 16,))
+
+    assert json.loads(создание)["hints"] == ["client-device"]
+    assert json.loads(создание)["authenticatorSelection"]["authenticatorAttachment"] == "platform"
+    assert json.loads(вход)["hints"] == ["client-device"]

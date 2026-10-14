@@ -85,6 +85,12 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Подключите вход в два шага: без него угнанная почта открывает вашу учётку",
         "en": "Turn on two-step sign-in: without it, a hijacked mailbox opens your account",
     },
+    "sf.here.title": {
+        "ru": "Входить по Touch ID в этом браузере?",
+        "en": "Sign in with Touch ID in this browser?",
+    },
+    "sf.here.enable": {"ru": "Включить", "en": "Turn on"},
+    "sf.here.later": {"ru": "Не сейчас", "en": "Not now"},
     "sf.sec.optional": {
         "ru": "Для вашей роли подтверждение входа необязательно, но рекомендуется.",
         "en": "Sign-in confirmation is optional for your role but recommended.",
