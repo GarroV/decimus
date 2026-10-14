@@ -210,25 +210,28 @@ def upload_photos(
     uploaded = 0
     missing: list[str] = []
     try:
+        # Слот пула не держится, пока идёт сеть (#713): список — одним коротким
+        # соединением, Telegram и хранилище — вне его, отметка — своим.
         with connection(settings.dsn) as conn:
             _require_inspection(conn, inspection_id)
             with conn.cursor() as cur:
                 cur.execute(_SELECT_PENDING_SQL, (inspection_id,))
                 pending = cur.fetchall()
 
-            for photo_id, file_id in pending:
-                data = fetch(file_id)
-                if data is None:
-                    missing.append(str(file_id))
-                    continue
-                uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
+        for photo_id, file_id in pending:
+            data = fetch(file_id)
+            if data is None:
+                missing.append(str(file_id))
+                continue
+            uri, preview_uri = _put_photo(store, inspection_id, str(photo_id), data)
+            with connection(settings.dsn) as conn:
                 with conn.cursor() as cur:
                     cur.execute(_MARK_UPLOADED_SQL, (uri, preview_uri, photo_id))
                     marked = cur.rowcount
                 conn.commit()
-                # Ноль строк — кадр уже записал другой выгрузчик (сдача или
-                # дозагрузка): объект тот же, ссылка его, считать его своим нельзя.
-                uploaded += marked
+            # Ноль строк — кадр уже записал другой выгрузчик (сдача или
+            # дозагрузка): объект тот же, ссылка его, считать его своим нельзя.
+            uploaded += marked
     except PushError:
         raise
     except psycopg.Error as exc:

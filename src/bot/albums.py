@@ -51,13 +51,17 @@ class _OpenAlbum:
 
     def to_group(self) -> PhotoGroup:
         """Подпись берётся первая непустая: Telegram кладёт её на один кадр из всех."""
-        captions = (f.caption.strip() for f in self.frames if f.caption and f.caption.strip())
+        # Порядок — по номеру сообщения, а не по приходу (#775): обработчики
+        # кадров одного альбома идут параллельно, и под нагрузкой второй кадр
+        # доходит раньше первого. Номер сообщения Telegram выдаёт по порядку.
+        frames = sorted(self.frames, key=lambda f: f.message_id)
+        captions = (f.caption.strip() for f in frames if f.caption and f.caption.strip())
         caption = next(captions, None)
         return PhotoGroup(
             group_id=self.group_key,
             chat_id=self.chat_id,
-            message_ids=tuple(f.message_id for f in self.frames),
-            photo_file_ids=tuple(f.file_id for f in self.frames),
+            message_ids=tuple(f.message_id for f in frames),
+            photo_file_ids=tuple(f.file_id for f in frames),
             caption=caption,
         )
 

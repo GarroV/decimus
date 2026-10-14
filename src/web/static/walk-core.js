@@ -39,6 +39,34 @@
     return !!(tg && tg.initData && tg.isVersionAtLeast && tg.isVersionAtLeast(version));
   };
 
+  /* Личное значение: CloudStorage Telegram (6.9+), иначе localStorage. Ответа
+     облака нет за CLOUD_WAIT_MS — берётся localStorage, а не вечное «…» (#636). */
+  var CLOUD_WAIT_MS = 2500;
+
+  function localGet(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
+  }
+
+  W.storedGet = function (key, done) {
+    if (!(W.supports("6.9") && tg.CloudStorage)) { done(localGet(key)); return; }
+    var settled = false;
+    var finish = function (value) {
+      if (settled) { return; }
+      settled = true;
+      done(value);
+    };
+    var timer = setTimeout(function () { finish(localGet(key)); }, CLOUD_WAIT_MS);
+    try {
+      tg.CloudStorage.getItem(key, function (err, value) {
+        clearTimeout(timer);
+        finish(err ? null : value);
+      });
+    } catch (e) {
+      clearTimeout(timer);
+      finish(localGet(key));
+    }
+  };
+
   W.tx = function (key, params) {
     var d = W.state.data;
     var s = (d && d.texts && d.texts[key]) || key;

@@ -129,9 +129,25 @@ def _engine(args: Sequence[str]) -> Callable[[InspectionDetail], Applied]:
             return apply_command(detail, papers=бумаги, args=args)
         except LetterError as отказ:
             # Текст движка — тот же, что видит аудитор в боте; пути вычищены.
-            raise ToolError(f"Движок не принял запись, ничего не изменено: {отказ}") from None
+            raise ToolError(
+                f"Движок не принял запись, ничего не изменено: {mcp_hints(str(отказ))}"
+            ) from None
 
     return применить
+
+
+#: Подсказки движка называют его команды (`audit.py photo 1 --add ...`), а у
+#: собеседника через MCP их нет (#563): он зовёт инструменты загрузки.
+_PHOTO_HINT = re.compile(r"\(audit\.py photo (\d+) --add[^)]*\)")
+_EDIT_HINT = re.compile(r"\(audit\.py edit --n (\d+)[^)]*\)")
+_ANY_HINT = re.compile(r"\s*\(audit\.py [^)]*\)")
+
+
+def mcp_hints(text: str) -> str:
+    """Команды движка в отказе — именами инструментов MCP; прочие убираются."""
+    text = _PHOTO_HINT.sub(r"(import_add_photo к записи #\1)", text)
+    text = _EDIT_HINT.sub(r"(import_edit_finding, n=\1)", text)
+    return _ANY_HINT.sub("", text)
 
 
 def _rescorer() -> Callable[[InspectionDetail], Any]:
@@ -208,6 +224,7 @@ def import_create_inspection(
     reported_status: str | None = None,
     legacy_method: str | None = None,
     source_ref: str | None = None,
+    second_visit: bool = False,
 ) -> dict[str, object]:
     """Завести черновик без записей в названном режиме (D334).
 
@@ -246,6 +263,7 @@ def import_create_inspection(
         "reported_pct": процент,
         "reported_grade": буква,
         "source_ref": ссылка,
+        "second_visit": bool(second_visit),
     }
     if режим == modes.MODE_CURRENT:
         modes.refuse_history_fields(reported_status, legacy_method)

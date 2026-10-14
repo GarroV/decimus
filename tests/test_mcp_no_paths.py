@@ -29,6 +29,7 @@ from typing import Any
 
 import pytest
 from mcp_checklist_harness import build_methodology
+from mcp_places import сверить
 from ratings_samples import rko_violations
 
 from src.mcp.catalogue import TOOLS
@@ -482,8 +483,8 @@ def test_обе_таблицы_аргументов_накрывают_весь_
     утверждение про пути перестало бы быть общим, оставшись зелёным."""
     имена = {spec.name for spec in TOOLS}
 
-    assert set(ГОДНЫЕ) == имена
-    assert set(НЕГОДНЫЕ) == имена
+    сверить("tests/test_mcp_no_paths.py: ГОДНЫЕ", ГОДНЫЕ, имена)
+    сверить("tests/test_mcp_no_paths.py: НЕГОДНЫЕ", НЕГОДНЫЕ, имена)
 
 
 def test_ни_один_ответ_инструмента_не_называет_абсолютного_пути(батарея: Батарея) -> None:

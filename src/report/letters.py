@@ -34,12 +34,15 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
+import threading
+from collections import OrderedDict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -690,6 +693,56 @@ def _status(
     return " ".join(предложения)
 
 
+#: Готовые тексты писем по их входу (#696): сверка оценки и сборка письма — два
+#: подпроцесса движка, ~200 мс на каждый показ. Вход — состояние проверки на
+#: языке письма и каталог издания методики; издания неизменны, поэтому тот же
+#: вход даёт тот же текст, а любая правка записи меняет вход и ключ. Кэш в
+#: процессе, ограничен по числу, при перезапуске пуст.
+LETTER_CACHE_SIZE = 256
+_letters: OrderedDict[str, str] = OrderedDict()
+_letters_lock = threading.Lock()
+
+
+def _letter_key(вход: str, detail: InspectionDetail, *, язык: str, каталог: Path) -> str:
+    # Записанная оценка — в ключе: её сверяет `_verify`, и расхождение с движком
+    # обязано всплыть отказом на каждом показе, а не только на первом.
+    оценка = f"{detail.inspection.pct}\0{detail.inspection.grade}"
+    return hashlib.sha256(f"{каталог}\0{язык}\0{оценка}\0{вход}".encode()).hexdigest()
+
+
+def clear_letter_cache() -> None:
+    """Забыть собранные письма — для тестов, которые подменяют движок."""
+    with _letters_lock:
+        _letters.clear()
+
+
+def _letter_text(вход: str, detail: InspectionDetail, *, язык: str, каталог: Path) -> str:
+    """Текст письма: из кэша по входу либо сверка оценки и сборка движком."""
+    ключ = _letter_key(вход, detail, язык=язык, каталог=каталог)
+    with _letters_lock:
+        if ключ in _letters:
+            _letters.move_to_end(ключ)
+            return _letters[ключ]
+    with tempfile.TemporaryDirectory(prefix="mcp-letter-") as рядом:
+        состояние = Path(рядом) / "inspection.json"
+        состояние.write_text(вход, encoding="utf-8")
+        _verify(detail, каталог, состояние)
+        код, письмо, ошибки = _run(
+            REPORT_SCRIPT, ["letter", f"--lang={язык}"], data_dir=каталог, state=состояние
+        )
+        if код != 0:
+            raise LetterError(
+                f"Движок не собрал письмо: {_clean(письмо + ошибки, каталог, состояние.parent)}"
+            )
+        текст = письмо.strip()
+    if текст:
+        with _letters_lock:
+            _letters[ключ] = текст
+            while len(_letters) > LETTER_CACHE_SIZE:
+                _letters.popitem(last=False)
+    return текст
+
+
 def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict[str, object]:
     """Собрать письмо партнёру по записанной проверке.
 
@@ -752,18 +805,8 @@ def build(detail: InspectionDetail, *, lang: str | None, papers: Papers) -> dict
         *([FINDING_TEXT_FIELD] if языки_находок else []),
         *([BLANK_TEXT_FIELD] if пустые else []),
     ]
-    with tempfile.TemporaryDirectory(prefix="mcp-letter-") as рядом:
-        состояние = Path(рядом) / "inspection.json"
-        состояние.write_text(state_json(detail, lang=язык), encoding="utf-8")
-        _verify(detail, каталог, состояние)
-        код, письмо, ошибки = _run(
-            REPORT_SCRIPT, ["letter", f"--lang={язык}"], data_dir=каталог, state=состояние
-        )
-        if код != 0:
-            raise LetterError(
-                f"Движок не собрал письмо: {_clean(письмо + ошибки, каталог, состояние.parent)}"
-            )
-        текст = письмо.strip()
+    вход = state_json(detail, lang=язык)
+    текст = _letter_text(вход, detail, язык=язык, каталог=каталог)
     if not текст:
         raise LetterError(
             "Сборщик письма отчитался об успехе и вернул пустой текст — отправлять партнёру нечего"

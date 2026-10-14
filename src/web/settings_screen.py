@@ -131,9 +131,6 @@ TILES = (
     "google",
 )
 
-#: Плитки подключений: по ним считается «сколько подключено».
-CONNECTION_TILES = ("claude", "bot", "google")
-
 #: Плитка, к которой относится исход действия: по началу ключа текста.
 _FLASH_TILE_PREFIXES = (
     ("settings.google.", "google"),

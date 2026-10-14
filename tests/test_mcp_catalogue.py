@@ -21,6 +21,8 @@ from __future__ import annotations
 
 import inspect
 
+from mcp_places import сверить
+
 from src.mcp import checklist_source as checklist_source_module
 from src.mcp import checklist_tools, checklists_tools
 from src.mcp import imports as imports_module
@@ -204,8 +206,12 @@ def test_каталог_содержит_ровно_пятьдесят_шест�
     инструмент, к которому агент внезапно теряет доступ.
     42 + 9 загрузки (D305) + 2 управления рейтингами (D320, D420) + 3 чтения
     рейтингов (D420)."""
+    сверить(
+        "tests/test_mcp_catalogue.py: ИМЕНА_ИНСТРУМЕНТОВ_*",
+        ИМЕНА_ИНСТРУМЕНТОВ,
+        {spec.name for spec in TOOLS},
+    )
     assert len(TOOLS) == 56
-    assert {spec.name for spec in TOOLS} == ИМЕНА_ИНСТРУМЕНТОВ
 
 
 def test_ни_одна_схема_не_объявляет_tenant() -> None:

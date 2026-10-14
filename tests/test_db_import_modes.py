@@ -397,3 +397,14 @@ def test_база_не_даёт_исторической_оценку_не_из_
         pytest.raises(psycopg.errors.CheckViolation, match="legacy_score_as_is"),
     ):
         conn.execute("update inspections set pct = 99.5 where id = %s", (ident,))
+
+
+def test_тот_же_визит_второй_раз_не_загружается(хранилище: Store) -> None:
+    """#782: точка и дата — ключ визита; повтор без second_visit — отказ."""
+    первая = _историческая(хранилище)
+
+    with pytest.raises(ToolError, match="уже есть проверка"):
+        _историческая(хранилище)
+
+    вторая = _историческая(хранилище, second_visit=True)
+    assert вторая != первая

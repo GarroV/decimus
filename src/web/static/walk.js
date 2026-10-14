@@ -39,13 +39,7 @@
   }
 
   function loadMarks(key, done) {
-    if (hasCloud()) {
-      tg.CloudStorage.getItem(key, function (err, value) { done(parseMarks(err ? null : value)); });
-      return;
-    }
-    var raw = null;
-    try { raw = window.localStorage.getItem(key); } catch (e) { raw = null; }
-    done(parseMarks(raw));
+    W.storedGet(key, function (raw) { done(parseMarks(raw)); });
   }
 
   function saveMarks() {

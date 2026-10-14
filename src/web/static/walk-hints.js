@@ -61,13 +61,7 @@
 
   function loadPrefs() {
     var done = function (raw) { prefs = parsePrefs(raw); W.hints.afterRender(); };
-    if (hasCloud()) {
-      tg.CloudStorage.getItem(PREFS_KEY, function (err, value) { done(err ? null : value); });
-      return;
-    }
-    var raw = null;
-    try { raw = window.localStorage.getItem(PREFS_KEY); } catch (e) { raw = null; }
-    done(raw);
+    W.storedGet(PREFS_KEY, done);
   }
 
   function savePrefs(change) {

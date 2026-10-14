@@ -144,3 +144,17 @@ def test_single_photo_is_a_group_of_one() -> None:
     assert group is not None
     assert group.photo_file_ids == ("AAA",)
     assert group.caption == "подпись"
+
+
+def test_кадры_альбома_по_порядку_сообщений_а_не_прихода() -> None:
+    """#775: под нагрузкой второй кадр доходит раньше первого — порядок съёмки важнее."""
+    buffer = AlbumBuffer()
+    buffer.add(1, "g", Frame(message_id=11, file_id="album-2"))
+    buffer.add(1, "g", Frame(message_id=10, file_id="album-1", caption="печь"))
+
+    group = buffer.close_open(1)
+
+    assert group is not None
+    assert group.photo_file_ids == ("album-1", "album-2")
+    assert group.message_ids == (10, 11)
+    assert group.caption == "печь"

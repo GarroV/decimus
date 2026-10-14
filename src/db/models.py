@@ -15,6 +15,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any
 
+from src.domain.models import DEFAULT_CHECKLIST_CODE
+
 #: Происхождение проверки (`inspections.origin`, миграции 0038 и 0042, D334).
 #:
 #: `field` — обход из бота, умолчание колонки.
@@ -92,7 +94,7 @@ class InspectionRow:
     #: Умолчание `bizdev`, а не пустая строка: до множественности чек-лист был
     #: один — методика бизнес-девелопера (D181), — и у строк, залитых до
     #: миграции, это запись того, что и так было правдой (D033).
-    checklist_code: str = "bizdev"
+    checklist_code: str = DEFAULT_CHECKLIST_CODE
     #: Снята ли проверка из истории (T210, D086, D089) и почему. Пустая
     #: причина при `retracted=False` — не «причину забыли», а «проверка живая»:
     #: схема не даёт ни снятия без причины, ни причины у живой проверки.

@@ -63,7 +63,10 @@ def main() -> None:
     if args[:1] == ["seed"] and len(args) == 2:
         print(f"Точек в справочнике записано: {seed(Path(args[1]))}")
         return
-    outcomes = run_all(date.today(), only=args[1:] if args[:1] == ["run"] else ())
+    with agg_store.collector_lock() as взят:
+        if not взят:
+            raise SystemExit("Сбор агрегаторов уже идёт в другом процессе (бот) — повторите позже")
+        outcomes = run_all(date.today(), only=args[1:] if args[:1] == ["run"] else ())
     failed = [o.aggregator for o in outcomes if not o.ok]
     if failed:
         raise SystemExit(f"Сбой агрегаторов: {', '.join(failed)}")

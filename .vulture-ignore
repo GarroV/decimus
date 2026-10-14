@@ -153,6 +153,7 @@ on_sealed_drop
 # краснеет у каждого блока, а красное, не связанное с работой, учит не смотреть
 # на красное.
 pytest_terminal_summary
+pytest_sessionstart
 
 # Админские хендлеры круга доступа к MCP (T253). Тот же случай, что у прочих
 # кнопок и команд: имя читает декоратор `@router.message`, а зовёт диспетчер по
@@ -522,6 +523,7 @@ _учётки
 # #717): pytest вызывает их сам. `tests/conftest.py` — свой предел частоты
 # обхода у каждого теста; `tests/test_migros_link.py` — подмена ретранслятора.
 _предел_обхода_свой_у_теста
+_письма_не_протекают_между_тестами
 _ретранслятор
 
 # Маршруты-приманки `tests/test_web_guard.py`: их регистрирует декоратор Flask,
@@ -577,3 +579,31 @@ factor_count
 
 # Поле записи о ключе модели читает шаблон блока («Поставлен»): кодом оно не используется.
 set_at
+
+# Фикстура-переключатель в параметрах теста (tests/test_mcp_personal_tokens.py): значение не читается.
+без_триггера
+
+# Обработчики, которые регистрирует декоратор (`@app.post`, `@router.callback_query`,
+# `@app.errorhandler`, `@app.teardown_request`): по имени их не зовёт никто (#862).
+_снять_пространство
+_second_step_required
+do_add_finding
+do_add_photo
+do_delete_photo
+on_fix_reading
+on_reading_other
+on_reading_value
+passkey_login_options
+passkey_login_verify
+security_prove_code
+settings_continue
+
+# Поля, которые читает только шаблон (`country/_summary.html`, `country/_units.html`).
+has_inspections
+has_maps
+has_ratings
+open_rows
+closed_rows
+
+# Города среза считаются, но экран «Обзор» их больше не показывает — разобрать (#862).
+cities

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from datetime import UTC, date, datetime
 
 import pytest
@@ -67,6 +68,7 @@ def очередь(monkeypatch: pytest.MonkeyPatch) -> Очередь:
     monkeypatch.setattr(agg_store, "open_request", q.открытая)
     monkeypatch.setattr(agg_store, "request_update", q.поставить)
     monkeypatch.setattr(agg_store, "finish_request", q.закрыть)
+    monkeypatch.setattr(agg_store, "collector_lock", lambda: nullcontext(True))
     return q
 
 
@@ -180,6 +182,24 @@ def test_заход_без_заявки_расписание_идёт_по_ча�
     assert собрано == []
     agg_loader._tick(scheduled=True)  # часовой — смотрит
     assert собрано == [()]
+
+
+def test_замок_занят_заход_ничего_не_собирает(
+    очередь: Очередь, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """#788: второй процесс против той же базы сбор не начинает и заявку не берёт."""
+    queue.ask(["wolt"], by="a")
+    собрано: list[tuple[str, ...]] = []
+    monkeypatch.setattr(
+        collect, "run_all", lambda today, only=(): собрано.append(tuple(only)) or ()
+    )
+    monkeypatch.setattr(agg_store, "last_run", lambda: None)
+    monkeypatch.setattr(agg_store, "collector_lock", lambda: nullcontext(False))
+
+    agg_loader._tick(scheduled=True)
+
+    assert собрано == []
+    assert очередь.строки[0].done_at is None, "заявку взял процесс без замка"
 
 
 def test_миграция_держит_одну_открытую_заявку_индексом() -> None:
