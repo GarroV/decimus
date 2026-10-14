@@ -1,0 +1,16 @@
+// ШАБЛОН конфига фронта веб-админки: https://decimus-stand.vasiliy-garro.workers.dev (стенд, не прод, §8.11)
+// Адреса инфраструктуры в репозиторий не кладутся (D431): рабочий
+// `wrangler.admin.jsonc` собирает `./deploy.sh` из этого шаблона и
+// неотслеживаемого `front/.deploy.env`. Руками выкладывать шаблон нельзя.
+// Ключ фронта — секретом: `npx wrangler secret put FRONT_KEY -c wrangler.admin.jsonc`.
+{
+  "name": "decimus-stand",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-01",
+  "workers_dev": true,
+  // Журналы Worker'а выключены: через него идут пароли, ключи и тела форм.
+  "observability": { "enabled": false },
+  // Туннель к Caddy на VPS (Workers VPC, D304): сервис vps-edge-caddy.
+  "vpc_services": [{ "binding": "EDGE", "service_id": "<VPC_SERVICE_ID>" }],
+  "vars": { "ORIGIN_HOST": "<STAND_ORIGIN_HOST>" }
+}
