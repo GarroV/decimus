@@ -29,6 +29,10 @@ class ModelUnavailable(RecognizeError):
     """
 
 
+class ModelKeyRejected(RecognizeError):
+    """Провайдер не принял ключ модели (проверка на экране «Подключения», D491)."""
+
+
 class TranscriptionFailed(RecognizeError):
     """Голосовое не разобрано: не перекодировалось, не распозналось, пустое.
 

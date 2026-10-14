@@ -95,7 +95,8 @@ def transcribe(
     cfg = settings or load_recognize_settings()
     if not cfg.api_key:
         raise TranscriptionFailed(
-            "Не задан ключ модели (OPENAI_API_KEY). Голосовое не распознано, "
+            "Не задан ключ модели (экран «Подключения» или OPENAI_API_KEY). "
+            "Голосовое не распознано, "
             "попросите аудитора написать текстом"
         )
     wav = _reencode(audio, cfg.ffmpeg)

@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 150 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 153 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -164,6 +164,9 @@
 | `/users/connections/<int:token_id>/revoke` | POST | `connections_revoke` | `src/web/connections_screen.py` |
 | `/users/connections/<int:token_id>/update` | POST | `connections_update` | `src/web/connections_screen.py` |
 | `/users/connections/issue` | POST | `connections_issue` | `src/web/connections_screen.py` |
+| `/users/connections/model-key/check` | POST | `model_key_check` | `src/web/connections_screen.py` |
+| `/users/connections/model-key/delete` | POST | `model_key_delete` | `src/web/connections_screen.py` |
+| `/users/connections/model-key/save` | POST | `model_key_save` | `src/web/connections_screen.py` |
 | `/users/email` | POST | `user_email` | `src/web/users_screen.py` |
 | `/users/freeze` | POST | `freeze_user` | `src/web/users_screen.py` |
 | `/users/reset-second-factor` | POST | `reset_second_factor` | `src/web/users_screen.py` |
@@ -331,6 +334,7 @@
 | `S3_ENDPOINT_URL` | `src/db/config.py` | да |
 | `S3_REGION` | `src/db/config.py` | да |
 | `S3_SECRET_ACCESS_KEY` | `src/db/config.py` | да |
+| `SECRETS_KEY` | `src/db/secret_crypto.py` | да |
 | `SEED_WEB_DEMO_FORCE` | `tools/seed_web_demo.py` | да |
 | `STATE_DIR` | `src/domain/config.py`, `src/report/letters.py`, `tools/state_backup.py` | да |
 | `TELEGRAM_BOT_TOKEN` | `src/bot/config.py`, `src/web/walk_auth.py` | да |
@@ -428,6 +432,7 @@
 | `0067_journals.sql` | `login_journal`, `action_journal` |
 | `0068_second_factor.sql` | `web_passkeys`, `web_totp`, `web_backup_codes`, `web_second_steps`, `web_webauthn_challenges` |
 | `0069_passkey_login.sql` | — |
+| `0070_model_key.sql` | `vault.secrets` |
 <!-- map:end -->
 
 ## Makefile

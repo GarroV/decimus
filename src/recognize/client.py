@@ -17,7 +17,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from openai import OpenAI, OpenAIError
+from openai import AuthenticationError, OpenAI, OpenAIError, PermissionDeniedError
 from openai.types.responses import (
     EasyInputMessageParam,
     ResponseInputImageParam,
@@ -30,7 +30,7 @@ from openai.types.responses.response_format_text_json_schema_config_param import
 )
 
 from .config import RecognizeSettings
-from .errors import ModelUnavailable
+from .errors import ModelKeyRejected, ModelUnavailable
 
 #: Имя схемы в запросе. Провайдеру оно нужно, на содержание не влияет.
 SCHEMA_NAME = "audit_suggestions"
@@ -54,10 +54,30 @@ def _new_client(settings: RecognizeSettings) -> OpenAI:
     """Клиент провайдера. Отдельная функция — шов, которым тесты подменяют вызов."""
     if not settings.api_key:
         raise ModelUnavailable(
-            "Не задан ключ модели (OPENAI_API_KEY). Разбор комментариев не работает, "
+            "Не задан ключ модели (экран «Подключения» или OPENAI_API_KEY). "
+            "Разбор комментариев не работает, "
             "проверка продолжается ручным выбором пункта"
         )
     return OpenAI(api_key=settings.api_key, timeout=settings.timeout)
+
+
+#: Проверка ключа — один дешёвый вызов (перечень моделей), без повторов.
+VERIFY_TIMEOUT = 15.0
+
+
+def verify_key(api_key: str) -> None:
+    """Один вызов провайдера с этим ключом: принят — тихо, иначе отказ.
+
+    `ModelKeyRejected` — провайдер ключ не принял; `ModelUnavailable` — проверить не удалось
+    (сеть, лимит, сбой провайдера). Ни ключа, ни текста ответа провайдера в отказе нет.
+    """
+    client = OpenAI(api_key=api_key, timeout=VERIFY_TIMEOUT, max_retries=0)
+    try:
+        client.models.list()
+    except (AuthenticationError, PermissionDeniedError) as exc:
+        raise ModelKeyRejected("Провайдер не принял ключ модели") from exc
+    except OpenAIError as exc:
+        raise ModelUnavailable(f"Не удалось проверить ключ модели ({type(exc).__name__})") from exc
 
 
 def _content(question: str, photos: Sequence[bytes]) -> ResponseInputMessageContentListParam:
