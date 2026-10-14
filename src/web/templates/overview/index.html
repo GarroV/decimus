@@ -47,6 +47,12 @@
     </div>
   </header>
 
+  {# Период — наверху и на весь экран (interface-logic п. 3, 7): в блоке «Фильтры»
+        справа его не находили. #}
+  <div class="sbar sbar--registry hm-period">
+    {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
+  </div>
+
   {% if data.truncated %}<div class="note note--warn"><div><div class="note__text">{{ t('overview.truncated', n=data.inspections|length) }}</div></div></div>{% endif %}
 
   {# ── Требует внимания (D398, D471): полоса во всю ширину над верхним рядом; задания
@@ -263,10 +269,6 @@
       <label class="hm-filters__toggle" for="hm-filters-flag">{{ t('home.filters.title') }}</label>
       <div class="hm-filters__body">
         <h2 class="hm-label hm-filters__title">{{ t('home.filters.title') }}</h2>
-        <div class="hm-field">
-          <span class="hm-field__label">{{ t('home.filters.period') }}</span>
-          {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path), dict(hidden_params, lang=lang)) }}
-        </div>
         {% if cluster_pick %}
           <div class="hm-field">
             <span class="hm-field__label">{{ t('home.filters.cluster') }}</span>
