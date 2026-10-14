@@ -71,7 +71,7 @@
   <script data-shell src="{{ url_for('static', filename='nav.js') }}" defer></script>
 </head>
 <body>
-  {% if not account %}
+  {% block topbar %}{% if not account %}
     {#
       До входа панели нет: разделы неопознанному человеку не показываются, а
       код тенанта — уже сведение о стенде. Остаются марка и выбор языка.
@@ -87,7 +87,7 @@
         {% include "_langpick.html" %}
       </div>
     </header>
-  {% endif %}
+  {% endif %}{% endblock %}
 
   {% if account %}
     {#

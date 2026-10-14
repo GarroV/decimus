@@ -1,0 +1,28 @@
+{#
+  Выбор языка на экранах входа (D492): маленький, в правом верхнем углу. Два языка —
+  пилюля ядра, как раньше; больше двух (D475) — меню `<details>` с тем же набором
+  кнопок, работает без скрипта. Форма GET: прочие параметры адреса (`next`,
+  `login_hint`) едут скрытыми полями, чтобы смена языка не сбрасывала их.
+#}
+<form{% if langs|length > 2 %} class="login__lang"{% else %} class="langpill"{% endif %} method="get" action="{{ url(current_path) }}" role="group" aria-label="{{ t('nav.lang') }}">
+  {% for key, value in request.args.items(multi=True) if key != 'lang' %}
+    <input type="hidden" name="{{ key }}" value="{{ value }}">
+  {% endfor %}
+  {% if langs|length > 2 %}
+    <details class="login__langmenu">
+      <summary aria-label="{{ t('nav.lang') }}"><span lang="{{ lang }}">{{ lang }}</span></summary>
+      <div class="login__langlist">
+        {% for code in langs %}
+          <button type="submit" name="lang" value="{{ code }}" lang="{{ code }}"
+                  aria-pressed="{{ 'true' if code == lang else 'false' }}">{{ t('nav.lang.' ~ code) }}</button>
+        {% endfor %}
+      </div>
+    </details>
+  {% else %}
+    {% for code in langs %}
+      <button class="langpill__item" type="submit" name="lang" value="{{ code }}"
+              aria-pressed="{{ 'true' if code == lang else 'false' }}"
+              title="{{ t('nav.lang.' ~ code) }}" lang="{{ code }}">{{ code }}</button>
+    {% endfor %}
+  {% endif %}
+</form>
