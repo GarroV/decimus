@@ -38,7 +38,12 @@ def сеть(pg_dsn: str, db_env: str, domain_env: Path) -> None:
 def _проверка(chat_id: int, reading_c: float | None) -> str:
     start_inspection(chat_id, unit=ТОЧКА, kind="planned", report_lang="ru", tenant="HQ")
     add_finding(
-        chat_id, code="CLN05", level="D1", zone="hot_kitchen", text="про градусы", reading_c=reading_c
+        chat_id,
+        code="CLN05",
+        level="D1",
+        zone="hot_kitchen",
+        text="про градусы",
+        reading_c=reading_c,
     )
     return push_inspection(chat_id)
 

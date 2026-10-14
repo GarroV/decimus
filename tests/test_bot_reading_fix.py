@@ -212,9 +212,7 @@ async def test_модель_недоступна_прежнее_предложе
     domain_env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     начата()
-    stub_model(
-        monkeypatch, с_показанием(26.0, "Про градусы"), ModelUnavailable("нет сети")
-    )
+    stub_model(monkeypatch, с_показанием(26.0, "Про градусы"), ModelUnavailable("нет сети"))
     bot, session = make_bot()
     dp = build_dispatcher(SETTINGS)
     await feed(dp, bot, photo_message("frame-1", caption=WORDS))
