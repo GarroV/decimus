@@ -49,6 +49,7 @@ from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
+from src.domain.second_factor import is_required as second_factor_required
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report.info_titles import FOUND
@@ -103,6 +104,7 @@ from .sections import (
     section,
     visible_sections,
 )
+from .security_screen import SECURITY_PATH
 from .texts import UI_LANGS, t
 
 logger = logging.getLogger(__name__)
@@ -276,7 +278,21 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "hint_key": users_view.hint_key,
             # Меню учётки ведёт в «Настройки»: подключения, вход, язык (D447).
             "settings_url": f"{request.script_root}{section('settings').path}?lang={lang}",
+            # Плашка «подключите вход в два шага» (D483): админу без способа — на
+            # каждой странице, пока не подключит; на самом экране защиты её нет.
+            "enroll_banner_url": _enroll_banner_url(account, lang),
         }
+
+
+def _enroll_banner_url(account: Any, lang: str) -> str:
+    """Адрес экрана защиты для плашки; пусто — плашку не показывать."""
+    if account is None or request.path == SECURITY_PATH:
+        return ""
+    if not second_factor_required(str(account.role)):
+        return ""
+    if bool(getattr(account, "has_second_factor", True)):
+        return ""
+    return f"{request.script_root}{SECURITY_PATH}?lang={lang}"
 
 
 def _register_sections(app: Flask) -> None:

@@ -740,3 +740,39 @@ def test_перебор_кодов_упирается_в_ограничител�
 
 def test_время_шага_не_уходит_в_будущее_случайно() -> None:
     assert totp_step_now(datetime.now(UTC)) > 0
+
+
+def test_страница_подтверждения_сама_запускает_ключ_когда_он_есть(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    стенд.вход_паролем("dev")
+
+    страница = стенд.client.get(STEP).get_data(as_text=True)
+
+    assert "data-passkey-autostart" in страница
+
+
+def test_после_неверного_кода_ключ_сам_не_запускается(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    """Осечка не должна вызывать окно ключа по кругу."""
+    стенд.вход_паролем("dev")
+    стенд.client.post(f"{STEP}/code", data={"code": "000000"}, headers=HDR)
+
+    страница = стенд.client.post(f"{STEP}/code", data={"code": "000000"}, headers=HDR).get_data(
+        as_text=True
+    )
+
+    assert "data-passkey-button" in страница
+    assert "data-passkey-autostart" not in страница
+
+
+def test_плашка_подключения_видна_админу_без_способа_но_не_на_экране_защиты(стенд: Стенд) -> None:
+    стенд.завести("adm", "admin")
+    войти(стенд.client, login="adm", password=ПАРОЛЬ)
+
+    другая = стенд.client.get("/settings", follow_redirects=True).get_data(as_text=True)
+    защита = стенд.client.get(SECURITY).get_data(as_text=True)
+
+    assert "data-enroll-banner" in другая
+    assert "data-enroll-banner" not in защита
