@@ -9,6 +9,10 @@
   Ключ доступа — кнопка со скриптом (`passkey.js`): без скрипта и в окнах без WebAuthn
   (встроенный браузер Telegram) остаётся код, а скрипт при отсутствии WebAuthn показывает
   подсказку «откройте в Safari или Chrome».
+
+  `data-passkey-autostart` (есть ключ и страница открыта не после осечки): скрипт сам
+  вызывает окно ключа один раз за загрузку страницы, без лишнего нажатия. Отказ или
+  закрытие окна молча оставляют кнопку; сообщение об ошибке — только после нажатия.
 #}{% extends "base.html" %}
 {% block title %}{{ t('sf.step.title') }}{% endblock %}
 {% block head %}
@@ -32,7 +36,7 @@
     {% endif %}
 
     {% if has_passkeys %}
-      <div class="login__google" data-passkey-login
+      <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}
            data-options-url="{{ url('/login/second-step/passkey/options') }}"
            data-verify-url="{{ url('/login/second-step/passkey/verify') }}"
            data-msg-failed="{{ t('sf.step.passkey_failed') }}"
