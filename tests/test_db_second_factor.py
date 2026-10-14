@@ -49,6 +49,10 @@ class Люди:
         with psycopg.connect(self.dsn, autocommit=True) as conn:
             conn.execute(запрос, параметры)  # type: ignore[arg-type]
 
+    def rows(self, запрос: str) -> list[tuple[object, ...]]:
+        with psycopg.connect(self.dsn, autocommit=True) as conn:
+            return conn.execute(запрос).fetchall()  # type: ignore[arg-type]
+
 
 @pytest.fixture
 def люди(pg_dsn: str, db_env: str, monkeypatch: pytest.MonkeyPatch) -> Люди:
@@ -357,3 +361,41 @@ def test_полная_сессия_человеку_со_способом_без
     with pytest.raises(SecondStepRequiredError):
         open_session(учётка)
     assert open_session(учётка, second_step=True) is not None
+
+
+# --- ключи, которыми не входили (D485) ----------------------------------------------
+
+
+def test_простаивающий_ключ_снимается_а_свежий_и_недавно_использованный_остаются(
+    люди: Люди,
+) -> None:
+    from src.bot import upload_sweeper
+
+    uid = люди.ид["anna"]
+    старый = sf.add_passkey(uid, **_ключ("anna", 1))  # type: ignore[arg-type]
+    забытый = sf.add_passkey(uid, **_ключ("anna", 2))  # type: ignore[arg-type]
+    недавний = sf.add_passkey(uid, **_ключ("anna", 3))  # type: ignore[arg-type]
+    свежий = sf.add_passkey(uid, **_ключ("anna", 4))  # type: ignore[arg-type]
+    # Снимаются: 60 дней и ни разу не использован; 45 дней без входа. Остаются: входили вчера
+    # (хотя создан 90 дней назад) и только что созданный.
+    люди.sql(
+        "update web_passkeys set created_at = now() - interval '60 days' where id = %s", старый.id
+    )
+    люди.sql(
+        "update web_passkeys set created_at = now() - interval '90 days',"
+        " last_used_at = now() - interval '45 days' where id = %s",
+        забытый.id,
+    )
+    люди.sql(
+        "update web_passkeys set created_at = now() - interval '90 days',"
+        " last_used_at = now() - interval '1 day' where id = %s",
+        недавний.id,
+    )
+
+    снято = upload_sweeper.purge_idle_passkeys_once()
+
+    assert снято == 2
+    оставшиеся = {k.id for k in sf.status_of(uid).passkeys}
+    assert оставшиеся == {недавний.id, свежий.id}, "снят не тот ключ"
+    записи = люди.rows("select action, target from action_journal where action = 'passkey_expired'")
+    assert записи == [("passkey_expired", "keys=2")]

@@ -63,7 +63,16 @@ from src.domain.journal import (
 )
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 
-from . import google_link, google_profile, oauth, reauth, second_step, swarm_api, walk_auth
+from . import (
+    google_link,
+    google_profile,
+    oauth,
+    passkey_login,
+    reauth,
+    second_step,
+    swarm_api,
+    walk_auth,
+)
 from . import journal as web_journal
 from .config import Settings
 from .google_auth import (
@@ -139,6 +148,7 @@ OPEN_ENDPOINTS = (
     | swarm_api.ENDPOINTS
     | oauth.ENDPOINTS
     | second_step.ENDPOINTS
+    | passkey_login.ENDPOINTS
 )
 
 
@@ -304,6 +314,7 @@ def install(app: Flask, conf: Settings) -> None:
         return response
 
     second_step.install(app, conf, remember=remember, stand=рубеж)
+    passkey_login.install(app, conf, remember=remember, stand=рубеж)
 
     @app.errorhandler(SecondStepRequiredError)
     def _second_step_required(_: SecondStepRequiredError) -> Response:
@@ -462,7 +473,12 @@ def install(app: Flask, conf: Settings) -> None:
         )
         if вторая is not None:
             return вторая
-        session = open_session(account, ip=откуда, user_agent=браузер)
+        session = open_session(
+            account,
+            ip=откуда,
+            user_agent=браузер,
+            step_waived=second_step.first_step_suffices(METHOD_PASSWORD),
+        )
         journals.record_login(
             method=METHOD_PASSWORD,
             result=RESULT_OK,
@@ -622,7 +638,12 @@ def install(app: Flask, conf: Settings) -> None:
         вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
         if вторая is not None:
             return запомнить_подсказку(очистить_метку(вторая), кто.email)
-        session = open_session(account, ip=откуда, user_agent=браузер)
+        session = open_session(
+            account,
+            ip=откуда,
+            user_agent=браузер,
+            step_waived=second_step.first_step_suffices(METHOD_GOOGLE),
+        )
         journals.record_login(
             method=METHOD_GOOGLE,
             result=RESULT_OK,
@@ -677,7 +698,9 @@ def install(app: Flask, conf: Settings) -> None:
         """Подтверждённый вход: прежняя сессия закрывается, новая — свежая (`reauth`)."""
         прежний = token_of_request()
         новая = open_session(
-            account, second_step=bool(getattr(account, "passed_second_step", False))
+            account,
+            second_step=bool(getattr(account, "passed_second_step", False)),
+            step_waived=True,  # подтверждение входа прав не повышает: признак прежней сессии выше
         )
         if прежний:
             close_session(прежний)

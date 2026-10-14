@@ -767,12 +767,167 @@ def test_после_неверного_кода_ключ_сам_не_запус�
     assert "data-passkey-autostart" not in страница
 
 
-def test_плашка_подключения_видна_админу_без_способа_но_не_на_экране_защиты(стенд: Стенд) -> None:
-    стенд.завести("adm", "admin")
-    войти(стенд.client, login="adm", password=ПАРОЛЬ)
+# --- ключ как способ входа, ступень при входе выключена (D485) -------------------------
 
-    другая = стенд.client.get("/settings", follow_redirects=True).get_data(as_text=True)
-    защита = стенд.client.get(SECURITY).get_data(as_text=True)
+LOGIN_KEY = "/login/passkey"
 
-    assert "data-enroll-banner" in другая
-    assert "data-enroll-banner" not in защита
+
+def _вход_ключом_с_формы(
+    клиент: FlaskClient, ключ: VirtualAuthenticator, **порча: object
+) -> tuple[int, dict[str, object]]:
+    опции = клиент.post(f"{LOGIN_KEY}/options", headers=HDR)
+    assert опции.status_code == 200, опции.get_data(as_text=True)
+    assert json.loads(опции.get_data(as_text=True))["allowCredentials"] == []
+    параметры: dict[str, object] = {"origin": ORIGIN, **порча}
+    тело = ключ.get(опции.get_data(as_text=True), **параметры)  # type: ignore[arg-type]
+    ответ = клиент.post(
+        f"{LOGIN_KEY}/verify", data=тело, content_type="application/json", headers=HDR
+    )
+    return ответ.status_code, ответ.get_json(silent=True) or {}
+
+
+def test_при_выключенной_ступени_пароль_открывает_сессию_сразу_и_с_ключом(
+    стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(second_step, "STEP_AT_PASSWORD", False)
+
+    ответ = стенд.вход_паролем("dev")
+
+    assert ответ.status_code == 302  # type: ignore[attr-defined]
+    assert _сессия(стенд.client), "после пароля нет сессии: ступень при входе не выключена"
+    assert not стенд.sql("select 1 from web_second_steps")
+
+
+def test_вход_ключом_с_формы_выдаёт_сессию_без_логина(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    чистый = стенд.новый_браузер()
+
+    код, тело = _вход_ключом_с_формы(чистый, с_ключом)
+
+    assert код == 200 and "redirect" in тело
+    assert _сессия(чистый)
+    assert ("passkey", "ok") in стенд.журнал_входов("dev")
+    assert _доказана(стенд, чистый), "сессия после входа ключом не помечена доказанной"
+
+
+def test_вызов_входа_ключом_одноразовый(стенд: Стенд, с_ключом: VirtualAuthenticator) -> None:
+    первый = стенд.новый_браузер()
+    опции = первый.post(f"{LOGIN_KEY}/options", headers=HDR).get_data(as_text=True)
+    тело = с_ключом.get(опции, origin=ORIGIN)
+    assert (
+        первый.post(
+            f"{LOGIN_KEY}/verify", data=тело, content_type="application/json", headers=HDR
+        ).status_code
+        == 200
+    )
+
+    # Тот же ответ из другого браузера: вызов снят, куки с привязкой там нет.
+    чужой = стенд.новый_браузер()
+    повтор = чужой.post(
+        f"{LOGIN_KEY}/verify", data=тело, content_type="application/json", headers=HDR
+    )
+
+    assert повтор.status_code == 401
+    assert not _сессия(чужой)
+
+
+def test_вход_ключом_замороженной_учётки_отвергается(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    from src.db.web_access import freeze_account
+
+    assert freeze_account("dev", tenant="HQ")
+    чистый = стенд.новый_браузер()
+
+    код, _ = _вход_ключом_с_формы(чистый, с_ключом)
+
+    assert код == 401
+    assert not _сессия(чистый)
+
+
+def test_вход_ключом_с_чужим_происхождением_отвергается(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    чистый = стенд.новый_браузер()
+
+    код, _ = _вход_ключом_с_формы(чистый, с_ключом, origin="https://evil.example")
+
+    assert код == 401
+    assert not _сессия(чистый)
+
+
+def test_вход_ключом_без_вызова_отвергается(стенд: Стенд, с_ключом: VirtualAuthenticator) -> None:
+    чистый = стенд.новый_браузер()
+    опции = чистый.post(f"{LOGIN_KEY}/options", headers=HDR).get_data(as_text=True)
+    тело = с_ключом.get(опции, origin=ORIGIN)
+    без_куки = стенд.новый_браузер()
+
+    ответ = без_куки.post(
+        f"{LOGIN_KEY}/verify", data=тело, content_type="application/json", headers=HDR
+    )
+
+    assert ответ.status_code == 401
+    assert not _сессия(без_куки)
+
+
+def _доказана(стенд: Стенд, клиент: FlaskClient) -> bool:
+    """Помечена ли сессия браузера как прошедшая вторую ступень (`second_step_at`)."""
+    assert клиент.get_cookie(auth.COOKIE_NAME) is not None
+    живые = стенд.sql(
+        "select second_step_at is not null from web_sessions"
+        " where closed_at is null order by issued_at desc limit 1"
+    )
+    return bool(живые and живые[0][0])
+
+
+def test_сессия_после_пароля_без_ступени_не_считается_прошедшей_и_не_снимает_способы(
+    стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(second_step, "STEP_AT_PASSWORD", False)
+    стенд.вход_паролем("dev")
+    assert _сессия(стенд.client)
+
+    assert not _доказана(стенд, стенд.client), "сессия после одного пароля помечена как доказанная"
+    ид = str(стенд.sql("select id from web_passkeys")[0][0])
+    стенд.client.post(f"{SECURITY}/passkey/{ид}/delete", headers=HDR)
+    assert стенд.sql("select 1 from web_passkeys"), "ключ снят сессией без доказательства"
+    экран = стенд.client.get(SECURITY).get_data(as_text=True)
+    assert 'id="prove"' in экран and "Подтвердить ключом" in экран
+
+
+def test_вход_ключом_с_формы_даёт_доказанную_сессию_и_способ_снимается(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    чистый = стенд.новый_браузер()
+    assert _вход_ключом_с_формы(чистый, с_ключом)[0] == 200
+    assert _доказана(стенд, чистый)
+    ид = str(стенд.sql("select id from web_passkeys")[0][0])
+
+    чистый.post(f"{SECURITY}/passkey/{ид}/delete", headers=HDR)
+
+    assert not стенд.sql("select 1 from web_passkeys")
+
+
+def test_код_приложения_в_сессии_даёт_доказательство_и_снятие(
+    стенд: Стенд, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    секрет = стенд.с_приложением("dev")
+    monkeypatch.setattr(second_step, "STEP_AT_PASSWORD", False)
+    стенд.вход_паролем("dev")
+    стенд.client.post(f"{SECURITY}/totp/remove", headers=HDR)
+    assert стенд.sql("select 1 from web_totp where confirmed_at is not null"), (
+        "снято без доказательства"
+    )
+
+    плохой = стенд.client.post(f"{SECURITY}/prove", data={"code": "000000"}, headers=HDR)
+    assert плохой.status_code == 302 and "prove=bad" in плохой.headers["Location"]
+    assert not _доказана(стенд, стенд.client)
+
+    хороший = стенд.client.post(
+        f"{SECURITY}/prove", data={"code": _код(секрет, totp_step_now())}, headers=HDR
+    )
+    assert хороший.status_code == 302 and "proved=1" in хороший.headers["Location"]
+    assert _доказана(стенд, стенд.client)
+    стенд.client.post(f"{SECURITY}/totp/remove", headers=HDR)
+    assert not стенд.sql("select 1 from web_totp where confirmed_at is not null")

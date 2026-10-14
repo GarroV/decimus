@@ -1,8 +1,8 @@
-"""«Входить по Touch ID в этом браузере?» (D485): плашка после входа и автозапуск по метке.
+"""Touch ID в браузере (D485): строка автосохранения после входа и автозапуск ключа по метке.
 
-Без базы, как `test_web_enroll_banner.py`. Что плашка показывается именно в браузере без
-метки, решает скрипт, а не сервер: сервер отдаёт её скрытой, а скрипт обязан гасить
-автозапуск без метки, поэтому его текст проверяется как часть договора.
+Без базы. Показывать ли строку в конкретном браузере (метка, одна попытка на вход) решает
+скрипт, а не сервер: сервер отдаёт её скрытой, а скрипт обязан гасить автозапуск без метки,
+поэтому его текст проверяется как часть договора.
 """
 
 from __future__ import annotations
@@ -55,28 +55,29 @@ def _страница(
         return ответ.get_data(as_text=True)
 
 
-def test_админу_со_способом_после_входа_плашка_есть(monkeypatch: pytest.MonkeyPatch) -> None:
-    страница = _страница(monkeypatch, роль="admin", есть_способ=True)
+@pytest.mark.parametrize("роль", ["developer", "admin", "superadmin", "control"])
+@pytest.mark.parametrize("есть_способ", [True, False])
+def test_ролям_веба_после_входа_строка_есть_со_способом_и_без(
+    monkeypatch: pytest.MonkeyPatch, роль: str, есть_способ: bool
+) -> None:
+    страница = _страница(monkeypatch, роль=роль, есть_способ=есть_способ)
 
     assert МАРКЕР in страница
     assert 'data-options-url="/settings/security/passkey/options"' in страница
     assert 'data-register-url="/settings/security/passkey/register"' in страница
-    assert "Входить по Touch ID в этом браузере?" in страница
-    # Скрыта разметкой: показывает её скрипт, и только в браузере без метки.
-    assert re.search(r"<div[^>]*data-passkey-here hidden", страница)
+    assert "Включить вход по Touch ID в этом браузере" in страница
+    # Скрыта разметкой: решает скрипт, по метке браузера и по тому, пробовали ли уже при этом входе.
+    assert re.search(r"<button[^>]*data-passkey-here hidden", страница)
+    assert 'data-session="' in страница
 
 
-def test_разработчику_без_способа_плашки_нет(monkeypatch: pytest.MonkeyPatch) -> None:
-    assert МАРКЕР not in _страница(monkeypatch, роль="developer", есть_способ=False)
+@pytest.mark.parametrize("роль", ["guest", "auditor"])
+def test_гостю_и_аудитору_строки_нет(monkeypatch: pytest.MonkeyPatch, роль: str) -> None:
+    assert МАРКЕР not in _страница(monkeypatch, роль=роль, есть_способ=False)
 
 
-def test_админу_без_способа_плашки_нет_у_него_плашка_подключения(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    страница = _страница(monkeypatch, роль="admin", есть_способ=False)
-
-    assert МАРКЕР not in страница
-    assert "data-enroll-banner" in страница
+def test_плашки_подключения_два_шага_больше_нет(monkeypatch: pytest.MonkeyPatch) -> None:
+    assert "data-enroll-banner" not in _страница(monkeypatch, роль="admin", есть_способ=False)
 
 
 def test_на_экране_защиты_плашки_нет(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -110,15 +111,42 @@ def test_скрипт_запускает_ключ_сам_только_по_ме�
         r"if \(root\.hasAttribute\(\"data-passkey-autostart\"\)\) run\(true\);",
         js,
     ), "автозапуск ключа не стоит за меткой браузера"
-    # Метка ставится и после входа ключом, и после создания ключа (экран защиты и плашка).
-    assert js.count("storageSet(HERE_KEY)") >= 4
+    # Метка ставится после входа ключом, после автосохранения и если ключ уже есть на устройстве.
+    assert js.count("storageSet(HERE_KEY)") >= 3
 
 
-def test_страница_подтверждения_не_запускает_ключ_безусловно() -> None:
-    """Разметка лишь допускает автозапуск; без метки скрипт ведёт с поля кода."""
-    html = (ШАБЛОНЫ / "login_second_step.html").read_text(encoding="utf-8")
+def test_автосохранение_пробует_один_раз_на_вход_и_без_кнопок_отказа() -> None:
     js = (СТАТИКА / "passkey.js").read_text(encoding="utf-8")
 
-    assert "login__methods" in html
-    assert "login__methods--code-first" in js
-    assert re.search(r"<input[^>]*id=\"code\"[^>]*\bautofocus\b", html, re.S)
+    assert 'var TRIED_KEY = "decimus.passkey.tried"' in js
+    assert "storageSetValue(TRIED_KEY, session);\n    attempt(true);" in js
+    assert "data-passkey-here-later" not in js
+
+
+def test_форма_входа_несёт_автозапуск_ключа_и_запасную_кнопку(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    подменить_двери(monkeypatch, tenant=ТЕНАНТ, role="admin")
+    app = собрать(tenant=ТЕНАНТ, webauthn_rp_id="localhost", webauthn_origin="http://localhost")
+    выкл = собрать(tenant=ТЕНАНТ)
+
+    with app.test_client() as client:
+        страница = client.get("/login").get_data(as_text=True)
+    with выкл.test_client() as client:
+        без_ключей = client.get("/login").get_data(as_text=True)
+
+    assert "data-passkey-autostart" in страница
+    assert 'data-options-url="/login/passkey/options"' in страница
+    assert 'data-verify-url="/login/passkey/verify"' in страница
+    assert "Войти по Touch ID" in страница
+    assert "data-passkey-login" not in без_ключей
+
+
+def test_вторая_ступень_стоит_у_пароля_и_не_стоит_у_google() -> None:
+    from src.domain.journal import METHOD_GOOGLE, METHOD_PASSWORD
+    from src.web import second_step
+
+    assert second_step.step_required(METHOD_PASSWORD)
+    assert not second_step.step_required(METHOD_GOOGLE)
+    assert second_step.first_step_suffices(METHOD_GOOGLE)
+    assert not second_step.first_step_suffices(METHOD_PASSWORD)

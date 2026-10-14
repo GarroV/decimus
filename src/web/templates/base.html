@@ -175,23 +175,18 @@
     {% endif %}
 
     <main class="page{% block page_class %}{% endblock %} shell__main">
-      {% if enroll_banner_url %}
-        {# Админу без второго способа (D483): заметно, без крестика, вся плашка — ссылка на «Вход и защиту». #}
-        <a class="note note--warn enroll-banner" href="{{ enroll_banner_url }}" data-enroll-banner role="alert">
-          <div class="note__title">{{ t('sf.banner.enroll') }}</div>
-        </a>
-      {% endif %}
-      {% if passkey_here_url %}
-        {# После входа второй ступенью (D485): одна кнопка заводит ключ в ЭТОМ браузере. Скрыта,
-           пока passkey.js не убедится, что метки «ключ тут есть» нет и «Не сейчас» не нажимали. #}
-        <div class="note passkey-here" data-passkey-here hidden
-             data-options-url="{{ passkey_here_url }}/passkey/options"
-             data-register-url="{{ passkey_here_url }}/passkey/register"
-             data-security-url="{{ passkey_here_url }}?lang={{ lang }}">
-          <div class="note__title passkey-here__title">{{ t('sf.here.title') }}</div>
-          <button class="btn btn--primary" type="button" data-passkey-here-enable>{{ t('sf.here.enable') }}</button>
-          <button class="btn" type="button" data-passkey-here-later>{{ t('sf.here.later') }}</button>
-        </div>
+      {% if passkey_here %}
+        {# После входа паролем или Google (D485): браузер без метки «ключ тут есть» сам просит у
+           устройства Touch ID и сохраняет ключ. Эта строка скрыта и показывается, только если
+           браузер не дал открыть окно сам или человек его закрыл: клик повторяет попытку.
+           Номер сессии нужен, чтобы отказ помнился до следующего входа, а не навсегда. #}
+        <button class="note note--warn passkey-here" type="button" data-passkey-here hidden
+                data-session="{{ passkey_here.session }}"
+                data-options-url="{{ passkey_here.base }}/passkey/options"
+                data-register-url="{{ passkey_here.base }}/passkey/register"
+                data-security-url="{{ passkey_here.base }}?lang={{ lang }}">
+          <span class="note__title">{{ t('sf.here.line') }}</span>
+        </button>
         <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
       {% endif %}
       {% block body %}{% endblock %}

@@ -38,6 +38,10 @@ _WEB: dict[str, tuple[str, str]] = {
     ),
     "security_passkey_register": ("Подключён ключ доступа", "Passkey added"),
     "security_passkey_delete": ("Удалён ключ доступа", "Passkey removed"),
+    "passkey_expired": (
+        "Сняты ключи доступа, которыми не входили 30 дней",
+        "Passkeys unused for 30 days removed",
+    ),
     "security_totp_confirm": (
         "Подключено приложение-аутентификатор",
         "Authenticator app connected",
@@ -178,6 +182,7 @@ _METHODS: dict[str, tuple[str, str]] = {
     "personal-mcp-token": ("Личный токен Claude", "Personal Claude token"),
     "bot-link": ("Ссылка привязки бота", "Bot link"),
     "second-step": ("Вторая ступень входа", "Second sign-in step"),
+    "passkey": ("Ключ доступа (Touch ID)", "Passkey (Touch ID)"),
 }
 _RESULTS: dict[str, tuple[str, str]] = {
     "ok": ("Вход выполнен", "Signed in"),

@@ -16,9 +16,10 @@ import asyncio
 import logging
 
 from src import db
-from src.db import journals
+from src.db import journals, second_factor
 from src.db.photos import walk_photo_refs
 from src.domain import check_environment
+from src.domain.second_factor import PASSKEY_IDLE_LIMIT
 from src.domain.upload_sweep import SweepResult, sweep_uploads
 
 logger = logging.getLogger(__name__)
@@ -52,6 +53,7 @@ async def sweep_forever() -> None:
         except Exception:
             logger.exception("уборка кадров мини-аппа не прошла")
         await _purge_journals()
+        await _purge_idle_passkeys()
         await asyncio.sleep(SWEEP_EVERY_SEC)
 
 
@@ -63,3 +65,38 @@ async def _purge_journals() -> None:
             logger.info("убрано старых записей журналов входов и действий: %s", убрано)
     except Exception:
         logger.exception("уборка журналов входов и действий не прошла")
+
+
+#: Запись в журнал действий (`action_journal.action`) о снятых за простой ключах (D485).
+PASSKEY_EXPIRED_ACTION = "passkey_expired"
+
+
+def purge_idle_passkeys_once() -> int:
+    """Снять ключи доступа, которыми не входили `PASSKEY_IDLE_LIMIT`; каждому человеку — запись.
+
+    Возвращает, сколько ключей снято. Потерянное устройство уходит само; человек при
+    следующем входе получит новое сохранение Touch ID.
+    """
+    снято = second_factor.purge_idle_passkeys(PASSKEY_IDLE_LIMIT)
+    for user_id, role, tenant, count in снято:
+        journals.record_action(
+            user_id=user_id,
+            role=role,
+            tenant=tenant,
+            action=PASSKEY_EXPIRED_ACTION,
+            target=f"keys={count}",
+            outcome="ok",
+            ip=None,
+            credential=None,
+        )
+    return sum(строка[3] for строка in снято)
+
+
+async def _purge_idle_passkeys() -> None:
+    """В каждом проходе (раз в 6 часов; лишний раз снимать безвредно). Сбой — в журнал процесса."""
+    try:
+        снято = await asyncio.to_thread(purge_idle_passkeys_once)
+        if снято:
+            logger.info("сняты ключи доступа, которыми не входили 30 дней: %s", снято)
+    except Exception:
+        logger.exception("снятие простаивающих ключей доступа не прошло")

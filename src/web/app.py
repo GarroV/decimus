@@ -49,7 +49,7 @@ from src.db.models import InspectionRow
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
-from src.domain.second_factor import is_required as second_factor_required
+from src.domain.second_factor import passkey_auto_enroll
 from src.domain.tenants import HQ_TENANT, canonical_tenant
 from src.domain.uploads import MAX_UPLOAD_BYTES
 from src.report.info_titles import FOUND
@@ -278,37 +278,30 @@ def _register_context(app: Flask, conf: Settings) -> None:
             "hint_key": users_view.hint_key,
             # Меню учётки ведёт в «Настройки»: подключения, вход, язык (D447).
             "settings_url": f"{request.script_root}{section('settings').path}?lang={lang}",
-            # Плашка «подключите вход в два шага» (D483): админу без способа — на
-            # каждой странице, пока не подключит; на самом экране защиты её нет.
-            "enroll_banner_url": _enroll_banner_url(account, lang),
-            # «Входить по Touch ID в этом браузере?» (D485): тем, у кого второй способ уже есть.
-            "passkey_here_url": _passkey_here_url(account, conf),
+            # Touch ID на этом устройстве (D485): после входа паролем или Google браузер без
+            # метки сам просит сохранить ключ; здесь — только допуск и адреса, решает passkey.js.
+            "passkey_here": _passkey_here(account, conf),
+            # Вход ключом с формы входа: кнопка и автозапуск только если ключи включены.
+            "passkeys_enabled": conf.webauthn_enabled,
         }
 
 
-def _enroll_banner_url(account: Any, lang: str) -> str:
-    """Адрес экрана защиты для плашки; пусто — плашку не показывать."""
-    if account is None or request.path == SECURITY_PATH:
-        return ""
-    if not second_factor_required(str(account.role)):
-        return ""
-    if bool(getattr(account, "has_second_factor", True)):
-        return ""
-    return f"{request.script_root}{SECURITY_PATH}?lang={lang}"
+def _passkey_here(account: Any, conf: Settings) -> dict[str, str] | None:
+    """Адреса и номер сессии для автосохранения Touch ID; `None` — не предлагать.
 
-
-def _passkey_here_url(account: Any, conf: Settings) -> str:
-    """Адрес экрана защиты для плашки «ключ в этом браузере»; пусто — плашку не рисовать.
-
-    Нужен способ (у тех, у кого его нет, плашка про подключение) и свежий вход: окно
-    подключения у сервера короткое, плашка после входа в него и укладывается. Показывать ли её
-    в конкретном браузере, решает `passkey.js` по метке.
+    Предлагается ролям веба, кроме гостя (`passkey_auto_enroll`), пока вход свежий (окно
+    подключения у сервера короткое, а предложение стоит сразу после входа) и не на самом
+    экране защиты — там своя кнопка. Ключи выключены на площадке — не предлагать.
     """
     if account is None or request.path == SECURITY_PATH or not conf.webauthn_enabled:
-        return ""
-    if not bool(getattr(account, "has_second_factor", False)) or not is_fresh(account):
-        return ""
-    return f"{request.script_root}{SECURITY_PATH}"
+        return None
+    if not passkey_auto_enroll(str(account.role)) or not is_fresh(account):
+        return None
+    base = f"{request.script_root}{SECURITY_PATH}"
+    return {
+        "base": base,
+        "session": str(getattr(account, "session_id", "")),
+    }
 
 
 def _register_sections(app: Flask) -> None:

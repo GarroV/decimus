@@ -1,5 +1,6 @@
-// Ключи доступа (WebAuthn, D463): вход ключом на «Подтвердите вход» и добавление ключа
-// на «Вход и защита». Параметры и ответы — JSON, номера и вызов — base64url; браузеры без
+// Ключи доступа (WebAuthn, D463, D485): вход ключом на форме входа (и на «Подтвердите
+// вход», если вторая ступень включена), сохранение
+// Touch ID в браузере после входа. Параметры и ответы — JSON, номера и вызов — base64url; браузеры без
 // `PublicKeyCredential.parse…FromJSON` обслуживаются ручным разбором, поэтому работает
 // и в Safari 16, и в Chrome. Без WebAuthn (встроенный браузер Telegram) — подсказка
 // «откройте в Safari или Chrome»; страница остаётся рабочей через код.
@@ -13,15 +14,21 @@
   // браузер помнит, что ключ тут есть (создан или вошли им), и без метки окно само не
   // открывается. Хранилище бывает закрыто (приватное окно) — любая осечка читается как «нет».
   var HERE_KEY = "decimus.passkey.here";
-  var DISMISS_KEY = "decimus.passkey.dismissed";
+  var TRIED_KEY = "decimus.passkey.tried";
 
   function storageGet(key) {
     try { return window.localStorage.getItem(key) === "1"; } catch (e) { return false; }
   }
 
-  function storageSet(key) {
-    try { window.localStorage.setItem(key, "1"); } catch (e) { /* без метки — только без автозапуска */ }
+  function storageValue(key) {
+    try { return window.localStorage.getItem(key); } catch (e) { return null; }
   }
+
+  function storageSetValue(key, value) {
+    try { window.localStorage.setItem(key, value); } catch (e) { /* без метки — только без автозапуска */ }
+  }
+
+  function storageSet(key) { storageSetValue(key, "1"); }
 
   // «Chrome · Mac»: имя ключа по браузеру и системе, чтобы не спрашивать его у человека.
   function deviceName() {
@@ -181,97 +188,64 @@
       if (root.hasAttribute("data-passkey-autostart")) run(true);
     } else {
       var methods = root.parentNode;
-      if (methods && methods.classList) methods.classList.add("login__methods--code-first");
+      if (methods && methods.classList && methods.classList.contains("login__methods")) methods.classList.add("login__methods--code-first");
     }
   }
 
-  // --- добавление ключа на «Вход и защита» ----------------------------------------------
-  function initRegister(root) {
-    var button = root.querySelector("[data-passkey-button]");
-    if (!button || guardUnsupported(root, button)) return;
+  // --- сохранить Touch ID в этом браузере после входа (D485) ----------------------------
+  // Браузер без метки «ключ тут есть» после входа паролем или Google сам просит у устройства
+  // Touch ID и создаёт ключ — без вопроса и кнопки. Если окно открыть не дали (Safari требует
+  // жеста) или его закрыли — тогда и только тогда показывается одна строка, клик по ней
+  // повторяет попытку. Автопопытка одна на вход (номер сессии в localStorage): отказ не
+  // дёргает человека на каждой странице, повтор — при следующем входе.
+  function initHere(root) {
+    if (!supported || storageGet(HERE_KEY)) return;
+    var session = root.getAttribute("data-session") || "";
     var busy = false;
-    button.addEventListener("click", function () {
+    var toSecurity = function () { window.location.href = root.getAttribute("data-security-url"); };
+
+    function attempt(auto) {
       if (busy) return;
       busy = true;
-      hide(root);
-      var nameField = root.querySelector("[data-passkey-name]");
-      var name = nameField ? nameField.value : "";
       postJson(root.getAttribute("data-options-url"))
         .then(function (opts) {
-          if (!opts.ok) throw new Error("options");
+          if (!opts.ok) throw Object.assign(new Error("options"), { refused: true });
           return navigator.credentials.create({ publicKey: creationOptions(opts.data) });
         })
         .then(function (cred) {
           return postJson(root.getAttribute("data-register-url"), {
-            name: name,
+            name: deviceName(),
             credential: encodeCreated(cred),
           });
         })
         .then(function (res) {
-          if (res.ok && res.data && res.data.redirect) {
-            storageSet(HERE_KEY);
-            window.location.href = res.data.redirect;
-            return;
-          }
-          throw new Error("register");
-        })
-        .catch(function () {
-          busy = false;
-          show(root, root.getAttribute("data-msg-failed") || "");
-        });
-    });
-  }
-
-  // --- «Входить по Touch ID в этом браузере?» после входа (D485) -------------------------
-  // Плашка скрыта разметкой и показывается, только если браузер поддерживает ключи, метки
-  // тут нет и «Не сейчас» не нажимали. Один клик — ключ создаётся тут же, без имени.
-  // Отказ сервера (окно подключения закрылось, лимит) уводит на «Вход и защиту» без шума.
-  function initHere(root) {
-    var button = root.querySelector("[data-passkey-here-enable]");
-    var later = root.querySelector("[data-passkey-here-later]");
-    if (!button || !supported || storageGet(HERE_KEY) || storageGet(DISMISS_KEY)) return;
-    root.hidden = false;
-    var busy = false;
-    var toSecurity = function () { window.location.href = root.getAttribute("data-security-url"); };
-
-    if (later) later.addEventListener("click", function () {
-      storageSet(DISMISS_KEY);
-      root.hidden = true;
-    });
-    button.addEventListener("click", function () {
-      if (busy) return;
-      busy = true;
-      postJson(root.getAttribute("data-options-url"))
-        .then(function (opts) {
-          if (!opts.ok) { toSecurity(); return null; }
-          return navigator.credentials.create({ publicKey: creationOptions(opts.data) })
-            .then(function (cred) {
-              return postJson(root.getAttribute("data-register-url"), {
-                name: deviceName(),
-                credential: encodeCreated(cred),
-              });
-            })
-            .then(function (res) {
-              if (!res.ok) { toSecurity(); return; }
-              storageSet(HERE_KEY);
-              root.hidden = true;
-            });
+          if (!res.ok) throw Object.assign(new Error("register"), { refused: true });
+          storageSet(HERE_KEY);
+          root.hidden = true;
         })
         .catch(function (err) {
           busy = false;
           var name = err && err.name;
           // Ключ с этого устройства уже есть (InvalidStateError): метка просто потерялась.
           if (name === "InvalidStateError") { storageSet(HERE_KEY); root.hidden = true; return; }
-          // Окно закрыли или отказали (NotAllowedError): тихо, кнопка остаётся.
-          if (name !== "NotAllowedError" && name !== "AbortError") toSecurity();
+          // Отказ сервера (окно подключения, лимит) по клику ведёт на «Вход и защиту».
+          if (err && err.refused && !auto) { toSecurity(); return; }
+          root.hidden = false;
         });
-    });
+    }
+
+    root.addEventListener("click", function () { attempt(false); });
+    if (storageValue(TRIED_KEY) === session) {
+      root.hidden = false;
+      return;
+    }
+    storageSetValue(TRIED_KEY, session);
+    attempt(true);
   }
 
   function init() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-here]"), initHere);
     Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-login]"), initLogin);
-    Array.prototype.forEach.call(document.querySelectorAll("[data-passkey-register]"), initRegister);
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);

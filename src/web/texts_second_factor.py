@@ -63,37 +63,59 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     # --- «Вход и защита» ----------------------------------------------------------------
     "sf.sec.title": {"ru": "Вход и защита", "en": "Sign-in and protection"},
     "sf.sec.sub": {
-        "ru": "Кроме Google или пароля вход подтверждается вторым шагом: ключом доступа или "
-        "кодом из приложения. Угнанная почта или пароль сами по себе в учётку не пускают.",
-        "en": "On top of Google or a password, sign-in is confirmed by a second step: a passkey "
-        "or a code from an app. A stolen mailbox or password alone does not get in.",
+        "ru": "Touch ID сохраняется сам после входа и снимается, если не входили 30 дней. Здесь "
+        "— запасной способ: приложение-аутентификатор и резервные коды.",
+        "en": "Touch ID saves itself after you sign in and is removed after 30 days without "
+        "use. Here is the fallback: an authenticator app and backup codes.",
     },
     "sf.sec.card": {
-        "ru": "Подтверждение входа: ключ, приложение, резервные коды.",
-        "en": "Sign-in confirmation: passkey, app, backup codes.",
+        "ru": "Вход по Touch ID; приложение и резервные коды — запасные.",
+        "en": "Touch ID sign-in; app and backup codes as a fallback.",
     },
     "sf.sec.open": {"ru": "Настроить", "en": "Set up"},
     "sf.sec.status_on": {"ru": "Подключено", "en": "On"},
     "sf.sec.status_off": {"ru": "Не подключено", "en": "Off"},
     "sf.sec.required": {
-        "ru": "Рекомендуем подключить подтверждение входа: так угнанная почта не откроет вашу "
-        "учётку. Нажмите «Добавить ключ доступа» — Touch ID на этом Mac, это 10 секунд.",
-        "en": "We recommend turning on sign-in confirmation: a hijacked mailbox then cannot open "
-        "your account. Click “Add a passkey” — Touch ID on this Mac, it takes 10 seconds.",
+        "ru": "Запасной способ не подключён: подключите приложение-аутентификатор.",
+        "en": "No fallback yet: connect an authenticator app.",
     },
-    "sf.banner.enroll": {
-        "ru": "Подключите вход в два шага: без него угнанная почта открывает вашу учётку",
-        "en": "Turn on two-step sign-in: without it, a hijacked mailbox opens your account",
+    "sf.sec.prove_title": {
+        "ru": "Подтвердите, что это вы",
+        "en": "Confirm it is you",
     },
-    "sf.here.title": {
-        "ru": "Входить по Touch ID в этом браузере?",
-        "en": "Sign in with Touch ID in this browser?",
+    "sf.sec.prove_lead": {
+        "ru": "Вы вошли Google или паролем. Чтобы удалить или заменить способ входа, "
+        "подтвердите вход ключом доступа или кодом.",
+        "en": "You signed in with Google or a password. To remove or replace a sign-in method, "
+        "confirm with a passkey or a code.",
     },
-    "sf.here.enable": {"ru": "Включить", "en": "Turn on"},
-    "sf.here.later": {"ru": "Не сейчас", "en": "Not now"},
+    "sf.sec.prove_key": {"ru": "Подтвердить ключом", "en": "Confirm with a passkey"},
+    "sf.sec.prove_code": {
+        "ru": "Код из приложения или резервный код",
+        "en": "Authenticator code or backup code",
+    },
+    "sf.sec.prove_submit": {"ru": "Подтвердить", "en": "Confirm"},
+    "sf.sec.prove_bad": {
+        "ru": "Код не подошёл. Попробуйте ещё раз.",
+        "en": "The code was not accepted. Try again.",
+    },
+    "sf.sec.proved": {
+        "ru": "Подтверждено: теперь способы входа можно менять.",
+        "en": "Confirmed: you can now change sign-in methods.",
+    },
+    "sf.here.line": {
+        "ru": "Включить вход по Touch ID в этом браузере",
+        "en": "Turn on Touch ID sign-in for this browser",
+    },
+    "sf.login.passkey": {"ru": "Войти по Touch ID", "en": "Sign in with Touch ID"},
+    "sf.login.passkey_failed": {
+        "ru": "Ключ не подошёл или окно закрыто. Войдите через Google или паролем.",
+        "en": "The passkey was not accepted or the prompt was closed. Sign in with Google or a "
+        "password.",
+    },
     "sf.sec.optional": {
-        "ru": "Для вашей роли подтверждение входа необязательно, но рекомендуется.",
-        "en": "Sign-in confirmation is optional for your role but recommended.",
+        "ru": "Запасной способ не подключён: подключите приложение-аутентификатор.",
+        "en": "No fallback yet: connect an authenticator app.",
     },
     "sf.sec.stale": {
         "ru": "Менять способы входа можно только сразу после входа (не позже 10 минут). "
@@ -109,12 +131,14 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     # ключи доступа
     "sf.pk.title": {"ru": "Ключ доступа", "en": "Passkey"},
     "sf.pk.lead": {
-        "ru": "Touch ID, Face ID, ключ безопасности или менеджер паролей: один шаг, без кода. "
-        "Ключей может быть несколько — например, ноутбук и телефон.",
-        "en": "Touch ID, Face ID, a security key or a password manager: one step, no code. "
-        "You can have several — a laptop and a phone, say.",
+        "ru": "Ключи входа по Touch ID: по одному на браузер. Потеряли устройство — удалите его "
+        "ключ.",
+        "en": "Touch ID sign-in keys: one per browser. Lost a device — remove its key.",
     },
-    "sf.pk.none": {"ru": "Ключей доступа пока нет.", "en": "No passkeys yet."},
+    "sf.pk.none": {
+        "ru": "Ключей пока нет.",
+        "en": "No keys yet.",
+    },
     "sf.pk.added": {"ru": "добавлен {date}", "en": "added {date}"},
     "sf.pk.used": {"ru": "последний вход {date}", "en": "last used {date}"},
     "sf.pk.never_used": {"ru": "ещё не использовался", "en": "not used yet"},
@@ -150,8 +174,10 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     # приложение
     "sf.totp.title": {"ru": "Приложение-аутентификатор", "en": "Authenticator app"},
     "sf.totp.lead": {
-        "ru": "Google Authenticator, 1Password, Authy и любое другое с кодами из шести цифр.",
-        "en": "Google Authenticator, 1Password, Authy or any app with six-digit codes.",
+        "ru": "Запасной способ. Google Authenticator, 1Password, Authy и любое другое с кодами "
+        "из шести цифр. При входе код не спрашивается.",
+        "en": "A fallback. Google Authenticator, 1Password, Authy or any app with six-digit "
+        "codes. Sign-in does not ask for the code.",
     },
     "sf.totp.on": {"ru": "Приложение подключено.", "en": "App connected."},
     "sf.totp.off": {"ru": "Приложение не подключено.", "en": "No app connected."},

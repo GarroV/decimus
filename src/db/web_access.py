@@ -250,6 +250,7 @@ _OPEN_SESSION_SQL = """
     insert into web_sessions (user_id, fingerprint, expires_at, ip, user_agent, second_step_at)
     select %(user)s, %(fp)s, now() + %(ttl)s, %(ip)s, %(ua)s, case when %(second)s then now() end
      where %(second)s
+        or %(waived)s
         or not (exists (select 1 from web_passkeys p where p.user_id = %(user)s)
                 or exists (select 1 from web_totp t
                             where t.user_id = %(user)s and t.confirmed_at is not null))
@@ -978,8 +979,13 @@ def open_session(
     ip: str | None = None,
     user_agent: str | None = None,
     second_step: bool = False,
+    step_waived: bool = False,
 ) -> OpenedSession:
     """Открыть сессию. Токен возвращается один раз — дальше он живёт в куке.
+
+    `step_waived` — вторая ступень при входе выключена (D485): сессию выдают без неё, но
+    `second_step_at` остаётся пустым. Отметку ставит только настоящее доказательство
+    (`second_step=True`: ключ доступа, код приложения), и только с ней можно снимать способы.
 
     **Полную сессию человеку со вторым способом без `second_step=True` не выдаёт сама эта
     функция** (`SecondStepRequiredError`): любой путь входа, нынешний или будущий, упрётся здесь.
@@ -1000,6 +1006,7 @@ def open_session(
                 "ip": ip,
                 "ua": truncate_user_agent(user_agent),
                 "second": second_step,
+                "waived": step_waived,
             },
         )
         row = cur.fetchone()

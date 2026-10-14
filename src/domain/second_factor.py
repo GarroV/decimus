@@ -32,6 +32,17 @@ REQUIRED_ROLES = frozenset({"admin", "superadmin"})
 #: Полупройденный вход живёт не дольше (D463): время на ввод кода, не на раздумья.
 PENDING_TTL = timedelta(minutes=5)
 
+#: Вызов входа ключом с формы входа живёт не дольше (D485): окно Touch ID, не раздумья.
+PASSKEY_LOGIN_TTL = timedelta(minutes=2)
+
+#: Кому после входа паролем или Google браузер сам предлагает Touch ID (D485): всем ролям веба,
+#: кроме гостя и аудитора (он работает в мини-апп Telegram, а не в админке).
+PASSKEY_AUTO_ROLES = frozenset({"developer", "admin", "superadmin", "control"})
+
+#: Ключ доступа, которым не входили дольше, снимается сам (D485): забытое устройство не остаётся
+#: входом навсегда. Отсчёт — от последнего входа, а у ни разу не использованного — от создания.
+PASSKEY_IDLE_LIMIT = timedelta(days=30)
+
 #: Сколько неверных ответов выдерживает один полупройденный вход, потом он мёртв.
 MAX_PENDING_FAILURES = 5
 
@@ -60,6 +71,11 @@ _BACKUP_GROUPS = 4
 _BACKUP_GROUP_LEN = 4
 
 _CODE_DIGITS = re.compile(r"[0-9]{%d}" % TOTP_DIGITS)
+
+
+def passkey_auto_enroll(role: str) -> bool:
+    """Предлагать ли этой роли сохранить Touch ID в браузере после входа."""
+    return role in PASSKEY_AUTO_ROLES
 
 
 def is_required(role: str) -> bool:

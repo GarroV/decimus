@@ -170,6 +170,10 @@ def render_page(
             flash=flash,
             codes=codes,
             fresh=is_fresh(account),
+            # Снять или заменить способ можно только сессией с настоящим доказательством (D485).
+            can_remove=may_remove(account),
+            can_prove_with_key=bool(status.passkeys) and conf.webauthn_enabled,
+            can_prove_with_code=status.totp_confirmed or status.backup_left > 0,
             required=is_required(account.role),
             enrolled=status.has_factor,
             passkeys_enabled=conf.webauthn_enabled,
@@ -207,6 +211,10 @@ def install(app: Flask, conf: Settings) -> None:
 
     @app.get(base, endpoint=SECURITY_ENDPOINT)
     def security_page() -> Response:
+        if request.args.get("prove") == "bad":
+            return render_page(flash=Flash("sf.sec.prove_bad", ok=False), code=401)
+        if request.args.get("proved") == "1":
+            return render_page(flash=Flash("sf.sec.proved", ok=True))
         return render_page()
 
     @app.post(f"{base}/relogin", endpoint="security_relogin")

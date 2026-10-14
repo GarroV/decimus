@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from src.domain.second_factor import (
@@ -43,6 +43,8 @@ LAST_FACTOR = "last-factor"
 
 PURPOSE_REGISTER = "register"
 PURPOSE_AUTHENTICATE = "authenticate"
+#: Вход ключом с формы входа (D485): вызов выдан без учётки, привязка — кука браузера.
+PURPOSE_LOGIN = "login"
 
 
 @dataclass(frozen=True)
@@ -255,6 +257,37 @@ def take_challenge(bound_token: str, *, purpose: str, user_id: str) -> bytes | N
     return bytes(строка[0])
 
 
+def store_login_challenge(bound_token: str, *, challenge: bytes) -> None:
+    """Запомнить вызов входа ключом за кукой браузера, без учётки. Прежний вытесняется."""
+    отпечаток = session_fingerprint(bound_token)
+    with _connected("запомнить вызов входа ключом") as conn, conn.cursor() as cur:
+        cur.execute("delete from web_webauthn_challenges where expires_at < now()")
+        cur.execute(
+            "delete from web_webauthn_challenges where bound_fp = %s and purpose = %s",
+            (отпечаток, PURPOSE_LOGIN),
+        )
+        cur.execute(
+            "insert into web_webauthn_challenges"
+            " (bound_fp, purpose, user_id, challenge, expires_at)"
+            " values (%s, %s, null, %s, now() + %s)",
+            (отпечаток, PURPOSE_LOGIN, challenge, CHALLENGE_TTL),
+        )
+
+
+def take_login_challenge(bound_token: str) -> bytes | None:
+    """Снять вызов входа ключом — ОДИН раз. Нет или просрочен — `None`; снятый не вернётся."""
+    with _connected("снять вызов входа ключом") as conn, conn.cursor() as cur:
+        cur.execute(
+            "delete from web_webauthn_challenges where bound_fp = %s and purpose = %s"
+            " returning challenge, expires_at > now()",
+            (session_fingerprint(bound_token), PURPOSE_LOGIN),
+        )
+        строка = cur.fetchone()
+    if строка is None or not строка[1]:
+        return None
+    return bytes(строка[0])
+
+
 # --- ключи доступа ---------------------------------------------------------------
 
 
@@ -302,6 +335,26 @@ def add_passkey(
         строка = cur.fetchone()
     assert строка is not None  # noqa: S101 — insert … returning без строки не бывает
     return _passkey(строка)
+
+
+def purge_idle_passkeys(
+    idle: timedelta,
+) -> tuple[tuple[str, str, str, int], ...]:
+    """Снять ключи, которыми не входили `idle` (`last_used_at`, у неиспользованных `created_at`).
+
+    Вернуть по человеку: (номер учётки, роль, пространство, сколько ключей снято).
+    """
+    with _connected("снять ключи доступа, которыми не входили") as conn, conn.cursor() as cur:
+        cur.execute(
+            "with gone as ("
+            " delete from web_passkeys"
+            "  where coalesce(last_used_at, created_at) < now() - %s returning user_id)"
+            " select g.user_id, u.role, u.tenant_code, count(*)"
+            "   from gone g join web_users u on u.id = g.user_id"
+            "  group by g.user_id, u.role, u.tenant_code",
+            (idle,),
+        )
+        return tuple((str(r[0]), str(r[1]), str(r[2]), int(r[3])) for r in cur.fetchall())
 
 
 def passkey_by_credential(credential_id: bytes) -> tuple[Passkey, str] | None:

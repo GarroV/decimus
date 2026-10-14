@@ -31,6 +31,8 @@ METHOD_MCP_TOKEN = "personal-mcp-token"  # noqa: S105 — название сп�
 METHOD_BOT_LINK = "bot-link"
 #: Вторая ступень входа (D463): ключ доступа, код приложения или резервный код.
 METHOD_SECOND_STEP = "second-step"
+#: Вход ключом доступа с формы входа (D485): ключ — способ входа, а не вторая ступень.
+METHOD_PASSKEY = "passkey"
 
 #: Исходы входа (`login_journal.result`).
 RESULT_OK = "ok"
