@@ -254,6 +254,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/walk_start.py` | Начало проверки из мини-аппа (D392): те же шаги, что у мастера бота, — полями на одном экране |
 | `src/web/walk_suggest.py` | Мини-апп обхода: поиск пункта по кадру и словам (D330) — `POST /tg/walk/suggest` |
 | `src/web/walk_translate.py` | Мини-апп обхода: перевод свободного текста на другой язык (D394) — `POST /tg/walk/translate` |
+| `src/web/walk_unseen.py` | Мини-апп обхода: «Ещё не смотрели» — пункты зоны, по которым записи пока нет (#837, D492) |
 | `src/web/walk_write.py` | Запись из мини-аппа обхода (D312): кадр, нарушение, замер, рекомендация, сведения о визите |
 | `src/web/walk_zone.py` | Мини-апп обхода: зона записи после того, как пункт найден (D445) |
 <!-- map:end -->
@@ -287,7 +288,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 <!-- map:begin tree src/web/static -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `src/web/static/` | 48 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-registry.css, … (+40) |
+| `src/web/static/` | 49 | SOURCE.md, apple-touch-icon.png, decimus-country.css, decimus-domain.css, decimus-home.css, decimus-journal.css, decimus-period.css, decimus-registry.css, … (+41) |
 | `src/web/static/fonts/` | 13 | golos-text-cyrillic-ext.woff2, golos-text-cyrillic.woff2, golos-text-latin-ext.woff2, golos-text-latin.woff2, ibm-plex-mono-cyrillic-400.woff2, ibm-plex-mono-cyrillic-500.woff2, ibm-plex-mono-cyrillic-600.woff2, ibm-plex-mono-latin-400.woff2, … (+5) |
 <!-- map:end -->
 
