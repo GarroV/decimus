@@ -978,7 +978,7 @@ Remove-Item -Recurse -Force C:\projects\decimus
 | Окружение | `/srv/decimus/.env`, права `600`; ключи — [`.env.example`](../.env.example) |
 | Методика | `/srv/decimus/data` (bind только на чтение, `AUDIT_DATA_DIR`) |
 | Проект compose | `decimus` → сеть `decimus_default`, тома `decimus_pgdata`, `decimus_state`, `decimus_frames`, `decimus_methodology` |
-| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet. Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
+| Кадры | **с 30.09.2026 — MinIO на MUSPELHEIM** (`C:\projects\decimus-frames`, канон — `GarroV/muspelheim-infra`), бот и админка ходят на `S3_ENDPOINT_URL=http://<TAILNET_IP>:9020` через tailnet под пользователем MinIO `decimus-app` с доступом только к корзине `inspection-frames` (политика `decimus-frames-rw`); root-ключи MinIO лежат только на MUSPELHEIM и в окружение прода не попадают (#458). Бэкапа у кадров нет (D259, #456). Пока MUSPELHEIM спит, фото на сдаче не выгружаются, а в админке не открываются; сдача при этом не встаёт, а кадры доливает сам бот, когда хранилище вернулось (§4.9.2, #459). Старое хранилище на VPS — служба `storage-live` и том `decimus_storage-data` — снято 30.09 (D293): `prod-update.sh` его не поднимает и корзину не заводит |
 
 ### 8.1. Подключение к прокси — надстройка площадки
 
