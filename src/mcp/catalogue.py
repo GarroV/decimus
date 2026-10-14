@@ -329,7 +329,7 @@ _CUE_CODES_PROPERTY: dict[str, object] = {
 }
 
 
-#: Одна фраза о поле `methodologies` на три инструмента ряда (D352): справка,
+#: Одна фраза о поле `methodologies` на три инструмента ряда (D365): справка,
 #: а не запрет — оценка каждой проверки верна по своей методике.
 _METHODOLOGIES_NOTE = (
     "The `methodologies` field is reference information: it groups the "
