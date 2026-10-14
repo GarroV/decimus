@@ -137,6 +137,8 @@
         <div class="sidenav__list">
           {% for item in sections %}
             {% set title = t('section.' ~ item.key ~ '.title') %}
+            {# Граница групп меню (D499): проверки · статистика · администрирование. #}
+            {% if not loop.first and item.group != loop.previtem.group %}<span class="sidenav__sep" aria-hidden="true"></span>{% endif %}
             {% if item.path == current_path %}
               <span class="sidenav__current" aria-current="page" title="{{ title }}">{{ icon(item.icon) }}<span class="sidenav__label">{{ title }}</span></span>
             {% elif item.key == current_key %}

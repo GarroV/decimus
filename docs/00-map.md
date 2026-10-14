@@ -113,10 +113,11 @@ Flask-приложение управляющей компании и партн
 Страница = модуль с маршрутами (`install` или `_register_*` в `app.py`) + шаблон в
 `src/web/templates/<раздел>/` + тексты в `texts_<раздел>.py`.
 
-<!-- map:begin files src/web/{action_plans,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
+<!-- map:begin files src/web/{action_plans,calendar_view,country,country_page,country_summary,country_units,edition,geo_names,google_mail,grade_explain,home_board,home_page,home_ratings,home_ratings_block,inspection_titles,inspections,letter_draft,letter_markup,methodology,methodology_view,overview,prescriptions,ratings,ratings_calendar,ratings_line,ratings_sheet,registry_period,registry_view,review,revision,to_inspect,unit_add,unit_card}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
+| `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
 | `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
 | `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
@@ -145,7 +146,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/registry_view.py` | Реестр проверок: отбор строк и подписи периода — без прав и без оценок |
 | `src/web/review.py` | Лист вычитки проверки на приёмке: весь чек-лист по пунктам (D199) |
 | `src/web/revision.py` | Правка записи на приёмке с пересчётом отчёта (D200) |
-| `src/web/to_inspect.py` | «Где нужно проверить» на экране «Календарь» (D399; с «Главной» в D418, оттуда в D466) |
+| `src/web/to_inspect.py` | «Где нужно проверить» (D399): с «Календаря» снят (D497), ждёт своего экрана |
 | `src/web/unit_add.py` | Новая пиццерия из веб-админки: экран страны → «Добавить пиццерию» (#437, D240) |
 | `src/web/unit_card.py` | Карточка точки: где пиццерия сейчас, куда движется и что у неё не чинится |
 <!-- map:end -->

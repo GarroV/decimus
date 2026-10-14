@@ -12,7 +12,7 @@
   мелкая, — вид проверки и аудитор. Процент и буква печатаются такими, какими
   лежат в базе, — на экран приходит уже подготовленная строка (`view.py`).
 
-  Два блока сверху вниз (D466). «На приёмке» — всё, что ждёт вычитки и
+  Слева — блок отбора и колонка стран (D498), справа два блока сверху вниз (D466). «На приёмке» — всё, что ждёт вычитки и
   подтверждения (D199): мимо периода и отбора, давно ждущие первыми, у каждой
   строки — сколько она ждёт. «Принятые» — история сети за выбранный период,
   новые сверху; период и отбор (буква, вид, страна, город, пиццерия) действуют
@@ -70,6 +70,42 @@
 {% endblock %}
 
 {% block split_list %}
+{# Раскладка D498: слева блок отбора и под ним колонка стран (как в «Стране» и
+   «Методике»), справа — «На приёмке» и «Принятые». На узком экране колонка
+   стран сворачивается обратно в чип отбора. #}
+<div class="mx-shell rg-shell">
+  <aside class="mx-rail rg-rail" aria-label="{{ t('registry.filters.title') }}">
+    <div class="rg-filters">
+      <div class="mx-rail__head">{{ t('registry.filters.title') }}</div>
+      {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
+      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
+                       period_hidden) }}
+      {% if country_pick %}<div class="rg-country-chip">{{ pick(country_pick) }}</div>{% endif %}
+      {% for chip in picks %}{{ pick(chip) }}{% endfor %}
+      <form class="rg-search" method="get" action="{{ url(current_path) }}" role="search">
+        {{ hidden_filters(skip=('q',)) }}
+        {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <label class="spill spill--search">
+          {{ icon('search') }}
+          <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ t('registry.search') }}"
+                 aria-label="{{ t('registry.search') }}" autocomplete="off" spellcheck="false">
+        </label>
+      </form>
+      {% if filters.active %}<a class="sbtn sbtn--ghost rg-reset" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
+    </div>
+    {% if country_pick %}
+      <div class="rg-countries">
+        <div class="mx-rail__head mx-rail__head--list"><span>{{ t('country.rail.title') }}</span></div>
+        {% for option in country_pick.options %}
+          <a class="mx-rail__row mx-rail__row--line{% if option.selected %} is-on{% endif %}" href="{{ option.href }}"{% if option.selected %} aria-current="true"{% endif %}>
+            <span class="mx-rail__name">{{ option.title }}</span>
+            {% if option.count is not none %}<span class="mx-rail__count">{{ option.count }}</span>{% endif %}
+          </a>
+        {% endfor %}
+      </div>
+    {% endif %}
+  </aside>
+  <div class="mx-main">
   <div class="sbox">
     {# «На приёмке» (D466): мимо периода и отбора, давно ждущие первыми. #}
     <div class="slist slist--registry slist--review">
@@ -82,25 +118,6 @@
       {% else %}
         <p class="slist__note">{{ t('registry.review.empty') }}</p>
       {% endif %}
-    </div>
-
-    <div class="sbar sbar--registry">
-      {# Период: стрелки листают на длину выбранного, по заголовку — календарь (`_period.html`). #}
-      {{ period_picker(period, period_title, period_prev, period_next, period_quick, url(current_path),
-                       period_hidden) }}
-
-      {% for chip in picks %}{{ pick(chip) }}{% endfor %}
-
-      <form class="sbar__search" method="get" action="{{ url(current_path) }}" role="search">
-        {{ hidden_filters(skip=('q',)) }}
-        {% for name, value in period.params().items() if value %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
-        <label class="spill spill--search">
-          {{ icon('search') }}
-          <input type="search" name="q" value="{{ filters.q }}" placeholder="{{ t('registry.search') }}"
-                 aria-label="{{ t('registry.search') }}" autocomplete="off" spellcheck="false">
-        </label>
-      </form>
-      {% if filters.active %}<a class="sbtn sbtn--ghost" href="{{ reset_url }}">{{ t('registry.filter.reset') }}</a>{% endif %}
     </div>
 
     {# «Принятые» — единственный блок, на который действуют период и отбор. #}
@@ -143,6 +160,8 @@
       {% endif %}
     </div>
   </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block split_title %}{{ t('registry.drawer.title') }}{% endblock %}

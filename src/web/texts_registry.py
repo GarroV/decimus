@@ -58,6 +58,7 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.search": {"ru": "Пиццерия", "en": "Pizzeria"},
     "registry.search.apply": {"ru": "Найти", "en": "Search"},
     "registry.filter.reset": {"ru": "Сбросить", "en": "Reset"},
+    "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
         "ru": "Период и отбор действуют только на принятые проверки, новые — сверху.",
@@ -110,14 +111,34 @@ _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
     "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
     "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
-    "calendar.tocheck.empty": {
-        "ru": "За этот период проверять нечего: у каждой точки охвата есть проверка.",
-        "en": "Nothing to inspect in this period: every unit in reach has an inspection.",
-    },
     "registry.tocheck.failed": {
         "ru": "Список не загрузился: база не ответила. Обновите страницу.",
         "en": "The list did not load: the database did not answer. Reload the page.",
     },
 }
 
-REGISTRY_TEXTS: dict[str, dict[str, str]] = {**_MONTHS, **_PERIOD, **_BAR, **_PANEL, **_TOCHECK}
+# Сетка «Календаря» (D497): дни недели с понедельника, клетка дня, пустой месяц.
+_CALENDAR: dict[str, dict[str, str]] = {
+    "calendar.wd.1": {"ru": "Пн", "en": "Mon"},
+    "calendar.wd.2": {"ru": "Вт", "en": "Tue"},
+    "calendar.wd.3": {"ru": "Ср", "en": "Wed"},
+    "calendar.wd.4": {"ru": "Чт", "en": "Thu"},
+    "calendar.wd.5": {"ru": "Пт", "en": "Fri"},
+    "calendar.wd.6": {"ru": "Сб", "en": "Sat"},
+    "calendar.wd.7": {"ru": "Вс", "en": "Sun"},
+    "calendar.count": {"ru": "проверок: {count}", "en": "inspections: {count}"},
+    "calendar.more": {"ru": "ещё {count}", "en": "{count} more"},
+    "calendar.empty": {
+        "ru": "За этот период проверок нет.",
+        "en": "No inspections in this period.",
+    },
+}
+
+REGISTRY_TEXTS: dict[str, dict[str, str]] = {
+    **_MONTHS,
+    **_PERIOD,
+    **_BAR,
+    **_PANEL,
+    **_TOCHECK,
+    **_CALENDAR,
+}

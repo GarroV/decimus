@@ -19,6 +19,8 @@
 {% from "country/_units.html" import units_table with context %}
 {% from "country/_panel.html" import unit_panel with context %}
 {% block title %}{{ t('section.country.title') }}{% endblock %}
+{# Широкая раскладка, как у «Методики» (D496): колонка у левого края, а не по центру. #}
+{% block page_class %} page--wide{% endblock %}
 {% block head %}
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-split.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='decimus-period.css') }}">
@@ -40,9 +42,9 @@
     </div>
     {% if dev_pick %}<div class="cn-devpick">{{ pick(dev_pick) }}</div>{% endif %}
     {% for row in rail %}
-      <a class="mx-rail__row{% if row.on %} is-on{% endif %}" href="{{ row.href }}"{% if row.on %} aria-current="page"{% endif %}>
+      <a class="mx-rail__row mx-rail__row--line{% if row.on %} is-on{% endif %}" href="{{ row.href }}"{% if row.on %} aria-current="page"{% endif %} title="{{ t('country.choose.units', n=row.units) }}">
         <span class="mx-rail__name">{{ country_title(row.code) or row.code }}</span>
-        <span class="mx-rail__meta">{{ t('country.choose.units', n=row.units) }}</span>
+        <span class="mx-rail__count">{{ row.units }}</span>
       </a>
     {% else %}
       <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>

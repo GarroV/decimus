@@ -25,22 +25,20 @@ from src.web.sections import (
 )
 
 
-def test_sections_are_the_nine_from_the_prototype_in_order() -> None:
-    """Девять разделов прототипа плюс «Люди» (T338): заведение учёток
-    переехало из командной строки на экран, и в прототипе его не было.
-    """
-    assert [item.key for item in SECTIONS] == [
-        "overview",
-        "registry",
-        "plans",
-        "orders",
-        "country",
-        "ratings",
-        "calendar",
-        "admin",
-        "actions",
-        "users",
-        "settings",
+def test_sections_go_in_menu_groups_in_order() -> None:
+    """Разделы по группам меню (D499): проверки, статистика, администрирование."""
+    assert [(item.group, item.key) for item in SECTIONS] == [
+        ("work", "overview"),
+        ("work", "registry"),
+        ("work", "plans"),
+        ("work", "orders"),
+        ("work", "calendar"),
+        ("work", "actions"),
+        ("stats", "country"),
+        ("stats", "ratings"),
+        ("admin", "admin"),
+        ("admin", "users"),
+        ("admin", "settings"),
     ]
 
 
