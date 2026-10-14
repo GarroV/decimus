@@ -71,7 +71,7 @@ def _record_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]
     return {
         "type": "object",
         "additionalProperties": False,
-        "required": ["item", "zone", "wording", "reason", "confidence"],
+        "required": ["item", "zone", "wording", "reason", "confidence", "reading_c"],
         "properties": {
             "item": {
                 "type": "string",
@@ -100,6 +100,14 @@ def _record_schema(picks: Sequence[str], zones: Sequence[str]) -> dict[str, Any]
             "confidence": {
                 "type": "number",
                 "description": "Уверенность от 0 до 1.",
+            },
+            "reading_c": {
+                "type": ["number", "null"],
+                "description": (
+                    "Показание термометра или щупа на кадре в градусах Цельсия, "
+                    "как оно видно. Кадр не про замер температуры или цифры не "
+                    "видно — null. Не вычисляй и не оценивай температуру сам."
+                ),
             },
         },
     }

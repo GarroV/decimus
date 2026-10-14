@@ -16,13 +16,14 @@ from .config import Settings
 from .engine import option, run_audit, state_file
 from .errors import EngineError, ValidationError
 from .handover import guard_writable
-from .models import SOURCES, Finding, Suggestion
+from .models import READING_MAX_C, READING_MIN_C, SOURCES, Finding, Suggestion
 from .state import (
     check_confidence,
     forget_source,
     forget_suggestion,
     forget_words,
     read_state,
+    remember_reading,
     remember_source,
     remember_suggestion,
     remember_words,
@@ -67,6 +68,21 @@ def _finding_after(chat_id: int, settings: Settings, n: int, what: str) -> Findi
     return found
 
 
+def check_reading(reading_c: float | None) -> None:
+    """Показание термометра: число в пределах термометра либо ничего (#836)."""
+    if reading_c is None:
+        return
+    if (
+        isinstance(reading_c, bool)
+        or not isinstance(reading_c, int | float)
+        or not READING_MIN_C <= reading_c <= READING_MAX_C
+    ):
+        raise ValidationError(
+            f"Показание «{reading_c!r}» не похоже на температуру: нужно число от "
+            f"{READING_MIN_C:g} до {READING_MAX_C:g} °C"
+        )
+
+
 def _clean_photo(ref: str, whose: str) -> str:
     """Ссылка на кадр, пригодная движку. Пусто или запятая — отказ.
 
@@ -97,6 +113,7 @@ def add_finding(
     zone_by_person: bool = False,
     repeat: bool = False,
     photos: Sequence[str] = (),
+    reading_c: float | None = None,
 ) -> Finding:
     """Зафиксировать запись.
 
@@ -152,6 +169,7 @@ def add_finding(
                 "сравнивать с записью не с чем, а в базе оно неотличимо от «не предлагала»"
             )
         check_confidence(suggested.confidence, "в предложении к новой записи")
+    check_reading(reading_c)
     frames = [_clean_photo(photo, "новой записи") for photo in photos]
     out = run_audit(
         [
@@ -174,6 +192,7 @@ def add_finding(
     path = state_file(chat_id, settings)
     remember_source(path, n, source)
     remember_words(path, n, words)
+    remember_reading(path, n, reading_c)
     remember_suggestion(path, n, suggested)
     after = _finding_after(chat_id, settings, n, "add")
     if any(frame not in after.photos for frame in frames):
@@ -225,6 +244,23 @@ def edit_finding(
     return _finding_after(chat_id, settings, n, "edit")
 
 
+def set_reading(chat_id: int, n: int, reading_c: float | None) -> Finding:
+    """Поставить или снять показание термометра у записи (#836).
+
+    Движок о показании не знает: оно лежит в блоке `domain` рядом со словами, и
+    правка идёт мимо `edit`. Записи нет — отказ, а не тихий успех: показание
+    чужой или удалённой записи осталось бы мусором внутри проверки.
+    """
+    guard_writable(chat_id)
+    settings = settings_for(chat_id)
+    check_reading(reading_c)
+    state = read_state(chat_id, settings)
+    if state is None or state.finding(n) is None:
+        raise ValidationError(f"Записи #{n} в проверке нет — показание ставить некуда")
+    remember_reading(state_file(chat_id, settings), n, reading_c)
+    return _finding_after(chat_id, settings, n, "reading")
+
+
 def drop_finding(chat_id: int, n: int) -> None:
     """Удалить запись. Удалять нечего — отказ, а не тихий успех."""
     guard_writable(chat_id)
@@ -239,6 +275,7 @@ def drop_finding(chat_id: int, n: int) -> None:
     forget_source(path, n)
     forget_suggestion(path, n)
     forget_words(path, n)  # слова аудитора (T183)
+    remember_reading(path, n, None)  # показание термометра (#836)
     state = read_state(chat_id, settings)
     if state is not None and state.finding(n) is not None:
         raise EngineError(

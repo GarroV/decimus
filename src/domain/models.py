@@ -105,6 +105,11 @@ NOTE_CODE = "NOTE"
 #: удваиваются и прошлым нарушением не считаются.
 NON_DEDUCTING = frozenset({"D0", ADVICE_LEVEL})
 
+#: Пределы показания термометра, °C (#836): от морозильной камеры до жарочного
+#: шкафа. Вне них число — мусор распознавания или опечатка, а не измерение.
+READING_MIN_C = -60.0
+READING_MAX_C = 500.0
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -154,6 +159,11 @@ class Finding:
     suggested_level: str = ""
     suggested_zone: str = ""
     suggested_confidence: float | None = None
+    #: Температура на фото термометра, °C (#836): прочитана моделью и подтверждена
+    #: или исправлена аудитором. Пусто — замера у записи нет. Лежит в блоке
+    #: `domain` проверки рядом со словами; на оценку не влияет — класс ставит
+    #: человек по порогам методики.
+    reading_c: float | None = None
 
 
 @dataclass(frozen=True)

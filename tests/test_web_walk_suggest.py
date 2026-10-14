@@ -134,6 +134,7 @@ def test_поиск_отдаёт_карточки_и_ничего_не_запи�
     assert тело["via"] == "model"
     карточка = тело["candidates"][0]
     assert {k: v for k, v in карточка.items() if k != "resolution"} | {"confidence": 0} == {
+        "reading_c": None,
         "code": "CLN05",
         "level": "D2",
         "zone": "hot_kitchen",

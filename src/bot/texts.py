@@ -691,6 +691,29 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "На кадрах видно ещё — вы об этом не говорили. Записать что-то из этого?\n\n{lines}",
         "en": "The frames also show this — you did not mention it. Record any of it?\n\n{lines}",
     },
+    # Показание термометра (#836): модель читает цифры с дисплея и путается
+    # (6 °C → 26 °C), поэтому число стоит отдельной строкой, а исправляет его
+    # аудитор.
+    "record.reading_line": {
+        "ru": "Температура на фото: {value} °C",
+        "en": "Temperature in the photo: {value} °C",
+    },
+    "record.ask_reading": {
+        "ru": "Напишите реальную температуру в °C, например 6 или -18.",
+        "en": "Type the real temperature in °C, for example 6 or -18.",
+    },
+    "record.reading_bad": {
+        "ru": "Не похоже на температуру. Напишите число в °C, например 6 или -18.",
+        "en": "That does not look like a temperature. Type a number in °C, for example 6 or -18.",
+    },
+    "record.reading_no_violation": {
+        "ru": "При температуре {value} °C нарушения нет — запись не создаётся.",
+        "en": "At {value} °C there is no violation, so no entry is created.",
+    },
+    "record.reading_dropped": {
+        "ru": "Исправление температуры отменено.",
+        "en": "Temperature correction cancelled.",
+    },
     "record.nothing_found": {
         "ru": "По этому материалу пункт не подобрался. Выберите сами или уточните словами.",
         "en": "No item matched this material. Pick one yourself or clarify in words.",
@@ -1396,6 +1419,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "btn.fix_skip": {"ru": "Оставить как есть", "en": "Leave as is"},
     "btn.manual": {"ru": "Выбрать пункт", "en": "Pick an item"},
     "btn.skip": {"ru": "Не записывать", "en": "Skip"},
+    "btn.fix_reading": {"ru": "Исправить температуру", "en": "Fix temperature"},
     "btn.more": {"ru": "Дальше", "en": "Next"},
     # Расхождение названной зоны со словарём объектов (T266). Название зоны
     # подставляется в подпись: «зона объекта» без имени заставляло бы аудитора

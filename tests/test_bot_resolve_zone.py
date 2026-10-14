@@ -23,7 +23,17 @@ from pathlib import Path
 import pytest
 from bot_harness import CHAT_ID
 
-from src.bot.zones import ASK, DICTIONARY, WORDS, allowed_zones, resolve_zone, zone_from_words
+from src.bot.zones import (
+    ASK,
+    DICTIONARY,
+    ITEM,
+    MODEL,
+    MODEL_ZONE_MIN_CONFIDENCE,
+    WORDS,
+    allowed_zones,
+    resolve_zone,
+    zone_from_words,
+)
 from src.domain import get_item, list_zones
 
 # --- зона, названная словами в живой форме (#225) ---------------------------
@@ -139,7 +149,7 @@ def test_прошлая_запись_среди_источников_не_зна
 
     параметры = set(inspect.signature(resolve_zone).parameters)
 
-    assert параметры == {"note", "item_code", "chat_id"}, (
+    assert параметры == {"note", "item_code", "chat_id", "model_zone", "model_confidence"}, (
         "у вывода зоны появился лишний вход — проверьте, не память ли это"
     )
 
@@ -196,5 +206,88 @@ def test_несуществующая_зона_в_карте_не_роняет_�
     with caplog.at_level(logging.WARNING):
         итог = resolve_zone("печь грязная", "CLN05", chat_id=CHAT_ID)
 
-    assert итог.source == ASK, "зоны, которой нет в методике, подставлять нельзя"
+    # Опечатка в карте зоной не стала; пункт держится в одной зоне методики
+    # (#838), и зона берётся оттуда, а не из строки карты.
+    assert (итог.zone, итог.source) == ("hot_kitchen", ITEM), (
+        "зоны, которой нет в методике, подставлять нельзя"
+    )
     assert "hot_kithcen" in caplog.text, "опечатка в карте прошла молча"
+
+
+# --- очевидная зона: пункт и модель (#838) -----------------------------------
+
+
+def test_пункт_в_одной_зоне_даёт_её_без_вопроса(domain_env: Path) -> None:
+    """Слов о месте нет, объекта в карте нет, но методика держит пункт в одной зоне."""
+    итог = resolve_zone("грязно", "CLN05", chat_id=CHAT_ID)
+
+    assert (итог.zone, итог.source) == ("hot_kitchen", ITEM)
+
+
+def test_пункт_ещё_не_выбран_зону_не_выводит(domain_env: Path) -> None:
+    """Без пункта «одна зона» не из чего вывести — кнопки по всем зонам."""
+    итог = resolve_zone("грязно", None, chat_id=CHAT_ID)
+
+    assert итог.source == ASK
+
+
+def test_слова_и_словарь_сильнее_зоны_пункта(domain_env: Path) -> None:
+    assert resolve_zone("в тепловом грязно", "CLN05", chat_id=CHAT_ID).source == WORDS
+    assert resolve_zone("печь грязная", "CLN05", chat_id=CHAT_ID).source == DICTIONARY
+
+
+def test_зона_модели_берётся_при_уверенности_и_из_зон_пункта(domain_env: Path) -> None:
+    допустимые = allowed_zones("CLN03", chat_id=CHAT_ID)
+    assert len(допустимые) > 1, "оснастка: пункт обязан быть в нескольких зонах"
+
+    итог = resolve_zone(
+        "грязно",
+        "CLN03",
+        chat_id=CHAT_ID,
+        model_zone=допустимые[0],
+        model_confidence=MODEL_ZONE_MIN_CONFIDENCE,
+    )
+
+    assert (итог.zone, итог.source) == (допустимые[0], MODEL)
+
+
+@pytest.mark.parametrize(
+    ("зона", "уверенность"),
+    [
+        ("{ok}", 0.1),  # слабая уверенность
+        ("{ok}", None),  # уверенности нет
+        ("UNKNOWN", 0.99),  # модель места не знает
+        ("{foreign}", 0.99),  # зона вне списка пункта
+    ],
+)
+def test_слабая_чужая_или_неизвестная_зона_модели_не_берётся(
+    domain_env: Path, зона: str, уверенность: float | None
+) -> None:
+    допустимые = allowed_zones("CLN03", chat_id=CHAT_ID)
+    чужая = next(z.code for z in list_zones(chat_id=CHAT_ID) if z.code not in допустимые)
+    зона = зона.format(ok=допустимые[0], foreign=чужая)
+
+    итог = resolve_zone(
+        "грязно", "CLN03", chat_id=CHAT_ID, model_zone=зона, model_confidence=уверенность
+    )
+
+    assert (итог.zone, итог.source) == (None, ASK), "неуверенная зона модели прошла без вопроса"
+
+
+@pytest.mark.parametrize(
+    "слова",
+    [
+        "температура продуктов на линии",
+        "на линии замерил",
+        "линия раздачи",
+        "Линия раздачи грязная",
+    ],
+)
+def test_линия_это_горячий_цех(domain_env: Path, слова: str) -> None:
+    """Выезд 14.10.2026: «температура продуктов на линии — всегда горячая зона»."""
+    assert zone_from_words(слова, chat_id=CHAT_ID) == "hot_kitchen"
+
+
+def test_линия_без_контекста_зоной_не_становится(domain_env: Path) -> None:
+    assert zone_from_words("очередь на кассе в зале", chat_id=CHAT_ID) != "hot_kitchen"
+    assert zone_from_words("температура в холодильнике", chat_id=CHAT_ID) is None
