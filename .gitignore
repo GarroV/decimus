@@ -72,3 +72,4 @@ backups/
 front/.deploy.env
 front/wrangler.admin.jsonc
 front/wrangler.mcp.jsonc
+front/wrangler.stand.jsonc
