@@ -232,7 +232,9 @@ def _unwrapped_file(view: Callable[..., Any]) -> str:
     if source is None:
         return "—"
     path = Path(source).resolve()
-    return _rel(path) if path.is_relative_to(ROOT) else "(библиотека)"
+    # Окружение внутри дерева (worktree с `.venv`) — тоже библиотека, а не код (#850).
+    inside = path.is_relative_to(ROOT) and not {".venv", "site-packages"} & set(path.parts)
+    return _rel(path) if inside else "(библиотека)"
 
 
 def _routes_of(app: Any) -> list[tuple[str, ...]]:
