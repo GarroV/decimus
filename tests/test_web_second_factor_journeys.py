@@ -931,3 +931,49 @@ def test_код_приложения_в_сессии_даёт_доказател
     assert _доказана(стенд, стенд.client)
     стенд.client.post(f"{SECURITY}/totp/remove", headers=HDR)
     assert not стенд.sql("select 1 from web_totp where confirmed_at is not null")
+
+
+def test_сессия_без_доказательства_не_подключает_приложение_и_не_выпускает_коды(
+    стенд: Стенд, с_ключом: VirtualAuthenticator, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """У учётки уже есть ключ, сессии хватило пароля: угнанный вход не перехватывает ступень."""
+    monkeypatch.setattr(second_step, "STEP_AT_PASSWORD", False)
+    стенд.вход_паролем("dev")
+
+    начало = стенд.client.post(f"{SECURITY}/totp/start", headers=HDR)
+    коды = стенд.client.post(f"{SECURITY}/backup/generate", headers=HDR)
+
+    assert начало.status_code == 403 and коды.status_code == 403
+    assert not стенд.sql("select 1 from web_totp"), "приложение заведено сессией без доказательства"
+    assert not стенд.sql("select 1 from web_backup_codes"), "коды выпущены без доказательства"
+
+
+def test_сессия_с_доказательством_выпускает_коды(
+    стенд: Стенд, с_ключом: VirtualAuthenticator
+) -> None:
+    чистый = стенд.новый_браузер()
+    assert _вход_ключом_с_формы(чистый, с_ключом)[0] == 200
+
+    коды = чистый.post(f"{SECURITY}/backup/generate", headers=HDR)
+
+    assert коды.status_code == 200
+    assert стенд.sql("select 1 from web_backup_codes")
+
+
+def test_сессия_подключившая_первый_способ_продолжает_настройку_без_доказательства(
+    стенд: Стенд, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Исключение одно: способов не было, эта сессия подключила первый — коды ей можно."""
+    monkeypatch.setattr(second_step, "STEP_AT_PASSWORD", False)
+    стенд.вход_паролем("dev")
+    стенд.client.post(f"{SECURITY}/totp/start", headers=HDR)
+    секрет = str(стенд.sql("select secret from web_totp")[0][0])
+    подключено = стенд.client.post(
+        f"{SECURITY}/totp/confirm", data={"code": _код(секрет, totp_step_now())}, headers=HDR
+    )
+    assert подключено.status_code == 200
+
+    коды = стенд.client.post(f"{SECURITY}/backup/generate", headers=HDR)
+
+    assert коды.status_code == 200
+    assert стенд.sql("select 1 from web_backup_codes")

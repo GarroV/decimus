@@ -117,6 +117,22 @@ def may_remove(account: Any, *, now: datetime | None = None) -> bool:
     )
 
 
+def may_change(account: Any, *, now: datetime | None = None) -> bool:
+    """Подключать приложение и выпускать резервные коды (D485).
+
+    Нет способов — достаточно свежего входа (первый способ). Способ УЖЕ есть — сессии, которой
+    хватило Google или пароля, нельзя: угнанная почта не должна выпускать себе коды и
+    перехватывать приложение. Нужна вторая ступень в этой сессии (`may_remove`) — либо эта
+    сессия сама подключила первый способ (все способы новее её входа).
+    """
+    if not is_fresh(account, now=now):
+        return False
+    if not bool(getattr(account, "has_second_factor", False)) or may_remove(account, now=now):
+        return True
+    since = getattr(account, "signed_in_at", None)
+    return since is not None and store.factors_all_newer_than(account.id, since)
+
+
 def _qr_svg(uri: str) -> Markup:
     """QR как встроенный SVG на белом: читается и на тёмной теме, адресов наружу нет."""
     svg = segno.make(uri, error="m").svg_inline(
@@ -172,6 +188,7 @@ def render_page(
             fresh=is_fresh(account),
             # Снять или заменить способ можно только сессией с настоящим доказательством (D485).
             can_remove=may_remove(account),
+            can_change=may_change(account),
             can_prove_with_key=bool(status.passkeys) and conf.webauthn_enabled,
             can_prove_with_code=status.totp_confirmed or status.backup_left > 0,
             required=is_required(account.role),
@@ -318,7 +335,7 @@ def install(app: Flask, conf: Settings) -> None:
     def security_totp_start() -> Response | tuple[Response, int]:
         refuse_foreign_origin()
         account = _me()
-        if not is_fresh(account):
+        if not may_change(account):
             return _stale_response(json_body=False)
         try:
             начато = store.begin_totp(account.id, new_totp_secret())
@@ -331,7 +348,7 @@ def install(app: Flask, conf: Settings) -> None:
     def security_totp_confirm() -> Response | tuple[Response, int]:
         refuse_foreign_origin()
         account = _me()
-        if not is_fresh(account):
+        if not may_change(account):
             return _stale_response(json_body=False)
         try:
             строка = store.totp_of(account.id)
@@ -368,7 +385,7 @@ def install(app: Flask, conf: Settings) -> None:
     def security_backup_generate() -> Response | tuple[Response, int]:
         refuse_foreign_origin()
         account = _me()
-        if not is_fresh(account):
+        if not may_change(account):
             return _stale_response(json_body=False)
         try:
             if not store.has_any(account.id):

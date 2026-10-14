@@ -337,6 +337,24 @@ def add_passkey(
     return _passkey(строка)
 
 
+def factors_all_newer_than(user_id: str, since: datetime) -> bool:
+    """Все способы входа человека созданы не раньше `since` (или их нет): до этой сессии их не было.
+
+    Так узнаётся сессия, которой человек подключил ПЕРВЫЙ способ: ей можно продолжить настройку
+    (резервные коды) без доказательства ступени. Сессия при уже имевшемся способе — нельзя.
+    """
+    with _connected("сверить давность способов входа") as conn, conn.cursor() as cur:
+        cur.execute(
+            "select not exists (select 1 from web_passkeys where user_id = %(u)s"
+            "                    and created_at < %(s)s)"
+            "   and not exists (select 1 from web_totp where user_id = %(u)s"
+            "                    and confirmed_at is not null and confirmed_at < %(s)s)",
+            {"u": user_id, "s": since},
+        )
+        строка = cur.fetchone()
+    return bool(строка and строка[0])
+
+
 def purge_idle_passkeys(
     idle: timedelta,
 ) -> tuple[tuple[str, str, str, int], ...]:
