@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 147 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 150 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -87,6 +87,8 @@
 | `/inspections/<inspection_id>/retract` | POST | `do_retract` | `src/web/app.py` |
 | `/login` | GET, POST | `login` | `src/web/auth.py` |
 | `/login/google` | GET | `google_start` | `src/web/auth.py` |
+| `/login/passkey/options` | POST | `passkey_login_options` | `src/web/passkey_login.py` |
+| `/login/passkey/verify` | POST | `passkey_login_verify` | `src/web/passkey_login.py` |
 | `/login/second-step` | GET | `second_step_page` | `src/web/second_step.py` |
 | `/login/second-step/code` | POST | `second_step_code` | `src/web/second_step.py` |
 | `/login/second-step/passkey/options` | POST | `second_step_passkey_options` | `src/web/second_step.py` |
@@ -136,6 +138,7 @@
 | `/settings/security/passkey/<passkey_id>/delete` | POST | `security_passkey_delete` | `src/web/security_screen.py` |
 | `/settings/security/passkey/options` | POST | `security_passkey_options` | `src/web/security_screen.py` |
 | `/settings/security/passkey/register` | POST | `security_passkey_register` | `src/web/security_screen.py` |
+| `/settings/security/prove` | POST | `security_prove_code` | `src/web/second_step.py` |
 | `/settings/security/relogin` | POST | `security_relogin` | `src/web/security_screen.py` |
 | `/settings/security/totp/confirm` | POST | `security_totp_confirm` | `src/web/security_screen.py` |
 | `/settings/security/totp/remove` | POST | `security_totp_remove` | `src/web/security_screen.py` |
@@ -424,6 +427,7 @@
 | `0066_move_with_action_plan.sql` | — |
 | `0067_journals.sql` | `login_journal`, `action_journal` |
 | `0068_second_factor.sql` | `web_passkeys`, `web_totp`, `web_backup_codes`, `web_second_steps`, `web_webauthn_challenges` |
+| `0069_passkey_login.sql` | — |
 <!-- map:end -->
 
 ## Makefile

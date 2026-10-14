@@ -154,7 +154,7 @@ Flask-приложение управляющей компании и партн
 экран «Пользователи» с карточкой человека, ключи API сервисов, подключение Claude
 входом через сайт (OAuth).
 
-<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,origin,partner_spaces,people,profile,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
+<!-- map:begin files src/web/{access_policy,account_menu,accounts,auth,connections_form,connections_screen,google_auth,google_link,google_profile,guard,journal,journal_screen,oauth,origin,partner_spaces,people,profile,passkey_login,proxy,remote,security_headers,reauth,second_step,security_screen,settings_screen,ui_lang,users_claude,users_mcp,users_page,users_screen,users_view}.py -->
 | Файл | Что делает |
 |---|---|
 | `src/web/access_policy.py` | Кто кого ведёт на экране «Пользователи» (#585, D362, D364) — одно правило на экран |
@@ -172,6 +172,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/oauth.py` | Сервер авторизации OAuth для подключения Claude к MCP (D417) |
 | `src/web/origin.py` | Заслон происхождения: пропустить отправку формы только со своей же страницы |
 | `src/web/partner_spaces.py` | Пространства партнёров на экране «Пользователи» (#585, D364) |
+| `src/web/passkey_login.py` | Вход ключом доступа с формы входа (D485): ключ — способ ВХОДА, а не вторая ступень |
 | `src/web/people.py` | Правка человека на вкладке «Пользователи»: роль и почта входа через Google (#399) |
 | `src/web/profile.py` | Свой пароль с экрана (#324): что форма пропускает к базе и что отвечает |
 | `src/web/proxy.py` | Что сказать `waitress` про звенья перед нами — и кому из соседей верить |
@@ -448,6 +449,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `0066_move_with_action_plan.sql` | Перенос проверки в пиццерию другой страны не оставляет по ней экшн-план (приватный advisory GHSA-wqh3-3qcr-cccp) |
 | `0067_journals.sql` | Два журнала на случай взлома учётки (D462, шаг 2): «кто и откуда входил» и «что делали админы» |
 | `0068_second_factor.sql` | Вторая ступень входа (D463): ключ доступа (passkey, Touch ID), код из приложения- аутентификатора (TOTP, RFC 6238) и одноразовые резервные коды |
+| `0069_passkey_login.sql` | Вход ключом идёт с формы входа, до того как известно, кто пришёл: вызов выдаётся браузеру без учётки (ключ находится по номеру, а не по логину) |
 <!-- map:end -->
 
 ## src/mcp — MCP-сервер

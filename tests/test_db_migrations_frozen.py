@@ -280,6 +280,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0068_second_factor.sql": (
         "sql1:fd72b43a4886143404ebdaaabf21ce091b581e1db848238ab4bcbafc7479b998"
     ),
+    # Ключ доступа как способ входа: вызов без учётки, способ `passkey` в журнале (D485).
+    "0069_passkey_login.sql": (
+        "sql1:6e90e207a16d3ce7378a331741fd8fda315f07e022a1ff3f9c76575ed92b9992"
+    ),
 }
 
 

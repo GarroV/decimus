@@ -65,6 +65,7 @@ EXEMPT_ENDPOINTS: Mapping[str, str] = {
     "settings_google_link": "свою почту Google привязывает сам (D447, D450)",
     "settings_google_unlink": "свою почту Google отвязывает сам (D447, D450)",
     "security_relogin": "выйти и войти заново, чтобы менять свои способы входа (D463)",
+    "security_prove_code": "подтверждает своей сессии вторую ступень кодом приложения (D485)",
     "security_passkey_options": "свой ключ доступа: параметры регистрации (D463)",
     "security_passkey_register": "свой ключ доступа добавляет сам (D463)",
     "security_passkey_delete": "свой ключ доступа убирает сам (D463)",

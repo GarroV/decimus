@@ -10,9 +10,12 @@
   (встроенный браузер Telegram) остаётся код, а скрипт при отсутствии WebAuthn показывает
   подсказку «откройте в Safari или Chrome».
 
-  `data-passkey-autostart` (есть ключ и страница открыта не после осечки): скрипт сам
-  вызывает окно ключа один раз за загрузку страницы, без лишнего нажатия. Отказ или
-  закрытие окна молча оставляют кнопку; сообщение об ошибке — только после нажатия.
+  `data-passkey-autostart` (есть ключ и страница открыта не после осечки) — только
+  ДОПУСК к автозапуску: решает скрипт, по метке браузера «ключ тут есть» (D485). Ключ живёт
+  там, где создан, а в другом браузере окно ключа показало бы QR-код. С меткой скрипт вызывает
+  окно ключа один раз за загрузку; без метки окна нет, страница ведёт с поля кода
+  (`login__methods--code-first`), кнопка ключа остаётся запасной. Отказ или закрытие окна
+  молча оставляют кнопку; сообщение об ошибке — только после нажатия.
 #}{% extends "base.html" %}
 {% block title %}{{ t('sf.step.title') }}{% endblock %}
 {% block head %}
@@ -35,6 +38,7 @@
       </div>
     {% endif %}
 
+    <div class="login__methods">
     {% if has_passkeys %}
       <div class="login__google" data-passkey-login{% if passkey_autostart %} data-passkey-autostart{% endif %}
            data-options-url="{{ url('/login/second-step/passkey/options') }}"
@@ -61,11 +65,12 @@
         <input class="input" id="code" name="code" type="text" inputmode="text"
                placeholder="{{ t('sf.step.code') }}" autocomplete="one-time-code"
                autocapitalize="characters" spellcheck="false" maxlength="40"
-               {% if not has_passkeys %}autofocus{% endif %} required>
+               autofocus required>
         <button class="btn{% if not has_passkeys %} btn--primary{% endif %}" type="submit">{{ t('sf.step.submit') }}</button>
       </form>
       <p class="login__aside">{{ t('sf.step.code_hint') }}</p>
     {% endif %}
+    </div>
 
     <p class="login__aside">{{ t('sf.step.lost') }}</p>
     <p class="login__aside"><a href="{{ url_for('login') }}?lang={{ lang }}">{{ t('sf.step.restart') }}</a></p>

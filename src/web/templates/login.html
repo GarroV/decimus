@@ -8,6 +8,10 @@
 #}{% extends "base.html" %}
 {% block title %}{{ t('auth.title') }}{% endblock %}
 
+{% block head %}
+  <script src="{{ url_for('static', filename='passkey.js') }}" defer></script>
+{% endblock %}
+
 {% block body %}
   {#
     Вход через Google — слева, логин и пароль — справа, без лишних слов
@@ -93,5 +97,22 @@
     </form>
 
     <p class="login__aside">{{ t('auth.aside') }}</p>
+    {#
+      Вход ключом доступа (D485): браузер с меткой «ключ тут есть» на открытии страницы сам
+      просит Touch ID (`passkey.js`), остальные видят запасную кнопку. Осечка автозапуска тихая.
+    #}
+    {% if passkeys_enabled %}
+      <div class="login__passkey" data-passkey-login data-passkey-autostart
+           data-options-url="{{ url('/login/passkey/options') }}"
+           data-verify-url="{{ url('/login/passkey/verify') }}{% if next_path %}?next={{ next_path|urlencode }}{% endif %}"
+           data-msg-failed="{{ t('sf.login.passkey_failed') }}"
+           data-msg-unavailable="{{ t('sf.step.passkey_unavailable') }}">
+        <button class="btn" type="button" data-passkey-button>{{ t('sf.login.passkey') }}</button>
+        <div class="note note--warn" role="alert" data-passkey-message hidden>
+          <div><div class="note__title" data-passkey-message-text></div></div>
+        </div>
+      </div>
+    {% endif %}
+
   </div>
 {% endblock %}

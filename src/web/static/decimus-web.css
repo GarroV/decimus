@@ -132,6 +132,9 @@
 .login__google-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .login__google-mark { width: 20px; height: 20px; flex: 0 0 auto; }
 
+.login__passkey { grid-column: 1 / -1; margin-top: var(--space-8); text-align: center; }
+.login__passkey .btn { width: 100%; justify-content: center; }
+
 .login__or {
   grid-area: or; align-self: stretch;
   display: flex; flex-direction: column; align-items: center; gap: var(--space-3);
@@ -1947,5 +1950,13 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__gear svg { width: 15px; height: 15px; }
 
 /* Плашка «подключите вход в два шага» (D483): ссылка целиком, предупреждающий тон из .note--warn. */
+/* Способы второй ступени: без метки «ключ в этом браузере» (D485) сверху поле кода,
+   ключ — запасной вариант ниже. Порядок в разметке не меняется. */
+.login__methods { display: flex; flex-direction: column; }
+.login__methods--code-first > .login__or { order: 1; }
+.login__methods--code-first > .login__google { order: 2; margin-top: var(--space-5); }
+.passkey-here { display: block; width: 100%; margin-bottom: var(--space-7); text-align: left; cursor: pointer; font: inherit; }
+.passkey-here[hidden] { display: none; }
+.passkey-here:hover .note__title { text-decoration: underline; }
 .enroll-banner { display: block; margin-bottom: var(--space-7); text-decoration: none; }
 .enroll-banner:hover { text-decoration: underline; }

@@ -19,7 +19,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 from src.domain.second_factor import (
@@ -43,6 +43,8 @@ LAST_FACTOR = "last-factor"
 
 PURPOSE_REGISTER = "register"
 PURPOSE_AUTHENTICATE = "authenticate"
+#: Вход ключом с формы входа (D485): вызов выдан без учётки, привязка — кука браузера.
+PURPOSE_LOGIN = "login"
 
 
 @dataclass(frozen=True)
@@ -255,7 +257,63 @@ def take_challenge(bound_token: str, *, purpose: str, user_id: str) -> bytes | N
     return bytes(строка[0])
 
 
+def store_login_challenge(bound_token: str, *, challenge: bytes) -> None:
+    """Запомнить вызов входа ключом за кукой браузера, без учётки. Прежний вытесняется."""
+    отпечаток = session_fingerprint(bound_token)
+    with _connected("запомнить вызов входа ключом") as conn, conn.cursor() as cur:
+        cur.execute("delete from web_webauthn_challenges where expires_at < now()")
+        cur.execute(
+            "delete from web_webauthn_challenges where bound_fp = %s and purpose = %s",
+            (отпечаток, PURPOSE_LOGIN),
+        )
+        cur.execute(
+            "insert into web_webauthn_challenges"
+            " (bound_fp, purpose, user_id, challenge, expires_at)"
+            " values (%s, %s, null, %s, now() + %s)",
+            (отпечаток, PURPOSE_LOGIN, challenge, CHALLENGE_TTL),
+        )
+
+
+def take_login_challenge(bound_token: str) -> bytes | None:
+    """Снять вызов входа ключом — ОДИН раз. Нет или просрочен — `None`; снятый не вернётся."""
+    with _connected("снять вызов входа ключом") as conn, conn.cursor() as cur:
+        cur.execute(
+            "delete from web_webauthn_challenges where bound_fp = %s and purpose = %s"
+            " returning challenge, expires_at > now()",
+            (session_fingerprint(bound_token), PURPOSE_LOGIN),
+        )
+        строка = cur.fetchone()
+    if строка is None or not строка[1]:
+        return None
+    return bytes(строка[0])
+
+
 # --- ключи доступа ---------------------------------------------------------------
+
+
+class NotFirstFactorError(Exception):
+    """Способ подключали как ПЕРВЫЙ, но у человека уже есть другой (проиграна гонка, D485)."""
+
+
+def _factor_count(cur: Any, user_id: str) -> int:
+    cur.execute(
+        "select (select count(*) from web_passkeys where user_id = %(u)s)"
+        " + (select count(*) from web_totp where user_id = %(u)s and confirmed_at is not null)",
+        {"u": user_id},
+    )
+    строка = cur.fetchone()
+    return 0 if строка is None else int(строка[0])
+
+
+def _take_first_slot(cur: Any, user_id: str, *, only_if_first: bool) -> None:
+    """Замок учётки и, если подключают ПЕРВЫЙ способ без доказательства ступени, проверка «их нет».
+
+    Замок и проверка — в той же транзакции, что вставка способа: два параллельных запроса,
+    каждый считающий себя первым, выстраиваются в очередь, и второй видит способ первого.
+    """
+    cur.execute(_LOCK_SQL, (ADVISORY_NAMESPACE, str(user_id)))
+    if only_if_first and _factor_count(cur, user_id) > 0:
+        raise NotFirstFactorError(user_id)
 
 
 def _close_others_if_first(cur: Any, user_id: str, keep_session_id: str | None) -> None:
@@ -264,13 +322,7 @@ def _close_others_if_first(cur: Any, user_id: str, keep_session_id: str | None) 
     Сессия, открытая одной первой ступенью до подключения способа, иначе пережила бы его:
     украденный пароль, которым зашли раньше хозяина, остался бы действующим входом.
     """
-    cur.execute(
-        "select (select count(*) from web_passkeys where user_id = %(u)s)"
-        " + (select count(*) from web_totp where user_id = %(u)s and confirmed_at is not null)",
-        {"u": user_id},
-    )
-    строка = cur.fetchone()
-    if строка is None or int(строка[0]) > 0:
+    if _factor_count(cur, user_id) > 0:
         return
     cur.execute(
         "update web_sessions set closed_at = now()"
@@ -288,9 +340,15 @@ def add_passkey(
     transports: tuple[str, ...],
     name: str,
     keep_session_id: str | None = None,
+    only_if_first: bool = False,
 ) -> Passkey:
-    """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии."""
+    """Записать новый ключ доступа. Первый способ человека закрывает его ДРУГИЕ сессии.
+
+    `only_if_first` — вызывающий считает этот способ первым (у учётки их не было); если к
+    моменту вставки способ уже есть — `NotFirstFactorError`, ключ не записан.
+    """
     with _connected("записать ключ доступа") as conn, conn.cursor() as cur:
+        _take_first_slot(cur, user_id, only_if_first=only_if_first)
         _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "insert into web_passkeys (user_id, credential_id, public_key, sign_count,"
@@ -302,6 +360,44 @@ def add_passkey(
         строка = cur.fetchone()
     assert строка is not None  # noqa: S101 — insert … returning без строки не бывает
     return _passkey(строка)
+
+
+def factors_all_newer_than(user_id: str, since: datetime) -> bool:
+    """Все способы входа человека созданы не раньше `since` (или их нет): до этой сессии их не было.
+
+    Так узнаётся сессия, которой человек подключил ПЕРВЫЙ способ: ей можно продолжить настройку
+    (резервные коды) без доказательства ступени. Сессия при уже имевшемся способе — нельзя.
+    """
+    with _connected("сверить давность способов входа") as conn, conn.cursor() as cur:
+        cur.execute(
+            "select not exists (select 1 from web_passkeys where user_id = %(u)s"
+            "                    and created_at < %(s)s)"
+            "   and not exists (select 1 from web_totp where user_id = %(u)s"
+            "                    and confirmed_at is not null and confirmed_at < %(s)s)",
+            {"u": user_id, "s": since},
+        )
+        строка = cur.fetchone()
+    return bool(строка and строка[0])
+
+
+def purge_idle_passkeys(
+    idle: timedelta,
+) -> tuple[tuple[str, str, str, int], ...]:
+    """Снять ключи, которыми не входили `idle` (`last_used_at`, у неиспользованных `created_at`).
+
+    Вернуть по человеку: (номер учётки, роль, пространство, сколько ключей снято).
+    """
+    with _connected("снять ключи доступа, которыми не входили") as conn, conn.cursor() as cur:
+        cur.execute(
+            "with gone as ("
+            " delete from web_passkeys"
+            "  where coalesce(last_used_at, created_at) < now() - %s returning user_id)"
+            " select g.user_id, u.role, u.tenant_code, count(*)"
+            "   from gone g join web_users u on u.id = g.user_id"
+            "  group by g.user_id, u.role, u.tenant_code",
+            (idle,),
+        )
+        return tuple((str(r[0]), str(r[1]), str(r[2]), int(r[3])) for r in cur.fetchall())
 
 
 def passkey_by_credential(credential_id: bytes) -> tuple[Passkey, str] | None:
@@ -404,12 +500,18 @@ def totp_of(user_id: str) -> TotpRow | None:
     )
 
 
-def confirm_totp(user_id: str, *, step: int, keep_session_id: str | None = None) -> bool:
+def confirm_totp(
+    user_id: str, *, step: int, keep_session_id: str | None = None, only_if_first: bool = False
+) -> bool:
     """Подтвердить приложение первым верным кодом; его шаг запоминается (повтор не пройдёт).
 
     Первый способ человека закрывает его ДРУГИЕ сессии (кроме `keep_session_id`).
     """
     with _connected("подтвердить приложение") as conn, conn.cursor() as cur:
+        try:
+            _take_first_slot(cur, user_id, only_if_first=only_if_first)
+        except NotFirstFactorError:
+            return False
         _close_others_if_first(cur, user_id, keep_session_id)
         cur.execute(
             "update web_totp set confirmed_at = now(), last_step = %s"

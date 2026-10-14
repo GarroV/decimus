@@ -34,6 +34,7 @@ from webauthn.helpers import base64url_to_bytes
 from webauthn.helpers.exceptions import WebAuthnException
 from webauthn.helpers.structs import (
     AttestationConveyancePreference,
+    AuthenticatorAttachment,
     AuthenticatorSelectionCriteria,
     PublicKeyCredentialDescriptor,
     ResidentKeyRequirement,
@@ -76,6 +77,16 @@ class Assertion:
     new_sign_count: int
 
 
+# Подсказка браузеру (Chrome 128+, остальные игнорируют): предпочесть встроенный датчик этого
+# устройства (Touch ID), а не QR-код и телефон (D485). Библиотека поля `hints` не знает,
+# поэтому оно дописывается в JSON перед отдачей.
+CLIENT_DEVICE_HINTS = ["client-device"]
+
+
+def _with_hints(options_json: str) -> str:
+    return json.dumps({**json.loads(options_json), "hints": CLIENT_DEVICE_HINTS})
+
+
 def registration_options(
     party: RelyingParty, *, user_id: str, login: str, existing: tuple[bytes, ...]
 ) -> tuple[str, bytes]:
@@ -93,12 +104,13 @@ def registration_options(
         timeout=TIMEOUT_MS,
         attestation=AttestationConveyancePreference.NONE,
         authenticator_selection=AuthenticatorSelectionCriteria(
-            resident_key=ResidentKeyRequirement.PREFERRED,
+            authenticator_attachment=AuthenticatorAttachment.PLATFORM,
+            resident_key=ResidentKeyRequirement.REQUIRED,
             user_verification=UserVerificationRequirement.REQUIRED,
         ),
         exclude_credentials=[PublicKeyCredentialDescriptor(id=i) for i in existing],
     )
-    return options_to_json(параметры), параметры.challenge
+    return _with_hints(options_to_json(параметры)), параметры.challenge
 
 
 def verify_registration(party: RelyingParty, *, credential: str, challenge: bytes) -> NewCredential:
@@ -131,7 +143,7 @@ def authentication_options(
         allow_credentials=[PublicKeyCredentialDescriptor(id=i) for i in credential_ids],
         user_verification=UserVerificationRequirement.REQUIRED,
     )
-    return options_to_json(параметры), параметры.challenge
+    return _with_hints(options_to_json(параметры)), параметры.challenge
 
 
 def credential_id_of(credential: str) -> bytes:

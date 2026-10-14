@@ -1,5 +1,10 @@
 """Вторая ступень входа: «Подтвердите вход» после Google или пароля (D463).
 
+**С 14.10.2026 (D485) ступень стоит только при входе ЛОГИНОМ И ПАРОЛЕМ (`STEP_AT_PASSWORD`);
+вход через Google её не проходит (`STEP_AT_GOOGLE = False`).** Ключ доступа — самостоятельный
+способ входа (`passkey_login.py`). Всё ниже описывает ступень как она работает там, где
+она включена.
+
 **Сессия выдаётся только после обеих ступеней.** Первая (Google или пароль) у человека
 со вторым способом открывает не сессию, а «полупройденный вход» (`web_second_steps`):
 строку на 5 минут, одноразовую, привязанную к браузеру подписанной кукой
@@ -45,9 +50,10 @@ from werkzeug.wrappers import Response
 
 from src.db import journals
 from src.db import second_factor as store
-from src.db.web_access import Account, OpenedSession, find_by_id, open_session
+from src.db.web_access import Account, OpenedSession, close_session, find_by_id, open_session
 from src.db.web_throttle import admit_attempt, note_success
 from src.domain.journal import (
+    METHOD_GOOGLE,
     METHOD_SECOND_STEP,
     RESULT_BACKUP_USED,
     RESULT_BAD_CODE,
@@ -99,6 +105,7 @@ ENROLL_ENDPOINTS = frozenset(
         "security_totp_confirm",
         "security_totp_remove",
         "security_backup_generate",
+        "security_prove_code",
         "logout",
         "static",
         "settings_menu",
@@ -115,6 +122,30 @@ THROTTLE_PREFIX = "2fa:"
 #: заперла владельца посреди встречи; подключение остаётся рекомендацией на экране.
 ENFORCE_ENROLL = False
 
+#: Спрашивать ли вторую ступень при входе (D485). Пароль — да: ключ доступа (Touch ID), а в
+#: браузере без ключа — приложение-аутентификатор как резерв; у учётки без способов вход
+#: как раньше. Google — нет: почту Google и так защищает сам Google, студии входят через неё.
+#: Код ступени и маршруты целы в обоих случаях; флаг лишь решает, открывает ли первая ступень
+#: сессию.
+STEP_AT_PASSWORD = True
+STEP_AT_GOOGLE = False
+
+
+def step_required(method: str) -> bool:
+    """Нужна ли вторая ступень после первой ступени этим способом (`METHOD_*`)."""
+    return STEP_AT_GOOGLE if method == METHOD_GOOGLE else STEP_AT_PASSWORD
+
+
+def first_step_suffices(method: str) -> bool:
+    """Достаточно ли первой ступени (пароль, Google) для полной сессии этим способом.
+
+    Если ступень этому способу не нужна — достаточно, и `open_session` выдаёт такую сессию
+    человеку со способом (`step_waived`). Сессия при этом НЕ считается прошедшей вторую
+    ступень: снять или заменить способы ей можно только после настоящего доказательства —
+    входа ключом или кода приложения в этой же сессии (`security_prove_code`, форма входа ключом).
+    """
+    return not step_required(method)
+
 
 def must_enroll(account: Any) -> bool:
     """Админу или главному админу без второго способа доступен только экран подключения."""
@@ -128,7 +159,8 @@ def throttle_key(login: str) -> str:
 
 
 def begin(account: Account, *, method: str, next_path: str | None) -> Response | None:
-    """После первой ступени: `None` — второго способа нет, сессию открывать можно.
+    """После первой ступени: `None` — второго способа нет или ступень выключена
+    (`step_required`), сессию открывать можно.
 
     Иначе — переход на «Подтвердите вход» с кукой полупройденного входа; сессии нет.
     """
@@ -184,7 +216,7 @@ def install(
             return None
 
     def _begin(account: Account, method: str, next_path: str | None) -> Response | None:
-        if not store.has_any(account.id):
+        if not step_required(method) or not store.has_any(account.id):
             return None
         token = store.open_pending(account.id, method=method, next_path=next_path)
         откуда, браузер = web_journal.login_origin(conf)
@@ -284,7 +316,7 @@ def install(
             return redirect(url_for("home"))
         return redirect(f"{request.script_root}{путь}")
 
-    def _admit(account: Account) -> tuple[bool, int | None, int]:
+    def _admit(account: Any) -> tuple[bool, int | None, int]:
         """Пустить ли попытку: (пустить, минут ожидания, секунд ожидания)."""
         адрес = client_address(trusted_proxies=conf.trusted_proxies)
         попытка = admit_attempt(tenant=stand, address=адрес, login=throttle_key(account.login))
@@ -338,11 +370,57 @@ def install(
             return _expired()
         return _page(status, account, failed=True, code=401)
 
+    @app.post("/settings/security/prove", endpoint="security_prove_code")
+    def security_prove_code() -> Response:
+        """Доказать вторую ступень в ЭТОЙ сессии кодом приложения или резервным кодом (D485).
+
+        Сессия после Google или пароля вторую ступень не проходила, и снять или заменить способы
+        ей нельзя. Верный код заменяет её новой сессией с отметкой `second_step_at`; неверный —
+        возврат на экран защиты с отказом, попытки считает тот же ограничитель, что у входа.
+        """
+        from . import auth
+        from .security_screen import SECURITY_PATH
+
+        refuse_foreign_origin()
+        account = auth.current_account()
+        if account is None:
+            return redirect(url_for("login"))
+        назад = f"{request.script_root}{SECURITY_PATH}"
+        status = store.status_of(account.id)
+        допущена, _, _ = _admit(account)
+        результат = (
+            _check_code(account, status, request.form.get("code") or "") if допущена else None
+        )
+        if результат is None:
+            откуда, браузер = web_journal.login_origin(conf)
+            journals.record_login(
+                method=METHOD_SECOND_STEP,
+                result=RESULT_BAD_CODE if допущена else RESULT_RATE_LIMITED,
+                user_id=account.id,
+                ip=откуда,
+                user_agent=браузер,
+            )
+            return open_response(redirect(f"{назад}?prove=bad"))
+        откуда, браузер = web_journal.login_origin(conf)
+        прежний = auth.current_session_token()
+        session = open_session(account, ip=откуда, user_agent=браузер, second_step=True)
+        close_session(прежний)
+        journals.record_login(
+            method=METHOD_SECOND_STEP,
+            result=результат,
+            user_id=account.id,
+            ip=откуда,
+            user_agent=браузер,
+            session_id=session.session_id,
+        )
+        note_success(tenant=stand, login=throttle_key(account.login))
+        return open_response(remember(redirect(f"{назад}?proved=1"), session))
+
     def open_response(response: Response) -> Response:
         response.headers["Cache-Control"] = "no-store"
         return response
 
-    def _check_code(account: Account, status: store.Status, raw: str) -> str | None:
+    def _check_code(account: Any, status: store.Status, raw: str) -> str | None:
         """Верный ли код; вернуть исход журнала (`ok` / `backup-used`) или `None`."""
         цифры = normalize_totp_code(raw)
         if цифры is not None:

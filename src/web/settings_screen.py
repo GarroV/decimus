@@ -61,6 +61,7 @@ from .google_auth import load_hq_domains
 from .origin import refuse_foreign_origin
 from .remote import client_address
 from .sections import section
+from .texts import t
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +119,20 @@ def _google_result() -> Flash | None:
 
 
 #: Плитки подключений, они же значения `?tile=`: порядок — порядок на экране.
-TILES = ("claude", "bot", "google")
+TILES = (
+    "profile",
+    "language",
+    "password",
+    "security",
+    "signins",
+    "signout",
+    "claude",
+    "bot",
+    "google",
+)
+
+#: Плитки подключений: по ним считается «сколько подключено».
+CONNECTION_TILES = ("claude", "bot", "google")
 
 #: Плитка, к которой относится исход действия: по началу ключа текста.
 _FLASH_TILE_PREFIXES = (
@@ -127,6 +141,7 @@ _FLASH_TILE_PREFIXES = (
     ("users.claude.", "claude"),
     ("users.bot.", "bot"),
     ("profile.bot.", "bot"),
+    ("settings.signout.", "signout"),
 )
 
 
@@ -142,6 +157,8 @@ def selected_tile(show: Show, requested: str | None) -> str:
         return "claude"
     if show.bot_link:
         return "bot"
+    if show.password is not None:
+        return "password"
     if show.flash is not None:
         for префикс, плитка in _FLASH_TILE_PREFIXES:
             if show.flash.key.startswith(префикс):
@@ -174,6 +191,37 @@ def tile_states(
     return {"claude": claude_state, "bot": bot_state, "google": "on" if has_google else "off"}
 
 
+def _own_tile_states(account: Any, google_login: bool) -> dict[str, str]:
+    """Точка плиток собственной учётки: заведено ли то, о чём плитка."""
+    return {
+        "profile": "on",
+        "language": "on",
+        "password": "off" if google_login else "on",
+        "security": "on" if getattr(account, "has_second_factor", False) else "off",
+        "signins": "on",
+        "signout": "on",
+    }
+
+
+def _tile_hints(account: Any, lang: str, google_login: bool) -> dict[str, str]:
+    """Короткая строка под названием плитки собственной учётки; длинное — в панели."""
+    return {
+        "profile": str(getattr(account, "display_name", None) or getattr(account, "login", "")),
+        "language": lang.upper(),
+        "password": t(
+            "settings.tile.password_google" if google_login else "settings.tile.password_set", lang
+        ),
+        "security": t(
+            "sf.sec.status_on"
+            if getattr(account, "has_second_factor", False)
+            else "sf.sec.status_off",
+            lang,
+        ),
+        "signins": t("settings.tile.signins", lang),
+        "signout": t("settings.tile.signout", lang),
+    }
+
+
 def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     """Страница целиком — для GET и для ответа на любую отправку экрана."""
     show = show or Show(flash=_google_result())
@@ -184,22 +232,25 @@ def render(show: Show | None = None, code: int = 200) -> tuple[str, int]:
     подключение = users_claude.claude_connect(
         user_id, current_app.config.get(users_claude.MCP_URL_KEY)
     )
+    has_google_login = bool(getattr(вошедший, "email", None)) and bool(
+        current_app.extensions.get(auth.GOOGLE_ENABLED_KEY)
+    )
+    lang = ui_lang.request_lang(current_app.extensions["decimus_conf"].ui_lang)
     состояния = tile_states(
         show=show,
         mcp=статус_токена,
         claude=подключение,
         own_binding=привязка,
         own_binding_known=известна,
-        has_google=bool(getattr(вошедший, "email", None))
-        and bool(current_app.extensions.get(auth.GOOGLE_ENABLED_KEY)),
+        has_google=has_google_login,
     )
     return (
         render_template(
             "settings/index.html",
             show=show,
             tile=selected_tile(show, request.args.get("tile")),
-            tile_states=состояния,
-            tile_count=sum(1 for состояние in состояния.values() if состояние == "on"),
+            tile_states={**состояния, **_own_tile_states(вошедший, has_google_login)},
+            tile_hint=_tile_hints(вошедший, lang, has_google_login),
             tiles=TILES,
             me=вошедший,
             base=f"{request.script_root}{section('settings').path}",
