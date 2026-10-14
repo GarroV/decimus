@@ -135,6 +135,7 @@ def стенд(monkeypatch: pytest.MonkeyPatch, request: pytest.FixtureRequest) 
     """
     monkeypatch.setattr(data, "retraction_available", lambda: True)
     monkeypatch.setattr(data, "load_registry", lambda **_: data.Registry((), True))
+    monkeypatch.setattr(data, "load_dated", lambda **_: ())
     monkeypatch.setattr(overview_data, "load", lambda **_: ПУСТАЯ_СЕТЬ)
     monkeypatch.setattr(country_data, "countries", lambda **_: ())
     monkeypatch.setattr(data, "load_card", lambda *_a, **_k: None)

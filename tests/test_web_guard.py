@@ -201,7 +201,10 @@ def test_маршрут_с_действием_только_УК_партнёру
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Граница — по коду матрицы, а не по пути: префикс раздела тут ни при чём."""
+    from src.web import inspections as data
+
     подменить_двери(monkeypatch, tenant=ПАРТНЁР, role="admin")
+    monkeypatch.setattr(data, "load_dated", lambda **_: ())
     app = собрать(tenant=ПАРТНЁР)
     app.add_url_rule("/zzz-hq", endpoint="zzz_hq", view_func=guard.action("unit.create")(_ок))
     with app.test_client() as client:
