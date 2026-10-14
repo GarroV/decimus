@@ -12,11 +12,11 @@ import os
 import shutil
 import subprocess
 import sys
-import uuid
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 
+import db_names
 import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -108,6 +108,16 @@ def run_engine(
 
 
 CHECKLIST_DIR_VAR = "CHECKLIST_DIR"
+
+
+@pytest.fixture(autouse=True)
+def _письма_не_протекают_между_тестами() -> Iterator[None]:
+    """Кэш готовых писем (#696) живёт в процессе — тест его не наследует."""
+    from src.report.letters import clear_letter_cache
+
+    clear_letter_cache()
+    yield
+    clear_letter_cache()
 
 
 @pytest.fixture(autouse=True)
@@ -408,7 +418,7 @@ def _предел_обхода_свой_у_теста(monkeypatch: pytest.Monkey
 def pg_dsn() -> Iterator[str]:
     """DSN одноразовой базы данных со свежо накатанной схемой блока `db`.
 
-    Имя — случайное (`dodo_audit_test_<hex>`), поэтому параллельный тестовый
+    Имя — время создания и случайный хвост (`tests/db_names.py`), поэтому параллельный тестовый
     прогон не топчет чужую базу того же имени. Обслуживающее подключение идёт
     к базе `postgres` — из своей же базы `DROP DATABASE` не выполнить. Ни
     настоящие данные проекта, ни база любого другого блока не трогаются:
@@ -421,7 +431,7 @@ def pg_dsn() -> Iterator[str]:
     from src.db.migrate import apply_migrations
 
     maintenance_dsn = make_conninfo(BASE_DSN, dbname="postgres")
-    dbname = f"dodo_audit_test_{uuid.uuid4().hex[:12]}"
+    dbname = db_names.new_name()
     create = sql.SQL("create database {}").format(sql.Identifier(dbname))
     drop = sql.SQL("drop database if exists {} with (force)").format(sql.Identifier(dbname))
 
@@ -493,6 +503,25 @@ def db_env(pg_dsn: str, monkeypatch: pytest.MonkeyPatch) -> str:
 #: отсутствия данных — не «нечего проверять», а неполная проверка, выданная за
 #: полную, и набор обязан об этом сказать кодом возврата.
 REQUIRE_DATA_VAR = "AUDIT_REQUIRE_DATA"
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    """Перед прогоном с базой — убрать базы, брошенные оборванными прогонами (#565).
+
+    Только в главном процессе: рабочие `xdist` стартуют одновременно и
+    убирали бы одно и то же наперегонки.
+    """
+    if NO_DB or hasattr(session.config, "workerinput"):
+        return
+    from psycopg.conninfo import make_conninfo
+
+    try:
+        удалено = db_names.sweep(make_conninfo(BASE_DSN, dbname="postgres"))
+    except Exception as exc:
+        print(f"[тесты] уборка брошенных тестовых баз не удалась: {type(exc).__name__}")
+        return
+    if удалено:
+        print(f"[тесты] удалено брошенных тестовых баз: {len(удалено)}")
 
 
 def pytest_terminal_summary(terminalreporter: pytest.TerminalReporter) -> None:

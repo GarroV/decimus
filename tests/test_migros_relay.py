@@ -12,6 +12,7 @@ import socket
 import threading
 import urllib.error
 from collections.abc import Iterator
+from contextlib import nullcontext
 from datetime import date
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
@@ -256,12 +257,14 @@ async def test_канал_лежит_сбор_не_падает(monkeypatch: pyt
 
 def test_заявка_не_уведомляет(monkeypatch: pytest.MonkeyPatch) -> None:
     """Итоги для уведомления — только суточного сбора; заявку видит нажавший."""
+    monkeypatch.setattr(agg_loader.agg_store, "collector_lock", lambda: nullcontext(True))
     monkeypatch.setattr(agg_loader.queue, "fulfil", lambda **_: True)
     monkeypatch.setattr(agg_loader.collect, "run_all", lambda *_: (СБОЙ,))
     assert agg_loader._tick(scheduled=True) == ()
 
 
 def test_суточный_сбор_отдаёт_итоги(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(agg_loader.agg_store, "collector_lock", lambda: nullcontext(True))
     monkeypatch.setattr(agg_loader.queue, "fulfil", lambda **_: False)
     monkeypatch.setattr(agg_loader, "_due", lambda: True)
     monkeypatch.setattr(agg_loader.collect, "run_all", lambda *_: (СБОЙ,))

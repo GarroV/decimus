@@ -245,7 +245,19 @@ def _reset(app_dsn: str) -> int:
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         apply_space(conn)
         cur.execute("delete from inspections where tenant_code = %s", (DEMO_TENANT,))
-        return cur.rowcount
+        removed = cur.rowcount
+        # Роль приложения строки `demo` видит, но удалить не может: `delete`
+        # отвечает 0 строк, и это не успех (#774) — дальше слив найдёт те же
+        # проверки по отпечатку и упадёт на приёмке непонятной ошибкой.
+        cur.execute("select count(*) from inspections where tenant_code = %s", (DEMO_TENANT,))
+        row = cur.fetchone()
+        left = int(row[0]) if row else 0
+    if left:
+        raise SystemExit(
+            f"Прежнее демо не снесено: осталось проверок {left}. Роль подключения их не "
+            f"удаляет — запустите сид с {ADMIN_URL_VAR} (роль администратора истории)"
+        )
+    return removed
 
 
 def _directory() -> None:

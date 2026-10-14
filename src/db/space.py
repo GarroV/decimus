@@ -46,9 +46,6 @@ from src.domain.tenants import canonical_tenant
 
 from .errors import DbError
 
-#: Имя настройки соединения, которую читают политики (`decimus_space()` в `0062`).
-SPACE_SETTING = "decimus.space"
-
 #: Служебное обращение без человека: читает и пишет всё. Ставится только явно.
 SYSTEM_SPACE = "*"
 

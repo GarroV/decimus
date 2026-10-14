@@ -362,3 +362,33 @@ def test_сбой_записи_методики_не_говорит_про_чт�
     assert "проверки" not in текст, f"отказ записи методики говорит про чтение проверок: {текст}"
     assert "методик" in текст, текст
     assert ответ["result"]["isError"] is True
+
+
+def test_сбой_инструмента_пишется_в_журнал_без_аргументов(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """#525: непредвиденный отказ оставляет след в журнале сервера.
+
+    Агенту уходит только тип отказа (прежнее поведение), а в журнал — имя
+    инструмента и трейсбек. Аргументов в журнале нет: в них данные проверок.
+    """
+
+    def падает(**_: Any) -> Any:
+        raise OSError("диск отвалился")
+
+    spec = find("list_inspections")
+    assert spec is not None
+    monkeypatch.setitem(_BY_NAME, "list_inspections", replace(spec, handler=падает))
+
+    with caplog.at_level("ERROR", logger="src.mcp.rpc"):
+        handle(
+            _запрос("list_inspections", {"unit": "секретная-точка"}),
+            tenant=АРЕНДАТОР,
+            role="admin",
+        )
+
+    записи = [r for r in caplog.records if r.name == "src.mcp.rpc"]
+    assert записи, "отказ инструмента не попал в журнал"
+    assert "list_inspections" in записи[0].getMessage()
+    assert записи[0].exc_info is not None
+    assert "секретная-точка" not in caplog.text

@@ -11,6 +11,11 @@ from dataclasses import dataclass, field
 
 from .errors import ValidationError
 
+#: Код чек-листа по умолчанию — один на весь продукт (#347). Здесь, а не в
+#: `edition.py`: модели не тянут за собой ни движок, ни хранилище, и импорт из
+#: базы и домена не замыкается в кольцо. `edition.DEFAULT_CODE` — это он же.
+DEFAULT_CHECKLIST_CODE = "bizdev"
+
 #: Откуда взялась запись (решение D044). Со слов аудитора — за формулировку
 #: отвечает он; распознано по кадру — не отвечает никто, и при предвычитке
 #: отчёта такие записи аудитор перечитывает в первую очередь.
@@ -204,7 +209,7 @@ class Inspection:
     city: str = ""
     #: Код чек-листа, по которому идёт проверка (волна 3). До неё чек-лист был
     #: один, и проверки без кода — это он.
-    checklist_code: str = "bizdev"
+    checklist_code: str = DEFAULT_CHECKLIST_CODE
     partner: str = ""
     contact: str = ""
     auditor: str = ""

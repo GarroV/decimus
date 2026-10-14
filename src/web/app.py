@@ -13,6 +13,7 @@ Node не требуется вовсе — стиль приезжает гот
 
 from __future__ import annotations
 
+import hashlib
 import io
 import logging
 import uuid
@@ -46,6 +47,7 @@ from src.db.errors import (
 )
 from src.db.migrate import discover_migrations
 from src.db.models import InspectionRow
+from src.db.reports import ReportRef
 from src.domain.errors import ValidationError
 from src.domain.kinds import kind_title
 from src.domain.permissions import is_read_only
@@ -708,18 +710,30 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 return _card_refusal(
                     inspection_id, conf=conf, text=t("card.report.none", lang), status=404
                 )
+            # Метка версии — по ссылке на файл, а не по его байтам: совпала —
+            # хранилище не читается вовсе (#697, ~300 мс на чтение). Новый отчёт
+            # (финальный после приёмки, D203) — новая ссылка и новая метка.
+            метка = report_etag(ref)
+            if метка in request.if_none_match:
+                не_изменён = FlaskResponse(status=304)
+                не_изменён.set_etag(метка)
+                не_изменён.headers["Cache-Control"] = REPORT_CACHE_CONTROL
+                return не_изменён
             файл = data.report_bytes(ref)
         except DbError as exc:
             logger.warning("отчёт проверки %s не выдан: %s", inspection_id, exc)
             return _card_refusal(
                 inspection_id, conf=conf, text=t("card.report.failed", lang), status=503
             )
-        return send_file(
+        ответ = send_file(
             io.BytesIO(файл),
             mimetype=ref.content_type,
             as_attachment=True,
             download_name=_report_name(detail.inspection),
         )
+        ответ.set_etag(метка)
+        ответ.headers["Cache-Control"] = REPORT_CACHE_CONTROL
+        return ответ
 
     @app.get(f"{section('registry').path}/<inspection_id>/photos/<photo_id>")
     def photo(inspection_id: str, photo_id: str) -> FlaskResponse | tuple[str, int]:
@@ -2370,6 +2384,18 @@ def _card_refusal(
     """Карточка с отказом наверху и кодом ответа отказа, а не 200."""
     страница = _render_card(inspection_id, conf=conf, notice=None, failure=text)
     return страница if isinstance(страница, tuple) else (страница, status)
+
+
+#: Отчёт держит только браузер читающего (`private`: документ партнёра не
+#: оседает в общих кэшах) и сверяет его с сервером при каждом открытии
+#: (`no-cache`): после приёмки отчёт заменяется финальным (D203).
+REPORT_CACHE_CONTROL = "private, no-cache"
+
+
+def report_etag(ref: ReportRef) -> str:
+    """Метка версии отчёта: путь в хранилище, время и размер сохранения (#697)."""
+    основа = f"{ref.storage_path}|{ref.created_at.isoformat()}|{ref.size_bytes}"
+    return hashlib.sha256(основа.encode()).hexdigest()[:32]
 
 
 def _report_name(head: InspectionRow) -> str:

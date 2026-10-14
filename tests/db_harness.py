@@ -15,11 +15,11 @@ pytest).
 from __future__ import annotations
 
 import os
-import uuid
 from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+import db_names
 import pytest
 from conftest import BASE_DSN
 
@@ -45,7 +45,7 @@ def empty_database() -> Iterator[str]:
     # `_база_не_видна_сама_собой`, чтобы база не доставалась тому, кто её
     # не просил (T123).
     maintenance_dsn = make_conninfo(BASE_DSN, dbname="postgres")
-    dbname = f"dodo_audit_test_{uuid.uuid4().hex[:12]}"
+    dbname = db_names.new_name()
 
     with psycopg.connect(maintenance_dsn, autocommit=True) as conn:
         conn.execute(sql.SQL("create database {}").format(sql.Identifier(dbname)))

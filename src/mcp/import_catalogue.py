@@ -218,6 +218,13 @@ IMPORT_TOOLS: tuple[ImportTool, ...] = (
                     "description": "Link or name of the original document (Bitrix link, "
                     "file name), so the import can be traced back.",
                 },
+                "second_visit": {
+                    "type": "boolean",
+                    "description": "Only when the person confirms this is a second visit "
+                    "to the same pizzeria on the same day. Without it an existing "
+                    "inspection of that pizzeria and date is a refusal: the same report "
+                    "must not be imported twice.",
+                },
             },
             ["mode", "unit", "date"],
         ),

@@ -381,8 +381,10 @@ git pull
 $env:BUILD_SHA=(git rev-parse --short HEAD)   # без него образ ответит «сборка: неизвестна»
 docker compose build
 
-# 4. Поднять с новым образом (звено пересоздаётся вместе с сервером — см. §4.6)
+# 4. Поднять с новым образом. Звено само НЕ пересоздаётся: оно в профиле funnel,
+#    и обычный `up -d` оставит его в сетевом пространстве удалённого сервера (#304, §4.6)
 docker compose up -d
+docker compose --profile funnel up -d --force-recreate mcp link
 
 # 5. Накатить
 docker compose run --rm --no-deps migrate

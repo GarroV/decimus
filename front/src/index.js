@@ -18,8 +18,9 @@
 // До сервера Worker идёт туннелем (привязка EDGE — Workers VPC, D304): запрос
 // попадает прямо в Caddy на VPS, и имя служебный домен в пути больше не участвует —
 // ни его DNS, ни его доступность. Имя остаётся только SNI и Host, по которым
-// Caddy выбирает сайт. Если туннель лёг, тот же запрос уходит прежним путём
-// через интернет: два независимых пути вместо одной точки отказа.
+// Caddy выбирает сайт. Если туннель лёг, запрос без тела (GET, HEAD, OPTIONS)
+// уходит прежним путём через интернет; запрос с телом не повторяется — он мог
+// уже дойти до сервера, и повтор доставил бы его дважды (#783).
 
 const FRONT_KEY_HEADER = "X-Decimus-Front-Key";
 const CLIENT_IP_HEADER = "X-Decimus-Client-IP";
@@ -55,7 +56,13 @@ export default {
     headers.delete("Host");
 
     const hasBody = !["GET", "HEAD"].includes(request.method);
-    const fallback = env.EDGE && hasBody ? request.clone() : request;
+    // Запасной путь — только для запросов, которые безопасно повторить (#783).
+    // Исключение туннеля не говорит, дошёл ли запрос до сервера: обрыв на чтении
+    // ответа после записи — тоже исключение. Повтор POST по публичному пути
+    // доставил бы форму, импорт или сдачу дважды, поэтому запрос с телом
+    // получает отказ 502, а повторить его решает человек.
+    const replayable = ["GET", "HEAD", "OPTIONS"].includes(request.method);
+    const fallback = request;
     const send = (via, from) =>
       via(upstream, {
         method: request.method,
@@ -68,6 +75,10 @@ export default {
       try {
         response = await send((u, init) => env.EDGE.fetch(u, init), request);
       } catch (error) {
+        if (!replayable) {
+          console.error("tunnel failed, request with body not replayed", String(error));
+          return new Response("upstream unavailable, please retry", { status: 502 });
+        }
         console.error("tunnel failed, falling back to public path", String(error));
       }
     }

@@ -123,6 +123,10 @@ class NewDraft:
     #: Только у исторической: статус из старого отчёта и метка прежней методики.
     reported_status: str | None = None
     legacy_method: str | None = None
+    #: Человек подтвердил, что это второй визит в ту же точку в тот же день
+    #: (#782). Без этого проверка той же точки и даты — отказ: тот же отчёт,
+    #: загруженный дважды, дал бы в истории два ряда одного визита.
+    second_visit: bool = False
 
 
 @dataclass(frozen=True)
@@ -397,11 +401,39 @@ def _check_open_drafts(conn: psycopg.Connection[Any], tenant: str) -> None:
         )
 
 
+_SAME_VISIT_SQL = """
+select id::text, origin from inspections
+where unit_id = %(unit)s and inspection_date = %(day)s and retracted_at is null
+order by pushed_at
+limit 1
+"""
+
+
+def _refuse_same_visit(cur: Any, unit_id: object, spec: NewDraft) -> None:
+    """Отказ, если у точки на эту дату уже есть проверка (#782, VIGIL F-116).
+
+    Ключ визита — точка и дата: отпечаток загрузки случайный, и по содержимому
+    тот же отчёт, загруженный второй раз, не узнаётся. Считаются и черновики, и
+    принятые, и слитые из бота; снятые — нет. Видно только своё пространство.
+    """
+    cur.execute(_SAME_VISIT_SQL, {"unit": unit_id, "day": spec.inspection_date})
+    row = cur.fetchone()
+    if row is None:
+        return
+    raise HistoryImportError(
+        f"У точки «{spec.unit}» на {spec.inspection_date.isoformat()} уже есть проверка "
+        f"(id {row[0]}, происхождение {row[1]}). Тот же визит второй раз не загружается. "
+        f"Если это правда второй визит в тот же день — повторите с second_visit=true"
+    )
+
+
 def _insert_draft(conn: psycopg.Connection[Any], spec: NewDraft, tenant: str) -> str:
     with conn.cursor() as cur:
         unit_id = resolve_unit_id(conn, spec.unit, tenant=HQ_TENANT)
         if unit_id is None:
             raise _unit_refused(spec.unit, tenant)
+        if not spec.second_visit:
+            _refuse_same_visit(cur, unit_id, spec)
         try:
             cur.execute(
                 _INSERT_DRAFT_SQL,
