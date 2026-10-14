@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -94,6 +95,13 @@ GOOGLE_CALLBACK_PATH = "/auth/google/callback"
 GOOGLE_STATE_COOKIE = "dodo_audit_google_state"
 GOOGLE_STATE_SALT = "google-state"
 GOOGLE_STATE_TTL_SECONDS = 600
+
+#: Кука-подсказка: почта, которой человек успешно входил через Google. Это не
+#: сессия и не доступ — только `login_hint`, чтобы Google не спрашивал аккаунт
+#: заново. Выход её не стирает; стирает отказ в допуске (чтобы окно выбора вернулось).
+GOOGLE_HINT_COOKIE = "dodo_audit_google_hint"
+GOOGLE_HINT_TTL_SECONDS = 180 * 24 * 3600
+GOOGLE_HINT_MAX_LENGTH = 254
 
 #: Где в `app.extensions` лежит начало привязки почты Google из «Настроек».
 GOOGLE_LINK_KEY = "decimus_google_link"
@@ -493,7 +501,11 @@ def install(app: Flask, conf: Settings) -> None:
         if google is None:
             return redirect(url_for("login"))
         метка = new_state()
-        ответ = redirect(authorization_url(_google_here(google), state=метка))
+        ответ = redirect(
+            authorization_url(
+                _google_here(google), state=метка, login_hint=_подсказка_google(request.cookies)
+            )
+        )
         # Метка кладётся В КУКУ, а не в память процесса: стенд может работать
         # несколькими воркерами, и возврат придёт не обязательно в тот, что
         # уводил. Туда же — путь возврата после входа (D417): в подписанной
@@ -574,7 +586,7 @@ def install(app: Flask, conf: Settings) -> None:
         # провайдер, кеш, тест-двойник) — и неподтверждённая почта пройдёт
         # сюда молча. Проверка стоит строки, пропуск стоит чужого входа.
         if not кто.email_verified:
-            return отказано
+            return отказ_входа(забыть_подсказку=True)
 
         # ВОТ ЗДЕСЬ круг допущенных: Google подтвердил владение почтой и не
         # более того. Незнакомая почта получает отказ, а не заводит учётку —
@@ -585,7 +597,7 @@ def install(app: Flask, conf: Settings) -> None:
             journals.record_failed_login(
                 email=кто.email, method=METHOD_GOOGLE, ip=откуда, user_agent=браузер
             )
-            return отказано
+            return отказ_входа(забыть_подсказку=True)
         # Учётка УК — только из домена компании (D430, F-028): совпавшая почта
         # без `hd` компании — это аккаунт, заведённый на чужой адрес, а не
         # сотрудник. Партнёров проверка не касается: они входят по почтам из
@@ -604,12 +616,12 @@ def install(app: Flask, conf: Settings) -> None:
                 ip=откуда,
                 user_agent=браузер,
             )
-            return отказано
+            return отказ_входа(забыть_подсказку=True)
 
         note_success(tenant=рубеж, login=account.login)
         вторая = second_step.begin(account, method=METHOD_GOOGLE, next_path=вернуться)
         if вторая is not None:
-            return очистить_метку(вторая)
+            return запомнить_подсказку(очистить_метку(вторая), кто.email)
         session = open_session(account, ip=откуда, user_agent=браузер)
         journals.record_login(
             method=METHOD_GOOGLE,
@@ -622,7 +634,9 @@ def install(app: Flask, conf: Settings) -> None:
         # Имя и фото из Google (D468) — после открытия сессии и мимо исхода
         # входа: сбой здесь не отнимает у человека вход.
         google_profile.remember(session.token, кто)
-        return очистить_метку(remember(after_login(вернуться), session))
+        return запомнить_подсказку(
+            очистить_метку(remember(after_login(вернуться), session)), кто.email
+        )
 
     def _начать_привязку() -> Response:
         """Метка за сессией в базе и в куке, затем увод к Google с `nonce`.
@@ -756,17 +770,36 @@ def install(app: Flask, conf: Settings) -> None:
             hq_domains=hq_domains,
         )
 
-    def отказ_входа() -> tuple[str, int]:
+    def отказ_входа(*, забыть_подсказку: bool = False) -> tuple[str, int]:
         """Один и тот же отказ на все осечки возврата.
 
         Разные ответы на «метка не та», «код не тот» и «почты нет в списке»
         рассказали бы подбирающему, на каком шаге он остановился, и заодно —
         кто здесь заведён.
+
+        `забыть_подсказку` — отказ в ДОПУСКЕ (почты нет в списке, не тот домен,
+        не подтверждена): куку-подсказку стираем, чтобы в следующий раз Google
+        показал выбор аккаунта, а не вёл по кругу в тот же отказ.
         """
         страница = render_template("login.html", failed=True, locked_minutes=None)
         ответ = make_response(страница, 401)
         ответ.delete_cookie(GOOGLE_STATE_COOKIE, path="/")
+        if забыть_подсказку:
+            ответ.delete_cookie(GOOGLE_HINT_COOKIE, path="/")
         return ответ  # type: ignore[return-value]
+
+    def запомнить_подсказку(response: Response, email: str) -> Response:
+        """После успешного входа — почта в долгую куку для `login_hint` (не сессия)."""
+        response.set_cookie(
+            GOOGLE_HINT_COOKIE,
+            email,
+            max_age=GOOGLE_HINT_TTL_SECONDS,
+            httponly=True,
+            samesite="Lax",
+            secure=over_https(),
+            path="/",
+        )
+        return response
 
     def очистить_метку(response: Response) -> Response:
         """Метка одноразовая: заход состоялся — её больше быть не должно."""
@@ -790,6 +823,14 @@ def install(app: Flask, conf: Settings) -> None:
         ответ = redirect(url_for("login"))
         ответ.delete_cookie(COOKIE_NAME, path="/")
         return ответ
+
+
+def _подсказка_google(cookies: Mapping[str, str]) -> str | None:
+    """Почта из куки-подсказки, если она похожа на почту; иначе `None` (окно выбора)."""
+    сырое = (cookies.get(GOOGLE_HINT_COOKIE) or "").strip()
+    if not сырое or len(сырое) > GOOGLE_HINT_MAX_LENGTH or "@" not in сырое:
+        return None
+    return сырое
 
 
 def _google_here(google: GoogleSettings) -> GoogleSettings:

@@ -76,10 +76,14 @@ SECOND_FACTOR_TEXTS: dict[str, dict[str, str]] = {
     "sf.sec.status_on": {"ru": "Подключено", "en": "On"},
     "sf.sec.status_off": {"ru": "Не подключено", "en": "Off"},
     "sf.sec.required": {
-        "ru": "Для вашей роли подтверждение входа обязательно. Подключите ключ доступа или "
-        "приложение: пока это не сделано, остальные разделы закрыты.",
-        "en": "Sign-in confirmation is mandatory for your role. Add a passkey or an app: until "
-        "then, every other section is closed.",
+        "ru": "Рекомендуем подключить подтверждение входа: так угнанная почта не откроет вашу "
+        "учётку. Нажмите «Добавить ключ доступа» — Touch ID на этом Mac, это 10 секунд.",
+        "en": "We recommend turning on sign-in confirmation: a hijacked mailbox then cannot open "
+        "your account. Click “Add a passkey” — Touch ID on this Mac, it takes 10 seconds.",
+    },
+    "sf.banner.enroll": {
+        "ru": "Подключите вход в два шага: без него угнанная почта открывает вашу учётку",
+        "en": "Turn on two-step sign-in: without it, a hijacked mailbox opens your account",
     },
     "sf.sec.optional": {
         "ru": "Для вашей роли подтверждение входа необязательно, но рекомендуется.",

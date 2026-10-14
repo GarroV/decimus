@@ -175,6 +175,12 @@
     {% endif %}
 
     <main class="page{% block page_class %}{% endblock %} shell__main">
+      {% if enroll_banner_url %}
+        {# Админу без второго способа (D483): заметно, без крестика, вся плашка — ссылка на «Вход и защиту». #}
+        <a class="note note--warn enroll-banner" href="{{ enroll_banner_url }}" data-enroll-banner role="alert">
+          <div class="note__title">{{ t('sf.banner.enroll') }}</div>
+        </a>
+      {% endif %}
       {% block body %}{% endblock %}
     </main>
   </div>

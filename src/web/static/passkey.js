@@ -115,7 +115,11 @@
     var button = root.querySelector("[data-passkey-button]");
     if (!button || guardUnsupported(root, button)) return;
     var busy = false;
-    button.addEventListener("click", function () {
+
+    // `auto` — запуск при открытии страницы, без нажатия: осечка тут тихая (кнопка
+    // остаётся, сообщения нет). Safari и другие браузеры вправе отказать вызову без
+    // жеста пользователя (NotAllowedError) — тогда человек просто нажимает кнопку.
+    function run(auto) {
       if (busy) return;
       busy = true;
       hide(root);
@@ -140,9 +144,12 @@
         })
         .catch(function () {
           busy = false;
-          show(root, root.getAttribute("data-msg-failed") || "");
+          if (!auto) show(root, root.getAttribute("data-msg-failed") || "");
         });
-    });
+    }
+
+    button.addEventListener("click", function () { run(false); });
+    if (root.hasAttribute("data-passkey-autostart")) run(true);
   }
 
   // --- добавление ключа на «Вход и защита» ----------------------------------------------

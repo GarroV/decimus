@@ -230,6 +230,12 @@ def install(
                 failed=failed,
                 locked_minutes=locked_minutes,
                 has_passkeys=bool(token_status.passkeys) and party is not None,
+                # Ключ запускается сам при открытии страницы; после осечки (код не
+                # подошёл, замок) — нет, иначе окно ключа выскакивало бы по кругу.
+                passkey_autostart=bool(token_status.passkeys)
+                and party is not None
+                and not failed
+                and not locked_minutes,
                 has_code=token_status.totp_confirmed or token_status.backup_left > 0,
                 passkeys_off=bool(token_status.passkeys) and party is None,
                 login=account.login,

@@ -1945,3 +1945,7 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__gear:focus-visible { outline: var(--focus-outline); outline-offset: 1px; }
 .sidenav__gear.is-current { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .sidenav__gear svg { width: 15px; height: 15px; }
+
+/* Плашка «подключите вход в два шага» (D483): ссылка целиком, предупреждающий тон из .note--warn. */
+.enroll-banner { display: block; margin-bottom: var(--space-7); text-decoration: none; }
+.enroll-banner:hover { text-decoration: underline; }
