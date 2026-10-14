@@ -63,6 +63,8 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
         "en": "Tap an item to record a finding against it.",
     },
     "walk.cl.was": {"ru": "было", "en": "last time"},
+    "walk.unseen.title": {"ru": "Ещё не смотрели", "en": "Not looked at yet"},
+    "walk.unseen.info": {"ru": "Замеры без баллов:", "en": "Readings, no points:"},
     "walk.cl.more": {"ru": "Показать ещё {count}", "en": "Show {count} more"},
     "walk.zone.ic.todo": {"ru": "не осмотрена", "en": "not checked yet"},
     "walk.zone.ic.started": {"ru": "в работе", "en": "in progress"},
