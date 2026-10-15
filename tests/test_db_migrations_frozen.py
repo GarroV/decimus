@@ -295,6 +295,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0072_ratings_clusters_four.sql": (
         "sql1:1f898bf5cbfae6c81ab3574289d6ccab81c07afb81cb24e9ce076eb31f5fa941"
     ),
+    # Разбивка проверки по процессам (блокам методики) рядом с зонами (D507, D509).
+    "0073_inspection_by_process.sql": (
+        "sql1:49ab90c0c335124e40ab42b874e92db527bcb2ff126e19d431ae37620e87b6dc"
+    ),
 }
 
 
