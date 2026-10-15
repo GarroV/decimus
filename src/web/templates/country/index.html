@@ -37,7 +37,7 @@
 <div class="mx-shell cn-shell{% if view is none and not combined or picking %} mx-shell--pick{% endif %}">
   <aside class="mx-rail cn-rail" aria-label="{{ t('country.rail.title') }}">
     {# Девелопер и страна — выпадающими списками в блоке отбора, как на «Проверках»
-       (D504, D507); под ним пиццерии страны. #}
+       (D504, D510); под ним пиццерии страны. #}
     <div class="cn-filters">
       <div class="mx-rail__head">{{ t('country.rail.title') }}</div>
       {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
@@ -58,7 +58,7 @@
       {% if units.profiles_failed or units.ratings_failed or units.maps_failed %}
         <p class="cn-quiet">{{ t('country.units.profiles_failed') if units.profiles_failed else t('country.units.ratings_failed') if units.ratings_failed else t('country.units.maps_failed') }}</p>
       {% endif %}
-      {# Не выше 15 строк, дальше прокрутка внутри списка (D507). #}
+      {# Не выше 15 строк, дальше прокрутка внутри списка (D510). #}
       <div class="cn-ulist" data-cn-ulist>
         {% for row in units.open_rows %}{{ unit_line(row) }}{% else %}<div class="ov-card__empty">{{ t('country.units.empty') }}</div>{% endfor %}
       </div>
