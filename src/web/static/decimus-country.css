@@ -100,10 +100,12 @@
 .cn-filters .ov-chip { display: flex; width: 100%; justify-content: space-between; }
 .cn-filters .ov-chip.is-on { background: transparent; border-color: var(--line); color: var(--ink-2); }
 .cn-filters .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
-/* Список пиццерий — не выше 15 строк (`--cn-urow` — высота строки), дальше
+/* Список пиццерий — не выше 15 строк (`--cn-urow` — высота строки, одна на все:
+   строка с буквой выше строки без неё), дальше
    прокрутка внутри (D507): в стране бывает 30+ точек. */
+.cn-rail { --cn-urow: 50px; }
+.cn-ulist .cn-uline { min-height: var(--cn-urow); align-content: center; }
 .cn-ulist {
-  --cn-urow: 46px;
   position: relative; display: grid; gap: 0; align-content: start;
   max-height: calc(15 * var(--cn-urow)); overflow-y: auto; overscroll-behavior: contain;
 }
