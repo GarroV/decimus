@@ -418,3 +418,36 @@ def test_справочник_id_двух_имён_не_достаётся_ни_
         "testville-2": base.AMBIGUOUS,
         "testville-3": ДРУГОЙ,
     }
+
+
+def _справочник_ru() -> dict[str, str]:
+    data = to_csv(
+        ["Пиццерия", "Ссылка для РКО", "Ссылка для РС"],
+        [
+            ["Новополоцк-1", f"https://dodopizza.info/rating#/{U1}/1?", ""],
+            ["Могилёв-2", f"https://dodopizza.info/rating#/{ДРУГОЙ}/1?", ""],
+        ],
+    )
+    return base.parse_directory(data)
+
+
+def test_справочник_русское_имя_находится_по_английскому() -> None:
+    """#808: в справочнике «Новополоцк-1», в листе оценок «Novopolotsk-1»."""
+    directory = _справочник_ru()
+    assert base.directory_id(directory, "Novopolotsk-1") == U1
+    assert base.directory_id(directory, "Mogilev-2") == ДРУГОЙ
+    assert base.directory_id(directory, "Mogilyov-2") == ДРУГОЙ
+
+
+def test_справочник_номер_точки_не_размывается_транслитом() -> None:
+    directory = _справочник_ru()
+    assert base.directory_id(directory, "Novopolotsk-2") is None
+    assert base.directory_id(directory, "Gomel-1") is None
+
+
+def test_справочник_два_русских_имени_с_одним_написанием_не_угадываются() -> None:
+    """Транслит свёл два имени справочника в одно написание с разными id: не угадываем."""
+    directory = {"новополоцк-1": U1, "novopolotsk-1": ДРУГОЙ}
+    двойной = {"новополоцк-1": U1, "новополотск-1": ДРУГОЙ}
+    assert base.directory_id(двойной, "Novopolotsk-1") == base.AMBIGUOUS
+    assert base.directory_id(directory, "novopolotsk-1") == ДРУГОЙ

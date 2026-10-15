@@ -117,34 +117,69 @@ def _key_fetch() -> pointer.Fetch:
     return pointer.http_fetch(key)
 
 
-def backfill(months: int, *, today: date, fetch: pointer.Fetch | None = None) -> int:
-    """Дозагрузить историю оценок всех филиалов на `months` месяцев назад.
+@dataclass(frozen=True)
+class BackfillStep:
+    """Итог одного шага дозагрузки: сколько легло, сколько запросов ушло, всё ли закрыто."""
 
-    Окна по 30 дней (лимит Pointer — 31). Окно, где у филиала уже есть почти все
-    дни, пропускается: прерванная дозагрузка продолжается с места, а не с начала.
-    Возвращает, сколько оценок легло.
-    """
-    fetch = fetch or _key_fetch()
-    uuids = maps_store.company_uuids()
-    windows = [
+    saved: int
+    requests: int
+    done: bool  # каждое окно каждого филиала покрыто или в этот день уже пробовалось
+
+
+def _history_windows(months: int, today: date) -> list[tuple[date, date]]:
+    return [
         (
             today - timedelta(days=HISTORY_DAYS * (i + 1) - 1),
             today - timedelta(days=HISTORY_DAYS * i),
         )
         for i in range(max(1, round(months * 30 / HISTORY_DAYS)))
     ]
-    saved = 0
+
+
+def backfill_step(
+    months: int,
+    *,
+    today: date,
+    max_requests: int | None = None,
+    fetch: pointer.Fetch | None = None,
+    attempted: set[tuple[str, date]] | None = None,
+) -> BackfillStep:
+    """Дозагрузить историю оценок филиалов на `months` месяцев назад — не больше
+    `max_requests` запросов за шаг (`None` — без предела).
+
+    Окна по 30 дней (лимит Pointer — 31). Окно, где у филиала уже есть почти все дни,
+    пропускается, поэтому прерванная дозагрузка — выкаткой, падением, пределом шага —
+    продолжается с места по самой базе, а не по памяти процесса (#616). `attempted` —
+    память только против повтора: окно, которое пробовали и которое не покрылось
+    (филиал открылся позже), в тот же день заново не запрашивается.
+    """
+    fetch = fetch or _key_fetch()
+    tried = attempted if attempted is not None else set()
+    uuids = maps_store.company_uuids()
+    saved = requests = 0
     for n, uuid in enumerate(uuids, 1):
-        for start, end in windows:
-            if maps_store.covered_days(uuid, start, end) >= HISTORY_DAYS - 2:
+        for start, end in _history_windows(months, today):
+            if (uuid, start) in tried or maps_store.covered_days(
+                uuid, start, end
+            ) >= HISTORY_DAYS - 2:
                 continue
+            if max_requests is not None and requests >= max_requests:
+                return BackfillStep(saved, requests, done=False)
             ratings = pointer.history(fetch, uuid, start, end)
+            requests += 1
+            tried.add((uuid, start))
             rows = [
                 (uuid, r.provider_id, r.on_date, r.avg_rating, r.ratings_count) for r in ratings
             ]
             saved += maps_store.save([], rows)[1]
         if n % 20 == 0:
             logger.info("История карт: филиалов %d из %d, оценок легло %d", n, len(uuids), saved)
+    return BackfillStep(saved, requests, done=True)
+
+
+def backfill(months: int, *, today: date, fetch: pointer.Fetch | None = None) -> int:
+    """Дозагрузить историю разом, руками (`history N`). Возвращает, сколько оценок легло."""
+    saved = backfill_step(months, today=today, fetch=fetch).saved
     maps_store.log_load(ok=True, ratings=saved, error=f"history {months} months")
     logger.info("История карт загружена: оценок %d", saved)
     return saved

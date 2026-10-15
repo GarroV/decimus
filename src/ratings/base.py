@@ -17,11 +17,11 @@
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, timedelta
 from typing import TypeVar
 
-from src.domain.unit_name import fold_unit_name
+from src.domain.unit_name import fold_unit_name, unit_name_skeleton
 
 from .countries import is_excluded
 from .csvio import read_table
@@ -326,6 +326,25 @@ def parse_directory(data: bytes) -> dict[str, str]:
         }
         ids.setdefault(key, set()).update(found)
     return shared_ids_ambiguous({key: one_id(found) for key, found in ids.items() if found})
+
+
+def directory_id(directory: Mapping[str, str], name: str) -> str | None:
+    """id пиццерии из справочника по имени из листа оценок (#808).
+
+    Сначала точное имя после `fold_unit_name`. Не нашлось — то же имя на другом алфавите:
+    в справочнике «Новополоцк-1», в листе «Novopolotsk-1». Если по такому ключу сошлись
+    имена с разными id, это `AMBIGUOUS`: ошибиться пиццерией хуже, чем не найти.
+    """
+    exact = directory.get(fold_unit_name(name))
+    if exact is not None:
+        return exact
+    key = unit_name_skeleton(name)
+    if not key:
+        return None
+    found = {dodo_id for known, dodo_id in directory.items() if unit_name_skeleton(known) == key}
+    if not found:
+        return None
+    return next(iter(found)) if len(found) == 1 else AMBIGUOUS
 
 
 def shared_ids_ambiguous(directory: dict[str, str]) -> dict[str, str]:
