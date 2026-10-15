@@ -175,7 +175,6 @@ class Overview:
     unchecked: int = 0
     selection: Selection = Selection()
     countries: tuple[tuple[str, int], ...] = ()
-    cities: tuple[tuple[str, int], ...] = ()
     breakdown: tuple[CityRow, ...] = ()
     points: tuple[PointRow, ...] = ()
     #: `{название точки: идентификатор}` — чтобы строка таблицы вела в карточку
@@ -514,26 +513,16 @@ def _units_in(geo: dict[str, tuple[str, str]], *, selection: Selection) -> int |
     )
 
 
-def _geo_choices(
-    geo: dict[str, tuple[str, str]], *, selection: Selection
-) -> tuple[tuple[tuple[str, int], ...], tuple[tuple[str, int], ...]]:
-    """Варианты чипов «страна» и «город» с числом точек, самые крупные первыми.
+def _country_choices(geo: dict[str, tuple[str, str]]) -> tuple[tuple[str, int], ...]:
+    """Варианты чипа «страна» с числом точек, самые крупные первыми.
 
-    Города — только выбранной страны: список, где рядом с Анталией стоит
-    Тбилиси при выбранной Турции, предлагает заведомо пустую выборку.
+    Страны — все, а не только выбранная: иначе на другую не переключиться.
     """
     страны: dict[str, int] = {}
-    города: dict[str, int] = {}
-    for country, city in geo.values():
+    for country, _city in geo.values():
         if country:
             страны[country] = страны.get(country, 0) + 1
-        if city and (not selection.country or country == selection.country):
-            города[city] = города.get(city, 0) + 1
-
-    def по_весу(счёт: dict[str, int]) -> tuple[tuple[str, int], ...]:
-        return tuple(sorted(счёт.items(), key=lambda п: (-п[1], п[0])))
-
-    return по_весу(страны), по_весу(города)
+    return tuple(sorted(страны.items(), key=lambda п: (-п[1], п[0])))
 
 
 def _slice(
@@ -623,7 +612,7 @@ def load(
         reach=охват, date_from=date_from, date_to=date_to, limit=PROCESS_TOP, **узко
     )
     всего_по_процессам = sum(строка[3] for строка in по_процессам) or 1.0
-    страны, города = _geo_choices(geo, selection=selection)
+    страны = _country_choices(geo)
     в_месте = _units_in(geo, selection=selection)
     всего_точек = queries.units_total(reach=охват) if в_месте is None else в_месте
     return Overview(
@@ -663,7 +652,6 @@ def load(
         unchecked=max(всего_точек - сводка.units, 0),
         selection=selection,
         countries=страны,
-        cities=города,
         breakdown=_breakdown(rows, geo=geo, counts=counts, before=было),
         points=sorted_points(точки, selection.sort),
         truncated=обрезан or было_обрезано,
