@@ -27,6 +27,10 @@ from src.db.reach import Reach
 #: Сколько поводов показывать в каждом списке. Экран — не отчёт: длинный
 #: список поводов не помогает выбрать, куда смотреть, он эту задачу и создаёт.
 TOP = 6
+
+#: Сколько процессов (блоков методики) читать для карточки потерь на главной (D507):
+#: их в методике единицы, и урезать их до `TOP` значило бы терять блоки молча.
+PROCESS_TOP = 12
 #: С какого числа точек нарушение пункта считается системным. Пункт на одной
 #: точке — это одна точка, и её уже показывают «Проблемные точки».
 SYSTEMIC_MIN_UNITS = 2
@@ -38,6 +42,19 @@ CRITICAL = "D3"
 @dataclass(frozen=True)
 class ZoneLoss:
     """Потеря по зоне за период — сложенная, а не пересчитанная."""
+
+    code: str
+    name_ru: str
+    name_en: str
+    loss: float
+    inspections: int
+    units: int
+    share: float
+
+
+@dataclass(frozen=True)
+class ProcessLoss:
+    """Потеря по процессу (блоку методики) за период — сложенная, а не пересчитанная (D507)."""
 
     code: str
     name_ru: str
@@ -162,6 +179,8 @@ class Overview:
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problems: tuple[PointRow, ...] = ()
+    #: Потери по процессам (D507) — карточка «Где сеть теряет проценты» на главной.
+    process_losses: tuple[ProcessLoss, ...] = ()
     #: Движение средней против такого же периода перед этим. `None` — не с чем
     #: сравнивать.
     average_delta: float | None = None
@@ -618,6 +637,10 @@ def load(
         reach=охват, date_from=date_from, date_to=date_to, limit=TOP, **узко
     )
     всего = sum(строка[3] for строка in losses) or 1.0
+    по_процессам = queries.process_losses(
+        reach=охват, date_from=date_from, date_to=date_to, limit=PROCESS_TOP, **узко
+    )
+    всего_по_процессам = sum(строка[3] for строка in по_процессам) or 1.0
     страны, города = _geo_choices(geo, selection=selection)
     в_месте = _units_in(geo, selection=selection)
     всего_точек = queries.units_total(reach=охват) if в_месте is None else в_месте
@@ -639,6 +662,18 @@ def load(
                 share=round(loss / всего * 100, 1),
             )
             for code, ru, en, loss, insp, units in losses
+        ),
+        process_losses=tuple(
+            ProcessLoss(
+                code=code,
+                name_ru=ru,
+                name_en=en,
+                loss=loss,
+                inspections=insp,
+                units=units,
+                share=round(loss / всего_по_процессам * 100, 1),
+            )
+            for code, ru, en, loss, insp, units in по_процессам
         ),
         systemic=tuple(
             Systemic(code=code, level=level, records=records, units=units, text=text, lang=lang)

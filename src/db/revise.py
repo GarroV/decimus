@@ -43,7 +43,7 @@ from .config import check_environment
 from .errors import ReviseError
 from .models import ORIGIN_LEGACY, InspectionDetail
 from .pool import connection
-from .push import _INSERT_TRANSLATION_SQL, _by_zone_payload
+from .push import _INSERT_TRANSLATION_SQL, _by_process_payload, _by_zone_payload
 from .queries import _read_detail, _require_inspection_id, _require_tenant
 from .reach import own_reach
 
@@ -98,7 +98,7 @@ where id = %(finding)s and inspection_id = %(id)s
 _UPDATE_SCORE_SQL = """
 update inspections
 set pct = %(pct)s, grade = %(grade)s, deductions = %(deductions)s,
-    counts = %(counts)s, by_zone = %(by_zone)s
+    counts = %(counts)s, by_zone = %(by_zone)s, by_process = %(by_process)s
 where id = %(id)s and tenant_code = %(tenant)s and status = 'draft' and origin <> 'legacy'
 """
 
@@ -255,6 +255,7 @@ def _write_score(cur: Any, ident: str, tenant: str, score: Score) -> None:
             "deductions": score.deductions,
             "counts": Json(dict(score.counts)),
             "by_zone": Json(_by_zone_payload(score)),
+            "by_process": Json(_by_process_payload(score)),
         },
     )
     if cur.rowcount != 1:

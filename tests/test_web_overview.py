@@ -84,6 +84,17 @@ def снимок(**поля: object) -> ov.Overview:
                 share=72.0,
             ),
         ),
+        "process_losses": (
+            ov.ProcessLoss(
+                code="CLEAN",
+                name_ru="Чистота",
+                name_en="Cleanliness",
+                loss=11.0,
+                inspections=2,
+                units=2,
+                share=100.0,
+            ),
+        ),
         "systemic": (ov.Systemic(code="K-041", level="D1", records=5, units=4),),
         "attention": (
             ov.Attention(
@@ -135,15 +146,18 @@ def test_поводы_смотреть_сегодня_попадают_на_эк
     assert "критических нарушений: 2" in страница
 
 
-def test_потери_по_зонам_показаны_именем_зоны_а_не_кодом(
+def test_потери_на_главной_по_процессам_а_не_по_зонам(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """D507: карточка «Где сеть теряет проценты» — блоки методики; зоны с главной ушли."""
     # Act
     страница = показать(стенд, monkeypatch, снимок())
 
-    # Assert — имя из снимка проверки, потеря — числом со знаком.
-    assert "Кухня" in страница
-    assert "−18.0" in страница
+    # Assert — имя из снимка проверки, потеря — числом со знаком; зоны не показаны.
+    assert "Чистота" in страница
+    assert "−11.0" in страница
+    assert "Кухня" not in страница
+    assert "−18.0" not in страница
 
 
 def test_системные_нарушения_названы_кодом_пункта(
@@ -182,7 +196,7 @@ def test_пустые_блоки_верхнего_ряда_говорят_об_�
     assert t_ru("home.attention.title") not in страница
     # D471: четыре карточки верхнего ряда есть всегда — без данных с пустым состоянием.
     assert t_ru("home.top.none") in страница
-    assert t_ru("home.zones.none") in страница
+    assert t_ru("home.processes.none") in страница
     assert t_ru("overview.systemic.title") not in страница
     assert t_ru("home.country.all") not in страница
     assert t_ru("home.inspections.none") in страница
@@ -248,7 +262,7 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
             "home.inspections.title",
             "home.rb.rs",
             "home.top.title",
-            "overview.zones.title",
+            "overview.processes.title",
             "home.units.title",
         )
     ]
@@ -602,6 +616,10 @@ class ЗаписнаяБаза:
         self._записать("zone_losses", kw)
         return []
 
+    def process_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
+        self._записать("process_losses", kw)
+        return []
+
     def systemic_findings(self, **kw: object) -> list[tuple[str, str, int, int, str, str]]:
         self._записать("systemic_findings", kw)
         return []
@@ -636,6 +654,7 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
         "class_counts",
         "worst_zones",
         "zone_losses",
+        "process_losses",
         "systemic_findings",
     }
     for имя, kwargs in база.звонки.items():

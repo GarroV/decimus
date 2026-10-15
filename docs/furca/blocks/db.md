@@ -685,7 +685,7 @@ repoint_phrase(text: str, *, lang: str, item_code: str, reason: str,
 | `src/db/models.py` | `InspectionRow` (с `origin`, `is_legacy`, `is_uploaded`), `FindingRow`, `InfoRow`, `InspectionDetail` (с `reported_status`, `legacy_method` исторической); происхождения `ORIGIN_*`, маркеры исторической записи `LEGACY_CODE`/`NO_CLASS`/`NO_ZONE`, `LEGACY_VERSION_PREFIX` |
 
 Расчёта оценки в блоке нет и быть не может: `push_inspection` берёт `Score` из
-`domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`
+`domain.score()` как есть и кладёт в `inspections.pct`/`grade`/`counts`/`by_zone`/`by_process` (D507)
 без единой операции над числами. Черновик загрузки (`imports.py`) так же
 кладёт итог движка (`report.rescore.apply_command`), пересчитанный после
 каждой записи, а не свой.
