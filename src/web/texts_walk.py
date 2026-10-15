@@ -218,6 +218,13 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.photo.hero": {"ru": "Фото нарушения", "en": "Photo of the issue"},
     "walk.photo.more": {"ru": "Ещё фото", "en": "Another photo"},
     "walk.photo.gallery": {"ru": "Галерея", "en": "Gallery"},
+    "walk.camera.title": {"ru": "Камера", "en": "Camera"},
+    "walk.camera.shoot": {"ru": "Снять", "en": "Take photo"},
+    "walk.camera.close": {"ru": "Закрыть камеру", "en": "Close camera"},
+    "walk.camera.denied": {
+        "ru": "Камера недоступна — выберите снимок в «Галерее»",
+        "en": "Camera unavailable — pick a photo from the Gallery",
+    },
     "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
     "walk.sheet.words_hint": {
         "ru": "Пара слов: «нагар на крышке линии», «просрочка на сыре»",

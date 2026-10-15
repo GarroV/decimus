@@ -66,6 +66,10 @@ OAUTH_CONTENT_SECURITY_POLICY = CONTENT_SECURITY_POLICY.replace(
 #: внедрённый код не должен суметь попросить от её имени.
 PERMISSIONS_POLICY = "camera=(), microphone=(), geolocation=()"
 
+#: Мини-апп обхода снимает нарушение своей камерой (D514): на Android телеграм
+#: не открывает камеру по `capture`. Камера — только своему адресу, без рамок.
+WALK_PERMISSIONS_POLICY = "camera=(self), microphone=(), geolocation=()"
+
 #: Год — срок, который браузеры и списки предзагрузки считают рабочим.
 #: Без `includeSubDomains`: стенд живёт на имени площадки, чьи соседние имена
 #: не наши.
@@ -108,6 +112,7 @@ BASE_HEADERS: dict[str, str] = {
 WALK_HEADERS: dict[str, str] = {
     **{ключ: значение for ключ, значение in BASE_HEADERS.items() if ключ != "X-Frame-Options"},
     "Content-Security-Policy": WALK_CONTENT_SECURITY_POLICY,
+    "Permissions-Policy": WALK_PERMISSIONS_POLICY,
 }
 
 

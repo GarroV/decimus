@@ -1,10 +1,11 @@
 /* Мини-апп обхода: кадры (D312) — сжать на телефоне, отправить, показать.
  *
- * Камера в WebView телеграма открывается только полем выбора файла:
- * getUserMedia там не работает. Кнопок две (D503, вместо одной D422): большая
- * «Фото» — поле с `capture`, сразу камера; рядом «Галерея» — поле без него,
- * сразу несколько кадров. Одна кнопка без `capture` на Android открывала сразу
- * галерею: системное меню с выбором есть только на iPhone.
+ * Кнопок две (D503, вместо одной D422): большая «Фото» — сразу камера, рядом
+ * «Галерея» — поле выбора файла, сразу несколько кадров.
+ * Камера (D514): на iPhone — поле с `capture`, открывается системная. На Android
+ * телеграм `capture` не смотрит (`onShowFileChooser` → `createIntent()`, то есть
+ * выбор файла), поэтому там своя камера: видоискатель на getUserMedia, доступ
+ * спрашивает сам телеграм. Отказ или нет камеры — сообщение, остаётся «Галерея».
  *
  * Снимок сжимается здесь же, до 1600 px по длинной стороне: кадр с телефона —
  * 3–8 МБ, на мобильной связи в подвале пиццерии это минуты, а для отчёта
@@ -187,11 +188,115 @@
     return input;
   }
 
+  /* ── своя камера (D514): Android-телеграм не открывает камеру по `capture` ── */
+
+  var CAMERA_START_MS = 10000;
+  var JPEG_QUALITY = 0.92;
+  var camera = null;
+
+  /** iPhone и iPad: системная камера по `capture` там работает, своя не нужна. */
+  function isApple() {
+    var platform = W.tg && W.tg.platform;
+    if (platform === "ios" || platform === "macos") return true;
+    return /iPhone|iPad|iPod/.test(navigator.userAgent || "");
+  }
+
+  function ownCamera() {
+    return !isApple() && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+  }
+
+  /** Закрыть видоискатель и погасить камеру. true — если он был открыт. */
+  function closeCamera() {
+    if (!camera) return false;
+    var c = camera;
+    camera = null;
+    if (c.stream) c.stream.getTracks().forEach(function (t) { t.stop(); });
+    document.removeEventListener("visibilitychange", onHidden);
+    window.removeEventListener("pagehide", closeCamera);
+    c.node.remove();
+    return true;
+  }
+
+  function onHidden() { if (document.visibilityState === "hidden") closeCamera(); }
+
+  /** Камера не далась: сказать и оставить «Галерею». */
+  function cameraFailed() {
+    closeCamera();
+    W.haptic("error");
+    W.toast(W.tx("walk.camera.denied"), "err");
+  }
+
+  /** Снять кадр с видео в File, как если бы его выбрали полем. */
+  function snap(onFiles) {
+    var c = camera;
+    if (!c || !c.video.videoWidth) return;
+    var canvas = document.createElement("canvas");
+    canvas.width = c.video.videoWidth;
+    canvas.height = c.video.videoHeight;
+    canvas.getContext("2d").drawImage(c.video, 0, 0);
+    canvas.toBlob(function (blob) {
+      closeCamera();
+      if (!blob) { cameraFailed(); return; }
+      W.haptic();
+      onFiles([new File([blob], "photo-" + Date.now() + ".jpg", { type: "image/jpeg" })]);
+    }, "image/jpeg", JPEG_QUALITY);
+  }
+
+  /** Видоискатель на весь экран: спуск — один кадр, крестик и «Назад» — закрыть. */
+  function openCamera(onFiles) {
+    if (camera) return;
+    var node = W.el("div", "walk-camera");
+    node.setAttribute("role", "dialog");
+    node.setAttribute("aria-label", W.tx("walk.camera.title"));
+    var video = W.el("video", "walk-camera__video");
+    video.setAttribute("playsinline", "");
+    video.muted = true;
+    video.autoplay = true;
+    var close = W.button("walk-camera__close", "×", closeCamera);
+    close.setAttribute("aria-label", W.tx("walk.camera.close"));
+    var shutter = W.button("walk-camera__shutter", "", function () { snap(onFiles); });
+    shutter.setAttribute("aria-label", W.tx("walk.camera.shoot"));
+    shutter.disabled = true;
+    node.appendChild(video);
+    node.appendChild(close);
+    node.appendChild(shutter);
+    document.body.appendChild(node);
+    camera = { node: node, video: video, stream: null };
+    document.addEventListener("visibilitychange", onHidden);
+    window.addEventListener("pagehide", closeCamera);
+
+    var mine = camera;
+    var timer = setTimeout(function () { if (camera === mine && !mine.stream) cameraFailed(); }, CAMERA_START_MS);
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+      audio: false,
+    }).then(function (stream) {
+      clearTimeout(timer);
+      if (camera !== mine) { stream.getTracks().forEach(function (t) { t.stop(); }); return; }
+      mine.stream = stream;
+      video.srcObject = stream;
+      video.addEventListener("loadedmetadata", function () { shutter.disabled = false; }, { once: true });
+    }, function () {
+      clearTimeout(timer);
+      if (camera === mine) cameraFailed();
+    });
+  }
+
+  /** Большая кнопка «Фото»: своя камера или поле с `capture` (iPhone). */
+  function shootButton(hero, onFiles) {
+    var cls = "walk-pick walk-pick--camera" + (hero ? " walk-pick--hero" : "");
+    if (!ownCamera()) {
+      var label = W.el("label", cls);
+      label.appendChild(fileInput(true, onFiles));
+      return label;
+    }
+    return W.button(cls, null, function () { openCamera(onFiles); });
+  }
+
   /** Кнопки кадра (D503): большая «Фото» — камера, рядом «Галерея». `onFiles` получает список File. */
   function picker(label, onFiles, hero) {
     var row = W.el("div", "walk-picks" + (hero ? " walk-picks--hero" : ""));
-    var shoot = W.hinted(W.el("label", "walk-pick walk-pick--camera" + (hero ? " walk-pick--hero" : "")), "photo");
-    shoot.appendChild(fileInput(true, onFiles));
+    var shoot = W.hinted(shootButton(hero, onFiles), "photo");
     shoot.appendChild(W.icon("camera", "walk-pick__icon"));
     shoot.appendChild(W.el("span", "walk-pick__label", label));
     var gallery = W.el("label", "walk-pick walk-pick--gallery");
@@ -254,5 +359,5 @@
     return box;
   }
 
-  W.photo = { compress: compress, upload: upload, profile: profile, offline: offline, view: view, remember: remember, picker: picker, thumb: thumb, block: block };
+  W.photo = { compress: compress, upload: upload, profile: profile, offline: offline, view: view, remember: remember, picker: picker, thumb: thumb, block: block, closeCamera: closeCamera };
 })();
