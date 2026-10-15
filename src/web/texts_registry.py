@@ -61,8 +61,8 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
-        "ru": "Период и отбор действуют только на принятые проверки, новые — сверху.",
-        "en": "The period and filters apply to accepted inspections only, newest first.",
+        "ru": "Период и отбор действуют на «Где не проведено» и принятые проверки, новые — сверху.",
+        "en": "The period and filters apply to Not inspected yet and accepted, newest first.",
     },
 }
 
