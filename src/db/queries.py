@@ -163,7 +163,7 @@ select
     i.checklist_code,
     i.status, i.accepted_at, i.accepted_by,
     i.origin,
-    i.deductions, i.counts, i.by_zone,
+    i.deductions, i.counts, i.by_zone, i.by_process,
     i.reported_status, i.legacy_method
 from inspections i
 join units u on u.id = i.unit_id
@@ -600,6 +600,7 @@ def _read_detail(
         deductions=deductions,
         counts=counts,
         by_zone=by_zone,
+        by_process=dict(row["by_process"]) if row.get("by_process") else None,
         findings=tuple(_row_to_finding(строка) for строка in findings),
         info=tuple(InfoRow(code=str(строка[0]), text=str(строка[1])) for строка in info),
         reported_status=str(row["reported_status"] or ""),
@@ -715,7 +716,12 @@ where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
   and (%(grade)s::text is null or i.grade = %(grade)s)
   and jsonb_typeof(proc.value) = 'object'
   and (proc.value ->> 'loss') is not null
+  -- Процесс, где вычеты невозможны («Информация», D511), на экранах не стоит.
+  -- Ключа нет в снимке, записанном до его появления, — тогда процесс считается
+  -- оцениваемым: молча спрятать его было бы хуже.
+  and coalesce((proc.value ->> 'scored')::boolean, true)
 group by proc.key
+having sum((proc.value ->> 'loss')::numeric) > 0
 order by loss desc, proc.key
 limit %(limit)s
 """
@@ -874,7 +880,9 @@ def process_losses(
     Вычет берётся из `by_process` и только сложением. Проверка без разбивки
     (не долита, историческая) и процесс без числа в ответ не попадают: нулём их
     подменять нельзя — «процесс без потерь» и «про процесс ничего не записано»
-    на экране читаются одинаково, а значат разное.
+    на экране читаются одинаково, а значат разное. Не попадают и процессы без
+    возможных вычетов (`scored: false`) и с нулевой суммой потерь: список
+    «где теряем» не показывает того, где не теряют (D511).
     """
     охват = _require_reach(reach)
     _require_window(date_from, date_to)
@@ -1339,6 +1347,66 @@ def worst_zones(
     with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
         cur.execute(
             _WORST_ZONES_SQL,
+            {
+                **охват.params(),
+                "date_from": date_from,
+                "date_to": date_to,
+                **_narrowing(city, country, grade),
+            },
+        )
+        return {
+            str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
+            for inspection_id, code, ru, en, loss in cur.fetchall()
+        }
+
+
+_WORST_PROCESSES_SQL = """
+select distinct on (i.id)
+    i.id,
+    proc.key as code,
+    proc.value ->> 'name_ru' as name_ru,
+    proc.value ->> 'name_en' as name_en,
+    (proc.value ->> 'loss')::numeric as loss
+from inspections i
+     join units u on u.id = i.unit_id
+     cross join lateral jsonb_each(i.by_process) as proc
+where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
+  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
+  and i.status = 'finalized'
+  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
+  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
+  and (%(city)s::text is null or u.city = %(city)s)
+  and (%(country)s::text is null or u.country = %(country)s)
+  and (%(grade)s::text is null or i.grade = %(grade)s)
+  and jsonb_typeof(proc.value) = 'object'
+  and (proc.value ->> 'loss') is not null
+  and (proc.value ->> 'loss')::numeric > 0
+  and coalesce((proc.value ->> 'scored')::boolean, true)
+order by i.id, (proc.value ->> 'loss')::numeric desc, proc.key
+"""
+
+
+def worst_processes(
+    *,
+    reach: Reach,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    city: str = "",
+    country: str = "",
+    grade: str = "",
+) -> dict[str, tuple[str, str, str, float]]:
+    """Самый дорогой процесс каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
+
+    Выбор по наибольшему из записанных движком чисел `loss` — это отбор, а не
+    подсчёт (D511). Имя — из снимка самой проверки. Проверки без разбивки
+    (историческая, не долитая) и без единого процесса с потерей в ответе нет:
+    экран пишет для них «—», а не выдумывает направление.
+    """
+    охват = _require_reach(reach)
+    _require_window(date_from, date_to)
+    with _reading("слабое направление проверки") as conn, conn.cursor() as cur:
+        cur.execute(
+            _WORST_PROCESSES_SQL,
             {
                 **охват.params(),
                 "date_from": date_from,

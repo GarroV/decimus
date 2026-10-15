@@ -98,6 +98,14 @@ class TestШкала:
 
 
 class TestСлабыеБлоки:
+    def test_процесс_без_возможных_вычетов_и_проверка_без_разбивки_не_показываются(self) -> None:
+        снимок = {
+            "INFO": {"name_ru": "Информация", "scored": False, "loss": 3.0},
+            "CLN": {"name_ru": "Чистота", "scored": True, "loss": 1.0},
+        }
+        assert [p.code for p in unit_card._weak(снимок, lang="ru")] == ["CLN"]
+        assert unit_card._weak(None, lang="ru") == ()
+
     def test_потери_читаются_ключом_loss_и_идут_тяжёлыми_вперёд(self) -> None:
         снимок = {
             "fridge": {"name_ru": "Холодильник", "name_en": "Fridge", "share": 20.0, "loss": 2.0},
@@ -290,7 +298,7 @@ class TestЭкран:
         self, стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         страница = self.показать(стенд, monkeypatch, self.снимок(weak=(), repeats=()))
-        assert "потерь по зонам не записано" in страница
+        assert "потерь по направлениям не записано" in страница
         assert "Ни одно нарушение не повторялось" in страница
 
     def test_предписаний_и_планов_на_карточке_нет_пока_нет_раздела(

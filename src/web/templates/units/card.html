@@ -95,12 +95,10 @@
         <div class="ov-card__title">{{ t('unit.weak') }}</div>
       </div>
       {% if data.weak %}
-        {% for zone in data.weak %}
+        {% for process in data.weak %}
           <div class="ov-row">
-            <span class="ov-row__name">{{ zone.name }}</span>
-            <span class="ov-row__meta">{{ t('unit.weak.share', share='%g'|format(zone.share)) }}</span>
-            {% if zone.zeroed %}<span class="ov-flag"><span class="ov-dot ov-dot--err" aria-hidden="true"></span>{{ t('unit.weak.zeroed') }}</span>{% endif %}
-            <span class="ov-row__num ov-num--err">−{{ '%.1f'|format(zone.loss) }}</span>
+            <span class="ov-row__name">{{ process.name }}</span>
+            <span class="ov-row__num ov-num--err">−{{ '%.1f'|format(process.loss) }}</span>
           </div>
         {% endfor %}
       {% else %}

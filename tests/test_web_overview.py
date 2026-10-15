@@ -18,6 +18,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import date
 
 import pytest
@@ -38,7 +39,6 @@ from src.web.texts import t as _t
     inspections=(),
     grades=(),
     average=None,
-    zone_losses=(),
     systemic=(),
     attention=(),
 )
@@ -73,17 +73,6 @@ def снимок(**поля: object) -> ov.Overview:
         "units_total": 150,
         "inspections": (строка("Белград-1", 71.5, "D"), строка("Тбилиси-2", 95.5, "B")),
         "average": 83.5,
-        "zone_losses": (
-            ov.ZoneLoss(
-                code="kitchen",
-                name_ru="Кухня",
-                name_en="Kitchen",
-                loss=18.0,
-                inspections=2,
-                units=2,
-                share=72.0,
-            ),
-        ),
         "process_losses": (
             ov.ProcessLoss(
                 code="CLEAN",
@@ -158,6 +147,26 @@ def test_потери_на_главной_по_процессам_а_не_по_�
     assert "−11.0" in страница
     assert "Кухня" not in страница
     assert "−18.0" not in страница
+
+
+def test_колонка_слабого_направления_называет_процесс_или_прочерк(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D511: в таблице «Пиццерии» — «Слабое направление», а не «Слабая зона»."""
+    # Arrange — у одной точки направление записано, у другой (историческая) его нет
+    с_направлением = replace(
+        точка("Белград-1", "RS", "beograd"),
+        worst_process_ru="Пищевая безопасность",
+        worst_process_en="Food safety",
+    )
+    без = точка("Белград-2", "RS", "beograd")
+
+    # Act
+    страница = показать(стенд, monkeypatch, снимок(points=(с_направлением, без)))
+
+    # Assert
+    assert "Слабое направление" in страница and "Слабая зона" not in страница
+    assert "Пищевая безопасность" in страница
 
 
 def test_системные_нарушения_названы_кодом_пункта(
@@ -255,17 +264,18 @@ def test_порядок_блоков_главной(стенд: FlaskClient, mon
     страница = показать(стенд, monkeypatch, с_оценками())
 
     # Assert
-    порядок = [
-        страница.index(t_ru(ключ))
-        for ключ in (
-            "home.attention.title",
-            "home.inspections.title",
-            "home.rb.rs",
-            "home.top.title",
-            "overview.processes.title",
-            "home.units.title",
-        )
-    ]
+    # Каждый заголовок ищется после предыдущего: «Пиццерии» стоит ещё и в меню
+    # (D512), и первое вхождение слова — не заголовок таблицы.
+    порядок: list[int] = []
+    for ключ in (
+        "home.attention.title",
+        "home.inspections.title",
+        "home.rb.rs",
+        "home.top.title",
+        "overview.processes.title",
+        "home.units.title",
+    ):
+        порядок.append(страница.index(t_ru(ключ), порядок[-1] if порядок else 0))
     assert порядок == sorted(порядок)
 
 
@@ -608,13 +618,9 @@ class ЗаписнаяБаза:
         self._записать("class_counts", kw)
         return {}
 
-    def worst_zones(self, **kw: object) -> dict[str, tuple[str, str, str, float]]:
-        self._записать("worst_zones", kw)
+    def worst_processes(self, **kw: object) -> dict[str, tuple[str, str, str, float]]:
+        self._записать("worst_processes", kw)
         return {}
-
-    def zone_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
-        self._записать("zone_losses", kw)
-        return []
 
     def process_losses(self, **kw: object) -> list[tuple[str, str, str, float, int, int]]:
         self._записать("process_losses", kw)
@@ -652,8 +658,7 @@ def test_отбор_сужает_и_те_блоки_что_считаются_з
         "list_inspections",
         "slice_summary",
         "class_counts",
-        "worst_zones",
-        "zone_losses",
+        "worst_processes",
         "process_losses",
         "systemic_findings",
     }
@@ -749,8 +754,8 @@ def точка(unit: str, country: str, city: str) -> ov.PointRow:
         grade="B",
         pct=90.0,
         delta=None,
-        worst_zone_ru="",
-        worst_zone_en="",
+        worst_process_ru="",
+        worst_process_en="",
         critical=0,
     )
 

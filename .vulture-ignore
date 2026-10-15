@@ -338,8 +338,8 @@ mtime_ns
 # «Обзор» и «Страна», карточка пиццерии, ставки методики.
 current_title
 narrowed
-worst_zone_ru
-worst_zone_en
+worst_process_ru
+worst_process_en
 breakdown
 audits_count
 bars
