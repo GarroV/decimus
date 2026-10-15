@@ -82,6 +82,7 @@ from . import (
     security_screen,
     settings_screen,
     swarm_api,
+    to_inspect,
     ui_lang,
     unit_add,
     users_screen,
@@ -571,6 +572,17 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
+def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
+    """Куда ведёт точка из «Где не проведено»: карточка в «Стране» (УК) или в «Пиццериях»."""
+    if item.unit_id and item.country and hq:
+        return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
+            f"#unit-{item.unit_id}"
+        )
+    if item.unit_id:
+        return _url("unit", unit_id=item.unit_id, lang=lang)
+    return _url("registry", lang=lang)
+
+
 def _register_calendar(app: Flask, conf: Settings) -> None:
     """Раздел «Календарь» (D497): сетка месяца с проверками по дням.
 
@@ -674,6 +686,21 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             "inspections/list.html",
             registry=registry_data,
             review_rows=на_приёмке,
+            # «Где не проведено» (D501): период и отбор страны, города и поиска —
+            # те же, что у «Принятых»; список целиком, лишнее свёрнуто в шаблоне.
+            to_check=to_inspect.load(
+                reach=auth.current_reach(),
+                date_from=период.start,
+                date_to=период.end,
+                country=отбор_в.country,
+                city=отбор_в.city,
+                query=отбор_в.q,
+                top=None,
+            ),
+            to_check_top=to_inspect.TO_CHECK_TOP,
+            unit_href=lambda item: _unit_href(
+                item, hq=auth.current_tenant() == HQ_TENANT, lang=язык
+            ),
             review_wait=ждёт_дней,
             rows=строки,
             # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.

@@ -211,7 +211,7 @@ def test_страница_показывает_блок_по_двум_класт
     # Assert
     assert t("home.rb.rs", "ru") in страница and t("home.rb.rko", "ru") in страница
     assert t("home.rb.maps", "ru") in страница
-    assert ">CEE<" in страница and "Другие страны" in страница
+    assert ">CEE<" in страница and "Остальные страны" in страница
     assert "85.0" in страница and "96.0" in страница and "4.50" in страница
     assert "▼-1.5" in страница and "▲+5.0" in страница
     assert 'href="/ratings?lang=ru&amp;from=2026-10-01&amp;to=2026-10-31"' in страница

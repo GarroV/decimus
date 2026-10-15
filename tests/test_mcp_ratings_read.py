@@ -95,8 +95,8 @@ def test_партнёр_видит_в_сводке_только_свою_стр�
 
     ответ = tool.ratings_summary(tenant="RS-SPACE", **ПЕРИОД)
 
-    assert [g["key"] for g in ответ["groups"]] == ["CEE", "OTHER"]
-    assert [g["countries"] for g in ответ["groups"]] == [["RS"], []]
+    assert [g["key"] for g in ответ["groups"]] == ["CEE"]  # пустые кластеры строкой не идут (D502)
+    assert [g["countries"] for g in ответ["groups"]] == [["RS"]]
     # среднее CEE — по пиццериям Сербии: (92 + 70) / 2, без Болгарии (60)
     assert ответ["groups"][0]["rs"] == 81.0
     текст = str(ответ)

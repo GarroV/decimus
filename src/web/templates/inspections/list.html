@@ -120,6 +120,38 @@
       {% endif %}
     </div>
 
+    {# «Где не проведено» (D501): точки охвата без проверок за период, отбор
+       страны, города и поиска — тот же, что у «Принятых». Первые пять видны,
+       остальные — под «и ещё N». #}
+    <div class="slist slist--tocheck">
+      <div class="slist__group">
+        <span>{{ t('registry.tocheck.title') }}</span>{% if to_check.shown and not to_check.failed %}<span class="sbadge">{{ to_check.total }}</span>{% endif %}
+      </div>
+      {% if to_check.failed %}
+        <p class="slist__note">{{ t('registry.tocheck.failed') }}</p>
+      {% elif not to_check.shown %}
+        <p class="slist__note">{{ t('registry.tocheck.empty') }}</p>
+      {% else %}
+        <p class="slist__note">{{ t('registry.tocheck.hint') }}</p>
+        {% macro tocheck_row(item) %}
+          <li>
+            <a class="srow" href="{{ unit_href(item) }}">
+              <span class="srow__dot" aria-hidden="true"></span>
+              <span class="srow__main"><b>{{ item.unit }}</b><small>{{ city_title(item.city) or '' }}</small></span>
+              <span class="srow__cell mono">{% if item.last %}{{ t('registry.tocheck.last', date=item.last) }}{% else %}{{ t('registry.tocheck.never') }}{% endif %}</span>
+            </a>
+          </li>
+        {% endmacro %}
+        <ul class="slist__rows">{% for item in to_check.units[:to_check_top] %}{{ tocheck_row(item) }}{% endfor %}</ul>
+        {% if to_check.units | length > to_check_top %}
+          <details class="tocheck-more">
+            <summary class="slist__note">{{ t('registry.tocheck.more', count=to_check.units | length - to_check_top) }}</summary>
+            <ul class="slist__rows">{% for item in to_check.units[to_check_top:] %}{{ tocheck_row(item) }}{% endfor %}</ul>
+          </details>
+        {% endif %}
+      {% endif %}
+    </div>
+
     {# «Принятые» — единственный блок, на который действуют период и отбор. #}
     <div class="slist slist--registry">
       <div class="slist__group">

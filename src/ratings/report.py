@@ -48,8 +48,9 @@ GROUP_DEVELOPER = "developer"
 GROUP_COUNTRY = "country"
 GROUP_CLUSTER = "cluster"
 GROUPS = (GROUP_IMF, GROUP_CLUSTER, GROUP_DEVELOPER, GROUP_COUNTRY)
-#: Кластеры IMF (D384): CEE — вся Европа, OTHER — Other countries.
-CLUSTERS = ("CEE", "OTHER")
+#: Кластеры IMF (D502, вместо двух D384): CEE — Европа, TR — Турция, CAUCASUS —
+#: Кавказ, OTHER — остальные страны. Порядок — порядок колонок и выбора.
+CLUSTERS = ("CEE", "TR", "CAUCASUS", "OTHER")
 #: Сколько месяцев на графике свечей — по конец выбранного периода.
 
 
@@ -239,6 +240,9 @@ def group_lines(
             )
             for key in CLUSTERS
         ]
+        # Кластер без стран в охвате строкой не идёт: четыре кластера (D502) у
+        # партнёра одной страны дали бы три пустые строки.
+        parts = [part for part in parts if part[2]]
     else:
         parts = [(LEVEL_SLICE, None, tuple(codes))]
         if selection.group == GROUP_DEVELOPER and len(codes) > 1:
