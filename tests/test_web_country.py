@@ -305,7 +305,7 @@ def test_девелопер_в_колонке_и_сводка_его_стран(
 
     monkeypatch.setattr(cn, "load", load)
     без = стенд.get("/country/GE").get_data(as_text=True)
-    assert "cn-devpick" in без and "dev=" in без
+    assert "Девелопер" in без and "dev=" in без
     сводка = стенд.get("/country?dev=Иван").get_data(as_text=True)
     assert видели[-1] == "RS" and "/country/GE" not in сводка.split('class="mx-main', 1)[0]
     assert "Страна</div>" not in сводка.split('class="mx-main', 1)[1].split("<h1", 1)[0]
