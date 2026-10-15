@@ -50,7 +50,7 @@ list_inspections(*, reach: Reach, unit: str | None = None,
 get_inspection(inspection_id: str, *, reach: Reach) -> InspectionDetail | None
 findings_by_unit(*, reach: Reach, unit: str,
                  limit: int = 100) -> list[FindingRow]
-# на охвате же: zone_losses, process_losses, systemic_findings, class_counts, worst_zones,
+# на охвате же: process_losses, systemic_findings, class_counts, worst_processes,
 # worst_processes,
 # units_total, unit_ids, unit_geography, edition_first_used, item_usage,
 # reports.latest_report, previews.finding_previews/preview_bytes, move.list_moves
