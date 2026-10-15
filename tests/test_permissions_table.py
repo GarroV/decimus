@@ -33,6 +33,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "ratings.read",
     "unit.create",
     "phrases.raw",
+    # Поездки «Календаря» своего пространства (D505, D506).
+    "trip.plan",
     "checklist.read",
     "checklist.edit",
     "checklist.publish",
@@ -61,6 +63,8 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
     "plan.submit",
     "checklist.read",
     "ratings.read",
+    # Свои поездки — где сам исполнитель (D506).
+    "trip.own",
 }
 
 ОЖИДАНИЕ: dict[tuple[str, str], set[str]] = {
@@ -101,6 +105,7 @@ from src.web.sections import OWN_SECTIONS, SECTIONS
         "phrases.manage",
         "people.manage",
         "people.role",
+        "trip.plan",
     },
     (SIDE_PARTNER, "auditor"): СОТРУДНИК_ПАРТНЁРА,
 }

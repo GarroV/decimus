@@ -17,7 +17,7 @@
 ## Маршруты веба
 
 <!-- map:begin routes -->
-**Админка (`src/web/app.py: create_app`)** — 153 маршрутов
+**Админка (`src/web/app.py: create_app`)** — 158 маршрутов
 
 | Путь | Методы | Endpoint | Файл |
 |---|---|---|---|
@@ -66,7 +66,12 @@
 | `/api/v1/ratings/violations` | GET | `swarm_api_violations` | `src/web/swarm_api.py` |
 | `/auth/google/callback` | GET | `google_callback` | `src/web/auth.py` |
 | `/auth/google/mail` | GET | `google_mail_callback` | `src/web/letter_draft.py` |
-| `/calendar` | GET | `calendar` | `src/web/app.py` |
+| `/calendar` | GET | `calendar` | `src/web/calendar_screen.py` |
+| `/calendar/trips` | POST | `trip_create` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>` | POST | `trip_update` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/delete` | POST | `trip_delete` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/steps` | POST | `trip_step_add` | `src/web/calendar_screen.py` |
+| `/calendar/trips/<trip_id>/steps/<step_id>/delete` | POST | `trip_step_delete` | `src/web/calendar_screen.py` |
 | `/country` | GET | `country_index` | `src/web/app.py` |
 | `/country/<code>` | GET | `country` | `src/web/app.py` |
 | `/country/<code>/units/new` | GET | `unit_new` | `src/web/unit_add.py` |
@@ -436,6 +441,7 @@
 | `0071_finding_reading.sql` | — |
 | `0072_ratings_clusters_four.sql` | — |
 | `0073_inspection_by_process.sql` | — |
+| `0074_trips.sql` | `trips`, `trip_steps` |
 <!-- map:end -->
 
 ## Makefile

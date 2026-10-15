@@ -37,6 +37,7 @@ from .texts_refusals import REFUSAL_TEXTS
 from .texts_registry import REGISTRY_TEXTS
 from .texts_second_factor import SECOND_FACTOR_TEXTS
 from .texts_settings import SETTINGS_TEXTS
+from .texts_trips import TRIP_TEXTS
 from .texts_units import UNIT_TEXTS
 from .texts_users import USERS_TEXTS
 from .texts_walk import WALK_TEXTS
@@ -1643,6 +1644,7 @@ _ЧАСТИ = (
     MODEL_KEY_TEXTS,
     PLAN_TEXTS,
     PRESCRIPTION_TEXTS,
+    TRIP_TEXTS,
     RATINGS_TEXTS,
     REFUSAL_TEXTS,
     REGISTRY_TEXTS,
@@ -1672,6 +1674,7 @@ TEXTS = {
     **OAUTH_TEXTS,
     **PLAN_TEXTS,
     **PRESCRIPTION_TEXTS,
+    **TRIP_TEXTS,
     **RATINGS_TEXTS,
     **REFUSAL_TEXTS,
     **REGISTRY_TEXTS,

@@ -279,3 +279,17 @@ class OAuthGrantError(DbError):
     def __init__(self, error: str, description: str) -> None:
         super().__init__(description)
         self.error = error
+
+
+class TripError(DbError):
+    """Действие с поездкой «Календаря» не выполнено (D506).
+
+    `code` — ключ текста для человека (`src/web/texts_trips.py`), `params` —
+    подстановки в него: экран говорит на языке интерфейса, а не на языке модуля
+    базы. Текста драйвера в ошибке нет — только тип.
+    """
+
+    def __init__(self, code: str, **params: object) -> None:
+        super().__init__(code)
+        self.code = code
+        self.params = params

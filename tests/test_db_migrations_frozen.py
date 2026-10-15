@@ -299,6 +299,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0073_inspection_by_process.sql": (
         "sql1:49ab90c0c335124e40ab42b874e92db527bcb2ff126e19d431ae37620e87b6dc"
     ),
+    # Поездки «Календаря», строго своего пространства (D505, D506).
+    "0074_trips.sql": (
+        "sql1:fd024426495e15fd8c0e9d94d16a2892c7584c107be94c988a5eb393c92c71bf"
+    ),
 }
 
 
