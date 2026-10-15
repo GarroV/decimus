@@ -473,7 +473,7 @@ def _register_overview(app: Flask, conf: Settings) -> None:
 
 
 def _register_country(app: Flask, conf: Settings) -> None:
-    """Раздел «Страна»: работа с одной страной (D260, D262, D467).
+    """Раздел «Пиццерии»: работа с одной страной (D260, D262, D467).
 
     Рабочая зона — шапка и сегменты («Сводка», «Пиццерии»); сборка в
     `country_page`. Срез живёт в адресе, как на «Главной»: «Грузия, пиццерии,
@@ -549,7 +549,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
         if точка is None:
             return render_template("inspections/not_found.html"), 404
-        # Партнёр (D508): к пиццерии один путь — экран «Страна» с её списком
+        # Партнёр (D508): к пиццерии один путь — экран «Пиццерии» с её списком
         # проверок; старая карточка точки остаётся УК. Старые ссылки не мертвеют.
         if auth.current_tenant() != HQ_TENANT and точка.country:
             return redirect(
@@ -579,7 +579,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
 
 
 def _unit_href(item: to_inspect.ToCheck, *, lang: str) -> str:
-    """Куда ведёт точка из «Где не проведено»: экран пиццерии в «Стране» (УК и партнёр, D508)."""
+    """Куда ведёт точка из «Где не проведено»: экран пиццерии в «Пиццериях» (УК и партнёр, D508)."""
     if item.unit_id and item.country:
         return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
             f"#unit-{item.unit_id}"

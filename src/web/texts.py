@@ -120,7 +120,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "overview.points.grade": {"ru": "Буква", "en": "Grade"},
     "overview.points.score": {"ru": "Оценка", "en": "Score"},
     "overview.points.delta": {"ru": "Δ", "en": "Δ"},
-    "overview.points.zone": {"ru": "Слабая зона", "en": "Weakest zone"},
+    "overview.points.process": {"ru": "Слабое направление", "en": "Weakest direction"},
     "overview.points.date": {"ru": "Проверена", "en": "Inspected"},
     "overview.points.empty": {
         "ru": "В этой выборке нет ни одной проверенной точки. Снимите часть отбора.",
@@ -204,14 +204,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "critical findings: {detail}",
     },
     "overview.why.low_grade": {"ru": "оценка {detail} %", "en": "score {detail}%"},
-    "overview.zones.title": {
-        "ru": "Где сеть теряет проценты",
-        "en": "Where the network loses points",
-    },
-    "overview.zones.hint": {
-        "ru": "Сумма потерь по зонам — что лечить системно",
-        "en": "Losses summed by zone — what to fix systemically",
-    },
     "overview.processes.title": {
         "ru": "Где сеть теряет проценты",
         "en": "Where the network loses points",
@@ -221,10 +213,6 @@ TEXTS: dict[str, dict[str, str]] = {
         "en": "Losses summed by methodology block — whom to train and what to fix",
     },
     "overview.processes.spread": {
-        "ru": "точек: {units} · проверок: {inspections}",
-        "en": "units: {units} · inspections: {inspections}",
-    },
-    "overview.zones.spread": {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",
     },
@@ -247,7 +235,8 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок в выборке нет — показывать нечего.",
         "en": "No inspections in this selection — nothing to show.",
     },
-    "country.kicker": {"ru": "Страна", "en": "Country"},
+    "country.kicker": {"ru": "Пиццерии", "en": "Pizzerias"},
+    "country.filter.title": {"ru": "Отбор", "en": "Filter"},
     "country.rail.title": {"ru": "Страны", "en": "Countries"},
     "country.choose.title": {"ru": "Выберите страну", "en": "Choose a country"},
     "country.choose.units": {"ru": "точек: {n}", "en": "units: {n}"},
@@ -261,7 +250,7 @@ TEXTS: dict[str, dict[str, str]] = {
     "section.registry.title": {"ru": "Проверки", "en": "Inspections"},
     "section.plans.title": {"ru": "Экшн-планы", "en": "Action plans"},
     "section.orders.title": {"ru": "Предписания", "en": "Compliance notices"},
-    "section.country.title": {"ru": "Страна", "en": "Country"},
+    "section.country.title": {"ru": "Пиццерии", "en": "Pizzerias"},
     "section.calendar.title": {"ru": "Календарь", "en": "Calendar"},
     "section.admin.title": {"ru": "Методика", "en": "Methodology"},
     # Слово владельца (D286): вкладка, где заводят людей и привязывают бота.
@@ -392,13 +381,14 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Проверок по этой точке ещё не было",
         "en": "This unit has not been audited yet",
     },
-    "unit.weak": {"ru": "Слабые блоки последней проверки", "en": "Weak zones of the last audit"},
-    "unit.weak.empty": {
-        "ru": "В последней проверке потерь по зонам не записано",
-        "en": "The last audit recorded no zone losses",
+    "unit.weak": {
+        "ru": "Слабые направления последней проверки",
+        "en": "Weak directions of the last audit",
     },
-    "unit.weak.zeroed": {"ru": "зона обнулена", "en": "zone zeroed"},
-    "unit.weak.share": {"ru": "доля {share}%", "en": "share {share}%"},
+    "unit.weak.empty": {
+        "ru": "В последней проверке потерь по направлениям не записано",
+        "en": "The last audit recorded no losses by direction",
+    },
     "unit.findings": {"ru": "Записи последней проверки", "en": "Records of the last audit"},
     "unit.findings.empty": {"ru": "Записей нет", "en": "No records"},
     "unit.repeats": {"ru": "Повторяющиеся нарушения", "en": "Repeating violations"},

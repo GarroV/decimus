@@ -40,19 +40,6 @@ CRITICAL = "D3"
 
 
 @dataclass(frozen=True)
-class ZoneLoss:
-    """Потеря по зоне за период — сложенная, а не пересчитанная."""
-
-    code: str
-    name_ru: str
-    name_en: str
-    loss: float
-    inspections: int
-    units: int
-    share: float
-
-
-@dataclass(frozen=True)
 class ProcessLoss:
     """Потеря по процессу (блоку методики) за период — сложенная, а не пересчитанная (D507)."""
 
@@ -159,8 +146,8 @@ class PointRow:
     grade: str
     pct: float
     delta: float | None
-    worst_zone_ru: str
-    worst_zone_en: str
+    worst_process_ru: str
+    worst_process_en: str
     critical: int
     #: Почему точка попала в проблемные — КОДОМ причины, не готовой фразой:
     #: причина одна, а языков у продукта два. Пусто — точка не проблемная.
@@ -175,7 +162,6 @@ class Overview:
     inspections: tuple[InspectionRow, ...]
     grades: tuple[tuple[str, int], ...]
     average: float | None
-    zone_losses: tuple[ZoneLoss, ...]
     systemic: tuple[Systemic, ...]
     attention: tuple[Attention, ...]
     problems: tuple[PointRow, ...] = ()
@@ -431,7 +417,7 @@ def _points(
     for имя, row in последние.items():
         country, city = geo.get(имя, ("", ""))
         было = предыдущие.get(имя)
-        зона = worst.get(row.id, ("", "", "", 0.0))
+        процесс = worst.get(row.id, ("", "", "", 0.0))
         точки.append(
             PointRow(
                 unit=имя,
@@ -442,8 +428,8 @@ def _points(
                 grade=row.grade,
                 pct=row.pct,
                 delta=round(row.pct - было.pct, 1) if было is not None else None,
-                worst_zone_ru=зона[1],
-                worst_zone_en=зона[2],
+                worst_process_ru=процесс[1],
+                worst_process_en=процесс[2],
                 critical=counts.get(row.id, {}).get(CRITICAL, 0),
             )
         )
@@ -614,7 +600,7 @@ def load(
     ид_точек = queries.unit_ids(reach=охват)
     последние = queries.unit_last_inspections(reach=охват, date_from=date_from, date_to=date_to)
     counts = queries.class_counts(reach=охват, date_from=date_from, date_to=date_to, **узко)
-    worst = queries.worst_zones(reach=охват, date_from=date_from, date_to=date_to, **узко)
+    worst = queries.worst_processes(reach=охват, date_from=date_from, date_to=date_to, **узко)
     rows, обрезан = _slice(
         reach=охват, limit=limit, selection=selection, date_from=date_from, date_to=date_to
     )
@@ -633,10 +619,6 @@ def load(
         else _НИЧЕГО
     )
     точки = _points(rows, geo=geo, counts=counts, worst=worst)
-    losses = queries.zone_losses(
-        reach=охват, date_from=date_from, date_to=date_to, limit=TOP, **узко
-    )
-    всего = sum(строка[3] for строка in losses) or 1.0
     по_процессам = queries.process_losses(
         reach=охват, date_from=date_from, date_to=date_to, limit=PROCESS_TOP, **узко
     )
@@ -651,18 +633,6 @@ def load(
         inspections=rows,
         grades=сводка.grades,
         average=сводка.average,
-        zone_losses=tuple(
-            ZoneLoss(
-                code=code,
-                name_ru=ru,
-                name_en=en,
-                loss=loss,
-                inspections=insp,
-                units=units,
-                share=round(loss / всего * 100, 1),
-            )
-            for code, ru, en, loss, insp, units in losses
-        ),
         process_losses=tuple(
             ProcessLoss(
                 code=code,

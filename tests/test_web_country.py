@@ -76,8 +76,8 @@ def с_точкой(вид: cn.CountryView) -> cn.CountryView:
         grade="B",
         pct=90.0,
         delta=None,
-        worst_zone_ru="",
-        worst_zone_en="",
+        worst_process_ru="",
+        worst_process_en="",
         critical=0,
     )
     return replace(вид, snapshot=replace(вид.snapshot, points=(точка,)))
@@ -205,7 +205,7 @@ def test_пустая_страна_одна_тихая_строка_без_пу�
         данные(),
         snapshot=replace(
             данные().snapshot,
-            points=(), inspections=(), inspections_total=0, systemic=(), zone_losses=(),
+            points=(), inspections=(), inspections_total=0, systemic=(),
         ),
     )  # fmt: skip
     страница = открыть(стенд, monkeypatch, вид, "/country/GE")
@@ -218,7 +218,7 @@ def test_где_болит_одним_блоком_и_только_при_про
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     страница = открыть(стенд, monkeypatch, данные(), "/country/GE")
-    assert страница.count('cn-hurt"') == 1 and "K-041" in страница and "Кухня" in страница
+    assert страница.count('cn-hurt"') == 1 and "K-041" in страница and "Чистота" in страница
 
 
 def test_смена_языка_оставляет_страну_и_раскрытую_точку(

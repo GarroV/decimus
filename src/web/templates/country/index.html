@@ -1,5 +1,5 @@
 {#
-  Экран «Страна» (D260, D262, D296, D467, D504) — статистика по стране (D500):
+  Экран «Пиццерии» (D512; раньше «Страна»; D260, D262, D296, D467, D504) — статистика по стране (D500):
   слева выпадающие списки «Девелопер» и «Страна», под ними пиццерии страны
   (сведения и история — в панели справа); справа блоки страны — ключевые цифры
   периода, рейтинги и карты, «Где болит». Состояние в адресе (`from`/`to`,
@@ -33,15 +33,15 @@
    `mx-rail`). Рабочая зона не пустует: без страны в адресе в ней первая страна
    колонки, а экран помечен выбором (`mx-shell--pick`) — на узком экране тогда
    видна только колонка. На экране страны колонка там прячется, и назад ведёт
-   ссылка «‹ Страны». #}
+   ссылка «‹ Пиццерии» (D512: слова «Страны» в ней больше нет). #}
 <div class="mx-shell cn-shell{% if view is none and not combined or picking %} mx-shell--pick{% endif %}">
-  <aside class="mx-rail cn-rail" aria-label="{{ t('country.rail.title') }}">
+  <aside class="mx-rail cn-rail" aria-label="{{ t('country.filter.title') }}">
     {# Девелопер и страна — выпадающими списками в блоке отбора, как на «Проверках»
        (D504, D510); под ним пиццерии страны. #}
     {# Партнёр с одной страной (D508): выбирать нечего — блока отбора нет. #}
     {% if not single_country %}
     <div class="cn-filters">
-      <div class="mx-rail__head">{{ t('country.rail.title') }}</div>
+      <div class="mx-rail__head">{{ t('country.filter.title') }}</div>
       {% if dev_pick %}{{ pick(dev_pick) }}{% endif %}
       {% if country_pick is defined and country_pick.options %}{{ pick(country_pick) }}{% else %}
         <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
@@ -49,7 +49,7 @@
     {% endif %}
     {% if units is defined and not combined %}
       <div class="mx-rail__head mx-rail__head--list cn-units-head">
-        <span>{{ t('country.units.title') }}</span><span class="mx-rail__count">{{ units.open_rows|length }}</span>
+        <span>{{ country_name or t('country.units.title') }}</span><span class="mx-rail__count">{{ units.open_rows|length }}</span>
       </div>
       {% macro unit_line(row) %}
         <a class="mx-rail__row mx-rail__row--line cn-uline{% if open_row and row.key == open_row.key %} is-on{% endif %}" data-drawer-open
@@ -82,7 +82,8 @@
     </div>
   </div>
 {% else %}
-  <a class="cn-back" href="{{ rail_back_url }}">‹ {{ t('country.rail.title') }}</a>
+  {# Только на узком экране (`.cn-back`): колонка со списком там прячется, и без ссылки к пиццериям не попасть. #}
+  <a class="cn-back" href="{{ rail_back_url }}">‹ {{ t('country.units.title') }}</a>
 
   {# ── Шапка: кто это, сколько пиццерий, период, счётчики ─────────────── #}
   <section class="ov-card cn-headcard">
