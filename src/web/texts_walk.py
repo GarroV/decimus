@@ -217,6 +217,7 @@ WALK_TEXTS: dict[str, dict[str, str]] = {
     "walk.sheet.pick_zone": {"ru": "Выбрать зону", "en": "Choose area"},
     "walk.photo.hero": {"ru": "Фото нарушения", "en": "Photo of the issue"},
     "walk.photo.more": {"ru": "Ещё фото", "en": "Another photo"},
+    "walk.photo.gallery": {"ru": "Галерея", "en": "Gallery"},
     "walk.sheet.words": {"ru": "Что не так", "en": "What is wrong"},
     "walk.sheet.words_hint": {
         "ru": "Пара слов: «нагар на крышке линии», «просрочка на сыре»",
