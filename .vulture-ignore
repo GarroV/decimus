@@ -328,6 +328,7 @@ walk_info
 # приложения `get_send_file_max_age` — их вызывает фреймворк, не код.
 _вход_через_google_доступен
 _add_fingerprint
+_mark_immutable
 _.get_send_file_max_age
 # Хендлер aiogram выбора чек-листа на старте (D221) — зовёт диспетчер по фильтру.
 on_checklist

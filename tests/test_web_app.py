@@ -675,6 +675,31 @@ def test_стили_адресуются_с_отпечатком_и_кеширу
     assert f"max-age={IMMUTABLE_MAX_AGE}" in ответ.headers["Cache-Control"]
 
 
+def test_стили_с_отпечатком_помечены_immutable(стенд: FlaskClient) -> None:
+    # Arrange — #698: без `immutable` браузер и край перепроверяют файл при
+    # обновлении страницы, хотя адрес с отпечатком меняется вместе с содержимым.
+    страница = стенд.get("/inspections").get_data(as_text=True)
+    адрес = re.findall(r'href="([^"]*decimus-web\.css[^"]*)"', страница)[0]
+
+    # Act
+    ответ = стенд.get(адрес)
+
+    # Assert
+    assert "public" in ответ.headers["Cache-Control"]
+    assert "immutable" in ответ.headers["Cache-Control"]
+
+
+def test_immutable_только_при_верном_отпечатке_и_не_шрифту(стенд: FlaskClient) -> None:
+    # Act
+    чужой = стенд.get("/static/decimus-web.css?v=000000000000")
+    без = стенд.get("/static/decimus-web.css")
+    шрифт = стенд.get("/static/fonts/golos-text-cyrillic.woff2")
+
+    # Assert — шрифт по голому пути может смениться со сменой дизайн-системы
+    for ответ in (чужой, без, шрифт):
+        assert "immutable" not in ответ.headers.get("Cache-Control", "")
+
+
 def test_адрес_без_отпечатка_перепроверяется(стенд: FlaskClient) -> None:
     # Act — старый адрес без `?v=` на год кешировать нельзя: он не меняется
     # вместе с файлом, и человек застрял бы на прошлых стилях.
