@@ -220,5 +220,15 @@ def test_разделы_только_УК_партнёру_закрыты_по_�
         for rule in app.url_map.iter_rules()
         if not guard.open_to_tenant(app, rule.endpoint, rule.rule, ПАРТНЁР)
     }
-    assert {"country", "country_index", "actions", "unit_new", "unit_create"} <= закрытые
-    assert not закрытые & {"overview", "registry", "card", "ratings", "settings_page", "home"}
+    assert {"actions", "unit_new", "unit_create"} <= закрытые
+    # «Страна» (D508) открыта партнёру; заведение пиццерии под ней — по-прежнему нет.
+    assert not закрытые & {
+        "country",
+        "country_index",
+        "overview",
+        "registry",
+        "card",
+        "ratings",
+        "settings_page",
+        "home",
+    }

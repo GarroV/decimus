@@ -695,9 +695,9 @@ def админ_партнёра(monkeypatch: pytest.MonkeyPatch, зовы: Any) 
     yield from стенд(monkeypatch, tenant="GE", role="admin")
 
 
-def test_партнёру_страна_закрыта_и_не_в_меню(админ_партнёра: FlaskClient) -> None:
-    """D371: «Страна» — только УК; партнёр не видит её в меню и не открывает адресом."""
-    assert админ_партнёра.get("/country/GE").status_code == 404
+def test_партнёру_страна_не_в_меню_и_чужая_закрыта(админ_партнёра: FlaskClient) -> None:
+    """D508: «Страна» не пункт меню партнёра (он идёт с «Главной»); чужая страна — 404."""
+    assert админ_партнёра.get("/country/RS").status_code == 404
     страница = админ_партнёра.get("/users").get_data(as_text=True)
     assert 'href="/country?lang=' not in страница
     for свой in ("/overview", "/inspections", "/calendar", "/admin", "/users", "/ratings"):

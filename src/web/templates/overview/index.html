@@ -33,7 +33,7 @@
 
 {% macro empty(text) %}<div class="hm-empty">{{ text }}</div>{% endmacro %}
 
-{# Куда ведёт точка: её карточка в «Стране» (УК) или в «Пиццериях»; нет id — запасной адрес. #}
+{# Куда ведёт точка: экран пиццерии в «Стране» (УК и партнёр, D508); нет id — запасной адрес. #}
 {% macro unit_href(unit_id, country, fallback) -%}
   {%- if unit_id and country and country_url -%}{{ country_url(country, unit=unit_id) }}#unit-{{ unit_id }}
   {%- elif unit_id -%}{{ url('/units/' ~ unit_id) }}

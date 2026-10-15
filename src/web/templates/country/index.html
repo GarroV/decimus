@@ -40,7 +40,8 @@
     </div>
     {# Девелопер и страна — выпадающими списками, под ними пиццерии страны (D504). #}
     {% if dev_pick %}<div class="cn-devpick">{{ pick(dev_pick) }}</div>{% endif %}
-    {% if country_pick is defined and country_pick.options %}<div class="cn-devpick">{{ pick(country_pick) }}</div>{% else %}
+    {% if single_country %}{# партнёр с одной страной: выбирать нечего (D508) #}
+    {% elif country_pick is defined and country_pick.options %}<div class="cn-devpick">{{ pick(country_pick) }}</div>{% else %}
       <div class="ov-card__empty">{{ t('country.choose.empty') }}</div>{% endif %}
     {% if units is defined and not combined %}
       <div class="mx-rail__head mx-rail__head--list cn-units-head">

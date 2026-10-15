@@ -50,6 +50,9 @@ class Section:
     #: целиком (`refused_for` в `before_request`), а не на каждую кнопку:
     #: так доступы проще держать, это и был довод владельца.
     hq_only: bool = False
+    #: Пункт стоит в меню только у УК, а сам адрес открыт и партнёру по матрице
+    #: (D508): партнёр попадает на экран с «Главной», выбора страны у него нет.
+    hq_menu_only: bool = False
     #: Виден только партнёру: у УК для того же дела свой раздел (D264), и пункт,
     #: ведущий его в чужую половину, — лишний шаг. Это НЕ заслон: открыть
     #: адрес УК может, экран сам отправит его в свой раздел.
@@ -80,8 +83,16 @@ SECTIONS: tuple[Section, ...] = (
     # названия разделов прорабатываются в #462.
     Section(key="actions", path="/actions", built=True, hq_only=True, icon="check"),
     # ── Статистика (D499) ──
-    # «Страна» — только УК (D371, пробно): партнёру хватает своих проверок.
-    Section(key="country", path="/country", built=True, hq_only=True, icon="globe", group="stats"),
+    # «Страна» (D371, D508): пункт меню — у УК; партнёр открывает тот же экран
+    # пиццерии с «Главной», в пределах своих стран (охват, `auth.current_reach`).
+    Section(
+        key="country",
+        path="/country",
+        built=True,
+        hq_menu_only=True,
+        icon="globe",
+        group="stats",
+    ),
     # Рейтинги РС/РКО (спека 2026-10-08): видят все — УК и любой партнёр
     # (D327, «рейтинги видят все»). Загрузки и справочники — заслон на маршрутах
     # (`src/web/ratings.py`), не флаг раздела.
@@ -206,6 +217,7 @@ def visible_sections(account: object | None) -> tuple[Section, ...]:
         and (item.key in OWN_SECTIONS or role_may(роль, пространство, view_code(item.key)))
         and (уК or item.built)
         and not (уК and item.partner_only)
+        and (уК or not item.hq_menu_only)
     )
 
 
