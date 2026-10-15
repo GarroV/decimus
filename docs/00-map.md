@@ -119,7 +119,7 @@ Flask-приложение управляющей компании и партн
 | `src/web/action_plans.py` | Экшн-планы в вебе: раздел действий УК и раздел партнёра (волна 2, D263–D274) |
 | `src/web/calendar_view.py` | Сетка месяца на экране «Календарь» (D497): проверки по дням |
 | `src/web/country.py` | Экран «Страна»: снимок одной страны и история выбранной пиццерии (D260, D262) |
-| `src/web/country_page.py` | Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии |
+| `src/web/country_page.py` | Сборка экрана «Страна» (D467, D504): слева девелопер, страна и пиццерии, справа блоки |
 | `src/web/country_summary.py` | Сводка экрана «Страна» (D467): цифры периода и девелоперы стран |
 | `src/web/country_units.py` | Таблица «Пиццерии» экрана «Страна» (D467): одна строка на пиццерию |
 | `src/web/edition.py` | День публикации издания методики — для шапки проверки на приёмке |
@@ -272,7 +272,7 @@ Jinja-шаблоны по разделам и статика с отпечатк
 | `src/web/templates/` | 17 | _account_menu.html, _account_menu_connections.html, _langpick.html, _period.html, _pick.html, _plan.html, _prescription.html, _split_page.html, … (+9) |
 | `src/web/templates/actions/` | 7 | _tabs.html, index.html, prescription.html, prescription_form.html, prescriptions.html, refused.html, request.html |
 | `src/web/templates/calendar/` | 1 | index.html |
-| `src/web/templates/country/` | 5 | _panel.html, _parts.html, _summary.html, _units.html, index.html |
+| `src/web/templates/country/` | 4 | _panel.html, _parts.html, _summary.html, index.html |
 | `src/web/templates/inspections/` | 8 | _card_body.html, _card_parts.html, _panel.html, _panel_fragment.html, card.html, letter.html, list.html, not_found.html |
 | `src/web/templates/journal/` | 1 | page.html |
 | `src/web/templates/methodology/` | 5 | apply.html, broken.html, checklists.html, index.html, unset.html |
