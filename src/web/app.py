@@ -538,7 +538,7 @@ def _register_units(app: Flask, conf: Settings) -> None:
     """
 
     @app.get("/units/<unit_id>")
-    def unit(unit_id: str) -> str | tuple[str, int]:
+    def unit(unit_id: str) -> str | tuple[str, int] | Response:
         lang = _lang(conf)
         # Справочник спрашивается целиком: точек у сети сотни, отдельный
         # запрос по идентификатору — это новая функция слоя базы ради одной
@@ -549,6 +549,12 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
         if точка is None:
             return render_template("inspections/not_found.html"), 404
+        # Партнёр (D508): к пиццерии один путь — экран «Страна» с её списком
+        # проверок; старая карточка точки остаётся УК. Старые ссылки не мертвеют.
+        if auth.current_tenant() != HQ_TENANT and точка.country:
+            return redirect(
+                _url("country", code=точка.country, unit=точка.id, lang=request.args.get("lang"))
+            )
         снимок = unit_data.load(reach=auth.current_reach(), unit=точка.name, lang=lang)
         if снимок.last is None:
             # Проверок нет — география только в справочнике. Так выглядит
@@ -572,9 +578,9 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
-def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
-    """Куда ведёт точка из «Где не проведено»: карточка в «Стране» (УК) или в «Пиццериях»."""
-    if item.unit_id and item.country and hq:
+def _unit_href(item: to_inspect.ToCheck, *, lang: str) -> str:
+    """Куда ведёт точка из «Где не проведено»: экран пиццерии в «Стране» (УК и партнёр, D508)."""
+    if item.unit_id and item.country:
         return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
             f"#unit-{item.unit_id}"
         )
@@ -698,9 +704,7 @@ def _register_registry(app: Flask, conf: Settings) -> None:
                 top=None,
             ),
             to_check_top=to_inspect.TO_CHECK_TOP,
-            unit_href=lambda item: _unit_href(
-                item, hq=auth.current_tenant() == HQ_TENANT, lang=язык
-            ),
+            unit_href=lambda item: _unit_href(item, lang=язык),
             review_wait=ждёт_дней,
             rows=строки,
             # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.

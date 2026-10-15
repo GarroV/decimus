@@ -57,7 +57,9 @@ _VIEWS: tuple[Action, ...] = (
     # Экшн-планы и предписания партнёра: УК открывает отсюда файлы планов и ответов.
     Action("view.plans", "view", writes=False),
     Action("view.orders", "view", writes=False),
-    Action("view.country", "view", hq_only=True, writes=False),
+    # Экран пиццерии (D508): УК листает страны, партнёр попадает на него с «Главной»
+    # и видит только свои страны (охват, а не флаг) — поэтому не `hq_only`.
+    Action("view.country", "view", writes=False),
     Action("view.ratings", "view", writes=False),
     Action("view.calendar", "view", writes=False),
     Action("view.admin", "view", writes=False),

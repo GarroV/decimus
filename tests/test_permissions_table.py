@@ -17,7 +17,8 @@ from src.domain.permissions import ACTION_CODES, MATRIX, SIDE_HQ, SIDE_PARTNER, 
 from src.web.sections import OWN_SECTIONS, SECTIONS
 
 ВИДЫ_ВСЕ = {f"view.{s.key}" for s in SECTIONS if s.key not in OWN_SECTIONS}
-ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.country", "view.actions"}
+# «Страна» открыта и партнёру (D508): экран пиццерии, в пределах его стран.
+ВИДЫ_ПАРТНЁРА = ВИДЫ_ВСЕ - {"view.actions"}
 
 РАБОТА_УК = {
     "inspection.read",

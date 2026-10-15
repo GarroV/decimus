@@ -88,6 +88,11 @@ NAVIGATION_ENDPOINTS: Mapping[str, str] = {
 #: проверок, то же, что «Проверки».
 ENDPOINT_VIEWS: Mapping[str, str] = {"unit": "view.registry"}
 
+#: Маршруты, которых чтение их раздела НЕ открывает: объявлены только своим
+#: действием. Форма «Добавить пиццерию» лежит под `/country`, а раздел открыт и
+#: партнёру (D508), но форма — только УК (`unit.create`).
+WITHOUT_SECTION_VIEW = frozenset({"unit_new", "unit_create"})
+
 _PERMITTED = "action_permitted"
 _REACHED = "guard_reached_view"
 
@@ -241,7 +246,11 @@ def _declared_codes(app: Flask, endpoint: str | None, path: str) -> frozenset[st
     view = app.view_functions.get(endpoint or "")
     коды = set(getattr(view, ACTIONS_ATTR, ()))
     ключ = current_section(path)
-    if ключ is not None and (код := section_view(ключ)) is not None:
+    if (
+        ключ is not None
+        and endpoint not in WITHOUT_SECTION_VIEW
+        and (код := section_view(ключ)) is not None
+    ):
         коды.add(код)
     if (код := ENDPOINT_VIEWS.get(endpoint or "")) is not None:
         коды.add(код)

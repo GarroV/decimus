@@ -54,9 +54,9 @@
     </section>
 
     <div class="sactions">
-      {% if row.unit_id %}
+      {% if row.unit_id and is_hq %}
         <a class="sbtn" href="{{ url('/units/' ~ row.unit_id) }}?lang={{ lang }}">{{ t('country.history.card') }}</a>
-      {% else %}
+      {% elif not row.unit_id %}
         <p class="ssec__note">{{ t('country.panel.no_card') }}</p>
       {% endif %}
     </div>

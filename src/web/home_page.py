@@ -44,7 +44,6 @@ from flask import render_template, request, url_for
 
 from src.db import ratings_read
 from src.db.errors import DbError
-from src.domain.tenants import HQ_TENANT
 from src.ratings import report
 
 from . import (
@@ -172,7 +171,6 @@ def render(
         dates=(period.start, period.end),
         dates_before=(before.start, before.end) if before else None,
     )
-    hq = auth.current_tenant() == HQ_TENANT
 
     def select(**изменения: str) -> str:
         """Адрес главной с изменённым срезом; пустое и умолчания из адреса выпадают."""
@@ -279,7 +277,7 @@ def render(
         grade_tone=view.grade_tone,
         level_tone=view.level_tone,
         lang=lang,
-        country_url=в_страну if hq else None,
+        country_url=в_страну,
         item_titles=item_titles,
         unit_ids=snapshot.unit_ids,
     )

@@ -12,8 +12,11 @@
 экшн-планы с экрана ушли: их счётчики в шапке ведут в «Действия» с отбором по
 стране, и ничего не теряется.
 
-Кто видит экран, решает `sections` и охват вошедшего (`auth.current_reach`) —
-здесь права не меняются.
+Кто видит экран, решает матрица (`view.country`) и охват вошедшего
+(`auth.current_reach`). Партнёр (D508) попадает сюда с «Главной» и видит ровно
+то же, но только свои страны: чужая страна в адресе — тот же 404, что у
+несуществующей; выбора девелопера у него нет, а выбор страны — только если
+стран в пространстве больше одной.
 """
 
 from __future__ import annotations
@@ -24,10 +27,11 @@ from dataclasses import replace
 from datetime import date
 from typing import Any
 
-from flask import redirect, render_template, request, url_for
+from flask import abort, redirect, render_template, request, url_for
 from werkzeug.wrappers import Response
 
 from src.db.models import InspectionRow
+from src.domain.tenants import HQ_TENANT
 
 from . import (
     action_plans,
@@ -98,8 +102,19 @@ def render(
     """Экран страны `code`; `None` — вход без страны: первая в колонке или сводка девелопера."""
     today = date.today()
     reach = auth.current_reach()
+    уК = auth.current_tenant() == HQ_TENANT
+    code = country_data.normalize_code(code) if code is not None else None
+    # Граница партнёра (D508): страна вне его охвата — 404, как у несуществующей.
+    # Дальше по экрану охват работает в запросах, но справочник свода пиццерий
+    # (`unit_profiles.by_country`) читается по одному коду страны, и без этой
+    # проверки партнёр прочитал бы чужую страну подстановкой кода в адрес.
+    if code is not None and reach.countries is not None and code not in reach.countries:
+        abort(404)
     страны = country_data.countries(reach=reach)
-    devs, dev_of, devs_failed = country_summary.developers_of([c for c, _n in страны])
+    # Девелопер — понятие УК (D508): партнёру ни списка, ни отбора по нему.
+    devs, dev_of, devs_failed = (
+        country_summary.developers_of([c for c, _n in страны]) if уК else ({}, {}, False)
+    )
     dev = request.args.get("dev", "").strip()[:DEVELOPER_MAX]
     if dev not in devs:
         dev = ""
@@ -109,7 +124,6 @@ def render(
         if not в_колонке:
             return render_template("country/index.html", view=None, choices=страны)
         code, picking = в_колонке[0][0], True
-    code = country_data.normalize_code(code) if code is not None else None
     period = registry_period.read(request.args, today=today)
     before = registry_period.shift(period, -1)
 
@@ -194,6 +208,9 @@ def render(
         "registry_path": section("registry").path,
         "combined": combined,
         "limit": limit,
+        "is_hq": уК,
+        # Партнёр с одной страной выбора страны не видит (D508).
+        "single_country": not уК and len(страны) <= 1,
     }
     if combined:
         return render_template(

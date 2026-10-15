@@ -119,7 +119,11 @@ def install(app: Flask, conf: Settings) -> None:
     """Маршруты заведения пиццерии: форма и её отправка."""
     путь = section("country").path + "/<code>/units/new"
 
+    # Объявлено действием, а не только чтением раздела: «Страна» открыта и
+    # партнёру (D508), а форма заведения — только УК, и заслон УК-границы
+    # закрывает её по матрице, а не лишь по `_gate`.
     @app.get(путь, endpoint="unit_new")
+    @guard.action("unit.create")
     def unit_new(code: str) -> str:
         return _render(_gate(code), _lang(conf))
 
