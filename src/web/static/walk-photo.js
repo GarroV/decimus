@@ -1,8 +1,10 @@
 /* Мини-апп обхода: кадры (D312) — сжать на телефоне, отправить, показать.
  *
  * Камера в WebView телеграма открывается только полем выбора файла:
- * getUserMedia там не работает. Поле одно и без `capture` (D422): телефон
- * сам предлагает «Сделать снимок / Медиатека / Выбрать файлы», сразу несколько кадров.
+ * getUserMedia там не работает. Кнопок две (D503, вместо одной D422): большая
+ * «Фото» — поле с `capture`, сразу камера; рядом «Галерея» — поле без него,
+ * сразу несколько кадров. Одна кнопка без `capture` на Android открывала сразу
+ * галерею: системное меню с выбором есть только на iPhone.
  *
  * Снимок сжимается здесь же, до 1600 px по длинной стороне: кадр с телефона —
  * 3–8 МБ, на мобильной связи в подвале пиццерии это минуты, а для отчёта
@@ -169,24 +171,36 @@
   /** Запомнить уже показанный локально кадр, чтобы не тянуть его с сервера. */
   function remember(ref, url) { views[ref] = Promise.resolve(url); }
 
-  /** Кнопка выбора кадров. Поле без `capture`: телефон сам предлагает «Снять / Медиатека / Файлы»
-   *  (D422). `onFiles` получает список File. */
-  function picker(label, onFiles) {
-    var wrap = W.hinted(W.el("label", "walk-pick walk-pick--camera"), "photo");
+  /** Поле выбора файла внутри кнопки: `camera` — сразу камера, иначе галерея. */
+  function fileInput(camera, onFiles) {
     var input = document.createElement("input");
     input.type = "file";
     input.accept = "image/*";
-    input.multiple = true;
+    if (camera) input.setAttribute("capture", "environment");
+    else input.multiple = true;
     input.className = "walk-pick__input";
     input.addEventListener("change", function () {
       var files = Array.prototype.slice.call(input.files || []);
       input.value = "";
       if (files.length) onFiles(files);
     });
-    wrap.appendChild(input);
-    wrap.appendChild(W.icon("camera", "walk-pick__icon"));
-    wrap.appendChild(W.el("span", "walk-pick__label", label));
-    return wrap;
+    return input;
+  }
+
+  /** Кнопки кадра (D503): большая «Фото» — камера, рядом «Галерея». `onFiles` получает список File. */
+  function picker(label, onFiles, hero) {
+    var row = W.el("div", "walk-picks" + (hero ? " walk-picks--hero" : ""));
+    var shoot = W.hinted(W.el("label", "walk-pick walk-pick--camera" + (hero ? " walk-pick--hero" : "")), "photo");
+    shoot.appendChild(fileInput(true, onFiles));
+    shoot.appendChild(W.icon("camera", "walk-pick__icon"));
+    shoot.appendChild(W.el("span", "walk-pick__label", label));
+    var gallery = W.el("label", "walk-pick walk-pick--gallery");
+    gallery.appendChild(fileInput(false, onFiles));
+    gallery.appendChild(W.icon("gallery", "walk-pick__icon"));
+    gallery.appendChild(W.el("span", "walk-pick__label", W.tx("walk.photo.gallery")));
+    row.appendChild(shoot);
+    row.appendChild(gallery);
+    return row;
   }
 
   /** Превью кадра: картинка или заглушка «фото из чата». */
@@ -236,9 +250,7 @@
       });
       box.appendChild(strip);
     }
-    var one = picker(photos.length ? tx("walk.photo.more") : tx("walk.photo.hero"), on.onFiles);
-    if (on.hero) one.classList.add("walk-pick--hero");
-    box.appendChild(one);
+    box.appendChild(picker(photos.length ? tx("walk.photo.more") : tx("walk.photo.hero"), on.onFiles, on.hero));
     return box;
   }
 

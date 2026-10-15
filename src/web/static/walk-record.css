@@ -384,6 +384,11 @@
 
 .walk-pick:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* Кадр — две кнопки (D503): большая «Фото» (камера) и узкая «Галерея» рядом. */
+.walk-picks { display: flex; gap: 8px; }
+.walk-pick--gallery { flex: 0 0 auto; flex-direction: column; gap: 2px; min-width: 84px; padding: 0 12px; font-size: 13px; }
+.walk-pick--gallery .walk-pick__icon { margin: 0; }
+
 /* выбор пункта */
 
 .walk-chips {
