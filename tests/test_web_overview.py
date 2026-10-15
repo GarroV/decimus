@@ -688,20 +688,20 @@ def test_пустой_отбор_не_сужает_агрегаты(monkeypatch:
         assert kwargs.get("grade") == "", имя
 
 
-def test_при_выбранной_стране_города_только_её() -> None:
-    # Arrange — 24.09.2026 при выбранной Турции в списке стояли Тбилиси и Батуми.
+def test_страны_чипа_все_и_крупные_первыми() -> None:
+    # Arrange
     гео = {
         "Tbilisi-1": ("GE", "tbilisi"),
         "Tbilisi-2": ("GE", "tbilisi"),
         "Antalya-1": ("TR", "antalya"),
+        "Nowhere-1": ("", ""),
     }
 
     # Act
-    страны, города = ov._geo_choices(гео, selection=ov.Selection(country="TR"))
+    страны = ov._country_choices(гео)
 
-    # Assert — страны все (иначе на другую не переключиться), города — турецкие.
+    # Assert — страны все (иначе на другую не переключиться), без пустой.
     assert страны == (("GE", 2), ("TR", 1))
-    assert города == (("antalya", 1),)
 
 
 def test_точки_справочника_считаются_в_выбранном_месте() -> None:
