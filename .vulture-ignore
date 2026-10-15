@@ -607,3 +607,13 @@ closed_rows
 
 # Города среза считаются, но экран «Обзор» их больше не показывает — разобрать (#862).
 cities
+
+# Маршруты поездок «Календаря» (D505, D506): регистрирует `@app.post` внутри
+# `calendar_screen.install`, зовёт Flask по адресу. `steps_on` читает только
+# шаблон `calendar/_trip.html` — план поездки по дням.
+trip_create
+trip_update
+trip_delete
+trip_step_add
+trip_step_delete
+steps_on
