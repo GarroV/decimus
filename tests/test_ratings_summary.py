@@ -260,17 +260,27 @@ def test_кластер_IMF_делит_страны_по_справочнику(
     страны = (
         CountryRow("RS", "Сербия", "Serbia", None, True, "CEE"),
         CountryRow("NG", "Нигерия", "Nigeria", None, True, "OTHER"),
+        CountryRow("TR", "Турция", "Turkey", None, True, "TR"),
+        CountryRow("GE", "Грузия", "Georgia", None, True, "CAUCASUS"),
     )
     found = Choices((), страны, ())
     период = ReportPeriod("month", "2026-09", date(2026, 9, 1), date(2026, 9, 30))
     факты = [Fact("a", "a", "RS", "rs", 1, date(2026, 9, 2), 90.0),
-             Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0)]  # fmt: skip
+             Fact("b", "b", "NG", "rs", 1, date(2026, 9, 2), 70.0),
+             Fact("c", "c", "TR", "rs", 1, date(2026, 9, 2), 80.0),
+             Fact("d", "d", "GE", "rs", 1, date(2026, 9, 2), 60.0)]  # fmt: skip
 
-    imf = group_lines(Selection("imf", None, период), found, ("RS", "NG"), (факты, []))
+    # Четыре кластера (D502), в порядке CEE, Турция, Кавказ, остальные.
+    imf = group_lines(Selection("imf", None, период), found, ("RS", "NG", "TR", "GE"), (факты, []))
     assert [(g.key, g.countries, g.rs) for g in imf] == [
         ("CEE", ("RS",), 90.0),
+        ("TR", ("TR",), 80.0),
+        ("CAUCASUS", ("GE",), 60.0),
         ("OTHER", ("NG",), 70.0),
     ]
+    # Кластер без стран в охвате строкой не идёт.
+    только_сербия = group_lines(Selection("imf", None, период), found, ("RS",), (факты, []))
+    assert [g.key for g in только_сербия] == ["CEE"]
 
     кластер = Selection("cluster", "OTHER", период)
     assert group_countries(кластер, страны) == ("NG",)

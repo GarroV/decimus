@@ -50,7 +50,9 @@ _SCREEN: dict[str, dict[str, str]] = {
     },
     "ratings.group.cluster": {"ru": "Кластер", "en": "Cluster"},
     "ratings.cluster.CEE": {"ru": "CEE", "en": "CEE"},
-    "ratings.cluster.OTHER": {"ru": "Другие страны", "en": "Other countries"},
+    "ratings.cluster.TR": {"ru": "Турция", "en": "Turkey"},
+    "ratings.cluster.CAUCASUS": {"ru": "Кавказ", "en": "Caucasus"},
+    "ratings.cluster.OTHER": {"ru": "Остальные страны", "en": "Other countries"},
     "ratings.countries.n": {"ru": "стран: {n}", "en": "countries: {n}"},
     "ratings.line.title": {
         "ru": "{p}: {v} · пиццерий: {n}",

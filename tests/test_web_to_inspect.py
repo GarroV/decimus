@@ -136,12 +136,46 @@ def test_отказ_базы_блок_называет_а_не_прячет(monk
     assert блок.failed and блок.shown
 
 
-def test_проверки_блока_больше_не_показывают(
+def test_проверки_показывают_блок_с_отбором_экрана(
     стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """D466: «Где нужно проверить» ушёл с «Проверок» и там не читается вовсе."""
-    monkeypatch.setattr(to_inspect, "load", lambda **_: _блок("Нови-Сад-3"))
+    """D501: блок вернулся на «Проверки», период и отбор — те же, что у «Принятых»."""
+    # Arrange
+    спросили: list[dict[str, object]] = []
+    имена = [f"Точка-{n}" for n in range(to_inspect.TO_CHECK_TOP + 2)]
+    monkeypatch.setattr(to_inspect, "load", lambda **kw: спросили.append(kw) or _блок(*имена))
+
+    # Act
+    страница = стенд.get("/inspections?from=2026-09-01&to=2026-09-30&country=RS&q=xy").get_data(
+        as_text=True
+    )
+
+    # Assert
+    assert t_ru("registry.tocheck.title") in страница
+    assert all(имя in страница for имя in имена)
+    assert "и ещё 2" in страница
+    assert (спросили[0]["date_from"], спросили[0]["date_to"]) == (
+        date(2026, 9, 1),
+        date(2026, 9, 30),
+    )
+    assert (спросили[0]["country"], спросили[0]["query"]) == ("RS", "xy")
+
+
+def test_проверки_пустой_блок_одна_строка(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block())
 
     страница = стенд.get("/inspections").get_data(as_text=True)
 
-    assert t_ru("registry.tocheck.title") not in страница and "Нови-Сад-3" not in страница
+    assert t_ru("registry.tocheck.empty") in страница
+
+
+def test_проверки_отказ_блока_называется_строкой(
+    стенд: FlaskClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(to_inspect, "load", lambda **_: to_inspect.Block(failed=True))
+
+    страница = стенд.get("/inspections").get_data(as_text=True)
+
+    assert t_ru("registry.tocheck.failed") in страница

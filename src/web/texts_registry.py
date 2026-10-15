@@ -61,8 +61,8 @@ _BAR: dict[str, dict[str, str]] = {
     "registry.filters.title": {"ru": "Отбор", "en": "Filters"},
     "registry.accepted.title": {"ru": "Принятые", "en": "Accepted"},
     "registry.accepted.hint": {
-        "ru": "Период и отбор действуют только на принятые проверки, новые — сверху.",
-        "en": "The period and filters apply to accepted inspections only, newest first.",
+        "ru": "Период и отбор действуют на «Где не проведено» и принятые проверки, новые — сверху.",
+        "en": "The period and filters apply to Not inspected yet and accepted, newest first.",
     },
 }
 
@@ -103,7 +103,7 @@ _PANEL: dict[str, dict[str, str]] = {
 
 # «Где нужно проверить» (D399; с «Главной» на «Проверки» в D418, оттуда в «Календарь» в D466).
 _TOCHECK: dict[str, dict[str, str]] = {
-    "registry.tocheck.title": {"ru": "Где нужно проверить", "en": "Where to inspect"},
+    "registry.tocheck.title": {"ru": "Где не проведено", "en": "Not inspected yet"},
     "registry.tocheck.hint": {
         "ru": "Нет проверок за период: ни разу не проверенные — первыми, затем ждущие дольше.",
         "en": "No inspections in the period: never inspected first, then waiting longest.",
@@ -111,6 +111,10 @@ _TOCHECK: dict[str, dict[str, str]] = {
     "registry.tocheck.last": {"ru": "последняя {date}", "en": "last {date}"},
     "registry.tocheck.never": {"ru": "ни разу не проверяли", "en": "never inspected"},
     "registry.tocheck.more": {"ru": "и ещё {count}", "en": "and {count} more"},
+    "registry.tocheck.empty": {
+        "ru": "За этот период везде проверено.",
+        "en": "Every unit has an inspection in this period.",
+    },
     "registry.tocheck.failed": {
         "ru": "Список не загрузился: база не ответила. Обновите страницу.",
         "en": "The list did not load: the database did not answer. Reload the page.",

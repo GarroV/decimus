@@ -434,6 +434,7 @@
 | `0069_passkey_login.sql` | — |
 | `0070_model_key.sql` | `vault.secrets` |
 | `0071_finding_reading.sql` | — |
+| `0072_ratings_clusters_four.sql` | — |
 <!-- map:end -->
 
 ## Makefile

@@ -291,6 +291,10 @@ from src.db.migrate import MIGRATIONS_DIR, discover_migrations
     "0071_finding_reading.sql": (
         "sql1:6040348c50fc85957e9e965779180450f84b444530b79360147766727df997ca"
     ),
+    # Четыре кластера стран: CEE, Турция, Кавказ, остальные (D502).
+    "0072_ratings_clusters_four.sql": (
+        "sql1:1f898bf5cbfae6c81ab3574289d6ccab81c07afb81cb24e9ce076eb31f5fa941"
+    ),
 }
 
 
