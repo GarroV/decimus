@@ -70,7 +70,7 @@ cases = [
     ),
     (
         "src/ratings/links.py",
-        "    if parts.hostname != RATING_HOST or not parts.fragment:\n",
+        "    if parts.hostname not in RATING_HOSTS or not parts.fragment:\n",
         "    if not parts.fragment:\n",
         "tests/test_ratings_formats.py::test_испорченная_ссылка_не_разбирается",
     ),
@@ -106,7 +106,7 @@ cases = [
     ),
     (
         "src/ratings/links.py",
-        "    if parts.hostname != RATING_HOST or not parts.fragment:\n",
+        "    if parts.hostname not in RATING_HOSTS or not parts.fragment:\n",
         "    if not parts.fragment:\n",
         "tests/test_ratings_sheet.py::test_ссылка_листа_чужой_хост_id_не_берётся",
     ),
@@ -557,8 +557,8 @@ cases = [
     ),
     (
         "src/ratings/summary.py",
-        "if where[unit] in countries\n",
-        "if True\n",
+        "if where[unit] in countries]",
+        "if True]",
         "tests/test_ratings_summary.py::test_страны_вне_списка_не_входят_в_группу",
     ),
     (
@@ -581,14 +581,14 @@ cases = [
     ),
     (
         "src/db/ratings_read.py",
-        '    "where u.country_code = any(%s) and p.begin_on between %s and %s "\n',
-        '    "where u.country_code = any(%s) and p.begin_on >= %s and %s is not null "\n',
+        '    "where u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "\n',
+        '    "where u.country_code = any(%s) and p.end_on > %s and p.begin_on <= %s "\n',
         "tests/test_db_ratings_read.py::test_окно_периодов_включает_оба_края",
     ),
     (
         "src/db/ratings_read.py",
-        '    "where u.country_code = any(%s) and p.begin_on between %s and %s "\n',
-        '    "where u.country_code = any(%s) and p.begin_on >= %s and p.begin_on < %s "\n',
+        '    "where u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "\n',
+        '    "where u.country_code = any(%s) and p.end_on >= %s and p.begin_on < %s "\n',
         "tests/test_db_ratings_read.py::test_окно_периодов_включает_оба_края",
     ),
     (
@@ -623,8 +623,8 @@ cases = [
     ),
     (
         "src/ratings/report.py",
-        "    imf = tuple(row for row in read.countries() if row.is_imf)\n",
-        "    imf = read.countries()\n",
+        "        row for row in read.countries() if row.is_imf and (only is None or row.code in only)\n",  # noqa: E501
+        "        row for row in read.countries() if (only is None or row.code in only)\n",
         "tests/test_db_ratings_read.py::test_группа_мф_без_стран_вне_охвата",
     ),
     (
@@ -659,26 +659,26 @@ cases = [
     ),
     (
         "src/db/ratings_read.py",
-        '    "and u.country_code = any(%s) and p.begin_on between %s and %s "\n',
-        '    "and u.country_code = any(%s) and p.begin_on >= %s and p.begin_on < %s "\n',
+        '    "and u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "\n',
+        '    "and u.country_code = any(%s) and p.end_on > %s and p.begin_on <= %s "\n',
         "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
     ),
     (
         "src/db/ratings_read.py",
-        '    "and u.country_code = any(%s) and p.begin_on between %s and %s "\n',
-        '    "and u.country_code = any(%s) and p.begin_on > %s and p.begin_on <= %s "\n',
+        '    "and u.country_code = any(%s) and p.end_on >= %s and p.begin_on <= %s "\n',
+        '    "and u.country_code = any(%s) and p.end_on >= %s and p.begin_on < %s "\n',
         "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
     ),
     (
         "src/db/ratings_read.py",
-        '    "and p.begin_on between %s and %s group by 1"\n',
-        '    "and p.begin_on >= %s and p.begin_on < %s group by 1"\n',
+        """    "where p.rating_type = 'rs' and u.country_code = any(%s) "\n    "and p.end_on >= %s and p.begin_on <= %s group by 1"\n""",  # noqa: E501
+        """    "where p.rating_type = 'rs' and u.country_code = any(%s) "\n    "and p.end_on > %s and p.begin_on <= %s group by 1"\n""",  # noqa: E501
         "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
     ),
     (
         "src/db/ratings_read.py",
-        '    "and p.begin_on between %s and %s group by 1"\n',
-        '    "and p.begin_on > %s and p.begin_on <= %s group by 1"\n',
+        """    "where p.rating_type = 'rs' and u.country_code = any(%s) "\n    "and p.end_on >= %s and p.begin_on <= %s group by 1"\n""",  # noqa: E501
+        """    "where p.rating_type = 'rs' and u.country_code = any(%s) "\n    "and p.end_on >= %s and p.begin_on < %s group by 1"\n""",  # noqa: E501
         "tests/test_db_ratings_read.py::test_окно_замечаний_рс_включает_оба_края",
     ),
     (
@@ -751,7 +751,7 @@ cases = [
     ),
     (
         "src/web/templates/ratings/index.html",
-        "{% if block.checkups == 0 %}",
+        "{% if not block.has_data %}",
         "{% if false %}",
         "tests/test_web_ratings_flow.py",
     ),
@@ -777,7 +777,7 @@ cases = [
     ),
     (
         "src/web/templates/ratings/index.html",
-        "{% if cluster.checkups == 0 %}",
+        "{% if not cluster.has_data %}",
         "{% if false %}",
         "tests/test_web_ratings_flow.py",
     ),
@@ -820,7 +820,7 @@ cases = [
     ),
     (
         "src/ratings/base.py",
-        "    year = label.year or (seen.year if seen else _year_from_today(label, today))\n",
+        "    year = label.year or (_year_near(label, seen) if seen else _year_from_today(label, today))\n",  # noqa: E501
         "    year = label.year or _year_from_today(label, today)\n",
         "tests/test_ratings_base.py::test_год_строки_главнее_вывода_от_сегодня",
     ),
@@ -850,8 +850,8 @@ cases = [
     ),
     (
         "src/ratings/base.py",
-        "    return {key: next(iter(found)) for key, found in ids.items() if len(found) == 1}\n",
-        "    return {key: next(iter(found)) for key, found in ids.items() if found}\n",
+        "    return next(iter(unique.values())) if len(unique) == 1 else AMBIGUOUS\n",
+        "    return next(iter(unique.values())) if unique else AMBIGUOUS\n",
         "tests/test_ratings_base.py::test_справочник_id_в_одной_форме_двусмысленное_имя_выброшено",
     ),
     (

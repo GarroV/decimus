@@ -54,8 +54,8 @@ cases = [
     ),
     (
         "src/domain/permissions.py",
-        '    "checklist.read",\n    "ratings.read",\n)\n',
-        '    "checklist.read",\n    "checklist.edit",\n    "ratings.read",\n)\n',
+        '    "checklist.read",\n    "ratings.read",\n    "trip.own",\n)\n',
+        '    "checklist.read",\n    "checklist.edit",\n    "ratings.read",\n    "trip.own",\n)\n',
         T + "test_mcp_policy.py::test_сотруднику_партнёра_в_claude_методика_только_на_чтение",
     ),
     (
