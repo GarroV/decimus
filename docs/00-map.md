@@ -829,7 +829,8 @@ Telegram, ни HTTP, ни SQL.
 <!-- map:begin tree front -->
 | Каталог | Файлов | Какие |
 |---|---|---|
-| `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/` | 7 | .deploy.env.example, deploy.sh, wrangler.admin.jsonc, wrangler.admin.template.jsonc, wrangler.mcp.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
+| `front/.wrangler/cache/` | 1 | wrangler-account.json |
 | `front/src/` | 1 | index.js |
 <!-- map:end -->
 
