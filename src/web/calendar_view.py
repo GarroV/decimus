@@ -2,19 +2,20 @@
 
 Список «Где нужно проверить» с экрана снят (владелец 14.10.2026: «не ясно зачем
 он нужен там. пока скрой вообще список»). Экран показывает календарь: неделя
-— строка с понедельника, в клетке дня — проверки с этой датой обхода. На этой
-же сетке потом встанут поездки сотрудников УК.
+— строка с понедельника, в клетке дня — поездки своего пространства, задевающие
+этот день (D505, D506), и проверки с этой датой обхода.
 
 Ни одного обращения к базе: строки приходят готовыми, здесь только раскладка.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 from src.db.models import InspectionRow
+from src.db.trips import Trip
 
 #: Сколько месяцев рисовать за раз: период «с — по» бывает любым, а сетка на
 #: год — это уже не календарь, а простыня.
@@ -30,6 +31,7 @@ class Day:
     in_month: bool
     today: bool
     rows: tuple[InspectionRow, ...]
+    trips: tuple[Trip, ...] = ()
 
     @property
     def shown(self) -> tuple[InspectionRow, ...]:
@@ -72,8 +74,18 @@ def months_between(start: date | None, end: date | None, today: date) -> tuple[d
     return tuple(первые) or (_first_of(today),)
 
 
-def month_grid(first: date, rows: Iterable[InspectionRow], today: date) -> Month:
-    """Сетка месяца `first`: полные недели с понедельника, проверки по дате обхода."""
+def month_grid(
+    first: date,
+    rows: Iterable[InspectionRow],
+    today: date,
+    *,
+    trips: Mapping[date, tuple[Trip, ...]] | None = None,
+) -> Month:
+    """Сетка месяца `first`: полные недели с понедельника, проверки по дате обхода.
+
+    `trips` — поездки по дням (каждая — на всех своих днях), уже своего пространства.
+    """
+    по_поездкам = trips or {}
     по_дням: dict[date, list[InspectionRow]] = {}
     for row in rows:
         по_дням.setdefault(row.inspection_date, []).append(row)
@@ -90,6 +102,7 @@ def month_grid(first: date, rows: Iterable[InspectionRow], today: date) -> Month
                 rows=tuple(
                     sorted(по_дням.get(день + timedelta(days=i), ()), key=lambda r: r.unit_name)
                 ),
+                trips=по_поездкам.get(день + timedelta(days=i), ()),
             )
             for i in range(DAYS_IN_WEEK)
         )

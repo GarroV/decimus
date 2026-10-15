@@ -98,6 +98,11 @@ ACTIONS: tuple[Action, ...] = (
     # Сырые слова аудиторов всех пространств из накопителя бота: разделения по
     # пространствам в нём нет, поэтому партнёру не выдаётся (D460, ревью безопасности).
     Action("phrases.raw", "checklist", hq_only=True, writes=False),
+    # Поездки «Календаря» (D505, D506): только своё пространство — и у УК тоже,
+    # поездки партнёра УК не трогает. `trip.plan` — любые поездки пространства,
+    # `trip.own` — только те, где человек сам исполнитель.
+    Action("trip.plan", "trip", own_space=True),
+    Action("trip.own", "trip", own_space=True),
     # Рейтинги
     Action("ratings.read", "ratings", writes=False),
     Action("ratings.manage", "ratings", hq_only=True),
@@ -164,6 +169,7 @@ _HQ_WORK = _codes(
     "ratings.read",
     "unit.create",
     "phrases.raw",
+    "trip.plan",
 )
 
 #: Методика без главного чек-листа и указателя прода (D440).
@@ -198,6 +204,7 @@ _PARTNER_AUDITOR = _ALL_VIEWS_PARTNER | _codes(
     "plan.submit",
     "checklist.read",
     "ratings.read",
+    "trip.own",
 )
 
 #: Матрица: (сторона, роль учётки) → действия. Нет клетки — нет права.
@@ -226,7 +233,7 @@ MATRIX: Mapping[tuple[str, str], frozenset[str]] = {
     (SIDE_PARTNER, "admin"): _PARTNER_AUDITOR
     | _CHECKLISTS
     | _codes("checklist.master")
-    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role"),
+    | _codes("inspection.accept", "inspection.revise", "people.manage", "people.role", "trip.plan"),
     (SIDE_PARTNER, "auditor"): _PARTNER_AUDITOR,
 }
 

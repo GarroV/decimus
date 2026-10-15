@@ -62,7 +62,7 @@ from . import (
     action_plans,
     assets,
     auth,
-    calendar_view,
+    calendar_screen,
     country_page,
     edition,
     grade_explain,
@@ -212,7 +212,7 @@ def create_app(settings: Settings | None = None) -> Flask:
     _register_units(app, conf)
     unit_add.install(app, conf)
     _register_registry(app, conf)
-    _register_calendar(app, conf)
+    calendar_screen.install(app, conf)
     letter_draft.install(app, conf)
     action_plans.install(app, conf)
     users_screen.install(app, conf)
@@ -587,44 +587,6 @@ def _unit_href(item: to_inspect.ToCheck, *, lang: str) -> str:
     if item.unit_id:
         return _url("unit", unit_id=item.unit_id, lang=lang)
     return _url("registry", lang=lang)
-
-
-def _register_calendar(app: Flask, conf: Settings) -> None:
-    """Раздел «Календарь» (D497): сетка месяца с проверками по дням.
-
-    Список «Где нужно проверить» с экрана снят (D497, «пока скрой»): модуль
-    `to_inspect` остался, экран его не читает. Период — тот же выбор «с — по»,
-    по умолчанию текущий месяц; длинный период рисуется первыми месяцами
-    (`calendar_view.MAX_MONTHS`).
-    """
-
-    @app.get(section("calendar").path)
-    def calendar() -> str:
-        язык = _lang(conf)
-        сегодня = date.today()
-        период = registry_period.read(request.args, today=сегодня)
-
-        def отбор(**изменения: str) -> str:
-            параметры = {**период.params(), "lang": язык, **изменения}
-            return _url("calendar", **{к: з for к, з in параметры.items() if з})
-
-        месяцы = calendar_view.months_between(период.start, период.end, сегодня)
-        конец = calendar_view.month_end(месяцы[-1])
-        строки = data.load_dated(reach=auth.current_reach(), date_from=месяцы[0], date_to=конец)
-        return render_template(
-            "calendar/index.html",
-            months=tuple(calendar_view.month_grid(м, строки, сегодня) for м in месяцы),
-            total=sum(1 for r in строки if месяцы[0] <= r.inspection_date <= конец),
-            card_href=lambda row: _url("registry", inspection=row.id, lang=язык),
-            # «Ещё N» — тот же день на «Проверках»: там список без предела клетки.
-            day_href=lambda d: _url("registry", lang=язык, **{"from": d, "to": d}),
-            period=период,
-            period_title=registry_view.period_title(период, язык),
-            period_prev=registry_view.period_link(период, -1, отбор),
-            period_next=registry_view.period_link(период, 1, отбор),
-            period_quick=registry_view.period_quick(период, сегодня, язык, отбор),
-            period_hidden={"lang": язык},
-        )
 
 
 def _register_registry(app: Flask, conf: Settings) -> None:
