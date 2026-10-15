@@ -21,8 +21,10 @@ from mcp_checklist_harness import build_methodology
 from src.mcp.catalogue import KIND_CHECKLIST, KIND_CHECKLIST_SOURCE, TOOLS
 from src.mcp.checklist import Store, current_version, read_journal
 from src.mcp.checklist_layout import read_meta
+from src.mcp.checklist_tools import uncovered_phrases
 from src.mcp.checklists import create
 from src.mcp.config import MIN_TOKEN_LENGTH, Settings
+from src.mcp.errors import ToolError
 from src.mcp.rpc import ETALON_READONLY_FOR_PARTNER, ROLE_CLOSED, handle
 from src.mcp.server import _checklist_for, _checklist_source_for
 
@@ -268,11 +270,12 @@ def test_накопитель_слов_аудиторов_партнёру_не_
     настройки: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Накопитель непокрытых слов общий на все пространства (разделения в нём нет): по
-    ревью безопасности он не открывается партнёру ни ролью, ни списком `.env`."""
-    monkeypatch.setattr(
-        "src.mcp.uncovered.read_uncovered",
-        lambda: [],
-    )
+    ревью безопасности он не открывается партнёру ни ролью, ни списком `.env` (#881).
+
+    Два замка проверяются порознь. Через `handle` отказывает матрица (`phrases.raw`) —
+    и с ролью, и без неё, поэтому второй замок в самом инструменте за ней не виден:
+    его зовём напрямую, как позвал бы `handle`, если бы матрица пропустила."""
+    monkeypatch.setattr("src.mcp.uncovered.read_uncovered", lambda: [])
     адрес = {"read_all_called": False}
 
     def _не_читать(**_: Any) -> dict[str, Any]:
@@ -281,23 +284,11 @@ def test_накопитель_слов_аудиторов_партнёру_не_
 
     monkeypatch.setattr("src.mcp.uncovered.read_all", _не_читать)
     по_роли = _вызов("uncovered_phrases", {"checklist": "own"}, настройки, role="admin")
-    # Токен без роли, партнёр назван в списке `.env`: матрицы нет, держит второй замок.
-    список = replace(настройки, checklist_tenants=("HQ", ПАРТНЁР))
-    ответ = handle(
-        {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "tools/call",
-            "params": {"name": "uncovered_phrases", "arguments": {"checklist": "own"}},
-        },
-        tenant=ПАРТНЁР,
-        checklist=_checklist_for(список, ПАРТНЁР),
-        source=_checklist_source_for(список, ПАРТНЁР),
-        role="admin",
-    )
-    assert ответ is not None
 
     assert _отказ(по_роли)
-    assert _отказ(ответ)
-    assert "чужого пространства" not in _текст(по_роли) + _текст(ответ)
+    assert "чужого пространства" not in _текст(по_роли)
+    with pytest.raises(ToolError, match="только УК"):
+        uncovered_phrases(
+            tenant=ПАРТНЁР, store=Store(root=настройки.checklist_store, live=настройки.data_dir)
+        )
     assert адрес["read_all_called"] is False

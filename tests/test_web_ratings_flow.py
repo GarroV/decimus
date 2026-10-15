@@ -66,6 +66,8 @@ def test_контроль_грузит_партнёр_видит(
         assert "Нарушений не найдено." not in текст
         assert "В зоне риска никого." not in текст
         assert "Недостаточно периодов для оценки: РС, РКО." in текст
+        # Пустой кластер не обёрнут в карточку — «нет данных» стоит на месте секции.
+        assert "rt-viol__cluster" not in текст
         # Дельта к периоду РС подписана его названием, а не ключом `rs:<id>` (P39):
         # догружаем прошлый период РС с оценкой — в первом снимке он пустой.
         прошлый = snapshot(history=[{"score": 90, "status": "1", "period": ПРОШЛЫЙ_РС}], remarks=[])
@@ -82,6 +84,15 @@ def test_контроль_грузит_партнёр_видит(
         период_текст = период.get_data(as_text=True)
         assert "Сентябрь 2 часть 2026" in период_текст.split("rt-cal__title")[1][:80]
         assert "Δ к Сентябрь 1 часть 2026" in период_текст and "Δ к rs:" not in период_текст
+        # Вторая страна застройщика без замечаний РС: её карточка пишет «нет данных»,
+        # а не «нарушений не найдено» — при данных в кластере.
+        ответ = client.post(
+            "/ratings/countries", data={"code": "BY", "developer": "Dev One"}, headers=ORIGIN
+        )
+        assert ответ.status_code == 200
+        две = client.get(f"/ratings?group=developer&value=Dev+One&{СЕНТЯБРЬ_2}")
+        замечания_рс = две.get_data(as_text=True).split("rt-viol__cluster")[1]
+        assert "За период нет данных РС." in замечания_рс
 
     подменить_двери(monkeypatch, tenant="GE", role="admin")
     with собрать(tenant="GE").test_client() as client:
