@@ -317,3 +317,38 @@ def test_у_пиццерии_top_bottom_изменение_к_прошлому_�
     assert новые[0].delta is None
     без_прошлого, _ = top_bottom(ТЕКУЩИЙ, "rs", threshold=85)
     assert без_прошлого[0].delta is None
+
+
+def test_строки_стран_совпадают_с_прямым_расчётом_до_бита() -> None:
+    """Средние считаются один раз на набор (~0,3 с на «Рейтингах»), числа — те же."""
+    import random
+
+    from src.ratings.summary import Fact, delta, group_average, score_lines
+
+    случай = random.Random(14)  # noqa: S311 — данные теста, не криптография
+    страны = ["AA", "BB", "CC"]
+
+    def набор(period: int) -> list[Fact]:
+        return [
+            Fact(
+                unit=f"u{i}",
+                unit_name=f"U{i}",
+                country=страны[i % 3],
+                rating_type=тип,
+                period_id=period,
+                begin_on=date(2026, 9, 1),
+                score=round(случай.uniform(60, 100), 2),
+            )
+            for i in range(40)
+            for тип in ("rs", "rko")
+            for _ in range(случай.randint(1, 3))
+        ]
+
+    сейчас, было = набор(2), набор(1)
+    строки, итог = score_lines(сейчас, было, страны)
+    for строка, группа in [*((с, [с.country]) for с in строки), (итог, страны)]:
+        rs = group_average(сейчас, "rs", группа)
+        rko = group_average(сейчас, "rko", группа)
+        assert (строка.rs, строка.rko) == (rs, rko)
+        assert строка.rs_delta == delta(rs, group_average(было, "rs", группа))
+        assert строка.rko_delta == delta(rko, group_average(было, "rko", группа))

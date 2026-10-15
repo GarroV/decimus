@@ -84,6 +84,18 @@ def retraction_available() -> bool:
 #: (D466), поэтому предел выше предела истории — иначе самые давние, ради
 #: которых очередь и стоит наверху, отрезались бы первыми.
 REVIEW_LIMIT = 1000
+#: Сколько проверок читать на сетку «Календаря» (D497): предел выдачи слоя базы,
+#: до трёх месяцев сети с запасом.
+CALENDAR_LIMIT = 1000
+
+
+def load_dated(*, reach: Reach, date_from: date, date_to: date) -> tuple[InspectionRow, ...]:
+    """Живые проверки охвата с датой обхода в окне — для сетки «Календаря» (D497)."""
+    return tuple(
+        queries.list_inspections(
+            reach=reach, limit=CALENDAR_LIMIT, date_from=date_from, date_to=date_to
+        )
+    )
 
 
 def load_registry(

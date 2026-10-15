@@ -80,3 +80,66 @@
 @media (max-width: 719px) {
   .page--split:has(.slist--registry) .sdrawer__panel { left: 0; }
 }
+
+/* Раскладка D498: блок отбора и колонка стран слева, списки справа. Колонка
+   не прокручивается сама и не липнет: выпадающие списки и календарь периода
+   раскрываются внутри неё и не должны обрезаться. */
+.rg-rail { position: static; max-height: none; overflow: visible; }
+.rg-filters {
+  display: grid; gap: var(--space-3); margin-bottom: var(--space-6); padding: var(--space-5);
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-block);
+}
+.rg-filters .pick { display: block; }
+.rg-filters .ov-chip { display: flex; width: 100%; justify-content: space-between; }
+.rg-filters .pick__menu { position: static; width: 100%; min-width: 0; margin-top: var(--space-2); box-shadow: none; }
+.rg-filters .spill--search { display: flex; width: 100%; min-width: 0; }
+.rg-reset { justify-self: start; }
+.rg-countries { display: grid; gap: var(--space-1); }
+.rg-country-chip { display: none; }
+@media (max-width: 1023px) {
+  .rg-shell .mx-rail { display: grid; }
+  .rg-countries { display: none; }
+  .rg-country-chip { display: block; }
+}
+
+/* ── «Календарь» (D497): сетка месяца, неделя с понедельника ──
+   Клетка дня — номер и до трёх проверок (`calendar_view.DAY_ROWS`), остальное
+   «ещё N» ведёт на «Проверки» за этот день. На телефоне сетка в семь колонок
+   нечитаема — дни идут списком, и только те, где проверки были. */
+.cal { margin-top: var(--space-5); }
+.cal__title { margin: 0 0 var(--space-3); font-size: var(--fs-lead); font-weight: var(--w-semibold); }
+.cal__grid {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--line); border-left: 1px solid var(--line);
+}
+.cal__wd {
+  padding: var(--space-2) var(--space-3); font-size: var(--fs-meta); color: var(--ink-3);
+  border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.cal__day {
+  display: flex; flex-direction: column; gap: var(--space-1); min-height: 104px; min-width: 0;
+  padding: var(--space-2); border-right: 1px solid var(--line); border-bottom: 1px solid var(--line);
+}
+.cal__day.is-out { background: var(--surface-2); }
+.cal__day.is-out .cal__num { color: var(--ink-3); opacity: .5; }
+.cal__num { font-size: var(--fs-meta); color: var(--ink-3); font-family: var(--font-mono); }
+.cal__day.is-today .cal__num {
+  align-self: flex-start; padding: 0 var(--space-2); border-radius: var(--r-pill);
+  background: var(--accent); color: #fff;
+}
+.cal__item {
+  display: flex; gap: var(--space-2); align-items: baseline; min-width: 0;
+  padding: 2px var(--space-2); border-radius: 6px; background: var(--accent-soft);
+  color: var(--ink); font-size: var(--fs-dense); text-decoration: none;
+}
+.cal__item:hover { background: var(--accent-line); }
+.cal__unit { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.cal__grade { font-family: var(--font-mono); font-weight: var(--w-semibold); }
+.cal__more { font-size: var(--fs-meta); color: var(--ink-3); }
+@media (max-width: 719px) {
+  .cal__grid { display: block; border: 0; }
+  .cal__wd, .cal__day.is-out, .cal__day:not(.has-rows) { display: none; }
+  .cal__day {
+    min-height: 0; padding: var(--space-3) 0; border-right: 0; border-bottom: 1px solid var(--line);
+  }
+}

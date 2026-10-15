@@ -62,6 +62,7 @@ from . import (
     action_plans,
     assets,
     auth,
+    calendar_view,
     country_page,
     edition,
     grade_explain,
@@ -81,7 +82,6 @@ from . import (
     security_screen,
     settings_screen,
     swarm_api,
-    to_inspect,
     ui_lang,
     unit_add,
     users_screen,
@@ -378,6 +378,9 @@ class Pick:
     current: str
     current_title: str
     options: tuple[PickOption, ...]
+    #: Размерность отбора кодом (`country`, …) — чтобы экран мог вынести её
+    #: из полосы чипов в свою колонку (D498). Пусто — обычный чип.
+    key: str = ""
 
 
 def _pick(
@@ -388,6 +391,7 @@ def _pick(
     values: tuple[tuple[str, int | None], ...],
     href: Callable[[str], str],
     title: Callable[[str], str] = str,
+    key: str = "",
 ) -> Pick:
     """Собрать чип отбора. Вариант «не сужать» всегда первый.
 
@@ -400,7 +404,9 @@ def _pick(
         for value, count in values
     ]
     выбранное = next((о.title for о in опции[1:] if о.selected), empty_title)
-    return Pick(label=label, current=current, current_title=выбранное, options=tuple(опции))
+    return Pick(
+        label=label, current=current, current_title=выбранное, options=tuple(опции), key=key
+    )
 
 
 def _checklist_names(lang: str) -> dict[str, str]:
@@ -565,46 +571,40 @@ def _register_units(app: Flask, conf: Settings) -> None:
         )
 
 
-def _unit_href(item: to_inspect.ToCheck, *, hq: bool, lang: str) -> str:
-    """Куда ведёт точка из «Где нужно проверить»: карточка в «Стране» (УК) или в «Пиццериях»."""
-    if item.unit_id and item.country and hq:
-        return _url("country", code=item.country, unit=item.unit_id, lang=lang) + (
-            f"#unit-{item.unit_id}"
-        )
-    if item.unit_id:
-        return _url("unit", unit_id=item.unit_id, lang=lang)
-    return _url("registry", lang=lang)
-
-
 def _register_calendar(app: Flask, conf: Settings) -> None:
-    """Раздел «Календарь» (D466): пока в нём одно — «Где нужно проверить».
+    """Раздел «Календарь» (D497): сетка месяца с проверками по дням.
 
-    Блок ушёл с «Проверок» (D418 → D466): он отвечает на вопрос «куда ехать», а
-    не «что проверено». Свой период, по умолчанию текущий месяц; охват и роли —
-    как были у блока на «Проверках».
+    Список «Где нужно проверить» с экрана снят (D497, «пока скрой»): модуль
+    `to_inspect` остался, экран его не читает. Период — тот же выбор «с — по»,
+    по умолчанию текущий месяц; длинный период рисуется первыми месяцами
+    (`calendar_view.MAX_MONTHS`).
     """
 
     @app.get(section("calendar").path)
     def calendar() -> str:
         язык = _lang(conf)
-        период = registry_period.read(request.args, today=date.today())
+        сегодня = date.today()
+        период = registry_period.read(request.args, today=сегодня)
 
         def отбор(**изменения: str) -> str:
             параметры = {**период.params(), "lang": язык, **изменения}
             return _url("calendar", **{к: з for к, з in параметры.items() if з})
 
-        hq = auth.current_tenant() == HQ_TENANT
+        месяцы = calendar_view.months_between(период.start, период.end, сегодня)
+        конец = calendar_view.month_end(месяцы[-1])
+        строки = data.load_dated(reach=auth.current_reach(), date_from=месяцы[0], date_to=конец)
         return render_template(
             "calendar/index.html",
-            to_check=to_inspect.load(
-                reach=auth.current_reach(), date_from=период.start, date_to=период.end, top=None
-            ),
-            unit_href=lambda item: _unit_href(item, hq=hq, lang=язык),
+            months=tuple(calendar_view.month_grid(м, строки, сегодня) for м in месяцы),
+            total=sum(1 for r in строки if месяцы[0] <= r.inspection_date <= конец),
+            card_href=lambda row: _url("registry", inspection=row.id, lang=язык),
+            # «Ещё N» — тот же день на «Проверках»: там список без предела клетки.
+            day_href=lambda d: _url("registry", lang=язык, **{"from": d, "to": d}),
             period=период,
             period_title=registry_view.period_title(период, язык),
             period_prev=registry_view.period_link(период, -1, отбор),
             period_next=registry_view.period_link(период, 1, отбор),
-            period_quick=registry_view.period_quick(период, date.today(), язык, отбор),
+            period_quick=registry_view.period_quick(период, сегодня, язык, отбор),
             period_hidden={"lang": язык},
         )
 
@@ -669,13 +669,16 @@ def _register_registry(app: Flask, conf: Settings) -> None:
             sorted(registry_data.review, key=lambda row: (row.inspection_date, row.pushed_at))
         )
         ждёт_дней = {row.id: max((сегодня - row.inspection_date).days, 0) for row in на_приёмке}
+        чипы = _registry_picks(registry_data.rows, отбор_в, место, отбор, язык)
         return render_template(
             "inspections/list.html",
             registry=registry_data,
             review_rows=на_приёмке,
             review_wait=ждёт_дней,
             rows=строки,
-            picks=_registry_picks(registry_data.rows, отбор_в, место, отбор, язык),
+            # Страна — колонкой слева (D498), остальные размерности — в блоке фильтров.
+            picks=tuple(ч for ч in чипы if ч.key != "country"),
+            country_pick=next((ч for ч in чипы if ч.key == "country"), None),
             grade_tone=view.grade_tone,
             kind_title=_kind_title,
             # Чек-лист в строке называется, только когда их в реестре больше
@@ -1301,6 +1304,7 @@ def _registry_picks(
                 values=страны,
                 href=lambda значение: select(country=значение, city=""),
                 title=lambda код: country_title(код, lang),
+                key="country",
             )
         )
     if города:
