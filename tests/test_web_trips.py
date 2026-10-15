@@ -153,7 +153,7 @@ def test_гость_не_заводит_поездок(
     monkeypatch: pytest.MonkeyPatch, зовы: dict[str, list[Any]]
 ) -> None:
     c = клиент(monkeypatch, tenant="HQ", role="guest")
-    assert "+ Поездка" not in c.get("/calendar").get_data(as_text=True)
+    assert "trip=new" not in c.get("/calendar").get_data(as_text=True)
     assert отправить(c, "/calendar/trips", **ФОРМА).status_code == 403
     assert зовы["create"] == []
 

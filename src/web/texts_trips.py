@@ -7,7 +7,7 @@
 from __future__ import annotations
 
 TRIP_TEXTS: dict[str, dict[str, str]] = {
-    "trip.add": {"ru": "+ Поездка", "en": "+ Trip"},
+    "trip.add": {"ru": "Поездка", "en": "Trip"},
     "trip.new": {"ru": "Новая поездка", "en": "New trip"},
     "trip.title": {"ru": "Поездка", "en": "Trip"},
     "trip.count": {"ru": "поездок: {count}", "en": "trips: {count}"},
