@@ -665,36 +665,6 @@ def _narrowing(city: str, country: str, grade: str) -> dict[str, str | None]:
     }
 
 
-_ZONE_LOSSES_SQL = """
-select
-    zone.key as code,
-    max(zone.value ->> 'name_ru') as name_ru,
-    max(zone.value ->> 'name_en') as name_en,
-    sum((zone.value ->> 'loss')::numeric) as loss,
-    count(distinct i.id) as inspections,
-    count(distinct i.unit_id) as units
-from inspections i
-     join units u on u.id = i.unit_id
-     cross join lateral jsonb_each(i.by_zone) as zone
-where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
-  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and i.status = 'finalized'
-  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
-  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
-  and (%(city)s::text is null or u.city = %(city)s)
-  and (%(country)s::text is null or u.country = %(country)s)
-  and (%(grade)s::text is null or i.grade = %(grade)s)
-  and jsonb_typeof(zone.value) = 'object'
-  and (zone.value ->> 'loss') is not null
-group by zone.key
-order by loss desc, zone.key
-limit %(limit)s
-"""
-
-# Потери по процессам (блокам методики, D507): то же сложение, что по зонам, но
-# из `by_process` — разбивки, которую движок вернул при завершении проверки
-# (0073). Проверка без разбивки (слита до миграции и не долита, историческая)
-# даёт `jsonb_each(NULL)`, то есть ни одной строки: числа нет — в сумму не идёт.
 _PROCESS_LOSSES_SQL = """
 select
     proc.key as code,
@@ -815,50 +785,6 @@ select count(*) from units u
 where u.tenant_code = 'HQ'
   and (%(countries)s::text[] is null or u.country = any(%(countries)s))
 """
-
-
-def zone_losses(
-    *,
-    reach: Reach,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    city: str = "",
-    country: str = "",
-    grade: str = "",
-    limit: int = DEFAULT_LIMIT,
-) -> list[tuple[str, str, str, float, int, int]]:
-    """Потери по зонам: `(код, имя ru, имя en, вычет, проверок, точек)`.
-
-    Имя зоны берётся из того же снимка `by_zone`, а не из нынешней методики:
-    проверка заморожена вместе с формулировками своей версии, и подпись из
-    сегодняшнего справочника подменила бы название, под которым зону смотрели.
-
-    Вычет берётся из `by_zone`, куда его положил движок, и только сложением.
-    Зона, у которой в снимке нет числа вычета, в ответ не попадает: нулём её
-    подменять нельзя — «зона без потерь» и «зона, про которую эта проверка
-    ничего не записала» на экране читаются одинаково, а значат разное.
-    """
-    охват = _require_reach(reach)
-    _require_window(date_from, date_to)
-    with _reading("потери по зонам") as conn, conn.cursor() as cur:
-        cur.execute(
-            _ZONE_LOSSES_SQL,
-            {
-                **охват.params(),
-                "date_from": date_from,
-                "date_to": date_to,
-                "limit": _require_limit(limit),
-                # Пустая строка означает «не сужать» и приходит в запрос как
-                # NULL: условие `%(city)s::text is null or ...` тогда истинно
-                # для всех строк. Пустую строку сравнивать с городом нельзя —
-                # она отсекла бы всё, молча и целиком.
-                **_narrowing(city, country, grade),
-            },
-        )
-        return [
-            (str(code), str(ru or code), str(en or code), float(loss), int(insp), int(units))
-            for code, ru, en, loss, insp, units in cur.fetchall()
-        ]
 
 
 def process_losses(
@@ -1297,67 +1223,6 @@ def unit_last_inspections(
         return [
             (str(name), str(code or ""), last, int(n)) for name, code, last, n in cur.fetchall()
         ]
-
-
-_WORST_ZONES_SQL = """
-select distinct on (i.id)
-    i.id,
-    zone.key as code,
-    zone.value ->> 'name_ru' as name_ru,
-    zone.value ->> 'name_en' as name_en,
-    (zone.value ->> 'loss')::numeric as loss
-from inspections i
-     join units u on u.id = i.unit_id
-     cross join lateral jsonb_each(i.by_zone) as zone
-where (%(tenants)s::text[] is null or i.tenant_code = any(%(tenants)s))
-  and (%(countries)s::text[] is null or u.country = any(%(countries)s))
-  and i.status = 'finalized'
-  and i.inspection_date >= coalesce(%(date_from)s::date, '-infinity'::date)
-  and i.inspection_date <= coalesce(%(date_to)s::date, 'infinity'::date)
-  and (%(city)s::text is null or u.city = %(city)s)
-  and (%(country)s::text is null or u.country = %(country)s)
-  and (%(grade)s::text is null or i.grade = %(grade)s)
-  and jsonb_typeof(zone.value) = 'object'
-  and (zone.value ->> 'loss') is not null
-order by i.id, (zone.value ->> 'loss')::numeric desc, zone.key
-"""
-
-
-def worst_zones(
-    *,
-    reach: Reach,
-    date_from: date | None = None,
-    date_to: date | None = None,
-    city: str = "",
-    country: str = "",
-    grade: str = "",
-) -> dict[str, tuple[str, str, str, float]]:
-    """Самая дорогая зона каждой проверки: `{id: (код, имя ru, имя en, вычет)}`.
-
-    Имя зоны — из снимка самой проверки, а не из нынешней методики: проверка
-    заморожена вместе со своими формулировками, и подпись из сегодняшнего
-    справочника подменила бы название, под которым зону смотрели.
-
-    Зона выбирается по НАИБОЛЬШЕМУ вычету, а не по числу находок: экран
-    отвечает на вопрос «где потеряно больше всего процентов», и три мелких
-    замечания в одной зоне не перевешивают одного дорогого в другой.
-    """
-    охват = _require_reach(reach)
-    _require_window(date_from, date_to)
-    with _reading("слабая зона проверки") as conn, conn.cursor() as cur:
-        cur.execute(
-            _WORST_ZONES_SQL,
-            {
-                **охват.params(),
-                "date_from": date_from,
-                "date_to": date_to,
-                **_narrowing(city, country, grade),
-            },
-        )
-        return {
-            str(inspection_id): (str(code), str(ru or ""), str(en or ""), float(loss))
-            for inspection_id, code, ru, en, loss in cur.fetchall()
-        }
 
 
 _WORST_PROCESSES_SQL = """
