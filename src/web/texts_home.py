@@ -78,9 +78,9 @@ HOME_TEXTS: dict[str, dict[str, str]] = {
         "ru": "Системных нарушений за период нет.",
         "en": "No systemic violations in the period.",
     },
-    "home.zones.none": {
-        "ru": "Потерь по зонам за период нет.",
-        "en": "No zone losses in the period.",
+    "home.processes.none": {
+        "ru": "Потерь по блокам методики за период нет.",
+        "en": "No losses by methodology block in the period.",
     },
     "home.top.title": {"ru": "Топ нарушений", "en": "Top violations"},
     # ── Колонки рейтинга клиента в таблице пиццерий (D399) ──────────────

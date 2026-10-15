@@ -212,6 +212,18 @@ TEXTS: dict[str, dict[str, str]] = {
         "ru": "Сумма потерь по зонам — что лечить системно",
         "en": "Losses summed by zone — what to fix systemically",
     },
+    "overview.processes.title": {
+        "ru": "Где сеть теряет проценты",
+        "en": "Where the network loses points",
+    },
+    "overview.processes.hint": {
+        "ru": "Сумма потерь по блокам методики — кого учить и что править",
+        "en": "Losses summed by methodology block — whom to train and what to fix",
+    },
+    "overview.processes.spread": {
+        "ru": "точек: {units} · проверок: {inspections}",
+        "en": "units: {units} · inspections: {inspections}",
+    },
     "overview.zones.spread": {
         "ru": "точек: {units} · проверок: {inspections}",
         "en": "units: {units} · inspections: {inspections}",

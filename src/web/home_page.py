@@ -64,9 +64,10 @@ log = logging.getLogger(__name__)
 
 
 #: Сколько строк каждого списка влезает в карточку целиком (D471): остальное — «ещё N →».
+#: Нижний ряд карточек выше верхнего (D507): «Топ нарушений» вмещает больше строк.
 ATTENTION_ROWS = 6
-TOP_ROWS = 4
-ZONE_ROWS = 6
+TOP_ROWS = 7
+PROCESS_ROWS = 8
 
 
 def _url(endpoint: str, **params: Any) -> str:
@@ -260,7 +261,7 @@ def render(
         only_country=selection.country,
         attention_rows=ATTENTION_ROWS,
         top_rows=TOP_ROWS,
-        zone_rows=ZONE_ROWS,
+        process_rows=PROCESS_ROWS,
         registry_all=в_реестр(),
         stickers=стикеры,
         board_failed=доска_отказ,
