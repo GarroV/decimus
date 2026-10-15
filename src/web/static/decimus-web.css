@@ -1779,7 +1779,9 @@ a.hbtn[aria-pressed="true"] { background: var(--surface-3); }
 .sidenav__chev { display: inline-flex; margin-left: auto; color: var(--ink-3); }
 .sidenav__chev svg { width: 14px; height: 14px; transform: rotate(-90deg); transition: transform var(--t-state) var(--ease); }
 .sidenav__me[aria-expanded="true"] .sidenav__chev svg { transform: rotate(90deg); }
-@media (max-width: 1099px) { .sidenav__chev { display: none; } }
+/* Свёрнутая панель (<1100px, 56px): имя и стрелка скрыты, и блок-ссылка с `flex: 1`
+   оставался во всю ширину с аватаром у левого края без полей (#477). Центруем. */
+@media (max-width: 1099px) { .sidenav__chev { display: none; } .sidenav__me { justify-content: center; } }
 
 /* Фото из Google вместо инициалов (D468): круг обрезает картинку. */
 .avatar { overflow: hidden; }
