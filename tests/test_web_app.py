@@ -57,7 +57,6 @@ from src.web.texts import t
     inspections=(),
     grades=(),
     average=None,
-    zone_losses=(),
     systemic=(),
     attention=(),
 )

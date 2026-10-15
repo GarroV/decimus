@@ -38,7 +38,6 @@ from src.web.sections import SECTIONS
     inspections=(),
     grades=(),
     average=None,
-    zone_losses=(),
     systemic=(),
     attention=(),
 )

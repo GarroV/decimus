@@ -1,4 +1,4 @@
-"""Экран «Страна» у партнёра (D508): тот же экран пиццерии, но строго в пределах его стран.
+"""Экран «Пиццерии» у партнёра (D508): тот же экран пиццерии, но строго в пределах его стран.
 
 Граница доступа — ядро: партнёр читает только страны своего пространства
 (`space_countries`), чужой код страны в адресе отвечает тем же 404, что и
@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterator
 from dataclasses import replace
 from datetime import date
@@ -26,6 +27,11 @@ from src.web import overview as ov
 ПАРТНЁР = "GE"
 
 
+def without(тело: bytes, адрес: bytes, вырезать: re.Pattern[bytes]) -> bytes:
+    """Тело ответа без собственного адреса и без навигации."""
+    return вырезать.sub(b"", тело.replace(адрес, b""))
+
+
 def _охват(*страны: str) -> Callable[[str], Reach]:
     return lambda tenant: Reach(tenant=tenant, tenants=None, countries=страны)
 
@@ -41,8 +47,8 @@ def _вид(code: str = "GE") -> cn.CountryView:
         grade="B",
         pct=90.0,
         delta=None,
-        worst_zone_ru="",
-        worst_zone_en="",
+        worst_process_ru="",
+        worst_process_en="",
         critical=0,
     )
     вид = replace(
@@ -175,7 +181,12 @@ def test_чужая_страна_отвечает_как_несуществую�
     нет = партнёр.get("/nothing-here-at-all")
     ответ = партнёр.get("/country/RS")
     assert ответ.status_code == 404
-    assert ответ.data.replace(b"/country/RS", b"") == нет.data.replace(b"/nothing-here-at-all", b"")
+    # Меню подсвечивает раздел по адресу (D512: «Пиццерии» теперь и у партнёра) —
+    # это про путь, а не про существование страны, поэтому навигацию не сверяем.
+    без_меню = re.compile(rb"<nav.*?</nav>", re.DOTALL)
+    assert without(ответ.data, b"/country/RS", без_меню) == without(
+        нет.data, b"/nothing-here-at-all", без_меню
+    )
 
 
 def test_вход_без_страны_ведёт_в_единственную_страну_партнёра(партнёр: FlaskClient) -> None:

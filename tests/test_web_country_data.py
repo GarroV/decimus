@@ -43,7 +43,7 @@ def test_мусорный_код_не_показывает_всю_сеть(monke
     monkeypatch.setattr(cn.overview, "load", lambda **_: снимок())
     вид = cn.load(reach=own_reach("HQ"), limit=10, code="", selection=ov.Selection(), unit_id="u-1")
     данные = вид.snapshot
-    assert (данные.inspections, данные.points, данные.systemic, данные.zone_losses) == (
+    assert (данные.inspections, данные.points, данные.systemic, данные.process_losses) == (
         (),
         (),
         (),
