@@ -1014,7 +1014,11 @@
     if (W.tg && W.supports("6.2")) W.tg.disableClosingConfirmation();
   }
 
-  function onBack() { close(false); }
+  /** «Назад» при открытом видоискателе закрывает его, а не форму. */
+  function onBack() {
+    if (W.photo && W.photo.closeCamera()) return;
+    close(false);
+  }
 
   /**
    * Открыть форму.
