@@ -11,6 +11,9 @@ Tailscale Funnel — около 0,3 с на запрос (замер 24.09.2026)
 на год без перепроверки: поменяли CSS — поменялся адрес, старая копия просто
 больше не запрашивается.
 
+К такому ответу добавляется `immutable` (#698). Край Cloudflare кеширует его сам: Worker
+`front/` отдаёт статику отдельной точкой входа с включённым кэшем (`docs/08-deploy.md`, §8.9).
+
 Шрифты адресуются из CSS относительным путём, без отпечатка. Им дан кеш на
 неделю: файлы шрифтов меняются раз в смену дизайн-системы, а неделя устаревшего
 начертания — мелочь по сравнению с перепроверкой на каждом клике.
@@ -23,7 +26,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, request
+from flask import Flask, Response, request
 
 VERSION_ARG = "v"
 IMMUTABLE_MAX_AGE = 365 * 24 * 3600
@@ -74,3 +77,16 @@ def install(app: Flask) -> None:
         return None
 
     app.get_send_file_max_age = _max_age  # type: ignore[method-assign]
+
+    @app.after_request
+    def _mark_immutable(response: Response) -> Response:
+        # Файл по адресу с верным отпечатком не меняется никогда: `immutable`
+        # снимает перепроверку при обновлении страницы (#698). Шрифты и адреса
+        # без отпечатка метки не получают — они могут смениться под тем же адресом.
+        if (
+            request.endpoint == "static"
+            and response.status_code == 200
+            and f"max-age={IMMUTABLE_MAX_AGE}" in response.headers.get("Cache-Control", "")
+        ):
+            response.headers["Cache-Control"] += ", immutable"
+        return response

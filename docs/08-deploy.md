@@ -1292,7 +1292,23 @@ SNI и Host, по которым Caddy выбирает сайт, — его DNS
 | Туннель | `vps-edge` | `<TUNNEL_ID>` |
 | VPC-сервис | `vps-edge-caddy` (хост `caddy`, проверка сертификата выключена — участок туннель→Caddy внутри docker-сети) | `<VPC_SERVICE_ID>` |
 
-Код — `front/src/index.js`. Настройки — шаблоны `front/wrangler.admin.template.jsonc`
+**Кэш статики на краю (#698).** Запрос до сервера идёт привязкой `EDGE` (туннель), а такой
+подзапрос мимо кэша Cloudflare: статика с `Cache-Control: public, max-age=31536000, immutable`
+всё равно доходила до VPS (TTFB CSS 210–440 мс, `cf-cache-status` в ответе не было). Теперь
+`GET /static/*` админки уходит в отдельную точку входа Worker'а `StaticCache` (`front/src/index.js`,
+маршрут — `front/src/proxy.js`) с включённым кэшем Worker'а (Workers Caching; работает и на
+`workers.dev`, решает по `Cache-Control` ответа; нужен Wrangler 4.107.0+). Запрос уходит туда
+без Cookie и Authorization; страницы под логином идут прежним путём и в кэш не попадают
+(у `default` кэш выключен). Включается переменной `STATIC_CACHE=1` в шаблоне админки; у `mcp` и
+стенда её нет. Сервер отдаёт `immutable` только на адрес с верным отпечатком (`src/web/assets.py`),
+поэтому чужой `?v=` не кэшируется. Проверка после выкладки Worker'а (`./deploy.sh admin`):
+дважды `curl -sI 'https://decimus.vasiliy-garro.workers.dev/static/decimus-web.css?v=<отпечаток из страницы>'`;
+на втором ответе ждём падение TTFB (`-w '%{time_starttransfer}'`) и ответ без захода на VPS
+(в логе Caddy нет второго запроса). Заголовка `cf-cache-status` Workers Caching может не
+показывать: смотреть по времени ответа и по логу Caddy.
+
+Код — `front/src/index.js` и `front/src/proxy.js`; проверка маршрутизации — `node --test
+front/test/proxy.test.mjs` (входит в `tests/test_front_worker.py`). Настройки — шаблоны `front/wrangler.admin.template.jsonc`
 и `front/wrangler.mcp.template.jsonc`: адреса инфраструктуры в репозиторий не
 кладутся (D431, `tests/test_no_infra_identifiers.py`), в шаблонах стоят заглушки
 `<VPC_SERVICE_ID>`, `<ORIGIN_HOST>`, `<MCP_ORIGIN_HOST>`. Wrangler подстановку

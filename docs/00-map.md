@@ -834,7 +834,8 @@ Telegram, ни HTTP, ни SQL.
 | Каталог | Файлов | Какие |
 |---|---|---|
 | `front/` | 5 | .deploy.env.example, deploy.sh, wrangler.admin.template.jsonc, wrangler.mcp.template.jsonc, wrangler.stand.template.jsonc |
-| `front/src/` | 1 | index.js |
+| `front/src/` | 2 | index.js, proxy.js |
+| `front/test/` | 1 | proxy.test.mjs |
 <!-- map:end -->
 
 ## По задаче → куда идти
