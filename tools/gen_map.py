@@ -23,6 +23,7 @@ import ast
 import inspect
 import os
 import re
+import subprocess
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Iterable
@@ -130,11 +131,24 @@ def table(header: tuple[str, ...], rows: Iterable[tuple[str, ...]]) -> list[str]
     return out
 
 
+def _tracked(base: Path) -> list[Path]:
+    """Файлы под `base`, которые знает git: карта описывает репозиторий, а не рабочее
+    дерево. Иначе неотслеживаемые остатки (`front/wrangler.admin.temp` после выкладки)
+    попадали в таблицу у того, кто запустил `make map`, и main краснел у всех."""
+    out = subprocess.run(  # noqa: S603 — свой git и свой путь, ввода извне нет
+        ["git", "ls-files", "-z", "--", base.relative_to(ROOT).as_posix()],  # noqa: S607
+        cwd=ROOT,
+        capture_output=True,
+        check=True,
+    ).stdout.decode()
+    return sorted(ROOT / name for name in out.split("\0") if name)
+
+
 def map_files() -> list[Path]:
     """Все файлы, которые карта обязана назвать: код в src/, tools/, scripts/, engine/."""
     found: list[Path] = []
     for top in MAP_ROOTS:
-        for path in sorted((ROOT / top).rglob("*")):
+        for path in _tracked(ROOT / top):
             if path.suffix not in MAP_SUFFIXES or path.name == "__init__.py":
                 continue
             if "__pycache__" in path.parts or ".venv" in path.parts:
@@ -174,7 +188,7 @@ def gen_files(args: list[str]) -> list[str]:
 def gen_tree(args: list[str]) -> list[str]:
     base = ROOT / args[0]
     groups: dict[str, list[str]] = defaultdict(list)
-    for path in sorted(base.rglob("*")):
+    for path in _tracked(base):
         if path.is_file():
             groups[path.parent.relative_to(base).as_posix()].append(path.name)
     rows = []
