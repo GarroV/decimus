@@ -1,8 +1,8 @@
-"""Сборка экрана «Страна» (D467): шапка, сегменты «Сводка» и «Пиццерии», панель пиццерии.
+"""Сборка экрана «Страна» (D467, D504): слева девелопер, страна и пиццерии, справа блоки.
 
-Раньше экран был длинной стеной блоков одной страницы. Теперь у блока своя
-рамка и заголовок, а длинное делится на сегменты — переключатель вверху
-рабочей зоны. Состояние живёт в адресе: `?seg=units`, период `from` / `to`,
+Слева выпадающие списки девелопера и страны и под ними пиццерии выбранной
+страны (D504); справа — блоки страны, у каждого своя рамка и заголовок.
+Состояние живёт в адресе: период `from` / `to`,
 `unit=<ключ>` (панель пиццерии справа), `dev=<девелопер>` (отбор стран) — ссылку
 на открытое отправляют коллеге, и он видит ровно это; без скриптов всё — ссылки.
 
@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -47,9 +48,6 @@ from .texts import t
 from .unit_add import can_add_here
 
 log = logging.getLogger(__name__)
-
-#: Сегменты рабочей зоны: код в адресе → ключ подписи. Первый — по умолчанию.
-SEGMENTS = ("summary", "units")
 
 #: Сколько названий партнёров перечислять в шапке; остальные — числом.
 PARTNERS_SHOWN = 2
@@ -112,15 +110,12 @@ def render(
             return render_template("country/index.html", view=None, choices=страны)
         code, picking = в_колонке[0][0], True
     code = country_data.normalize_code(code) if code is not None else None
-    seg = request.args.get("seg", "")
-    seg = seg if seg in SEGMENTS else SEGMENTS[0]
     period = registry_period.read(request.args, today=today)
     before = registry_period.shift(period, -1)
 
     def select(**changes: str) -> str:
         """Адрес этого же экрана с изменённым срезом; пустое и умолчания выпадают."""
         params = {
-            "seg": seg if seg != SEGMENTS[0] and not combined else "",
             **period.params(),
             "dev": dev,
             "unit": request.args.get("unit", "").strip()[:80] if not combined else "",
@@ -132,19 +127,30 @@ def render(
         return _url("country", code=code or "-", **params)
 
     def to_country(target: str) -> str:
-        """Строка колонки: та же вкладка и период, но без раскрытой пиццерии."""
+        """Выбор страны: тот же период и девелопер, но без раскрытой пиццерии."""
         keep = {
-            "seg": seg if seg != SEGMENTS[0] else "",
             **period.params(),
             "dev": dev,
             "lang": lang,
         }
         return _url("country", code=target, **keep)
 
-    rail = tuple(
-        {"code": c, "units": n, "href": to_country(c), "on": not combined and c == code}
-        for c, n in в_колонке
+    # Страна — выпадающим списком под девелопером (D504). «Все страны» —
+    # сводка девелопера, поэтому этот вариант есть только при выбранном девелопере.
+    country_pick = pick(
+        label=t("country.pick.label", lang),
+        empty_title=t("country.pick.all", lang),
+        current="" if combined else (code or ""),
+        values=tuple((c, n) for c, n in в_колонке),
+        href=lambda значение: (
+            to_country(значение)
+            if значение
+            else _url("country_index", dev=dev, lang=lang, **period.params())
+        ),
+        title=lambda c: country_title(c, lang) or c,
     )
+    if not dev:
+        country_pick = replace(country_pick, options=country_pick.options[1:])
     dev_pick = (
         pick(
             label=t("country.dev.label", lang),
@@ -163,7 +169,7 @@ def render(
     )
     common: dict[str, Any] = {
         "choices": страны,
-        "rail": rail,
+        "country_pick": country_pick,
         "dev": dev,
         "dev_pick": dev_pick,
         "devs_failed": devs_failed,
@@ -173,14 +179,15 @@ def render(
         "period_prev": registry_view.period_link(period, -1, select),
         "period_next": registry_view.period_link(period, 1, select),
         "period_quick": registry_view.period_quick(period, today, lang, select),
-        "period_hidden": {
-            k: v
-            for k, v in (("seg", seg if seg != SEGMENTS[0] else ""), ("dev", dev), ("lang", lang))
-            if v
-        },
+        "period_hidden": {k: v for k, v in (("dev", dev), ("lang", lang)) if v},
         "select_url": select,
         "all_time_url": select(**{"from": "", "to": "", "period": registry_period.ALL}),
-        "rail_back_url": _url("country_index", dev=dev, lang=lang, pick="1"),
+        # «‹ Страны» на телефоне: колонка той же страны — с её пиццериями (D504).
+        "rail_back_url": (
+            _url("country_index", dev=dev, lang=lang, pick="1")
+            if combined
+            else _url("country", code=code or "-", dev=dev, lang=lang, pick="1", **period.params())
+        ),
         "item_titles": item_titles,
         "grade_tone": view.grade_tone,
         "level_tone": view.level_tone,
@@ -197,9 +204,7 @@ def render(
     return render_template(
         "country/index.html",
         **common,
-        **_one_country(
-            code or "", dev_of.get(code or "", ""), seg, select, period, before, limit, today, lang
-        ),
+        **_one_country(code or "", dev_of.get(code or "", ""), period, before, limit, today, lang),
     )
 
 
@@ -240,16 +245,12 @@ def _combined(
             for v in views
         ),
         "truncated": any(s.truncated for s in snapshots),
-        "segs": (),
-        "seg": SEGMENTS[0],
     }
 
 
 def _one_country(
     code: str,
     developer: str,
-    seg: str,
-    select: Callable[..., str],
     period: registry_period.Period,
     before: registry_period.Period | None,
     limit: int,
@@ -278,17 +279,6 @@ def _one_country(
         история = country_units.history(reach=reach, name=открытая.name, fallback=вид.history)
     plans = _country_plans(вид.code)
     rx = prescriptions.country_block(вид.code)
-    open_count = sum(1 for r in units.rows if not r.is_closed)
-    segs = tuple(
-        {
-            "key": k,
-            "title": t(f"country.seg.{k}", lang),
-            "href": select(seg="" if k == SEGMENTS[0] else k, unit=""),
-            "on": k == seg,
-            "count": open_count if k == "units" and open_count else None,
-        }
-        for k in SEGMENTS
-    )
     return {
         "view": вид,
         "data": data,
@@ -301,8 +291,6 @@ def _one_country(
         "developer": developer,
         "open_row": открытая,
         "history": история,
-        "segs": segs,
-        "seg": seg,
         "can_add_units": can_add_here(вид.code),
         "plans_count": len(plans["plans"]) if plans["plans_known"] else None,
         "rx_count": len(rx["rx_rows"]) if rx["rx_known"] else None,
